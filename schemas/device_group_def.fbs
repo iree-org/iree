@@ -1,0 +1,9 @@
+namespace iree;
+
+// Specifies two or more devices that must have certain sharing properties.
+// This is used by the runtime to, for example, ensure that devices which are
+// selected can reference each other's memory, have certain performance
+// characteristics, etc.
+table DeviceGroupDef {
+  // TODO(benvanik): define device groups.
+}
