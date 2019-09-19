@@ -1,0 +1,19 @@
+# Python
+*.pyc
+
+# Visual Studio files
+.vs/
+*.sdf
+*.opensdf
+*.VC.opendb
+*.suo
+*.user
+
+# macOS files
+.DS_Store
+
+# CMake artifacts
+build/
+
+# Bazel artifacts
+bazel-*/
