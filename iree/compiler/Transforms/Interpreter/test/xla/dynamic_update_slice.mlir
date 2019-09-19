@@ -1,139 +1,111 @@
-// RUN: iree-opt --lower-xla-to-iree-interpreter --mlir-print-op-generic %s --split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt --lower-xla-to-iree-interpreter %s --split-input-file | FileCheck %s --dump-input=fail
 
 // -----
 
-// CHECK-LABEL: func @dynamic_update_slice.1D() -> tensor<4xi32> {
-func @dynamic_update_slice.1D() -> tensor<4xi32> {
-  // CHECK-DAG: [[C:%[a-z_0-9]+]] = "std.constant"() {value = dense<5> : tensor<1xi32>} : () -> tensor<1xi32>
-  %cst = "std.constant"() {value = dense<5> : tensor<1xi32>} : () -> tensor<1xi32>
+// CHECK-LABEL: func @dynamic_update_slice.1D
+// CHECK-SAME: [[OPERAND:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[UPDATE:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[INDICES:%[a-zA-Z0-9]+]]
+func @dynamic_update_slice.1D(%operand : tensor<4xi32>, %update : tensor<1xi32>, %indices : tensor<i32>) -> tensor<4xi32> {
+  // CHECK-DAG: [[OPERAND_MEMREF:%.+]] = iree.tensor_to_memref([[OPERAND]]
+  // CHECK-DAG: [[UPDATE_MEMREF:%.+]] = iree.tensor_to_memref([[UPDATE]]
+  // CHECK-DAG: [[INDICES_MEMREF:%.+]] = iree.tensor_to_memref([[INDICES]]
+  // CHECK-DAG: [[LENGTHS:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_SHAPE:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_RESHAPED:%.+]] = "iree_hl_interp.reshape"([[INDICES_MEMREF]], [[INDICES_SHAPE]])
+  // CHECK-DAG: [[INDICES_CONCAT:%.+]] = "iree_hl_interp.concat"([[INDICES_RESHAPED]]) {dimension = 0 : i32}
+  // CHECK-DAG: [[SRC_INDICES:%.+]] = iree.constant dense<0> : tensor<1xi64>
+  // CHECK-DAG: [[DST:%.+]] = "iree_hl_interp.clone"([[OPERAND_MEMREF]])
+  // CHECK-NEXT: "iree_hl_interp.copy"([[UPDATE_MEMREF]], [[SRC_INDICES]], [[DST]], [[INDICES_CONCAT]], [[LENGTHS]])
+  %0 = "xla_hlo.dynamic-update-slice"(%operand, %update, %indices) : (tensor<4xi32>, tensor<1xi32>, tensor<i32>) -> tensor<4xi32>
 
-  // CHECK-DAG: [[C0:%[a-z_0-9]+]] = "std.constant"() {value = dense<[1, 2, 3, 4]> : tensor<4xi32>} : () -> tensor<4xi32>
-  %cst_0 = "std.constant"() {value = dense<[1, 2, 3, 4]> : tensor<4xi32>} : () -> tensor<4xi32>
-
-  // CHECK-DAG: [[C1:%[a-z_0-9]+]] = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-  %cst_1 = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-
-  // CHECK-DAG: [[R0:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C0]]) : (tensor<4xi32>) -> memref<4xi32>
-  // CHECK-DAG: [[R1:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C]]) : (tensor<1xi32>) -> memref<1xi32>
-  // CHECK-DAG: [[R2:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C1]]) : (tensor<i32>) -> memref<i32>
-  // CHECK-DAG: [[R3:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R4:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R5:%[a-z_0-9]+]] = "iree_hl_interp.reshape"([[R2]], [[R4]]) : (memref<i32>, memref<1xi64>) -> memref<1xi32>
-  // CHECK-DAG: [[R6:%[a-z_0-9]+]] = "iree_hl_interp.concat"([[R5]]) {dimension = 0 : i32} : (memref<1xi32>) -> memref<1xi32>
-  // CHECK-DAG: [[R7:%[a-z_0-9]+]] = "iree.constant"() {value = dense<0> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R8:%[a-z_0-9]+]] = "iree_hl_interp.clone"([[R0]]) : (memref<4xi32>) -> memref<4xi32>
-  // CHECK-NEXT: "iree_hl_interp.copy"([[R1]], [[R7]], [[R8]], [[R6]], [[R3]]) : (memref<1xi32>, memref<1xi64>, memref<4xi32>, memref<1xi32>, memref<1xi64>) -> ()
-  %0 = "xla_hlo.dynamic-update-slice"(%cst_0, %cst, %cst_1) : (tensor<4xi32>, tensor<1xi32>, tensor<i32>) -> tensor<4xi32>
-
-  // CHECK-NEXT: [[R9:%[a-z_0-9]+]] = "iree.memref_to_tensor"([[R8]]) : (memref<4xi32>) -> tensor<4xi32>
-  // CHECK-NEXT: "std.return"([[R9]]) : (tensor<4xi32>) -> ()
-  "std.return"(%0) : (tensor<4xi32>) -> ()
+  // CHECK-NEXT: [[RES:%.+]] = iree.memref_to_tensor([[DST]]
+  // CHECK-NEXT: return [[RES]]
+  return %0 : tensor<4xi32>
 }
 
 // -----
 
-// CHECK-LABEL: func @dynamic_update_slice.2D() -> tensor<2x4xi32> {
-func @dynamic_update_slice.2D() -> tensor<2x4xi32> {
-  // CHECK-DAG: [[C:%[a-z_0-9]+]] = "std.constant"() {value = dense<12> : tensor<1x1xi32>} : () -> tensor<1x1xi32>
-  %cst = "std.constant"() {value = dense<12> : tensor<1x1xi32>} : () -> tensor<1x1xi32>
+// CHECK-LABEL: func @dynamic_update_slice.2D
+// CHECK-SAME: [[OPERAND:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[UPDATE:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[INDICES_0:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[INDICES_1:%[a-zA-Z0-9]+]]
+func @dynamic_update_slice.2D(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, %indices_0 : tensor<i32>, %indices_1 : tensor<i32>) -> tensor<2x4xi32> {
+  // CHECK-DAG: [[OPERAND_MEMREF:%.+]] = iree.tensor_to_memref([[OPERAND]]
+  // CHECK-DAG: [[UPDATE_MEMREF:%.+]] = iree.tensor_to_memref([[UPDATE]]
+  // CHECK-DAG: [[INDICES_0_MEMREF:%.+]] = iree.tensor_to_memref([[INDICES_0]]
+  // CHECK-DAG: [[INDICES_1_MEMREF:%.+]] = iree.tensor_to_memref([[INDICES_1]]
+  // CHECK-DAG: [[LENGTHS:%.+]] = iree.constant dense<1> : tensor<2xi64>
+  // CHECK-DAG: [[INDICES_0_SHAPE:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_0_RESHAPED:%.+]] = "iree_hl_interp.reshape"([[INDICES_0_MEMREF]], [[INDICES_0_SHAPE]])
+  // CHECK-DAG: [[INDICES_1_SHAPE:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_1_RESHAPED:%.+]] = "iree_hl_interp.reshape"([[INDICES_1_MEMREF]], [[INDICES_1_SHAPE]])
+  // CHECK-DAG: [[INDICES_CONCAT:%.+]] = "iree_hl_interp.concat"([[INDICES_0_RESHAPED]], [[INDICES_1_RESHAPED]]) {dimension = 0 : i32}
+  // CHECK-DAG: [[SRC_INDICES:%.+]] = iree.constant dense<0> : tensor<2xi64>
+  // CHECK-NEXT: [[DST:%.+]] = "iree_hl_interp.clone"([[OPERAND_MEMREF]])
+  // CHECK-NEXT: "iree_hl_interp.copy"([[UPDATE_MEMREF]], [[SRC_INDICES]], [[DST]], [[INDICES_CONCAT]], [[LENGTHS]])
+  %0 = "xla_hlo.dynamic-update-slice"(%operand, %update, %indices_0, %indices_1) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i32>, tensor<i32>) -> tensor<2x4xi32>
 
-  // CHECK-DAG: [[C0:%[a-z_0-9]+]] = "std.constant"() {value = dense<{{\[\[}}1, 2, 3, 4], [5, 6, 7, 8]]> : tensor<2x4xi32>} : () -> tensor<2x4xi32>
-  %cst_0 = "std.constant"() {value = dense<[[1, 2, 3, 4], [5, 6, 7, 8]]> : tensor<2x4xi32>} : () -> tensor<2x4xi32>
-
-  // CHECK-DAG: [[C1:%[a-z_0-9]+]] = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-  %cst_1 = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-
-  // CHECK-DAG: [[C2:%[a-z_0-9]+]] = "std.constant"() {value = dense<2> : tensor<i32>} : () -> tensor<i32>
-  %cst_2 = "std.constant"() {value = dense<2> : tensor<i32>} : () -> tensor<i32>
-
-  // CHECK-DAG: [[R0:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C0]]) : (tensor<2x4xi32>) -> memref<2x4xi32>
-  // CHECK-DAG: [[R1:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C]]) : (tensor<1x1xi32>) -> memref<1x1xi32>
-  // CHECK-DAG: [[R2:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C1]]) : (tensor<i32>) -> memref<i32>
-  // CHECK-DAG: [[R3:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C2]]) : (tensor<i32>) -> memref<i32>
-  // CHECK-DAG: [[R4:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<2xi64>} : () -> memref<2xi64>
-  // CHECK-DAG: [[R5:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R6:%[a-z_0-9]+]] = "iree_hl_interp.reshape"([[R2]], [[R5]]) : (memref<i32>, memref<1xi64>) -> memref<1xi32>
-  // CHECK-DAG: [[R7:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R8:%[a-z_0-9]+]] = "iree_hl_interp.reshape"([[R3]], [[R7]]) : (memref<i32>, memref<1xi64>) -> memref<1xi32>
-  // CHECK-DAG: [[R9:%[a-z_0-9]+]] = "iree_hl_interp.concat"([[R6]], [[R8]]) {dimension = 0 : i32} : (memref<1xi32>, memref<1xi32>) -> memref<2xi32>
-  // CHECK-DAG: [[R10:%[a-z_0-9]+]] = "iree.constant"() {value = dense<0> : tensor<2xi64>} : () -> memref<2xi64>
-  // CHECK-NEXT: [[R11:%[a-z_0-9]+]] = "iree_hl_interp.clone"([[R0]]) : (memref<2x4xi32>) -> memref<2x4xi32>
-  // CHECK-NEXT: "iree_hl_interp.copy"([[R1]], [[R10]], [[R11]], [[R9]], [[R4]]) : (memref<1x1xi32>, memref<2xi64>, memref<2x4xi32>, memref<2xi32>, memref<2xi64>) -> ()
-  %0 = "xla_hlo.dynamic-update-slice"(%cst_0, %cst, %cst_1, %cst_2) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i32>, tensor<i32>) -> tensor<2x4xi32>
-
-  // CHECK-NEXT: [[R12:%[a-z_0-9]+]] = "iree.memref_to_tensor"([[R11]]) : (memref<2x4xi32>) -> tensor<2x4xi32>
-  // CHECK-NEXT: "std.return"([[R12]]) : (tensor<2x4xi32>) -> ()
-  "std.return"(%0) : (tensor<2x4xi32>) -> ()
+  // CHECK-NEXT: [[RES:%.+]] = iree.memref_to_tensor([[DST]]
+  // CHECK-NEXT: return [[RES]]
+  return %0 : tensor<2x4xi32>
 }
 
 // -----
 
-// CHECK-LABEL: func @dynamic_update_slice.1D.notlast() -> tensor<4xi32> {
-func @dynamic_update_slice.1D.notlast() -> tensor<4xi32> {
-  // CHECK-DAG: [[C:%[a-z_0-9]+]] = "std.constant"() {value = dense<5> : tensor<1xi32>} : () -> tensor<1xi32>
-  %cst = "std.constant"() {value = dense<5> : tensor<1xi32>} : () -> tensor<1xi32>
+// CHECK-LABEL: func @dynamic_update_slice.1D.notlast
+// CHECK-SAME: [[OPERAND:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[UPDATE:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[INDICES:%[a-zA-Z0-9]+]]
+func @dynamic_update_slice.1D.notlast(%operand : tensor<4xi32>, %update : tensor<1xi32>, %indices : tensor<i32>) -> tensor<4xi32> {
+  // CHECK-DAG: [[OPERAND_MEMREF:%.+]] = iree.tensor_to_memref([[OPERAND]]
+  // CHECK-DAG: [[UPDATE_MEMREF:%.+]] = iree.tensor_to_memref([[UPDATE]]
+  // CHECK-DAG: [[INDICES_MEMREF:%.+]] = iree.tensor_to_memref([[INDICES]]
+  // CHECK-DAG: [[LENGTHS:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_SHAPE:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_RESHAPED:%.+]] = "iree_hl_interp.reshape"([[INDICES_MEMREF]], [[INDICES_SHAPE]])
+  // CHECK-DAG: [[INDICES_CONCAT:%.+]] = "iree_hl_interp.concat"([[INDICES_RESHAPED]]) {dimension = 0 : i32}
+  // CHECK-DAG: [[SRC_INDICES:%.+]] = iree.constant dense<0> : tensor<1xi64>
+  // CHECK-DAG: [[DST:%.+]] = "iree_hl_interp.clone"([[OPERAND_MEMREF]])
+  // CHECK-NEXT: "iree_hl_interp.copy"([[UPDATE_MEMREF]], [[SRC_INDICES]], [[DST]], [[INDICES_CONCAT]], [[LENGTHS]])
+  %0 = "xla_hlo.dynamic-update-slice"(%operand, %update, %indices) : (tensor<4xi32>, tensor<1xi32>, tensor<i32>) -> tensor<4xi32>
 
-  // CHECK-DAG: [[C0:%[a-z_0-9]+]] = "std.constant"() {value = dense<[1, 2, 3, 4]> : tensor<4xi32>} : () -> tensor<4xi32>
-  %cst_0 = "std.constant"() {value = dense<[1, 2, 3, 4]> : tensor<4xi32>} : () -> tensor<4xi32>
+  // CHECK-NEXT: [[DST_TENSOR:%.+]] = iree.memref_to_tensor([[DST]]
+  // CHECK-NEXT: [[RES:%.+]] = xla_hlo.add [[OPERAND]], [[DST_TENSOR]]
+  %1 = xla_hlo.add %operand, %0 : tensor<4xi32>
 
-  // CHECK-DAG: [[C1:%[a-z_0-9]+]] = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-  %cst_1 = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-
-  // CHECK-DAG: [[R0:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C0]]) : (tensor<4xi32>) -> memref<4xi32>
-  // CHECK-DAG: [[R1:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C]]) : (tensor<1xi32>) -> memref<1xi32>
-  // CHECK-DAG: [[R2:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C1]]) : (tensor<i32>) -> memref<i32>
-  // CHECK-DAG: [[R3:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R4:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R5:%[a-z_0-9]+]] = "iree_hl_interp.reshape"([[R2]], [[R4]]) : (memref<i32>, memref<1xi64>) -> memref<1xi32>
-  // CHECK-DAG: [[R6:%[a-z_0-9]+]] = "iree_hl_interp.concat"([[R5]]) {dimension = 0 : i32} : (memref<1xi32>) -> memref<1xi32>
-  // CHECK-DAG: [[R7:%[a-z_0-9]+]] = "iree.constant"() {value = dense<0> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R8:%[a-z_0-9]+]] = "iree_hl_interp.clone"([[R0]]) : (memref<4xi32>) -> memref<4xi32>
-  // CHECK-NEXT: "iree_hl_interp.copy"([[R1]], [[R7]], [[R8]], [[R6]], [[R3]]) : (memref<1xi32>, memref<1xi64>, memref<4xi32>, memref<1xi32>, memref<1xi64>) -> ()
-  %0 = "xla_hlo.dynamic-update-slice"(%cst_0, %cst, %cst_1) : (tensor<4xi32>, tensor<1xi32>, tensor<i32>) -> tensor<4xi32>
-
-  // CHECK-NEXT: [[R9:%[a-z_0-9]+]] = "iree.memref_to_tensor"([[R8]]) : (memref<4xi32>) -> tensor<4xi32>
-  // CHECK-NEXT: [[R10:%[a-z_0-9]+]] = "xla_hlo.add"([[C0]], [[R9]]) : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
-  %1 = "xla_hlo.add"(%cst_0, %0) : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
-
-  // CHECK-DAG: "std.return"([[R10]]) : (tensor<4xi32>) -> ()
-  "std.return"(%1) : (tensor<4xi32>) -> ()
+  // CHECK-DAG: return [[RES]]
+  return %1 : tensor<4xi32>
 }
 
 // -----
 
-// CHECK-LABEL: func @dynamic_update_slice.2D.notlast() -> tensor<2x4xi32> {
-func @dynamic_update_slice.2D.notlast() -> tensor<2x4xi32> {
-  // CHECK-DAG: [[C:%[a-z_0-9]+]] = "std.constant"() {value = dense<12> : tensor<1x1xi32>} : () -> tensor<1x1xi32>
-  %cst = "std.constant"() {value = dense<12> : tensor<1x1xi32>} : () -> tensor<1x1xi32>
+// CHECK-LABEL: func @dynamic_update_slice.2D.notlast
+// CHECK-SAME: [[OPERAND:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[UPDATE:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[INDICES_0:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[INDICES_1:%[a-zA-Z0-9]+]]
+func @dynamic_update_slice.2D.notlast(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, %indices_0 : tensor<i32>, %indices_1 : tensor<i32>) -> tensor<2x4xi32> {
+  // CHECK-DAG: [[OPERAND_MEMREF:%.+]] = iree.tensor_to_memref([[OPERAND]]
+  // CHECK-DAG: [[UPDATE_MEMREF:%.+]] = iree.tensor_to_memref([[UPDATE]]
+  // CHECK-DAG: [[INDICES_0_MEMREF:%.+]] = iree.tensor_to_memref([[INDICES_0]]
+  // CHECK-DAG: [[INDICES_1_MEMREF:%.+]] = iree.tensor_to_memref([[INDICES_1]]
+  // CHECK-DAG: [[LENGTHS:%.+]] = iree.constant dense<1> : tensor<2xi64>
+  // CHECK-DAG: [[INDICES_0_SHAPE:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_0_RESHAPED:%.+]] = "iree_hl_interp.reshape"([[INDICES_0_MEMREF]], [[INDICES_0_SHAPE]])
+  // CHECK-DAG: [[INDICES_1_SHAPE:%.+]] = iree.constant dense<1> : tensor<1xi64>
+  // CHECK-DAG: [[INDICES_1_RESHAPED:%.+]] = "iree_hl_interp.reshape"([[INDICES_1_MEMREF]], [[INDICES_1_SHAPE]])
+  // CHECK-DAG: [[INDICES_CONCAT:%.+]] = "iree_hl_interp.concat"([[INDICES_0_RESHAPED]], [[INDICES_1_RESHAPED]]) {dimension = 0 : i32}
+  // CHECK-DAG: [[SRC_INDICES:%.+]] = iree.constant dense<0> : tensor<2xi64>
+  // CHECK-DAG: [[DST:%.+]] = "iree_hl_interp.clone"([[OPERAND_MEMREF]])
+  // CHECK-NEXT: "iree_hl_interp.copy"([[UPDATE_MEMREF]], [[SRC_INDICES]], [[DST]], [[INDICES_CONCAT]], [[LENGTHS]])
+  %0 = "xla_hlo.dynamic-update-slice"(%operand, %update, %indices_0, %indices_1) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i32>, tensor<i32>) -> tensor<2x4xi32>
 
-  // CHECK-DAG: [[C0:%[a-z_0-9]+]] = "std.constant"() {value = dense<{{\[\[}}1, 2, 3, 4], [5, 6, 7, 8]]> : tensor<2x4xi32>} : () -> tensor<2x4xi32>
-  %cst_0 = "std.constant"() {value = dense<[[1, 2, 3, 4], [5, 6, 7, 8]]> : tensor<2x4xi32>} : () -> tensor<2x4xi32>
+  // CHECK-NEXT: [[DST_TENSOR:%.+]] = iree.memref_to_tensor([[DST]]
+  // CHECK-NEXT: [[RES:%.+]] = xla_hlo.add [[OPERAND]], [[DST_TENSOR]]
+  %1 = xla_hlo.add %operand, %0 : tensor<2x4xi32>
 
-  // CHECK-DAG: [[C1:%[a-z_0-9]+]] = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-  %cst_1 = "std.constant"() {value = dense<1> : tensor<i32>} : () -> tensor<i32>
-
-  // CHECK-DAG: [[C2:%[a-z_0-9]+]] = "std.constant"() {value = dense<2> : tensor<i32>} : () -> tensor<i32>
-  %cst_2 = "std.constant"() {value = dense<2> : tensor<i32>} : () -> tensor<i32>
-
-  // CHECK-DAG: [[R0:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C0]]) : (tensor<2x4xi32>) -> memref<2x4xi32>
-  // CHECK-DAG: [[R1:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C]]) : (tensor<1x1xi32>) -> memref<1x1xi32>
-  // CHECK-DAG: [[R2:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C1]]) : (tensor<i32>) -> memref<i32>
-  // CHECK-DAG: [[R3:%[a-z_0-9]+]] = "iree.tensor_to_memref"([[C2]]) : (tensor<i32>) -> memref<i32>
-  // CHECK-DAG: [[R4:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<2xi64>} : () -> memref<2xi64>
-  // CHECK-DAG: [[R5:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R6:%[a-z_0-9]+]] = "iree_hl_interp.reshape"([[R2]], [[R5]]) : (memref<i32>, memref<1xi64>) -> memref<1xi32>
-  // CHECK-DAG: [[R7:%[a-z_0-9]+]] = "iree.constant"() {value = dense<1> : tensor<1xi64>} : () -> memref<1xi64>
-  // CHECK-DAG: [[R8:%[a-z_0-9]+]] = "iree_hl_interp.reshape"([[R3]], [[R7]]) : (memref<i32>, memref<1xi64>) -> memref<1xi32>
-  // CHECK-DAG: [[R9:%[a-z_0-9]+]] = "iree_hl_interp.concat"([[R6]], [[R8]]) {dimension = 0 : i32} : (memref<1xi32>, memref<1xi32>) -> memref<2xi32>
-  // CHECK-DAG: [[R10:%[a-z_0-9]+]] = "iree.constant"() {value = dense<0> : tensor<2xi64>} : () -> memref<2xi64>
-  // CHECK-DAG: [[R11:%[a-z_0-9]+]] = "iree_hl_interp.clone"([[R0]]) : (memref<2x4xi32>) -> memref<2x4xi32>
-  // CHECK-NEXT: "iree_hl_interp.copy"([[R1]], [[R10]], [[R11]], [[R9]], [[R4]]) : (memref<1x1xi32>, memref<2xi64>, memref<2x4xi32>, memref<2xi32>, memref<2xi64>) -> ()
-  // CHECK-NEXT: [[R12:%[a-z_0-9]+]] = "iree.memref_to_tensor"([[R11]]) : (memref<2x4xi32>) -> tensor<2x4xi32>
-  %0 = "xla_hlo.dynamic-update-slice"(%cst_0, %cst, %cst_1, %cst_2) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i32>, tensor<i32>) -> tensor<2x4xi32>
-
-  // CHECK-NEXT: [[R13:%[a-z_0-9]+]] = "xla_hlo.add"([[C0]], [[R12]]) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
-  %1 = "xla_hlo.add"(%cst_0, %0) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
-
-  // CHECK-NEXT: "std.return"([[R13]]) : (tensor<2x4xi32>) -> ()
-  "std.return"(%1) : (tensor<2x4xi32>) -> ()
+  // CHECK-NEXT: return [[RES]]
+  return %1 : tensor<2x4xi32>
 }
