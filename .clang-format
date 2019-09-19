@@ -1,0 +1,3 @@
+# All of IREE is in the Google style except for iree/compiler/, which follows
+# the LLVM style (along with MLIR).
+BasedOnStyle: Google
