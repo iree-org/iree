@@ -1,7 +1,7 @@
-include "third_party/iree/schemas/executable_table_def.fbs";
-include "third_party/iree/schemas/device_table_def.fbs";
-include "third_party/iree/schemas/function_table_def.fbs";
-include "third_party/iree/schemas/source_map_def.fbs";
+include "iree/schemas/executable_table_def.fbs";
+include "iree/schemas/device_table_def.fbs";
+include "iree/schemas/function_table_def.fbs";
+include "iree/schemas/source_map_def.fbs";
 
 namespace iree;
 

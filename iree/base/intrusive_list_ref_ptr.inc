@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// IWYU pragma: private, include "third_party/iree/base/intrusive_list.h"
+// IWYU pragma: private, include "iree/base/intrusive_list.h"
 
 #ifndef IREE_BASE_INTRUSIVE_LIST_REF_PTR_H_
 #define IREE_BASE_INTRUSIVE_LIST_REF_PTR_H_

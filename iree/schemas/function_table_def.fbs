@@ -1,4 +1,4 @@
-include "third_party/iree/schemas/function_def.fbs";
+include "iree/schemas/function_def.fbs";
 
 namespace iree;
 

@@ -1,5 +1,5 @@
-include "third_party/iree/schemas/device_def.fbs";
-include "third_party/iree/schemas/device_group_def.fbs";
+include "iree/schemas/device_def.fbs";
+include "iree/schemas/device_group_def.fbs";
 
 namespace iree;
 

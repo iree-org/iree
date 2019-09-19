@@ -33,6 +33,7 @@
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/DialectConversion.h"
 #include "third_party/tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+#include "third_party/tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -559,6 +560,9 @@ class LowerXLAToInterpreterDialectPass
  public:
   void runOnFunction() override {
     OwningRewritePatternList patterns;
+    mlir::xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns,
+                                                        &getContext());
+
     patterns
         .insert<BroadcastInDimOpLowering, ConcatOpLowering, ConstOpLowering,
                 ConvertLowering, CopyOpLowering, DotOpLowering,

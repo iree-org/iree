@@ -1,5 +1,5 @@
-include "third_party/iree/schemas/function_def.fbs";
-include "third_party/iree/schemas/module_def.fbs";
+include "iree/schemas/function_def.fbs";
+include "iree/schemas/module_def.fbs";
 
 namespace iree.vm.debug.rpc;
 

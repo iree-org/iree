@@ -1,5 +1,5 @@
-include "third_party/iree/schemas/bytecode_def.fbs";
-include "third_party/iree/schemas/type_def.fbs";
+include "iree/schemas/bytecode_def.fbs";
+include "iree/schemas/type_def.fbs";
 
 namespace iree;
 
