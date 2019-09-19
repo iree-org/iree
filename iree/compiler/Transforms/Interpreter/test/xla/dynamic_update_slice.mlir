@@ -92,7 +92,7 @@ func @dynamic_update_slice.1D.notlast() -> tensor<4xi32> {
   %0 = "xla_hlo.dynamic-update-slice"(%cst_0, %cst, %cst_1) : (tensor<4xi32>, tensor<1xi32>, tensor<i32>) -> tensor<4xi32>
 
   // CHECK-NEXT: [[R9:%[a-z_0-9]+]] = "iree.memref_to_tensor"([[R8]]) : (memref<4xi32>) -> tensor<4xi32>
-  // CHECK-NEXT: [[R11:%[a-z_0-9]+]] = "xla_hlo.add"([[C0]], [[R9]]) : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
+  // CHECK-NEXT: [[R10:%[a-z_0-9]+]] = "xla_hlo.add"([[C0]], [[R9]]) : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
   %1 = "xla_hlo.add"(%cst_0, %0) : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
 
   // CHECK-DAG: "std.return"([[R10]]) : (tensor<4xi32>) -> ()
