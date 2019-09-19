@@ -31,12 +31,12 @@ DeferredBuffer::~DeferredBuffer() = default;
 
 Status DeferredBuffer::GrowByteLength(device_size_t new_byte_length) {
   if (parent_buffer_) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Attempting to set min allocation size while bound to an "
               "allocation";
   }
   if (byte_length_ != kWholeBuffer && new_byte_length < byte_length_) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Attempting to shrink a buffer to " << new_byte_length
            << " when it has a minimum size of " << byte_length_;
   }
@@ -50,7 +50,7 @@ Status DeferredBuffer::BindAllocation(ref_ptr<Buffer> allocated_buffer,
   // We can only be bound to allocations that are compatible with our specified
   // allocator and usage.
   if (!allocator_->CanUseBuffer(allocated_buffer.get(), usage())) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Allocation is not compatible with the allocator specified for "
               "the deferred buffer";
   }
@@ -62,7 +62,7 @@ Status DeferredBuffer::BindAllocation(ref_ptr<Buffer> allocated_buffer,
 
   // Verify that we have enough bytes for what we've promised.
   if (byte_length < byte_length_) {
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Allocation range is too small; min_allocation_size="
            << byte_length_ << " but the range of " << byte_offset << "-"
            << (byte_offset + byte_length - 1) << " (" << byte_length
@@ -88,7 +88,7 @@ StatusOr<Buffer*> DeferredBuffer::ResolveAllocation() const {
   // you need to use the buffer in non-transient ways then allocate the buffer
   // without the MemoryType::kTransient flag.
   if (!parent_buffer_) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Attempting to use a transient buffer prior to allocation: "
            << DebugString();
   }

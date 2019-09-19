@@ -100,7 +100,7 @@ StatusOr<std::unique_ptr<EmbeddedDebugger>> AttachDebugger(
   IREE_DISABLE_LEAK_CHECKS();
 
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
-    return InternalErrorBuilder(ABSL_LOC)
+    return InternalErrorBuilder(IREE_LOC)
            << "Unable to init SDL: " << SDL_GetError();
   }
 

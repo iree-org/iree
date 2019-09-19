@@ -19,7 +19,7 @@
 #include <string>
 #include <utility>
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/allocator.h"
@@ -108,7 +108,7 @@ StatusOr<ref_ptr<Buffer>> HeapAllocator::Allocate(
   IREE_TRACE_SCOPE0("HeapAllocator::Allocate");
 
   if (!CanAllocate(memory_type, buffer_usage, allocation_size)) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Allocation not supported; memory_type="
            << MemoryTypeString(memory_type)
            << ", buffer_usage=" << BufferUsageString(buffer_usage)
@@ -117,7 +117,7 @@ StatusOr<ref_ptr<Buffer>> HeapAllocator::Allocate(
 
   void* malloced_data = std::calloc(1, allocation_size);
   if (!malloced_data) {
-    return ResourceExhaustedErrorBuilder(ABSL_LOC)
+    return ResourceExhaustedErrorBuilder(IREE_LOC)
            << "Failed to malloc " << allocation_size << " bytes";
   }
 

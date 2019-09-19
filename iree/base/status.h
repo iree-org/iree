@@ -26,4 +26,6 @@
 #include "iree/base/internal/statusor.h"
 #endif  // IREE_CONFIG_GOOGLE_INTERNAL
 
+#include "iree/base/source_location.h"  // IWYU pragma: export
+
 #endif  // IREE_BASE_STATUS_H_

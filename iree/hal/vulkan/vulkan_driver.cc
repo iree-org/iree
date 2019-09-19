@@ -195,7 +195,7 @@ StatusOr<std::shared_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
   // Query available devices.
   ASSIGN_OR_RETURN(auto available_devices, EnumerateAvailableDevices());
   if (available_devices.empty()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "No devices are available";
+    return NotFoundErrorBuilder(IREE_LOC) << "No devices are available";
   }
 
   // Just create the first one we find.

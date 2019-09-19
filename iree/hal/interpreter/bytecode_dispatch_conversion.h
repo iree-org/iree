@@ -35,11 +35,11 @@ struct ApplyConversionOp {
     int src_type_index = src_type.type_index();
     int dst_type_index = dst_type.type_index();
     if (src_type_index < 0 || src_type_index >= kBuiltinTypeCount) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Conversion from invalid source builtin type "
              << src_type_index;
     } else if (dst_type_index < 0 || dst_type_index >= kBuiltinTypeCount) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Conversion to invalid dest builtin type " << dst_type_index;
     }
 
@@ -325,7 +325,7 @@ struct ApplyConversionOp {
           kConversionTable[src_type_index * kBuiltinTypeCount + dst_type_index];
     }
     if (!fn) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Unsupported conversion from " << src_type_index << " to "
              << dst_type_index;
     }
@@ -351,14 +351,14 @@ struct ApplyConversionOp {
   struct Thunk<float, DST> {
     static Status Apply(BufferView* src_local, BufferView* dst_local,
                         ARGS... args) {
-      return UnimplementedErrorBuilder(ABSL_LOC) << "F32 not supported";
+      return UnimplementedErrorBuilder(IREE_LOC) << "F32 not supported";
     }
   };
   template <typename SRC>
   struct Thunk<SRC, float> {
     static Status Apply(BufferView* src_local, BufferView* dst_local,
                         ARGS... args) {
-      return UnimplementedErrorBuilder(ABSL_LOC) << "F32 not supported";
+      return UnimplementedErrorBuilder(IREE_LOC) << "F32 not supported";
     }
   };
 #endif  // !IREE_SUPPORT_F32
@@ -367,14 +367,14 @@ struct ApplyConversionOp {
   struct Thunk<double, DST> {
     static Status Apply(BufferView* src_local, BufferView* dst_local,
                         ARGS... args) {
-      return UnimplementedErrorBuilder(ABSL_LOC) << "F64 not supported";
+      return UnimplementedErrorBuilder(IREE_LOC) << "F64 not supported";
     }
   };
   template <typename SRC>
   struct Thunk<SRC, double> {
     static Status Apply(BufferView* src_local, BufferView* dst_local,
                         ARGS... args) {
-      return UnimplementedErrorBuilder(ABSL_LOC) << "F64 not supported";
+      return UnimplementedErrorBuilder(IREE_LOC) << "F64 not supported";
     }
   };
 #endif  // !IREE_SUPPORT_F64

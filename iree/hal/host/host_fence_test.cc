@@ -63,7 +63,7 @@ TEST(HostFenceTest, StickyFailure) {
   EXPECT_EQ(3u, fence.QueryValue().ValueOrDie());
 
   // Fail now.
-  EXPECT_OK(fence.Fail(UnknownErrorBuilder(ABSL_LOC)));
+  EXPECT_OK(fence.Fail(UnknownErrorBuilder(IREE_LOC)));
   EXPECT_TRUE(IsUnknown(fence.status()));
   EXPECT_EQ(UINT64_MAX, fence.QueryValue().ValueOrDie());
 
@@ -100,7 +100,7 @@ TEST(HostFenceTest, WaitUnsignaled) {
 // Tests waiting on a failed fence (it should return the error on the fence).
 TEST(HostFenceTest, WaitAlreadyFailed) {
   HostFence fence(2u);
-  EXPECT_OK(fence.Fail(UnknownErrorBuilder(ABSL_LOC)));
+  EXPECT_OK(fence.Fail(UnknownErrorBuilder(IREE_LOC)));
   EXPECT_TRUE(IsUnknown(HostFence::WaitForFences(
       {{&fence, 2u}}, /*wait_all=*/true, absl::InfinitePast())));
 }
@@ -137,7 +137,7 @@ TEST(HostFenceTest, FailNotifies) {
   });
   ASSERT_OK(HostFence::WaitForFences({{&b2a, 1u}}, /*wait_all=*/true,
                                      absl::InfiniteFuture()));
-  ASSERT_OK(a2b.Fail(UnknownErrorBuilder(ABSL_LOC)));
+  ASSERT_OK(a2b.Fail(UnknownErrorBuilder(IREE_LOC)));
   thread.join();
   ASSERT_TRUE(got_failure);
 }

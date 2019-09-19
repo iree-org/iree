@@ -52,7 +52,7 @@ Status FiberState::Resume() {
 
 Status FiberState::Step(StepTarget step_target,
                         SuspendCallback suspend_callback) {
-  return UnimplementedErrorBuilder(ABSL_LOC) << "Step not yet implemented";
+  return UnimplementedErrorBuilder(IREE_LOC) << "Step not yet implemented";
 }
 
 namespace {

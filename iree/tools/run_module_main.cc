@@ -19,9 +19,9 @@
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/source_location.h"
 #include "iree/base/file_io.h"
 #include "iree/base/init.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view_string_util.h"
 #include "iree/hal/driver_registry.h"
@@ -148,7 +148,7 @@ Status Run() {
           main_function,
           main_module_ptr->function_table().LookupFunction(exports->Get(0)));
     } else {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "--main_function= must be specified to disambiguate the "
                 "function to run";
     }
@@ -168,7 +168,7 @@ Status Run() {
       absl::StrSplit(absl::GetFlag(FLAGS_output_types),
                      absl::delimiter::AnyOf(", "), absl::SkipWhitespace());
   if (!output_types.empty() && output_types.size() != results.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "--output_types= specified but has " << output_types.size()
            << " types when the function returns " << results.size();
   }
@@ -183,7 +183,7 @@ Status Run() {
                      PrintBufferViewToString(result, print_mode, 1024));
     const auto& buffer = result.buffer;
     if (!buffer) {
-      return InternalErrorBuilder(ABSL_LOC)
+      return InternalErrorBuilder(IREE_LOC)
              << "result[" << i << "] unexpectedly has no buffer";
     }
     LOG(INFO) << "result[" << i << "]: " << buffer->DebugString();

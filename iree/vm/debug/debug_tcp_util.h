@@ -134,12 +134,12 @@ inline StatusOr<size_t> ReadSizePrefix(int fd, bool poll_only) {
                           poll_only ? (MSG_PEEK | MSG_DONTWAIT) : 0);
   if (read_bytes == 0) {
     // Remote side disconnected.
-    return CancelledErrorBuilder(ABSL_LOC) << "Graceful remote close";
+    return CancelledErrorBuilder(IREE_LOC) << "Graceful remote close";
   } else if (read_bytes < 0) {
     if (errno == ECONNRESET) {
-      return CancelledErrorBuilder(ABSL_LOC) << "Ungraceful remote close";
+      return CancelledErrorBuilder(IREE_LOC) << "Ungraceful remote close";
     }
-    return DataLossErrorBuilder(ABSL_LOC)
+    return DataLossErrorBuilder(IREE_LOC)
            << "Failed to read size prefix from socket: (" << errno << ") "
            << ::strerror(errno);
   } else if (read_bytes != sizeof(size_prefix)) {
@@ -147,7 +147,7 @@ inline StatusOr<size_t> ReadSizePrefix(int fd, bool poll_only) {
       // No data available.
       return 0;
     } else {
-      return DataLossErrorBuilder(ABSL_LOC)
+      return DataLossErrorBuilder(IREE_LOC)
              << "Failed to read full size prefix (got " << read_bytes << "b of "
              << sizeof(size_prefix) << "b expected)";
     }
@@ -178,11 +178,11 @@ StatusOr<MessageBuffer<T>> ReadBuffer(int fd) {
   // Read the entire message contents.
   int full_read_bytes = ::recv(fd, buffer.data(), buffer.size(), 0);
   if (full_read_bytes < 0) {
-    return DataLossErrorBuilder(ABSL_LOC)
+    return DataLossErrorBuilder(IREE_LOC)
            << "Failed to read full message contents from socket: (" << errno
            << ") " << ::strerror(errno);
   } else if (full_read_bytes != buffer.size()) {
-    return DataLossErrorBuilder(ABSL_LOC)
+    return DataLossErrorBuilder(IREE_LOC)
            << "Failed to read full message contents (got " << full_read_bytes
            << "b of " << buffer.size() << "b expected)";
   }
@@ -191,7 +191,7 @@ StatusOr<MessageBuffer<T>> ReadBuffer(int fd) {
   // prod), but useful in ensuring our socket code isn't corrupting things.
   ::flatbuffers::Verifier verifier(buffer.data(), buffer.size());
   if (!verifier.VerifyBuffer<T>()) {
-    return DataLossErrorBuilder(ABSL_LOC)
+    return DataLossErrorBuilder(IREE_LOC)
            << "Verification of input buffer of type " << typeid(T).name()
            << " (" << buffer.size() << "b) failed";
   }
@@ -203,7 +203,7 @@ StatusOr<MessageBuffer<T>> ReadBuffer(int fd) {
 // Writes a buffer to the given fd.
 inline Status WriteBuffer(int fd, ::flatbuffers::DetachedBuffer buffer) {
   if (::send(fd, buffer.data(), buffer.size(), 0) < 0) {
-    return UnavailableErrorBuilder(ABSL_LOC)
+    return UnavailableErrorBuilder(IREE_LOC)
            << "Write failed: (" << errno << ") " << ::strerror(errno);
   }
   return OkStatus();

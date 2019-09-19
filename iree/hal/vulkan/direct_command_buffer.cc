@@ -17,7 +17,7 @@
 #include "absl/base/attributes.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -392,7 +392,7 @@ Status DirectCommandBuffer::UpdateAndBindDescriptorSet(
         write_infos.size(), write_infos.data());
   } else {
     // TODO(benvanik): allocate from pool and update.
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Non-push descriptor set path not yet implemented";
   }
 
@@ -446,7 +446,7 @@ Status DirectCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
   // TODO(benvanik): divide workload by caps and issue multiple dispatches.
   // TODO(benvanik): track local workgroup/subgroup size and divide into groups.
   if (dispatch_request.workload_buffer) {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Dynamic dispatches not yet implemented";
   }
   uint32_t group_count_x = dispatch_request.workload[0];

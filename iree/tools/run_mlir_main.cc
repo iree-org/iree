@@ -39,8 +39,8 @@
 #include "absl/strings/str_replace.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
-#include "absl/types/source_location.h"
 #include "iree/base/init.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/compiler/Translation/SequencerModuleTranslation.h"
 #include "iree/hal/buffer_view_string_util.h"
@@ -127,7 +127,7 @@ StatusOr<std::unique_ptr<Module>> PrepareModule(
       mlir::iree_compiler::translateMlirToIreeSequencerModule(mlir_module.get(),
                                                               options);
   if (iree_module_bytes.empty()) {
-    return iree::InternalErrorBuilder(ABSL_LOC)
+    return iree::InternalErrorBuilder(IREE_LOC)
            << "Error translating MLIR to an IREE sequencer module";
   }
 
@@ -169,7 +169,7 @@ Status OutputFunctionResults(const Function& function,
       absl::StrSplit(absl::GetFlag(FLAGS_output_types),
                      absl::delimiter::AnyOf(", "), absl::SkipWhitespace());
   if (!output_types.empty() && output_types.size() != results.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "--output_types= specified but has " << output_types.size()
            << " types when the function returns " << results.size();
   }
@@ -286,7 +286,7 @@ Status RunFile(std::string mlir_filename) {
   std::string error_message;
   auto file = mlir::openInputFile(mlir_filename, &error_message);
   if (!file) {
-    return NotFoundErrorBuilder(ABSL_LOC)
+    return NotFoundErrorBuilder(IREE_LOC)
            << "Unable to open input file " << mlir_filename << ": "
            << error_message;
   }

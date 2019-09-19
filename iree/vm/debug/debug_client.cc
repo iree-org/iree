@@ -14,7 +14,7 @@
 
 #include "iree/vm/debug/debug_client.h"
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -45,7 +45,7 @@ Status DebugClient::StepFiberOver(const RemoteFiberState& fiber_state,
   // int bytecode_offset = 0;
   // return StepFiberToOffset(fiber_state, bytecode_offset,
   // std::move(callback));
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "StepFiberOver not yet implemented";
 }
 
@@ -55,7 +55,7 @@ Status DebugClient::StepFiberOut(const RemoteFiberState& fiber_state,
   // int bytecode_offset = 0;
   // return StepFiberToOffset(fiber_state, bytecode_offset,
   // std::move(callback));
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "StepFiberOut not yet implemented";
 }
 

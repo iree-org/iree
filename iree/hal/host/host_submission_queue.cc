@@ -37,7 +37,7 @@ bool HostBinarySemaphore::is_signaled() const {
 Status HostBinarySemaphore::BeginSignaling() {
   State old_state = state_.load(std::memory_order_acquire);
   if (old_state.signal_pending != 0) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "A signal operation on a binary semaphore is already pending";
   }
   State new_state = old_state;
@@ -51,7 +51,7 @@ Status HostBinarySemaphore::EndSignaling() {
   DCHECK_EQ(old_state.signal_pending, 1)
       << "A signal operation on a binary semaphore was not pending";
   if (old_state.signaled != 0) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "A binary semaphore cannot be signaled multiple times";
   }
   State new_state = old_state;
@@ -64,7 +64,7 @@ Status HostBinarySemaphore::EndSignaling() {
 Status HostBinarySemaphore::BeginWaiting() {
   State old_state = state_.load(std::memory_order_acquire);
   if (old_state.wait_pending != 0) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "A wait operation on a binary semaphore is already pending";
   }
   State new_state = old_state;
@@ -78,7 +78,7 @@ Status HostBinarySemaphore::EndWaiting() {
   DCHECK_EQ(old_state.wait_pending, 1)
       << "A wait operation on a binary semaphore was not pending";
   if (old_state.signaled != 1) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "A binary semaphore cannot be reset multiple times";
   }
   State new_state = old_state;
@@ -113,7 +113,7 @@ Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches,
   IREE_TRACE_SCOPE0("HostSubmissionQueue::Enqueue");
 
   if (has_shutdown_) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Cannot enqueue new submissions; queue is exiting";
   } else if (!permanent_error_.ok()) {
     return permanent_error_;
@@ -130,7 +130,7 @@ Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches,
         RETURN_IF_ERROR(binary_semaphore->BeginWaiting());
       } else {
         // TODO(b/140141417): implement timeline semaphores.
-        return UnimplementedErrorBuilder(ABSL_LOC) << "Timeline semaphores NYI";
+        return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
       }
     }
     for (auto& semaphore_value : batch.signal_semaphores) {
@@ -140,7 +140,7 @@ Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches,
         RETURN_IF_ERROR(binary_semaphore->BeginSignaling());
       } else {
         // TODO(b/140141417): implement timeline semaphores.
-        return UnimplementedErrorBuilder(ABSL_LOC) << "Timeline semaphores NYI";
+        return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
       }
     }
   }
@@ -236,7 +236,7 @@ Status HostSubmissionQueue::ProcessBatch(const PendingBatch& batch,
       RETURN_IF_ERROR(binary_semaphore->EndWaiting());
     } else {
       // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(ABSL_LOC) << "Timeline semaphores NYI";
+      return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
     }
   }
 
@@ -251,7 +251,7 @@ Status HostSubmissionQueue::ProcessBatch(const PendingBatch& batch,
       RETURN_IF_ERROR(binary_semaphore->EndSignaling());
     } else {
       // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(ABSL_LOC) << "Timeline semaphores NYI";
+      return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
     }
   }
 

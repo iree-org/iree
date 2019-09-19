@@ -34,7 +34,7 @@ Status ValidateType(const FunctionTypeDef& type_def) {
 Status FunctionTable::ValidateStructure(
     const FunctionTableDef& function_table_def) {
   if (!function_table_def.functions()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Function table is missing the function listing";
   }
 
@@ -43,11 +43,11 @@ Status FunctionTable::ValidateStructure(
   for (int i = 0; i < functions.size(); ++i) {
     const auto* function = functions[i];
     if (!function) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Function ordinal " << i << " is missing its contents";
     }
     if (!function->type()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Function ordinal " << i << " is missing its type";
     }
     RETURN_IF_ERROR(ValidateType(*function->type()));
@@ -59,7 +59,7 @@ Status FunctionTable::ValidateStructure(
     for (int i = 0; i < imports.size(); ++i) {
       int function_index = imports[i];
       if (!functions[function_index]->name()) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC)
+        return InvalidArgumentErrorBuilder(IREE_LOC)
                << "Import ordinal " << i << " is missing its contents";
       }
     }
@@ -71,7 +71,7 @@ Status FunctionTable::ValidateStructure(
     for (int i = 0; i < exports.size(); ++i) {
       int function_index = exports[i];
       if (!functions[function_index]->name()) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC)
+        return InvalidArgumentErrorBuilder(IREE_LOC)
                << "Export ordinal " << i << " is missing its contents";
       }
     }
@@ -115,7 +115,7 @@ StatusOr<int> FunctionTable::LookupImportOrdinal(
       }
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "Import with the name '" << import_name << "' not found in module";
 }
 
@@ -128,7 +128,7 @@ StatusOr<const ImportFunction*> FunctionTable::LookupImport(
 StatusOr<const ImportFunction*> FunctionTable::LookupImport(
     int import_ordinal) const {
   if (import_ordinal < 0 || import_ordinal >= import_functions_.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Import ordinal " << import_ordinal
            << " is outside the valid range [0, " << import_functions_.size()
            << ")";
@@ -152,7 +152,7 @@ StatusOr<int> FunctionTable::LookupExportFunctionOrdinal(
       }
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "Export with the name '" << export_name << "' not found in module";
 }
 
@@ -166,7 +166,7 @@ StatusOr<const Function> FunctionTable::LookupExport(
 StatusOr<const Function> FunctionTable::LookupExport(int export_ordinal) const {
   if (!function_table_def_.exports() || export_ordinal < 0 ||
       export_ordinal >= function_table_def_.exports()->size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Export ordinal " << export_ordinal
            << " is outside the valid range [0, "
            << function_table_def_.exports()->size() << ")";
@@ -178,7 +178,7 @@ StatusOr<const Function> FunctionTable::LookupExport(int export_ordinal) const {
 
 StatusOr<const Function> FunctionTable::LookupFunction(int ordinal) const {
   if (ordinal < 0 || ordinal >= function_table_def_.functions()->size()) {
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Function ordinal " << ordinal
            << " is outside the valid range [0, "
            << function_table_def_.functions()->size() << ")";
@@ -195,7 +195,7 @@ StatusOr<int> FunctionTable::LookupFunctionOrdinal(
       return i;
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC) << "Function not a member of module";
+  return NotFoundErrorBuilder(IREE_LOC) << "Function not a member of module";
 }
 
 StatusOr<int> FunctionTable::LookupFunctionOrdinalByName(
@@ -206,7 +206,7 @@ StatusOr<int> FunctionTable::LookupFunctionOrdinalByName(
       return i;
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "Function '" << name
          << "' not found in function table (or names have been stripped)";
 }
@@ -217,7 +217,7 @@ Status FunctionTable::RegisterBreakpoint(int function_ordinal, int offset,
     breakpoint_tables_.resize(function_table_def_.functions()->size());
   }
   if (function_ordinal < 0 || function_ordinal > breakpoint_tables_.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Function ordinal " << function_ordinal << " out of bounds";
   }
   if (!breakpoint_tables_[function_ordinal]) {
@@ -231,7 +231,7 @@ Status FunctionTable::RegisterBreakpoint(int function_ordinal, int offset,
 
 Status FunctionTable::UnregisterBreakpoint(int function_ordinal, int offset) {
   if (function_ordinal < 0 || function_ordinal > breakpoint_tables_.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Function ordinal " << function_ordinal << " out of bounds";
   }
   auto* function_table = breakpoint_tables_[function_ordinal].get();

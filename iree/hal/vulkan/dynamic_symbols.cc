@@ -21,7 +21,7 @@
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
 #include "absl/memory/memory.h"
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
@@ -90,7 +90,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
   syms->vkGetInstanceProcAddr = reinterpret_cast<PFN_vkGetInstanceProcAddr>(
       get_proc_addr("vkGetInstanceProcAddr"));
   if (!syms->vkGetInstanceProcAddr) {
-    return UnavailableErrorBuilder(ABSL_LOC)
+    return UnavailableErrorBuilder(IREE_LOC)
            << "Required method vkGetInstanceProcAddr not "
               "found in provided Vulkan library (did you pick the wrong file?)";
   }
@@ -105,7 +105,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
     *member_ptr =
         syms->vkGetInstanceProcAddr(VK_NULL_HANDLE, function_ptr.function_name);
     if (*member_ptr == nullptr) {
-      return UnavailableErrorBuilder(ABSL_LOC)
+      return UnavailableErrorBuilder(IREE_LOC)
              << "Mandatory Vulkan function " << function_ptr.function_name
              << " not available; invalid loader/ICD?";
     }
@@ -121,7 +121,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   // TODO(benvanik): abstract out for other platforms.
   void* library = ::dlopen("libvulkan.so.1", RTLD_LAZY | RTLD_LOCAL);
   if (!library) {
-    return UnavailableErrorBuilder(ABSL_LOC)
+    return UnavailableErrorBuilder(IREE_LOC)
            << "Unable to open libvulkan.so; driver not installed/on "
               "LD_LIBRARY_PATH";
   }
@@ -147,7 +147,7 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
   IREE_TRACE_SCOPE0("DynamicSymbols::LoadFromDevice");
 
   if (!instance) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Instance must have been created and a default instance proc "
               "lookup function is required";
   }
@@ -157,7 +157,7 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
   this->vkGetDeviceProcAddr = reinterpret_cast<PFN_vkGetDeviceProcAddr>(
       this->vkGetInstanceProcAddr(instance, "vkGetDeviceProcAddr"));
   if (!this->vkGetDeviceProcAddr) {
-    return UnavailableErrorBuilder(ABSL_LOC)
+    return UnavailableErrorBuilder(IREE_LOC)
            << "Required Vulkan function vkGetDeviceProcAddr not available; "
               "invalid driver handle?";
   }
@@ -175,7 +175,7 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
           this->vkGetInstanceProcAddr(instance, function_ptr.function_name);
     }
     if (*member_ptr == nullptr && function_ptr.is_required) {
-      return UnavailableErrorBuilder(ABSL_LOC)
+      return UnavailableErrorBuilder(IREE_LOC)
              << "Required Vulkan function " << function_ptr.function_name
              << " not available";
     }

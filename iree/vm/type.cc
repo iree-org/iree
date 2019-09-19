@@ -27,7 +27,7 @@ StatusOr<const Type> Type::FromTypeIndex(uint8_t type_index) {
   } else if (type_index < kBuiltinTypeCount) {
     return Type(type_index);
   }
-  return InvalidArgumentErrorBuilder(ABSL_LOC)
+  return InvalidArgumentErrorBuilder(IREE_LOC)
          << "Type index " << static_cast<int>(type_index) << " not supported";
 }
 

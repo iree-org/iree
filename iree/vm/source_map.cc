@@ -95,7 +95,7 @@ Status PrintLocation(const SourceMap& source_map,
                                 *location.location_union_as_FusedLocationDef(),
                                 stream);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unhandled location type "
              << static_cast<int>(location.location_union_type());
   }
@@ -135,20 +135,20 @@ SourceMap SourceMap::FromModule(const ModuleDef& module_def) {
 
 StatusOr<absl::string_view> SourceMap::GetUniqueString(int string_index) const {
   if (empty()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "No source map present";
+    return NotFoundErrorBuilder(IREE_LOC) << "No source map present";
   }
   const auto* string_table = source_map_def_->string_table();
   if (string_table && string_table->size() > string_index) {
     return WrapString(string_table->Get(string_index));
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "String index " << string_index << " not present in string table";
 }
 
 StatusOr<const FunctionSourceMapDef*> SourceMap::GetFunctionSourceMap(
     int function_ordinal) const {
   if (empty()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "No source map present";
+    return NotFoundErrorBuilder(IREE_LOC) << "No source map present";
   }
   const auto* function_table = source_map_def_->function_table();
   if (function_table && function_table->size() > function_ordinal) {
@@ -158,7 +158,7 @@ StatusOr<const FunctionSourceMapDef*> SourceMap::GetFunctionSourceMap(
       return function_source_map;
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "Function ordinal " << function_ordinal
          << " source map not present in function table";
 }

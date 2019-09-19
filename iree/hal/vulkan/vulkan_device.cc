@@ -98,7 +98,7 @@ StatusOr<QueueFamilyInfo> SelectQueueFamilies(
         queue_family_properties, VK_QUEUE_COMPUTE_BIT, 0);
   }
   if (queue_family_info.dispatch_index == kInvalidQueueFamilyIndex) {
-    return NotFoundErrorBuilder(ABSL_LOC)
+    return NotFoundErrorBuilder(IREE_LOC)
            << "Unable to find any queue family support compute operations";
   }
   queue_family_info.dispatch_queue_count =
@@ -426,7 +426,7 @@ StatusOr<ref_ptr<TimelineSemaphore>> VulkanDevice::CreateTimelineSemaphore(
   IREE_TRACE_SCOPE0("VulkanDevice::CreateTimelineSemaphore");
 
   // TODO(b/140141417): implement timeline semaphores.
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "Timeline semaphores not yet implemented";
 }
 

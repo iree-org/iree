@@ -228,7 +228,7 @@ Status Pad::Execute(absl::Span<const T> src_buffer,
   // TODO(b/140836672) support negative padding
 
   if (padding_value_buffer.size() != 1) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Padding value buffer is larger than one element.";
   }
   auto padding_value = padding_value_buffer.front();

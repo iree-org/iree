@@ -27,7 +27,7 @@ Status Module::ValidateStructure(const ModuleDef& module_def) {
     RETURN_IF_ERROR(
         FunctionTable::ValidateStructure(*module_def.function_table()));
   } else {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "ModuleDef is missing a function table";
   }
 
@@ -50,7 +50,7 @@ StatusOr<std::unique_ptr<Module>> Module::FromDef(const ModuleDef& module_def) {
 StatusOr<std::unique_ptr<Module>> Module::FromFile(
     std::unique_ptr<ModuleFile> module_file) {
   if (module_file->root() == nullptr) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC) << "No root ModuleDef present";
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "No root ModuleDef present";
   }
   const auto& module_def = *module_file->root();
 

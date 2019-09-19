@@ -14,7 +14,7 @@
 
 #include "iree/hal/vulkan/vma_buffer.h"
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -73,7 +73,7 @@ Status VmaBuffer::FillImpl(device_size_t byte_offset, device_size_t byte_length,
       break;
     }
     default:
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Unsupported scalar data size: " << pattern_length;
   }
   return OkStatus();

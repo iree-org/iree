@@ -16,7 +16,7 @@
 
 #include "absl/flags/flag.h"
 #include "absl/memory/memory.h"
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer.h"
@@ -239,7 +239,7 @@ StatusOr<ref_ptr<Buffer>> VmaAllocator::WrapMutable(
     BufferUsageBitfield buffer_usage, void* data, size_t data_length) {
   IREE_TRACE_SCOPE0("VmaAllocator::WrapMutable");
   // TODO(benvanik): import memory.
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "Wrapping host memory is not yet implemented";
 }
 

@@ -44,7 +44,7 @@ StatusOr<std::vector<const char*>> MatchAvailableLayers(
       }
     }
     if (!found) {
-      return UnavailableErrorBuilder(ABSL_LOC)
+      return UnavailableErrorBuilder(IREE_LOC)
              << "Required layer " << layer_name << " not available";
     }
   }
@@ -89,7 +89,7 @@ StatusOr<std::vector<const char*>> MatchAvailableExtensions(
       }
     }
     if (!found) {
-      return UnavailableErrorBuilder(ABSL_LOC)
+      return UnavailableErrorBuilder(IREE_LOC)
              << "Required extension " << extension_name << " not available";
     }
   }

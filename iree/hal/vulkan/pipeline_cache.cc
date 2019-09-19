@@ -15,8 +15,8 @@
 #include "iree/hal/vulkan/pipeline_cache.h"
 
 #include "absl/synchronization/mutex.h"
-#include "absl/types/source_location.h"
 #include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"
@@ -43,12 +43,12 @@ StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
     ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("PipelineCache::PrepareExecutable");
   if (!CanPrepareFormat(spec.format)) {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Unsupported 4CC format: 0x" << std::hex << spec.format;
   }
   if (spec.executable_data.size() <= 4 ||
       !SpirVExecutableDefBufferHasIdentifier(spec.executable_data.data())) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Supplied executable data does not contain a SpirVExecutableDef";
   }
 
@@ -58,7 +58,7 @@ StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
 
   // Create (or reuse) a pipeline layout.
   if (!spirv_executable_def.pipeline_layout()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Missing pipeline layout def";
   }
   ASSIGN_OR_RETURN(
@@ -93,7 +93,7 @@ PipelineCache::LookupOrInsertPipelineLayout(
     descriptor_set_layouts.resize(layout_defs.size());
     for (int i = 0; i < descriptor_set_layouts.size(); ++i) {
       if (!layout_defs[i]) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC) << "Missing layout def";
+        return InvalidArgumentErrorBuilder(IREE_LOC) << "Missing layout def";
       }
       ASSIGN_OR_RETURN(descriptor_set_layouts[i],
                        LookupOrInsertDescriptorSetLayout(*layout_defs[i]));
@@ -115,7 +115,7 @@ PipelineCache::LookupOrInsertPipelineLayout(
     push_constant_ranges.resize(range_defs.size());
     for (int i = 0; i < push_constant_ranges.size(); ++i) {
       if (!range_defs[i]) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC)
+        return InvalidArgumentErrorBuilder(IREE_LOC)
                << "Missing push constant range def";
       }
       push_constant_ranges[i].stageFlags = range_defs[i]->stage_flags();

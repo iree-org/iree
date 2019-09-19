@@ -15,8 +15,8 @@
 #include "iree/hal/interpreter/interpreter_command_processor.h"
 
 #include "absl/container/inlined_vector.h"
-#include "absl/types/source_location.h"
 #include "absl/types/span.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer_view.h"
@@ -54,7 +54,7 @@ Status InterpreterCommandProcessor::Dispatch(
   }
   absl::InlinedVector<BufferView, 8> results;
   if (entry_function.result_count() > 0) {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Executable export results are not yet implemented";
   }
 

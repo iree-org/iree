@@ -146,7 +146,7 @@ Status Dispatch(hal::Allocator* allocator,
   });
 
   DISPATCH_CORE_OPCODE(kCallIndirect, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented call_indirect";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented call_indirect";
   });
 
   DISPATCH_CORE_OPCODE(kReturn, {
@@ -163,7 +163,7 @@ Status Dispatch(hal::Allocator* allocator,
       DVLOG(1) << "Returning to entry";
       return OkStatus();
     } else if (!new_stack_frame) {
-      return FailedPreconditionErrorBuilder(ABSL_LOC) << "Stack underflow";
+      return FailedPreconditionErrorBuilder(IREE_LOC) << "Stack underflow";
     }
     RETURN_IF_ERROR(reader.CopyResultsAndSwitchStackFrame(old_stack_frame,
                                                           new_stack_frame));
@@ -288,7 +288,7 @@ Status Dispatch(hal::Allocator* allocator,
       case CmpFPredicate::kUno:
       case CmpFPredicate::kTrue:
         // TODO(b/132183250) support these if we ever need them.
-        return UnimplementedErrorBuilder(ABSL_LOC)
+        return UnimplementedErrorBuilder(IREE_LOC)
                << "Unsupported comparison predicate value "
                << static_cast<int>(p) << " ("
                << vm::PredicateToString(predicate) << ")";
@@ -296,15 +296,15 @@ Status Dispatch(hal::Allocator* allocator,
   });
 
   DISPATCH_CORE_OPCODE(kAllocStatic, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented alloc_static";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented alloc_static";
   });
 
   DISPATCH_CORE_OPCODE(kAllocStack, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented alloc_stack";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented alloc_stack";
   });
 
   DISPATCH_CORE_OPCODE(kAllocStackInit, {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Unimplemented alloc_stack_init";
   });
 
@@ -413,7 +413,7 @@ Status Dispatch(hal::Allocator* allocator,
   });
 
   DISPATCH_CORE_OPCODE(kSplit, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented split";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented split";
   });
 
   DISPATCH_CORE_OPCODE(kAssign, {
@@ -437,7 +437,7 @@ Status Dispatch(hal::Allocator* allocator,
     ASSIGN_OR_RETURN(auto* dst_local, reader.ReadLocal());
     Shape new_shape = Shape{shape_data};
     if (src_local->shape.element_count() != new_shape.element_count()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "New element count " << new_shape.element_count()
              << " != source element count " << src_local->shape.element_count();
     }
@@ -460,13 +460,13 @@ Status Dispatch(hal::Allocator* allocator,
     ASSIGN_OR_RETURN(auto dst_buffer, dst_local->buffer->MapMemory<uint8_t>(
                                           MemoryAccess::kDiscardWrite));
     if (cond_local->element_size != 1) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC) << "Select cond must be i8";
+      return InvalidArgumentErrorBuilder(IREE_LOC) << "Select cond must be i8";
     } else if (lhs_buffer.size() != rhs_buffer.size()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "LHS " << lhs_buffer.size() << "b != RHS " << rhs_buffer.size()
              << "b; both arguments must match";
     } else if (lhs_buffer.size() != dst_buffer.size()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Dest " << dst_buffer.size() << "b != LHS/RHS "
              << lhs_buffer.size() << "b; dest must match inputs";
     }
@@ -498,7 +498,7 @@ Status Dispatch(hal::Allocator* allocator,
             ReinterpretSpan<uint64_t>(dst_buffer.mutable_contents())));
         break;
       default:
-        return UnimplementedErrorBuilder(ABSL_LOC)
+        return UnimplementedErrorBuilder(IREE_LOC)
                << "Unimplemented element size: " << lhs_local->element_size;
     }
   });
@@ -750,7 +750,7 @@ Status Dispatch(hal::Allocator* allocator,
             multiplier_mantissa_local, multiplier_exponent_local, dst_local));
         break;
       default:
-        return UnimplementedErrorBuilder(ABSL_LOC)
+        return UnimplementedErrorBuilder(IREE_LOC)
                << "Unimplemented element size: " << lhs_local->element_size;
     }
   });
@@ -773,7 +773,7 @@ Status Dispatch(hal::Allocator* allocator,
             mat_mul_state, lhs_local, rhs_local, bias_local, dst_local));
         break;
       default:
-        return UnimplementedErrorBuilder(ABSL_LOC)
+        return UnimplementedErrorBuilder(IREE_LOC)
                << "Unimplemented element size: " << lhs_local->element_size;
     }
   });
@@ -845,20 +845,20 @@ Status Dispatch(hal::Allocator* allocator,
   });
 
   DISPATCH_CORE_OPCODE(kTrace, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented trace";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented trace";
   });
 
   DISPATCH_CORE_OPCODE(kBreak, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented break";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented break";
   });
 
   DISPATCH_CORE_OPCODE(kCondBreak, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented cond_break";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented cond_break";
   });
 
 _dispatch_unhandled:
   // TODO(benvanik): better tracing.
-  return UnimplementedErrorBuilder(ABSL_LOC) << "Unknown dispatch opcode";
+  return UnimplementedErrorBuilder(IREE_LOC) << "Unknown dispatch opcode";
 }  // NOLINT(readability/fn_size)
 
 }  // namespace hal

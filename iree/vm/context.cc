@@ -70,7 +70,7 @@ Status Context::RegisterModule(std::unique_ptr<Module> module) {
           }
         }
 
-        return NotFoundErrorBuilder(ABSL_LOC)
+        return NotFoundErrorBuilder(IREE_LOC)
                << "Import '" << export_name << "' could not be resolved";
       }));
 
@@ -89,7 +89,7 @@ StatusOr<Module*> Context::LookupModule(absl::string_view module_name) {
       return module.get();
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "No module with the name '" << module_name
          << "' has been registered";
 }
@@ -102,7 +102,7 @@ StatusOr<const Function> Context::LookupExport(
       return export_or.ValueOrDie();
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "No export with the name '" << export_name
          << "' is present in the context";
 }

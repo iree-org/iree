@@ -124,7 +124,7 @@ Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {
               },
               &submission_queue_),
           deadline)) {
-    return DeadlineExceededErrorBuilder(ABSL_LOC)
+    return DeadlineExceededErrorBuilder(IREE_LOC)
            << "Deadline exceeded waiting for submission thread to go idle";
   }
   return submission_queue_.permanent_error();

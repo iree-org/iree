@@ -113,14 +113,14 @@ StatusOr<std::string> RunIreeModule(std::string module_file_data,
                      PrintBufferViewToString(result, print_mode, 1024));
     const auto& buffer = result.buffer;
     if (!buffer) {
-      return InternalErrorBuilder(ABSL_LOC)
+      return InternalErrorBuilder(IREE_LOC)
              << "result[" << i << "] unexpectedly has no buffer";
     }
 
     return result_str;
   }
 
-  return InternalErrorBuilder(ABSL_LOC) << "Received no results";
+  return InternalErrorBuilder(IREE_LOC) << "Received no results";
 }
 
 std::string RunIreeModuleEntry(std::string module_file_data,

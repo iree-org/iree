@@ -86,14 +86,14 @@ inline std::string PrettyPrint(absl::Span<const int32_t> arr) {
 StatusOr<device_size_t> CalculateOffset(absl::Span<const int32_t> indices,
                                         Shape shape, uint8_t element_size) {
   if (shape.empty() || indices.size() > shape.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Indices " << PrettyPrint(indices) << " out of bounds of shape "
            << PrettyPrint(shape.subspan());
   }
   device_size_t offset = 0;
   for (int i = 0; i < indices.size(); ++i) {
     if (indices[i] >= shape[i]) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Indices[" << i << "]=" << indices[i]
              << " out of bounds of shape " << PrettyPrint(shape.subspan());
     }
@@ -199,7 +199,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
   });
 
   DISPATCH_CORE_OPCODE(kCallIndirect, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented call_indirect";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented call_indirect";
   });
 
   DISPATCH_CORE_OPCODE(kReturn, {
@@ -216,7 +216,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
       DVLOG(1) << "Returning to entry";
       return OkStatus();
     } else if (!new_stack_frame) {
-      return FailedPreconditionErrorBuilder(ABSL_LOC) << "Stack underflow";
+      return FailedPreconditionErrorBuilder(IREE_LOC) << "Stack underflow";
     }
     RETURN_IF_ERROR(reader.CopyResultsAndSwitchStackFrame(old_stack_frame,
                                                           new_stack_frame));
@@ -251,7 +251,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
   });
 
   DISPATCH_CORE_OPCODE(kDynamicDispatch, {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Unimplemented dynamic_dispatch";
   });
 
@@ -265,7 +265,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
         auto* multi_arch_executable_def,
         executable_table.LookupMultiArchExecutable(dispatch_ordinal));
     if (export_ordinal >= multi_arch_executable_def->entry_point_count()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Invalid executable export ordinal " << export_ordinal;
     }
     auto* executable_def = multi_arch_executable_def->executables()->Get(0);
@@ -293,7 +293,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
       break;
     }
     if (!executable) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "No executable found for the current driver";
     }
 
@@ -346,15 +346,15 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
   });
 
   DISPATCH_CORE_OPCODE(kAllocStatic, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented alloc_static";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented alloc_static";
   });
 
   DISPATCH_CORE_OPCODE(kAllocStack, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented alloc_stack";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented alloc_stack";
   });
 
   DISPATCH_CORE_OPCODE(kAllocStackInit, {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Unimplemented alloc_stack_init";
   });
 
@@ -414,7 +414,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
                      CalculateOffset(indices, shape, element_size));
     auto offset_based_length = end_offset - dst_offset + element_size;
     if (dst_length != offset_based_length) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Cannot compute range for non-contiguous region of memory;"
              << " shape: " << PrettyPrint(shape.subspan())
              << " indices: " << PrettyPrint(indices)
@@ -441,7 +441,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
 
   DISPATCH_CORE_OPCODE(kDynamicSlice, {
     // TODO(b/139299169): implement indirect copies to avoid CPU readback.
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented dynamic_slice";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented dynamic_slice";
   });
 
   DISPATCH_CORE_OPCODE(kStaticSlice, {
@@ -453,7 +453,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
     ASSIGN_OR_RETURN(auto* dst_local, reader.ReadLocal());
     Shape new_shape = Shape{shape_data};
     if (new_shape.element_count() * type.element_size() != length) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "New element count " << new_shape.element_count()
              << " != length slice " << length;
     }
@@ -487,7 +487,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
 
   DISPATCH_CORE_OPCODE(kDynamicFill, {
     // TODO(b/139299169): implement indirect fills to avoid CPU readback.
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented dynamic_fill";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented dynamic_fill";
   });
 
   DISPATCH_CORE_OPCODE(kStaticFill, {
@@ -531,7 +531,7 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
     ASSIGN_OR_RETURN(auto* dst_local, reader.ReadLocal());
     Shape new_shape = Shape{shape_data};
     if (src_local->shape.element_count() != new_shape.element_count()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "New element count " << new_shape.element_count()
              << " != source element count " << src_local->shape.element_count();
     }
@@ -541,20 +541,20 @@ Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
   });
 
   DISPATCH_CORE_OPCODE(kTrace, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented trace";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented trace";
   });
 
   DISPATCH_CORE_OPCODE(kBreak, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented break";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented break";
   });
 
   DISPATCH_CORE_OPCODE(kCondBreak, {
-    return UnimplementedErrorBuilder(ABSL_LOC) << "Unimplemented cond_break";
+    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented cond_break";
   });
 
 _dispatch_unhandled:
   // TODO(benvanik): better tracing.
-  return UnimplementedErrorBuilder(ABSL_LOC) << "Unknown dispatch opcode";
+  return UnimplementedErrorBuilder(IREE_LOC) << "Unknown dispatch opcode";
 }
 
 }  // namespace vm

@@ -58,11 +58,11 @@
 #include <string>
 #include <utility>
 
-#include "absl/types/source_location.h"
 #include "absl/types/span.h"
 #include "absl/types/variant.h"
 #include "iree/base/bitfield.h"
 #include "iree/base/logging.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/hal/resource.h"
 
@@ -821,9 +821,9 @@ template <typename T>
 Status MappedMemory<T>::ValidateAccess(
     MemoryAccessBitfield memory_access) const {
   if (!data_) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC) << "Buffer is not mapped";
+    return FailedPreconditionErrorBuilder(IREE_LOC) << "Buffer is not mapped";
   } else if (!AnyBitSet(access_ & memory_access)) {
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Buffer is not mapped for the desired access";
   }
   return OkStatus();

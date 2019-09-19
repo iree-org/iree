@@ -48,7 +48,7 @@ StatusOr<const uint8_t*> BytecodeReader::AdvanceOffset() {
 Status BytecodeReader::SkipLocals(int count) {
   size_t stride = sizeof(uint16_t) * count;
   if (bytecode_pc_ + stride >= bytecode_limit_) {
-    return OutOfRangeErrorBuilder(ABSL_LOC) << "Bytecode underflow";
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Bytecode underflow";
   }
   bytecode_pc_ += stride;
   return OkStatus();
@@ -64,7 +64,7 @@ StatusOr<Shape> BytecodeReader::ReadShapePieces() {
   // TODO(benvanik): rewrite to be faster (multiple offsets to walk both lists).
   ASSIGN_OR_RETURN(auto shape_dims, ReadIndexList());
   if (shape_dims.size() >= kMaxRank) {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Shapes limited to rank " << kMaxRank << " right now";
   }
   int expected_dynamic_dims = 0;
@@ -77,7 +77,7 @@ StatusOr<Shape> BytecodeReader::ReadShapePieces() {
   Shape shape(shape_dims);
   ASSIGN_OR_RETURN(int dynamic_dims, ReadCount());
   if (dynamic_dims != expected_dynamic_dims) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Expected " << expected_dynamic_dims << " dynamic dims but only "
            << dynamic_dims << " provided";
   } else if (dynamic_dims) {
@@ -88,7 +88,7 @@ StatusOr<Shape> BytecodeReader::ReadShapePieces() {
       // TODO(benvanik): kill this embarrassment.
       ASSIGN_OR_RETURN(auto dims_piece, ReadSlotElements<int32_t>());
       if (dims_piece.size() != 1) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC)
+        return InvalidArgumentErrorBuilder(IREE_LOC)
                << "Dims piece has rank " << dims_piece.size() << "; must be 1";
       }
       shape[i] = dims_piece[0];
@@ -107,7 +107,7 @@ StatusOr<absl::Span<const int32_t>> BytecodeReader::ReadIndexList() {
   ASSIGN_OR_RETURN(int count, ReadCount());
   int stride = count * sizeof(int32_t);
   if (bytecode_pc_ + stride >= bytecode_limit_) {
-    return OutOfRangeErrorBuilder(ABSL_LOC) << "Bytecode underflow";
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Bytecode underflow";
   }
   auto list = absl::Span<const int32_t>(
       reinterpret_cast<const int32_t*>(bytecode_pc_), count);
@@ -167,7 +167,7 @@ Status BytecodeReader::CopyResultsAndSwitchStackFrame(
   RETURN_IF_ERROR(SwitchStackFrame(dst_stack_frame));
   ASSIGN_OR_RETURN(int32_t dst_count, ReadCount());
   if (src_count != dst_count) {
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Src and dst value counts differ: " << src_count << " vs "
            << dst_count;
   }
@@ -194,7 +194,7 @@ Status BytecodeReader::CopySlots() {
 Status BytecodeReader::BranchToOffset(int32_t offset) {
   const uint8_t* new_bytecode_pc = bytecode_base_ + offset;
   if (new_bytecode_pc < bytecode_base_ || new_bytecode_pc > bytecode_limit_) {
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Branch target " << offset
            << " is out of bounds of the function bytecode ("
            << static_cast<size_t>(bytecode_limit_ - bytecode_base_)
@@ -224,7 +224,7 @@ StatusOr<BufferView> BytecodeReader::ReadConstant() {
       // Validate we have all constant data present.
       device_size_t serialized_length = buffer_view.byte_length();
       if (bytecode_pc_ + serialized_length >= bytecode_limit_) {
-        return OutOfRangeErrorBuilder(ABSL_LOC)
+        return OutOfRangeErrorBuilder(IREE_LOC)
                << "Constant data out of bounds";
       }
 
@@ -237,7 +237,7 @@ StatusOr<BufferView> BytecodeReader::ReadConstant() {
     case ConstantEncoding::kSplat: {
       // Validate we have at least one element worth of data in the buffer.
       if (bytecode_pc_ + buffer_view.element_size >= bytecode_limit_) {
-        return OutOfRangeErrorBuilder(ABSL_LOC)
+        return OutOfRangeErrorBuilder(IREE_LOC)
                << "Constant data out of bounds";
       }
 
@@ -276,7 +276,7 @@ StatusOr<BufferView> BytecodeReader::ReadConstant() {
           break;
         }
         default:
-          return UnimplementedErrorBuilder(ABSL_LOC)
+          return UnimplementedErrorBuilder(IREE_LOC)
                  << "Unimplemented splat element stride "
                  << buffer_view.element_size;
       }
@@ -284,7 +284,7 @@ StatusOr<BufferView> BytecodeReader::ReadConstant() {
       break;
     }
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented constant encoding "
              << static_cast<int>(encoding);
   }

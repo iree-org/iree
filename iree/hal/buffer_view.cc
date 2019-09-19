@@ -17,7 +17,7 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/hal/buffer.h"
 
@@ -51,7 +51,7 @@ StatusOr<device_size_t> BufferView::CalculateOffset(
   if (indices.empty()) {
     return 0;
   } else if (shape.empty() || indices.size() > shape.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Indices " << PrettyPrint(indices)
            << " out of bounds of the rank of buffer_view "
            << DebugStringShort();
@@ -59,7 +59,7 @@ StatusOr<device_size_t> BufferView::CalculateOffset(
   device_size_t offset = 0;
   for (int i = 0; i < indices.size(); ++i) {
     if (indices[i] >= shape[i]) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Indices[" << i << "]=" << indices[i]
              << " out of bounds of buffer_view " << DebugStringShort();
     }
@@ -77,12 +77,12 @@ StatusOr<BufferView> BufferView::Slice(
     absl::Span<const int32_t> start_indices,
     absl::Span<const int32_t> lengths) const {
   if (start_indices.size() != shape.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Slice start_indices " << PrettyPrint(start_indices)
            << " do not match rank of buffer_view " << DebugStringShort();
   }
   if (start_indices.size() != lengths.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Slice start_indices " << PrettyPrint(start_indices)
            << " and lengths " << PrettyPrint(lengths)
            << " are not the same size";
@@ -104,7 +104,7 @@ StatusOr<BufferView> BufferView::Slice(
 
   auto offset_length = end_byte_offset - start_byte_offset + element_size;
   if (subspan_length != offset_length) {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Slice for non-contiguous region of memory unimplemented. "
               "start_indices: "
            << PrettyPrint(start_indices) << " lengths: " << PrettyPrint(lengths)
@@ -127,7 +127,7 @@ Status BufferView::Copy(BufferView* src,
       dst_start_indices.size() != dst->shape.size() ||
       src_start_indices.size() != lengths.size() ||
       dst_start_indices.size() != lengths.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Src/dst shape/size mismatch: src=" << src->DebugStringShort()
            << ", dst=" << dst->DebugStringShort()
            << ", src_indices=" << PrettyPrint(src_start_indices)
@@ -161,7 +161,7 @@ Status BufferView::Copy(BufferView* src,
   auto dst_length =
       dst_end_byte_offset - dst_start_byte_offset + dst->element_size;
   if (src_length != dst_length || src_length != total_length) {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Copy for non-contiguous region of memory unimplemented: "
            << src->DebugStringShort() << ", dst=" << dst->DebugStringShort()
            << ", src_indices=" << PrettyPrint(src_start_indices)

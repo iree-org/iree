@@ -15,17 +15,17 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_MACROS_H_
 #define IREE_BASE_INTERNAL_STATUS_MACROS_H_
 
-#include "absl/types/source_location.h"
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"
 #include "iree/base/internal/statusor.h"
+#include "iree/base/source_location.h"
 
 // Evaluates an expression that produces a `iree::Status`. If the status is not
 // ok, returns it from the current function.
 #define RETURN_IF_ERROR(expr)                                   \
   STATUS_MACROS_IMPL_ELSE_BLOCKER_                              \
   if (iree::status_macro_internal::StatusAdaptorForMacros       \
-          status_macro_internal_adaptor = {(expr), ABSL_LOC}) { \
+          status_macro_internal_adaptor = {(expr), IREE_LOC}) { \
   } else /* NOLINT */                                           \
     return status_macro_internal_adaptor.Consume()
 
@@ -58,7 +58,7 @@
                                              error_expression)          \
   auto statusor = (rexpr);                                              \
   if (ABSL_PREDICT_FALSE(!statusor.ok())) {                             \
-    iree::StatusBuilder _(std::move(statusor).status(), ABSL_LOC);      \
+    iree::StatusBuilder _(std::move(statusor).status(), IREE_LOC);      \
     (void)_; /* error_expression is allowed to not use this variable */ \
     return (error_expression);                                          \
   }                                                                     \

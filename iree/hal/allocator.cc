@@ -19,7 +19,7 @@
 #include <string>
 #include <utility>
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -69,7 +69,7 @@ StatusOr<ref_ptr<Buffer>> Allocator::Wrap(MemoryTypeBitfield memory_type,
 StatusOr<ref_ptr<Buffer>> Allocator::WrapMutable(
     MemoryTypeBitfield memory_type, MemoryAccessBitfield allowed_access,
     BufferUsageBitfield buffer_usage, void* data, size_t data_length) {
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "Allocator does not support wrapping host memory";
 }
 

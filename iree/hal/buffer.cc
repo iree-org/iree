@@ -292,7 +292,7 @@ Status Buffer::ValidateCompatibleMemoryType(
     MemoryTypeBitfield memory_type) const {
   if ((memory_type_ & memory_type) != memory_type) {
     // Missing one or more bits.
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Buffer memory type is not compatible with the requested "
               "operation; buffer has "
            << MemoryTypeString(memory_type_) << ", operation requires "
@@ -305,11 +305,11 @@ Status Buffer::ValidateAccess(MemoryAccessBitfield memory_access) const {
   if (!AnyBitSet(memory_access &
                  (MemoryAccess::kRead | MemoryAccess::kWrite))) {
     // No actual access bits defined.
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Memory access must specify one or more of kRead or kWrite";
   } else if ((allowed_access_ & memory_access) != memory_access) {
     // Bits must match exactly.
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "The buffer does not support the requested access type; buffer "
               "allows "
            << MemoryAccessString(allowed_access_) << ", operation requires "
@@ -321,7 +321,7 @@ Status Buffer::ValidateAccess(MemoryAccessBitfield memory_access) const {
 Status Buffer::ValidateUsage(BufferUsageBitfield usage) const {
   if ((usage_ & usage) != usage) {
     // Missing one or more bits.
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Requested usage was not specified when the buffer was "
               "allocated; buffer allows "
            << BufferUsageString(usage_) << ", operation requires "
@@ -339,7 +339,7 @@ Status Buffer::CalculateRange(device_size_t base_offset,
   if (offset > max_length) {
     *out_adjusted_offset = 0;
     if (out_adjusted_length) *out_adjusted_length = 0;
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Attempted to access an address off the end of the valid buffer "
               "range (offset="
            << offset << ", length=" << length
@@ -349,7 +349,7 @@ Status Buffer::CalculateRange(device_size_t base_offset,
   // Handle length as kWholeBuffer by adjusting it (if allowed).
   if (length == kWholeBuffer && !out_adjusted_length) {
     *out_adjusted_offset = 0;
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "kWholeBuffer may only be used with buffer ranges, not external "
               "pointer ranges";
   }
@@ -370,7 +370,7 @@ Status Buffer::CalculateRange(device_size_t base_offset,
   if (end >= max_length) {
     *out_adjusted_offset = 0;
     if (out_adjusted_length) *out_adjusted_length = 0;
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Attempted to access an address outside of the valid buffer "
               "range (offset="
            << offset << ", adjusted_length=" << adjusted_length
@@ -406,12 +406,12 @@ Status Buffer::Fill(device_size_t byte_offset, device_size_t byte_length,
   RETURN_IF_ERROR(
       CalculateRange(byte_offset, byte_length, &byte_offset, &byte_length));
   if (pattern_length != 1 && pattern_length != 2 && pattern_length != 4) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Fill patterns must be 1, 2, or 4 bytes";
   }
   if ((byte_offset % pattern_length) != 0 ||
       (byte_length % pattern_length) != 0) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Attempting to fill a range with " << pattern_length
            << " byte values that is not "
               "aligned (offset="
@@ -494,7 +494,7 @@ Status Buffer::CopyData(device_size_t target_offset, Buffer* source_buffer,
   if (this == source_buffer &&
       adjusted_source_offset <= target_offset + adjusted_data_length &&
       target_offset <= adjusted_source_offset + adjusted_data_length) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Source and target ranges overlap within the same buffer";
   }
 
@@ -528,7 +528,7 @@ Status Buffer::InvalidateMappedMemory(device_size_t local_byte_offset,
                                       device_size_t local_byte_length) {
   RETURN_IF_ERROR(ValidateCompatibleMemoryType(MemoryType::kHostVisible));
   if (AnyBitSet(memory_type_ & MemoryType::kHostCoherent)) {
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Buffer memory type is coherent and invalidation is not required";
   }
   RETURN_IF_ERROR(ValidateUsage(BufferUsage::kMapping));

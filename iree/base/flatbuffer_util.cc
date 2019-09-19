@@ -18,8 +18,8 @@
 #include <cstring>
 
 #include "absl/memory/memory.h"
-#include "absl/types/source_location.h"
 #include "iree/base/memory.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -78,7 +78,7 @@ Status FlatBufferFileBase::FromBuffer(Identifier identifier,
 
   // Sanity check buffer for the minimum size as FlatBuffers doesn't.
   if (buffer_data.size() < 16) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Provided serialized flatbuffer buffer is too small to be legit "
               "at size="
            << buffer_data.size();
@@ -87,7 +87,7 @@ Status FlatBufferFileBase::FromBuffer(Identifier identifier,
   // Ensure the buffer has the BIPE magic bytes.
   if (identifier.has_value() && !::flatbuffers::BufferHasIdentifier(
                                     buffer_data.data(), identifier.value())) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Provided serialized buffer does not contain the expected type; "
               "magic bytes mismatch (expected "
            << identifier.value() << ")";
@@ -100,7 +100,7 @@ Status FlatBufferFileBase::FromBuffer(Identifier identifier,
     IREE_TRACE_SCOPE0("FlatBufferFileBase::FromBufferVerification");
     ::flatbuffers::Verifier verifier{buffer_data.data(), buffer_data.size()};
     if (!verifier_fn(identifier.value_or(nullptr), &verifier)) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "FlatBuffer failed to verify as expected type; possibly "
                 "corrupt input";
     }
@@ -113,7 +113,7 @@ Status FlatBufferFileBase::FromBuffer(Identifier identifier,
                   *reinterpret_cast<const ::flatbuffers::uoffset_t*>(
                       buffer_data.data()));
   if (!root_ptr_) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Unable to resolve root table";
   }
   deleter_ = std::move(deleter);
@@ -159,13 +159,13 @@ class FileDescriptor {
   static StatusOr<std::unique_ptr<FileDescriptor> > OpenRead(std::string path) {
     struct stat buf;
     if (::lstat(path.c_str(), &buf) == -1) {
-      return NotFoundErrorBuilder(ABSL_LOC)
+      return NotFoundErrorBuilder(IREE_LOC)
              << "Unable to stat file " << path << ": " << ::strerror(errno);
     }
 
     int fd = ::open(path.c_str(), O_RDONLY);
     if (fd == -1) {
-      return UnavailableErrorBuilder(ABSL_LOC)
+      return UnavailableErrorBuilder(IREE_LOC)
              << "Unable to open file " << path << ": " << ::strerror(errno);
     }
     return absl::WrapUnique(
@@ -197,7 +197,7 @@ class MappedFile {
     void* data =
         ::mmap(nullptr, file->size(), PROT_READ, MAP_SHARED, file->fd(), 0);
     if (data == MAP_FAILED) {
-      return UnavailableErrorBuilder(ABSL_LOC)
+      return UnavailableErrorBuilder(IREE_LOC)
              << "Mapping failed on file (ensure uncompressed): " << path;
     }
 

@@ -32,13 +32,13 @@ Status InterpreterContext::Invoke(vm::Stack* stack, Function function,
                                   absl::Span<BufferView> results) const {
   // Verify arg/result counts.
   if (args.size() != function.input_count()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Function " << function.name() << " requires "
            << function.input_count() << " inputs but only " << args.size()
            << " provided";
   }
   if (results.size() != function.result_count()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Function " << function.name() << " requires "
            << function.result_count() << " outputs but only " << results.size()
            << " provided";

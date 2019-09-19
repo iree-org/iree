@@ -34,7 +34,7 @@ StackFrame::StackFrame(const ImportFunction& function)
 
 Status StackFrame::set_offset(int offset) {
   if (offset < 0 || offset > offset_limit_) {
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Offset " << offset
            << " is outside of the bytecode body limit of " << offset_limit_;
   }

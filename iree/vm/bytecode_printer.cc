@@ -37,7 +37,7 @@ namespace {
 template <typename T>
 StatusOr<T> ReadValue(absl::Span<const uint8_t> data, int* offset) {
   if (*offset + sizeof(T) > data.size()) {
-    return OutOfRangeErrorBuilder(ABSL_LOC) << "Bytecode data underrun";
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Bytecode data underrun";
   }
   auto value = *reinterpret_cast<const T*>(&data[*offset]);
   *offset = *offset + sizeof(T);
@@ -156,7 +156,7 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
     uint8_t opcode = data[offset++];
     const auto& opcode_info = GetOpcodeInfo(opcode_table_, opcode);
     if (!opcode_info.mnemonic) {
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unhandled opcode " << opcode << " at offset " << (offset - 1);
     }
     int payload_offset = offset;
@@ -173,7 +173,7 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
       switch (opcode_info.operands[i]) {
         default:
         case OperandEncoding::kNone:
-          return UnimplementedErrorBuilder(ABSL_LOC)
+          return UnimplementedErrorBuilder(IREE_LOC)
                  << "Unhandled op encoding "
                  << static_cast<int>(opcode_info.operands[i]) << " at offset "
                  << (offset - 1);
@@ -291,7 +291,7 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
       switch (opcode_info.operands[i]) {
         default:
         case OperandEncoding::kNone:
-          return UnimplementedErrorBuilder(ABSL_LOC)
+          return UnimplementedErrorBuilder(IREE_LOC)
                  << "Unhandled op encoding "
                  << static_cast<int>(opcode_info.operands[i]) << " at offset "
                  << (offset - 1);
@@ -384,7 +384,7 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
               serialized_element_count = 1;
               break;
             default:
-              return UnimplementedErrorBuilder(ABSL_LOC)
+              return UnimplementedErrorBuilder(IREE_LOC)
                      << "Unimplemented constant encoding "
                      << static_cast<int>(encoding);
           }

@@ -73,7 +73,7 @@ class BytecodeReader {
       absl::Span<hal::BufferView> locals) {
     ASSIGN_OR_RETURN(auto value, ReadValue<uint16_t>());
     if (value > locals.size()) {
-      return OutOfRangeErrorBuilder(ABSL_LOC)
+      return OutOfRangeErrorBuilder(IREE_LOC)
              << "Out of bounds local access " << value << " of "
              << locals.size();
     }
@@ -131,7 +131,7 @@ class BytecodeReader {
           break;
         }
         default:
-          return UnimplementedErrorBuilder(ABSL_LOC)
+          return UnimplementedErrorBuilder(IREE_LOC)
                  << "Unsupported local element size: " << local->element_size;
       }
     }

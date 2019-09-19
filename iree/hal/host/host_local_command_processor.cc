@@ -14,7 +14,7 @@
 
 #include "iree/hal/host/host_local_command_processor.h"
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -112,7 +112,7 @@ Status HostLocalCommandProcessor::CopyBuffer(Buffer* source_buffer,
 
 Status HostLocalCommandProcessor::Dispatch(
     const DispatchRequest& dispatch_request) {
-  return FailedPreconditionErrorBuilder(ABSL_LOC)
+  return FailedPreconditionErrorBuilder(IREE_LOC)
          << "Command processor does not support dispatch operations";
 }
 

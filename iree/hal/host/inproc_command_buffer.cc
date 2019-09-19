@@ -254,7 +254,7 @@ Status InProcCommandBuffer::ProcessCmd(CmdHeader* cmd_header,
       return command_processor->Dispatch(cmd->request);
     }
     default:
-      return DataLossErrorBuilder(ABSL_LOC)
+      return DataLossErrorBuilder(IREE_LOC)
              << "Unrecognized command type "
              << static_cast<int>(cmd_header->type) << "; corrupt buffer?";
   }

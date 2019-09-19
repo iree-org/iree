@@ -125,7 +125,7 @@ Status ApplyUnaryOpIS(BufferView* src_local, BufferView* dst_local,
     case 8:
       return ApplyUnaryOp<KERNEL, int64_t>(src_local, dst_local, args...);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << src_local->element_size;
   }
 }
@@ -143,7 +143,7 @@ Status ApplyUnaryOpIU(BufferView* src_local, BufferView* dst_local,
     case 8:
       return ApplyUnaryOp<KERNEL, uint64_t>(src_local, dst_local, args...);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << src_local->element_size;
   }
 }
@@ -161,7 +161,7 @@ Status ApplyUnaryOpF(BufferView* src_local, BufferView* dst_local,
       return ApplyUnaryOp<KERNEL, double>(src_local, dst_local, args...);
 #endif  // IREE_SUPPORT_F64
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << src_local->element_size;
   }
 }
@@ -183,7 +183,7 @@ Status ApplyBinaryOpIS(BufferView* lhs_local, BufferView* rhs_local,
       return ApplyBinaryOp<KERNEL, int64_t>(lhs_local, rhs_local, dst_local,
                                             args...);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << lhs_local->element_size;
   }
 }
@@ -205,7 +205,7 @@ Status ApplyBinaryOpIU(BufferView* lhs_local, BufferView* rhs_local,
       return ApplyBinaryOp<KERNEL, uint64_t>(lhs_local, rhs_local, dst_local,
                                              args...);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << lhs_local->element_size;
   }
 }
@@ -225,7 +225,7 @@ Status ApplyBinaryOpF(BufferView* lhs_local, BufferView* rhs_local,
                                            args...);
 #endif  // IREE_SUPPORT_F64
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << lhs_local->element_size;
   }
 }
@@ -248,7 +248,7 @@ Status ApplyTernaryOpIS(BufferView* a_local, BufferView* b_local,
       return ApplyTernaryOp<KERNEL, int64_t>(a_local, b_local, c_local,
                                              dst_local, args...);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << a_local->element_size;
   }
 }
@@ -271,7 +271,7 @@ Status ApplyTernaryOpIU(BufferView* a_local, BufferView* b_local,
       return ApplyTernaryOp<KERNEL, uint64_t>(a_local, b_local, c_local,
                                               dst_local, args...);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << a_local->element_size;
   }
 }
@@ -292,7 +292,7 @@ Status ApplyTernaryOpF(BufferView* a_local, BufferView* b_local,
                                             dst_local, args...);
 #endif  // IREE_SUPPORT_F64
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << a_local->element_size;
   }
 }
@@ -313,7 +313,7 @@ Status ApplyComparisonOpIS(BufferView* lhs_local, BufferView* rhs_local,
       return ApplyComparisonOp<KERNEL, int64_t>(lhs_local, rhs_local,
                                                 dst_local);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << lhs_local->element_size;
   }
 }
@@ -335,7 +335,7 @@ Status ApplyComparisonOpIU(BufferView* lhs_local, BufferView* rhs_local,
       return ApplyComparisonOp<KERNEL, uint64_t>(lhs_local, rhs_local,
                                                  dst_local);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << lhs_local->element_size;
   }
 }
@@ -349,7 +349,7 @@ Status ApplyComparisonOpF(BufferView* lhs_local, BufferView* rhs_local,
     case 8:
       return ApplyComparisonOp<KERNEL, double>(lhs_local, rhs_local, dst_local);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << lhs_local->element_size;
   }
 }
@@ -373,7 +373,7 @@ Status ApplyMatMulOpI(kernels::MatMul::RuntimeState* runtime_state,
   MappedMemory<ACC> bias_buffer;
   if (bias_local && bias_local->buffer && !bias_local->shape.empty()) {
     if (bias_local->element_size != sizeof(ACC)) {
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Only " << sizeof(ACC) << "b biases are supported right now";
     }
     ASSIGN_OR_RETURN(bias_buffer,

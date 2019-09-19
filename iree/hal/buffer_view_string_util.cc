@@ -25,7 +25,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/strip.h"
 #include "absl/types/optional.h"
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/hal/heap_buffer.h"
 
@@ -54,7 +54,7 @@ Status ParseBinaryData(absl::string_view data_str, Buffer* buffer) {
       continue;
     }
     if (src_i + 1 >= data_str.size()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Invalid input hex data (offset=" << src_i << ")";
     }
     strings::a2b_hex(data_str.data() + src_i, contents.data() + dst_i, 1);
@@ -62,11 +62,11 @@ Status ParseBinaryData(absl::string_view data_str, Buffer* buffer) {
     ++dst_i;
   }
   if (dst_i < contents.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Too few elements to fill type; expected " << contents.size()
            << " but only read " << dst_i;
   } else if (data_str.size() - src_i > 0) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Input data string contains more elements than the underlying "
               "buffer ("
            << contents.size() << ")";
@@ -142,7 +142,7 @@ Status ParseNumericalDataElement(absl::string_view data_str, size_t token_start,
                                  size_t token_end, absl::Span<T> contents,
                                  int dst_i) {
   if (dst_i >= contents.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Input data string contains more elements than the underlying "
               "buffer ("
            << contents.size() << ")";
@@ -150,7 +150,7 @@ Status ParseNumericalDataElement(absl::string_view data_str, size_t token_start,
   auto element_str = data_str.substr(token_start, token_end - token_start + 1);
   auto element = SimpleStrToValue<T>()(element_str);
   if (!element.has_value()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Unable to parse element " << dst_i << " = '" << element_str
            << "'";
   }
@@ -187,7 +187,7 @@ Status ParseNumericalDataAsType(absl::string_view data_str, Buffer* buffer) {
         data_str, token_start, data_str.size() - 1, contents, dst_i++));
   }
   if (dst_i < contents.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Input data string contains fewer elements than the underlying "
               "buffer (expected "
            << contents.size() << ")";
@@ -219,7 +219,7 @@ Status ParseNumericalData(absl::string_view type_str,
   } else if (type_str == "f64") {
     return ParseNumericalDataAsType<double>(data_str, buffer);
   } else {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Unsupported type: " << type_str;
   }
 }
@@ -294,7 +294,7 @@ Status PrintNumericalData(const Shape& shape, absl::string_view type_str,
   } else if (type_str == "f64") {
     return PrintNumericalDataAsType<double>(shape, buffer, max_entries, stream);
   } else {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Unsupported type: " << type_str;
   }
 }
@@ -303,13 +303,13 @@ Status PrintNumericalData(const Shape& shape, absl::string_view type_str,
 
 StatusOr<int> GetTypeElementSize(absl::string_view type_str) {
   if (type_str.empty()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC) << "Type is empty";
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "Type is empty";
   } else if (IsBinaryType(type_str)) {
     // If the first character is a digit then we are dealign with binary data.
     // The type is just the number of bytes per element.
     int element_size = 0;
     if (!absl::SimpleAtoi(type_str, &element_size)) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Unable to parse element size type '" << type_str << "'";
     }
     return element_size;
@@ -318,7 +318,7 @@ StatusOr<int> GetTypeElementSize(absl::string_view type_str) {
   // If we start to support other types we may need to do something more clever.
   int bit_count = 0;
   if (!absl::SimpleAtoi(type_str.substr(1), &bit_count)) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Unable to parse type bit count from '" << type_str
            << "'; expecting something like 'i32'";
   }
@@ -330,7 +330,7 @@ StatusOr<Shape> ParseShape(absl::string_view shape_str) {
   for (auto dim_str : absl::StrSplit(shape_str, 'x', absl::SkipWhitespace())) {
     int dim_value = 0;
     if (!absl::SimpleAtoi(dim_str, &dim_value)) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Invalid shape dimension '" << dim_str
              << "' while parsing shape '" << shape_str << "'";
     }
@@ -417,7 +417,7 @@ StatusOr<BufferViewPrintMode> ParseBufferViewPrintMode(absl::string_view str) {
     case 'f':
       return BufferViewPrintMode::kFloatingPoint;
     default:
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Unsupported output type '" << str << "'";
   }
 }

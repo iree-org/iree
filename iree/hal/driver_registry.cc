@@ -33,7 +33,7 @@ Status DriverRegistry::Register(std::string driver_name, FactoryFn factory_fn) {
   absl::MutexLock lock(&mutex_);
   for (const auto& pair : driver_factory_fns_) {
     if (pair.first == driver_name) {
-      return AlreadyExistsErrorBuilder(ABSL_LOC)
+      return AlreadyExistsErrorBuilder(IREE_LOC)
              << "Driver already registered: " << driver_name;
     }
   }
@@ -73,7 +73,7 @@ StatusOr<std::shared_ptr<Driver>> DriverRegistry::Create(
       }
     }
     if (!factory_fn) {
-      return NotFoundErrorBuilder(ABSL_LOC)
+      return NotFoundErrorBuilder(IREE_LOC)
              << "Driver " << driver_name << " not found";
     }
   }

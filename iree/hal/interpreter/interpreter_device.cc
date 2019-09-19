@@ -144,7 +144,7 @@ StatusOr<ref_ptr<TimelineSemaphore>> InterpreterDevice::CreateTimelineSemaphore(
   IREE_TRACE_SCOPE0("InterpreterDevice::CreateTimelineSemaphore");
 
   // TODO(b/140141417): implement timeline semaphores.
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "Timeline semaphores not yet implemented";
 }
 

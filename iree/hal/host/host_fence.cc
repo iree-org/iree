@@ -44,7 +44,7 @@ Status HostFence::Signal(uint64_t value) {
     return status_;
   }
   if (value_.exchange(value) >= value) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Fence values must be monotonically increasing";
   }
   return OkStatus();
@@ -95,7 +95,7 @@ Status HostFence::WaitForFences(absl::Span<const FenceValue> fences,
                 },
                 &fence_value),
             deadline)) {
-      return DeadlineExceededErrorBuilder(ABSL_LOC)
+      return DeadlineExceededErrorBuilder(IREE_LOC)
              << "Deadline exceeded waiting for fences";
     }
     if (!fence->status_.ok()) {

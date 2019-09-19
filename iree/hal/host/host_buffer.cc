@@ -18,8 +18,8 @@
 #include <cstdlib>
 #include <cstring>
 
-#include "absl/types/source_location.h"
 #include "iree/base/logging.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -69,7 +69,7 @@ Status HostBuffer::FillImpl(device_size_t byte_offset,
       break;
     }
     default:
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Unsupported scalar data size: " << pattern_length;
   }
   return OkStatus();

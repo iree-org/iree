@@ -16,7 +16,7 @@
 
 #include <algorithm>
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/heap_buffer.h"
@@ -32,7 +32,7 @@ Status DeviceManager::RegisterDevice(std::shared_ptr<Device> device) {
   IREE_TRACE_SCOPE0("DeviceManager::RegisterDevice");
   absl::MutexLock lock(&device_mutex_);
   if (std::find(devices_.begin(), devices_.end(), device) != devices_.end()) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Device already registered";
   }
   devices_.push_back(std::move(device));
@@ -47,7 +47,7 @@ Status DeviceManager::UnregisterDevice(Device* device) {
                            return device == other_device.get();
                          });
   if (it == devices_.end()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "Device not registered";
+    return NotFoundErrorBuilder(IREE_LOC) << "Device not registered";
   }
   devices_.erase(it);
   return OkStatus();
@@ -58,7 +58,7 @@ StatusOr<DevicePlacement> DeviceManager::ResolvePlacement(
   IREE_TRACE_SCOPE0("DeviceManager::ResolvePlacement");
   absl::MutexLock lock(&device_mutex_);
   if (devices_.empty()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "No devices registered";
+    return NotFoundErrorBuilder(IREE_LOC) << "No devices registered";
   }
 
   // TODO(benvanik): multiple devices and placement.
@@ -75,7 +75,7 @@ StatusOr<Allocator*> DeviceManager::FindCompatibleAllocator(
     absl::Span<const DevicePlacement> device_placements) const {
   IREE_TRACE_SCOPE0("DeviceManager::FindCompatibleAllocator");
   if (device_placements.empty()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC) << "No placements provided";
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "No placements provided";
   }
 
   // Find the first allocator. As we only return an allocator if all placements
@@ -94,7 +94,7 @@ StatusOr<Allocator*> DeviceManager::FindCompatibleAllocator(
         !allocator->CanUseBufferLike(some_allocator, memory_type, buffer_usage,
                                      buffer_usage)) {
       // Allocators are not compatible.
-      return NotFoundErrorBuilder(ABSL_LOC)
+      return NotFoundErrorBuilder(IREE_LOC)
              << "No single allocator found that is compatible with all "
                 "placements";
     }
@@ -109,7 +109,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::TryAllocateDeviceVisibleBuffer(
   IREE_TRACE_SCOPE("DeviceManager::TryAllocateDeviceVisibleBuffer:size", int)
   (static_cast<int>(allocation_size));
   if (!AnyBitSet(memory_type & MemoryType::kHostLocal)) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Host-local buffers require the kHostLocal bit: "
            << MemoryTypeString(memory_type);
   }
@@ -139,7 +139,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceVisibleBuffer(
   IREE_TRACE_SCOPE("DeviceManager::AllocateDeviceVisibleBuffer:size", int)
   (static_cast<int>(allocation_size));
   if (!AnyBitSet(memory_type & MemoryType::kHostLocal)) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Host-local buffers require the kHostLocal bit: "
            << MemoryTypeString(memory_type);
   }
@@ -161,7 +161,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceLocalBuffer(
   IREE_TRACE_SCOPE("DeviceManager::AllocateDeviceLocalBuffer:size", int)
   (static_cast<int>(allocation_size));
   if (!AnyBitSet(memory_type & MemoryType::kDeviceLocal)) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Device-local buffers require the kDeviceLocal bit: "
            << MemoryTypeString(memory_type);
   }

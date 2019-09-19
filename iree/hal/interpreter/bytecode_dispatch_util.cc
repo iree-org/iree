@@ -110,7 +110,7 @@ Status ApplyCopy(BufferView* src_local, absl::Span<const int32_t> src_indices,
                                        dst_buffer.mutable_contents(),
                                        dst_local->shape, dst_indices, lengths);
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Unimplemented element size: " << src_local->element_size;
   }
 }

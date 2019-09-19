@@ -19,8 +19,8 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/time.h"
-#include "absl/types/source_location.h"
 #include "iree/base/intrusive_list.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -95,7 +95,7 @@ StatusOr<OutstandingFenceSignal*> LegacyFencePool::Acquire() {
 
   absl::MutexLock lock(&mutex_);
   if (unused_fences_.empty()) {
-    return ResourceExhaustedErrorBuilder(ABSL_LOC)
+    return ResourceExhaustedErrorBuilder(IREE_LOC)
            << "Fence pool out of unused fences";
   }
 
@@ -235,7 +235,7 @@ StatusOr<VkFence> LegacyFence::AcquireSignalFence(uint64_t value) {
   // It's an error to signal out of order (as that requires a lot more
   // tracking and magic to get right).
   if (value_.load() >= value) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Attempting to signal a timeline fence out of order; value="
            << value_ << ", new_value=" << value;
   }
@@ -249,7 +249,7 @@ StatusOr<VkFence> LegacyFence::AcquireSignalFence(uint64_t value) {
       // Fence is going to be signaled at exactly the required value.
       if (fence_signal->is_pending) {
         // Already have signaled to this value - that's a paddlin'.
-        return FailedPreconditionErrorBuilder(ABSL_LOC)
+        return FailedPreconditionErrorBuilder(IREE_LOC)
                << "Duplicate signal of timeline fence for value=" << value;
       }
       signal_state = fence_signal;

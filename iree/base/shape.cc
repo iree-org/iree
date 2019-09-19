@@ -18,7 +18,7 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_join.h"
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -90,7 +90,7 @@ StatusOr<int> Shape::ResolveAxis(int axis) const {
     new_axis += rank_;
   }
   if (new_axis < 0 || new_axis >= rank_) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Axis " << new_axis << " (orig " << axis
            << ") out of bounds of rank " << rank_;
   }

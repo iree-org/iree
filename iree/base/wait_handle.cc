@@ -27,7 +27,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 // TODO(benvanik): organize these macros - they are terrible.
@@ -99,7 +99,7 @@ StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, absl::Time deadline) {
     if (remaining_time < absl::ZeroDuration()) {
       // Note: we likely have already bailed before getting here with a negative
       // duration.
-      return DeadlineExceededErrorBuilder(ABSL_LOC);
+      return DeadlineExceededErrorBuilder(IREE_LOC);
     }
     timeout_spec = absl::ToTimespec(remaining_time);
     tmo_p = &timeout_spec;
@@ -122,7 +122,7 @@ StatusOr<int> SystemPoll(absl::Span<pollfd> poll_fds, absl::Time deadline) {
   } else {
     absl::Duration remaining_time = deadline - absl::Now();
     if (remaining_time < absl::ZeroDuration()) {
-      return DeadlineExceededErrorBuilder(ABSL_LOC);
+      return DeadlineExceededErrorBuilder(IREE_LOC);
     }
     timeout = static_cast<int>(absl::ToInt64Milliseconds(remaining_time));
   }
@@ -161,7 +161,7 @@ StatusOr<absl::FixedArray<pollfd>> AcquireWaitHandles(
 
     // Abort if deadline exceeded.
     if (deadline != absl::InfinitePast() && deadline < absl::Now()) {
-      return DeadlineExceededErrorBuilder(ABSL_LOC)
+      return DeadlineExceededErrorBuilder(IREE_LOC)
              << "Deadline exceeded acquiring for fds";
     }
   }
@@ -181,7 +181,7 @@ Status ClearFd(WaitableObject::FdType fd_type, int fd) {
     char buf;
     int rv = ::read(fd, &buf, 1);
 #else
-    return UnimplementedErrorBuilder(ABSL_LOC) << "fd_type cannot be cleared";
+    return UnimplementedErrorBuilder(IREE_LOC) << "fd_type cannot be cleared";
 #endif  // IREE_HAS_EVENTFD
     if (rv != -1) {
       // Success! Keep going.
@@ -238,7 +238,7 @@ Status MultiPoll(WaitHandle::WaitHandleSpan wait_handles,
     if (rv == 0) {
       // Call timed out and no descriptors were ready.
       // If this was just a poll then that's fine.
-      return DeadlineExceededErrorBuilder(ABSL_LOC);
+      return DeadlineExceededErrorBuilder(IREE_LOC);
     }
   }
 
@@ -266,13 +266,13 @@ Status MultiPoll(WaitHandle::WaitHandleSpan wait_handles,
       *out_any_signaled_index = i;
     } else if (poll_fds[i].revents) {
       if (poll_fds[i].revents & POLLERR) {
-        return InternalErrorBuilder(ABSL_LOC);
+        return InternalErrorBuilder(IREE_LOC);
       } else if (poll_fds[i].revents & POLLHUP) {
-        return CancelledErrorBuilder(ABSL_LOC);
+        return CancelledErrorBuilder(IREE_LOC);
       } else if (poll_fds[i].revents & POLLNVAL) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC);
+        return InvalidArgumentErrorBuilder(IREE_LOC);
       } else {
-        return UnknownErrorBuilder(ABSL_LOC);
+        return UnknownErrorBuilder(IREE_LOC);
       }
     } else if (poll_fds[i].fd != kInvalidFd) {
       ++(*out_unsignaled_count);
@@ -309,10 +309,10 @@ WaitHandle WaitHandle::AlwaysFailing() {
     std::string DebugString() const override { return "fail"; }
     StatusOr<std::pair<FdType, int>> AcquireFdForWait(
         absl::Time deadline) override {
-      return InternalErrorBuilder(ABSL_LOC) << "AlwaysFailingObject";
+      return InternalErrorBuilder(IREE_LOC) << "AlwaysFailingObject";
     }
     StatusOr<bool> TryResolveWakeOnFd(int fd) override {
-      return InternalErrorBuilder(ABSL_LOC) << "AlwaysFailingObject";
+      return InternalErrorBuilder(IREE_LOC) << "AlwaysFailingObject";
     }
   };
   static auto* obj = new AlwaysFailingObject();
@@ -339,7 +339,7 @@ Status WaitHandle::WaitAll(WaitHandleSpan wait_handles, absl::Time deadline) {
     return OkStatus();
   } else {
     // One or more were unsignaled.
-    return DeadlineExceededErrorBuilder(ABSL_LOC);
+    return DeadlineExceededErrorBuilder(IREE_LOC);
   }
 }
 
@@ -358,7 +358,7 @@ StatusOr<bool> WaitHandle::TryWaitAll(WaitHandleSpan wait_handles) {
 StatusOr<int> WaitHandle::WaitAny(WaitHandleSpan wait_handles,
                                   absl::Time deadline) {
   if (wait_handles.empty()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "At least one wait handle is required for WaitAny";
   }
 
@@ -520,7 +520,7 @@ Status ManualResetEvent::Set() {
   char buf = '\n';
   return Syscall(::write, write_fd_, &buf, 1).status();
 #else
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "No fd-based sync primitive on this platform";
 #endif  // IREE_HAS_EVENTFD / IREE_HAS_PIPE
 }

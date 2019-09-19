@@ -14,7 +14,7 @@
 
 #include "iree/vm/debug/debug_session.h"
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -29,7 +29,7 @@ bool DebugSession::is_ready() const {
 Status DebugSession::OnReady() {
   absl::MutexLock lock(&mutex_);
   if (ready_ > 0) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Session has already readied up";
   }
   ++ready_;

@@ -15,8 +15,8 @@
 #include "iree/hal/vulkan/pipeline_executable.h"
 
 #include "absl/container/inlined_vector.h"
-#include "absl/types/source_location.h"
 #include "iree/base/memory.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -35,10 +35,10 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
   const auto& syms = logical_device->syms();
   if (!spirv_executable_def.entry_points() ||
       spirv_executable_def.entry_points()->size() == 0) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC) << "No entry points defined";
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "No entry points defined";
   }
   if (!spirv_executable_def.code()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC) << "No SPIR-V code present";
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "No SPIR-V code present";
   }
   const auto& code = *spirv_executable_def.code();
 
@@ -128,7 +128,7 @@ PipelineExecutable::~PipelineExecutable() {
 StatusOr<VkPipeline> PipelineExecutable::GetPipelineForEntryPoint(
     int entry_ordinal) const {
   if (entry_ordinal < 0 || entry_ordinal >= pipelines_.size()) {
-    return OutOfRangeErrorBuilder(ABSL_LOC) << "Invalid entry point ordinal";
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Invalid entry point ordinal";
   }
   return pipelines_[entry_ordinal];
 }

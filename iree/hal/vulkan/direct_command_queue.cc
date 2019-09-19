@@ -18,8 +18,8 @@
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
-#include "absl/types/source_location.h"
 #include "iree/base/memory.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
@@ -65,7 +65,7 @@ Status DirectCommandQueue::TranslateBatchInfo(const SubmissionBatch& batch,
       wait_semaphore_handles[i] = binary_semaphore->handle();
     } else {
       // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Timeline semaphores not yet implemented";
     }
     wait_dst_stage_masks[i] = dst_stage_mask;
@@ -81,7 +81,7 @@ Status DirectCommandQueue::TranslateBatchInfo(const SubmissionBatch& batch,
       signal_semaphore_handles[i] = binary_semaphore->handle();
     } else {
       // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Timeline semaphores not yet implemented";
     }
   }
@@ -179,7 +179,7 @@ Status DirectCommandQueue::WaitIdle(absl::Time deadline) {
     // The implementation may not wait with this granularity (like, by 10000x).
     absl::Time now = absl::Now();
     if (deadline < now) {
-      return DeadlineExceededErrorBuilder(ABSL_LOC) << "Deadline in the past";
+      return DeadlineExceededErrorBuilder(IREE_LOC) << "Deadline in the past";
     }
     timeout = static_cast<uint64_t>(absl::ToInt64Nanoseconds(deadline - now));
   }
@@ -195,7 +195,7 @@ Status DirectCommandQueue::WaitIdle(absl::Time deadline) {
     case VK_SUCCESS:
       return OkStatus();
     case VK_TIMEOUT:
-      return DeadlineExceededErrorBuilder(ABSL_LOC)
+      return DeadlineExceededErrorBuilder(IREE_LOC)
              << "Deadline exceeded waiting for idle";
     default:
       return VkResultToStatus(result);

@@ -34,7 +34,7 @@ Status ValidateElementSize(int element_bit_width,
       auto expected_bit_width =
           expected_element_type.type_union_as_FloatTypeDef()->width();
       if (element_bit_width != expected_bit_width) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC)
+        return InvalidArgumentErrorBuilder(IREE_LOC)
                << "Has element bit width " << element_bit_width
                << " but expected " << expected_bit_width;
       }
@@ -44,7 +44,7 @@ Status ValidateElementSize(int element_bit_width,
       auto expected_bit_width =
           expected_element_type.type_union_as_IntegerTypeDef()->width();
       if (element_bit_width != expected_bit_width) {
-        return InvalidArgumentErrorBuilder(ABSL_LOC)
+        return InvalidArgumentErrorBuilder(IREE_LOC)
                << "Has element bit width " << element_bit_width
                << " but expected " << expected_bit_width;
       }
@@ -54,7 +54,7 @@ Status ValidateElementSize(int element_bit_width,
     case ElementTypeDefUnion::NONE: {
     }
   }
-  return InvalidArgumentErrorBuilder(ABSL_LOC)
+  return InvalidArgumentErrorBuilder(IREE_LOC)
          << "Defined type has unsupported element type "
          << EnumNameElementTypeDefUnion(
                 expected_element_type.type_union_type());
@@ -67,7 +67,7 @@ Status ValidateArgType(const BufferView& arg,
 
   auto expected_shape = expected_type.shape();
   if (arg.shape.size() != expected_shape->size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Argument should have rank " << expected_shape->size()
            << " but has rank " << arg.shape.size();
   }
@@ -75,7 +75,7 @@ Status ValidateArgType(const BufferView& arg,
     auto dim_size = arg.shape[i];
     auto expected_dim_size = expected_shape->Get(i);
     if (dim_size != expected_dim_size) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Argument dimension " << i << " should have size "
              << expected_dim_size << " but has size " << dim_size;
     }
@@ -120,13 +120,13 @@ Status SequencerContext::Invoke(FiberState* fiber_state, Function function,
                                 absl::Span<BufferView> results) const {
   // Verify arg/result counts.
   if (args.size() != function.input_count()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Function " << function.name() << " requires "
            << function.input_count() << " inputs but " << args.size()
            << " provided";
   }
   if (results.size() != function.result_count()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Function " << function.name() << " requires "
            << function.result_count() << " outputs but " << results.size()
            << " provided";

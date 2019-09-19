@@ -63,7 +63,7 @@ StatusOr<std::pair<std::string, int>> ParseAddress(absl::string_view address) {
   if (bracket_loc != std::string::npos) {
     // Has at least a ]. Let's assume it's mostly right.
     if (address.find('[') != 0) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Mismatched brackets in address: " << address;
     }
     hostname = address.substr(1, bracket_loc - 1);
@@ -83,7 +83,7 @@ StatusOr<std::pair<std::string, int>> ParseAddress(absl::string_view address) {
   }
   int port = 0;
   if (!port_str.empty() && !absl::SimpleAtoi(port_str, &port)) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Unable to parse port '" << port_str << "' from " << address;
   }
   return std::make_pair(std::string(hostname), port);
@@ -469,7 +469,7 @@ class TcpDebugClient final : public DebugClient {
     }
     if (!target_module) {
       // TODO(benvanik): fetch contexts first.
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Demand fetch contexts not yet implemented";
     }
     // Found at least one module with the right name.
@@ -657,7 +657,7 @@ class TcpDebugClient final : public DebugClient {
       if (!packet_buffer_or.ok()) {
         if (shutdown_pending_ && IsUnavailable(packet_buffer_or.status())) {
           // This is a graceful close.
-          return CancelledErrorBuilder(ABSL_LOC) << "Service shutdown";
+          return CancelledErrorBuilder(IREE_LOC) << "Service shutdown";
         }
         return packet_buffer_or.status();
       }
@@ -781,7 +781,7 @@ class TcpDebugClient final : public DebugClient {
 
   Status DispatchResponse(const rpc::Response& response) {
     if (pending_responses_.empty()) {
-      return FailedPreconditionErrorBuilder(ABSL_LOC)
+      return FailedPreconditionErrorBuilder(IREE_LOC)
              << "Response received but no request is pending";
     }
     auto type_callback = std::move(pending_responses_.front());
@@ -790,18 +790,18 @@ class TcpDebugClient final : public DebugClient {
     if (response.status()) {
       const auto& status = *response.status();
       Status client_status =
-          StatusBuilder(static_cast<StatusCode>(status.code()), ABSL_LOC)
+          StatusBuilder(static_cast<StatusCode>(status.code()), IREE_LOC)
           << "Server request failed: " << WrapString(status.message());
       return type_callback.second(std::move(client_status), response);
     }
 
     if (!response.message()) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Response contains no message body";
     }
 
     if (response.message_type() != type_callback.first) {
-      return DataLossErrorBuilder(ABSL_LOC)
+      return DataLossErrorBuilder(IREE_LOC)
              << "Out of order response (mismatch pending)";
     }
     return type_callback.second(OkStatus(), response);
@@ -824,7 +824,7 @@ class TcpDebugClient final : public DebugClient {
       DISPATCH_EVENT(BreakpointHit);
       DISPATCH_EVENT(StepCompleted);
       default:
-        return UnimplementedErrorBuilder(ABSL_LOC)
+        return UnimplementedErrorBuilder(IREE_LOC)
                << "Unimplemented debug service event: "
                << static_cast<int>(packet.event_type());
     }
@@ -833,7 +833,7 @@ class TcpDebugClient final : public DebugClient {
   StatusOr<TcpRemoteContext*> GetContext(int context_id) {
     auto it = context_map_.find(context_id);
     if (it == context_map_.end()) {
-      return NotFoundErrorBuilder(ABSL_LOC) << "Context was never registered";
+      return NotFoundErrorBuilder(IREE_LOC) << "Context was never registered";
     }
     return it->second.get();
   }
@@ -857,7 +857,7 @@ class TcpDebugClient final : public DebugClient {
     VLOG(2) << "OnContextRegistered(" << event.context_id() << ")";
     auto it = context_map_.find(event.context_id());
     if (it != context_map_.end()) {
-      return FailedPreconditionErrorBuilder(ABSL_LOC)
+      return FailedPreconditionErrorBuilder(IREE_LOC)
              << "Context already registered";
     }
     return RegisterContext(event.context_id());
@@ -867,7 +867,7 @@ class TcpDebugClient final : public DebugClient {
     VLOG(2) << "OnContextUnregistered(" << event.context_id() << ")";
     auto it = context_map_.find(event.context_id());
     if (it == context_map_.end()) {
-      return FailedPreconditionErrorBuilder(ABSL_LOC)
+      return FailedPreconditionErrorBuilder(IREE_LOC)
              << "Context was never registered";
     }
     auto context = std::move(it->second);
@@ -892,7 +892,7 @@ class TcpDebugClient final : public DebugClient {
   StatusOr<TcpRemoteFiberState*> GetFiberState(int fiber_id) {
     auto it = fiber_state_map_.find(fiber_id);
     if (it == fiber_state_map_.end()) {
-      return NotFoundErrorBuilder(ABSL_LOC) << "Fiber was never registered";
+      return NotFoundErrorBuilder(IREE_LOC) << "Fiber was never registered";
     }
     return it->second.get();
   }
@@ -911,7 +911,7 @@ class TcpDebugClient final : public DebugClient {
     VLOG(2) << "OnFiberRegistered(" << event.fiber_id() << ")";
     auto it = fiber_state_map_.find(event.fiber_id());
     if (it != fiber_state_map_.end()) {
-      return FailedPreconditionErrorBuilder(ABSL_LOC)
+      return FailedPreconditionErrorBuilder(IREE_LOC)
              << "Fiber already registered";
     }
     return RegisterFiberState(event.fiber_id());
@@ -921,7 +921,7 @@ class TcpDebugClient final : public DebugClient {
     VLOG(2) << "OnFiberUnregistered(" << event.fiber_id() << ")";
     auto it = fiber_state_map_.find(event.fiber_id());
     if (it == fiber_state_map_.end()) {
-      return FailedPreconditionErrorBuilder(ABSL_LOC)
+      return FailedPreconditionErrorBuilder(IREE_LOC)
              << "Fiber was never registered";
     }
     auto fiber_state = std::move(it->second);
@@ -935,7 +935,7 @@ class TcpDebugClient final : public DebugClient {
   StatusOr<TcpRemoteBreakpoint*> GetBreakpoint(int breakpoint_id) {
     auto it = breakpoint_map_.find(breakpoint_id);
     if (it == breakpoint_map_.end()) {
-      return NotFoundErrorBuilder(ABSL_LOC)
+      return NotFoundErrorBuilder(IREE_LOC)
              << "Breakpoint " << breakpoint_id << " was never registered";
     }
     return it->second.get();
@@ -964,7 +964,7 @@ class TcpDebugClient final : public DebugClient {
     VLOG(2) << "UnregisterBreakpoint(" << breakpoint->id() << ")";
     auto it = breakpoint_map_.find(breakpoint->id());
     if (it == breakpoint_map_.end()) {
-      return NotFoundErrorBuilder(ABSL_LOC)
+      return NotFoundErrorBuilder(IREE_LOC)
              << "Breakpoint was never registered";
     }
     breakpoint_map_.erase(it);
@@ -1070,7 +1070,7 @@ StatusOr<std::unique_ptr<DebugClient>> DebugClient::Connect(
   // Parse address into hostname and port.
   ASSIGN_OR_RETURN(auto hostname_port, ParseAddress(service_address));
   if (hostname_port.second == 0) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "No port specified in service address; port must match the "
               "server: "
            << service_address;
@@ -1087,7 +1087,7 @@ StatusOr<std::unique_ptr<DebugClient>> DebugClient::Connect(
   int getaddrinfo_ret = ::getaddrinfo(
       hostname_port.first.c_str(), port_str.c_str(), &hints, &resolved_address);
   if (getaddrinfo_ret != 0) {
-    return UnavailableErrorBuilder(ABSL_LOC)
+    return UnavailableErrorBuilder(IREE_LOC)
            << "Unable to resolve debug service address for " << service_address
            << ": (" << getaddrinfo_ret << ") "
            << ::gai_strerror(getaddrinfo_ret);
@@ -1106,7 +1106,7 @@ StatusOr<std::unique_ptr<DebugClient>> DebugClient::Connect(
   }
   ::freeaddrinfo(resolved_address);
   if (fd == -1) {
-    return UnavailableErrorBuilder(ABSL_LOC)
+    return UnavailableErrorBuilder(IREE_LOC)
            << "Unable to connect to " << service_address << " on any address: ("
            << errno << ") " << ::strerror(errno);
   }

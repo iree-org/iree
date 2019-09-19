@@ -30,7 +30,7 @@ Stack::~Stack() = default;
 
 StatusOr<StackFrame*> Stack::PushFrame(Function function) {
   if (stack_depth_ + 1 > kMaxStackDepth) {
-    return InternalErrorBuilder(ABSL_LOC)
+    return InternalErrorBuilder(IREE_LOC)
            << "Max stack depth of " << kMaxStackDepth << " exceeded";
   }
   stack_[stack_depth_++] = StackFrame(function);
@@ -42,7 +42,7 @@ StatusOr<StackFrame*> Stack::PushFrame(Function function) {
 
 StatusOr<StackFrame*> Stack::PushFrame(const ImportFunction& function) {
   if (stack_depth_ + 1 > kMaxStackDepth) {
-    return InternalErrorBuilder(ABSL_LOC)
+    return InternalErrorBuilder(IREE_LOC)
            << "Max stack depth of " << kMaxStackDepth << " exceeded";
   }
   stack_[stack_depth_++] = StackFrame(function);
@@ -54,7 +54,7 @@ StatusOr<StackFrame*> Stack::PushFrame(const ImportFunction& function) {
 
 Status Stack::PopFrame() {
   if (stack_depth_ == 0) {
-    return InternalErrorBuilder(ABSL_LOC) << "Unbalanced stack pop";
+    return InternalErrorBuilder(IREE_LOC) << "Unbalanced stack pop";
   }
 
   // TODO(benvanik): WTF scope leave.

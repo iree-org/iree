@@ -14,7 +14,7 @@
 
 #include "iree/hal/interpreter/bytecode_cache.h"
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"
@@ -36,7 +36,7 @@ StatusOr<ref_ptr<Executable>> BytecodeCache::PrepareExecutable(
     ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("BytecodeCache::PrepareExecutable");
   if (!CanPrepareFormat(spec.format)) {
-    return UnimplementedErrorBuilder(ABSL_LOC)
+    return UnimplementedErrorBuilder(IREE_LOC)
            << "Unsupported format: " << spec.format;
   }
 

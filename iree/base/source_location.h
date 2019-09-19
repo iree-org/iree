@@ -12,26 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/instance.h"
+#ifndef IREE_BASE_SOURCE_LOCATION_H_
+#define IREE_BASE_SOURCE_LOCATION_H_
 
-#include "absl/memory/memory.h"
-#include "iree/base/source_location.h"
-#include "iree/base/status.h"
+#ifdef IREE_CONFIG_GOOGLE_INTERNAL
+#include "iree/base/google/source_location_absl.h"
+#else
+#include "iree/base/internal/source_location.h"
+#endif  // IREE_CONFIG_GOOGLE_INTERNAL
 
-namespace iree {
-namespace vm {
-
-// static
-int Instance::NextUniqueId() {
-  static int next_id = 0;
-  return ++next_id;
-}
-
-Instance::Instance(std::unique_ptr<debug::DebugServer> debug_server)
-    : debug_server_(std::move(debug_server)),
-      device_manager_(absl::make_unique<hal::DeviceManager>()) {}
-
-Instance::~Instance() = default;
-
-}  // namespace vm
-}  // namespace iree
+#endif  // IREE_BASE_SOURCE_LOCATION_H_

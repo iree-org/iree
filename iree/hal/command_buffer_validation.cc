@@ -98,7 +98,7 @@ bool ValidatingCommandBuffer::is_recording() const {
 Status ValidatingCommandBuffer::Begin() {
   DVLOG(3) << "CommandBuffer::Begin()";
   if (impl_->is_recording()) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Command buffer is already recording";
   }
   return impl_->Begin();
@@ -107,7 +107,7 @@ Status ValidatingCommandBuffer::Begin() {
 Status ValidatingCommandBuffer::End() {
   DVLOG(3) << "CommandBuffer::End()";
   if (!impl_->is_recording()) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Command buffer is not recording";
   }
   return impl_->End();
@@ -116,7 +116,7 @@ Status ValidatingCommandBuffer::End() {
 Status ValidatingCommandBuffer::ValidateCategories(
     CommandCategoryBitfield required_categories) const {
   if (!AllBitsSet(command_categories(), required_categories)) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC)
+    return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Operation requires categories "
            << CommandCategoryString(required_categories)
            << " but buffer only supports "
@@ -129,7 +129,7 @@ Status ValidatingCommandBuffer::ValidateCompatibleMemoryType(
     Buffer* buffer, MemoryTypeBitfield memory_type) const {
   if ((buffer->memory_type() & memory_type) != memory_type) {
     // Missing one or more bits.
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Buffer memory type is not compatible with the requested "
               "operation; buffer has "
            << MemoryTypeString(buffer->memory_type()) << ", operation requires "
@@ -142,7 +142,7 @@ Status ValidatingCommandBuffer::ValidateAccess(
     Buffer* buffer, MemoryAccessBitfield memory_access) const {
   if ((buffer->allowed_access() & memory_access) != memory_access) {
     // Bits must match exactly.
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "The buffer does not support the requested access type; buffer "
               "allows "
            << MemoryAccessString(buffer->allowed_access())
@@ -156,7 +156,7 @@ Status ValidatingCommandBuffer::ValidateUsage(Buffer* buffer,
                                               BufferUsageBitfield usage) const {
   if (!allocator()->CanUseBuffer(buffer, usage)) {
     // Buffer cannot be used on the queue for the given usage.
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Requested usage of " << buffer->DebugString()
            << " is not supported for the buffer on this queue; "
               "buffer allows "
@@ -166,7 +166,7 @@ Status ValidatingCommandBuffer::ValidateUsage(Buffer* buffer,
 
   if ((buffer->usage() & usage) != usage) {
     // Missing one or more bits.
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "Requested usage was not specified when the buffer was "
               "allocated; buffer allows "
            << BufferUsageString(buffer->usage()) << ", operation requires "
@@ -182,7 +182,7 @@ Status ValidatingCommandBuffer::ValidateRange(Buffer* buffer,
                                               device_size_t byte_length) const {
   // Check if the start of the range runs off the end of the buffer.
   if (byte_offset > buffer->byte_length()) {
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Attempted to access an address off the end of the valid buffer "
               "range (offset="
            << byte_offset << ", length=" << byte_length
@@ -197,7 +197,7 @@ Status ValidatingCommandBuffer::ValidateRange(Buffer* buffer,
   // Check if the end runs over the allocation.
   device_size_t end = byte_offset + byte_length;
   if (end > buffer->byte_length()) {
-    return OutOfRangeErrorBuilder(ABSL_LOC)
+    return OutOfRangeErrorBuilder(IREE_LOC)
            << "Attempted to access an address outside of the valid buffer "
               "range (offset="
            << byte_offset << ", length=" << byte_length
@@ -275,7 +275,7 @@ Status ValidatingCommandBuffer::FillBuffer(Buffer* target_buffer,
 
   // Ensure the value length is supported.
   if (pattern_length != 1 && pattern_length != 2 && pattern_length != 4) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Fill value length is not one of the supported values "
               "(pattern_length="
            << pattern_length << ")";
@@ -283,7 +283,7 @@ Status ValidatingCommandBuffer::FillBuffer(Buffer* target_buffer,
 
   // Ensure the offset and length have an alignment matching the value length.
   if ((target_offset % pattern_length) != 0 || (length % pattern_length) != 0) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Fill offset and/or length do not match the natural alignment of "
               "the fill value (target_offset="
            << target_offset << ", length=" << length
@@ -341,7 +341,7 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
   // TODO(b/117338171): host->host copies.
   if (!AnyBitSet(source_buffer->memory_type() & MemoryType::kDeviceVisible) &&
       !AnyBitSet(target_buffer->memory_type() & MemoryType::kDeviceVisible)) {
-    return PermissionDeniedErrorBuilder(ABSL_LOC)
+    return PermissionDeniedErrorBuilder(IREE_LOC)
            << "At least one buffer must be device-visible for a copy; "
               "source_buffer="
            << MemoryTypeString(source_buffer->memory_type())
@@ -360,7 +360,7 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
   if (Buffer::TestOverlap(source_buffer, source_offset, length, target_buffer,
                           target_offset,
                           length) != Buffer::Overlap::kDisjoint) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Source and target ranges overlap within the same buffer";
   }
 

@@ -19,10 +19,10 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/mutex.h"
-#include "absl/types/source_location.h"
 #include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
 #include "third_party/flatbuffers/include/flatbuffers/reflection.h"
 #include "iree/base/flatbuffer_util.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/schemas/debug_service_generated.h"
 #include "iree/schemas/reflection_data.h"
@@ -110,13 +110,13 @@ StatusOr<BufferView*> ResolveFiberLocal(FiberState* fiber_state,
                                         int frame_index, int local_index) {
   auto frames = fiber_state->mutable_stack()->mutable_frames();
   if (frame_index < 0 || frame_index > frames.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Frame index " << frame_index << " out of bounds ("
            << frames.size() << ")";
   }
   auto locals = frames[frame_index].mutable_locals();
   if (local_index < 0 || local_index > locals.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Local index " << local_index << " out of bounds ("
            << locals.size() << ")";
   }
@@ -193,7 +193,7 @@ Status DebugService::UnregisterContext(SequencerContext* context) {
   VLOG(2) << "UnregisterContext(" << context->id() << ")";
   auto it = std::find(contexts_.begin(), contexts_.end(), context);
   if (it == contexts_.end()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "Context not registered";
+    return NotFoundErrorBuilder(IREE_LOC) << "Context not registered";
   }
   RETURN_IF_ERROR(SuspendAllFibers());
   RETURN_IF_ERROR(UnreadyAllSessions());
@@ -211,7 +211,7 @@ StatusOr<SequencerContext*> DebugService::GetContext(int context_id) const {
       return context;
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "Context with ID " << context_id
          << " not registered with the debug service";
 }
@@ -239,7 +239,7 @@ StatusOr<Module*> DebugService::GetModule(int context_id,
       return module.get();
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "Module '" << module_name << "' not found on context "
          << context_id;
 }
@@ -266,7 +266,7 @@ Status DebugService::UnregisterFiberState(FiberState* fiber_state) {
   VLOG(2) << "UnregisterFiberState(" << fiber_state->id() << ")";
   auto it = std::find(fiber_states_.begin(), fiber_states_.end(), fiber_state);
   if (it == fiber_states_.end()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "Fiber state not registered";
+    return NotFoundErrorBuilder(IREE_LOC) << "Fiber state not registered";
   }
   RETURN_IF_ERROR(SuspendAllFibers());
   RETURN_IF_ERROR(UnreadyAllSessions());
@@ -284,7 +284,7 @@ StatusOr<FiberState*> DebugService::GetFiberState(int fiber_id) const {
       return fiber_state;
     }
   }
-  return NotFoundErrorBuilder(ABSL_LOC)
+  return NotFoundErrorBuilder(IREE_LOC)
          << "Fiber state with ID " << fiber_id
          << " not registered with the debug service";
 }
@@ -323,7 +323,7 @@ Status DebugService::UnregisterDebugSession(DebugSession* session) {
   VLOG(2) << "UnregisterDebugSession(" << session->id() << ")";
   auto it = std::find(sessions_.begin(), sessions_.end(), session);
   if (it == sessions_.end()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "Session not registered";
+    return NotFoundErrorBuilder(IREE_LOC) << "Session not registered";
   }
   sessions_.erase(it);
   if (session->is_ready()) {
@@ -374,7 +374,7 @@ Status DebugService::WaitUntilAllSessionsReady() {
       &cond_state));
   mutex_.Unlock();
   if (cond_state.consider_aborted) {
-    return AbortedErrorBuilder(ABSL_LOC)
+    return AbortedErrorBuilder(IREE_LOC)
            << "At least one session connected but never readied up";
   }
   VLOG(1) << "Sessions ready, resuming";
@@ -673,7 +673,7 @@ StatusOr<Offset<rpc::ListBreakpointsResponse>> DebugService::ListBreakpoints(
 StatusOr<Offset<rpc::AddBreakpointResponse>> DebugService::AddBreakpoint(
     const rpc::AddBreakpointRequest& request, FlatBufferBuilder* fbb) {
   if (!request.breakpoint()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC) << "No breakpoint specified";
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "No breakpoint specified";
   }
   absl::MutexLock lock(&mutex_);
   int breakpoint_id = Instance::NextUniqueId();
@@ -696,7 +696,7 @@ StatusOr<Offset<rpc::AddBreakpointResponse>> DebugService::AddBreakpoint(
       }
       break;
     default:
-      return UnimplementedErrorBuilder(ABSL_LOC) << "Unhandled breakpoint type";
+      return UnimplementedErrorBuilder(IREE_LOC) << "Unhandled breakpoint type";
   }
   breakpoints_.push_back(std::move(breakpoint));
 
@@ -725,7 +725,7 @@ StatusOr<Offset<rpc::RemoveBreakpointResponse>> DebugService::RemoveBreakpoint(
           RETURN_IF_ERROR(UnregisterFunctionBreakpoint(breakpoint));
           break;
         default:
-          return UnimplementedErrorBuilder(ABSL_LOC)
+          return UnimplementedErrorBuilder(IREE_LOC)
                  << "Unhandled breakpoint type";
       }
       breakpoints_.erase(it);
@@ -735,7 +735,7 @@ StatusOr<Offset<rpc::RemoveBreakpointResponse>> DebugService::RemoveBreakpoint(
 
   RETURN_IF_ERROR(ResumeAllFibers());
   if (!found) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Breakpoint ID " << request.breakpoint_id() << " not found";
   }
 
@@ -803,7 +803,7 @@ Status DebugService::OnFunctionBreakpointHit(int breakpoint_id,
     }
   }
   if (!source_fiber_state) {
-    return InternalErrorBuilder(ABSL_LOC)
+    return InternalErrorBuilder(IREE_LOC)
            << "Fiber state not found for stack - race?";
   }
   RETURN_IF_ERROR(UnreadyAllSessions());
@@ -833,7 +833,7 @@ StatusOr<Offset<rpc::StartProfilingResponse>> DebugService::StartProfiling(
   // ASSIGN_OR_RETURN(auto* context, GetContext(request.context_id()));
   // rpc::StartProfilingResponseBuilder response(*fbb);
   // return response.Finish();
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "StartProfiling not yet implemented";
 }
 
@@ -845,7 +845,7 @@ StatusOr<Offset<rpc::StopProfilingResponse>> DebugService::StopProfiling(
   // ASSIGN_OR_RETURN(auto* context, GetContext(request.context_id()));
   // rpc::StopProfilingResponseBuilder response(*fbb);
   // return response.Finish();
-  return UnimplementedErrorBuilder(ABSL_LOC)
+  return UnimplementedErrorBuilder(IREE_LOC)
          << "StopProfiling not yet implemented";
 }
 

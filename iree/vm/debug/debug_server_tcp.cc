@@ -277,7 +277,7 @@ class TcpDebugSession : public DebugSession {
       DISPATCH_REQUEST(StartProfiling);
       DISPATCH_REQUEST(StopProfiling);
       default:
-        return UnimplementedErrorBuilder(ABSL_LOC)
+        return UnimplementedErrorBuilder(IREE_LOC)
                << "Unimplemented debug service request: "
                << static_cast<int>(request.message_type());
     }
@@ -304,13 +304,13 @@ class TcpDebugServer final : public DebugServer {
     socket_addr.sin6_addr = in6addr_any;
     if (::bind(listen_fd, reinterpret_cast<struct sockaddr*>(&socket_addr),
                sizeof(socket_addr)) < 0) {
-      return AlreadyExistsErrorBuilder(ABSL_LOC)
+      return AlreadyExistsErrorBuilder(IREE_LOC)
              << "Unable to bind socket to port " << port << ": (" << errno
              << ") " << ::strerror(errno);
     }
     if (::listen(listen_fd, 1)) {
       ::close(listen_fd);
-      return AlreadyExistsErrorBuilder(ABSL_LOC)
+      return AlreadyExistsErrorBuilder(IREE_LOC)
              << "Unable to listen on port " << port << ": (" << errno << ") "
              << ::strerror(errno);
     }

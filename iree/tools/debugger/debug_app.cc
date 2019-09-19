@@ -24,9 +24,9 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
-#include "absl/types/source_location.h"
 #include "third_party/dear_imgui/imgui.h"
 #include "third_party/dear_imgui/imgui_internal.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/schemas/debug_service_generated.h"
 #include "iree/vm/bytecode_printer.h"
@@ -235,10 +235,10 @@ Status DebugApp::RefreshActiveBreakpoints() {
           break;
         case RemoteBreakpoint::Type::kNativeFunction:
           // TODO(benvanik): native breakpoint support.
-          return UnimplementedErrorBuilder(ABSL_LOC)
+          return UnimplementedErrorBuilder(IREE_LOC)
                  << "Native function breakpoints are TODO";
         default:
-          return UnimplementedErrorBuilder(ABSL_LOC)
+          return UnimplementedErrorBuilder(IREE_LOC)
                  << "Unimplemented breakpoint type";
       }
       user_breakpoint.is_enabling = true;
@@ -291,14 +291,14 @@ int DebugApp::FindMatchingUserBreakpointIndex(absl::string_view module_name,
 
 Status DebugApp::ResumeFromBreakpoint(UserBreakpoint* user_breakpoint) {
   if (!user_breakpoint->active_breakpoint) {
-    return FailedPreconditionErrorBuilder(ABSL_LOC) << "Breakpoint not active";
+    return FailedPreconditionErrorBuilder(IREE_LOC) << "Breakpoint not active";
   }
   VLOG(1) << "Resuming from breakpoint "
           << user_breakpoint->active_breakpoint->id() << "...";
   auto it = std::find(hit_breakpoints_.begin(), hit_breakpoints_.end(),
                       user_breakpoint->active_breakpoint);
   if (it == hit_breakpoints_.end()) {
-    return NotFoundErrorBuilder(ABSL_LOC) << "Breakpoint not found";
+    return NotFoundErrorBuilder(IREE_LOC) << "Breakpoint not found";
   }
   hit_breakpoints_.erase(it);
   return debug_client_->MakeReady();
@@ -413,11 +413,11 @@ Status DebugApp::PumpMainLoop() {
   while (SDL_PollEvent(&event)) {
     ImGui_ImplSDL2_ProcessEvent(&event);
     if (event.type == SDL_QUIT) {
-      return CancelledErrorBuilder(ABSL_LOC) << "Quit hotkey";
+      return CancelledErrorBuilder(IREE_LOC) << "Quit hotkey";
     } else if (event.type == SDL_WINDOWEVENT &&
                event.window.event == SDL_WINDOWEVENT_CLOSE &&
                event.window.windowID == SDL_GetWindowID(window_)) {
-      return CancelledErrorBuilder(ABSL_LOC) << "Window closed";
+      return CancelledErrorBuilder(IREE_LOC) << "Window closed";
     }
   }
   ImGui_ImplOpenGL3_NewFrame();
@@ -1151,7 +1151,7 @@ Status DebugApp::NavigateToCodeView(absl::string_view module_name,
                                     int function_ordinal, int offset,
                                     NavigationMode navigation_mode) {
   if (!debug_client_) {
-    return UnavailableErrorBuilder(ABSL_LOC) << "No connection established";
+    return UnavailableErrorBuilder(IREE_LOC) << "No connection established";
   }
   VLOG(1) << "NavigateToCodeView(" << module_name << ", " << function_ordinal
           << ", " << offset << ")";
@@ -1196,7 +1196,7 @@ Status DebugApp::NavigateToCodeView(absl::string_view module_name,
                                     absl::string_view function_name, int offset,
                                     NavigationMode navigation_mode) {
   if (!debug_client_) {
-    return UnavailableErrorBuilder(ABSL_LOC) << "No connection established";
+    return UnavailableErrorBuilder(IREE_LOC) << "No connection established";
   }
   return debug_client_->ResolveFunction(
       std::string(module_name), std::string(function_name),
@@ -1212,7 +1212,7 @@ Status DebugApp::NavigateToCodeView(const RemoteFiberState& fiber_state,
                                     int stack_frame_index,
                                     NavigationMode navigation_mode) {
   if (!debug_client_) {
-    return UnavailableErrorBuilder(ABSL_LOC) << "No connection established";
+    return UnavailableErrorBuilder(IREE_LOC) << "No connection established";
   }
   const auto& stack_frame = stack_frame_index == -1
                                 ? *fiber_state.def().frames.back()
@@ -1227,7 +1227,7 @@ Status DebugApp::NavigateToCodeView(const RemoteFiberState& fiber_state,
 Status DebugApp::NavigateToCodeView(const UserBreakpoint& user_breakpoint,
                                     NavigationMode navigation_mode) {
   if (!debug_client_) {
-    return UnavailableErrorBuilder(ABSL_LOC) << "No connection established";
+    return UnavailableErrorBuilder(IREE_LOC) << "No connection established";
   }
   switch (user_breakpoint.type) {
     case RemoteBreakpoint::Type::kBytecodeFunction:
@@ -1241,7 +1241,7 @@ Status DebugApp::NavigateToCodeView(const UserBreakpoint& user_breakpoint,
             user_breakpoint.bytecode_offset, navigation_mode);
       }
     case RemoteBreakpoint::Type::kNativeFunction:
-      return UnimplementedErrorBuilder(ABSL_LOC)
+      return UnimplementedErrorBuilder(IREE_LOC)
              << "Navigation to non-bytecode functions unimplemented";
   }
 }

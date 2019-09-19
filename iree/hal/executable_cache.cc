@@ -14,7 +14,7 @@
 
 #include "iree/hal/executable_cache.h"
 
-#include "absl/types/source_location.h"
+#include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
@@ -30,7 +30,7 @@ StatusOr<WaitHandle> ExecutableCache::PrepareExecutables(
     absl::Span<ref_ptr<Executable>> out_executables) {
   IREE_TRACE_SCOPE0("ExecutableCache::PrepareExecutables");
   if (specs.size() != out_executables.size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "1:1 specs:out_executables required";
   }
 

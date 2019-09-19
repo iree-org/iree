@@ -35,7 +35,7 @@ Status ExecutableTable::ValidateStructure(
     const auto* multi_arch_executable = multi_arch_executables[i];
     if (!multi_arch_executable || !multi_arch_executable->executables() ||
         multi_arch_executable->executables()->size() == 0) {
-      return InvalidArgumentErrorBuilder(ABSL_LOC)
+      return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Multi-arch executable ordinal " << i
              << " is missing its contents";
     }
@@ -54,7 +54,7 @@ ExecutableTable::LookupMultiArchExecutable(int executable_ordinal) const {
   if (executable_ordinal < 0 ||
       executable_ordinal >=
           executable_table_def_.multi_arch_executables()->size()) {
-    return InvalidArgumentErrorBuilder(ABSL_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Invalid multi-arch executable ordinal " << executable_ordinal;
   }
   return executable_table_def_.multi_arch_executables()->Get(

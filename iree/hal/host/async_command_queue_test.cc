@@ -89,7 +89,7 @@ TEST_F(AsyncCommandQueueTest, PropagateSubmitFailure) {
   EXPECT_CALL(*mock_target_queue, Submit(_, _))
       .WillOnce(
           [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            return DataLossErrorBuilder(ABSL_LOC);
+            return DataLossErrorBuilder(IREE_LOC);
           });
   HostFence fence(0u);
   ASSERT_OK(command_queue->Submit({{}, {cmd_buffer.get()}, {}}, {&fence, 1u}));
@@ -169,7 +169,7 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
       .WillOnce(
           [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
             usleep(100000);  // 100ms
-            return DataLossErrorBuilder(ABSL_LOC);
+            return DataLossErrorBuilder(IREE_LOC);
           });
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
@@ -201,7 +201,7 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
       .WillOnce(
           [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
             usleep(100000);  // 100ms
-            return DataLossErrorBuilder(ABSL_LOC);
+            return DataLossErrorBuilder(IREE_LOC);
           });
 
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
