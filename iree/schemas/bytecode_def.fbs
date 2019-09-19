@@ -1,0 +1,8 @@
+namespace iree;
+
+table BytecodeDef {
+  local_count:int;
+  contents:[byte];
+}
+
+root_type BytecodeDef;
