@@ -48,11 +48,10 @@ include(CMakeParseArguments)
 #     "awesome_test.cc"
 #   DEPS
 #     iree::awesome
-#     gmock
 #     gtest_main
 # )
 function(iree_cc_test)
-  if(NOT IREE_RUN_TESTS)
+  if(NOT IREE_BUILD_TESTS)
     return()
   endif()
 
@@ -73,7 +72,6 @@ function(iree_cc_test)
     PUBLIC
       ${IREE_COMMON_INCLUDE_DIRS}
     PRIVATE
-      ${GMOCK_INCLUDE_DIRS}
       ${GTEST_INCLUDE_DIRS}
   )
   target_compile_definitions(${_NAME}
@@ -86,7 +84,8 @@ function(iree_cc_test)
   )
   target_link_libraries(${_NAME}
     PUBLIC
-      ${IREE_CC_TEST_DEPS} gmock gunit
+      ${IREE_CC_TEST_DEPS}
+      gmock
     PRIVATE
       ${IREE_CC_TEST_LINKOPTS}
   )

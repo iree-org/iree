@@ -28,7 +28,7 @@ include(CMakeParseArguments)
 # LINKOPTS: List of link options
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
-# TESTONLY: When added, this target will only be built if user passes -DIREE_RUN_TESTS=ON to CMake.
+# TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 #
 # Note:
 # By default, iree_cc_library will always create a library named iree_${NAME},
@@ -70,7 +70,7 @@ function(iree_cc_library)
     ${ARGN}
   )
 
-  if(NOT IREE_CC_LIB_TESTONLY OR IREE_RUN_TESTS)
+  if(NOT IREE_CC_LIB_TESTONLY OR IREE_BUILD_TESTS)
     set(_NAME "iree_${IREE_CC_LIB_NAME}")
 
     # Check if this is a header-only library

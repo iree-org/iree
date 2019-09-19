@@ -14,10 +14,25 @@
 
 include(AbseilConfigureCopts)
 
+#-------------------------------------------------------------------------------
+# C++ used within IREE
+#-------------------------------------------------------------------------------
+
 set(IREE_CXX_STANDARD 11)
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
 
 set(IREE_DEFAULT_COPTS "${ABSL_DEFAULT_COPTS}")
-set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
+set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
+
+#-------------------------------------------------------------------------------
+# Third party: gtest
+#-------------------------------------------------------------------------------
+
+set(INSTALL_GTEST OFF)
+set(GTEST_INCLUDE_DIRS
+  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest/include/"
+  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googlemock/include/"
+)
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

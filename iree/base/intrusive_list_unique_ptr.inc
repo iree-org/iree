@@ -14,14 +14,14 @@
 
 // IWYU pragma: private, include "third_party/iree/base/intrusive_list.h"
 
-#ifndef THIRD_PARTY_IREE_BASE_INTRUSIVE_LIST_UNIQUE_PTR_H_
-#define THIRD_PARTY_IREE_BASE_INTRUSIVE_LIST_UNIQUE_PTR_H_
+#ifndef IREE_BASE_INTRUSIVE_LIST_UNIQUE_PTR_H_
+#define IREE_BASE_INTRUSIVE_LIST_UNIQUE_PTR_H_
 
 #include <cstddef>
 #include <memory>
 
-#include "third_party/iree/base/intrusive_list.h"
-#include "third_party/iree/base/logging.h"
+#include "iree/base/intrusive_list.h"
+#include "iree/base/logging.h"
 
 namespace iree {
 
@@ -137,4 +137,4 @@ class IntrusiveList<std::unique_ptr<U>, kUseDefaultLinkOffset>
 
 }  // namespace iree
 
-#endif  // THIRD_PARTY_IREE_BASE_INTRUSIVE_LIST_UNIQUE_PTR_H_
+#endif  // IREE_BASE_INTRUSIVE_LIST_UNIQUE_PTR_H_

@@ -34,11 +34,14 @@ include(iree_copts)
 include(iree_cc_library)
 include(iree_cc_test)
 
+option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+
 #-------------------------------------------------------------------------------
 # Third-party dependencies
 #-------------------------------------------------------------------------------
 
 add_subdirectory(third_party/abseil-cpp)
+add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
