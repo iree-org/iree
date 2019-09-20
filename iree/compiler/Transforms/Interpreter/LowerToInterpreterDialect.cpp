@@ -20,7 +20,7 @@
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/PatternMatch.h"
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/DialectConversion.h"
-#include "third_party/tensorflow/compiler/mlir/xla/transforms/rewriters.h"
+#include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {

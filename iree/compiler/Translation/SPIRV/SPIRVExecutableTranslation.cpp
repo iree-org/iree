@@ -39,7 +39,7 @@
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LogicalResult.h"
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/Passes.h"
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Translation.h"
-#include "third_party/tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -19,8 +19,8 @@
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view.h"
-#include "third_party/tensorflow/lite/experimental/ruy/context.h"
-#include "third_party/tensorflow/lite/experimental/ruy/ruy.h"
+#include "tensorflow/lite/experimental/ruy/context.h"
+#include "tensorflow/lite/experimental/ruy/ruy.h"
 
 namespace iree {
 namespace hal {

@@ -22,7 +22,7 @@
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/PassRegistry.h"
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/Utils.h"
-#include "third_party/tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 using mlir::PassRegistration;
 
