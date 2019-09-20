@@ -36,8 +36,8 @@ namespace IREE {
 //===----------------------------------------------------------------------===//
 
 // Parses an op that has no inputs and no outputs.
-static ParseResult parseNoIOOp(OpAsmParser *parser, OperationState *state) {
-  if (failed(parser->parseOptionalAttributeDict(state->attributes))) {
+static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState *state) {
+  if (failed(parser.parseOptionalAttributeDict(state->attributes))) {
     return failure();
   }
   return success();
@@ -57,15 +57,15 @@ void ModuleOp::build(Builder *builder, OperationState *state) {
   ensureTerminator(*state->addRegion(), *builder, state->location);
 }
 
-static ParseResult parseModuleOp(OpAsmParser *parser, OperationState *state) {
+static ParseResult parseModuleOp(OpAsmParser &parser, OperationState *state) {
   Region *body = state->addRegion();
-  if (parser->parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{})) {
+  if (parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{})) {
     return failure();
   }
-  if (parser->parseOptionalAttributeDict(state->attributes)) {
+  if (parser.parseOptionalAttributeDict(state->attributes)) {
     return failure();
   }
-  ModuleOp::ensureTerminator(*body, parser->getBuilder(), state->location);
+  ModuleOp::ensureTerminator(*body, parser.getBuilder(), state->location);
   return success();
 }
 
@@ -87,37 +87,37 @@ void MultiArchExecutableOp::build(Builder *builder, OperationState *state,
   ensureTerminator(*state->addRegion(), *builder, state->location);
 }
 
-static ParseResult parseMultiArchExecutableOp(OpAsmParser *parser,
+static ParseResult parseMultiArchExecutableOp(OpAsmParser &parser,
                                               OperationState *state) {
-  auto &builder = parser->getBuilder();
+  auto &builder = parser.getBuilder();
 
   // Parse the name as a symbol reference attr and then convert to a string.
   SymbolRefAttr nameAttr;
-  if (failed(parser->parseAttribute(nameAttr, SymbolTable::getSymbolAttrName(),
-                                    state->attributes))) {
+  if (failed(parser.parseAttribute(nameAttr, SymbolTable::getSymbolAttrName(),
+                                   state->attributes))) {
     return failure();
   }
   state->attributes.back().second = builder.getStringAttr(nameAttr.getValue());
 
-  if (succeeded(parser->parseOptionalLSquare())) {
+  if (succeeded(parser.parseOptionalLSquare())) {
     IntegerAttr ordinalAttr;
-    if (failed(parser->parseAttribute(ordinalAttr, builder.getIntegerType(32),
-                                      "iree.ordinal", state->attributes)) ||
-        failed(parser->parseRSquare())) {
+    if (failed(parser.parseAttribute(ordinalAttr, builder.getIntegerType(32),
+                                     "iree.ordinal", state->attributes)) ||
+        failed(parser.parseRSquare())) {
       return failure();
     }
   }
 
-  if (failed(parser->parseLParen()) || failed(parser->parseRParen())) {
+  if (failed(parser.parseLParen()) || failed(parser.parseRParen())) {
     return failure();
   }
 
   Region *body = state->addRegion();
-  if (failed(parser->parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
+  if (failed(parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
     return failure();
   }
-  if (succeeded(parser->parseOptionalKeyword("attributes"))) {
-    if (failed(parser->parseOptionalAttributeDict(state->attributes))) {
+  if (succeeded(parser.parseOptionalKeyword("attributes"))) {
+    if (failed(parser.parseOptionalAttributeDict(state->attributes))) {
       return failure();
     }
   }
@@ -165,15 +165,15 @@ void ExecutableOp::build(Builder *builder, OperationState *state,
   ensureTerminator(*state->addRegion(), *builder, state->location);
 }
 
-static ParseResult parseExecutableOp(OpAsmParser *parser,
+static ParseResult parseExecutableOp(OpAsmParser &parser,
                                      OperationState *state) {
-  auto &builder = parser->getBuilder();
+  auto &builder = parser.getBuilder();
 
-  if (succeeded(parser->parseOptionalLSquare())) {
+  if (succeeded(parser.parseOptionalLSquare())) {
     IntegerAttr ordinalAttr;
-    if (failed(parser->parseAttribute(ordinalAttr, builder.getIntegerType(32),
-                                      "iree.ordinal", state->attributes)) ||
-        failed(parser->parseRSquare())) {
+    if (failed(parser.parseAttribute(ordinalAttr, builder.getIntegerType(32),
+                                     "iree.ordinal", state->attributes)) ||
+        failed(parser.parseRSquare())) {
       return failure();
     }
   }
@@ -181,30 +181,30 @@ static ParseResult parseExecutableOp(OpAsmParser *parser,
   IntegerAttr executableOrdinalAttr;
   StringAttr formatAttr;
   llvm::SMLoc formatLoc;
-  if (failed(parser->parseLParen()) ||
-      failed(parser->getCurrentLocation(&formatLoc)) ||
-      failed(parser->parseAttribute(formatAttr, "format", state->attributes))) {
+  if (failed(parser.parseLParen()) ||
+      failed(parser.getCurrentLocation(&formatLoc)) ||
+      failed(parser.parseAttribute(formatAttr, "format", state->attributes))) {
     return failure();
   }
   auto format = symbolizeExecutableFormat(formatAttr.getValue());
   if (!format.hasValue()) {
-    return parser->emitError(formatLoc)
+    return parser.emitError(formatLoc)
            << "Unknown executable format " << formatAttr.getValue();
   }
   state->attributes.back().second =
       builder.getI32IntegerAttr(static_cast<int32_t>(format.getValue()));
 
   Region *body = state->addRegion();
-  if (failed(parser->parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
+  if (failed(parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
     return failure();
   }
-  if (succeeded(parser->parseOptionalKeyword("attributes"))) {
-    if (failed(parser->parseOptionalAttributeDict(state->attributes))) {
+  if (succeeded(parser.parseOptionalKeyword("attributes"))) {
+    if (failed(parser.parseOptionalAttributeDict(state->attributes))) {
       return failure();
     }
   }
 
-  ExecutableOp::ensureTerminator(*body, parser->getBuilder(), state->location);
+  ExecutableOp::ensureTerminator(*body, parser.getBuilder(), state->location);
 
   return success();
 }

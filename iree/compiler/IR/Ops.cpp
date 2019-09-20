@@ -32,22 +32,22 @@ namespace IREE {
 // iree.constant
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseConstantOp(OpAsmParser *parser,
+static ParseResult parseConstantOp(OpAsmParser &parser,
                                    OperationState *result) {
   Attribute valueAttr;
-  if (parser->parseOptionalAttributeDict(result->attributes) ||
-      parser->parseAttribute(valueAttr, "value", result->attributes))
+  if (parser.parseOptionalAttributeDict(result->attributes) ||
+      parser.parseAttribute(valueAttr, "value", result->attributes))
     return failure();
 
   // If the attribute is a symbol reference, then we expect a trailing type.
   Type type;
   if (!valueAttr.isa<SymbolRefAttr>())
     type = valueAttr.getType();
-  else if (parser->parseColonType(type))
+  else if (parser.parseColonType(type))
     return failure();
 
   // Add the attribute type to the list.
-  return parser->addTypeToList(type, result->types);
+  return parser.addTypeToList(type, result->types);
 }
 
 static void printConstantOp(OpAsmPrinter *p, ConstantOp &op) {
@@ -96,17 +96,17 @@ void ConstantOp::build(Builder *builder, OperationState *state,
 // iree.tensor_to_memref
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseTensorToMemRefOp(OpAsmParser *parser,
+static ParseResult parseTensorToMemRefOp(OpAsmParser &parser,
                                          OperationState *state) {
   OpAsmParser::OperandType operand;
   Type operandType;
   Type resultType;
-  if (failed(parser->parseLParen()) || failed(parser->parseOperand(operand)) ||
-      failed(parser->parseColonType(operandType)) ||
-      failed(parser->resolveOperand(operand, operandType, state->operands)) ||
-      failed(parser->parseRParen()) ||
-      failed(parser->parseColonType(resultType)) ||
-      failed(parser->addTypeToList(resultType, state->types))) {
+  if (failed(parser.parseLParen()) || failed(parser.parseOperand(operand)) ||
+      failed(parser.parseColonType(operandType)) ||
+      failed(parser.resolveOperand(operand, operandType, state->operands)) ||
+      failed(parser.parseRParen()) ||
+      failed(parser.parseColonType(resultType)) ||
+      failed(parser.addTypeToList(resultType, state->types))) {
     return failure();
   }
   return success();
@@ -125,17 +125,17 @@ static void printTensorToMemRefOp(OpAsmPrinter *p, TensorToMemRefOp &op) {
 // iree.memref_to_tensor
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseMemRefToTensorOp(OpAsmParser *parser,
+static ParseResult parseMemRefToTensorOp(OpAsmParser &parser,
                                          OperationState *state) {
   OpAsmParser::OperandType operand;
   Type operandType;
   Type resultType;
-  if (failed(parser->parseLParen()) || failed(parser->parseOperand(operand)) ||
-      failed(parser->parseColonType(operandType)) ||
-      failed(parser->resolveOperand(operand, operandType, state->operands)) ||
-      failed(parser->parseRParen()) ||
-      failed(parser->parseColonType(resultType)) ||
-      failed(parser->addTypeToList(resultType, state->types))) {
+  if (failed(parser.parseLParen()) || failed(parser.parseOperand(operand)) ||
+      failed(parser.parseColonType(operandType)) ||
+      failed(parser.resolveOperand(operand, operandType, state->operands)) ||
+      failed(parser.parseRParen()) ||
+      failed(parser.parseColonType(resultType)) ||
+      failed(parser.addTypeToList(resultType, state->types))) {
     return failure();
   }
   return success();
@@ -166,57 +166,57 @@ void DispatchRegionOp::build(Builder *builder, OperationState *state,
   state->setOperandListToResizable();
 }
 
-ParseResult parseDispatchRegionOp(OpAsmParser *parser, OperationState *state) {
+ParseResult parseDispatchRegionOp(OpAsmParser &parser, OperationState *state) {
   // Parse required workload.
   OpAsmParser::OperandType workloadArg;
   Type workloadArgType;
-  if (failed(parser->parseLSquare()) ||
-      failed(parser->parseOperand(workloadArg)) ||
-      failed(parser->parseColonType(workloadArgType)) ||
-      failed(parser->parseRSquare()) ||
-      failed(parser->resolveOperand(workloadArg, workloadArgType,
-                                    state->operands))) {
+  if (failed(parser.parseLSquare()) ||
+      failed(parser.parseOperand(workloadArg)) ||
+      failed(parser.parseColonType(workloadArgType)) ||
+      failed(parser.parseRSquare()) ||
+      failed(parser.resolveOperand(workloadArg, workloadArgType,
+                                   state->operands))) {
     return failure();
   }
 
   // Parse (optional) args.
   SmallVector<OpAsmParser::OperandType, 16> regionArgs;
   SmallVector<Type, 16> regionArgTypes;
-  if (failed(parser->parseLParen())) {
+  if (failed(parser.parseLParen())) {
     return failure();
   }
-  if (failed(parser->parseOptionalRParen())) {
+  if (failed(parser.parseOptionalRParen())) {
     SmallVector<OpAsmParser::OperandType, 16> regionOperands;
-    auto argsLoc = parser->getCurrentLocation();
+    auto argsLoc = parser.getCurrentLocation();
     do {
       // Reserve entries in the lists.
       regionArgs.emplace_back();
       regionOperands.emplace_back();
       regionArgTypes.emplace_back();
-      if (failed(parser->parseRegionArgument(regionArgs.back())) ||
-          failed(parser->parseEqual()) ||
-          failed(parser->parseOperand(regionOperands.back())) ||
-          failed(parser->parseColonType(regionArgTypes.back()))) {
+      if (failed(parser.parseRegionArgument(regionArgs.back())) ||
+          failed(parser.parseEqual()) ||
+          failed(parser.parseOperand(regionOperands.back())) ||
+          failed(parser.parseColonType(regionArgTypes.back()))) {
         return failure();
       }
-    } while (succeeded(parser->parseOptionalComma()));
-    if (failed(parser->parseRParen()) ||
-        failed(parser->resolveOperands(regionOperands, regionArgTypes, argsLoc,
-                                       state->operands))) {
+    } while (succeeded(parser.parseOptionalComma()));
+    if (failed(parser.parseRParen()) ||
+        failed(parser.resolveOperands(regionOperands, regionArgTypes, argsLoc,
+                                      state->operands))) {
       return failure();
     }
   }
   state->setOperandListToResizable();
 
   // Parse (optional) results.
-  if (failed(parser->parseOptionalColonTypeList(state->types))) {
+  if (failed(parser.parseOptionalColonTypeList(state->types))) {
     return failure();
   }
 
   // Parse region body.
   Region *body = state->addRegion();
-  if (failed(parser->parseRegion(*body, regionArgs, regionArgTypes)) ||
-      failed(parser->parseOptionalAttributeDict(state->attributes))) {
+  if (failed(parser.parseRegion(*body, regionArgs, regionArgTypes)) ||
+      failed(parser.parseOptionalAttributeDict(state->attributes))) {
     return failure();
   }
   return success();
@@ -321,26 +321,26 @@ void ReductionRegionOp::build(
   state->setOperandListToResizable();
 }
 
-ParseResult parseReductionRegionOp(OpAsmParser *parser, OperationState *state) {
+ParseResult parseReductionRegionOp(OpAsmParser &parser, OperationState *state) {
   OpAsmParser::OperandType workloadArg;
   Type workloadArgType;
-  if (failed(parser->parseLSquare()) ||
-      failed(parser->parseOperand(workloadArg)) ||
-      failed(parser->parseColonType(workloadArgType)) ||
-      failed(parser->parseRSquare()) ||
-      failed(parser->resolveOperand(workloadArg, workloadArgType,
-                                    state->operands))) {
+  if (failed(parser.parseLSquare()) ||
+      failed(parser.parseOperand(workloadArg)) ||
+      failed(parser.parseColonType(workloadArgType)) ||
+      failed(parser.parseRSquare()) ||
+      failed(parser.resolveOperand(workloadArg, workloadArgType,
+                                   state->operands))) {
     return failure();
   }
 
   SmallVector<OpAsmParser::OperandType, 8> reductionOperands;
   Type reductionType;
-  auto operandsLoc = parser->getCurrentLocation();
-  if (failed(parser->parseLParen()) ||
-      failed(parser->parseOperandList(reductionOperands)) ||
-      failed(parser->parseRParen()) ||
-      failed(parser->parseColonType(reductionType)) ||
-      failed(parser->resolveOperands(
+  auto operandsLoc = parser.getCurrentLocation();
+  if (failed(parser.parseLParen()) ||
+      failed(parser.parseOperandList(reductionOperands)) ||
+      failed(parser.parseRParen()) ||
+      failed(parser.parseColonType(reductionType)) ||
+      failed(parser.resolveOperands(
           reductionOperands, reductionType.cast<FunctionType>().getInputs(),
           operandsLoc, state->operands))) {
     return failure();
@@ -352,36 +352,35 @@ ParseResult parseReductionRegionOp(OpAsmParser *parser, OperationState *state) {
 
   SmallVector<OpAsmParser::OperandType, 8> regionArgs;
   SmallVector<Type, 8> regionArgTypes;
-  if (failed(parser->parseKeyword("invocation")) ||
-      failed(parser->parseLParen())) {
+  if (failed(parser.parseKeyword("invocation")) ||
+      failed(parser.parseLParen())) {
     return failure();
   }
   do {
     Type argType;
     SmallVector<OpAsmParser::OperandType, 2> reductionRegionArgs;
     OpAsmParser::OperandType initialValue;
-    if (failed(parser->parseLParen()) ||
-        failed(parser->parseOperandList(reductionRegionArgs, 2)) ||
-        failed(parser->parseRParen()) || failed(parser->parseEqual()) ||
-        failed(parser->parseOperand(initialValue)) ||
-        failed(parser->parseColonType(argType)) ||
-        failed(
-            parser->resolveOperand(initialValue, argType, state->operands))) {
+    if (failed(parser.parseLParen()) ||
+        failed(parser.parseOperandList(reductionRegionArgs, 2)) ||
+        failed(parser.parseRParen()) || failed(parser.parseEqual()) ||
+        failed(parser.parseOperand(initialValue)) ||
+        failed(parser.parseColonType(argType)) ||
+        failed(parser.resolveOperand(initialValue, argType, state->operands))) {
       return failure();
     }
     regionArgs.push_back(reductionRegionArgs[0]);
     regionArgTypes.push_back(argType);
     regionArgs.push_back(reductionRegionArgs[1]);
     regionArgTypes.push_back(argType);
-  } while (succeeded(parser->parseOptionalComma()));
-  if (failed(parser->parseRParen())) {
+  } while (succeeded(parser.parseOptionalComma()));
+  if (failed(parser.parseRParen())) {
     return failure();
   }
 
   // Parse region body.
   Region *body = state->addRegion();
-  if (failed(parser->parseRegion(*body, regionArgs, regionArgTypes)) ||
-      failed(parser->parseOptionalAttributeDict(state->attributes))) {
+  if (failed(parser.parseRegion(*body, regionArgs, regionArgTypes)) ||
+      failed(parser.parseOptionalAttributeDict(state->attributes))) {
     return failure();
   }
 
@@ -436,13 +435,13 @@ void printReductionRegionOp(OpAsmPrinter *p, ReductionRegionOp op) {
 // iree.return
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseReturnOp(OpAsmParser *parser, OperationState *state) {
+static ParseResult parseReturnOp(OpAsmParser &parser, OperationState *state) {
   SmallVector<OpAsmParser::OperandType, 2> opInfo;
   SmallVector<Type, 2> types;
-  llvm::SMLoc loc = parser->getCurrentLocation();
-  return failure(parser->parseOperandList(opInfo) ||
-                 (!opInfo.empty() && parser->parseColonTypeList(types)) ||
-                 parser->resolveOperands(opInfo, types, loc, state->operands));
+  llvm::SMLoc loc = parser.getCurrentLocation();
+  return failure(parser.parseOperandList(opInfo) ||
+                 (!opInfo.empty() && parser.parseColonTypeList(types)) ||
+                 parser.resolveOperands(opInfo, types, loc, state->operands));
 }
 
 static void printReturnOp(OpAsmPrinter *p, ReturnOp op) {
@@ -459,17 +458,17 @@ static void printReturnOp(OpAsmPrinter *p, ReturnOp op) {
 // iree.load_input
 //===----------------------------------------------------------------------===//
 
-ParseResult parseLoadInputOp(OpAsmParser *parser, OperationState *state) {
+ParseResult parseLoadInputOp(OpAsmParser &parser, OperationState *state) {
   OpAsmParser::OperandType operand;
   Type argType;
-  if (parser->parseLParen() || parser->parseOperand(operand) ||
-      parser->parseColonType(argType) || parser->parseRParen() ||
-      parser->resolveOperand(operand, argType, state->operands)) {
+  if (parser.parseLParen() || parser.parseOperand(operand) ||
+      parser.parseColonType(argType) || parser.parseRParen() ||
+      parser.resolveOperand(operand, argType, state->operands)) {
     return failure();
   }
   Type outputType;
-  if (parser->parseColonType(outputType) ||
-      parser->addTypeToList(outputType, state->types)) {
+  if (parser.parseColonType(outputType) ||
+      parser.addTypeToList(outputType, state->types)) {
     return failure();
   }
   return success();
@@ -490,15 +489,15 @@ void printLoadInputOp(OpAsmPrinter *printer, Operation *op) {
 // iree.store_output
 //===----------------------------------------------------------------------===//
 
-ParseResult parseStoreOutputOp(OpAsmParser *parser, OperationState *state) {
+ParseResult parseStoreOutputOp(OpAsmParser &parser, OperationState *state) {
   OpAsmParser::OperandType op0, op1;
   Type argType0, argType1;
-  if (parser->parseLParen() || parser->parseOperand(op0) ||
-      parser->parseColonType(argType0) || parser->parseComma() ||
-      parser->resolveOperand(op0, argType0, state->operands) ||
-      parser->parseOperand(op1) || parser->parseColonType(argType1) ||
-      parser->parseRParen() ||
-      parser->resolveOperand(op1, argType1, state->operands)) {
+  if (parser.parseLParen() || parser.parseOperand(op0) ||
+      parser.parseColonType(argType0) || parser.parseComma() ||
+      parser.resolveOperand(op0, argType0, state->operands) ||
+      parser.parseOperand(op1) || parser.parseColonType(argType1) ||
+      parser.parseRParen() ||
+      parser.resolveOperand(op1, argType1, state->operands)) {
     return failure();
   }
   return success();

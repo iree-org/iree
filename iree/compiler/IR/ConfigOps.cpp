@@ -36,8 +36,8 @@ namespace IREE {
 //===----------------------------------------------------------------------===//
 
 // Parses an op that has no inputs and no outputs.
-static ParseResult parseNoIOOp(OpAsmParser *parser, OperationState *state) {
-  if (failed(parser->parseOptionalAttributeDict(state->attributes))) {
+static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState *state) {
+  if (failed(parser.parseOptionalAttributeDict(state->attributes))) {
     return failure();
   }
   return success();
@@ -59,28 +59,28 @@ void ExecutableTargetConfigOp::build(Builder *builder, OperationState *state,
   ensureTerminator(*state->addRegion(), *builder, state->location);
 }
 
-static ParseResult parseExecutableTargetConfigOp(OpAsmParser *parser,
+static ParseResult parseExecutableTargetConfigOp(OpAsmParser &parser,
                                                  OperationState *state) {
   llvm::SMLoc backendLoc;
   StringAttr backendAttr;
-  if (failed(parser->parseLParen()) ||
-      failed(parser->getCurrentLocation(&backendLoc)) ||
+  if (failed(parser.parseLParen()) ||
+      failed(parser.getCurrentLocation(&backendLoc)) ||
       failed(
-          parser->parseAttribute(backendAttr, "backend", state->attributes))) {
+          parser.parseAttribute(backendAttr, "backend", state->attributes))) {
     return failure();
   }
 
   Region *body = state->addRegion();
-  if (failed(parser->parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
+  if (failed(parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
     return failure();
   }
-  if (succeeded(parser->parseOptionalKeyword("attributes"))) {
-    if (failed(parser->parseOptionalAttributeDict(state->attributes))) {
+  if (succeeded(parser.parseOptionalKeyword("attributes"))) {
+    if (failed(parser.parseOptionalAttributeDict(state->attributes))) {
       return failure();
     }
   }
 
-  ExecutableTargetConfigOp::ensureTerminator(*body, parser->getBuilder(),
+  ExecutableTargetConfigOp::ensureTerminator(*body, parser.getBuilder(),
                                              state->location);
 
   return success();
