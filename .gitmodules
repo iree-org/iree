@@ -18,3 +18,7 @@
 	path = third_party/tensorflow
 	url = https://github.com/tensorflow/tensorflow.git
 	shallow = true
+[submodule "third_party/flatbuffers"]
+	path = third_party/flatbuffers
+	url = https://github.com/google/flatbuffers.git
+	shallow = true
