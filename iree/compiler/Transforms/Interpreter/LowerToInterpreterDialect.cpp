@@ -16,10 +16,10 @@
 #include "iree/compiler/IR/Interpreter/HLDialect.h"
 #include "iree/compiler/IR/Interpreter/LLDialect.h"
 #include "iree/compiler/Transforms/Interpreter/Rewrites.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/StandardOps/Ops.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/PatternMatch.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/DialectConversion.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {

@@ -20,10 +20,10 @@
 #include "iree/compiler/Serialization/VMSourceMapBuilder.h"
 #include "iree/schemas/bytecode_def_generated.h"
 #include "iree/schemas/function_def_generated.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/StandardOps/Ops.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/MLIRContext.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

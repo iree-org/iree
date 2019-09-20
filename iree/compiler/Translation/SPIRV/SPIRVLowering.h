@@ -21,9 +21,9 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_SPIRVLOWERING_H
 
 #include "iree/compiler/Translation/SPIRV/AffineExprCodegen.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/SPIRV/SPIRVDialect.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/StringExtras.h"
+#include "mlir/Dialect/SPIRV/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Support/StringExtras.h"
 
 namespace mlir {
 namespace iree_compiler {

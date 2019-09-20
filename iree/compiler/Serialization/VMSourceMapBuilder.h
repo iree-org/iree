@@ -19,8 +19,8 @@
 
 #include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
 #include "iree/schemas/source_map_def_generated.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Location.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/MLIRContext.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/MLIRContext.h"
 
 namespace mlir {
 namespace iree_compiler {

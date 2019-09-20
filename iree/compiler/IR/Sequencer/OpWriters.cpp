@@ -19,8 +19,8 @@
 #include "iree/compiler/Serialization/BytecodeWriter.h"
 #include "iree/compiler/Utils/Macros.h"
 #include "iree/schemas/bytecode/sequencer_bytecode_v0.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Module.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpImplementation.h"
+#include "mlir/IR/Module.h"
+#include "mlir/IR/OpImplementation.h"
 
 namespace mlir {
 namespace iree_compiler {

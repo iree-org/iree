@@ -20,8 +20,8 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/SPIRV/IndexComputation.h"
 
-#include "third_party/llvm/llvm/include/llvm/Support/CommandLine.h"
-#include "third_party/llvm/llvm/include/llvm/Support/raw_ostream.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/raw_ostream.h"
 
 static llvm::cl::opt<bool> doAffineExprSimplify(
     "simplify-spirv-affine-exprs",

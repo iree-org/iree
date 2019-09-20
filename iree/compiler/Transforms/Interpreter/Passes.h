@@ -17,7 +17,7 @@
 
 #include <memory>
 
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
+#include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {

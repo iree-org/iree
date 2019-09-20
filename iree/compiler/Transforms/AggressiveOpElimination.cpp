@@ -16,12 +16,12 @@
 #include <memory>
 
 #include "iree/compiler/IR/StructureOps.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Analysis/Dominance.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/StandardOps/Ops.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Block.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/PassRegistry.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/Utils.h"
+#include "mlir/Analysis/Dominance.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Block.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Utils.h"
 
 namespace mlir {
 namespace iree_compiler {

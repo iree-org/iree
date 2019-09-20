@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_UTILS_MODULEUTILS_H_
 #define IREE_COMPILER_UTILS_MODULEUTILS_H_
 
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Module.h"
+#include "mlir/IR/Module.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -15,8 +15,8 @@
 #ifndef IREE_COMPILER_TRANSFORMS_INTERPRETER_REWRITES_H_
 #define IREE_COMPILER_TRANSFORMS_INTERPRETER_REWRITES_H_
 
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/MLIRContext.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/PatternMatch.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
 namespace iree_compiler {

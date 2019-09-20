@@ -14,9 +14,9 @@
 
 #include "iree/compiler/IR/Interpreter/LLOps.h"
 
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpImplementation.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/OpImplementation.h"
 
 namespace mlir {
 namespace iree_compiler {

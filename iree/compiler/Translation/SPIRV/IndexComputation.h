@@ -21,17 +21,17 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_H
 
-#include "third_party/llvm/llvm/include/llvm/ADT/ArrayRef.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/DenseMap.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/DenseSet.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/MapVector.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/AffineExpr.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/AffineMap.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Operation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LogicalResult.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallVector.h"
+#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/AffineMap.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/StandardTypes.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {

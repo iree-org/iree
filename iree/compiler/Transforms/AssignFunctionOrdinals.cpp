@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/MLIRContext.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/PassRegistry.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LLVM.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LogicalResult.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/Utils.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/Utils.h"
 
 namespace mlir {
 namespace iree_compiler {

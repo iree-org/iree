@@ -18,11 +18,11 @@
 #include <cstdint>
 
 #include "iree/compiler/IR/Types.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/StandardOps/Ops.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Dialect.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpDefinition.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

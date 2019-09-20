@@ -23,11 +23,11 @@
 #include "iree/compiler/Utils/Macros.h"
 #include "iree/schemas/bytecode/bytecode_v0.h"
 #include "iree/schemas/type_def_generated.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/STLExtras.h"
-#include "third_party/llvm/llvm/include/llvm/Support/raw_ostream.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Location.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Module.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Location.h"
+#include "mlir/IR/Module.h"
 
 namespace mlir {
 namespace iree_compiler {

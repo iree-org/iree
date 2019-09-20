@@ -17,7 +17,7 @@
 
 #include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
 #include "iree/schemas/executable_table_def_generated.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LogicalResult.h"
+#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -23,8 +23,8 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_XLAINDEXPROPOGATION_H
 
 #include "iree/compiler/Translation/SPIRV/IndexComputation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/StandardOps/Ops.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Function.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 namespace mlir {

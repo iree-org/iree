@@ -20,7 +20,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_IREETOSPIRVPASS_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_IREETOSPIRVPASS_H
 
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
+#include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {

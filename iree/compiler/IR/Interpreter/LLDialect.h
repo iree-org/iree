@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_IR_INTERPRETER_LLDIALECT_H_
 #define IREE_COMPILER_IR_INTERPRETER_LLDIALECT_H_
 
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Dialect.h"
+#include "mlir/IR/Dialect.h"
 
 namespace mlir {
 namespace iree_compiler {

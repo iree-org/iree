@@ -16,16 +16,16 @@
 
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Utils/OpUtils.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Matchers.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Module.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpImplementation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Operation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/PatternMatch.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/TypeUtilities.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/STLExtras.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/Module.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/TypeUtilities.h"
+#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {

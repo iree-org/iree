@@ -24,12 +24,12 @@
 
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/IR/StructureOps.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/ArrayRef.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Operation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Value.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Value.h"
 
 namespace mlir {
 namespace iree_compiler {

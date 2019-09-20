@@ -21,7 +21,7 @@
 
 #include "iree/compiler/Translation/SPIRV/IREEIndexComputation.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRV.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/SPIRV/SPIRVTypes.h"
+#include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

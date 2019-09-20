@@ -15,7 +15,7 @@
 #include "iree/compiler/IR/Interpreter/HLDialect.h"
 
 #include "iree/compiler/IR/Interpreter/HLOps.h"
-#include "third_party/llvm/llvm/include/llvm/Support/SourceMgr.h"
+#include "llvm/Support/SourceMgr.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -15,17 +15,17 @@
 #include "iree/compiler/IR/StructureOps.h"
 
 #include "iree/compiler/IR/Types.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/STLExtras.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SmallString.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Diagnostics.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpImplementation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/SymbolTable.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Value.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LLVM.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/STLExtras.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallString.h"
+#include "llvm/ADT/SmallVector.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {

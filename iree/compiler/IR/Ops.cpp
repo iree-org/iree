@@ -14,15 +14,15 @@
 
 #include "iree/compiler/IR/Ops.h"
 
-#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
-#include "third_party/llvm/llvm/include/llvm/Support/SMLoc.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Diagnostics.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpImplementation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Value.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LogicalResult.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/SMLoc.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {

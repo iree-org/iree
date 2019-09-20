@@ -18,8 +18,8 @@
 #include "iree/compiler/Serialization/BytecodeWriter.h"
 #include "iree/compiler/Utils/Macros.h"
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Module.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/TypeUtilities.h"
+#include "mlir/IR/Module.h"
+#include "mlir/IR/TypeUtilities.h"
 
 namespace mlir {
 namespace iree_compiler {

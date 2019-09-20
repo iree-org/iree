@@ -16,12 +16,12 @@
 
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/IR/Types.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpImplementation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/PatternMatch.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "third_party/llvm/llvm/include/llvm/ADT/ArrayRef.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/iterator_range.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/BlockAndValueMapping.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/PatternMatch.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/PassRegistry.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/Utils.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/iterator_range.h"
+#include "mlir/IR/BlockAndValueMapping.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/StandardTypes.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Utils.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 using mlir::PassRegistration;

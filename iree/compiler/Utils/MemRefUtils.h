@@ -15,12 +15,12 @@
 #ifndef IREE_COMPILER_UTILS_MEMREFUTILS_H_
 #define IREE_COMPILER_UTILS_MEMREFUTILS_H_
 
-#include "third_party/llvm/llvm/include/llvm/ADT/ArrayRef.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Builders.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Operation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Value.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/DialectConversion.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Operation.h"
+#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {

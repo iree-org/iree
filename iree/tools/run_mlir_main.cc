@@ -53,14 +53,14 @@
 #include "iree/vm/module.h"
 #include "iree/vm/module_printer.h"
 #include "iree/vm/sequencer_context.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/StringRef.h"
-#include "third_party/llvm/llvm/include/llvm/Support/SourceMgr.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/MLIRContext.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Module.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Parser.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/FileUtilities.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SourceMgr.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Module.h"
+#include "mlir/Parser.h"
+#include "mlir/Support/FileUtilities.h"
 
 ABSL_FLAG(bool, split_input_file, true,
           "Split the input file into multiple modules.");

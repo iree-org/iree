@@ -14,14 +14,14 @@
 
 #include "iree/compiler/IR/Sequencer/HLOps.h"
 #include "iree/compiler/IR/StructureOps.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SetVector.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Dialect/StandardOps/Ops.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/PassRegistry.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LLVM.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Support/LogicalResult.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Transforms/Utils.h"
+#include "llvm/ADT/SetVector.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/LLVM.h"
+#include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/Utils.h"
 
 namespace mlir {
 namespace iree_compiler {

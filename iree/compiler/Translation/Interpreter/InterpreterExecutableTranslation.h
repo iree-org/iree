@@ -19,7 +19,7 @@
 
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Utils/TranslationUtils.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Module.h"
+#include "mlir/IR/Module.h"
 
 namespace mlir {
 namespace iree_compiler {

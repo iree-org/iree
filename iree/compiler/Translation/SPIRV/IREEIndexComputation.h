@@ -23,7 +23,7 @@
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Translation/SPIRV/XLAIndexPropagation.h"
-#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Function.h"
+#include "mlir/IR/Function.h"
 
 namespace mlir {
 namespace iree_compiler {
