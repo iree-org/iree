@@ -22,3 +22,7 @@
 	path = third_party/flatbuffers
 	url = https://github.com/google/flatbuffers.git
 	shallow = true
+[submodule "third_party/vulkan-headers"]
+	path = third_party/vulkan-headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+	shallow = true
