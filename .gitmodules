@@ -22,7 +22,15 @@
 	path = third_party/flatbuffers
 	url = https://github.com/google/flatbuffers.git
 	shallow = true
-[submodule "third_party/vulkan-headers"]
-	path = third_party/vulkan-headers
+[submodule "third_party/vulkan_headers"]
+	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+	shallow = true
+[submodule "third_party/vulkan_memory_allocator"]
+	path = third_party/vulkan_memory_allocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+	shallow = true
+[submodule "third_party/gemmlowp"]
+	path = third_party/gemmlowp
+	url = https://github.com/google/gemmlowp.git
 	shallow = true
