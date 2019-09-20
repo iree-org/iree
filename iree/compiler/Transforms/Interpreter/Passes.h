@@ -15,6 +15,8 @@
 #ifndef IREE_COMPILER_TRANSFORMS_INTERPRETER_PASSES_H_
 #define IREE_COMPILER_TRANSFORMS_INTERPRETER_PASSES_H_
 
+#include <memory>
+
 #include "third_party/llvm/llvm/projects/google_mlir/include/mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -26,12 +28,6 @@ std::unique_ptr<OpPassBase<ModuleOp>> createExpandReductionsToOpsPass();
 // Refactors entry points to match the IREE dispatch executable ABI.
 std::unique_ptr<OpPassBase<ModuleOp>> createMakeExecutableABIPass();
 
-// Lowers Standard dialect (std.*) ops to IREE Interpreter HL ops.
-std::unique_ptr<OpPassBase<FuncOp>> createLowerStdToInterpreterDialectPass();
-
-// Lowers XLA dialect (xla_hlo.*) ops to IREE Interpreter HL ops.
-std::unique_ptr<OpPassBase<FuncOp>> createLowerXLAToInterpreterDialectPass();
-
 // Lowers IREE HL ops (iree_hl_interp.*) to LL ops (iree_ll_interp.*).
 std::unique_ptr<OpPassBase<FuncOp>> createLowerInterpreterDialectPass();
 
@@ -40,6 +36,9 @@ std::unique_ptr<OpPassBase<FuncOp>> createInterpreterLoadStoreDataFlowOptPass();
 
 // Legalizes all ops to canonical/supported forms.
 std::unique_ptr<OpPassBase<FuncOp>> createLegalizeInterpreterOpsPass();
+
+// Lowers input dialect ops (e.g. std, xla_hlo) to IREE Interpreter HL dialect.
+std::unique_ptr<OpPassBase<FuncOp>> createLowerToInterpreterDialectPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

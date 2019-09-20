@@ -91,9 +91,7 @@ void buildInterpreterConversionPassPipeline(PassManager *passManager) {
   passManager->addPass(createMemRefDataFlowOptPass());
 
   // Convert various dialects to IREE opcodes and cleanup leftover conversions.
-  passManager->addPass(createLowerXLAToInterpreterDialectPass());
-  passManager->addPass(mlir::xla_hlo::createLegalizeToStdPass());
-  passManager->addPass(createLowerStdToInterpreterDialectPass());
+  passManager->addPass(createLowerToInterpreterDialectPass());
   passManager->addPass(createLegalizeTensorMemRefPass());
   passManager->addPass(createInterpreterLoadStoreDataFlowOptPass());
   passManager->addPass(createAggressiveOpEliminationPass());

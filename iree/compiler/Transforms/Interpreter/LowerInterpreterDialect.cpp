@@ -135,96 +135,101 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
 
 }  // namespace
 
+void populateInterpreterLoweringPatterns(OwningRewritePatternList &patterns,
+                                         MLIRContext *ctx) {
+  patterns.insert<LowerBranchOpPattern, LowerCondCondBranchOpPattern>(ctx);
+  patterns.insert<
+      SimpleOpLowering<IREE::ConstantOp, IREEInterp::LL::ConstantOp>,
+      SimpleOpLowering<IREEInterp::HL::CopyOp, IREEInterp::LL::DynamicCopyOp>,
+      SimpleOpLowering<IREEInterp::HL::SliceOp,
+                       IREEInterp::LL::DynamicSliceOp>>(ctx);
+#define SAME_NAME_SIMPLE_PATTERN(op_name) \
+  SimpleOpLowering<IREEInterp::HL::op_name, IREEInterp::LL::op_name>
+  // clang-format off
+  patterns.insert<
+      SAME_NAME_SIMPLE_PATTERN(AssignOp),
+      SAME_NAME_SIMPLE_PATTERN(AbsFOp),
+      SAME_NAME_SIMPLE_PATTERN(AbsIOp),
+      SAME_NAME_SIMPLE_PATTERN(AddFOp),
+      SAME_NAME_SIMPLE_PATTERN(AddIOp),
+      SAME_NAME_SIMPLE_PATTERN(AllocHeapOp),
+      SAME_NAME_SIMPLE_PATTERN(AndOp),
+      SAME_NAME_SIMPLE_PATTERN(Atan2FOp),
+      SAME_NAME_SIMPLE_PATTERN(BreakOp),
+      SAME_NAME_SIMPLE_PATTERN(BroadcastOp),
+      SAME_NAME_SIMPLE_PATTERN(CallOp),
+      SAME_NAME_SIMPLE_PATTERN(CallIndirectOp),
+      SAME_NAME_SIMPLE_PATTERN(CeilFOp),
+      SAME_NAME_SIMPLE_PATTERN(ClampFOp),
+      SAME_NAME_SIMPLE_PATTERN(CloneOp),
+      SAME_NAME_SIMPLE_PATTERN(CmpFOp),
+      SAME_NAME_SIMPLE_PATTERN(CmpIOp),
+      SAME_NAME_SIMPLE_PATTERN(CondAssignOp),
+      SAME_NAME_SIMPLE_PATTERN(ConvertSSOp),
+      SAME_NAME_SIMPLE_PATTERN(ConvertUUOp),
+      SAME_NAME_SIMPLE_PATTERN(ConvertSUOp),
+      SAME_NAME_SIMPLE_PATTERN(ConvertUSOp),
+      SAME_NAME_SIMPLE_PATTERN(CondBreakOp),
+      SAME_NAME_SIMPLE_PATTERN(CosFOp),
+      SAME_NAME_SIMPLE_PATTERN(DimOp),
+      SAME_NAME_SIMPLE_PATTERN(DivFOp),
+      SAME_NAME_SIMPLE_PATTERN(DivISOp),
+      SAME_NAME_SIMPLE_PATTERN(DivIUOp),
+      SAME_NAME_SIMPLE_PATTERN(ExpFOp),
+      SAME_NAME_SIMPLE_PATTERN(LogFOp),
+      SAME_NAME_SIMPLE_PATTERN(RsqrtFOp),
+      SAME_NAME_SIMPLE_PATTERN(FloorFOp),
+      SAME_NAME_SIMPLE_PATTERN(LengthOp),
+      SAME_NAME_SIMPLE_PATTERN(MatMulFOp),
+      SAME_NAME_SIMPLE_PATTERN(MatMulIOp),
+      SAME_NAME_SIMPLE_PATTERN(MaxFOp),
+      SAME_NAME_SIMPLE_PATTERN(MaxISOp),
+      SAME_NAME_SIMPLE_PATTERN(MaxIUOp),
+      SAME_NAME_SIMPLE_PATTERN(MinFOp),
+      SAME_NAME_SIMPLE_PATTERN(MinISOp),
+      SAME_NAME_SIMPLE_PATTERN(MinIUOp),
+      SAME_NAME_SIMPLE_PATTERN(MulAddFOp),
+      SAME_NAME_SIMPLE_PATTERN(MulAddIOp),
+      SAME_NAME_SIMPLE_PATTERN(MulFOp),
+      SAME_NAME_SIMPLE_PATTERN(MulIOp),
+      SAME_NAME_SIMPLE_PATTERN(NotOp),
+      SAME_NAME_SIMPLE_PATTERN(OrOp),
+      SAME_NAME_SIMPLE_PATTERN(PadOp),
+      SAME_NAME_SIMPLE_PATTERN(RankOp),
+      SAME_NAME_SIMPLE_PATTERN(ReduceSumIOp),
+      SAME_NAME_SIMPLE_PATTERN(ReduceSumFOp),
+      SAME_NAME_SIMPLE_PATTERN(ReduceMinIOp),
+      SAME_NAME_SIMPLE_PATTERN(ReduceMinFOp),
+      SAME_NAME_SIMPLE_PATTERN(ReduceMaxIOp),
+      SAME_NAME_SIMPLE_PATTERN(ReduceMaxFOp),
+      SAME_NAME_SIMPLE_PATTERN(ReshapeOp),
+      SAME_NAME_SIMPLE_PATTERN(ReturnOp),
+      SAME_NAME_SIMPLE_PATTERN(SelectOp),
+      SAME_NAME_SIMPLE_PATTERN(ShapeOp),
+      SAME_NAME_SIMPLE_PATTERN(ShiftLeftOp),
+      SAME_NAME_SIMPLE_PATTERN(ShiftRightArithmeticOp),
+      SAME_NAME_SIMPLE_PATTERN(ShiftRightLogicalOp),
+      SAME_NAME_SIMPLE_PATTERN(SinFOp),
+      SAME_NAME_SIMPLE_PATTERN(SplitOp),
+      SAME_NAME_SIMPLE_PATTERN(SubFOp),
+      SAME_NAME_SIMPLE_PATTERN(SubIOp),
+      SAME_NAME_SIMPLE_PATTERN(TanhFOp),
+      SAME_NAME_SIMPLE_PATTERN(TileOp),
+      SAME_NAME_SIMPLE_PATTERN(TraceOp),
+      SAME_NAME_SIMPLE_PATTERN(TransposeOp),
+      SAME_NAME_SIMPLE_PATTERN(ReverseOp),
+      SAME_NAME_SIMPLE_PATTERN(XorOp)>(ctx);
+  // clang-format on
+#undef SAME_NAME_SIMPLE_PATTERN
+}
+
+namespace {
 class LowerInterpreterDialectPass
     : public FunctionPass<LowerInterpreterDialectPass> {
  public:
   void runOnFunction() override {
     OwningRewritePatternList patterns;
-    patterns.insert<LowerBranchOpPattern, LowerCondCondBranchOpPattern>(
-        &getContext());
-    patterns.insert<
-        SimpleOpLowering<IREE::ConstantOp, IREEInterp::LL::ConstantOp>,
-        SimpleOpLowering<IREEInterp::HL::CopyOp, IREEInterp::LL::DynamicCopyOp>,
-        SimpleOpLowering<IREEInterp::HL::SliceOp,
-                         IREEInterp::LL::DynamicSliceOp>>(&getContext());
-#define SAME_NAME_SIMPLE_PATTERN(op_name) \
-  SimpleOpLowering<IREEInterp::HL::op_name, IREEInterp::LL::op_name>
-    // clang-format off
-    patterns.insert<
-        SAME_NAME_SIMPLE_PATTERN(AssignOp),
-        SAME_NAME_SIMPLE_PATTERN(AbsFOp),
-        SAME_NAME_SIMPLE_PATTERN(AbsIOp),
-        SAME_NAME_SIMPLE_PATTERN(AddFOp),
-        SAME_NAME_SIMPLE_PATTERN(AddIOp),
-        SAME_NAME_SIMPLE_PATTERN(AllocHeapOp),
-        SAME_NAME_SIMPLE_PATTERN(AndOp),
-        SAME_NAME_SIMPLE_PATTERN(Atan2FOp),
-        SAME_NAME_SIMPLE_PATTERN(BreakOp),
-        SAME_NAME_SIMPLE_PATTERN(BroadcastOp),
-        SAME_NAME_SIMPLE_PATTERN(CallOp),
-        SAME_NAME_SIMPLE_PATTERN(CallIndirectOp),
-        SAME_NAME_SIMPLE_PATTERN(CeilFOp),
-        SAME_NAME_SIMPLE_PATTERN(ClampFOp),
-        SAME_NAME_SIMPLE_PATTERN(CloneOp),
-        SAME_NAME_SIMPLE_PATTERN(CmpFOp),
-        SAME_NAME_SIMPLE_PATTERN(CmpIOp),
-        SAME_NAME_SIMPLE_PATTERN(CondAssignOp),
-        SAME_NAME_SIMPLE_PATTERN(ConvertSSOp),
-        SAME_NAME_SIMPLE_PATTERN(ConvertUUOp),
-        SAME_NAME_SIMPLE_PATTERN(ConvertSUOp),
-        SAME_NAME_SIMPLE_PATTERN(ConvertUSOp),
-        SAME_NAME_SIMPLE_PATTERN(CondBreakOp),
-        SAME_NAME_SIMPLE_PATTERN(CosFOp),
-        SAME_NAME_SIMPLE_PATTERN(DimOp),
-        SAME_NAME_SIMPLE_PATTERN(DivFOp),
-        SAME_NAME_SIMPLE_PATTERN(DivISOp),
-        SAME_NAME_SIMPLE_PATTERN(DivIUOp),
-        SAME_NAME_SIMPLE_PATTERN(ExpFOp),
-        SAME_NAME_SIMPLE_PATTERN(LogFOp),
-        SAME_NAME_SIMPLE_PATTERN(RsqrtFOp),
-        SAME_NAME_SIMPLE_PATTERN(FloorFOp),
-        SAME_NAME_SIMPLE_PATTERN(LengthOp),
-        SAME_NAME_SIMPLE_PATTERN(MatMulFOp),
-        SAME_NAME_SIMPLE_PATTERN(MatMulIOp),
-        SAME_NAME_SIMPLE_PATTERN(MaxFOp),
-        SAME_NAME_SIMPLE_PATTERN(MaxISOp),
-        SAME_NAME_SIMPLE_PATTERN(MaxIUOp),
-        SAME_NAME_SIMPLE_PATTERN(MinFOp),
-        SAME_NAME_SIMPLE_PATTERN(MinISOp),
-        SAME_NAME_SIMPLE_PATTERN(MinIUOp),
-        SAME_NAME_SIMPLE_PATTERN(MulAddFOp),
-        SAME_NAME_SIMPLE_PATTERN(MulAddIOp),
-        SAME_NAME_SIMPLE_PATTERN(MulFOp),
-        SAME_NAME_SIMPLE_PATTERN(MulIOp),
-        SAME_NAME_SIMPLE_PATTERN(NotOp),
-        SAME_NAME_SIMPLE_PATTERN(OrOp),
-        SAME_NAME_SIMPLE_PATTERN(PadOp),
-        SAME_NAME_SIMPLE_PATTERN(RankOp),
-        SAME_NAME_SIMPLE_PATTERN(ReduceSumIOp),
-        SAME_NAME_SIMPLE_PATTERN(ReduceSumFOp),
-        SAME_NAME_SIMPLE_PATTERN(ReduceMinIOp),
-        SAME_NAME_SIMPLE_PATTERN(ReduceMinFOp),
-        SAME_NAME_SIMPLE_PATTERN(ReduceMaxIOp),
-        SAME_NAME_SIMPLE_PATTERN(ReduceMaxFOp),
-        SAME_NAME_SIMPLE_PATTERN(ReshapeOp),
-        SAME_NAME_SIMPLE_PATTERN(ReturnOp),
-        SAME_NAME_SIMPLE_PATTERN(SelectOp),
-        SAME_NAME_SIMPLE_PATTERN(ShapeOp),
-        SAME_NAME_SIMPLE_PATTERN(ShiftLeftOp),
-        SAME_NAME_SIMPLE_PATTERN(ShiftRightArithmeticOp),
-        SAME_NAME_SIMPLE_PATTERN(ShiftRightLogicalOp),
-        SAME_NAME_SIMPLE_PATTERN(SinFOp),
-        SAME_NAME_SIMPLE_PATTERN(SplitOp),
-        SAME_NAME_SIMPLE_PATTERN(SubFOp),
-        SAME_NAME_SIMPLE_PATTERN(SubIOp),
-        SAME_NAME_SIMPLE_PATTERN(TanhFOp),
-        SAME_NAME_SIMPLE_PATTERN(TileOp),
-        SAME_NAME_SIMPLE_PATTERN(TraceOp),
-        SAME_NAME_SIMPLE_PATTERN(TransposeOp),
-        SAME_NAME_SIMPLE_PATTERN(ReverseOp),
-        SAME_NAME_SIMPLE_PATTERN(XorOp)>(&getContext());
-    // clang-format on
-#undef SAME_NAME_SIMPLE_PATTERN
+    populateInterpreterLoweringPatterns(patterns, &getContext());
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREELLInterpreterDialect>();
@@ -234,6 +239,7 @@ class LowerInterpreterDialectPass
     }
   }
 };
+}  // namespace
 
 std::unique_ptr<OpPassBase<FuncOp>> createLowerInterpreterDialectPass() {
   return std::make_unique<LowerInterpreterDialectPass>();

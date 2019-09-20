@@ -555,22 +555,30 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
   }
 };
 
+}  // namespace
+
+void populateLowerXlaToInterpreterPatterns(OwningRewritePatternList &patterns,
+                                           MLIRContext *ctx) {
+  patterns.insert<BroadcastInDimOpLowering, ConcatOpLowering, ConstOpLowering,
+                  ConvertLowering, CopyOpLowering, DotOpLowering,
+                  DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
+                  GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
+                  PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
+                  RsqrtOpLowering, SelectOpLowering, SliceOpLowering,
+                  TransposeOpLowering, TanhOpLowering>(ctx);
+}
+
+namespace {
+// Just for testing these passes.
+// TODO(b/141337493) can we get rid of this pass entirely?
 class LowerXLAToInterpreterDialectPass
     : public FunctionPass<LowerXLAToInterpreterDialectPass> {
  public:
   void runOnFunction() override {
     OwningRewritePatternList patterns;
+    populateLowerXlaToInterpreterPatterns(patterns, &getContext());
     mlir::xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns,
                                                         &getContext());
-
-    patterns
-        .insert<BroadcastInDimOpLowering, ConcatOpLowering, ConstOpLowering,
-                ConvertLowering, CopyOpLowering, DotOpLowering,
-                DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
-                GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
-                PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
-                RsqrtOpLowering, SelectOpLowering, SliceOpLowering,
-                TransposeOpLowering, TanhOpLowering>(&getContext());
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLInterpreterDialect, IREEDialect>();
@@ -582,10 +590,6 @@ class LowerXLAToInterpreterDialectPass
 };
 
 }  // namespace
-
-std::unique_ptr<OpPassBase<FuncOp>> createLowerXLAToInterpreterDialectPass() {
-  return std::make_unique<LowerXLAToInterpreterDialectPass>();
-}
 
 static PassRegistration<LowerXLAToInterpreterDialectPass> pass(
     "lower-xla-to-iree-interpreter",

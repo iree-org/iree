@@ -36,6 +36,8 @@
 namespace mlir {
 namespace iree_compiler {
 
+namespace {
+
 struct ConstantOpLowering : public ConversionPattern {
   explicit ConstantOpLowering(MLIRContext *context)
       : ConversionPattern(ConstantOp::getOperationName(), 1, context) {}
@@ -276,26 +278,36 @@ BINARY_OP_LOWERING(DivFOp, IREEInterp::HL::DivFOp);
 // UNARY_OP_LOWERING(FloorFOp, IREEInterp::HL::FloorFOp);
 // UNARY_OP_LOWERING(CeilFOp, IREEInterp::HL::CeilFOp);
 
+}  // namespace
+
+void populateLowerStdToInterpreterPatterns(OwningRewritePatternList &patterns,
+                                           MLIRContext *ctx) {
+  patterns.insert<ConstantOpLowering,
+                  // Control flow.
+                  CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
+                  BranchOpLowering, CondBranchOpLowering, CmpIOpLowering,
+                  CmpFOpLowering,
+                  // Memory management.
+                  AllocOpLowering, DeallocOpLowering, ExtractElementOpLowering,
+                  // Shape operations.
+                  DimOpLowering,
+                  // Logical ops.
+                  AndOpLowering, OrOpLowering,
+                  // Arithmetic ops.
+                  AddIOpLowering, AddFOpLowering, SubIOpLowering,
+                  SubFOpLowering, MulIOpLowering, MulFOpLowering,
+                  DivISOpLowering, DivIUOpLowering, DivFOpLowering>(ctx);
+}
+
+namespace {
+// Just for testing these passes.
+// TODO(b/141337493) can we get rid of this pass entirely?
 class LowerStdToInterpreterDialectPass
     : public FunctionPass<LowerStdToInterpreterDialectPass> {
  public:
   void runOnFunction() override {
     OwningRewritePatternList patterns;
-    patterns.insert<
-        ConstantOpLowering,
-        // Control flow.
-        CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
-        BranchOpLowering, CondBranchOpLowering, CmpIOpLowering, CmpFOpLowering,
-        // Memory management.
-        AllocOpLowering, DeallocOpLowering, ExtractElementOpLowering,
-        // Shape operations.
-        DimOpLowering,
-        // Logical ops.
-        AndOpLowering, OrOpLowering,
-        // Arithmetic ops.
-        AddIOpLowering, AddFOpLowering, SubIOpLowering, SubFOpLowering,
-        MulIOpLowering, MulFOpLowering, DivISOpLowering, DivIUOpLowering,
-        DivFOpLowering>(&getContext());
+    populateLowerStdToInterpreterPatterns(patterns, &getContext());
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLInterpreterDialect, IREELLInterpreterDialect,
@@ -306,19 +318,12 @@ class LowerStdToInterpreterDialectPass
       return constOp.getValue().isa<IntegerAttr>() &&
              constOp.getType().isIndex();
     });
-    // This is only able to be a full conversion because we know that we do it
-    // last. Other conversions (e.g. XLA->IREE) can't be full because we might
-    // still have e.g. std ops.
-    // TODO(b/139012931) Move fully to the conversion framework.
     if (failed(applyFullConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }
   }
 };
-
-std::unique_ptr<OpPassBase<FuncOp>> createLowerStdToInterpreterDialectPass() {
-  return std::make_unique<LowerStdToInterpreterDialectPass>();
-}
+}  // namespace
 
 static PassRegistration<LowerStdToInterpreterDialectPass> pass(
     "lower-std-to-iree-interpreter",
