@@ -31,7 +31,7 @@ class ValidatingCommandBuffer : public CommandBuffer {
   explicit ValidatingCommandBuffer(ref_ptr<CommandBuffer> impl);
   ~ValidatingCommandBuffer() override;
 
-  CommandBuffer* impl() { return impl_.get(); }
+  CommandBuffer* impl() override { return impl_.get(); }
 
   bool is_recording() const override;
 

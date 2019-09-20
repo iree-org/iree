@@ -31,6 +31,7 @@
 #include "absl/time/time.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/status.h"
+#include "iree/base/status_matchers.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/command_queue.h"
 #include "iree/hal/driver_registry.h"

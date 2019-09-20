@@ -121,7 +121,9 @@ inline NullStream& operator<<(NullStream& str,
   LOG(FATAL) << "Check failed: " #condition " "
 
 // TODO(scotttodd): Log information about the check failure
-#define CHECK_OP_LOG(name, op, val1, val2) LOG(FATAL) << "Check failed"
+#define CHECK_OP_LOG(name, op, val1, val2)   \
+  if (ABSL_PREDICT_FALSE(!((val1)op(val2)))) \
+  LOG(FATAL) << "Check " #name " failed: " #val1 " " #op " " #val2
 
 #define CHECK_OP(name, op, val1, val2) CHECK_OP_LOG(name, op, val1, val2)
 

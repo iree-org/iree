@@ -168,7 +168,7 @@ Status ErrnoToCanonicalStatus(int error_number, absl::string_view message) {
 
 StatusBuilder ErrnoToCanonicalStatusBuilder(int error_number,
                                             absl::string_view message,
-                                            absl::SourceLocation location) {
+                                            SourceLocation location) {
   return StatusBuilder(ErrnoToCanonicalStatus(error_number, message), location);
 }
 

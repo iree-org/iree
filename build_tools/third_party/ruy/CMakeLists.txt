@@ -1,0 +1,813 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+set(RUY_SRC_ROOT
+  "${IREE_ROOT_DIR}/third_party/tensorflow/tensorflow/lite/experimental/ruy/"
+)
+set(GEMMLOWP_SRC_ROOT
+  "${IREE_ROOT_DIR}/third_party/gemmlowp/"
+)
+
+# TODO(benvanik): if android_arm then add -O3/-mfpu=neon.
+# TODO(benvanik): if andoird_arm64 then add -O3
+set(RUY_COPTS_BASE
+  "-O3"
+  "-I${IREE_ROOT_DIR}/third_party/tensorflow"
+  "-I${IREE_ROOT_DIR}/third_party/gemmlowp"
+  "-Wno-shadow"
+  "-Wno-missing-noreturn"
+  "-Wno-unused-local-typedef"
+)
+set(RUY_COPTS_AVX2)
+set(RUY_COPTS_SKYLAKE)
+
+external_cc_library(
+  PACKAGE
+    gemmlowp
+  NAME
+    fixedpoint
+  ROOT
+    ${GEMMLOWP_SRC_ROOT}
+  HDRS
+    "fixedpoint/fixedpoint.h"
+    "fixedpoint/fixedpoint_avx.h"
+    "fixedpoint/fixedpoint_msa.h"
+    "fixedpoint/fixedpoint_neon.h"
+    "fixedpoint/fixedpoint_sse.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  INCLUDES
+    "${IREE_ROOT_DIR}/third_party/gemmlowp"
+)
+
+external_cc_library(
+  PACKAGE
+    gemmlowp
+  NAME
+    profiler
+  ROOT
+    ${GEMMLOWP_SRC_ROOT}
+  HDRS
+    "profiling/instrumentation.h"
+    "profiling/profiler.h"
+    "profiling/pthread_everywhere.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  INCLUDES
+    "${IREE_ROOT_DIR}/third_party/gemmlowp"
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    platform
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "platform.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    check_macros
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "check_macros.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    # TODO(benvanik): support this? doesn't seem to be needed yet?
+    #//tensorflow/lite/kernels/internal:compatibility
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    opt_set
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "opt_set.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    time
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "time.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    wait
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "wait.cc"
+  HDRS
+    "wait.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::time
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    size_util
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "size_util.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::check_macros
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    tune
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "tune.cc"
+  HDRS
+    "tune.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::opt_set
+    ruy::platform
+    ruy::time
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    allocator
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "allocator.cc"
+  HDRS
+    "allocator.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::check_macros
+    ruy::size_util
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    side_pair
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "side_pair.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::check_macros
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    block_map
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "block_map.cc"
+  HDRS
+    "block_map.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::opt_set
+    ruy::side_pair
+    ruy::size_util
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    blocking_counter
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "blocking_counter.cc"
+  HDRS
+    "blocking_counter.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::check_macros
+    ruy::wait
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    thread_pool
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "thread_pool.cc"
+  HDRS
+    "thread_pool.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::blocking_counter
+    ruy::check_macros
+    ruy::wait
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    detect_arm
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "detect_arm.cc"
+  HDRS
+    "detect_arm.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    detect_x86
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "detect_x86.cc"
+  HDRS
+    "detect_x86.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::platform
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    path
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "path.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::platform
+    ruy::size_util
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    trace
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "trace.cc"
+  HDRS
+    "trace.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::block_map
+    ruy::check_macros
+    ruy::side_pair
+    ruy::time
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    matrix
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "matrix.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::check_macros
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    spec
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "spec.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::matrix
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    internal_matrix
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "internal_matrix.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::check_macros
+    ruy::common
+    ruy::matrix
+    ruy::size_util
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    common
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "common.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::check_macros
+    ruy::matrix
+    ruy::opt_set
+    ruy::path
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    kernel_common
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "kernel.h"
+    "kernel_arm.h"
+    "kernel_common.h"
+    "kernel_x86.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::fixedpoint
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::common
+    ruy::internal_matrix
+    ruy::matrix
+    ruy::opt_set
+    ruy::path
+    ruy::platform
+    ruy::side_pair
+    ruy::size_util
+    ruy::spec
+    ruy::tune
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    pack_common
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "pack.h"
+    "pack_arm.h"
+    "pack_common.h"
+    "pack_x86.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::common
+    ruy::internal_matrix
+    ruy::matrix
+    ruy::opt_set
+    ruy::path
+    ruy::platform
+    ruy::tune
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    kernel_arm
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "kernel_arm32.cc"
+    "kernel_arm64.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::common
+    ruy::kernel_common
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    pack_arm
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "pack_arm.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::common
+    ruy::opt_set
+    ruy::pack_common
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    kernel_avx512
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "kernel_avx512.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_SKYLAKE}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::kernel_common
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    pack_avx512
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "pack_avx512.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_SKYLAKE}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::matrix
+    ruy::opt_set
+    ruy::pack_common
+    ruy::path
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    have_built_path_for_avx512
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "have_built_path_for_avx512.cc"
+  HDRS
+    "have_built_path_for.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_SKYLAKE}
+  DEPS
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    kernel_avx2
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "kernel_avx2.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_AVX2}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::kernel_common
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    pack_avx2
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "pack_avx2.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_AVX2}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::matrix
+    ruy::opt_set
+    ruy::pack_common
+    ruy::path
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    have_built_path_for_avx2
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "have_built_path_for_avx2.cc"
+  HDRS
+    "have_built_path_for.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_AVX2}
+  DEPS
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    kernel
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "kernel.h"
+    "kernel_common.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::fixedpoint
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::common
+    ruy::internal_matrix
+    ruy::kernel_arm
+    ruy::kernel_avx2
+    ruy::kernel_avx512
+    ruy::kernel_common
+    ruy::matrix
+    ruy::opt_set
+    ruy::path
+    ruy::platform
+    ruy::side_pair
+    ruy::size_util
+    ruy::spec
+    ruy::tune
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    pack
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "pack.h"
+    "pack_common.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::common
+    ruy::internal_matrix
+    ruy::matrix
+    ruy::opt_set
+    ruy::pack_arm  # fixdeps: keep
+    ruy::pack_avx2  # fixdeps: keep
+    ruy::pack_avx512  # fixdeps: keep
+    ruy::pack_common
+    ruy::path
+    ruy::platform
+    ruy::tune
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    have_built_path_for
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "have_built_path_for.h"
+  DEPS
+    ruy::have_built_path_for_avx2
+    ruy::have_built_path_for_avx512
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    context
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "context.cc"
+  HDRS
+    "context.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::allocator
+    ruy::check_macros
+    ruy::detect_arm
+    ruy::detect_x86
+    ruy::have_built_path_for
+    ruy::path
+    ruy::platform
+    ruy::thread_pool
+    ruy::trace
+    ruy::tune
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    trmul_params
+  ROOT
+    ${RUY_SRC_ROOT}
+  HDRS
+    "trmul_params.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::internal_matrix
+    ruy::side_pair
+    ruy::tune
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    trmul
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "trmul.cc"
+  HDRS
+    "trmul.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::allocator
+    ruy::block_map
+    ruy::check_macros
+    ruy::common
+    ruy::context
+    ruy::internal_matrix
+    ruy::matrix
+    ruy::opt_set
+    ruy::side_pair
+    ruy::size_util
+    ruy::spec
+    ruy::thread_pool
+    ruy::trace
+    ruy::trmul_params
+    ruy::tune
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    ruy
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "dispatch.h"
+    "prepack.h"
+  HDRS
+    "ruy.h"
+    "ruy_advanced.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::common
+    ruy::context
+    ruy::internal_matrix
+    ruy::kernel
+    ruy::matrix
+    ruy::opt_set
+    ruy::pack
+    ruy::path
+    ruy::side_pair
+    ruy::size_util
+    ruy::spec
+    ruy::trmul
+    ruy::trmul_params
+    ruy::tune
+  INCLUDES
+    "${IREE_ROOT_DIR}/third_party/tensorflow"
+  PUBLIC
+)
+add_library(ruy ALIAS ruy_ruy)

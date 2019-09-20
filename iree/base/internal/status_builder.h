@@ -27,17 +27,15 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
  public:
   // Creates a `StatusBuilder` based on an original status.
   explicit StatusBuilder(const Status& original_status,
-                         absl::SourceLocation location
-                             IREE_LOC_CURRENT_DEFAULT_ARG);
+                         SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
   explicit StatusBuilder(Status&& original_status,
-                         absl::SourceLocation location
-                             IREE_LOC_CURRENT_DEFAULT_ARG);
+                         SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 
   // Creates a `StatusBuilder` from a status code.
   // A typical user will not specify `location`, allowing it to default to the
   // current location.
-  explicit StatusBuilder(StatusCode code, absl::SourceLocation location
-                                              IREE_LOC_CURRENT_DEFAULT_ARG);
+  explicit StatusBuilder(StatusCode code,
+                         SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 
   StatusBuilder(const StatusBuilder& sb);
   StatusBuilder& operator=(const StatusBuilder& sb);
@@ -65,7 +63,7 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
   StatusCode code() const;
 
   // Returns the source location used to create this builder.
-  absl::SourceLocation source_location() const;
+  SourceLocation source_location() const;
 
   // Implicit conversion to Status.
   operator Status() const&;
@@ -80,7 +78,7 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
   Status status_;
 
   // The location to record if this status is logged.
-  absl::SourceLocation loc_;
+  SourceLocation loc_;
 
   // The message that will be added to the original status.
   std::string message_;
@@ -102,37 +100,37 @@ std::ostream& operator<<(std::ostream& os, StatusBuilder&& builder);
 // Each of the functions below creates StatusBuilder with a canonical error.
 // The error code of the StatusBuilder matches the name of the function.
 StatusBuilder AbortedErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder AlreadyExistsErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder CancelledErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder DataLossErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder DeadlineExceededErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder FailedPreconditionErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder InternalErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder InvalidArgumentErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder NotFoundErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder OutOfRangeErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder PermissionDeniedErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder UnauthenticatedErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder ResourceExhaustedErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder UnavailableErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder UnimplementedErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 StatusBuilder UnknownErrorBuilder(
-    absl::SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
+    SourceLocation location IREE_LOC_CURRENT_DEFAULT_ARG);
 
 }  // namespace iree
 

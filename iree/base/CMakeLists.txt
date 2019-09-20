@@ -14,63 +14,63 @@
 
 iree_cc_library(
   NAME
-    base_arena
+    arena
   HDRS
     "arena.h"
   SRCS
     "arena.cc"
   DEPS
     absl::span
-    iree::base_logging
+    iree::base::logging
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    base_arena_test
+    arena_test
   SRCS
     "arena_test.cc"
   DEPS
-    iree::base_arena
     gtest_main
+    iree::base::arena
 )
 
 iree_cc_library(
   NAME
-    base_bitfield
+    bitfield
   HDRS
     "bitfield.h"
   DEPS
     absl::span
-    iree::base_bitfield
+    iree::base::bitfield
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    base_bitfield_test
+    bitfield_test
   SRCS
     "bitfield_test.cc"
   DEPS
     absl::base
-    iree::base_bitfield
     gtest_main
+    iree::base::bitfield
 )
 
 iree_cc_library(
   NAME
-    base_file_io
+    file_io
   HDRS
     "file_io.h"
   DEPS
     absl::strings
-    iree::base_status
+    iree::base::status
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    base_flatbuffer_util
+    flatbuffer_util
   HDRS
     "flatbuffer_util.h"
   SRCS
@@ -80,15 +80,16 @@ iree_cc_library(
     absl::optional
     absl::span
     absl::strings
-    iree::base_memory
-    iree::base_status
-    iree::base_tracing
+    flatbuffers
+    iree::base::memory
+    iree::base::status
+    iree::base::tracing
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    base_init
+    init
   HDRS
     "init.h"
     "internal/init_internal.h"
@@ -101,30 +102,30 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    base_intrusive_list
+    intrusive_list
   HDRS
     "intrusive_list.h"
     "intrusive_list_ref_ptr.inc"
     "intrusive_list_unique_ptr.inc"
   DEPS
-    iree::base_logging
-    iree::base_ref_ptr
+    iree::base::logging
+    iree::base::ref_ptr
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    base_intrusive_list_test
+    intrusive_list_test
   SRCS
     "intrusive_list_test.cc"
   DEPS
-    iree::base_intrusive_list
     gtest_main
+    iree::base::intrusive_list
 )
 
 iree_cc_library(
   NAME
-    base_logging
+    logging
   HDRS
     "logging.h"
     "internal/logging.h"
@@ -138,7 +139,7 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    base_memory
+    memory
   HDRS
     "memory.h"
   DEPS
@@ -148,28 +149,28 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    base_ref_ptr
+    ref_ptr
   HDRS
     "ref_ptr.h"
   DEPS
     absl::base
-    iree::base_logging
+    iree::base::logging
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    base_ref_ptr_test
+    ref_ptr_test
   SRCS
     "ref_ptr_test.cc"
   DEPS
-    iree::base_ref_ptr
     gtest_main
+    iree::base::ref_ptr
 )
 
 iree_cc_library(
   NAME
-    base_shape
+    shape
   HDRS
     "shape.h"
   SRCS
@@ -179,28 +180,38 @@ iree_cc_library(
     absl::span
     absl::strings
     absl::type_traits
-    iree::base_logging
-    iree::base_status
+    iree::base::logging
+    iree::base::status
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    base_shape_test
+    shape_test
   SRCS
     "shape_test.cc"
   DEPS
     absl::span
     absl::strings
-    iree::base_logging
-    iree::base_shape
-    iree::base_status
     gtest_main
+    iree::base::logging
+    iree::base::shape
+    iree::base::status
+    iree::base::status_matchers
 )
 
 iree_cc_library(
   NAME
-    base_status
+    source_location
+  HDRS
+    "source_location.h"
+    "internal/source_location.h"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    status
   HDRS
     "status.h"
     "internal/status.h"
@@ -221,13 +232,29 @@ iree_cc_library(
     absl::flags
     absl::memory
     absl::strings
-    iree::base_logging
+    iree::base::logging
+    iree::base::source_location
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    base_time
+    status_matchers
+  HDRS
+    "status_matchers.h"
+    "internal/status_matchers.h"
+  DEPS
+    absl::strings
+    absl::optional
+    gmock
+    iree::base::status
+  TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    time
   HDRS
     "time.h"
   DEPS
@@ -235,23 +262,43 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    base_tracing
-  HDRS
-    "tracing.h"
-  SRCS
-    # TODO(benvanik): implement tracing.
-    "tracing_disabled.cc"
-  DEPS
-    absl::flags
-    iree::base_logging
-  PUBLIC
-)
+if(${IREE_ENABLE_TRACING})
+  iree_cc_library(
+    NAME
+      tracing
+    HDRS
+      "tracing.h"
+    SRCS
+      "tracing.cc"
+    DEPS
+      absl::core_headers
+      absl::flags
+      absl::strings
+      absl::synchronization
+      absl::time
+      iree::base::file_io
+      iree::base::init
+      iree::base::logging
+      iree::base::status
+    PUBLIC
+  )
+else()
+  iree_cc_library(
+    NAME
+      tracing
+    HDRS
+      "tracing.h"
+    SRCS
+      "tracing_disabled.cc"
+    DEPS
+      absl::flags
+    PUBLIC
+  )
+endif()
 
 iree_cc_library(
   NAME
-    base_wait_handle
+    wait_handle
   HDRS
     "wait_handle.h"
   SRCS
@@ -262,21 +309,22 @@ iree_cc_library(
     absl::span
     absl::strings
     absl::time
-    iree::base_logging
-    iree::base_ref_ptr
-    iree::base_status
-    iree::base_time
+    iree::base::logging
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::time
   PUBLIC
 )
 
 iree_cc_test(
   NAME
-    base_wait_handle_test
+    wait_handle_test
   SRCS
     "wait_handle_test.cc"
   DEPS
     absl::time
-    iree::base_wait_handle
-    iree::base_status
     gtest_main
+    iree::base::status
+    iree::base::status_matchers
+    iree::base::wait_handle
 )

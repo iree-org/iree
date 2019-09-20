@@ -1,0 +1,338 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+iree_cc_library(
+  NAME
+    debug_reporter
+  HDRS
+    "debug_reporter.h"
+  SRCS
+    "debug_reporter.cc"
+  DEPS
+    iree::base::status
+    iree::base::tracing
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::status_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    direct_command_buffer
+  HDRS
+    "direct_command_buffer.h"
+  SRCS
+    "direct_command_buffer.cc"
+  DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::synchronization
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_buffer
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::native_event
+    iree::hal::vulkan::pipeline_executable
+    iree::hal::vulkan::status_util
+    iree::hal::vulkan::vma_allocator
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    direct_command_queue
+  HDRS
+    "direct_command_queue.h"
+  SRCS
+    "direct_command_queue.cc"
+  DEPS
+    absl::core_headers
+    absl::synchronization
+    absl::time
+    iree::base::arena
+    iree::base::memory
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_queue
+    iree::hal::vulkan::direct_command_buffer
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::legacy_fence
+    iree::hal::vulkan::native_binary_semaphore
+    iree::hal::vulkan::status_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    dynamic_symbols
+  HDRS
+    "dynamic_symbol_tables.h"
+    "dynamic_symbols.h"
+  SRCS
+    "dynamic_symbols.cc"
+  DEPS
+    absl::core_headers
+    absl::memory
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    extensibility_util
+  HDRS
+    "extensibility_util.h"
+  SRCS
+    "extensibility_util.cc"
+  DEPS
+    absl::span
+    iree::base::status
+    iree::base::tracing
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::status_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    handle_util
+  HDRS
+    "handle_util.h"
+  DEPS
+    absl::synchronization
+    absl::utility
+    iree::base::ref_ptr
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::extensibility_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    legacy_fence
+  HDRS
+    "legacy_fence.h"
+  SRCS
+    "legacy_fence.cc"
+  DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::synchronization
+    absl::time
+    iree::base::intrusive_list
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    iree::hal::fence
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::status_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    native_binary_semaphore
+  HDRS
+    "native_binary_semaphore.h"
+  SRCS
+    "native_binary_semaphore.cc"
+  DEPS
+    iree::hal::semaphore
+    iree::hal::vulkan::handle_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    native_event
+  HDRS
+    "native_event.h"
+  SRCS
+    "native_event.cc"
+  DEPS
+    iree::hal::vulkan::handle_util
+    iree::hal::event
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    pipeline_cache
+  HDRS
+    "pipeline_cache.h"
+  SRCS
+    "pipeline_cache.cc"
+  DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::synchronization
+    flatbuffers
+    iree::base::status
+    iree::base::tracing
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_format
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::pipeline_executable
+    iree::hal::vulkan::status_util
+    iree::schemas::spirv_executable_def_cc_fbs
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    pipeline_executable
+  HDRS
+    "pipeline_executable.h"
+  SRCS
+    "pipeline_executable.cc"
+  DEPS
+    absl::inlined_vector
+    iree::base::memory
+    iree::base::status
+    iree::base::tracing
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_spec
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::status_util
+    iree::schemas::spirv_executable_def_cc_fbs
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    status_util
+  HDRS
+    "status_util.h"
+  SRCS
+    "status_util.cc"
+  DEPS
+    iree::base::status
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vma_allocator
+  HDRS
+    "vma_allocator.h"
+    "vma_buffer.h"
+  SRCS
+    "vma_allocator.cc"
+    "vma_buffer.cc"
+  DEPS
+    absl::flags
+    absl::memory
+    iree::base::status
+    iree::base::tracing
+    iree::hal::allocator
+    iree::hal::buffer
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::status_util
+    vulkan_memory_allocator::no_prototypes
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vulkan_device
+  HDRS
+    "vulkan_device.h"
+  SRCS
+    "vulkan_device.cc"
+  DEPS
+    absl::inlined_vector
+    absl::memory
+    absl::strings
+    absl::synchronization
+    absl::span
+    iree::base::memory
+    iree::base::status
+    iree::base::tracing
+    iree::hal::allocator
+    iree::hal::command_buffer_validation
+    iree::hal::command_queue
+    iree::hal::device
+    iree::hal::fence
+    iree::hal::vulkan::direct_command_buffer
+    iree::hal::vulkan::direct_command_queue
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::extensibility_util
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::legacy_fence
+    iree::hal::vulkan::native_binary_semaphore
+    iree::hal::vulkan::native_event
+    iree::hal::vulkan::pipeline_cache
+    iree::hal::vulkan::status_util
+    iree::hal::vulkan::vma_allocator
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vulkan_driver
+  HDRS
+    "vulkan_driver.h"
+  SRCS
+    "vulkan_driver.cc"
+  DEPS
+    absl::inlined_vector
+    iree::base::status
+    iree::base::tracing
+    iree::hal::device_info
+    iree::hal::driver
+    iree::hal::vulkan::debug_reporter
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::extensibility_util
+    iree::hal::vulkan::status_util
+    iree::hal::vulkan::vulkan_device
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vulkan_driver_module
+  SRCS
+    "vulkan_driver_module.cc"
+  DEPS
+    absl::flags
+    iree::base::init
+    iree::base::status
+    iree::base::tracing
+    iree::hal::driver_registry
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::vulkan_driver
+  PUBLIC
+)

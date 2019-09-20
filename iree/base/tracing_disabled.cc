@@ -20,23 +20,11 @@
 #include <string>
 
 #include "absl/flags/flag.h"
-#include "iree/base/logging.h"
 #include "iree/base/tracing.h"
 
+// TODO(benvanik): remove this when disabled so that we don't dep on flags.
 ABSL_FLAG(int32_t, iree_trace_file_period, 0,
           "Flag for tracing. Use --define=GLOBAL_WTF_ENABLE=1 to enable WTF.");
 ABSL_FLAG(std::string, iree_trace_file, "",
           "Flag for tracing. Use --define=GLOBAL_WTF_ENABLE=1 to enable WTF.");
 
-namespace iree {
-
-void InitializeTracing() {
-  if (!absl::GetFlag(FLAGS_iree_trace_file).empty()) {
-    LOG(WARNING) << "WTF trace save requested but WTF is not compiled in. "
-                 << "Enable by building with --define=GLOBAL_WTF_ENABLE=1.";
-  }
-}
-
-void FlushTrace() {}
-
-}  // namespace iree

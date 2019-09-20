@@ -16,6 +16,7 @@
 #define IREE_HAL_HOST_HOST_SUBMISSION_QUEUE_H_
 
 #include "absl/base/thread_annotations.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/intrusive_list.h"
 #include "iree/base/status.h"
@@ -62,7 +63,7 @@ class HostBinarySemaphore final : public BinarySemaphore {
     uint32_t wait_pending : 1;
     uint32_t signaled : 1;
   };
-  std::atomic<State> state_{{0}};
+  std::atomic<State> state_{{0, 0, 0}};
 };
 
 // Simple host-only timeline semaphore implemented with a mutex.

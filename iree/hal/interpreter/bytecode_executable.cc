@@ -14,6 +14,8 @@
 
 #include "iree/hal/interpreter/bytecode_executable.h"
 
+#include <iostream>
+
 #include "iree/vm/bytecode_tables_interpreter.h"
 #include "iree/vm/bytecode_validator.h"
 #include "iree/vm/module.h"

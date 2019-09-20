@@ -300,7 +300,7 @@ namespace impl {
 
 // Maps an IntrusiveListLink to its containing type T.
 template <typename T, size_t kOffset>
-static T* LinkToT(IntrusiveListLink* link) {
+static inline T* LinkToT(IntrusiveListLink* link) {
   if (link) {
     return reinterpret_cast<T*>(reinterpret_cast<uintptr_t>(link) - kOffset);
   } else {
@@ -310,7 +310,7 @@ static T* LinkToT(IntrusiveListLink* link) {
 
 // Maps a containing type T to its IntrusiveListLink.
 template <typename T, size_t kOffset>
-static IntrusiveListLink* TToLink(T* value) {
+static inline IntrusiveListLink* TToLink(T* value) {
   if (value) {
     return reinterpret_cast<IntrusiveListLink*>(
         reinterpret_cast<uintptr_t>(value) + kOffset);

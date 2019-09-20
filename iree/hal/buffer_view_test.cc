@@ -14,11 +14,13 @@
 
 #include "iree/hal/buffer_view.h"
 
+#include <numeric>
 #include <vector>
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "iree/base/status.h"
+#include "iree/base/status_matchers.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/heap_buffer.h"
 

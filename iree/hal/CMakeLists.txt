@@ -1,0 +1,414 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+add_subdirectory(host)
+add_subdirectory(interpreter)
+add_subdirectory(testing)
+add_subdirectory(vulkan)
+
+iree_cc_library(
+  NAME
+    allocator
+  HDRS
+    "allocator.h"
+  SRCS
+    "allocator.cc"
+  DEPS
+    absl::base
+    absl::fixed_array
+    absl::span
+    absl::strings
+    absl::time
+    iree::base::logging
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::time
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    buffer
+  HDRS
+    "buffer.h"
+  SRCS
+    "buffer.cc"
+  DEPS
+    absl::base
+    absl::span
+    absl::strings
+    absl::variant
+    iree::base::bitfield
+    iree::base::logging
+    iree::base::status
+    iree::hal::resource
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    buffer_test
+  SRCS
+    "buffer_test.cc"
+  DEPS
+    absl::base
+    absl::span
+    gtest_main
+    iree::base::status
+    iree::base::status_matchers
+    iree::hal::buffer
+    iree::hal::heap_buffer
+)
+
+iree_cc_library(
+  NAME
+    buffer_view
+  HDRS
+    "buffer_view.h"
+  SRCS
+    "buffer_view.cc"
+  DEPS
+    absl::inlined_vector
+    absl::strings
+    iree::base::shape
+    iree::base::status
+    iree::hal::buffer_view
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    buffer_view_test
+  SRCS
+    "buffer_view_test.cc"
+  DEPS
+    gtest_main
+    iree::base::status
+    iree::base::status_matchers
+    iree::hal::buffer
+    iree::hal::buffer_view
+    iree::hal::heap_buffer
+)
+
+iree_cc_library(
+  NAME
+    buffer_view_string_util
+  HDRS
+    "buffer_view_string_util.h"
+  SRCS
+    "buffer_view_string_util.cc"
+  DEPS
+    absl::strings
+    iree::base::status
+    iree::hal::allocator
+    iree::hal::buffer_view
+    iree::hal::heap_buffer
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    buffer_view_string_util_test
+  SRCS
+    "buffer_view_string_util_test.cc"
+  DEPS
+    gtest_main
+    iree::base::status
+    iree::base::status_matchers
+    iree::hal::buffer_view_string_util
+)
+
+iree_cc_library(
+  NAME
+    command_buffer
+  HDRS
+    "command_buffer.h"
+  SRCS
+    "command_buffer.cc"
+  DEPS
+    absl::base
+    iree::base::bitfield
+    iree::base::shape
+    iree::base::status
+    iree::hal::allocator
+    iree::hal::buffer
+    iree::hal::buffer_view
+    iree::hal::event
+    iree::hal::executable
+    iree::hal::resource
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    command_buffer_validation
+  HDRS
+    "command_buffer_validation.h"
+  SRCS
+    "command_buffer_validation.cc"
+  DEPS
+    iree::base::logging
+    iree::base::status
+    iree::hal::command_buffer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    command_queue
+  HDRS
+    "command_queue.h"
+  DEPS
+    absl::span
+    absl::time
+    iree::base::bitfield
+    iree::base::status
+    iree::base::time
+    iree::hal::command_buffer
+    iree::hal::fence
+    iree::hal::semaphore
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    deferred_buffer
+  HDRS
+    "deferred_buffer.h"
+  SRCS
+    "deferred_buffer.cc"
+  DEPS
+    iree::base::status
+    iree::hal::allocator
+    iree::hal::buffer
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    deferred_buffer_test
+  SRCS
+    "deferred_buffer_test.cc"
+  DEPS
+    absl::memory
+    gtest_main
+    iree::base::status_matchers
+    iree::hal::deferred_buffer
+    iree::hal::heap_buffer
+    iree::hal::testing::mock_allocator
+)
+
+iree_cc_library(
+  NAME
+    device
+  HDRS
+    "device.h"
+  DEPS
+    absl::time
+    iree::base::status
+    iree::base::time
+    iree::hal::allocator
+    iree::hal::buffer
+    iree::hal::command_queue
+    iree::hal::device_info
+    iree::hal::event
+    iree::hal::executable_cache
+    iree::hal::semaphore
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    device_info
+  HDRS
+    "device_info.h"
+  DEPS
+    absl::base
+    iree::base::bitfield
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    device_manager
+  HDRS
+    "device_manager.h"
+  SRCS
+    "device_manager.cc"
+  DEPS
+    absl::span
+    absl::synchronization
+    iree::base::status
+    iree::base::tracing
+    iree::hal::allocator
+    iree::hal::buffer
+    iree::hal::device
+    iree::hal::device_placement
+    iree::hal::executable_format
+    iree::hal::heap_buffer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    device_placement
+  HDRS
+    "device_placement.h"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    driver
+  HDRS
+    "driver.h"
+  DEPS
+    iree::base::status
+    iree::hal::device
+    iree::hal::device_info
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    driver_registry
+  HDRS
+    "driver_registry.h"
+  SRCS
+    "driver_registry.cc"
+  DEPS
+    absl::base
+    absl::synchronization
+    iree::base::init
+    iree::base::status
+    iree::hal::driver
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    event
+  HDRS
+    "event.h"
+  DEPS
+    iree::hal::resource
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable
+  HDRS
+    "executable.h"
+  DEPS
+    iree::hal::resource
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_cache
+  HDRS
+    "executable_cache.h"
+  SRCS
+    "executable_cache.cc"
+  DEPS
+    iree::base::bitfield
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    iree::base::wait_handle
+    iree::hal::executable
+    iree::hal::executable_format
+    iree::hal::executable_spec
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_format
+  HDRS
+    "executable_format.h"
+  DEPS
+    absl::base
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_spec
+  HDRS
+    "executable_spec.h"
+  DEPS
+    absl::span
+    iree::hal::executable_format
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    fence
+  HDRS
+    "fence.h"
+  DEPS
+    iree::base::status
+    iree::hal::resource
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    heap_buffer
+  HDRS
+    "heap_buffer.h"
+  SRCS
+    "heap_buffer.cc"
+  DEPS
+    absl::base
+    iree::base::status
+    iree::base::tracing
+    iree::hal::allocator
+    iree::hal::buffer
+    iree::hal::host::host_buffer
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    resource
+  HDRS
+    "resource.h"
+  DEPS
+    iree::base::ref_ptr
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    semaphore
+  HDRS
+    "semaphore.h"
+  DEPS
+    absl::variant
+    iree::hal::resource
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    stack_trace
+  HDRS
+    "stack_trace.h"
+  PUBLIC
+)

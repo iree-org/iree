@@ -1,0 +1,361 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+add_subdirectory(debug EXCLUDE_FROM_ALL)
+
+iree_cc_library(
+  NAME
+    bytecode_printer
+  SRCS
+    "bytecode_printer.cc"
+  HDRS
+    "bytecode_printer.h"
+  DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::strings
+    absl::span
+    iree::base::status
+    iree::schemas
+    iree::schemas::bytecode::bytecode_v0
+    iree::vm::bytecode_util
+    iree::vm::executable_table
+    iree::vm::function_table
+    iree::vm::module
+    iree::vm::opcode_info
+    iree::vm::source_map
+    iree::vm::type
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    bytecode_reader
+  SRCS
+    "bytecode_reader.cc"
+  HDRS
+    "bytecode_reader.h"
+  DEPS
+    absl::core_headers
+    absl::inlined_vector
+    iree::base::shape
+    iree::base::status
+    iree::hal::buffer_view
+    iree::hal::heap_buffer
+    iree::schemas::bytecode::bytecode_v0
+    iree::vm::function
+    iree::vm::stack
+    iree::vm::type
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    bytecode_tables_interpreter
+  SRCS
+    "bytecode_tables_interpreter.cc"
+  HDRS
+    "bytecode_tables_interpreter.h"
+  DEPS
+    iree::schemas::bytecode::interpreter_bytecode_v0
+    iree::vm::opcode_info
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    bytecode_tables_sequencer
+  SRCS
+    "bytecode_tables_sequencer.cc"
+  HDRS
+    "bytecode_tables_sequencer.h"
+  DEPS
+    iree::schemas::bytecode::sequencer_bytecode_v0
+    iree::vm::opcode_info
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    bytecode_util
+  SRCS
+    "bytecode_util.cc"
+  HDRS
+    "bytecode_util.h"
+  DEPS
+    absl::strings
+    iree::schemas::bytecode::bytecode_v0
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    bytecode_validator
+  SRCS
+    "bytecode_validator.cc"
+  HDRS
+    "bytecode_validator.h"
+  DEPS
+    iree::base::status
+    iree::schemas
+    iree::vm::context
+    iree::vm::module
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    context
+  SRCS
+    "context.cc"
+  HDRS
+    "context.h"
+  DEPS
+    absl::strings
+    absl::span
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::vm::function
+    iree::vm::module
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_table
+  SRCS
+    "executable_table.cc"
+  HDRS
+    "executable_table.h"
+  DEPS
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::schemas
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    fiber_state
+  SRCS
+    "fiber_state.cc"
+  HDRS
+    "fiber_state.h"
+  DEPS
+    absl::strings
+    absl::span
+    iree::base::status
+    iree::vm::instance
+    iree::vm::stack
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    function
+  SRCS
+    "function.cc"
+  HDRS
+    "function.h"
+  DEPS
+    absl::strings
+    absl::span
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::hal::buffer_view
+    iree::schemas
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    function_table
+  SRCS
+    "function_table.cc"
+  HDRS
+    "function_table.h"
+  DEPS
+    absl::flat_hash_map
+    absl::strings
+    absl::span
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::schemas
+    iree::vm::function
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    instance
+  SRCS
+    "instance.cc"
+  HDRS
+    "instance.h"
+  DEPS
+    absl::memory
+    iree::base::source_location
+    iree::base::status
+    iree::hal::device_manager
+    iree::vm::debug::debug_server_interface
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    module
+  SRCS
+    "module.cc"
+  HDRS
+    "module.h"
+  DEPS
+    absl::memory
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::schemas
+    iree::vm::executable_table
+    iree::vm::function_table
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    module_printer
+  SRCS
+    "module_printer.cc"
+  HDRS
+    "module_printer.h"
+  DEPS
+    iree::base::bitfield
+    iree::base::status
+    iree::vm::bytecode_printer
+    iree::vm::module
+    iree::vm::opcode_info
+    iree::vm::source_map
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    opcode_info
+  hdrs = ["opcode_info.h"
+  DEPS
+    absl::strings
+    absl::optional
+    absl::span
+    iree::schemas::bytecode::bytecode_v0
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    sequencer_context
+  SRCS
+    "sequencer_context.cc"
+  HDRS
+    "sequencer_context.h"
+  DEPS
+    absl::strings
+    absl::span
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::hal::buffer_view
+    iree::vm::context
+    iree::vm::fiber_state
+    iree::vm::function
+    iree::vm::instance
+    iree::vm::module
+    iree::vm::sequencer_dispatch
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    sequencer_dispatch
+  SRCS
+    "sequencer_dispatch.cc"
+  HDRS
+    "sequencer_dispatch.h"
+  DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::strings
+    absl::time
+    absl::span
+    iree::base::logging
+    iree::base::memory
+    iree::base::status
+    iree::hal::buffer_view
+    iree::hal::command_queue
+    iree::hal::device
+    iree::hal::device_placement
+    iree::hal::heap_buffer
+    iree::schemas::bytecode::sequencer_bytecode_v0
+    iree::vm::bytecode_reader
+    iree::vm::bytecode_tables_sequencer
+    iree::vm::bytecode_util
+    iree::vm::function
+    iree::vm::opcode_info
+    iree::vm::stack
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    source_map
+  SRCS
+    "source_map.cc"
+  HDRS
+    "source_map.h"
+  DEPS
+    absl::strings
+    absl::optional
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::schemas
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    stack
+  SRCS
+    "stack.cc"
+    "stack_frame.cc"
+  HDRS
+    "stack.h"
+    "stack_frame.h"
+  DEPS
+    absl::strings
+    absl::span
+    iree::base::status
+    iree::hal::buffer_view
+    iree::vm::function
+    iree::vm::module
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    type
+  SRCS
+    "type.cc"
+  HDRS
+    "type.h"
+  DEPS
+    iree::base::status
+    iree::schemas
+    iree::schemas::bytecode::bytecode_v0
+  PUBLIC
+)

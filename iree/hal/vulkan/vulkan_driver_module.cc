@@ -34,6 +34,7 @@ ABSL_FLAG(bool, vulkan_push_descriptors, true,
 namespace iree {
 namespace hal {
 namespace vulkan {
+namespace {
 
 StatusOr<std::shared_ptr<Driver>> CreateVulkanDriver() {
   IREE_TRACE_SCOPE0("CreateVulkanDriver");
@@ -89,6 +90,7 @@ StatusOr<std::shared_ptr<Driver>> CreateVulkanDriver() {
   return driver;
 }
 
+}  // namespace
 }  // namespace vulkan
 }  // namespace hal
 }  // namespace iree

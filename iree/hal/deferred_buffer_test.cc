@@ -17,6 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/memory/memory.h"
+#include "iree/base/status_matchers.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/testing/mock_allocator.h"
 

@@ -14,42 +14,55 @@
 
 include(CMakeParseArguments)
 
-# iree_cc_library()
+# external_cc_library()
 #
 # CMake function to imitate Bazel's cc_library rule.
+# This is used for external libraries (from third_party, etc) that don't live
+# in the IREE namespace.
 #
 # Parameters:
-# NAME: name of target (see Note)
+# PACKAGE: Name of the package (overrides actual path)
+# NAME: Name of target (see Note)
+# ROOT: Path to the source root where files are found
 # HDRS: List of public header files for the library
 # SRCS: List of source files for the library
 # DEPS: List of other libraries to be linked in to the binary targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
+# INCLUDES: Include directories to add to dependencies
 # LINKOPTS: List of link options
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 #
 # Note:
-# By default, iree_cc_library will always create a library named iree_${NAME},
-# and alias target iree::${NAME}. The iree:: form should always be used.
+# By default, external_cc_library will always create a library named ${PACKAGE}_${NAME},
+# and alias target ${PACKAGE}::${NAME}. The ${PACKAGE}:: form should always be used.
 # This is to reduce namespace pollution.
 #
-# iree_cc_library(
+# external_cc_library(
+#   PACKAGE
+#     some_external_thing
 #   NAME
 #     awesome
+#   ROOT
+#     "third_party/foo"
 #   HDRS
 #     "a.h"
 #   SRCS
 #     "a.cc"
 # )
-# iree_cc_library(
+# external_cc_library(
+#   PACKAGE
+#     some_external_thing
 #   NAME
 #     fantastic_lib
+#   ROOT
+#     "third_party/foo"
 #   SRCS
 #     "b.cc"
 #   DEPS
-#     iree::package::awesome # not "awesome" !
+#     some_external_thing::awesome # not "awesome" !
 #   PUBLIC
 # )
 #
@@ -58,74 +71,79 @@ include(CMakeParseArguments)
 #     main_lib
 #   ...
 #   DEPS
-#     iree::package::fantastic_lib
+#     some_external_thing::fantastic_lib
 # )
 #
 # TODO: Implement "ALWAYSLINK"
-function(iree_cc_library)
-  cmake_parse_arguments(IREE_CC_LIB
+function(external_cc_library)
+  cmake_parse_arguments(EXTERNAL_CC_LIB
     "PUBLIC;TESTONLY"
-    "NAME"
-    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
+    "PACKAGE;NAME;ROOT"
+    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS;INCLUDES"
     ${ARGN}
   )
 
-  if(NOT IREE_CC_LIB_TESTONLY OR IREE_BUILD_TESTS)
-    # Prefix the library with the package name, so we get: iree_package_name
-    iree_package_name(_PACKAGE_NAME)
-    set(_NAME "${_PACKAGE_NAME}_${IREE_CC_LIB_NAME}")
+  if(NOT EXTERNAL_CC_LIB_TESTONLY OR IREE_BUILD_TESTS)
+    # Prefix the library with the package name.
+    string(REPLACE "::" "_" _PACKAGE_NAME ${EXTERNAL_CC_LIB_PACKAGE})
+    set(_NAME "${_PACKAGE_NAME}_${EXTERNAL_CC_LIB_NAME}")
+
+    # Prefix paths with the root.
+    list(TRANSFORM EXTERNAL_CC_LIB_HDRS PREPEND ${EXTERNAL_CC_LIB_ROOT})
+    list(TRANSFORM EXTERNAL_CC_LIB_SRCS PREPEND ${EXTERNAL_CC_LIB_ROOT})
 
     # Check if this is a header-only library.
     # Note that as of February 2019, many popular OS's (for example, Ubuntu
     # 16.04 LTS) only come with cmake 3.5 by default.  For this reason, we can't
     # use list(FILTER...)
-    set(IREE_CC_SRCS "${IREE_CC_LIB_SRCS}")
-    foreach(src_file IN LISTS IREE_CC_SRCS)
+    set(_CC_SRCS "${EXTERNAL_CC_LIB_SRCS}")
+    foreach(src_file IN LISTS _CC_SRCS)
       if(${src_file} MATCHES ".*\\.(h|inc)")
-        list(REMOVE_ITEM IREE_CC_SRCS "${src_file}")
+        list(REMOVE_ITEM _CC_SRCS "${src_file}")
       endif()
     endforeach()
-    if("${IREE_CC_SRCS}" STREQUAL "")
-      set(IREE_CC_LIB_IS_INTERFACE 1)
+    if("${_CC_SRCS}" STREQUAL "")
+      set(EXTERNAL_CC_LIB_IS_INTERFACE 1)
     else()
-      set(IREE_CC_LIB_IS_INTERFACE 0)
+      set(EXTERNAL_CC_LIB_IS_INTERFACE 0)
     endif()
 
-    if(NOT IREE_CC_LIB_IS_INTERFACE)
+    if(NOT EXTERNAL_CC_LIB_IS_INTERFACE)
       add_library(${_NAME} STATIC "")
       target_sources(${_NAME}
         PRIVATE
-          ${IREE_CC_LIB_SRCS}
-          ${IREE_CC_LIB_HDRS}
+          ${EXTERNAL_CC_LIB_SRCS}
+          ${EXTERNAL_CC_LIB_HDRS}
       )
       target_include_directories(${_NAME}
         PUBLIC
           "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+          "$<BUILD_INTERFACE:${EXTERNAL_CC_LIB_INCLUDES}>"
       )
       target_compile_options(${_NAME}
         PRIVATE
-          ${IREE_CC_LIB_COPTS}
+          ${EXTERNAL_CC_LIB_COPTS}
           ${IREE_DEFAULT_COPTS}
       )
       target_link_libraries(${_NAME}
         PUBLIC
-          ${IREE_CC_LIB_DEPS}
+          ${EXTERNAL_CC_LIB_DEPS}
         PRIVATE
-          ${IREE_CC_LIB_LINKOPTS}
+          ${EXTERNAL_CC_LIB_LINKOPTS}
           ${IREE_DEFAULT_LINKOPTS}
       )
       target_compile_definitions(${_NAME}
         PUBLIC
-          ${IREE_CC_LIB_DEFINES}
+          ${EXTERNAL_CC_LIB_DEFINES}
       )
 
-      # Add all IREE targets to a a folder in the IDE for organization.
-      if(IREE_CC_LIB_PUBLIC)
-        set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER})
-      elseif(IREE_CC_LIB_TESTONLY)
-        set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
+      # Add all external targets to a a folder in the IDE for organization.
+      if(EXTERNAL_CC_LIB_PUBLIC)
+        set_property(TARGET ${_NAME} PROPERTY FOLDER third_party)
+      elseif(EXTERNAL_CC_LIB_TESTONLY)
+        set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/test)
       else()
-        set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/internal)
+        set_property(TARGET ${_NAME} PROPERTY FOLDER third_party/internal)
       endif()
 
       # INTERFACE libraries can't have the CXX_STANDARD property set
@@ -137,23 +155,25 @@ function(iree_cc_library)
       target_include_directories(${_NAME}
         INTERFACE
           "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
-        )
+          "$<BUILD_INTERFACE:${EXTERNAL_CC_LIB_INCLUDES}>"
+      )
+      target_compile_options(${_NAME}
+        INTERFACE
+          ${EXTERNAL_CC_LIB_COPTS}
+          ${IREE_DEFAULT_COPTS}
+      )
       target_link_libraries(${_NAME}
         INTERFACE
-          ${IREE_CC_LIB_DEPS}
-          ${IREE_CC_LIB_LINKOPTS}
+          ${EXTERNAL_CC_LIB_DEPS}
+          ${EXTERNAL_CC_LIB_LINKOPTS}
           ${IREE_DEFAULT_LINKOPTS}
       )
       target_compile_definitions(${_NAME}
         INTERFACE
-          ${IREE_CC_LIB_DEFINES}
+          ${EXTERNAL_CC_LIB_DEFINES}
       )
     endif()
 
-    # Alias the iree_package_name library to iree::package::name.
-    # This lets us more clearly map to Bazel and makes it possible to
-    # disambiguate the underscores in paths vs. the separators.
-    iree_package_ns(_PACKAGE_NS)
-    add_library(${_PACKAGE_NS}::${IREE_CC_LIB_NAME} ALIAS ${_NAME})
+    add_library(${EXTERNAL_CC_LIB_PACKAGE}::${EXTERNAL_CC_LIB_NAME} ALIAS ${_NAME})
   endif()
 endfunction()

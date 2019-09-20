@@ -79,16 +79,16 @@ namespace status_macro_internal {
 // that declares a variable.
 class StatusAdaptorForMacros {
  public:
-  StatusAdaptorForMacros(const Status& status, absl::SourceLocation loc)
+  StatusAdaptorForMacros(const Status& status, SourceLocation loc)
       : builder_(status, loc) {}
 
-  StatusAdaptorForMacros(Status&& status, absl::SourceLocation loc)
+  StatusAdaptorForMacros(Status&& status, SourceLocation loc)
       : builder_(std::move(status), loc) {}
 
-  StatusAdaptorForMacros(const StatusBuilder& builder, absl::SourceLocation loc)
+  StatusAdaptorForMacros(const StatusBuilder& builder, SourceLocation loc)
       : builder_(builder) {}
 
-  StatusAdaptorForMacros(StatusBuilder&& builder, absl::SourceLocation loc)
+  StatusAdaptorForMacros(StatusBuilder&& builder, SourceLocation loc)
       : builder_(std::move(builder)) {}
 
   StatusAdaptorForMacros(const StatusAdaptorForMacros&) = delete;

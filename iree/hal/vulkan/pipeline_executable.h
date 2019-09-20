@@ -19,6 +19,7 @@
 
 #include <vector>
 
+#include "absl/container/inlined_vector.h"
 #include "iree/base/status.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
@@ -77,7 +78,7 @@ class PipelineExecutable final : public Executable {
   ref_ptr<VkDeviceHandle> logical_device_;
   VkPipelineLayout pipeline_layout_;
   PipelineDescriptorSets descriptor_sets_;
-  string tag_;
+  std::string tag_;
 
   // One pipeline per entry point.
   absl::InlinedVector<VkPipeline, 1> pipelines_;

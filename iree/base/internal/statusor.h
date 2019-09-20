@@ -76,7 +76,7 @@ using IsStatusOrDirectInitializationValid = absl::disjunction<
 
 class Helper {
  public:
-  static void HandleInvalidStatusCtorArg(Status*);
+  ABSL_ATTRIBUTE_NORETURN static void HandleInvalidStatusCtorArg(Status*);
   ABSL_ATTRIBUTE_NORETURN static void Crash(const Status& status);
 };
 

@@ -35,6 +35,16 @@ namespace status_internal {
 
 ABSL_CONST_INIT std::atomic<bool> iree_save_stack_trace{false};
 
+}  // namespace status_internal
+
+bool DoesStatusSaveStackTrace() {
+  return status_internal::iree_save_stack_trace.load(std::memory_order_relaxed);
+}
+void StatusSavesStackTrace(bool on_off) {
+  status_internal::iree_save_stack_trace.store(on_off,
+                                               std::memory_order_relaxed);
+}
+
 std::string StatusCodeToString(StatusCode code) {
   switch (code) {
     case StatusCode::kOk:
@@ -74,16 +84,6 @@ std::string StatusCodeToString(StatusCode code) {
     default:
       return "";
   }
-}
-
-}  // namespace status_internal
-
-bool DoesStatusSaveStackTrace() {
-  return status_internal::iree_save_stack_trace.load(std::memory_order_relaxed);
-}
-void StatusSavesStackTrace(bool on_off) {
-  status_internal::iree_save_stack_trace.store(on_off,
-                                               std::memory_order_relaxed);
 }
 
 Status::Status() {}
@@ -127,8 +127,8 @@ std::string Status::ToString() const {
   }
 
   std::string text;
-  absl::StrAppend(&text, status_internal::StatusCodeToString(state_->code),
-                  ": ", state_->message);
+  absl::StrAppend(&text, StatusCodeToString(state_->code), ": ",
+                  state_->message);
   // TODO(scotttodd): Payloads (stack traces)
   return text;
 }

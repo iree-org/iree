@@ -55,6 +55,8 @@ enum class StatusCode : int {
   kDoNotUseReservedForFutureExpansionUseDefaultInSwitchInstead_ = 20
 };
 
+std::string StatusCodeToString(StatusCode code);
+
 class ABSL_MUST_USE_RESULT Status;
 
 // A Status value can be either OK or not-OK

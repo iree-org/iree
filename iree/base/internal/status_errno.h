@@ -34,7 +34,7 @@ Status ErrnoToCanonicalStatus(int error_number, absl::string_view message);
 // `ErrnoToCanonicalStatus(error_number, message)` and `location`.
 StatusBuilder ErrnoToCanonicalStatusBuilder(int error_number,
                                             absl::string_view message,
-                                            absl::SourceLocation location);
+                                            SourceLocation location);
 
 }  // namespace iree
 

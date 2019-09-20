@@ -17,6 +17,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "iree/base/memory.h"
+#include "iree/base/status_matchers.h"
 
 namespace iree {
 namespace hal {

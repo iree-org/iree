@@ -21,7 +21,7 @@
 #include "gtest/gtest.h"
 #include "absl/time/time.h"
 #include "iree/base/status.h"
-
+#include "iree/base/status_matchers.h"
 namespace iree {
 namespace hal {
 namespace {

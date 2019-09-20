@@ -28,6 +28,8 @@
 #ifndef IREE_BASE_TRACING_H_
 #define IREE_BASE_TRACING_H_
 
+#if defined(GLOBAL_WTF_ENABLE) || defined(IREE_CONFIG_GOOGLE_INTERNAL)
+
 #include "third_party/tracing_framework_bindings_cpp/event.h"  // IWYU pragma: export
 #include "third_party/tracing_framework_bindings_cpp/macros.h"  // IWYU pragma: export
 
@@ -65,5 +67,23 @@ void FlushTrace();
 #define IREE_TRACE_EVENT WTF_EVENT
 
 }  // namespace iree
+
+#else
+
+namespace iree {
+
+inline void InitializeTracing() {}
+inline void StopTracing() {}
+inline void FlushTrace() {}
+
+#define IREE_TRACE_THREAD_ENABLE(name)
+#define IREE_TRACE_SCOPE0(name_spec)
+#define IREE_TRACE_SCOPE(name_spec, ...) (void)
+#define IREE_TRACE_EVENT0
+#define IREE_TRACE_EVENT (void)
+
+}  // namespace iree
+
+#endif  // GLOBAL_WTF_ENABLE
 
 #endif  // IREE_BASE_TRACING_H_

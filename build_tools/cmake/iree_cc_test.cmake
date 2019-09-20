@@ -47,8 +47,8 @@ include(CMakeParseArguments)
 #   SRCS
 #     "awesome_test.cc"
 #   DEPS
-#     iree::awesome
 #     gtest_main
+#     iree::awesome
 # )
 function(iree_cc_test)
   if(NOT IREE_BUILD_TESTS)
@@ -62,7 +62,10 @@ function(iree_cc_test)
     ${ARGN}
   )
 
-  set(_NAME "iree_${IREE_CC_TEST_NAME}")
+  # Prefix the library with the package name, so we get: iree_package_name
+  iree_package_name(_PACKAGE_NAME)
+  set(_NAME "${_PACKAGE_NAME}_${IREE_CC_TEST_NAME}")
+
   add_executable(${_NAME} "")
   target_sources(${_NAME}
     PRIVATE
@@ -89,7 +92,7 @@ function(iree_cc_test)
     PRIVATE
       ${IREE_CC_TEST_LINKOPTS}
   )
-  # Add all Abseil targets to a a folder in the IDE for organization.
+  # Add all IREE targets to a a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
 
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})

@@ -64,6 +64,9 @@ class Initializer {
   bool done_;
 };
 
+// In iree/base/init.h:
+void InitializeEnvironment(int* argc, char*** argv);
+
 }  // namespace iree
 
 #define IREE_DECLARE_MODULE_INITIALIZER(name) \
