@@ -36,8 +36,8 @@ namespace IREE {
 //===----------------------------------------------------------------------===//
 
 // Parses an op that has no inputs and no outputs.
-static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState *state) {
-  if (failed(parser.parseOptionalAttributeDict(state->attributes))) {
+static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState &state) {
+  if (failed(parser.parseOptionalAttributeDict(state.attributes))) {
     return failure();
   }
   return success();
@@ -53,35 +53,34 @@ static void printNoIOOp(Operation *op, OpAsmPrinter *printer) {
 // iree.target_config
 //===----------------------------------------------------------------------===//
 
-void ExecutableTargetConfigOp::build(Builder *builder, OperationState *state,
+void ExecutableTargetConfigOp::build(Builder *builder, OperationState &state,
                                      std::string backend) {
-  state->addAttribute("backend", builder->getStringAttr(backend));
-  ensureTerminator(*state->addRegion(), *builder, state->location);
+  state.addAttribute("backend", builder->getStringAttr(backend));
+  ensureTerminator(*state.addRegion(), *builder, state.location);
 }
 
 static ParseResult parseExecutableTargetConfigOp(OpAsmParser &parser,
-                                                 OperationState *state) {
+                                                 OperationState &state) {
   llvm::SMLoc backendLoc;
   StringAttr backendAttr;
   if (failed(parser.parseLParen()) ||
       failed(parser.getCurrentLocation(&backendLoc)) ||
-      failed(
-          parser.parseAttribute(backendAttr, "backend", state->attributes))) {
+      failed(parser.parseAttribute(backendAttr, "backend", state.attributes))) {
     return failure();
   }
 
-  Region *body = state->addRegion();
+  Region *body = state.addRegion();
   if (failed(parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
     return failure();
   }
   if (succeeded(parser.parseOptionalKeyword("attributes"))) {
-    if (failed(parser.parseOptionalAttributeDict(state->attributes))) {
+    if (failed(parser.parseOptionalAttributeDict(state.attributes))) {
       return failure();
     }
   }
 
   ExecutableTargetConfigOp::ensureTerminator(*body, parser.getBuilder(),
-                                             state->location);
+                                             state.location);
 
   return success();
 }

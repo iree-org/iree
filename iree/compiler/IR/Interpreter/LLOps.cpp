@@ -27,18 +27,18 @@ namespace LL {
 // iree_ll_interp.call
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseCallOp(OpAsmParser &parser, OperationState *state) {
+static ParseResult parseCallOp(OpAsmParser &parser, OperationState &state) {
   SymbolRefAttr calleeAttr;
   FunctionType calleeType;
   SmallVector<OpAsmParser::OperandType, 4> operands;
   auto calleeLoc = parser.getNameLoc();
-  if (parser.parseAttribute(calleeAttr, "callee", state->attributes) ||
+  if (parser.parseAttribute(calleeAttr, "callee", state.attributes) ||
       parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren) ||
-      parser.parseOptionalAttributeDict(state->attributes) ||
+      parser.parseOptionalAttributeDict(state.attributes) ||
       parser.parseColonType(calleeType) ||
-      parser.addTypesToList(calleeType.getResults(), state->types) ||
+      parser.addTypesToList(calleeType.getResults(), state.types) ||
       parser.resolveOperands(operands, calleeType.getInputs(), calleeLoc,
-                             state->operands)) {
+                             state.operands)) {
     return failure();
   }
   return success();
@@ -64,18 +64,18 @@ FunctionType CallOp::getCalleeType() {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseCallImportOp(OpAsmParser &parser,
-                                     OperationState *state) {
+                                     OperationState &state) {
   SymbolRefAttr calleeAttr;
   FunctionType calleeType;
   SmallVector<OpAsmParser::OperandType, 4> operands;
   auto calleeLoc = parser.getNameLoc();
-  if (parser.parseAttribute(calleeAttr, "callee", state->attributes) ||
+  if (parser.parseAttribute(calleeAttr, "callee", state.attributes) ||
       parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren) ||
-      parser.parseOptionalAttributeDict(state->attributes) ||
+      parser.parseOptionalAttributeDict(state.attributes) ||
       parser.parseColonType(calleeType) ||
-      parser.addTypesToList(calleeType.getResults(), state->types) ||
+      parser.addTypesToList(calleeType.getResults(), state.types) ||
       parser.resolveOperands(operands, calleeType.getInputs(), calleeLoc,
-                             state->operands)) {
+                             state.operands)) {
     return failure();
   }
   return success();
@@ -101,7 +101,7 @@ FunctionType CallImportOp::getCalleeType() {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseCallIndirectOp(OpAsmParser &parser,
-                                       OperationState *result) {
+                                       OperationState &result) {
   FunctionType calleeType;
   OpAsmParser::OperandType callee;
   llvm::SMLoc operandsLoc;
@@ -109,12 +109,12 @@ static ParseResult parseCallIndirectOp(OpAsmParser &parser,
   return failure(
       parser.parseOperand(callee) || parser.getCurrentLocation(&operandsLoc) ||
       parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren) ||
-      parser.parseOptionalAttributeDict(result->attributes) ||
+      parser.parseOptionalAttributeDict(result.attributes) ||
       parser.parseColonType(calleeType) ||
-      parser.resolveOperand(callee, calleeType, result->operands) ||
+      parser.resolveOperand(callee, calleeType, result.operands) ||
       parser.resolveOperands(operands, calleeType.getInputs(), operandsLoc,
-                             result->operands) ||
-      parser.addTypesToList(calleeType.getResults(), result->types));
+                             result.operands) ||
+      parser.addTypesToList(calleeType.getResults(), result.types));
 }
 
 static void printCallIndirectOp(OpAsmPrinter *p, CallIndirectOp op) {
@@ -132,13 +132,13 @@ static void printCallIndirectOp(OpAsmPrinter *p, CallIndirectOp op) {
 // iree_ll_interp.return
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseReturnOp(OpAsmParser &parser, OperationState *state) {
+static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &state) {
   SmallVector<OpAsmParser::OperandType, 2> opInfo;
   SmallVector<Type, 2> types;
   llvm::SMLoc loc = parser.getCurrentLocation();
   return failure(parser.parseOperandList(opInfo) ||
                  (!opInfo.empty() && parser.parseColonTypeList(types)) ||
-                 parser.resolveOperands(opInfo, types, loc, state->operands));
+                 parser.resolveOperands(opInfo, types, loc, state.operands));
 }
 
 static void printReturnOp(OpAsmPrinter *p, ReturnOp op) {
@@ -155,11 +155,11 @@ static void printReturnOp(OpAsmPrinter *p, ReturnOp op) {
 // iree_ll_interp.br
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseBranchOp(OpAsmParser &parser, OperationState *result) {
+static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
   Block *dest;
   SmallVector<Value *, 4> destOperands;
   if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
-  result->addSuccessor(dest, destOperands);
+  result.addSuccessor(dest, destOperands);
   return success();
 }
 
@@ -183,7 +183,7 @@ void BranchOp::eraseOperand(unsigned index) {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseCondBranchOp(OpAsmParser &parser,
-                                     OperationState *result) {
+                                     OperationState &result) {
   SmallVector<Value *, 4> destOperands;
   Block *dest;
   OpAsmParser::OperandType condInfo;
@@ -191,21 +191,21 @@ static ParseResult parseCondBranchOp(OpAsmParser &parser,
   // Parse the condition.
   Type int1Ty = parser.getBuilder().getI1Type();
   if (parser.parseOperand(condInfo) || parser.parseComma() ||
-      parser.resolveOperand(condInfo, int1Ty, result->operands)) {
+      parser.resolveOperand(condInfo, int1Ty, result.operands)) {
     return parser.emitError(parser.getNameLoc(),
                             "expected condition type was boolean (i1)");
   }
 
   // Parse the true successor.
   if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
-  result->addSuccessor(dest, destOperands);
+  result.addSuccessor(dest, destOperands);
 
   // Parse the false successor.
   destOperands.clear();
   if (parser.parseComma() ||
       parser.parseSuccessorAndUseList(dest, destOperands))
     return failure();
-  result->addSuccessor(dest, destOperands);
+  result.addSuccessor(dest, destOperands);
 
   return success();
 }

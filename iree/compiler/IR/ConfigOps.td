@@ -31,7 +31,7 @@ def IREE_ExecutableTargetConfigOp : IREE_ConfigOp<"target_config", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<"Builder *builder, OperationState *state, std::string backend">,
+    OpBuilder<"Builder *builder, OperationState &state, std::string backend">,
   ];
 }
 

@@ -31,7 +31,7 @@ def IREE_ConstantOp : IREE_PureOp<"constant"> {
   }];
 
   let builders = [
-    OpBuilder<"Builder *builder, OperationState *state, Attribute value">,
+    OpBuilder<"Builder *builder, OperationState &state, Attribute value">,
   ];
 
   // TODO(b/134575149): enable folder when we store the correct type.
@@ -91,7 +91,7 @@ def IREE_DispatchRegionOp : IREE_PureOp<"dispatch_region"> {
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<"Builder *builder, OperationState *state,"
+    OpBuilder<"Builder *builder, OperationState &state,"
               "ArrayRef<Type> resultTypes, Value *workload,"
               "ArrayRef<Value *> args,"
               "ArrayRef<NamedAttribute> attributes = {}">,
@@ -135,12 +135,12 @@ def IREE_ReductionRegionOp : IREE_PureOp<"reduction_region", [
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<"Builder *builder, OperationState *state,"
+    OpBuilder<"Builder *builder, OperationState &state,"
     "ArrayRef<Type> resultTypes, Value *workload, ArrayRef<Value *> operands,"
     "ArrayRef<Value *> initialValues,"
     "ArrayRef<int64_t> dimensions,"
     "ArrayRef<NamedAttribute> attributes = {}">,
-    OpBuilder<"Builder *builder, OperationState *state,"
+    OpBuilder<"Builder *builder, OperationState &state,"
     "ArrayRef<Type> resultTypes, Value *workload, ArrayRef<Value *> operands,"
     "ArrayRef<Value *> initialValues,"
     "ArrayRef<int64_t> windowDimensions, ArrayRef<int64_t> windowStrides,"
@@ -154,7 +154,7 @@ def IREE_ReturnOp : IREE_Op<"return", [Terminator]> {
   let arguments = (ins Variadic<AnyType>:$operands);
 
   let builders = [OpBuilder<
-    "Builder *b, OperationState *result", [{ build(b, result, llvm::None); }]
+    "Builder *b, OperationState &result", [{ build(b, result, llvm::None); }]
   >];
 }
 

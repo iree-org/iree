@@ -59,17 +59,17 @@ def IREEInterpLL_CallOp : IREEInterpLL_Op<"call"> {
   let results = (outs Variadic<IREELL_MemRef>);
 
   let builders = [OpBuilder<
-    "Builder *builder, OperationState *result, FuncOp callee,"
+    "Builder *builder, OperationState &result, FuncOp callee,"
     "ArrayRef<Value *> operands = {}", [{
-      result->addOperands(operands);
-      result->addAttribute("callee", builder->getSymbolRefAttr(callee));
-      result->addTypes(callee.getType().getResults());
+      result.addOperands(operands);
+      result.addAttribute("callee", builder->getSymbolRefAttr(callee));
+      result.addTypes(callee.getType().getResults());
   }]>, OpBuilder<
-    "Builder *builder, OperationState *result, StringRef callee,"
+    "Builder *builder, OperationState &result, StringRef callee,"
     "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
-      result->addOperands(operands);
-      result->addAttribute("callee", builder->getSymbolRefAttr(callee));
-      result->addTypes(results);
+      result.addOperands(operands);
+      result.addAttribute("callee", builder->getSymbolRefAttr(callee));
+      result.addTypes(results);
   }]>];
 
   let extraClassDeclaration = [{
@@ -97,17 +97,17 @@ def IREEInterpLL_CallImportOp : IREEInterpLL_Op<"call_import"> {
   let results = (outs Variadic<IREELL_MemRef>);
 
   let builders = [OpBuilder<
-    "Builder *builder, OperationState *result, FuncOp callee,"
+    "Builder *builder, OperationState &result, FuncOp callee,"
     "ArrayRef<Value *> operands = {}", [{
-      result->addOperands(operands);
-      result->addAttribute("callee", builder->getSymbolRefAttr(callee));
-      result->addTypes(callee.getType().getResults());
+      result.addOperands(operands);
+      result.addAttribute("callee", builder->getSymbolRefAttr(callee));
+      result.addTypes(callee.getType().getResults());
   }]>, OpBuilder<
-    "Builder *builder, OperationState *result, StringRef callee,"
+    "Builder *builder, OperationState &result, StringRef callee,"
     "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
-      result->addOperands(operands);
-      result->addAttribute("callee", builder->getSymbolRefAttr(callee));
-      result->addTypes(results);
+      result.addOperands(operands);
+      result.addAttribute("callee", builder->getSymbolRefAttr(callee));
+      result.addTypes(results);
   }]>];
 
   let extraClassDeclaration = [{
@@ -134,11 +134,11 @@ def IREEInterpLL_CallIndirectOp : IREEInterpLL_Op<"call_indirect"> {
   let results = (outs Variadic<IREELL_MemRef>);
 
   let builders = [OpBuilder<
-    "Builder *, OperationState *result, Value *callee,"
+    "Builder *, OperationState &result, Value *callee,"
     "ArrayRef<Value *> operands = {}", [{
-      result->operands.push_back(callee);
-      result->addOperands(operands);
-      result->addTypes(callee->getType().cast<FunctionType>().getResults());
+      result.operands.push_back(callee);
+      result.addOperands(operands);
+      result.addTypes(callee->getType().cast<FunctionType>().getResults());
   }]>];
 
   let extraClassDeclaration = [{
@@ -161,7 +161,7 @@ def IREEInterpLL_ReturnOp : IREEInterpLL_Op<"return", [Terminator]> {
   let arguments = (ins Variadic<IREELL_MemRef>:$operands);
 
   let builders = [OpBuilder<
-    "Builder *b, OperationState *result", [{ build(b, result, llvm::None); }]
+    "Builder *b, OperationState &result", [{ build(b, result, llvm::None); }]
   >];
 
   let parser = [{ return parse$cppClass(parser, result); }];
@@ -172,9 +172,9 @@ def IREEInterpLL_BranchOp : IREEInterpLL_Op<"br", [Terminator]> {
   let arguments = (ins Variadic<IREELL_MemRef>:$operands);
 
   let builders = [OpBuilder<
-    "Builder *, OperationState *result, Block *dest,"
+    "Builder *, OperationState &result, Block *dest,"
     "ArrayRef<Value *> operands = {}", [{
-      result->addSuccessor(dest, operands);
+      result.addSuccessor(dest, operands);
   }]>];
 
   let extraClassDeclaration = [{
@@ -196,12 +196,12 @@ def IREEInterpLL_CondBranchOp : IREEInterpLL_Op<"cond_br", [Terminator]> {
   );
 
   let builders = [OpBuilder<
-    "Builder *, OperationState *result, Value *condition,"
+    "Builder *, OperationState &result, Value *condition,"
     "Block *trueDest, ArrayRef<Value *> trueOperands,"
     "Block *falseDest, ArrayRef<Value *> falseOperands", [{
-      result->addOperands(condition);
-      result->addSuccessor(trueDest, trueOperands);
-      result->addSuccessor(falseDest, falseOperands);
+      result.addOperands(condition);
+      result.addSuccessor(trueDest, trueOperands);
+      result.addSuccessor(falseDest, falseOperands);
   }]>];
 
   let extraClassDeclaration = [{

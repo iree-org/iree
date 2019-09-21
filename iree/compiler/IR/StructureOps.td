@@ -31,7 +31,7 @@ def IREE_ModuleOp :
   }];
 
   let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<"Builder *, OperationState *state">];
+  let builders = [OpBuilder<"Builder *, OperationState &state">];
 }
 
 def IREE_ModuleEndOp :
@@ -70,7 +70,7 @@ def IREE_MultiArchExecutableOp :
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<"Builder *builder, OperationState *state, StringRef name">,
+    OpBuilder<"Builder *builder, OperationState &state, StringRef name">,
   ];
 }
 
@@ -108,7 +108,7 @@ def IREE_ExecutableOp :
 
   let skipDefaultBuilders = 1;
   let builders = [
-    OpBuilder<[{Builder *builder, OperationState *state,
+    OpBuilder<[{Builder *builder, OperationState &state,
                 ExecutableFormat executable_format}]>,
   ];
 }
