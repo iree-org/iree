@@ -7,7 +7,7 @@
 #else
 #define IREE_CONFIG_OPS
 
-include "third_party/iree/compiler/IR/OpBase.td"
+include "iree/compiler/IR/OpBase.td"
 
 class IREE_ConfigOp<string mnemonic, list<OpTrait> traits = []> :
     Op<IREE_Dialect, mnemonic, traits> {

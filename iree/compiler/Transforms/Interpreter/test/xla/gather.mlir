@@ -1,4 +1,4 @@
-// RUN: iree-opt --lower-xla-to-iree-interpreter --print-ir-after-all %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt --lower-xla-to-iree-interpreter %s | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: @gather
 // CHECK-SAME: [[INPUT:%[a-zA-Z0-9]+]]

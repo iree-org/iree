@@ -8,7 +8,7 @@
 
 #ifdef IREE_OP_BASE
 #else
-include "third_party/iree/compiler/IR/OpBase.td"
+include "iree/compiler/IR/OpBase.td"
 #endif  // IREE_OP_BASE
 
 class IREE_Op<string mnemonic, list<OpTrait> traits = []> :
