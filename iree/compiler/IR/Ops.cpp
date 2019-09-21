@@ -50,17 +50,17 @@ static ParseResult parseConstantOp(OpAsmParser &parser,
   return parser.addTypeToList(type, result.types);
 }
 
-static void printConstantOp(OpAsmPrinter *p, ConstantOp &op) {
-  *p << "iree.constant ";
-  p->printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
+static void printConstantOp(OpAsmPrinter &p, ConstantOp &op) {
+  p << "iree.constant ";
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
 
-  if (op.getAttrs().size() > 1) *p << ' ';
-  p->printAttribute(op.getValue());
+  if (op.getAttrs().size() > 1) p << ' ';
+  p.printAttribute(op.getValue());
 
   // If the value is a symbol reference, print a trailing type.
   if (op.getValue().isa<SymbolRefAttr>()) {
-    *p << " : ";
-    p->printType(op.getType());
+    p << " : ";
+    p.printType(op.getType());
   }
 }
 
@@ -112,13 +112,13 @@ static ParseResult parseTensorToMemRefOp(OpAsmParser &parser,
   return success();
 }
 
-static void printTensorToMemRefOp(OpAsmPrinter *p, TensorToMemRefOp &op) {
-  *p << "iree.tensor_to_memref(";
-  p->printOperand(op.getOperand());
-  *p << " : ";
-  p->printType(op.getOperand()->getType());
-  *p << ") : ";
-  p->printType(op.getType());
+static void printTensorToMemRefOp(OpAsmPrinter &p, TensorToMemRefOp &op) {
+  p << "iree.tensor_to_memref(";
+  p.printOperand(op.getOperand());
+  p << " : ";
+  p.printType(op.getOperand()->getType());
+  p << ") : ";
+  p.printType(op.getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -141,13 +141,13 @@ static ParseResult parseMemRefToTensorOp(OpAsmParser &parser,
   return success();
 }
 
-static void printMemRefToTensorOp(OpAsmPrinter *p, MemRefToTensorOp &op) {
-  *p << "iree.memref_to_tensor(";
-  p->printOperand(op.getOperand());
-  *p << " : ";
-  p->printType(op.getOperand()->getType());
-  *p << ") : ";
-  p->printType(op.getType());
+static void printMemRefToTensorOp(OpAsmPrinter &p, MemRefToTensorOp &op) {
+  p << "iree.memref_to_tensor(";
+  p.printOperand(op.getOperand());
+  p << " : ";
+  p.printType(op.getOperand()->getType());
+  p << ") : ";
+  p.printType(op.getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -222,36 +222,36 @@ ParseResult parseDispatchRegionOp(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
-void printDispatchRegionOp(OpAsmPrinter *p, DispatchRegionOp op) {
-  *p << "iree.dispatch_region";
+void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
+  p << "iree.dispatch_region";
 
   // Print the workload argument.
-  *p << "[";
-  p->printOperand(op.getWorkload());
-  *p << " : ";
-  p->printType(op.getWorkload()->getType());
-  *p << "]";
+  p << "[";
+  p.printOperand(op.getWorkload());
+  p << " : ";
+  p.printType(op.getWorkload()->getType());
+  p << "]";
 
   // Print the data argument remapping.
-  *p << "(";
+  p << "(";
   interleaveComma(
-      llvm::zip(op.getBody().front().getArguments(), op.getArgOperands()), *p,
+      llvm::zip(op.getBody().front().getArguments(), op.getArgOperands()), p,
       [&](std::tuple<BlockArgument *, Value *> it) {
-        *p << *std::get<0>(it) << " = " << *std::get<1>(it);
-        *p << " : ";
-        *p << std::get<1>(it)->getType();
+        p << *std::get<0>(it) << " = " << *std::get<1>(it);
+        p << " : ";
+        p << std::get<1>(it)->getType();
       });
-  *p << ")";
+  p << ")";
 
   // Print the result types, if any.
   if (op.getNumResults() > 0) {
-    *p << " : ";
-    interleaveComma(op.getResultTypes(), *p);
+    p << " : ";
+    interleaveComma(op.getResultTypes(), p);
   }
 
-  p->printRegion(op.getBody(), /*printEntryBlockArgs=*/false);
-  p->printOptionalAttrDict(op.getAttrs(),
-                           /*elidedAttrs=*/{});
+  p.printRegion(op.getBody(), /*printEntryBlockArgs=*/false);
+  p.printOptionalAttrDict(op.getAttrs(),
+                          /*elidedAttrs=*/{});
 }
 
 //===----------------------------------------------------------------------===//
@@ -387,48 +387,48 @@ ParseResult parseReductionRegionOp(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
-void printReductionRegionOp(OpAsmPrinter *p, ReductionRegionOp op) {
-  *p << "iree.reduction_region";
+void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
+  p << "iree.reduction_region";
 
   // Print the workload argument.
-  *p << "[";
-  p->printOperand(op.getWorkload());
-  *p << " : ";
-  p->printType(op.getWorkload()->getType());
-  *p << "]";
+  p << "[";
+  p.printOperand(op.getWorkload());
+  p << " : ";
+  p.printType(op.getWorkload()->getType());
+  p << "]";
 
-  *p << "(";
-  p->printOperands(op.getODSOperands(1));
-  *p << ")";
+  p << "(";
+  p.printOperands(op.getODSOperands(1));
+  p << ")";
   if (op.getNumResults() > 0) {
-    *p << " : (";
-    interleaveComma(op.getODSOperands(1), *p,
-                    [&](Value *operand) { p->printType(operand->getType()); });
-    *p << ")";
-    *p << " -> (";
-    interleaveComma(op.getResultTypes(), *p);
-    *p << ")";
+    p << " : (";
+    interleaveComma(op.getODSOperands(1), p,
+                    [&](Value *operand) { p.printType(operand->getType()); });
+    p << ")";
+    p << " -> (";
+    interleaveComma(op.getResultTypes(), p);
+    p << ")";
   }
-  *p << "\n";
+  p << "\n";
 
-  *p << "      invocation(";
+  p << "      invocation(";
   auto &entryBlock = op.getBody().getBlocks().front();
   int regionArgIndex = 0;
-  interleaveComma(op.getODSOperands(2), *p, [&](Value *operand) {
-    *p << "(";
-    p->printOperand(entryBlock.getArgument(regionArgIndex++));
-    *p << ", ";
-    p->printOperand(entryBlock.getArgument(regionArgIndex++));
-    *p << ") = ";
-    p->printOperand(operand);
-    *p << " : ";
-    p->printType(operand->getType());
+  interleaveComma(op.getODSOperands(2), p, [&](Value *operand) {
+    p << "(";
+    p.printOperand(entryBlock.getArgument(regionArgIndex++));
+    p << ", ";
+    p.printOperand(entryBlock.getArgument(regionArgIndex++));
+    p << ") = ";
+    p.printOperand(operand);
+    p << " : ";
+    p.printType(operand->getType());
   });
-  *p << ") ";
+  p << ") ";
 
-  p->printRegion(op.getBody(), /*printEntryBlockArgs=*/false);
-  p->printOptionalAttrDict(op.getAttrs(),
-                           /*elidedAttrs=*/{});
+  p.printRegion(op.getBody(), /*printEntryBlockArgs=*/false);
+  p.printOptionalAttrDict(op.getAttrs(),
+                          /*elidedAttrs=*/{});
 }
 
 //===----------------------------------------------------------------------===//
@@ -444,13 +444,13 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &state) {
                  parser.resolveOperands(opInfo, types, loc, state.operands));
 }
 
-static void printReturnOp(OpAsmPrinter *p, ReturnOp op) {
-  *p << "iree.return";
+static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
+  p << "iree.return";
   if (op.getNumOperands() > 0) {
-    *p << ' ';
-    p->printOperands(op.operand_begin(), op.operand_end());
-    *p << " : ";
-    interleaveComma(op.getOperandTypes(), *p);
+    p << ' ';
+    p.printOperands(op.operand_begin(), op.operand_end());
+    p << " : ";
+    interleaveComma(op.getOperandTypes(), p);
   }
 }
 
@@ -474,15 +474,15 @@ ParseResult parseLoadInputOp(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
-void printLoadInputOp(OpAsmPrinter *printer, Operation *op) {
+void printLoadInputOp(OpAsmPrinter &printer, Operation *op) {
   auto *inputValue = op->getOperand(0);
   auto *outputValue = op->getResult(0);
-  *printer << op->getName() << '(';
-  printer->printOperand(inputValue);
-  *printer << " : ";
-  printer->printType(inputValue->getType());
-  *printer << ") : ";
-  printer->printType(outputValue->getType());
+  printer << op->getName() << '(';
+  printer.printOperand(inputValue);
+  printer << " : ";
+  printer.printType(inputValue->getType());
+  printer << ") : ";
+  printer.printType(outputValue->getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -503,18 +503,18 @@ ParseResult parseStoreOutputOp(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
-void printStoreOutputOp(OpAsmPrinter *printer, Operation *op) {
+void printStoreOutputOp(OpAsmPrinter &printer, Operation *op) {
   auto *inputValue = op->getOperand(0);
   auto *outputValue = op->getOperand(1);
-  *printer << op->getName() << '(';
-  printer->printOperand(inputValue);
-  *printer << " : ";
-  printer->printType(inputValue->getType());
-  *printer << ", ";
-  printer->printOperand(outputValue);
-  *printer << " : ";
-  printer->printType(outputValue->getType());
-  *printer << ")";
+  printer << op->getName() << '(';
+  printer.printOperand(inputValue);
+  printer << " : ";
+  printer.printType(inputValue->getType());
+  printer << ", ";
+  printer.printOperand(outputValue);
+  printer << " : ";
+  printer.printType(outputValue->getType());
+  printer << ")";
 }
 
 #define GET_OP_CLASSES

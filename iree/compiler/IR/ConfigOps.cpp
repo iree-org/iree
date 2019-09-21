@@ -44,9 +44,9 @@ static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState &state) {
 }
 
 // Prints an op that has no inputs and no outputs.
-static void printNoIOOp(Operation *op, OpAsmPrinter *printer) {
-  *printer << op->getName();
-  printer->printOptionalAttrDict(op->getAttrs());
+static void printNoIOOp(Operation *op, OpAsmPrinter &printer) {
+  printer << op->getName();
+  printer.printOptionalAttrDict(op->getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -85,20 +85,20 @@ static ParseResult parseExecutableTargetConfigOp(OpAsmParser &parser,
   return success();
 }
 
-static void printExecutableTargetConfigOp(OpAsmPrinter *printer,
+static void printExecutableTargetConfigOp(OpAsmPrinter &printer,
                                           ExecutableTargetConfigOp op) {
-  *printer << op.getOperationName() << "(" << op.backend() << ")";
+  printer << op.getOperationName() << "(" << op.backend() << ")";
 
-  printer->printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                       /*printBlockTerminators=*/false);
+  printer.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                      /*printBlockTerminators=*/false);
 
   // Print out executable attributes, if present.
   SmallVector<StringRef, 1> ignoredAttrs = {
       "backend",
   };
   if (op.getAttrs().size() > ignoredAttrs.size()) {
-    *printer << "\n  attributes ";
-    printer->printOptionalAttrDict(op.getAttrs(), ignoredAttrs);
+    printer << "\n  attributes ";
+    printer.printOptionalAttrDict(op.getAttrs(), ignoredAttrs);
   }
 }
 

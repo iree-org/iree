@@ -88,13 +88,13 @@ static ParseResult parseCallOp(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
-static void printCallOp(OpAsmPrinter *p, CallOp op) {
-  *p << "iree_ll_seq.call " << op.getAttr("callee") << '(';
-  p->printOperands(op.getOperands());
-  *p << ')';
-  p->printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
-  *p << " : ";
-  p->printType(op.getCalleeType());
+static void printCallOp(OpAsmPrinter &p, CallOp op) {
+  p << "iree_ll_seq.call " << op.getAttr("callee") << '(';
+  p.printOperands(op.getOperands());
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
+  p << " : ";
+  p.printType(op.getCalleeType());
 }
 
 FunctionType CallOp::getCalleeType() {
@@ -125,13 +125,13 @@ static ParseResult parseCallImportOp(OpAsmParser &parser,
   return success();
 }
 
-static void printCallImportOp(OpAsmPrinter *p, CallImportOp op) {
-  *p << "iree_ll_seq.call_import " << op.getAttr("callee") << '(';
-  p->printOperands(op.getOperands());
-  *p << ')';
-  p->printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
-  *p << " : ";
-  p->printType(op.getCalleeType());
+static void printCallImportOp(OpAsmPrinter &p, CallImportOp op) {
+  p << "iree_ll_seq.call_import " << op.getAttr("callee") << '(';
+  p.printOperands(op.getOperands());
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
+  p << " : ";
+  p.printType(op.getCalleeType());
 }
 
 FunctionType CallImportOp::getCalleeType() {
@@ -161,15 +161,15 @@ static ParseResult parseCallIndirectOp(OpAsmParser &parser,
       parser.addTypesToList(calleeType.getResults(), result.types));
 }
 
-static void printCallIndirectOp(OpAsmPrinter *p, CallIndirectOp op) {
-  *p << "iree_ll_seq.call_indirect ";
-  p->printOperand(op.getCallee());
-  *p << '(';
+static void printCallIndirectOp(OpAsmPrinter &p, CallIndirectOp op) {
+  p << "iree_ll_seq.call_indirect ";
+  p.printOperand(op.getCallee());
+  p << '(';
   auto operandRange = op.getOperands();
-  p->printOperands(++operandRange.begin(), operandRange.end());
-  *p << ')';
-  p->printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
-  *p << " : " << op.getCallee()->getType();
+  p.printOperands(++operandRange.begin(), operandRange.end());
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
+  p << " : " << op.getCallee()->getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -185,13 +185,13 @@ static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &state) {
                  parser.resolveOperands(opInfo, types, loc, state.operands));
 }
 
-static void printReturnOp(OpAsmPrinter *p, ReturnOp op) {
-  *p << "iree_ll_seq.return";
+static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
+  p << "iree_ll_seq.return";
   if (op.getNumOperands() > 0) {
-    *p << ' ';
-    p->printOperands(op.operand_begin(), op.operand_end());
-    *p << " : ";
-    interleaveComma(op.getOperandTypes(), *p);
+    p << ' ';
+    p.printOperands(op.operand_begin(), op.operand_end());
+    p << " : ";
+    interleaveComma(op.getOperandTypes(), p);
   }
 }
 
@@ -207,9 +207,9 @@ static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
   return success();
 }
 
-static void printBranchOp(OpAsmPrinter *p, BranchOp op) {
-  *p << "iree_ll_seq.br ";
-  p->printSuccessorAndUseList(op.getOperation(), 0);
+static void printBranchOp(OpAsmPrinter &p, BranchOp op) {
+  p << "iree_ll_seq.br ";
+  p.printSuccessorAndUseList(op.getOperation(), 0);
 }
 
 Block *BranchOp::getDest() { return getOperation()->getSuccessor(0); }
@@ -254,13 +254,13 @@ static ParseResult parseCondBranchOp(OpAsmParser &parser,
   return success();
 }
 
-static void printCondBranchOp(OpAsmPrinter *p, CondBranchOp op) {
-  *p << "iree_ll_interp.cond_br ";
-  p->printOperand(op.getCondition());
-  *p << ", ";
-  p->printSuccessorAndUseList(op.getOperation(), CondBranchOp::trueIndex);
-  *p << ", ";
-  p->printSuccessorAndUseList(op.getOperation(), CondBranchOp::falseIndex);
+static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp op) {
+  p << "iree_ll_interp.cond_br ";
+  p.printOperand(op.getCondition());
+  p << ", ";
+  p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::trueIndex);
+  p << ", ";
+  p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::falseIndex);
 }
 
 //===----------------------------------------------------------------------===//
@@ -306,22 +306,22 @@ static ParseResult parseDynamicDispatchOp(OpAsmParser &parser,
   return success();
 }
 
-static void printDynamicDispatchOp(OpAsmPrinter *p, DynamicDispatchOp op) {
-  *p << "iree_ll_seq.dynamic_dispatch " << op.getExecutable()
-     << "::" << op.getEntryPoint();
-  *p << "[";
-  p->printOperand(op.getWorkload());
-  *p << " : ";
-  p->printType(op.getWorkload()->getType());
-  *p << "](";
-  p->printOperands(op.getArgOperands());
-  *p << ')';
-  p->printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
-                               "executable",
-                               "entry_point",
-                           });
-  *p << " : ";
-  p->printType(op.getEntryPointType());
+static void printDynamicDispatchOp(OpAsmPrinter &p, DynamicDispatchOp op) {
+  p << "iree_ll_seq.dynamic_dispatch " << op.getExecutable()
+    << "::" << op.getEntryPoint();
+  p << "[";
+  p.printOperand(op.getWorkload());
+  p << " : ";
+  p.printType(op.getWorkload()->getType());
+  p << "](";
+  p.printOperands(op.getArgOperands());
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+                              "executable",
+                              "entry_point",
+                          });
+  p << " : ";
+  p.printType(op.getEntryPointType());
 }
 
 static LogicalResult verifyDynamicDispatchOp(DynamicDispatchOp op) {
@@ -404,21 +404,21 @@ static ParseResult parseStaticDispatchOp(OpAsmParser &parser,
   return success();
 }
 
-static void printStaticDispatchOp(OpAsmPrinter *p, StaticDispatchOp op) {
-  *p << "iree_ll_seq.static_dispatch " << op.getExecutable()
-     << "::" << op.getEntryPoint();
-  *p << "[";
-  p->printAttribute(op.getWorkload());
-  *p << "](";
-  p->printOperands(op.getArgOperands());
-  *p << ')';
-  p->printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
-                               "executable",
-                               "entry_point",
-                               "workload",
-                           });
-  *p << " : ";
-  p->printType(op.getEntryPointType());
+static void printStaticDispatchOp(OpAsmPrinter &p, StaticDispatchOp op) {
+  p << "iree_ll_seq.static_dispatch " << op.getExecutable()
+    << "::" << op.getEntryPoint();
+  p << "[";
+  p.printAttribute(op.getWorkload());
+  p << "](";
+  p.printOperands(op.getArgOperands());
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+                              "executable",
+                              "entry_point",
+                              "workload",
+                          });
+  p << " : ";
+  p.printType(op.getEntryPointType());
 }
 
 static LogicalResult verifyStaticDispatchOp(StaticDispatchOp op) {

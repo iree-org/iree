@@ -44,9 +44,9 @@ static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState &state) {
 }
 
 // Prints an op that has no inputs and no outputs.
-static void printNoIOOp(Operation *op, OpAsmPrinter *printer) {
-  *printer << op->getName();
-  printer->printOptionalAttrDict(op->getAttrs());
+static void printNoIOOp(Operation *op, OpAsmPrinter &printer) {
+  printer << op->getName();
+  printer.printOptionalAttrDict(op->getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -69,11 +69,11 @@ static ParseResult parseModuleOp(OpAsmParser &parser, OperationState &state) {
   return success();
 }
 
-static void printModuleOp(OpAsmPrinter *printer, Operation *op) {
-  *printer << op->getName();
-  printer->printRegion(op->getRegion(0), /*printEntryBlockArgs=*/false,
-                       /*printBlockTerminators=*/false);
-  printer->printOptionalAttrDict(op->getAttrs());
+static void printModuleOp(OpAsmPrinter &printer, Operation *op) {
+  printer << op->getName();
+  printer.printRegion(op->getRegion(0), /*printEntryBlockArgs=*/false,
+                      /*printBlockTerminators=*/false);
+  printer.printOptionalAttrDict(op->getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -127,17 +127,17 @@ static ParseResult parseMultiArchExecutableOp(OpAsmParser &parser,
   return success();
 }
 
-static void printMultiArchExecutableOp(OpAsmPrinter *printer,
+static void printMultiArchExecutableOp(OpAsmPrinter &printer,
                                        MultiArchExecutableOp op) {
-  *printer << op.getOperationName() << " @" << op.sym_name();
+  printer << op.getOperationName() << " @" << op.sym_name();
   if (auto ordinalAttr =
           op.getAttr("iree.ordinal").dyn_cast_or_null<IntegerAttr>()) {
-    *printer << "[" << ordinalAttr.getInt() << "]";
+    printer << "[" << ordinalAttr.getInt() << "]";
   }
-  *printer << "()";
+  printer << "()";
 
-  printer->printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                       /*printBlockTerminators=*/false);
+  printer.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                      /*printBlockTerminators=*/false);
 
   // Print out executable attributes, if present.
   SmallVector<StringRef, 2> ignoredAttrs = {
@@ -149,8 +149,8 @@ static void printMultiArchExecutableOp(OpAsmPrinter *printer,
         return llvm::count(ignoredAttrs, attr.first) == 0;
       }));
   if (!attrs.empty()) {
-    *printer << "\n    attributes ";
-    printer->printOptionalAttrDict(attrs);
+    printer << "\n    attributes ";
+    printer.printOptionalAttrDict(attrs);
   }
 }
 
@@ -209,23 +209,23 @@ static ParseResult parseExecutableOp(OpAsmParser &parser,
   return success();
 }
 
-static void printExecutableOp(OpAsmPrinter *printer, ExecutableOp op) {
-  *printer << op.getOperationName();
+static void printExecutableOp(OpAsmPrinter &printer, ExecutableOp op) {
+  printer << op.getOperationName();
   if (auto ordinalAttr =
           op.getAttr("iree.ordinal").dyn_cast_or_null<IntegerAttr>()) {
-    *printer << "[" << ordinalAttr.getInt() << "]";
+    printer << "[" << ordinalAttr.getInt() << "]";
   }
-  *printer << "(";
+  printer << "(";
   auto format = symbolizeExecutableFormat(op.format());
   if (format.hasValue()) {
-    *printer << stringifyExecutableFormat(format.getValue());
+    printer << stringifyExecutableFormat(format.getValue());
   } else {
-    *printer << "INVALID FORMAT";
+    printer << "INVALID FORMAT";
   }
-  *printer << ")";
+  printer << ")";
 
-  printer->printRegion(op.body(), /*printEntryBlockArgs=*/false,
-                       /*printBlockTerminators=*/false);
+  printer.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                      /*printBlockTerminators=*/false);
 
   // Print out executable attributes, if present.
   SmallVector<StringRef, 2> ignoredAttrs = {
@@ -237,8 +237,8 @@ static void printExecutableOp(OpAsmPrinter *printer, ExecutableOp op) {
         return llvm::count(ignoredAttrs, attr.first) == 0;
       }));
   if (!attrs.empty()) {
-    *printer << "\n      attributes ";
-    printer->printOptionalAttrDict(attrs);
+    printer << "\n      attributes ";
+    printer.printOptionalAttrDict(attrs);
   }
 }
 
