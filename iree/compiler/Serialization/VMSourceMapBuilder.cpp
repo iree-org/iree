@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Serialization/VMSourceMapBuilder.h"
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/schemas/source_map_def_generated.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Identifier.h"

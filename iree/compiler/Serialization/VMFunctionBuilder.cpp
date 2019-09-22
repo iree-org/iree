@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Serialization/VMFunctionBuilder.h"
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/IR/Dialect.h"
 #include "iree/compiler/IR/Interpreter/LLDialect.h"
 #include "iree/compiler/IR/Sequencer/LLDialect.h"

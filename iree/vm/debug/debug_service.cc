@@ -19,8 +19,8 @@
 
 #include "absl/strings/str_join.h"
 #include "absl/synchronization/mutex.h"
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
-#include "third_party/flatbuffers/include/flatbuffers/reflection.h"
+#include "flatbuffers/flatbuffers.h"
+#include "flatbuffers/reflection.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"

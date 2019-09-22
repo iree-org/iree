@@ -17,7 +17,7 @@
 
 #include <vector>
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Serialization/VMDeviceTableBuilder.h"
 #include "iree/compiler/Serialization/VMExecutableTableBuilder.h"
 #include "iree/compiler/Serialization/VMFunctionTableBuilder.h"

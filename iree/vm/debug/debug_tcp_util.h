@@ -26,8 +26,8 @@
 
 #include <cstddef>
 
-#include "third_party/flatbuffers/include/flatbuffers/base.h"
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/base.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/base/status.h"
 #include "iree/schemas/debug_service_generated.h"
 

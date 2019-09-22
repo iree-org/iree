@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_SERIALIZATION_VM_EXECUTABLE_TABLE_BUILDER_H_
 #define IREE_COMPILER_SERIALIZATION_VM_EXECUTABLE_TABLE_BUILDER_H_
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/schemas/executable_table_def_generated.h"
 #include "mlir/Support/LogicalResult.h"
 

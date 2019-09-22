@@ -20,8 +20,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
-#include "third_party/flatbuffers/include/flatbuffers/minireflect.h"
+#include "flatbuffers/flatbuffers.h"
+#include "flatbuffers/minireflect.h"
 #include "iree/base/status.h"
 #include "iree/compiler/IR/ConfigOps.h"
 #include "iree/compiler/IR/Sequencer/OpWriters.h"

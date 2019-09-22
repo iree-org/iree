@@ -18,7 +18,7 @@
 #include <string>
 #include <vector>
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Serialization/VMSourceMapBuilder.h"
 #include "iree/schemas/function_def_generated.h"
 #include "iree/schemas/function_table_def_generated.h"

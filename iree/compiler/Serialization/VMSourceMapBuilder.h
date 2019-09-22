@@ -17,7 +17,7 @@
 
 #include <vector>
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/schemas/source_map_def_generated.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"

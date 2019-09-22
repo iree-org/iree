@@ -26,7 +26,7 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/memory/memory.h"
 #include "absl/synchronization/mutex.h"
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/base/status.h"
 #include "iree/schemas/debug_service_generated.h"
 #include "iree/vm/debug/debug_server.h"

@@ -19,7 +19,7 @@
 #include <map>
 #include <vector>
 
-#include "third_party/flatbuffers/include/flatbuffers/flatbuffers.h"
+#include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRVPass.h"
 #include "iree/compiler/Translation/SPIRV/Kernels/Kernels.h"
 #include "iree/compiler/Utils/OpUtils.h"
