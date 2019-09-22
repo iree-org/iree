@@ -28,9 +28,6 @@ namespace iree_compiler {
 std::unique_ptr<OpPassBase<ModuleOp>>
 createConvertToMemRefCallingConventionPass();
 
-// Legalizes tensor-to-memref conversions by deduping identity operations.
-std::unique_ptr<OpPassBase<FuncOp>> createLegalizeTensorMemRefPass();
-
 // Removes all uses of XLA Tuples as args/results from functions by expanding
 // them (recursively) into individual args/results.
 std::unique_ptr<OpPassBase<ModuleOp>>

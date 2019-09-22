@@ -44,6 +44,7 @@ def IREE_TensorToMemRefOp : IREE_PureOp<"tensor_to_memref", [
 ]> {
   let arguments = (ins AnyTensor:$src);
   let results = (outs IREEHL_MemRef);
+  let hasFolder = 1;
 }
 
 // TODO(b/134671482): remove/move tensor_to_memref/memref_to_tensor.
@@ -52,6 +53,7 @@ def IREE_MemRefToTensorOp : IREE_PureOp<"memref_to_tensor", [
 ]> {
   let arguments = (ins IREEHL_MemRef:$src);
   let results = (outs AnyTensor);
+  let hasFolder = 1;
 }
 
 def IREE_Workload : TensorOf<[AnyInteger]>;

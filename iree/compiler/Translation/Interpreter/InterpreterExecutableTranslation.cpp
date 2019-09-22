@@ -92,7 +92,7 @@ void buildInterpreterConversionPassPipeline(PassManager *passManager) {
 
   // Convert various dialects to IREE opcodes and cleanup leftover conversions.
   passManager->addPass(createLowerToInterpreterDialectPass());
-  passManager->addPass(createLegalizeTensorMemRefPass());
+  passManager->addPass(createCanonicalizerPass());
   passManager->addPass(createInterpreterLoadStoreDataFlowOptPass());
   passManager->addPass(createAggressiveOpEliminationPass());
 

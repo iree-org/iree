@@ -111,8 +111,7 @@ void buildPartitioningPassPipeline(PassManager *passManager) {
   passManager->addPass(createOutlineReductionRegionsPass());
 
   // Cleanup identity sequencer tensor-to-memref ops that clutter up the IR.
-  // TODO(benvanik): implement as folder/canonicalizers instead.
-  passManager->addPass(createLegalizeTensorMemRefPass());
+  passManager->addPass(createCanonicalizerPass());
 
   // Drop all functions that are no longer reachable.
   // This is important as many of the functions remaining are probably
@@ -141,7 +140,6 @@ void buildSequencerConversionPassPipeline(PassManager *passManager) {
 
   // Cleanup identity sequencer tensor-to-memref ops and other memory accesses
   // that clutter up the IR.
-  passManager->addPass(createLegalizeTensorMemRefPass());
   passManager->addPass(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
   passManager->addPass(createLoadStoreDataFlowOptPass());

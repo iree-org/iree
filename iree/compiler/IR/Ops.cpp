@@ -121,6 +121,16 @@ static void printTensorToMemRefOp(OpAsmPrinter &p, TensorToMemRefOp &op) {
   p.printType(op.getType());
 }
 
+OpFoldResult TensorToMemRefOp::fold(ArrayRef<Attribute> operands) {
+  if (auto memrefToTensorOp = dyn_cast_or_null<IREE::MemRefToTensorOp>(
+          getOperand()->getDefiningOp())) {
+    return memrefToTensorOp.getOperand();
+  }
+
+  return {};
+}
+
+
 //===----------------------------------------------------------------------===//
 // iree.memref_to_tensor
 //===----------------------------------------------------------------------===//
@@ -148,6 +158,15 @@ static void printMemRefToTensorOp(OpAsmPrinter &p, MemRefToTensorOp &op) {
   p.printType(op.getOperand()->getType());
   p << ") : ";
   p.printType(op.getType());
+}
+
+OpFoldResult MemRefToTensorOp::fold(ArrayRef<Attribute> operands) {
+  if (auto tensorToMemRefOp = dyn_cast_or_null<IREE::TensorToMemRefOp>(
+          getOperand()->getDefiningOp())) {
+    return tensorToMemRefOp.getOperand();
+  }
+
+  return {};
 }
 
 //===----------------------------------------------------------------------===//
