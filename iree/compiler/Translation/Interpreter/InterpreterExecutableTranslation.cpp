@@ -76,10 +76,6 @@ void buildLegalizeInputPassPipeline(PassManager *passManager) {
 
 // Builds a pass pipeline that converts functions to the iree_hl_interp dialect.
 void buildInterpreterConversionPassPipeline(PassManager *passManager) {
-  // Widen reduction functions (that have iree.executable.reduction attrs) to
-  // use their primitive IREE ops.
-  passManager->addPass(createExpandReductionsToOpsPass());
-
   // We don't need the IREE binding ops anymore, as we match the calling
   // convention exactly (we're the same VM).
   passManager->addPass(createMakeExecutableABIPass());
@@ -95,6 +91,10 @@ void buildInterpreterConversionPassPipeline(PassManager *passManager) {
   passManager->addPass(createCanonicalizerPass());
   passManager->addPass(createInterpreterLoadStoreDataFlowOptPass());
   passManager->addPass(createAggressiveOpEliminationPass());
+
+  // Widen reduction functions (that have iree.executable.reduction attrs) to
+  // use their primitive IREE ops.
+  passManager->addPass(createExpandReductionsToOpsPass());
 
   // Convert any uses of index to int32_t (as we explicitly don't want to
   // support dynamic index width).

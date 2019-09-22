@@ -38,10 +38,7 @@ class LowerToInterpreterDialectPass
     populateLowerXlaToInterpreterPatterns(patterns, ctx);
 
     ConversionTarget target(getContext());
-    target.addLegalDialect<IREEHLInterpreterDialect,
-                           // TODO(b/139012931) Reduce lowerings create LL ops
-                           // for some reason
-                           IREELLInterpreterDialect, IREEDialect>();
+    target.addLegalDialect<IREEHLInterpreterDialect, IREEDialect>();
     target.addLegalOp<LoadOp, StoreOp, FuncOp, ReturnOp>();
     target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp constOp) {
       // std.constant is legal for index integers.
