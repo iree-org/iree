@@ -67,7 +67,7 @@ StatusOr<std::shared_ptr<Driver>> DriverRegistry::Create(
   FactoryFn factory_fn;
   {
     absl::MutexLock lock(&mutex_);
-    const auto* drive_factory_fn_pos = std::find_if(driver_factory_fns_.begin(), 
+    auto drive_factory_fn_pos = std::find_if(driver_factory_fns_.begin(), 
     driver_factory_fns_.end(),
     [=driver_name](const auto & pair) { 
     return pair.first == driver_name; });
