@@ -85,11 +85,7 @@ bool HeapAllocator::CanUseBufferLike(Allocator* source_allocator,
   }
 
   // Host currently uses mapping to copy buffers, which is done a lot.
-  if (!AnyBitSet(buffer_usage & BufferUsage::kMapping)) {
-    return false;
-  }
-
-  return true;
+  return AnyBitSet(buffer_usage & BufferUsage::kMapping);
 }
 
 bool HeapAllocator::CanAllocate(MemoryTypeBitfield memory_type,
