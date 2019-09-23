@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <algorithm>
 
 #include "iree/hal/driver_registry.h"
 
@@ -66,17 +67,17 @@ StatusOr<std::shared_ptr<Driver>> DriverRegistry::Create(
   FactoryFn factory_fn;
   {
     absl::MutexLock lock(&mutex_);
-    for (const auto& pair : driver_factory_fns_) {
-      if (pair.first == driver_name) {
-        factory_fn = pair.second;
-        break;
-      }
-    }
-    if (!factory_fn) {
+    const auto* drive_factory_fn_pos = std::find_if(driver_factory_fns_.begin(), 
+    driver_factory_fns_.end(),
+    [=driver_name](const auto & pair) { 
+    return pair.first == driver_name; });
+    
+    if(drive_factory_fn_pos == driver_factory_fns_.end()) 
       return NotFoundErrorBuilder(IREE_LOC)
              << "Driver " << driver_name << " not found";
-    }
-  }
+  
+  factory_fn = drive_factory_fn_pos->second;
+
   return factory_fn();
 }
 
