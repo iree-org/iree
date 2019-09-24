@@ -8,7 +8,7 @@
 // types.
 //
 // The source of truth for bytecode opcodes is:
-//   iree/schemas/bytecode/sequencer_bytecode_v0.h
+//   https://github.com/google/iree/tree/master/iree/schemas/bytecode/sequencer_bytecode_v0.h
 
 #ifdef IREE_SEQUENCER_HL_OPS
 #else

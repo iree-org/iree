@@ -3,7 +3,7 @@
 // output parameters instead of return types.
 //
 // The source of truth for bytecode opcodes is:
-//   iree/schemas/bytecode/interpreter_bytecode_v0.h
+//   https://github.com/google/iree/tree/master/iree/schemas/bytecode/interpreter_bytecode_v0.h
 
 #ifdef IREE_INTERPRETER_LL_OPS
 #else

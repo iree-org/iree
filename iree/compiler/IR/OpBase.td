@@ -127,7 +127,7 @@ def IREELL_1DIndexMemRef : MemRefRankOf<[IREELL_Index], [1]>;
 //===----------------------------------------------------------------------===//
 
 // Values are FourCC codes.
-// See iree/hal/executable_format.h for more info.
+// See https://github.com/google/iree/tree/master/iree/hal/executable_format.h for more info.
 // https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
 // integer values for inclusion here.
 //

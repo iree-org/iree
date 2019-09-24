@@ -3,7 +3,7 @@
 // output parameters instead of return types.
 //
 // The source of truth for bytecode opcodes is:
-//   iree/schemas/bytecode/sequencer_bytecode_v0.h
+//   https://github.com/google/iree/tree/master/iree/schemas/bytecode/sequencer_bytecode_v0.h
 //
 // Note that in this dialect we cannot use folders: they require that all
 // operands are possible to make constants where we use output arguments that
