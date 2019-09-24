@@ -13,13 +13,12 @@
 // limitations under the License.
 
 #include "iree/compiler/IR/Dialect.h"
-#include "iree/compiler/IR/Interpreter/LLDialect.h"
-#include "iree/compiler/IR/Interpreter/LLOps.h"
 #include "iree/compiler/IR/Interpreter/HLDialect.h"
 #include "iree/compiler/IR/Interpreter/HLOps.h"
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Transforms/ConversionUtils.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/OpCreationUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -80,6 +79,7 @@ LogicalResult convertReductionOp(FuncOp entryPoint, FuncOp applyFunc,
       entryPointEntryBlock.getArgument(applyFunc.getNumArguments() + setIndex);
   auto dstType = dstArg->getType().cast<ShapedType>();
   Type elementType = dstType.getElementType();
+  auto loc = elementOp->getLoc();
   auto dimensionAttr = entryPoint.getAttrOfType<IntegerAttr>(
       "iree.executable.reduction.dimension");
 
@@ -87,37 +87,42 @@ LogicalResult convertReductionOp(FuncOp entryPoint, FuncOp applyFunc,
   if (isa<IREEInterp::HL::AddFOp>(elementOp) ||
       isa<IREEInterp::HL::AddIOp>(elementOp)) {
     if (elementType.isa<FloatType>()) {
-      expandedOp = builder.create<IREEInterp::LL::ReduceSumFOp>(
-          elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
+      expandedOp = builder.create<IREEInterp::HL::ReduceSumFOp>(
+          loc, dstType, srcArg, initArg, dimensionAttr);
     } else {
-      expandedOp = builder.create<IREEInterp::LL::ReduceSumIOp>(
-          elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
+      expandedOp = builder.create<IREEInterp::HL::ReduceSumIOp>(
+          loc, dstType, srcArg, initArg, dimensionAttr);
     }
   } else if (isa<IREEInterp::HL::MinFOp>(elementOp) ||
              isa<IREEInterp::HL::MinISOp>(elementOp) ||
              isa<IREEInterp::HL::MinIUOp>(elementOp)) {
     if (elementType.isa<FloatType>()) {
-      expandedOp = builder.create<IREEInterp::LL::ReduceMinFOp>(
-          elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
+      expandedOp = builder.create<IREEInterp::HL::ReduceMinFOp>(
+          loc, dstType, srcArg, initArg, dimensionAttr);
     } else {
-      expandedOp = builder.create<IREEInterp::LL::ReduceMinIOp>(
-          elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
+      expandedOp = builder.create<IREEInterp::HL::ReduceMinIOp>(
+          loc, dstType, srcArg, initArg, dimensionAttr);
     }
   } else if (isa<IREEInterp::HL::MaxFOp>(elementOp) ||
              isa<IREEInterp::HL::MaxISOp>(elementOp) ||
              isa<IREEInterp::HL::MaxIUOp>(elementOp)) {
     if (elementType.isa<FloatType>()) {
-      expandedOp = builder.create<IREEInterp::LL::ReduceMaxFOp>(
-          elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
+      expandedOp = builder.create<IREEInterp::HL::ReduceMaxFOp>(
+          loc, dstType, srcArg, initArg, dimensionAttr);
     } else {
-      expandedOp = builder.create<IREEInterp::LL::ReduceMaxIOp>(
-          elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
+      expandedOp = builder.create<IREEInterp::HL::ReduceMaxIOp>(
+          loc, dstType, srcArg, initArg, dimensionAttr);
     }
   }
   if (!expandedOp) {
     return elementOp->emitOpError()
            << "No matching expanded reduction op for elemental op";
   }
+  llvm::SmallVector<int64_t, 4> zeroOffset(dstType.getRank(), 0);
+  auto zeroIndices = createArrayConstant(builder, loc, zeroOffset);
+  auto lengths = createArrayConstant(builder, loc, dstType.getShape());
+  builder.create<IREEInterp::HL::CopyOp>(
+      loc, expandedOp->getResult(0), zeroIndices, dstArg, zeroIndices, lengths);
 
   return success();
 }
