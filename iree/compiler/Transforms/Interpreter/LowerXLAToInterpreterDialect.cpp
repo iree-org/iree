@@ -18,6 +18,7 @@
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Transforms/ConversionUtils.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/OpCreationUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -64,20 +65,6 @@ TERNARY_OP_LOWERING(SelectOp, IREEInterp::HL::SelectOp);
 
 #undef UNARY_OP_LOWERING
 #undef TERNARY_OP_LOWERING
-
-static ElementsAttr elementsAttrFromArray(ConversionPatternRewriter &rewriter,
-                                          ArrayRef<int64_t> elements) {
-  return rewriter.getDenseIntElementsAttr(
-      rewriter.getTensorType(elements.size(), rewriter.getIntegerType(64)),
-      elements);
-}
-
-static IREE::ConstantOp createArrayConstant(ConversionPatternRewriter &rewriter,
-                                            Location loc,
-                                            llvm::ArrayRef<int64_t> elements) {
-  auto shapeAttr = elementsAttrFromArray(rewriter, elements);
-  return rewriter.create<IREE::ConstantOp>(loc, shapeAttr);
-}
 
 template <typename T>
 static Operation *createShapeTargetingOp(ConversionPatternRewriter &rewriter,

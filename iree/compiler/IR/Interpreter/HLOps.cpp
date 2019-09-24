@@ -15,6 +15,7 @@
 #include "iree/compiler/IR/Interpreter/HLOps.h"
 
 #include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Utils/OpCreationUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/OpImplementation.h"
@@ -189,20 +190,6 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp op) {
 //===----------------------------------------------------------------------===//
 
 namespace {
-static ElementsAttr elementsAttrFromArray(PatternRewriter &rewriter,
-                                          ArrayRef<int64_t> elements) {
-  return rewriter.getDenseIntElementsAttr(
-      rewriter.getTensorType(elements.size(), rewriter.getIntegerType(64)),
-      elements);
-}
-
-static IREE::ConstantOp createArrayConstant(PatternRewriter &rewriter,
-                                            Location loc,
-                                            llvm::ArrayRef<int64_t> elements) {
-  auto elementsAttr = elementsAttrFromArray(rewriter, elements);
-  return rewriter.create<IREE::ConstantOp>(loc, elementsAttr);
-}
-
 struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
   using OpRewritePattern::OpRewritePattern;
   PatternMatchResult matchAndRewrite(ConcatOp concatOp,
