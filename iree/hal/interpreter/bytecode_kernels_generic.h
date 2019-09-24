@@ -127,6 +127,7 @@ inline void CopyRegion(absl::Span<const uint8_t> src_buffer,
 }  // namespace impl
 
 // TODO(benvanik): replace with a real implementation once copy is defined.
+// TODO(gcmn): More consistent/principled handling for scalars.
 template <int element_size>
 Status Copy::Execute(absl::Span<const uint8_t> src_buffer,
                      const Shape& src_shape,
@@ -134,10 +135,21 @@ Status Copy::Execute(absl::Span<const uint8_t> src_buffer,
                      absl::Span<uint8_t> dst_buffer, const Shape& dst_shape,
                      absl::Span<const int32_t> dst_indices,
                      absl::Span<const int32_t> lengths) {
+  DCHECK_EQ(src_indices.size(), lengths.size());
+  DCHECK_EQ(dst_indices.size(), lengths.size());
+  if (lengths.empty()) {
+    DCHECK(src_shape.subspan().empty());
+    DCHECK(dst_shape.subspan().empty());
+    std::memcpy(dst_buffer.data(), src_buffer.data(), element_size);
+    return OkStatus();
+  }
+
   // TODO(gcmn) Maybe we can fast-path earlier if we detect contiguous memory
   // across multiple rows.
   auto src_strides = impl::ComputeCopyStrides(src_shape, element_size);
   auto dst_strides = impl::ComputeCopyStrides(dst_shape, element_size);
+  DCHECK_EQ(src_strides.size(), lengths.size());
+  DCHECK_EQ(dst_strides.size(), lengths.size());
   impl::CopyRegion(src_buffer, src_strides, src_indices, dst_buffer,
                    dst_strides, dst_indices, lengths);
   return OkStatus();
