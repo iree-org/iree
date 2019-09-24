@@ -41,7 +41,7 @@ namespace iree_compiler {
 namespace {
 
 LogicalResult convertReductionOp(FuncOp entryPoint, FuncOp applyFunc,
-                                 Operation *elementOp, OpBuilder *builder) {
+                                 Operation *elementOp, OpBuilder &builder) {
   // Ensure that this op is pass-through and does not interact with any other
   // ops within the function.
   // TODO(b/139313439): support fused reductions.
@@ -87,30 +87,30 @@ LogicalResult convertReductionOp(FuncOp entryPoint, FuncOp applyFunc,
   if (isa<IREEInterp::HL::AddFOp>(elementOp) ||
       isa<IREEInterp::HL::AddIOp>(elementOp)) {
     if (elementType.isa<FloatType>()) {
-      expandedOp = builder->create<IREEInterp::LL::ReduceSumFOp>(
+      expandedOp = builder.create<IREEInterp::LL::ReduceSumFOp>(
           elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
     } else {
-      expandedOp = builder->create<IREEInterp::LL::ReduceSumIOp>(
+      expandedOp = builder.create<IREEInterp::LL::ReduceSumIOp>(
           elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
     }
   } else if (isa<IREEInterp::HL::MinFOp>(elementOp) ||
              isa<IREEInterp::HL::MinISOp>(elementOp) ||
              isa<IREEInterp::HL::MinIUOp>(elementOp)) {
     if (elementType.isa<FloatType>()) {
-      expandedOp = builder->create<IREEInterp::LL::ReduceMinFOp>(
+      expandedOp = builder.create<IREEInterp::LL::ReduceMinFOp>(
           elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
     } else {
-      expandedOp = builder->create<IREEInterp::LL::ReduceMinIOp>(
+      expandedOp = builder.create<IREEInterp::LL::ReduceMinIOp>(
           elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
     }
   } else if (isa<IREEInterp::HL::MaxFOp>(elementOp) ||
              isa<IREEInterp::HL::MaxISOp>(elementOp) ||
              isa<IREEInterp::HL::MaxIUOp>(elementOp)) {
     if (elementType.isa<FloatType>()) {
-      expandedOp = builder->create<IREEInterp::LL::ReduceMaxFOp>(
+      expandedOp = builder.create<IREEInterp::LL::ReduceMaxFOp>(
           elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
     } else {
-      expandedOp = builder->create<IREEInterp::LL::ReduceMaxIOp>(
+      expandedOp = builder.create<IREEInterp::LL::ReduceMaxIOp>(
           elementOp->getLoc(), srcArg, initArg, dimensionAttr, dstArg);
     }
   }
@@ -150,7 +150,7 @@ LogicalResult expandReductionFunction(FuncOp entryFunc) {
           .walk([&](Operation *op) {
             if (!op->isKnownTerminator()) {
               if (failed(
-                      convertReductionOp(entryFunc, applyFunc, op, &builder))) {
+                      convertReductionOp(entryFunc, applyFunc, op, builder))) {
                 return WalkResult::interrupt();
               }
             }

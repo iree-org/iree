@@ -506,7 +506,7 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
 namespace {
 
 // Recursively clones the given |sourceOp| and returns the newly cloned op.
-Operation *recursivelyCloneOp(Operation *sourceOp, OpBuilder *builder,
+Operation *recursivelyCloneOp(Operation *sourceOp, OpBuilder &builder,
                               BlockAndValueMapping *mapping) {
   // Note that we dedupe required operands in the case of multiple arguments
   // coming from the same source operation.
@@ -517,7 +517,7 @@ Operation *recursivelyCloneOp(Operation *sourceOp, OpBuilder *builder,
   for (auto *operandOp : operandOps) {
     recursivelyCloneOp(operandOp, builder, mapping);
   }
-  return builder->clone(*sourceOp, *mapping);
+  return builder.clone(*sourceOp, *mapping);
 }
 
 // Clones the |sourceValue| op tree into |targetBlock|.
@@ -535,7 +535,7 @@ Value *cloneOpTreeIntoBlock(Value *sourceValue, Block *targetBlock,
   OpBuilder builder(targetBlock);
   builder.setInsertionPointToStart(targetBlock);
   auto *sourceOp = sourceValue->getDefiningOp();
-  auto *clonedOp = recursivelyCloneOp(sourceOp, &builder, mapping);
+  auto *clonedOp = recursivelyCloneOp(sourceOp, builder, mapping);
 
   // Return only the result matching our source value (in the case of multiple
   // results).
@@ -665,7 +665,7 @@ std::pair<IREE::MultiArchExecutableOp, FuncOp> createRegionExecutable(
   return std::make_pair(multiArchExecutable, outlinedFunc);
 }
 
-Value *insertDispatcherStore(Operation *op, Value *value, OpBuilder *builder) {
+Value *insertDispatcherStore(Operation *op, Value *value, OpBuilder &builder) {
   if (!value) {
     return nullptr;
   }
@@ -681,36 +681,35 @@ Value *insertDispatcherStore(Operation *op, Value *value, OpBuilder *builder) {
   if (value->getType().isa<MemRefType>()) {
     return value;
   } else if (value->getType().isa<TensorType>()) {
-    auto castOp = builder->create<IREE::TensorToMemRefOp>(op->getLoc(),
-                                                          memRefType, value);
+    auto castOp =
+        builder.create<IREE::TensorToMemRefOp>(op->getLoc(), memRefType, value);
     return castOp.getResult();
   }
 
   // Allocate the memref to store the value.
-  auto newStorage = builder->create<AllocOp>(op->getLoc(), memRefType);
+  auto newStorage = builder.create<AllocOp>(op->getLoc(), memRefType);
 
   // Insert the store we'll use to box the value.
-  builder->create<StoreOp>(op->getLoc(), value, newStorage,
-                           ArrayRef<Value *>{});
+  builder.create<StoreOp>(op->getLoc(), value, newStorage, ArrayRef<Value *>{});
 
   return newStorage;
 }
 
 Value *insertDispatcherLoad(Operation *op, Value *originalValue,
-                            Value *allocatedValue, OpBuilder *builder) {
+                            Value *allocatedValue, OpBuilder &builder) {
   // If old value was a memref we don't need to change anything.
   if (originalValue->getType().isa<MemRefType>()) {
     return allocatedValue;
   } else if (originalValue->getType().isa<TensorType>()) {
-    auto castOp = builder->create<IREE::MemRefToTensorOp>(
+    auto castOp = builder.create<IREE::MemRefToTensorOp>(
         op->getLoc(), originalValue->getType(), allocatedValue);
     originalValue->replaceAllUsesWith(castOp.getResult());
     return castOp.getResult();
   }
 
   // Insert the load we'll use to unbox the value.
-  auto loadOp = builder->create<LoadOp>(op->getLoc(), allocatedValue,
-                                        ArrayRef<Value *>{});
+  auto loadOp =
+      builder.create<LoadOp>(op->getLoc(), allocatedValue, ArrayRef<Value *>{});
   originalValue->replaceAllUsesWith(loadOp);
   return loadOp;
 }

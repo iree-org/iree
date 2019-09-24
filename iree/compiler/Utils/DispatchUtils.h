@@ -74,12 +74,12 @@ std::pair<IREE::MultiArchExecutableOp, FuncOp> createRegionExecutable(
 // Inserts a conversion of an arbitrary |value| to a memref, possibly by way of
 // wrapping in an allocation.
 // Returns a new memref containing the value or an alias to |value|.
-Value *insertDispatcherStore(Operation *op, Value *value, OpBuilder *builder);
+Value *insertDispatcherStore(Operation *op, Value *value, OpBuilder &builder);
 
 // Inserts a load from a wrapped memref.
 // Returns the value in the original type or an alias to the |value| memref.
 Value *insertDispatcherLoad(Operation *op, Value *originalValue,
-                            Value *allocatedValue, OpBuilder *builder);
+                            Value *allocatedValue, OpBuilder &builder);
 
 // TODO(benvanik): enough information to walk into dispatch region and compute
 // shape when not static.

@@ -181,7 +181,7 @@ void buildSequencerLoweringPassPipeline(PassManager *passManager) {
 // Inserts one or more iree.executable_target_config ops based on the
 // translation options.
 void insertTargetConfigOps(const ModuleTranslationOptions &options,
-                           OpBuilder *builder) {
+                           OpBuilder &builder) {
   llvm::StringSet<> targetBackends;
   if (options.target_backends.empty()) {
     // Add all backends when none are explicitly provided.
@@ -196,8 +196,8 @@ void insertTargetConfigOps(const ModuleTranslationOptions &options,
     }
   }
   for (auto &targetBackend : targetBackends) {
-    builder->create<IREE::ExecutableTargetConfigOp>(builder->getUnknownLoc(),
-                                                    targetBackend.getKey());
+    builder.create<IREE::ExecutableTargetConfigOp>(builder.getUnknownLoc(),
+                                                   targetBackend.getKey());
   }
 }
 
@@ -320,7 +320,7 @@ LogicalResult SequencerTranslator::translateMultiArchExecutable(
   // be used for each executable.
   OpBuilder configBuilder(templateExecutableOp);
   configBuilder.setInsertionPointToStart(&templateExecutableOp.getBlock());
-  insertTargetConfigOps(options(), &configBuilder);
+  insertTargetConfigOps(options(), configBuilder);
 
   // Find all target configs and bucket them into the backends that will
   // translate them. This way we can batch the translations and possibly enable

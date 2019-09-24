@@ -38,14 +38,14 @@ namespace {
 // Inserts a load from a wrapped memref (as inserted via insertDispatcherStore).
 // Returns the value in the original type.
 Value *insertDispatcheeLoad(Operation *op, Type originalType, Value *value,
-                            OpBuilder *builder) {
+                            OpBuilder &builder) {
   // If old value was a memref we don't need to change anything.
   if (originalType.isa<MemRefType>()) {
     return value;
   }
 
   auto loadInputOp =
-      builder->create<IREE::LoadInputOp>(op->getLoc(), originalType, value);
+      builder.create<IREE::LoadInputOp>(op->getLoc(), originalType, value);
   value->replaceAllUsesWith(loadInputOp.getResult());
   loadInputOp.setOperand(value);
   return loadInputOp.getResult();
@@ -67,13 +67,13 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
     Type originalType = blockArg->getType();
     auto *originalArg = regionOp.getArgOperand(i);
     auto *wrappedArg =
-        insertDispatcherStore(regionOp, originalArg, &dispatcherBuilder);
+        insertDispatcherStore(regionOp, originalArg, dispatcherBuilder);
     newArgs.push_back(wrappedArg);
     blockArg->setType(wrappedArg->getType());
 
     // Unwrap the block arg value and replace all of the uses with the newly
     // unwrapped value.
-    insertDispatcheeLoad(regionOp, originalType, blockArg, &dispatcheeBuilder);
+    insertDispatcheeLoad(regionOp, originalType, blockArg, dispatcheeBuilder);
   }
 
   // Allocate output arguments and replace the return values with those.
@@ -129,7 +129,7 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
   // Marshal back the results by replacing uses of the original with loads from
   // the new output arg.
   for (auto &it : replacedResults) {
-    insertDispatcherLoad(regionOp, it.first, it.second, &dispatcherBuilder);
+    insertDispatcherLoad(regionOp, it.first, it.second, dispatcherBuilder);
   }
 
   // Remove original region.

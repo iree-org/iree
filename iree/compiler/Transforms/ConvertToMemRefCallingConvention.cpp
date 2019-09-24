@@ -63,7 +63,7 @@ FunctionType getMemRefFunctionType(FunctionType type) {
 }
 
 bool insertLoad(BlockArgument *oldArg, BlockArgument *newArg,
-                OpBuilder *builder, BlockAndValueMapping *mapping) {
+                OpBuilder &builder, BlockAndValueMapping *mapping) {
   auto loc = oldArg->getOwner()->getParent()->getLoc();
 
   // If old arg was a memref we don't need to change anything. We still need
@@ -73,26 +73,26 @@ bool insertLoad(BlockArgument *oldArg, BlockArgument *newArg,
     return false;
   } else if (oldArg->getType().isa<TensorType>()) {
     auto castOp =
-        builder->create<IREE::MemRefToTensorOp>(loc, oldArg->getType(), newArg);
+        builder.create<IREE::MemRefToTensorOp>(loc, oldArg->getType(), newArg);
     mapping->map(oldArg, castOp.getResult());
     return false;
   }
 
   // Insert the load we'll use to unbox the value.
-  auto loadedValue = builder->create<LoadOp>(loc, newArg, ArrayRef<Value *>{});
+  auto loadedValue = builder.create<LoadOp>(loc, newArg, ArrayRef<Value *>{});
   mapping->map(oldArg, loadedValue);
 
   return false;
 }
 
 bool insertLoad(Operation *oldOp, Value *oldValue, Value *newValue,
-                OpBuilder *builder, BlockAndValueMapping *mapping) {
+                OpBuilder &builder, BlockAndValueMapping *mapping) {
   // If old value was a memref we don't need to change anything.
   if (oldValue->getType().isa<MemRefType>()) {
     mapping->map(oldValue, newValue);
     return false;
   } else if (oldValue->getType().isa<TensorType>()) {
-    auto castOp = builder->create<IREE::MemRefToTensorOp>(
+    auto castOp = builder.create<IREE::MemRefToTensorOp>(
         oldOp->getLoc(), oldValue->getType(), newValue);
     mapping->map(oldValue, castOp.getResult());
     return false;
@@ -102,13 +102,13 @@ bool insertLoad(Operation *oldOp, Value *oldValue, Value *newValue,
 
   // Insert the load we'll use to unbox the value.
   auto loadedValue =
-      builder->create<LoadOp>(oldOp->getLoc(), newValue, ArrayRef<Value *>{});
+      builder.create<LoadOp>(oldOp->getLoc(), newValue, ArrayRef<Value *>{});
   mapping->map(oldValue, loadedValue);
 
   return false;
 }
 
-Value *insertStore(Operation *oldOp, Value *oldValue, OpBuilder *builder,
+Value *insertStore(Operation *oldOp, Value *oldValue, OpBuilder &builder,
                    BlockAndValueMapping *mapping) {
   auto *newValue = mapping->lookupOrNull(oldValue);
   if (!newValue) {
@@ -126,8 +126,8 @@ Value *insertStore(Operation *oldOp, Value *oldValue, OpBuilder *builder,
   if (oldValue->getType().isa<MemRefType>()) {
     return newValue;
   } else if (oldValue->getType().isa<TensorType>()) {
-    auto castOp = builder->create<IREE::TensorToMemRefOp>(oldOp->getLoc(),
-                                                          memRefType, newValue);
+    auto castOp = builder.create<IREE::TensorToMemRefOp>(oldOp->getLoc(),
+                                                         memRefType, newValue);
     return castOp.getResult();
   }
 
@@ -137,16 +137,16 @@ Value *insertStore(Operation *oldOp, Value *oldValue, OpBuilder *builder,
   }
 
   // Allocate the memref to store the value.
-  auto newStorage = builder->create<AllocOp>(oldOp->getLoc(), memRefType);
+  auto newStorage = builder.create<AllocOp>(oldOp->getLoc(), memRefType);
 
   // Insert the store we'll use to box the value.
-  builder->create<StoreOp>(oldOp->getLoc(), newValue, newStorage,
-                           ArrayRef<Value *>{});
+  builder.create<StoreOp>(oldOp->getLoc(), newValue, newStorage,
+                          ArrayRef<Value *>{});
 
   return newStorage;
 }
 
-bool convertCallOp(CallOp *oldOp, OpBuilder *builder,
+bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
                    BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value *, 4> newArgs;
   for (auto *oldArg : oldOp->getOperands()) {
@@ -161,8 +161,8 @@ bool convertCallOp(CallOp *oldOp, OpBuilder *builder,
   for (auto oldType : oldOp->getOperation()->getResultTypes()) {
     resultTypes.push_back(convertTypeToMemRef(oldType));
   }
-  auto newOp = builder->create<CallOp>(oldOp->getLoc(), oldOp->getCallee(),
-                                       resultTypes, newArgs);
+  auto newOp = builder.create<CallOp>(oldOp->getLoc(), oldOp->getCallee(),
+                                      resultTypes, newArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
 
   for (int i = 0; i < newOp.getNumResults(); ++i) {
@@ -177,7 +177,7 @@ bool convertCallOp(CallOp *oldOp, OpBuilder *builder,
   return false;
 }
 
-bool convertCallIndirectOp(CallIndirectOp *oldOp, OpBuilder *builder,
+bool convertCallIndirectOp(CallIndirectOp *oldOp, OpBuilder &builder,
                            BlockAndValueMapping *mapping) {
   // TODO(benvanik): support wrapping callee values.
   oldOp->emitError("CallIndirectOp not yet supported");
@@ -192,7 +192,7 @@ bool convertCallIndirectOp(CallIndirectOp *oldOp, OpBuilder *builder,
     newArgs.push_back(newArg);
   }
 
-  auto newOp = builder->create<CallIndirectOp>(oldOp->getLoc(),
+  auto newOp = builder.create<CallIndirectOp>(oldOp->getLoc(),
                                                oldOp->getCallee(), newArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
 
@@ -209,7 +209,7 @@ bool convertCallIndirectOp(CallIndirectOp *oldOp, OpBuilder *builder,
 #endif  // 0
 }
 
-bool convertReturnOp(Operation *oldOp, OpBuilder *builder,
+bool convertReturnOp(Operation *oldOp, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
   BlockAndValueMapping returnMapping;
   for (auto *oldArg : oldOp->getOperands()) {
@@ -220,11 +220,11 @@ bool convertReturnOp(Operation *oldOp, OpBuilder *builder,
     returnMapping.map(oldArg, newArg);
   }
 
-  builder->clone(*oldOp, returnMapping);
+  builder.clone(*oldOp, returnMapping);
   return false;
 }
 
-bool convertBranchOp(BranchOp *oldOp, OpBuilder *builder,
+bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value *, 4> newArgs;
   for (auto *oldArg : oldOp->getOperands()) {
@@ -241,13 +241,13 @@ bool convertBranchOp(BranchOp *oldOp, OpBuilder *builder,
     return true;
   }
 
-  auto newOp = builder->create<BranchOp>(oldOp->getLoc(), dest, newArgs);
+  auto newOp = builder.create<BranchOp>(oldOp->getLoc(), dest, newArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
 
   return false;
 }
 
-bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder *builder,
+bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder &builder,
                          BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value *, 4> trueArgs;
   for (auto *oldArg : oldOp->getTrueOperands()) {
@@ -284,17 +284,17 @@ bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder *builder,
     return false;
   }
 
-  auto newOp = builder->create<CondBranchOp>(
+  auto newOp = builder.create<CondBranchOp>(
       oldOp->getLoc(), newCondition, trueDest, trueArgs, falseDest, falseArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
 
   return false;
 }
 
-bool convertOperation(Operation *oldOp, OpBuilder *builder,
+bool convertOperation(Operation *oldOp, OpBuilder &builder,
                       BlockAndValueMapping *mapping) {
   if (isa<ConstantOp>(oldOp)) {
-    builder->clone(*oldOp, *mapping);
+    builder.clone(*oldOp, *mapping);
     return false;
   } else if (auto callOp = dyn_cast<CallOp>(oldOp)) {
     return convertCallOp(&callOp, builder, mapping);
@@ -307,7 +307,7 @@ bool convertOperation(Operation *oldOp, OpBuilder *builder,
   } else if (auto condBranchOp = dyn_cast<CondBranchOp>(oldOp)) {
     return convertCondBranchOp(&condBranchOp, builder, mapping);
   } else {
-    builder->clone(*oldOp, *mapping);
+    builder.clone(*oldOp, *mapping);
     return false;
   }
 }
@@ -331,7 +331,7 @@ bool convertFunction(FuncOp oldFunc, FuncOp newFunc) {
       // Insert loads to preserve type, if needed.
       // This will replace all uses of the oldArg with the loaded value from
       // newArg so that the block contents are still using unwrapped values.
-      if (insertLoad(oldArg, newArg, &builder, &mapping)) {
+      if (insertLoad(oldArg, newArg, builder, &mapping)) {
         return true;
       }
     }
@@ -342,7 +342,7 @@ bool convertFunction(FuncOp oldFunc, FuncOp newFunc) {
   for (auto &oldBlock : oldFunc.getBlocks()) {
     builder.setInsertionPointToEnd(mapping.lookupOrNull(&oldBlock));
     for (auto &oldOp : oldBlock.getOperations()) {
-      if (convertOperation(&oldOp, &builder, &mapping)) {
+      if (convertOperation(&oldOp, builder, &mapping)) {
         return true;
       }
     }

@@ -118,7 +118,7 @@ SmallVector<Value *, 4> convertToDispatchOp(
     IREE::ReductionRegionOp regionOp, IREE::MultiArchExecutableOp executable,
     FuncOp entryFunc, int reductionDimension,
     SmallVector<Value *, 4> initialValues, SmallVector<Value *, 4> inputs,
-    OpBuilder *dispatcherBuilder) {
+    OpBuilder &dispatcherBuilder) {
   // Allocate output args and replace the return values with those.
   SmallVector<Value *, 4> resultValues;
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
@@ -126,11 +126,11 @@ SmallVector<Value *, 4> convertToDispatchOp(
     auto shapedType = resultType.value().cast<ShapedType>();
     Value *allocatedValue = allocateDispatchOutputBuffer(
         regionOp.getLoc(),
-        dispatcherBuilder->getMemRefType(
+        dispatcherBuilder.getMemRefType(
             calculateResultShape(inputs[resultType.index()],
                                  reductionDimension),
             shapedType.getElementType()),
-        *dispatcherBuilder);
+        dispatcherBuilder);
     if (!allocatedValue) {
       regionOp.emitError("unable to allocate result value");
       return {};
@@ -141,7 +141,7 @@ SmallVector<Value *, 4> convertToDispatchOp(
   // Calculate workload from the result shape.
   auto *workload =
       wrapAsMemRef(calculateWorkload(regionOp, resultValues.front()), regionOp,
-                   *dispatcherBuilder);
+                   dispatcherBuilder);
 
   // Create the reduce op to the executable function.
   std::vector<Value *> allOperands;
@@ -150,7 +150,7 @@ SmallVector<Value *, 4> convertToDispatchOp(
                      initialValues.end());
   allOperands.insert(allOperands.end(), resultValues.begin(),
                      resultValues.end());
-  dispatcherBuilder->create<IREESeq::HL::DispatchOp>(
+  dispatcherBuilder.create<IREESeq::HL::DispatchOp>(
       regionOp.getLoc(), executable.getName(), entryFunc.getName(), workload,
       ArrayRef<Type>{}, allOperands);
 
@@ -170,11 +170,11 @@ LogicalResult outlineReductionRegion(IREE::ReductionRegionOp regionOp,
   // Wrap input operands in memrefs.
   SmallVector<Value *, 4> initialValues{llvm::map_range(
       regionOp.getInitialValueOperands(), [&](Value *originalArg) {
-        return insertDispatcherStore(regionOp, originalArg, &dispatcherBuilder);
+        return insertDispatcherStore(regionOp, originalArg, dispatcherBuilder);
       })};
   SmallVector<Value *, 4> temps{
       llvm::map_range(regionOp.getReductionOperands(), [&](Value *originalArg) {
-        return insertDispatcherStore(regionOp, originalArg, &dispatcherBuilder);
+        return insertDispatcherStore(regionOp, originalArg, dispatcherBuilder);
       })};
 
   // Create one dispatch per dimension being reduced.
@@ -226,7 +226,7 @@ LogicalResult outlineReductionRegion(IREE::ReductionRegionOp regionOp,
                         dispatcherBuilder.getI32IntegerAttr(windowDilation));
       temps = convertToDispatchOp(regionOp, multiArchExecutable, entryFunc,
                                   windowDimension, initialValues,
-                                  std::move(temps), &dispatcherBuilder);
+                                  std::move(temps), dispatcherBuilder);
       if (temps.empty()) {
         return regionOp.emitOpError()
                << "Failed to construct reduction for windowed dimension "
@@ -251,7 +251,7 @@ LogicalResult outlineReductionRegion(IREE::ReductionRegionOp regionOp,
                         dispatcherBuilder.getI32IntegerAttr(dimension.value()));
       temps = convertToDispatchOp(regionOp, multiArchExecutable, entryFunc,
                                   dimension.value(), initialValues,
-                                  std::move(temps), &dispatcherBuilder);
+                                  std::move(temps), dispatcherBuilder);
       if (temps.empty()) {
         return regionOp.emitOpError()
                << "Failed to construct reduction for dimension "
@@ -261,7 +261,7 @@ LogicalResult outlineReductionRegion(IREE::ReductionRegionOp regionOp,
   }
   for (auto it : llvm::enumerate(regionOp.getResults())) {
     insertDispatcherLoad(regionOp, it.value(), temps[it.index()],
-                         &dispatcherBuilder);
+                         dispatcherBuilder);
   }
 
   // Erase original region.

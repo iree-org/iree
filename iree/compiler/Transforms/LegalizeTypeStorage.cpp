@@ -29,7 +29,7 @@ namespace iree_compiler {
 
 namespace {
 
-bool convertOperation(Operation *oldOp, OpBuilder *builder,
+bool convertOperation(Operation *oldOp, OpBuilder &builder,
                       BlockAndValueMapping *mapping) {
   OperationState state(oldOp->getLoc(), oldOp->getName());
   if (oldOp->getNumSuccessors() == 0) {
@@ -62,7 +62,7 @@ bool convertOperation(Operation *oldOp, OpBuilder *builder,
     state.types.push_back(legalizeType(oldType));
   }
   state.attributes = {oldOp->getAttrs().begin(), oldOp->getAttrs().end()};
-  auto newOp = builder->createOperation(state);
+  auto newOp = builder.createOperation(state);
   for (int i = 0; i < newOp->getNumResults(); ++i) {
     mapping->map(oldOp->getResult(i), newOp->getResult(i));
   }
@@ -90,7 +90,7 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
   for (auto &oldBlock : oldFunction.getBlocks()) {
     builder.setInsertionPointToEnd(mapping.lookupOrNull(&oldBlock));
     for (auto &oldOp : oldBlock.getOperations()) {
-      if (convertOperation(&oldOp, &builder, &mapping)) {
+      if (convertOperation(&oldOp, builder, &mapping)) {
         return true;
       }
     }
