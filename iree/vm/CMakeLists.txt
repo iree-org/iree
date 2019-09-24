@@ -249,7 +249,8 @@ iree_cc_library(
 iree_cc_library(
   NAME
     opcode_info
-  hdrs = ["opcode_info.h"
+  HDRS
+    "opcode_info.h"
   DEPS
     absl::strings
     absl::optional

@@ -34,7 +34,6 @@ iree_cc_library(
     iree::schemas::type_def_cc_fbs
   PUBLIC
 )
-add_library(iree::schemas ALIAS iree_schemas_schemas)
 
 iree_cc_library(
   NAME

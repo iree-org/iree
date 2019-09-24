@@ -175,5 +175,8 @@ function(external_cc_library)
     endif()
 
     add_library(${EXTERNAL_CC_LIB_PACKAGE}::${EXTERNAL_CC_LIB_NAME} ALIAS ${_NAME})
+    if(${EXTERNAL_CC_LIB_PACKAGE} STREQUAL ${EXTERNAL_CC_LIB_NAME})
+      add_library(${EXTERNAL_CC_LIB_PACKAGE} ALIAS ${_NAME})
+    endif()
   endif()
 endfunction()

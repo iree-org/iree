@@ -18,6 +18,8 @@
 #include <map>
 #include <string>
 
+#include "iree/base/target_platform.h"
+
 namespace iree {
 
 // A static instance of this class is declared for each piece of initialization
@@ -95,8 +97,14 @@ void InitializeEnvironment(int* argc, char*** argv);
     ::iree::Initializer::RunInitializers(); \
   } while (0)
 
-#define IREE_REQUIRE_MODULE_LINKED(name)                                     \
-  __attribute__((used)) static ::iree::Initializer* iree_module_ref_##name = \
+#if !defined(IREE_COMPILER_MSVC)
+#define IREE_ATTRIBUTE_USED __attribute__((used))
+#else
+#define IREE_ATTRIBUTE_USED
+#endif  // IREE_COMPILER_MSVC
+
+#define IREE_REQUIRE_MODULE_LINKED(name)                                   \
+  IREE_ATTRIBUTE_USED static ::iree::Initializer* iree_module_ref_##name = \
       &iree_initializer_##name
 
 #endif  // IREE_BASE_INTERNAL_INIT_INTERNAL_H_

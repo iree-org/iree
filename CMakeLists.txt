@@ -27,6 +27,7 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 option(IREE_ENABLE_DEBUG "Enables debugging of the VM." ON)
 option(IREE_ENABLE_TRACING "Enables WTF tracing." OFF)
 
+option(IREE_BUILD_COMPILER "Builds the IREE compiler." OFF)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 
@@ -37,17 +38,21 @@ option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
-  ${CMAKE_CURRENT_LIST_DIR}/third_party/flatbuffers/CMake/
 )
 
 include(iree_macros)
 include(iree_copts)
 include(iree_cc_library)
 include(iree_cc_test)
+include(iree_tablegen_library)
 
 #-------------------------------------------------------------------------------
 # Third-party dependencies
 #-------------------------------------------------------------------------------
+
+list(APPEND CMAKE_MODULE_PATH
+  ${CMAKE_CURRENT_LIST_DIR}/third_party/flatbuffers/CMake/
+)
 
 include(external_cc_library)
 include(flatbuffer_cc_library)
@@ -60,6 +65,10 @@ add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
+if(${IREE_BUILD_COMPILER})
+  add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
+endif()
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
@@ -70,3 +79,7 @@ add_subdirectory(iree/samples)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/tools)
 add_subdirectory(iree/vm)
+
+if(${IREE_BUILD_COMPILER})
+  add_subdirectory(iree/compiler)
+endif()

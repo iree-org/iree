@@ -63,7 +63,8 @@ include(CMakeParseArguments)
 #
 # TODO: Implement "ALWAYSLINK"
 function(iree_cc_library)
-  cmake_parse_arguments(IREE_CC_LIB
+  cmake_parse_arguments(
+    IREE_CC_LIB
     "PUBLIC;TESTONLY"
     "NAME"
     "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
@@ -155,5 +156,11 @@ function(iree_cc_library)
     # disambiguate the underscores in paths vs. the separators.
     iree_package_ns(_PACKAGE_NS)
     add_library(${_PACKAGE_NS}::${IREE_CC_LIB_NAME} ALIAS ${_NAME})
+    iree_package_dir(_PACKAGE_DIR)
+    if(${IREE_CC_LIB_NAME} STREQUAL ${_PACKAGE_DIR})
+      # If the library name matches the package then treat it as a default.
+      # For example, foo/bar/ library 'bar' would end up as 'foo::bar'.
+      add_library(${_PACKAGE_NS} ALIAS ${_NAME})
+    endif()
   endif()
 endfunction()

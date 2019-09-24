@@ -22,12 +22,17 @@ set(GEMMLOWP_SRC_ROOT
 # TODO(benvanik): if android_arm then add -O3/-mfpu=neon.
 # TODO(benvanik): if andoird_arm64 then add -O3
 set(RUY_COPTS_BASE
-  "-O3"
   "-I${IREE_ROOT_DIR}/third_party/tensorflow"
   "-I${IREE_ROOT_DIR}/third_party/gemmlowp"
-  "-Wno-shadow"
-  "-Wno-missing-noreturn"
-  "-Wno-unused-local-typedef"
+)
+iree_select_compiler_opts(RUY_COPTS_BASE
+  CLANG_OR_GCC
+    "-O3"
+    "-Wno-shadow"
+    "-Wno-missing-noreturn"
+    "-Wno-unused-local-typedef"
+  MSVC_OR_CLANG_CL
+    "/O3"
 )
 set(RUY_COPTS_AVX2)
 set(RUY_COPTS_SKYLAKE)
@@ -810,4 +815,3 @@ external_cc_library(
     "${IREE_ROOT_DIR}/third_party/tensorflow"
   PUBLIC
 )
-add_library(ruy ALIAS ruy_ruy)
