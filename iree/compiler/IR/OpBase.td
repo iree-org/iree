@@ -131,6 +131,7 @@ def IREELL_1DIndexMemRef : MemRefRankOf<[IREELL_Index], [1]>;
 // https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
 // integer values for inclusion here.
 //
+// LINT.IfChange(executable_format)
 def IREE_EF_Unspecified : I32EnumAttrCase<"Unspecified", 538976288>;
 def IREE_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
 def IREE_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
@@ -146,6 +147,7 @@ def IREE_ExecutableFormatAttr :
   let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE";
 }
+// LINT.ThenChange(//iree/hal/executable_format.h:fourcc)
 
 // Use no padding and clamp the window to the valid area, possibly stopping
 // early prior to having covered all data.

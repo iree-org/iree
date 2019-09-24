@@ -34,6 +34,7 @@ constexpr ExecutableFormat MakeExecutableFormatID(char const four_cc[5]) {
          four_cc[3];
 }
 
+// LINT.IfChange(fourcc)
 
 // Undefined (or unknown). The format may be derived from the executable
 // contents (such as file magic bytes).
@@ -53,6 +54,7 @@ constexpr ExecutableFormat kExecutableFormatIreeBytecode =
 constexpr ExecutableFormat kExecutableFormatSpirV =
     MakeExecutableFormatID("SPVE");
 
+// LINT.ThenChange(//iree/compiler/IR/OpBase.td:executable_format)
 
 }  // namespace hal
 }  // namespace iree
