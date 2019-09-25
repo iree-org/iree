@@ -56,8 +56,8 @@ class IndexPropagation {
   /// that represents the element(s) of result(s) used within a thread, compute
   /// the indices of the operands needed. If overridden by inherited class the
   /// implementation should evaluate the indices of the operands needed for all
-  /// indices of the result value needed. The dafult implementation only handles
-  /// operations with a zero or single-return value.
+  /// indices of the result value needed. The default implementation only
+  /// handles operations with a zero or single-return value.
   virtual LogicalResult propagateIndexMap(
       Operation *operation, IndexComputationCache &indexMap) const;
 
@@ -205,7 +205,7 @@ class IndexPropagationList {
  public:
   explicit IndexPropagationList() { insert(); }
 
-  /// Performs the propogation.
+  /// Performs the propagation.
   LogicalResult propagate(Region &region,
                           IndexComputationCache &indexMap) const {
     if (region.getBlocks().size() != 1) {
@@ -219,7 +219,7 @@ class IndexPropagationList {
         auto &op = *jt;
         auto opName = op.getName().getStringRef();
         if (!indexPropagationList.count(opName)) {
-          return op.emitError("unhandled index propogation");
+          return op.emitError("unhandled index propagation");
         }
         for (auto rt = op.result_begin(), re = op.result_end(); rt != re;
              ++rt) {
@@ -256,7 +256,7 @@ class IndexPropagationList {
     }
   }
 
-  /// List of methods for propogation indexed using opname.
+  /// List of methods for propagation indexed using opname.
   IndexPropagationListT indexPropagationList;
 };
 
