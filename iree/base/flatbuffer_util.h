@@ -40,7 +40,6 @@ inline absl::string_view WrapString(const ::flatbuffers::String* value) {
 // Base type for FlatBufferFile<T>. See below.
 class FlatBufferFileBase {
  public:
-
   using Identifier = absl::optional<const char*>;
 
   virtual ~FlatBufferFileBase();
@@ -72,7 +71,7 @@ class FlatBufferFileBase {
                     size_t root_type_size, VerifierFn verifier_fn);
   Status FromString(Identifier identifier, std::string buffer_data,
                     size_t root_type_size, VerifierFn verifier_fn);
-  Status LoadFile(Identifier identifier, absl::string_view path,
+  Status LoadFile(Identifier identifier, std::string path,
                   size_t root_type_size, VerifierFn verifier_fn);
 
  private:
@@ -142,7 +141,7 @@ class FlatBufferFile final : public FlatBufferFileBase {
   // This will attempt to mmap the file and is the preferred way of loading as
   // only those pages that contain requested tables will be read.
   static StatusOr<std::unique_ptr<FlatBufferFile<T>>> LoadFile(
-      Identifier identifier, absl::string_view path);
+      Identifier identifier, std::string path);
 
   // Returns a vector of file references that share the same underlying data
   // buffer. The buffer will be kept alive until the last file is released.
@@ -244,11 +243,11 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromString(
 // static
 template <typename T>
 StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::LoadFile(
-    Identifier identifier, absl::string_view path) {
+    Identifier identifier, std::string path) {
   std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   RETURN_IF_ERROR(
-      base_file->LoadFile(identifier, path, sizeof(T), VerifierFnT));
+      base_file->LoadFile(identifier, std::move(path), sizeof(T), VerifierFnT));
   return std::move(flat_buffer_file);
 }
 

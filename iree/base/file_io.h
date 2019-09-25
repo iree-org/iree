@@ -15,51 +15,32 @@
 #ifndef IREE_BASE_FILE_IO_H_
 #define IREE_BASE_FILE_IO_H_
 
-#include <cstdint>
 #include <string>
-#include <vector>
 
-#include "absl/strings/string_view.h"
 #include "iree/base/status.h"
 
 namespace iree {
 namespace file_io {
 
+// Checks if a file exists at the provided path.
+//
+// Returns an OK status if the file definitely exists.
+// Errors can include PermissionDeniedError, NotFoundError, etc.
+Status FileExists(const std::string& path);
+
+// Synchronously reads a file's contents into a string.
+StatusOr<std::string> GetFileContents(const std::string& path);
+
 // Deletes the file at the provided path.
-Status DeleteFile(absl::string_view path);
+Status DeleteFile(const std::string& path);
 
 // Moves a file from 'source_path' to 'destination_path'.
 //
 // This may simply rename the file, but may fall back to a full copy and delete
 // of the original if renaming is not possible (for example when moving between
 // physical storage locations).
-Status MoveFile(absl::string_view source_path,
-                absl::string_view destination_path);
-
-// Checks if a file exists at the provided path.
-//
-// Returns an OK status if the file definitely exists.
-// Errors can include PermissionDeniedError, NotFoundError, etc.
-Status FileExists(absl::string_view path);
-
-// Joins two paths together.
-//
-// For example:
-//   JoinFilePaths('foo', 'bar') --> 'foo/bar'
-//   JoinFilePaths('/foo/', '/bar') --> '/foo/bar'
-std::string JoinFilePaths(absl::string_view path1, absl::string_view path2);
-
-// Gets the directory name component of a file path.
-absl::string_view FileDirectoryName(absl::string_view path);
-
-// Returns the part of the path after the final "/".
-absl::string_view FileBasename(absl::string_view path);
-
-// Returns the part of the basename of path prior to the final ".".
-absl::string_view FileStem(absl::string_view path);
-
-// Synchronously reads a file's contents into a string.
-StatusOr<std::string> GetFileContents(absl::string_view path);
+Status MoveFile(const std::string& source_path,
+                const std::string& destination_path);
 
 }  // namespace file_io
 }  // namespace iree

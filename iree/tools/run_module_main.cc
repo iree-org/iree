@@ -20,6 +20,7 @@
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/file_io.h"
+#include "iree/base/file_path.h"
 #include "iree/base/init.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"

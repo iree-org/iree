@@ -14,7 +14,7 @@
 
 #include "iree/base/internal/status_errno.h"
 
-#include <errno.h>
+#include <cerrno>
 
 #include "absl/strings/str_cat.h"
 

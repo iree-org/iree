@@ -22,16 +22,16 @@
 
 namespace iree {
 
-// Returns the code for `error_number`, which should be an `errno` value.
+// Returns the code for |error_number|, which should be an |errno| value.
 // See https://en.cppreference.com/w/cpp/error/errno_macros and similar refs.
 StatusCode ErrnoToCanonicalCode(int error_number);
 
 // Returns a Status, using a code of `ErrnoToCode(error_number)`, and a
-// `message` with the result of `StrError(error_number)` appended.
+// |message| with the result of `StrError(error_number)` appended.
 Status ErrnoToCanonicalStatus(int error_number, absl::string_view message);
 
 // Returns a StatusBuilder using a status of
-// `ErrnoToCanonicalStatus(error_number, message)` and `location`.
+// `ErrnoToCanonicalStatus(error_number, message)` and |location|.
 StatusBuilder ErrnoToCanonicalStatusBuilder(int error_number,
                                             absl::string_view message,
                                             SourceLocation location);

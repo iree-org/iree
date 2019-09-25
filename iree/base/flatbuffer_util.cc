@@ -18,17 +18,11 @@
 #include <cstring>
 
 #include "absl/memory/memory.h"
+#include "iree/base/file_mapping.h"
 #include "iree/base/memory.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-
-// Used for mmap:
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
 
 namespace iree {
 
@@ -152,92 +146,15 @@ Status FlatBufferFileBase::FromString(Identifier identifier,
       root_type_size, verifier_fn);
 }
 
-namespace {
-
-class FileDescriptor {
- public:
-  static StatusOr<std::unique_ptr<FileDescriptor> > OpenRead(std::string path) {
-    struct stat buf;
-    if (::lstat(path.c_str(), &buf) == -1) {
-      return NotFoundErrorBuilder(IREE_LOC)
-             << "Unable to stat file " << path << ": " << ::strerror(errno);
-    }
-
-    int fd = ::open(path.c_str(), O_RDONLY);
-    if (fd == -1) {
-      return UnavailableErrorBuilder(IREE_LOC)
-             << "Unable to open file " << path << ": " << ::strerror(errno);
-    }
-    return absl::WrapUnique(
-        new FileDescriptor(fd, static_cast<size_t>(buf.st_size)));
-  }
-
-  ~FileDescriptor() { ::close(fd_); }
-
-  int fd() const { return fd_; }
-  size_t size() const { return size_; }
-
- private:
-  FileDescriptor(int fd, size_t size) : fd_(fd), size_(size) {}
-  FileDescriptor(const FileDescriptor&) = delete;
-  FileDescriptor& operator=(const FileDescriptor&) = delete;
-
-  int fd_;
-  size_t size_;
-};
-
-class MappedFile {
- public:
-  static StatusOr<std::unique_ptr<MappedFile> > Open(absl::string_view path) {
-    // Open the file for reading. Note that we only need to keep it open long
-    // enough to map it and we can close the descriptor after that.
-    ASSIGN_OR_RETURN(auto file, FileDescriptor::OpenRead(std::string(path)));
-
-    // Map the file from the file descriptor.
-    void* data =
-        ::mmap(nullptr, file->size(), PROT_READ, MAP_SHARED, file->fd(), 0);
-    if (data == MAP_FAILED) {
-      return UnavailableErrorBuilder(IREE_LOC)
-             << "Mapping failed on file (ensure uncompressed): " << path;
-    }
-
-    return absl::WrapUnique(new MappedFile(data, file->size()));
-  }
-
-  ~MappedFile() {
-    if (::munmap(const_cast<void*>(data_), data_size_) != 0) {
-      LOG(WARNING) << "Unable to unmap file: " << strerror(errno);
-    }
-  }
-
-  const void* data() const { return data_; }
-  size_t data_size() const { return data_size_; }
-
- private:
-  MappedFile(const void* data, size_t data_size)
-      : data_(data), data_size_(data_size) {}
-  MappedFile(const MappedFile&) = delete;
-  MappedFile& operator=(const MappedFile&) = delete;
-
-  const void* data_;
-  size_t data_size_;
-};
-
-}  // namespace
-
-Status FlatBufferFileBase::LoadFile(Identifier identifier,
-                                    absl::string_view path,
+Status FlatBufferFileBase::LoadFile(Identifier identifier, std::string path,
                                     size_t root_type_size,
                                     VerifierFn verifier_fn) {
   IREE_TRACE_SCOPE0("FlatBufferFileBase::LoadFile");
 
-  ASSIGN_OR_RETURN(auto mapped_file, MappedFile::Open(path));
+  ASSIGN_OR_RETURN(auto file_mapping, FileMapping::OpenRead(path));
+  auto buffer_data = file_mapping->data();
 
-  absl::Span<const uint8_t> buffer_data{
-      reinterpret_cast<const uint8_t*>(mapped_file->data()),
-      mapped_file->data_size()};
-
-  auto handle_baton = MoveToLambda(mapped_file);
+  auto handle_baton = MoveToLambda(file_mapping);
   return FromBuffer(
       identifier, buffer_data,
       [handle_baton]() {

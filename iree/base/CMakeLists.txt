@@ -60,11 +60,49 @@ iree_cc_test(
 iree_cc_library(
   NAME
     file_io
+  SRCS
+    "file_io_posix.cc"
+    "file_io_win32.cc"
   HDRS
     "file_io.h"
   DEPS
+    absl::memory
     absl::strings
+    absl::span
+    iree::base::ref_ptr
     iree::base::status
+    iree::base::target_platform
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    file_mapping
+  SRCS
+    "file_io_posix.cc"
+    "file_io_win32.cc"
+  HDRS
+    "file_mapping.h"
+  DEPS
+    absl::memory
+    absl::strings
+    absl::span
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    iree::base::target_platform
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    file_path
+  SRCS
+    "file_path.cc"
+  HDRS
+    "file_path.h"
+  DEPS
+    absl::strings
   PUBLIC
 )
 
@@ -97,6 +135,7 @@ iree_cc_library(
     "internal/init_internal.cc"
   DEPS
     absl::flags
+    iree::base::target_platform
   PUBLIC
 )
 
@@ -219,12 +258,14 @@ iree_cc_library(
     "internal/status_errno.h"
     "internal/status_errors.h"
     "internal/status_macros.h"
+    "internal/status_win32_errors.h"
     "internal/statusor.h"
   SRCS
     "internal/status.cc"
     "internal/status_builder.cc"
     "internal/status_errno.cc"
     "internal/status_errors.cc"
+    "internal/status_win32_errors.cc"
     "internal/statusor.cc"
   DEPS
     absl::base
@@ -249,6 +290,14 @@ iree_cc_library(
     gmock
     iree::base::status
   TESTONLY
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    target_platform
+  HDRS
+    "target_platform.h"
   PUBLIC
 )
 
@@ -296,35 +345,37 @@ else()
   )
 endif()
 
-iree_cc_library(
-  NAME
-    wait_handle
-  HDRS
-    "wait_handle.h"
-  SRCS
-    "wait_handle.cc"
-  DEPS
-    absl::base
-    absl::fixed_array
-    absl::span
-    absl::strings
-    absl::time
-    iree::base::logging
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::time
-  PUBLIC
-)
+# TODO(benvanik): get wait_handle ported to win32.
+# iree_cc_library(
+#   NAME
+#     wait_handle
+#   HDRS
+#     "wait_handle.h"
+#   SRCS
+#     "wait_handle.cc"
+#   DEPS
+#     absl::base
+#     absl::fixed_array
+#     absl::span
+#     absl::strings
+#     absl::time
+#     iree::base::logging
+#     iree::base::ref_ptr
+#     iree::base::status
+#     iree::base::time
+#   PUBLIC
+# )
+#
+# iree_cc_test(
+#   NAME
+#     wait_handle_test
+#   SRCS
+#     "wait_handle_test.cc"
+#   DEPS
+#     absl::time
+#     gtest_main
+#     iree::base::status
+#     iree::base::status_matchers
+#     iree::base::wait_handle
+# )
 
-iree_cc_test(
-  NAME
-    wait_handle_test
-  SRCS
-    "wait_handle_test.cc"
-  DEPS
-    absl::time
-    gtest_main
-    iree::base::status
-    iree::base::status_matchers
-    iree::base::wait_handle
-)

@@ -25,6 +25,7 @@
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 #include "iree/base/file_io.h"
+#include "iree/base/file_path.h"
 #include "iree/base/init.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
@@ -48,8 +49,8 @@ bool global_tracing_initialized ABSL_GUARDED_BY(global_tracing_mutex) = false;
 // If there is an existing file at the given path back it up by moving it aside.
 // Only kMaxBackups will be kept to avoid unbounded growth.
 void RollTraceFiles(const std::string& path) {
-  std::string path_stem = file_io::JoinFilePaths(
-      file_io::FileDirectoryName(path), file_io::FileStem(path));
+  std::string path_stem = file_path::JoinPaths(file_path::DirectoryName(path),
+                                               file_path::Stem(path));
   const int kMaxBackups = 5;
   for (int i = kMaxBackups; i >= 0; i--) {
     std::string source_name;
