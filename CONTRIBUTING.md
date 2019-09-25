@@ -15,6 +15,18 @@ You generally only need to submit a CLA once, so if you've already submitted one
 (even if it was for a different project), you probably don't need to do it
 again.
 
+## Changes Accepted
+
+Please file issues before doing substantial work; this will ensure that others
+don't duplicate the work and that there's a chance to discuss any design issues.
+
+Changes only tweaking style are unlikely to be accepted unless they are applied
+consistently across the project. Most of the code style is derived from the
+[Google Style Guides](http://google.github.io/styleguide/) for the appropriate
+language and is generally not something we accept changes on (as clang-format
+and clang-tidy handle that for us). Improvements to code structure and clarity
+are welcome but please file issues to track such work first.
+
 ## Code reviews
 
 All submissions, including submissions by project members, require review. We
