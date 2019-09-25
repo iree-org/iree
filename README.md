@@ -35,7 +35,7 @@ The included layered runtime scales from generated code for a particular API
 (such as emitting C code calling external DSP kernels), to a HAL (**H**ardware
 **A**bstraction **L**ayer) that allows the same generated code to target
 multiple APIs (like Vulkan and Direct3D 12), to a full VM allowing runtime model
-loading for flexible deployment options and heterogenous execution. Consider
+loading for flexible deployment options and heterogeneous execution. Consider
 both the compiler and the included runtime a toolbox for making it easier - via
 the versatility of MLIR - to take ML models from their source to some varying
 degree of integration with your application.
