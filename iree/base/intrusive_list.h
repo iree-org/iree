@@ -46,14 +46,6 @@
 //   list.push_back(absl::make_unique<MyElement>());
 //   std::unique_ptr<MyElement> elm = list.take(list.front());
 //
-// We use this instead of //util/gtl/intrusive_list.h as we need support for
-// list items being in multiple lists simultaneously. Without some significant
-// hackery this isn't possible with the gtl version as the intrusive_link must
-// be subclassed instead of being a member variable. The gtl type also conforms
-// more to STL (nice!) but unfortunately that means that iterators are used in
-// most operations. We tend not to have iterators, and the act of mapping from
-// an element to an iterator to then go back to elements is wasteful.
-//
 // This type is thread-unsafe.
 
 #ifndef IREE_BASE_INTRUSIVE_LIST_H_
