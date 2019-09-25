@@ -26,7 +26,6 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_BINARY_DIR}
 )
 
-set(IREE_DEFAULT_COPTS "${ABSL_DEFAULT_COPTS}")
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
   CLANG_OR_GCC
     "-Wno-strict-prototypes"
@@ -41,6 +40,8 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-gnu-label-as-value"
     "-Wno-unused-local-typedef"
     "-Wno-gnu-zero-variadic-macro-arguments"
+  MSVC_OR_CLANG_CL
+    "/DWIN32_LEAN_AND_MEAN"
 )
 set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
@@ -81,12 +82,13 @@ set(FLATBUFFERS_BUILD_GRPCTEST OFF)
 set(FLATBUFFERS_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatbuffers/include/"
 )
-iree_select_compiler_opts(IREE_DEFAULT_COPTS
+iree_select_compiler_opts(FLATBUFFERS_COPTS
   CLANG_OR_GCC
     # Flatbuffers has a bunch of incorrect documentation annotations.
     "-Wno-documentation"
     "-Wno-documentation-unknown-command"
 )
+list(APPEND IREE_DEFAULT_COPTS ${FLATBUFFERS_COPTS})
 
 #-------------------------------------------------------------------------------
 # Third party: gtest

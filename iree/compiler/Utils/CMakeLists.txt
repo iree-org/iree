@@ -14,31 +14,26 @@
 
 iree_cc_library(
   NAME
-    bytecode_v0
+    Utils
   HDRS
-    "bytecode_v0.h"
+    "DispatchUtils.h"
+    "Macros.h"
+    "MemRefUtils.h"
+    "ModuleUtils.h"
+    "OpUtils.h"
+    "TranslationUtils.h"
+  SRCS
+    "DispatchUtils.cpp"
+    "MemRefUtils.cpp"
+    "ModuleUtils.cpp"
+    "OpUtils.cpp"
+    "TranslationUtils.cpp"
   DEPS
-    absl::core_headers
-    iree::base::bitfield
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    interpreter_bytecode_v0
-  HDRS
-    "interpreter_bytecode_v0.h"
-  DEPS
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_bytecode_v0
-  HDRS
-    "sequencer_bytecode_v0.h"
-  DEPS
-    iree::schemas::bytecode::bytecode_v0
+    iree::compiler::IR
+    iree::compiler::IR::Sequencer
+    iree::schemas::executable_def_cc_fbs
+    tensorflow::mlir_xla
+    LLVMSupport
+    MLIR
   PUBLIC
 )

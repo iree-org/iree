@@ -48,7 +48,7 @@ function(iree_tablegen_library)
     set_target_properties(${_NAME}_target PROPERTIES FOLDER "Tablegenning")
 
     add_library(${_NAME} INTERFACE)
-    add_dependencies(${_NAME} ${_NAME}_target})
+    add_dependencies(${_NAME} ${_NAME}_target)
 
     # Alias the iree_package_name library to iree::package::name.
     iree_package_ns(_PACKAGE_NS)

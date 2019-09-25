@@ -12,33 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_cc_library(
-  NAME
-    bytecode_v0
-  HDRS
-    "bytecode_v0.h"
-  DEPS
-    absl::core_headers
-    iree::base::bitfield
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    interpreter_bytecode_v0
-  HDRS
-    "interpreter_bytecode_v0.h"
-  DEPS
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_bytecode_v0
-  HDRS
-    "sequencer_bytecode_v0.h"
-  DEPS
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
+# TODO(benvanik): iree_glsl_cc_library.
+# iree_glsl_cc_library(
+#   NAME
+#     Kernels
+#  TARGET
+#    spirv
+#  SRCS
+#    "matmul.comp"
+#   PUBLIC
+# )

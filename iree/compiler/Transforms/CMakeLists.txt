@@ -12,33 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_cc_library(
-  NAME
-    bytecode_v0
-  HDRS
-    "bytecode_v0.h"
-  DEPS
-    absl::core_headers
-    iree::base::bitfield
-  PUBLIC
-)
+add_subdirectory(Interpreter)
+add_subdirectory(Sequencer)
 
 iree_cc_library(
   NAME
-    interpreter_bytecode_v0
+    Transforms
   HDRS
-    "interpreter_bytecode_v0.h"
+    "ConversionUtils.h"
+    "Passes.h"
+  SRCS
+    "AggressiveOpElimination.cpp"
+    "AssignFunctionOrdinals.cpp"
+    "ConvertFromTupleCallingConvention.cpp"
+    "ConvertToMemRefCallingConvention.cpp"
+    "DropUnreachableFunctions.cpp"
+    "DropUnusedExecutables.cpp"
+    "LegalizeTupleElementAccess.cpp"
+    "LegalizeTypeStorage.cpp"
   DEPS
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_bytecode_v0
-  HDRS
-    "sequencer_bytecode_v0.h"
-  DEPS
-    iree::schemas::bytecode::bytecode_v0
+    iree::compiler::IR
+    iree::compiler::Utils
+    tensorflow::mlir_xla
+    LLVMSupport
+    MLIR
   PUBLIC
 )

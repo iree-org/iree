@@ -46,6 +46,8 @@ include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
 
+string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
+
 #-------------------------------------------------------------------------------
 # Third-party dependencies
 #-------------------------------------------------------------------------------
@@ -58,6 +60,7 @@ include(external_cc_library)
 include(flatbuffer_cc_library)
 
 add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/tensorflow EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)

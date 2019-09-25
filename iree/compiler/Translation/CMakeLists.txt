@@ -12,33 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_cc_library(
-  NAME
-    bytecode_v0
-  HDRS
-    "bytecode_v0.h"
-  DEPS
-    absl::core_headers
-    iree::base::bitfield
-  PUBLIC
-)
+add_subdirectory(Interpreter)
+add_subdirectory(SPIRV)
 
 iree_cc_library(
   NAME
-    interpreter_bytecode_v0
+    Translation
   HDRS
-    "interpreter_bytecode_v0.h"
+    "SequencerModuleTranslation.h"
+  SRCS
+    "SequencerModuleTranslation.cpp"
   DEPS
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_bytecode_v0
-  HDRS
-    "sequencer_bytecode_v0.h"
-  DEPS
-    iree::schemas::bytecode::bytecode_v0
+    flatbuffers
+    iree::base::status
+    iree::compiler::IR
+    iree::compiler::Serialization
+    iree::compiler::Transforms
+    iree::compiler::Transforms::Sequencer
+    iree::compiler::Utils
+    iree::hal::executable_format
+    iree::schemas
+    tensorflow::mlir_xla
+    LLVMSupport
+    MLIR
   PUBLIC
 )

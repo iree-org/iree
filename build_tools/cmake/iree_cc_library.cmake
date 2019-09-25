@@ -138,7 +138,12 @@ function(iree_cc_library)
       target_include_directories(${_NAME}
         INTERFACE
           "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
-        )
+      )
+      target_compile_options(${_NAME}
+        INTERFACE
+          ${IREE_CC_LIB_COPTS}
+          ${IREE_DEFAULT_COPTS}
+      )
       target_link_libraries(${_NAME}
         INTERFACE
           ${IREE_CC_LIB_DEPS}
