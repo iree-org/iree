@@ -307,7 +307,10 @@ def IREEInterpHL_SliceOp :
   let results = (outs IREEHL_MemRef:$result);
 }
 
-def IREEInterpHL_CopyOp : IREEInterpHL_Op<"copy"> {
+def IREEInterpHL_CopyOp : IREEInterpHL_Op<"copy", [
+  AllElementCountsMatch<["srcIndices", "dstIndices", "lengths"]>,
+  AllElementTypesMatch<["src", "dst"]>
+]> {
   let arguments = (ins
     IREEHL_MemRef:$src,
     IREEHL_1DIndexMemRef:$srcIndices,

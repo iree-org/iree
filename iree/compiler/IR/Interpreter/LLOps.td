@@ -398,7 +398,9 @@ def IREEInterpLL_StaticSliceOp :
   let results = (outs IREELL_MemRef);
 }
 
-def IREEInterpLL_DynamicCopyOp : IREEInterpLL_Op<"dynamic_copy"> {
+def IREEInterpLL_DynamicCopyOp : IREEInterpLL_Op<"dynamic_copy", [
+  AllElementCountsMatch<["srcIndices", "dstIndices", "lengths"]>,
+]> {
   let arguments = (ins
       IREELL_MemRef:$src,
       IREELL_1DIndexMemRef:$srcIndices,
@@ -408,7 +410,9 @@ def IREEInterpLL_DynamicCopyOp : IREEInterpLL_Op<"dynamic_copy"> {
   );
 }
 
-def IREEInterpLL_StaticCopyOp : IREEInterpLL_Op<"static_copy"> {
+def IREEInterpLL_StaticCopyOp : IREEInterpLL_Op<"static_copy", [
+  AllElementCountsMatch<["srcIndices", "dstIndices", "lengths"]>,
+]> {
   let arguments = (ins
       IREELL_MemRef:$src,
       I32ElementsAttr:$srcIndices,

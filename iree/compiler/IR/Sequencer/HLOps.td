@@ -346,7 +346,10 @@ def IREESeqHL_SliceOp :
   let results = (outs IREEHL_MemRef:$result);
 }
 
-def IREESeqHL_CopyOp : IREESeqHL_Op<"copy"> {
+def IREESeqHL_CopyOp : IREESeqHL_Op<"copy", [
+  AllElementCountsMatch<["srcIndices", "dstIndices", "lengths"]>,
+  AllElementTypesMatch<["src", "dst"]>
+]> {
   let arguments = (ins
     IREEHL_MemRef:$src,
     IREEHL_1DIndexMemRef:$srcIndices,
