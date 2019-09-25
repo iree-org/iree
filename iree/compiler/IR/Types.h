@@ -22,6 +22,7 @@
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
 
+// Order matters.
 #include "iree/compiler/IR/Enums.h.inc"
 
 namespace mlir {
