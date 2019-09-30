@@ -176,43 +176,6 @@ TEST(Copy, HighRank) {
 TEST(Copy, Scalar) {
   Shape src_shape = {};
   std::vector<uint8_t> src_buffer = {42};
-  std::vector<int32_t> src_indices = {0};
-  Shape dst_shape = {};
-  std::vector<uint8_t> dst_buffer(dst_shape.element_count());
-  std::vector<int32_t> dst_indices = {0};
-  std::vector<int32_t> lengths = {1};
-  std::vector<uint8_t> expected_dst = {42};
-
-  EXPECT_OK(Copy::Execute<1>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
-  EXPECT_EQ(dst_buffer, expected_dst);
-}
-
-TEST(Copy, ScalarMultiByte) {
-  Shape src_shape = {};
-  std::vector<int32_t> src_vals = {INT32_MAX};
-  auto src_buffer = ReinterpretSpan<uint8_t>(absl::MakeSpan(src_vals));
-  std::vector<int32_t> src_indices = {0};
-  Shape dst_shape = {};
-  std::vector<uint8_t> dst_buffer(sizeof(int32_t));
-  std::vector<int32_t> dst_indices = {0};
-  std::vector<int32_t> lengths = {1};
-  std::vector<int32_t> expected_dst = {INT32_MAX};
-
-  EXPECT_OK(Copy::Execute<4>(src_buffer, src_shape, src_indices,
-                             absl::MakeSpan(dst_buffer), dst_shape, dst_indices,
-                             lengths));
-
-  absl::Span<int32_t> dst_buffer_int32_t =
-      ReinterpretSpan<int32_t>(absl::MakeSpan(dst_buffer));
-
-  EXPECT_EQ(dst_buffer_int32_t, expected_dst);
-}
-
-TEST(Copy, ScalarNoLengths) {
-  Shape src_shape = {};
-  std::vector<uint8_t> src_buffer = {42};
   std::vector<int32_t> src_indices = {};
   Shape dst_shape = {};
   std::vector<uint8_t> dst_buffer(dst_shape.element_count());
@@ -226,7 +189,7 @@ TEST(Copy, ScalarNoLengths) {
   EXPECT_EQ(dst_buffer, expected_dst);
 }
 
-TEST(Copy, ScalarMultiByteNoLengths) {
+TEST(Copy, ScalarMultiByte) {
   Shape src_shape = {};
   std::vector<int32_t> src_vals = {INT32_MAX};
   auto src_buffer = ReinterpretSpan<uint8_t>(absl::MakeSpan(src_vals));

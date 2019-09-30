@@ -53,3 +53,11 @@ func @not_scalar_bool(%cond : memref<i32>, %a : memref<1xf32>) {
   "iree_hl_interp.cond_assign"(%cond, %a, %a) : (memref<i32>, memref<1xf32>, memref<1xf32>) -> memref<1xf32>
   return
 }
+
+// -----
+
+func @bad_copy(%src : memref<2xf32>, %srcIndices : memref<2xi32>, %dst : memref<2xf32>, %dstIndices : memref<2xi32>, %lengths : memref<2xi32>) {
+  // expected-error@+1 {{src/dst rank is the same as srcIndices/dstIndices/lengths size}}
+  "iree_hl_interp.copy"(%src, %srcIndices, %dst, %dstIndices, %lengths) : (memref<2xf32>, memref<2xi32>, memref<2xf32>, memref<2xi32>, memref<2xi32>) -> ()
+  return
+}

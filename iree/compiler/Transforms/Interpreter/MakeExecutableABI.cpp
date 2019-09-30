@@ -14,6 +14,7 @@
 
 #include "iree/compiler/IR/Interpreter/HLOps.h"
 #include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Utils/OpCreationUtils.h"
 #include "iree/compiler/Utils/OpUtils.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -74,29 +75,10 @@ LogicalResult replaceStoreOutputOp(IREE::StoreOutputOp bindOp) {
              << "Dynamic output args are not yet implemented";
     }
 
-    // TODO(b/134586626): decide if we want copy indices or byte offsets and
-    // support 0-rank natively.
-    int rank = dst.getRank() ? dst.getRank() : 1;
-    auto zeroValues = std::vector<int32_t>(rank);
-    auto shapeValues = std::vector<int32_t>(rank);
-    if (dst.getRank() > 0) {
-      for (int i = 0; i < dst.getRank(); ++i) {
-        shapeValues[i] = static_cast<int32_t>(dst.getDimSize(i));
-      }
-    } else {
-      shapeValues[0] = 1;
-    }
-    auto zeros = builder.create<IREE::ConstantOp>(
-        bindOp.getLoc(),
-        DenseIntElementsAttr::get<int32_t>(
-            builder.getTensorType({rank}, builder.getIntegerType(32)),
-            zeroValues));
-    auto lengths = builder.create<IREE::ConstantOp>(
-        bindOp.getLoc(),
-        DenseIntElementsAttr::get<int32_t>(
-            builder.getTensorType({rank}, builder.getIntegerType(32)),
-            shapeValues));
-
+    auto zeroValues = llvm::SmallVector<int64_t, 4>(dst.getRank());
+    auto zeros = createArrayConstant(builder, bindOp.getLoc(), zeroValues);
+    auto lengths =
+        createArrayConstant(builder, bindOp.getLoc(), dst.getShape());
     builder.create<IREEInterp::HL::CopyOp>(bindOp.getLoc(), castOp.getResult(),
                                            zeros, bindOp.dst(), zeros, lengths);
   } else if (srcType.isIntOrIndexOrFloat()) {

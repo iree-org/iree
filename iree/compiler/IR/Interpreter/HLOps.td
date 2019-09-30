@@ -309,6 +309,16 @@ def IREEInterpHL_SliceOp :
 
 def IREEInterpHL_CopyOp : IREEInterpHL_Op<"copy", [
   AllElementCountsMatch<["srcIndices", "dstIndices", "lengths"]>,
+  AllRanksMatch<["src", "dst"]>,
+  // The checks above are redundant with this one, but they give more specific
+  // error messages.
+  AllMatch<[
+    Rank<"src">.result,
+    Rank<"dst">.result,
+    ElementCount<"srcIndices">.result,
+    ElementCount<"dstIndices">.result,
+    ElementCount<"lengths">.result
+  ], "src/dst rank is the same as srcIndices/dstIndices/lengths size">,
   AllElementTypesMatch<["src", "dst"]>
 ]> {
   let arguments = (ins

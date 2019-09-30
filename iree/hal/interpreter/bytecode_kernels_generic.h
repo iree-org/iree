@@ -87,7 +87,7 @@ Status CompareGE::Execute(absl::Span<const T> lhs_buffer,
 namespace impl {
 inline absl::InlinedVector<size_t, 6> ComputeCopyStrides(const Shape& shape,
                                                          size_t element_size) {
-  absl::InlinedVector<size_t, 6> strides(shape.empty() ? 1 : shape.size());
+  absl::InlinedVector<size_t, 6> strides(shape.size());
   strides.back() = element_size;
   for (int i = shape.size() - 2; i >= 0; --i) {
     strides[i] = strides[i + 1] * shape[i + 1];
@@ -137,9 +137,9 @@ Status Copy::Execute(absl::Span<const uint8_t> src_buffer,
                      absl::Span<const int32_t> lengths) {
   DCHECK_EQ(src_indices.size(), lengths.size());
   DCHECK_EQ(dst_indices.size(), lengths.size());
+  DCHECK_EQ(src_shape.size(), lengths.size());
+  DCHECK_EQ(dst_shape.size(), lengths.size());
   if (lengths.empty()) {
-    DCHECK(src_shape.subspan().empty());
-    DCHECK(dst_shape.subspan().empty());
     std::memcpy(dst_buffer.data(), src_buffer.data(), element_size);
     return OkStatus();
   }

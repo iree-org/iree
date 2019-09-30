@@ -17,6 +17,7 @@
 #include "iree/compiler/IR/Interpreter/HLOps.h"
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/OpCreationUtils.h"
 #include "iree/compiler/Utils/OpUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
@@ -26,6 +27,7 @@
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -36,82 +38,43 @@ namespace iree_compiler {
 
 namespace {
 
-// Returns a value containing the indices in the form of a memref with shape
-// {|indices|.size()}.
-Value *makeIndicesMemRef(const MemRefType &type,
-                         Operation::operand_range indices, OpBuilder &builder) {
-  auto &useOp = *builder.getInsertionPoint();
-  size_t indicesCount = std::distance(indices.begin(), indices.end());
-  if (indicesCount == 0) {
-    return builder
-        .create<IREE::ConstantOp>(
-            useOp.getLoc(), builder.getMemRefType({1}, builder.getIndexType()),
-            builder.getIntegerAttr(builder.getIndexType(), 0))
-        .getResult();
-  } else if (indicesCount == 1) {
-    auto allocOp = builder.create<AllocOp>(
-        useOp.getLoc(), builder.getMemRefType({1}, builder.getIndexType()));
-    auto storeIndex = builder.create<ConstantOp>(
-        useOp.getLoc(), builder.getIndexType(),
-        builder.getIntegerAttr(builder.getIndexType(), 0));
-    builder.create<StoreOp>(useOp.getLoc(), *indices.begin(),
-                            allocOp.getResult(), ArrayRef<Value *>{storeIndex});
-    return allocOp;
+struct LoadStoreToCopy : public OpRewritePattern<StoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(StoreOp storeOp,
+                                     PatternRewriter &rewriter) const override {
+    auto loadOp = dyn_cast<LoadOp>(storeOp.getValueToStore()->getDefiningOp());
+    if (!loadOp) {
+      return matchFailure();
+    }
+    if (loadOp.getMemRefType().getRank() != 0 ||
+        storeOp.getMemRefType().getRank() != 0) {
+      // TODO(b/141705188) Support non-scalar folding
+      return matchFailure();
+    }
+
+    auto emptyArrayMemref = createArrayConstant(rewriter, storeOp.getLoc(), {});
+    rewriter.create<IREEInterp::HL::CopyOp>(
+        storeOp.getLoc(), loadOp.getMemRef(),
+        /*srcIndices=*/emptyArrayMemref, storeOp.getMemRef(),
+        /*dstIndices=*/emptyArrayMemref, /*lengths=*/emptyArrayMemref);
+    storeOp.erase();
+    return matchSuccess();
   }
+};
 
-  // TODO(benvanik): support arbitrary indices.
-  useOp.emitError() << "Multiple indices are not yet implemented";
-  return nullptr;
-}
-
-// Returns a value containing the lengths in the form of a memref with shape
-// {|dims|.size()}.
-Value *makeLengthsMemRef(Value *storedValue, OpBuilder &builder) {
-  Type valueType = storedValue->getType();
-  if (auto shapedType = valueType.dyn_cast<ShapedType>()) {
-    auto shapeType =
-        builder.getMemRefType({shapedType.getRank()}, builder.getIndexType());
-    return builder.create<IREEInterp::HL::ShapeOp>(storedValue->getLoc(),
-                                                   shapeType, storedValue);
-  } else {
-    return builder.create<IREE::ConstantOp>(
-        storedValue->getLoc(),
-        builder.getMemRefType({1}, builder.getIndexType()),
-        builder.getIntegerAttr(builder.getIndexType(), 1));
+// TODO(b/141771852) Figure out how to have the same pattern delete the load and
+// store
+struct EraseUnusedLoad : public OpRewritePattern<LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(LoadOp loadOp,
+                                     PatternRewriter &rewriter) const override {
+    if (loadOp.use_empty()) {
+      loadOp.erase();
+      return matchSuccess();
+    }
+    return matchFailure();
   }
-}
-
-// Returns the origin operation of a value if it is a load.
-LoadOp findOriginLoadOperation(Value *value) {
-  // TODO(benvanik): follow through identity ops or something?
-  if (auto loadOp = dyn_cast<LoadOp>(value->getDefiningOp())) {
-    return loadOp;
-  }
-  return nullptr;
-}
-
-// Inserts a copy operation performing the same work as a store.
-//
-// Example:
-//   %0 = ... : memref<4xf32>
-//   %1 = load %0[%offset] : memref<4xf32>
-//   %2 = ... : memref<f32>
-//   store %1, %2[] : memref<f32>
-//  ->
-//   %0 = ... : memref<4xf32>
-//   %2 = ... : memref<f32>
-//   iree_hl_interp.copy %0[%offset], %2[], [%length]
-void insertCopyForStore(LoadOp &loadOp, StoreOp &storeOp) {
-  OpBuilder builder(storeOp);
-  auto *srcIndices =
-      makeIndicesMemRef(loadOp.getMemRefType(), loadOp.getIndices(), builder);
-  auto *dstIndices =
-      makeIndicesMemRef(storeOp.getMemRefType(), storeOp.getIndices(), builder);
-  auto *lengths = makeLengthsMemRef(storeOp.getValueToStore(), builder);
-  builder.create<IREEInterp::HL::CopyOp>(storeOp.getLoc(), loadOp.getMemRef(),
-                                         srcIndices, storeOp.getMemRef(),
-                                         dstIndices, lengths);
-}
+};
 
 }  // namespace
 
@@ -119,19 +82,12 @@ class InterpreterLoadStoreDataFlowOptPass
     : public FunctionPass<InterpreterLoadStoreDataFlowOptPass> {
  public:
   void runOnFunction() override {
-    auto func = getFunction();
+    OwningRewritePatternList patterns;
+    patterns.insert<LoadStoreToCopy, EraseUnusedLoad>(&getContext());
 
-    // Find stores and attempt to optimize load+store pairs.
-    llvm::SetVector<Operation *> deadOperations;
-    func.walk([&](StoreOp storeOp) {
-      if (auto loadOp = findOriginLoadOperation(storeOp.getValueToStore())) {
-        insertCopyForStore(loadOp, storeOp);
-        deadOperations.insert(storeOp);
-      }
-    });
-
-    // Remove all the now-unused ops.
-    removeDeadOperations(deadOperations);
+    // TODO(b/141771852) Incorporate these patterns into dialect conversion
+    // instead?
+    applyPatternsGreedily(getFunction(), patterns);
   }
 };
 
