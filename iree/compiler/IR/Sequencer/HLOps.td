@@ -348,6 +348,16 @@ def IREESeqHL_SliceOp :
 
 def IREESeqHL_CopyOp : IREESeqHL_Op<"copy", [
   AllElementCountsMatch<["srcIndices", "dstIndices", "lengths"]>,
+  AllRanksMatch<["src", "dst"]>,
+  // The checks above are redundant with this one, but they give more specific
+  // error messages.
+  AllMatch<[
+    Rank<"src">.result,
+    Rank<"dst">.result,
+    ElementCount<"srcIndices">.result,
+    ElementCount<"dstIndices">.result,
+    ElementCount<"lengths">.result
+  ], "src/dst rank is the same as srcIndices/dstIndices/lengths size">,
   AllElementTypesMatch<["src", "dst"]>
 ]> {
   let arguments = (ins
@@ -416,4 +426,4 @@ def IREESeqHL_CondBreakOp : IREESeqHL_Op<"cond_break"> {
 
 def IREESeqHL_BreakOp : IREESeqHL_Op<"break">;
 
-#endif  // IREE_INTERPRETER_HL_OPS
+#endif  // IREE_SEQUENCER_HL_OPS
