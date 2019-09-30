@@ -21,7 +21,9 @@
 
 #include "iree/compiler/Translation/SPIRV/IREEIndexComputation.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRV.h"
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -39,38 +41,107 @@ void IREEToSPIRVPass::runOnModule() {
   OpBuilder builder(module.getBodyRegion());
 
   // Initialize the index computation.
-  IndexPropagationList<
-      IndexPropagationOp<ConstantOp>, IndexPropagationOp<IREE::ReturnOp>,
-      IREELoadIndexPropagation, IREEStoreIndexPropagation,
-      NoBroadcastPwOpIndexPropagation<AddFOp>,
-      NoBroadcastPwOpIndexPropagation<CmpFOp>,
-      NoBroadcastPwOpIndexPropagation<MulFOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::ExpOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::MaxOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,
-      ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
-      XLABroadcastInDimOpIndexPropagation, XLATransposeOpIndexPropagation>
+  IndexPropagationList<IndexPropagationOp<ConstantOp>,
+                       // IREE-specific ops:
+                       IndexPropagationOp<IREE::ReturnOp>,
+                       IREELoadIndexPropagation, IREEStoreIndexPropagation,
+                       // Standard dialect unary elementwise ops:
+                       NoBroadcastPwOpIndexPropagation<SIToFPOp>,
+                       NoBroadcastPwOpIndexPropagation<SignExtendIOp>,
+                       // Standard dialect binary elementwise ops:
+                       NoBroadcastPwOpIndexPropagation<AddFOp>,
+                       NoBroadcastPwOpIndexPropagation<AddIOp>,
+                       NoBroadcastPwOpIndexPropagation<AndOp>,
+                       NoBroadcastPwOpIndexPropagation<CmpFOp>,
+                       NoBroadcastPwOpIndexPropagation<CmpIOp>,
+                       NoBroadcastPwOpIndexPropagation<DivFOp>,
+                       NoBroadcastPwOpIndexPropagation<DivISOp>,
+                       NoBroadcastPwOpIndexPropagation<DivIUOp>,
+                       NoBroadcastPwOpIndexPropagation<MulFOp>,
+                       NoBroadcastPwOpIndexPropagation<MulIOp>,
+                       NoBroadcastPwOpIndexPropagation<OrOp>,
+                       NoBroadcastPwOpIndexPropagation<RemFOp>,
+                       NoBroadcastPwOpIndexPropagation<RemISOp>,
+                       NoBroadcastPwOpIndexPropagation<RemIUOp>,
+                       NoBroadcastPwOpIndexPropagation<SubFOp>,
+                       NoBroadcastPwOpIndexPropagation<SubFOp>,
+                       NoBroadcastPwOpIndexPropagation<SubIOp>,
+                       NoBroadcastPwOpIndexPropagation<TruncateIOp>,
+                       NoBroadcastPwOpIndexPropagation<XOrOp>,
+                       NoBroadcastPwOpIndexPropagation<ZeroExtendIOp>,
+                       // XLA unary elementwise ops:
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::AbsOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::CeilOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::ConvertOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::CosOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::ExpOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::FloorOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::LogOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::NegOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::RsqrtOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::SignOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::TanhOp>,
+                       // XLA binary elementwise ops:
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::AndOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::DivOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::MaxOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::MinOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::SubOp>,
+                       // XLA other ops:
+                       // TODO(ravishankarm): conv, dot.
+                       // TODO(ravishankarm): gather.
+                       // TODO(ravishankarm): reverse.
+                       // TODO(ravishankarm): pad.
+                       // TODO(ravishankarm): slice.
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
+                       ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
+                       NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
+                       XLABroadcastInDimOpIndexPropagation,
+                       XLATransposeOpIndexPropagation>
       indexPropagation;
 
   // Initialize the spir-v codegenerator.
-  SPIRVCodegen<ConstantOpSPIRVLowering, CmpFOpSPIRVLowering,
-               CmpSelectOpSPIRVLowering<xla_hlo::MaxOp, spirv::SGreaterThanOp,
-                                        spirv::FOrdGreaterThanOp>,
-               IREELoadOpSPIRVLowering, IREEReturnOpSPIRVLowering,
-               IREEStoreOpSPIRVLowering,
-               SPIRVPwOpLowering<AddFOp, spirv::FAddOp>,
-               SPIRVPwOpLowering<MulFOp, spirv::FMulOp>,
-               SPIRVPwOpLowering<xla_hlo::AddOp, spirv::IAddOp, spirv::FAddOp>,
-               SPIRVPwOpLowering<xla_hlo::MulOp, spirv::IMulOp, spirv::FMulOp>,
-               SPIRVPwOpLowering<xla_hlo::ExpOp, spirv::GLSLExpOp>,
-               SPIRVPwOpLowering<xla_hlo::SelectOp, spirv::SelectOp>,
-               SPIRVIndexOpLowering<xla_hlo::BroadcastInDimOp>,
-               SPIRVIndexOpLowering<xla_hlo::CopyOp>,
-               SPIRVIndexOpLowering<xla_hlo::ReshapeOp>,
-               SPIRVIndexOpLowering<xla_hlo::TransposeOp>>
+  SPIRVCodegen<
+      ConstantOpSPIRVLowering,
+      // IREE-specific ops:
+      IREELoadOpSPIRVLowering, IREEReturnOpSPIRVLowering,
+      IREEStoreOpSPIRVLowering,
+      // Standard dialect unary elementwise ops:
+      // Standard dialect binary elementwise ops:
+      SPIRVPwOpLowering<AddFOp, spirv::FAddOp>,
+      SPIRVPwOpLowering<DivFOp, spirv::FDivOp>,
+      SPIRVPwOpLowering<MulFOp, spirv::FMulOp>,
+      SPIRVPwOpLowering<SubFOp, spirv::FSubOp>,
+      // XLA unary elementwise ops:
+      SPIRVPwOpLowering<xla_hlo::AbsOp, spirv::GLSLSAbsOp, spirv::GLSLFAbsOp>,
+      SPIRVPwOpLowering<xla_hlo::CeilOp, spirv::GLSLCeilOp>,
+      // TODO(ravishankarm): xla_hlo::ConvertOp
+      SPIRVPwOpLowering<xla_hlo::CosOp, spirv::GLSLCosOp>,
+      SPIRVPwOpLowering<xla_hlo::ExpOp, spirv::GLSLExpOp>,
+      SPIRVPwOpLowering<xla_hlo::FloorOp, spirv::GLSLFloorOp>,
+      SPIRVPwOpLowering<xla_hlo::LogOp, spirv::GLSLLogOp>,
+      SPIRVPwOpLowering<xla_hlo::NegOp, spirv::FNegateOp>,
+      SPIRVPwOpLowering<xla_hlo::RsqrtOp, spirv::GLSLInverseSqrtOp>,
+      SPIRVPwOpLowering<xla_hlo::SignOp, spirv::GLSLSSignOp,
+                        spirv::GLSLFSignOp>,
+      SPIRVPwOpLowering<xla_hlo::TanhOp, spirv::GLSLTanhOp>,
+      // XLA binary elementwise ops:
+      SPIRVPwOpLowering<xla_hlo::AddOp, spirv::IAddOp, spirv::FAddOp>,
+      // TODO(ravishankarm): xla_hlo::AndOp
+      SPIRVPwOpLowering<xla_hlo::DivOp, spirv::FDivOp>,
+      SPIRVPwOpLowering<xla_hlo::MaxOp, spirv::GLSLSMaxOp, spirv::GLSLFMaxOp>,
+      SPIRVPwOpLowering<xla_hlo::MinOp, spirv::GLSLSMinOp, spirv::GLSLFMinOp>,
+      SPIRVPwOpLowering<xla_hlo::MulOp, spirv::IMulOp, spirv::FMulOp>,
+      SPIRVPwOpLowering<xla_hlo::SubOp, spirv::ISubOp, spirv::FSubOp>,
+      // XLA other ops:
+      CmpFOpSPIRVLowering,
+      SPIRVPwOpLowering<xla_hlo::SelectOp, spirv::SelectOp>,
+      SPIRVIndexOpLowering<xla_hlo::BroadcastInDimOp>,
+      SPIRVIndexOpLowering<xla_hlo::CopyOp>,
+      SPIRVIndexOpLowering<xla_hlo::ReshapeOp>,
+      SPIRVIndexOpLowering<xla_hlo::TransposeOp>>
       spirvCodegen;
 
   // Create a spirv.module Op.

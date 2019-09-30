@@ -83,20 +83,7 @@ class XLATransposeOpIndexPropagation final
       SmallVectorImpl<AffineMap> &indexMap) const override;
 };
 
-/// Utility function that does index propagation for a fn that has only XLA-HLO
-/// ops.
-inline LogicalResult propagateIndexForXLAFn(FuncOp fn,
-                                            IndexComputationCache &map) {
-  IndexPropagationList<NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,
-                       ReturnOpIndexPropagation<ReturnOp>,
-                       XLATransposeOpIndexPropagation>
-      indexList;
-  if (!fn.getOperation()->getNumRegions()) {
-    return success();
-  }
-  return indexList.propagate(fn.getOperation()->getRegion(0), map);
-}
 }  // namespace iree_compiler
 }  // namespace mlir
+
 #endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLAINDEXPROPOGATION_H

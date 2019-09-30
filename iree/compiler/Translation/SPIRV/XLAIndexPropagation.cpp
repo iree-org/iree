@@ -19,6 +19,7 @@
 // index.
 //
 //===----------------------------------------------------------------------===//
+
 #include "iree/compiler/Translation/SPIRV/XLAIndexPropagation.h"
 
 namespace mlir {
@@ -30,7 +31,7 @@ namespace iree_compiler {
 
 LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
     Operation *op, AffineMap resultIndex,
-    SmallVectorImpl<AffineMap> &operandIndices) const {
+    SmallVectorImpl<AffineMap> &indexMap) const {
   auto broadcastOp = cast<xla_hlo::BroadcastInDimOp>(op);
   auto broadcastDim = broadcastOp.broadcast_dimensions();
 
@@ -40,7 +41,7 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
     AffineMap scalarMap = builder.getAffineMap(
         resultIndex.getNumDims(), resultIndex.getNumSymbols(),
         builder.getAffineConstantExpr(0));
-    operandIndices.push_back(scalarMap);
+    indexMap.push_back(scalarMap);
     return success();
   }
 
@@ -56,7 +57,7 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
   }
   auto operandMap = builder.getAffineMap(resultIndex.getNumDims(),
                                          resultIndex.getNumSymbols(), exprs);
-  operandIndices.push_back(operandMap);
+  indexMap.push_back(operandMap);
   return success();
 }
 
@@ -66,14 +67,14 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
 
 LogicalResult XLATransposeOpIndexPropagation::propagateIndexMap(
     Operation *op, AffineMap resultIndex,
-    SmallVectorImpl<AffineMap> &operandIndices) const {
+    SmallVectorImpl<AffineMap> &indexMap) const {
   auto transposeOp = cast<xla_hlo::TransposeOp>(op);
   // Compute the affine map that represents the permutation.
   SmallVector<unsigned, 4> permutation;
   for (auto index : transposeOp.permutation()) {
     permutation.push_back(index.getZExtValue());
   }
-  return propagateIndexMapImpl(op, permutation, resultIndex, operandIndices);
+  return propagateIndexMapImpl(op, permutation, resultIndex, indexMap);
 }
 
 }  // namespace iree_compiler
