@@ -142,7 +142,6 @@ void buildSequencerConversionPassPipeline(PassManager *passManager) {
   // that clutter up the IR.
   passManager->addPass(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
-  passManager->addPass(createLoadStoreDataFlowOptPass());
 
   // Convert any uses of index to int32_t (as we explicitly don't want to
   // support dynamic index width).

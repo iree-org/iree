@@ -61,9 +61,6 @@ std::unique_ptr<OpPassBase<ModuleOp>> createLowerStdToSequencerDialectPass();
 // Lowers the HL sequencer dialect to the LL sequencer dialect.
 std::unique_ptr<OpPassBase<FuncOp>> createLowerSequencerDialectPass();
 
-// Optimizes std.load and std.store to remove unnessisary copies.
-std::unique_ptr<OpPassBase<FuncOp>> createLoadStoreDataFlowOptPass();
-
 //===----------------------------------------------------------------------===//
 // Module Analysis and Assignment
 //===----------------------------------------------------------------------===//
