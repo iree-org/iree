@@ -40,14 +40,6 @@ func @big_float(%a: memref<1xbf16>, %dst: memref<1xbf16>) {
 
 // -----
 
-func @index(%a : memref<1 x index>, %dst : memref<1 x index>) {
-  // expected-error@+1 {{must be memref of 8/16/32/64-bit integer values}}
-  "iree_ll_interp.add_i"(%a, %a, %dst) : (memref<1 x index>, memref<1 x index>, memref<1 x index>) -> ()
-  return
-}
-
-// -----
-
 func @i1_cmp(%a: memref<1xf32>, %dst: memref<1xi1>) {
   // expected-error@+1 {{must be memref of boolean-storing type (8-bit integer) values}}
   "iree_ll_interp.cmp_f"(%a, %a, %dst) {predicate = 0 : i32} : (memref<1xf32>, memref<1xf32>, memref<1xi1>) -> ()

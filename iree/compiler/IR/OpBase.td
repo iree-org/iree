@@ -22,9 +22,6 @@ def IREE_Dialect : Dialect {
 // General types and helpers
 //===----------------------------------------------------------------------===//
 
-// Type constraint for integer-like types: integers, indices.
-def IntegerOrIndex : AnyTypeOf<[AnyInteger, Index], "integer or index">;
-
 class IREE_ScalarMemRefOf<list<Type> allowedTypes> :
     MemRefRankOf<allowedTypes, [0]>;
 
@@ -76,17 +73,17 @@ def IREEHL_MemRef : MemRefOf<[AnyType]>;
 def IREEHL_BoolMemRef : MemRefOf<[IREEHL_Bool]>;
 def IREEHL_IntMemRef : MemRefOf<[AnyInteger]>;
 def IREEHL_FloatMemRef : MemRefOf<[AnyFloat]>;
-def IREEHL_IndexMemRef : MemRefOf<[IntegerOrIndex]>;
+def IREEHL_IndexMemRef : MemRefOf<[AnyInteger]>;
 
 def IREEHL_AnyScalar : IREE_ScalarMemRefOf<[AnyType]>;
 def IREEHL_BoolScalar : IREE_ScalarMemRefOf<[IREEHL_Bool]>;
 def IREEHL_IntScalar : IREE_ScalarMemRefOf<[AnyInteger]>;
 def IREEHL_FloatScalar : IREE_ScalarMemRefOf<[AnyFloat]>;
-def IREEHL_IndexScalar : IREE_ScalarMemRefOf<[IntegerOrIndex]>;
+def IREEHL_IndexScalar : IREE_ScalarMemRefOf<[AnyInteger]>;
 def IREEHL_I32Scalar : IREE_ScalarMemRefOf<[I32]>;
 
 def IREEHL_1DIntMemRef : MemRefRankOf<[AnyInteger], [1]>;
-def IREEHL_1DIndexMemRef : MemRefRankOf<[IntegerOrIndex], [1]>;
+def IREEHL_1DIndexMemRef : MemRefRankOf<[AnyInteger], [1]>;
 
 
 //===----------------------------------------------------------------------===//
