@@ -217,33 +217,13 @@ struct ReshapeOpLowering : public XlaOpLowering<xla_hlo::ReshapeOp> {
   }
 };
 
-class LowerXLAToSequencerDialectPass
-    : public FunctionPass<LowerXLAToSequencerDialectPass> {
- public:
-  void runOnFunction() override {
-    ConversionTarget target(getContext());
-    target.addLegalDialect<IREEHLSequencerDialect, IREEDialect>();
-    target.addLegalOp<AllocOp, LoadOp, StoreOp>();
-
-    OwningRewritePatternList patterns;
-    patterns
-        .insert<ConcatOpLowering, CopyOpLowering, DynamicUpdateSliceLowering,
-                ReshapeOpLowering, SliceLowering>(&getContext());
-    if (failed(applyPartialConversion(getFunction(), target, patterns))) {
-      return signalPassFailure();
-    }
-  }
-};
-
 }  // namespace
 
-std::unique_ptr<OpPassBase<FuncOp>> createLowerXLAToSequencerDialectPass() {
-  return std::make_unique<LowerXLAToSequencerDialectPass>();
+void populateLowerXlaToSequencerPatterns(OwningRewritePatternList &patterns,
+                                         MLIRContext *ctx) {
+  patterns.insert<ConcatOpLowering, CopyOpLowering, DynamicUpdateSliceLowering,
+                  ReshapeOpLowering, SliceLowering>(ctx);
 }
-
-static PassRegistration<LowerXLAToSequencerDialectPass> pass(
-    "iree-lower-xla-to-iree-sequencer",
-    "Convert all supported XLA ops to the IREE sequencer dialect");
 
 }  // namespace iree_compiler
 }  // namespace mlir

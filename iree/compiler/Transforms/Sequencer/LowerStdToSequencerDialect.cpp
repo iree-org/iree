@@ -194,9 +194,11 @@ class DeallocOpLowering : public SequencerConversionPattern {
   }
 };
 
-void populateStdToSequencerConversionPatterns(
-    MLIRContext *context, MemRefTypeConverter &converter,
-    OwningRewritePatternList &patterns) {
+}  // namespace
+
+void populateLowerStdToSequencerPatterns(OwningRewritePatternList &patterns,
+                                         MemRefTypeConverter &converter,
+                                         MLIRContext *context) {
   patterns.insert<ConstantOpLowering,
                   // Control flow.
                   CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
@@ -204,59 +206,6 @@ void populateStdToSequencerConversionPatterns(
                   // Memory management.
                   AllocOpLowering, DeallocOpLowering>(context, converter);
 }
-
-}  // namespace
-
-// Lowers functions using std.* ops to the IREE HL sequencer dialect and buffer
-// view types.
-// FuncOp signatures will be updated to use the buffer view type and
-// dispatch regions will get iree.bind_input where needed.
-//
-// Beyond bindings there will be no other changes within dispatchable regions.
-// It is up to the downstream dialects to properly use the bindings to map their
-// I/O to expected values.
-//
-// Note that output buffer allocation is required following this pass to either
-// elide dispatch results entirely and provide output params or provide both
-// while ensuring that the returned value is always sliced from an input. This
-// should happen prior to outlining.
-class LowerStdToSequencerDialectPass
-    : public ModulePass<LowerStdToSequencerDialectPass> {
- public:
-  void runOnModule() override {
-    auto module = getModule();
-
-    // Only convert top-level functions, not ones nested in executables.
-    std::vector<Operation *> toConvert;
-    for (auto funcOp : module.getOps<FuncOp>()) {
-      toConvert.push_back(funcOp);
-    }
-
-    // Convert the signature and body of all sequencer functions.
-    MemRefTypeConverter converter(&getContext());
-    ConversionTarget target(getContext());
-    target.addLegalDialect<IREEHLSequencerDialect, IREEDialect>();
-    target.addLegalOp<LoadOp, StoreOp>();
-    target.addDynamicallyLegalOp<FuncOp>(
-        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
-
-    OwningRewritePatternList patterns;
-    populateStdToSequencerConversionPatterns(&getContext(), converter,
-                                             patterns);
-    if (failed(
-            applyPartialConversion(toConvert, target, patterns, &converter))) {
-      return signalPassFailure();
-    }
-  }
-};
-
-std::unique_ptr<OpPassBase<ModuleOp>> createLowerStdToSequencerDialectPass() {
-  return std::make_unique<LowerStdToSequencerDialectPass>();
-}
-
-static PassRegistration<LowerStdToSequencerDialectPass> pass(
-    "iree-lower-std-to-sequencer-dialect",
-    "Lowers std ops to the IREE HL sequencer dialect.");
 
 }  // namespace iree_compiler
 }  // namespace mlir

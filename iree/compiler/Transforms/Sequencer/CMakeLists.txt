@@ -26,6 +26,7 @@ iree_cc_library(
     "LoadStoreDataFlowOpt.cpp"
     "LowerSequencerDialect.cpp"
     "LowerStdToSequencerDialect.cpp"
+    "LowerToSequencerDialect.cpp"
     "LowerXLAToSequencerDialect.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineReductionRegions.cpp"

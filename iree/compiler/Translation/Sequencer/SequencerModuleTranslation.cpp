@@ -125,24 +125,19 @@ void buildPartitioningPassPipeline(PassManager *passManager) {
 // Builds a pass pipeline that converts sequencer functions to the iree_seq.hl
 // dialect.
 void buildSequencerConversionPassPipeline(PassManager *passManager) {
-  // Convert to the memref calling convention and optimize away as many
-  // loads and stores as we can prior to progressing.
   passManager->addPass(createConvertToMemRefCallingConventionPass());
 
   // Convert ops that are supported by the sequencer directly to the sequencer
   // dialect. The ops that remain should be only those that can be moved into
   // dispatch regions.
-  passManager->addPass(createLowerXLAToSequencerDialectPass());
-  passManager->addPass(createLowerStdToSequencerDialectPass());
+  passManager->addPass(createLowerToSequencerDialectPass());
 
   // Cleanup identity sequencer tensor-to-memref ops and other memory accesses
   // that clutter up the IR.
   passManager->addPass(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
 
-  // Convert any uses of index to int32_t (as we explicitly don't want to
-  // support dynamic index width).
-  // This also looks for other weird types (i1, etc).
+  // Convert unsupported types (e.g. index -> i32, i1 -> i8).
   passManager->addPass(createLegalizeTypeStoragePass());
 
   // Eliminate ops we don't care about based on a lack of side-effects.

@@ -51,12 +51,8 @@ std::unique_ptr<OpPassBase<ModuleOp>> createOutlineReductionRegionsPass();
 // Lowering/Conversion
 //===----------------------------------------------------------------------===//
 
-// Lowers XLA dialect (xla.*) ops to IREE Sequencer HL ops.
-std::unique_ptr<OpPassBase<FuncOp>> createLowerXLAToSequencerDialectPass();
-
-// Lowers sequencer functions using std ops (call/cond_br/etc) to the IREE HL
-// sequencer dialect and buffer view types.
-std::unique_ptr<OpPassBase<ModuleOp>> createLowerStdToSequencerDialectPass();
+// Lowers input dialect ops (e.g. std, xla_hlo) to IREE Sequencer HL dialect.
+std::unique_ptr<OpPassBase<FuncOp>> createLowerToSequencerDialectPass();
 
 // Lowers the HL sequencer dialect to the LL sequencer dialect.
 std::unique_ptr<OpPassBase<FuncOp>> createLowerSequencerDialectPass();
