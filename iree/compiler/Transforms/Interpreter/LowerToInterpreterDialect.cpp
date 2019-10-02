@@ -39,12 +39,8 @@ class LowerToInterpreterDialectPass
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLInterpreterDialect, IREEDialect>();
+    // TODO(b/141771852) get rid of load/store as part of this pass.
     target.addLegalOp<LoadOp, StoreOp, FuncOp, ReturnOp>();
-    target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp constOp) {
-      // std.constant is legal for index integers.
-      return constOp.getValue().isa<IntegerAttr>() &&
-             constOp.getType().isIndex();
-    });
     if (failed(applyFullConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }

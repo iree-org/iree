@@ -34,7 +34,6 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
-#include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -564,12 +563,9 @@ class LowerXLAToInterpreterDialectPass
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     populateLowerXlaToInterpreterPatterns(patterns, &getContext());
-    mlir::xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns,
-                                                        &getContext());
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLInterpreterDialect, IREEDialect>();
-    target.addLegalOp<AllocOp, LoadOp, StoreOp, FuncOp>();
     if (failed(applyPartialConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }

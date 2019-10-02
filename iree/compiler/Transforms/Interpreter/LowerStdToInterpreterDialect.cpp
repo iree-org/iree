@@ -299,35 +299,5 @@ void populateLowerStdToInterpreterPatterns(OwningRewritePatternList &patterns,
                   DivISOpLowering, DivIUOpLowering, DivFOpLowering>(ctx);
 }
 
-namespace {
-// Just for testing these passes.
-// TODO(b/141337493) can we get rid of this pass entirely?
-class LowerStdToInterpreterDialectPass
-    : public FunctionPass<LowerStdToInterpreterDialectPass> {
- public:
-  void runOnFunction() override {
-    OwningRewritePatternList patterns;
-    populateLowerStdToInterpreterPatterns(patterns, &getContext());
-
-    ConversionTarget target(getContext());
-    target.addLegalDialect<IREEHLInterpreterDialect, IREELLInterpreterDialect,
-                           IREEDialect>();
-    target.addLegalOp<LoadOp, StoreOp, FuncOp, ModuleOp>();
-    target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp constOp) {
-      // std.constant is legal for index integers.
-      return constOp.getValue().isa<IntegerAttr>() &&
-             constOp.getType().isIndex();
-    });
-    if (failed(applyFullConversion(getFunction(), target, patterns))) {
-      return signalPassFailure();
-    }
-  }
-};
-}  // namespace
-
-static PassRegistration<LowerStdToInterpreterDialectPass> pass(
-    "lower-std-to-iree-interpreter",
-    "Convert all std functions to the IREE dialect");
-
 }  // namespace iree_compiler
 }  // namespace mlir

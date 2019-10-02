@@ -235,7 +235,7 @@ class LowerSequencerDialectPass
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREELLSequencerDialect>();
-    target.addLegalOp<FuncOp, ModuleOp>();
+    target.addLegalOp<FuncOp>();
 
     if (failed(applyFullConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
