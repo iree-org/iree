@@ -75,7 +75,6 @@ void buildLegalizeInputPassPipeline(PassManager *passManager) {
   passManager->addPass(createCanonicalizerPass());
 
   // Get out of XLA HLO into a sane control flow representation.
-  passManager->addPass(xla_hlo::createLegalizeToStdPass());
   passManager->addPass(xla_hlo::createLegalizeControlFlowPass());
 
   // Expand uses of tuples into independent args/results.
