@@ -75,7 +75,7 @@ struct move_on_copy {
 // Usage:
 //   auto baton = MoveToLambda(my_ref);
 //   DoSomething([baton] () { baton.value; });
-#define MoveToLambda(p) ::iree::move_on_copy<decltype(p)>(std::move(p))
+#define IreeMoveToLambda(p) ::iree::move_on_copy<decltype(p)>(std::move(p))
 
 // TODO(benvanik): replace with an absl version when it exists.
 // A move-only RAII object that calls a stored cleanup functor when

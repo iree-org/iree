@@ -55,7 +55,7 @@ StatusOr<std::unique_ptr<DebugServer>> CreateDebugServerFromFlags() {
     RETURN_IF_ERROR(debug_server->WaitUntilSessionReady());
     LOG(INFO) << "Debugger attached";
     // TODO(benvanik): C++14 to avoid this.
-    auto debugger_baton = MoveToLambda(debugger);
+    auto debugger_baton = IreeMoveToLambda(debugger);
     debug_server->AtExit([debugger_baton]() { debugger_baton.value.reset(); });
   }
 #else

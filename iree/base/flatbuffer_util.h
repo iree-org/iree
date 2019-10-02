@@ -27,6 +27,7 @@
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "flatbuffers/flatbuffers.h"
+#include "iree/base/memory.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -66,10 +67,13 @@ class FlatBufferFileBase {
                     absl::Span<const uint8_t> buffer_data,
                     std::function<void()> deleter, size_t root_type_size,
                     VerifierFn verifier_fn);
+  // Initializes from an STL byte based container (string and vector of
+  // char/byte should be compatible).
+  template <typename Container>
+  Status FromContainer(Identifier identifier, Container container,
+                       size_t root_type_size, VerifierFn verifier_fn);
   Status WrapBuffer(Identifier identifier,
                     absl::Span<const uint8_t> buffer_data,
-                    size_t root_type_size, VerifierFn verifier_fn);
-  Status FromString(Identifier identifier, std::string buffer_data,
                     size_t root_type_size, VerifierFn verifier_fn);
   Status LoadFile(Identifier identifier, std::string path,
                   size_t root_type_size, VerifierFn verifier_fn);
@@ -132,10 +136,24 @@ class FlatBufferFile final : public FlatBufferFileBase {
   static StatusOr<std::unique_ptr<FlatBufferFile<T>>> WrapBuffer(
       Identifier identifier, absl::Span<const uint8_t> buffer_data);
 
+  // Loads the FlatBufferFile from a serialized byte-based STL container.
+  template <typename Container>
+  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromContainer(
+      Identifier identifier, Container buffer_data);
+
   // Loads a FlatBufferFile from a serialized string.
   // The FlatBufferFile takes ownership of the string.
   static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromString(
-      Identifier identifier, std::string buffer_data);
+      Identifier identifier, std::string buffer_data) {
+    return FromContainer(identifier, std::move(buffer_data));
+  }
+
+  // Loads a FlatBufferFile from a serialized byte vector.
+  // The FlatBufferFile takes ownership of the vector.
+  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromVector(
+      Identifier identifier, std::vector<uint8_t> buffer_data) {
+    return FromContainer(identifier, std::move(buffer_data));
+  }
 
   // Loads a FlatBufferFile from a serialized file on the file system.
   // This will attempt to mmap the file and is the preferred way of loading as
@@ -162,6 +180,29 @@ class FlatBufferFile final : public FlatBufferFileBase {
     return verifier->VerifyBuffer<T>(identifier);
   }
 };
+
+template <typename Container>
+Status FlatBufferFileBase::FromContainer(Identifier identifier,
+                                         Container container,
+                                         size_t root_type_size,
+                                         VerifierFn verifier_fn) {
+  static_assert(sizeof(*container.data()) == 1,
+                "Expected container of byte sized elements");
+  auto buffer_data = absl::MakeConstSpan(
+      // Double static_cast through void is safer than reinterpret_cast.
+      static_cast<const uint8_t*>(static_cast<const void*>(container.data())),
+      container.size());
+  // Use a baton to keep the container alive until the FlatBufferFileBase is
+  // destroyed.
+  auto buffer_data_baton = IreeMoveToLambda(container);
+  return FromBuffer(
+      identifier, buffer_data,
+      [buffer_data_baton]() {
+        // Keeping the container alive.
+        (void)buffer_data_baton.value;
+      },
+      root_type_size, verifier_fn);
+}
 
 // static
 template <typename T>
@@ -231,12 +272,13 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::WrapBuffer(
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromString(
-    Identifier identifier, std::string buffer_data) {
+template <typename Container>
+StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromContainer(
+    Identifier identifier, Container buffer_data) {
   std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
-  RETURN_IF_ERROR(base_file->FromString(identifier, std::move(buffer_data),
-                                        sizeof(T), VerifierFnT));
+  RETURN_IF_ERROR(base_file->FromContainer(identifier, std::move(buffer_data),
+                                           sizeof(T), VerifierFnT));
   return std::move(flat_buffer_file);
 }
 

@@ -51,7 +51,7 @@ Status FlatBufferFileBase::CreateWithBackingBuffer(
 
   // Pass along the buffer provided so we keep it alive until the
   // FlatBufferFileBase is destructed.
-  auto backing_buffer_baton = MoveToLambda(backing_buffer);
+  auto backing_buffer_baton = IreeMoveToLambda(backing_buffer);
   deleter_ = [backing_buffer_baton]() { (void)backing_buffer_baton.value; };
 
   return OkStatus();
@@ -124,28 +124,6 @@ Status FlatBufferFileBase::WrapBuffer(Identifier identifier,
       identifier, buffer_data, []() {}, root_type_size, verifier_fn);
 }
 
-Status FlatBufferFileBase::FromString(Identifier identifier,
-                                      std::string buffer_data,
-                                      size_t root_type_size,
-                                      VerifierFn verifier_fn) {
-  IREE_TRACE_SCOPE0("FlatBufferFileBase::FromString");
-
-  // Reference right into the string buffer.
-  auto buffer_data_data = absl::MakeConstSpan(
-      reinterpret_cast<const uint8_t*>(buffer_data.data()), buffer_data.size());
-
-  // Use a baton to keep the string alive until the FlatBufferFileBase is
-  // destroyed.
-  auto buffer_data_baton = MoveToLambda(buffer_data);
-  return FromBuffer(
-      identifier, buffer_data_data,
-      [buffer_data_baton]() {
-        // Keeping the string alive.
-        (void)buffer_data_baton.value;
-      },
-      root_type_size, verifier_fn);
-}
-
 Status FlatBufferFileBase::LoadFile(Identifier identifier, std::string path,
                                     size_t root_type_size,
                                     VerifierFn verifier_fn) {
@@ -154,7 +132,7 @@ Status FlatBufferFileBase::LoadFile(Identifier identifier, std::string path,
   ASSIGN_OR_RETURN(auto file_mapping, FileMapping::OpenRead(path));
   auto buffer_data = file_mapping->data();
 
-  auto handle_baton = MoveToLambda(file_mapping);
+  auto handle_baton = IreeMoveToLambda(file_mapping);
   return FromBuffer(
       identifier, buffer_data,
       [handle_baton]() {
