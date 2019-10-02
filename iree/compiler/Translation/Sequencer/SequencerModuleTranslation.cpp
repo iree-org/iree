@@ -74,9 +74,7 @@ void buildLegalizeInputPassPipeline(PassManager *passManager) {
   passManager->addPass(createCSEPass());
   passManager->addPass(createCanonicalizerPass());
 
-  // Get out of TF ASAP and into a sane control flow representation.
-  // TODO(benvanik): do this externally prior to getting the input?
-  passManager->addPass(xla_hlo::createLegalizeTFPass());
+  // Get out of XLA HLO into a sane control flow representation.
   passManager->addPass(xla_hlo::createLegalizeToStdPass());
   passManager->addPass(xla_hlo::createLegalizeControlFlowPass());
 
