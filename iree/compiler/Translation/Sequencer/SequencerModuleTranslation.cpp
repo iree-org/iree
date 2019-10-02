@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Translation/SequencerModuleTranslation.h"
+#include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 
 #include <cstdint>
 #include <iostream>

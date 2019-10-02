@@ -15,7 +15,6 @@
 #include "iree/compiler/Utils/DispatchUtils.h"
 
 #include "iree/compiler/IR/Ops.h"
-#include "iree/compiler/IR/Sequencer/HLOps.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
@@ -725,7 +724,7 @@ Value *allocateDispatchOutputBuffer(Location loc, MemRefType type,
   //   - unranked = death, need to be able to alloc shape outputs
   // - insert alloc
   SmallVector<Value *, 4> dimPieces;
-  return builder.create<IREESeq::HL::AllocHeapOp>(loc, type, dimPieces);
+  return builder.create<AllocOp>(loc, type, dimPieces);
 }
 
 }  // namespace iree_compiler

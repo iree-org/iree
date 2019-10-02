@@ -14,26 +14,21 @@
 
 iree_cc_library(
   NAME
-    Utils
+    Sequencer
   HDRS
-    "DispatchUtils.h"
-    "Macros.h"
-    "MemRefUtils.h"
-    "ModuleUtils.h"
-    "OpCreationUtils.h"
-    "OpUtils.h"
-    "TranslationUtils.h"
+    "SequencerModuleTranslation.h"
   SRCS
-    "DispatchUtils.cpp"
-    "MemRefUtils.cpp"
-    "ModuleUtils.cpp"
-    "OpCreationUtils.cpp"
-    "OpUtils.cpp"
-    "TranslationUtils.cpp"
+    "SequencerModuleTranslation.cpp"
   DEPS
+    flatbuffers
+    iree::base::status
     iree::compiler::IR
-    iree::compiler::IR::Sequencer
-    iree::schemas::executable_def_cc_fbs
+    iree::compiler::Serialization
+    iree::compiler::Transforms
+    iree::compiler::Transforms::Sequencer
+    iree::compiler::Utils
+    iree::hal::executable_format
+    iree::schemas
     tensorflow::mlir_xla
     LLVMSupport
     MLIR

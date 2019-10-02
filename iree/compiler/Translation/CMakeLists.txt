@@ -14,26 +14,4 @@
 
 add_subdirectory(Interpreter)
 add_subdirectory(SPIRV)
-
-iree_cc_library(
-  NAME
-    Translation
-  HDRS
-    "SequencerModuleTranslation.h"
-  SRCS
-    "SequencerModuleTranslation.cpp"
-  DEPS
-    flatbuffers
-    iree::base::status
-    iree::compiler::IR
-    iree::compiler::Serialization
-    iree::compiler::Transforms
-    iree::compiler::Transforms::Sequencer
-    iree::compiler::Utils
-    iree::hal::executable_format
-    iree::schemas
-    tensorflow::mlir_xla
-    LLVMSupport
-    MLIR
-  PUBLIC
-)
+add_subdirectory(Sequencer)

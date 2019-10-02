@@ -42,7 +42,7 @@
 #include "iree/base/init.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
-#include "iree/compiler/Translation/SequencerModuleTranslation.h"
+#include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/hal/buffer_view_string_util.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/schemas/module_def_generated.h"

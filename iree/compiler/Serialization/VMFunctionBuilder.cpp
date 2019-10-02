@@ -16,8 +16,6 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/IR/Dialect.h"
-#include "iree/compiler/IR/Interpreter/LLDialect.h"
-#include "iree/compiler/IR/Sequencer/LLDialect.h"
 #include "iree/compiler/IR/Types.h"
 #include "iree/compiler/Serialization/BytecodeTables.h"
 #include "iree/compiler/Utils/Macros.h"
@@ -48,7 +46,7 @@ LogicalResult WriteGenericIreeOp(Block *block, Operation *op,
   auto dialectNamespace = dialect->getNamespace();
   std::unique_ptr<OpcodeInfo> operandInfo;
   auto strippedOpName = opName.substr(opName.find('.') + 1).str();
-  if (dialectNamespace == IREELLSequencerDialect::getDialectNamespace()) {
+  if (dialectNamespace == "iree_ll_seq") {
     auto opcode = GetSequencerOpcodeByName(strippedOpName);
     if (!opcode.hasValue()) {
       return op->emitOpError()
@@ -57,8 +55,7 @@ LogicalResult WriteGenericIreeOp(Block *block, Operation *op,
     RETURN_IF_FAILURE(writer->WriteOpcode(opcode.getValue()));
     operandInfo =
         std::make_unique<OpcodeInfo>(GetSequencerOpcodeInfo(opcode.getValue()));
-  } else if (dialectNamespace ==
-                 IREELLInterpreterDialect::getDialectNamespace() ||
+  } else if (dialectNamespace == "iree_ll_interp" ||
              // TODO(gcmn) remove special case for IREE dialect?
              dialectNamespace == IREEDialect::getDialectNamespace()) {
     auto opcode = GetInterpreterOpcodeByName(strippedOpName);

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_SEQUENCERMODULETRANSLATION_H_
-#define IREE_COMPILER_TRANSLATION_SEQUENCERMODULETRANSLATION_H_
+#ifndef IREE_COMPILER_TRANSLATION_SEQUENCER_SEQUENCERMODULETRANSLATION_H_
+#define IREE_COMPILER_TRANSLATION_SEQUENCER_SEQUENCERMODULETRANSLATION_H_
 
 #include <vector>
 
@@ -33,4 +33,4 @@ std::vector<uint8_t> translateMlirToIreeSequencerModule(
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SEQUENCERMODULETRANSLATION_H_
+#endif  // IREE_COMPILER_TRANSLATION_SEQUENCER_SEQUENCERMODULETRANSLATION_H_
