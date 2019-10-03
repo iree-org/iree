@@ -43,7 +43,8 @@ std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeTypeStoragePass();
 // Cleanup and Dead Code Elimination
 //===----------------------------------------------------------------------===//
 
-// Aggressively eliminates ops that have no side-effects.
+// Removes ops that technically have side effects, but we still want to remove
+// if their results are unused: e.g. alloc and load.
 std::unique_ptr<OpPassBase<FuncOp>> createAggressiveOpEliminationPass();
 
 // Drops functions from the module that are unreachable from any exported

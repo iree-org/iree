@@ -260,7 +260,7 @@ def IREEInterpHL_CmpFOp :
   let results = (outs IREEHL_BoolMemRef);
 }
 
-// TODO(benvanik): make pure (when we can disable CSE).
+// TODO(b/142012496): Add trait that enables DCE but not CSE.
 def IREEInterpHL_AllocHeapOp : IREEInterpHL_Op<"alloc_heap"> {
   // TODO(benvanik): attributes and args.
   let arguments = (ins

@@ -335,7 +335,7 @@ def IREEInterpLL_AllocStackInitOp : IREEInterpLL_PureOp<"alloc_stack_init"> {
   );
 }
 
-// TODO(benvanik): make pure (when we can disable CSE).
+// TODO(b/142012496): Add trait that enables DCE but not CSE.
 def IREEInterpLL_AllocHeapOp : IREEInterpLL_Op<"alloc_heap"> {
   // TODO(benvanik): attributes and args.
   let arguments = (ins

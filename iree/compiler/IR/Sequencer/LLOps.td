@@ -429,7 +429,8 @@ def IREESeqLL_AllocStackInitOp : IREESeqLL_PureOp<"alloc_stack_init"> {
   let results = (outs IREELL_MemRef);
 }
 
-def IREESeqLL_AllocHeapOp : IREESeqLL_PureOp<"alloc_heap"> {
+// TODO(b/142012496): Add trait that enables DCE but not CSE.
+def IREESeqLL_AllocHeapOp : IREESeqLL_Op<"alloc_heap"> {
   // TODO(benvanik): attributes and args.
   let arguments = (ins Variadic<IREELL_IntMemRef>:$dim_pieces);
   let results = (outs IREELL_MemRef);

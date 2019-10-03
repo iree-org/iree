@@ -293,7 +293,7 @@ def IREESeqHL_DispatchOp : IREESeqHL_Op<"dispatch"> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-// TODO(benvanik): make pure (when we can disable CSE).
+// TODO(b/142012496): Add trait that enables DCE but not CSE.
 def IREESeqHL_AllocHeapOp : IREESeqHL_Op<"alloc_heap"> {
   // TODO(benvanik): attributes and args.
   let arguments = (ins Variadic<IREEHL_IntMemRef>:$dim_pieces);
