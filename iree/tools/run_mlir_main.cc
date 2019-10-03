@@ -83,6 +83,9 @@ ABSL_FLAG(bool, print_mlir, true, "Prints MLIR IR during translation.");
 ABSL_FLAG(bool, print_bytecode, false,
           "Prints IREE bytecode after translation.");
 
+ABSL_FLAG(bool, run, true,
+          "Option to run the file. Setting it to false just compiles it.");
+
 namespace iree {
 namespace {
 
@@ -273,6 +276,9 @@ Status EvaluateFile(std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
         file_buffer->getBuffer(), file_buffer->getBufferIdentifier());
     ASSIGN_OR_RETURN(auto module, PrepareModule(target_backend + '*',
                                                 std::move(cloned_file_buffer)));
+    if (!absl::GetFlag(FLAGS_run)) {
+      continue;
+    }
     RETURN_IF_ERROR(EvaluateFunctions(BackendToDriverName(target_backend),
                                       std::move(module)));
   }
