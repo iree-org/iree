@@ -75,7 +75,15 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
   SmallVector<AffineExpr, 4> affineExprs;
   int64_t numElements = 1;
   for (size_t i = launchSize.size(); i > 0; --i) {
-    affineExprs.push_back(builder.getAffineDimExpr(i - 1));
+    // If launchSize along any dimension is 1, just use 0 for the index. This is
+    // not just an optimization. If you have an output of type memref<f32> which
+    // is lowered to !spv.ptr<!spv.struct<f32>, StorageBuffer> with launchSize
+    // <1>, then spv.AccessChain requires the indices to be a constant.
+    if (launchSize[i - 1] == 1) {
+      affineExprs.push_back(builder.getAffineConstantExpr(0));
+    } else {
+      affineExprs.push_back(builder.getAffineDimExpr(i - 1));
+    }
     numElements *= launchSize[i - 1];
   }
   auto launchMap = builder.getAffineMap(launchSize.size(), 0, affineExprs);
