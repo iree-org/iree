@@ -40,6 +40,7 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Translation.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+#include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -300,6 +301,7 @@ std::vector<uint32_t> SPIRVTranslator::translateAndSerializeShaderModule(
 
   // Lower module to spirv::ModuleOp.
   auto spirvGenPasses = createPassManager(module.getContext(), options());
+  spirvGenPasses->addPass(xla_hlo::createLegalizeToStdPass());
   spirvGenPasses->addPass(createIREEToSPIRVPass());
   if (failed(runPassPipeline(options(), spirvGenPasses.get(), module))) {
     executableOp.emitError() << "Failed to generate spv.module";
