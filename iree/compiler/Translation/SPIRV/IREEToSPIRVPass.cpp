@@ -98,6 +98,7 @@ void IREEToSPIRVPass::runOnModule() {
                        NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
                        ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
                        NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
+                       XLABroadcastOpIndexPropagation,
                        XLABroadcastInDimOpIndexPropagation,
                        XLATransposeOpIndexPropagation>
       indexPropagation;
@@ -138,6 +139,7 @@ void IREEToSPIRVPass::runOnModule() {
       // XLA other ops:
       CmpFOpSPIRVLowering,
       SPIRVPwOpLowering<xla_hlo::SelectOp, spirv::SelectOp>,
+      SPIRVIndexOpLowering<xla_hlo::BroadcastOp>,
       SPIRVIndexOpLowering<xla_hlo::BroadcastInDimOp>,
       SPIRVIndexOpLowering<xla_hlo::CopyOp>,
       SPIRVIndexOpLowering<xla_hlo::ReshapeOp>,

@@ -30,12 +30,12 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
-    Operation *op, AffineMap resultIndex,
+    Operation *operation, AffineMap resultIndex,
     SmallVectorImpl<AffineMap> &indexMap) const {
-  auto broadcastOp = cast<xla_hlo::BroadcastInDimOp>(op);
+  auto broadcastOp = cast<xla_hlo::BroadcastInDimOp>(operation);
   auto broadcastDim = broadcastOp.broadcast_dimensions();
 
-  Builder builder(op->getContext());
+  Builder builder(operation->getContext());
   if (!broadcastDim) {
     // This is a scalar. So all indices map to the same element.
     AffineMap scalarMap = builder.getAffineMap(
@@ -54,6 +54,36 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
         })) {
       exprs.push_back(resultExpr.value());
     }
+  }
+  auto operandMap = builder.getAffineMap(resultIndex.getNumDims(),
+                                         resultIndex.getNumSymbols(), exprs);
+  indexMap.push_back(operandMap);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// BroadcastOp
+//===----------------------------------------------------------------------===//
+
+// For broadcast op, just drop the first N expressions of the resultIndex, where
+// N is the number of elements in broadcast_sizes attribute.
+LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
+    Operation *operation, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &indexMap) const {
+  auto broadcastOp = cast<xla_hlo::BroadcastOp>(operation);
+  auto broadcastDim = broadcastOp.broadcast_sizes();
+
+  SmallVector<AffineExpr, 4> exprs;
+  for (auto i : llvm::seq<size_t>(
+           broadcastDim.getType().getShape()[0],
+           operation->getResult(0)->getType().cast<ShapedType>().getRank())) {
+    exprs.push_back(resultIndex.getResult(i));
+  }
+
+  Builder builder(operation->getContext());
+  if (exprs.empty()) {
+    // The result is a scalar. Just add a constant expr 0.
+    exprs.push_back(builder.getAffineConstantExpr(0));
   }
   auto operandMap = builder.getAffineMap(resultIndex.getNumDims(),
                                          resultIndex.getNumSymbols(), exprs);

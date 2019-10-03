@@ -40,6 +40,18 @@ class XLABroadcastInDimOpIndexPropagation final
       SmallVectorImpl<AffineMap> &operandIndices) const override;
 };
 
+// For broadcast op, just drop the first N expressions of the resultIndex, where
+// N is the number of elements in broadcast_sizes attribute.
+class XLABroadcastOpIndexPropagation final
+    : public IndexPropagationOp<xla_hlo::BroadcastOp> {
+ public:
+  using IndexPropagationOp<xla_hlo::BroadcastOp>::IndexPropagationOp;
+
+  LogicalResult propagateIndexMap(
+      Operation *operation, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &operandIndices) const override;
+};
+
 /// For return ops, it is assumed that each thread is computing the value of one
 /// element of the returned tensor.
 template <typename OpTy>
