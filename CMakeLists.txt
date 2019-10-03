@@ -29,6 +29,7 @@ option(IREE_ENABLE_TRACING "Enables WTF tracing." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." OFF)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 
 #-------------------------------------------------------------------------------
@@ -42,6 +43,7 @@ list(APPEND CMAKE_MODULE_PATH
 
 include(iree_macros)
 include(iree_copts)
+include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
@@ -60,7 +62,6 @@ include(external_cc_library)
 include(flatbuffer_cc_library)
 
 add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/tensorflow EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
@@ -70,6 +71,8 @@ add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
+  include(external_tablegen_library)
+  add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------
@@ -78,11 +81,15 @@ endif()
 
 add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
-add_subdirectory(iree/samples)
 add_subdirectory(iree/schemas)
-add_subdirectory(iree/tools)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(iree/compiler)
+endif()
+
+add_subdirectory(iree/tools)
+
+if(${IREE_BUILD_SAMPLES})
+  add_subdirectory(iree/samples)
 endif()

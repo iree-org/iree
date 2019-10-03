@@ -59,17 +59,17 @@ include(CMakeParseArguments)
 #     iree::schemas::other_schemas
 # )
 function(flatbuffer_cc_library)
-  cmake_parse_arguments(FLATBUFFER_CC_LIB
+  cmake_parse_arguments(_RULE
     "PUBLIC;TESTONLY"
     "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
     ${ARGN}
   )
 
-  if(NOT FLATBUFFER_CC_LIB_TESTONLY OR IREE_BUILD_TESTS)
+  if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
     # Prefix the library with the package name, so we get: iree_package_name
     iree_package_name(_PACKAGE_NAME)
-    set(_NAME "${_PACKAGE_NAME}_${FLATBUFFER_CC_LIB_NAME}")
+    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
     set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS
       # Preserve root-relative include paths in generated code.
@@ -83,10 +83,10 @@ function(flatbuffer_cc_library)
       "--gen-object-api"
     )
     build_flatbuffers(
-      "${FLATBUFFER_CC_LIB_SRCS}"
+      "${_RULE_SRCS}"
       "${IREE_ROOT_DIR}"
       "${_NAME}_gen"  # custom_target_name
-      "${FLATBUFFER_CC_LIB_DEPS}" # additional_dependencies
+      "${_RULE_DEPS}" # additional_dependencies
       "${CMAKE_CURRENT_BINARY_DIR}" # generated_include_dir
       "${CMAKE_CURRENT_BINARY_DIR}" # binary_schemas_dir
       "" # copy_text_schemas_dir
@@ -102,18 +102,18 @@ function(flatbuffer_cc_library)
     target_link_libraries(${_NAME}
       INTERFACE
         flatbuffers
-        ${FLATBUFFER_CC_LIB_LINKOPTS}
+        ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
     )
     target_compile_definitions(${_NAME}
       INTERFACE
-        ${FLATBUFFER_CC_LIB_DEFINES}
+        ${_RULE_DEFINES}
     )
 
     # Alias the iree_package_name library to iree::package::name.
     # This lets us more clearly map to Bazel and makes it possible to
     # disambiguate the underscores in paths vs. the separators.
     iree_package_ns(_PACKAGE_NS)
-    add_library(${_PACKAGE_NS}::${FLATBUFFER_CC_LIB_NAME} ALIAS ${_NAME})
+    add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
   endif()
 endfunction()

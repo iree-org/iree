@@ -59,16 +59,33 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    file_handle
+  SRCS
+    "internal/file_handle_win32.cc"
+  HDRS
+    "internal/file_handle_win32.h"
+  DEPS
+    absl::memory
+    absl::strings
+    iree::base::status
+    iree::base::tracing
+    iree::base::target_platform
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     file_io
   SRCS
-    "file_io_posix.cc"
-    "file_io_win32.cc"
+    "internal/file_io_posix.cc"
+    "internal/file_io_win32.cc"
   HDRS
     "file_io.h"
   DEPS
     absl::memory
     absl::strings
     absl::span
+    iree::base::file_handle
     iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
@@ -79,14 +96,15 @@ iree_cc_library(
   NAME
     file_mapping
   SRCS
-    "file_io_posix.cc"
-    "file_io_win32.cc"
+    "internal/file_mapping_posix.cc"
+    "internal/file_mapping_win32.cc"
   HDRS
     "file_mapping.h"
   DEPS
     absl::memory
     absl::strings
     absl::span
+    iree::base::file_handle
     iree::base::ref_ptr
     iree::base::status
     iree::base::tracing

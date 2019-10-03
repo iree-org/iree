@@ -91,6 +91,7 @@ iree_cc_library(
     absl::memory
     iree::base::ref_ptr
     iree::base::status
+    iree::base::target_platform
     iree::base::tracing
     Vulkan::Headers
   PUBLIC

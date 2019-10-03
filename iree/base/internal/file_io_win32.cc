@@ -15,6 +15,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/file_io.h"
+#include "iree/base/internal/file_handle_win32.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)

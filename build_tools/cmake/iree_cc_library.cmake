@@ -26,6 +26,7 @@ include(CMakeParseArguments)
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # LINKOPTS: List of link options
+# ALWAYSLINK: Always link the library into any binary with a transitive dep.
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
@@ -60,44 +61,42 @@ include(CMakeParseArguments)
 #   DEPS
 #     iree::package::fantastic_lib
 # )
-#
-# TODO: Implement "ALWAYSLINK"
 function(iree_cc_library)
   cmake_parse_arguments(
-    IREE_CC_LIB
-    "PUBLIC;TESTONLY"
+    _RULE
+    "PUBLIC;ALWAYSLINK;TESTONLY"
     "NAME"
     "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
     ${ARGN}
   )
 
-  if(NOT IREE_CC_LIB_TESTONLY OR IREE_BUILD_TESTS)
-    # Prefix the library with the package name, so we get: iree_package_name
+  if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
+    # Prefix the library with the package name, so we get: iree_package_name.
     iree_package_name(_PACKAGE_NAME)
-    set(_NAME "${_PACKAGE_NAME}_${IREE_CC_LIB_NAME}")
+    set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
     # Check if this is a header-only library.
     # Note that as of February 2019, many popular OS's (for example, Ubuntu
     # 16.04 LTS) only come with cmake 3.5 by default.  For this reason, we can't
     # use list(FILTER...)
-    set(IREE_CC_SRCS "${IREE_CC_LIB_SRCS}")
-    foreach(src_file IN LISTS IREE_CC_SRCS)
+    set(_CC_SRCS "${_RULE_SRCS}")
+    foreach(src_file IN LISTS _CC_SRCS)
       if(${src_file} MATCHES ".*\\.(h|inc)")
-        list(REMOVE_ITEM IREE_CC_SRCS "${src_file}")
+        list(REMOVE_ITEM _CC_SRCS "${src_file}")
       endif()
     endforeach()
-    if("${IREE_CC_SRCS}" STREQUAL "")
-      set(IREE_CC_LIB_IS_INTERFACE 1)
+    if("${_CC_SRCS}" STREQUAL "")
+      set(_RULE_IS_INTERFACE 1)
     else()
-      set(IREE_CC_LIB_IS_INTERFACE 0)
+      set(_RULE_IS_INTERFACE 0)
     endif()
 
-    if(NOT IREE_CC_LIB_IS_INTERFACE)
+    if(NOT _RULE_IS_INTERFACE)
       add_library(${_NAME} STATIC "")
       target_sources(${_NAME}
         PRIVATE
-          ${IREE_CC_LIB_SRCS}
-          ${IREE_CC_LIB_HDRS}
+          ${_RULE_SRCS}
+          ${_RULE_HDRS}
       )
       target_include_directories(${_NAME}
         PUBLIC
@@ -105,35 +104,35 @@ function(iree_cc_library)
       )
       target_compile_options(${_NAME}
         PRIVATE
-          ${IREE_CC_LIB_COPTS}
+          ${_RULE_COPTS}
           ${IREE_DEFAULT_COPTS}
       )
       target_link_libraries(${_NAME}
         PUBLIC
-          ${IREE_CC_LIB_DEPS}
+          ${_RULE_DEPS}
         PRIVATE
-          ${IREE_CC_LIB_LINKOPTS}
+          ${_RULE_LINKOPTS}
           ${IREE_DEFAULT_LINKOPTS}
       )
       target_compile_definitions(${_NAME}
         PUBLIC
-          ${IREE_CC_LIB_DEFINES}
+          ${_RULE_DEFINES}
       )
 
       # Add all IREE targets to a a folder in the IDE for organization.
-      if(IREE_CC_LIB_PUBLIC)
+      if(_RULE_PUBLIC)
         set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER})
-      elseif(IREE_CC_LIB_TESTONLY)
+      elseif(_RULE_TESTONLY)
         set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
       else()
         set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/internal)
       endif()
 
-      # INTERFACE libraries can't have the CXX_STANDARD property set
+      # INTERFACE libraries can't have the CXX_STANDARD property set.
       set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
       set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
     else()
-      # Generating header-only library
+      # Generating header-only library.
       add_library(${_NAME} INTERFACE)
       target_include_directories(${_NAME}
         INTERFACE
@@ -141,18 +140,18 @@ function(iree_cc_library)
       )
       target_compile_options(${_NAME}
         INTERFACE
-          ${IREE_CC_LIB_COPTS}
+          ${_RULE_COPTS}
           ${IREE_DEFAULT_COPTS}
       )
       target_link_libraries(${_NAME}
         INTERFACE
-          ${IREE_CC_LIB_DEPS}
-          ${IREE_CC_LIB_LINKOPTS}
+          ${_RULE_DEPS}
+          ${_RULE_LINKOPTS}
           ${IREE_DEFAULT_LINKOPTS}
       )
       target_compile_definitions(${_NAME}
         INTERFACE
-          ${IREE_CC_LIB_DEFINES}
+          ${_RULE_DEFINES}
       )
     endif()
 
@@ -160,9 +159,9 @@ function(iree_cc_library)
     # This lets us more clearly map to Bazel and makes it possible to
     # disambiguate the underscores in paths vs. the separators.
     iree_package_ns(_PACKAGE_NS)
-    add_library(${_PACKAGE_NS}::${IREE_CC_LIB_NAME} ALIAS ${_NAME})
+    add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
     iree_package_dir(_PACKAGE_DIR)
-    if(${IREE_CC_LIB_NAME} STREQUAL ${_PACKAGE_DIR})
+    if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
       # If the library name matches the package then treat it as a default.
       # For example, foo/bar/ library 'bar' would end up as 'foo::bar'.
       add_library(${_PACKAGE_NS} ALIAS ${_NAME})

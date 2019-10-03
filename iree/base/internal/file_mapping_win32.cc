@@ -15,6 +15,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "iree/base/file_mapping.h"
+#include "iree/base/internal/file_handle_win32.h"
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
@@ -25,49 +26,6 @@
 namespace iree {
 
 namespace {
-
-class FileHandle {
- public:
-  static StatusOr<std::unique_ptr<FileHandle>> OpenRead(std::string path,
-                                                        DWORD file_flags) {
-    HANDLE handle = ::CreateFileA(
-        /*lpFileName=*/path.c_str(), /*dwDesiredAccess=*/GENERIC_READ,
-        /*dwShareMode=*/FILE_SHARE_READ, /*lpSecurityAttributes=*/nullptr,
-        /*dwCreationDisposition=*/OPEN_EXISTING,
-        /*dwFlagsAndAttributes=*/FILE_ATTRIBUTE_NORMAL | file_flags,
-        /*hTemplateFile=*/nullptr);
-    if (handle == INVALID_HANDLE_VALUE) {
-      return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-             << "Unable to open file " << path;
-    }
-
-    BY_HANDLE_FILE_INFORMATION file_info;
-    if (::GetFileInformationByHandle(handle, &file_info) == FALSE) {
-      return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-             << "Unable to query file info for " << path;
-    }
-
-    uint64_t file_size =
-        (static_cast<uint64_t>(file_info.nFileSizeHigh) << 32) |
-        file_info.nFileSizeLow;
-    return absl::make_unique<FileHandle>(handle, file_size);
-  }
-
-  FileHandle(HANDLE handle, size_t size) : handle_(handle), size_(size) {}
-  ~FileHandle() { ::CloseHandle(handle_); }
-
-  absl::string_view path() const { return path_; }
-  HANDLE handle() const { return handle_; }
-  size_t size() const { return size_; }
-
- private:
-  FileHandle(const FileHandle&) = delete;
-  FileHandle& operator=(const FileHandle&) = delete;
-
-  std::string path_;
-  HANDLE handle_;
-  size_t size_;
-};
 
 class Win32FileMapping : public FileMapping {
  public:

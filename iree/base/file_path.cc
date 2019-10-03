@@ -23,7 +23,7 @@ namespace {
 
 std::pair<absl::string_view, absl::string_view> SplitPath(
     absl::string_view path) {
-  ssize_t pos = path.find_last_of('/');
+  size_t pos = path.find_last_of('/');
   // Handle the case with no '/' in 'path'.
   if (pos == absl::string_view::npos) {
     return std::make_pair(path.substr(0, 0), path);
@@ -42,7 +42,7 @@ std::pair<absl::string_view, absl::string_view> SplitPath(
 std::pair<absl::string_view, absl::string_view> SplitBasename(
     absl::string_view path) {
   path = Basename(path);
-  ssize_t pos = path.find_last_of('.');
+  size_t pos = path.find_last_of('.');
   if (pos == absl::string_view::npos)
     return std::make_pair(path, absl::ClippedSubstr(path, path.size(), 0));
   return std::make_pair(path.substr(0, pos),

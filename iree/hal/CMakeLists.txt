@@ -327,8 +327,6 @@ iree_cc_library(
     iree::base::bitfield
     iree::base::ref_ptr
     iree::base::status
-    iree::base::tracing
-    iree::base::wait_handle
     iree::hal::executable
     iree::hal::executable_format
     iree::hal::executable_spec

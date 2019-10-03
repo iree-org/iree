@@ -41,6 +41,6 @@ iree_cc_library(
     iree::schemas::bytecode::interpreter_bytecode_v0
     iree::schemas::bytecode::sequencer_bytecode_v0
     LLVMSupport
-    MLIR
+    MLIRIR
   PUBLIC
 )

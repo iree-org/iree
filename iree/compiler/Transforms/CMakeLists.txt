@@ -35,6 +35,8 @@ iree_cc_library(
     iree::compiler::Utils
     tensorflow::mlir_xla
     LLVMSupport
-    MLIR
+    MLIRIR
+    MLIRPass
+    MLIRTransformUtils
   PUBLIC
 )

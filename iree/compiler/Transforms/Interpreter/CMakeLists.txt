@@ -17,12 +17,14 @@ iree_cc_library(
     Interpreter
   HDRS
     "Passes.h"
+    "Rewrites.h"
   SRCS
     "ExpandReductionsToOps.cpp"
     "LegalizeInterpreterOps.cpp"
     "LoadStoreDataFlowOpt.cpp"
     "LowerInterpreterDialect.cpp"
     "LowerStdToInterpreterDialect.cpp"
+    "LowerToInterpreterDialect.cpp"
     "LowerXLAToInterpreterDialect.cpp"
     "MakeExecutableABI.cpp"
   DEPS
@@ -31,6 +33,8 @@ iree_cc_library(
     iree::compiler::Utils
     tensorflow::mlir_xla
     LLVMSupport
-    MLIR
+    MLIRIR
+    MLIRPass
+    MLIRTransformUtils
   PUBLIC
 )

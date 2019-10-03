@@ -14,8 +14,6 @@
 
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
-#include <dlfcn.h>
-
 #include <cstddef>
 
 #include "absl/base/attributes.h"
@@ -23,8 +21,15 @@
 #include "absl/memory/memory.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
+#include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
+
+#if defined(IREE_PLATFORM_WINDOWS)
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif  // IREE_PLATFORM_WINDOWS
 
 namespace iree {
 namespace hal {
@@ -45,8 +50,6 @@ struct FunctionPtrInfo {
   // member is located.
   uint32_t member_offset : 30;
 } ABSL_ATTRIBUTE_PACKED;
-static_assert(sizeof(FunctionPtrInfo) == sizeof(const char*) + sizeof(uint32_t),
-              "Alignment on FunctionPtrInfo struct is wrong");
 
 namespace {
 
@@ -118,7 +121,26 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
-  // TODO(benvanik): abstract out for other platforms.
+// NOTE: we could factor this out into base, but this is the only place we use
+// it right now so it's fine.
+#if defined(IREE_PLATFORM_WINDOWS)
+  HMODULE library = ::LoadLibraryA("vulkan-1.dll");
+  if (!library) {
+    return UnavailableErrorBuilder(IREE_LOC)
+           << "Unable to open vulkan-1.dll; driver not installed/on PATH";
+  }
+  ASSIGN_OR_RETURN(auto syms, Create([library](const char* function_name) {
+                     return reinterpret_cast<PFN_vkVoidFunction>(
+                         ::GetProcAddress(library, function_name));
+                   }));
+  syms->close_fn_ = [library]() {
+    // TODO(benvanik): disable if we want to get profiling results. Sometimes
+    // closing the library can prevent proper symbolization on crashes or
+    // in sampling profilers.
+    ::FreeLibrary(library);
+  };
+  return syms;
+#else
   void* library = ::dlopen("libvulkan.so.1", RTLD_LAZY | RTLD_LOCAL);
   if (!library) {
     return UnavailableErrorBuilder(IREE_LOC)
@@ -136,6 +158,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
     ::dlclose(library);
   };
   return syms;
+#endif  // IREE_PLATFORM_WINDOWS
 }
 
 Status DynamicSymbols::LoadFromInstance(VkInstance instance) {

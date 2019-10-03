@@ -689,7 +689,7 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::sort(
     tail_ = nullptr;
     // Repeatedly merge sublists.
     int merge_count = 0;
-    while (p) {
+    do {
       ++merge_count;
       q = p;
       // Determine the size of the first part and find the second.
@@ -736,7 +736,7 @@ void IntrusiveListBase<T, IteratorT, ReverseIteratorT, kOffset>::sort(
         tail = e;
       }
       p = q;
-    }
+    } while (p);
     tail->next = nullptr;
     if (merge_count <= 1) {
       // List is now sorted; stash and return.

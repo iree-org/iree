@@ -218,7 +218,7 @@ LogicalResult BytecodeWriter::WriteLocal(Value *value) {
   if (!ordinal.hasValue()) {
     return failure();
   }
-  if (ordinal > UINT16_MAX) {
+  if (ordinal.getValue() > UINT16_MAX) {
     // TODO(benvanik): varints?
     return emitError(UnknownLoc::get(value->getContext()))
            << "Too many locals: " << ordinal.getValue()

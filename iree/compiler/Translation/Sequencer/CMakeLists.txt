@@ -31,6 +31,9 @@ iree_cc_library(
     iree::schemas
     tensorflow::mlir_xla
     LLVMSupport
-    MLIR
+    MLIRIR
+    MLIRTransforms
+    MLIRTranslation
+  ALWAYSLINK
   PUBLIC
 )

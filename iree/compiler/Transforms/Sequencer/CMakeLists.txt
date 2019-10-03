@@ -17,13 +17,13 @@ iree_cc_library(
     Sequencer
   HDRS
     "Passes.h"
+    "Rewrites.h"
   SRCS
     "AssignExecutableOrdinals.cpp"
     "AssignExecutableWorkloadAttrs.cpp"
     "FoldCompatibleDispatchRegions.cpp"
     "IdentifyDispatchRegions.cpp"
     "IdentifyReductionRegions.cpp"
-    "LoadStoreDataFlowOpt.cpp"
     "LowerSequencerDialect.cpp"
     "LowerStdToSequencerDialect.cpp"
     "LowerToSequencerDialect.cpp"
@@ -37,6 +37,8 @@ iree_cc_library(
     iree::compiler::Utils
     tensorflow::mlir_xla
     LLVMSupport
-    MLIR
+    MLIRIR
+    MLIRPass
+    MLIRTransformUtils
   PUBLIC
 )

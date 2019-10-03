@@ -15,6 +15,9 @@
 #ifndef IREE_BASE_TIME_H_
 #define IREE_BASE_TIME_H_
 
+#include <chrono>  // NOLINT
+#include <thread>  // NOLINT
+
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
 
@@ -30,6 +33,13 @@ inline absl::Time RelativeTimeoutToDeadline(absl::Duration timeout) {
     return absl::InfiniteFuture();
   }
   return absl::Now() + timeout;
+}
+
+// Suspends execution of the calling thread for the given |duration|.
+// Depending on platform this may have an extremely coarse resolution (upwards
+// of several to dozens of milliseconds).
+inline void Sleep(absl::Duration duration) {
+  std::this_thread::sleep_for(absl::ToChronoMilliseconds(duration));
 }
 
 }  // namespace iree

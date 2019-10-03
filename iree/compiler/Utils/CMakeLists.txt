@@ -36,6 +36,6 @@ iree_cc_library(
     iree::schemas::executable_def_cc_fbs
     tensorflow::mlir_xla
     LLVMSupport
-    MLIR
+    MLIRIR
   PUBLIC
 )

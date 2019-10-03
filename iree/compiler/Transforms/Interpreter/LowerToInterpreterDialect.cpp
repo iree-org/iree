@@ -33,8 +33,8 @@ class LowerToInterpreterDialectPass
     OwningRewritePatternList patterns;
     auto* ctx = &getContext();
     xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns, ctx);
-    populateLowerStdToInterpreterPatterns(patterns, ctx);
     xla_hlo::PopulateXlaToStdPatterns(&patterns, ctx);
+    populateLowerStdToInterpreterPatterns(patterns, ctx);
     populateLowerXlaToInterpreterPatterns(patterns, ctx);
 
     ConversionTarget target(getContext());

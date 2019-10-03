@@ -38,7 +38,8 @@ iree_cc_library(
     iree::compiler::Serialization
     iree::compiler::Utils
     LLVMSupport
-    MLIR
+    MLIRIR
+  ALWAYSLINK
   PUBLIC
 )
 

@@ -30,8 +30,6 @@ iree_select_compiler_opts(RUY_COPTS_BASE
     "-Wno-shadow"
     "-Wno-missing-noreturn"
     "-Wno-unused-local-typedef"
-  MSVC_OR_CLANG_CL
-    "/O3"
 )
 set(RUY_COPTS_AVX2)
 set(RUY_COPTS_SKYLAKE)

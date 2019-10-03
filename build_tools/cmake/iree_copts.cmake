@@ -42,6 +42,8 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-gnu-zero-variadic-macro-arguments"
   MSVC_OR_CLANG_CL
     "/DWIN32_LEAN_AND_MEAN"
+    # TODO(benvanik): figure out if really required or accidentally enabled.
+    "/EHsc"
 )
 set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
@@ -130,11 +132,13 @@ set(MLIR_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir/include)
 set(MLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir)
 set(MLIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR)
 
-function(mlir_tablegen1 ofn)
-  tablegen(MLIR ${ARGV} "-I${MLIR_SOURCE_DIR}" "-I${MLIR_INCLUDE_DIR}")
-  set(TABLEGEN_OUTPUT ${TABLEGEN_OUTPUT} ${CMAKE_CURRENT_BINARY_DIR}/${ofn}
-      PARENT_SCOPE)
-endfunction()
+#-------------------------------------------------------------------------------
+# Third party: tensorflow
+#-------------------------------------------------------------------------------
+
+list(APPEND IREE_COMMON_INCLUDE_DIRS
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
+)
 
 #-------------------------------------------------------------------------------
 # Third party: vulkan

@@ -36,6 +36,7 @@ iree_cc_test(
     gtest_main
     iree::base::status
     iree::base::status_matchers
+    iree::base::time
     iree::hal::command_queue
     iree::hal::host::async_command_queue
     iree::hal::host::host_submission_queue

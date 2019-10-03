@@ -14,8 +14,6 @@
 
 #include "iree/hal/host/async_command_queue.h"
 
-#include <unistd.h>
-
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -26,6 +24,7 @@
 #include "absl/time/time.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
+#include "iree/base/time.h"
 #include "iree/hal/command_queue.h"
 #include "iree/hal/host/host_submission_queue.h"
 #include "iree/hal/testing/mock_command_buffer.h"
@@ -113,7 +112,7 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
   EXPECT_CALL(*mock_target_queue, Submit(_, _))
       .WillOnce(
           [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            usleep(100000);  // 100ms
+            Sleep(absl::Milliseconds(100));
             return OkStatus();
           });
   HostFence fence(0u);
@@ -135,7 +134,7 @@ TEST_F(AsyncCommandQueueTest, WaitIdleAndProgress) {
   EXPECT_CALL(*mock_target_queue, Submit(_, _))
       .WillRepeatedly(
           [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            usleep(100000);  // 100ms
+            Sleep(absl::Milliseconds(100));
             return OkStatus();
           });
 
@@ -169,7 +168,7 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   EXPECT_CALL(*mock_target_queue, Submit(_, _))
       .WillOnce(
           [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            usleep(100000);  // 100ms
+            Sleep(absl::Milliseconds(100));
             return DataLossErrorBuilder(IREE_LOC);
           });
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
@@ -201,7 +200,7 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
   EXPECT_CALL(*mock_target_queue, Submit(_, _))
       .WillOnce(
           [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            usleep(100000);  // 100ms
+            Sleep(absl::Milliseconds(100));
             return DataLossErrorBuilder(IREE_LOC);
           });
 

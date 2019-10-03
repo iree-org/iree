@@ -26,11 +26,14 @@ iree_cc_library(
     iree::compiler::IR::Interpreter
     iree::compiler::Serialization
     iree::compiler::Transforms
-    iree::compiler::Transforms::Sequencer
+    iree::compiler::Transforms::Interpreter
     iree::compiler::Utils
     iree::schemas
     tensorflow::mlir_xla
     LLVMSupport
-    MLIR
+    MLIRIR
+    MLIRTransforms
+    MLIRTranslation
+  ALWAYSLINK
   PUBLIC
 )

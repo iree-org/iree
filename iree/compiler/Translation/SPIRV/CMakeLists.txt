@@ -48,6 +48,11 @@ iree_cc_library(
     iree::schemas::spirv_executable_def_cc_fbs
     tensorflow::mlir_xla
     LLVMSupport
-    MLIR
+    MLIRIR
+    MLIRSPIRV
+    MLIRSPIRVSerialization
+    MLIRTransforms
+    MLIRTranslation
+  ALWAYSLINK
   PUBLIC
 )

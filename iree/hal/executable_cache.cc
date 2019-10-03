@@ -14,43 +14,12 @@
 
 #include "iree/hal/executable_cache.h"
 
-#include "iree/base/source_location.h"
-#include "iree/base/status.h"
-#include "iree/base/tracing.h"
-
 namespace iree {
 namespace hal {
 
 ExecutableCache::ExecutableCache() = default;
 
 ExecutableCache::~ExecutableCache() = default;
-
-StatusOr<WaitHandle> ExecutableCache::PrepareExecutables(
-    ExecutableCachingModeBitfield mode, absl::Span<const ExecutableSpec> specs,
-    absl::Span<ref_ptr<Executable>> out_executables) {
-  IREE_TRACE_SCOPE0("ExecutableCache::PrepareExecutables");
-  if (specs.size() != out_executables.size()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "1:1 specs:out_executables required";
-  }
-
-  ManualResetEvent fence("ExecutableCachePreparation");
-  auto wait_handle = fence.OnSet();
-
-  // TODO(benvanik): make async (spin up thread, etc).
-  for (int i = 0; i < specs.size(); ++i) {
-    auto executable_or = PrepareExecutable(mode, specs[i]);
-    if (!executable_or.ok()) {
-      // TODO(benvanik): propagate executable error.
-      RETURN_IF_ERROR(fence.Set());
-      return wait_handle;
-    }
-    out_executables[i] = add_ref(std::move(executable_or).ValueOrDie());
-  }
-
-  RETURN_IF_ERROR(fence.Set());
-  return wait_handle;
-}
 
 }  // namespace hal
 }  // namespace iree

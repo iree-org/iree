@@ -45,8 +45,9 @@ iree_cc_library(
     iree::compiler::IR::StructureOpsGen
     iree::schemas::executable_def_cc_fbs
     LLVMSupport
-    MLIR
+    MLIRIR
     MLIRStandardOps
+  ALWAYSLINK
   PUBLIC
 )
 

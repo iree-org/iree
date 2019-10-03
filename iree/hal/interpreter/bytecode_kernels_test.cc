@@ -30,7 +30,7 @@ constexpr float kEpsilon = 0.0001f;
 template <typename T>
 std::vector<T> MakeIota(int size) {
   std::vector<T> v(size);
-  std::iota(v.begin(), v.end(), 1);
+  std::iota(v.begin(), v.end(), static_cast<T>(1));
   return v;
 }
 

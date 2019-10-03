@@ -55,7 +55,8 @@ function(iree_cc_test)
     return()
   endif()
 
-  cmake_parse_arguments(IREE_CC_TEST
+  cmake_parse_arguments(
+    _RULE
     ""
     "NAME"
     "SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
@@ -64,12 +65,12 @@ function(iree_cc_test)
 
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
-  set(_NAME "${_PACKAGE_NAME}_${IREE_CC_TEST_NAME}")
+  set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   add_executable(${_NAME} "")
   target_sources(${_NAME}
     PRIVATE
-      ${IREE_CC_TEST_SRCS}
+      ${_RULE_SRCS}
   )
   target_include_directories(${_NAME}
     PUBLIC
@@ -79,18 +80,18 @@ function(iree_cc_test)
   )
   target_compile_definitions(${_NAME}
     PUBLIC
-      ${IREE_CC_TEST_DEFINES}
+      ${_RULE_DEFINES}
   )
   target_compile_options(${_NAME}
     PRIVATE
-      ${IREE_CC_TEST_COPTS}
+      ${_RULE_COPTS}
   )
   target_link_libraries(${_NAME}
     PUBLIC
-      ${IREE_CC_TEST_DEPS}
+      ${_RULE_DEPS}
       gmock
     PRIVATE
-      ${IREE_CC_TEST_LINKOPTS}
+      ${_RULE_LINKOPTS}
   )
   # Add all IREE targets to a a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)

@@ -27,10 +27,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace optimize_patterns {
-#include "iree/compiler/Transforms/Interpreter/LegalizeInterpreterOps.inc"
-}  // namespace optimize_patterns
-
 void tryElideClone(IREEInterp::HL::CloneOp *cloneOp,
                    std::vector<Operation *> *deadOperations) {
   cloneOp->replaceAllUsesWith(cloneOp->src());
@@ -56,10 +52,7 @@ class LegalizeInterpreterOpsPass
  public:
   void runOnFunction() override {
     OwningRewritePatternList patterns;
-    auto *context = getFunction().getContext();
-    optimize_patterns::populateWithGenerated(context, &patterns);
     applyPatternsGreedily(getFunction(), patterns);
-
     removeIdentityClones(getFunction());
   }
 };

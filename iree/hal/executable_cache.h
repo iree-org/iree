@@ -18,7 +18,6 @@
 #include "iree/base/bitfield.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
-#include "iree/base/wait_handle.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_format.h"
 #include "iree/hal/executable_spec.h"
@@ -116,24 +115,6 @@ class ExecutableCache {
   // PrepareExecutables method to batch and wait on the results.
   virtual StatusOr<ref_ptr<Executable>> PrepareExecutable(
       ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) = 0;
-
-  // Prepares one or more executables asynchronously on a worker thread (maybe).
-  // When the WaitHandle is signaled successfully |out_executables| will contain
-  // one Executable for each ExecutableSpec provided in |specs|, in order.
-  // The backing memory of |out_executables| must remain valid until the
-  // WaitHandle resolves. Preparation errors will be returned on the WaitHandle.
-  // If more than one preparation errors occurs only one will be returned (from
-  // an undefined order).
-  //
-  // Note: not all implementations will actually perform preparation
-  // asynchronously. This method just allows drivers to do so as possible.
-  //
-  // If applications already have their own preparation threads it is better to
-  // use PrepareExecutable in a loop to avoid the creation of new threads.
-  virtual StatusOr<WaitHandle> PrepareExecutables(
-      ExecutableCachingModeBitfield mode,
-      absl::Span<const ExecutableSpec> specs,
-      absl::Span<ref_ptr<Executable>> out_executables);
 
  protected:
   ExecutableCache();
