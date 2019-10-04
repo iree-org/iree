@@ -48,7 +48,7 @@ struct LoadStoreToCopy : public OpRewritePattern<StoreOp> {
     }
     if (loadOp.getMemRefType().getRank() != 0 ||
         storeOp.getMemRefType().getRank() != 0) {
-      // TODO(b/141705188) Support non-scalar folding
+      // TODO(b/138851470) Support non-scalar folding
       return matchFailure();
     }
 
