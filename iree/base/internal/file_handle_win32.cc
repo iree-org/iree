@@ -16,7 +16,6 @@
 
 #include "absl/memory/memory.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/tracing.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 
@@ -27,8 +26,6 @@ namespace iree {
 // static
 StatusOr<std::unique_ptr<FileHandle>> FileHandle::OpenRead(std::string path,
                                                            DWORD file_flags) {
-  IREE_TRACE_SCOPE0("FileHandle::OpenRead");
-
   HANDLE handle = ::CreateFileA(
       /*lpFileName=*/path.c_str(), /*dwDesiredAccess=*/GENERIC_READ,
       /*dwShareMode=*/FILE_SHARE_READ, /*lpSecurityAttributes=*/nullptr,
@@ -51,10 +48,7 @@ StatusOr<std::unique_ptr<FileHandle>> FileHandle::OpenRead(std::string path,
   return absl::make_unique<FileHandle>(handle, file_size);
 }
 
-FileHandle::~FileHandle() {
-  IREE_TRACE_SCOPE0("FileHandle::~dtor");
-  ::CloseHandle(handle_);
-}
+FileHandle::~FileHandle() { ::CloseHandle(handle_); }
 
 }  // namespace iree
 
