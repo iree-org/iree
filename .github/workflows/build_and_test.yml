@@ -1,0 +1,118 @@
+name: Build and Test CI
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  # Run clang-format and verify there are no errors. We don't want to bother
+  # building until we've at least got clean code.
+  lint:
+    name: Lint 
+    runs-on: ubuntu-latest
+    steps:
+    # Prepare dependencies.
+    - name: Installing dependencies (ubuntu-latest)
+      run: |
+        apt-get update -qq
+        apt-get install -y clang-format-9
+
+    # Checkout latest version and all submodules.
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+        fetch-depth: 1
+
+    - name: Running clang-format on changed source files
+      # TODO(benvanik): actually filter to changed files.
+      run: |
+        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-tidy -i {} +
+        git diff --exit-code
+
+  tidy:
+    name: Clang Tidy
+    needs: [lint]
+    runs-on: ubuntu-latest
+    steps:
+    # Prepare dependencies.
+    - name: Installing dependencies (ubuntu-latest)
+      run: |
+        apt-get update -qq
+        apt-get install -y clang-tidy-9
+          
+    # Checkout latest version and all submodules.
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+        fetch-depth: 1
+    
+    # Configure and run clang-tidy.
+    - name: Configuring CMake and exporting compile commands
+      run: |
+        cmake -B build/ -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - name: Running clang-tidy on changed source files
+      # TODO(benvanik): actually filter to changed files.
+      run: |
+        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-tidy -p "$PWD" {} +
+
+  build:
+    name: Build on ${{ matrix.host_os }} with ${{ matrix.compiler }} for ${{ matrix.target_os }}
+    needs: [lint]
+    runs-on: ${{ matrix.host_os }}
+    strategy:
+      matrix:
+        host_os: [ubuntu-latest, windows-latest, macos-latest]
+        target_os: [host]
+        compiler: [clang]
+        build_system: [cmake]
+        include:
+          - host_os: ubuntu-latest
+            compiler: gcc
+          - host_os: ubuntu-latest
+            compiler: emscripten
+          - host_os: windows-latest
+            compiler: msvc
+    
+    steps:
+    # Prepare dependencies for each platform.
+    - uses: seanmiddleditch/gha-setup-ninja@master
+    - uses: mymindstorm/setup-emsdk@v1
+      if: matrix.target_os == "emscripten"
+    - name: Installing dependencies (${{ matrix.host_os }})
+      if: matrix.host_os == "ubuntu-latest"
+      run: |
+        echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+        sudo apt-get install curl
+        curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
+        apt-get update -qq
+        apt-get install -y install bazel llvm-9 ninja-build
+    - name: Installing dependencies (${{ matrix.host_os }})
+      uses: artemnovichkov/action-homebrew@master
+      if: matrix.host_os == "macos-latest"
+      with:
+        args: bazel llvm ninja
+    - name: Installing dependencies (${{ matrix.host_os }})
+      uses: crazy-max/ghaction-chocolatey@master
+      if: matrix.host_os == "windows-latest"
+      with:
+        args: bazel llvm ninja
+          
+    # Checkout latest version and all submodules.
+    - uses: actions/checkout@v1
+      with:
+        submodules: true
+        fetch-depth: 1
+
+    - name: Building and testing with CMake
+      if: matrix.build_system == "cmake"
+      # TODO(benvanik): configure ctest
+      run: |
+        cmake -B build/
+
+    - name: Building and testing with Bazel
+      if: matrix.build_system == "bazel"
+      run: |
+        bazel build //iree/...
+        bazel test //iree/...
+        
+    # TODO(benvanik): coverage: build with -copt --coverage and `bash <(curl -s https://codecov.io/bash)`
