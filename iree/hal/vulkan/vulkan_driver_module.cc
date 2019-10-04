@@ -48,7 +48,7 @@ StatusOr<std::shared_ptr<Driver>> CreateVulkanDriver() {
   // set their options however they want.
   VulkanDriver::Options options;
 
-  // HACK: validation layers have bugs when using VK_EXT_debug_report, so if the
+  // TODO: validation layers have bugs when using VK_EXT_debug_report, so if the
   // user requested that we force them off with a warning. Prefer using
   // VK_EXT_debug_utils when available.
   if (absl::GetFlag(FLAGS_vulkan_debug_report) &&

@@ -322,8 +322,8 @@ struct GatherOpLowering : public ConversionPattern {
   explicit GatherOpLowering(MLIRContext *context)
       : ConversionPattern(xla_hlo::GatherOp::getOperationName(), 1, context) {}
 
-  // TODO(gcmn): This is a pile of hacks. When XLA redefines gather to be
-  // simpler, lower it properly.
+  // TODO(gcmn): This only handles a minimal number of cases. When XLA
+  // redefines gather to be simpler, lower it properly.
   PatternMatchResult matchAndRewrite(
       Operation *op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {

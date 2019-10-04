@@ -729,7 +729,7 @@ Status DebugApp::DrawBreakpointListPanel() {
 
   ImGui::SameLine();
   if (ImGui::Button("Remove All")) {
-    // FIXME(benvanik): removal all is broken - need removebreakpoints or a
+    // TODO(benvanik): removal all is broken - need removebreakpoints or a
     // 'want_removal' flag so that RefreshActiveBreakpoints handles things.
     // Right now if you have 2 breakpoints and hit remove all the second will
     // come back during the next refresh (as the server hasn't removed it yet).
