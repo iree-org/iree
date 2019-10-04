@@ -196,6 +196,16 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    math
+  HDRS
+    "math.h"
+  DEPS
+    absl::core_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     memory
   HDRS
     "memory.h"
