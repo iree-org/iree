@@ -26,7 +26,7 @@ jobs:
     - name: Running clang-format on changed source files
       # TODO(benvanik): actually filter to changed files.
       run: |
-        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-format -i {} +
+        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-format-9 -i {} +
         git diff --exit-code
 
   tidy:
@@ -53,7 +53,7 @@ jobs:
     - name: Running clang-tidy on changed source files
       # TODO(benvanik): actually filter to changed files.
       run: |
-        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-tidy -p "$PWD" {} +
+        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-tidy-9 -p "$PWD" {} +
 
   build:
     name: Build on ${{ matrix.host_os }} with ${{ matrix.compiler }} for ${{ matrix.target_os }}
