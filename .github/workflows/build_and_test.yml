@@ -97,9 +97,9 @@ jobs:
     steps:
     - uses: seanmiddleditch/gha-setup-ninja@master
     - uses: mymindstorm/setup-emsdk@v1
-      if: matrix.target_os == "emscripten"
+      if: matrix.target_os == 'emscripten'
     - name: Installing dependencies (${{ matrix.host_os }})
-      if: matrix.host_os == "ubuntu-latest"
+      if: matrix.host_os == 'ubuntu-latest'
       run: |
         echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
         sudo apt-get install curl
@@ -108,12 +108,12 @@ jobs:
         apt-get install -y install bazel llvm-9 ninja-build
     - name: Installing dependencies (${{ matrix.host_os }})
       uses: artemnovichkov/action-homebrew@master
-      if: matrix.host_os == "macos-latest"
+      if: matrix.host_os == 'macos-latest'
       with:
         args: bazel llvm ninja
     - name: Installing dependencies (${{ matrix.host_os }})
       uses: crazy-max/ghaction-chocolatey@master
-      if: matrix.host_os == "windows-latest"
+      if: matrix.host_os == 'windows-latest'
       with:
         args: bazel llvm ninja
 
@@ -125,22 +125,22 @@ jobs:
     
     # TODO(benvanik): setup CC env var for MSVC (use vswhere to find cl.exe?)
     - name: Configuring compilation environment to use ${{ matrix.compiler }}
-      if: matrix.compiler == "msvc"
+      if: matrix.compiler == 'msvc'
       run: |
         export CC=cl.exe
     - name: Configuring compilation environment to use ${{ matrix.compiler }}
-      if: matrix.compiler != "msvc"
+      if: matrix.compiler != 'msvc'
       run: |
         export CC=${{ matrix.compiler }}
 
     - name: Building and testing with CMake
-      if: matrix.build_system == "cmake"
+      if: matrix.build_system == 'cmake'
       # TODO(benvanik): configure ctest
       run: |
         cmake -B build/
 
     - name: Building and testing with Bazel
-      if: matrix.build_system == "bazel"
+      if: matrix.build_system == 'bazel'
       run: |
         bazel build //iree/...
         bazel test //iree/...
