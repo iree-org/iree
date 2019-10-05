@@ -11,14 +11,13 @@ jobs:
     name: Lint 
     runs-on: ubuntu-latest
     steps:
-    # Prepare dependencies.
     - name: Installing dependencies (ubuntu-latest)
       run: |
         apt-get update -qq
         apt-get install -y clang-format-9
 
-    # Checkout latest version and all submodules.
-    - uses: actions/checkout@v1
+    - name: Checking out latest version and all submodules
+      uses: actions/checkout@v1
       with:
         submodules: true
         fetch-depth: 1
@@ -34,14 +33,13 @@ jobs:
     needs: [lint]
     runs-on: ubuntu-latest
     steps:
-    # Prepare dependencies.
     - name: Installing dependencies (ubuntu-latest)
       run: |
         apt-get update -qq
         apt-get install -y clang-tidy-9
           
-    # Checkout latest version and all submodules.
-    - uses: actions/checkout@v1
+    - name: Checking out latest version and all submodules
+      uses: actions/checkout@v1
       with:
         submodules: true
         fetch-depth: 1
@@ -62,19 +60,41 @@ jobs:
     strategy:
       matrix:
         host_os: [ubuntu-latest, windows-latest, macos-latest]
-        target_os: [host]
-        compiler: [clang]
-        build_system: [cmake]
         include:
           - host_os: ubuntu-latest
+            target_os: host
+            build_system: bazel
+            compiler: clang
+          - host_os: ubuntu-latest
+            target_os: host
+            build_system: cmake
+            compiler: clang
+          - host_os: ubuntu-latest
+            target_os: host
+            build_system: cmake
             compiler: gcc
           - host_os: ubuntu-latest
+            target_os: emscripten
+            build_system: cmake
             compiler: emscripten
+          - host_os: macos-latest
+            target_os: host
+            build_system: bazel
+            compiler: clang
+          - host_os: macos-latest
+            target_os: host
+            build_system: cmake
+            compiler: clang
           - host_os: windows-latest
+            target_os: host
+            build_system: bazel
+            compiler: msvc
+          - host_os: windows-latest
+            target_os: host
+            build_system: cmake
             compiler: msvc
     
     steps:
-    # Prepare dependencies for each platform.
     - uses: seanmiddleditch/gha-setup-ninja@master
     - uses: mymindstorm/setup-emsdk@v1
       if: matrix.target_os == "emscripten"
@@ -96,12 +116,22 @@ jobs:
       if: matrix.host_os == "windows-latest"
       with:
         args: bazel llvm ninja
-          
-    # Checkout latest version and all submodules.
-    - uses: actions/checkout@v1
+
+    - name: Checking out latest version and all submodules
+      uses: actions/checkout@v1
       with:
         submodules: true
         fetch-depth: 1
+    
+    # TODO(benvanik): setup CC env var for MSVC (use vswhere to find cl.exe?)
+    - name: Configuring compilation environment to use ${{ matrix.compiler }}
+      if: matrix.compiler == "msvc"
+      run: |
+        export CC=cl.exe
+    - name: Configuring compilation environment to use ${{ matrix.compiler }}
+      if: matrix.compiler != "msvc"
+      run: |
+        export CC=${{ matrix.compiler }}
 
     - name: Building and testing with CMake
       if: matrix.build_system == "cmake"
