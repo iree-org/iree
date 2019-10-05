@@ -13,6 +13,7 @@ jobs:
     steps:
     - name: Installing dependencies (ubuntu-latest)
       run: |
+        sudo add-apt-repository universe
         sudo apt-get update -qq
         sudo apt-get install -y clang-format-9
 
@@ -35,6 +36,7 @@ jobs:
     steps:
     - name: Installing dependencies (ubuntu-latest)
       run: |
+        sudo add-apt-repository universe
         sudo apt-get update -qq
         sudo apt-get install -y clang-tidy-9
           
@@ -101,6 +103,7 @@ jobs:
     - name: Installing dependencies (${{ matrix.host_os }})
       if: matrix.host_os == 'ubuntu-latest'
       run: |
+        sudo add-apt-repository universe
         echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
         sudo apt-get install curl
         curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
