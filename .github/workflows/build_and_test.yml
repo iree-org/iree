@@ -16,6 +16,9 @@ jobs:
         sudo add-apt-repository -y "deb http://mirror.enzu.com/ubuntu/ eoan main universe"
         sudo apt-get update -qq
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends clang-format-9
+        curl https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format
+        chmod +x git-clang-format
+        git config clangFormat.binary "clang-format-9"
 
     - name: Checking out latest version and all submodules
       uses: actions/checkout@v1
@@ -26,8 +29,7 @@ jobs:
     - name: Running clang-format on changed source files
       # TODO(benvanik): actually filter to changed files.
       run: |
-        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-format-9 -i {} +
-        git diff --exit-code
+        git clang-format origin/master
 
   tidy:
     name: Clang Tidy
