@@ -68,14 +68,15 @@ def IREE_Executable : Type<IREE_IsExecutableType, "an IREE executable">;
 
 def IREEHL_Bool :
     AnyTypeOf<[I1, I8], "boolean-storing type (1 or 8 -bit integer)">;
+def IREEHL_Element : AnyTypeOf<[AnyInteger, AnyFloat]>;
 
-def IREEHL_MemRef : MemRefOf<[AnyType]>;
+def IREEHL_MemRef : MemRefOf<[IREEHL_Element]>;
 def IREEHL_BoolMemRef : MemRefOf<[IREEHL_Bool]>;
 def IREEHL_IntMemRef : MemRefOf<[AnyInteger]>;
 def IREEHL_FloatMemRef : MemRefOf<[AnyFloat]>;
 def IREEHL_IndexMemRef : MemRefOf<[AnyInteger]>;
 
-def IREEHL_AnyScalar : IREE_ScalarMemRefOf<[AnyType]>;
+def IREEHL_AnyScalar : IREE_ScalarMemRefOf<[IREEHL_Element]>;
 def IREEHL_BoolScalar : IREE_ScalarMemRefOf<[IREEHL_Bool]>;
 def IREEHL_IntScalar : IREE_ScalarMemRefOf<[AnyInteger]>;
 def IREEHL_FloatScalar : IREE_ScalarMemRefOf<[AnyFloat]>;
@@ -94,8 +95,7 @@ def IREELL_Bool : TypeAlias<I8, "boolean-storing type (8-bit integer)">;
 def IREELL_Int: AnyTypeOf<[I8, I16, I32, I64], "8/16/32/64-bit integer">;
 def IREELL_Float: AnyTypeOf<[F32, F64], "32/64-bit float">;
 def IREELL_Index : AnyTypeOf<[I32, I64], "32/64-bit index integer">;
-def IREELL_Element : AnyTypeOf<[IREELL_Int, IREELL_Float],
-    !strconcat(IREELL_Int.description, " or ", IREELL_Float.description)>;
+def IREELL_Element : AnyTypeOf<[IREELL_Int, IREELL_Float]>;
 
 def IREELL_MemRef : MemRefOf<[IREELL_Element]>;
 def IREELL_IntMemRef : MemRefOf<[IREELL_Int]>;

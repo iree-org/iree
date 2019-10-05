@@ -42,7 +42,7 @@ def IREE_ConstantOp : IREE_PureOp<"constant"> {
 def IREE_TensorToMemRefOp : IREE_PureOp<"tensor_to_memref", [
   SameOperandsAndResultShape, SameOperandsAndResultElementType
 ]> {
-  let arguments = (ins AnyTensor:$src);
+  let arguments = (ins AnyTensor);
   let results = (outs IREEHL_MemRef);
   let hasFolder = 1;
 }
@@ -51,8 +51,24 @@ def IREE_TensorToMemRefOp : IREE_PureOp<"tensor_to_memref", [
 def IREE_MemRefToTensorOp : IREE_PureOp<"memref_to_tensor", [
   SameOperandsAndResultShape, SameOperandsAndResultElementType
 ]> {
-  let arguments = (ins IREEHL_MemRef:$src);
+  let arguments = (ins IREEHL_MemRef);
   let results = (outs AnyTensor);
+  let hasFolder = 1;
+}
+
+def IREE_ScalarToMemRefOp : IREE_PureOp<"scalar_to_memref", [
+  SameOperandsAndResultElementType
+]> {
+  let arguments = (ins IREEHL_Element);
+  let results = (outs IREEHL_AnyScalar);
+  let hasFolder = 1;
+}
+
+def IREE_MemRefToScalarOp : IREE_PureOp<"memref_to_scalar", [
+  SameOperandsAndResultElementType
+]> {
+  let arguments = (ins IREEHL_AnyScalar);
+  let results = (outs IREEHL_Element);
   let hasFolder = 1;
 }
 
