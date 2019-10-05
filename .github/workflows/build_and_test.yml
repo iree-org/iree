@@ -26,7 +26,7 @@ jobs:
     - name: Running clang-format on changed source files
       # TODO(benvanik): actually filter to changed files.
       run: |
-        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-tidy -i {} +
+        find "$PWD/iree" \( -name '*.[ch]' -o -name '*.cc' \) -exec clang-format -i {} +
         git diff --exit-code
 
   tidy:
