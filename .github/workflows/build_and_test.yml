@@ -21,7 +21,7 @@ jobs:
       uses: actions/checkout@v1
       with:
         submodules: true
-        fetch-depth: 1
+        fetch-depth: 100
 
     - name: Running clang-format on changed source files
       # TODO(benvanik): actually filter to changed files.
@@ -44,7 +44,7 @@ jobs:
       uses: actions/checkout@v1
       with:
         submodules: true
-        fetch-depth: 1
+        fetch-depth: 100
     
     # Configure and run clang-tidy.
     - name: Configuring CMake and exporting compile commands
@@ -124,7 +124,7 @@ jobs:
       uses: actions/checkout@v1
       with:
         submodules: true
-        fetch-depth: 1
+        fetch-depth: 100
     
     # TODO(benvanik): setup CC env var for MSVC (use vswhere to find cl.exe?)
     - name: Configuring compilation environment to use ${{ matrix.compiler }}
