@@ -18,6 +18,7 @@
 #include "iree/compiler/IR/Sequencer/HLOps.h"
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/OpCreationUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -194,6 +195,69 @@ class DeallocOpLowering : public SequencerConversionPattern {
   }
 };
 
+class LoadOpLowering : public SequencerConversionPattern {
+ public:
+  LoadOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
+      : SequencerConversionPattern(LoadOp::getOperationName(), 1, context,
+                                   typeConverter) {}
+  PatternMatchResult matchAndRewrite(
+      Operation *op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto loadOp = cast<LoadOp>(op);
+
+    if (loadOp.getMemRefType().getRank() != 0) {
+      loadOp.emitError() << "Cannot lower load of non-scalar";
+      return matchFailure();
+    }
+    ArrayRef<Value *> dimPieces;
+    auto dst =
+        rewriter
+            .create<AllocOp>(loadOp.getLoc(), loadOp.getMemRefType(), dimPieces)
+            .getResult();
+    auto emptyArrayMemref = createArrayConstant(rewriter, loadOp.getLoc(), {});
+    rewriter.create<IREESeq::HL::CopyOp>(loadOp.getLoc(), loadOp.getMemRef(),
+                                         /*srcIndices=*/emptyArrayMemref, dst,
+                                         /*dstIndices=*/emptyArrayMemref,
+                                         /*lengths=*/emptyArrayMemref);
+
+    // TODO(b/139012931) infer type on creation
+    rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(loadOp,
+                                                        loadOp.getType(), dst);
+
+    return matchSuccess();
+  }
+};
+
+class StoreOpLowering : public SequencerConversionPattern {
+ public:
+  StoreOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
+      : SequencerConversionPattern(StoreOp::getOperationName(), 1, context,
+                                   typeConverter) {}
+  PatternMatchResult matchAndRewrite(
+      Operation *op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto storeOp = cast<StoreOp>(op);
+
+    if (storeOp.getMemRefType().getRank() != 0) {
+      storeOp.emitError() << "Cannot lower store of non-scalar";
+      return matchFailure();
+    }
+
+    // TODO(b/139012931) infer type on creation
+    auto scalarMemRefType =
+        rewriter.getMemRefType({}, storeOp.getValueToStore()->getType());
+    auto src = rewriter.create<IREE::ScalarToMemRefOp>(
+        storeOp.getLoc(), scalarMemRefType, storeOp.getValueToStore());
+
+    auto emptyArrayMemref = createArrayConstant(rewriter, storeOp.getLoc(), {});
+    rewriter.replaceOpWithNewOp<IREESeq::HL::CopyOp>(
+        storeOp, src, /*srcIndices=*/emptyArrayMemref, storeOp.getMemRef(),
+        /*dstIndices=*/emptyArrayMemref, /*lengths=*/emptyArrayMemref);
+
+    return matchSuccess();
+  }
+};
+
 }  // namespace
 
 void populateLowerStdToSequencerPatterns(OwningRewritePatternList &patterns,
@@ -204,7 +268,8 @@ void populateLowerStdToSequencerPatterns(OwningRewritePatternList &patterns,
                   CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
                   BranchOpLowering, CondBranchOpLowering,
                   // Memory management.
-                  AllocOpLowering, DeallocOpLowering>(context, converter);
+                  AllocOpLowering, DeallocOpLowering, LoadOpLowering,
+                  StoreOpLowering>(context, converter);
 }
 
 }  // namespace iree_compiler

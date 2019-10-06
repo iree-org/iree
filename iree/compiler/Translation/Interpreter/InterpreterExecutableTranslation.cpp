@@ -89,7 +89,6 @@ void buildInterpreterConversionPassPipeline(PassManager *passManager) {
   // Convert various dialects to IREE opcodes and cleanup leftover conversions.
   passManager->addPass(createLowerToInterpreterDialectPass());
   passManager->addPass(createCanonicalizerPass());
-  passManager->addPass(createInterpreterLoadStoreDataFlowOptPass());
   passManager->addPass(createAggressiveOpEliminationPass());
 
   // Widen reduction functions (that have iree.executable.reduction attrs) to

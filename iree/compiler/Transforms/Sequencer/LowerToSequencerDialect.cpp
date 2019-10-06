@@ -40,8 +40,6 @@ class LowerToSequencerDialectPass
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLSequencerDialect, IREEDialect>();
-    // TODO(b/139012931) Get rid of load/store as part of this pass.
-    target.addLegalOp<LoadOp, StoreOp>();
     target.addDynamicallyLegalOp<FuncOp>(
         [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
     if (failed(applyFullConversion(getFunction(), target, patterns))) {

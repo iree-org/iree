@@ -19,6 +19,7 @@
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Transforms/ConversionUtils.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/OpCreationUtils.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Allocator.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -28,6 +29,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -216,6 +218,57 @@ struct ExtractElementOpLowering : public ConversionPattern {
   }
 };
 
+struct LoadOpLowering : public OpRewritePattern<LoadOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(LoadOp loadOp,
+                                     PatternRewriter &rewriter) const override {
+    if (loadOp.getMemRefType().getRank() != 0) {
+      loadOp.emitError() << "Cannot lower load of non-scalar";
+      return matchFailure();
+    }
+    ArrayRef<Value *> dimPieces;
+    auto dst =
+        rewriter
+            .create<AllocOp>(loadOp.getLoc(), loadOp.getMemRefType(), dimPieces)
+            .getResult();
+    auto emptyArrayMemref = createArrayConstant(rewriter, loadOp.getLoc(), {});
+    rewriter.create<IREEInterp::HL::CopyOp>(
+        loadOp.getLoc(), loadOp.getMemRef(),
+        /*srcIndices=*/emptyArrayMemref, dst,
+        /*dstIndices=*/emptyArrayMemref, /*lengths=*/emptyArrayMemref);
+
+    // TODO(b/139012931) infer type on creation
+    rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(loadOp,
+                                                        loadOp.getType(), dst);
+
+    return matchSuccess();
+  }
+};
+
+struct StoreOpLowering : public OpRewritePattern<StoreOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(StoreOp storeOp,
+                                     PatternRewriter &rewriter) const override {
+    if (storeOp.getMemRefType().getRank() != 0) {
+      storeOp.emitError() << "Cannot lower store of non-scalar";
+      return matchFailure();
+    }
+
+    // TODO(b/139012931) infer type on creation
+    auto scalarMemRefType =
+        rewriter.getMemRefType({}, storeOp.getValueToStore()->getType());
+    auto src = rewriter.create<IREE::ScalarToMemRefOp>(
+        storeOp.getLoc(), scalarMemRefType, storeOp.getValueToStore());
+
+    auto emptyArrayMemref = createArrayConstant(rewriter, storeOp.getLoc(), {});
+    rewriter.replaceOpWithNewOp<IREEInterp::HL::CopyOp>(
+        storeOp, src, /*srcIndices=*/emptyArrayMemref, storeOp.getMemRef(),
+        /*dstIndices=*/emptyArrayMemref, /*lengths=*/emptyArrayMemref);
+
+    return matchSuccess();
+  }
+};
+
 #define UNARY_OP_LOWERING(StdOpType, IREEOpType)                               \
   struct StdOpType##Lowering : public UnaryOpLowering<StdOpType, IREEOpType> { \
     using UnaryOpLowering::UnaryOpLowering;                                    \
@@ -289,6 +342,7 @@ void populateLowerStdToInterpreterPatterns(OwningRewritePatternList &patterns,
                   CmpFOpLowering,
                   // Memory management.
                   AllocOpLowering, DeallocOpLowering, ExtractElementOpLowering,
+                  LoadOpLowering, StoreOpLowering,
                   // Shape operations.
                   DimOpLowering,
                   // Logical ops.

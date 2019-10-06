@@ -39,8 +39,7 @@ class LowerToInterpreterDialectPass
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLInterpreterDialect, IREEDialect>();
-    // TODO(b/141771852) get rid of load/store as part of this pass.
-    target.addLegalOp<LoadOp, StoreOp, FuncOp, ReturnOp>();
+    target.addLegalOp<FuncOp, ReturnOp>();
     if (failed(applyFullConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }
