@@ -72,8 +72,7 @@ bool insertLoad(BlockArgument *oldArg, BlockArgument *newArg,
     mapping->map(oldArg, newArg);
     return false;
   } else if (oldArg->getType().isa<TensorType>()) {
-    auto castOp =
-        builder.create<IREE::MemRefToTensorOp>(loc, oldArg->getType(), newArg);
+    auto castOp = builder.create<IREE::MemRefToTensorOp>(loc, newArg);
     mapping->map(oldArg, castOp.getResult());
     return false;
   }
@@ -92,8 +91,8 @@ bool insertLoad(Operation *oldOp, Value *oldValue, Value *newValue,
     mapping->map(oldValue, newValue);
     return false;
   } else if (oldValue->getType().isa<TensorType>()) {
-    auto castOp = builder.create<IREE::MemRefToTensorOp>(
-        oldOp->getLoc(), oldValue->getType(), newValue);
+    auto castOp =
+        builder.create<IREE::MemRefToTensorOp>(oldOp->getLoc(), newValue);
     mapping->map(oldValue, castOp.getResult());
     return false;
   }
@@ -115,19 +114,14 @@ Value *insertStore(Operation *oldOp, Value *oldValue, OpBuilder &builder,
     return nullptr;
   }
 
-  auto memRefType = convertTypeToMemRef(oldValue->getType());
-  if (!memRefType) {
-    return nullptr;
-  }
-
   // If the previous value was already a memref we don't need to change
   // anything.
   // TODO(benvanik): ensure indices make sense.
   if (oldValue->getType().isa<MemRefType>()) {
     return newValue;
   } else if (oldValue->getType().isa<TensorType>()) {
-    auto castOp = builder.create<IREE::TensorToMemRefOp>(oldOp->getLoc(),
-                                                         memRefType, newValue);
+    auto castOp =
+        builder.create<IREE::TensorToMemRefOp>(oldOp->getLoc(), newValue);
     return castOp.getResult();
   }
 
@@ -137,7 +131,8 @@ Value *insertStore(Operation *oldOp, Value *oldValue, OpBuilder &builder,
   }
 
   // Allocate the memref to store the value.
-  auto newStorage = builder.create<AllocOp>(oldOp->getLoc(), memRefType);
+  auto newStorage = builder.create<AllocOp>(
+      oldOp->getLoc(), convertTypeToMemRef(oldValue->getType()));
 
   // Insert the store we'll use to box the value.
   builder.create<StoreOp>(oldOp->getLoc(), newValue, newStorage,

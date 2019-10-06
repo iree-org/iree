@@ -669,24 +669,19 @@ Value *insertDispatcherStore(Operation *op, Value *value, OpBuilder &builder) {
     return nullptr;
   }
 
-  auto memRefType = convertTypeToMemRef(value->getType());
-  if (!memRefType) {
-    return nullptr;
-  }
-
   // If the previous value was already a memref we don't need to change
   // anything.
   // TODO(benvanik): ensure indices make sense.
   if (value->getType().isa<MemRefType>()) {
     return value;
   } else if (value->getType().isa<TensorType>()) {
-    auto castOp =
-        builder.create<IREE::TensorToMemRefOp>(op->getLoc(), memRefType, value);
+    auto castOp = builder.create<IREE::TensorToMemRefOp>(op->getLoc(), value);
     return castOp.getResult();
   }
 
   // Allocate the memref to store the value.
-  auto newStorage = builder.create<AllocOp>(op->getLoc(), memRefType);
+  auto newStorage = builder.create<AllocOp>(
+      op->getLoc(), convertTypeToMemRef(value->getType()));
 
   // Insert the store we'll use to box the value.
   builder.create<StoreOp>(op->getLoc(), value, newStorage, ArrayRef<Value *>{});
@@ -700,8 +695,8 @@ Value *insertDispatcherLoad(Operation *op, Value *originalValue,
   if (originalValue->getType().isa<MemRefType>()) {
     return allocatedValue;
   } else if (originalValue->getType().isa<TensorType>()) {
-    auto castOp = builder.create<IREE::MemRefToTensorOp>(
-        op->getLoc(), originalValue->getType(), allocatedValue);
+    auto castOp =
+        builder.create<IREE::MemRefToTensorOp>(op->getLoc(), allocatedValue);
     originalValue->replaceAllUsesWith(castOp.getResult());
     return castOp.getResult();
   }

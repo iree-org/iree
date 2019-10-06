@@ -20,6 +20,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/STLExtras.h"
@@ -66,6 +67,8 @@ static void printConstantOp(OpAsmPrinter &p, ConstantOp &op) {
 
 namespace {
 
+// TODO(gcmn) this is duplicated from MemRefUtils to avoid a circular
+// dependency. Extract op-dependent parts of memref utils to allow reuse.
 MemRefType convertTypeToMemRef(Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
@@ -130,6 +133,10 @@ OpFoldResult TensorToMemRefOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
+void TensorToMemRefOp::build(Builder *builder, OperationState &state,
+                             Value *arg) {
+  build(builder, state, convertTypeToMemRef(arg->getType()), arg);
+}
 
 //===----------------------------------------------------------------------===//
 // iree.memref_to_tensor
@@ -167,6 +174,16 @@ OpFoldResult MemRefToTensorOp::fold(ArrayRef<Attribute> operands) {
   }
 
   return {};
+}
+
+void MemRefToTensorOp::build(Builder *builder, OperationState &state,
+                             Value *arg) {
+  // TODO(gcmn) Use getTensorType from MemRefUtils when circular dependency can
+  // be avoided.
+  auto memRefType = arg->getType().cast<MemRefType>();
+  auto tensorType = builder->getTensorType(memRefType.getShape(),
+                                           memRefType.getElementType());
+  build(builder, state, tensorType, arg);
 }
 
 //===----------------------------------------------------------------------===//
@@ -207,6 +224,11 @@ OpFoldResult ScalarToMemRefOp::fold(ArrayRef<Attribute> operands) {
   return {};
 }
 
+void ScalarToMemRefOp::build(Builder *builder, OperationState &state,
+                             Value *arg) {
+  build(builder, state, convertTypeToMemRef(arg->getType()), arg);
+}
+
 //===----------------------------------------------------------------------===//
 // iree.memref_to_scalar
 //===----------------------------------------------------------------------===//
@@ -243,6 +265,11 @@ OpFoldResult MemRefToScalarOp::fold(ArrayRef<Attribute> operands) {
   }
 
   return {};
+}
+
+void MemRefToScalarOp::build(Builder *builder, OperationState &state,
+                             Value *arg) {
+  build(builder, state, getElementTypeOrSelf(arg), arg);
 }
 
 //===----------------------------------------------------------------------===//

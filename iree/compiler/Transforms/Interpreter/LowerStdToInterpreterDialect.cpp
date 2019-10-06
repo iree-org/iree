@@ -237,9 +237,7 @@ struct LoadOpLowering : public OpRewritePattern<LoadOp> {
         /*srcIndices=*/emptyArrayMemref, dst,
         /*dstIndices=*/emptyArrayMemref, /*lengths=*/emptyArrayMemref);
 
-    // TODO(b/139012931) infer type on creation
-    rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(loadOp,
-                                                        loadOp.getType(), dst);
+    rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(loadOp, dst);
 
     return matchSuccess();
   }
@@ -254,11 +252,8 @@ struct StoreOpLowering : public OpRewritePattern<StoreOp> {
       return matchFailure();
     }
 
-    // TODO(b/139012931) infer type on creation
-    auto scalarMemRefType =
-        rewriter.getMemRefType({}, storeOp.getValueToStore()->getType());
     auto src = rewriter.create<IREE::ScalarToMemRefOp>(
-        storeOp.getLoc(), scalarMemRefType, storeOp.getValueToStore());
+        storeOp.getLoc(), storeOp.getValueToStore());
 
     auto emptyArrayMemref = createArrayConstant(rewriter, storeOp.getLoc(), {});
     rewriter.replaceOpWithNewOp<IREEInterp::HL::CopyOp>(

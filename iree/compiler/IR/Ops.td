@@ -30,9 +30,7 @@ def IREE_ConstantOp : IREE_PureOp<"constant"> {
     Attribute getValue() { return value(); }
   }];
 
-  let builders = [
-    OpBuilder<"Builder *builder, OperationState &state, Attribute value">,
-  ];
+  let builders = [OpBuilder<"Builder*, OperationState&, Attribute">];
 
   // TODO(b/134575149): enable folder when we store the correct type.
   // let hasFolder = 1;
@@ -44,6 +42,9 @@ def IREE_TensorToMemRefOp : IREE_PureOp<"tensor_to_memref", [
 ]> {
   let arguments = (ins AnyTensor);
   let results = (outs IREEHL_MemRef);
+
+  let builders = [OpBuilder<"Builder*, OperationState&, Value*">];
+
   let hasFolder = 1;
 }
 
@@ -53,6 +54,8 @@ def IREE_MemRefToTensorOp : IREE_PureOp<"memref_to_tensor", [
 ]> {
   let arguments = (ins IREEHL_MemRef);
   let results = (outs AnyTensor);
+  let builders = [OpBuilder<"Builder*, OperationState&, Value*">];
+
   let hasFolder = 1;
 }
 
@@ -61,6 +64,9 @@ def IREE_ScalarToMemRefOp : IREE_PureOp<"scalar_to_memref", [
 ]> {
   let arguments = (ins IREEHL_Element);
   let results = (outs IREEHL_AnyScalar);
+
+  let builders = [OpBuilder<"Builder*, OperationState&, Value*">];
+
   let hasFolder = 1;
 }
 
@@ -69,6 +75,9 @@ def IREE_MemRefToScalarOp : IREE_PureOp<"memref_to_scalar", [
 ]> {
   let arguments = (ins IREEHL_AnyScalar);
   let results = (outs IREEHL_Element);
+
+  let builders = [OpBuilder<"Builder*, OperationState&, Value*">];
+
   let hasFolder = 1;
 }
 

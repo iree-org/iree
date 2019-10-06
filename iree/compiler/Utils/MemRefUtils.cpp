@@ -123,8 +123,7 @@ Value *wrapAsTensor(Value *value, Operation *srcOp, OpBuilder &builder) {
     if (isa_and_nonnull<IREE::TensorToMemRefOp>(value->getDefiningOp())) {
       return value->getDefiningOp()->getOperand(0);
     }
-    auto newOp = builder.create<IREE::MemRefToTensorOp>(
-        srcOp->getLoc(), getTensorType(value, builder), value);
+    auto newOp = builder.create<IREE::MemRefToTensorOp>(srcOp->getLoc(), value);
     value = newOp.getResult();
   }
   return value;
@@ -135,8 +134,7 @@ Value *wrapAsMemRef(Value *value, Operation *srcOp, OpBuilder &builder) {
     if (isa_and_nonnull<IREE::MemRefToTensorOp>(value->getDefiningOp())) {
       return value->getDefiningOp()->getOperand(0);
     }
-    auto newOp = builder.create<IREE::TensorToMemRefOp>(
-        srcOp->getLoc(), getMemRefType(value, builder), value);
+    auto newOp = builder.create<IREE::TensorToMemRefOp>(srcOp->getLoc(), value);
     value = newOp.getResult();
   }
   return value;
