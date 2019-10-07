@@ -314,6 +314,8 @@ VulkanDevice::VulkanDevice(
       logical_device_(std::move(logical_device)),
       allocator_(std::move(allocator)),
       command_queues_(std::move(command_queues)),
+      descriptor_pool_cache_(
+          make_ref<DescriptorPoolCache>(add_ref(logical_device_))),
       dispatch_command_pool_(std::move(dispatch_command_pool)),
       transfer_command_pool_(std::move(transfer_command_pool)),
       legacy_fence_pool_(std::move(legacy_fence_pool)) {
@@ -342,6 +344,9 @@ VulkanDevice::~VulkanDevice() {
   // buffers.
   dispatch_command_pool_.reset();
   transfer_command_pool_.reset();
+
+  // Now that no commands are outstanding we can release all descriptor sets.
+  descriptor_pool_cache_.reset();
 
   // Finally, destroy the device.
   logical_device_.reset();
@@ -384,7 +389,8 @@ StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(
 
   // TODO(b/140026716): conditionally enable validation.
   auto impl = make_ref<DirectCommandBuffer>(
-      allocator(), mode, command_categories, command_pool, command_buffer);
+      allocator(), mode, command_categories, add_ref(descriptor_pool_cache_),
+      add_ref(command_pool), command_buffer);
   return WrapCommandBufferWithValidation(std::move(impl));
 }
 

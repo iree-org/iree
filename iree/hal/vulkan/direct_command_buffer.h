@@ -18,6 +18,8 @@
 #include <vulkan/vulkan.h>
 
 #include "iree/hal/command_buffer.h"
+#include "iree/hal/vulkan/descriptor_pool_cache.h"
+#include "iree/hal/vulkan/descriptor_set_arena.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/native_event.h"
@@ -35,7 +37,8 @@ class DirectCommandBuffer final : public CommandBuffer {
  public:
   DirectCommandBuffer(Allocator* allocator, CommandBufferModeBitfield mode,
                       CommandCategoryBitfield command_categories,
-                      const ref_ptr<VkCommandPoolHandle>& command_pool,
+                      ref_ptr<DescriptorPoolCache> descriptor_pool_cache,
+                      ref_ptr<VkCommandPoolHandle> command_pool,
                       VkCommandBuffer command_buffer);
   ~DirectCommandBuffer() override;
 
@@ -80,12 +83,17 @@ class DirectCommandBuffer final : public CommandBuffer {
   StatusOr<NativeEvent*> CastEvent(Event* event) const;
   StatusOr<VmaBuffer*> CastBuffer(Buffer* buffer) const;
 
-  Status UpdateAndBindDescriptorSet(PipelineExecutable* executable,
-                                    absl::Span<const BufferBinding> bindings);
-
   bool is_recording_ = false;
   ref_ptr<VkCommandPoolHandle> command_pool_;
   VkCommandBuffer command_buffer_;
+
+  // TODO(b/140026716): may grow large - should try to reclaim or reuse.
+  DescriptorSetArena descriptor_set_arena_;
+
+  // The current descriptor set group in use by the command buffer, if any.
+  // This must remain valid until all in-flight submissions of the command
+  // buffer complete.
+  DescriptorSetGroup descriptor_set_group_;
 };
 
 }  // namespace vulkan

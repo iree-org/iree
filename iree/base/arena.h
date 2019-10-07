@@ -22,6 +22,8 @@
 
 namespace iree {
 
+// TODO(b/140026716): add InlineArena/FixedArena to avoid malloc.
+
 // Arena allocator.
 // Allocates memory from a cached block list grown at specified intervals.
 // Individual allocations cannot be freed.

@@ -30,6 +30,45 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    descriptor_pool_cache
+  HDRS
+    "descriptor_pool_cache.h"
+  SRCS
+    "descriptor_pool_cache.cc"
+  DEPS
+    iree::base::ref_ptr
+    iree::base::status
+    iree::base::tracing
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::handle_util
+    iree::hal::vulkan::status_util
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    descriptor_set_arena
+  HDRS
+    "descriptor_set_arena.h"
+  SRCS
+    "descriptor_set_arena.cc"
+  DEPS
+    iree::base::arena
+    iree::base::math
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_buffer
+    iree::hal::vulkan::descriptor_pool_cache
+    iree::hal::vulkan::pipeline_executable
+    iree::hal::vulkan::status_util
+    iree::hal::vulkan::vma_allocator
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     direct_command_buffer
   HDRS
     "direct_command_buffer.h"
@@ -39,9 +78,12 @@ iree_cc_library(
     absl::core_headers
     absl::inlined_vector
     absl::synchronization
+    iree::base::math
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
+    iree::hal::vulkan::descriptor_pool_cache
+    iree::hal::vulkan::descriptor_set_arena
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::handle_util
     iree::hal::vulkan::native_event
@@ -285,6 +327,7 @@ iree_cc_library(
     iree::hal::command_queue
     iree::hal::device
     iree::hal::fence
+    iree::hal::vulkan::descriptor_pool_cache
     iree::hal::vulkan::direct_command_buffer
     iree::hal::vulkan::direct_command_queue
     iree::hal::vulkan::dynamic_symbols

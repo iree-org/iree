@@ -17,6 +17,7 @@
 #include "absl/base/attributes.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/synchronization/mutex.h"
+#include "iree/base/math.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
@@ -113,14 +114,16 @@ uint32_t SplatPattern(const void* pattern, size_t pattern_length) {
 DirectCommandBuffer::DirectCommandBuffer(
     Allocator* allocator, CommandBufferModeBitfield mode,
     CommandCategoryBitfield command_categories,
-    const ref_ptr<VkCommandPoolHandle>& command_pool,
-    VkCommandBuffer command_buffer)
+    ref_ptr<DescriptorPoolCache> descriptor_pool_cache,
+    ref_ptr<VkCommandPoolHandle> command_pool, VkCommandBuffer command_buffer)
     : CommandBuffer(allocator, mode, command_categories),
-      command_pool_(add_ref(command_pool)),
-      command_buffer_(command_buffer) {}
+      command_pool_(std::move(command_pool)),
+      command_buffer_(command_buffer),
+      descriptor_set_arena_(std::move(descriptor_pool_cache)) {}
 
 DirectCommandBuffer::~DirectCommandBuffer() {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::dtor");
+  descriptor_set_group_.Reset().IgnoreError();
   absl::MutexLock lock(command_pool_->mutex());
   syms()->vkFreeCommandBuffers(*command_pool_->logical_device(), *command_pool_,
                                1, &command_buffer_);
@@ -142,6 +145,10 @@ Status DirectCommandBuffer::Begin() {
 
   is_recording_ = true;
 
+  // NOTE: we require that command buffers not be recorded while they are
+  // in-flight so this is safe.
+  RETURN_IF_ERROR(descriptor_set_group_.Reset());
+
   VkCommandBufferBeginInfo begin_info;
   begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
   begin_info.pNext = nullptr;
@@ -159,6 +166,9 @@ Status DirectCommandBuffer::End() {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::End");
 
   VK_RETURN_IF_ERROR(syms()->vkEndCommandBuffer(command_buffer_));
+
+  // Flush all pending descriptor set writes (if any).
+  ASSIGN_OR_RETURN(descriptor_set_group_, descriptor_set_arena_.Flush());
 
   is_recording_ = false;
 
@@ -348,57 +358,6 @@ Status DirectCommandBuffer::CopyBuffer(Buffer* source_buffer,
   return OkStatus();
 }
 
-Status DirectCommandBuffer::UpdateAndBindDescriptorSet(
-    PipelineExecutable* executable, absl::Span<const BufferBinding> bindings) {
-  absl::InlinedVector<VkDescriptorBufferInfo, 8> buffer_infos;
-  buffer_infos.resize(bindings.size());
-  for (int i = 0; i < bindings.size(); ++i) {
-    ASSIGN_OR_RETURN(auto buffer, CastBuffer(bindings[i].buffer));
-    buffer_infos[i].buffer = buffer->handle();
-    // TODO(benvanik): properly subrange (add to BufferBinding).
-    buffer_infos[i].offset = bindings[i].buffer->byte_offset();
-    buffer_infos[i].range = bindings[i].buffer->byte_length();
-  }
-
-  const auto& descriptor_sets = executable->descriptor_sets();
-  absl::InlinedVector<VkWriteDescriptorSet, 8> write_infos;
-  write_infos.resize(bindings.size());
-  for (int i = 0; i < bindings.size(); ++i) {
-    ASSIGN_OR_RETURN(auto buffer, CastBuffer(bindings[i].buffer));
-    VkDescriptorBufferInfo buffer_info;
-    buffer_info.buffer = buffer->handle();
-    // TODO(benvanik): properly subrange (add to BufferBinding).
-    buffer_info.offset = bindings[i].buffer->byte_offset();
-    buffer_info.range = bindings[i].buffer->byte_length();
-    auto& write_info = write_infos[i];
-    write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write_info.pNext = nullptr;
-    write_info.dstSet = VK_NULL_HANDLE;
-    write_info.dstBinding = descriptor_sets.buffer_binding_set_map[i];
-    write_info.dstArrayElement = 0;
-    write_info.descriptorCount = 1;
-    write_info.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    write_info.pImageInfo = nullptr;
-    write_info.pBufferInfo = &buffer_infos[i];
-    write_info.pTexelBufferView = nullptr;
-  }
-
-  if (command_pool_->logical_device()->enabled_extensions().push_descriptors) {
-    // Fast path using push descriptors. These are pooled internally by the
-    // command buffer and prevent the need for our own pooling mechanisms.
-    syms()->vkCmdPushDescriptorSetKHR(
-        command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
-        executable->pipeline_layout(), descriptor_sets.buffer_binding_set,
-        write_infos.size(), write_infos.data());
-  } else {
-    // TODO(benvanik): allocate from pool and update.
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Non-push descriptor set path not yet implemented";
-  }
-
-  return OkStatus();
-}
-
 Status DirectCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::Dispatch");
 
@@ -413,8 +372,8 @@ Status DirectCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
 
   // Either allocate, update, and bind a descriptor set or use push descriptor
   // sets to use the command buffer pool when supported.
-  RETURN_IF_ERROR(
-      UpdateAndBindDescriptorSet(executable, dispatch_request.bindings));
+  RETURN_IF_ERROR(descriptor_set_arena_.BindDescriptorSet(
+      command_buffer_, executable, dispatch_request.bindings));
 
   // TODO(benvanik): not this, /obviously/. Replace with semantic tags or just
   // get SPIR-V roundtripping what we need to do this in proper IR. The infra

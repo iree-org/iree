@@ -176,7 +176,7 @@ TEST_P(SimpleComputeTest, RunOnce) {
   DispatchRequest dispatch_request;
   dispatch_request.executable = executable.get();
   dispatch_request.entry_point = 0;
-  dispatch_request.workload[0] = 1;
+  dispatch_request.workload[0] = 4;
   dispatch_request.workload[1] = 1;
   dispatch_request.workload[2] = 1;
   BufferBinding bindings[3];

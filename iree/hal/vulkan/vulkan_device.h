@@ -25,6 +25,7 @@
 #include "iree/base/memory.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/device.h"
+#include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
@@ -101,6 +102,8 @@ class VulkanDevice final : public Device {
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues_;
   mutable absl::InlinedVector<CommandQueue*, 4> dispatch_queues_;
   mutable absl::InlinedVector<CommandQueue*, 4> transfer_queues_;
+
+  ref_ptr<DescriptorPoolCache> descriptor_pool_cache_;
 
   ref_ptr<VkCommandPoolHandle> dispatch_command_pool_;
   ref_ptr<VkCommandPoolHandle> transfer_command_pool_;
