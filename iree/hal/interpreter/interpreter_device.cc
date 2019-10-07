@@ -70,11 +70,6 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
     return OkStatus();
   }
 
-  Status Flush() override {
-    // No-op.
-    return OkStatus();
-  }
-
   Status WaitIdle(absl::Time deadline) override {
     // No-op.
     return OkStatus();

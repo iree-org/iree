@@ -32,8 +32,6 @@ class MockCommandQueue : public ::testing::StrictMock<CommandQueue> {
   MOCK_METHOD2(Submit, Status(absl::Span<const SubmissionBatch> batches,
                               FenceValue fence));
 
-  MOCK_METHOD0(Flush, Status());
-
   MOCK_METHOD1(WaitIdle, Status(absl::Time deadline));
 };
 

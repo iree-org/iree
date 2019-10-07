@@ -93,13 +93,6 @@ class CommandQueue {
     return Submit(absl::MakeConstSpan(&batch, 1), std::move(fence));
   }
 
-  // Flushes any requests that are pending with a queue and ensure they begin
-  // executing ASAP. May be a no-op.
-  //
-  // If the command queue has encountered an error during submission at any
-  // point it will be returned here (repeatedly).
-  virtual Status Flush() = 0;
-
   // Blocks until all outstanding requests have been completed.
   // This is equivalent to having waited on all outstanding fences.
   // Implicitly calls Flush to ensure delayed requests are scheduled.

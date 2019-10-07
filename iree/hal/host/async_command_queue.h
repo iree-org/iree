@@ -47,7 +47,6 @@ class AsyncCommandQueue final : public CommandQueue {
   Status Submit(absl::Span<const SubmissionBatch> batches,
                 FenceValue fence) override;
 
-  Status Flush() override;
   Status WaitIdle(absl::Time deadline) override;
 
  private:

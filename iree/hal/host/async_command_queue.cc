@@ -104,13 +104,6 @@ Status AsyncCommandQueue::Submit(absl::Span<const SubmissionBatch> batches,
   return submission_queue_.Enqueue(batches, fence);
 }
 
-Status AsyncCommandQueue::Flush() {
-  IREE_TRACE_SCOPE0("AsyncCommandQueue::Flush");
-  // No-op (as we don't currently delay).
-  absl::MutexLock lock(&submission_mutex_);
-  return submission_queue_.permanent_error();
-}
-
 Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {
   IREE_TRACE_SCOPE0("AsyncCommandQueue::WaitIdle");
 

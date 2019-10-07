@@ -135,12 +135,6 @@ Status DirectCommandQueue::Submit(absl::Span<const SubmissionBatch> batches,
   return OkStatus();
 }
 
-Status DirectCommandQueue::Flush() {
-  IREE_TRACE_SCOPE0("DirectCommandQueue::Flush");
-  // Nothing to do here as submit is not async.
-  return OkStatus();
-}
-
 Status DirectCommandQueue::WaitIdle(absl::Time deadline) {
   if (deadline == absl::InfiniteFuture()) {
     // Fast path for using vkQueueWaitIdle, which is usually cheaper (as it

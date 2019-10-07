@@ -180,7 +180,6 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
       {{&fence_0, 1u}}, /*wait_all=*/true, absl::InfiniteFuture())));
 
   // Future flushes/waits/etc should also fail.
-  EXPECT_TRUE(IsDataLoss(command_queue->Flush()));
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
 
   // Future submits should fail asynchronously.
@@ -225,7 +224,6 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
       {{&fence_1, 1u}}, /*wait_all=*/true, absl::InfiniteFuture())));
 
   // Future flushes/waits/etc should also fail.
-  EXPECT_TRUE(IsDataLoss(command_queue->Flush()));
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
 }
 
