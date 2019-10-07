@@ -26,7 +26,10 @@ namespace hal {
 
 DeviceManager::DeviceManager() = default;
 
-DeviceManager::~DeviceManager() = default;
+DeviceManager::~DeviceManager() {
+  IREE_TRACE_SCOPE0("DeviceManager::dtor");
+  WaitIdle().IgnoreError();
+}
 
 Status DeviceManager::RegisterDevice(std::shared_ptr<Device> device) {
   IREE_TRACE_SCOPE0("DeviceManager::RegisterDevice");
@@ -171,6 +174,27 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceLocalBuffer(
       auto* allocator,
       FindCompatibleAllocator(memory_type, buffer_usage, device_placements));
   return allocator->Allocate(memory_type, buffer_usage, allocation_size);
+}
+
+Status DeviceManager::Submit(Device* device, CommandQueue* command_queue,
+                             absl::Span<const SubmissionBatch> batches,
+                             absl::Time deadline, FenceValue fence) {
+  IREE_TRACE_SCOPE0("DeviceManager::Submit");
+  return command_queue->Submit(batches, fence);
+}
+
+Status DeviceManager::Flush() {
+  IREE_TRACE_SCOPE0("DeviceManager::Flush");
+  return OkStatus();
+}
+
+Status DeviceManager::WaitIdle(absl::Time deadline) {
+  IREE_TRACE_SCOPE0("DeviceManager::WaitIdle");
+  absl::MutexLock lock(&device_mutex_);
+  for (const auto& device : devices_) {
+    RETURN_IF_ERROR(device->WaitIdle(deadline));
+  }
+  return OkStatus();
 }
 
 }  // namespace hal

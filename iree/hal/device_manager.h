@@ -20,11 +20,14 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
+#include "iree/base/time.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
+#include "iree/hal/command_queue.h"
 #include "iree/hal/device.h"
 #include "iree/hal/device_placement.h"
 #include "iree/hal/executable_format.h"
+#include "iree/hal/fence.h"
 
 namespace iree {
 namespace hal {
@@ -42,6 +45,9 @@ struct PlacementSpec {
 };
 
 // Manages device lifetime and placement resolution.
+// Optionally the DeviceManager may be used for automatic device selection for
+// allocations or batched submissions, however this is not required if specific
+// devices and scheduling behavior are known to the caller.
 //
 // Thread-safe. Note that callers must ensure that unregistered devices are kept
 // alive for as long as any commands are in-flight that may be using them.
@@ -138,6 +144,59 @@ class DeviceManager final {
     return AllocateDeviceLocalBuffer(MemoryType::kDeviceLocal, buffer_usage,
                                      allocation_size, device_placements);
   }
+
+  // Enqueues a submission against the given target |device| |command_queue|.
+  // The provided |deadline| is used to determine how long the submission can
+  // stay waiting in the queue prior to flushing, with absl::InfinitePast
+  // indicating immediate submission and absl::InfiniteFuture indicating that
+  // Flush must be called.
+  //
+  // If a |fence| is provided it will be signaled when the submission has
+  // completed and otherwise the caller must use WaitIdle to ensure completion.
+  // If a sequence of submissions are performed then the semaphore relationships
+  // can be used to elide waits. Submit(A)+Submit(B, fence) where there is a
+  // dependency from A->B is safe.
+  //
+  // All provided resources must remain alive until the provided |fence|
+  // resolves or Scheduler::WaitIdle succeeds.
+  //
+  // Submissions may be made from any thread. Behavior is undefined
+  // if a thread is performing a WaitIdle while another thread submits work.
+  Status Submit(Device* device, CommandQueue* command_queue,
+                absl::Span<const SubmissionBatch> batches, absl::Time deadline,
+                FenceValue fence = {});
+  Status Submit(Device* device, CommandQueue* command_queue,
+                absl::Span<const SubmissionBatch> batches,
+                absl::Duration timeout, FenceValue fence = {}) {
+    return Submit(device, command_queue, batches,
+                  RelativeTimeoutToDeadline(timeout), fence);
+  }
+  Status Submit(Device* device, CommandQueue* command_queue,
+                absl::Span<const SubmissionBatch> batches,
+                FenceValue fence = {}) {
+    return Submit(device, command_queue, batches, absl::InfinitePast(), fence);
+  }
+
+  // Flushes any requests that are pending in the scheduler and ensures they
+  // begin executing ASAP regardless of policy.
+  //
+  // If any used device has encountered an error during submission at any
+  // point it will be returned here (repeatedly).
+  Status Flush();
+
+  // Blocks until all outstanding requests have been completed.
+  // This is equivalent to having waited on all outstanding fences.
+  // Implicitly calls Flush to ensure delayed requests are scheduled.
+  // Work submitted from other threads during a wait may not be included in the
+  // wait set.
+  //
+  // If any used device has encountered an error during submission at any
+  // point it will be returned here (repeatedly).
+  Status WaitIdle(absl::Time deadline);
+  inline Status WaitIdle(absl::Duration timeout) {
+    return WaitIdle(RelativeTimeoutToDeadline(timeout));
+  }
+  inline Status WaitIdle() { return WaitIdle(absl::InfiniteFuture()); }
 
  private:
   mutable absl::Mutex device_mutex_;

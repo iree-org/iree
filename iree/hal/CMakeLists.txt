@@ -250,12 +250,15 @@ iree_cc_library(
     absl::span
     absl::synchronization
     iree::base::status
+    iree::base::time
     iree::base::tracing
     iree::hal::allocator
     iree::hal::buffer
+    iree::hal::command_queue
     iree::hal::device
     iree::hal::device_placement
     iree::hal::executable_format
+    iree::hal::fence
     iree::hal::heap_buffer
   PUBLIC
 )
