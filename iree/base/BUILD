@@ -1,0 +1,354 @@
+# Common types and utilities used in the IREE codebase.
+
+load("//iree:build_defs.bzl", "platform_trampoline_deps")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "api",
+    srcs = ["api.cc"],
+    hdrs = ["api.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":api_hdrs",
+        ":api_util",
+        ":file_mapping",
+        ":tracing",
+    ],
+)
+
+cc_library(
+    name = "api_hdrs",
+    hdrs = ["api.h"],
+)
+
+cc_library(
+    name = "api_util",
+    hdrs = ["api_util.h"],
+    deps = [
+        ":api_hdrs",
+        ":status",
+    ],
+)
+
+cc_library(
+    name = "arena",
+    srcs = ["arena.cc"],
+    hdrs = ["arena.h"],
+    deps = [
+        ":logging",
+        "//third_party/absl/base:core_headers",
+        "//third_party/absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "arena_test",
+    srcs = ["arena_test.cc"],
+    deps = [
+        ":arena",
+        "//testing/base/public:gunit_main",
+    ],
+)
+
+cc_library(
+    name = "bitfield",
+    hdrs = ["bitfield.h"],
+    deps = [
+        "//third_party/absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "bitfield_test",
+    srcs = ["bitfield_test.cc"],
+    deps = [
+        ":bitfield",
+        "//testing/base/public:gunit_main",
+        "//third_party/absl/base:core_headers",
+    ],
+)
+
+cc_library(
+    name = "file_io",
+    hdrs = ["file_io.h"],
+    deps = [
+        ":status",
+        ":target_platform",
+        "//third_party/absl/memory",
+        "//third_party/absl/strings",
+        "//third_party/absl/types:span",
+    ] + platform_trampoline_deps("file_io"),
+)
+
+cc_library(
+    name = "file_io_hdrs",
+    hdrs = ["file_io.h"],
+    deps = [":status"],
+)
+
+cc_library(
+    name = "file_mapping",
+    hdrs = ["file_mapping.h"],
+    deps = [
+        ":ref_ptr",
+        ":status",
+        "//third_party/absl/memory",
+        "//third_party/absl/strings",
+        "//third_party/absl/types:span",
+    ] + platform_trampoline_deps("file_mapping"),
+)
+
+cc_library(
+    name = "file_mapping_hdrs",
+    hdrs = ["file_mapping.h"],
+    deps = [
+        ":ref_ptr",
+        ":status",
+        "//third_party/absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "file_path",
+    srcs = ["file_path.cc"],
+    hdrs = ["file_path.h"],
+    deps = [
+        "//third_party/absl/strings",
+    ],
+)
+
+cc_library(
+    name = "flatbuffer_util",
+    srcs = ["flatbuffer_util.cc"],
+    hdrs = ["flatbuffer_util.h"],
+    deps = [
+        ":file_mapping",
+        ":memory",
+        ":source_location",
+        ":status",
+        ":tracing",
+        "//third_party/absl/base:core_headers",
+        "//third_party/absl/memory",
+        "//third_party/absl/strings",
+        "//third_party/absl/types:optional",
+        "//third_party/absl/types:span",
+        "//third_party/flatbuffers",
+    ],
+)
+
+cc_library(
+    name = "init",
+    hdrs = ["init.h"],
+    deps = platform_trampoline_deps("init"),
+)
+
+cc_library(
+    name = "intrusive_list",
+    hdrs = [
+        "intrusive_list.h",
+        "intrusive_list_ref_ptr.inc",
+        "intrusive_list_unique_ptr.inc",
+    ],
+    deps = [
+        ":logging",
+        ":ref_ptr",
+    ],
+)
+
+cc_test(
+    name = "intrusive_list_test",
+    srcs = [
+        "intrusive_list_ref_ptr_test.cc",
+        "intrusive_list_test.cc",
+        "intrusive_list_unique_ptr_test.cc",
+    ],
+    deps = [
+        ":intrusive_list",
+        "//testing/base/public:gunit_main",
+    ],
+)
+
+cc_library(
+    name = "logging",
+    hdrs = ["logging.h"],
+    deps = platform_trampoline_deps("logging"),
+)
+
+cc_library(
+    name = "math",
+    hdrs = ["math.h"],
+    deps = [
+        "//third_party/absl/base:core_headers",
+    ],
+)
+
+cc_library(
+    name = "memory",
+    hdrs = ["memory.h"],
+    deps = [
+        "//third_party/absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "ref_ptr",
+    hdrs = ["ref_ptr.h"],
+    deps = [
+        ":logging",
+        "//third_party/absl/base:core_headers",
+    ],
+)
+
+cc_test(
+    name = "ref_ptr_test",
+    size = "small",
+    srcs = ["ref_ptr_test.cc"],
+    deps = [
+        ":ref_ptr",
+        "//testing/base/public:gunit_main",
+    ],
+)
+
+cc_library(
+    name = "shape",
+    srcs = ["shape.cc"],
+    hdrs = ["shape.h"],
+    deps = [
+        ":logging",
+        ":source_location",
+        ":status",
+        "//third_party/absl/meta:type_traits",
+        "//third_party/absl/strings",
+        "//third_party/absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "shape_test",
+    srcs = ["shape_test.cc"],
+    deps = [
+        ":shape",
+        ":status",
+        ":status_matchers",
+        "//testing/base/public:gunit_main",
+    ],
+)
+
+cc_library(
+    name = "source_location",
+    hdrs = ["source_location.h"],
+    deps = platform_trampoline_deps("source_location"),
+)
+
+cc_library(
+    name = "status",
+    hdrs = ["status.h"],
+    deps = [
+        ":source_location",
+    ] + platform_trampoline_deps("status"),
+)
+
+cc_library(
+    name = "status_matchers",
+    testonly = 1,
+    hdrs = ["status_matchers.h"],
+    deps = platform_trampoline_deps("status_matchers"),
+)
+
+cc_library(
+    name = "target_platform",
+    hdrs = ["target_platform.h"],
+)
+
+cc_library(
+    name = "time",
+    hdrs = ["time.h"],
+    deps = [
+        "//third_party/absl/time",
+    ],
+)
+
+cc_library(
+    name = "tracing",
+    hdrs = ["tracing.h"],
+    deps = [
+        "//iree:target_config",
+        "//third_party/tracing_framework_bindings_cpp",
+    ] + select({
+        "//third_party/tracing_framework_bindings_cpp:wtf_enable": [":tracing_enabled"],
+        "//conditions:default": [":tracing_disabled"],
+    }),
+)
+
+cc_library(
+    name = "tracing_disabled",
+    srcs = [
+        "tracing.h",
+        "tracing_disabled.cc",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":init",
+        ":logging",
+        "//third_party/absl/flags:flag",
+        "//third_party/tracing_framework_bindings_cpp",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "tracing_enabled",
+    srcs = [
+        "tracing.cc",
+        "tracing.h",
+    ],
+    visibility = ["//visibility:private"],
+    deps = [
+        ":file_io",
+        ":file_path",
+        ":init",
+        ":logging",
+        ":status",
+        "//third_party/absl/base:core_headers",
+        "//third_party/absl/flags:flag",
+        "//third_party/absl/strings",
+        "//third_party/absl/synchronization",
+        "//third_party/absl/time",
+        "//third_party/tracing_framework_bindings_cpp",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "wait_handle",
+    srcs = ["wait_handle.cc"],
+    hdrs = ["wait_handle.h"],
+    deps = [
+        ":logging",
+        ":ref_ptr",
+        ":source_location",
+        ":status",
+        ":time",
+        "//third_party/absl/base:core_headers",
+        "//third_party/absl/container:fixed_array",
+        "//third_party/absl/strings",
+        "//third_party/absl/time",
+        "//third_party/absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "wait_handle_test",
+    srcs = ["wait_handle_test.cc"],
+    deps = [
+        ":status",
+        ":status_matchers",
+        ":wait_handle",
+        "//testing/base/public:gunit_main",
+        "//third_party/absl/time",
+    ],
+)

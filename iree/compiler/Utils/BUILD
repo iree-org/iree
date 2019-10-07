@@ -1,0 +1,39 @@
+# Utilities for working with IREE MLIR types.
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "Utils",
+    srcs = [
+        "DispatchUtils.cpp",
+        "MemRefUtils.cpp",
+        "ModuleUtils.cpp",
+        "OpCreationUtils.cpp",
+        "OpUtils.cpp",
+        "TranslationUtils.cpp",
+    ],
+    hdrs = [
+        "DispatchUtils.h",
+        "Macros.h",
+        "MemRefUtils.h",
+        "ModuleUtils.h",
+        "OpCreationUtils.h",
+        "OpUtils.h",
+        "TranslationUtils.h",
+    ],
+    deps = [
+        "//iree/compiler/IR",
+        "//iree/schemas",
+        "//third_party/llvm/llvm:support",
+        "//third_party/llvm/llvm/projects/google_mlir:IR",
+        "//third_party/llvm/llvm/projects/google_mlir:Pass",
+        "//third_party/llvm/llvm/projects/google_mlir:StandardOps",
+        "//third_party/llvm/llvm/projects/google_mlir:Support",
+        "//third_party/llvm/llvm/projects/google_mlir:TransformUtils",
+        "//third_party/llvm/llvm/projects/google_mlir:Transforms",
+        "//third_party/tensorflow/compiler/mlir/xla:hlo",
+    ],
+)

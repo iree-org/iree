@@ -16,7 +16,7 @@
 #define IREE_BASE_SOURCE_LOCATION_H_
 
 #ifdef IREE_CONFIG_GOOGLE_INTERNAL
-#include "iree/base/google/source_location_absl.h"
+#include "iree/base/google/source_location_google.h"
 #else
 #include "iree/base/internal/source_location.h"
 #endif  // IREE_CONFIG_GOOGLE_INTERNAL
