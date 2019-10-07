@@ -39,6 +39,25 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    api
+  HDRS
+    "api.h"
+  SRCS
+    "api.cc"
+  DEPS
+    iree::base::api
+    iree::base::api_util
+    iree::base::shape
+    iree::base::tracing
+    iree::hal::buffer
+    iree::hal::buffer_view
+    iree::hal::fence
+    iree::hal::semaphore
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     buffer
   HDRS
     "buffer.h"

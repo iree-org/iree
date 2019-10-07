@@ -14,6 +14,31 @@
 
 iree_cc_library(
   NAME
+    api
+  HDRS
+    "api.h"
+  SRCS
+    "api.cc"
+  DEPS
+    iree::base::api_util
+    iree::base::file_mapping
+    iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    api_util
+  HDRS
+    "api.h"
+    "api_util.h"
+  DEPS
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     arena
   HDRS
     "arena.h"
