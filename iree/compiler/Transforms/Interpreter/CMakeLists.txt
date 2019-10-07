@@ -21,7 +21,6 @@ iree_cc_library(
   SRCS
     "ExpandReductionsToOps.cpp"
     "LegalizeInterpreterOps.cpp"
-    "LoadStoreDataFlowOpt.cpp"
     "LowerInterpreterDialect.cpp"
     "LowerStdToInterpreterDialect.cpp"
     "LowerToInterpreterDialect.cpp"
