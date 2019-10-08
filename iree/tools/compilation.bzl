@@ -18,7 +18,7 @@ def iree_module(
             " ".join([
                 "$(location //iree/tools:iree-translate)",
                 "-mlir-to-iree-module",
-                "--print-after-all",
+                "--print-ir-after-all",
                 "-o $(location %s.emod)" % (name),
             ] + ["$(locations %s)" % (src) for src in srcs]),
         ]),

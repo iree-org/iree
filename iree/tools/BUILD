@@ -64,13 +64,19 @@ cc_binary(
 
 cc_binary(
     name = "iree-translate",
+    srcs = ["iree_translate_main.cc"],
     deps = [
         "//iree/compiler/Translation/Interpreter",
         "//iree/compiler/Translation/SPIRV",
         "//iree/compiler/Translation/Sequencer",
+        "//third_party/llvm/llvm:support",
         "//third_party/llvm/llvm/projects/google_mlir:AffineDialectRegistration",
+        "//third_party/llvm/llvm/projects/google_mlir:IR",
+        "//third_party/llvm/llvm/projects/google_mlir:Pass",
         "//third_party/llvm/llvm/projects/google_mlir:StandardDialectRegistration",
-        "//third_party/llvm/llvm/projects/google_mlir:tools/mlir-translate/mlir-translate",
+        "//third_party/llvm/llvm/projects/google_mlir:Support",
+        "//third_party/llvm/llvm/projects/google_mlir:TranslateClParser",
+        "//third_party/llvm/llvm/projects/google_mlir:Translation",
         "//third_party/tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ],
 )
