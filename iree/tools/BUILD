@@ -49,6 +49,8 @@ cc_binary(
         "//iree/hal/interpreter:interpreter_driver_module",
         # TODO(b/138220713): enable when we have swiftshader support.
         # "//iree/hal/vulkan:vulkan_driver_module",
+        # TODO(b/142004903): enable when Dawn HAL implementation is functional
+        # "//iree/hal/dawn:dawn_driver_module",
         "//iree/schemas",
         "//iree/vm:bytecode_tables_sequencer",
         "//iree/vm:fiber_state",

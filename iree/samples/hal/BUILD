@@ -41,5 +41,8 @@ cc_test(
         # executables for from the source MLIR.
         "//iree/hal/interpreter:interpreter_driver_module",  # build-cleaner: keep
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
+
+        # TODO(b/142004903): enable when Dawn HAL implementation is functional
+        # "//iree/hal/dawn:dawn_driver_module",  # build-cleaner: keep
     ] + PLATFORM_VULKAN_TEST_DEPS,
 )
