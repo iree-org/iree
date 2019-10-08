@@ -15,10 +15,12 @@
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
 #include <cstddef>
+#include <cstdlib>
 
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
 #include "absl/memory/memory.h"
+#include "iree/base/file_path.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
@@ -120,6 +122,22 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 // static
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
+
+#if defined(IREE_VK_ICD_FILENAMES)
+#define IREE_STRINGIFY_(x) #x
+#define IREE_STRING_(x) IREE_STRINGIFY_(x)
+  std::string vk_icd_filenames = IREE_STRING_(IREE_VK_ICD_FILENAMES);
+#undef IREE_STRINGIFY_
+#undef IREE_STRING_
+#if defined(IREE_PLATFORM_WINDOWS)
+  // TODO(b/138220713): Set VK_ICD_FILENAMES on Windows
+#else
+  ::setenv("VK_ICD_FILENAMES", vk_icd_filenames.c_str(), 0);
+#endif  // IREE_PLATFORM_WINDOWS
+#else
+  // Leave VK_ICD_FILENAMES unchanged and rely on the system Vulkan loader to
+  // discover ICDs.
+#endif  // IREE_VK_ICD_FILENAMES
 
 // NOTE: we could factor this out into base, but this is the only place we use
 // it right now so it's fine.

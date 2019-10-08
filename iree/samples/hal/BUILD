@@ -1,6 +1,7 @@
 # Samples demonstrating use of the HAL API.
 # These do not rely on higher layers of the system (such as the VM or runtime).
 
+load("//iree:build_defs.bzl", "PLATFORM_VULKAN_TEST_DEPS")
 load("//iree/tools:compilation.bzl", "iree_module")
 
 package(
@@ -25,7 +26,6 @@ cc_test(
     ],
     deps = [
         ":simple_compute_test_module_cc",
-        "//testing/base/public:gunit_main",
         "//third_party/absl/container:inlined_vector",
         "//third_party/absl/strings",
         "//third_party/absl/time",
@@ -41,5 +41,5 @@ cc_test(
         # executables for from the source MLIR.
         "//iree/hal/interpreter:interpreter_driver_module",  # build-cleaner: keep
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
-    ],
+    ] + PLATFORM_VULKAN_TEST_DEPS,
 )

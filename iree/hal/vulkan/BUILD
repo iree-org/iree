@@ -1,8 +1,26 @@
 # HAL implementation using Vulkan and (likely) SPIR-V executables.
 
+load("//iree:build_defs.bzl", "PLATFORM_VULKAN_LOADER_COPTS")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+# --define=IREE_VK=native to use the native Vulkan drivers (and real hardware).
+config_setting(
+    name = "native_vk",
+    values = {
+        "define": "IREE_VK=native",
+    },
+)
+
+# --define=IREE_VK=swiftshader to use SwiftShader.
+config_setting(
+    name = "swiftshader_vk",
+    values = {
+        "define": "IREE_VK=swiftshader",
+    },
 )
 
 cc_library(
@@ -105,21 +123,20 @@ cc_library(
         "dynamic_symbol_tables.h",
         "dynamic_symbols.h",
     ],
+    copts = PLATFORM_VULKAN_LOADER_COPTS,
     linkopts = [
         "-ldl",
     ],
     deps = [
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/memory",
+        "//iree/base:file_path",
         "//iree/base:ref_ptr",
-        "//iree/base:target_platform",
-        "//iree/base:tracing",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "//iree/base:source_location",
         "//iree/base:status",
-
-        # TODO(b/138220713): include when we run on TAP only (not locally/android).
-        # "//third_party/vulkan_loader",  # build-cleaner: keep
+        "//iree/base:target_platform",
+        "//iree/base:tracing",
+        "//third_party/absl/base:core_headers",
+        "//third_party/absl/memory",
+        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
     ],
 )
 
