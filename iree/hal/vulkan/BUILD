@@ -85,10 +85,10 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/synchronization",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -109,10 +109,10 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_queue",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/synchronization",
-        "//third_party/absl/time",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -134,9 +134,9 @@ cc_library(
         "//iree/base:status",
         "//iree/base:target_platform",
         "//iree/base:tracing",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/memory",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -149,8 +149,8 @@ cc_library(
         ":status_util",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//third_party/absl/types:span",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -161,9 +161,9 @@ cc_library(
         ":dynamic_symbols",
         ":extensibility_util",
         "//iree/base:ref_ptr",
-        "//third_party/absl/synchronization",
-        "//third_party/absl/utility",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/utility",
     ],
 )
 
@@ -180,11 +180,11 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:fence",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/synchronization",
-        "//third_party/absl/time",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -225,11 +225,11 @@ cc_library(
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
         "//iree/schemas:spirv_executable_def_cc_fbs",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/synchronization",
-        "//third_party/flatbuffers",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
+        "@flatbuffers",
     ],
 )
 
@@ -248,8 +248,8 @@ cc_library(
         "//iree/hal:executable_cache",
         "//iree/hal:executable_spec",
         "//iree/schemas:spirv_executable_def_cc_fbs",
-        "//third_party/absl/container:inlined_vector",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -282,10 +282,10 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:allocator",
         "//iree/hal:buffer",
-        "//third_party/absl/flags:flag",
-        "//third_party/absl/memory",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "//third_party/vulkan_memory_allocator",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -314,12 +314,12 @@ cc_library(
         "//iree/hal:command_queue",
         "//iree/hal:device",
         "//iree/hal:fence",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
-        "//third_party/absl/synchronization",
-        "//third_party/absl/types:span",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -337,8 +337,8 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:device_info",
         "//iree/hal:driver",
-        "//third_party/absl/container:inlined_vector",
         "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -352,7 +352,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:driver_registry",
-        "//third_party/absl/flags:flag",
+        "@com_google_absl//absl/flags:flag",
     ],
     alwayslink = 1,
 )

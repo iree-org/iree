@@ -237,7 +237,7 @@ cc_library(
         ":source_map_def_cc_fbs",
         ":spirv_executable_def_cc_fbs",
         ":type_def_cc_fbs",
-        "//third_party/flatbuffers",
+        "@flatbuffers",
     ],
 )
 

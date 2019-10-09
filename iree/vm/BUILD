@@ -29,10 +29,10 @@ cc_library(
         "//iree/base:status",
         "//iree/schemas",
         "//iree/schemas/bytecode:bytecode_v0",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -49,8 +49,8 @@ cc_library(
         "//iree/hal:buffer_view",
         "//iree/hal:heap_buffer",
         "//iree/schemas/bytecode:bytecode_v0",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -80,7 +80,7 @@ cc_library(
     hdrs = ["bytecode_util.h"],
     deps = [
         "//iree/schemas/bytecode:bytecode_v0",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -105,8 +105,8 @@ cc_library(
         ":module",
         "//iree/base:flatbuffer_util",
         "//iree/base:status",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -130,8 +130,8 @@ cc_library(
         ":instance",
         ":stack",
         "//iree/base:status",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -144,8 +144,8 @@ cc_library(
         "//iree/base:status",
         "//iree/hal:buffer_view",
         "//iree/schemas",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -158,9 +158,9 @@ cc_library(
         "//iree/base:flatbuffer_util",
         "//iree/base:status",
         "//iree/schemas",
-        "//third_party/absl/container:flat_hash_map",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -173,7 +173,7 @@ cc_library(
         "//iree/base:status",
         "//iree/hal:device_manager",
         "//iree/vm/debug:debug_server_interface",
-        "//third_party/absl/memory",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -187,7 +187,7 @@ cc_library(
         "//iree/base:flatbuffer_util",
         "//iree/base:status",
         "//iree/schemas",
-        "//third_party/absl/memory",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -210,9 +210,9 @@ cc_library(
     hdrs = ["opcode_info.h"],
     deps = [
         "//iree/schemas/bytecode:bytecode_v0",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -230,8 +230,8 @@ cc_library(
         "//iree/base:flatbuffer_util",
         "//iree/base:status",
         "//iree/hal:buffer_view",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -255,11 +255,11 @@ cc_library(
         "//iree/hal:device_placement",
         "//iree/hal:heap_buffer",
         "//iree/schemas/bytecode:sequencer_bytecode_v0",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/strings",
-        "//third_party/absl/time",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -271,8 +271,8 @@ cc_library(
         "//iree/base:flatbuffer_util",
         "//iree/base:status",
         "//iree/schemas",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -291,8 +291,8 @@ cc_library(
         ":module",
         "//iree/base:status",
         "//iree/hal:buffer_view",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 

@@ -19,7 +19,7 @@ filegroup(
     testonly = True,
     data = [
         "//iree/tools:iree-opt",
-        "//third_party/llvm/llvm:FileCheck",
-        "//third_party/llvm/llvm/projects/google_mlir:run_lit.sh",
+        "@llvm//:FileCheck",
+        "@local_config_mlir//:run_lit.sh",
     ],
 )

@@ -28,10 +28,10 @@
 #ifndef IREE_BASE_TRACING_H_
 #define IREE_BASE_TRACING_H_
 
-#if defined(GLOBAL_WTF_ENABLE) || defined(IREE_CONFIG_GOOGLE_INTERNAL)
+#if defined(WTF_ENABLE) || defined(IREE_CONFIG_GOOGLE_INTERNAL)
 
-#include "third_party/tracing_framework_bindings_cpp/event.h"  // IWYU pragma: export
-#include "third_party/tracing_framework_bindings_cpp/macros.h"  // IWYU pragma: export
+#include "wtf/event.h"  // IWYU pragma: export
+#include "wtf/macros.h"  // IWYU pragma: export
 
 namespace iree {
 

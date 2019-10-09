@@ -11,7 +11,7 @@ cc_library(
     hdrs = ["mock_allocator.h"],
     deps = [
         "//iree/hal:allocator",
-        "//testing/base/public:gunit_for_library_testonly",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -21,7 +21,7 @@ cc_library(
     hdrs = ["mock_command_buffer.h"],
     deps = [
         "//iree/hal:command_buffer",
-        "//testing/base/public:gunit_for_library_testonly",
+        "@com_google_googletest//:gtest",
     ],
 )
 
@@ -31,6 +31,6 @@ cc_library(
     hdrs = ["mock_command_queue.h"],
     deps = [
         "//iree/hal:command_queue",
-        "//testing/base/public:gunit_for_library_testonly",
+        "@com_google_googletest//:gtest",
     ],
 )

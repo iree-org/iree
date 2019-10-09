@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Force the header to detect WTF_ENABLE so that this library builds
+// (for when building recursively).
+#if !defined(WTF_ENABLE)
+#define WTF_ENABLE
+#endif
+
 #include "iree/base/tracing.h"
 
 #include <thread>  // NOLINT: Fiber doesn't work during startup on Android.

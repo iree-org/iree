@@ -12,8 +12,8 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/base:target_platform",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -28,8 +28,8 @@ cc_library(
         "//iree/base:file_io_hdrs",
         "//iree/base:status",
         "//iree/base:target_platform",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -44,8 +44,8 @@ cc_library(
         "//iree/base:file_mapping_hdrs",
         "//iree/base:target_platform",
         "//iree/base:tracing",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -55,7 +55,7 @@ cc_library(
     hdrs = ["init_internal.h"],
     deps = [
         "//iree/base:target_platform",
-        "//third_party/absl/flags:parse",
+        "@com_google_absl//absl/flags:parse",
     ],
 )
 
@@ -64,8 +64,8 @@ cc_library(
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
     deps = [
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/flags:flag",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -97,11 +97,11 @@ cc_library(
         ":logging_internal",
         "//iree/base:source_location",
         "//iree/base:target_platform",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/debugging:stacktrace",
-        "//third_party/absl/flags:flag",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/debugging:stacktrace",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -111,8 +111,8 @@ cc_library(
     hdrs = ["status_matchers.h"],
     deps = [
         "//iree/base:status",
-        "//testing/base/public:gunit_for_library",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_googletest//:gtest",
     ],
 )

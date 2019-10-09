@@ -40,8 +40,8 @@ cc_library(
     hdrs = ["arena.h"],
     deps = [
         ":logging",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -50,7 +50,7 @@ cc_test(
     srcs = ["arena_test.cc"],
     deps = [
         ":arena",
-        "//testing/base/public:gunit_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -58,7 +58,7 @@ cc_library(
     name = "bitfield",
     hdrs = ["bitfield.h"],
     deps = [
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -67,8 +67,8 @@ cc_test(
     srcs = ["bitfield_test.cc"],
     deps = [
         ":bitfield",
-        "//testing/base/public:gunit_main",
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -78,9 +78,9 @@ cc_library(
     deps = [
         ":status",
         ":target_platform",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ] + platform_trampoline_deps("file_io"),
 )
 
@@ -96,9 +96,9 @@ cc_library(
     deps = [
         ":ref_ptr",
         ":status",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ] + platform_trampoline_deps("file_mapping"),
 )
 
@@ -108,7 +108,7 @@ cc_library(
     deps = [
         ":ref_ptr",
         ":status",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -117,7 +117,7 @@ cc_library(
     srcs = ["file_path.cc"],
     hdrs = ["file_path.h"],
     deps = [
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -131,12 +131,12 @@ cc_library(
         ":source_location",
         ":status",
         ":tracing",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
-        "//third_party/absl/types:span",
-        "//third_party/flatbuffers",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+        "@flatbuffers",
     ],
 )
 
@@ -168,7 +168,8 @@ cc_test(
     ],
     deps = [
         ":intrusive_list",
-        "//testing/base/public:gunit_main",
+        "@com_google_absl//absl/memory",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -182,7 +183,7 @@ cc_library(
     name = "math",
     hdrs = ["math.h"],
     deps = [
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -190,7 +191,7 @@ cc_library(
     name = "memory",
     hdrs = ["memory.h"],
     deps = [
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -199,7 +200,7 @@ cc_library(
     hdrs = ["ref_ptr.h"],
     deps = [
         ":logging",
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -209,7 +210,7 @@ cc_test(
     srcs = ["ref_ptr_test.cc"],
     deps = [
         ":ref_ptr",
-        "//testing/base/public:gunit_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -221,9 +222,9 @@ cc_library(
         ":logging",
         ":source_location",
         ":status",
-        "//third_party/absl/meta:type_traits",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/meta:type_traits",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -234,7 +235,7 @@ cc_test(
         ":shape",
         ":status",
         ":status_matchers",
-        "//testing/base/public:gunit_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -268,7 +269,7 @@ cc_library(
     name = "time",
     hdrs = ["time.h"],
     deps = [
-        "//third_party/absl/time",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -277,9 +278,9 @@ cc_library(
     hdrs = ["tracing.h"],
     deps = [
         "//iree:target_config",
-        "//third_party/tracing_framework_bindings_cpp",
+        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ] + select({
-        "//third_party/tracing_framework_bindings_cpp:wtf_enable": [":tracing_enabled"],
+        "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"],
         "//conditions:default": [":tracing_disabled"],
     }),
 )
@@ -294,8 +295,8 @@ cc_library(
     deps = [
         ":init",
         ":logging",
-        "//third_party/absl/flags:flag",
-        "//third_party/tracing_framework_bindings_cpp",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ],
     alwayslink = 1,
 )
@@ -313,12 +314,12 @@ cc_library(
         ":init",
         ":logging",
         ":status",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/flags:flag",
-        "//third_party/absl/strings",
-        "//third_party/absl/synchronization",
-        "//third_party/absl/time",
-        "//third_party/tracing_framework_bindings_cpp",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
+        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ],
     alwayslink = 1,
 )
@@ -333,11 +334,11 @@ cc_library(
         ":source_location",
         ":status",
         ":time",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:fixed_array",
-        "//third_party/absl/strings",
-        "//third_party/absl/time",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:fixed_array",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -348,7 +349,7 @@ cc_test(
         ":status",
         ":status_matchers",
         ":wait_handle",
-        "//testing/base/public:gunit_main",
-        "//third_party/absl/time",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
     ],
 )

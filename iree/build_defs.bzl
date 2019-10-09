@@ -35,7 +35,7 @@ PLATFORM_VULKAN_LOADER_COPTS = select({
 #
 # Define "IREE_VK=swiftshader" to include SwiftShader (if it is available).
 PLATFORM_VULKAN_TEST_DEPS = [
-    "//testing/base/public:gunit_main",
+    "@com_google_googletest//:gtest_main",
 
     # TODO(b/138220713): Support SwiftShader use.
 ]

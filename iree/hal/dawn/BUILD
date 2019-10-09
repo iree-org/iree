@@ -19,9 +19,9 @@ cc_library(
         "//iree/hal:executable_cache",
         "//iree/hal:fence",
         "//iree/hal/host:host_local_allocator",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/memory",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -46,7 +46,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:driver_registry",
-        "//third_party/absl/flags:flag",
+        "@com_google_absl//absl/flags:flag",
     ],
     alwayslink = 1,
 )

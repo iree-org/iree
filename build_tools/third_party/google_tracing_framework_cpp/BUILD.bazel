@@ -1,0 +1,48 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package(
+    default_visibility = ["//visibility:public"],
+)
+
+# There are two ways to enable WTF at compile time:
+#   1) Arrange to add a --copt=-DWTF_ENABLE to your build.
+#   2) Add --define=GLOBAL_WTF_ENABLE=1 to the bazel command line
+# The disadvantage to #1 is that you end up building the entire codebase
+# with a non-standard copt. Depending on the size of your deps, this
+# can use a lot of resources due to inability to hit the forge cache.
+#
+# The advantage to #2 is that it narrowly scopes the copt change just to
+# things that depend on WTF, limiting the scope of things that need to
+# be compiled differently.
+config_setting(
+    name = "wtf_enable",
+    define_values = {
+        "GLOBAL_WTF_ENABLE": "1",
+    },
+)
+
+cc_library(
+    name = "tracing_framework_bindings_cpp",
+    srcs = glob(
+        ["*.cc"],
+        exclude = ["*_test.cc"],
+    ) + glob(["include/wtf/platform/*.h"]),
+    hdrs = glob(["include/wtf/*.h"]),
+    defines = select({
+        ":wtf_enable": ["WTF_ENABLE"],
+        "//conditions:default": [],
+    }),
+    includes = ["include"],
+)

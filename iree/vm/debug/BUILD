@@ -13,10 +13,10 @@ cc_library(
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/schemas",
-        "//third_party/absl/container:flat_hash_map",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -26,10 +26,10 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/schemas",
-        "//third_party/absl/container:flat_hash_map",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -43,11 +43,11 @@ cc_library(
         "//iree/base:status",
         "//iree/schemas",
         "//iree/vm:module",
-        "//third_party/absl/container:flat_hash_map",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
-        "//third_party/flatbuffers",
+        "@com_google_absl//absl/container:flat_hash_map",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+        "@flatbuffers",
     ],
 )
 
@@ -56,7 +56,7 @@ cc_library(
     hdrs = ["debug_server.h"],
     deps = [
         ":debug_server_interface",
-        "//third_party/flatbuffers",
+        "@flatbuffers",
         "//iree/schemas",
         "//iree/base:status",
     ] + select({
@@ -76,7 +76,7 @@ cc_library(
     srcs = ["debug_server_disabled.cc"],
     deps = [
         ":debug_server_interface",
-        "//third_party/absl/memory",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -89,10 +89,10 @@ cc_library(
         ":debug_tcp_util",
         "//iree/base:status",
         "//iree/schemas",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/memory",
-        "//third_party/absl/synchronization",
-        "//third_party/flatbuffers",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/synchronization",
+        "@flatbuffers",
     ],
 )
 
@@ -109,8 +109,8 @@ cc_library(
     deps = [
         ":debug_server",
         "//iree/base:memory",
-        "//third_party/absl/flags:flag",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
         "//iree/base:status",
     ] + select({
         "//iree/vm:debug": [
@@ -136,10 +136,10 @@ cc_library(
         "//iree/vm:fiber_state",
         "//iree/vm:instance",
         "//iree/vm:sequencer_context",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/strings",
-        "//third_party/absl/synchronization",
-        "//third_party/flatbuffers",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
+        "@flatbuffers",
     ],
 )
 
@@ -153,8 +153,8 @@ cc_library(
         "//iree/schemas",
         "//iree/vm:fiber_state",
         "//iree/vm:sequencer_context",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/synchronization",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -164,6 +164,6 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/schemas",
-        "//third_party/flatbuffers",
+        "@flatbuffers",
     ],
 )

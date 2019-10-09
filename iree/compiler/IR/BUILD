@@ -3,7 +3,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-load("//third_party/llvm/llvm/projects/google_mlir:tblgen.bzl", "gentbl")
+load("@local_config_mlir//:tblgen.bzl", "gentbl")
 
 exports_files(["OpBase.td"])
 
@@ -43,10 +43,10 @@ cc_library(
         ":EnumsGen",
         ":OpsGen",
         ":StructureOpsGen",
-        "//third_party/llvm/llvm:support",
-        "//third_party/llvm/llvm/projects/google_mlir:IR",
-        "//third_party/llvm/llvm/projects/google_mlir:StandardOps",
-        "//third_party/llvm/llvm/projects/google_mlir:Support",
+        "@llvm//:support",
+        "@local_config_mlir//:IR",
+        "@local_config_mlir//:StandardOps",
+        "@local_config_mlir//:Support",
     ],
     alwayslink = 1,
 )
@@ -57,11 +57,11 @@ gentbl(
         ("-gen-op-decls", "ConfigOps.h.inc"),
         ("-gen-op-defs", "ConfigOps.cpp.inc"),
     ],
-    tblgen = "//third_party/llvm/llvm/projects/google_mlir:mlir-tblgen",
+    tblgen = "@local_config_mlir//:mlir-tblgen",
     td_file = "ConfigOps.td",
     td_srcs = [
         ":td_files",
-        "//third_party/llvm/llvm/projects/google_mlir:OpBaseTdFiles",
+        "@local_config_mlir//:OpBaseTdFiles",
     ],
 )
 
@@ -71,11 +71,11 @@ gentbl(
         ("-gen-enum-decls", "Enums.h.inc"),
         ("-gen-enum-defs", "Enums.cpp.inc"),
     ],
-    tblgen = "//third_party/llvm/llvm/projects/google_mlir:mlir-tblgen",
+    tblgen = "@local_config_mlir//:mlir-tblgen",
     td_file = "OpBase.td",
     td_srcs = [
         ":td_files",
-        "//third_party/llvm/llvm/projects/google_mlir:OpBaseTdFiles",
+        "@local_config_mlir//:OpBaseTdFiles",
     ],
 )
 
@@ -85,11 +85,11 @@ gentbl(
         ("-gen-op-decls", "Ops.h.inc"),
         ("-gen-op-defs", "Ops.cpp.inc"),
     ],
-    tblgen = "//third_party/llvm/llvm/projects/google_mlir:mlir-tblgen",
+    tblgen = "@local_config_mlir//:mlir-tblgen",
     td_file = "Ops.td",
     td_srcs = [
         ":td_files",
-        "//third_party/llvm/llvm/projects/google_mlir:OpBaseTdFiles",
+        "@local_config_mlir//:OpBaseTdFiles",
     ],
 )
 
@@ -99,10 +99,10 @@ gentbl(
         ("-gen-op-decls", "StructureOps.h.inc"),
         ("-gen-op-defs", "StructureOps.cpp.inc"),
     ],
-    tblgen = "//third_party/llvm/llvm/projects/google_mlir:mlir-tblgen",
+    tblgen = "@local_config_mlir//:mlir-tblgen",
     td_file = "StructureOps.td",
     td_srcs = [
         ":td_files",
-        "//third_party/llvm/llvm/projects/google_mlir:OpBaseTdFiles",
+        "@local_config_mlir//:OpBaseTdFiles",
     ],
 )

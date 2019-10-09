@@ -46,9 +46,9 @@ cc_library(
         "//iree/vm:opcode_info",
         "//iree/vm:stack",
         "//iree/vm:type",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -67,7 +67,7 @@ cc_library(
         "//iree/vm:context",
         "//iree/vm:module",
         "//iree/vm:module_printer",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -83,14 +83,14 @@ cc_library(
         "//iree/base:shape",
         "//iree/base:status",
         "//iree/hal:buffer_view",
-        "//third_party/absl/algorithm",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:flat_hash_set",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/memory",
-        "//third_party/absl/types:span",
-        "//third_party/tensorflow/lite/experimental/ruy",
-        "//third_party/tensorflow/lite/experimental/ruy:context",
+        "@com_google_absl//absl/algorithm",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
+        "@tensorflow///lite/experimental/ruy",
+        "@tensorflow///lite/experimental/ruy:context",
     ],
 )
 
@@ -101,7 +101,7 @@ cc_test(
         ":bytecode_kernels",
         "//iree/base:memory",
         "//iree/base:status_matchers",
-        "//testing/base/public:gunit_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -116,8 +116,8 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:buffer_view",
         "//iree/hal/host:host_local_command_processor",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -135,7 +135,7 @@ cc_library(
         "//iree/vm:context",
         "//iree/vm:function",
         "//iree/vm:stack",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -159,9 +159,9 @@ cc_library(
         "//iree/hal/host:host_local_allocator",
         "//iree/hal/host:host_submission_queue",
         "//iree/hal/host:inproc_command_buffer",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/memory",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
     ],
 )
 

@@ -38,12 +38,12 @@ cc_library(
         "//iree/vm/debug:debug_client",
         "//third_party/GL:GLES2_headers",
         "//third_party/SDL2",
-        "//third_party/absl/flags:flag",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
         "//third_party/dear_imgui",
         "//third_party/dear_imgui:imgui_sdl_opengl3",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -58,11 +58,11 @@ cc_library(
         "//iree/base:memory",
         "//iree/base:status",
         "//third_party/SDL2",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/memory",
-        "//third_party/absl/strings",
-        "//third_party/absl/synchronization",
         "//third_party/dear_imgui",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -111,9 +111,9 @@ cc_binary(
         "//iree/base:source_location",
         "//iree/base:status",
         "//third_party/SDL2",
-        "//third_party/absl/memory",
         "//third_party/dear_imgui",
         "//third_party/dear_imgui:imgui_sdl_opengl3",
+        "@com_google_absl//absl/memory",
     ],
 )
 
@@ -159,7 +159,7 @@ cc_binary(
         ":debug_prompt",
         "//iree/base:init",
         "//iree/base:status",
-        "//third_party/absl/flags:flag",
+        "@com_google_absl//absl/flags:flag",
     ],
 )
 
@@ -170,6 +170,6 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/vm/debug:debug_client",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/strings",
     ],
 )

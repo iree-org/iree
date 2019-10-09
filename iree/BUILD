@@ -1,4 +1,14 @@
 # Main IREE build file.
+# Note that project-wide, bazel repo aliases are used:
+#   "@absl_py//absl"
+#   "@com_google_absl//absl"
+#   "@local_config_mlir//"
+#   "@llvm//"
+#   "@flatbuffers//:flatbuffers"
+#   "@tensorflow//"
+#
+# Various scripts and helpers operate on these prefixes textually, so
+# avoid doing any systematic construction that would break the matching.
 
 package(
     default_visibility = ["//visibility:public"],

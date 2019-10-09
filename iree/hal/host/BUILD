@@ -16,8 +16,8 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:command_queue",
         "//iree/hal:fence",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/synchronization",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -33,9 +33,9 @@ cc_test(
         "//iree/hal:command_queue",
         "//iree/hal/testing:mock_command_buffer",
         "//iree/hal/testing:mock_command_queue",
-        "//testing/base/public:gunit_main",
-        "//third_party/absl/memory",
-        "//third_party/absl/time",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -48,7 +48,7 @@ cc_library(
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/hal:buffer",
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -69,10 +69,10 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:fence",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/synchronization",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -83,8 +83,8 @@ cc_test(
         ":host_fence",
         "//iree/base:status",
         "//iree/base:status_matchers",
-        "//testing/base/public:gunit_main",
-        "//third_party/absl/time",
+        "@com_google_absl//absl/time",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -126,9 +126,9 @@ cc_library(
         "//iree/hal:command_queue",
         "//iree/hal:fence",
         "//iree/hal:semaphore",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/synchronization",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -137,7 +137,7 @@ cc_test(
     srcs = ["host_submission_queue_test.cc"],
     deps = [
         ":host_submission_queue",
-        "//testing/base/public:gunit_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 

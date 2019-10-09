@@ -3,7 +3,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-load("//third_party/llvm/llvm/projects/google_mlir:tblgen.bzl", "gentbl")
+load("@local_config_mlir//:tblgen.bzl", "gentbl")
 
 filegroup(
     name = "td_files",
@@ -37,9 +37,9 @@ cc_library(
         "//iree/compiler/Serialization",
         "//iree/compiler/Utils",
         "//iree/schemas/bytecode:interpreter_bytecode_v0",
-        "//third_party/llvm/llvm:support",
-        "//third_party/llvm/llvm/projects/google_mlir:IR",
-        "//third_party/llvm/llvm/projects/google_mlir:StandardOps",
+        "@llvm//:support",
+        "@local_config_mlir//:IR",
+        "@local_config_mlir//:StandardOps",
     ],
     alwayslink = 1,
 )
@@ -50,11 +50,11 @@ gentbl(
         ("-gen-op-decls", "HLOps.h.inc"),
         ("-gen-op-defs", "HLOps.cpp.inc"),
     ],
-    tblgen = "//third_party/llvm/llvm/projects/google_mlir:mlir-tblgen",
+    tblgen = "@local_config_mlir//:mlir-tblgen",
     td_file = "HLOps.td",
     td_srcs = [
         ":td_files",
-        "//third_party/llvm/llvm/projects/google_mlir:include/mlir/IR/OpBase.td",
+        "@local_config_mlir//:include/mlir/IR/OpBase.td",
         "//iree/compiler/IR:OpBase.td",
     ],
 )
@@ -65,11 +65,11 @@ gentbl(
         ("-gen-op-decls", "LLOps.h.inc"),
         ("-gen-op-defs", "LLOps.cpp.inc"),
     ],
-    tblgen = "//third_party/llvm/llvm/projects/google_mlir:mlir-tblgen",
+    tblgen = "@local_config_mlir//:mlir-tblgen",
     td_file = "LLOps.td",
     td_srcs = [
         ":td_files",
-        "//third_party/llvm/llvm/projects/google_mlir:include/mlir/IR/OpBase.td",
+        "@local_config_mlir//:include/mlir/IR/OpBase.td",
         "//iree/compiler/IR:OpBase.td",
     ],
 )

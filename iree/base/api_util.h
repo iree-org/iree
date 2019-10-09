@@ -47,7 +47,7 @@ class StatusAdaptorForApiMacros {
 #define IREE_API_RETURN_IF_ERROR(expr)                         \
   IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_                    \
   if (::iree::status_macro_internal::StatusAdaptorForApiMacros \
-          status_adaptor = (expr)) {                           \
+          status_adaptor = {expr}) {                           \
   } else /* NOLINT */                                          \
     return ::iree::ToApiStatus(status_adaptor.Consume().code())
 

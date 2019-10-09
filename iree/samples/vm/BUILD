@@ -24,8 +24,8 @@ cc_test(
     ],
     deps = [
         ":simple_module_test_module_cc",
-        "//testing/base/public:gunit_main",
-        "//third_party/absl/strings",
+        "@com_google_googletest//:gtest_main",
+        "@com_google_absl//absl/strings",
         "//iree/base:flatbuffer_util",
         "//iree/base:status_matchers",
         "//iree/hal:buffer_view",

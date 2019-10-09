@@ -16,8 +16,8 @@ cc_library(
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -57,10 +57,10 @@ cc_library(
         "//iree/base:logging",
         "//iree/base:source_location",
         "//iree/base:status",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:span",
-        "//third_party/absl/types:variant",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 
@@ -75,9 +75,9 @@ cc_test(
         ":heap_buffer",
         "//iree/base:status",
         "//iree/base:status_matchers",
-        "//testing/base/public:gunit_main",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -90,8 +90,8 @@ cc_library(
         "//iree/base:shape",
         "//iree/base:source_location",
         "//iree/base:status",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/strings",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -106,7 +106,7 @@ cc_test(
         ":heap_buffer",
         "//iree/base:status",
         "//iree/base:status_matchers",
-        "//testing/base/public:gunit_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -120,8 +120,8 @@ cc_library(
         ":heap_buffer",
         "//iree/base:source_location",
         "//iree/base:status",
-        "//third_party/absl/strings",
-        "//third_party/absl/types:optional",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -132,7 +132,7 @@ cc_test(
         ":buffer_view_string_util",
         "//iree/base:status",
         "//iree/base:status_matchers",
-        "//testing/base/public:gunit_main",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -150,7 +150,7 @@ cc_library(
         "//iree/base:bitfield",
         "//iree/base:shape",
         "//iree/base:status",
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -175,8 +175,8 @@ cc_library(
         "//iree/base:bitfield",
         "//iree/base:status",
         "//iree/base:time",
-        "//third_party/absl/time",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -199,8 +199,8 @@ cc_test(
         ":heap_buffer",
         "//iree/base:status_matchers",
         "//iree/hal/testing:mock_allocator",
-        "//testing/base/public:gunit_main",
-        "//third_party/absl/memory",
+        "@com_google_absl//absl/memory",
+        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -217,7 +217,7 @@ cc_library(
         ":semaphore",
         "//iree/base:status",
         "//iree/base:time",
-        "//third_party/absl/time",
+        "@com_google_absl//absl/time",
     ],
 )
 
@@ -226,7 +226,7 @@ cc_library(
     hdrs = ["device_info.h"],
     deps = [
         "//iree/base:bitfield",
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -247,8 +247,8 @@ cc_library(
         "//iree/base:status",
         "//iree/base:time",
         "//iree/base:tracing",
-        "//third_party/absl/synchronization",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -275,8 +275,8 @@ cc_library(
         ":driver",
         "//iree/base:init",
         "//iree/base:status",
-        "//third_party/absl/base:core_headers",
-        "//third_party/absl/synchronization",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/synchronization",
     ],
 )
 
@@ -312,7 +312,7 @@ cc_library(
     name = "executable_format",
     hdrs = ["executable_format.h"],
     deps = [
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -321,7 +321,7 @@ cc_library(
     hdrs = ["executable_spec.h"],
     deps = [
         ":executable_format",
-        "//third_party/absl/types:span",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -345,7 +345,7 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:host_buffer",
-        "//third_party/absl/base:core_headers",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 
@@ -362,7 +362,7 @@ cc_library(
     hdrs = ["semaphore.h"],
     deps = [
         ":resource",
-        "//third_party/absl/types:variant",
+        "@com_google_absl//absl/types:variant",
     ],
 )
 

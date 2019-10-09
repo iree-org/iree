@@ -26,9 +26,9 @@ cc_test(
     ],
     deps = [
         ":simple_compute_test_module_cc",
-        "//third_party/absl/container:inlined_vector",
-        "//third_party/absl/strings",
-        "//third_party/absl/time",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
         "//iree/base:flatbuffer_util",
         "//iree/base:status_matchers",
         "//iree/hal:command_buffer",
