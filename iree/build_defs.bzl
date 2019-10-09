@@ -1,3 +1,5 @@
+load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
+
 """Common Bazel definitions for IREE."""
 
 def platform_trampoline_deps(basename):
@@ -39,3 +41,23 @@ PLATFORM_VULKAN_TEST_DEPS = [
 
     # TODO(b/138220713): Support SwiftShader use.
 ]
+
+def iree_build_test(name, targets):
+    """Dummy rule to ensure that targets build.
+
+    This is currently undefined in bazel and is preserved for compatibility.
+    """
+    pass
+
+def iree_flatbuffer_cc_library(**kwargs):
+    """Wrapper for the flatbuffer_cc_library."""
+
+    # TODO(laurenzo): The bazel rule for reflections seems broken in OSS
+    # builds. Fix it and enable by default.
+    flatbuffer_cc_library(gen_reflections = False, **kwargs)
+
+def iree_cc_embed_data(**kwargs):
+    """Wrapper for generating embedded data objects."""
+
+    # TODO(laurenzo): Implement me for OSS builds.
+    pass

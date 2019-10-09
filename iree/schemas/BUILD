@@ -1,6 +1,4 @@
-load("//third_party/flatbuffers:build_defs.bzl", "flatbuffer_cc_library")
-load("//tools/build_defs/cc:cc_embed_data.bzl", "cc_embed_data")
-load("//tools/build_rules:build_test.bzl", "build_test")
+load("//iree:build_defs.bzl", "iree_build_test", "iree_cc_embed_data", "iree_flatbuffer_cc_library")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -19,11 +17,10 @@ FLATC_ARGS = [
     "--gen-object-api",
 ]
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "archive_def_cc_fbs",
     srcs = ["archive_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
         ":bytecode_def_cc_fbs_includes",
         ":device_def_cc_fbs_includes",
@@ -39,20 +36,18 @@ flatbuffer_cc_library(
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "bytecode_def_cc_fbs",
     srcs = ["bytecode_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "debug_service_cc_fbs",
     srcs = ["debug_service.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
         ":bytecode_def_cc_fbs_includes",
         ":device_def_cc_fbs_includes",
@@ -68,70 +63,63 @@ flatbuffer_cc_library(
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "device_def_cc_fbs",
     srcs = ["device_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "device_group_def_cc_fbs",
     srcs = ["device_group_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "device_table_def_cc_fbs",
     srcs = ["device_table_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
         ":device_def_cc_fbs_includes",
         ":device_group_def_cc_fbs_includes",
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "executable_def_cc_fbs",
     srcs = ["executable_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "executable_table_def_cc_fbs",
     srcs = ["executable_table_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
         ":executable_def_cc_fbs_includes",
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "function_def_cc_fbs",
     srcs = ["function_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
         ":bytecode_def_cc_fbs_includes",
         ":type_def_cc_fbs_includes",
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "function_table_def_cc_fbs",
     srcs = ["function_table_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
         ":bytecode_def_cc_fbs_includes",
         ":function_def_cc_fbs_includes",
@@ -139,11 +127,10 @@ flatbuffer_cc_library(
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "module_def_cc_fbs",
     srcs = ["module_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
         ":bytecode_def_cc_fbs_includes",
         ":device_def_cc_fbs_includes",
@@ -158,34 +145,31 @@ flatbuffer_cc_library(
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "source_map_def_cc_fbs",
     srcs = ["source_map_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "spirv_executable_def_cc_fbs",
     srcs = ["spirv_executable_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
     ],
 )
 
-flatbuffer_cc_library(
+iree_flatbuffer_cc_library(
     name = "type_def_cc_fbs",
     srcs = ["type_def.fbs"],
     flatc_args = FLATC_ARGS,
-    gen_reflections = True,
     includes = [
     ],
 )
 
-build_test(
+iree_build_test(
     name = "schema_build_test",
     targets = [
         ":archive_def_cc_fbs",
@@ -237,19 +221,16 @@ cc_library(
         ":source_map_def_cc_fbs",
         ":spirv_executable_def_cc_fbs",
         ":type_def_cc_fbs",
-        "@flatbuffers",
+        "@com_github_google_flatbuffers//:flatbuffers",
     ],
 )
 
-cc_embed_data(
+iree_cc_embed_data(
     name = "reflection_data",
     srcs = [
         "archive_def.bfbs",
         "bytecode_def.bfbs",
         "debug_service.bfbs",
-        ":device_def.bfbs",
-        ":device_group_def.bfbs",
-        ":device_table_def.bfbs",
         "executable_def.bfbs",
         "executable_table_def.bfbs",
         "function_def.bfbs",
@@ -258,6 +239,9 @@ cc_embed_data(
         "source_map_def.bfbs",
         "spirv_executable_def.bfbs",
         "type_def.bfbs",
+        ":device_def.bfbs",
+        ":device_group_def.bfbs",
+        ":device_table_def.bfbs",
     ],
     outs = [
         "reflection_data.cc",

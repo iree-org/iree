@@ -32,7 +32,7 @@ cc_library(
         ":status_util",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -86,10 +86,10 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -110,10 +110,10 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_queue",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -135,9 +135,9 @@ cc_library(
         "//iree/base:status",
         "//iree/base:target_platform",
         "//iree/base:tracing",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -150,8 +150,8 @@ cc_library(
         ":status_util",
         "//iree/base:status",
         "//iree/base:tracing",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/types:span",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -162,9 +162,9 @@ cc_library(
         ":dynamic_symbols",
         ":extensibility_util",
         "//iree/base:ref_ptr",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/utility",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -181,11 +181,11 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:fence",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -196,7 +196,7 @@ cc_library(
     deps = [
         ":handle_util",
         "//iree/hal:semaphore",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -207,7 +207,7 @@ cc_library(
     deps = [
         ":handle_util",
         "//iree/hal:event",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -226,11 +226,11 @@ cc_library(
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
         "//iree/schemas:spirv_executable_def_cc_fbs",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/synchronization",
-        "@flatbuffers",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -249,8 +249,8 @@ cc_library(
         "//iree/hal:executable_cache",
         "//iree/hal:executable_spec",
         "//iree/schemas:spirv_executable_def_cc_fbs",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/container:inlined_vector",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -260,13 +260,15 @@ cc_library(
     hdrs = ["status_util.h"],
     deps = [
         "//iree/base:status",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
 cc_library(
     name = "vma_allocator",
     srcs = [
+        "internal_vk_mem_alloc.cc",
+        "internal_vk_mem_alloc.h",
         "vma_allocator.cc",
         "vma_buffer.cc",
     ],
@@ -274,19 +276,26 @@ cc_library(
         "vma_allocator.h",
         "vma_buffer.h",
     ],
+    copts = [
+        # Only needed in the implementation cc and not by external users.
+        "-DVMA_STATIC_VULKAN_FUNCTIONS=0",
+    ],
     deps = [
         ":dynamic_symbols",
         ":handle_util",
         ":status_util",
+        "//iree/base:logging",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:allocator",
         "//iree/hal:buffer",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
-        "//third_party/vulkan_memory_allocator",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/synchronization",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
+        "@vulkan_memory_allocator//:impl_header_only",
     ],
 )
 
@@ -315,12 +324,12 @@ cc_library(
         "//iree/hal:command_queue",
         "//iree/hal:device",
         "//iree/hal:fence",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/types:span",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -338,8 +347,8 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:device_info",
         "//iree/hal:driver",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
         "@com_google_absl//absl/container:inlined_vector",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 

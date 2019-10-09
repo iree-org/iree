@@ -27,12 +27,24 @@ local_repository(
 )
 
 local_repository(
-    name = "flatbuffers",
+    name = "com_github_google_flatbuffers",
     path = "third_party/flatbuffers",
 )
 
 new_local_repository(
     name = "com_google_tracing_framework_cpp",
     path = "third_party/google_tracing_framework/bindings/cpp",
-    build_file = "build_tools/third_party/google_tracing_framework_cpp/BUILD.bazel",
+    build_file = "build_tools/third_party/google_tracing_framework_cpp/BUILD.overlay",
+)
+
+new_local_repository(
+    name = "vulkan_headers",
+    path = "third_party/vulkan_headers",
+    build_file = "build_tools/third_party/vulkan_headers/BUILD.overlay",
+)
+
+new_local_repository(
+    name = "vulkan_memory_allocator",
+    path = "third_party/vulkan_memory_allocator",
+    build_file = "build_tools/third_party/vulkan_memory_allocator/BUILD.overlay",
 )

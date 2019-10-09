@@ -17,7 +17,7 @@ cc_library(
         "//iree/compiler/Utils",
         "//iree/hal:executable_format",
         "//iree/schemas",
-        "@flatbuffers",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",

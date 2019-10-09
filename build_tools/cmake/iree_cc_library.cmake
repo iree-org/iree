@@ -25,6 +25,7 @@ include(CMakeParseArguments)
 # DEPS: List of other libraries to be linked in to the binary targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
+# INCLUDES: Include directories to add to dependencies
 # LINKOPTS: List of link options
 # ALWAYSLINK: Always link the library into any binary with a transitive dep.
 # PUBLIC: Add this so that this library will be exported under iree::
@@ -66,7 +67,7 @@ function(iree_cc_library)
     _RULE
     "PUBLIC;ALWAYSLINK;TESTONLY"
     "NAME"
-    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
+    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS;INCLUDES"
     ${ARGN}
   )
 
@@ -101,6 +102,7 @@ function(iree_cc_library)
       target_include_directories(${_NAME}
         PUBLIC
           "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+          "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
       )
       target_compile_options(${_NAME}
         PRIVATE

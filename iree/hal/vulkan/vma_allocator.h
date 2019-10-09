@@ -23,7 +23,7 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/handle_util.h"
-#include "third_party/vulkan_memory_allocator/src/vk_mem_alloc.h"
+#include "iree/hal/vulkan/internal_vk_mem_alloc.h"
 
 namespace iree {
 namespace hal {

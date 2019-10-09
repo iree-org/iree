@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+set(VMA_SRC_ROOT
+  "${IREE_ROOT_DIR}/third_party/vulkan_memory_allocator/src/"
+)
+
 iree_cc_library(
   NAME
     debug_reporter
@@ -290,11 +294,21 @@ iree_cc_library(
     "vma_allocator.h"
     "vma_buffer.h"
   SRCS
+    "internal_vk_mem_alloc.cc"
+    "internal_vk_mem_alloc.h"
     "vma_allocator.cc"
     "vma_buffer.cc"
+  COPTS
+    # Only needed in the implementation cc and not by external users.
+    "-DVMA_STATIC_VULKAN_FUNCTIONS=0"
+  INCLUDES
+    ${VMA_SRC_ROOT}
   DEPS
     absl::flags
+    absl::flat_hash_map
     absl::memory
+    absl::synchronization
+    iree::base::logging
     iree::base::status
     iree::base::tracing
     iree::hal::allocator
@@ -302,7 +316,6 @@ iree_cc_library(
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::handle_util
     iree::hal::vulkan::status_util
-    vulkan_memory_allocator::no_prototypes
     Vulkan::Headers
   PUBLIC
 )

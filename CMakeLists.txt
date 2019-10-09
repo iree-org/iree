@@ -62,7 +62,6 @@ include(external_cc_library)
 include(flatbuffer_cc_library)
 
 add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/vulkan_memory_allocator EXCLUDE_FROM_ALL)
 
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)

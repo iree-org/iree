@@ -43,11 +43,11 @@ cc_library(
         "//iree/base:status",
         "//iree/schemas",
         "//iree/vm:module",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
-        "@flatbuffers",
     ],
 )
 
@@ -56,7 +56,7 @@ cc_library(
     hdrs = ["debug_server.h"],
     deps = [
         ":debug_server_interface",
-        "@flatbuffers",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "//iree/schemas",
         "//iree/base:status",
     ] + select({
@@ -89,10 +89,10 @@ cc_library(
         ":debug_tcp_util",
         "//iree/base:status",
         "//iree/schemas",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/synchronization",
-        "@flatbuffers",
     ],
 )
 
@@ -136,10 +136,10 @@ cc_library(
         "//iree/vm:fiber_state",
         "//iree/vm:instance",
         "//iree/vm:sequencer_context",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
-        "@flatbuffers",
     ],
 )
 
@@ -164,6 +164,6 @@ cc_library(
     deps = [
         "//iree/base:status",
         "//iree/schemas",
-        "@flatbuffers",
+        "@com_github_google_flatbuffers//:flatbuffers",
     ],
 )

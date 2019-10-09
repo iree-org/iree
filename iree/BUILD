@@ -4,7 +4,7 @@
 #   "@com_google_absl//absl"
 #   "@local_config_mlir//"
 #   "@llvm//"
-#   "@flatbuffers//:flatbuffers"
+#   "@com_github_google_flatbuffers//:flatbuffers"
 #   "@tensorflow//"
 #
 # Various scripts and helpers operate on these prefixes textually, so

@@ -18,6 +18,9 @@
 // size and ease debugging (such as by using absl::Mutex to get better tsan
 // warnings).
 
+// Only compile if an external implementation has not been otherwise linked.
+#if !defined(VULKAN_MEMORY_ALLOCATOR_EXTERNAL_IMPL)
+
 #include "absl/container/flat_hash_map.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/logging.h"
@@ -60,4 +63,6 @@ class AbslVmaRWMutex {
 #define VMA_RW_MUTEX AbslVmaRWMutex
 
 #define VMA_IMPLEMENTATION
-#include "third_party/vulkan_memory_allocator/src/vk_mem_alloc.h"
+#include "vk_mem_alloc.h"
+
+#endif

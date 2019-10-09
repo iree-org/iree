@@ -12,32 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-set(VMA_SRC_ROOT
-  "${IREE_ROOT_DIR}/third_party/vulkan_memory_allocator/src/"
-)
+package(default_visibility = ["//visibility:public"])
 
-set(VMA_COPTS_BASE
-  "-I${VMA_SRC_ROOT}"
-)
-
-external_cc_library(
-  PACKAGE
-    vulkan_memory_allocator
-  NAME
-    no_prototypes
-  ROOT
-    ${VMA_SRC_ROOT}
-  SRCS
-    "vk_mem_alloc.h"
-  HDRS
-    "vk_mem_alloc.h"
-  COPTS
-    "-I${VMA_SRC_ROOT}"
-    # Only needed in the implementation cc and not by external users.
-    "-DVMA_STATIC_VULKAN_FUNCTIONS=0"
-  DEPS
-    absl::flat_hash_map
-    absl::synchronization
-    iree::base::logging
-  PUBLIC
+# Exports all headers but defining VK_NO_PROTOTYPES to disable the
+# inclusion of C function prototypes. Useful if dynamically loading
+# all symbols via dlopen/etc.
+# Not all headers are hermetic, so they are just included as textual
+# headers to disable additional validation.
+cc_library(
+    name = "vulkan_headers_no_prototypes",
+    defines = ["VK_NO_PROTOTYPES"],
+    includes = ["include"],
+    textual_hdrs = glob(["include/vulkan/*.h"]),
 )

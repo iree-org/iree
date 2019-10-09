@@ -35,8 +35,7 @@ config_setting(
 
 cc_library(
     name = "tracing_framework_bindings_cpp",
-    srcs = glob(
-        ["*.cc"],
+    srcs = glob(["*.cc"],
         exclude = ["*_test.cc"],
     ) + glob(["include/wtf/platform/*.h"]),
     hdrs = glob(["include/wtf/*.h"]),

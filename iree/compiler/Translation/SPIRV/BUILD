@@ -30,7 +30,7 @@ cc_library(
         "//iree/compiler/Utils",
         "//iree/schemas",
         "//iree/schemas:spirv_executable_def_cc_fbs",
-        "@flatbuffers",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
