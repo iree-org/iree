@@ -22,6 +22,7 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/memory/memory.h"
 #include "absl/synchronization/mutex.h"
+#include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/tools/debugger/debug_app.h"
 
@@ -97,6 +98,7 @@ StatusOr<std::unique_ptr<EmbeddedDebugger>> LaunchDebugger() {
 StatusOr<std::unique_ptr<EmbeddedDebugger>> AttachDebugger(
     absl::string_view service_address) {
   LOG(INFO) << "Launching embedded debugger; service=" << service_address;
+  // Workaround for terrible bad SDL/graphics driver leaks.
   IREE_DISABLE_LEAK_CHECKS();
 
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {

@@ -27,6 +27,7 @@ cc_library(
     srcs = ["debug_app.cc"],
     hdrs = ["debug_app.h"],
     deps = [
+        "//iree/base:memory",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/schemas",
@@ -54,6 +55,7 @@ cc_library(
     hdrs = ["debug_app_embedded.h"],
     deps = [
         ":debug_app_library",
+        "//iree/base:memory",
         "//iree/base:status",
         "//third_party/SDL2",
         "//third_party/absl/base:core_headers",

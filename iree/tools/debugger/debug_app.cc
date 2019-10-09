@@ -26,6 +26,7 @@
 #include "absl/types/optional.h"
 #include "third_party/dear_imgui/imgui.h"
 #include "third_party/dear_imgui/imgui_internal.h"
+#include "iree/base/memory.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/schemas/debug_service_generated.h"
@@ -436,6 +437,7 @@ Status DebugApp::PumpMainLoop() {
   glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
   glClearColor(0.45f, 0.55f, 0.60f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);
+  // Workaround for terrible bad SDL/graphics driver leaks.
   IREE_DISABLE_LEAK_CHECKS();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   IREE_ENABLE_LEAK_CHECKS();
