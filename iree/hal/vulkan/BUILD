@@ -47,6 +47,7 @@ cc_library(
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:tracing",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 

@@ -36,6 +36,7 @@ iree_cc_library(
   SRCS
     "descriptor_pool_cache.cc"
   DEPS
+    absl::inlined_vector
     iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
