@@ -15,6 +15,7 @@
 #include "iree/compiler/IR/Dialect.h"
 #include "iree/compiler/IR/Sequencer/HLDialect.h"
 #include "iree/compiler/IR/Sequencer/LLDialect.h"
+#include "iree/compiler/Transforms/Rewrites.h"
 #include "iree/compiler/Transforms/Sequencer/Rewrites.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/PatternMatch.h"
@@ -35,7 +36,9 @@ class LowerToSequencerDialectPass
     MemRefTypeConverter converter(ctx);
     xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns, ctx);
     xla_hlo::PopulateXlaToStdPatterns(&patterns, ctx);
+    populateLowerStdToIreePatterns(patterns, ctx);
     populateLowerStdToSequencerPatterns(patterns, converter, ctx);
+    populateLowerXlaToIreePatterns(patterns, ctx);
     populateLowerXlaToSequencerPatterns(patterns, ctx);
 
     ConversionTarget target(getContext());

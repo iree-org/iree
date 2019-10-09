@@ -40,24 +40,6 @@ namespace iree_compiler {
 
 namespace {
 
-struct ConstantOpLowering : public ConversionPattern {
-  explicit ConstantOpLowering(MLIRContext *context)
-      : ConversionPattern(ConstantOp::getOperationName(), 1, context) {}
-
-  PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto midOp = rewriter.create<IREE::ConstantOp>(
-        op->getLoc(), cast<ConstantOp>(op).getValue());
-
-    auto result = wrapAsTensor(midOp.getResult(), op, rewriter);
-    rewriter.replaceOp(
-        op, {loadResultValue(op->getLoc(), op->getResult(0)->getType(), result,
-                             rewriter)});
-    return matchSuccess();
-  }
-};
-
 class CallOpLowering : public ConversionPattern {
  public:
   explicit CallOpLowering(MLIRContext *context)
@@ -200,24 +182,6 @@ struct DeallocOpLowering : public ConversionPattern {
   }
 };
 
-struct ExtractElementOpLowering : public ConversionPattern {
-  explicit ExtractElementOpLowering(MLIRContext *context)
-      : ConversionPattern(ExtractElementOp::getOperationName(), 1, context) {}
-  PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto extractOp = cast<ExtractElementOp>(op);
-    Value *memRefInput = wrapAsMemRef(
-        loadAccessValue(op->getLoc(), extractOp.getAggregate(), rewriter), op,
-        rewriter);
-
-    SmallVector<Value *, 4> indices = {extractOp.indices().begin(),
-                                       extractOp.indices().end()};
-    rewriter.replaceOpWithNewOp<LoadOp>(op, memRefInput, indices);
-    return matchSuccess();
-  }
-};
-
 struct LoadOpLowering : public OpRewritePattern<LoadOp> {
   using OpRewritePattern::OpRewritePattern;
   PatternMatchResult matchAndRewrite(LoadOp loadOp,
@@ -330,22 +294,20 @@ BINARY_OP_LOWERING(DivFOp, IREEInterp::HL::DivFOp);
 
 void populateLowerStdToInterpreterPatterns(OwningRewritePatternList &patterns,
                                            MLIRContext *ctx) {
-  patterns.insert<ConstantOpLowering,
-                  // Control flow.
-                  CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
-                  BranchOpLowering, CondBranchOpLowering, CmpIOpLowering,
-                  CmpFOpLowering,
-                  // Memory management.
-                  AllocOpLowering, DeallocOpLowering, ExtractElementOpLowering,
-                  LoadOpLowering, StoreOpLowering,
-                  // Shape operations.
-                  DimOpLowering,
-                  // Logical ops.
-                  AndOpLowering, OrOpLowering,
-                  // Arithmetic ops.
-                  AddIOpLowering, AddFOpLowering, SubIOpLowering,
-                  SubFOpLowering, MulIOpLowering, MulFOpLowering,
-                  DivISOpLowering, DivIUOpLowering, DivFOpLowering>(ctx);
+  patterns.insert<
+      // Control flow.
+      CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
+      BranchOpLowering, CondBranchOpLowering, CmpIOpLowering, CmpFOpLowering,
+      // Memory management.
+      AllocOpLowering, DeallocOpLowering, LoadOpLowering, StoreOpLowering,
+      // Shape operations.
+      DimOpLowering,
+      // Logical ops.
+      AndOpLowering, OrOpLowering,
+      // Arithmetic ops.
+      AddIOpLowering, AddFOpLowering, SubIOpLowering, SubFOpLowering,
+      MulIOpLowering, MulFOpLowering, DivISOpLowering, DivIUOpLowering,
+      DivFOpLowering>(ctx);
 }
 
 }  // namespace iree_compiler

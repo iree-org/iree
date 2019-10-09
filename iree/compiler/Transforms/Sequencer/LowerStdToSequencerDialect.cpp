@@ -53,25 +53,6 @@ class SequencerConversionPattern : public ConversionPattern {
   MemRefTypeConverter &typeConverter_;
 };
 
-struct ConstantOpLowering : public SequencerConversionPattern {
-  ConstantOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(ConstantOp::getOperationName(), 1, context,
-                                   typeConverter) {}
-
-  PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    const auto &valueAttr = cast<ConstantOp>(op).getValue();
-    auto midOp = rewriter.create<IREE::ConstantOp>(op->getLoc(), valueAttr);
-
-    auto result = wrapAsTensor(midOp.getResult(), op, rewriter);
-    rewriter.replaceOp(
-        op, {loadResultValue(op->getLoc(), op->getResult(0)->getType(), result,
-                             rewriter)});
-    return matchSuccess();
-  }
-};
-
 class CallOpLowering : public SequencerConversionPattern {
  public:
   CallOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
@@ -258,13 +239,13 @@ class StoreOpLowering : public SequencerConversionPattern {
 void populateLowerStdToSequencerPatterns(OwningRewritePatternList &patterns,
                                          MemRefTypeConverter &converter,
                                          MLIRContext *context) {
-  patterns.insert<ConstantOpLowering,
-                  // Control flow.
-                  CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
-                  BranchOpLowering, CondBranchOpLowering,
-                  // Memory management.
-                  AllocOpLowering, DeallocOpLowering, LoadOpLowering,
-                  StoreOpLowering>(context, converter);
+  patterns.insert<
+      // Control flow.
+      CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
+      BranchOpLowering, CondBranchOpLowering,
+      // Memory management.
+      AllocOpLowering, DeallocOpLowering, LoadOpLowering, StoreOpLowering>(
+      context, converter);
 }
 
 }  // namespace iree_compiler

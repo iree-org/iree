@@ -21,6 +21,7 @@ iree_cc_library(
   HDRS
     "ConversionUtils.h"
     "Passes.h"
+    "Rewrites.h"
   SRCS
     "AggressiveOpElimination.cpp"
     "AssignFunctionOrdinals.cpp"
@@ -30,6 +31,8 @@ iree_cc_library(
     "DropUnusedExecutables.cpp"
     "LegalizeTupleElementAccess.cpp"
     "LegalizeTypeStorage.cpp"
+    "LowerStdToIreeDialect.cpp"
+    "LowerXLAToIreeDialect.cpp"
   DEPS
     iree::compiler::IR
     iree::compiler::Utils

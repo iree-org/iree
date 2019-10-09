@@ -167,16 +167,6 @@ struct ConcatOpLowering : public XlaOpLowering<xla_hlo::ConcatenateOp> {
   }
 };
 
-struct ConstOpLowering : public XlaOpLowering<xla_hlo::ConstOp> {
-  using XlaOpLowering::XlaOpLowering;
-
-  Operation *rewriteInternal(
-      xla_hlo::ConstOp *op, ArrayRef<Value *> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    return rewriter.create<IREE::ConstantOp>(op->getLoc(), op->value());
-  }
-};
-
 struct DotOpLowering : public XlaOpLowering<xla_hlo::DotOp> {
   using XlaOpLowering::XlaOpLowering;
 
@@ -545,13 +535,13 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
 
 void populateLowerXlaToInterpreterPatterns(OwningRewritePatternList &patterns,
                                            MLIRContext *ctx) {
-  patterns.insert<BroadcastInDimOpLowering, ConcatOpLowering, ConstOpLowering,
-                  ConvertLowering, CopyOpLowering, DotOpLowering,
-                  DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
-                  GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
-                  PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
-                  RsqrtOpLowering, SelectOpLowering, SliceOpLowering,
-                  TransposeOpLowering, TanhOpLowering>(ctx);
+  patterns
+      .insert<BroadcastInDimOpLowering, ConcatOpLowering, ConvertLowering,
+              CopyOpLowering, DotOpLowering, DynamicUpdateSliceOpLowering,
+              ExpOpLowering, FloorOpLowering, GatherOpLowering, LogOpLowering,
+              MaxOpLowering, MinOpLowering, PadOpLowering, ReshapeOpLowering,
+              ReverseOpLowering, RsqrtOpLowering, SelectOpLowering,
+              SliceOpLowering, TransposeOpLowering, TanhOpLowering>(ctx);
 }
 
 namespace {

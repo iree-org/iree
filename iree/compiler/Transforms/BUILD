@@ -14,10 +14,13 @@ cc_library(
         "DropUnusedExecutables.cpp",
         "LegalizeTupleElementAccess.cpp",
         "LegalizeTypeStorage.cpp",
+        "LowerStdToIreeDialect.cpp",
+        "LowerXLAToIreeDialect.cpp",
     ],
     hdrs = [
         "ConversionUtils.h",
         "Passes.h",
+        "Rewrites.h",
     ],
     deps = [
         "//iree/compiler/IR",

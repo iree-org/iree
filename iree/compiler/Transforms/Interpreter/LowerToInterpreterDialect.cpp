@@ -16,6 +16,7 @@
 #include "iree/compiler/IR/Interpreter/HLDialect.h"
 #include "iree/compiler/IR/Interpreter/LLDialect.h"
 #include "iree/compiler/Transforms/Interpreter/Rewrites.h"
+#include "iree/compiler/Transforms/Rewrites.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -34,7 +35,9 @@ class LowerToInterpreterDialectPass
     auto* ctx = &getContext();
     xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns, ctx);
     xla_hlo::PopulateXlaToStdPatterns(&patterns, ctx);
+    populateLowerStdToIreePatterns(patterns, ctx);
     populateLowerStdToInterpreterPatterns(patterns, ctx);
+    populateLowerXlaToIreePatterns(patterns, ctx);
     populateLowerXlaToInterpreterPatterns(patterns, ctx);
 
     ConversionTarget target(getContext());
