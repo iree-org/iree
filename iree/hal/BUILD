@@ -36,6 +36,7 @@ cc_library(
         "//iree/base:api_util",
         "//iree/base:shape",
         "//iree/base:tracing",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 

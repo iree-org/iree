@@ -14,6 +14,7 @@
 
 #include "iree/hal/api.h"
 
+#include "absl/base/macros.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/shape.h"
@@ -298,7 +299,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_shape(
 
   const auto& shape = handle->impl.shape;
   out_shape->rank = shape.size();
-  if (shape.size() > arraysize(out_shape->dims)) {
+  if (shape.size() > ABSL_ARRAYSIZE(out_shape->dims)) {
     return IREE_STATUS_OUT_OF_RANGE;
   }
   for (int i = 0; i < out_shape->rank; ++i) {
