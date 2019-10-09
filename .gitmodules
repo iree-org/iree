@@ -34,3 +34,6 @@
 	path = third_party/gemmlowp
 	url = https://github.com/google/gemmlowp.git
 	shallow = true
+[submodule "third_party/google_tracing_framework"]
+	path = third_party/google_tracing_framework
+	url = https://github.com/google/tracing-framework.git
