@@ -1,5 +1,6 @@
 """Common Bazel definitions for IREE."""
 
+load("//build_tools/third_party/glslang:build_defs.bzl", "glsl_vulkan")
 load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 
 def platform_trampoline_deps(basename):
@@ -75,3 +76,6 @@ def iree_cc_embed_data(**kwargs):
 
 def iree_glob_lit_tests(**kwargs):
     print("TODO: glob_lit_tests is presently a no-op")
+
+def iree_glsl_vulkan(**kwargs):
+    glsl_vulkan(**kwargs)

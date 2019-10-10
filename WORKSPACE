@@ -102,3 +102,19 @@ maybe(new_local_repository,
     path = "third_party/vulkan_memory_allocator",
     build_file = "build_tools/third_party/vulkan_memory_allocator/BUILD.overlay",
 )
+
+maybe(new_local_repository,
+    name = "glslang",
+    path = "third_party/glslang",
+    build_file = "build_tools/third_party/glslang/BUILD.overlay",
+)
+
+maybe(local_repository,
+    name = "spirv_tools",
+    path = "third_party/spirv_tools",
+)
+
+maybe(local_repository,
+    name = "spirv_headers",
+    path = "third_party/spirv_headers",
+)

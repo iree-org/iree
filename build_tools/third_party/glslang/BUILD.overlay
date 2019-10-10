@@ -1,0 +1,119 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "glslang",
+    srcs = glob(
+        [
+            "glslang/GenericCodeGen/*.cpp",
+            "glslang/MachineIndependent/*.cpp",
+            "glslang/MachineIndependent/preprocessor/*.cpp",
+            "hlsl/*.cpp",
+        ],
+        exclude = [
+            "glslang/MachineIndependent/pch.cpp",
+            "glslang/MachineIndependent/pch.h",
+            "hlsl/pch.cpp",
+            "hlsl/pch.h",
+        ],
+    ) + [
+        "OGLCompilersDLL/InitializeDll.cpp",
+        "glslang/OSDependent/Unix/ossource.cpp",
+    ],
+    hdrs = glob([
+        "glslang/Include/*.h",
+        "glslang/MachineIndependent/*.h",
+        "glslang/MachineIndependent/preprocessor/*.h",
+        "hlsl/*.h",
+    ]) + [
+        "OGLCompilersDLL/InitializeDll.h",
+        "StandAlone/DirStackFileIncluder.h",
+        "glslang/OSDependent/osinclude.h",
+        "glslang/Public/ShaderLang.h",
+    ],
+    includes = ["glslang/MachineIndependent"],
+    defines = [
+        "AMD_EXTENSIONS",
+        "ENABLE_HLSL",
+        "ENABLE_OPT=1",
+        "GLSLANG_OSINCLUDE_UNIX",
+        "NV_EXTENSIONS",
+    ],
+    linkstatic = 1,
+    # glslang is not clean under signed-integer-overflow or null sanitizers
+    nocopts = "-fsanitize=.*",
+)
+
+cc_library(
+    name = "SPIRV_headers",
+    hdrs = [
+        "SPIRV/GLSL.ext.AMD.h",
+        "SPIRV/GLSL.ext.EXT.h",
+        "SPIRV/GLSL.ext.KHR.h",
+        "SPIRV/GLSL.ext.NV.h",
+        "SPIRV/GLSL.std.450.h",
+        "SPIRV/spirv.hpp",
+    ],
+    includes = ["."],
+    linkstatic = 1,
+)
+
+cc_library(
+    name = "SPIRV",
+    srcs = glob(["SPIRV/*.cpp"]),
+    hdrs = [
+        "SPIRV/GlslangToSpv.h",
+        "SPIRV/Logger.h",
+        "SPIRV/SPVRemapper.h",
+        "SPIRV/SpvBuilder.h",
+        "SPIRV/SpvTools.h",
+        "SPIRV/bitutils.h",
+        "SPIRV/disassemble.h",
+        "SPIRV/doc.h",
+        "SPIRV/hex_float.h",
+        "SPIRV/spvIR.h",
+    ],
+    linkstatic = 1,
+    # glslang is not clean under signed-integer-overflow or null sanitizers
+    nocopts = "-fsanitize=.*",
+    deps = [
+        ":SPIRV_headers",
+        ":glslang",
+        "@spirv_tools//:spirv_tools_opt",
+    ],
+)
+
+cc_library(
+    name = "glslang-default-resource-limits",
+    srcs = ["StandAlone/ResourceLimits.cpp"],
+    hdrs = ["StandAlone/ResourceLimits.h"],
+    deps = [":glslang"],
+)
+
+cc_binary(
+    name = "glslangValidator",
+    srcs = [
+        "StandAlone/StandAlone.cpp",
+        "StandAlone/Worklist.h",
+    ],
+    deps = [
+        ":SPIRV",
+        ":glslang",
+        ":glslang-default-resource-limits",
+    ],
+    # TODO(laurenzo): Windows?
+    linkopts = ["-pthread"],
+)
