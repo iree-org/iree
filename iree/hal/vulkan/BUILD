@@ -1,6 +1,6 @@
 # HAL implementation using Vulkan and (likely) SPIR-V executables.
 
-load("//iree:build_defs.bzl", "PLATFORM_VULKAN_LOADER_COPTS")
+load("//iree:build_defs.bzl", "PLATFORM_VULKAN_LOADER_COPTS", "PLATFORM_VULKAN_TEST_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -139,6 +139,15 @@ cc_library(
         "@com_google_absl//absl/memory",
         "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
+)
+
+cc_test(
+    name = "dynamic_symbols_test",
+    srcs = ["dynamic_symbols_test.cc"],
+    deps = [
+        ":status_util",
+        ":dynamic_symbols",
+    ] + PLATFORM_VULKAN_TEST_DEPS,
 )
 
 cc_library(
