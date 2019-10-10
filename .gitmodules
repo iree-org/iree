@@ -39,3 +39,6 @@
 	url = https://github.com/google/tracing-framework.git
 	shallow = true
 	fetchRecurseSubmodules = false
+[submodule "third_party/glslang"]
+	path = third_party/glslang
+	url = https://github.com/KhronosGroup/glslang.git
