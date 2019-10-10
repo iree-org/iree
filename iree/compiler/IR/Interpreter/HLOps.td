@@ -334,6 +334,8 @@ def IREEInterpHL_CloneOp :
     IREEInterpHL_PureOp<"clone", [SameOperandsAndResultType]> {
   let arguments = (ins IREEHL_MemRef:$src);
   let results = (outs IREEHL_MemRef);
+
+  let hasFolder = 1;
 }
 
 // A pseudo op provided for convenience. This gets canonicalized to a series of

@@ -186,6 +186,17 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// iree_hl_interp.clone
+//===----------------------------------------------------------------------===//
+
+OpFoldResult CloneOp::fold(ArrayRef<Attribute> operands) {
+  // If this is the only usage, we know the clone is unnecessary.
+  // TODO(b/135053584) More sophisticated analysis.
+  if (src()->hasOneUse()) return src();
+  return {};
+}
+
+//===----------------------------------------------------------------------===//
 // iree_hl_interp.concat
 //===----------------------------------------------------------------------===//
 

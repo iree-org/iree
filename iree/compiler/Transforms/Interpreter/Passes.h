@@ -31,9 +31,6 @@ std::unique_ptr<OpPassBase<ModuleOp>> createMakeExecutableABIPass();
 // Lowers IREE HL ops (iree_hl_interp.*) to LL ops (iree_ll_interp.*).
 std::unique_ptr<OpPassBase<FuncOp>> createLowerInterpreterDialectPass();
 
-// Legalizes all ops to canonical/supported forms.
-std::unique_ptr<OpPassBase<FuncOp>> createLegalizeInterpreterOpsPass();
-
 // Lowers input dialect ops (e.g. std, xla_hlo) to IREE Interpreter HL dialect.
 std::unique_ptr<OpPassBase<FuncOp>> createLowerToInterpreterDialectPass();
 

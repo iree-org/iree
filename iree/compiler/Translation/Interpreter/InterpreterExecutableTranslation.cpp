@@ -101,7 +101,6 @@ void buildInterpreterConversionPassPipeline(PassManager *passManager) {
   passManager->addPass(createLegalizeTypeStoragePass());
 
   // Perform any last-minute optimizations to trim down the IR.
-  passManager->addPass(createLegalizeInterpreterOpsPass());
   passManager->addPass(createAggressiveOpEliminationPass());
   passManager->addPass(createCanonicalizerPass());
   passManager->addPass(createLoopFusionPass());

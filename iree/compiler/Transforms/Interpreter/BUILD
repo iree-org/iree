@@ -9,7 +9,6 @@ cc_library(
     name = "Interpreter",
     srcs = [
         "ExpandReductionsToOps.cpp",
-        "LegalizeInterpreterOps.cpp",
         "LowerInterpreterDialect.cpp",
         "LowerStdToInterpreterDialect.cpp",
         "LowerToInterpreterDialect.cpp",

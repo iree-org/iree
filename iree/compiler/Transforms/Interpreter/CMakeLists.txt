@@ -20,7 +20,6 @@ iree_cc_library(
     "Rewrites.h"
   SRCS
     "ExpandReductionsToOps.cpp"
-    "LegalizeInterpreterOps.cpp"
     "LowerInterpreterDialect.cpp"
     "LowerStdToInterpreterDialect.cpp"
     "LowerToInterpreterDialect.cpp"
