@@ -34,6 +34,6 @@ cc_library(
         "@local_config_mlir//:Support",
         "@local_config_mlir//:TransformUtils",
         "@local_config_mlir//:Transforms",
-        "@tensorflow///compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
 )

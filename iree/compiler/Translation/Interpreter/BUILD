@@ -23,9 +23,9 @@ cc_library(
         "@local_config_mlir//:Support",
         "@local_config_mlir//:Transforms",
         "@local_config_mlir//:Translation",
-        "@tensorflow///compiler/mlir/xla:hlo",
-        "@tensorflow///compiler/mlir/xla:xla_dialect_registration",
-        "@tensorflow///compiler/mlir/xla:xla_legalize_to_standard",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_standard",
     ],
     alwayslink = 1,
 )

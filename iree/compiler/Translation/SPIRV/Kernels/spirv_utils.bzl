@@ -1,7 +1,7 @@
 """Utilities for handling hand-written SPIR-V files."""
 
 load("//third_party/glslang:build_defs.bzl", "glsl_vulkan")
-load("//tools/build_defs/cc:cc_embed_data.bzl", "cc_embed_data")
+load("//iree:build_defs.bzl", "iree_cc_embed_data")
 
 def spirv_kernel_cc_library(name, srcs):
     """Compiles GLSL files into SPIR-V binaries and embeds them in a cc_library.
@@ -22,7 +22,7 @@ def spirv_kernel_cc_library(name, srcs):
         name = name + "_files",
         srcs = spv_files,
     )
-    cc_embed_data(
+    iree_cc_embed_data(
         name = name,
         srcs = spv_files,
         outs = [

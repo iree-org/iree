@@ -5,7 +5,7 @@
 #   "@local_config_mlir//"
 #   "@llvm//"
 #   "@com_github_google_flatbuffers//:flatbuffers"
-#   "@tensorflow//"
+#   "@org_tensorflow//tensorflow"
 #
 # Various scripts and helpers operate on these prefixes textually, so
 # avoid doing any systematic construction that would break the matching.

@@ -72,3 +72,6 @@ def iree_cc_embed_data(**kwargs):
 
     # TODO(laurenzo): Implement me for OSS builds.
     pass
+
+def iree_glob_lit_tests(**kwargs):
+    print("TODO: glob_lit_tests is presently a no-op")

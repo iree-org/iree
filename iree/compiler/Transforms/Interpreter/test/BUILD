@@ -1,13 +1,13 @@
 # Tests for lowering MLIR in various dialects to IREE interpreter bytecode.
 
-load("//third_party/llvm/build_defs:lit.bzl", "glob_lit_tests")
+load("//iree:build_defs.bzl", "iree_glob_lit_tests")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-glob_lit_tests(
+iree_glob_lit_tests(
     data = [":test_utilities"],
     driver = "//iree/tools:run_lit.sh",
     test_file_exts = ["mlir"],

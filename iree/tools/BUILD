@@ -25,8 +25,8 @@ cc_binary(
         "@local_config_mlir//:MlirOptLib",
         "@local_config_mlir//:MlirOptMain",
         "@local_config_mlir//:StandardDialectRegistration",
-        "@tensorflow///compiler/mlir/xla:hlo",
-        "@tensorflow///compiler/mlir/xla:xla_dialect_registration",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ],
 )
 
@@ -78,7 +78,7 @@ cc_binary(
         "@local_config_mlir//:Support",
         "@local_config_mlir//:TranslateClParser",
         "@local_config_mlir//:Translation",
-        "@tensorflow///compiler/mlir/xla:xla_dialect_registration",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ],
 )
 
