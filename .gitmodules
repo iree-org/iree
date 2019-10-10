@@ -37,3 +37,5 @@
 [submodule "third_party/google_tracing_framework"]
 	path = third_party/google_tracing_framework
 	url = https://github.com/google/tracing-framework.git
+	shallow = true
+	fetchRecurseSubmodules = false
