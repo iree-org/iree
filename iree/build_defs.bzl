@@ -1,6 +1,6 @@
-load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
-
 """Common Bazel definitions for IREE."""
+
+load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 
 def platform_trampoline_deps(basename):
     """Produce a list of deps for the given `basename` platform target.
