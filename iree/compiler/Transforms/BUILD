@@ -12,7 +12,6 @@ cc_library(
         "ConvertToMemRefCallingConvention.cpp",
         "DropUnreachableFunctions.cpp",
         "DropUnusedExecutables.cpp",
-        "LegalizeTupleElementAccess.cpp",
         "LegalizeTypeStorage.cpp",
         "LowerStdToIreeDialect.cpp",
         "LowerXLAToIreeDialect.cpp",

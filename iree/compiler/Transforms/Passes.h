@@ -33,9 +33,6 @@ createConvertToMemRefCallingConventionPass();
 std::unique_ptr<OpPassBase<ModuleOp>>
 createConvertFromTupleCallingConventionPass();
 
-// Removes all uses of XLA Tuples by evaluating their selection statically.
-std::unique_ptr<OpPassBase<FuncOp>> createLegalizeTupleElementAccessPass();
-
 // Legalizes all types to ones supported by the IREE VM.
 std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeTypeStoragePass();
 

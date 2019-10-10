@@ -71,7 +71,7 @@ void buildLegalizeInputPassPipeline(PassManager *passManager) {
 
   // Expand uses of tuples into independent args/results.
   passManager->addPass(createConvertFromTupleCallingConventionPass());
-  passManager->addPass(createLegalizeTupleElementAccessPass());
+  passManager->addPass(createCanonicalizerPass());
 }
 
 // Builds a pass pipeline that converts functions to the iree_hl_interp dialect.

@@ -79,7 +79,7 @@ void buildLegalizeInputPassPipeline(PassManager *passManager) {
 
   // Expand uses of tuples into independent args/results.
   passManager->addPass(createConvertFromTupleCallingConventionPass());
-  passManager->addPass(createLegalizeTupleElementAccessPass());
+  passManager->addPass(createCanonicalizerPass());
 }
 
 // Builds a pass pipeline that partitions the module into sequencer functions
