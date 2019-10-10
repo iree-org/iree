@@ -9,8 +9,8 @@ func @staticOutputEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>)
   // CHECK-NEXT: %1 = call @staticOutput(%0) : (tensor<4x2xf32>) -> tensor<4x2xf32>
   %1 = call @staticOutput(%0) : (tensor<4x2xf32>) -> tensor<4x2xf32>
   // CHECK-NEXT: %2 = iree.tensor_to_memref(%1 : tensor<4x2xf32>) : memref<4x2xf32>
-  // CHECK-NEXT: %3 = iree.constant dense<0> : tensor<2xi64>
-  // CHECK-NEXT: %4 = iree.constant dense<[4, 2]> : tensor<2xi64>
+  // CHECK-NEXT: %3 = iree.constant[dense<0> : tensor<2xi64>
+  // CHECK-NEXT: %4 = iree.constant[dense<[4, 2]> : tensor<2xi64>
   // CHECK-NEXT: "iree_hl_interp.copy"(%2, %3, %arg1, %3, %4)
   iree.store_output(%1 : tensor<4x2xf32>, %arg1 : memref<4x2xf32>)
   // CHECK-NEXT: return
@@ -54,8 +54,8 @@ func @scalarTensorFnEntry(%arg0: memref<f32>, %arg1: memref<f32>)
   // CHECK-NEXT: %1 = call @scalarTensorFn(%0) : (tensor<f32>) -> tensor<f32>
   %1 = call @scalarTensorFn(%0) : (tensor<f32>) -> tensor<f32>
   // CHECK-NEXT: %2 = iree.tensor_to_memref(%1 : tensor<f32>) : memref<f32>
-  // CHECK-NEXT: %3 = iree.constant dense<[]> : tensor<0xi64>
-  // CHECK-NEXT: %4 = iree.constant dense<[]> : tensor<0xi64>
+  // CHECK-NEXT: %3 = iree.constant[dense<[]> : tensor<0xi64>
+  // CHECK-NEXT: %4 = iree.constant[dense<[]> : tensor<0xi64>
   // CHECK-NEXT: "iree_hl_interp.copy"(%2, %3, %arg1, %3, %4) : (memref<f32>, memref<0xi64>, memref<f32>, memref<0xi64>, memref<0xi64>) -> ()
   iree.store_output(%1 : tensor<f32>, %arg1 : memref<f32>)
   // CHECK-NEXT: return
@@ -78,13 +78,13 @@ func @returnValuesEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>, %arg2: m
   // CHECK-NEXT: call @returnValues
   %1, %2 = call @returnValues(%0) : (tensor<4x2xf32>) -> (tensor<4x2xf32>, tensor<4x2xf32>)
   // CHECK-NEXT: %2 = iree.tensor_to_memref(%1#0 : tensor<4x2xf32>) : memref<4x2xf32>
-  // CHECK-NEXT: %3 = iree.constant dense<0> : tensor<2xi64>
-  // CHECK-NEXT: %4 = iree.constant dense<[4, 2]> : tensor<2xi64>
+  // CHECK-NEXT: %3 = iree.constant[dense<0> : tensor<2xi64>
+  // CHECK-NEXT: %4 = iree.constant[dense<[4, 2]> : tensor<2xi64>
   // CHECK-NEXT: "iree_hl_interp.copy"(%2, %3, %arg1, %3, %4)
   iree.store_output(%1 : tensor<4x2xf32>, %arg1 : memref<4x2xf32>)
   // CHECK-NEXT: %5 = iree.tensor_to_memref(%1#1 : tensor<4x2xf32>) : memref<4x2xf32>
-  // CHECK-NEXT: %6 = iree.constant dense<0> : tensor<2xi64>
-  // CHECK-NEXT: %7 = iree.constant dense<[4, 2]> : tensor<2xi64>
+  // CHECK-NEXT: %6 = iree.constant[dense<0> : tensor<2xi64>
+  // CHECK-NEXT: %7 = iree.constant[dense<[4, 2]> : tensor<2xi64>
   // CHECK-NEXT: "iree_hl_interp.copy"(%5, %6, %arg2, %6, %7)
   iree.store_output(%2 : tensor<4x2xf32>, %arg2 : memref<4x2xf32>)
   %3 = iree.tensor_to_memref(%1 : tensor<4x2xf32>) : memref<4x2xf32>
@@ -111,8 +111,8 @@ func @aliasInputsEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>)
   // CHECK-NEXT: call @aliasInputs
   %2 = call @aliasInputs(%0, %1) : (tensor<4x2xf32>, tensor<4x2xf32>) -> tensor<4x2xf32>
   // CHECK-NEXT: %3 = iree.tensor_to_memref(%2 : tensor<4x2xf32>) : memref<4x2xf32>
-  // CHECK-NEXT: %4 = iree.constant dense<0> : tensor<2xi64>
-  // CHECK-NEXT: %5 = iree.constant dense<[4, 2]> : tensor<2xi64>
+  // CHECK-NEXT: %4 = iree.constant[dense<0> : tensor<2xi64>
+  // CHECK-NEXT: %5 = iree.constant[dense<[4, 2]> : tensor<2xi64>
   // CHECK-NEXT: "iree_hl_interp.copy"(%3, %4, %arg1, %4, %5)
   iree.store_output(%2 : tensor<4x2xf32>, %arg1 : memref<4x2xf32>)
   // CHECK-NEXT: return
@@ -135,13 +135,13 @@ func @aliasOutputsEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>)
   // CHECK-NEXT: call @aliasOutputs
   %1 = call @aliasOutputs(%0) : (tensor<4x2xf32>) -> tensor<4x2xf32>
   // CHECK-NEXT: %2 = iree.tensor_to_memref(%1 : tensor<4x2xf32>) : memref<4x2xf32>
-  // CHECK-NEXT: %3 = iree.constant dense<0> : tensor<2xi64>
-  // CHECK-NEXT: %4 = iree.constant dense<[4, 2]> : tensor<2xi64>
+  // CHECK-NEXT: %3 = iree.constant[dense<0> : tensor<2xi64>
+  // CHECK-NEXT: %4 = iree.constant[dense<[4, 2]> : tensor<2xi64>
   // CHECK-NEXT: "iree_hl_interp.copy"(%2, %3, %arg1, %3, %4)
   iree.store_output(%1 : tensor<4x2xf32>, %arg1 : memref<4x2xf32>)
   // CHECK-NEXT: %5 = iree.tensor_to_memref(%1 : tensor<4x2xf32>) : memref<4x2xf32>
-  // CHECK-NEXT: %6 = iree.constant dense<0> : tensor<2xi64>
-  // CHECK-NEXT: %7 = iree.constant dense<[4, 2]> : tensor<2xi64>
+  // CHECK-NEXT: %6 = iree.constant[dense<0> : tensor<2xi64>
+  // CHECK-NEXT: %7 = iree.constant[dense<[4, 2]> : tensor<2xi64>
   // CHECK-NEXT: "iree_hl_interp.copy"(%5, %6, %arg1, %6, %7)
   iree.store_output(%1 : tensor<4x2xf32>, %arg1 : memref<4x2xf32>)
   // CHECK-NEXT: return

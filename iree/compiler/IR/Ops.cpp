@@ -36,33 +36,25 @@ namespace IREE {
 static ParseResult parseConstantOp(OpAsmParser &parser,
                                    OperationState &result) {
   Attribute valueAttr;
-  if (parser.parseOptionalAttributeDict(result.attributes) ||
-      parser.parseAttribute(valueAttr, "value", result.attributes))
-    return failure();
-
-  // If the attribute is a symbol reference, then we expect a trailing type.
   Type type;
-  if (!valueAttr.isa<SymbolRefAttr>())
-    type = valueAttr.getType();
-  else if (parser.parseColonType(type))
+  if (parser.parseLSquare() ||
+      parser.parseAttribute(valueAttr, "value", result.attributes) ||
+      parser.parseRSquare() ||
+      parser.parseOptionalAttributeDict(result.attributes) ||
+      parser.parseColonType(type))
     return failure();
 
-  // Add the attribute type to the list.
   return parser.addTypeToList(type, result.types);
 }
 
 static void printConstantOp(OpAsmPrinter &p, ConstantOp &op) {
-  p << "iree.constant ";
+  p << "iree.constant[";
+  p.printAttribute(op.getValue());
+  p << "] ";
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
 
-  if (op.getAttrs().size() > 1) p << ' ';
-  p.printAttribute(op.getValue());
-
-  // If the value is a symbol reference, print a trailing type.
-  if (op.getValue().isa<SymbolRefAttr>()) {
-    p << " : ";
-    p.printType(op.getType());
-  }
+  p << " : ";
+  p.printType(op.getType());
 }
 
 namespace {
