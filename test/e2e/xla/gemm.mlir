@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir %s --input_values="5x3xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1\n3x5xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s --implicit-check-not="[" --implicit-check-not="]" --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="5x3xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1\n3x5xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s --implicit-check-not="[" --implicit-check-not="]" --dump-input=fail
 
 // CHECK-LABEL: EXEC @main
 func @main(%arg0: tensor<5x3xf32>, %arg1: tensor<3x5xf32>) -> tensor<5x5xf32>

@@ -148,6 +148,7 @@ cc_library(
     deps = [
         ":dynamic_symbols",
         ":status_util",
+        "//iree/base:memory",
         "//iree/base:status",
         "//iree/base:tracing",
         "@com_google_absl//absl/types:span",

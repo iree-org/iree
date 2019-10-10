@@ -14,6 +14,7 @@
 
 #include "iree/hal/vulkan/extensibility_util.h"
 
+#include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -134,6 +135,8 @@ StatusOr<std::vector<const char*>> MatchAvailableInstanceLayers(
 StatusOr<std::vector<const char*>> MatchAvailableInstanceExtensions(
     const ExtensibilitySpec& extensibility_spec, const DynamicSymbols& syms) {
   uint32_t extension_property_count = 0;
+  // Warning: leak checks remain disabled if an error is returned.
+  IREE_DISABLE_LEAK_CHECKS();
   VK_RETURN_IF_ERROR(syms.vkEnumerateInstanceExtensionProperties(
       nullptr, &extension_property_count, nullptr));
   std::vector<VkExtensionProperties> extension_properties(
@@ -146,6 +149,7 @@ StatusOr<std::vector<const char*>> MatchAvailableInstanceExtensions(
                                extensibility_spec.optional_extensions,
                                extension_properties),
       _ << "Unable to find all required instance extensions");
+  IREE_ENABLE_LEAK_CHECKS();
   return enabled_extensions;
 }
 

@@ -94,10 +94,15 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
   }
   absl::InlinedVector<VkPipeline, 1> pipelines;
   pipelines.resize(entry_points.size());
+
+  // Some ICDs appear to leak in here, out of our control.
+  // Warning: leak checks remain disabled if an error is returned.
+  IREE_DISABLE_LEAK_CHECKS();
   VK_RETURN_IF_ERROR(syms->vkCreateComputePipelines(
       *logical_device, pipeline_cache, pipeline_create_infos.size(),
       pipeline_create_infos.data(), logical_device->allocator(),
       pipelines.data()));
+  IREE_ENABLE_LEAK_CHECKS();
 
   auto executable =
       make_ref<PipelineExecutable>(CtorKey{}, logical_device, pipeline_layout,

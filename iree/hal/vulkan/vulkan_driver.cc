@@ -119,10 +119,14 @@ StatusOr<std::shared_ptr<VulkanDriver>> VulkanDriver::Create(
     DebugReporter::PopulateStaticCreateInfo(&debug_report_create_info);
   }
 
+  // Some ICDs appear to leak in here, out of our control.
+  // Warning: leak checks remain disabled if an error is returned.
+  IREE_DISABLE_LEAK_CHECKS();
   VkInstance instance = VK_NULL_HANDLE;
   VK_RETURN_IF_ERROR(
       syms->vkCreateInstance(&create_info, /*pAllocator=*/nullptr, &instance))
       << "Unable to create Vulkan instance";
+  IREE_ENABLE_LEAK_CHECKS();
 
   // TODO(benvanik): enable validation layers if needed.
 

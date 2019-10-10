@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir %s --input_values="f32=0\n5x1xf32=[1][-2][-3][4][-5]\nf32=1\n5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]\n5xf32=0 0 0 0 0" | FileCheck %s --implicit-check-not="[" --implicit-check-not="]" --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="f32=0\n5x1xf32=[1][-2][-3][4][-5]\nf32=1\n5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]\n5xf32=0 0 0 0 0" | FileCheck %s --implicit-check-not="[" --implicit-check-not="]" --dump-input=fail
 
 // CHECK-LABEL: EXEC @main_entry_dispatch_3
 func @main_entry_dispatch_3(

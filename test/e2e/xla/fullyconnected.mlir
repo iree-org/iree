@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir %s --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s --implicit-check-not="[" --implicit-check-not="]" --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s --implicit-check-not="[" --implicit-check-not="]" --dump-input=fail
 // RUN: iree-run-mlir %s --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" --norun
 
 // CHECK-LABEL: EXEC @main
