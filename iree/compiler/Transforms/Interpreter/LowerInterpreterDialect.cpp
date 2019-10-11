@@ -110,6 +110,7 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
       return this->matchSuccess();
     }
 
+    SmallVector<Value *, 4> replacementValues;
     for (Value *result : op.getOperation()->getResults()) {
       auto memRefType = result->getType().cast<MemRefType>();
       if (!memRefType.hasStaticShape()) {
@@ -124,11 +125,11 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
       auto allocOp = rewriter.create<IREEInterp::LL::AllocHeapOp>(
           op.getLoc(), memRefType, dim_pieces);
       operands.push_back(allocOp);
-      result->replaceAllUsesWith(allocOp);
+      replacementValues.push_back(allocOp);
     }
     ArrayRef<Type> resultTypes;
     rewriter.create<DstOp>(op.getLoc(), resultTypes, operands, op.getAttrs());
-    op.erase();
+    rewriter.replaceOp(op, replacementValues);
     return this->matchSuccess();
   }
 };
