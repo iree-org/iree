@@ -1,24 +1,15 @@
-load("//iree:build_defs.bzl", "iree_glob_lit_tests")
+load("//iree:build_defs.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_glob_lit_tests(
-    data = [":test_utilities"],
-    driver = "//iree/tools:run_lit.sh",
-    test_file_exts = ["mlir"],
-)
-
-# Bundle together all of the test utilities that are used by tests.
-filegroup(
-    name = "test_utilities",
-    testonly = True,
+iree_setup_lit_package(
     data = [
         "//iree/tools:iree-opt",
         "//iree/tools:iree-run-mlir",
-        "@llvm//:FileCheck",
-        "@local_config_mlir//:run_lit.sh",
     ],
 )
+
+iree_glob_lit_tests()

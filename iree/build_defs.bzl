@@ -61,6 +61,25 @@ def iree_build_test(name, targets):
     """
     pass
 
+def iree_setup_lit_package(data):
+    """Should be called once per test package that contains globbed lit tests.
+
+    Args:
+      data: Additional, project specific data deps to add.
+    """
+
+    # Bundle together all of the test utilities that are used by tests.
+    native.filegroup(
+        name = "lit_test_utilities",
+        testonly = True,
+        data = data + [
+            "@llvm//:FileCheck",
+        ],
+    )
+
+def iree_glob_lit_tests(**kwargs):
+    print("TODO: glob_lit_tests is presently a no-op")
+
 # The OSS build currently has issues with generating flatbuffer reflections.
 # It is hard-coded to disabled here (and in iree_flatbuffer_cc_library) until triaged/fixed.
 FLATBUFFER_SUPPORTS_REFLECTIONS = False
@@ -77,9 +96,6 @@ def iree_cc_embed_data(**kwargs):
 
     # TODO(laurenzo): Implement me for OSS builds.
     pass
-
-def iree_glob_lit_tests(**kwargs):
-    print("TODO: glob_lit_tests is presently a no-op")
 
 def iree_glsl_vulkan(**kwargs):
     glsl_vulkan(**kwargs)

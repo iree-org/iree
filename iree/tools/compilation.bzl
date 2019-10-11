@@ -1,6 +1,6 @@
 """Rules for compiling IREE executables, modules, and archives."""
 
-load("//tools/build_defs/cc:cc_embed_data.bzl", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 # TODO(benvanik): port to a full starlark rule, document, etc.
 def iree_module(
@@ -33,13 +33,11 @@ def iree_module(
     if cc_namespace:
         cc_embed_data(
             name = "%s_cc" % (name),
+            identifier = name,
             srcs = ["%s.emod" % (name)],
-            outs = [
-                # NOTE: we do not generate the .o as it is tricky on platforms
-                # like wasm.
-                "%s.cc" % (name),
-                "%s.h" % (name),
-            ],
-            embedopts = ["--namespace=%s" % (cc_namespace)],
+            cc_file_output = "%s.cc" % (name),
+            h_file_output = "%s.h" % (name),
+            cpp_namespace = cc_namespace,
             visibility = visibility,
+            flatten = True,
         )

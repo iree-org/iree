@@ -21,7 +21,9 @@ def cc_embed_data(
         h_file_output,
         cpp_namespace = None,
         strip_prefix = None,
-        flatten = False):
+        flatten = False,
+        identifier = None,
+        **kwargs):
     """Embeds 'srcs' into a C++ module.
 
     Generates a header like:
@@ -48,14 +50,18 @@ def cc_embed_data(
       cpp_namespace: Wraps everything in a C++ namespace.
       strip_prefix: Strips this verbatim prefix from filenames (in the TOC).
       flatten: Removes all directory components from filenames (in the TOC).
+      identifier: The identifier to use in generated names (defaults to name).
+      **kwargs: Args to pass to the cc_library.
     """
     generator = "//build_tools/embed_data:generate_cc_embed_data"
     generator_location = "$(location %s)" % generator
+    if identifier == None:
+        identifier = name
     flags = "--output_header='$(location %s)' --output_impl='$(location %s)'" % (
         h_file_output,
         cc_file_output,
     )
-    flags += " --identifier='%s'" % (name,)
+    flags += " --identifier='%s'" % (identifier,)
     if cpp_namespace != None:
         flags += " --cpp_namespace='%s'" % (cpp_namespace,)
     if strip_prefix != None:
@@ -77,4 +83,5 @@ def cc_embed_data(
         name = name,
         hdrs = [h_file_output],
         srcs = [cc_file_output],
+        **kwargs
     )
