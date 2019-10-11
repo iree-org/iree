@@ -81,7 +81,7 @@ iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
   *out_file_mapping = nullptr;
 
   auto file_mapping_or =
-      FileMapping::OpenRead(std::string(path.data, path.data_length));
+      FileMapping::OpenRead(std::string(path.data, path.size));
   IREE_API_RETURN_IF_ERROR(file_mapping_or.status());
 
   ref_ptr<FileMapping> handle = std::move(file_mapping_or.ValueOrDie());

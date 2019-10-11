@@ -142,6 +142,14 @@ typedef struct {
 #define IREE_ALLOCATOR_DEFAULT \
   { 0, iree_allocator_alloc, iree_allocator_free }
 
+// Like absl::Time, represented as nanoseconds since unix epoch.
+// TODO(benvanik): pick something easy to get into/outof time_t/etc.
+typedef int64_t iree_time_t;
+// Like absl::InfinitePast.
+#define IREE_TIME_INFINITE_PAST INT64_MIN
+// Like absl::InfiniteFuture.
+#define IREE_TIME_INFINITE_FUTURE INT64_MAX
+
 // A span of bytes (ala std::span of uint8_t).
 typedef struct {
   uint8_t* data;
@@ -151,7 +159,7 @@ typedef struct {
 // A string view (ala std::string_view) into a non-NUL-terminated string.
 typedef struct {
   const char* data;
-  size_t data_length;
+  size_t size;
 } iree_string_view_t;
 
 #define IREE_SHAPE_MAX_RANK 5

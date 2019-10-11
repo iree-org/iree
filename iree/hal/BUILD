@@ -32,7 +32,7 @@ cc_library(
         ":buffer_view",
         ":fence",
         ":semaphore",
-        "//iree/base:api_hdrs",
+        "//iree/base:api",
         "//iree/base:api_util",
         "//iree/base:shape",
         "//iree/base:tracing",

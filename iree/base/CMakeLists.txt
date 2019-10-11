@@ -33,6 +33,8 @@ iree_cc_library(
     "api.h"
     "api_util.h"
   DEPS
+    absl::time
+    iree::base::shape
     iree::base::status
   PUBLIC
 )

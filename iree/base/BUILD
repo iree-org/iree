@@ -30,7 +30,9 @@ cc_library(
     hdrs = ["api_util.h"],
     deps = [
         ":api_hdrs",
+        ":shape",
         ":status",
+        "@com_google_absl//absl/time",
     ],
 )
 

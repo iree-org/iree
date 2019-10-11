@@ -15,13 +15,20 @@
 #ifndef IREE_BASE_API_UTIL_H_
 #define IREE_BASE_API_UTIL_H_
 
+#include "absl/base/macros.h"
+#include "absl/time/time.h"
 #include "iree/base/api.h"
+#include "iree/base/shape.h"
 #include "iree/base/status.h"
 
 namespace iree {
 
 constexpr iree_status_t ToApiStatus(StatusCode status_code) {
   return static_cast<iree_status_t>(status_code);
+}
+
+inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
+  return StatusBuilder(static_cast<StatusCode>(status_code), loc);
 }
 
 // clang-format off
@@ -56,6 +63,29 @@ class StatusAdaptorForApiMacros {
   if (iree_status_t status = (expr)) {      \
   } else /* NOLINT */                       \
     return status
+
+// Converts an iree_time_t to its equivalent absl::Time.
+inline absl::Time ToAbslTime(iree_time_t time) {
+  if (time == IREE_TIME_INFINITE_PAST) {
+    return absl::InfinitePast();
+  } else if (time == IREE_TIME_INFINITE_FUTURE) {
+    return absl::InfiniteFuture();
+  } else {
+    return absl::FromUnixNanos(time);
+  }
+}
+
+// Converts a Shape to an iree_shape_t.
+inline iree_status_t ToApiShape(const Shape& shape, iree_shape_t* out_shape) {
+  out_shape->rank = shape.size();
+  if (shape.size() > ABSL_ARRAYSIZE(out_shape->dims)) {
+    return IREE_STATUS_OUT_OF_RANGE;
+  }
+  for (int i = 0; i < out_shape->rank; ++i) {
+    out_shape->dims[i] = shape[i];
+  }
+  return IREE_STATUS_OK;
+}
 
 }  // namespace iree
 
