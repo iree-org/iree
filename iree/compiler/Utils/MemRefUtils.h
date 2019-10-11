@@ -39,25 +39,12 @@ Type legalizeType(Type type);
 
 // Converts a type (scalar, tensor, etc) to a MemRef-based type.
 MemRefType convertTypeToMemRef(Type type);
-
-// Attempts to resolve the use of a MemRef back to the value stored into it.
-// Returns either the value stored into the given index or nullptr if the value
-// is unavailable (or possibly unknown).
-Value *resolveMemRefSourceValue(Value *memRef, Operation *useOp,
-                                llvm::ArrayRef<Value *> indices = {});
+MemRefType convertTypeToMemRef(Value *value);
 
 // Attempts to resolve the use of a value back to the MemRef it was loaded from.
 // Returns either a MemRef view containing the value or nullptr if the value was
 // not loaded from a MemRef (or is possibly unknown).
 Value *resolveValueToSourceMemRef(Value *value, Operation *useOp);
-
-// Returns an equivalent TensorType for a MemRef value or returns the values
-// current type.
-Type getTensorType(Value *value, OpBuilder &builder);
-
-// Returns an equivalent MemRefType for a Tensor value or returns the values
-// current type.
-Type getMemRefType(Value *value, OpBuilder &builder);
 
 // Wraps a memref with a MemRefToTensorOp, returning the resulting Tensor value.
 Value *wrapAsTensor(Value *value, Operation *srcOp, OpBuilder &builder);

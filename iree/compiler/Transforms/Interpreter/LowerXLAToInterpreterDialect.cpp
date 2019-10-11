@@ -79,11 +79,6 @@ static Value *inputAsMemref(ConversionPatternRewriter &rewriter, Operation *op,
                       rewriter);
 }
 
-static MemRefType getFinalType(ConversionPatternRewriter &rewriter,
-                               Value *result) {
-  return getMemRefType(result, rewriter).cast<MemRefType>();
-}
-
 template <typename SrcOp>
 class XlaOpLowering : public ConversionPattern {
  public:
@@ -125,7 +120,7 @@ struct BroadcastInDimOpLowering
       ConversionPatternRewriter &rewriter) const override {
     auto *inputValue = operands[0];
     auto inputType = inputValue->getType().cast<MemRefType>();
-    auto finalType = getFinalType(rewriter, *op);
+    auto finalType = convertTypeToMemRef(*op);
 
     // Reshape to scalar and broadcast.
     auto createFinal = createShapeTargetingOp<IREEInterp::HL::BroadcastOp>;
@@ -159,7 +154,7 @@ struct ConcatOpLowering : public XlaOpLowering<xla_hlo::ConcatenateOp> {
   Operation *rewriteInternal(
       xla_hlo::ConcatenateOp *op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto finalType = getFinalType(rewriter, *op);
+    auto finalType = convertTypeToMemRef(*op);
 
     return rewriter.create<IREEInterp::HL::ConcatOp>(
         op->getLoc(), finalType, operands,
@@ -176,7 +171,7 @@ struct DotOpLowering : public XlaOpLowering<xla_hlo::DotOp> {
     auto *lhsValue = operands[0];
     auto *rhsValue = operands[1];
 
-    auto finalType = getFinalType(rewriter, *op);
+    auto finalType = convertTypeToMemRef(*op);
     auto elementType = finalType.getElementType();
     if (!elementType.isa<FloatType>()) {
       op->emitOpError("xla_hlo.dot only supports floating point values");
@@ -287,7 +282,7 @@ struct ConvertLowering : public XlaOpLowering<xla_hlo::ConvertOp> {
     auto operandType = operand->getType().cast<MemRefType>().getElementType();
     auto resultType = result->getType().cast<ShapedType>().getElementType();
 
-    auto newResultType = getMemRefType(result, rewriter);
+    auto newResultType = convertTypeToMemRef(result);
 
 #define ConvertCase(InType, OutType, NewOp)                                \
   {                                                                        \
@@ -418,7 +413,7 @@ struct GatherOpLowering : public ConversionPattern {
                                             dst, dstIndices, lengths);
 
     auto reshaped = createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
-        rewriter, op->getLoc(), dst, getFinalType(rewriter, gatherOp));
+        rewriter, op->getLoc(), dst, convertTypeToMemRef(gatherOp));
     rewriter.replaceOp(
         op, wrapAsTensor(reshaped->getResult(0), gatherOp, rewriter));
 
@@ -441,7 +436,7 @@ struct SliceOpLowering : public XlaOpLowering<xla_hlo::SliceOp> {
       return nullptr;
     }
 
-    auto finalType = getFinalType(rewriter, *op);
+    auto finalType = convertTypeToMemRef(*op);
     auto src = operands[0];
     std::vector<Value *> dim_pieces;
     auto dst = rewriter.create<IREEInterp::HL::AllocHeapOp>(
@@ -487,7 +482,7 @@ struct PadOpLowering : public XlaOpLowering<xla_hlo::PadOp> {
         rewriter.create<IREE::ConstantOp>(op->getLoc(), op->interior_padding());
 
     return rewriter.create<IREEInterp::HL::PadOp>(
-        op->getLoc(), getFinalType(rewriter, *op), src, paddingValue,
+        op->getLoc(), convertTypeToMemRef(*op), src, paddingValue,
         edgePaddingLowOp, edgePaddingHighOp, interiorPaddingOp);
   }
 };
@@ -499,7 +494,7 @@ struct ReshapeOpLowering : public XlaOpLowering<xla_hlo::ReshapeOp> {
       xla_hlo::ReshapeOp *op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     return createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
-        rewriter, op->getLoc(), operands[0], getFinalType(rewriter, *op));
+        rewriter, op->getLoc(), operands[0], convertTypeToMemRef(*op));
   }
 };
 
@@ -513,7 +508,7 @@ struct TransposeOpLowering : public XlaOpLowering<xla_hlo::TransposeOp> {
         rewriter.create<IREE::ConstantOp>(op->getLoc(), op->permutation());
 
     return rewriter.create<IREEInterp::HL::TransposeOp>(
-        op->getLoc(), getFinalType(rewriter, *op), operands[0], permutationOp);
+        op->getLoc(), convertTypeToMemRef(*op), operands[0], permutationOp);
   }
 };
 
@@ -527,7 +522,7 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
         rewriter.create<IREE::ConstantOp>(op->getLoc(), op->dimensions());
 
     return rewriter.create<IREEInterp::HL::ReverseOp>(
-        op->getLoc(), getFinalType(rewriter, *op), operands[0], reverseOp);
+        op->getLoc(), convertTypeToMemRef(*op), operands[0], reverseOp);
   }
 };
 

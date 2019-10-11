@@ -54,20 +54,18 @@ MemRefType convertTypeToMemRef(Type type) {
   } else if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
     return MemRefType::get(tensorType.getShape(), tensorType.getElementType());
   } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
-    return MemRefType::get(memRefType.getShape(), memRefType.getElementType());
+    return memRefType;
   } else {
     llvm_unreachable("Unconvertable type");
   }
 }
 
-Type MemRefTypeConverter::convertType(Type type) {
-  return convertTypeToMemRef(type);
+MemRefType convertTypeToMemRef(Value *value) {
+  return convertTypeToMemRef(value->getType());
 }
 
-Value *resolveMemRefSourceValue(Value *memRef, Operation *useOp,
-                                llvm::ArrayRef<Value *> indices) {
-  // TODO(benvanik): implement resolveMemRefSourceValue
-  return nullptr;
+Type MemRefTypeConverter::convertType(Type type) {
+  return convertTypeToMemRef(type);
 }
 
 Value *resolveValueToSourceMemRef(Value *value, Operation *useOp) {
@@ -79,29 +77,6 @@ Value *resolveValueToSourceMemRef(Value *value, Operation *useOp) {
     return loadOp.getMemRef();
   }
   return nullptr;
-}
-
-Type getTensorType(Value *value, OpBuilder &builder) {
-  Type resultType = value->getType();
-  if (resultType.isa<TensorType>()) {
-    return resultType;
-  } else if (auto tensorType = resultType.dyn_cast<MemRefType>()) {
-    return builder.getTensorType(tensorType.getShape(),
-                                 tensorType.getElementType());
-  }
-
-  return builder.getTensorType({}, resultType);
-}
-
-Type getMemRefType(Value *value, OpBuilder &builder) {
-  Type resultType = value->getType();
-  if (resultType.isa<MemRefType>()) {
-    return resultType;
-  } else if (auto tensorType = resultType.dyn_cast<TensorType>()) {
-    return builder.getMemRefType(tensorType.getShape(),
-                                 tensorType.getElementType());
-  }
-  return builder.getMemRefType({}, resultType);
 }
 
 Value *wrapAsTensor(Value *value, Operation *srcOp, OpBuilder &builder) {

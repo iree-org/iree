@@ -72,11 +72,6 @@ static Value *inputAsMemref(ConversionPatternRewriter &rewriter, Operation *op,
                       rewriter);
 }
 
-static MemRefType getFinalType(ConversionPatternRewriter &rewriter,
-                               Value *result) {
-  return getMemRefType(result, rewriter).cast<MemRefType>();
-}
-
 template <typename SrcOp>
 class XlaOpLowering : public ConversionPattern {
  public:
@@ -112,7 +107,7 @@ struct ConcatOpLowering : public XlaOpLowering<xla_hlo::ConcatenateOp> {
   Operation *rewriteInternal(
       xla_hlo::ConcatenateOp *op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto finalType = getFinalType(rewriter, *op);
+    auto finalType = convertTypeToMemRef(*op);
 
     return rewriter.create<IREESeq::HL::ConcatOp>(
         op->getLoc(), finalType, operands,
@@ -185,7 +180,7 @@ struct SliceLowering : public XlaOpLowering<xla_hlo::SliceOp> {
       return nullptr;
     }
 
-    auto finalType = getFinalType(rewriter, *op);
+    auto finalType = convertTypeToMemRef(*op);
 
     auto src = operands[0];
     std::vector<Value *> dim_pieces;
@@ -213,7 +208,7 @@ struct ReshapeOpLowering : public XlaOpLowering<xla_hlo::ReshapeOp> {
       xla_hlo::ReshapeOp *op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     return createShapeTargetingOp<IREESeq::HL::ReshapeOp>(
-        rewriter, op->getLoc(), operands[0], getFinalType(rewriter, *op));
+        rewriter, op->getLoc(), operands[0], convertTypeToMemRef(*op));
   }
 };
 
