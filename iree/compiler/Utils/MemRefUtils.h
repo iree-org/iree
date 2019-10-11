@@ -37,14 +37,8 @@ class MemRefTypeConverter : public TypeConverter {
 
 Type legalizeType(Type type);
 
-MemRefType legalizeMemRefType(MemRefType type);
-
 // Converts a type (scalar, tensor, etc) to a MemRef-based type.
 MemRefType convertTypeToMemRef(Type type);
-
-// Returns the number of elements within a MemRef, or -1 if the shape is
-// dynamic and cannot be known at compile time.
-int64_t getElementCount(const MemRefType &type);
 
 // Attempts to resolve the use of a MemRef back to the value stored into it.
 // Returns either the value stored into the given index or nullptr if the value

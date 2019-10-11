@@ -48,11 +48,6 @@ Type legalizeType(Type type) {
   return type;
 }
 
-MemRefType legalizeMemRefType(MemRefType type) {
-  return MemRefType::get(type.getShape(), legalizeType(type.getElementType()),
-                         type.getAffineMaps(), type.getMemorySpace());
-}
-
 MemRefType convertTypeToMemRef(Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
@@ -67,15 +62,6 @@ MemRefType convertTypeToMemRef(Type type) {
 
 Type MemRefTypeConverter::convertType(Type type) {
   return convertTypeToMemRef(type);
-}
-
-int64_t getElementCount(const MemRefType &type) {
-  if (!type.hasStaticShape()) return -1;
-  int64_t count = 1;
-  for (int64_t dim : type.getShape()) {
-    count *= dim;
-  }
-  return count;
 }
 
 Value *resolveMemRefSourceValue(Value *memRef, Operation *useOp,

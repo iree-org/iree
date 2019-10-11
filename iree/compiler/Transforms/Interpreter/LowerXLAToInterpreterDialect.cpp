@@ -132,7 +132,7 @@ struct BroadcastInDimOpLowering
     llvm::SmallVector<int64_t, 6> intermediateShape{};
 
     // Or reshape to final rank and tile.
-    if (getElementCount(inputType) != 1) {
+    if (inputType.getNumElements() != 1) {
       createFinal = createShapeTargetingOp<IREEInterp::HL::TileOp>;
 
       intermediateShape = llvm::SmallVector<int64_t, 6>(finalType.getRank(), 1);
