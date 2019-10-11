@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <iostream>
 #include <vector>
 
 #include "absl/flags/flag.h"
@@ -166,8 +167,8 @@ Status Run() {
 
   // Dump all results to stdout.
   std::vector<std::string> output_types =
-      absl::StrSplit(absl::GetFlag(FLAGS_output_types),
-                     absl::delimiter::AnyOf(", "), absl::SkipWhitespace());
+      absl::StrSplit(absl::GetFlag(FLAGS_output_types), absl::ByAnyChar(", "),
+                     absl::SkipWhitespace());
   if (!output_types.empty() && output_types.size() != results.size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "--output_types= specified but has " << output_types.size()
