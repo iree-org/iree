@@ -61,6 +61,10 @@ def iree_build_test(name, targets):
     """
     pass
 
+# The OSS build currently has issues with generating flatbuffer reflections.
+# It is hard-coded to disabled here (and in iree_flatbuffer_cc_library) until triaged/fixed.
+FLATBUFFER_SUPPORTS_REFLECTIONS = False
+
 def iree_flatbuffer_cc_library(**kwargs):
     """Wrapper for the flatbuffer_cc_library."""
 

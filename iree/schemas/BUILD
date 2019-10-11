@@ -1,4 +1,5 @@
-load("//iree:build_defs.bzl", "iree_build_test", "iree_cc_embed_data", "iree_flatbuffer_cc_library")
+load("//iree:build_defs.bzl", "FLATBUFFER_SUPPORTS_REFLECTIONS", "iree_build_test", "iree_flatbuffer_cc_library")
+load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -225,28 +226,27 @@ cc_library(
     ],
 )
 
-iree_cc_embed_data(
+REFLECTION_SRCS = [] if not FLATBUFFER_SUPPORTS_REFLECTIONS else [
+    "archive_def.bfbs",
+    "bytecode_def.bfbs",
+    "debug_service.bfbs",
+    "executable_def.bfbs",
+    "executable_table_def.bfbs",
+    "function_def.bfbs",
+    "function_table_def.bfbs",
+    "module_def.bfbs",
+    "source_map_def.bfbs",
+    "spirv_executable_def.bfbs",
+    "type_def.bfbs",
+    "device_def.bfbs",
+    "device_group_def.bfbs",
+    "device_table_def.bfbs",
+]
+
+cc_embed_data(
     name = "reflection_data",
-    srcs = [
-        "archive_def.bfbs",
-        "bytecode_def.bfbs",
-        "debug_service.bfbs",
-        "executable_def.bfbs",
-        "executable_table_def.bfbs",
-        "function_def.bfbs",
-        "function_table_def.bfbs",
-        "module_def.bfbs",
-        "source_map_def.bfbs",
-        "spirv_executable_def.bfbs",
-        "type_def.bfbs",
-        ":device_def.bfbs",
-        ":device_group_def.bfbs",
-        ":device_table_def.bfbs",
-    ],
-    outs = [
-        "reflection_data.cc",
-        "reflection_data.h",
-        "reflection_data_bin.o",
-    ],
-    embedopts = ["--namespace=iree::schemas"],
+    srcs = REFLECTION_SRCS,
+    cc_file_output = "reflection_data.cc",
+    cpp_namespace = "iree::schemas",
+    h_file_output = "reflection_data.h",
 )
