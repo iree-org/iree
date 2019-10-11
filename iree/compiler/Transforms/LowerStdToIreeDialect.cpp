@@ -28,12 +28,24 @@ struct ConstantOpLowering : public OpRewritePattern<ConstantOp> {
 
   PatternMatchResult matchAndRewrite(ConstantOp op,
                                      PatternRewriter &rewriter) const override {
-    auto midOp = rewriter.create<IREE::ConstantOp>(op.getLoc(), op.getValue());
+    if (auto elementsValue = op.getValue().dyn_cast<ElementsAttr>()) {
+      auto ireeConst =
+          rewriter.create<IREE::ConstantOp>(op.getLoc(), elementsValue);
 
-    auto result = wrapAsTensor(midOp.getResult(), op, rewriter);
-    rewriter.replaceOp(
-        op, {loadResultValue(op.getLoc(), op.getResult()->getType(), result,
-                             rewriter)});
+      auto result = wrapAsTensor(ireeConst.getResult(), op, rewriter);
+      rewriter.replaceOp(op, result);
+      return matchSuccess();
+    }
+
+    auto type = op.getValue().getType();
+    if (!type.isIntOrFloat()) {
+      return matchFailure();
+    }
+    auto elementsValue = rewriter.getDenseElementsAttr(
+        rewriter.getTensorType({}, type), op.getValue());
+    auto ireeConst =
+        rewriter.create<IREE::ConstantOp>(op.getLoc(), elementsValue);
+    rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(op, ireeConst);
     return matchSuccess();
   }
 };

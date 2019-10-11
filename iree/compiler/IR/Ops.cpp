@@ -76,7 +76,7 @@ MemRefType convertTypeToMemRef(Type type) {
 }  // namespace
 
 void ConstantOp::build(Builder *builder, OperationState &state,
-                       Attribute value) {
+                       ElementsAttr value) {
   auto type = convertTypeToMemRef(value.getType());
   return build(builder, state, type, value);
 }

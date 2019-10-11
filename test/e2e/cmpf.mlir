@@ -1,5 +1,4 @@
-// TODO(b/134586626): enable when scalar values are better supported.
-// xxx: iree-run-mlir %s --input_values="f32=42.0" --output_types="i,i,i,i,i,i" | FileCheck %s
+// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="f32=42.0" --output_types="i,i,i,i,i,i" | FileCheck %s
 
 // CHECK-LABEL: EXEC @cmpf
 func @cmpf(%42 : f32) -> (i1, i1, i1, i1, i1, i1) { // need at least one arg to avoid constant folding

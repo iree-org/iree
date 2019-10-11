@@ -21,16 +21,19 @@ class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
     IREE_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 // TODO(b/134575149): determine if we want multiple constant op types.
-def IREE_ConstantOp : IREE_PureOp<"constant"> {
-  let arguments = (ins AnyAttr:$value);
-  let results = (outs IREEHL_MemRef);
+def IREE_ConstantOp : IREE_PureOp<"constant", [
+    AllShapesMatch<["value", "result"]>,
+    AllElementTypesMatch<["value", "result"]>
+]> {
+  let arguments = (ins ElementsAttr:$value);
+  let results = (outs IREEHL_MemRef:$result);
 
   // TODO(b/132296600): make tablegen follow the style guide.
   let extraClassDeclaration = [{
     Attribute getValue() { return value(); }
   }];
 
-  let builders = [OpBuilder<"Builder*, OperationState&, Attribute">];
+  let builders = [OpBuilder<"Builder*, OperationState&, ElementsAttr">];
 
   // TODO(b/134575149): enable folder when we store the correct type.
   // let hasFolder = 1;
