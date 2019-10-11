@@ -34,6 +34,8 @@
 //   return %0 : memref<f32>
 // }
 
+#include <iostream>
+
 #include "absl/flags/flag.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_replace.h"
@@ -169,8 +171,8 @@ StatusOr<std::vector<BufferView>> ParseInputsFromFlags(
 Status OutputFunctionResults(const Function& function,
                              absl::Span<BufferView> results) {
   std::vector<std::string> output_types =
-      absl::StrSplit(absl::GetFlag(FLAGS_output_types),
-                     absl::delimiter::AnyOf(", "), absl::SkipWhitespace());
+      absl::StrSplit(absl::GetFlag(FLAGS_output_types), absl::ByAnyChar(", "),
+                     absl::SkipWhitespace());
   if (!output_types.empty() && output_types.size() != results.size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "--output_types= specified but has " << output_types.size()
