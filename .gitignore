@@ -18,3 +18,6 @@ build/
 
 # Bazel artifacts
 bazel-*/
+
+# Local-only config options
+user.bazelrc
