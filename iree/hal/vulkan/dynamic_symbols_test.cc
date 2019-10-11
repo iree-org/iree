@@ -16,6 +16,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "iree/base/status_matchers.h"
 #include "iree/hal/vulkan/status_util.h"
 
 namespace iree {

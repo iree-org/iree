@@ -125,6 +125,11 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_select_compiler_opts(DYNAMIC_SYMBOLS_LINKOPTS
+  CLANG_OR_GCC
+    "-ldl"
+)
+
 iree_cc_library(
   NAME
     dynamic_symbols
@@ -141,7 +146,21 @@ iree_cc_library(
     iree::base::target_platform
     iree::base::tracing
     Vulkan::Headers
+  LINKOPTS
+    ${DYNAMIC_SYMBOLS_LINKOPTS}
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    dynamic_symbols_test
+  SRCS
+    "dynamic_symbols_test.cc"
+  DEPS
+    iree::base::status_matchers
+    iree::hal::vulkan::status_util
+    iree::hal::vulkan::dynamic_symbols
+    gtest_main
 )
 
 iree_cc_library(
