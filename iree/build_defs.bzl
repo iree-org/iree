@@ -77,8 +77,34 @@ def iree_setup_lit_package(data):
         ],
     )
 
-def iree_glob_lit_tests(**kwargs):
-    print("TODO: glob_lit_tests is presently a no-op")
+def iree_glob_lit_tests(
+        data = [":lit_test_utilities"],
+        driver = "//iree/tools:run_lit.sh",
+        test_file_exts = ["mlir"]):
+    """Globs lit test files into tests for a package.
+
+    For most packages, the defaults suffice. Packages that include this must
+    also include a call to iree_setup_lit_package().
+
+    Args:
+      data: Data files to include/build.
+      driver: Test driver.
+      test_file_exts: File extensions to glob.
+    """
+    for test_file_ext in test_file_exts:
+        test_files = native.glob([
+            "*.%s" % (test_file_ext,),
+            "**/*.%s" % (test_file_ext,),
+        ])
+        for test_file in test_files:
+            test_file_location = "$(location %s)" % (test_file,)
+            native.sh_test(
+                name = "%s.test" % (test_file,),
+                size = "small",
+                srcs = [driver],
+                data = data + [test_file],
+                args = [test_file_location],
+            )
 
 # The OSS build currently has issues with generating flatbuffer reflections.
 # It is hard-coded to disabled here (and in iree_flatbuffer_cc_library) until triaged/fixed.
@@ -90,12 +116,6 @@ def iree_flatbuffer_cc_library(**kwargs):
     # TODO(laurenzo): The bazel rule for reflections seems broken in OSS
     # builds. Fix it and enable by default.
     flatbuffer_cc_library(gen_reflections = False, **kwargs)
-
-def iree_cc_embed_data(**kwargs):
-    """Wrapper for generating embedded data objects."""
-
-    # TODO(laurenzo): Implement me for OSS builds.
-    pass
 
 def iree_glsl_vulkan(**kwargs):
     glsl_vulkan(**kwargs)
