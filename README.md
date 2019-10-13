@@ -120,6 +120,11 @@ compiler we will be increasing the complexity of the models that can run and
 demonstrating more of the optimizations we've found useful in previous efforts
 to run them efficiently on edge devices.
 
+A short-term
+[Roadmap](https://github.com/google/iree/blob/master/docs/roadmap.md) is
+available talking about the major areas where are focusing on in addition to the
+more infrastructure-focused work listed below.
+
 We'll be setting up GitHub milestones with issues tracking major feature work we
 are planning. For now, our areas of work are:
 
