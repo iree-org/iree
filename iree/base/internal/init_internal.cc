@@ -14,8 +14,6 @@
 
 #include "iree/base/internal/init_internal.h"
 
-#include <string.h>
-
 #include <set>
 
 #include "absl/flags/parse.h"
@@ -94,17 +92,7 @@ void Initializer::RunInitializer(InitializerData* initializer_data) {
 }
 
 void InitializeEnvironment(int* argc, char*** argv) {
-  auto positional_args = absl::ParseCommandLine(*argc, *argv);
-  if (positional_args.size() != *argc) {
-    // Edit the passed argument refs to only include positional args.
-    *argc = positional_args.size();
-    char** new_argv = new char*[*argc + 1];
-    for (int i = 0; i < *argc; ++i) {
-      new_argv[i] = strdup(positional_args[i]);
-    }
-    new_argv[*argc + 1] = nullptr;
-    *argv = new_argv;
-  }
+  absl::ParseCommandLine(*argc, *argv);
 
   IREE_RUN_MODULE_INITIALIZERS();
 }

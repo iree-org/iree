@@ -17,9 +17,6 @@ set -e
 
 ls -lR ${RUNFILES_DIR}
 
-# Detect whether cygwin/msys2 paths need to be translated.
-cygpath="$(which cygpath 2>/dev/null)"
-
 # Bazel helpfully puts all data deps in the ${RUNFILES_DIR}, but
 # it unhelpfully preserves the nesting with no way to reason about
 # it generically. run_lit expects that anything passed in the runfiles
@@ -28,11 +25,7 @@ cygpath="$(which cygpath 2>/dev/null)"
 SUBPATH=""
 for runfile_path in $(find "${RUNFILES_DIR}" -executable -print); do
   # Prepend so that local things override.
-  EXEDIR="$(dirname ${runfile_path})"
-  if ! [ -z "$cygpath" ]; then
-    EXEDIR="$($cygpath -u "$EXEDIR")"
-  fi
-  SUBPATH="${EXEDIR}:$SUBPATH"
+  SUBPATH="$(dirname ${runfile_path}):$SUBPATH"
 done
 
 echo "run_lit.sh: $1"
@@ -40,12 +33,7 @@ echo "PWD=$(pwd)"
 
 # Extract the test first line and assume it starts with:
 # // RUN: ...
-firstline="$(egrep "^// RUN: " "$1" | head -n 1)"
-if [ -z "${firstline}" ]; then
-  echo "ERROR: Could not find lit '// RUN: ' line"
-  exit 1
-fi
-
+read -r firstline < $1
 echo "FIRSTLINE: $firstline"
 match="${firstline%%// RUN: *}"
 command="${firstline##// RUN: }"
@@ -66,7 +54,6 @@ export PATH="$SUBPATH"
 echo "PATH=$PATH"
 echo "RUNNING TEST:"
 echo "----------------"
-set -x
 eval "$full_command"
 echo "--- COMPLETE ---"
 exit $?

@@ -14,31 +14,6 @@
 
 package(default_visibility = ["//visibility:public"])
 
-OS_SRCS = select({
-    "@bazel_tools//src/conditions:windows": [
-        "glslang/OSDependent/Windows/ossource.cpp",
-    ],
-    "//conditions:default": [
-        "glslang/OSDependent/Unix/ossource.cpp",
-    ],
-})
-
-OS_DEFINES = select({
-    "@bazel_tools//src/conditions:windows": [
-    ],
-    "//conditions:default": [
-        "GLSLANG_OSINCLUDE_UNIX",
-    ],
-})
-
-OS_LINKOPTS = select({
-    "@bazel_tools//src/conditions:windows": [
-    ],
-    "//conditions:default": [
-        "-lpthread",
-    ],
-})
-
 cc_library(
     name = "glslang",
     srcs = glob(
@@ -56,7 +31,8 @@ cc_library(
         ],
     ) + [
         "OGLCompilersDLL/InitializeDll.cpp",
-    ] + OS_SRCS,
+        "glslang/OSDependent/Unix/ossource.cpp",
+    ],
     hdrs = glob([
         "glslang/Include/*.h",
         "glslang/MachineIndependent/*.h",
@@ -73,8 +49,9 @@ cc_library(
         "AMD_EXTENSIONS",
         "ENABLE_HLSL",
         "ENABLE_OPT=1",
+        "GLSLANG_OSINCLUDE_UNIX",
         "NV_EXTENSIONS",
-    ] + OS_DEFINES,
+    ],
     linkstatic = 1,
 )
 
@@ -133,5 +110,6 @@ cc_binary(
         ":glslang",
         ":glslang-default-resource-limits",
     ],
-    linkopts = OS_LINKOPTS,
+    # TODO(laurenzo): Windows?
+    linkopts = ["-pthread"],
 )
