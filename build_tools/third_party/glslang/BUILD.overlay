@@ -53,8 +53,6 @@ cc_library(
         "NV_EXTENSIONS",
     ],
     linkstatic = 1,
-    # glslang is not clean under signed-integer-overflow or null sanitizers
-    nocopts = "-fsanitize=.*",
 )
 
 cc_library(
@@ -87,8 +85,6 @@ cc_library(
         "SPIRV/spvIR.h",
     ],
     linkstatic = 1,
-    # glslang is not clean under signed-integer-overflow or null sanitizers
-    nocopts = "-fsanitize=.*",
     deps = [
         ":SPIRV_headers",
         ":glslang",
