@@ -41,3 +41,9 @@ build:windows --copt=-Wno-builtin-macro-redefined --copt=-Wno-unknown-argument
 # Disables windows headers from pulling in GDI, which does a lot of terrible
 # things (such as defining the ERROR macro, which breaks the world).
 build:windows --copt=-DNOGDI
+
+# Enables unix-style runfiles link trees (requires symlink permission).
+# See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
+# Generally: Enable Developer Mode in the Developer Settings page of the
+# system settings.
+build:windows --experimental_enable_runfiles
