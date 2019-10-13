@@ -40,7 +40,12 @@ echo "PWD=$(pwd)"
 
 # Extract the test first line and assume it starts with:
 # // RUN: ...
-egrep "^// RUN: " "$1" | read -r firstline
+firstline="$(egrep "^// RUN: " "$1" | head -n 1)"
+if [ -z "${firstline}" ]; then
+  echo "ERROR: Could not find lit '// RUN: ' line"
+  exit 1
+fi
+
 echo "FIRSTLINE: $firstline"
 match="${firstline%%// RUN: *}"
 command="${firstline##// RUN: }"
