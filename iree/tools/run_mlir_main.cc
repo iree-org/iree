@@ -344,7 +344,11 @@ extern "C" int main(int argc, char** argv) {
     LOG(ERROR) << "Must supply an input .mlir file.";
     return 1;
   }
-  QCHECK_OK(RunFile(argv[1]));
+  auto status = RunFile(argv[1]);
+  if (!status.ok()) {
+    std::cerr << "ERROR running file (" << argv[1] << "): " << status << "\n";
+  }
+  QCHECK_OK(status);
   return 0;
 }
 

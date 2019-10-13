@@ -19,3 +19,31 @@ build --nocheck_visibility
 
 # Enable some default cpu flags for x86 optimization.
 build:x86opt --copt=-mavx2
+
+# Experimental config for building on Windows via clang-cl.
+# As an aspiration, it may eventually not be required to manually
+# activate this config, but for now, it is a place to store the
+# set of flags and tweaks needed to get the Windows build working.
+# Note that this is intended to work with clang-cl, not the Visual
+# Studio compiler. The following must be performed prior to invoking
+# Bazel:
+#   * Install Visual Studio Build Tools
+#   * export USE_CLANG_CL=1
+#   * export BAZEL_LLVM=C:/Users/$USER/scoop/apps/llvm/current
+#     (or actual LLVM install location)
+# Then one can build with:
+#   bazel build --config=windows {targets...}
+
+# Works around __TIME__ __DATE__, etc redefinitions and -std=c++14
+# warnings. 
+build:windows --copt=-Wno-builtin-macro-redefined --copt=-Wno-unknown-argument
+
+# Disables windows headers from pulling in GDI, which does a lot of terrible
+# things (such as defining the ERROR macro, which breaks the world).
+build:windows --copt=-DNOGDI
+
+# Enables unix-style runfiles link trees (requires symlink permission).
+# See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
+# Generally: Enable Developer Mode in the Developer Settings page of the
+# system settings.
+build:windows --experimental_enable_runfiles
