@@ -40,7 +40,7 @@ echo "PWD=$(pwd)"
 
 # Extract the test first line and assume it starts with:
 # // RUN: ...
-read -r firstline < $1
+egrep "^// RUN: " "$1" | read -r firstline
 echo "FIRSTLINE: $firstline"
 match="${firstline%%// RUN: *}"
 command="${firstline##// RUN: }"
