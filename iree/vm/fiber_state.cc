@@ -24,15 +24,9 @@ namespace vm {
 
 FiberState::FiberState(std::shared_ptr<Instance> instance)
     : instance_(std::move(instance)), id_(Instance::NextUniqueId()) {
-  if (instance_->debug_server()) {
-    CHECK_OK(instance_->debug_server()->RegisterFiberState(this));
-  }
 }
 
 FiberState::~FiberState() {
-  if (instance_->debug_server()) {
-    CHECK_OK(instance_->debug_server()->UnregisterFiberState(this));
-  }
 }
 
 bool FiberState::is_suspended() {

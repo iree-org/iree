@@ -21,7 +21,7 @@ ABSL_FLAG(std::string, debug_service_uri, "0.0.0.0:6000",
           "IP/port of debug service to connect to.");
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 Status Run() {
@@ -36,5 +36,5 @@ extern "C" int main(int argc, char** argv) {
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

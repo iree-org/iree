@@ -18,7 +18,6 @@
 #include <memory>
 
 #include "iree/hal/device_manager.h"
-#include "iree/vm/debug/debug_server.h"
 
 namespace iree {
 namespace vm {
@@ -35,17 +34,14 @@ class Instance {
   // Allocates a global unique ID.
   static int NextUniqueId();
 
-  explicit Instance(std::unique_ptr<debug::DebugServer> debug_server = nullptr);
+  Instance();
   ~Instance();
   Instance(const Instance&) = delete;
   Instance& operator=(const Instance&) = delete;
 
-  debug::DebugServer* debug_server() const { return debug_server_.get(); }
-
   hal::DeviceManager* device_manager() const { return device_manager_.get(); }
 
  private:
-  std::unique_ptr<debug::DebugServer> debug_server_;
   std::unique_ptr<hal::DeviceManager> device_manager_;
 };
 

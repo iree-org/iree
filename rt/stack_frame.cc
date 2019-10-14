@@ -12,17 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/debug/debug_server.h"
+#include "iree/rt/stack_frame.h"
+
+#include "absl/strings/str_cat.h"
+#include "iree/rt/source_resolver.h"
 
 namespace iree {
-namespace vm {
-namespace debug {
+namespace rt {
 
-// static
-StatusOr<std::unique_ptr<DebugServer>> DebugServer::Create(int listen_port) {
-  return {nullptr};
+absl::optional<SourceLocation> StackFrame::source_location() const {
+  auto* source_resolver = function_.module()->source_resolver();
+  if (!source_resolver) return absl::nullopt;
+  return source_resolver->ResolveFunctionOffset(function_, offset_);
 }
 
-}  // namespace debug
-}  // namespace vm
+std::string StackFrame::DebugStringShort() const {
+  return absl::StrCat(module().name(), ":", function().name(), "@", offset());
+}
+
+}  // namespace rt
 }  // namespace iree

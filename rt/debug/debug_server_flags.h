@@ -12,38 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/debug/debug_session.h"
+#ifndef IREE_RT_DEBUG_DEBUG_SERVER_FLAGS_H_
+#define IREE_RT_DEBUG_DEBUG_SERVER_FLAGS_H_
 
-#include "iree/base/source_location.h"
 #include "iree/base/status.h"
+#include "iree/rt/debug/debug_server.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
-bool DebugSession::is_ready() const {
-  absl::MutexLock lock(&mutex_);
-  return ready_ == 0;
-}
-
-Status DebugSession::OnReady() {
-  absl::MutexLock lock(&mutex_);
-  if (ready_ > 0) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "Session has already readied up";
-  }
-  ++ready_;
-  VLOG(2) << "Session " << id() << ": ++ready = " << ready_;
-  return OkStatus();
-}
-
-Status DebugSession::OnUnready() {
-  absl::MutexLock lock(&mutex_);
-  --ready_;
-  VLOG(2) << "Session " << id() << ": --ready = " << ready_;
-  return OkStatus();
-}
+// Creates a debug server based on the current --iree_* debug flags.
+// Returns nullptr if no server is compiled in or the flags are not set.
+StatusOr<std::unique_ptr<DebugServer>> CreateDebugServerFromFlags();
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
+
+#endif  // IREE_RT_DEBUG_DEBUG_SERVER_FLAGS_H_

@@ -32,6 +32,7 @@ cc_library(
         ":api_hdrs",
         ":shape",
         ":status",
+        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/time",
     ],
 )

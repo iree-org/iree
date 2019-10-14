@@ -15,6 +15,13 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+# Enables the debug service and other profiling features.
+# $ bazel build --define=IREE_DEBUG=1 :some_target
+config_setting(
+    name = "debug",
+    define_values = {"IREE_DEBUG": "1"},
+)
+
 # Marker library which can be extended to provide flags for things that
 # need to know the platform target.
 cc_library(

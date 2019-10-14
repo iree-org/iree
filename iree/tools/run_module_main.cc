@@ -27,10 +27,10 @@
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view_string_util.h"
 #include "iree/hal/driver_registry.h"
+#include "iree/rt/debug/debug_server_flags.h"
 #include "iree/schemas/module_def_generated.h"
 #include "iree/vm/bytecode_printer.h"
 #include "iree/vm/bytecode_tables_sequencer.h"
-#include "iree/vm/debug/debug_server_flags.h"
 #include "iree/vm/fiber_state.h"
 #include "iree/vm/function.h"
 #include "iree/vm/instance.h"
@@ -88,8 +88,8 @@ StatusOr<std::vector<BufferView>> ParseInputsFromFlags(
 }  // namespace
 
 Status Run() {
-  ASSIGN_OR_RETURN(auto debug_server, debug::CreateDebugServerFromFlags());
-  auto instance = std::make_shared<Instance>(std::move(debug_server));
+  ASSIGN_OR_RETURN(auto debug_server, rt::debug::CreateDebugServerFromFlags());
+  auto instance = std::make_shared<Instance>();
   ASSIGN_OR_RETURN(auto driver, hal::DriverRegistry::shared_registry()->Create(
                                     "interpreter"));
   ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());

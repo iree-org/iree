@@ -27,9 +27,8 @@ int Instance::NextUniqueId() {
   return ++next_id;
 }
 
-Instance::Instance(std::unique_ptr<debug::DebugServer> debug_server)
-    : debug_server_(std::move(debug_server)),
-      device_manager_(absl::make_unique<hal::DeviceManager>()) {}
+Instance::Instance()
+    : device_manager_(absl::make_unique<hal::DeviceManager>()) {}
 
 Instance::~Instance() = default;
 

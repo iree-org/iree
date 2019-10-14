@@ -86,17 +86,9 @@ Status ValidateArgType(const BufferView& arg,
 }  // namespace
 
 SequencerContext::SequencerContext(std::shared_ptr<Instance> instance)
-    : instance_(std::move(instance)) {
-  if (instance_->debug_server()) {
-    CHECK_OK(instance_->debug_server()->RegisterContext(this));
-  }
-}
+    : instance_(std::move(instance)) {}
 
-SequencerContext::~SequencerContext() {
-  if (instance_->debug_server()) {
-    CHECK_OK(instance_->debug_server()->UnregisterContext(this));
-  }
-}
+SequencerContext::~SequencerContext() = default;
 
 Status SequencerContext::RegisterNativeFunction(
     std::string name, NativeFunction native_function) {
@@ -106,12 +98,7 @@ Status SequencerContext::RegisterNativeFunction(
 }
 
 Status SequencerContext::RegisterModule(std::unique_ptr<Module> module) {
-  auto* module_ptr = module.get();
   RETURN_IF_ERROR(Context::RegisterModule(std::move(module)));
-  if (instance_->debug_server()) {
-    RETURN_IF_ERROR(
-        instance_->debug_server()->RegisterContextModule(this, module_ptr));
-  }
   return OkStatus();
 }
 

@@ -1,7 +1,7 @@
 include "iree/schemas/function_def.fbs";
 include "iree/schemas/module_def.fbs";
 
-namespace iree.vm.debug.rpc;
+namespace iree.rt.debug.rpc;
 
 table Status {
   code:int;
@@ -95,31 +95,31 @@ table StackFrameDef {
   locals:[BufferViewDef];
 }
 
-table FiberStateDef {
-  fiber_id:int;
+table InvocationDef {
+  invocation_id:int;
   frames:[StackFrameDef];
 }
 
-table ListFibersRequest {
+table ListInvocationsRequest {
   session_id:int;
 }
-table ListFibersResponse {
-  fiber_states:[FiberStateDef];
+table ListInvocationsResponse {
+  invocations:[InvocationDef];
 }
 
-table SuspendFibersRequest {
+table SuspendInvocationsRequest {
   session_id:int;
-  fiber_ids:[int];
+  invocation_ids:[int];
 }
-table SuspendFibersResponse {
-  fiber_states:[FiberStateDef];
+table SuspendInvocationsResponse {
+  invocations:[InvocationDef];
 }
 
-table ResumeFibersRequest {
+table ResumeInvocationsRequest {
   session_id:int;
-  fiber_ids:[int];
+  invocation_ids:[int];
 }
-table ResumeFibersResponse {
+table ResumeInvocationsResponse {
 }
 
 enum StepMode : uint8 {
@@ -127,33 +127,33 @@ enum StepMode : uint8 {
   STEP_TO_OFFSET = 1,
 }
 
-table StepFiberRequest {
+table StepInvocationRequest {
   session_id:int;
   step_id:int;
-  fiber_id:int;
+  invocation_id:int;
   step_mode:StepMode;
   bytecode_offset:int;
 }
-table StepFiberResponse {}
+table StepInvocationResponse {}
 
-table GetFiberLocalRequest {
+table GetInvocationLocalRequest {
   session_id:int;
-  fiber_id:int;
+  invocation_id:int;
   frame_index:int;
   local_index:int;
 }
-table GetFiberLocalResponse {
+table GetInvocationLocalResponse {
   value:BufferViewDef;
 }
 
-table SetFiberLocalRequest {
+table SetInvocationLocalRequest {
   session_id:int;
-  fiber_id:int;
+  invocation_id:int;
   frame_index:int;
   local_index:int;
   value:BufferViewDef;
 }
-table SetFiberLocalResponse {
+table SetInvocationLocalResponse {
   value:BufferViewDef;
 }
 
@@ -230,11 +230,11 @@ table ModuleLoadedEvent {
   module_name:string;
 }
 
-table FiberRegisteredEvent {
-  fiber_id:int;
+table InvocationRegisteredEvent {
+  invocation_id:int;
 }
-table FiberUnregisteredEvent {
-  fiber_id:int;
+table InvocationUnregisteredEvent {
+  invocation_id:int;
 }
 
 table BreakpointResolvedEvent {
@@ -244,12 +244,12 @@ table BreakpointResolvedEvent {
 
 table BreakpointHitEvent {
   breakpoint_id:int;
-  fiber_state:FiberStateDef;
+  invocation:InvocationDef;
 }
 
 table StepCompletedEvent {
   step_id:int;
-  fiber_states:[FiberStateDef];
+  invocations:[InvocationDef];
 }
 
 union RequestUnion {
@@ -260,12 +260,12 @@ union RequestUnion {
   GetModuleRequest,
   GetFunctionRequest,
   ResolveFunctionRequest,
-  ListFibersRequest,
-  SuspendFibersRequest,
-  ResumeFibersRequest,
-  StepFiberRequest,
-  GetFiberLocalRequest,
-  SetFiberLocalRequest,
+  ListInvocationsRequest,
+  SuspendInvocationsRequest,
+  ResumeInvocationsRequest,
+  StepInvocationRequest,
+  GetInvocationLocalRequest,
+  SetInvocationLocalRequest,
   ListBreakpointsRequest,
   AddBreakpointRequest,
   RemoveBreakpointRequest,
@@ -281,12 +281,12 @@ union ResponseUnion {
   GetModuleResponse,
   GetFunctionResponse,
   ResolveFunctionResponse,
-  ListFibersResponse,
-  SuspendFibersResponse,
-  ResumeFibersResponse,
-  StepFiberResponse,
-  GetFiberLocalResponse,
-  SetFiberLocalResponse,
+  ListInvocationsResponse,
+  SuspendInvocationsResponse,
+  ResumeInvocationsResponse,
+  StepInvocationResponse,
+  GetInvocationLocalResponse,
+  SetInvocationLocalResponse,
   ListBreakpointsResponse,
   AddBreakpointResponse,
   RemoveBreakpointResponse,
@@ -299,8 +299,8 @@ union EventUnion {
   ContextRegisteredEvent,
   ContextUnregisteredEvent,
   ModuleLoadedEvent,
-  FiberRegisteredEvent,
-  FiberUnregisteredEvent,
+  InvocationRegisteredEvent,
+  InvocationUnregisteredEvent,
   BreakpointResolvedEvent,
   BreakpointHitEvent,
   StepCompletedEvent,
@@ -331,12 +331,12 @@ rpc_service DebugServiceRpc {
   GetFunction(GetFunctionRequest):GetFunctionResponse;
   ResolveFunction(ResolveFunctionRequest):ResolveFunctionResponse;
 
-  ListFibers(ListFibersRequest):ListFibersResponse;
-  SuspendFibers(SuspendFibersRequest):SuspendFibersResponse;
-  ResumeFibers(ResumeFibersRequest):ResumeFibersResponse;
-  StepFiber(StepFiberRequest):StepFiberResponse;
-  GetFiberLocal(GetFiberLocalRequest):GetFiberLocalResponse;
-  SetFiberLocal(SetFiberLocalRequest):SetFiberLocalResponse;
+  ListInvocations(ListInvocationsRequest):ListInvocationsResponse;
+  SuspendInvocations(SuspendInvocationsRequest):SuspendInvocationsResponse;
+  ResumeInvocations(ResumeInvocationsRequest):ResumeInvocationsResponse;
+  StepInvocation(StepInvocationRequest):StepInvocationResponse;
+  GetInvocationLocal(GetInvocationLocalRequest):GetInvocationLocalResponse;
+  SetInvocationLocal(SetInvocationLocalRequest):SetInvocationLocalResponse;
 
   ListBreakpoints(ListBreakpointsRequest):ListBreakpointsResponse;
   AddBreakpoint(AddBreakpointRequest):AddBreakpointResponse;

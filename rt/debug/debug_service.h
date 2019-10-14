@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_DEBUG_DEBUG_SERVICE_H_
-#define IREE_VM_DEBUG_DEBUG_SERVICE_H_
+#ifndef IREE_RT_DEBUG_DEBUG_SERVICE_H_
+#define IREE_RT_DEBUG_DEBUG_SERVICE_H_
 
 #include <vector>
 
@@ -22,13 +22,12 @@
 #include "absl/synchronization/mutex.h"
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/status.h"
+#include "iree/rt/context.h"
+#include "iree/rt/debug/debug_session.h"
 #include "iree/schemas/debug_service_generated.h"
-#include "iree/vm/debug/debug_session.h"
-#include "iree/vm/fiber_state.h"
-#include "iree/vm/sequencer_context.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 // Debugging service used to implement the DebugService RPC methods in a
@@ -43,17 +42,17 @@ class DebugService {
   // Registers a context with the debug service.
   // Ownership remains with the caller and UnregisterContext must be called
   // prior to the context being destroyed.
-  Status RegisterContext(SequencerContext* context);
-  Status UnregisterContext(SequencerContext* context);
+  Status RegisterContext(Context* context);
+  Status UnregisterContext(Context* context);
 
   // Registers a new module linked into an existing Context.
-  Status RegisterContextModule(SequencerContext* context, vm::Module* module);
+  Status RegisterContextModule(Context* context, Module* module);
 
-  // Registers a fiber state with the debug service.
-  // Ownership remains with the caller and UnregisterFiberState must be called
-  // prior to the fiber state being destroyed.
-  Status RegisterFiberState(FiberState* fiber_state);
-  Status UnregisterFiberState(FiberState* fiber_state);
+  // Registers a invocation state with the debug service.
+  // Ownership remains with the caller and UnregisterInvocation must be called
+  // prior to the invocation state being destroyed.
+  Status RegisterInvocation(Invocation* invocation);
+  Status UnregisterInvocation(Invocation* invocation);
 
   // Registers a debug session with the service.
   Status RegisterDebugSession(DebugSession* session);
@@ -86,24 +85,24 @@ class DebugService {
       const rpc::ResolveFunctionRequest& request,
       ::flatbuffers::FlatBufferBuilder* fbb);
 
-  StatusOr<::flatbuffers::Offset<rpc::ListFibersResponse>> ListFibers(
-      const rpc::ListFibersRequest& request,
+  StatusOr<::flatbuffers::Offset<rpc::ListInvocationsResponse>> ListInvocations(
+      const rpc::ListInvocationsRequest& request,
       ::flatbuffers::FlatBufferBuilder* fbb);
-  StatusOr<::flatbuffers::Offset<rpc::SuspendFibersResponse>> SuspendFibers(
-      const rpc::SuspendFibersRequest& request,
+  StatusOr<::flatbuffers::Offset<rpc::SuspendInvocationsResponse>>
+  SuspendInvocations(const rpc::SuspendInvocationsRequest& request,
+                     ::flatbuffers::FlatBufferBuilder* fbb);
+  StatusOr<::flatbuffers::Offset<rpc::ResumeInvocationsResponse>>
+  ResumeInvocations(const rpc::ResumeInvocationsRequest& request,
+                    ::flatbuffers::FlatBufferBuilder* fbb);
+  StatusOr<::flatbuffers::Offset<rpc::StepInvocationResponse>> StepInvocation(
+      const rpc::StepInvocationRequest& request,
       ::flatbuffers::FlatBufferBuilder* fbb);
-  StatusOr<::flatbuffers::Offset<rpc::ResumeFibersResponse>> ResumeFibers(
-      const rpc::ResumeFibersRequest& request,
-      ::flatbuffers::FlatBufferBuilder* fbb);
-  StatusOr<::flatbuffers::Offset<rpc::StepFiberResponse>> StepFiber(
-      const rpc::StepFiberRequest& request,
-      ::flatbuffers::FlatBufferBuilder* fbb);
-  StatusOr<::flatbuffers::Offset<rpc::GetFiberLocalResponse>> GetFiberLocal(
-      const rpc::GetFiberLocalRequest& request,
-      ::flatbuffers::FlatBufferBuilder* fbb);
-  StatusOr<::flatbuffers::Offset<rpc::SetFiberLocalResponse>> SetFiberLocal(
-      const rpc::SetFiberLocalRequest& request,
-      ::flatbuffers::FlatBufferBuilder* fbb);
+  StatusOr<::flatbuffers::Offset<rpc::GetInvocationLocalResponse>>
+  GetInvocationLocal(const rpc::GetInvocationLocalRequest& request,
+                     ::flatbuffers::FlatBufferBuilder* fbb);
+  StatusOr<::flatbuffers::Offset<rpc::SetInvocationLocalResponse>>
+  SetInvocationLocal(const rpc::SetInvocationLocalRequest& request,
+                     ::flatbuffers::FlatBufferBuilder* fbb);
 
   StatusOr<::flatbuffers::Offset<rpc::ListBreakpointsResponse>> ListBreakpoints(
       const rpc::ListBreakpointsRequest& request,
@@ -122,48 +121,46 @@ class DebugService {
       const rpc::StopProfilingRequest& request,
       ::flatbuffers::FlatBufferBuilder* fbb);
 
-  // Serializes a fiber state and its stack frames.
-  StatusOr<::flatbuffers::Offset<rpc::FiberStateDef>> SerializeFiberState(
-      const FiberState& fiber_state, ::flatbuffers::FlatBufferBuilder* fbb);
+  // Serializes an invocation and its stack frames.
+  StatusOr<::flatbuffers::Offset<rpc::InvocationDef>> SerializeInvocation(
+      const Invocation& invocation, ::flatbuffers::FlatBufferBuilder* fbb);
 
  private:
-  StatusOr<SequencerContext*> GetContext(int context_id) const
+  StatusOr<Context*> GetContext(int context_id) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  StatusOr<vm::Module*> GetModule(int context_id,
-                                  absl::string_view module_name) const
+  StatusOr<Module*> GetModule(int context_id,
+                              absl::string_view module_name) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  StatusOr<FiberState*> GetFiberState(int fiber_id) const
+  StatusOr<Invocation*> GetInvocation(int invocation_id) const
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  // Suspends all fibers on all contexts. Returns only once all fibers have been
-  // suspended successfully. Fails if any fiber fails to suspend.
-  Status SuspendAllFibers() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  // Suspends all invocations on all contexts. Returns only once all invocations
+  // have been suspended successfully. Fails if any invocation fails to suspend.
+  Status SuspendAllInvocations() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
-  // Resumes all fibers on all contexts (the inverse of SuspendAllFibers).
-  // Returns immediately.
-  Status ResumeAllFibers() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  // Resumes all invocations on all contexts (the inverse of
+  // SuspendAllInvocations). Returns immediately.
+  Status ResumeAllInvocations() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Marks all sessions as unready.
   Status UnreadyAllSessions() ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // Attempts to re-register all breakpoints for a module.
-  Status RegisterModuleBreakpoints(SequencerContext* context,
-                                   vm::Module* module)
+  Status RegisterModuleBreakpoints(Context* context, Module* module)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  Status RegisterFunctionBreakpoint(SequencerContext* context,
-                                    vm::Module* module,
+  Status RegisterFunctionBreakpoint(Context* context, Module* module,
                                     rpc::BreakpointDefT* breakpoint)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
   Status UnregisterFunctionBreakpoint(const rpc::BreakpointDefT& breakpoint)
       ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-  // Signals that the given breakpoint was hit by the specified fiber.
+  // Signals that the given breakpoint was hit by the specified invocation.
   // Called without the debug lock held.
   Status OnFunctionBreakpointHit(int breakpoint_id,
-                                 const vm::Stack& fiber_state);
+                                 const Invocation& invocation);
 
   absl::Mutex mutex_;
-  std::vector<SequencerContext*> contexts_ ABSL_GUARDED_BY(mutex_);
-  std::vector<FiberState*> fiber_states_ ABSL_GUARDED_BY(mutex_);
+  std::vector<Context*> contexts_ ABSL_GUARDED_BY(mutex_);
+  std::vector<Invocation*> invocations_ ABSL_GUARDED_BY(mutex_);
   std::vector<DebugSession*> sessions_ ABSL_GUARDED_BY(mutex_);
   int sessions_unready_ ABSL_GUARDED_BY(mutex_) = 0;
   int sessions_ready_ ABSL_GUARDED_BY(mutex_) = 0;
@@ -172,7 +169,7 @@ class DebugService {
 };
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
-#endif  // IREE_VM_DEBUG_DEBUG_SERVICE_H_
+#endif  // IREE_RT_DEBUG_DEBUG_SERVICE_H_

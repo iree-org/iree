@@ -15,10 +15,10 @@
 #include "iree/tools/debugger/debug_prompt.h"
 
 #include "iree/base/status.h"
-#include "iree/vm/debug/debug_client.h"
+#include "iree/rt/debug/debug_client.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 namespace {
 
@@ -58,18 +58,18 @@ class DebugPrompt : private DebugClient::Listener {
     return debug_client_->MakeReady();
   }
 
-  Status OnFiberRegistered(const RemoteFiberState& fiber_state) override {
+  Status OnInvocationRegistered(const RemoteInvocation& invocation) override {
     // Ack.
     return debug_client_->MakeReady();
   }
 
-  Status OnFiberUnregistered(const RemoteFiberState& fiber_state) override {
+  Status OnInvocationUnregistered(const RemoteInvocation& invocation) override {
     // Ack.
     return debug_client_->MakeReady();
   }
 
   Status OnBreakpointHit(const RemoteBreakpoint& breakpoint,
-                         const RemoteFiberState& fiber_state) override {
+                         const RemoteInvocation& invocation) override {
     // Ack.
     return debug_client_->MakeReady();
   }
@@ -86,5 +86,5 @@ Status AttachDebugPrompt(absl::string_view debug_service_uri) {
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

@@ -59,7 +59,7 @@ StatusOr<std::vector<hal::BufferView>> ParseInputs(
 // Runs an IREE module with the provided inputs and returns its outputs.
 StatusOr<std::string> RunIreeModule(std::string module_file_data,
                                     absl::string_view inputs_string) {
-  auto instance = std::make_shared<vm::Instance>(/* debug_server= */ nullptr);
+  auto instance = std::make_shared<vm::Instance>();
 
   // Create driver and device.
   ASSIGN_OR_RETURN(auto driver, hal::DriverRegistry::shared_registry()->Create(

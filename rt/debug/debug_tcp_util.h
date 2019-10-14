@@ -15,8 +15,8 @@
 // Utilities for working with TCP sockets.
 // These are (mostly) portable to systems implementing BSD sockets.
 
-#ifndef IREE_VM_DEBUG_DEBUG_TCP_UTIL_H_
-#define IREE_VM_DEBUG_DEBUG_TCP_UTIL_H_
+#ifndef IREE_RT_DEBUG_DEBUG_TCP_UTIL_H_
+#define IREE_RT_DEBUG_DEBUG_TCP_UTIL_H_
 
 #include <fcntl.h>
 #include <netinet/in.h>
@@ -32,7 +32,7 @@
 #include "iree/schemas/debug_service_generated.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 namespace tcp {
 
@@ -211,7 +211,7 @@ inline Status WriteBuffer(int fd, ::flatbuffers::DetachedBuffer buffer) {
 
 }  // namespace tcp
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
-#endif  // IREE_VM_DEBUG_DEBUG_TCP_UTIL_H_
+#endif  // IREE_RT_DEBUG_DEBUG_TCP_UTIL_H_

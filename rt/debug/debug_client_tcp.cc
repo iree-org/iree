@@ -32,19 +32,18 @@
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/status.h"
+#include "iree/rt/debug/debug_client.h"
+#include "iree/rt/debug/debug_tcp_util.h"
+#include "iree/rt/module.h"
 #include "iree/schemas/debug_service_generated.h"
 #include "iree/schemas/module_def_generated.h"
-#include "iree/vm/debug/debug_client.h"
-#include "iree/vm/debug/debug_tcp_util.h"
-#include "iree/vm/module.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 namespace {
 
 using ::flatbuffers::FlatBufferBuilder;
-using ::iree::vm::ModuleFile;
 
 // Parses a host:port address, with support for the RFC 3986 IPv6 [host]:port
 // format. Returns a pair of (hostname, port), with port being 0 if none was
@@ -343,21 +342,21 @@ class TcpDebugClient final : public DebugClient {
         module_map_;
   };
 
-  class TcpRemoteFiberState final : public RemoteFiberState {
+  class TcpRemoteInvocation final : public RemoteInvocation {
    public:
-    TcpRemoteFiberState(int fiber_id, TcpDebugClient* client)
-        : RemoteFiberState(fiber_id), client_(client) {}
+    TcpRemoteInvocation(int invocation_id, TcpDebugClient* client)
+        : RemoteInvocation(invocation_id), client_(client) {}
 
-    const rpc::FiberStateDefT& def() const override { return def_; }
+    const rpc::InvocationDefT& def() const override { return def_; }
 
-    Status MergeFrom(const rpc::FiberStateDef& fiber_state_def) {
-      fiber_state_def.UnPackTo(&def_);
+    Status MergeFrom(const rpc::InvocationDef& invocation_def) {
+      invocation_def.UnPackTo(&def_);
       return OkStatus();
     }
 
    private:
     TcpDebugClient* client_;
-    rpc::FiberStateDefT def_;
+    rpc::InvocationDefT def_;
   };
 
   static StatusOr<std::unique_ptr<TcpDebugClient>> Create(int fd,
@@ -395,8 +394,8 @@ class TcpDebugClient final : public DebugClient {
     return absl::MakeConstSpan(contexts_);
   }
 
-  absl::Span<RemoteFiberState* const> fiber_states() const override {
-    return absl::MakeConstSpan(fiber_states_);
+  absl::Span<RemoteInvocation* const> invocations() const override {
+    return absl::MakeConstSpan(invocations_);
   }
 
   absl::Span<RemoteBreakpoint* const> breakpoints() const override {
@@ -408,7 +407,7 @@ class TcpDebugClient final : public DebugClient {
   //
   // Example:
   //  FlatBufferBuilder fbb;
-  //  rpc::SuspendFiberRequestBuilder request(fbb);
+  //  rpc::SuspendInvocationRequestBuilder request(fbb);
   //  RETURN_IF_ERROR(WriteRequest(fd_, request.Finish(), std::move(fbb)));
   template <typename T>
   Status WriteRequest(int fd, ::flatbuffers::Offset<T> request_offs,
@@ -557,92 +556,96 @@ class TcpDebugClient final : public DebugClient {
         });
   }
 
-  Status SuspendAllFibers() override {
-    VLOG(2) << "Client " << fd_ << ": SuspendAllFibers()";
+  Status SuspendAllInvocations() override {
+    VLOG(2) << "Client " << fd_ << ": SuspendAllInvocations()";
     FlatBufferBuilder fbb;
-    rpc::SuspendFibersRequestBuilder request(fbb);
+    rpc::SuspendInvocationsRequestBuilder request(fbb);
     request.add_session_id(session_id_);
-    return IssueRequest<rpc::SuspendFibersRequest,
-                        rpc::ResponseUnion::SuspendFibersResponse>(
+    return IssueRequest<rpc::SuspendInvocationsRequest,
+                        rpc::ResponseUnion::SuspendInvocationsResponse>(
         request.Finish(), std::move(fbb),
         [this](Status status, const rpc::Response& response_union) -> Status {
           if (!status.ok()) return status;
-          return RefreshFiberStates();
+          return RefreshInvocations();
         });
   }
 
-  Status ResumeAllFibers() override {
-    VLOG(2) << "Client " << fd_ << ": ResumeAllFibers()";
+  Status ResumeAllInvocations() override {
+    VLOG(2) << "Client " << fd_ << ": ResumeAllInvocations()";
     FlatBufferBuilder fbb;
-    rpc::ResumeFibersRequestBuilder request(fbb);
+    rpc::ResumeInvocationsRequestBuilder request(fbb);
     request.add_session_id(session_id_);
-    return IssueRequest<rpc::ResumeFibersRequest,
-                        rpc::ResponseUnion::ResumeFibersResponse>(
+    return IssueRequest<rpc::ResumeInvocationsRequest,
+                        rpc::ResponseUnion::ResumeInvocationsResponse>(
         request.Finish(), std::move(fbb),
         [this](Status status, const rpc::Response& response_union) -> Status {
           if (!status.ok()) return status;
-          return RefreshFiberStates();
+          return RefreshInvocations();
         });
   }
 
-  Status SuspendFibers(absl::Span<RemoteFiberState*> fibers) override {
-    VLOG(2) << "Client " << fd_ << ": SuspendFibers(...)";
+  Status SuspendInvocations(
+      absl::Span<RemoteInvocation*> invocations) override {
+    VLOG(2) << "Client " << fd_ << ": SuspendInvocations(...)";
     FlatBufferBuilder fbb;
-    auto fiber_ids_offs = fbb.CreateVector<int32_t>(
-        fibers.size(), [&fibers](size_t i) { return fibers[i]->id(); });
-    rpc::SuspendFibersRequestBuilder request(fbb);
+    auto invocation_ids_offs = fbb.CreateVector<int32_t>(
+        invocations.size(),
+        [&invocations](size_t i) { return invocations[i]->id(); });
+    rpc::SuspendInvocationsRequestBuilder request(fbb);
     request.add_session_id(session_id_);
-    request.add_fiber_ids(fiber_ids_offs);
-    return IssueRequest<rpc::SuspendFibersRequest,
-                        rpc::ResponseUnion::SuspendFibersResponse>(
+    request.add_invocation_ids(invocation_ids_offs);
+    return IssueRequest<rpc::SuspendInvocationsRequest,
+                        rpc::ResponseUnion::SuspendInvocationsResponse>(
         request.Finish(), std::move(fbb),
         [this](Status status, const rpc::Response& response_union) -> Status {
           if (!status.ok()) return status;
-          return RefreshFiberStates();
+          return RefreshInvocations();
         });
   }
 
-  Status ResumeFibers(absl::Span<RemoteFiberState*> fibers) override {
-    VLOG(2) << "Client " << fd_ << ": ResumeFibers(...)";
+  Status ResumeInvocations(absl::Span<RemoteInvocation*> invocations) override {
+    VLOG(2) << "Client " << fd_ << ": ResumeInvocations(...)";
     FlatBufferBuilder fbb;
-    auto fiber_ids_offs = fbb.CreateVector<int32_t>(
-        fibers.size(), [&fibers](size_t i) { return fibers[i]->id(); });
-    rpc::ResumeFibersRequestBuilder request(fbb);
+    auto invocation_ids_offs = fbb.CreateVector<int32_t>(
+        invocations.size(),
+        [&invocations](size_t i) { return invocations[i]->id(); });
+    rpc::ResumeInvocationsRequestBuilder request(fbb);
     request.add_session_id(session_id_);
-    request.add_fiber_ids(fiber_ids_offs);
-    return IssueRequest<rpc::ResumeFibersRequest,
-                        rpc::ResponseUnion::ResumeFibersResponse>(
+    request.add_invocation_ids(invocation_ids_offs);
+    return IssueRequest<rpc::ResumeInvocationsRequest,
+                        rpc::ResponseUnion::ResumeInvocationsResponse>(
         request.Finish(), std::move(fbb),
         [this](Status status, const rpc::Response& response_union) -> Status {
           if (!status.ok()) return status;
-          return RefreshFiberStates();
+          return RefreshInvocations();
         });
   }
 
-  Status StepFiber(const RemoteFiberState& fiber_state,
-                   std::function<void()> callback) override {
+  Status StepInvocation(const RemoteInvocation& invocation,
+                        std::function<void()> callback) override {
     int step_id = next_step_id_++;
-    VLOG(2) << "Client " << fd_ << ": StepFiber(" << fiber_state.id()
+    VLOG(2) << "Client " << fd_ << ": StepInvocation(" << invocation.id()
             << ") as step_id=" << step_id;
-    rpc::StepFiberRequestT step_request;
+    rpc::StepInvocationRequestT step_request;
     step_request.step_id = step_id;
-    step_request.fiber_id = fiber_state.id();
+    step_request.invocation_id = invocation.id();
     step_request.step_mode = rpc::StepMode::STEP_ONCE;
-    return StepFiber(&step_request, std::move(callback));
+    return StepInvocation(&step_request, std::move(callback));
   }
 
-  Status StepFiberToOffset(const RemoteFiberState& fiber_state,
-                           int bytecode_offset,
-                           std::function<void()> callback) override {
+  Status StepInvocationToOffset(const RemoteInvocation& invocation,
+                                int bytecode_offset,
+                                std::function<void()> callback) override {
     int step_id = next_step_id_++;
-    VLOG(2) << "Client " << fd_ << ": StepFiberToOffset(" << fiber_state.id()
-            << ", " << bytecode_offset << ") as step_id=" << step_id;
-    rpc::StepFiberRequestT step_request;
+    VLOG(2) << "Client " << fd_ << ": StepInvocationToOffset("
+            << invocation.id() << ", " << bytecode_offset
+            << ") as step_id=" << step_id;
+    rpc::StepInvocationRequestT step_request;
     step_request.step_id = step_id;
-    step_request.fiber_id = fiber_state.id();
+    step_request.invocation_id = invocation.id();
     step_request.step_mode = rpc::StepMode::STEP_TO_OFFSET;
     step_request.bytecode_offset = bytecode_offset;
-    return StepFiber(&step_request, std::move(callback));
+    return StepInvocation(&step_request, std::move(callback));
   }
 
   Status Poll() override {
@@ -686,7 +689,7 @@ class TcpDebugClient final : public DebugClient {
  private:
   Status Refresh() {
     RETURN_IF_ERROR(RefreshContexts());
-    RETURN_IF_ERROR(RefreshFiberStates());
+    RETURN_IF_ERROR(RefreshInvocations());
     RETURN_IF_ERROR(RefreshBreakpoints());
     return OkStatus();
   }
@@ -719,32 +722,33 @@ class TcpDebugClient final : public DebugClient {
         });
   }
 
-  Status RefreshFiberStates() {
-    VLOG(2) << "Request fiber states refresh...";
+  Status RefreshInvocations() {
+    VLOG(2) << "Request invocation states refresh...";
     FlatBufferBuilder fbb;
-    rpc::ListFibersRequestBuilder request(fbb);
+    rpc::ListInvocationsRequestBuilder request(fbb);
     request.add_session_id(session_id_);
-    return IssueRequest<rpc::ListFibersRequest,
-                        rpc::ResponseUnion::ListFibersResponse>(
+    return IssueRequest<rpc::ListInvocationsRequest,
+                        rpc::ResponseUnion::ListInvocationsResponse>(
         request.Finish(), std::move(fbb),
         [this](Status status, const rpc::Response& response_union) -> Status {
           if (!status.ok()) return status;
-          VLOG(2) << "Refreshing fiber states...";
+          VLOG(2) << "Refreshing invocation states...";
           const auto& response =
-              *response_union.message_as_ListFibersResponse();
-          for (auto* fiber_state_def : *response.fiber_states()) {
-            auto fiber_state_or = GetFiberState(fiber_state_def->fiber_id());
-            if (!fiber_state_or.ok()) {
+              *response_union.message_as_ListInvocationsResponse();
+          for (auto* invocation_def : *response.invocations()) {
+            auto invocation_or = GetInvocation(invocation_def->invocation_id());
+            if (!invocation_or.ok()) {
               // Not found; add new.
-              RETURN_IF_ERROR(RegisterFiberState(fiber_state_def->fiber_id()));
-              fiber_state_or = GetFiberState(fiber_state_def->fiber_id());
+              RETURN_IF_ERROR(
+                  RegisterInvocation(invocation_def->invocation_id()));
+              invocation_or = GetInvocation(invocation_def->invocation_id());
             }
-            RETURN_IF_ERROR(fiber_state_or.status());
+            RETURN_IF_ERROR(invocation_or.status());
             RETURN_IF_ERROR(
-                fiber_state_or.ValueOrDie()->MergeFrom(*fiber_state_def));
+                invocation_or.ValueOrDie()->MergeFrom(*invocation_def));
           }
           // TODO(benvanik): handle removals/deaths.
-          VLOG(2) << "Refreshed fiber states!";
+          VLOG(2) << "Refreshed invocation states!";
           return OkStatus();
         });
   }
@@ -818,8 +822,8 @@ class TcpDebugClient final : public DebugClient {
       DISPATCH_EVENT(ContextRegistered);
       DISPATCH_EVENT(ContextUnregistered);
       DISPATCH_EVENT(ModuleLoaded);
-      DISPATCH_EVENT(FiberRegistered);
-      DISPATCH_EVENT(FiberUnregistered);
+      DISPATCH_EVENT(InvocationRegistered);
+      DISPATCH_EVENT(InvocationUnregistered);
       DISPATCH_EVENT(BreakpointResolved);
       DISPATCH_EVENT(BreakpointHit);
       DISPATCH_EVENT(StepCompleted);
@@ -889,47 +893,50 @@ class TcpDebugClient final : public DebugClient {
     return listener_->OnModuleLoaded(*context, *module_ptr);
   }
 
-  StatusOr<TcpRemoteFiberState*> GetFiberState(int fiber_id) {
-    auto it = fiber_state_map_.find(fiber_id);
-    if (it == fiber_state_map_.end()) {
-      return NotFoundErrorBuilder(IREE_LOC) << "Fiber was never registered";
+  StatusOr<TcpRemoteInvocation*> GetInvocation(int invocation_id) {
+    auto it = invocation_map_.find(invocation_id);
+    if (it == invocation_map_.end()) {
+      return NotFoundErrorBuilder(IREE_LOC)
+             << "Invocation was never registered";
     }
     return it->second.get();
   }
 
-  Status RegisterFiberState(int fiber_id) {
-    VLOG(2) << "RegisterFiberState(" << fiber_id << ")";
-    auto fiber_state = absl::make_unique<TcpRemoteFiberState>(fiber_id, this);
-    auto fiber_state_ptr = fiber_state.get();
-    fiber_state_map_.insert({fiber_id, std::move(fiber_state)});
-    fiber_states_.push_back(fiber_state_ptr);
-    RETURN_IF_ERROR(RefreshFiberStates());
-    return listener_->OnFiberRegistered(*fiber_state_ptr);
+  Status RegisterInvocation(int invocation_id) {
+    VLOG(2) << "RegisterInvocation(" << invocation_id << ")";
+    auto invocation =
+        absl::make_unique<TcpRemoteInvocation>(invocation_id, this);
+    auto invocation_ptr = invocation.get();
+    invocation_map_.insert({invocation_id, std::move(invocation)});
+    invocations_.push_back(invocation_ptr);
+    RETURN_IF_ERROR(RefreshInvocations());
+    return listener_->OnInvocationRegistered(*invocation_ptr);
   }
 
-  Status OnFiberRegistered(const rpc::FiberRegisteredEvent& event) {
-    VLOG(2) << "OnFiberRegistered(" << event.fiber_id() << ")";
-    auto it = fiber_state_map_.find(event.fiber_id());
-    if (it != fiber_state_map_.end()) {
+  Status OnInvocationRegistered(const rpc::InvocationRegisteredEvent& event) {
+    VLOG(2) << "OnInvocationRegistered(" << event.invocation_id() << ")";
+    auto it = invocation_map_.find(event.invocation_id());
+    if (it != invocation_map_.end()) {
       return FailedPreconditionErrorBuilder(IREE_LOC)
-             << "Fiber already registered";
+             << "Invocation already registered";
     }
-    return RegisterFiberState(event.fiber_id());
+    return RegisterInvocation(event.invocation_id());
   }
 
-  Status OnFiberUnregistered(const rpc::FiberUnregisteredEvent& event) {
-    VLOG(2) << "OnFiberUnregistered(" << event.fiber_id() << ")";
-    auto it = fiber_state_map_.find(event.fiber_id());
-    if (it == fiber_state_map_.end()) {
+  Status OnInvocationUnregistered(
+      const rpc::InvocationUnregisteredEvent& event) {
+    VLOG(2) << "OnInvocationUnregistered(" << event.invocation_id() << ")";
+    auto it = invocation_map_.find(event.invocation_id());
+    if (it == invocation_map_.end()) {
       return FailedPreconditionErrorBuilder(IREE_LOC)
-             << "Fiber was never registered";
+             << "Invocation was never registered";
     }
-    auto fiber_state = std::move(it->second);
-    fiber_state_map_.erase(it);
-    auto list_it = std::find(fiber_states_.begin(), fiber_states_.end(),
-                             fiber_state.get());
-    fiber_states_.erase(list_it);
-    return listener_->OnFiberUnregistered(*fiber_state);
+    auto invocation = std::move(it->second);
+    invocation_map_.erase(it);
+    auto list_it =
+        std::find(invocations_.begin(), invocations_.end(), invocation.get());
+    invocations_.erase(list_it);
+    return listener_->OnInvocationUnregistered(*invocation);
   }
 
   StatusOr<TcpRemoteBreakpoint*> GetBreakpoint(int breakpoint_id) {
@@ -989,25 +996,24 @@ class TcpDebugClient final : public DebugClient {
   Status OnBreakpointHit(const rpc::BreakpointHitEvent& event) {
     VLOG(2) << "OnBreakpointHit(" << event.breakpoint_id() << ")";
     ASSIGN_OR_RETURN(auto* breakpoint, GetBreakpoint(event.breakpoint_id()));
-    auto* fiber_state_def = event.fiber_state();
-    auto fiber_state_or = GetFiberState(fiber_state_def->fiber_id());
-    if (!fiber_state_or.ok()) {
+    auto* invocation_def = event.invocation();
+    auto invocation_or = GetInvocation(invocation_def->invocation_id());
+    if (!invocation_or.ok()) {
       // Not found; add new.
-      RETURN_IF_ERROR(RegisterFiberState(fiber_state_def->fiber_id()));
-      fiber_state_or = GetFiberState(fiber_state_def->fiber_id());
+      RETURN_IF_ERROR(RegisterInvocation(invocation_def->invocation_id()));
+      invocation_or = GetInvocation(invocation_def->invocation_id());
     }
-    RETURN_IF_ERROR(fiber_state_or.status());
-    RETURN_IF_ERROR(fiber_state_or.ValueOrDie()->MergeFrom(*fiber_state_def));
-    return listener_->OnBreakpointHit(*breakpoint,
-                                      *fiber_state_or.ValueOrDie());
+    RETURN_IF_ERROR(invocation_or.status());
+    RETURN_IF_ERROR(invocation_or.ValueOrDie()->MergeFrom(*invocation_def));
+    return listener_->OnBreakpointHit(*breakpoint, *invocation_or.ValueOrDie());
   }
 
-  Status StepFiber(rpc::StepFiberRequestT* step_request,
-                   std::function<void()> callback) {
+  Status StepInvocation(rpc::StepInvocationRequestT* step_request,
+                        std::function<void()> callback) {
     FlatBufferBuilder fbb;
-    auto status = IssueRequest<rpc::StepFiberRequest,
-                               rpc::ResponseUnion::StepFiberResponse>(
-        rpc::StepFiberRequest::Pack(fbb, step_request), std::move(fbb),
+    auto status = IssueRequest<rpc::StepInvocationRequest,
+                               rpc::ResponseUnion::StepInvocationResponse>(
+        rpc::StepInvocationRequest::Pack(fbb, step_request), std::move(fbb),
         [](Status status, const rpc::Response& response_union) -> Status {
           return status;
         });
@@ -1019,12 +1025,12 @@ class TcpDebugClient final : public DebugClient {
   Status OnStepCompleted(const rpc::StepCompletedEvent& event) {
     VLOG(2) << "OnStepCompleted(" << event.step_id() << ")";
 
-    // Update all fiber states that are contained.
+    // Update all invocation states that are contained.
     // This may only be a subset of relevant states.
-    for (auto* fiber_state_def : *event.fiber_states()) {
-      ASSIGN_OR_RETURN(auto fiber_state,
-                       GetFiberState(fiber_state_def->fiber_id()));
-      RETURN_IF_ERROR(fiber_state->MergeFrom(*fiber_state_def));
+    for (auto* invocation_def : *event.invocations()) {
+      ASSIGN_OR_RETURN(auto invocation,
+                       GetInvocation(invocation_def->invocation_id()));
+      RETURN_IF_ERROR(invocation->MergeFrom(*invocation_def));
     }
 
     // Dispatch step callback. Note that it may have been cancelled and that's
@@ -1051,9 +1057,9 @@ class TcpDebugClient final : public DebugClient {
 
   std::vector<RemoteContext*> contexts_;
   absl::flat_hash_map<int, std::unique_ptr<TcpRemoteContext>> context_map_;
-  std::vector<RemoteFiberState*> fiber_states_;
-  absl::flat_hash_map<int, std::unique_ptr<TcpRemoteFiberState>>
-      fiber_state_map_;
+  std::vector<RemoteInvocation*> invocations_;
+  absl::flat_hash_map<int, std::unique_ptr<TcpRemoteInvocation>>
+      invocation_map_;
   std::vector<RemoteBreakpoint*> breakpoints_;
   absl::flat_hash_map<int, std::unique_ptr<TcpRemoteBreakpoint>>
       breakpoint_map_;
@@ -1117,5 +1123,5 @@ StatusOr<std::unique_ptr<DebugClient>> DebugClient::Connect(
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

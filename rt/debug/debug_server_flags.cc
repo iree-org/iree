@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/debug/debug_server_flags.h"
+#include "iree/rt/debug/debug_server_flags.h"
 
 #include "absl/flags/flag.h"
 #include "absl/strings/str_cat.h"
@@ -30,7 +30,7 @@ ABSL_FLAG(bool, iree_wait_for_debugger, false,
 ABSL_FLAG(bool, iree_attach_debugger, false, "Attaches a debugger at startup.");
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 StatusOr<std::unique_ptr<DebugServer>> CreateDebugServerFromFlags() {
@@ -76,5 +76,5 @@ StatusOr<std::unique_ptr<DebugServer>> CreateDebugServerFromFlags() {
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

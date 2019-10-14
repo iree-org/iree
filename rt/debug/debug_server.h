@@ -12,21 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_DEBUG_DEBUG_SERVER_H_
-#define IREE_VM_DEBUG_DEBUG_SERVER_H_
+#ifndef IREE_RT_DEBUG_DEBUG_SERVER_H_
+#define IREE_RT_DEBUG_DEBUG_SERVER_H_
 
 #include "iree/base/status.h"
 
 namespace iree {
-namespace vm {
-class FiberState;
-class SequencerContext;
+namespace rt {
+class Context;
+class Instance;
+class Invocation;
 class Module;
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 // Runtime debugging server.
@@ -58,29 +59,30 @@ class DebugServer {
   virtual Status WaitUntilSessionReady() = 0;
 
  protected:
-  friend class ::iree::vm::SequencerContext;
+  friend class ::iree::rt::Instance;
 
   // Registers a context with the debug service.
   // Ownership remains with the caller and UnregisterContext must be called
   // prior to the context being destroyed.
-  virtual Status RegisterContext(SequencerContext* context) = 0;
-  virtual Status UnregisterContext(SequencerContext* context) = 0;
+  virtual Status RegisterContext(Context* context) = 0;
+  virtual Status UnregisterContext(Context* context) = 0;
+
+  friend class ::iree::rt::Context;
 
   // Registers a new module linked into an existing Context.
-  virtual Status RegisterContextModule(SequencerContext* context,
-                                       vm::Module* module) = 0;
+  virtual Status RegisterContextModule(Context* context, Module* module) = 0;
 
-  friend class ::iree::vm::FiberState;
+  friend class ::iree::rt::Invocation;
 
-  // Registers a fiber state with the debug service.
-  // Ownership remains with the caller and UnregisterFiberState must be called
+  // Registers an invocation with the debug service.
+  // Ownership remains with the caller and UnregisterInvocation must be called
   // prior to the fiber state being destroyed.
-  virtual Status RegisterFiberState(FiberState* fiber_state) = 0;
-  virtual Status UnregisterFiberState(FiberState* fiber_state) = 0;
+  virtual Status RegisterInvocation(Invocation* invocation) = 0;
+  virtual Status UnregisterInvocation(Invocation* invocation) = 0;
 };
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
-#endif  // IREE_VM_DEBUG_DEBUG_SERVER_H_
+#endif  // IREE_RT_DEBUG_DEBUG_SERVER_H_

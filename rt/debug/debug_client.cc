@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/debug/debug_client.h"
+#include "iree/rt/debug/debug_client.h"
 
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 Status DebugClient::GetFunction(
@@ -39,26 +39,26 @@ Status DebugClient::GetFunction(
       });
 }
 
-Status DebugClient::StepFiberOver(const RemoteFiberState& fiber_state,
-                                  std::function<void()> callback) {
+Status DebugClient::StepInvocationOver(const RemoteInvocation& invocation,
+                                       std::function<void()> callback) {
   // TODO(benvanik): implement bytecode stepping search.
   // int bytecode_offset = 0;
-  // return StepFiberToOffset(fiber_state, bytecode_offset,
+  // return StepInvocationToOffset(invocation, bytecode_offset,
   // std::move(callback));
   return UnimplementedErrorBuilder(IREE_LOC)
-         << "StepFiberOver not yet implemented";
+         << "StepInvocationOver not yet implemented";
 }
 
-Status DebugClient::StepFiberOut(const RemoteFiberState& fiber_state,
-                                 std::function<void()> callback) {
+Status DebugClient::StepInvocationOut(const RemoteInvocation& invocation,
+                                      std::function<void()> callback) {
   // TODO(benvanik): implement bytecode stepping search.
   // int bytecode_offset = 0;
-  // return StepFiberToOffset(fiber_state, bytecode_offset,
+  // return StepInvocationToOffset(invocation, bytecode_offset,
   // std::move(callback));
   return UnimplementedErrorBuilder(IREE_LOC)
-         << "StepFiberOut not yet implemented";
+         << "StepInvocationOut not yet implemented";
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

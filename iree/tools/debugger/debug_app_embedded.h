@@ -21,7 +21,7 @@
 #include "iree/base/status.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 // RAII handle for keeping the debugger alive.
@@ -46,7 +46,7 @@ StatusOr<std::unique_ptr<EmbeddedDebugger>> AttachDebugger(
     absl::string_view service_address);
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
 #endif  // IREE_TOOLS_DEBUGGER_DEBUG_APP_EMBEDDED_H_

@@ -27,8 +27,8 @@ iree_cc_library(
     iree::base::source_location
     iree::base::status
     iree::schemas
-    iree::vm::debug::debug_client_interface
-    iree::vm::debug::debug_client_tcp
+    iree::rt::debug::debug_client_interface
+    iree::rt::debug::debug_client_tcp
   PUBLIC
 )
 
@@ -61,9 +61,9 @@ iree_cc_library(
     iree::base::flatbuffer_util
     iree::base::status
     iree::schemas
-    iree::vm::debug::debug_client_interface
-    iree::vm::debug::debug_tcp_util
-    iree::vm::module
+    iree::rt::debug::debug_client_interface
+    iree::rt::debug::debug_tcp_util
+    iree::rt
   PUBLIC
 )
 
@@ -77,8 +77,8 @@ if(${IREE_ENABLE_DEBUG})
       flatbuffers
       iree::schemas
       iree::base::status
-      iree::vm::debug::debug_server_interface
-      iree::vm::debug::debug_server_tcp
+      iree::rt::debug::debug_server_interface
+      iree::rt::debug::debug_server_tcp
     PUBLIC
   )
 else()
@@ -117,9 +117,9 @@ iree_cc_library(
     flatbuffers
     iree::base::status
     iree::schemas
-    iree::vm::debug::debug_server_interface
-    iree::vm::debug::debug_service
-    iree::vm::debug::debug_tcp_util
+    iree::rt::debug::debug_server_interface
+    iree::rt::debug::debug_service
+    iree::rt::debug::debug_tcp_util
 )
 
 if(${IREE_BUILD_DEBUGGER})
@@ -138,8 +138,8 @@ if(${IREE_BUILD_DEBUGGER})
       absl::strings
       iree::base::memory
       iree::base::status
+      iree::rt::debug::debug_server
       iree::tools::debugger::debug_app_embedded
-      iree::vm::debug::debug_server
   )
 else()
   iree_cc_library(
@@ -154,7 +154,7 @@ else()
       absl::strings
       iree::base::memory
       iree::base::status
-      iree::vm::debug::debug_server
+      iree::rt::debug::debug_server
   )
 endif()
 
@@ -175,10 +175,8 @@ iree_cc_library(
     iree::base::status
     iree::schemas
     iree::schemas::reflection_data
-    iree::vm::debug::debug_session
-    iree::vm::fiber_state
-    iree::vm::instance
-    iree::vm::sequencer_context
+    iree::rt
+    iree::rt::debug::debug_session
   PUBLIC
 )
 
@@ -195,8 +193,7 @@ iree_cc_library(
     iree::base::source_location
     iree::base::status
     iree::schemas
-    iree::vm::fiber_state
-    iree::vm::sequencer_context
+    iree::rt
   PUBLIC
 )
 

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(debug EXCLUDE_FROM_ALL)
 
 iree_cc_library(
   NAME
@@ -208,7 +207,6 @@ iree_cc_library(
     iree::base::source_location
     iree::base::status
     iree::hal::device_manager
-    iree::vm::debug::debug_server_interface
   PUBLIC
 )
 

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/debug/debug_service.h"
+#include "iree/rt/debug/debug_service.h"
 
 #include <algorithm>
 #include <memory>
@@ -24,20 +24,23 @@
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
+#include "iree/rt/instance.h"
 #include "iree/schemas/debug_service_generated.h"
 #include "iree/schemas/reflection_data.h"
-#include "iree/vm/instance.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 namespace {
 
 using ::flatbuffers::FlatBufferBuilder;
 using ::flatbuffers::Offset;
 using ::iree::hal::BufferView;
-using ::iree::vm::Module;
-using ::iree::vm::StackFrame;
+
+int32_t NextUniqueBreakpointId() {
+  static std::atomic<int32_t> next_id = 0;
+  return ++next_id;
+}
 
 // Gets an embedded flatbuffers reflection schema.
 const ::reflection::Schema& GetSchema(const char* schema_name) {
@@ -105,10 +108,10 @@ StatusOr<Offset<rpc::StackFrameDef>> SerializeStackFrame(
   return sfb.Finish();
 }
 
-// Resolves a local from a fiber:frame:local_index to a BufferView.
-StatusOr<BufferView*> ResolveFiberLocal(FiberState* fiber_state,
-                                        int frame_index, int local_index) {
-  auto frames = fiber_state->mutable_stack()->mutable_frames();
+// Resolves a local from a invocation:frame:local_index to a BufferView.
+StatusOr<BufferView*> ResolveInvocationLocal(Invocation* invocation,
+                                             int frame_index, int local_index) {
+  auto frames = invocation->mutable_stack()->mutable_frames();
   if (frame_index < 0 || frame_index > frames.size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Frame index " << frame_index << " out of bounds ("
@@ -123,30 +126,29 @@ StatusOr<BufferView*> ResolveFiberLocal(FiberState* fiber_state,
   return &locals[local_index];
 }
 
-// Suspends a set of fibers and blocks until all have been suspended (or one or
-// more fails to suspend).
-// This works only when the caller is *not* one of the threads executing a
-// fiber in |fiber_states| (this normally shouldn't happen, but may if we
-// support eval()-like semantics).
-Status SuspendFibersAndWait(absl::Span<FiberState*> fiber_states) {
+// Suspends a set of invocations and blocks until all have been suspended (or
+// one or more fails to suspend). This works only when the caller is *not* one
+// of the threads executing a invocation in |invocations| (this normally
+// shouldn't happen, but may if we support eval()-like semantics).
+Status SuspendInvocationsAndWait(absl::Span<Invocation*> invocations) {
   absl::Mutex suspend_mutex;
   Status one_suspend_status = OkStatus();
   std::list<int> pending_suspend_ids;
-  for (auto* fiber_state : fiber_states) {
-    pending_suspend_ids.push_back(fiber_state->id());
+  for (auto* invocation : invocations) {
+    pending_suspend_ids.push_back(invocation->id());
   }
-  for (auto* fiber_state : fiber_states) {
-    auto suspend_callback = [&, fiber_state](Status suspend_status) {
+  for (auto* invocation : invocations) {
+    auto suspend_callback = [&, invocation](Status suspend_status) {
       absl::MutexLock lock(&suspend_mutex);
       auto it = std::find(pending_suspend_ids.begin(),
-                          pending_suspend_ids.end(), fiber_state->id());
+                          pending_suspend_ids.end(), invocation->id());
       CHECK(it != pending_suspend_ids.end());
       pending_suspend_ids.erase(it);
       if (!suspend_status.ok()) {
         one_suspend_status = std::move(suspend_status);
       }
     };
-    RETURN_IF_ERROR(fiber_state->Suspend(suspend_callback));
+    RETURN_IF_ERROR(invocation->Suspend(suspend_callback));
   }
   suspend_mutex.LockWhen(absl::Condition(
       +[](std::list<int>* pending_suspend_ids) {
@@ -159,53 +161,53 @@ Status SuspendFibersAndWait(absl::Span<FiberState*> fiber_states) {
 
 }  // namespace
 
-Status DebugService::SuspendAllFibers() {
-  VLOG(2) << "SuspendAllFibers";
-  for (auto* fiber_state : fiber_states_) {
-    RETURN_IF_ERROR(fiber_state->Suspend());
+Status DebugService::SuspendAllInvocations() {
+  VLOG(2) << "SuspendAllInvocations";
+  for (auto* invocation : invocations_) {
+    RETURN_IF_ERROR(invocation->Suspend());
   }
   return OkStatus();
 }
 
-Status DebugService::ResumeAllFibers() {
-  VLOG(2) << "ResumeAllFibers";
-  for (auto* fiber_state : fiber_states_) {
-    RETURN_IF_ERROR(fiber_state->Resume());
+Status DebugService::ResumeAllInvocations() {
+  VLOG(2) << "ResumeAllInvocations";
+  for (auto* invocation : invocations_) {
+    RETURN_IF_ERROR(invocation->Resume());
   }
   return OkStatus();
 }
 
-Status DebugService::RegisterContext(SequencerContext* context) {
+Status DebugService::RegisterContext(Context* context) {
   absl::MutexLock lock(&mutex_);
   VLOG(2) << "RegisterContext(" << context->id() << ")";
-  RETURN_IF_ERROR(SuspendAllFibers());
+  RETURN_IF_ERROR(SuspendAllInvocations());
   RETURN_IF_ERROR(UnreadyAllSessions());
   contexts_.push_back(context);
   for (auto* session : sessions_) {
     RETURN_IF_ERROR(session->OnContextRegistered(context));
   }
-  RETURN_IF_ERROR(ResumeAllFibers());
+  RETURN_IF_ERROR(ResumeAllInvocations());
   return OkStatus();
 }
 
-Status DebugService::UnregisterContext(SequencerContext* context) {
+Status DebugService::UnregisterContext(Context* context) {
   absl::MutexLock lock(&mutex_);
   VLOG(2) << "UnregisterContext(" << context->id() << ")";
   auto it = std::find(contexts_.begin(), contexts_.end(), context);
   if (it == contexts_.end()) {
     return NotFoundErrorBuilder(IREE_LOC) << "Context not registered";
   }
-  RETURN_IF_ERROR(SuspendAllFibers());
+  RETURN_IF_ERROR(SuspendAllInvocations());
   RETURN_IF_ERROR(UnreadyAllSessions());
   for (auto* session : sessions_) {
     RETURN_IF_ERROR(session->OnContextUnregistered(context));
   }
   contexts_.erase(it);
-  RETURN_IF_ERROR(ResumeAllFibers());
+  RETURN_IF_ERROR(ResumeAllInvocations());
   return OkStatus();
 }
 
-StatusOr<SequencerContext*> DebugService::GetContext(int context_id) const {
+StatusOr<Context*> DebugService::GetContext(int context_id) const {
   for (auto* context : contexts_) {
     if (context->id() == context_id) {
       return context;
@@ -216,18 +218,17 @@ StatusOr<SequencerContext*> DebugService::GetContext(int context_id) const {
          << " not registered with the debug service";
 }
 
-Status DebugService::RegisterContextModule(SequencerContext* context,
-                                           Module* module) {
+Status DebugService::RegisterContextModule(Context* context, Module* module) {
   absl::MutexLock lock(&mutex_);
   VLOG(2) << "RegisterContextModule(" << context->id() << ", " << module->name()
           << ")";
-  RETURN_IF_ERROR(SuspendAllFibers());
+  RETURN_IF_ERROR(SuspendAllInvocations());
   RETURN_IF_ERROR(UnreadyAllSessions());
   RETURN_IF_ERROR(RegisterModuleBreakpoints(context, module));
   for (auto* session : sessions_) {
     RETURN_IF_ERROR(session->OnModuleLoaded(context, module));
   }
-  RETURN_IF_ERROR(ResumeAllFibers());
+  RETURN_IF_ERROR(ResumeAllInvocations());
   return OkStatus();
 }
 
@@ -244,61 +245,61 @@ StatusOr<Module*> DebugService::GetModule(int context_id,
          << context_id;
 }
 
-Status DebugService::RegisterFiberState(FiberState* fiber_state) {
+Status DebugService::RegisterInvocation(Invocation* invocation) {
   absl::MutexLock lock(&mutex_);
-  VLOG(2) << "RegisterFiberState(" << fiber_state->id() << ")";
-  RETURN_IF_ERROR(SuspendAllFibers());
+  VLOG(2) << "RegisterInvocation(" << invocation->id() << ")";
+  RETURN_IF_ERROR(SuspendAllInvocations());
   RETURN_IF_ERROR(UnreadyAllSessions());
-  fiber_states_.push_back(fiber_state);
+  invocations_.push_back(invocation);
   if (sessions_unready_) {
     // Suspend immediately as a debugger is not yet read.
-    RETURN_IF_ERROR(fiber_state->Suspend());
+    RETURN_IF_ERROR(invocation->Suspend());
   }
   for (auto* session : sessions_) {
-    RETURN_IF_ERROR(session->OnFiberRegistered(fiber_state));
+    RETURN_IF_ERROR(session->OnInvocationRegistered(invocation));
   }
-  RETURN_IF_ERROR(ResumeAllFibers());
+  RETURN_IF_ERROR(ResumeAllInvocations());
   return OkStatus();
 }
 
-Status DebugService::UnregisterFiberState(FiberState* fiber_state) {
+Status DebugService::UnregisterInvocation(Invocation* invocation) {
   absl::MutexLock lock(&mutex_);
-  VLOG(2) << "UnregisterFiberState(" << fiber_state->id() << ")";
-  auto it = std::find(fiber_states_.begin(), fiber_states_.end(), fiber_state);
-  if (it == fiber_states_.end()) {
-    return NotFoundErrorBuilder(IREE_LOC) << "Fiber state not registered";
+  VLOG(2) << "UnregisterInvocation(" << invocation->id() << ")";
+  auto it = std::find(invocations_.begin(), invocations_.end(), invocation);
+  if (it == invocations_.end()) {
+    return NotFoundErrorBuilder(IREE_LOC) << "Invocation state not registered";
   }
-  RETURN_IF_ERROR(SuspendAllFibers());
+  RETURN_IF_ERROR(SuspendAllInvocations());
   RETURN_IF_ERROR(UnreadyAllSessions());
   for (auto* session : sessions_) {
-    RETURN_IF_ERROR(session->OnFiberUnregistered(fiber_state));
+    RETURN_IF_ERROR(session->OnInvocationUnregistered(invocation));
   }
-  fiber_states_.erase(it);
-  RETURN_IF_ERROR(ResumeAllFibers());
+  invocations_.erase(it);
+  RETURN_IF_ERROR(ResumeAllInvocations());
   return OkStatus();
 }
 
-StatusOr<FiberState*> DebugService::GetFiberState(int fiber_id) const {
-  for (auto* fiber_state : fiber_states_) {
-    if (fiber_state->id() == fiber_id) {
-      return fiber_state;
+StatusOr<Invocation*> DebugService::GetInvocation(int invocation_id) const {
+  for (auto* invocation : invocations_) {
+    if (invocation->id() == invocation_id) {
+      return invocation;
     }
   }
   return NotFoundErrorBuilder(IREE_LOC)
-         << "Fiber state with ID " << fiber_id
+         << "Invocation state with ID " << invocation_id
          << " not registered with the debug service";
 }
 
-StatusOr<Offset<rpc::FiberStateDef>> DebugService::SerializeFiberState(
-    const FiberState& fiber_state, FlatBufferBuilder* fbb) {
+StatusOr<Offset<rpc::InvocationDef>> DebugService::SerializeInvocation(
+    const Invocation& invocation, FlatBufferBuilder* fbb) {
   std::vector<Offset<rpc::StackFrameDef>> frame_offs_list;
-  for (const auto& frame : fiber_state.stack().frames()) {
+  for (const auto& frame : invocation.stack().frames()) {
     ASSIGN_OR_RETURN(auto frame_offs, SerializeStackFrame(frame, fbb));
     frame_offs_list.push_back(frame_offs);
   }
   auto frames_offs = fbb->CreateVector(frame_offs_list);
-  rpc::FiberStateDefBuilder fsb(*fbb);
-  fsb.add_fiber_id(fiber_state.id());
+  rpc::InvocationDefBuilder fsb(*fbb);
+  fsb.add_invocation_id(invocation.id());
   fsb.add_frames(frames_offs);
   return fsb.Finish();
 }
@@ -310,10 +311,10 @@ Status DebugService::RegisterDebugSession(DebugSession* session) {
   if (session->is_ready()) {
     ++sessions_ready_;
   } else {
-    // Immediately suspend all fibers until the session readies up (or
+    // Immediately suspend all invocations until the session readies up (or
     // disconnects).
     ++sessions_unready_;
-    RETURN_IF_ERROR(SuspendAllFibers());
+    RETURN_IF_ERROR(SuspendAllInvocations());
   }
   return OkStatus();
 }
@@ -329,10 +330,11 @@ Status DebugService::UnregisterDebugSession(DebugSession* session) {
   if (session->is_ready()) {
     --sessions_ready_;
   } else {
-    // If the session never readied up then we still have all fibers suspended
-    // waiting for it. We should resume so that we don't block forever.
+    // If the session never readied up then we still have all invocations
+    // suspended waiting for it. We should resume so that we don't block
+    // forever.
     --sessions_unready_;
-    RETURN_IF_ERROR(ResumeAllFibers());
+    RETURN_IF_ERROR(ResumeAllInvocations());
   }
   return OkStatus();
 }
@@ -519,118 +521,125 @@ StatusOr<Offset<rpc::ResolveFunctionResponse>> DebugService::ResolveFunction(
   return response.Finish();
 }
 
-StatusOr<Offset<rpc::ListFibersResponse>> DebugService::ListFibers(
-    const rpc::ListFibersRequest& request, FlatBufferBuilder* fbb) {
+StatusOr<Offset<rpc::ListInvocationsResponse>> DebugService::ListInvocations(
+    const rpc::ListInvocationsRequest& request, FlatBufferBuilder* fbb) {
   absl::MutexLock lock(&mutex_);
-  VLOG(1) << "RPC: ListFibers()";
-  std::vector<Offset<rpc::FiberStateDef>> fiber_state_offsets;
-  for (auto* fiber_state : fiber_states_) {
-    ASSIGN_OR_RETURN(auto fiber_state_offs,
-                     SerializeFiberState(*fiber_state, fbb));
-    fiber_state_offsets.push_back(fiber_state_offs);
+  VLOG(1) << "RPC: ListInvocations()";
+  std::vector<Offset<rpc::InvocationDef>> invocation_offsets;
+  for (auto* invocation : invocations_) {
+    ASSIGN_OR_RETURN(auto invocation_offs,
+                     SerializeInvocation(*invocation, fbb));
+    invocation_offsets.push_back(invocation_offs);
   }
-  auto fiber_states_offs = fbb->CreateVector(fiber_state_offsets);
-  rpc::ListFibersResponseBuilder response(*fbb);
-  response.add_fiber_states(fiber_states_offs);
+  auto invocations_offs = fbb->CreateVector(invocation_offsets);
+  rpc::ListInvocationsResponseBuilder response(*fbb);
+  response.add_invocations(invocations_offs);
   return response.Finish();
 }
 
-StatusOr<Offset<rpc::SuspendFibersResponse>> DebugService::SuspendFibers(
-    const rpc::SuspendFibersRequest& request, FlatBufferBuilder* fbb) {
+StatusOr<Offset<rpc::SuspendInvocationsResponse>>
+DebugService::SuspendInvocations(const rpc::SuspendInvocationsRequest& request,
+                                 FlatBufferBuilder* fbb) {
   absl::MutexLock lock(&mutex_);
-  VLOG(1) << "RPC: SuspendFibers(fiber_ids=["
-          << (request.fiber_ids() ? absl::StrJoin(*request.fiber_ids(), ", ")
-                                  : "")
+  VLOG(1) << "RPC: SuspendInvocations(invocation_ids=["
+          << (request.invocation_ids()
+                  ? absl::StrJoin(*request.invocation_ids(), ", ")
+                  : "")
           << "])";
-  std::vector<Offset<rpc::FiberStateDef>> fiber_state_offsets;
-  if (request.fiber_ids() && request.fiber_ids()->size() > 0) {
-    // Suspending a list of fibers.
-    std::vector<FiberState*> fibers_to_suspend;
-    for (int fiber_id : *request.fiber_ids()) {
-      ASSIGN_OR_RETURN(auto* fiber_state, GetFiberState(fiber_id));
-      fibers_to_suspend.push_back(fiber_state);
+  std::vector<Offset<rpc::InvocationDef>> invocation_offsets;
+  if (request.invocation_ids() && request.invocation_ids()->size() > 0) {
+    // Suspending a list of invocations.
+    std::vector<Invocation*> invocations_to_suspend;
+    for (int invocation_id : *request.invocation_ids()) {
+      ASSIGN_OR_RETURN(auto* invocation, GetInvocation(invocation_id));
+      invocations_to_suspend.push_back(invocation);
     }
-    RETURN_IF_ERROR(SuspendFibersAndWait(absl::MakeSpan(fibers_to_suspend)));
-    for (auto* fiber_state : fibers_to_suspend) {
-      ASSIGN_OR_RETURN(auto fiber_state_offs,
-                       SerializeFiberState(*fiber_state, fbb));
-      fiber_state_offsets.push_back(fiber_state_offs);
+    RETURN_IF_ERROR(
+        SuspendInvocationsAndWait(absl::MakeSpan(invocations_to_suspend)));
+    for (auto* invocation : invocations_to_suspend) {
+      ASSIGN_OR_RETURN(auto invocation_offs,
+                       SerializeInvocation(*invocation, fbb));
+      invocation_offsets.push_back(invocation_offs);
     }
   } else {
-    // Suspending all fibers.
-    RETURN_IF_ERROR(SuspendAllFibers());
-    for (auto* fiber_state : fiber_states_) {
-      ASSIGN_OR_RETURN(auto fiber_state_offs,
-                       SerializeFiberState(*fiber_state, fbb));
-      fiber_state_offsets.push_back(fiber_state_offs);
+    // Suspending all invocations.
+    RETURN_IF_ERROR(SuspendAllInvocations());
+    for (auto* invocation : invocations_) {
+      ASSIGN_OR_RETURN(auto invocation_offs,
+                       SerializeInvocation(*invocation, fbb));
+      invocation_offsets.push_back(invocation_offs);
     }
   }
-  auto fiber_states_offs = fbb->CreateVector(fiber_state_offsets);
-  rpc::SuspendFibersResponseBuilder response(*fbb);
-  response.add_fiber_states(fiber_states_offs);
+  auto invocations_offs = fbb->CreateVector(invocation_offsets);
+  rpc::SuspendInvocationsResponseBuilder response(*fbb);
+  response.add_invocations(invocations_offs);
   return response.Finish();
 }
 
-StatusOr<Offset<rpc::ResumeFibersResponse>> DebugService::ResumeFibers(
-    const rpc::ResumeFibersRequest& request, FlatBufferBuilder* fbb) {
-  VLOG(1) << "RPC: ResumeFibers(fiber_ids=["
-          << (request.fiber_ids() ? absl::StrJoin(*request.fiber_ids(), ", ")
-                                  : "")
+StatusOr<Offset<rpc::ResumeInvocationsResponse>>
+DebugService::ResumeInvocations(const rpc::ResumeInvocationsRequest& request,
+                                FlatBufferBuilder* fbb) {
+  VLOG(1) << "RPC: ResumeInvocations(invocation_ids=["
+          << (request.invocation_ids()
+                  ? absl::StrJoin(*request.invocation_ids(), ", ")
+                  : "")
           << "])";
   absl::MutexLock lock(&mutex_);
-  if (request.fiber_ids() && request.fiber_ids()->size() > 0) {
-    // Resuming a list of fibers.
-    for (int fiber_id : *request.fiber_ids()) {
-      ASSIGN_OR_RETURN(auto* fiber_state, GetFiberState(fiber_id));
-      RETURN_IF_ERROR(fiber_state->Resume());
+  if (request.invocation_ids() && request.invocation_ids()->size() > 0) {
+    // Resuming a list of invocations.
+    for (int invocation_id : *request.invocation_ids()) {
+      ASSIGN_OR_RETURN(auto* invocation, GetInvocation(invocation_id));
+      RETURN_IF_ERROR(invocation->Resume());
     }
   } else {
-    // Resuming all fibers.
-    RETURN_IF_ERROR(ResumeAllFibers());
+    // Resuming all invocations.
+    RETURN_IF_ERROR(ResumeAllInvocations());
   }
-  rpc::ResumeFibersResponseBuilder response(*fbb);
+  rpc::ResumeInvocationsResponseBuilder response(*fbb);
   return response.Finish();
 }
 
-StatusOr<Offset<rpc::StepFiberResponse>> DebugService::StepFiber(
-    const rpc::StepFiberRequest& request, FlatBufferBuilder* fbb) {
+StatusOr<Offset<rpc::StepInvocationResponse>> DebugService::StepInvocation(
+    const rpc::StepInvocationRequest& request, FlatBufferBuilder* fbb) {
   absl::MutexLock lock(&mutex_);
-  VLOG(1) << "RPC: StepFiber(" << request.fiber_id() << ")";
-  ASSIGN_OR_RETURN(auto* fiber_state, GetFiberState(request.fiber_id()));
-  FiberState::StepTarget step_target;
+  VLOG(1) << "RPC: StepInvocation(" << request.invocation_id() << ")";
+  ASSIGN_OR_RETURN(auto* invocation, GetInvocation(request.invocation_id()));
+  Invocation::StepTarget step_target;
   // TODO(benvanik): step settings.
-  RETURN_IF_ERROR(fiber_state->Step(step_target));
-  rpc::StepFiberResponseBuilder response(*fbb);
+  RETURN_IF_ERROR(invocation->Step(step_target));
+  rpc::StepInvocationResponseBuilder response(*fbb);
   return response.Finish();
 }
 
-StatusOr<Offset<rpc::GetFiberLocalResponse>> DebugService::GetFiberLocal(
-    const rpc::GetFiberLocalRequest& request, FlatBufferBuilder* fbb) {
+StatusOr<Offset<rpc::GetInvocationLocalResponse>>
+DebugService::GetInvocationLocal(const rpc::GetInvocationLocalRequest& request,
+                                 FlatBufferBuilder* fbb) {
   absl::MutexLock lock(&mutex_);
-  VLOG(1) << "RPC: GetFiberLocal(" << request.fiber_id() << ", "
+  VLOG(1) << "RPC: GetInvocationLocal(" << request.invocation_id() << ", "
           << request.frame_index() << ", " << request.local_index() << ")";
-  ASSIGN_OR_RETURN(auto* fiber_state, GetFiberState(request.fiber_id()));
+  ASSIGN_OR_RETURN(auto* invocation, GetInvocation(request.invocation_id()));
   ASSIGN_OR_RETURN(auto* local,
-                   ResolveFiberLocal(fiber_state, request.frame_index(),
-                                     request.local_index()));
+                   ResolveInvocationLocal(invocation, request.frame_index(),
+                                          request.local_index()));
 
   ASSIGN_OR_RETURN(
       auto value_offs,
       SerializeBufferView(*local, /*include_buffer_contents=*/true, fbb));
-  rpc::GetFiberLocalResponseBuilder response(*fbb);
+  rpc::GetInvocationLocalResponseBuilder response(*fbb);
   response.add_value(value_offs);
   return response.Finish();
 }
 
-StatusOr<Offset<rpc::SetFiberLocalResponse>> DebugService::SetFiberLocal(
-    const rpc::SetFiberLocalRequest& request, FlatBufferBuilder* fbb) {
+StatusOr<Offset<rpc::SetInvocationLocalResponse>>
+DebugService::SetInvocationLocal(const rpc::SetInvocationLocalRequest& request,
+                                 FlatBufferBuilder* fbb) {
   absl::MutexLock lock(&mutex_);
-  VLOG(1) << "RPC: SetFiberLocal(" << request.fiber_id() << ", "
+  VLOG(1) << "RPC: SetInvocationLocal(" << request.invocation_id() << ", "
           << request.frame_index() << ", " << request.local_index() << ")";
-  ASSIGN_OR_RETURN(auto* fiber_state, GetFiberState(request.fiber_id()));
+  ASSIGN_OR_RETURN(auto* invocation, GetInvocation(request.invocation_id()));
   ASSIGN_OR_RETURN(auto* local,
-                   ResolveFiberLocal(fiber_state, request.frame_index(),
-                                     request.local_index()));
+                   ResolveInvocationLocal(invocation, request.frame_index(),
+                                          request.local_index()));
 
   if (!request.value()) {
     local->shape.clear();
@@ -651,7 +660,7 @@ StatusOr<Offset<rpc::SetFiberLocalResponse>> DebugService::SetFiberLocal(
   ASSIGN_OR_RETURN(
       auto value_offs,
       SerializeBufferView(*local, /*include_buffer_contents=*/true, fbb));
-  rpc::SetFiberLocalResponseBuilder response(*fbb);
+  rpc::SetInvocationLocalResponseBuilder response(*fbb);
   response.add_value(value_offs);
   return response.Finish();
 }
@@ -676,10 +685,10 @@ StatusOr<Offset<rpc::AddBreakpointResponse>> DebugService::AddBreakpoint(
     return InvalidArgumentErrorBuilder(IREE_LOC) << "No breakpoint specified";
   }
   absl::MutexLock lock(&mutex_);
-  int breakpoint_id = Instance::NextUniqueId();
+  int breakpoint_id = NextUniqueBreakpointId();
   VLOG(1) << "RPC: AddBreakpoint(" << breakpoint_id << ")";
 
-  RETURN_IF_ERROR(SuspendAllFibers());
+  RETURN_IF_ERROR(SuspendAllInvocations());
 
   rpc::BreakpointDefT breakpoint;
   request.breakpoint()->UnPackTo(&breakpoint);
@@ -700,7 +709,7 @@ StatusOr<Offset<rpc::AddBreakpointResponse>> DebugService::AddBreakpoint(
   }
   breakpoints_.push_back(std::move(breakpoint));
 
-  RETURN_IF_ERROR(ResumeAllFibers());
+  RETURN_IF_ERROR(ResumeAllInvocations());
 
   auto breakpoint_offs = rpc::BreakpointDef::Pack(*fbb, &breakpoints_.back());
   rpc::AddBreakpointResponseBuilder response(*fbb);
@@ -712,7 +721,7 @@ StatusOr<Offset<rpc::RemoveBreakpointResponse>> DebugService::RemoveBreakpoint(
     const rpc::RemoveBreakpointRequest& request, FlatBufferBuilder* fbb) {
   absl::MutexLock lock(&mutex_);
   VLOG(1) << "RPC: RemoveBreakpoint(" << request.breakpoint_id() << ")";
-  RETURN_IF_ERROR(SuspendAllFibers());
+  RETURN_IF_ERROR(SuspendAllInvocations());
 
   bool found = false;
   for (auto it = breakpoints_.begin(); it != breakpoints_.end(); ++it) {
@@ -733,7 +742,7 @@ StatusOr<Offset<rpc::RemoveBreakpointResponse>> DebugService::RemoveBreakpoint(
     }
   }
 
-  RETURN_IF_ERROR(ResumeAllFibers());
+  RETURN_IF_ERROR(ResumeAllInvocations());
   if (!found) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Breakpoint ID " << request.breakpoint_id() << " not found";
@@ -743,7 +752,7 @@ StatusOr<Offset<rpc::RemoveBreakpointResponse>> DebugService::RemoveBreakpoint(
   return response.Finish();
 }
 
-Status DebugService::RegisterModuleBreakpoints(SequencerContext* context,
+Status DebugService::RegisterModuleBreakpoints(Context* context,
                                                Module* module) {
   for (auto& breakpoint : breakpoints_) {
     switch (breakpoint.breakpoint_type) {
@@ -762,8 +771,7 @@ Status DebugService::RegisterModuleBreakpoints(SequencerContext* context,
 }
 
 Status DebugService::RegisterFunctionBreakpoint(
-    SequencerContext* context, Module* module,
-    rpc::BreakpointDefT* breakpoint) {
+    Context* context, Module* module, rpc::BreakpointDefT* breakpoint) {
   if (!breakpoint->function_name.empty()) {
     ASSIGN_OR_RETURN(breakpoint->function_ordinal,
                      module->function_table().LookupFunctionOrdinalByName(
@@ -792,24 +800,12 @@ Status DebugService::UnregisterFunctionBreakpoint(
 }
 
 Status DebugService::OnFunctionBreakpointHit(int breakpoint_id,
-                                             const vm::Stack& stack) {
+                                             const Invocation& invocation) {
   absl::ReleasableMutexLock lock(&mutex_);
   LOG(INFO) << "Breakpoint hit: " << breakpoint_id;
-  FiberState* source_fiber_state = nullptr;
-  for (auto* fiber_state : fiber_states_) {
-    if (fiber_state->mutable_stack() == std::addressof(stack)) {
-      source_fiber_state = fiber_state;
-      break;
-    }
-  }
-  if (!source_fiber_state) {
-    return InternalErrorBuilder(IREE_LOC)
-           << "Fiber state not found for stack - race?";
-  }
   RETURN_IF_ERROR(UnreadyAllSessions());
   for (auto* session : sessions_) {
-    RETURN_IF_ERROR(
-        session->OnBreakpointHit(breakpoint_id, *source_fiber_state));
+    RETURN_IF_ERROR(session->OnBreakpointHit(breakpoint_id, invocation));
   }
   lock.Release();
 
@@ -850,5 +846,5 @@ StatusOr<Offset<rpc::StopProfilingResponse>> DebugService::StopProfiling(
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

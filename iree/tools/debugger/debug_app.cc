@@ -29,15 +29,15 @@
 #include "iree/base/memory.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
+#include "iree/rt/debug/debug_client.h"
 #include "iree/schemas/debug_service_generated.h"
 #include "iree/vm/bytecode_printer.h"
 #include "iree/vm/bytecode_tables_sequencer.h"
-#include "iree/vm/debug/debug_client.h"
 #include "iree/vm/module.h"
 #include "iree/vm/source_map.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 namespace {
 
@@ -165,13 +165,13 @@ bool DebugApp::is_paused() const {
   return is_paused_ || !is_stepping_;
 }
 
-RemoteFiberState* DebugApp::GetSelectedFiberState() const {
-  if (!debug_client_ || !selected_fiber_state_id_.has_value()) {
+RemoteInvocation* DebugApp::GetSelectedInvocation() const {
+  if (!debug_client_ || !selected_invocation_id_.has_value()) {
     return nullptr;
   }
-  for (auto* fiber_state : debug_client_->fiber_states()) {
-    if (fiber_state->id() == selected_fiber_state_id_.value()) {
-      return fiber_state;
+  for (auto* invocation : debug_client_->invocations()) {
+    if (invocation->id() == selected_invocation_id_.value()) {
+      return invocation;
     }
   }
   return nullptr;
@@ -372,9 +372,9 @@ Status DebugApp::OnModuleLoaded(const RemoteContext& context,
   return debug_client_->MakeReady();
 }
 
-Status DebugApp::OnFiberRegistered(const RemoteFiberState& fiber_state) {
-  if (!selected_fiber_state_id_.has_value()) {
-    selected_fiber_state_id_ = fiber_state.id();
+Status DebugApp::OnInvocationRegistered(const RemoteInvocation& invocation) {
+  if (!selected_invocation_id_.has_value()) {
+    selected_invocation_id_ = invocation.id();
     selected_stack_frame_index_ = {};
   }
 
@@ -382,10 +382,10 @@ Status DebugApp::OnFiberRegistered(const RemoteFiberState& fiber_state) {
   return debug_client_->MakeReady();
 }
 
-Status DebugApp::OnFiberUnregistered(const RemoteFiberState& fiber_state) {
-  if (selected_fiber_state_id_.has_value() &&
-      selected_fiber_state_id_.value() == fiber_state.id()) {
-    selected_fiber_state_id_ = {};
+Status DebugApp::OnInvocationUnregistered(const RemoteInvocation& invocation) {
+  if (selected_invocation_id_.has_value() &&
+      selected_invocation_id_.value() == invocation.id()) {
+    selected_invocation_id_ = {};
     selected_stack_frame_index_ = {};
   }
 
@@ -394,10 +394,10 @@ Status DebugApp::OnFiberUnregistered(const RemoteFiberState& fiber_state) {
 }
 
 Status DebugApp::OnBreakpointHit(const RemoteBreakpoint& breakpoint,
-                                 const RemoteFiberState& fiber_state) {
+                                 const RemoteInvocation& invocation) {
   // Keep track of where we are stopped.
   hit_breakpoints_.push_back(&breakpoint);
-  return NavigateToCodeView(fiber_state, -1, NavigationMode::kMatchDocument);
+  return NavigateToCodeView(invocation, -1, NavigationMode::kMatchDocument);
 }
 
 Status DebugApp::PumpMainLoop() {
@@ -483,7 +483,7 @@ Status DebugApp::LayoutInitialDockSpace() {
 
   ImGui::DockBuilderDockWindow("Modules", dock_left_id_);
   ImGui::DockBuilderDockWindow("Locals", dock_bottom_left_id_);
-  ImGui::DockBuilderDockWindow("Fibers", dock_bottom_right_id_);
+  ImGui::DockBuilderDockWindow("Invocations", dock_bottom_right_id_);
   ImGui::DockBuilderDockWindow("Breakpoints", dock_bottom_right_id_);
 
   ImGui::DockBuilderFinish(dockspace_id_);
@@ -517,7 +517,7 @@ Status DebugApp::DrawUI() {
   RETURN_IF_ERROR(DrawBreakpointListPanel());
   RETURN_IF_ERROR(DrawModuleListPanel());
   RETURN_IF_ERROR(DrawLocalListPanel());
-  RETURN_IF_ERROR(DrawFiberStateListPanel());
+  RETURN_IF_ERROR(DrawInvocationListPanel());
   ImGui::PopStyleVar();
 
   RETURN_IF_ERROR(DrawCodeViewPanels());
@@ -582,20 +582,20 @@ Status DebugApp::DrawToolbar() {
 
   ImGui::SameLine();
   ImGui::BeginGroup();
-  ImGui::Text("Fiber: ");
+  ImGui::Text("Invocation: ");
   ImGui::SameLine();
   ImGui::SetNextItemWidth(300);
-  auto* selected_fiber_state = GetSelectedFiberState();
-  const std::string& active_fiber_name =
-      selected_fiber_state ? selected_fiber_state->name() : "";
-  if (ImGui::BeginCombo("##active_fiber", active_fiber_name.c_str(),
+  auto* selected_invocation = GetSelectedInvocation();
+  const std::string& active_invocation_name =
+      selected_invocation ? selected_invocation->name() : "";
+  if (ImGui::BeginCombo("##active_invocation", active_invocation_name.c_str(),
                         ImGuiComboFlags_PopupAlignLeft)) {
     if (debug_client_) {
-      for (auto* fiber_state : debug_client_->fiber_states()) {
-        ImGui::PushID(fiber_state->id());
-        bool is_selected = fiber_state == selected_fiber_state;
-        if (ImGui::Selectable(fiber_state->name().c_str(), is_selected)) {
-          RETURN_IF_ERROR(NavigateToCodeView(*fiber_state, -1,
+      for (auto* invocation : debug_client_->invocations()) {
+        ImGui::PushID(invocation->id());
+        bool is_selected = invocation == selected_invocation;
+        if (ImGui::Selectable(invocation->name().c_str(), is_selected)) {
+          RETURN_IF_ERROR(NavigateToCodeView(*invocation, -1,
                                              NavigationMode::kMatchDocument));
         }
         if (is_selected) {
@@ -616,7 +616,7 @@ Status DebugApp::DrawToolbar() {
   if (debug_client_ && !is_paused()) {
     PushButtonHue(kPauseButtonHue);
     if (ImGui::Button("Pause")) {
-      RETURN_IF_ERROR(debug_client_->SuspendAllFibers());
+      RETURN_IF_ERROR(debug_client_->SuspendAllInvocations());
     }
     PopButtonStyle();
   } else if (debug_client_ && is_paused()) {
@@ -647,21 +647,22 @@ Status DebugApp::DrawToolbar() {
     ImGui::PopStyleColor(2);
   }
 
-  if (debug_client_ && is_paused() && selected_fiber_state) {
+  if (debug_client_ && is_paused() && selected_invocation) {
     ImGui::SameLine();
     PushButtonHue(kStepButtonHue);
     if (ImGui::Button("Step Into")) {
-      RETURN_IF_ERROR(debug_client_->StepFiber(*selected_fiber_state, [this]() {
-        is_paused_ = true;
-        is_stepping_ = false;
-      }));
+      RETURN_IF_ERROR(
+          debug_client_->StepInvocation(*selected_invocation, [this]() {
+            is_paused_ = true;
+            is_stepping_ = false;
+          }));
       is_stepping_ = true;
     }
     PopButtonStyle();
     ImGui::SameLine();
     if (ImGui::Button("Step Over")) {
       RETURN_IF_ERROR(
-          debug_client_->StepFiberOver(*selected_fiber_state, [this]() {
+          debug_client_->StepInvocationOver(*selected_invocation, [this]() {
             is_paused_ = true;
             is_stepping_ = false;
           }));
@@ -670,7 +671,7 @@ Status DebugApp::DrawToolbar() {
     ImGui::SameLine();
     if (ImGui::Button("Step Out")) {
       RETURN_IF_ERROR(
-          debug_client_->StepFiberOut(*selected_fiber_state, [this]() {
+          debug_client_->StepInvocationOut(*selected_invocation, [this]() {
             is_paused_ = true;
             is_stepping_ = false;
           }));
@@ -1036,33 +1037,33 @@ Status DebugApp::DrawLocalListPanel() {
     ImGui::End();
     return OkStatus();
   }
-  auto* fiber_state = GetSelectedFiberState();
-  if (!fiber_state) {
-    ImGui::TextDisabled("select a fiber to view locals");
+  auto* invocation = GetSelectedInvocation();
+  if (!invocation) {
+    ImGui::TextDisabled("select a invocation to view locals");
     ImGui::End();
     return OkStatus();
-  } else if (fiber_state->def().frames.empty()) {
-    ImGui::TextDisabled("(fiber has no frames)");
+  } else if (invocation->def().frames.empty()) {
+    ImGui::TextDisabled("(invocation has no frames)");
     ImGui::End();
     return OkStatus();
   }
   int stack_frame_index = selected_stack_frame_index_.value_or(-1);
   if (stack_frame_index == -1) {
-    stack_frame_index = fiber_state->def().frames.size() - 1;
+    stack_frame_index = invocation->def().frames.size() - 1;
   }
-  auto& stack_frame = fiber_state->def().frames[stack_frame_index];
+  auto& stack_frame = invocation->def().frames[stack_frame_index];
 
   // TODO(benvanik): toggle for IREE VM locals vs. source locals.
   for (int i = 0; i < stack_frame->locals.size(); ++i) {
     auto& local = stack_frame->locals[i];
-    RETURN_IF_ERROR(DrawLocal(fiber_state, stack_frame_index, i, *local));
+    RETURN_IF_ERROR(DrawLocal(invocation, stack_frame_index, i, *local));
   }
 
   ImGui::End();
   return OkStatus();
 }
 
-Status DebugApp::DrawLocal(RemoteFiberState* fiber_state, int stack_frame_index,
+Status DebugApp::DrawLocal(RemoteInvocation* invocation, int stack_frame_index,
                            int local_index, const rpc::BufferViewDefT& local) {
   // TODO(benvanik): columns and such in fancy table.
   ImGui::Text("l%d", local_index);
@@ -1079,9 +1080,9 @@ Status DebugApp::DrawLocal(RemoteFiberState* fiber_state, int stack_frame_index,
   return OkStatus();
 }
 
-Status DebugApp::DrawFiberStateListPanel() {
+Status DebugApp::DrawInvocationListPanel() {
   static bool is_panel_visible = true;
-  if (!ImGui::Begin("Fibers", &is_panel_visible, ImGuiWindowFlags_None)) {
+  if (!ImGui::Begin("Invocations", &is_panel_visible, ImGuiWindowFlags_None)) {
     ImGui::End();
     return OkStatus();
   } else if (!debug_client_) {
@@ -1089,30 +1090,30 @@ Status DebugApp::DrawFiberStateListPanel() {
     ImGui::End();
     return OkStatus();
   }
-  for (auto* fiber_state : debug_client_->fiber_states()) {
-    RETURN_IF_ERROR(DrawFiberState(*fiber_state));
+  for (auto* invocation : debug_client_->invocations()) {
+    RETURN_IF_ERROR(DrawInvocation(*invocation));
   }
   ImGui::End();
   return OkStatus();
 }
 
-Status DebugApp::DrawFiberState(const RemoteFiberState& fiber_state) {
-  // TODO(benvanik): expand if any breakpoints are stopped in fiber.
-  if (selected_fiber_state_id_.has_value() &&
-      selected_fiber_state_id_.value() == fiber_state.id()) {
+Status DebugApp::DrawInvocation(const RemoteInvocation& invocation) {
+  // TODO(benvanik): expand if any breakpoints are stopped in invocation.
+  if (selected_invocation_id_.has_value() &&
+      selected_invocation_id_.value() == invocation.id()) {
     ImGui::SetNextTreeNodeOpen(true);
   }
-  if (!ImGui::CollapsingHeader(fiber_state.name().c_str())) {
+  if (!ImGui::CollapsingHeader(invocation.name().c_str())) {
     return OkStatus();
   }
-  ImGui::PushID(fiber_state.id());
+  ImGui::PushID(invocation.id());
 
-  for (int i = 0; i < fiber_state.def().frames.size(); ++i) {
-    const auto& stack_frame = fiber_state.def().frames[i];
+  for (int i = 0; i < invocation.def().frames.size(); ++i) {
+    const auto& stack_frame = invocation.def().frames[i];
     ImGui::PushID(i);
     // TODO(benvanik): highlight frames with breakpoints in them.
-    bool is_selected = selected_fiber_state_id_.has_value() &&
-                       selected_fiber_state_id_.value() == fiber_state.id() &&
+    bool is_selected = selected_invocation_id_.has_value() &&
+                       selected_invocation_id_.value() == invocation.id() &&
                        selected_stack_frame_index_.has_value() &&
                        selected_stack_frame_index_.value() == i;
     if (ImGui::Selectable("##selectable", &is_selected,
@@ -1121,7 +1122,7 @@ Status DebugApp::DrawFiberState(const RemoteFiberState& fiber_state) {
       // TODO(benvanik): detect when clicking but already selected.
       if (is_selected) {
         RETURN_IF_ERROR(
-            NavigateToCodeView(fiber_state, i, NavigationMode::kMatchDocument));
+            NavigateToCodeView(invocation, i, NavigationMode::kMatchDocument));
       }
     }
     ImGui::SameLine();
@@ -1210,16 +1211,16 @@ Status DebugApp::NavigateToCodeView(absl::string_view module_name,
       });
 }
 
-Status DebugApp::NavigateToCodeView(const RemoteFiberState& fiber_state,
+Status DebugApp::NavigateToCodeView(const RemoteInvocation& invocation,
                                     int stack_frame_index,
                                     NavigationMode navigation_mode) {
   if (!debug_client_) {
     return UnavailableErrorBuilder(IREE_LOC) << "No connection established";
   }
   const auto& stack_frame = stack_frame_index == -1
-                                ? *fiber_state.def().frames.back()
-                                : *fiber_state.def().frames[stack_frame_index];
-  selected_fiber_state_id_ = fiber_state.id();
+                                ? *invocation.def().frames.back()
+                                : *invocation.def().frames[stack_frame_index];
+  selected_invocation_id_ = invocation.id();
   selected_stack_frame_index_ = stack_frame_index;
   return NavigateToCodeView(stack_frame.module_name,
                             stack_frame.function_ordinal, stack_frame.offset,
@@ -1310,14 +1311,14 @@ Status DebugApp::PrepareBytecodeCodeView(CodeViewDocument* document) {
   auto* remote_module = document->function->module();
   auto* remote_function = document->function;
 
-  ASSIGN_OR_RETURN(auto module, Module::FromDef(remote_module->def()));
+  ASSIGN_OR_RETURN(auto module, vm::Module::FromDef(remote_module->def()));
 
   // TODO(benvanik): source map support.
   // Want line count including source lines, IR lines, and bytecode lines.
   // May want lower level (JIT/etc) lines too.
 
   // TODO(benvanik): bytecode iterator for richer display.
-  auto source_map_resolver = SourceMapResolver::FromFunction(
+  auto source_map_resolver = vm::SourceMapResolver::FromFunction(
       module->def(), remote_function->ordinal());
   vm::BytecodePrinter printer(vm::sequencer_opcode_table(),
                               module->function_table(),
@@ -1355,8 +1356,8 @@ Status DebugApp::DrawBytecodeCodeView(CodeViewDocument* document) {
       int breakpoint_index = FindMatchingUserBreakpointIndex(
           remote_module->name(), remote_function->ordinal(), bytecode_offset);
       bool has_breakpoint = breakpoint_index != -1;
-      bool active_on_any_fiber = false;
-      bool active_on_selected_fiber = false;
+      bool active_on_any_invocation = false;
+      bool active_on_selected_invocation = false;
 
       ImGui::Dummy(ImVec2(4, 0));
 
@@ -1395,15 +1396,15 @@ Status DebugApp::DrawBytecodeCodeView(CodeViewDocument* document) {
         }
       }
 
-      // Active execution chevron (shows when active or any fiber is executing
-      // this region).
+      // Active execution chevron (shows when active or any invocation is
+      // executing this region).
       ImGui::SameLine();
-      if (active_on_selected_fiber) {
-        // The selected fiber is active here.
+      if (active_on_selected_invocation) {
+        // The selected invocation is active here.
         ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_SeparatorActive),
                            " > ");
-      } else if (active_on_any_fiber) {
-        // At least one other fiber is active here.
+      } else if (active_on_any_invocation) {
+        // At least one other invocation is active here.
         ImGui::TextColored(ImGui::GetStyleColorVec4(ImGuiCol_Separator), " > ");
       } else {
         // Not active.
@@ -1433,5 +1434,5 @@ Status DebugApp::DrawBytecodeCodeView(CodeViewDocument* document) {
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

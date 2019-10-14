@@ -28,24 +28,22 @@
 #include "absl/synchronization/mutex.h"
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/status.h"
+#include "iree/rt/debug/debug_server.h"
+#include "iree/rt/debug/debug_service.h"
+#include "iree/rt/debug/debug_tcp_util.h"
 #include "iree/schemas/debug_service_generated.h"
-#include "iree/vm/debug/debug_server.h"
-#include "iree/vm/debug/debug_service.h"
-#include "iree/vm/debug/debug_tcp_util.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 namespace {
-
-using ::iree::vm::Module;
 
 // Writes the given typed response message to the given fd by wrapping it in
 // a size-prefixed rpc::Request union.
 //
 // Example:
 //  ::flatbuffers::FlatBufferBuilder fbb;
-//  rpc::SuspendFiberResponseBuilder response(fbb);
+//  rpc::SuspendInvocationResponseBuilder response(fbb);
 //  RETURN_IF_ERROR(WriteResponse(fd_, response.Finish(), std::move(fbb)));
 template <typename T>
 Status WriteResponse(int fd, ::flatbuffers::Offset<T> message_offs,
@@ -115,7 +113,7 @@ class TcpDebugSession : public DebugSession {
     return PostEvent(event.Finish(), std::move(fbb));
   }
 
-  Status OnContextRegistered(SequencerContext* context) override {
+  Status OnContextRegistered(Context* context) override {
     VLOG(2) << "Client " << client_fd_ << ": Post OnContextRegistered("
             << context->id() << ")";
     ::flatbuffers::FlatBufferBuilder fbb;
@@ -123,7 +121,7 @@ class TcpDebugSession : public DebugSession {
     event.add_context_id(context->id());
     return PostEvent(event.Finish(), std::move(fbb));
   }
-  Status OnContextUnregistered(SequencerContext* context) override {
+  Status OnContextUnregistered(Context* context) override {
     VLOG(2) << "Client " << client_fd_ << ": Post OnContextUnregistered("
             << context->id() << ")";
     ::flatbuffers::FlatBufferBuilder fbb;
@@ -132,7 +130,7 @@ class TcpDebugSession : public DebugSession {
     return PostEvent(event.Finish(), std::move(fbb));
   }
 
-  Status OnModuleLoaded(SequencerContext* context, Module* module) override {
+  Status OnModuleLoaded(Context* context, Module* module) override {
     VLOG(2) << "Client " << client_fd_ << ": Post OnModuleLoaded("
             << context->id() << ", " << module->name() << ")";
     ::flatbuffers::FlatBufferBuilder fbb;
@@ -144,25 +142,25 @@ class TcpDebugSession : public DebugSession {
     return PostEvent(event.Finish(), std::move(fbb));
   }
 
-  Status OnFiberRegistered(FiberState* fiber_state) override {
-    VLOG(2) << "Client " << client_fd_ << ": Post OnFiberRegistered("
-            << fiber_state->id() << ")";
+  Status OnInvocationRegistered(Invocation* invocation) override {
+    VLOG(2) << "Client " << client_fd_ << ": Post OnInvocationRegistered("
+            << invocation->id() << ")";
     ::flatbuffers::FlatBufferBuilder fbb;
-    rpc::FiberRegisteredEventBuilder event(fbb);
-    event.add_fiber_id(fiber_state->id());
+    rpc::InvocationRegisteredEventBuilder event(fbb);
+    event.add_invocation_id(invocation->id());
     return PostEvent(event.Finish(), std::move(fbb));
   }
-  Status OnFiberUnregistered(FiberState* fiber_state) override {
-    VLOG(2) << "Client " << client_fd_ << ": Post OnFiberUnregistered("
-            << fiber_state->id() << ")";
+  Status OnInvocationUnregistered(Invocation* invocation) override {
+    VLOG(2) << "Client " << client_fd_ << ": Post OnInvocationUnregistered("
+            << invocation->id() << ")";
     ::flatbuffers::FlatBufferBuilder fbb;
-    rpc::FiberUnregisteredEventBuilder event(fbb);
-    event.add_fiber_id(fiber_state->id());
+    rpc::InvocationUnregisteredEventBuilder event(fbb);
+    event.add_invocation_id(invocation->id());
     return PostEvent(event.Finish(), std::move(fbb));
   }
 
   Status OnBreakpointResolved(const rpc::BreakpointDefT& breakpoint,
-                              SequencerContext* context) override {
+                              Context* context) override {
     VLOG(2) << "Client " << client_fd_ << ": Post OnBreakpointResolved("
             << breakpoint.breakpoint_id << ", " << context->id() << ", "
             << breakpoint.function_ordinal << ")";
@@ -176,15 +174,15 @@ class TcpDebugSession : public DebugSession {
   }
 
   Status OnBreakpointHit(int breakpoint_id,
-                         const FiberState& fiber_state) override {
+                         const Invocation& invocation) override {
     VLOG(2) << "Client " << client_fd_ << ": Post OnBreakpointHit("
-            << breakpoint_id << ", " << fiber_state.id() << ")";
+            << breakpoint_id << ", " << invocation.id() << ")";
     ::flatbuffers::FlatBufferBuilder fbb;
-    ASSIGN_OR_RETURN(auto fiber_state_offs,
-                     debug_service_->SerializeFiberState(fiber_state, &fbb));
+    ASSIGN_OR_RETURN(auto invocation_offs,
+                     debug_service_->SerializeInvocation(invocation, &fbb));
     rpc::BreakpointHitEventBuilder event(fbb);
     event.add_breakpoint_id(breakpoint_id);
-    event.add_fiber_state(fiber_state_offs);
+    event.add_invocation(invocation_offs);
     return PostEvent(event.Finish(), std::move(fbb));
   }
 
@@ -265,12 +263,12 @@ class TcpDebugSession : public DebugSession {
       DISPATCH_REQUEST(ListContexts);
       DISPATCH_REQUEST(GetModule);
       DISPATCH_REQUEST(GetFunction);
-      DISPATCH_REQUEST(ListFibers);
-      DISPATCH_REQUEST(SuspendFibers);
-      DISPATCH_REQUEST(ResumeFibers);
-      DISPATCH_REQUEST(StepFiber);
-      DISPATCH_REQUEST(GetFiberLocal);
-      DISPATCH_REQUEST(SetFiberLocal);
+      DISPATCH_REQUEST(ListInvocations);
+      DISPATCH_REQUEST(SuspendInvocations);
+      DISPATCH_REQUEST(ResumeInvocations);
+      DISPATCH_REQUEST(StepInvocation);
+      DISPATCH_REQUEST(GetInvocationLocal);
+      DISPATCH_REQUEST(SetInvocationLocal);
       DISPATCH_REQUEST(ListBreakpoints);
       DISPATCH_REQUEST(AddBreakpoint);
       DISPATCH_REQUEST(RemoveBreakpoint);
@@ -392,21 +390,20 @@ class TcpDebugServer final : public DebugServer {
   }
 
  protected:
-  Status RegisterContext(SequencerContext* context) override {
+  Status RegisterContext(Context* context) override {
     return debug_service_.RegisterContext(context);
   }
-  Status UnregisterContext(SequencerContext* context) override {
+  Status UnregisterContext(Context* context) override {
     return debug_service_.UnregisterContext(context);
   }
-  Status RegisterContextModule(SequencerContext* context,
-                               Module* module) override {
+  Status RegisterContextModule(Context* context, Module* module) override {
     return debug_service_.RegisterContextModule(context, module);
   }
-  Status RegisterFiberState(FiberState* fiber_state) override {
-    return debug_service_.RegisterFiberState(fiber_state);
+  Status RegisterInvocation(Invocation* invocation) override {
+    return debug_service_.RegisterInvocation(invocation);
   }
-  Status UnregisterFiberState(FiberState* fiber_state) override {
-    return debug_service_.UnregisterFiberState(fiber_state);
+  Status UnregisterInvocation(Invocation* invocation) override {
+    return debug_service_.UnregisterInvocation(invocation);
   }
 
  private:
@@ -458,5 +455,5 @@ StatusOr<std::unique_ptr<DebugServer>> DebugServer::Create(int listen_port) {
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

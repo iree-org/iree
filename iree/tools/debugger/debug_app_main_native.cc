@@ -20,7 +20,7 @@
 #include "iree/tools/debugger/debug_app_embedded.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 Status Run() {
@@ -41,5 +41,5 @@ extern "C" int main(int argc, char** argv) {
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

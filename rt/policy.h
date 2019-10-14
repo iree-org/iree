@@ -12,24 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_TOOLS_DEBUGGER_DEBUG_PROMPT_H_
-#define IREE_TOOLS_DEBUGGER_DEBUG_PROMPT_H_
+#ifndef IREE_RT_POLICY_H_
+#define IREE_RT_POLICY_H_
 
-#include "absl/strings/string_view.h"
-#include "iree/base/status.h"
+#include "iree/base/ref_ptr.h"
 
 namespace iree {
 namespace rt {
-namespace debug {
 
-// TODO(benvanik): take stdin/stdout as arguments.
-// Attaches a debug prompt reading stdin for commands and printing results to
-// stdout. The calling thread will block until the debugger is exited or the
-// debug service closes.
-Status AttachDebugPrompt(absl::string_view debug_service_uri);
+// Defines how invocation scheduling is to be performed.
+// The policy instance is used by the scheduler to determine when submissions
+// should be flushed to target queues.
+//
+// Thread-safe; the policy may be evaluated from arbitrary threads after an
+// invocation has began processing.
+class Policy : public RefObject<Policy> {
+ public:
+  virtual ~Policy() = default;
 
-}  // namespace debug
+  // TODO(benvanik): constraints:
+  // - max memory usage
+  // - max delay
+  // - max in-flight items/etc
+  // - allowed device types
+};
+
 }  // namespace rt
 }  // namespace iree
 
-#endif  // IREE_TOOLS_DEBUGGER_DEBUG_PROMPT_H_
+#endif  // IREE_RT_POLICY_H_

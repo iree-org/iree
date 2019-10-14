@@ -20,7 +20,7 @@
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "iree/base/status.h"
-#include "iree/vm/debug/debug_client.h"
+#include "iree/rt/debug/debug_client.h"
 
 // NOTE: order matters here, imgui must come first:
 #include "third_party/dear_imgui/imgui.h"
@@ -29,7 +29,7 @@
 #include "third_party/dear_imgui/examples/imgui_impl_sdl.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 // Debug client app UI.
@@ -95,7 +95,7 @@ class DebugApp : private DebugClient::Listener {
   Status NavigateToCodeView(absl::string_view module_name,
                             absl::string_view function_name, int offset,
                             NavigationMode navigation_mode);
-  Status NavigateToCodeView(const RemoteFiberState& fiber_state,
+  Status NavigateToCodeView(const RemoteInvocation& invocation,
                             int stack_frame_index,
                             NavigationMode navigation_mode);
   Status NavigateToCodeView(const UserBreakpoint& user_breakpoint,
@@ -118,7 +118,7 @@ class DebugApp : private DebugClient::Listener {
 
   CodeViewDocument* FindMatchingDocument(absl::string_view module_name,
                                          int function_ordinal);
-  RemoteFiberState* GetSelectedFiberState() const;
+  RemoteInvocation* GetSelectedInvocation() const;
 
   Status RefreshActiveBreakpoints();
   bool IsStoppedAtBreakpoint(const UserBreakpoint& user_breakpoint) const;
@@ -133,10 +133,10 @@ class DebugApp : private DebugClient::Listener {
   Status OnContextUnregistered(const RemoteContext& context) override;
   Status OnModuleLoaded(const RemoteContext& context,
                         const RemoteModule& module) override;
-  Status OnFiberRegistered(const RemoteFiberState& fiber_state) override;
-  Status OnFiberUnregistered(const RemoteFiberState& fiber_state) override;
+  Status OnInvocationRegistered(const RemoteInvocation& invocation) override;
+  Status OnInvocationUnregistered(const RemoteInvocation& invocation) override;
   Status OnBreakpointHit(const RemoteBreakpoint& breakpoint,
-                         const RemoteFiberState& fiber_state) override;
+                         const RemoteInvocation& invocation) override;
 
   Status LayoutInitialDockSpace();
 
@@ -157,11 +157,11 @@ class DebugApp : private DebugClient::Listener {
   Status DrawModule(RemoteModule* module, const ImGuiTextFilter& filter);
 
   Status DrawLocalListPanel();
-  Status DrawLocal(RemoteFiberState* fiber_state, int stack_frame_index,
+  Status DrawLocal(RemoteInvocation* invocation, int stack_frame_index,
                    int local_index, const rpc::BufferViewDefT& local);
 
-  Status DrawFiberStateListPanel();
-  Status DrawFiberState(const RemoteFiberState& fiber_state);
+  Status DrawInvocationListPanel();
+  Status DrawInvocation(const RemoteInvocation& invocation);
 
   Status DrawCodeViewPanels();
   StatusOr<bool> DrawCodeViewDocument(CodeViewDocument* document);
@@ -187,14 +187,14 @@ class DebugApp : private DebugClient::Listener {
   std::vector<const RemoteBreakpoint*> hit_breakpoints_;
   bool is_stepping_ = false;
 
-  absl::optional<int> selected_fiber_state_id_;
+  absl::optional<int> selected_invocation_id_;
   absl::optional<int> selected_stack_frame_index_;
 
   std::vector<std::unique_ptr<CodeViewDocument>> documents_;
 };
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
 #endif  // IREE_TOOLS_DEBUGGER_DEBUG_APP_H_

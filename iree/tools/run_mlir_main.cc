@@ -47,9 +47,9 @@
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/hal/buffer_view_string_util.h"
 #include "iree/hal/driver_registry.h"
+#include "iree/rt/debug/debug_server_flags.h"
 #include "iree/schemas/module_def_generated.h"
 #include "iree/vm/bytecode_tables_sequencer.h"
-#include "iree/vm/debug/debug_server_flags.h"
 #include "iree/vm/fiber_state.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
@@ -226,8 +226,8 @@ Status EvaluateFunctions(absl::string_view target_backend,
   // Create the context we'll use for this (ensuring that we can't interfere
   // with other running evaluations, such as when in a multithreaded test
   // runner).
-  ASSIGN_OR_RETURN(auto debug_server, vm::debug::CreateDebugServerFromFlags());
-  auto instance = std::make_shared<vm::Instance>(std::move(debug_server));
+  ASSIGN_OR_RETURN(auto debug_server, rt::debug::CreateDebugServerFromFlags());
+  auto instance = std::make_shared<vm::Instance>();
   ASSIGN_OR_RETURN(auto driver, hal::DriverRegistry::shared_registry()->Create(
                                     target_backend));
   ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());

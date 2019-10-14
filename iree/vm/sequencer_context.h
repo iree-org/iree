@@ -23,6 +23,7 @@
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/vm/context.h"
+#include "iree/vm/fiber_state.h"
 #include "iree/vm/function.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"

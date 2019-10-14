@@ -27,7 +27,7 @@
 #include "iree/tools/debugger/debug_app.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 class InProcessEmbeddedDebugger : public EmbeddedDebugger {
@@ -149,5 +149,5 @@ StatusOr<std::unique_ptr<EmbeddedDebugger>> AttachDebugger(
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

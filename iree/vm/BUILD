@@ -5,15 +5,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-# Enable the debug service and other profiling features.
-# $ bazel build --define=IREE_DEBUG=1 :some_target
-config_setting(
-    name = "debug",
-    define_values = {
-        "IREE_DEBUG": "1",
-    },
-)
-
 cc_library(
     name = "bytecode_printer",
     srcs = ["bytecode_printer.cc"],
@@ -172,7 +163,6 @@ cc_library(
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/hal:device_manager",
-        "//iree/vm/debug:debug_server_interface",
         "@com_google_absl//absl/memory",
     ],
 )

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_DEBUG_DEBUG_CLIENT_H_
-#define IREE_VM_DEBUG_DEBUG_CLIENT_H_
+#ifndef IREE_RT_DEBUG_DEBUG_CLIENT_H_
+#define IREE_RT_DEBUG_DEBUG_CLIENT_H_
 
 #include <functional>
 #include <memory>
@@ -26,7 +26,7 @@
 #include "iree/schemas/debug_service_generated.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 // Remote breakpoint currently active on the server.
@@ -124,18 +124,18 @@ class RemoteContext {
   int id_;
 };
 
-class RemoteFiberState {
+class RemoteInvocation {
  public:
-  virtual ~RemoteFiberState() = default;
+  virtual ~RemoteInvocation() = default;
 
   int id() const { return id_; }
   const std::string& name() const { return name_; }
 
-  virtual const rpc::FiberStateDefT& def() const = 0;
+  virtual const rpc::InvocationDefT& def() const = 0;
 
  protected:
-  explicit RemoteFiberState(int id)
-      : id_(id), name_(absl::StrCat("Fiber ", id)) {}
+  explicit RemoteInvocation(int id)
+      : id_(id), name_(absl::StrCat("Invocation ", id)) {}
 
  private:
   int id_;
@@ -155,9 +155,9 @@ class DebugClient {
   // Event methods will be called from within Poll calls (so on that thread).
   //
   // When the server posts an event it will mark the client as unready and
-  // suspend execution of all fibers until MakeReady is used to indicate that
-  // the client is ready for the server to resume. Each event needs a matching
-  // MakeReady ack.
+  // suspend execution of all invocations until MakeReady is used to indicate
+  // that the client is ready for the server to resume. Each event needs a
+  // matching MakeReady ack.
   //
   // Listeners can defer acking if they need to perform additional queries or
   // state changes to the server or wait for user interaction. Multiple events
@@ -175,13 +175,15 @@ class DebugClient {
     virtual Status OnModuleLoaded(const RemoteContext& context,
                                   const RemoteModule& module) = 0;
 
-    // Signals that a fiber has been registered on the server.
-    virtual Status OnFiberRegistered(const RemoteFiberState& fiber_state) = 0;
-    virtual Status OnFiberUnregistered(const RemoteFiberState& fiber_state) = 0;
+    // Signals that a invocation has been registered on the server.
+    virtual Status OnInvocationRegistered(
+        const RemoteInvocation& invocation) = 0;
+    virtual Status OnInvocationUnregistered(
+        const RemoteInvocation& invocation) = 0;
 
-    // Signals that a breakpoint has been hit by a fiber on the server.
+    // Signals that a breakpoint has been hit by a invocation on the server.
     virtual Status OnBreakpointHit(const RemoteBreakpoint& breakpoint,
-                                   const RemoteFiberState& fiber_state) = 0;
+                                   const RemoteInvocation& invocation) = 0;
   };
 
   // Connects to a remote debug service at the provided IP:port.
@@ -197,8 +199,8 @@ class DebugClient {
   // A list of all contexts registered with the server.
   virtual absl::Span<RemoteContext* const> contexts() const = 0;
 
-  // A list of all fibers registered with the server.
-  virtual absl::Span<RemoteFiberState* const> fiber_states() const = 0;
+  // A list of all invocations registered with the server.
+  virtual absl::Span<RemoteInvocation* const> invocations() const = 0;
 
   // A list of all breakpoints registered with the server.
   virtual absl::Span<RemoteBreakpoint* const> breakpoints() const = 0;
@@ -235,33 +237,37 @@ class DebugClient {
   // events posted by the server (read: any call to the Listener::On* methods).
   virtual Status MakeReady() = 0;
 
-  // Suspends all fibers running on the server.
-  virtual Status SuspendAllFibers() = 0;
+  // Suspends all invocations running on the server.
+  virtual Status SuspendAllInvocations() = 0;
 
-  // Resumes all fibers running on the server.
-  virtual Status ResumeAllFibers() = 0;
+  // Resumes all invocations running on the server.
+  virtual Status ResumeAllInvocations() = 0;
 
-  // Suspends a list of fibers running on the server. Fibers not in the provided
-  // list will not be suspended, such as new fibers created while the request
-  // is pending.
-  virtual Status SuspendFibers(absl::Span<RemoteFiberState*> fibers) = 0;
+  // Suspends a list of invocations running on the server. Invocations not in
+  // the provided list will not be suspended, such as new invocations created
+  // while the request is pending.
+  virtual Status SuspendInvocations(
+      absl::Span<RemoteInvocation*> invocations) = 0;
 
-  // Resumes a list of fibers running on the server.
-  virtual Status ResumeFibers(absl::Span<RemoteFiberState*> fibers) = 0;
+  // Resumes a list of invocations running on the server.
+  virtual Status ResumeInvocations(
+      absl::Span<RemoteInvocation*> invocations) = 0;
 
-  // Steps a fiber one bytecode operation.
-  virtual Status StepFiber(const RemoteFiberState& fiber_state,
-                           std::function<void()> callback) = 0;
-  // Steps a fiber over one bytecode operation, not stopping until it completes.
-  Status StepFiberOver(const RemoteFiberState& fiber_state,
-                       std::function<void()> callback);
-  // Steps a fiber out of the current block.
-  Status StepFiberOut(const RemoteFiberState& fiber_state,
-                      std::function<void()> callback);
-  // Steps a fiber to a specific bytecode offset within the current function.
-  virtual Status StepFiberToOffset(const RemoteFiberState& fiber_state,
-                                   int bytecode_offset,
-                                   std::function<void()> callback) = 0;
+  // Steps a invocation one bytecode operation.
+  virtual Status StepInvocation(const RemoteInvocation& invocation,
+                                std::function<void()> callback) = 0;
+  // Steps a invocation over one bytecode operation, not stopping until it
+  // completes.
+  Status StepInvocationOver(const RemoteInvocation& invocation,
+                            std::function<void()> callback);
+  // Steps a invocation out of the current block.
+  Status StepInvocationOut(const RemoteInvocation& invocation,
+                           std::function<void()> callback);
+  // Steps a invocation to a specific bytecode offset within the current
+  // function.
+  virtual Status StepInvocationToOffset(const RemoteInvocation& invocation,
+                                        int bytecode_offset,
+                                        std::function<void()> callback) = 0;
 
   // TODO(benvanik): profiling modes.
 
@@ -274,7 +280,7 @@ class DebugClient {
 };
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
-#endif  // IREE_VM_DEBUG_DEBUG_CLIENT_H_
+#endif  // IREE_RT_DEBUG_DEBUG_CLIENT_H_

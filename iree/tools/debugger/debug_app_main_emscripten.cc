@@ -25,7 +25,7 @@
 #include "iree/tools/debugger/debug_app.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 extern "C" int main(int argc, char** argv) {
@@ -65,5 +65,5 @@ extern "C" int main(int argc, char** argv) {
 }
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

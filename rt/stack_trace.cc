@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_TOOLS_DEBUGGER_DEBUG_PROMPT_H_
-#define IREE_TOOLS_DEBUGGER_DEBUG_PROMPT_H_
+#include "iree/rt/stack_trace.h"
 
-#include "absl/strings/string_view.h"
+#include "absl/strings/str_join.h"
 #include "iree/base/status.h"
 
 namespace iree {
 namespace rt {
-namespace debug {
 
-// TODO(benvanik): take stdin/stdout as arguments.
-// Attaches a debug prompt reading stdin for commands and printing results to
-// stdout. The calling thread will block until the debugger is exited or the
-// debug service closes.
-Status AttachDebugPrompt(absl::string_view debug_service_uri);
+namespace {
+struct StackFrameFormatter {
+  void operator()(std::string* out, const StackFrame& stack_frame) const {
+    out->append(stack_frame.DebugStringShort());
+  }
+};
+}  // namespace
 
-}  // namespace debug
+std::string StackTrace::DebugString() const {
+  return absl::StrJoin(frames_, "\n", StackFrameFormatter());
+}
+
 }  // namespace rt
 }  // namespace iree
-
-#endif  // IREE_TOOLS_DEBUGGER_DEBUG_PROMPT_H_

@@ -59,7 +59,7 @@ cc_binary(
         "//iree/vm:module",
         "//iree/vm:module_printer",
         "//iree/vm:sequencer_context",
-        "//iree/vm/debug:debug_server_flags",
+        "//iree/rt/debug:debug_server_flags",
     ] + PLATFORM_VULKAN_DEPS,
 )
 
@@ -94,6 +94,7 @@ cc_binary(
         "//iree/hal:buffer_view_string_util",
         "//iree/hal:driver_registry",
         "//iree/hal/interpreter:interpreter_driver_module",
+        "//iree/rt/debug:debug_server_flags",
         "//iree/schemas",
         "//iree/vm:bytecode_printer",
         "//iree/vm:bytecode_tables_sequencer",
@@ -103,7 +104,6 @@ cc_binary(
         "//iree/vm:module",
         "//iree/vm:module_printer",
         "//iree/vm:sequencer_context",
-        "//iree/vm/debug:debug_server_flags",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
     ],

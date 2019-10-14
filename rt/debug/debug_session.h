@@ -12,18 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_DEBUG_DEBUG_SESSION_H_
-#define IREE_VM_DEBUG_DEBUG_SESSION_H_
+#ifndef IREE_RT_DEBUG_DEBUG_SESSION_H_
+#define IREE_RT_DEBUG_DEBUG_SESSION_H_
 
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/status.h"
+#include "iree/rt/context.h"
+#include "iree/rt/invocation.h"
+#include "iree/rt/module.h"
 #include "iree/schemas/debug_service_generated.h"
-#include "iree/vm/fiber_state.h"
-#include "iree/vm/sequencer_context.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace debug {
 
 // An active debugging session maintained by the DebugService.
@@ -56,29 +57,28 @@ class DebugSession {
 
   // Signals that a context has been registered.
   // Called with the global debug lock held.
-  virtual Status OnContextRegistered(SequencerContext* context) = 0;
-  virtual Status OnContextUnregistered(SequencerContext* context) = 0;
+  virtual Status OnContextRegistered(Context* context) = 0;
+  virtual Status OnContextUnregistered(Context* context) = 0;
 
   // Signals that a module has been loaded in a context.
   // Called with the global debug lock held.
-  virtual Status OnModuleLoaded(SequencerContext* context,
-                                vm::Module* module) = 0;
+  virtual Status OnModuleLoaded(Context* context, Module* module) = 0;
 
-  // Signals that a fiber has been registered.
+  // Signals that a invocation has been registered.
   // Called with the global debug lock held.
-  virtual Status OnFiberRegistered(FiberState* fiber_state) = 0;
-  virtual Status OnFiberUnregistered(FiberState* fiber_state) = 0;
+  virtual Status OnInvocationRegistered(Invocation* invocation) = 0;
+  virtual Status OnInvocationUnregistered(Invocation* invocation) = 0;
 
   // Signals that a breakpoint has been resolved to a particular function in a
   // context.
   // Called with the global debug lock held.
   virtual Status OnBreakpointResolved(const rpc::BreakpointDefT& breakpoint,
-                                      SequencerContext* context) = 0;
+                                      Context* context) = 0;
 
   // Signals that the given breakpoint has been hit during execution.
   // Called with the global debug lock held.
   virtual Status OnBreakpointHit(int breakpoint_id,
-                                 const FiberState& fiber_state) = 0;
+                                 const Invocation& invocation) = 0;
 
  private:
   mutable absl::Mutex mutex_;
@@ -87,7 +87,7 @@ class DebugSession {
 };
 
 }  // namespace debug
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
 
-#endif  // IREE_VM_DEBUG_DEBUG_SESSION_H_
+#endif  // IREE_RT_DEBUG_DEBUG_SESSION_H_
