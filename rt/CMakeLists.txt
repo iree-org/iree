@@ -16,6 +16,24 @@ add_subdirectory(debug)
 
 iree_cc_library(
   NAME
+    api
+  HDRS
+    "api.h"
+  SRCS
+    "api.cc"
+  DEPS
+    absl::time
+    iree::base::api
+    iree::base::api_util
+    iree::base::tracing
+    iree::hal::api
+    iree::hal::buffer_view
+    iree::rt
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     rt
   SRCS
     "context.cc"

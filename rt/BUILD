@@ -6,6 +6,33 @@ package(
 )
 
 cc_library(
+    name = "api",
+    srcs = ["api.cc"],
+    hdrs = ["api.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":api_hdrs",
+        ":rt",
+        "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:tracing",
+        "//iree/hal:api",
+        "//iree/hal:buffer_view",
+        "//iree/rt/debug:debug_server_interface",
+        "@com_google_absl//absl/time",
+    ],
+)
+
+cc_library(
+    name = "api_hdrs",
+    hdrs = ["api.h"],
+    deps = [
+        "//iree/base:api_hdrs",
+        "//iree/hal:api_hdrs",
+    ],
+)
+
+cc_library(
     name = "rt",
     srcs = [
         "context.cc",
