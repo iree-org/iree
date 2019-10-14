@@ -246,9 +246,9 @@ void dumpIndexCache(IndexComputationCache &indexMap) {
   for (auto &el : indexMap) {
     // llvm::errs() << "Value : " << *(el.first);
     // llvm::errs().flush();
-    if (el.first->getKind() == Value::Kind::OpResult) {
+    if (isa<OpResult>(el.first)) {
       llvm::errs() << "Operation : " << el.first->getDefiningOp()->getName();
-    } else if (el.first->getKind() == Value::Kind::BlockArgument) {
+    } else if (isa<BlockArgument>(el.first)) {
       llvm::errs() << "BlockArgument";
     }
     for (auto &used : el.second) {
