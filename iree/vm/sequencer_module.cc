@@ -99,8 +99,8 @@ Status SequencerModule::Execute(
   ASSIGN_OR_RETURN(
       auto placement,
       stack->context()->instance()->device_manager()->ResolvePlacement({}));
-  RETURN_IF_ERROR(
-      DispatchSequence(placement, stack, callee_stack_frame, results));
+  RETURN_IF_ERROR(DispatchSequence(placement, stack, callee_stack_frame,
+                                   absl::MakeSpan(*results)));
 
   // Pop the callee frame to balance out the stack.
   RETURN_IF_ERROR(stack->PopFrame());

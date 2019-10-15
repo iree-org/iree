@@ -29,7 +29,7 @@ namespace rt {
 namespace {
 
 int32_t NextUniqueContextId() {
-  static std::atomic<int32_t> next_id = 0;
+  static std::atomic<int32_t> next_id = {0};
   return ++next_id;
 }
 
