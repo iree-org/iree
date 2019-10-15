@@ -46,9 +46,36 @@ class NoopExecutableCache final : public ExecutableCache {
 
 }  // namespace
 
-DawnDevice::DawnDevice(DeviceInfo device_info)
-    : Device(std::move(device_info)) {
+DawnDevice::DawnDevice(const DeviceInfo& device_info,
+                       ::dawn::Device backend_device)
+    : Device(device_info), backend_device_(backend_device) {
+  IREE_TRACE_SCOPE0("DawnDevice::ctor");
+
   // TODO(scotttodd): construct command queues, perform other initialization
+
+  // Log some basic device info.
+  std::string backend_type_str;
+  auto* adapter =
+      static_cast<dawn_native::Adapter*>(device_info.driver_handle());
+  switch (adapter->GetBackendType()) {
+    case dawn_native::BackendType::D3D12:
+      backend_type_str = "D3D12";
+      break;
+    case dawn_native::BackendType::Metal:
+      backend_type_str = "Metal";
+      break;
+    case dawn_native::BackendType::Null:
+      backend_type_str = "Null";
+      break;
+    case dawn_native::BackendType::OpenGL:
+      backend_type_str = "OpenGL";
+      break;
+    case dawn_native::BackendType::Vulkan:
+      backend_type_str = "Vulkan";
+      break;
+  }
+  LOG(INFO) << "Created DawnDevice '" << device_info.name() << "' ("
+            << backend_type_str << ")";
 }
 
 DawnDevice::~DawnDevice() = default;

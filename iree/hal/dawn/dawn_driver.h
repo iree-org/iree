@@ -15,6 +15,11 @@
 #ifndef IREE_HAL_DAWN_DAWN_DRIVER_H_
 #define IREE_HAL_DAWN_DAWN_DRIVER_H_
 
+#include <memory>
+#include <vector>
+
+#include "third_party/dawn/src/include/dawn/dawncpp.h"
+#include "third_party/dawn/src/include/dawn_native/DawnNative.h"
 #include "iree/hal/driver.h"
 
 namespace iree {
@@ -32,6 +37,10 @@ class DawnDriver final : public Driver {
 
   StatusOr<std::shared_ptr<Device>> CreateDevice(
       const DeviceInfo& device_info) override;
+
+ private:
+  std::unique_ptr<dawn_native::Instance> dawn_instance_;
+  std::vector<dawn_native::Adapter> dawn_backend_adapters_;
 };
 
 }  // namespace dawn

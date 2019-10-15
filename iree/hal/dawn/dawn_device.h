@@ -17,6 +17,8 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
+#include "third_party/dawn/src/include/dawn/dawncpp.h"
+#include "third_party/dawn/src/include/dawn_native/DawnNative.h"
 #include "iree/base/memory.h"
 #include "iree/hal/device.h"
 #include "iree/hal/host/host_local_allocator.h"
@@ -27,7 +29,8 @@ namespace dawn {
 
 class DawnDevice final : public Device {
  public:
-  explicit DawnDevice(DeviceInfo device_info);
+  explicit DawnDevice(const DeviceInfo& device_info,
+                      ::dawn::Device backend_device);
   ~DawnDevice() override;
 
   Allocator* allocator() const override { return &allocator_; }
@@ -64,6 +67,8 @@ class DawnDevice final : public Device {
  private:
   mutable HostLocalAllocator allocator_;
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;
+
+  ::dawn::Device backend_device_;
 };
 
 }  // namespace dawn

@@ -19,6 +19,9 @@ cc_library(
         "//iree/hal:executable_cache",
         "//iree/hal:fence",
         "//iree/hal/host:host_local_allocator",
+        "//third_party/dawn:dawn_headers",
+        "//third_party/dawn:dawn_native",
+        "//third_party/dawn:dawn_static_proc",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
@@ -32,8 +35,14 @@ cc_library(
     deps = [
         ":dawn_device",
         "//iree/base:status",
+        "//iree/base:tracing",
         "//iree/hal:device_info",
         "//iree/hal:driver",
+        "//third_party/dawn:dawn_headers",
+        "//third_party/dawn:dawn_native",
+        "//third_party/dawn:dawn_static_proc",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
     ],
 )
 
