@@ -31,6 +31,11 @@ inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
   return StatusBuilder(static_cast<StatusCode>(status_code), loc);
 }
 
+// Internal helper for concatenating macro values.
+#define IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y) x##y
+#define IREE_API_STATUS_MACROS_IMPL_CONCAT_(x, y) \
+  IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y)
+
 // clang-format off
 #define IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_ switch (0) case 0: default:  // NOLINT
 // clang-format on
@@ -63,6 +68,33 @@ class StatusAdaptorForApiMacros {
   if (iree_status_t status = (expr)) {      \
   } else /* NOLINT */                       \
     return status
+
+#define IREE_API_ASSIGN_OR_RETURN(...)                               \
+  IREE_API_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
+      (__VA_ARGS__, IREE_API_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_, \
+       IREE_API_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_))             \
+  (__VA_ARGS__)
+
+#define IREE_API_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_(_1, _2, _3, NAME, \
+                                                         ...)              \
+  NAME
+#define IREE_API_STATUS_MACROS_IMPL_GET_VARIADIC_(args) \
+  IREE_API_STATUS_MACROS_IMPL_GET_VARIADIC_HELPER_ args
+
+#define IREE_API_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_2_(lhs, rexpr) \
+  IREE_API_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(lhs, rexpr, std::move(_))
+#define IREE_API_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_3_(lhs, rexpr,         \
+                                                        error_expression)   \
+  IREE_API_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_(                            \
+      IREE_API_STATUS_MACROS_IMPL_CONCAT_(_status_or_value, __LINE__), lhs, \
+      rexpr, error_expression)
+#define IREE_API_STATUS_MACROS_IMPL_ASSIGN_OR_RETURN_(statusor, lhs, rexpr, \
+                                                      error_expression)     \
+  auto statusor = (rexpr);                                                  \
+  if (ABSL_PREDICT_FALSE(!statusor.ok())) {                                 \
+    return ::iree::ToApiStatus(std::move(statusor).status().code());        \
+  }                                                                         \
+  lhs = std::move(statusor).ValueOrDie()
 
 // Converts an iree_time_t to its equivalent absl::Time.
 inline absl::Time ToAbslTime(iree_time_t time) {

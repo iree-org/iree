@@ -244,10 +244,9 @@ iree_rt_module_lookup_function_by_ordinal(iree_rt_module_t* module,
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  auto function_or = handle->LookupFunctionByOrdinal(
-      static_cast<Function::Linkage>(linkage), ordinal);
-  IREE_API_RETURN_IF_ERROR(function_or.status());
-  auto function = std::move(function_or).ValueOrDie();
+  IREE_API_ASSIGN_OR_RETURN(
+      auto function, handle->LookupFunctionByOrdinal(
+                         static_cast<Function::Linkage>(linkage), ordinal));
 
   out_function->module = module;
   out_function->linkage =
@@ -274,11 +273,10 @@ iree_rt_module_lookup_function_by_name(iree_rt_module_t* module,
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  auto function_or =
+  IREE_API_ASSIGN_OR_RETURN(
+      auto function,
       handle->LookupFunctionByName(static_cast<Function::Linkage>(linkage),
-                                   absl::string_view{name.data, name.size});
-  IREE_API_RETURN_IF_ERROR(function_or.status());
-  auto function = std::move(function_or).ValueOrDie();
+                                   absl::string_view{name.data, name.size}));
 
   out_function->linkage =
       static_cast<iree_rt_function_linkage_t>(function.linkage());
@@ -320,10 +318,10 @@ iree_rt_function_signature(const iree_rt_function_t* function,
   }
 
   auto* module = reinterpret_cast<Module*>(function->module);
-  auto signature_or = module->GetFunctionSignature(
-      static_cast<Function::Linkage>(function->linkage), function->ordinal);
-  IREE_API_RETURN_IF_ERROR(signature_or.status());
-  auto signature = std::move(signature_or).ValueOrDie();
+  IREE_API_ASSIGN_OR_RETURN(
+      auto signature, module->GetFunctionSignature(
+                          static_cast<Function::Linkage>(function->linkage),
+                          function->ordinal));
   out_signature->argument_count = signature.argument_count();
   out_signature->result_count = signature.result_count();
   return IREE_STATUS_OK;
@@ -539,16 +537,16 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_invocation_create(
     }
   }
 
-  auto invocation_or = Invocation::Create(
-      add_ref(reinterpret_cast<Context*>(context)),
-      Function{reinterpret_cast<Module*>(function->module),
-               static_cast<Function::Linkage>(function->linkage),
-               function->ordinal},
-      add_ref(reinterpret_cast<Policy*>(policy)),
-      std::move(dependent_invocations), std::move(argument_views),
-      std::move(result_views));
-  IREE_API_RETURN_IF_ERROR(invocation_or.status());
-  auto invocation = std::move(invocation_or).ValueOrDie();
+  IREE_API_ASSIGN_OR_RETURN(
+      auto invocation,
+      Invocation::Create(
+          add_ref(reinterpret_cast<Context*>(context)),
+          Function{reinterpret_cast<Module*>(function->module),
+                   static_cast<Function::Linkage>(function->linkage),
+                   function->ordinal},
+          add_ref(reinterpret_cast<Policy*>(policy)),
+          std::move(dependent_invocations), std::move(argument_views),
+          std::move(result_views)));
 
   *out_invocation =
       reinterpret_cast<iree_rt_invocation_t*>(invocation.release());
@@ -618,9 +616,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_invocation_consume_results(
     return IREE_STATUS_OUT_OF_RANGE;
   }
 
-  auto results_or = handle->ConsumeResults();
-  IREE_API_RETURN_IF_ERROR(results_or.status());
-  auto results = std::move(results_or).ValueOrDie();
+  IREE_API_ASSIGN_OR_RETURN(auto results, handle->ConsumeResults());
   iree_status_t status = IREE_STATUS_OK;
   int i = 0;
   for (i = 0; i < results.size(); ++i) {

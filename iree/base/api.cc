@@ -80,12 +80,12 @@ iree_file_mapping_open_read(iree_string_view_t path, iree_allocator_t allocator,
   }
   *out_file_mapping = nullptr;
 
-  auto file_mapping_or =
-      FileMapping::OpenRead(std::string(path.data, path.size));
-  IREE_API_RETURN_IF_ERROR(file_mapping_or.status());
+  IREE_API_ASSIGN_OR_RETURN(
+      auto file_mapping,
+      FileMapping::OpenRead(std::string(path.data, path.size)));
 
-  ref_ptr<FileMapping> handle = std::move(file_mapping_or.ValueOrDie());
-  *out_file_mapping = reinterpret_cast<iree_file_mapping_t*>(handle.release());
+  *out_file_mapping =
+      reinterpret_cast<iree_file_mapping_t*>(file_mapping.release());
 
   return IREE_STATUS_OK;
 }

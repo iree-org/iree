@@ -14,6 +14,24 @@
 
 iree_cc_library(
   NAME
+    api
+  HDRS
+    "api.h"
+  SRCS
+    "api.cc"
+  DEPS
+    absl::time
+    iree::base::api
+    iree::base::api_util
+    iree::base::flatbuffer_util
+    iree::base::tracing
+    iree::rt::api
+    iree::vm::sequencer_module
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     bytecode_disassembler
   SRCS
     "bytecode_disassembler.cc"

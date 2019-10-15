@@ -6,6 +6,31 @@ package(
 )
 
 cc_library(
+    name = "api",
+    srcs = ["api.cc"],
+    hdrs = ["api.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":api_hdrs",
+        ":sequencer_module",
+        "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:flatbuffer_util",
+        "//iree/base:tracing",
+        "//iree/rt:api",
+    ],
+)
+
+cc_library(
+    name = "api_hdrs",
+    hdrs = ["api.h"],
+    deps = [
+        "//iree/base:api_hdrs",
+        "//iree/rt:api_hdrs",
+    ],
+)
+
+cc_library(
     name = "bytecode_module",
     srcs = [
         "bytecode_disassembler.cc",

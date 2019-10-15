@@ -46,10 +46,9 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
   }
   auto handle = add_ref(reinterpret_cast<Buffer*>(buffer));
 
-  auto new_handle_or = Buffer::Subspan(handle, byte_offset, byte_length);
-  IREE_API_RETURN_IF_ERROR(new_handle_or.status());
+  IREE_API_ASSIGN_OR_RETURN(auto new_handle,
+                            Buffer::Subspan(handle, byte_offset, byte_length));
 
-  auto new_handle = std::move(new_handle_or).ValueOrDie();
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(new_handle.release());
 
   return IREE_STATUS_OK;
@@ -153,21 +152,21 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  auto mapping_or = buffer_handle->MapMemory<uint8_t>(
-      static_cast<MemoryAccessBitfield>(memory_access), element_offset,
-      element_length);
-  IREE_API_RETURN_IF_ERROR(mapping_or.status());
+  IREE_API_ASSIGN_OR_RETURN(
+      auto mapping, buffer_handle->MapMemory<uint8_t>(
+                        static_cast<MemoryAccessBitfield>(memory_access),
+                        element_offset, element_length));
 
   static_assert(sizeof(iree_hal_mapped_memory_t::reserved) >=
                     sizeof(MappedMemory<uint8_t>),
                 "C mapped memory struct must have large enough storage for the "
                 "matching C++ struct");
-  auto* mapping =
+  auto* mapping_storage =
       reinterpret_cast<MappedMemory<uint8_t>*>(out_mapped_memory->reserved);
-  *mapping = std::move(mapping_or).ValueOrDie();
+  *mapping_storage = std::move(mapping);
 
-  out_mapped_memory->contents = {const_cast<uint8_t*>(mapping->data()),
-                                 mapping->size()};
+  out_mapped_memory->contents = {const_cast<uint8_t*>(mapping_storage->data()),
+                                 mapping_storage->size()};
 
   return IREE_STATUS_OK;
 }
