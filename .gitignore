@@ -17,7 +17,7 @@
 build/
 
 # Bazel artifacts
-bazel-*/
+/bazel-*
 
 # Local-only config options
 user.bazelrc
