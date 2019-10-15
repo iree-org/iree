@@ -3,6 +3,9 @@
 # The user.bazelrc file is not checked in but available for local mods.
 try-import user.bazelrc
 
+# Some packages do not yet load with Bazel. Ignore them.
+build  --deleted_packages=//iree/tools/web
+
 # Disable warnings we don't care about.
 build --copt=-Wno-unused-local-typedef
 
