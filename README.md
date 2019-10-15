@@ -236,9 +236,12 @@ hardware-independent testing of the Vulkan and SPIR-V portions of the toolchain.
 
 ## Quickstart
 
-Coming soon! Performing full model translation may require a few steps (such as
-ensuring you have a working TensorFlow build), however we'll have pre-translated
-example models that allow independent testing of the runtime portions.
+More Coming soon! Performing full model translation may require a few steps
+(such as ensuring you have a working TensorFlow build), however we'll have
+pre-translated example models that allow independent testing of the runtime
+portions.
+
+*   [Getting Started on Windows](docs/getting_started_on_windows.md)
 
 <a name="license"></a>
 
