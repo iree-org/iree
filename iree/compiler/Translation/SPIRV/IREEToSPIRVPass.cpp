@@ -130,7 +130,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVPwOpLowering<xla_hlo::TanhOp, spirv::GLSLTanhOp>,
       // XLA binary elementwise ops:
       SPIRVPwOpLowering<xla_hlo::AddOp, spirv::IAddOp, spirv::FAddOp>,
-      // TODO(ravishankarm): xla_hlo::AndOp
+      SPIRVPwOpLowering<xla_hlo::AndOp, spirv::LogicalAndOp>,
       SPIRVPwOpLowering<xla_hlo::DivOp, spirv::FDivOp>,
       SPIRVPwOpLowering<xla_hlo::MaxOp, spirv::GLSLSMaxOp, spirv::GLSLFMaxOp>,
       SPIRVPwOpLowering<xla_hlo::MinOp, spirv::GLSLSMinOp, spirv::GLSLFMinOp>,

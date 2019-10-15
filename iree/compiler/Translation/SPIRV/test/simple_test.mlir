@@ -730,3 +730,17 @@ module {
     iree.return
   }
 }
+
+// -----
+
+module {
+  func @and(%arg0: memref<12x42xi1>, %arg1: memref<12x42xi1>, %arg2: memref<12x42xi1>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i1} {
+    %0 = iree.load_input(%arg0 : memref<12x42xi1>) : tensor<12x42xi1>
+    %1 = iree.load_input(%arg1 : memref<12x42xi1>) : tensor<12x42xi1>
+    //CHECK: {{%.*}} = spv.LogicalAnd {{%.*}}, {{%.*}} : i1
+    %2 = xla_hlo.and %0, %1 : tensor<12x42xi1>
+    iree.store_output(%2 : tensor<12x42xi1>, %arg2 : memref<12x42xi1>)
+    iree.return
+  }
+}
