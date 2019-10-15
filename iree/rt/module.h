@@ -17,6 +17,7 @@
 
 #include <ostream>
 
+#include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"

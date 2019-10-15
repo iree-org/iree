@@ -68,7 +68,7 @@ Status InterpreterModule::Execute(
 
   // Run main dispatch loop until it exits (or errors).
   RETURN_IF_ERROR(Dispatch(allocator_, &kernel_runtime_state_, stack,
-                           callee_stack_frame, results));
+                           callee_stack_frame, absl::MakeSpan(*results)));
 
   // Pop the callee frame to balance out the stack.
   RETURN_IF_ERROR(stack->PopFrame());
