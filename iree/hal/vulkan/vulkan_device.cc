@@ -65,7 +65,7 @@ uint32_t FindFirstQueueFamilyWithFlags(
     const auto& properties = queue_family_properties[queue_family_index];
     if ((properties.queueFlags & required_queue_flags) ==
             required_queue_flags &&
-        (properties.queueFlags & excluded_queue_flags) != 0) {
+        (properties.queueFlags & excluded_queue_flags) == 0) {
       return queue_family_index;
     }
   }
@@ -115,11 +115,24 @@ StatusOr<QueueFamilyInfo> SelectQueueFamilies(
       VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT);
   if (queue_family_info.transfer_index == kInvalidQueueFamilyIndex) {
     queue_family_info.transfer_index = FindFirstQueueFamilyWithFlags(
+        queue_family_properties, VK_QUEUE_TRANSFER_BIT, VK_QUEUE_GRAPHICS_BIT);
+  }
+  if (queue_family_info.transfer_index == kInvalidQueueFamilyIndex) {
+    queue_family_info.transfer_index = FindFirstQueueFamilyWithFlags(
         queue_family_properties, VK_QUEUE_TRANSFER_BIT, 0);
   }
   if (queue_family_info.transfer_index != kInvalidQueueFamilyIndex) {
     queue_family_info.transfer_queue_count =
         queue_family_properties[queue_family_info.transfer_index].queueCount;
+  }
+
+  // Ensure that we don't share the dispatch queues with transfer queues if that
+  // would put us over the queue count.
+  if (queue_family_info.dispatch_index == queue_family_info.transfer_index) {
+    queue_family_info.transfer_queue_count = std::min(
+        queue_family_properties[queue_family_info.dispatch_index].queueCount -
+            queue_family_info.dispatch_queue_count,
+        queue_family_info.transfer_queue_count);
   }
 
   return queue_family_info;
