@@ -21,6 +21,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/interpreter/bytecode_executable.h"
+#include "iree/rt/stack.h"
 
 namespace iree {
 namespace hal {
@@ -40,26 +41,23 @@ Status InterpreterCommandProcessor::Dispatch(
   auto* executable =
       static_cast<BytecodeExecutable*>(dispatch_request.executable);
   const auto& module = executable->module();
-  ASSIGN_OR_RETURN(auto entry_function, module.function_table().LookupExport(
+  ASSIGN_OR_RETURN(auto entry_function, module->LookupFunctionByOrdinal(
+                                            rt::Function::Linkage::kExport,
                                             dispatch_request.entry_point));
 
-  vm::Stack stack;
+  rt::Stack stack(executable->context().get());
 
   // TODO(benvanik): avoid this by directly referencing the bindings.
-  absl::InlinedVector<BufferView, 8> args;
-  args.reserve(dispatch_request.bindings.size());
+  absl::InlinedVector<BufferView, 8> arguments;
+  arguments.reserve(dispatch_request.bindings.size());
   for (auto& binding : dispatch_request.bindings) {
-    args.push_back(BufferView{add_ref(binding.buffer), binding.shape,
-                              binding.element_size});
+    arguments.push_back(BufferView{add_ref(binding.buffer), binding.shape,
+                                   binding.element_size});
   }
   absl::InlinedVector<BufferView, 8> results;
-  if (entry_function.result_count() > 0) {
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Executable export results are not yet implemented";
-  }
 
-  RETURN_IF_ERROR(executable->context().Invoke(
-      &stack, entry_function, absl::MakeSpan(args), absl::MakeSpan(results)));
+  RETURN_IF_ERROR(executable->module()->Execute(
+      &stack, entry_function, std::move(arguments), &results));
 
   return OkStatus();
 }

@@ -1,11 +1,11 @@
 # IREE web tools.
 
+load("//third_party/emscripten:split_transition_defs.bzl", "auto_wasm_binary")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-load("//third_party/emscripten:split_transition_defs.bzl", "auto_wasm_binary")
 
 EMSCRIPTEN_LINKOPTS_COMMON = [
     # Error at compile time on unresolved symbols.
@@ -58,9 +58,8 @@ cc_binary(
         "//iree/hal:buffer_view_string_util",
         "//iree/hal:driver_registry",
         "//iree/hal/interpreter:interpreter_driver_module",
-        "//iree/vm:bytecode_tables_sequencer",
-        "//iree/vm:instance",
-        "//iree/vm:sequencer_context",
+        "//iree/rt",
+        "//iree/vm:sequencer_module",
         "//third_party/emscripten:embind",
     ],
 )

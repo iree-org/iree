@@ -31,10 +31,8 @@
 #include "iree/base/status.h"
 #include "iree/rt/debug/debug_client.h"
 #include "iree/schemas/debug_service_generated.h"
-#include "iree/vm/bytecode_printer.h"
+#include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_tables_sequencer.h"
-#include "iree/vm/module.h"
-#include "iree/vm/source_map.h"
 
 namespace iree {
 namespace rt {
@@ -1311,21 +1309,7 @@ Status DebugApp::PrepareBytecodeCodeView(CodeViewDocument* document) {
   auto* remote_module = document->function->module();
   auto* remote_function = document->function;
 
-  ASSIGN_OR_RETURN(auto module, vm::Module::FromDef(remote_module->def()));
-
-  // TODO(benvanik): source map support.
-  // Want line count including source lines, IR lines, and bytecode lines.
-  // May want lower level (JIT/etc) lines too.
-
-  // TODO(benvanik): bytecode iterator for richer display.
-  auto source_map_resolver = vm::SourceMapResolver::FromFunction(
-      module->def(), remote_function->ordinal());
-  vm::BytecodePrinter printer(vm::sequencer_opcode_table(),
-                              module->function_table(),
-                              module->executable_table(), source_map_resolver);
-  ASSIGN_OR_RETURN(std::string full_string,
-                   printer.Print(*remote_function->bytecode()));
-  document->bytecode_info.lines = absl::StrSplit(full_string, '\n');
+  document->bytecode_info.lines = remote_function->name();
 
   return OkStatus();
 }

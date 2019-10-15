@@ -26,14 +26,10 @@
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/buffer_view_string_util.h"
 #include "iree/hal/driver_registry.h"
+#include "iree/rt/context.h"
+#include "iree/rt/instance.h"
 #include "iree/schemas/module_def_generated.h"
-#include "iree/vm/bytecode_tables_sequencer.h"
-#include "iree/vm/fiber_state.h"
-#include "iree/vm/function.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/module.h"
-#include "iree/vm/module_printer.h"
-#include "iree/vm/sequencer_context.h"
+#include "iree/vm/sequencer_module.h"
 
 namespace iree {
 
@@ -59,52 +55,49 @@ StatusOr<std::vector<hal::BufferView>> ParseInputs(
 // Runs an IREE module with the provided inputs and returns its outputs.
 StatusOr<std::string> RunIreeModule(std::string module_file_data,
                                     absl::string_view inputs_string) {
-  auto instance = std::make_shared<vm::Instance>();
+  auto instance = make_ref<rt::Instance>();
 
   // Create driver and device.
   ASSIGN_OR_RETURN(auto driver, hal::DriverRegistry::shared_registry()->Create(
                                     "interpreter"));
   ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());
   RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(device));
-  vm::SequencerContext context(instance);
+
+  auto policy = make_ref<rt::Policy>();
+  auto context = make_ref<rt::Context>(add_ref(instance), std::move(policy));
 
   // Load main module FlatBuffer.
   ASSIGN_OR_RETURN(auto main_module_file,
                    FlatBufferFile<ModuleDef>::FromString(ModuleDefIdentifier(),
                                                          module_file_data));
   ASSIGN_OR_RETURN(auto main_module,
-                   vm::Module::FromFile(std::move(main_module_file)));
+                   vm::SequencerModule::FromFile(std::move(main_module_file)));
 
   // Register the main module with the context.
-  RETURN_IF_ERROR(context.RegisterModule(std::move(main_module)));
-
-  // Dump the registered modules.
-  vm::PrintModuleFlagBitfield print_flags =
-      vm::PrintModuleFlag::kIncludeSourceMapping;
-  for (const auto& module : context.modules()) {
-    RETURN_IF_ERROR(vm::PrintModuleToStream(vm::sequencer_opcode_table(),
-                                            *module, print_flags, &std::cout));
-  }
-
-  // Setup a new fiber.
-  vm::FiberState fiber_state(instance);
+  RETURN_IF_ERROR(context->RegisterModule(add_ref(main_module)));
 
   // Setup arguments and storage for results.
-  // TODO(scotttodd): Receive main function name from JS
-  ASSIGN_OR_RETURN(vm::Function main_function, context.LookupExport("main"));
+  // TODO(scotttodd): Receive main function name from JS.
+  ASSIGN_OR_RETURN(auto main_function,
+                   main_module->LookupFunctionByName(
+                       rt::Function::Linkage::kExport, "main"));
 
-  ASSIGN_OR_RETURN(std::vector<hal::BufferView> args,
+  ASSIGN_OR_RETURN(auto arguments,
                    ParseInputs(inputs_string, device->allocator()));
-  std::vector<hal::BufferView> results;
-  results.resize(main_function.result_count());
 
   // Call into the main function.
-  RETURN_IF_ERROR(context.Invoke(&fiber_state, main_function,
-                                 absl::MakeSpan(args),
-                                 absl::MakeSpan(results)));
+  ASSIGN_OR_RETURN(auto invocation,
+                   rt::Invocation::Create(add_ref(context), main_function,
+                                          make_ref<rt::Policy>(), {},
+                                          absl::MakeConstSpan(arguments)));
+
+  // Wait until invocation completes.
+  // TODO(scotttodd): make this an async callback.
+  RETURN_IF_ERROR(invocation->Await(absl::InfiniteFuture()));
+  ASSIGN_OR_RETURN(auto results, invocation->ConsumeResults());
 
   // Dump all results to stdout.
-  // TODO(scotttodd): Receive output types / print mode from JS
+  // TODO(scotttodd): Receive output types / print mode from JS.
   // TODO(scotttodd): Return list of outputs instead of just the first (proto?)
   for (int i = 0; i < results.size(); ++i) {
     const auto& result = results[i];

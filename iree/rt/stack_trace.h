@@ -25,12 +25,13 @@
 namespace iree {
 namespace rt {
 
-// A snapshot of the runtime callstack providing access to stack frames.
+// A snapshot of a stack at a point in time.
 // The frames within a stack may be from different backends and may provide
 // varying levels of information based on capabilities.
 //
-// Thread-compatible. Execution on one thread and stack manipulation on another
-// must be externally synchronized by the caller.
+// Depending on the capture options the trace may contain references to register
+// values (such as buffers) from the time of capture. If the buffers were
+// modified after the capture was taken those results will be reflected!
 class StackTrace final {
  public:
   StackTrace() = default;
@@ -43,16 +44,6 @@ class StackTrace final {
   // All stack frames within the stack.
   absl::Span<const StackFrame> frames() const {
     return absl::MakeConstSpan(frames_);
-  }
-
-  // The current stack frame.
-  const StackFrame* current_frame() const {
-    return !frames_.empty() ? &frames_[frames_.size() - 1] : nullptr;
-  }
-
-  // The stack frame of the caller of the current function.
-  const StackFrame* caller_frame() const {
-    return frames_.size() > 1 ? &frames_[frames_.size() - 2] : nullptr;
   }
 
   // Returns a full stack frame listing in human-readable form.

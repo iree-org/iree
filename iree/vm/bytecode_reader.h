@@ -19,10 +19,10 @@
 #include "absl/container/inlined_vector.h"
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view.h"
+#include "iree/rt/context.h"
+#include "iree/rt/stack.h"
+#include "iree/rt/stack_frame.h"
 #include "iree/schemas/bytecode/bytecode_v0.h"
-#include "iree/vm/function.h"
-#include "iree/vm/stack.h"
-#include "iree/vm/stack_frame.h"
 #include "iree/vm/type.h"
 
 namespace iree {
@@ -30,19 +30,19 @@ namespace vm {
 
 class BytecodeReader {
  public:
-  explicit BytecodeReader(Stack* stack) : stack_(stack) {}
+  explicit BytecodeReader(rt::Stack* stack) : stack_(stack) {}
 
   int offset() const { return static_cast<int>(bytecode_pc_ - bytecode_base_); }
 
   StatusOr<const uint8_t*> AdvanceOffset();
 
-  Status SwitchStackFrame(StackFrame* new_stack_frame);
+  Status SwitchStackFrame(rt::StackFrame* new_stack_frame);
   Status BranchToOffset(int32_t offset);
 
-  Status CopyInputsAndSwitchStackFrame(StackFrame* src_stack_frame,
-                                       StackFrame* dst_stack_frame);
-  Status CopyResultsAndSwitchStackFrame(StackFrame* src_stack_frame,
-                                        StackFrame* dst_stack_frame);
+  Status CopyInputsAndSwitchStackFrame(rt::StackFrame* src_stack_frame,
+                                       rt::StackFrame* dst_stack_frame);
+  Status CopyResultsAndSwitchStackFrame(rt::StackFrame* src_stack_frame,
+                                        rt::StackFrame* dst_stack_frame);
   Status CopySlots();
 
   StatusOr<hal::BufferView> ReadConstant();
@@ -56,32 +56,33 @@ class BytecodeReader {
     return Type::FromTypeIndex(type_index);
   }
 
-  ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<const Function> ReadFunction() {
+  ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<const rt::Function> ReadFunction() {
     ASSIGN_OR_RETURN(auto value, ReadValue<uint32_t>());
     const auto& module = stack_frame_->module();
-    return module.function_table().LookupFunction(value);
+    return module.LookupFunctionByOrdinal(rt::Function::Linkage::kInternal,
+                                          value);
   }
 
-  ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<const ImportFunction*>
+  ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<const rt::Function>
   ReadImportFunction() {
     ASSIGN_OR_RETURN(auto value, ReadValue<uint32_t>());
     const auto& module = stack_frame_->module();
-    return module.function_table().LookupImport(value);
+    return stack_->context()->ResolveImport(&module, value);
   }
 
   ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<hal::BufferView*> ReadLocal(
-      absl::Span<hal::BufferView> locals) {
+      rt::Registers* registers) {
     ASSIGN_OR_RETURN(auto value, ReadValue<uint16_t>());
-    if (value > locals.size()) {
+    if (value > registers->buffer_views.size()) {
       return OutOfRangeErrorBuilder(IREE_LOC)
              << "Out of bounds local access " << value << " of "
-             << locals.size();
+             << registers->buffer_views.size();
     }
-    return &locals[value];
+    return &registers->buffer_views[value];
   }
 
   ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<hal::BufferView*> ReadLocal() {
-    return ReadLocal(locals_);
+    return ReadLocal(registers_);
   }
 
   Status SkipLocals(int count);
@@ -105,7 +106,7 @@ class BytecodeReader {
   template <typename T, size_t N = 8>
   ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<absl::InlinedVector<T, N>>
   ReadSlotElements() {
-    ASSIGN_OR_RETURN(auto* local, ReadLocal(locals_));
+    ASSIGN_OR_RETURN(auto* local, ReadLocal(registers_));
     absl::InlinedVector<T, N> result(local->shape.element_count());
     if (sizeof(T) == local->element_size) {
       // Fast(ish) path: requested element size matches the actual element size.
@@ -154,13 +155,12 @@ class BytecodeReader {
     return value;
   }
 
-  Stack* stack_ = nullptr;
-  StackFrame* stack_frame_ = nullptr;
+  rt::Stack* stack_ = nullptr;
+  rt::StackFrame* stack_frame_ = nullptr;
   const uint8_t* bytecode_base_ = nullptr;
   const uint8_t* bytecode_limit_ = nullptr;
   const uint8_t* bytecode_pc_ = nullptr;
-  absl::Span<hal::BufferView> locals_;
-  FunctionTable::BreakpointTable* breakpoint_table_ = nullptr;
+  rt::Registers* registers_ = nullptr;
 };
 
 }  // namespace vm

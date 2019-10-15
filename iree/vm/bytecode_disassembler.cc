@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/bytecode_printer.h"
+#include "iree/vm/bytecode_disassembler.h"
 
 #include <iomanip>
 #include <sstream>
@@ -25,8 +25,8 @@
 #include "iree/base/status.h"
 #include "iree/schemas/bytecode/bytecode_v0.h"
 #include "iree/schemas/source_map_def_generated.h"
+#include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_util.h"
-#include "iree/vm/module.h"
 #include "iree/vm/type.h"
 
 namespace iree {
@@ -34,8 +34,10 @@ namespace vm {
 
 namespace {
 
+using ::iree::rt::SourceOffset;
+
 template <typename T>
-StatusOr<T> ReadValue(absl::Span<const uint8_t> data, int* offset) {
+StatusOr<T> ReadValue(absl::Span<const uint8_t> data, SourceOffset* offset) {
   if (*offset + sizeof(T) > data.size()) {
     return OutOfRangeErrorBuilder(IREE_LOC) << "Bytecode data underrun";
   }
@@ -44,16 +46,19 @@ StatusOr<T> ReadValue(absl::Span<const uint8_t> data, int* offset) {
   return value;
 }
 
-StatusOr<const Type> ReadType(absl::Span<const uint8_t> data, int* offset) {
+StatusOr<const Type> ReadType(absl::Span<const uint8_t> data,
+                              SourceOffset* offset) {
   ASSIGN_OR_RETURN(uint8_t type_index, ReadValue<uint8_t>(data, offset));
   return Type::FromTypeIndex(type_index);
 }
 
-StatusOr<uint8_t> ReadCount(absl::Span<const uint8_t> data, int* offset) {
+StatusOr<uint8_t> ReadCount(absl::Span<const uint8_t> data,
+                            SourceOffset* offset) {
   return ReadValue<uint8_t>(data, offset);
 }
 
-StatusOr<uint16_t> ReadValueSlot(absl::Span<const uint8_t> data, int* offset) {
+StatusOr<uint16_t> ReadValueSlot(absl::Span<const uint8_t> data,
+                                 SourceOffset* offset) {
   return ReadValue<uint16_t>(data, offset);
 }
 
@@ -103,55 +108,30 @@ std::string ConstantToString(const Type& type,
 
 }  // namespace
 
-// static
-std::string BytecodePrinter::ToString(
-    OpcodeTable opcode_table, const FunctionTable& function_table,
-    const ExecutableTable& executable_table,
-    const SourceMapResolver& source_map_resolver,
-    const BytecodeDef& bytecode_def) {
-  BytecodePrinter printer(opcode_table, function_table, executable_table,
-                          source_map_resolver);
-  auto result = printer.Print(bytecode_def);
-  if (!result.ok()) {
-    return result.status().ToString();
-  }
-  return result.ValueOrDie();
-}
+StatusOr<std::vector<rt::Instruction>>
+BytecodeDisassembler::DisassembleInstructions(const rt::Function& function,
+                                              SourceOffset offset,
+                                              int32_t instruction_count) const {
+  std::vector<rt::Instruction> instructions;
 
-StatusOr<std::string> BytecodePrinter::Print(
-    const BytecodeDef& bytecode_def) const {
-  std::ostringstream stream;
-  RETURN_IF_ERROR(PrintToStream(bytecode_def, &stream)) << stream.str();
-  return stream.str();
-}
-
-Status BytecodePrinter::PrintToStream(const BytecodeDef& bytecode_def,
-                                      std::ostream* stream) const {
-  if (!bytecode_def.contents()) {
-    return OkStatus();
+  ASSIGN_OR_RETURN(
+      auto* function_def,
+      static_cast<const BytecodeModule*>(function.module())
+          ->GetFunctionDef(function.linkage(), function.ordinal()));
+  auto* bytecode_def = function_def->bytecode();
+  if (!bytecode_def) {
+    return UnavailableErrorBuilder(IREE_LOC) << "Function contains no body";
   }
   auto data = absl::MakeSpan(
-      reinterpret_cast<const uint8_t*>(bytecode_def.contents()->data()),
-      bytecode_def.contents()->size());
-  return PrintToStream(data, stream);
-}
+      reinterpret_cast<const uint8_t*>(bytecode_def->contents()->data()),
+      bytecode_def->contents()->size());
 
-Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
-                                      std::ostream* stream) const {
   // TODO(benvanik): scan and find all branch offsets to insert labels
 
-  int offset = 0;
-  absl::optional<SourceLocation> previous_location;
-  while (offset < data.length()) {
-    auto source_location = source_map_resolver_.ResolveBytecodeOffset(offset);
-    if (source_location.has_value()) {
-      if (previous_location != source_location) {
-        *stream << std::setw(10) << "; " << source_location.value() << "\n";
-      }
-      previous_location = source_location;
-    }
-
-    *stream << std::setw(6) << offset << ": ";
+  while (offset < data.length() && instructions.size() < instruction_count) {
+    instructions.push_back({});
+    auto& instruction = instructions.back();
+    instruction.offset = offset;
 
     uint8_t opcode = data[offset++];
     const auto& opcode_info = GetOpcodeInfo(opcode_table_, opcode);
@@ -161,6 +141,8 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
     }
     int payload_offset = offset;
 
+    std::ostringstream stream;
+
     // Print out return values, if any.
     int base_result_index = 0;
     int printed_result_count = 0;
@@ -168,7 +150,7 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
          ++i) {
       if (opcode_info.operands[i] == OperandEncoding::kNone) break;
       if (printed_result_count > 0) {
-        *stream << ", ";
+        stream << ", ";
       }
       switch (opcode_info.operands[i]) {
         default:
@@ -193,20 +175,20 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
         case OperandEncoding::kResultSlot: {
           ++printed_result_count;
           ASSIGN_OR_RETURN(uint16_t slot_ordinal, ReadValueSlot(data, &offset));
-          *stream << "%" << slot_ordinal;
+          stream << "%" << slot_ordinal;
           break;
         }
         case OperandEncoding::kVariadicResultSlots: {
           ++printed_result_count;
-          *stream << "[";
+          stream << "[";
           ASSIGN_OR_RETURN(int count, ReadCount(data, &offset));
           for (int j = 0; j < count; ++j) {
             ASSIGN_OR_RETURN(uint16_t slot_ordinal,
                              ReadValueSlot(data, &offset));
-            if (j > 0) *stream << ", ";
-            *stream << "%" << slot_ordinal;
+            if (j > 0) stream << ", ";
+            stream << "%" << slot_ordinal;
           }
-          *stream << "]";
+          stream << "]";
           break;
         }
         case OperandEncoding::kVariadicTransferSlots: {
@@ -268,11 +250,11 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
       }
     }
     if (printed_result_count > 0) {
-      *stream << " = ";
+      stream << " = ";
     }
     offset = payload_offset;
 
-    *stream << opcode_info.mnemonic;
+    stream << opcode_info.mnemonic;
 
     // Print out operands.
     int base_operand_index = 0;
@@ -283,9 +265,9 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
       if (opcode_info.operands[i] != OperandEncoding::kResultSlot &&
           opcode_info.operands[i] != OperandEncoding::kVariadicResultSlots) {
         if (i == base_operand_index) {
-          *stream << " ";
+          stream << " ";
         } else if (printed_operand_count > 0) {
-          *stream << ", ";
+          stream << ", ";
         }
       }
       switch (opcode_info.operands[i]) {
@@ -298,41 +280,41 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
         case OperandEncoding::kInputSlot: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(uint16_t slot_ordinal, ReadValueSlot(data, &offset));
-          *stream << "%" << slot_ordinal;
+          stream << "%" << slot_ordinal;
           break;
         }
         case OperandEncoding::kVariadicInputSlots: {
           ++printed_operand_count;
-          *stream << "[";
+          stream << "[";
           ASSIGN_OR_RETURN(int count, ReadCount(data, &offset));
           for (int j = 0; j < count; ++j) {
             ASSIGN_OR_RETURN(uint16_t slot_ordinal,
                              ReadValueSlot(data, &offset));
-            if (j > 0) *stream << ", ";
-            *stream << "%" << slot_ordinal;
+            if (j > 0) stream << ", ";
+            stream << "%" << slot_ordinal;
           }
-          *stream << "]";
+          stream << "]";
           break;
         }
         case OperandEncoding::kOutputSlot: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(uint16_t slot_ordinal, ReadValueSlot(data, &offset));
-          *stream << "&"
-                  << "%" << slot_ordinal;
+          stream << "&"
+                 << "%" << slot_ordinal;
           break;
         }
         case OperandEncoding::kVariadicOutputSlots: {
           ++printed_operand_count;
-          *stream << "[";
+          stream << "[";
           ASSIGN_OR_RETURN(int count, ReadCount(data, &offset));
           for (int j = 0; j < count; ++j) {
             ASSIGN_OR_RETURN(uint16_t slot_ordinal,
                              ReadValueSlot(data, &offset));
-            if (j > 0) *stream << ", ";
-            *stream << "&"
-                    << "%" << slot_ordinal;
+            if (j > 0) stream << ", ";
+            stream << "&"
+                   << "%" << slot_ordinal;
           }
-          *stream << "]";
+          stream << "]";
           break;
         }
         case OperandEncoding::kResultSlot: {
@@ -348,17 +330,17 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
         }
         case OperandEncoding::kVariadicTransferSlots: {
           ++printed_operand_count;
-          *stream << "[";
+          stream << "[";
           ASSIGN_OR_RETURN(int count, ReadCount(data, &offset));
           for (int j = 0; j < count; ++j) {
             ASSIGN_OR_RETURN(uint16_t src_slot_ordinal,
                              ReadValueSlot(data, &offset));
             ASSIGN_OR_RETURN(uint16_t dst_slot_ordinal,
                              ReadValueSlot(data, &offset));
-            if (j > 0) *stream << ", ";
-            *stream << "%" << src_slot_ordinal << "=>%" << dst_slot_ordinal;
+            if (j > 0) stream << ", ";
+            stream << "%" << src_slot_ordinal << "=>%" << dst_slot_ordinal;
           }
-          *stream << "]";
+          stream << "]";
           break;
         }
         case OperandEncoding::kConstant: {
@@ -374,7 +356,7 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
           }
           ASSIGN_OR_RETURN(auto encoding,
                            ReadValue<ConstantEncoding>(data, &offset));
-          *stream << ConstantEncodingToString(encoding);
+          stream << ConstantEncodingToString(encoding);
           int serialized_element_count = 1;
           switch (encoding) {
             case ConstantEncoding::kDense:
@@ -388,27 +370,29 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
                      << "Unimplemented constant encoding "
                      << static_cast<int>(encoding);
           }
-          *stream << " buffer_view<";
+          stream << " buffer_view<";
           if (!shape.empty()) {
-            *stream << absl::StrJoin(shape, "x") << "x";
+            stream << absl::StrJoin(shape, "x") << "x";
           }
-          *stream << type << ">{";
+          stream << type << ">{";
           size_t element_size = type.element_size();
           auto bytes = data.subspan(
               offset, std::min(serialized_element_count, 1024) * element_size);
-          *stream << ConstantToString(type, bytes);
-          if (serialized_element_count > 1024) *stream << "...";
+          stream << ConstantToString(type, bytes);
+          if (serialized_element_count > 1024) stream << "...";
           offset += serialized_element_count * element_size;
-          *stream << "}";
+          stream << "}";
           break;
         }
         case OperandEncoding::kFunctionOrdinal: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(auto function_ordinal,
                            ReadValue<uint32_t>(data, &offset));
-          ASSIGN_OR_RETURN(auto function,
-                           function_table_.LookupFunction(function_ordinal));
-          *stream << "@" << function_ordinal << " " << function.name();
+          ASSIGN_OR_RETURN(
+              auto target_function,
+              function.module()->LookupFunctionByOrdinal(
+                  rt::Function::Linkage::kInternal, function_ordinal));
+          stream << "@" << function_ordinal << " " << target_function.name();
           break;
         }
         case OperandEncoding::kDispatchOrdinal: {
@@ -418,88 +402,80 @@ Status BytecodePrinter::PrintToStream(absl::Span<const uint8_t> data,
           ASSIGN_OR_RETURN(auto export_ordinal,
                            ReadValue<uint16_t>(data, &offset));
           // TODO(benvanik): lookup in executable table.
-          *stream << "@" << dispatch_ordinal << ":" << export_ordinal;
+          stream << "@" << dispatch_ordinal << ":" << export_ordinal;
           break;
         }
         case OperandEncoding::kImportOrdinal: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(auto import_ordinal,
                            ReadValue<uint32_t>(data, &offset));
-          ASSIGN_OR_RETURN(auto* function,
-                           function_table_.LookupImport(import_ordinal));
-          *stream << "@i" << import_ordinal << " ";
-          switch (function->link_type()) {
-            default:
-              *stream << "??";
-              break;
-            case ImportFunction::LinkType::kNativeFunction:
-              *stream << "<native>";
-              break;
-            case ImportFunction::LinkType::kModule:
-              *stream << function->linked_function().module().name() << ":"
-                      << function->linked_function().name();
-              break;
-          }
+          ASSIGN_OR_RETURN(auto target_function,
+                           function.module()->LookupFunctionByOrdinal(
+                               rt::Function::Linkage::kImport, import_ordinal));
+          stream << "@i" << import_ordinal << " " << target_function.name();
           break;
         }
         case OperandEncoding::kBlockOffset: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(uint32_t block_offset,
                            ReadValue<uint32_t>(data, &offset));
-          *stream << ":" << block_offset;
+          stream << ":" << block_offset;
           break;
         }
         case OperandEncoding::kTypeIndex: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(auto type, ReadType(data, &offset));
-          *stream << type;
+          stream << type;
           break;
         }
         case OperandEncoding::kIndex: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(auto index, ReadValue<int32_t>(data, &offset));
-          *stream << "#" << index;
+          stream << "#" << index;
           break;
         }
         case OperandEncoding::kIndexList: {
           ++printed_operand_count;
-          *stream << "{";
+          stream << "{";
           ASSIGN_OR_RETURN(int count, ReadCount(data, &offset));
           for (int j = 0; j < count; ++j) {
             ASSIGN_OR_RETURN(auto dim, ReadValue<int32_t>(data, &offset));
-            if (j > 0) *stream << ",";
-            *stream << dim;
+            if (j > 0) stream << ",";
+            stream << dim;
           }
-          *stream << "}";
+          stream << "}";
           break;
         }
         case OperandEncoding::kCmpIPredicate: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(auto predicate_value,
                            ReadValue<uint8_t>(data, &offset));
-          *stream << "<"
-                  << PredicateToString(
-                         static_cast<CmpIPredicate>(predicate_value))
-                  << ">";
+          stream << "<"
+                 << PredicateToString(
+                        static_cast<CmpIPredicate>(predicate_value))
+                 << ">";
           break;
         }
         case OperandEncoding::kCmpFPredicate: {
           ++printed_operand_count;
           ASSIGN_OR_RETURN(auto predicate_value,
                            ReadValue<uint8_t>(data, &offset));
-          *stream << "<"
-                  << PredicateToString(
-                         static_cast<CmpFPredicate>(predicate_value))
-                  << ">";
+          stream << "<"
+                 << PredicateToString(
+                        static_cast<CmpFPredicate>(predicate_value))
+                 << ">";
           break;
         }
       }
     }
 
-    *stream << "\n";
+    stream << "\n";
+
+    instruction.long_text = stream.str();
+    instruction.short_text = instruction.long_text;
   }
 
-  return OkStatus();
+  return instructions;
 }
 
 }  // namespace vm

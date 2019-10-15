@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_INTERPRETER_INTERPRETER_CONTEXT_H_
-#define IREE_HAL_INTERPRETER_INTERPRETER_CONTEXT_H_
+#ifndef IREE_HAL_INTERPRETER_INTERPRETER_MODULE_H_
+#define IREE_HAL_INTERPRETER_INTERPRETER_MODULE_H_
 
 #include <memory>
 
@@ -22,24 +22,29 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/interpreter/bytecode_kernels.h"
-#include "iree/vm/context.h"
-#include "iree/vm/function.h"
-#include "iree/vm/stack.h"
+#include "iree/rt/function.h"
+#include "iree/rt/module.h"
+#include "iree/rt/stack.h"
+#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode_tables_interpreter.h"
 
 namespace iree {
 namespace hal {
 
-class InterpreterContext final : public vm::Context {
+class InterpreterModule final : public vm::BytecodeModule {
  public:
-  explicit InterpreterContext(hal::Allocator* allocator)
-      : allocator_(allocator) {}
+  static StatusOr<ref_ptr<rt::Module>> FromDef(hal::Allocator* allocator,
+                                               const ModuleDef& module_def);
 
-  // TODO(benvanik): helpers to make passing args easier
-  Status Invoke(vm::Stack* stack, vm::Function function,
-                absl::Span<BufferView> args,
-                absl::Span<BufferView> results) const;
+  Status Execute(
+      rt::Stack* stack, const rt::Function function,
+      absl::InlinedVector<hal::BufferView, 8> arguments,
+      absl::InlinedVector<hal::BufferView, 8>* results) const override;
 
  private:
+  InterpreterModule(hal::Allocator* allocator,
+                    std::unique_ptr<vm::ModuleFile> module_file);
+
   hal::Allocator* allocator_;
   mutable kernels::RuntimeState kernel_runtime_state_;
 };
@@ -47,4 +52,4 @@ class InterpreterContext final : public vm::Context {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_INTERPRETER_INTERPRETER_CONTEXT_H_
+#endif  // IREE_HAL_INTERPRETER_INTERPRETER_MODULE_H_

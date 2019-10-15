@@ -17,8 +17,7 @@
 
 #include "iree/base/status.h"
 #include "iree/schemas/bytecode_def_generated.h"
-#include "iree/vm/context.h"
-#include "iree/vm/module.h"
+#include "iree/vm/bytecode_module.h"
 
 namespace iree {
 namespace vm {
@@ -28,7 +27,7 @@ namespace vm {
 // be resolved with matching signatures.
 class BytecodeValidator {
  public:
-  static Status Validate(const Context& context, const Module& module,
+  static Status Validate(const BytecodeModule& module,
                          const BytecodeDef& bytecode_def);
 };
 

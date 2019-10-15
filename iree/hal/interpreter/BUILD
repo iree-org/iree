@@ -18,6 +18,7 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
+        "//iree/rt",
     ],
 )
 
@@ -38,13 +39,13 @@ cc_library(
         "//iree/hal:allocator",
         "//iree/hal:buffer_view",
         "//iree/hal:heap_buffer",
+        "//iree/rt",
         "//iree/schemas/bytecode:interpreter_bytecode_v0",
+        "//iree/vm:bytecode_module",
         "//iree/vm:bytecode_reader",
         "//iree/vm:bytecode_tables_interpreter",
         "//iree/vm:bytecode_util",
-        "//iree/vm:function",
         "//iree/vm:opcode_info",
-        "//iree/vm:stack",
         "//iree/vm:type",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
@@ -57,16 +58,13 @@ cc_library(
     srcs = ["bytecode_executable.cc"],
     hdrs = ["bytecode_executable.h"],
     deps = [
-        ":interpreter_context",
+        ":interpreter_module",
         "//iree/base:status",
         "//iree/hal:allocator",
         "//iree/hal:executable",
         "//iree/hal:executable_spec",
+        "//iree/rt",
         "//iree/vm:bytecode_tables_interpreter",
-        "//iree/vm:bytecode_validator",
-        "//iree/vm:context",
-        "//iree/vm:module",
-        "//iree/vm:module_printer",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -116,25 +114,8 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:buffer_view",
         "//iree/hal/host:host_local_command_processor",
+        "//iree/rt",
         "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "interpreter_context",
-    srcs = ["interpreter_context.cc"],
-    hdrs = ["interpreter_context.h"],
-    deps = [
-        ":bytecode_dispatch",
-        ":bytecode_kernels",
-        "//iree/base:flatbuffer_util",
-        "//iree/base:status",
-        "//iree/hal:allocator",
-        "//iree/hal:buffer_view",
-        "//iree/vm:context",
-        "//iree/vm:function",
-        "//iree/vm:stack",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -159,6 +140,7 @@ cc_library(
         "//iree/hal/host:host_local_allocator",
         "//iree/hal/host:host_submission_queue",
         "//iree/hal/host:inproc_command_buffer",
+        "//iree/rt",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
@@ -186,4 +168,23 @@ cc_library(
         "//iree/hal:driver_registry",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "interpreter_module",
+    srcs = ["interpreter_module.cc"],
+    hdrs = ["interpreter_module.h"],
+    deps = [
+        ":bytecode_dispatch",
+        ":bytecode_kernels",
+        "//iree/base:flatbuffer_util",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:allocator",
+        "//iree/hal:buffer_view",
+        "//iree/rt",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:bytecode_tables_interpreter",
+        "@com_google_absl//absl/types:span",
+    ],
 )

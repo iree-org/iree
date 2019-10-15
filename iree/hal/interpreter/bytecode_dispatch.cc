@@ -33,11 +33,12 @@
 #include "iree/hal/interpreter/bytecode_dispatch_conversion.h"
 #include "iree/hal/interpreter/bytecode_dispatch_util.h"
 #include "iree/hal/interpreter/bytecode_kernels.h"
+#include "iree/rt/function.h"
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
+#include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_reader.h"
 #include "iree/vm/bytecode_tables_interpreter.h"
 #include "iree/vm/bytecode_util.h"
-#include "iree/vm/function.h"
 #include "iree/vm/opcode_info.h"
 
 namespace iree {
@@ -45,11 +46,9 @@ namespace hal {
 
 namespace {
 
+using ::iree::rt::Stack;
+using ::iree::rt::StackFrame;
 using ::iree::vm::BytecodeReader;
-using ::iree::vm::ImportFunction;
-using ::iree::vm::NativeFunction;
-using ::iree::vm::Stack;
-using ::iree::vm::StackFrame;
 
 }  // namespace
 
@@ -111,38 +110,23 @@ Status Dispatch(hal::Allocator* allocator,
   DISPATCH_CORE_OPCODE(kCall, {
     auto* old_stack_frame = stack->current_frame();
     ASSIGN_OR_RETURN(const auto& target_function, reader.ReadFunction());
+    // TODO(benvanik): rework register storage interface.
+    ASSIGN_OR_RETURN(
+        const auto* function_def,
+        static_cast<const vm::BytecodeModule*>(target_function.module())
+            ->GetFunctionDef(target_function.linkage(),
+                             target_function.ordinal()));
     ASSIGN_OR_RETURN(auto* new_stack_frame, stack->PushFrame(target_function));
+    new_stack_frame->mutable_registers()->buffer_views.resize(
+        function_def->bytecode()->local_count());
     RETURN_IF_ERROR(
         reader.CopyInputsAndSwitchStackFrame(old_stack_frame, new_stack_frame));
     DVLOG(1) << "Call; stack now: " << stack->DebugString();
   });
 
   DISPATCH_CORE_OPCODE(kCallImport, {
-    auto* old_stack_frame = stack->current_frame();
-    ASSIGN_OR_RETURN(const auto* target_function, reader.ReadImportFunction());
-    switch (target_function->link_type()) {
-      case ImportFunction::LinkType::kModule: {
-        ASSIGN_OR_RETURN(auto* new_stack_frame,
-                         stack->PushFrame(target_function->linked_function()));
-        RETURN_IF_ERROR(reader.CopyInputsAndSwitchStackFrame(old_stack_frame,
-                                                             new_stack_frame));
-        DVLOG(1) << "Call module import; stack now: " << stack->DebugString();
-        break;
-      }
-      case ImportFunction::LinkType::kNativeFunction: {
-        ASSIGN_OR_RETURN(auto* new_stack_frame,
-                         stack->PushFrame(*target_function));
-        RETURN_IF_ERROR(reader.CopyInputsAndSwitchStackFrame(old_stack_frame,
-                                                             new_stack_frame));
-        DVLOG(1) << "Call native import; stack now: " << stack->DebugString();
-        RETURN_IF_ERROR(CallNativeFunction(stack, *target_function));
-        RETURN_IF_ERROR(reader.CopyResultsAndSwitchStackFrame(old_stack_frame,
-                                                              new_stack_frame));
-        RETURN_IF_ERROR(stack->PopFrame());
-        DVLOG(1) << "Return from native; stack now: " << stack->DebugString();
-        break;
-      }
-    }
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "Non-module imports not supported";
   });
 
   DISPATCH_CORE_OPCODE(kCallIndirect, {
@@ -156,8 +140,9 @@ Status Dispatch(hal::Allocator* allocator,
       // Returning from entry function. Marshal results from the return stmt.
       ASSIGN_OR_RETURN(int32_t src_count, reader.ReadCount());
       for (int i = 0; i < src_count; ++i) {
-        ASSIGN_OR_RETURN(auto* src_local,
-                         reader.ReadLocal(old_stack_frame->mutable_locals()));
+        ASSIGN_OR_RETURN(
+            auto* src_local,
+            reader.ReadLocal(old_stack_frame->mutable_registers()));
         entry_results[i] = std::move(*src_local);
       }
       DVLOG(1) << "Returning to entry";

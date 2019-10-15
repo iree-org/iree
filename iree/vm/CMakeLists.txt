@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 iree_cc_library(
   NAME
-    bytecode_printer
+    bytecode_disassembler
   SRCS
-    "bytecode_printer.cc"
+    "bytecode_disassembler.cc"
   HDRS
-    "bytecode_printer.h"
+    "bytecode_disassembler.h"
   DEPS
     absl::core_headers
     absl::inlined_vector
@@ -28,13 +27,29 @@ iree_cc_library(
     iree::base::status
     iree::schemas
     iree::schemas::bytecode::bytecode_v0
+    iree::rt
     iree::vm::bytecode_util
-    iree::vm::executable_table
-    iree::vm::function_table
-    iree::vm::module
     iree::vm::opcode_info
-    iree::vm::source_map
+    iree::vm::source_map_resolver
     iree::vm::type
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    bytecode_module
+  SRCS
+    "bytecode_module.cc"
+  HDRS
+    "bytecode_module.h"
+  DEPS
+    absl::memory
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::rt
+    iree::schemas
+    iree::vm::bytecode_disassembler
+    iree::vm::source_map_resolver
   PUBLIC
 )
 
@@ -52,9 +67,9 @@ iree_cc_library(
     iree::base::status
     iree::hal::buffer_view
     iree::hal::heap_buffer
+    iree::rt
     iree::schemas::bytecode::bytecode_v0
-    iree::vm::function
-    iree::vm::stack
+    iree::vm::bytecode_module
     iree::vm::type
   PUBLIC
 )
@@ -115,137 +130,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    context
-  SRCS
-    "context.cc"
-  HDRS
-    "context.h"
-  DEPS
-    absl::strings
-    absl::span
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::vm::function
-    iree::vm::module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    executable_table
-  SRCS
-    "executable_table.cc"
-  HDRS
-    "executable_table.h"
-  DEPS
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::schemas
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    fiber_state
-  SRCS
-    "fiber_state.cc"
-  HDRS
-    "fiber_state.h"
-  DEPS
-    absl::strings
-    absl::span
-    iree::base::status
-    iree::vm::instance
-    iree::vm::stack
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    function
-  SRCS
-    "function.cc"
-  HDRS
-    "function.h"
-  DEPS
-    absl::strings
-    absl::span
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::hal::buffer_view
-    iree::schemas
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    function_table
-  SRCS
-    "function_table.cc"
-  HDRS
-    "function_table.h"
-  DEPS
-    absl::flat_hash_map
-    absl::strings
-    absl::span
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::schemas
-    iree::vm::function
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    instance
-  SRCS
-    "instance.cc"
-  HDRS
-    "instance.h"
-  DEPS
-    absl::memory
-    iree::base::source_location
-    iree::base::status
-    iree::hal::device_manager
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    module
-  SRCS
-    "module.cc"
-  HDRS
-    "module.h"
-  DEPS
-    absl::memory
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::schemas
-    iree::vm::executable_table
-    iree::vm::function_table
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    module_printer
-  SRCS
-    "module_printer.cc"
-  HDRS
-    "module_printer.h"
-  DEPS
-    iree::base::bitfield
-    iree::base::status
-    iree::vm::bytecode_printer
-    iree::vm::module
-    iree::vm::opcode_info
-    iree::vm::source_map
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     opcode_info
   HDRS
     "opcode_info.h"
@@ -254,28 +138,6 @@ iree_cc_library(
     absl::optional
     absl::span
     iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_context
-  SRCS
-    "sequencer_context.cc"
-  HDRS
-    "sequencer_context.h"
-  DEPS
-    absl::strings
-    absl::span
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::hal::buffer_view
-    iree::vm::context
-    iree::vm::fiber_state
-    iree::vm::function
-    iree::vm::instance
-    iree::vm::module
-    iree::vm::sequencer_dispatch
   PUBLIC
 )
 
@@ -300,48 +162,48 @@ iree_cc_library(
     iree::hal::device
     iree::hal::device_placement
     iree::hal::heap_buffer
+    iree::rt
     iree::schemas::bytecode::sequencer_bytecode_v0
+    iree::vm::bytecode_module
     iree::vm::bytecode_reader
     iree::vm::bytecode_tables_sequencer
     iree::vm::bytecode_util
-    iree::vm::function
     iree::vm::opcode_info
-    iree::vm::stack
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    source_map
+    sequencer_module
   SRCS
-    "source_map.cc"
+    "sequencer_module.cc"
   HDRS
-    "source_map.h"
+    "sequencer_module.h"
+  DEPS
+    absl::core_headers
+    iree::base::status
+    iree::hal::buffer_view
+    iree::rt
+    iree::schemas::bytecode::sequencer_bytecode_v0
+    iree::vm::bytecode_module
+    iree::vm::sequencer_dispatch
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    source_map_resolver
+  SRCS
+    "source_map_resolver.cc"
+  HDRS
+    "source_map_resolver.h"
   DEPS
     absl::strings
     absl::optional
     iree::base::flatbuffer_util
     iree::base::status
+    iree::rt
     iree::schemas
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    stack
-  SRCS
-    "stack.cc"
-    "stack_frame.cc"
-  HDRS
-    "stack.h"
-    "stack_frame.h"
-  DEPS
-    absl::strings
-    absl::span
-    iree::base::status
-    iree::hal::buffer_view
-    iree::vm::function
-    iree::vm::module
   PUBLIC
 )
 

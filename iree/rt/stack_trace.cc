@@ -20,14 +20,6 @@
 namespace iree {
 namespace rt {
 
-namespace {
-struct StackFrameFormatter {
-  void operator()(std::string* out, const StackFrame& stack_frame) const {
-    out->append(stack_frame.DebugStringShort());
-  }
-};
-}  // namespace
-
 std::string StackTrace::DebugString() const {
   return absl::StrJoin(frames_, "\n", StackFrameFormatter());
 }

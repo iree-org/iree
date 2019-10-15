@@ -17,12 +17,16 @@
 #include "iree/base/shape.h"
 #include "iree/base/status.h"
 #include "iree/hal/heap_buffer.h"
+#include "iree/vm/bytecode_module.h"
 
 namespace iree {
 namespace vm {
 
 namespace {
+
 using ::iree::hal::BufferView;
+using ::iree::rt::StackFrame;
+
 }  // namespace
 
 StatusOr<const uint8_t*> BytecodeReader::AdvanceOffset() {
@@ -30,18 +34,10 @@ StatusOr<const uint8_t*> BytecodeReader::AdvanceOffset() {
   // TODO(benvanik): make a flag and/or remove.
   DVLOG(1) << "dispatch(" << stack_frame_->function().name() << "@" << offset()
            << "): " << int(*bytecode_pc_);
-  for (int i = 0; i < locals_.size(); ++i) {
-    DVLOG(1) << "local[" << i << "] " << locals_[i].DebugStringShort();
+  for (int i = 0; i < registers_->buffer_views.size(); ++i) {
+    DVLOG(1) << "local[" << i << "] "
+             << registers_->buffer_views[i].DebugStringShort();
   }
-
-  if (breakpoint_table_) {
-    auto it = breakpoint_table_->find(offset());
-    if (it != breakpoint_table_->end()) {
-      // Breakpoint hit!
-      RETURN_IF_ERROR(it->second(*stack_));
-    }
-  }
-
   return bytecode_pc_++;
 }
 
@@ -128,29 +124,26 @@ Status BytecodeReader::SwitchStackFrame(StackFrame* new_stack_frame) {
 
   // Setup state pointers for faster dereferencing.
   const auto& function = new_stack_frame->function();
-  const auto& bytecode = *function.def().bytecode();
+  ASSIGN_OR_RETURN(
+      const auto* function_def,
+      static_cast<const BytecodeModule*>(function.module())
+          ->GetFunctionDef(function.linkage(), function.ordinal()));
+  const auto& bytecode = *function_def->bytecode();
   bytecode_base_ = bytecode.contents()->Data();
   bytecode_limit_ = bytecode_base_ + bytecode.contents()->size();
   bytecode_pc_ = bytecode_base_ + new_stack_frame->offset();
-  locals_ = new_stack_frame->mutable_locals();
-  // TODO(benvanik): reimplement breakpoints as bytecode rewriting.
-  int function_ordinal = function.module()
-                             .function_table()
-                             .LookupFunctionOrdinal(function)
-                             .ValueOrDie();
-  breakpoint_table_ =
-      function.module().function_table().GetFunctionBreakpointTable(
-          function_ordinal);
+  registers_ = new_stack_frame->mutable_registers();
   return OkStatus();
 }
 
 Status BytecodeReader::CopyInputsAndSwitchStackFrame(
     StackFrame* src_stack_frame, StackFrame* dst_stack_frame) {
-  ASSIGN_OR_RETURN(int32_t src_count, ReadCount());
-  for (int i = 0; i < src_count; ++i) {
+  ASSIGN_OR_RETURN(size_t src_count, ReadCount());
+  auto& dst_buffer_views = dst_stack_frame->mutable_registers()->buffer_views;
+  for (int i = 0; i < std::min(src_count, dst_buffer_views.size()); ++i) {
     ASSIGN_OR_RETURN(auto* src_local,
-                     ReadLocal(src_stack_frame->mutable_locals()));
-    *dst_stack_frame->mutable_local(i) = *src_local;
+                     ReadLocal(src_stack_frame->mutable_registers()));
+    dst_buffer_views[i] = *src_local;
   }
   return SwitchStackFrame(dst_stack_frame);
 }
@@ -162,7 +155,7 @@ Status BytecodeReader::CopyResultsAndSwitchStackFrame(
   absl::InlinedVector<BufferView*, 8> src_locals(src_count);
   for (int i = 0; i < src_count; ++i) {
     ASSIGN_OR_RETURN(src_locals[i],
-                     ReadLocal(src_stack_frame->mutable_locals()));
+                     ReadLocal(src_stack_frame->mutable_registers()));
   }
   RETURN_IF_ERROR(SwitchStackFrame(dst_stack_frame));
   ASSIGN_OR_RETURN(int32_t dst_count, ReadCount());
@@ -173,7 +166,7 @@ Status BytecodeReader::CopyResultsAndSwitchStackFrame(
   }
   for (int i = 0; i < dst_count; ++i) {
     ASSIGN_OR_RETURN(auto* dst_local,
-                     ReadLocal(dst_stack_frame->mutable_locals()));
+                     ReadLocal(dst_stack_frame->mutable_registers()));
     *dst_local = *src_locals[i];
   }
   return OkStatus();
@@ -183,9 +176,9 @@ Status BytecodeReader::CopySlots() {
   ASSIGN_OR_RETURN(int32_t count, ReadCount());
   for (int i = 0; i < count; ++i) {
     ASSIGN_OR_RETURN(auto* src_local,
-                     ReadLocal(stack_frame_->mutable_locals()));
+                     ReadLocal(stack_frame_->mutable_registers()));
     ASSIGN_OR_RETURN(auto* dst_local,
-                     ReadLocal(stack_frame_->mutable_locals()));
+                     ReadLocal(stack_frame_->mutable_registers()));
     *dst_local = *src_local;
   }
   return OkStatus();

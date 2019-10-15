@@ -123,6 +123,24 @@ StatusOr<const Function> Context::ResolveFunction(
                                       function_name);
 }
 
+StatusOr<const Function> Context::ResolveImport(const Module* module,
+                                                int32_t ordinal) const {
+  for (const auto& import_table_ref : module_import_tables_) {
+    if (import_table_ref.first == module) {
+      const auto& import_table = import_table_ref.second;
+      if (ordinal >= import_table.size()) {
+        return NotFoundErrorBuilder(IREE_LOC)
+               << "Import ordinal " << ordinal
+               << " out of bounds of import table (" << import_table.size()
+               << ")";
+      }
+      return import_table[ordinal];
+    }
+  }
+  return NotFoundErrorBuilder(IREE_LOC)
+         << "Import ordinal " << ordinal << " not found";
+}
+
 void Context::RegisterInvocation(Invocation* invocation) {
   {
     absl::MutexLock lock(&invocations_mutex_);

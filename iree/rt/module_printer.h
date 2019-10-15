@@ -12,25 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/instance.h"
+#ifndef IREE_RT_MODULE_PRINTER_H_
+#define IREE_RT_MODULE_PRINTER_H_
 
-#include "absl/memory/memory.h"
-#include "iree/base/source_location.h"
+#include <ostream>
+
+#include "iree/base/bitfield.h"
 #include "iree/base/status.h"
+#include "iree/rt/module.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 
-// static
-int Instance::NextUniqueId() {
-  static int next_id = 0;
-  return ++next_id;
-}
+enum class PrintModuleFlag {
+  kNone = 0,
+  kDisassemble = 1 << 0,
+};
+IREE_BITFIELD(PrintModuleFlag);
+using PrintModuleFlagBitfield = PrintModuleFlag;
 
-Instance::Instance()
-    : device_manager_(absl::make_unique<hal::DeviceManager>()) {}
+// Prints all functions within the module to the given |stream|.
+Status PrintModuleToStream(const Module& module, std::ostream* stream);
+Status PrintModuleToStream(const Module& module, PrintModuleFlagBitfield flags,
+                           std::ostream* stream);
 
-Instance::~Instance() = default;
-
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree
+
+#endif  // IREE_RT_MODULE_PRINTER_H_

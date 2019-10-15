@@ -40,20 +40,25 @@ iree_cc_library(
     "function.cc"
     "instance.cc"
     "invocation.cc"
+    "module_printer.cc"
     "source_location.cc"
+    "stack.cc"
     "stack_frame.cc"
     "stack_trace.cc"
   HDRS
     "context.h"
+    "disassembler.h"
     "function.h"
     "function_signature.h"
     "instance.h"
     "invocation.h"
     "module.h"
+    "module_printer.h"
     "module_signature.h"
     "policy.h"
     "source_location.h"
     "source_resolver.h"
+    "stack.h"
     "stack_frame.h"
     "stack_trace.h"
   DEPS
@@ -64,6 +69,7 @@ iree_cc_library(
     absl::time
     absl::optional
     absl::span
+    iree::base::bitfield
     iree::base::intrusive_list
     iree::base::ref_ptr
     iree::base::status

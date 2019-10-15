@@ -12,23 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/source_map.h"
-
-#include <sstream>
+#include "iree/vm/source_map_resolver.h"
 
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/status.h"
+#include "iree/schemas/source_map_def_generated.h"
 
 namespace iree {
 namespace vm {
 
 namespace {
 
-Status PrintLocation(const SourceMap& source_map,
+Status PrintLocation(const SourceMapResolver& source_map,
                      const FunctionSourceMapDef& function_source_map,
                      const LocationDef& location, std::ostream* stream);
 
-Status PrintFileLocation(const SourceMap& source_map,
+Status PrintFileLocation(const SourceMapResolver& source_map,
                          const FunctionSourceMapDef& function_source_map,
                          const FileLocationDef& location,
                          std::ostream* stream) {
@@ -38,7 +37,7 @@ Status PrintFileLocation(const SourceMap& source_map,
   return OkStatus();
 }
 
-Status PrintNameLocation(const SourceMap& source_map,
+Status PrintNameLocation(const SourceMapResolver& source_map,
                          const FunctionSourceMapDef& function_source_map,
                          const NameLocationDef& location,
                          std::ostream* stream) {
@@ -47,7 +46,7 @@ Status PrintNameLocation(const SourceMap& source_map,
   return OkStatus();
 }
 
-Status PrintCallSiteLocation(const SourceMap& source_map,
+Status PrintCallSiteLocation(const SourceMapResolver& source_map,
                              const FunctionSourceMapDef& function_source_map,
                              const CallSiteLocationDef& location,
                              std::ostream* stream) {
@@ -55,7 +54,7 @@ Status PrintCallSiteLocation(const SourceMap& source_map,
   return OkStatus();
 }
 
-Status PrintFusedLocation(const SourceMap& source_map,
+Status PrintFusedLocation(const SourceMapResolver& source_map,
                           const FunctionSourceMapDef& function_source_map,
                           const FusedLocationDef& location,
                           std::ostream* stream) {
@@ -74,7 +73,7 @@ Status PrintFusedLocation(const SourceMap& source_map,
   return OkStatus();
 }
 
-Status PrintLocation(const SourceMap& source_map,
+Status PrintLocation(const SourceMapResolver& source_map,
                      const FunctionSourceMapDef& function_source_map,
                      const LocationDef& location, std::ostream* stream) {
   switch (location.location_union_type()) {
@@ -104,36 +103,15 @@ Status PrintLocation(const SourceMap& source_map,
 }  // namespace
 
 // static
-bool SourceLocation::Equal(const SourceLocation& a, const SourceLocation& b) {
-  return a.source_map_def_ == b.source_map_def_ &&
-         a.function_source_map_ == b.function_source_map_ &&
-         a.location_ordinal_ == b.location_ordinal_;
-}
-
-std::string SourceLocation::DebugStringShort() const {
-  if (empty()) {
-    return "<unknown>";
-  }
-  std::ostringstream stream;
-  const auto& location =
-      *function_source_map_->location_table()->Get(location_ordinal_);
-  auto status = PrintLocation(SourceMap(*source_map_def_),
-                              *function_source_map_, location, &stream);
-  if (!status.ok()) {
-    stream << status;
-  }
-  return stream.str();
-}
-
-// static
-SourceMap SourceMap::FromModule(const ModuleDef& module_def) {
+SourceMapResolver SourceMapResolver::FromModule(const ModuleDef& module_def) {
   if (module_def.source_map()) {
-    return SourceMap{*module_def.source_map()};
+    return SourceMapResolver{*module_def.source_map()};
   }
   return {};
 }
 
-StatusOr<absl::string_view> SourceMap::GetUniqueString(int string_index) const {
+StatusOr<absl::string_view> SourceMapResolver::GetUniqueString(
+    int string_index) const {
   if (empty()) {
     return NotFoundErrorBuilder(IREE_LOC) << "No source map present";
   }
@@ -145,7 +123,7 @@ StatusOr<absl::string_view> SourceMap::GetUniqueString(int string_index) const {
          << "String index " << string_index << " not present in string table";
 }
 
-StatusOr<const FunctionSourceMapDef*> SourceMap::GetFunctionSourceMap(
+StatusOr<const FunctionSourceMapDef*> SourceMapResolver::GetFunctionSourceMap(
     int function_ordinal) const {
   if (empty()) {
     return NotFoundErrorBuilder(IREE_LOC) << "No source map present";
@@ -163,28 +141,16 @@ StatusOr<const FunctionSourceMapDef*> SourceMap::GetFunctionSourceMap(
          << " source map not present in function table";
 }
 
-// static
-SourceMapResolver SourceMapResolver::FromFunction(const ModuleDef& module_def,
-                                                  int function_ordinal) {
-  auto source_map = SourceMap::FromModule(module_def);
-  if (source_map.empty()) {
-    return {};
-  }
-  auto function_source_map_or =
-      source_map.GetFunctionSourceMap(function_ordinal);
+absl::optional<rt::SourceLocation> SourceMapResolver::ResolveFunctionOffset(
+    const rt::Function& function, rt::SourceOffset offset) {
+  if (empty()) return absl::nullopt;
+  auto function_source_map_or = GetFunctionSourceMap(function.ordinal());
   if (!function_source_map_or.ok()) {
-    return {};
+    return absl::nullopt;
   }
-  return SourceMapResolver(source_map, *function_source_map_or.ValueOrDie());
-}
-
-absl::optional<SourceLocation> SourceMapResolver::ResolveBytecodeOffset(
-    int offset) const {
-  if (!function_source_map_) {
-    return {};
-  }
-
-  const auto* bytecode_map = function_source_map_->bytecode_map();
+  const auto* function_source_map = function_source_map_or.ValueOrDie();
+  const auto* bytecode_map = function_source_map->bytecode_map();
+  if (!bytecode_map) return absl::nullopt;
 
   // TODO(benvanik): allow fuzzy offset matching/table sparsity.
   int location_ordinal = -1;
@@ -195,11 +161,33 @@ absl::optional<SourceLocation> SourceMapResolver::ResolveBytecodeOffset(
     }
   }
   if (location_ordinal == -1) {
-    return {};
+    return absl::nullopt;
   }
 
-  return SourceLocation(*source_map_.def(), *function_source_map_,
-                        location_ordinal);
+  return rt::SourceLocation(this,
+                            {
+                                reinterpret_cast<uint64_t>(function_source_map),
+                                static_cast<uint64_t>(location_ordinal),
+                            });
+}
+
+void SourceMapResolver::PrintSourceLocation(
+    rt::SourceResolverArgs resolver_args, std::ostream* stream) const {
+  if (empty()) {
+    *stream << "<unknown>";
+    return;
+  }
+
+  auto* function_source_map =
+      reinterpret_cast<FunctionSourceMapDef*>(resolver_args[0]);
+  int location_ordinal = static_cast<int>(resolver_args[1]);
+
+  const auto& location =
+      *function_source_map->location_table()->Get(location_ordinal);
+  auto status = PrintLocation(*this, *function_source_map, location, stream);
+  if (!status.ok()) {
+    *stream << status;
+  }
 }
 
 }  // namespace vm

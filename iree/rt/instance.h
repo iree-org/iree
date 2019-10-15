@@ -21,14 +21,7 @@
 #include "iree/base/ref_ptr.h"
 #include "iree/hal/device_manager.h"
 #include "iree/rt/context.h"
-
-namespace iree {
-namespace rt {
-namespace debug {
-class DebugServer;
-}  // namespace debug
-}  // namespace rt
-}  // namespace iree
+#include "iree/rt/debug/debug_server.h"
 
 namespace iree {
 namespace rt {
@@ -46,7 +39,8 @@ namespace rt {
 class Instance final : public RefObject<Instance> {
  public:
   // Creates an instance with an optional attached |debug_server|.
-  explicit Instance(std::unique_ptr<debug::DebugServer> debug_server = nullptr);
+  Instance() : Instance(nullptr) {}
+  explicit Instance(std::unique_ptr<debug::DebugServer> debug_server);
   ~Instance();
   Instance(const Instance&) = delete;
   Instance& operator=(const Instance&) = delete;

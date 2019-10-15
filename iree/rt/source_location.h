@@ -15,6 +15,7 @@
 #ifndef IREE_RT_SOURCE_LOCATION_H_
 #define IREE_RT_SOURCE_LOCATION_H_
 
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <ostream>
@@ -31,6 +32,10 @@ class SourceResolver;
 // hash table.
 using SourceOffset = int64_t;
 
+// Implementation-defined opaque args stored within source locations that can be
+// used by a SourceResolver to map back to its internal storage.
+using SourceResolverArgs = std::array<uint64_t, 2>;
+
 // A location within a source file.
 // Only valid for the lifetime of the SourceResolver that returned it.
 class SourceLocation final {
@@ -40,15 +45,12 @@ class SourceLocation final {
 
   // Returns true if the two source locations reference the same target.
   inline static bool Equal(const SourceLocation& a, const SourceLocation& b) {
-    return a.resolver_ == b.resolver_ &&
-           std::memcmp(a.resolver_args_, b.resolver_args_,
-                       sizeof(a.resolver_args_)) == 0;
+    return a.resolver_ == b.resolver_ && a.resolver_args_ == b.resolver_args_;
   }
 
   SourceLocation() = default;
-  SourceLocation(SourceResolver* resolver, uintptr_t resolver_args[2])
-      : resolver_(resolver),
-        resolver_args_{resolver_args[0], resolver_args[1]} {}
+  SourceLocation(SourceResolver* resolver, SourceResolverArgs resolver_args)
+      : resolver_(resolver), resolver_args_(resolver_args) {}
 
   // A short one-line human readable string (such as file/line number).
   std::string DebugStringShort() const;
@@ -63,7 +65,7 @@ class SourceLocation final {
 
  private:
   SourceResolver* resolver_ = nullptr;
-  uintptr_t resolver_args_[2] = {0, 0};
+  SourceResolverArgs resolver_args_ = {0, 0};
 };
 
 inline bool operator==(const SourceLocation& a, const SourceLocation& b) {

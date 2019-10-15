@@ -108,6 +108,8 @@ class ExternalModule final : public Module {
 
   SourceResolver* source_resolver() const override { return nullptr; }
 
+  Disassembler* disassembler() const override { return nullptr; }
+
   std::string DebugStringShort() const override { return std::string(name()); }
 
   StatusOr<const Function> LookupFunctionByOrdinal(
@@ -165,7 +167,7 @@ class ExternalModule final : public Module {
   }
 
   Status Execute(
-      const Function function,
+      Stack* stack, const Function function,
       absl::InlinedVector<hal::BufferView, 8> arguments,
       absl::InlinedVector<hal::BufferView, 8>* results) const override {
     // TODO(benvanik): fn ptr callback to external code. Waiting on fibers.

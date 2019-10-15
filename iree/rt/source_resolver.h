@@ -15,14 +15,21 @@
 #ifndef IREE_RT_SOURCE_RESOLVER_H_
 #define IREE_RT_SOURCE_RESOLVER_H_
 
+#include <cstdint>
+#include <ostream>
+#include <vector>
+
+#include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "iree/base/status.h"
 #include "iree/rt/function.h"
 #include "iree/rt/source_location.h"
 
 namespace iree {
 namespace rt {
 
-// Resolves offsets within functions to SourceLocations.
+// Resolves offsets within functions to SourceLocations and provides source
+// language services.
 //
 // Thread-safe.
 class SourceResolver {
@@ -33,6 +40,11 @@ class SourceResolver {
   // Not all offsets within a function may have source mapping information.
   virtual absl::optional<SourceLocation> ResolveFunctionOffset(
       const Function& function, SourceOffset offset) = 0;
+
+  // Converts a source location to a human-readable string, commonly in a single
+  // line denoting an original source file location (such as path:line:col).
+  virtual void PrintSourceLocation(SourceResolverArgs resolver_args,
+                                   std::ostream* stream) const = 0;
 
   // TODO(benvanik): query local variable names.
 

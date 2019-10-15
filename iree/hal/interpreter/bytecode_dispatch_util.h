@@ -24,10 +24,10 @@
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/interpreter/bytecode_kernels.h"
+#include "iree/rt/function.h"
+#include "iree/rt/stack.h"
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
 #include "iree/vm/bytecode_reader.h"
-#include "iree/vm/function.h"
-#include "iree/vm/stack.h"
 #include "iree/vm/type.h"
 
 // TODO(benvanik): move to dedicated config file/build flags.
@@ -41,8 +41,6 @@ namespace hal {
 // Returns false if there is no buffer, the buffer is empty, or the contents are
 // bitwise zero.
 bool BufferViewIsTrue(const BufferView& buffer_view);
-
-Status CallNativeFunction(vm::Stack* stack, const vm::ImportFunction& function);
 
 Status ValidateElementwiseUnaryOp(BufferView* src_local, BufferView* dst_local);
 Status ValidateElementwiseBinaryOp(BufferView* lhs_local, BufferView* rhs_local,

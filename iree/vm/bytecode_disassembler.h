@@ -12,33 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_MODULE_PRINTER_H_
-#define IREE_VM_MODULE_PRINTER_H_
+#ifndef IREE_VM_BYTECODE_DISASSEMBLER_H_
+#define IREE_VM_BYTECODE_DISASSEMBLER_H_
 
 #include <ostream>
 
-#include "iree/base/bitfield.h"
 #include "iree/base/status.h"
-#include "iree/vm/module.h"
+#include "iree/rt/disassembler.h"
+#include "iree/schemas/bytecode_def_generated.h"
+#include "iree/schemas/source_map_def_generated.h"
 #include "iree/vm/opcode_info.h"
 
 namespace iree {
 namespace vm {
 
-enum class PrintModuleFlag {
-  kNone = 0,
-  kIncludeSourceMapping = 1,
-};
-IREE_BITFIELD(PrintModuleFlag);
-using PrintModuleFlagBitfield = PrintModuleFlag;
+// Disassembles bytecode with a specific op set to text.
+class BytecodeDisassembler final : public rt::Disassembler {
+ public:
+  explicit BytecodeDisassembler(OpcodeTable opcode_table)
+      : opcode_table_(opcode_table) {}
 
-// Prints all functions within the module to the given |stream|.
-Status PrintModuleToStream(OpcodeTable opcode_table, const Module& module,
-                           std::ostream* stream);
-Status PrintModuleToStream(OpcodeTable opcode_table, const Module& module,
-                           PrintModuleFlagBitfield flags, std::ostream* stream);
+  StatusOr<std::vector<rt::Instruction>> DisassembleInstructions(
+      const rt::Function& function, rt::SourceOffset offset,
+      int32_t instruction_count) const override;
+
+ private:
+  OpcodeTable opcode_table_;
+};
 
 }  // namespace vm
 }  // namespace iree
 
-#endif  // IREE_VM_MODULE_PRINTER_H_
+#endif  // IREE_VM_BYTECODE_DISASSEMBLER_H_

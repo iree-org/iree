@@ -97,11 +97,12 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
 }  // namespace
 
 InterpreterDevice::InterpreterDevice(DeviceInfo device_info)
-    : Device(std::move(device_info)) {
+    : Device(std::move(device_info)), instance_(make_ref<rt::Instance>()) {
   // We currently only expose a single command queue.
   auto command_queue = absl::make_unique<UnsynchronizedCommandQueue>(
       &allocator_, "cpu0",
       CommandCategory::kTransfer | CommandCategory::kDispatch);
+
   // TODO(benvanik): allow injection of the wrapper type to support
   // SyncCommandQueue without always linking in both.
   auto async_command_queue =
@@ -112,7 +113,7 @@ InterpreterDevice::InterpreterDevice(DeviceInfo device_info)
 InterpreterDevice::~InterpreterDevice() = default;
 
 std::shared_ptr<ExecutableCache> InterpreterDevice::CreateExecutableCache() {
-  return std::make_shared<BytecodeCache>(&allocator_);
+  return std::make_shared<BytecodeCache>(add_ref(instance_), &allocator_);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> InterpreterDevice::CreateCommandBuffer(

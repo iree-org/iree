@@ -18,13 +18,14 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
+#include "iree/rt/instance.h"
 
 namespace iree {
 namespace hal {
 
 class BytecodeCache final : public ExecutableCache {
  public:
-  explicit BytecodeCache(hal::Allocator* allocator);
+  BytecodeCache(ref_ptr<rt::Instance> instance, hal::Allocator* allocator);
   ~BytecodeCache() override;
 
   bool CanPrepareFormat(ExecutableFormat format) const override;
@@ -33,6 +34,7 @@ class BytecodeCache final : public ExecutableCache {
       ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) override;
 
  private:
+  ref_ptr<rt::Instance> instance_;
   hal::Allocator* allocator_;
 };
 

@@ -34,18 +34,6 @@ bool BufferViewIsTrue(const BufferView& buffer_view) {
   return false;
 }
 
-Status CallNativeFunction(vm::Stack* stack,
-                          const vm::ImportFunction& function) {
-  auto* stack_frame = stack->current_frame();
-
-  // Marshal inputs and outputs.
-  auto args = stack_frame->mutable_locals().subspan(0, function.input_count());
-  auto results = stack_frame->mutable_locals().subspan(args.size());
-
-  const auto& fn = function.native_function();
-  return fn(stack, args, results);
-}
-
 Status ValidateElementwiseUnaryOp(BufferView* src_local,
                                   BufferView* dst_local) {
   // TODO(benvanik): validate shapes.

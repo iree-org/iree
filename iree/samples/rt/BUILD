@@ -1,21 +1,21 @@
-# Samples demonstrating use of the VM API.
+# Samples demonstrating use of the RT API.
 
-load("//iree/tools:compilation.bzl", "iree_module")
+load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_module(
-    name = "simple_module_test_module",
+iree_bytecode_module(
+    name = "simple_module_test_bytecode_module",
     srcs = ["simple_module_test.mlir"],
-    cc_namespace = "iree::vm::samples",
+    cc_namespace = "iree::rt::samples",
 )
 
 cc_test(
-    name = "simple_module_test",
-    srcs = ["simple_module_test.cc"],
+    name = "bytecode_module_test",
+    srcs = ["bytecode_module_test.cc"],
     data = [
         # When building with --config=asan you must specify the following
         # envvar when using Vulkan + a local Nvidia GPU:
@@ -23,20 +23,18 @@ cc_test(
         "//iree/tools:sanitizer_suppressions.txt",
     ],
     deps = [
-        ":simple_module_test_module_cc",
+        ":simple_module_test_bytecode_module_cc",
         "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/strings",
         "//iree/base:flatbuffer_util",
+        "//iree/base:status",
         "//iree/base:status_matchers",
         "//iree/hal:buffer_view",
-        "//iree/hal:command_buffer",
-        "//iree/hal:command_queue",
         "//iree/hal:driver_registry",
+        "//iree/rt",
         "//iree/schemas",
-        "//iree/base:status",
-        "//iree/vm:fiber_state",
-        "//iree/vm:instance",
-        "//iree/vm:sequencer_context",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:sequencer_module",
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.

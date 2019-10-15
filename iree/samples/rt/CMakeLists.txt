@@ -14,9 +14,9 @@
 
 iree_cc_test(
   NAME
-    simple_module_test
+    bytecode_module_test
   SRCS
-    "simple_module_test.cc"
+    "bytecode_module_test.cc"
   DEPS
     absl::strings
     gtest_main
@@ -24,13 +24,10 @@ iree_cc_test(
     iree::base::status
     iree::base::status_matchers
     iree::hal::buffer_view
-    iree::hal::command_buffer
-    iree::hal::command_queue
     iree::hal::driver_registry
     iree::schemas
-    iree::vm::fiber_state
-    iree::vm::instance
-    iree::vm::sequencer_context
+    iree::rt
+    iree::vm::bytecode_module
     # Enabled drivers:
     iree::hal::interpreter::interpreter_driver_module
     iree::hal::vulkan::vulkan_driver_module

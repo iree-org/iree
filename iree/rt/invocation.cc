@@ -72,7 +72,7 @@ StatusOr<ref_ptr<Invocation>> Invocation::Create(
 
   // TODO(benvanik): fiber scheduling and such.
   auto execute_status = function.module()->Execute(
-      function, std::move(arguments), &results_value);
+      &invocation->stack_, function, std::move(arguments), &results_value);
   if (execute_status.ok()) {
     invocation->CompleteSuccess(std::move(results_value));
   } else {
@@ -82,12 +82,33 @@ StatusOr<ref_ptr<Invocation>> Invocation::Create(
   return invocation;
 }
 
+// static
+StatusOr<ref_ptr<Invocation>> Invocation::Create(
+    ref_ptr<Context> context, const Function function, ref_ptr<Policy> policy,
+    absl::Span<const ref_ptr<Invocation>> dependencies,
+    absl::Span<const hal::BufferView> arguments) {
+  absl::InlinedVector<ref_ptr<Invocation>, 4> dependency_list;
+  dependency_list.reserve(dependencies.size());
+  for (auto& dependency : dependencies) {
+    dependency_list.push_back(add_ref(dependency));
+  }
+  absl::InlinedVector<hal::BufferView, 8> argument_list;
+  argument_list.reserve(arguments.size());
+  for (auto& buffer_view : arguments) {
+    argument_list.push_back(buffer_view);
+  }
+  return Invocation::Create(std::move(context), function, std::move(policy),
+                            std::move(dependency_list),
+                            std::move(argument_list));
+}
+
 Invocation::Invocation(ref_ptr<Context> context, const Function function,
                        ref_ptr<Policy> policy)
     : id_(NextUniqueInvocationId()),
       context_(std::move(context)),
       function_(function),
-      policy_(std::move(policy)) {
+      policy_(std::move(policy)),
+      stack_(context_.get()) {
   IREE_TRACE_SCOPE0("Invocation::ctor");
   context_->RegisterInvocation(this);
 }

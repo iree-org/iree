@@ -27,6 +27,7 @@
 #include "iree/hal/buffer_view.h"
 #include "iree/rt/function.h"
 #include "iree/rt/policy.h"
+#include "iree/rt/stack.h"
 #include "iree/rt/stack_trace.h"
 
 namespace iree {
@@ -63,6 +64,10 @@ class Invocation final : public RefObject<Invocation> {
       absl::InlinedVector<hal::BufferView, 8> arguments,
       absl::optional<absl::InlinedVector<hal::BufferView, 8>> results =
           absl::nullopt);
+  static StatusOr<ref_ptr<Invocation>> Create(
+      ref_ptr<Context> context, const Function function, ref_ptr<Policy> policy,
+      absl::Span<const ref_ptr<Invocation>> dependencies,
+      absl::Span<const hal::BufferView> arguments);
 
   ~Invocation();
 
@@ -125,6 +130,8 @@ class Invocation final : public RefObject<Invocation> {
   ref_ptr<Context> context_;
   const Function function_;
   ref_ptr<Policy> policy_;
+
+  Stack stack_;
 
   absl::Mutex status_mutex_;
   Status completion_status_ ABSL_GUARDED_BY(status_mutex_) =

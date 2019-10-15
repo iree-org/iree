@@ -7,7 +7,8 @@
 # By default the IREE runtime does not compile in debug support. To link it in
 # pass --define=IREE_DEBUG=1 to bazel builds of the runtime.
 
-load("//third_party/emscripten:split_transition_defs.bzl", "auto_wasm_binary")
+# TODO(benvanik): re-enable debugger after refactoring.
+# load("//third_party/emscripten:split_transition_defs.bzl", "auto_wasm_binary")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -41,10 +42,6 @@ package(
 #         "//iree/base:status",
 #         "//iree/rt/debug:debug_client",
 #         "//iree/schemas",
-#         "//iree/vm:bytecode_printer",
-#         "//iree/vm:bytecode_tables_sequencer",
-#         "//iree/vm:module",
-#         "//iree/vm:source_map",
 #     ],
 # )
 #

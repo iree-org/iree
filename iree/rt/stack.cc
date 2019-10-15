@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/stack.h"
+#include "iree/rt/stack.h"
 
 #include <iterator>
 
@@ -20,11 +20,11 @@
 #include "iree/base/status.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 
 constexpr int Stack::kMaxStackDepth;
 
-Stack::Stack() = default;
+Stack::Stack(Context* context) : context_(context) {}
 
 Stack::~Stack() = default;
 
@@ -33,19 +33,7 @@ StatusOr<StackFrame*> Stack::PushFrame(Function function) {
     return InternalErrorBuilder(IREE_LOC)
            << "Max stack depth of " << kMaxStackDepth << " exceeded";
   }
-  stack_[stack_depth_++] = StackFrame(function);
-
-  // TODO(benvanik): WTF scope enter.
-
-  return current_frame();
-}
-
-StatusOr<StackFrame*> Stack::PushFrame(const ImportFunction& function) {
-  if (stack_depth_ + 1 > kMaxStackDepth) {
-    return InternalErrorBuilder(IREE_LOC)
-           << "Max stack depth of " << kMaxStackDepth << " exceeded";
-  }
-  stack_[stack_depth_++] = StackFrame(function);
+  frames_[stack_depth_++] = StackFrame(function);
 
   // TODO(benvanik): WTF scope enter.
 
@@ -60,23 +48,13 @@ Status Stack::PopFrame() {
   // TODO(benvanik): WTF scope leave.
 
   --stack_depth_;
+  frames_[stack_depth_] = {};
   return OkStatus();
 }
 
-namespace {
-struct StackFrameFormatter {
-  void operator()(std::string* out, const StackFrame& stack_frame) const {
-    out->append(absl::StrCat(stack_frame.module().name(), ":",
-                             stack_frame.function().name(), "@",
-                             stack_frame.offset()));
-  }
-};
-}  // namespace
-
 std::string Stack::DebugString() const {
-  return absl::StrJoin(std::begin(stack_), std::begin(stack_) + stack_depth_,
-                       "\n", StackFrameFormatter());
+  return absl::StrJoin(frames(), "\n", StackFrameFormatter());
 }
 
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

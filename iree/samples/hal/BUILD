@@ -2,14 +2,14 @@
 # These do not rely on higher layers of the system (such as the VM or runtime).
 
 load("//iree:build_defs.bzl", "PLATFORM_VULKAN_TEST_DEPS")
-load("//iree/tools:compilation.bzl", "iree_module")
+load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_module(
+iree_bytecode_module(
     name = "simple_compute_test_module",
     srcs = ["simple_compute_test.mlir"],
     cc_namespace = "iree::hal::samples",

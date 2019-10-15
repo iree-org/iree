@@ -14,14 +14,18 @@
 
 #include "iree/rt/source_location.h"
 
+#include <sstream>
+
 #include "iree/rt/source_resolver.h"
 
 namespace iree {
 namespace rt {
 
 std::string SourceLocation::DebugStringShort() const {
-  // TODO(benvanik): ask source resolver.
-  return "<source>";
+  if (is_unknown()) return "(unknown)";
+  std::ostringstream stream;
+  resolver_->PrintSourceLocation(resolver_args_, &stream);
+  return stream.str();
 }
 
 }  // namespace rt

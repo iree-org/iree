@@ -21,8 +21,8 @@
 // imports requiring runtime support, uses floats exclusively (as that's assumed
 // available everywhere), etc.
 //
-// The `iree_module` build rule is used to translate the MLIR to the module
-// flatbuffer. Additional target support can be defined there.
+// The `iree_bytecode_module` build rule is used to translate the MLIR to the
+// module flatbuffer. Additional target support can be defined there.
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

@@ -47,14 +47,14 @@
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/hal/buffer_view_string_util.h"
 #include "iree/hal/driver_registry.h"
+#include "iree/rt/context.h"
 #include "iree/rt/debug/debug_server_flags.h"
+#include "iree/rt/instance.h"
+#include "iree/rt/invocation.h"
+#include "iree/rt/module.h"
+#include "iree/rt/module_printer.h"
 #include "iree/schemas/module_def_generated.h"
-#include "iree/vm/bytecode_tables_sequencer.h"
-#include "iree/vm/fiber_state.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/module.h"
-#include "iree/vm/module_printer.h"
-#include "iree/vm/sequencer_context.h"
+#include "iree/vm/sequencer_module.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
@@ -92,9 +92,8 @@ namespace iree {
 namespace {
 
 using ::iree::hal::BufferView;
-using ::iree::vm::Function;
-using ::iree::vm::Module;
-using ::iree::vm::ModuleFile;
+using ::iree::rt::Function;
+using ::iree::rt::Module;
 
 // Returns a driver name capable of handling input from the given backend.
 std::string BackendToDriverName(std::string backend) {
@@ -107,7 +106,7 @@ std::string BackendToDriverName(std::string backend) {
 }
 
 // Prepares a module for evaluation by running MLIR import and IREE translation.
-StatusOr<std::unique_ptr<Module>> PrepareModule(
+StatusOr<ref_ptr<Module>> PrepareModule(
     std::string target_backend,
     std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
   mlir::MLIRContext context;
@@ -142,9 +141,9 @@ StatusOr<std::unique_ptr<Module>> PrepareModule(
 
   // Wrap module in a file handle.
   ASSIGN_OR_RETURN(auto iree_module_file,
-                   ModuleFile::FromBuffer(ModuleDefIdentifier(),
-                                          std::move(iree_module_bytes)));
-  return Module::FromFile(std::move(iree_module_file));
+                   vm::ModuleFile::FromBuffer(ModuleDefIdentifier(),
+                                              std::move(iree_module_bytes)));
+  return vm::SequencerModule::FromFile(std::move(iree_module_file));
 }
 
 // Parses a list of input shapes and values from a string of newline-separated
@@ -196,25 +195,22 @@ Status OutputFunctionResults(const Function& function,
 }
 
 // Evaluates a single function in its own fiber, printing the results to stdout.
-Status EvaluateFunction(std::shared_ptr<vm::Instance> instance,
-                        vm::SequencerContext* context,
+Status EvaluateFunction(const ref_ptr<rt::Context>& context,
                         hal::Allocator* allocator, const Function& function) {
-  // Setup our dummy fiber we will run with.
-  vm::FiberState fiber_state(instance);
-
   std::cout << "EXEC @" << function.name() << std::endl;
 
-  // Marshal inputs.
-  ASSIGN_OR_RETURN(std::vector<BufferView> args,
-                   ParseInputsFromFlags(allocator));
-  std::vector<BufferView> results;
-  results.resize(function.result_count());
+  // Create invocation that will perform the execution.
+  ASSIGN_OR_RETURN(auto arguments, ParseInputsFromFlags(allocator));
+  ASSIGN_OR_RETURN(
+      auto invocation,
+      rt::Invocation::Create(add_ref(context), function, make_ref<rt::Policy>(),
+                             {}, absl::MakeConstSpan(arguments)));
 
-  // Call into the main function.
-  RETURN_IF_ERROR(context->Invoke(&fiber_state, function, absl::MakeSpan(args),
-                                  absl::MakeSpan(results)));
+  // Wait until invocation completes.
+  RETURN_IF_ERROR(invocation->Await(absl::InfiniteFuture()));
 
   // Print outputs.
+  ASSIGN_OR_RETURN(auto results, invocation->ConsumeResults());
   RETURN_IF_ERROR(OutputFunctionResults(function, absl::MakeSpan(results)));
 
   return OkStatus();
@@ -222,35 +218,33 @@ Status EvaluateFunction(std::shared_ptr<vm::Instance> instance,
 
 // Evaluates all exported functions within given module.
 Status EvaluateFunctions(absl::string_view target_backend,
-                         std::unique_ptr<Module> module) {
+                         ref_ptr<Module> module) {
   // Create the context we'll use for this (ensuring that we can't interfere
   // with other running evaluations, such as when in a multithreaded test
   // runner).
   ASSIGN_OR_RETURN(auto debug_server, rt::debug::CreateDebugServerFromFlags());
-  auto instance = std::make_shared<vm::Instance>();
+  auto instance = make_ref<rt::Instance>(std::move(debug_server));
   ASSIGN_OR_RETURN(auto driver, hal::DriverRegistry::shared_registry()->Create(
                                     target_backend));
   ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());
   RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(device));
-  vm::SequencerContext context(instance);
 
   if (absl::GetFlag(FLAGS_print_bytecode)) {
-    vm::PrintModuleFlagBitfield print_flags = vm::PrintModuleFlag::kNone;
-    RETURN_IF_ERROR(vm::PrintModuleToStream(vm::sequencer_opcode_table(),
-                                            *module, print_flags, &std::cout));
+    RETURN_IF_ERROR(rt::PrintModuleToStream(
+        *module, rt::PrintModuleFlag::kDisassemble, &std::cout));
   }
 
-  // Register module with the context.
-  RETURN_IF_ERROR(context.RegisterModule(std::move(module)));
-
   // Evaluate all exported functions.
-  for (auto& module : context.modules()) {
-    for (int function_ordinal : *module->def().function_table()->exports()) {
-      ASSIGN_OR_RETURN(auto function, module->function_table().LookupFunction(
-                                          function_ordinal));
-      RETURN_IF_ERROR(
-          EvaluateFunction(instance, &context, device->allocator(), function));
-    }
+  auto policy = make_ref<rt::Policy>();
+  for (int i = 0; i < module->signature().export_function_count(); ++i) {
+    // Setup a new context for this invocation.
+    auto context = make_ref<rt::Context>(add_ref(instance), add_ref(policy));
+    RETURN_IF_ERROR(context->RegisterModule(add_ref(module)));
+
+    // Invoke the function and print results.
+    ASSIGN_OR_RETURN(auto function, module->LookupFunctionByOrdinal(
+                                        rt::Function::Linkage::kExport, i));
+    RETURN_IF_ERROR(EvaluateFunction(context, device->allocator(), function));
   }
 
   RETURN_IF_ERROR(instance->device_manager()->UnregisterDevice(device.get()));

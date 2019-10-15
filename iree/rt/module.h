@@ -27,7 +27,9 @@
 namespace iree {
 namespace rt {
 
+class Disassembler;
 class SourceResolver;
+class Stack;
 
 // Abstract compiled module interface for resolving functions.
 //
@@ -49,6 +51,11 @@ class Module : public RefObject<Module> {
   // basic debugging logic (such as offset calculation).
   // May be nullptr if debugging info has been stripped.
   virtual SourceResolver* source_resolver() const = 0;
+
+  // Returns a disassembler that can be used to disassemble functions in the
+  // module. May be nullptr if debugging info has been stripped or disassembly
+  // has been disabled as a compile option.
+  virtual Disassembler* disassembler() const = 0;
 
   // A short human-readable string that matches the compiler formatting.
   virtual std::string DebugStringShort() const = 0;
@@ -82,7 +89,7 @@ class Module : public RefObject<Module> {
 
   // Temporary until scheduler is built.
   virtual Status Execute(
-      const Function function,
+      Stack* stack, const Function function,
       absl::InlinedVector<hal::BufferView, 8> arguments,
       absl::InlinedVector<hal::BufferView, 8>* results) const = 0;
 

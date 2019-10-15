@@ -23,8 +23,9 @@
 namespace iree {
 namespace hal {
 
-BytecodeCache::BytecodeCache(hal::Allocator* allocator)
-    : allocator_(allocator) {}
+BytecodeCache::BytecodeCache(ref_ptr<rt::Instance> instance,
+                             hal::Allocator* allocator)
+    : instance_(std::move(instance)), allocator_(allocator) {}
 
 BytecodeCache::~BytecodeCache() = default;
 
@@ -43,9 +44,9 @@ StatusOr<ref_ptr<Executable>> BytecodeCache::PrepareExecutable(
   // Wrap the data (or copy it).
   bool allow_aliasing_data =
       AllBitsSet(mode, ExecutableCachingMode::kAliasProvidedData);
-  ASSIGN_OR_RETURN(
-      auto executable,
-      BytecodeExecutable::Load(allocator_, spec, !allow_aliasing_data));
+  ASSIGN_OR_RETURN(auto executable,
+                   BytecodeExecutable::Load(add_ref(instance_), allocator_,
+                                            spec, !allow_aliasing_data));
 
   return executable;
 }

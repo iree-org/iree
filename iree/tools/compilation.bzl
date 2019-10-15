@@ -3,7 +3,7 @@
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 # TODO(benvanik): port to a full starlark rule, document, etc.
-def iree_module(
+def iree_bytecode_module(
         name,
         srcs,
         cc_namespace = None,

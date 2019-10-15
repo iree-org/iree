@@ -80,6 +80,11 @@ class Context final : public RefObject<Context> {
   // reference is valid for the lifetime of the context.
   StatusOr<const Function> ResolveFunction(absl::string_view full_name) const;
 
+  // Resolves an imported function by import ordinal. The function reference is
+  // valid for the lifetime of the context.
+  StatusOr<const Function> ResolveImport(const Module* module,
+                                         int32_t ordinal) const;
+
  private:
   // Resolves imports for the given module.
   StatusOr<ModuleImportTable> ResolveImports(Module* module);

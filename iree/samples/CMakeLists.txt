@@ -13,4 +13,4 @@
 # limitations under the License.
 
 add_subdirectory(hal)
-add_subdirectory(vm)
+add_subdirectory(rt)

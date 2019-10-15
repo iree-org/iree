@@ -18,15 +18,15 @@
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/device_placement.h"
-#include "iree/vm/stack.h"
-#include "iree/vm/stack_frame.h"
+#include "iree/rt/stack.h"
+#include "iree/rt/stack_frame.h"
 
 namespace iree {
 namespace vm {
 
 // TODO(benvanik): API that supports yielding.
-Status DispatchSequence(const hal::DevicePlacement& placement, Stack* stack,
-                        StackFrame* entry_stack_frame,
+Status DispatchSequence(const hal::DevicePlacement& placement, rt::Stack* stack,
+                        rt::StackFrame* entry_stack_frame,
                         absl::Span<hal::BufferView> entry_results);
 
 }  // namespace vm

@@ -25,6 +25,8 @@
 // The `iree_module` build rule is used to translate the MLIR to the module
 // flatbuffer. Additional HAL backend target support can be defined there.
 
+#include "iree/vm/bytecode_module.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "absl/strings/str_replace.h"
@@ -32,23 +34,20 @@
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/hal/buffer_view.h"
-#include "iree/hal/command_buffer.h"
-#include "iree/hal/command_queue.h"
 #include "iree/hal/driver_registry.h"
-#include "iree/samples/vm/simple_module_test_module.h"
+#include "iree/rt/context.h"
+#include "iree/rt/instance.h"
+#include "iree/samples/rt/simple_module_test_bytecode_module.h"
 #include "iree/schemas/module_def_generated.h"
-#include "iree/vm/fiber_state.h"
-#include "iree/vm/instance.h"
-#include "iree/vm/sequencer_context.h"
+#include "iree/vm/sequencer_module.h"
 
 namespace iree {
-namespace vm {
+namespace rt {
 namespace samples {
 namespace {
 
-using iree::hal::BufferView;
-
-using ModuleFile = FlatBufferFile<ModuleDef>;
+using ::iree::hal::BufferView;
+using ::iree::vm::ModuleFile;
 
 struct TestParams {
   // HAL driver to use for the test.
@@ -77,7 +76,7 @@ class SimpleModuleTest : public ::testing::Test,
 };
 
 TEST_P(SimpleModuleTest, RunOnce) {
-  auto instance = std::make_shared<Instance>();
+  auto instance = make_ref<Instance>();
 
   // Create driver for this test (based on params) and then get a default
   // device.
@@ -105,21 +104,19 @@ TEST_P(SimpleModuleTest, RunOnce) {
   // Make a new context and load the precompiled module file (from
   // simple_module_test.mlir) into it.
   LOG(INFO) << "Loading simple_module_test.mlir...";
-  SequencerContext context(instance);
-  const auto* module_file_toc = simple_module_test_module_create();
-  ASSERT_OK_AND_ASSIGN(
-      auto module_file,
-      ModuleFile::WrapBuffer(ModuleDefIdentifier(),
-                             absl::MakeSpan(reinterpret_cast<const uint8_t*>(
-                                                module_file_toc->data),
-                                            module_file_toc->size)));
+  auto policy = make_ref<Policy>();
+  Context context(add_ref(instance), add_ref(policy));
+  const auto* module_file_toc = simple_module_test_bytecode_module_create();
+  ASSERT_OK_AND_ASSIGN(auto module_file,
+                       vm::ModuleFile::WrapBuffer(
+                           ModuleDefIdentifier(),
+                           absl::MakeSpan(reinterpret_cast<const uint8_t*>(
+                                              module_file_toc->data),
+                                          module_file_toc->size)));
   ASSERT_OK_AND_ASSIGN(auto main_module,
-                       Module::FromFile(std::move(module_file)));
+                       vm::SequencerModule::FromFile(std::move(module_file)));
   ASSERT_OK(context.RegisterModule(std::move(main_module)));
   LOG(INFO) << "Module loaded and context is ready for use";
-
-  // In this sample we just have a single fiber.
-  FiberState fiber_state(instance);
 
   // Allocate buffers that can be mapped on the CPU and that can also be used
   // on the device. Not all devices support this, but the ones we have now do.
@@ -140,14 +137,17 @@ TEST_P(SimpleModuleTest, RunOnce) {
 
   // Call into the @simple_mul function.
   LOG(INFO) << "Calling @simple_mul...";
-  std::vector<BufferView> args{
+  absl::InlinedVector<BufferView, 8> args{
       BufferView{add_ref(arg0_buffer), {kElementCount}, sizeof(float)},
       BufferView{add_ref(arg1_buffer), {kElementCount}, sizeof(float)},
   };
-  std::vector<BufferView> results{1};
-  ASSERT_OK_AND_ASSIGN(auto simple_mul, context.LookupExport("simple_mul"));
-  ASSERT_OK(context.Invoke(&fiber_state, simple_mul, absl::MakeSpan(args),
-                           absl::MakeSpan(results)));
+  ASSERT_OK_AND_ASSIGN(auto simple_mul,
+                       context.ResolveFunction("module.simple_mul"));
+  ASSERT_OK_AND_ASSIGN(auto invocation,
+                       Invocation::Create(add_ref(&context), simple_mul,
+                                          nullptr, {}, std::move(args)));
+  ASSERT_OK(invocation->Await(absl::InfiniteFuture()));
+  ASSERT_OK_AND_ASSIGN(auto results, invocation->ConsumeResults());
 
   // Read back the results and ensure we got the right values.
   LOG(INFO) << "Reading back results...";
@@ -166,5 +166,5 @@ INSTANTIATE_TEST_SUITE_P(AllDrivers, SimpleModuleTest,
 
 }  // namespace
 }  // namespace samples
-}  // namespace vm
+}  // namespace rt
 }  // namespace iree

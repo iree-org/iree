@@ -17,12 +17,19 @@
 
 #include <ostream>
 
+#include "absl/types/span.h"
 #include "iree/rt/function.h"
 #include "iree/rt/module.h"
 #include "iree/rt/source_location.h"
 
 namespace iree {
 namespace rt {
+
+// TODO(benvanik): allocate in-place from an arena.
+// Register table used within a stack frame.
+struct Registers {
+  std::vector<hal::BufferView> buffer_views;
+};
 
 // A single frame on the call stack containing current execution state and
 // register values.
@@ -35,12 +42,15 @@ namespace rt {
 // but instead just routing to the real storage via indirection. If the debugger
 // is not attached and no errors are hit then no additional bookkeeping is done.
 //
-// Thread-compatible, as is the owning StackTrace.
+// Thread-compatible, as is the owning Stack/StackTrace.
 class StackFrame final {
  public:
   StackFrame() = default;
-  explicit StackFrame(Function function, SourceOffset offset)
-      : function_(function), offset_(offset) {}
+  explicit StackFrame(Function function) : function_(function) {}
+  StackFrame(Function function, SourceOffset offset, Registers registers)
+      : function_(function),
+        offset_(offset),
+        registers_(std::move(registers)) {}
   StackFrame(const StackFrame&) = delete;
   StackFrame& operator=(const StackFrame&) = delete;
   StackFrame(StackFrame&&) = default;
@@ -57,15 +67,17 @@ class StackFrame final {
   // treat them as opaque and must use the SourceResolver to compute new
   // offsets (such as 'next offset').
   SourceOffset offset() const { return offset_; }
+  SourceOffset* mutable_offset() { return &offset_; }
 
   // Returns a source location, if available, for the current offset within the
   // target function.
   absl::optional<SourceLocation> source_location() const;
 
-  // TODO(benvanik): register access:
-  //   query total register layout for stack frame
-  //   get register in stack frame
-  //   set register in stack frame
+  // Registers used within the stack frame.
+  // Storage is implementation-defined and is valid only for the lifetime of the
+  // frame.
+  const Registers& registers() const { return registers_; }
+  Registers* mutable_registers() { return &registers_; }
 
   // A short human-readable string for the frame; a single line.
   std::string DebugStringShort() const;
@@ -73,6 +85,13 @@ class StackFrame final {
  private:
   Function function_;
   SourceOffset offset_ = 0;
+  Registers registers_;
+};
+
+struct StackFrameFormatter {
+  void operator()(std::string* out, const StackFrame& stack_frame) const {
+    out->append(stack_frame.DebugStringShort());
+  }
 };
 
 inline std::ostream& operator<<(std::ostream& stream,

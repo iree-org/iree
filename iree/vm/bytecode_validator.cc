@@ -18,7 +18,7 @@ namespace iree {
 namespace vm {
 
 // static
-Status BytecodeValidator::Validate(const Context& context, const Module& module,
+Status BytecodeValidator::Validate(const BytecodeModule& module,
                                    const BytecodeDef& bytecode_def) {
   // TODO(benvanik): validate bytecode.
   return OkStatus();

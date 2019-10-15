@@ -75,7 +75,7 @@ iree_cc_library(
     iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_spec
-    iree::hal::interpreter::interpreter_context
+    iree::hal::interpreter::interpreter_module
     iree::vm::bytecode_tables_interpreter
     iree::vm::bytecode_validator
     iree::vm::context
@@ -138,27 +138,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    interpreter_context
-  HDRS
-    "interpreter_context.h"
-  SRCS
-    "interpreter_context.cc"
-  DEPS
-    absl::span
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::hal::allocator
-    iree::hal::buffer_view
-    iree::hal::interpreter::bytecode_dispatch
-    iree::hal::interpreter::bytecode_kernels
-    iree::vm::context
-    iree::vm::function
-    iree::vm::stack
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     interpreter_device
   HDRS
     "interpreter_device.h"
@@ -210,5 +189,26 @@ iree_cc_library(
     iree::base::status
     iree::hal::driver_registry
     iree::hal::interpreter::interpreter_driver
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    interpreter_module
+  HDRS
+    "interpreter_module.h"
+  SRCS
+    "interpreter_module.cc"
+  DEPS
+    absl::span
+    iree::base::flatbuffer_util
+    iree::base::status
+    iree::hal::allocator
+    iree::hal::buffer_view
+    iree::hal::interpreter::bytecode_dispatch
+    iree::hal::interpreter::bytecode_kernels
+    iree::vm::context
+    iree::vm::function
+    iree::vm::stack
   PUBLIC
 )
