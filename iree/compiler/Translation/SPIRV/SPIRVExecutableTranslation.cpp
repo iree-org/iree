@@ -20,8 +20,8 @@
 #include <vector>
 
 #include "flatbuffers/flatbuffers.h"
+#include "iree/compiler/Translation/SPIRV/EmbeddedKernels.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRVPass.h"
-#include "iree/compiler/Translation/SPIRV/Kernels/Kernels.h"
 #include "iree/compiler/Utils/OpUtils.h"
 #include "iree/compiler/Utils/TranslationUtils.h"
 #include "iree/schemas/executable_def_generated.h"
@@ -47,91 +47,6 @@ namespace iree_compiler {
 
 namespace {
 
-enum class KnownKernel {
-  kConv = 0,
-  kMatMul,
-};
-
-// Matches the given |executableOp| against a set of well-known kernels.
-// Returns the KnownKernel the executable represents or None if no match occurs.
-llvm::Optional<KnownKernel> matchKnownKernel(IREE::ExecutableOp executableOp) {
-  auto module = executableOp.getInnerModule();
-  for (auto funcOp : module.getOps<FuncOp>()) {
-    for (auto &block : funcOp) {
-      for (auto &op : block) {
-        if (isa<xla_hlo::ConvOp>(&op)) {
-          return KnownKernel::kConv;
-        } else if (isa<xla_hlo::DotOp>(&op)) {
-          return KnownKernel::kMatMul;
-        }
-      }
-    }
-  }
-  return llvm::None;
-}
-
-// Builds a SPIR-V executable from a well-known matmul executable.
-// |out_def| will be populated with all required information for serialization.
-LogicalResult buildMatMulExecutable(IREE::ExecutableOp executableOp,
-                                    iree::SpirVExecutableDefT *out_def) {
-  out_def->tag = "__matmul__";
-  out_def->entry_points = {"main"};
-
-  auto *fileToc = spirv_kernels::Kernels_create();
-  for (int i = 0; i < spirv_kernels::Kernels_size(); ++i) {
-    if (std::strcmp(fileToc[i].name, "matmul.spv") == 0) {
-      out_def->code.resize(fileToc[i].size / 4);
-      std::memcpy(out_def->code.data(), fileToc[i].data, fileToc[i].size);
-      break;
-    }
-  }
-
-  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
-  pipelineLayoutDef->buffer_binding_set = 0;
-
-  pipelineLayoutDef->descriptor_set_layouts.resize(1);
-
-  auto dsl = std::make_unique<::iree::VkDescriptorSetLayoutDefT>();
-  {
-    auto binding = std::make_unique<::iree::VkDescriptorSetLayoutBindingDefT>();
-    binding->binding = 0;
-    binding->descriptor_count = 1;
-    binding->descriptor_type = 7;       // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-    binding->stage_flags = 0x00000020;  // VK_SHADER_STAGE_COMPUTE_BIT
-    dsl->bindings.push_back(std::move(binding));
-  }
-  {
-    auto binding = std::make_unique<::iree::VkDescriptorSetLayoutBindingDefT>();
-    binding->binding = 1;
-    binding->descriptor_count = 1;
-    binding->descriptor_type = 7;       // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-    binding->stage_flags = 0x00000020;  // VK_SHADER_STAGE_COMPUTE_BIT
-    dsl->bindings.push_back(std::move(binding));
-  }
-  {
-    auto binding = std::make_unique<::iree::VkDescriptorSetLayoutBindingDefT>();
-    binding->binding = 2;
-    binding->descriptor_count = 1;
-    binding->descriptor_type = 7;       // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-    binding->stage_flags = 0x00000020;  // VK_SHADER_STAGE_COMPUTE_BIT
-    dsl->bindings.push_back(std::move(binding));
-  }
-  pipelineLayoutDef->descriptor_set_layouts[0] = std::move(dsl);
-
-  auto pushConstantRangeDef =
-      std::make_unique<::iree::VkPushConstantRangeDefT>();
-  pushConstantRangeDef->offset = 0;
-  pushConstantRangeDef->size = sizeof(int32_t) * 4 * 3;
-  pushConstantRangeDef->stage_flags =
-      0x00000020;  // VK_SHADER_STAGE_COMPUTE_BIT;
-  pipelineLayoutDef->push_constant_ranges.push_back(
-      std::move(pushConstantRangeDef));
-
-  out_def->pipeline_layout = std::move(pipelineLayoutDef);
-
-  return success();
-}
-
 class SPIRVTranslator {
  public:
   explicit SPIRVTranslator(ExecutableTranslationOptions options)
@@ -155,7 +70,7 @@ class SPIRVTranslator {
       IREE::ExecutableOp executableOp);
 
   // Returns a pipeline layout definition based on the bindings required.
-  std::unique_ptr<::iree::VkPipelineLayoutDefT> populatePipelineLayout(
+  std::unique_ptr<iree::VkPipelineLayoutDefT> populatePipelineLayout(
       spirv::ModuleOp spirvModuleOp);
 
   ExecutableTranslationOptions options_;
@@ -163,24 +78,10 @@ class SPIRVTranslator {
 
 std::unique_ptr<iree::ExecutableDefT> SPIRVTranslator::translateExecutable(
     IREE::ExecutableOp executableOp) {
-  ::iree::SpirVExecutableDefT spirvExecutableDef;
-  if (auto knownKernel = matchKnownKernel(executableOp)) {
-    // This executable represents a well-known kernel.
-    switch (knownKernel.getValue()) {
-      case KnownKernel::kConv:
-        executableOp.emitOpError() << "Conv not yet implemented";
-        return {};
-      case KnownKernel::kMatMul:
-        if (failed(buildMatMulExecutable(executableOp, &spirvExecutableDef))) {
-          executableOp.emitOpError() << "Failed to splat in the matmul kernel";
-          return {};
-        }
-        break;
-      default:
-        llvm_unreachable("unhandled known kernel");
-        break;
-    }
-  } else {
+  // Try first to match against an embedded kernel (such as matmul) and
+  // otherwise fall back to generating the kernel.
+  iree::SpirVExecutableDefT spirvExecutableDef;
+  if (!tryEmbeddedKernelRewrite(executableOp, &spirvExecutableDef)) {
     // The sequencer and runtime use ordinals instead of names. We provide the
     // list of entry point names here that are then passed in
     // VkShaderModuleCreateInfo.
@@ -217,8 +118,8 @@ std::unique_ptr<iree::ExecutableDefT> SPIRVTranslator::translateExecutable(
   // The header is used to verify the contents at runtime.
   ::flatbuffers::FlatBufferBuilder fbb;
   auto executableOffset =
-      ::iree::SpirVExecutableDef::Pack(fbb, &spirvExecutableDef);
-  ::iree::FinishSpirVExecutableDefBuffer(fbb, executableOffset);
+      iree::SpirVExecutableDef::Pack(fbb, &spirvExecutableDef);
+  iree::FinishSpirVExecutableDefBuffer(fbb, executableOffset);
   std::vector<uint8_t> bytes;
   bytes.resize(fbb.GetSize());
   std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
@@ -337,13 +238,13 @@ std::vector<uint32_t> SPIRVTranslator::translateAndSerializeShaderModule(
   return spvBinaries;
 }
 
-std::unique_ptr<::iree::VkPipelineLayoutDefT>
+std::unique_ptr<iree::VkPipelineLayoutDefT>
 SPIRVTranslator::populatePipelineLayout(spirv::ModuleOp spirvModuleOp) {
   // NOTE: we currently make some assumptions about this based on the expected
   // ABI of the runtime. If we wanted to support more general shaders with more
   // complex I/O we'd need to find a better way to communicate this through the
   // VkPipelineLayoutDef.
-  auto pipelineLayoutDef = std::make_unique<::iree::VkPipelineLayoutDefT>();
+  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
   pipelineLayoutDef->buffer_binding_set = 0;
 
   // Build a set of descriptor_set -> binding -> variable.
@@ -370,11 +271,10 @@ SPIRVTranslator::populatePipelineLayout(spirv::ModuleOp spirvModuleOp) {
   pipelineLayoutDef->descriptor_set_layouts.resize(maxDescriptorSetOrdinal + 1);
   for (auto &descriptorSetBindings : descriptorSets) {
     int32_t descriptorSet = descriptorSetBindings.first;
-    auto dsl = std::make_unique<::iree::VkDescriptorSetLayoutDefT>();
+    auto dsl = std::make_unique<iree::VkDescriptorSetLayoutDefT>();
 
     for (auto &globalVarBinding : descriptorSetBindings.second) {
-      auto binding =
-          std::make_unique<::iree::VkDescriptorSetLayoutBindingDefT>();
+      auto binding = std::make_unique<iree::VkDescriptorSetLayoutBindingDefT>();
       binding->binding = globalVarBinding.first;
       binding->descriptor_count = 1;
       // TODO(benvanik): pull from type info.

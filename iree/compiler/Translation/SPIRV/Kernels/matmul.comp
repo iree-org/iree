@@ -22,18 +22,17 @@ layout(std430, binding = 2) buffer writeonly ret0_binding {
    float ret0[];
 };
 
-layout(push_constant) uniform io_shapes_push_constant {
-  // Shapes of [arg0, arg1, ret0].
-  //   arg0 = [b0, m, k]
-  //   arg1 = [b0, k, n]
-  //   ret0 = [b0, m, n]
-  layout(offset = 0) ivec4 io_shapes[3];
-};
-
-// TODO(benvanik): only send these values - the rest are not needed.
-uint kMatrixM = io_shapes[0].y;
-uint kMatrixK = io_shapes[0].z;
-uint kMatrixN = io_shapes[1].z;
+// Derived from the shapes of [arg0, arg1, ret0] and passed as specialization
+// constants to the particular executable instance.
+// Note that when we can generate this (or fully round-trip it) in the MLIR
+// SPIR-V dialect we won't need to do this but can instead substitute at compile
+// time. I can't wait :)
+//   arg0 = [b0, m, k]
+//   arg1 = [b0, k, n]
+//   ret0 = [b0, m, n]
+layout(constant_id = 100) const uint kMatrixM = 0;
+layout(constant_id = 101) const uint kMatrixK = 0;
+layout(constant_id = 102) const uint kMatrixN = 0;
 
 const uint kTileSize = gl_WorkGroupSize.x;  // .x == .y
 uint kTileCount = (kMatrixK - 1) / kTileSize + 1;

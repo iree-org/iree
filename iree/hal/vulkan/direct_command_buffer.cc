@@ -375,33 +375,6 @@ Status DirectCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
   RETURN_IF_ERROR(descriptor_set_arena_.BindDescriptorSet(
       command_buffer_, executable, dispatch_request.bindings));
 
-  // TODO(benvanik): not this, /obviously/. Replace with semantic tags or just
-  // get SPIR-V roundtripping what we need to do this in proper IR. The infra
-  // for dynamic shapes is another route, with us being able to just pass shapes
-  // in via dynamically updated uniform buffers.
-  if (executable->is_matmul()) {
-    struct ABSL_ATTRIBUTE_PACKED {
-      int32_t dims[4];
-    } shapes[3];
-    for (int i = 0; i < 3; ++i) {
-      const auto& shape = dispatch_request.bindings[i].shape;
-      if (shape.size() == 3) {
-        shapes[i].dims[0] = shape[0];
-        shapes[i].dims[1] = shape[1];
-        shapes[i].dims[2] = shape[2];
-        shapes[i].dims[3] = 1;
-      } else {
-        shapes[i].dims[0] = 1;
-        shapes[i].dims[1] = shape[0];
-        shapes[i].dims[2] = shape[1];
-        shapes[i].dims[3] = 1;
-      }
-    }
-    syms()->vkCmdPushConstants(command_buffer_, executable->pipeline_layout(),
-                               VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(shapes),
-                               &shapes);
-  }
-
   // TODO(benvanik): divide workload by caps and issue multiple dispatches.
   // TODO(benvanik): track local workgroup/subgroup size and divide into groups.
   if (dispatch_request.workload_buffer) {
@@ -412,6 +385,7 @@ Status DirectCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
   uint32_t group_count_y = dispatch_request.workload[1];
   uint32_t group_count_z = dispatch_request.workload[2];
 
+  // TODO(GH-67): pre-divide workload by tile size.
   if (executable->is_matmul()) {
     group_count_x = (group_count_x + 16 - 1) / 16;
     group_count_y = (group_count_y + 16 - 1) / 16;

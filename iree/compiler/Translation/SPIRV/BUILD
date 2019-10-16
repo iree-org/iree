@@ -7,6 +7,7 @@ cc_library(
     name = "SPIRV",
     srcs = [
         "AffineExprCodegen.h",
+        "EmbeddedKernels.cpp",
         "IREEIndexComputation.cpp",
         "IREEToSPIRV.cpp",
         "IREEToSPIRVPass.cpp",
@@ -17,6 +18,7 @@ cc_library(
         "XLAIndexPropagation.cpp",
     ],
     hdrs = [
+        "EmbeddedKernels.h",
         "IREEIndexComputation.h",
         "IREEToSPIRV.h",
         "IREEToSPIRVPass.h",

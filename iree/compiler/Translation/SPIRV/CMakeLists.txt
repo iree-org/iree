@@ -19,6 +19,7 @@ iree_cc_library(
     SPIRV
   HDRS
     "AffineExprCodegen.h"
+    "EmbeddedKernels.h"
     "IndexComputation.h"
     "IREEIndexComputation.h"
     "IREEToSPIRV.h"
@@ -27,6 +28,7 @@ iree_cc_library(
     "SPIRVLowering.h"
     "XLAIndexPropagation.h"
   SRCS
+    "EmbeddedKernels.cpp"
     "IndexComputation.cpp"
     "IREEIndexComputation.cpp"
     "IREEToSPIRV.cpp"

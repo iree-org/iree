@@ -86,6 +86,30 @@ table VkPipelineLayoutDef {
   buffer_binding_set:uint32;
 }
 
+// VkSpecializationMapEntry:
+//   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkSpecializationMapEntry.html
+//
+// Instead of a packed byte buffer we encode each value in its typed form. This
+// ensures we don't have endianness or data type size mismatch issues.
+//
+// Right now we only encode uint32s (or other 4-byte values) as that's the most
+// common, however we could add other types (including composite structs like
+// vec4). We can also specify well-known system values to substitute such as
+// required alignment or shared workspace size.
+table VkSpecializationMapEntryDef {
+  // ID of the specialization constant in SPIR-V.
+  constant_id:uint32;
+  // Value of the constant as a 4-byte integer.
+  uint32_value:uint32;
+}
+
+// VkSpecializationInfo:
+//   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkSpecializationInfo.html
+table VkSpecializationInfoDef {
+  // A list of specialization constants and their values.
+  map_entries:[VkSpecializationMapEntryDef];
+}
+
 // A SPIR-V shader module and runtime pipeline layout description.
 // This information is used to create the VkShaderModule, VkPipelineLayout, and
 // any required VkDescriptorSetLayouts.
@@ -103,6 +127,9 @@ table SpirVExecutableDef {
   // A serialized VkPipelineLayout object describing the bindings and push
   // constants used by the shader.
   pipeline_layout:VkPipelineLayoutDef;
+
+  // Optional specialization constants.
+  specialization_info:VkSpecializationInfoDef;
 }
 
 root_type SpirVExecutableDef;
