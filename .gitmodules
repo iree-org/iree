@@ -1,43 +1,33 @@
 [submodule "third_party/abseil-cpp"]
 	path = third_party/abseil-cpp
 	url = https://github.com/abseil/abseil-cpp.git
-	shallow = true
 [submodule "third_party/googletest"]
 	path = third_party/googletest
 	url = https://github.com/google/googletest.git
-	shallow = true
 [submodule "third_party/llvm-project"]
 	path = third_party/llvm-project
 	url = https://github.com/llvm/llvm-project.git
-	shallow = true
 [submodule "third_party/mlir"]
 	path = third_party/mlir
 	url = https://github.com/tensorflow/mlir.git
-	shallow = true
 [submodule "third_party/tensorflow"]
 	path = third_party/tensorflow
 	url = https://github.com/tensorflow/tensorflow.git
-	shallow = true
 [submodule "third_party/flatbuffers"]
 	path = third_party/flatbuffers
 	url = https://github.com/google/flatbuffers.git
-	shallow = true
 [submodule "third_party/vulkan_headers"]
 	path = third_party/vulkan_headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
-	shallow = true
 [submodule "third_party/vulkan_memory_allocator"]
 	path = third_party/vulkan_memory_allocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
-	shallow = true
 [submodule "third_party/gemmlowp"]
 	path = third_party/gemmlowp
 	url = https://github.com/google/gemmlowp.git
-	shallow = true
 [submodule "third_party/google_tracing_framework"]
 	path = third_party/google_tracing_framework
 	url = https://github.com/google/tracing-framework.git
-	shallow = true
 	fetchRecurseSubmodules = false
 [submodule "third_party/glslang"]
 	path = third_party/glslang
