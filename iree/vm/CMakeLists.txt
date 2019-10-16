@@ -140,9 +140,8 @@ iree_cc_library(
     "bytecode_validator.h"
   DEPS
     iree::base::status
+    iree::rt
     iree::schemas
-    iree::vm::context
-    iree::vm::module
   PUBLIC
 )
 
