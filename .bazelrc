@@ -1,8 +1,5 @@
 # Required bazel flags for building IREE.
 
-# The user.bazelrc file is not checked in but available for local mods.
-try-import user.bazelrc
-
 # Disable warnings we don't care about.
 build --copt=-Wno-unused-local-typedef
 
@@ -48,4 +45,8 @@ build:windows --copt=-DNOGDI --host_copt=-DNOGDI
 # Generally: Enable Developer Mode in the Developer Settings page of the
 # system settings.
 build:windows --experimental_enable_runfiles
+
+# The user.bazelrc file is not checked in but available for local mods.
+# Always keep this at the end of the file so that user flags override.
+try-import user.bazelrc
 

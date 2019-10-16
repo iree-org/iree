@@ -168,6 +168,17 @@ bazel run --config=windows iree/tools/iree-run-mlir -- \
     --iree_logtostderr --target_backends=vulkan
 ```
 
+## Recommended user.bazelrc
+
+You can put a user.bazelrc at the root of the repository and it will be ignored
+by git. The recommended contents for Windows are:
+
+```
+build --config=windows
+build --disk_cache=c:/bazelcache --experimental_guard_against_concurrent_changes
+build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=never
+```
+
 ## Troubleshooting
 
 ### Bazel and Visual Studio Versions
@@ -190,3 +201,29 @@ See
 for more options.
 
 If setting up a new machine, it is best to just make sure there is one version.
+
+### Caching
+
+Bazel can use a local disk cache, which can speed up compiles that iterate
+between different sets of flags (ie. optimized and prod). Add this to your
+user.bazelrc:
+
+```
+build --disk_cache=c:/bazelcache --experimental_guard_against_concurrent_changes
+```
+
+### Debugging
+
+By default, the project builds in opt mode, which is optimized/stripped. For
+Windows builds that do not wish to switch entirely to a debug build (i.e. it is
+often advantageous to only disable optimizations for some part of the code you
+are working on, you can use a build config like this by adding it to your
+user.bazelrc and building with --config=debug):
+
+```
+build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=never
+```
+
+Note that there is a Windows specific sharp edge: The `-O0` flag does nothing on
+CL-like compilers. You must use the Microsoft syntax of /Od. Given that, we just
+use it consistently.
