@@ -145,7 +145,7 @@ cd /c/src/ireepub
 git clone $IREE_CLONE_ARGS https://github.com/google/iree.git iree
 cd iree
 git submodule init
-git submodule update $IREE_CLONE_ARGS --recursive
+git submodule update $IREE_CLONE_ARGS --recursive --depth 5000
 ```
 
 ### Build
