@@ -1,2 +1,8 @@
 # TODO(scotttodd): enable when Dawn HAL implementation is functional
 iree/hal/dawn
+iree/tools/web
+
+# Ignore third_party directories which contain BUILD files so that recursive
+# from root works.
+third_party/abseil-cpp
+third_party/googletest
