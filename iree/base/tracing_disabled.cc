@@ -27,4 +27,3 @@ ABSL_FLAG(int32_t, iree_trace_file_period, 0,
           "Flag for tracing. Use --define=GLOBAL_WTF_ENABLE=1 to enable WTF.");
 ABSL_FLAG(std::string, iree_trace_file, "",
           "Flag for tracing. Use --define=GLOBAL_WTF_ENABLE=1 to enable WTF.");
-

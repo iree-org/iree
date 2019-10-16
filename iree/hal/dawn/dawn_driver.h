@@ -18,9 +18,9 @@
 #include <memory>
 #include <vector>
 
+#include "iree/hal/driver.h"
 #include "third_party/dawn/src/include/dawn/dawncpp.h"
 #include "third_party/dawn/src/include/dawn_native/DawnNative.h"
-#include "iree/hal/driver.h"
 
 namespace iree {
 namespace hal {

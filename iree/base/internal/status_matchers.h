@@ -17,10 +17,10 @@
 
 #include <memory>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "iree/base/status.h"
 
 #undef EXPECT_OK

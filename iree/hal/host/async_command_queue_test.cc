@@ -18,10 +18,10 @@
 #include <memory>
 #include <utility>
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "absl/memory/memory.h"
 #include "absl/time/time.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/base/time.h"

@@ -24,8 +24,6 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 #include "absl/types/optional.h"
-#include "third_party/dear_imgui/imgui.h"
-#include "third_party/dear_imgui/imgui_internal.h"
 #include "iree/base/memory.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
@@ -33,6 +31,8 @@
 #include "iree/schemas/debug_service_generated.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/bytecode_tables_sequencer.h"
+#include "third_party/dear_imgui/imgui.h"
+#include "third_party/dear_imgui/imgui_internal.h"
 
 namespace iree {
 namespace rt {

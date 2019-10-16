@@ -18,13 +18,13 @@
 
 #include <thread>  // NOLINT
 
-#include "third_party/SDL2/include/SDL_thread.h"
 #include "absl/base/thread_annotations.h"
 #include "absl/memory/memory.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/tools/debugger/debug_app.h"
+#include "third_party/SDL2/include/SDL_thread.h"
 
 namespace iree {
 namespace rt {

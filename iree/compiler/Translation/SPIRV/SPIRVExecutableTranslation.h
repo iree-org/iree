@@ -26,7 +26,8 @@ namespace iree_compiler {
 
 // Translates an MLIR module into a SPIR-V executable.
 // These executables are stored as FlatBuffers in the
-// https://github.com/google/iree/tree/master/iree/schemas/spirv_executable_def.fbs schema.
+// https://github.com/google/iree/tree/master/iree/schemas/spirv_executable_def.fbs
+// schema.
 llvm::Optional<ExecutableTranslationResult>
 translateExecutableToSPIRVExecutable(ArrayRef<IREE::ExecutableOp> executableOps,
                                      ExecutableTranslationOptions options = {});

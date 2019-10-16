@@ -103,9 +103,13 @@ Status::Status(const Status& x) {
 }
 
 Status& Status::operator=(const Status& x) {
-  state_ = absl::make_unique<State>();
-  state_->code = x.state_->code;
-  state_->message = x.state_->message;
+  if (x.ok()) {
+    state_ = nullptr;
+  } else {
+    state_ = absl::make_unique<State>();
+    state_->code = x.state_->code;
+    state_->message = x.state_->message;
+  }
   return *this;
 }
 

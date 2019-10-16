@@ -17,9 +17,9 @@
 #include <cstdint>
 #include <thread>  // NOLINT
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/time/time.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 

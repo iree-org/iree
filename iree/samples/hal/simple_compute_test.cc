@@ -24,11 +24,11 @@
 // The `iree_bytecode_module` build rule is used to translate the MLIR to the
 // module flatbuffer. Additional target support can be defined there.
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/str_replace.h"
 #include "absl/time/time.h"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"

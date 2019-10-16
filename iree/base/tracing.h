@@ -30,7 +30,7 @@
 
 #if defined(WTF_ENABLE) || defined(IREE_CONFIG_GOOGLE_INTERNAL)
 
-#include "wtf/event.h"  // IWYU pragma: export
+#include "wtf/event.h"   // IWYU pragma: export
 #include "wtf/macros.h"  // IWYU pragma: export
 
 namespace iree {

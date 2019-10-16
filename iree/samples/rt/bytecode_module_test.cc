@@ -27,9 +27,9 @@
 
 #include "iree/vm/bytecode_module.h"
 
+#include "absl/strings/str_replace.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "absl/strings/str_replace.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"

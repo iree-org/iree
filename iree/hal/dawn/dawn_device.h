@@ -17,11 +17,11 @@
 
 #include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
-#include "third_party/dawn/src/include/dawn/dawncpp.h"
-#include "third_party/dawn/src/include/dawn_native/DawnNative.h"
 #include "iree/base/memory.h"
 #include "iree/hal/device.h"
 #include "iree/hal/host/host_local_allocator.h"
+#include "third_party/dawn/src/include/dawn/dawncpp.h"
+#include "third_party/dawn/src/include/dawn_native/DawnNative.h"
 
 namespace iree {
 namespace hal {
