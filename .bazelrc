@@ -36,11 +36,12 @@ build:x86opt --copt=-mavx2
 
 # Works around __TIME__ __DATE__, etc redefinitions and -std=c++14
 # warnings.
-build:windows --copt=-Wno-builtin-macro-redefined --copt=-Wno-unknown-argument
+build:windows --copt=-Wno-builtin-macro-redefined --host_copt=-Wno-builtin-macro-redefined
+build:windows --copt=-Wno-unknown-argument --host_copt=-Wno-unknown-argument
 
 # Disables windows headers from pulling in GDI, which does a lot of terrible
 # things (such as defining the ERROR macro, which breaks the world).
-build:windows --copt=-DNOGDI
+build:windows --copt=-DNOGDI --host_copt=-DNOGDI
 
 # Enables unix-style runfiles link trees (requires symlink permission).
 # See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
