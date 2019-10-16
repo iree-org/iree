@@ -157,8 +157,9 @@ StatusOr<std::vector<BufferView>> ParseInputsFromFlags(
   std::string file_contents =
       absl::StrReplaceAll(absl::GetFlag(FLAGS_input_values), {{"\\n", "\n"}});
   std::vector<BufferView> inputs;
-  for (const auto &line :
-       absl::StrSplit(file_contents, '\n', absl::SkipWhitespace())) {
+  std::vector<std::string> lines = absl::StrSplit(
+      file_contents, absl::ByAnyChar("\n;"), absl::SkipWhitespace());
+  for (const auto &line : lines) {
     ASSIGN_OR_RETURN(auto input,
                      hal::ParseBufferViewFromString(line, allocator));
     inputs.push_back(input);
