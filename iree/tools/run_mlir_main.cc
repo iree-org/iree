@@ -55,14 +55,14 @@
 #include "iree/rt/module_printer.h"
 #include "iree/schemas/module_def_generated.h"
 #include "iree/vm/sequencer_module.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
 #include "mlir/Support/FileUtilities.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/SourceMgr.h"
 
 ABSL_FLAG(bool, split_input_file, true,
           "Split the input file into multiple modules.");
@@ -106,9 +106,9 @@ std::string BackendToDriverName(std::string backend) {
 }
 
 // Prepares a module for evaluation by running MLIR import and IREE translation.
-StatusOr<ref_ptr<Module>> PrepareModule(
-    std::string target_backend,
-    std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
+StatusOr<ref_ptr<Module>>
+PrepareModule(std::string target_backend,
+              std::unique_ptr<llvm::MemoryBuffer> file_buffer) {
   mlir::MLIRContext context;
 
   // Parse input MLIR module.
@@ -152,8 +152,8 @@ StatusOr<ref_ptr<Module>> PrepareModule(
 //   [shape]xtype=[value]
 // Example:
 //   4x4xi8=0,1,2,3
-StatusOr<std::vector<BufferView>> ParseInputsFromFlags(
-    hal::Allocator *allocator) {
+StatusOr<std::vector<BufferView>>
+ParseInputsFromFlags(hal::Allocator *allocator) {
   std::string file_contents =
       absl::StrReplaceAll(absl::GetFlag(FLAGS_input_values), {{"\\n", "\n"}});
   std::vector<BufferView> inputs;
@@ -201,10 +201,10 @@ Status EvaluateFunction(const ref_ptr<rt::Context> &context,
 
   // Create invocation that will perform the execution.
   ASSIGN_OR_RETURN(auto arguments, ParseInputsFromFlags(allocator));
-  ASSIGN_OR_RETURN(
-      auto invocation,
-      rt::Invocation::Create(add_ref(context), function, make_ref<rt::Policy>(),
-                             {}, absl::MakeConstSpan(arguments)));
+  ASSIGN_OR_RETURN(auto invocation,
+                   rt::Invocation::Create(add_ref(context), function,
+                                          make_ref<rt::Policy>(), {},
+                                          absl::MakeConstSpan(arguments)));
 
   // Wait until invocation completes.
   RETURN_IF_ERROR(invocation->Await(absl::InfiniteFuture()));
@@ -213,6 +213,12 @@ Status EvaluateFunction(const ref_ptr<rt::Context> &context,
   ASSIGN_OR_RETURN(auto results, invocation->ConsumeResults());
   RETURN_IF_ERROR(OutputFunctionResults(function, absl::MakeSpan(results)));
 
+  return OkStatus();
+}
+
+Status EvaluateFunctionsHelper(ref_ptr<Module> &module,
+                               ref_ptr<rt::Instance> &instance,
+                               ref_ptr<rt::Policy> &policy) {
   return OkStatus();
 }
 
@@ -340,7 +346,7 @@ Status RunFile(std::string mlir_filename) {
   return any_failure;
 }
 
-}  // namespace
+} // namespace
 
 extern "C" int main(int argc, char **argv) {
   InitializeEnvironment(&argc, &argv);
@@ -356,4 +362,4 @@ extern "C" int main(int argc, char **argv) {
   return 0;
 }
 
-}  // namespace iree
+} // namespace iree
