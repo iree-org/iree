@@ -62,6 +62,11 @@ namespace {
 // Builds a pass pipeline that optimizes and legalizes the module to the form
 // expected by partitioning.
 void buildLegalizeInputPassPipeline(PassManager *passManager) {
+  // Convert to the subset of XLA HLO and Standard dialects supported as IREE
+  // input. In particular, move from XLA HLO to standard control flow.
+  passManager->addPass(xla_hlo::createLegalizeControlFlowPass());
+  passManager->addPass(createLegalizeInputOpsPass());
+
   // Standard passes that shake out a lot of garbage.
   // Some may have been run prior to translation but this ensures we are always
   // in a known state.
@@ -73,9 +78,6 @@ void buildLegalizeInputPassPipeline(PassManager *passManager) {
   passManager->addPass(createSimplifyAffineStructuresPass());
   passManager->addPass(createCSEPass());
   passManager->addPass(createCanonicalizerPass());
-
-  // Get out of XLA HLO into a sane control flow representation.
-  passManager->addPass(xla_hlo::createLegalizeControlFlowPass());
 
   // Expand uses of tuples into independent args/results.
   passManager->addPass(createConvertFromTupleCallingConventionPass());

@@ -24,6 +24,7 @@ iree_cc_library(
     "FoldCompatibleDispatchRegions.cpp"
     "IdentifyDispatchRegions.cpp"
     "IdentifyReductionRegions.cpp"
+    "LegalizeInputs.cpp"
     "LowerSequencerDialect.cpp"
     "LowerStdToSequencerDialect.cpp"
     "LowerToSequencerDialect.cpp"

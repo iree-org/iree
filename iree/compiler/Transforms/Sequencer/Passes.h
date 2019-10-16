@@ -51,6 +51,10 @@ std::unique_ptr<OpPassBase<ModuleOp>> createOutlineReductionRegionsPass();
 // Lowering/Conversion
 //===----------------------------------------------------------------------===//
 
+// Lowers inputs to legal IREE inputs (a subset of XLA and Standard ops). Also
+// serves to verify input is only made up of known ops.
+std::unique_ptr<OpPassBase<FuncOp>> createLegalizeInputOpsPass();
+
 // Lowers input dialect ops (e.g. std, xla_hlo) to IREE Sequencer HL dialect.
 std::unique_ptr<OpPassBase<FuncOp>> createLowerToSequencerDialectPass();
 
