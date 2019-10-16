@@ -153,11 +153,11 @@ StatusOr<ref_ptr<Module>> PrepareModule(
 // Example:
 //   4x4xi8=0,1,2,3
 StatusOr<std::vector<BufferView>> ParseInputsFromFlags(
-    hal::Allocator* allocator) {
+    hal::Allocator *allocator) {
   std::string file_contents =
       absl::StrReplaceAll(absl::GetFlag(FLAGS_input_values), {{"\\n", "\n"}});
   std::vector<BufferView> inputs;
-  for (const auto& line :
+  for (const auto &line :
        absl::StrSplit(file_contents, '\n', absl::SkipWhitespace())) {
     ASSIGN_OR_RETURN(auto input,
                      hal::ParseBufferViewFromString(line, allocator));
@@ -167,7 +167,7 @@ StatusOr<std::vector<BufferView>> ParseInputsFromFlags(
 }
 
 // Outputs all results from the function to stdout in IREE BufferView format.
-Status OutputFunctionResults(const Function& function,
+Status OutputFunctionResults(const Function &function,
                              absl::Span<BufferView> results) {
   std::vector<std::string> output_types =
       absl::StrSplit(absl::GetFlag(FLAGS_output_types), absl::ByAnyChar(", "),
@@ -179,7 +179,7 @@ Status OutputFunctionResults(const Function& function,
   }
 
   for (int i = 0; i < results.size(); ++i) {
-    const auto& result = results[i];
+    const auto &result = results[i];
     auto print_mode = hal::BufferViewPrintMode::kFloatingPoint;
     if (!output_types.empty()) {
       ASSIGN_OR_RETURN(print_mode,
@@ -195,8 +195,8 @@ Status OutputFunctionResults(const Function& function,
 }
 
 // Evaluates a single function in its own fiber, printing the results to stdout.
-Status EvaluateFunction(const ref_ptr<rt::Context>& context,
-                        hal::Allocator* allocator, const Function& function) {
+Status EvaluateFunction(const ref_ptr<rt::Context> &context,
+                        hal::Allocator *allocator, const Function &function) {
   std::cout << "EXEC @" << function.name() << std::endl;
 
   // Create invocation that will perform the execution.
@@ -236,22 +236,32 @@ Status EvaluateFunctions(absl::string_view target_backend,
 
   // Evaluate all exported functions.
   auto policy = make_ref<rt::Policy>();
-  for (int i = 0; i < module->signature().export_function_count(); ++i) {
+  auto run_function = [&](int ordinal) -> Status {
     // Setup a new context for this invocation.
     auto context = make_ref<rt::Context>(add_ref(instance), add_ref(policy));
     RETURN_IF_ERROR(context->RegisterModule(add_ref(module)));
 
     // Invoke the function and print results.
-    ASSIGN_OR_RETURN(auto function, module->LookupFunctionByOrdinal(
-                                        rt::Function::Linkage::kExport, i));
+    ASSIGN_OR_RETURN(auto function,
+                     module->LookupFunctionByOrdinal(
+                         rt::Function::Linkage::kExport, ordinal));
     RETURN_IF_ERROR(EvaluateFunction(context, device->allocator(), function));
+    return OkStatus();
+  };
+
+  Status evaluate_status = OkStatus();
+  for (int i = 0; i < module->signature().export_function_count(); ++i) {
+    evaluate_status = run_function(i);
+    if (!evaluate_status.ok()) {
+      break;
+    }
   }
 
   RETURN_IF_ERROR(instance->device_manager()->UnregisterDevice(device.get()));
   device.reset();
   driver.reset();
 
-  return OkStatus();
+  return evaluate_status;
 }
 
 // Translates and runs a single LLVM file buffer.
@@ -301,7 +311,7 @@ Status RunFile(std::string mlir_filename) {
   // Split the buffer into separate modules and evaluate independently.
   // This matches the -split-input-file arg to mlir-opt.
   const char kSplitMarker[] = "// -----\n";
-  auto* full_buffer = file.get();
+  auto *full_buffer = file.get();
   llvm::SmallVector<llvm::StringRef, 8> source_buffers;
   full_buffer->getBuffer().split(source_buffers, kSplitMarker);
 
@@ -311,7 +321,7 @@ Status RunFile(std::string mlir_filename) {
 
   // Process each chunk in turn. Only return the first error (but log all).
   Status any_failure;
-  for (auto& sub_source_buffer : source_buffers) {
+  for (auto &sub_source_buffer : source_buffers) {
     auto split_loc = llvm::SMLoc::getFromPointer(sub_source_buffer.data());
     unsigned split_line = fileSourceMgr.getLineAndColumn(split_loc).first;
     auto sub_buffer = llvm::MemoryBuffer::getMemBufferCopy(
@@ -332,7 +342,7 @@ Status RunFile(std::string mlir_filename) {
 
 }  // namespace
 
-extern "C" int main(int argc, char** argv) {
+extern "C" int main(int argc, char **argv) {
   InitializeEnvironment(&argc, &argv);
   if (argc < 2) {
     LOG(ERROR) << "Must supply an input .mlir file.";
@@ -341,8 +351,8 @@ extern "C" int main(int argc, char** argv) {
   auto status = RunFile(argv[1]);
   if (!status.ok()) {
     std::cerr << "ERROR running file (" << argv[1] << "): " << status << "\n";
+    return 1;
   }
-  QCHECK_OK(status);
   return 0;
 }
 
