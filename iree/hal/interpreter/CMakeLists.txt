@@ -51,13 +51,12 @@ iree_cc_library(
     iree::hal::buffer_view
     iree::hal::heap_buffer
     iree::hal::interpreter::bytecode_kernels
+    iree::rt
     iree::schemas::bytecode::interpreter_bytecode_v0
     iree::vm::bytecode_reader
     iree::vm::bytecode_tables_interpreter
     iree::vm::bytecode_util
-    iree::vm::function
     iree::vm::opcode_info
-    iree::vm::stack
     iree::vm::type
   PUBLIC
 )
@@ -76,11 +75,9 @@ iree_cc_library(
     iree::hal::executable
     iree::hal::executable_spec
     iree::hal::interpreter::interpreter_module
+    iree::rt
     iree::vm::bytecode_tables_interpreter
     iree::vm::bytecode_validator
-    iree::vm::context
-    iree::vm::module
-    iree::vm::module_printer
   PUBLIC
 )
 
@@ -207,8 +204,6 @@ iree_cc_library(
     iree::hal::buffer_view
     iree::hal::interpreter::bytecode_dispatch
     iree::hal::interpreter::bytecode_kernels
-    iree::vm::context
-    iree::vm::function
-    iree::vm::stack
+    iree::rt
   PUBLIC
 )

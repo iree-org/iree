@@ -80,6 +80,7 @@ endif()
 
 add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
+add_subdirectory(iree/rt)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/vm)
 
