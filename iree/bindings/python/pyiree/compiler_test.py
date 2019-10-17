@@ -14,14 +14,14 @@
 
 from absl.testing import absltest
 
-from iree import binding as iree_binding
+from pyiree import binding as binding
 
 
 class CompilerTest(absltest.TestCase):
 
   def testModuleCompileAndIntrospectFromAsm(self):
 
-    m = iree_binding.compiler.compile_module_from_asm("""
+    m = binding.compiler.compile_module_from_asm("""
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
         %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>

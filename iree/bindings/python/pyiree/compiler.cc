@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/bindings/python/compiler.h"
+#include "iree/bindings/python/pyiree/compiler.h"
 
 #include <stdexcept>
 
-#include "iree/bindings/python/binding.h"
-#include "iree/bindings/python/status_utils.h"
+#include "iree/bindings/python/pyiree/binding.h"
+#include "iree/bindings/python/pyiree/status_utils.h"
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/schemas/module_def_generated.h"
 #include "llvm/Support/SourceMgr.h"

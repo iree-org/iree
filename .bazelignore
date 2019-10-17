@@ -1,7 +1,7 @@
 # TODO(scotttodd): enable when Dawn HAL implementation is functional
 iree/hal/dawn
 iree/tools/web
-iree/bindings/python
+#iree/bindings/python
 
 # Ignore third_party directories which contain BUILD files so that recursive
 # from root works.
