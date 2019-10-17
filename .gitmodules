@@ -42,3 +42,6 @@
 	path = third_party/pybind11
 	url = https://github.com/pybind/pybind11.git
 	branch = stable
+[submodule "third_party/swiftshader"]
+	path = third_party/swiftshader
+	url = https://github.com/google/swiftshader.git
