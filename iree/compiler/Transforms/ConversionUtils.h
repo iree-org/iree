@@ -16,6 +16,7 @@
 #define IREE_COMPILER_TRANSFORMS_CONVERSIONUTILS_H_
 
 #include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {

@@ -15,7 +15,7 @@
 #include "iree/compiler/Utils/DispatchUtils.h"
 
 #include "iree/compiler/IR/Ops.h"
-#include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"

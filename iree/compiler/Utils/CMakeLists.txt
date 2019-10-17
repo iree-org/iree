@@ -23,6 +23,7 @@ iree_cc_library(
     "OpCreationUtils.h"
     "OpUtils.h"
     "TranslationUtils.h"
+    "TypeConversionUtils.h"
   SRCS
     "DispatchUtils.cpp"
     "MemRefUtils.cpp"
@@ -30,6 +31,7 @@ iree_cc_library(
     "OpCreationUtils.cpp"
     "OpUtils.cpp"
     "TranslationUtils.cpp"
+    "TypeConversionUtils.cpp"
   DEPS
     iree::compiler::IR
     iree::compiler::IR::Sequencer

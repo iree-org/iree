@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/DenseSet.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"

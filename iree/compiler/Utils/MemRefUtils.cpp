@@ -25,49 +25,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-Type legalizeType(Type type) {
-  if (type.isIndex()) {
-    return IntegerType::get(kIndexBitWidth, type.getContext());
-  } else if (type.isInteger(1)) {
-    return IntegerType::get(kBoolBitWidth, type.getContext());
-  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
-    return MemRefType::get(memRefType.getShape(),
-                           legalizeType(memRefType.getElementType()));
-  } else if (auto functionType = type.dyn_cast<FunctionType>()) {
-    llvm::SmallVector<Type, 4> inputs;
-    for (const auto &oldType : functionType.getInputs()) {
-      inputs.push_back(legalizeType(oldType));
-    }
-    llvm::SmallVector<Type, 4> results;
-    for (const auto &oldType : functionType.getResults()) {
-      results.push_back(legalizeType(oldType));
-    }
-    return FunctionType::get(inputs, results, type.getContext());
-  }
-  return type;
-}
-
-MemRefType convertTypeToMemRef(Type type) {
-  if (type.isIntOrIndexOrFloat()) {
-    return MemRefType::get({}, type, {}, 0);
-  } else if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
-    return MemRefType::get(tensorType.getShape(), tensorType.getElementType());
-  } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
-    return memRefType;
-  } else {
-    llvm_unreachable("Unconvertable type");
-  }
-}
-
-MemRefType convertTypeToMemRef(Value *value) {
-  return convertTypeToMemRef(value->getType());
-}
-
-Type MemRefTypeConverter::convertType(Type type) {
-  return convertTypeToMemRef(type);
-}
-
 Value *resolveValueToSourceMemRef(Value *value, Operation *useOp) {
   // TODO(benvanik): implement this for real; this is naive but enough for our
   // simple load patterns.

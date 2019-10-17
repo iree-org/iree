@@ -19,6 +19,7 @@
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
 #include "iree/compiler/Utils/OpCreationUtils.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"

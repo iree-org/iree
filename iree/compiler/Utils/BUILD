@@ -14,6 +14,7 @@ cc_library(
         "OpCreationUtils.cpp",
         "OpUtils.cpp",
         "TranslationUtils.cpp",
+        "TypeConversionUtils.cpp",
     ],
     hdrs = [
         "DispatchUtils.h",
@@ -23,6 +24,7 @@ cc_library(
         "OpCreationUtils.h",
         "OpUtils.h",
         "TranslationUtils.h",
+        "TypeConversionUtils.h",
     ],
     deps = [
         "//iree/compiler/IR",

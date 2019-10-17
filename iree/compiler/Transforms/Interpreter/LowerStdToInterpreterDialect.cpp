@@ -20,6 +20,7 @@
 #include "iree/compiler/Transforms/ConversionUtils.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
 #include "iree/compiler/Utils/OpCreationUtils.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Allocator.h"
 #include "mlir/Dialect/StandardOps/Ops.h"

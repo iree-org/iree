@@ -20,6 +20,7 @@
 #include "iree/compiler/Transforms/ConversionUtils.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
 #include "iree/compiler/Utils/OpCreationUtils.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/IR/Attributes.h"

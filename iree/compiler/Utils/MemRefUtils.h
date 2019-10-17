@@ -24,23 +24,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-static const int kBoolBitWidth = 8;
-static const int kIndexBitWidth = 32;
-
-// Converts types to MemRefs using convertTypeToMemRef.
-class MemRefTypeConverter : public TypeConverter {
- public:
-  explicit MemRefTypeConverter(MLIRContext *context) {}
-  Type convertType(Type type) override;
-};
-
-Type legalizeType(Type type);
-
-// Converts a type (scalar, tensor, etc) to a MemRef-based type.
-MemRefType convertTypeToMemRef(Type type);
-MemRefType convertTypeToMemRef(Value *value);
-
 // Attempts to resolve the use of a value back to the MemRef it was loaded from.
 // Returns either a MemRef view containing the value or nullptr if the value was
 // not loaded from a MemRef (or is possibly unknown).

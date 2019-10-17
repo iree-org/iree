@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_TRANSFORMS_SEQUENCER_REWRITES_H_
 #define IREE_COMPILER_TRANSFORMS_SEQUENCER_REWRITES_H_
 
-#include "iree/compiler/Utils/MemRefUtils.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 
