@@ -454,7 +454,7 @@ struct FoldShapeOp : public OpRewritePattern<ShapeOp> {
                                      rewriter.getIntegerType(64)),
               memRefType.getShape()));
       replaceSubsequentUses(shapeOp, shapeOp.dst(), constantOp.getResult());
-      rewriter.replaceOp(shapeOp, {});
+      rewriter.eraseOp(shapeOp);
       return matchSuccess();
     }
     return matchFailure();
@@ -485,7 +485,7 @@ struct FoldLengthOp : public OpRewritePattern<LengthOp> {
               rewriter.getTensorType({}, rewriter.getIntegerType(64)),
               {memRefType.getNumElements()}));
       replaceSubsequentUses(lengthOp, lengthOp.dst(), constantOp.getResult());
-      rewriter.replaceOp(lengthOp, {});
+      rewriter.eraseOp(lengthOp);
       return matchSuccess();
     }
     return matchFailure();
@@ -532,7 +532,7 @@ struct FoldComputeOffsetOp : public OpRewritePattern<ComputeOffsetOp> {
             rewriter.getTensorType({}, rewriter.getIntegerType(64)), {offset}));
     replaceSubsequentUses(computeOffsetOp, computeOffsetOp.dst(),
                           constantOp.getResult());
-    rewriter.replaceOp(computeOffsetOp, {});
+    rewriter.eraseOp(computeOffsetOp);
     return matchSuccess();
   }
 };
@@ -588,7 +588,7 @@ struct FoldComputeRangeOp : public OpRewritePattern<ComputeRangeOp> {
             rewriter.getTensorType({}, rewriter.getIntegerType(64)), {length}));
     replaceSubsequentUses(computeRangeOp, computeRangeOp.dstLength(),
                           lengthConstantOp.getResult());
-    rewriter.replaceOp(computeRangeOp, {});
+    rewriter.eraseOp(computeRangeOp);
     return matchSuccess();
   }
 };

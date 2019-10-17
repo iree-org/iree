@@ -39,9 +39,7 @@ struct EraseUnused : public OpRewritePattern<T> {
   PatternMatchResult matchAndRewrite(T op,
                                      PatternRewriter &rewriter) const override {
     if (op.use_empty()) {
-      // TODO(b/141771852) Make this work for multiple results when eraseOp
-      // exists
-      rewriter.replaceOp(op, {nullptr});
+      rewriter.eraseOp(op);
       return this->matchSuccess();
     }
     return this->matchFailure();
