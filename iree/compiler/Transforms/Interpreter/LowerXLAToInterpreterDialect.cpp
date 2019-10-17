@@ -80,23 +80,19 @@ static Value *inputAsMemref(ConversionPatternRewriter &rewriter, Operation *op,
 }
 
 template <typename SrcOp>
-class XlaOpLowering : public ConversionPattern {
- public:
-  explicit XlaOpLowering(MLIRContext *context)
-      : ConversionPattern(SrcOp::getOperationName(), 1, context) {}
+class XlaOpLowering : public OpConversionPattern<SrcOp> {
+  using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      SrcOp srcOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto srcOp = cast<SrcOp>(op);
-
     SmallVector<Value *, 4> memrefOperands;
     for (auto operand : operands) {
-      memrefOperands.push_back(inputAsMemref(rewriter, op, operand));
+      memrefOperands.push_back(inputAsMemref(rewriter, srcOp, operand));
     }
 
     if (auto dstOp = rewriteInternal(&srcOp, memrefOperands, rewriter)) {
-      rewriter.replaceOp(op,
+      rewriter.replaceOp(srcOp,
                          wrapAsTensor(dstOp->getResult(0), srcOp, rewriter));
       return this->matchSuccess();
     }
@@ -302,26 +298,24 @@ struct ConvertLowering : public XlaOpLowering<xla_hlo::ConvertOp> {
 
 // Lowers a subset of gathers along axis 0 that are really just a slice and
 // reshape.
-struct GatherOpLowering : public ConversionPattern {
- public:
-  explicit GatherOpLowering(MLIRContext *context)
-      : ConversionPattern(xla_hlo::GatherOp::getOperationName(), 1, context) {}
+struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   // TODO(gcmn): This only handles a minimal number of cases. When XLA
   // redefines gather to be simpler, lower it properly.
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      xla_hlo::GatherOp gatherOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto gatherOp = cast<xla_hlo::GatherOp>(op);
-
     if (gatherOp.index_vector_dim() != 0) {
-      op->emitRemark() << "Couldn't lower gather with index_vector_dim != 0";
+      gatherOp.emitRemark()
+          << "Couldn't lower gather with index_vector_dim != 0";
       return matchFailure();
     }
     if (gatherOp.start_index_map().getType().getRank() != 1 ||
         gatherOp.start_index_map().getValue(0).cast<IntegerAttr>().getValue() !=
             0) {
-      op->emitRemark() << "Couldn't lower gather with start_index_map != [0]";
+      gatherOp.emitRemark()
+          << "Couldn't lower gather with start_index_map != [0]";
       return matchFailure();
     }
     if (gatherOp.collapsed_slice_dims().getType().getRank() != 1 ||
@@ -329,21 +323,22 @@ struct GatherOpLowering : public ConversionPattern {
                 .getValue(0)
                 .cast<IntegerAttr>()
                 .getValue() != 0) {
-      op->emitRemark() << "Couldn't lower gather with collapsed_dims != [0]";
+      gatherOp.emitRemark()
+          << "Couldn't lower gather with collapsed_dims != [0]";
       return matchFailure();
     }
 
     auto resultType = gatherOp.getResult()->getType().cast<RankedTensorType>();
     if (gatherOp.offset_dims().getType().getNumElements() !=
         resultType.getRank()) {
-      op->emitRemark() << "Couldn't lower gather with offset_dims != "
-                          "[0,...,rank of output]";
+      gatherOp.emitRemark() << "Couldn't lower gather with offset_dims != "
+                               "[0,...,rank of output]";
       return matchFailure();
     }
     for (auto it : llvm::enumerate(gatherOp.offset_dims())) {
       if (it.index() != it.value()) {
-        op->emitRemark() << "Couldn't lower gather with offset_dims != "
-                            "[0,...,rank of output]";
+        gatherOp.emitRemark() << "Couldn't lower gather with offset_dims != "
+                                 "[0,...,rank of output]";
         return matchFailure();
       }
     }
@@ -353,7 +348,7 @@ struct GatherOpLowering : public ConversionPattern {
               .getValue(it.index() + 1)
               .cast<IntegerAttr>()
               .getValue() != it.value()) {
-        op->emitRemark()
+        gatherOp.emitRemark()
             << "Couldn't lower gather with slice_sizes not [1] + final shape";
         return matchFailure();
       }
@@ -361,7 +356,8 @@ struct GatherOpLowering : public ConversionPattern {
 
     auto inputType = gatherOp.operand()->getType().cast<RankedTensorType>();
 
-    auto startIndices = inputAsMemref(rewriter, op, gatherOp.start_indices());
+    auto startIndices =
+        inputAsMemref(rewriter, gatherOp, gatherOp.start_indices());
     auto startIndicesType = startIndices->getType().cast<MemRefType>();
     if (startIndicesType.getNumElements() != inputType.getRank()) {
       auto extraDims = inputType.getRank() - startIndicesType.getNumElements();
@@ -369,7 +365,7 @@ struct GatherOpLowering : public ConversionPattern {
 
       if (startIndicesType.getRank() != 1) {
         startIndices = createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
-                           rewriter, op->getLoc(), startIndices,
+                           rewriter, gatherOp.getLoc(), startIndices,
                            rewriter.getMemRefType({1}, elementType))
                            ->getResult(0);
       }
@@ -381,7 +377,7 @@ struct GatherOpLowering : public ConversionPattern {
           rewriter.getTensorType(zeroes.size(), elementType), zeroes);
 
       auto extraStartIndices =
-          rewriter.create<IREE::ConstantOp>(op->getLoc(), elementsAttr);
+          rewriter.create<IREE::ConstantOp>(gatherOp.getLoc(), elementsAttr);
 
       auto memrefOutputType =
           rewriter.getMemRefType({inputType.getRank()}, elementType);
@@ -389,7 +385,7 @@ struct GatherOpLowering : public ConversionPattern {
       SmallVector<Value *, 2> valuesToConcat = {startIndices,
                                                 extraStartIndices};
       startIndices = rewriter.create<IREEInterp::HL::ConcatOp>(
-          op->getLoc(), memrefOutputType, valuesToConcat,
+          gatherOp.getLoc(), memrefOutputType, valuesToConcat,
           rewriter.getI32IntegerAttr(0));
     }
 
@@ -399,23 +395,24 @@ struct GatherOpLowering : public ConversionPattern {
     auto dstType =
         rewriter.getMemRefType(sliceSizes, inputType.getElementType());
 
-    auto src = inputAsMemref(rewriter, op, gatherOp.operand());
+    auto src = inputAsMemref(rewriter, gatherOp, gatherOp.operand());
     std::vector<Value *> dim_pieces;
     auto dst = rewriter.create<IREEInterp::HL::AllocHeapOp>(
-        op->getLoc(), dstType, dim_pieces);
-    auto lengths =
-        rewriter.create<IREE::ConstantOp>(op->getLoc(), gatherOp.slice_sizes());
+        gatherOp.getLoc(), dstType, dim_pieces);
+    auto lengths = rewriter.create<IREE::ConstantOp>(gatherOp.getLoc(),
+                                                     gatherOp.slice_sizes());
     llvm::SmallVector<int64_t, 4> zero_offset;
     zero_offset.resize(dstType.getRank(), 0);
-    auto dstIndices = createArrayConstant(rewriter, op->getLoc(), zero_offset);
+    auto dstIndices =
+        createArrayConstant(rewriter, gatherOp.getLoc(), zero_offset);
 
-    rewriter.create<IREEInterp::HL::CopyOp>(op->getLoc(), src, startIndices,
-                                            dst, dstIndices, lengths);
+    rewriter.create<IREEInterp::HL::CopyOp>(
+        gatherOp.getLoc(), src, startIndices, dst, dstIndices, lengths);
 
     auto reshaped = createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
-        rewriter, op->getLoc(), dst, convertTypeToMemRef(gatherOp));
+        rewriter, gatherOp.getLoc(), dst, convertTypeToMemRef(gatherOp));
     rewriter.replaceOp(
-        op, wrapAsTensor(reshaped->getResult(0), gatherOp, rewriter));
+        gatherOp, wrapAsTensor(reshaped->getResult(0), gatherOp, rewriter));
 
     return matchSuccess();
   }

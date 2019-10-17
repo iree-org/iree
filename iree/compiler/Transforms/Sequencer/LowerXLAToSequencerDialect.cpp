@@ -73,13 +73,12 @@ static Value *inputAsMemref(ConversionPatternRewriter &rewriter, Operation *op,
 }
 
 template <typename SrcOp>
-class XlaOpLowering : public ConversionPattern {
+class XlaOpLowering : public OpConversionPattern<SrcOp> {
  public:
-  explicit XlaOpLowering(MLIRContext *context)
-      : ConversionPattern(SrcOp::getOperationName(), 1, context) {}
+  using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto srcOp = cast<SrcOp>(op);
 

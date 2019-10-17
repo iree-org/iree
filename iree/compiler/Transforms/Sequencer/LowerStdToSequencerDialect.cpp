@@ -41,104 +41,87 @@ namespace iree_compiler {
 
 namespace {
 
-class SequencerConversionPattern : public ConversionPattern {
+template <typename T>
+class SequencerConversionPattern : public OpConversionPattern<T> {
  public:
-  SequencerConversionPattern(StringRef operationName, int benefit,
-                             MLIRContext *context,
+  SequencerConversionPattern(MLIRContext *context,
                              MemRefTypeConverter &typeConverter)
-      : ConversionPattern(operationName, benefit, context),
-        typeConverter_(typeConverter) {}
+      : OpConversionPattern<T>(context), typeConverter_(typeConverter) {}
 
  protected:
   MemRefTypeConverter &typeConverter_;
 };
 
-class CallOpLowering : public SequencerConversionPattern {
- public:
-  CallOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(CallOp::getOperationName(), 1, context,
-                                   typeConverter) {}
+struct CallOpLowering : public SequencerConversionPattern<CallOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      CallOp callOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto callOp = cast<CallOp>(op);
-
     SmallVector<Type, 4> convertedResults;
     auto result = typeConverter_.convertTypes(
         callOp.getCalleeType().getResults(), convertedResults);
     (void)result;
     assert(succeeded(result) && "expected valid callee type conversion");
     rewriter.replaceOpWithNewOp<IREESeq::HL::CallOp>(
-        op, callOp.getCallee(), convertedResults, operands);
+        callOp, callOp.getCallee(), convertedResults, operands);
 
     return matchSuccess();
   }
 };
 
-class CallIndirectOpLowering : public SequencerConversionPattern {
- public:
-  CallIndirectOpLowering(MLIRContext *context,
-                         MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(CallIndirectOp::getOperationName(), 1,
-                                   context, typeConverter) {}
+struct CallIndirectOpLowering
+    : public SequencerConversionPattern<CallIndirectOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      CallIndirectOp callOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto callOp = cast<CallIndirectOp>(op);
     rewriter.replaceOpWithNewOp<IREESeq::HL::CallIndirectOp>(
-        op, callOp.getCallee(), operands);
+        callOp, callOp.getCallee(), operands);
     return matchSuccess();
   }
 };
 
-struct ReturnOpLowering : public SequencerConversionPattern {
-  ReturnOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(ReturnOp::getOperationName(), 1, context,
-                                   typeConverter) {}
+struct ReturnOpLowering : public SequencerConversionPattern<ReturnOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      ReturnOp returnOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value *, 4> newOperands;
     newOperands.reserve(operands.size());
     for (auto *operand : operands) {
-      newOperands.push_back(wrapAsMemRef(operand, op, rewriter));
+      newOperands.push_back(wrapAsMemRef(operand, returnOp, rewriter));
     }
-    rewriter.replaceOpWithNewOp<IREESeq::HL::ReturnOp>(op, newOperands);
+    rewriter.replaceOpWithNewOp<IREESeq::HL::ReturnOp>(returnOp, newOperands);
     return matchSuccess();
   }
 };
 
-struct BranchOpLowering : public SequencerConversionPattern {
-  BranchOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(BranchOp::getOperationName(), 1, context,
-                                   typeConverter) {}
-
+struct BranchOpLowering : public SequencerConversionPattern<BranchOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> properOperands,
+      BranchOp branchOp, ArrayRef<Value *> properOperands,
       ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREESeq::HL::BranchOp>(op, destinations[0],
-                                                       operands[0]);
+    rewriter.replaceOpWithNewOp<IREESeq::HL::BranchOp>(
+        branchOp, destinations[0], operands[0]);
     return this->matchSuccess();
   }
 };
 
-struct CondBranchOpLowering : public SequencerConversionPattern {
-  CondBranchOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(CondBranchOp::getOperationName(), 1, context,
-                                   typeConverter) {}
-
+struct CondBranchOpLowering : public SequencerConversionPattern<CondBranchOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> properOperands,
+      CondBranchOp condBranchOp, ArrayRef<Value *> properOperands,
       ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto *condValue =
-        loadAccessValue(op->getLoc(), properOperands[0], rewriter);
+        loadAccessValue(condBranchOp.getLoc(), properOperands[0], rewriter);
     rewriter.replaceOpWithNewOp<IREESeq::HL::CondBranchOp>(
-        op, condValue, destinations[IREESeq::HL::CondBranchOp::trueIndex],
+        condBranchOp, condValue,
+        destinations[IREESeq::HL::CondBranchOp::trueIndex],
         operands[IREESeq::HL::CondBranchOp::trueIndex],
         destinations[IREESeq::HL::CondBranchOp::falseIndex],
         operands[IREESeq::HL::CondBranchOp::falseIndex]);
@@ -146,55 +129,40 @@ struct CondBranchOpLowering : public SequencerConversionPattern {
   }
 };
 
-class AllocOpLowering : public SequencerConversionPattern {
- public:
-  AllocOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(AllocOp::getOperationName(), 1, context,
-                                   typeConverter) {}
-
+struct AllocOpLowering : public SequencerConversionPattern<AllocOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      AllocOp allocOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): replace with length computation.
     rewriter.replaceOpWithNewOp<IREESeq::HL::AllocHeapOp>(
-        op, *op->getResultTypes().begin(), operands);
+        allocOp, allocOp.getType(), operands);
     return matchSuccess();
   }
 };
 
-class DeallocOpLowering : public SequencerConversionPattern {
- public:
-  DeallocOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(DeallocOp::getOperationName(), 1, context,
-                                   typeConverter) {}
-
+struct DeallocOpLowering : public SequencerConversionPattern<DeallocOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      DeallocOp deallocOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREESeq::HL::DiscardOp>(op, operands[0]);
+    rewriter.replaceOpWithNewOp<IREESeq::HL::DiscardOp>(deallocOp, operands[0]);
     return matchSuccess();
   }
 };
 
-class LoadOpLowering : public SequencerConversionPattern {
- public:
-  LoadOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(LoadOp::getOperationName(), 1, context,
-                                   typeConverter) {}
+struct LoadOpLowering : public SequencerConversionPattern<LoadOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      LoadOp loadOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto loadOp = cast<LoadOp>(op);
-
     if (loadOp.getMemRefType().getRank() != 0) {
       loadOp.emitError() << "Cannot lower load of non-scalar";
       return matchFailure();
     }
     ArrayRef<Value *> dimPieces;
-    auto dst =
-        rewriter
-            .create<AllocOp>(loadOp.getLoc(), loadOp.getMemRefType(), dimPieces)
-            .getResult();
+    auto dst = rewriter.create<AllocOp>(loadOp.getLoc(), loadOp.getMemRefType(),
+                                        dimPieces);
     auto emptyArrayMemref = createArrayConstant(rewriter, loadOp.getLoc(), {});
     rewriter.create<IREESeq::HL::CopyOp>(loadOp.getLoc(), loadOp.getMemRef(),
                                          /*srcIndices=*/emptyArrayMemref, dst,
@@ -207,16 +175,11 @@ class LoadOpLowering : public SequencerConversionPattern {
   }
 };
 
-class StoreOpLowering : public SequencerConversionPattern {
- public:
-  StoreOpLowering(MLIRContext *context, MemRefTypeConverter &typeConverter)
-      : SequencerConversionPattern(StoreOp::getOperationName(), 1, context,
-                                   typeConverter) {}
+struct StoreOpLowering : public SequencerConversionPattern<StoreOp> {
+  using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      StoreOp storeOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto storeOp = cast<StoreOp>(op);
-
     if (storeOp.getMemRefType().getRank() != 0) {
       storeOp.emitError() << "Cannot lower store of non-scalar";
       return matchFailure();

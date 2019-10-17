@@ -22,81 +22,75 @@ namespace mlir {
 namespace iree_compiler {
 
 template <typename SrcOp, typename DstOp>
-struct UnaryOpLowering : public ConversionPattern {
-  explicit UnaryOpLowering(MLIRContext *context)
-      : ConversionPattern(SrcOp::getOperationName(), 1, context) {}
+struct UnaryOpLowering : public OpConversionPattern<SrcOp> {
+  using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *value = loadAccessValue(op->getLoc(), operands[0], rewriter);
+    auto *value = loadAccessValue(op.getLoc(), operands[0], rewriter);
     value = wrapAsMemRef(value, op, rewriter);
 
-    auto dstType = convertTypeToMemRef(op->getResult(0));
-    auto dstOp = rewriter.create<DstOp>(op->getLoc(), dstType, value);
+    auto dstType = convertTypeToMemRef(op.getResult());
+    auto dstOp = rewriter.create<DstOp>(op.getLoc(), dstType, value);
     auto result = dstOp.getResult();
     result = wrapAsTensor(result, op, rewriter);
 
     rewriter.replaceOp(
-        op, {loadResultValue(op->getLoc(), op->getResult(0)->getType(), result,
-                             rewriter)});
-    return matchSuccess();
+        op, {loadResultValue(op.getLoc(), op.getType(), result, rewriter)});
+    return this->matchSuccess();
   }
 };
 
 template <typename SrcOp, typename DstOp>
-struct BinaryOpLowering : public ConversionPattern {
-  explicit BinaryOpLowering(MLIRContext *context)
-      : ConversionPattern(SrcOp::getOperationName(), 1, context) {}
+struct BinaryOpLowering : public OpConversionPattern<SrcOp> {
+  using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *lhsValue = loadAccessValue(op->getLoc(), operands[0], rewriter);
-    auto *rhsValue = loadAccessValue(op->getLoc(), operands[1], rewriter);
-    auto dstType = convertTypeToMemRef(op->getResult(0));
+    auto *lhsValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
+    auto *rhsValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
+    auto dstType = convertTypeToMemRef(op.getResult());
 
     lhsValue = wrapAsMemRef(lhsValue, op, rewriter);
     rhsValue = wrapAsMemRef(rhsValue, op, rewriter);
 
     auto midOp =
-        rewriter.create<DstOp>(op->getLoc(), dstType, lhsValue, rhsValue);
+        rewriter.create<DstOp>(op.getLoc(), dstType, lhsValue, rhsValue);
     auto result = midOp.getResult();
     result = wrapAsTensor(result, op, rewriter);
 
     rewriter.replaceOp(
-        op, {loadResultValue(op->getLoc(), op->getResult(0)->getType(), result,
-                             rewriter)});
-    return matchSuccess();
+        op, {loadResultValue(op.getLoc(), op.getType(), result, rewriter)});
+    return this->matchSuccess();
   }
 };
 
 template <typename SrcOp, typename DstOp>
-struct TernaryOpLowering : public ConversionPattern {
-  explicit TernaryOpLowering(MLIRContext *context)
-      : ConversionPattern(SrcOp::getOperationName(), 1, context) {}
+struct TernaryOpLowering : public OpConversionPattern<SrcOp> {
+  using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *aValue = loadAccessValue(op->getLoc(), operands[0], rewriter);
-    auto *bValue = loadAccessValue(op->getLoc(), operands[1], rewriter);
-    auto *cValue = loadAccessValue(op->getLoc(), operands[2], rewriter);
+    auto *aValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
+    auto *bValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
+    auto *cValue = loadAccessValue(op.getLoc(), operands[2], rewriter);
 
     aValue = wrapAsMemRef(aValue, op, rewriter);
     bValue = wrapAsMemRef(bValue, op, rewriter);
     cValue = wrapAsMemRef(cValue, op, rewriter);
 
-    auto dstType = convertTypeToMemRef(op->getResult(0));
+    auto dstType = convertTypeToMemRef(op.getResult());
     auto dstOp =
-        rewriter.create<DstOp>(op->getLoc(), dstType, aValue, bValue, cValue);
+        rewriter.create<DstOp>(op.getLoc(), dstType, aValue, bValue, cValue);
     auto result = dstOp.getResult();
     result = wrapAsTensor(result, op, rewriter);
 
     rewriter.replaceOp(
-        op, {loadResultValue(op->getLoc(), op->getResult(0)->getType(), result,
-                             rewriter)});
-    return matchSuccess();
+        op, {loadResultValue(op.getLoc(), op.getType(), result, rewriter)});
+    return this->matchSuccess();
   }
 };
 

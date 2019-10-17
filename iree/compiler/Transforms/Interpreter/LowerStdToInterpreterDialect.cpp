@@ -40,13 +40,11 @@ namespace iree_compiler {
 
 namespace {
 
-class CallOpLowering : public ConversionPattern {
- public:
-  explicit CallOpLowering(MLIRContext *context)
-      : ConversionPattern(CallOp::getOperationName(), 1, context) {}
+struct CallOpLowering : public OpConversionPattern<CallOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      CallOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto callOp = cast<CallOp>(op);
     auto calleeType = callOp.getCalleeType();
@@ -56,13 +54,11 @@ class CallOpLowering : public ConversionPattern {
   }
 };
 
-class CallIndirectOpLowering : public ConversionPattern {
- public:
-  explicit CallIndirectOpLowering(MLIRContext *context)
-      : ConversionPattern(CallIndirectOp::getOperationName(), 1, context) {}
+struct CallIndirectOpLowering : public OpConversionPattern<CallIndirectOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      CallIndirectOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto callOp = cast<CallIndirectOp>(op);
     rewriter.replaceOpWithNewOp<IREEInterp::HL::CallIndirectOp>(
@@ -71,24 +67,22 @@ class CallIndirectOpLowering : public ConversionPattern {
   }
 };
 
-struct ReturnOpLowering : public ConversionPattern {
-  explicit ReturnOpLowering(MLIRContext *context)
-      : ConversionPattern(ReturnOp::getOperationName(), 1, context) {}
+struct ReturnOpLowering : public OpConversionPattern<ReturnOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      ReturnOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREEInterp::HL::ReturnOp>(op, operands);
     return matchSuccess();
   }
 };
 
-struct BranchOpLowering : public ConversionPattern {
-  explicit BranchOpLowering(MLIRContext *context)
-      : ConversionPattern(BranchOp::getOperationName(), 1, context) {}
+struct BranchOpLowering : public OpConversionPattern<BranchOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> properOperands,
+      BranchOp op, ArrayRef<Value *> properOperands,
       ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREEInterp::HL::BranchOp>(op, destinations[0],
@@ -97,16 +91,14 @@ struct BranchOpLowering : public ConversionPattern {
   }
 };
 
-struct CondBranchOpLowering : public ConversionPattern {
-  explicit CondBranchOpLowering(MLIRContext *context)
-      : ConversionPattern(CondBranchOp::getOperationName(), 1, context) {}
+struct CondBranchOpLowering : public OpConversionPattern<CondBranchOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> properOperands,
+      CondBranchOp op, ArrayRef<Value *> properOperands,
       ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *condValue =
-        loadAccessValue(op->getLoc(), properOperands[0], rewriter);
+    auto *condValue = loadAccessValue(op.getLoc(), properOperands[0], rewriter);
     rewriter.replaceOpWithNewOp<IREEInterp::HL::CondBranchOp>(
         op, condValue, destinations[IREEInterp::HL::CondBranchOp::trueIndex],
         operands[IREEInterp::HL::CondBranchOp::trueIndex],
@@ -117,31 +109,29 @@ struct CondBranchOpLowering : public ConversionPattern {
 };
 
 template <typename SrcOp, typename DstOp>
-struct CompareOpLowering : public ConversionPattern {
-  explicit CompareOpLowering(MLIRContext *context)
-      : ConversionPattern(SrcOp::getOperationName(), 1, context) {}
+struct CompareOpLowering : public OpConversionPattern<SrcOp> {
+  using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto lhValue = loadAccessValue(op->getLoc(), operands[0], rewriter);
-    auto rhValue = loadAccessValue(op->getLoc(), operands[1], rewriter);
+    auto lhValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
+    auto rhValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
 
     lhValue = wrapAsMemRef(lhValue, op, rewriter);
     rhValue = wrapAsMemRef(rhValue, op, rewriter);
 
     // TODO(benvanik): map predicate to stable value.
-    auto predicate = rewriter.getI32IntegerAttr(
-        static_cast<int32_t>(dyn_cast<SrcOp>(op).getPredicate()));
+    auto predicate =
+        rewriter.getI32IntegerAttr(static_cast<int32_t>(op.getPredicate()));
 
-    auto dstType = convertTypeToMemRef(op->getResult(0));
-    auto midOp = rewriter.create<DstOp>(op->getLoc(), dstType, predicate,
+    auto dstType = convertTypeToMemRef(op.getResult());
+    auto midOp = rewriter.create<DstOp>(op.getLoc(), dstType, predicate,
                                         lhValue, rhValue);
 
     auto result = wrapAsTensor(midOp.getResult(), op, rewriter);
     rewriter.replaceOp(
-        op, {loadResultValue(op->getLoc(), op->getResult(0)->getType(), result,
-                             rewriter)});
+        op, {loadResultValue(op.getLoc(), op.getType(), result, rewriter)});
     return this->matchSuccess();
   }
 };
@@ -156,26 +146,24 @@ struct CmpFOpLowering
   using CompareOpLowering::CompareOpLowering;
 };
 
-struct AllocOpLowering : public ConversionPattern {
-  explicit AllocOpLowering(MLIRContext *context)
-      : ConversionPattern(AllocOp::getOperationName(), 1, context) {}
+struct AllocOpLowering : public OpConversionPattern<AllocOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      AllocOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): replace with length computation.
-    rewriter.replaceOpWithNewOp<IREEInterp::HL::AllocHeapOp>(
-        op, *op->getResultTypes().begin(), operands);
+    rewriter.replaceOpWithNewOp<IREEInterp::HL::AllocHeapOp>(op, op.getType(),
+                                                             operands);
     return matchSuccess();
   }
 };
 
-struct DeallocOpLowering : public ConversionPattern {
-  explicit DeallocOpLowering(MLIRContext *context)
-      : ConversionPattern(DeallocOp::getOperationName(), 1, context) {}
+struct DeallocOpLowering : public OpConversionPattern<DeallocOp> {
+  using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      Operation *op, ArrayRef<Value *> operands,
+      DeallocOp op, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREEInterp::HL::DiscardOp>(op, operands[0]);
     return matchSuccess();
