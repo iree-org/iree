@@ -227,3 +227,32 @@ build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=n
 Note that there is a Windows specific sharp edge: The `-O0` flag does nothing on
 CL-like compilers. You must use the Microsoft syntax of /Od. Given that, we just
 use it consistently.
+
+## Annex
+
+### Configuring Python
+
+The python bindings are still rudimentary but do require a functioning Python
+install with deps. If you installed Python from scoop or another place that
+doesn't bundle common deps, you'll need to take a couple of extra steps:
+
+#### Install PIP:
+
+Try running `pip`. If it doesn't exist (and if it isn't in your python Scripts/
+directory and somehow excluded from your path), install it by:
+
+```shell
+which python
+# Verify that this is where you think it is. Also verify that pip
+# prints install paths where you think.
+curl https://bootstrap.pypa.io/get-pip.py > ~/Downloads/get-pip.py
+python ~/Downloads/get-pip.py
+# Note that pip may print a directory name that needs to be added
+# to the path. Do so.
+```
+
+#### Install Python Deps
+
+```shell
+pip install numpy
+```

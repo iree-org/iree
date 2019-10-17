@@ -1,6 +1,6 @@
 # Main IREE build file.
 # Note that project-wide, bazel repo aliases are used:
-#   "@absl_py//absl"
+#   "@com_google_absl//absl/python"
 #   "@com_google_absl//absl"
 #   "@local_config_mlir//"
 #   "@llvm//"

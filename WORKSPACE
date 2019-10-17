@@ -1,21 +1,37 @@
 # Workspace file for the IREE project.
-workspace(name = "iree")
+# buildozer: disable=positional-args
+
+workspace(name = "iree_core")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":repo_utils.bzl", "maybe")
 
-# Abseil depends on starlark rules that are currently maintained outside
-# of Bazel.
-# Source: https://github.com/abseil/abseil-cpp/blob/master/WORKSPACE
+###############################################################################
+# Bazel federation rules.
 http_archive(
-    name = "rules_cc",
-    sha256 = "67412176974bfce3f4cf8bdaff39784a72ed709fc58def599d1f68710b58d68b",
-    strip_prefix = "rules_cc-b7fe9697c0c76ab2fd431a891dbb9a6a32ed7c3e",
-    urls = [
-        "https://mirror.bazel.build/github.com/bazelbuild/rules_cc/archive/b7fe9697c0c76ab2fd431a891dbb9a6a32ed7c3e.zip",
-        "https://github.com/bazelbuild/rules_cc/archive/b7fe9697c0c76ab2fd431a891dbb9a6a32ed7c3e.zip",
-    ],
+    name = "bazel_federation",
+    url = "https://github.com/bazelbuild/bazel-federation/archive/130c84ec6d60f31b711400e8445a8d0d4a2b5de8.zip",
+    sha256 = "9d4fdf7cc533af0b50f7dd8e58bea85df3b4454b7ae00056d7090eb98e3515cc",
+    strip_prefix = "bazel-federation-130c84ec6d60f31b711400e8445a8d0d4a2b5de8",
+    type = "zip",
 )
+
+load("@bazel_federation//:repositories.bzl",
+     "rules_cc",
+     "rules_python",
+)
+
+rules_cc()
+load("@bazel_federation//setup:rules_cc.bzl", "rules_cc_setup")
+rules_cc_setup()
+
+rules_python()
+load("@bazel_federation//setup:rules_python.bzl", "rules_python_setup")
+rules_python_setup()
+
+load("@rules_python//python:repositories.bzl", "py_repositories")
+py_repositories()
+###############################################################################
 
 ###############################################################################
 # io_bazel_rules_closure
@@ -68,6 +84,17 @@ load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
 tf_repositories()
 ###############################################################################
 
+###############################################################################
+# Autoconfigure native build repo for python.
+load("//build_tools/python:configure.bzl", "python_configure")
+
+# TODO(laurenzo): Scoping to "iree" to avoid conflicts with other things that
+# take an opinion until we can isolate.
+maybe(python_configure,
+    name = "iree_native_python",
+)
+###############################################################################
+
 maybe(local_repository,
      name = "com_google_absl",
      path = "third_party/abseil-cpp",
@@ -117,4 +144,12 @@ maybe(local_repository,
 maybe(local_repository,
     name = "spirv_headers",
     path = "third_party/spirv_headers",
+)
+
+# TODO(laurenzo): TensorFlow is squatting on the pybind11 repo name, so
+# we use a temporary one until resolved. Theirs pulls in a bunch of stuff.
+maybe(new_local_repository,
+    name = "iree_pybind11",
+    path = "third_party/pybind11",
+    build_file = "build_tools/third_party/pybind11/BUILD.overlay",
 )

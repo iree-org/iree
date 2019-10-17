@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_COMPILER_H_
-#define IREE_BINDINGS_PYTHON_COMPILER_H_
+#ifndef IREE_BINDINGS_PYTHON_PYIREE_COMPILER_H_
+#define IREE_BINDINGS_PYTHON_PYIREE_COMPILER_H_
 
 #include <string>
 
 #include "iree/base/flatbuffer_util.h"
-#include "iree/bindings/python/binding.h"
+#include "iree/bindings/python/pyiree/binding.h"
 #include "iree/schemas/module_def_generated.h"
 
 namespace iree {
@@ -43,4 +43,4 @@ std::shared_ptr<MemoryModuleFile> CompileModuleFromAsm(
 }  // namespace python
 }  // namespace iree
 
-#endif  // IREE_BINDINGS_PYTHON_COMPILER_H_
+#endif  // IREE_BINDINGS_PYTHON_PYIREE_COMPILER_H_

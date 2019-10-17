@@ -7,3 +7,13 @@ real API :)
 
 We're still untangling build support, jupyter integration, etc for OSS builds.
 Stand by.
+
+## Issues:
+
+*   This is called `pyiree` vs `iree` to avoid pythonpath collisions that tend
+    to arise when an iree directory is inside of an iree directory.
+*   The above could be solved in the bazel build by making iree/bindings/python
+    its own sub-workspace.
+*   However, doing so presently breaks both flatbuffer and tablegen generation
+    because of fixes needed to those build rules so that they are sub-worksapce
+    aware.

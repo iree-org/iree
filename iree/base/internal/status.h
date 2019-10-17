@@ -90,6 +90,9 @@ class Status final {
   // Return a combination of the error code name and message.
   std::string ToString() const;
 
+  // Compatibility with upstream API. Equiv to ToString().
+  std::string error_message() const { return ToString(); }
+
   friend bool operator==(const Status&, const Status&);
   friend bool operator!=(const Status&, const Status&);
 

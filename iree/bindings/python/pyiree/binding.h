@@ -12,33 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/bindings/python/status_utils.h"
+#ifndef IREE_BINDINGS_PYTHON_PYIREE_BINDING_H_
+#define IREE_BINDINGS_PYTHON_PYIREE_BINDING_H_
+
+#include <vector>
+
+#include "pybind11/pybind11.h"
+#include "pybind11/stl.h"
 
 namespace iree {
 namespace python {
 
-namespace {
-
-PyObject* StatusToPyExcClass(const Status& status) {
-  switch (status.code()) {
-    case StatusCode::kInvalidArgument:
-      return PyExc_ValueError;
-    case StatusCode::kOutOfRange:
-      return PyExc_IndexError;
-    case StatusCode::kUnimplemented:
-      return PyExc_NotImplementedError;
-    default:
-      return PyExc_RuntimeError;
-  }
-}
-
-}  // namespace
-
-pybind11::error_already_set StatusToPyExc(const Status& status) {
-  assert(!status.ok());
-  PyErr_SetString(StatusToPyExcClass(status), status.error_message().c_str());
-  return pybind11::error_already_set();
-}
+namespace py = pybind11;
 
 }  // namespace python
 }  // namespace iree
+
+#endif  // IREE_BINDINGS_PYTHON_PYIREE_BINDING_H_

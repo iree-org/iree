@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_STATUS_UTILS_H_
-#define IREE_BINDINGS_PYTHON_STATUS_UTILS_H_
+#ifndef IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_
+#define IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_
 
 #include "iree/base/status.h"
-#include "third_party/pybind11/include/pybind11/pytypes.h"
+#include "pybind11/pytypes.h"
 
 namespace iree {
 namespace python {
@@ -46,4 +46,4 @@ namespace pybind11 {
 namespace detail {}  // namespace detail
 }  // namespace pybind11
 
-#endif  // IREE_BINDINGS_PYTHON_STATUS_UTILS_H_
+#endif  // IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_

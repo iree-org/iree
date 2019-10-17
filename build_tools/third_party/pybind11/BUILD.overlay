@@ -12,14 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.bzl", "iree_py_library")
-
 package(
     default_visibility = ["//visibility:public"],
-    licenses = ["notice"],  # Apache 2.0
 )
 
-iree_py_library(
-    name = "pathsetup",
-    imports = ["."],
+cc_library(
+    name = "pybind11",
+    hdrs = glob(["include/pybind11/*.h"]),
+    includes = ["include"],
 )
