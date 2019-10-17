@@ -49,12 +49,12 @@ class AffineExprCodegen : public AffineExprVisitor<AffineExprCodegen, Value *> {
   Value *visitModExpr(AffineBinaryOpExpr expr) {
     auto operand1 = getValueInternal(expr.getLHS());
     auto operand2 = getValueInternal(expr.getRHS());
-    return builder.create<spirv::UModOp>(location, operand1, operand2);
+    return builder.create<spirv::SModOp>(location, operand1, operand2);
   }
   Value *visitFloorDivExpr(AffineBinaryOpExpr expr) {
     auto operand1 = getValueInternal(expr.getLHS());
     auto operand2 = getValueInternal(expr.getRHS());
-    return builder.create<spirv::UDivOp>(location, operand1, operand2);
+    return builder.create<spirv::SDivOp>(location, operand1, operand2);
   }
   Value *visitCeilDivExpr(AffineBinaryOpExpr expr) {
     // TODO(ravishankarm): Implement ceil div expr codegen.

@@ -646,8 +646,8 @@ module {
     // CHECK-DAG: [[L1:%.*]] = spv.IMul [[GLOBALIDY]], [[STRIDE0]] : i32
     // CHECK-DAG: [[L2:%.*]] = spv.IAdd [[L1]], [[GLOBALIDX]] : i32
     // CHECK-DAG: [[STRIDE2:%.*]] = spv.constant 21 : i32
-    // CHECK-DAG: [[INDEX0:%.*]] = spv.UDiv [[L2]], [[STRIDE2]] : i32
-    // CHECK-DAG: [[INDEX1:%.*]] = spv.UMod [[L2]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[INDEX0:%.*]] = spv.SDiv [[L2]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[INDEX1:%.*]] = spv.SMod [[L2]], [[STRIDE2]] : i32
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO1]], [[INDEX0]], [[INDEX1]]{{\]}}
     %0 = iree.load_input(%arg0 : memref<24x21xi32>) : tensor<24x21xi32>
     %1 = "xla_hlo.reshape"(%0) : (tensor<24x21xi32>) -> tensor<12x42xi32>
@@ -664,11 +664,11 @@ module {
   func @simple_load_store_entry_dispatch_0(%arg0: memref<4x6x21xi32>, %arg1: memref<12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK-DAG: [[STRIDE1:%.*]] = spv.constant 126 : i32
-    // CHECK-DAG: [[I0:%.*]] = spv.UDiv [[L1:%.*]], [[STRIDE2]] : i32
-    // CHECK-DAG: [[I1:%.*]] = spv.UMod [[L1]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[I0:%.*]] = spv.SDiv [[L1:%.*]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[I1:%.*]] = spv.SMod [[L1]], [[STRIDE2]] : i32
     // CHECK-DAG: [[STRIDE2:%.*]] = spv.constant 21 : i32
-    // CHECK-DAG: [[I2:%.*]] = spv.UDiv [[I1]], [[STRIDE2]] : i32
-    // CHECK-DAG: [[I3:%.*]] = spv.UMod [[I1]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[I2:%.*]] = spv.SDiv [[I1]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[I3:%.*]] = spv.SMod [[I1]], [[STRIDE2]] : i32
     // CHECK-DAG: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK-DAG: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO1]], [[I0]], [[I2]], [[I3]]{{\]}}
     %0 = iree.load_input(%arg0 : memref<4x6x21xi32>) : tensor<4x6x21xi32>
@@ -695,18 +695,18 @@ module {
     // CHECK-DAG: [[FORTYTWO:%.*]] = spv.constant 42 : i32
     // CHECK-DAG: [[I1:%.*]] = spv.IMul [[GLOBALIDY]], [[FORTYTWO]] : i32
     // CHECK-DAG: [[I2:%.*]] = spv.IAdd [[I1]], [[GLOBALIDX]] : i32
-    // CHECK-DAG: [[I3:%.*]] = spv.UDiv [[I2]], [[FORTYTWO]] : i32
+    // CHECK-DAG: [[I3:%.*]] = spv.SDiv [[I2]], [[FORTYTWO]] : i32
     // CHECK-DAG: [[I4:%.*]] = spv.IMul [[I3]], [[FORTYTWO]] : i32
-    // CHECK-DAG: [[I5:%.*]] = spv.UMod [[I2]], [[FORTYTWO]] : i32
+    // CHECK-DAG: [[I5:%.*]] = spv.SMod [[I2]], [[FORTYTWO]] : i32
     // CHECK: [[SEVEN:%.*]] = spv.constant 7 : i32
-    // CHECK-DAG: [[I6:%.*]] = spv.UDiv [[I5]], [[SEVEN]] : i32
+    // CHECK-DAG: [[I6:%.*]] = spv.SDiv [[I5]], [[SEVEN]] : i32
     // CHECK-DAG: [[I7:%.*]] = spv.IMul [[I6]], [[SEVEN]] : i32
     // CHECK-DAG: [[I8:%.*]] = spv.IAdd [[I4]], [[I7]] : i32
-    // CHECK-DAG: [[I9:%.*]] = spv.UMod [[I5]], [[SEVEN]] : i32
+    // CHECK-DAG: [[I9:%.*]] = spv.SMod [[I5]], [[SEVEN]] : i32
     // CHECK-DAG: [[I10:%.*]] = spv.IAdd [[I8]], [[I9]] : i32
     // CHECK: [[TWENTYONE:%.*]] = spv.constant 21 : i32
-    // CHECK-DAG: [[I11:%.*]] = spv.UDiv [[I10]], [[TWENTYONE]] : i32
-    // CHECK-DAG: [[I12:%.*]] = spv.UMod [[I10]], [[TWENTYONE]] : i32
+    // CHECK-DAG: [[I11:%.*]] = spv.SDiv [[I10]], [[TWENTYONE]] : i32
+    // CHECK-DAG: [[I12:%.*]] = spv.SMod [[I10]], [[TWENTYONE]] : i32
     // CHECK: {{%.*}} = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO]], [[I11]], [[I12]]
     // CHECK-DAG: [[ARG1PTR:%.*]] = spv._address_of [[ARG1VAR]]
     // CHECK-DAG: [[ZERO2:%.*]] = spv.constant 0 : i32
