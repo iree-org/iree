@@ -348,8 +348,7 @@ class SPIRVCodegen {
       auto varName =
           fn.getName().str() + "_arg_" + std::to_string(argType.index());
       auto var = builder.create<spirv::GlobalVariableOp>(
-          loc, builder.getTypeAttr(varType), builder.getStringAttr(varName),
-          nullptr);
+          loc, TypeAttr::get(varType), builder.getStringAttr(varName), nullptr);
       // Set descriptor_set to 0.
       var.setAttr(descriptorSetAttrName, builder.getI32IntegerAttr(0));
       // Set binding to argument number.
@@ -365,8 +364,7 @@ class SPIRVCodegen {
       auto varName =
           fn.getName().str() + "_res_" + std::to_string(resType.index());
       auto var = builder.create<spirv::GlobalVariableOp>(
-          loc, builder.getTypeAttr(varType), builder.getStringAttr(varName),
-          nullptr);
+          loc, TypeAttr::get(varType), builder.getStringAttr(varName), nullptr);
       // Set descriptor_set to 0.
       var.setAttr(descriptorSetAttrName, builder.getI32IntegerAttr(0));
       // Set binding to (result number + num arguments)
@@ -416,11 +414,11 @@ class SPIRVCodegen {
                         ->getParentOfType<spirv::ModuleOp>();
     OpBuilder moduleBuilder(moduleOp.body());
     auto i32Type = builder.getIntegerType(32);
-    auto idType = builder.getVectorType(3, i32Type);
+    auto idType = VectorType::get(3, i32Type);
     auto ptrIdType =
         spirv::PointerType::get(idType, spirv::StorageClass::Input);
     auto globalInvocationID = moduleBuilder.create<spirv::GlobalVariableOp>(
-        loc, builder.getTypeAttr(ptrIdType),
+        loc, TypeAttr::get(ptrIdType),
         builder.getStringAttr("globalInvocationID"), nullptr);
     globalInvocationID.setAttr(
         convertToSnakeCase(stringifyDecoration(spirv::Decoration::BuiltIn)),

@@ -86,7 +86,7 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
     }
     numElements *= launchSize[i - 1];
   }
-  auto launchMap = builder.getAffineMap(launchSize.size(), 0, affineExprs);
+  auto launchMap = AffineMap::get(launchSize.size(), 0, affineExprs);
 
   // The stored tensor can be a reshape of the launch dimension. It still
   // retains the requirement that each workitem is computing a single element

@@ -206,8 +206,8 @@ LogicalResult getReshapeOperandMap(Builder &builder, AffineMap resultIndexMap,
   assert(operandExprs.size() == operandShape.size() &&
          "expected as many exprs for the operand as the rank of the operand");
   operandIndexMap =
-      builder.getAffineMap(resultIndexMap.getNumDims(),
-                           resultIndexMap.getNumSymbols(), operandExprs);
+      AffineMap::get(resultIndexMap.getNumDims(),
+                     resultIndexMap.getNumSymbols(), operandExprs);
 
   return success();
 }

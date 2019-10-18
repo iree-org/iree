@@ -72,7 +72,7 @@ Value *calculateWorkload(Operation *op, Value *baseOperand) {
 
   // TODO(b/139353314): optimize workload layout.
 
-  auto constantType = builder.getTensorType({3}, builder.getIntegerType(32));
+  auto constantType = RankedTensorType::get({3}, builder.getIntegerType(32));
   return builder.create<ConstantOp>(
       op->getLoc(), constantType,
       DenseIntElementsAttr::get<int32_t>(constantType, workload));

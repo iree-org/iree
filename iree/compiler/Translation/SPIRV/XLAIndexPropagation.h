@@ -79,7 +79,7 @@ class ReturnOpIndexPropagation : public IndexPropagationOp<OpTy> {
       affineExprs.push_back(builder.getAffineDimExpr(i - 1));
     }
     indexMap[operation->getOperand(0)]
-            [builder.getAffineMap(returnRank, 0, affineExprs)];
+            [AffineMap::get(returnRank, 0, affineExprs)];
     return success();
   }
 };

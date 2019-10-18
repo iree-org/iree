@@ -302,14 +302,14 @@ void ShapeOp::build(Builder *builder, OperationState &state, Value *operand) {
   if (auto shapedType = operand->getType().dyn_cast<ShapedType>()) {
     rank = shapedType.getRank();
   }
-  state.addTypes(builder->getMemRefType({rank}, builder->getIntegerType(32)));
+  state.addTypes(MemRefType::get({rank}, builder->getIntegerType(32)));
 }
 
 OpFoldResult ShapeOp::fold(ArrayRef<Attribute> operands) {
   Builder builder(getContext());
   if (auto op0 = operands[0].dyn_cast_or_null<ElementsAttr>()) {
-    return builder.getDenseIntElementsAttr(
-        builder.getTensorType({op0.getType().getRank()},
+    return DenseIntElementsAttr::get(
+        RankedTensorType::get({op0.getType().getRank()},
                               builder.getIntegerType(32)),
         op0.getType().getShape());
   }

@@ -50,15 +50,15 @@ Value *computeOffset(Location loc, Value *reference, Value *indices,
   auto *shapeMemRef = builder
                           .create<IREESeq::LL::AllocHeapOp>(
                               loc,
-                              builder.getMemRefType({referenceType.getRank()},
-                                                    builder.getIntegerType(32)),
+                              MemRefType::get({referenceType.getRank()},
+                                              builder.getIntegerType(32)),
                               ArrayRef<Value *>{})
                           .getResult();
   builder.create<IREESeq::LL::ShapeOp>(loc, reference, shapeMemRef);
   auto *resultMemRef =
       builder
           .create<IREESeq::LL::AllocHeapOp>(
-              loc, builder.getMemRefType({}, builder.getIntegerType(32)),
+              loc, MemRefType::get({}, builder.getIntegerType(32)),
               ArrayRef<Value *>{})
           .getResult();
   auto elementSizeAttr = builder.getIntegerAttr(
@@ -77,21 +77,21 @@ std::pair<Value *, Value *> computeRange(Location loc, Value *reference,
   auto *shapeMemRef = builder
                           .create<IREESeq::LL::AllocHeapOp>(
                               loc,
-                              builder.getMemRefType({referenceType.getRank()},
-                                                    builder.getIntegerType(32)),
+                              MemRefType::get({referenceType.getRank()},
+                                              builder.getIntegerType(32)),
                               ArrayRef<Value *>{})
                           .getResult();
   builder.create<IREESeq::LL::ShapeOp>(loc, reference, shapeMemRef);
   auto *offsetMemRef =
       builder
           .create<IREESeq::LL::AllocHeapOp>(
-              loc, builder.getMemRefType({}, builder.getIntegerType(32)),
+              loc, MemRefType::get({}, builder.getIntegerType(32)),
               ArrayRef<Value *>{})
           .getResult();
   auto *lengthMemRef =
       builder
           .create<IREESeq::LL::AllocHeapOp>(
-              loc, builder.getMemRefType({}, builder.getIntegerType(32)),
+              loc, MemRefType::get({}, builder.getIntegerType(32)),
               ArrayRef<Value *>{})
           .getResult();
   auto elementSizeAttr = builder.getIntegerAttr(
@@ -125,7 +125,7 @@ struct LowerShapeOpPattern : public OpRewritePattern<IREESeq::HL::ShapeOp> {
         rewriter
             .create<IREESeq::LL::AllocHeapOp>(
                 op.getLoc(),
-                rewriter.getMemRefType(
+                MemRefType::get(
                     {op.getResult()->getType().cast<ShapedType>().getRank()},
                     rewriter.getIntegerType(64)),
                 ArrayRef<Value *>{})

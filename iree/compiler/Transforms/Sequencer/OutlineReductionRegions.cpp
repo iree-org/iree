@@ -90,7 +90,7 @@ std::pair<IREE::MultiArchExecutableOp, FuncOp> createReductionExecutable(
   allOperandTypes.append(initialValueTypes.begin(), initialValueTypes.end());
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
     auto shapedType = resultType.value().cast<ShapedType>();
-    allOperandTypes.push_back(builder.getMemRefType(
+    allOperandTypes.push_back(MemRefType::get(
         calculateResultShape(inputs[resultType.index()], reductionDimension),
         shapedType.getElementType()));
   }
@@ -126,10 +126,9 @@ SmallVector<Value *, 4> convertToDispatchOp(
     auto shapedType = resultType.value().cast<ShapedType>();
     Value *allocatedValue = allocateDispatchOutputBuffer(
         regionOp.getLoc(),
-        dispatcherBuilder.getMemRefType(
-            calculateResultShape(inputs[resultType.index()],
-                                 reductionDimension),
-            shapedType.getElementType()),
+        MemRefType::get(calculateResultShape(inputs[resultType.index()],
+                                             reductionDimension),
+                        shapedType.getElementType()),
         dispatcherBuilder);
     if (!allocatedValue) {
       regionOp.emitError("unable to allocate result value");

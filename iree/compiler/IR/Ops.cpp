@@ -173,8 +173,8 @@ void MemRefToTensorOp::build(Builder *builder, OperationState &state,
   // TODO(gcmn) Use getTensorType from MemRefUtils when circular dependency can
   // be avoided.
   auto memRefType = arg->getType().cast<MemRefType>();
-  auto tensorType = builder->getTensorType(memRefType.getShape(),
-                                           memRefType.getElementType());
+  auto tensorType =
+      RankedTensorType::get(memRefType.getShape(), memRefType.getElementType());
   build(builder, state, tensorType, arg);
 }
 
@@ -384,9 +384,9 @@ void ReductionRegionOp::build(Builder *builder, OperationState &state,
   state.addOperands(initialValues);
   state.addAttribute(
       "dimensions",
-      builder->getDenseIntElementsAttr(
-          builder->getTensorType({static_cast<int64_t>(dimensions.size())},
-                                 builder->getIntegerType(64)),
+      DenseIntElementsAttr::get(
+          RankedTensorType::get({static_cast<int64_t>(dimensions.size())},
+                                builder->getIntegerType(64)),
           dimensions));
   state.addAttributes(attributes);
   state.addRegion();
@@ -404,29 +404,29 @@ void ReductionRegionOp::build(
   state.addOperands({workload});
   state.addOperands(operands);
   state.addOperands(initialValues);
-  state.addAttribute("window_dimensions",
-                     builder->getDenseIntElementsAttr(
-                         builder->getTensorType(
-                             {static_cast<int64_t>(windowDimensions.size())},
-                             builder->getIntegerType(64)),
-                         windowDimensions));
+  state.addAttribute(
+      "window_dimensions",
+      DenseIntElementsAttr::get(
+          RankedTensorType::get({static_cast<int64_t>(windowDimensions.size())},
+                                builder->getIntegerType(64)),
+          windowDimensions));
   state.addAttribute(
       "window_strides",
-      builder->getDenseIntElementsAttr(
-          builder->getTensorType({static_cast<int64_t>(windowStrides.size())},
-                                 builder->getIntegerType(64)),
+      DenseIntElementsAttr::get(
+          RankedTensorType::get({static_cast<int64_t>(windowStrides.size())},
+                                builder->getIntegerType(64)),
           windowStrides));
   state.addAttribute(
       "base_dilations",
-      builder->getDenseIntElementsAttr(
-          builder->getTensorType({static_cast<int64_t>(baseDilations.size())},
-                                 builder->getIntegerType(64)),
+      DenseIntElementsAttr::get(
+          RankedTensorType::get({static_cast<int64_t>(baseDilations.size())},
+                                builder->getIntegerType(64)),
           baseDilations));
   state.addAttribute(
       "window_dilations",
-      builder->getDenseIntElementsAttr(
-          builder->getTensorType({static_cast<int64_t>(windowDilations.size())},
-                                 builder->getIntegerType(64)),
+      DenseIntElementsAttr::get(
+          RankedTensorType::get({static_cast<int64_t>(windowDilations.size())},
+                                builder->getIntegerType(64)),
           windowDilations));
   state.addAttribute("padding_mode", builder->getI32IntegerAttr(
                                          static_cast<int32_t>(paddingMode)));

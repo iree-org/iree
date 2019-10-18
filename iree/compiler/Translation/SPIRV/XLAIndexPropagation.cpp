@@ -38,9 +38,9 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
   Builder builder(operation->getContext());
   if (!broadcastDim) {
     // This is a scalar. So all indices map to the same element.
-    AffineMap scalarMap = builder.getAffineMap(
-        resultIndex.getNumDims(), resultIndex.getNumSymbols(),
-        builder.getAffineConstantExpr(0));
+    AffineMap scalarMap =
+        AffineMap::get(resultIndex.getNumDims(), resultIndex.getNumSymbols(),
+                       builder.getAffineConstantExpr(0));
     indexMap.push_back(scalarMap);
     return success();
   }
@@ -55,8 +55,8 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
       exprs.push_back(resultExpr.value());
     }
   }
-  auto operandMap = builder.getAffineMap(resultIndex.getNumDims(),
-                                         resultIndex.getNumSymbols(), exprs);
+  auto operandMap = AffineMap::get(resultIndex.getNumDims(),
+                                   resultIndex.getNumSymbols(), exprs);
   indexMap.push_back(operandMap);
   return success();
 }
@@ -85,8 +85,8 @@ LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
     // The result is a scalar. Just add a constant expr 0.
     exprs.push_back(builder.getAffineConstantExpr(0));
   }
-  auto operandMap = builder.getAffineMap(resultIndex.getNumDims(),
-                                         resultIndex.getNumSymbols(), exprs);
+  auto operandMap = AffineMap::get(resultIndex.getNumDims(),
+                                   resultIndex.getNumSymbols(), exprs);
   indexMap.push_back(operandMap);
   return success();
 }

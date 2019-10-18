@@ -64,7 +64,7 @@ Value *loadAccessValue(Location location, Value *operand, OpBuilder &builder) {
     return operand;
   }
 
-  auto memRefType = builder.getMemRefType({}, operand->getType());
+  auto memRefType = MemRefType::get({}, operand->getType());
   if (auto loadOp = dyn_cast_or_null<LoadOp>(operand->getDefiningOp())) {
     // TODO(benvanik): handle creating views.
     if (loadOp.getMemRefType() == memRefType) {

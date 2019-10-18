@@ -139,14 +139,14 @@ struct DynamicUpdateSliceLowering
     // into a reshaped and concated value.
     for (auto index : startIndices) {
       auto reshapedIndex = rewriter.create<IREESeq::HL::ReshapeOp>(
-          op->getLoc(), rewriter.getMemRefType({1}, type), index,
+          op->getLoc(), MemRefType::get({1}, type), index,
           createArrayConstant(rewriter, op->getLoc(), {1}));
       valuesToConcat.push_back(reshapedIndex);
     }
 
     auto dstOffset = rewriter
                          .create<IREESeq::HL::ConcatOp>(
-                             op->getLoc(), rewriter.getMemRefType({rank}, type),
+                             op->getLoc(), MemRefType::get({rank}, type),
                              valuesToConcat, rewriter.getI32IntegerAttr(0))
                          .getResult();
 

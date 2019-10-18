@@ -183,7 +183,7 @@ class TransposeOpIndexPropagation : public IndexPropagationOp<OpTy> {
       permutationExprs.push_back(builder.getAffineDimExpr(index));
     }
     auto permutationAffineMap =
-        builder.getAffineMap(permutationExprs.size(), 0, permutationExprs);
+        AffineMap::get(permutationExprs.size(), 0, permutationExprs);
     // Compute the inverse of the permutation map.
     auto invPermutationMap = inversePermutation(permutationAffineMap);
 

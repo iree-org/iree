@@ -447,11 +447,10 @@ struct FoldShapeOp : public OpRewritePattern<ShapeOp> {
     if (memRefType.hasStaticShape()) {
       auto constantOp = rewriter.create<IREESeq::LL::ConstantOp>(
           shapeOp.getLoc(),
-          rewriter.getMemRefType({memRefType.getRank()},
-                                 rewriter.getIntegerType(64)),
-          rewriter.getDenseIntElementsAttr(
-              rewriter.getTensorType({memRefType.getRank()},
-                                     rewriter.getIntegerType(64)),
+          MemRefType::get({memRefType.getRank()}, rewriter.getIntegerType(64)),
+          DenseIntElementsAttr::get(
+              RankedTensorType::get({memRefType.getRank()},
+                                    rewriter.getIntegerType(64)),
               memRefType.getShape()));
       replaceSubsequentUses(shapeOp, shapeOp.dst(), constantOp.getResult());
       rewriter.eraseOp(shapeOp);
@@ -479,10 +478,9 @@ struct FoldLengthOp : public OpRewritePattern<LengthOp> {
     auto memRefType = lengthOp.input()->getType().cast<MemRefType>();
     if (memRefType.hasStaticShape()) {
       auto constantOp = rewriter.create<IREESeq::LL::ConstantOp>(
-          lengthOp.getLoc(),
-          rewriter.getMemRefType({}, rewriter.getIntegerType(64)),
-          rewriter.getDenseIntElementsAttr(
-              rewriter.getTensorType({}, rewriter.getIntegerType(64)),
+          lengthOp.getLoc(), MemRefType::get({}, rewriter.getIntegerType(64)),
+          DenseIntElementsAttr::get(
+              RankedTensorType::get({}, rewriter.getIntegerType(64)),
               {memRefType.getNumElements()}));
       replaceSubsequentUses(lengthOp, lengthOp.dst(), constantOp.getResult());
       rewriter.eraseOp(lengthOp);
@@ -527,9 +525,9 @@ struct FoldComputeOffsetOp : public OpRewritePattern<ComputeOffsetOp> {
 
     auto constantOp = rewriter.create<IREESeq::LL::ConstantOp>(
         computeOffsetOp.getLoc(),
-        rewriter.getMemRefType({}, rewriter.getIntegerType(64)),
-        rewriter.getDenseIntElementsAttr(
-            rewriter.getTensorType({}, rewriter.getIntegerType(64)), {offset}));
+        MemRefType::get({}, rewriter.getIntegerType(64)),
+        DenseIntElementsAttr::get(
+            RankedTensorType::get({}, rewriter.getIntegerType(64)), {offset}));
     replaceSubsequentUses(computeOffsetOp, computeOffsetOp.dst(),
                           constantOp.getResult());
     rewriter.eraseOp(computeOffsetOp);
@@ -576,16 +574,16 @@ struct FoldComputeRangeOp : public OpRewritePattern<ComputeRangeOp> {
 
     auto offsetConstantOp = rewriter.create<IREESeq::LL::ConstantOp>(
         computeRangeOp.getLoc(),
-        rewriter.getMemRefType({}, rewriter.getIntegerType(64)),
-        rewriter.getDenseIntElementsAttr(
-            rewriter.getTensorType({}, rewriter.getIntegerType(64)), {offset}));
+        MemRefType::get({}, rewriter.getIntegerType(64)),
+        DenseIntElementsAttr::get(
+            RankedTensorType::get({}, rewriter.getIntegerType(64)), {offset}));
     replaceSubsequentUses(computeRangeOp, computeRangeOp.dstOffset(),
                           offsetConstantOp.getResult());
     auto lengthConstantOp = rewriter.create<IREESeq::LL::ConstantOp>(
         computeRangeOp.getLoc(),
-        rewriter.getMemRefType({}, rewriter.getIntegerType(64)),
-        rewriter.getDenseIntElementsAttr(
-            rewriter.getTensorType({}, rewriter.getIntegerType(64)), {length}));
+        MemRefType::get({}, rewriter.getIntegerType(64)),
+        DenseIntElementsAttr::get(
+            RankedTensorType::get({}, rewriter.getIntegerType(64)), {length}));
     replaceSubsequentUses(computeRangeOp, computeRangeOp.dstLength(),
                           lengthConstantOp.getResult());
     rewriter.eraseOp(computeRangeOp);

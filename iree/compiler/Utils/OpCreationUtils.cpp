@@ -28,8 +28,8 @@ namespace {
 
 ElementsAttr elementsAttrFromArray(OpBuilder &builder,
                                    ArrayRef<int64_t> elements) {
-  return builder.getDenseIntElementsAttr(
-      builder.getTensorType(elements.size(), builder.getIntegerType(64)),
+  return DenseIntElementsAttr::get(
+      RankedTensorType::get(elements.size(), builder.getIntegerType(64)),
       elements);
 }
 

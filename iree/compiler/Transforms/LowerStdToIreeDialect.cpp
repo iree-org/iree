@@ -41,8 +41,8 @@ struct ConstantOpLowering : public OpRewritePattern<ConstantOp> {
     if (!type.isIntOrFloat()) {
       return matchFailure();
     }
-    auto elementsValue = rewriter.getDenseElementsAttr(
-        rewriter.getTensorType({}, type), op.getValue());
+    auto elementsValue =
+        DenseElementsAttr::get(RankedTensorType::get({}, type), op.getValue());
     auto ireeConst =
         rewriter.create<IREE::ConstantOp>(op.getLoc(), elementsValue);
     rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(op, ireeConst);

@@ -137,7 +137,7 @@ struct BroadcastInDimOpLowering
     }
 
     auto intermediateType =
-        rewriter.getMemRefType(intermediateShape, inputType.getElementType());
+        MemRefType::get(intermediateShape, inputType.getElementType());
     auto reshapeOp = createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
         rewriter, op->getLoc(), inputValue, intermediateType);
     return createFinal(rewriter, op->getLoc(), reshapeOp->getResult(0),
@@ -206,14 +206,14 @@ struct DynamicUpdateSliceOpLowering
     // into a reshaped and concated value.
     for (auto index : startIndices) {
       auto reshapedIndex = rewriter.create<IREEInterp::HL::ReshapeOp>(
-          op->getLoc(), rewriter.getMemRefType({1}, type), index,
+          op->getLoc(), MemRefType::get({1}, type), index,
           createArrayConstant(rewriter, op->getLoc(), {1}));
       valuesToConcat.push_back(reshapedIndex);
     }
 
     auto dstOffset = rewriter
                          .create<IREEInterp::HL::ConcatOp>(
-                             op->getLoc(), rewriter.getMemRefType({rank}, type),
+                             op->getLoc(), MemRefType::get({rank}, type),
                              valuesToConcat, rewriter.getI32IntegerAttr(0))
                          .getResult();
 
@@ -367,21 +367,22 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
       if (startIndicesType.getRank() != 1) {
         startIndices = createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
                            rewriter, gatherOp.getLoc(), startIndices,
-                           rewriter.getMemRefType({1}, elementType))
+                           MemRefType::get({1}, elementType))
                            ->getResult(0);
       }
 
       llvm::SmallVector<int64_t, 4> zeroes;
       zeroes.resize(extraDims, 0);
 
-      auto elementsAttr = rewriter.getDenseIntElementsAttr(
-          rewriter.getTensorType(zeroes.size(), elementType), zeroes);
+      auto elementsAttr = DenseIntElementsAttr::get(
+          RankedTensorType::get(zeroes.size(), elementType),
+          llvm::makeArrayRef(zeroes));
 
       auto extraStartIndices =
           rewriter.create<IREE::ConstantOp>(gatherOp.getLoc(), elementsAttr);
 
       auto memrefOutputType =
-          rewriter.getMemRefType({inputType.getRank()}, elementType);
+          MemRefType::get({inputType.getRank()}, elementType);
 
       SmallVector<Value *, 2> valuesToConcat = {startIndices,
                                                 extraStartIndices};
@@ -393,8 +394,7 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
     auto sliceSizeValues = gatherOp.slice_sizes().getValues<int64_t>();
     std::vector<int64_t> sliceSizes = {sliceSizeValues.begin(),
                                        sliceSizeValues.end()};
-    auto dstType =
-        rewriter.getMemRefType(sliceSizes, inputType.getElementType());
+    auto dstType = MemRefType::get(sliceSizes, inputType.getElementType());
 
     auto src = inputAsMemref(rewriter, gatherOp, gatherOp.operand());
     std::vector<Value *> dim_pieces;
