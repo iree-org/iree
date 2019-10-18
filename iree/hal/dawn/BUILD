@@ -46,6 +46,17 @@ cc_library(
     ],
 )
 
+# TODO(scotttodd): Use SwiftShader to test Vulkan backend
+cc_test(
+    name = "dawn_driver_test",
+    srcs = ["dawn_driver_test.cc"],
+    deps = [
+        ":dawn_driver",
+        "//iree/base:status_matchers",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
 cc_library(
     name = "dawn_driver_module",
     srcs = ["dawn_driver_module.cc"],
