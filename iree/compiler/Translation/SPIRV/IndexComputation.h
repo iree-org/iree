@@ -163,6 +163,46 @@ class ReshapeOpIndexPropagation final : public IndexPropagationOp<OpTy> {
   }
 };
 
+// ===-------------------------------------------------------------------- ===//
+// ReverseOp
+// ===-------------------------------------------------------------------- ===//
+
+/// Propagates the index map from result to operands of reverse type operation.
+/// See https://www.tensorflow.org/xla/operation_semantics#rev_reverse for more
+/// details.
+template <typename OpTy>
+class ReverseOpIndexPropagation : public IndexPropagationOp<OpTy> {
+ public:
+  using IndexPropagationOp<OpTy>::IndexPropagationOp;
+  virtual ~ReverseOpIndexPropagation() = default;
+
+ protected:
+  LogicalResult propagateIndexMapImpl(
+      Operation *op, DenseSet<unsigned> dimensions, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &operandIndices) const {
+    auto shaped_type = op->getOperand(0)->getType().cast<ShapedType>();
+    Builder builder(op->getContext());
+    SmallVector<AffineExpr, 4> dimensionsExprs;
+    for (unsigned index = 0; index < shaped_type.getRank(); ++index) {
+      if (dimensions.count(index)) {
+        auto reversed_index =
+            shaped_type.getDimSize(index) - builder.getAffineDimExpr(index) - 1;
+        dimensionsExprs.push_back(reversed_index);
+      } else {
+        dimensionsExprs.push_back(builder.getAffineDimExpr(index));
+      }
+    }
+    auto dimensionsAffineMap = AffineMap::get(
+        dimensionsExprs.size(), /*symbolCount=*/0, dimensionsExprs);
+
+    // Compose the index map of the result with the index map for the
+    // dimensions.
+    auto operandMap = dimensionsAffineMap.compose(resultIndex);
+    operandIndices.push_back(operandMap);
+    return success();
+  }
+};
+
 /// Index map of the operand of a transpose op is obtained by composing the
 /// affine map of the result with the affine map that represents the inverse of
 /// the transpose permutation vector. The permutation vector must be supplied by

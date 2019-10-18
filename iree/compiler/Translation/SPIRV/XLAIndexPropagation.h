@@ -84,6 +84,17 @@ class ReturnOpIndexPropagation : public IndexPropagationOp<OpTy> {
   }
 };
 
+/// Index propogation for XLA Reverse.
+class XLAReverseOpIndexPropagation final
+    : public ReverseOpIndexPropagation<xla_hlo::ReverseOp> {
+ public:
+  using ReverseOpIndexPropagation<
+      xla_hlo::ReverseOp>::ReverseOpIndexPropagation;
+  LogicalResult propagateIndexMap(
+      Operation *op, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &indexMap) const override;
+};
+
 /// Index propogation for XLA Transpose.
 class XLATransposeOpIndexPropagation final
     : public TransposeOpIndexPropagation<xla_hlo::TransposeOp> {

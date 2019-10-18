@@ -92,6 +92,21 @@ LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
 }
 
 //===----------------------------------------------------------------------===//
+// ReverseOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult XLAReverseOpIndexPropagation::propagateIndexMap(
+    Operation *op, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &indexMap) const {
+  auto reverseOp = cast<xla_hlo::ReverseOp>(op);
+  DenseSet<unsigned> dimensions;
+  for (auto index : reverseOp.dimensions()) {
+    dimensions.insert(index.getZExtValue());
+  }
+  return propagateIndexMapImpl(op, dimensions, resultIndex, indexMap);
+}
+
+//===----------------------------------------------------------------------===//
 // TransposeOp
 //===----------------------------------------------------------------------===//
 
