@@ -20,5 +20,6 @@ spirv_kernel_cc_library(
     name = "Kernels",
     srcs = [
         "matmul.comp",
+        "reduce_untiled.comp",
     ],
 )

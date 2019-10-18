@@ -15,6 +15,7 @@
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels.h"
 
 #include "iree/compiler/Translation/SPIRV/Kernels/Kernels.h"
+#include "iree/schemas/spirv_executable_def_generated.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
@@ -59,6 +60,83 @@ void addSpecializationMapEntry(
   specValue->constant_id = constant_id;
   specValue->uint32_value = value;
   specializationInfoDef->map_entries.push_back(std::move(specValue));
+}
+
+LogicalResult buildReductionExecutable(IREE::ExecutableOp executableOp,
+                                       FuncOp entryFuncOp,
+                                       iree::SpirVExecutableDefT *out_def) {
+  auto funcType = entryFuncOp.getType();
+  auto arg0 = funcType.getInput(0).cast<ShapedType>();
+  if (!arg0.getElementType().isF32()) {
+    // When we do other types we'll need other shaders.
+    return entryFuncOp.emitOpError()
+           << "Only floating point reduction is implemented";
+  }
+
+  auto module = executableOp.getInnerModule();
+  auto applyFuncAttr = entryFuncOp.getAttrOfType<SymbolRefAttr>(
+      "iree.executable.reduction.apply");
+  auto applyFuncOp = module.lookupSymbol(applyFuncAttr.getValue());
+
+  // TODO(benvanik): specialize (template on shapes/types/etc).
+  std::string kernelName = "reduce_untiled.spv";
+  llvm::Optional<uint32_t> operationId;
+  applyFuncOp->walk([&](Operation *op) {
+    if (isa<xla_hlo::AddOp>(op)) {
+      operationId = 0;
+    } else if (isa<xla_hlo::MaxOp>(op)) {
+      operationId = 1;
+    } else if (isa<xla_hlo::MinOp>(op)) {
+      operationId = 2;
+    }
+  });
+  if (!operationId.hasValue()) {
+    applyFuncOp->dump();
+    return applyFuncOp->emitOpError() << "Unsupported reduction operator";
+  }
+
+  out_def->tag = "__reduce__";
+  out_def->entry_points = {"main"};
+
+  out_def->code = readEmbeddedKernelCode(kernelName);
+
+  // arg0, arg1, ret0
+  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
+  pipelineLayoutDef->buffer_binding_set = 0;
+  auto dsl = std::make_unique<iree::VkDescriptorSetLayoutDefT>();
+  addDescriptorSetLayoutBinding(0, dsl.get());
+  addDescriptorSetLayoutBinding(1, dsl.get());
+  addDescriptorSetLayoutBinding(2, dsl.get());
+  pipelineLayoutDef->descriptor_set_layouts.push_back(std::move(dsl));
+  out_def->pipeline_layout = std::move(pipelineLayoutDef);
+
+  // See the shader source for documentation on the values of A/B/C/R.
+  int64_t reductionDimension =
+      entryFuncOp
+          .getAttrOfType<IntegerAttr>("iree.executable.reduction.dimension")
+          .getInt();
+  uint32_t r = arg0.getDimSize(reductionDimension);
+  uint32_t a = 1;
+  for (int i = 0; i < reductionDimension; ++i) {
+    a *= arg0.getDimSize(i);
+  }
+  uint32_t b = 1;
+  for (int i = reductionDimension + 1; i < arg0.getRank(); ++i) {
+    b *= arg0.getDimSize(i);
+  }
+  uint32_t c = b;
+
+  auto specializationInfoDef =
+      std::make_unique<iree::VkSpecializationInfoDefT>();
+  addSpecializationMapEntry(/*kOperationId*/ 100, operationId.getValue(),
+                            specializationInfoDef.get());
+  addSpecializationMapEntry(/*kA*/ 101, a, specializationInfoDef.get());
+  addSpecializationMapEntry(/*kB*/ 102, b, specializationInfoDef.get());
+  addSpecializationMapEntry(/*kC*/ 103, c, specializationInfoDef.get());
+  addSpecializationMapEntry(/*kR*/ 104, r, specializationInfoDef.get());
+  out_def->specialization_info = std::move(specializationInfoDef);
+
+  return success();
 }
 
 // Builds a SPIR-V executable from a well-known matmul executable.
@@ -109,6 +187,14 @@ bool tryEmbeddedKernelRewrite(IREE::ExecutableOp executableOp,
                               iree::SpirVExecutableDefT *out_def) {
   auto module = executableOp.getInnerModule();
   for (auto funcOp : module.getOps<FuncOp>()) {
+    if (funcOp.getAttr("iree.executable.reduction")) {
+      if (failed(buildReductionExecutable(executableOp, funcOp, out_def))) {
+        executableOp.emitOpError() << "Failed to splat in the reduction kernel";
+        return false;
+      }
+      return true;
+    }
+
     for (auto &block : funcOp) {
       for (auto &op : block) {
         if (isa<xla_hlo::ConvOp>(&op)) {

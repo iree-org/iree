@@ -1,4 +1,6 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types="f" | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --output_types="f" | FileCheck %s --dump-input=fail
+// TODO(b/142903911): figure out swiftshader+asan crash:
+// RUN: iree-run-mlir %s --target_backends=vulkan-spirv --output_types="f" --norun
 
 // Float sum values from [1.0, 10.0]
 // CHECK-LABEL: EXEC @reduce_sum_1x10xf32
@@ -107,6 +109,28 @@ func @reduce_sum_4x2x3xf32_dim0() -> tensor<2x3xf32> {
 
 // -----
 
+// CHECK-LABEL: EXEC @reduce_sum_4x2x3xf32_dim1
+func @reduce_sum_4x2x3xf32_dim1() -> tensor<4x3xf32> {
+  %0 = constant dense<[[[1.0, 2.0, 3.0],
+                        [4.0, 5.0, 6.0]],
+                       [[1.0, 2.0, 3.0],
+                        [4.0, 5.0, 6.0]],
+                       [[1.0, 2.0, 3.0],
+                        [4.0, 5.0, 6.0]],
+                       [[1.0, 2.0, 3.0],
+                        [4.0, 5.0, 6.0]]]> : tensor<4x2x3xf32>
+  %1 = constant dense<0.0> : tensor<f32>
+  %2 = "xla_hlo.reduce"(%0, %1) ( {
+  ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
+    %3 = "xla_hlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+    "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+  }) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<4x2x3xf32>, tensor<f32>) -> tensor<4x3xf32>
+  return %2 : tensor<4x3xf32>
+}
+// CHECK: 4x3xf32=[5 7 9][5 7 9][5 7 9][5 7 9]
+
+// -----
+
 // CHECK-LABEL: EXEC @reduce_sum_4x2x3xf32_dim2
 func @reduce_sum_4x2x3xf32_dim2() -> tensor<4x2xf32> {
   %0 = constant dense<[[[1.0, 2.0, 3.0],
@@ -170,4 +194,3 @@ func @reduce_sum_4x2x3xf32_dims_0_1_2() -> tensor<f32> {
   return %2 : tensor<f32>
 }
 // CHECK: f32=84
-

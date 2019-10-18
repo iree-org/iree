@@ -20,5 +20,6 @@
 #    spirv
 #  SRCS
 #    "matmul.comp"
+#    "reduce_untiled.comp"
 #   PUBLIC
 # )

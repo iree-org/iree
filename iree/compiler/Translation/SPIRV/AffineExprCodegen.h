@@ -62,12 +62,9 @@ class AffineExprCodegen : public AffineExprVisitor<AffineExprCodegen, Value *> {
     return nullptr;
   }
   Value *visitConstantExpr(AffineConstantExpr expr) {
-    // TODO(ravishankarm): Implement constant expr codegen.
     return builder.create<spirv::ConstantOp>(
         location, builder.getIntegerType(32),
         builder.getI32IntegerAttr(expr.getValue()));
-    llvm_unreachable("Unimplemented affine AffineConstantExpr codegen");
-    return nullptr;
   }
   Value *visitDimExpr(AffineDimExpr expr) {
     return threadDimToDstValue.lookup(expr.getPosition());
