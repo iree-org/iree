@@ -19,7 +19,6 @@
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
 #include "iree/compiler/Utils/OpCreationUtils.h"
-#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -44,13 +43,7 @@ namespace {
 
 template <typename T>
 class SequencerConversionPattern : public OpConversionPattern<T> {
- public:
-  SequencerConversionPattern(MLIRContext *context,
-                             MemRefTypeConverter &typeConverter)
-      : OpConversionPattern<T>(context), typeConverter_(typeConverter) {}
-
- protected:
-  MemRefTypeConverter &typeConverter_;
+  using OpConversionPattern<T>::OpConversionPattern;
 };
 
 struct CallOpLowering : public SequencerConversionPattern<CallOp> {
@@ -59,13 +52,9 @@ struct CallOpLowering : public SequencerConversionPattern<CallOp> {
   PatternMatchResult matchAndRewrite(
       CallOp callOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<Type, 4> convertedResults;
-    auto result = typeConverter_.convertTypes(
-        callOp.getCalleeType().getResults(), convertedResults);
-    (void)result;
-    assert(succeeded(result) && "expected valid callee type conversion");
-    rewriter.replaceOpWithNewOp<IREESeq::HL::CallOp>(
-        callOp, callOp.getCallee(), convertedResults, operands);
+    SmallVector<Type, 4> resultTypes(callOp.getResultTypes());
+    rewriter.replaceOpWithNewOp<IREESeq::HL::CallOp>(callOp, callOp.getCallee(),
+                                                     resultTypes, operands);
 
     return matchSuccess();
   }
@@ -201,7 +190,6 @@ struct StoreOpLowering : public SequencerConversionPattern<StoreOp> {
 }  // namespace
 
 void populateLowerStdToSequencerPatterns(OwningRewritePatternList &patterns,
-                                         MemRefTypeConverter &converter,
                                          MLIRContext *context) {
   patterns.insert<
       // Control flow.
@@ -209,7 +197,7 @@ void populateLowerStdToSequencerPatterns(OwningRewritePatternList &patterns,
       BranchOpLowering, CondBranchOpLowering,
       // Memory management.
       AllocOpLowering, DeallocOpLowering, LoadOpLowering, StoreOpLowering>(
-      context, converter);
+      context);
 }
 
 }  // namespace iree_compiler

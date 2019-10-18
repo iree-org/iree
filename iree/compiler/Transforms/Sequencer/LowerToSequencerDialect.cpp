@@ -33,18 +33,16 @@ class LowerToSequencerDialectPass
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     auto* ctx = &getContext();
-    MemRefTypeConverter converter(ctx);
     xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns, ctx);
     xla_hlo::PopulateXlaToStdPatterns(&patterns, ctx);
     populateLowerStdToIreePatterns(patterns, ctx);
-    populateLowerStdToSequencerPatterns(patterns, converter, ctx);
+    populateLowerStdToSequencerPatterns(patterns, ctx);
     populateLowerXlaToIreePatterns(patterns, ctx);
     populateLowerXlaToSequencerPatterns(patterns, ctx);
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLSequencerDialect, IREEDialect>();
-    target.addDynamicallyLegalOp<FuncOp>(
-        [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
+    target.addLegalOp<FuncOp>();
     if (failed(applyFullConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }

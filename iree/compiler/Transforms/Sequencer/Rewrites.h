@@ -33,7 +33,6 @@ void populateLowerXlaToSequencerPatterns(OwningRewritePatternList &patterns,
 
 // Adds rewrite patterns for lowering standard ops to Sequencer HL ops.
 void populateLowerStdToSequencerPatterns(OwningRewritePatternList &patterns,
-                                         MemRefTypeConverter &converter,
                                          MLIRContext *ctx);
 }  // namespace iree_compiler
 }  // namespace mlir
