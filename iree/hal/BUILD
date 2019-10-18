@@ -31,6 +31,7 @@ cc_library(
         ":buffer",
         ":buffer_view",
         ":fence",
+        ":heap_buffer",
         ":semaphore",
         "//iree/base:api",
         "//iree/base:api_util",

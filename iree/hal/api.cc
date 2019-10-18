@@ -21,6 +21,7 @@
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/fence.h"
+#include "iree/hal/heap_buffer.h"
 #include "iree/hal/semaphore.h"
 
 namespace iree {
@@ -184,6 +185,83 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_unmap(
   mapping->reset();
 
   std::memset(mapped_memory, 0, sizeof(*mapped_memory));
+  return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::HeapBuffer
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate(
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
+    iree_host_size_t allocation_size, iree_allocator_t contents_allocator,
+    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_heap_buffer_allocate");
+
+  if (!out_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_buffer = nullptr;
+
+  if (!allocation_size) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto handle = HeapBuffer::Allocate(
+      static_cast<MemoryTypeBitfield>(memory_type),
+      static_cast<BufferUsageBitfield>(usage), allocation_size);
+
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate_copy(
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
+    iree_hal_memory_access_t allowed_access, iree_byte_span_t contents,
+    iree_allocator_t contents_allocator, iree_allocator_t allocator,
+    iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_heap_buffer_allocate_copy");
+
+  if (!out_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_buffer = nullptr;
+
+  if (!contents.data || !contents.data_length) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto handle = HeapBuffer::AllocateCopy(
+      static_cast<BufferUsageBitfield>(usage),
+      static_cast<MemoryAccessBitfield>(allowed_access), contents.data,
+      contents.data_length);
+
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t usage, iree_byte_span_t contents,
+    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_heap_buffer_wrap");
+
+  if (!out_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_buffer = nullptr;
+
+  if (!contents.data || !contents.data_length) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto handle =
+      HeapBuffer::WrapMutable(static_cast<MemoryTypeBitfield>(memory_type),
+                              static_cast<MemoryAccessBitfield>(allowed_access),
+                              static_cast<BufferUsageBitfield>(usage),
+                              contents.data, contents.data_length);
+
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
   return IREE_STATUS_OK;
 }
 

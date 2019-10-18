@@ -52,6 +52,7 @@ iree_cc_library(
     iree::hal::buffer
     iree::hal::buffer_view
     iree::hal::fence
+    iree::hal::heap_buffer
     iree::hal::semaphore
   PUBLIC
 )

@@ -44,6 +44,60 @@ typedef struct {
   uint64_t reserved[8];
 } iree_hal_mapped_memory_t;
 
+// A bitfield specifying properties for a memory type.
+typedef enum {
+  IREE_HAL_MEMORY_TYPE_NONE = 0,
+
+  // Memory is lazily allocated by the device and only exists transiently.
+  // This is the optimal mode for memory used only within a single command
+  // buffer. Transient buffers, even if they have
+  // IREE_HAL_MEMORY_TYPE_HOST_VISIBLE set, should be treated as device-local
+  // and opaque as they may have no memory attached to them outside of the time
+  // they are being evaluated on devices.
+  //
+  // This flag can be treated as a hint in most cases; allocating a buffer with
+  // it set _may_ return the same as if it had not be set. Certain allocation
+  // routines may use the hint to more tightly control reuse or defer wiring the
+  // memory.
+  IREE_HAL_MEMORY_TYPE_TRANSIENT = 1 << 0,
+
+  // Memory allocated with this type can be mapped for host access using
+  // iree_hal_buffer_map.
+  IREE_HAL_MEMORY_TYPE_HOST_VISIBLE = 1 << 1,
+
+  // The host cache management commands MappedMemory::Flush and
+  // MappedMemory::Invalidate are not needed to flush host writes
+  // to the device or make device writes visible to the host, respectively.
+  IREE_HAL_MEMORY_TYPE_HOST_COHERENT = 1 << 2,
+
+  // Memory allocated with this type is cached on the host. Host memory
+  // accesses to uncached memory are slower than to cached memory, however
+  // uncached memory is always host coherent. MappedMemory::Flush must be used
+  // to ensure the device has visibility into any changes made on the host and
+  // Invalidate must be used to ensure the host has visibility into any changes
+  // made on the device.
+  IREE_HAL_MEMORY_TYPE_HOST_CACHED = 1 << 3,
+
+  // Memory is accessible as normal host allocated memory.
+  IREE_HAL_MEMORY_TYPE_HOST_LOCAL =
+      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_HOST_COHERENT,
+
+  // Memory allocated with this type is visible to the device for execution.
+  // Being device visible does not mean the same thing as
+  // IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL. Though an allocation may be visible to
+  // the device and therefore useable for execution it may require expensive
+  // mapping or implicit transfers.
+  IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE = 1 << 4,
+
+  // Memory allocated with this type is the most efficient for device access.
+  // Devices may support using memory that is not device local via
+  // IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE but doing so can incur non-trivial
+  // performance penalties. Device local memory, on the other hand, is
+  // guaranteed to be fast for all operations.
+  IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL =
+      IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE | (1 << 5),
+} iree_hal_memory_type_t;
+
 // A bitfield specifying how memory will be accessed in a mapped memory region.
 typedef enum {
   // Memory is not mapped.
@@ -69,6 +123,45 @@ typedef enum {
                                IREE_HAL_MEMORY_ACCESS_WRITE |
                                IREE_HAL_MEMORY_ACCESS_DISCARD,
 } iree_hal_memory_access_t;
+
+// Bitfield that defines how a buffer is intended to be used.
+// Usage allows the driver to appropriately place the buffer for more
+// efficient operations of the specified types.
+typedef enum {
+  IREE_HAL_BUFFER_USAGE_NONE = 0,
+
+  // The buffer, once defined, will not be mapped or updated again.
+  // This should be used for uniform parameter values such as runtime
+  // constants for executables. Doing so may allow drivers to inline values or
+  // represent them in command buffers more efficiently (avoiding memory reads
+  // or swapping, etc).
+  IREE_HAL_BUFFER_USAGE_CONSTANT = 1 << 0,
+
+  // The buffer can be used as the source or target of a transfer command
+  // (CopyBuffer, UpdateBuffer, etc).
+  //
+  // If |IREE_HAL_BUFFER_USAGE_MAPPING| is not specified drivers may safely
+  // assume that the host may never need visibility of this buffer as all
+  // accesses will happen via command buffers.
+  IREE_HAL_BUFFER_USAGE_TRANSFER = 1 << 1,
+
+  // The buffer can be mapped by the host application for reading and writing.
+  //
+  // As mapping may require placement in special address ranges or system
+  // calls to enable visibility the driver can use the presence (or lack of)
+  // this flag to perform allocation-type setup and avoid initial mapping
+  // overhead.
+  IREE_HAL_BUFFER_USAGE_MAPPING = 1 << 2,
+
+  // The buffer can be provided as an input or output to an executable.
+  // Buffers of this type may be directly used by drivers during dispatch.
+  IREE_HAL_BUFFER_USAGE_DISPATCH = 1 << 3,
+
+  // Buffer may be used for any operation.
+  IREE_HAL_BUFFER_USAGE_ALL = IREE_HAL_BUFFER_USAGE_TRANSFER |
+                              IREE_HAL_BUFFER_USAGE_MAPPING |
+                              IREE_HAL_BUFFER_USAGE_DISPATCH,
+} iree_hal_buffer_usage_t;
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Buffer
@@ -134,6 +227,56 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map(
 // Unmaps the buffer as was previously mapped to |mapped_memory|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_unmap(
     iree_hal_buffer_t* buffer, iree_hal_mapped_memory_t* mapped_memory);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::HeapBuffer
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Allocates a zeroed host heap buffer of the given size.
+// The buffer contents will be allocated with |contents_allocator| while
+// |allocator| is used for the iree_hal_buffer_t.
+//
+// Returns a buffer allocated with malloc that may not be usable by devices
+// without copies. |memory_type| should be set to
+// IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate(
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
+    iree_host_size_t allocation_size, iree_allocator_t contents_allocator,
+    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer);
+
+// Allocates a host heap buffer with a copy of the given data.
+// The buffer contents will be allocated with |contents_allocator| while
+// |allocator| is used for the iree_hal_buffer_t.
+//
+// Returns a buffer allocated with malloc that may not be usable by devices
+// without copies. |memory_type| should be set to
+// IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate_copy(
+    iree_hal_memory_type_t memory_type, iree_hal_buffer_usage_t usage,
+    iree_hal_memory_access_t allowed_access, iree_byte_span_t contents,
+    iree_allocator_t contents_allocator, iree_allocator_t allocator,
+    iree_hal_buffer_t** out_buffer);
+
+// Wraps an existing host heap allocation in a buffer.
+// Ownership of the host allocation remains with the caller and the memory
+// must remain valid for so long as the iree_hal_buffer_t may be in use.
+//
+// Returns a buffer allocated with malloc that may not be usable by devices
+// without copies. |memory_type| should be set to
+// IREE_HAL_MEMORY_TYPE_HOST_LOCAL in most cases.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
+    iree_hal_memory_type_t memory_type, iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t usage, iree_byte_span_t contents,
+    iree_allocator_t allocator, iree_hal_buffer_t** out_buffer);
+
+// TODO(benvanik): add a wrap that takes an allocator just for the buffer.
 
 #endif  // IREE_API_NO_PROTOTYPES
 
