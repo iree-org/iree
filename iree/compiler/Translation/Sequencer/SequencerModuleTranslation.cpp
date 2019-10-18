@@ -226,9 +226,7 @@ std::vector<uint8_t> SequencerTranslator::translateModule(ModuleOp module) {
     return {};
   }
 
-  // Run the sequencer-specific conversion passes on the module after we've
-  // removed the executables. We don't lower all the way yet as we need the
-  // executables to know some things.
+  // Run the sequencer-specific conversion passes on the module.
   auto sequencerConversionPasses =
       createPassManager(module.getContext(), options());
   buildSequencerConversionPassPipeline(sequencerConversionPasses.get());
