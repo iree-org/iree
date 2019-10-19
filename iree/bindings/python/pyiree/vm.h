@@ -12,29 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/bindings/python/pyiree/binding.h"
+#ifndef IREE_BINDINGS_PYTHON_PYIREE_VM_H_
+#define IREE_BINDINGS_PYTHON_PYIREE_VM_H_
 
-#include "iree/bindings/python/pyiree/compiler.h"
+#include "iree/bindings/python/pyiree/binding.h"
 #include "iree/bindings/python/pyiree/rt.h"
-#include "iree/bindings/python/pyiree/status_utils.h"
-#include "iree/bindings/python/pyiree/vm.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace python {
 
-PYBIND11_MODULE(binding, m) {
-  m.doc() = "IREE Binding Backend Helpers";
-  py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob");
-
-  auto compiler_m = m.def_submodule("compiler", "IREE compiler support");
-  SetupCompilerBindings(compiler_m);
-
-  auto rt_m = m.def_submodule("rt", "IREE RT api");
-  SetupRtBindings(rt_m);
-
-  auto vm_m = m.def_submodule("vm", "IREE VM api");
-  SetupVmBindings(vm_m);
-}
+void SetupVmBindings(pybind11::module m);
 
 }  // namespace python
 }  // namespace iree
+
+#endif  // IREE_BINDINGS_PYTHON_PYIREE_VM_H_

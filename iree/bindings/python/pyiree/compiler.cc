@@ -59,8 +59,7 @@ OwningModuleRef parseMLIRModuleFromString(StringRef contents,
 
 }  // namespace
 
-std::shared_ptr<MemoryModuleFile> CompileModuleFromAsm(
-    const std::string& moduleAsm) {
+std::shared_ptr<OpaqueBlob> CompileModuleFromAsm(const std::string& moduleAsm) {
   MLIRContext context;
 
   // Arrange to get a view that includes a terminating null to avoid additional
@@ -80,10 +79,11 @@ std::shared_ptr<MemoryModuleFile> CompileModuleFromAsm(
   if (moduleBlob.empty()) {
     throw std::runtime_error("Failed to translate MLIR module");
   }
+  return std::make_shared<OpaqueByteVectorBlob>(std::move(moduleBlob));
+}
 
-  auto moduleFile = PyConsumeStatusOr(FlatBufferFile<ModuleDef>::FromContainer(
-      ModuleDefIdentifier(), std::move(moduleBlob)));
-  return std::make_shared<MemoryModuleFile>(std::move(moduleFile));
+void SetupCompilerBindings(pybind11::module m) {
+  m.def("compile_module_from_asm", CompileModuleFromAsm);
 }
 
 }  // namespace python

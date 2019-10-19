@@ -12,28 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/bindings/python/pyiree/binding.h"
-
-#include "iree/bindings/python/pyiree/compiler.h"
-#include "iree/bindings/python/pyiree/rt.h"
-#include "iree/bindings/python/pyiree/status_utils.h"
 #include "iree/bindings/python/pyiree/vm.h"
+
+#include "iree/bindings/python/pyiree/status_utils.h"
 
 namespace iree {
 namespace python {
 
-PYBIND11_MODULE(binding, m) {
-  m.doc() = "IREE Binding Backend Helpers";
-  py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob");
+std::unique_ptr<RtModule> CreateModuleFromBlob(
+    std::shared_ptr<OpaqueBlob> blob) {
+  iree_rt_module_t* module;
+  auto free_fn = OpaqueBlob::CreateFreeFn(blob);
+  auto status = iree_vm_bytecode_module_create_from_buffer(
+      {static_cast<uint8_t*>(blob->data()), blob->size()}, free_fn.first,
+      free_fn.second, IREE_ALLOCATOR_DEFAULT, &module);
+  CheckApiStatus(status, "Error creating vm module from blob");
+  return RtModule::CreateRetained(module);
+}
 
-  auto compiler_m = m.def_submodule("compiler", "IREE compiler support");
-  SetupCompilerBindings(compiler_m);
-
-  auto rt_m = m.def_submodule("rt", "IREE RT api");
-  SetupRtBindings(rt_m);
-
-  auto vm_m = m.def_submodule("vm", "IREE VM api");
-  SetupVmBindings(vm_m);
+void SetupVmBindings(pybind11::module m) {
+  m.def("create_module_from_blob", CreateModuleFromBlob);
 }
 
 }  // namespace python

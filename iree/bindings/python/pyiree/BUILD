@@ -28,15 +28,22 @@ iree_py_extension(
         "binding.h",
         "compiler.cc",
         "compiler.h",
+        "rt.h",
+        "rt.cc",
         "status_utils.cc",
         "status_utils.h",
+        "vm.cc",
+        "vm.h",
     ],
     copts = [
         "-fexceptions",
     ],
     features = ["-use_header_modules"],
     deps = [
-        "//iree/base:flatbuffer_util",
+        "//iree/base:api",
+        "//iree/hal:api",
+        "//iree/rt:api",
+        "//iree/vm:api",
         "//iree/base:status",
         "//iree/compiler/Translation/Sequencer",
         "//iree/schemas",
@@ -50,6 +57,17 @@ iree_py_extension(
 py_test(
     name = "compiler_test",
     srcs = ["compiler_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":binding",
+        "//iree/bindings/python:pathsetup",
+        "@absl_py//absl/testing:absltest",
+    ],
+)
+
+py_test(
+    name = "runtime_test",
+    srcs = ["runtime_test.py"],
     python_version = "PY3",
     deps = [
         ":binding",

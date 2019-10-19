@@ -17,28 +17,12 @@
 
 #include <string>
 
-#include "iree/base/flatbuffer_util.h"
 #include "iree/bindings/python/pyiree/binding.h"
-#include "iree/schemas/module_def_generated.h"
 
 namespace iree {
 namespace python {
 
-class MemoryModuleFile : public std::enable_shared_from_this<MemoryModuleFile> {
- public:
-  MemoryModuleFile() = default;
-  explicit MemoryModuleFile(std::unique_ptr<FlatBufferFile<ModuleDef>> file)
-      : file_(std::move(file)) {}
-  virtual ~MemoryModuleFile() = default;
-
-  FlatBufferFile<ModuleDef>* file() const { return file_.get(); }
-
- private:
-  std::unique_ptr<FlatBufferFile<ModuleDef>> file_;
-};
-
-std::shared_ptr<MemoryModuleFile> CompileModuleFromAsm(
-    const std::string& moduleAsm);
+void SetupCompilerBindings(pybind11::module m);
 
 }  // namespace python
 }  // namespace iree
