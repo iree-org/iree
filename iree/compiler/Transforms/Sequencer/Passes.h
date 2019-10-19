@@ -59,7 +59,7 @@ std::unique_ptr<OpPassBase<FuncOp>> createLegalizeInputOpsPass();
 std::unique_ptr<OpPassBase<FuncOp>> createLowerToSequencerDialectPass();
 
 // Lowers the HL sequencer dialect to the LL sequencer dialect.
-std::unique_ptr<OpPassBase<FuncOp>> createLowerSequencerDialectPass();
+std::unique_ptr<OpPassBase<ModuleOp>> createLowerSequencerDialectPass();
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Assignment

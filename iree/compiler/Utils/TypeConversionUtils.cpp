@@ -48,6 +48,8 @@ Type legalizeType(Type type) {
   return type;
 }
 
+Type LLTypeConverter::convertType(Type type) { return legalizeType(type); }
+
 MemRefType convertTypeToMemRef(Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);

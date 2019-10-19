@@ -19,6 +19,7 @@
 #include "iree/compiler/IR/Sequencer/LLDialect.h"
 #include "iree/compiler/IR/Sequencer/LLOps.h"
 #include "iree/compiler/IR/StructureOps.h"
+#include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -28,6 +29,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Module.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
@@ -41,6 +43,16 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+template <typename SrcOp>
+class SequencerLoweringPattern : public OpConversionPattern<SrcOp> {
+ public:
+  SequencerLoweringPattern(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern<SrcOp>(context), typeConverter_(typeConverter) {}
+
+ protected:
+  TypeConverter &typeConverter_;
+};
 
 // Returns an integer scalar memref containing the offset specified by |indices|
 // within |type|.
@@ -102,95 +114,116 @@ std::pair<Value *, Value *> computeRange(Location loc, Value *reference,
   return {offsetMemRef, lengthMemRef};
 }
 
-struct LowerSliceOpPattern : public OpRewritePattern<IREESeq::HL::SliceOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct LowerSliceOpPattern
+    : public SequencerLoweringPattern<IREESeq::HL::SliceOp> {
+  using SequencerLoweringPattern::SequencerLoweringPattern;
 
-  PatternMatchResult matchAndRewrite(IREESeq::HL::SliceOp op,
-                                     PatternRewriter &rewriter) const {
-    auto range = computeRange(op.getLoc(), op.src(), op.indices(), op.lengths(),
-                              rewriter);
+  PatternMatchResult matchAndRewrite(
+      IREESeq::HL::SliceOp op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    OperandAdaptor<IREESeq::HL::SliceOp> operandAdaptor(operands);
+    auto range = computeRange(op.getLoc(), operandAdaptor.src(),
+                              operandAdaptor.indices(),
+                              operandAdaptor.lengths(), rewriter);
     rewriter.replaceOpWithNewOp<IREESeq::LL::DynamicSliceOp>(
-        op, ArrayRef<Type>{op.getResult()->getType()},
-        ArrayRef<Value *>{op.src(), range.first, range.second}, op.getAttrs());
+        op, typeConverter_.convertType(op.getType()),
+        ArrayRef<Value *>{operandAdaptor.src(), range.first, range.second},
+        op.getAttrs());
     return matchSuccess();
   }
 };
 
-struct LowerShapeOpPattern : public OpRewritePattern<IREESeq::HL::ShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct LowerShapeOpPattern
+    : public SequencerLoweringPattern<IREESeq::HL::ShapeOp> {
+  using SequencerLoweringPattern::SequencerLoweringPattern;
 
-  PatternMatchResult matchAndRewrite(IREESeq::HL::ShapeOp op,
-                                     PatternRewriter &rewriter) const {
+  PatternMatchResult matchAndRewrite(
+      IREESeq::HL::ShapeOp op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
     auto *shapeMemRef =
         rewriter
             .create<IREESeq::LL::AllocHeapOp>(
                 op.getLoc(),
-                MemRefType::get(
-                    {op.getResult()->getType().cast<ShapedType>().getRank()},
-                    rewriter.getIntegerType(64)),
+                MemRefType::get({op.getType().cast<ShapedType>().getRank()},
+                                rewriter.getIntegerType(64)),
                 ArrayRef<Value *>{})
             .getResult();
     op.replaceAllUsesWith(shapeMemRef);
-    rewriter.replaceOpWithNewOp<IREESeq::LL::ShapeOp>(op, op.getOperand(),
+    rewriter.replaceOpWithNewOp<IREESeq::LL::ShapeOp>(op, operands[0],
                                                       shapeMemRef);
     return matchSuccess();
   }
 };
 
-struct LowerCopyOpPattern : public OpRewritePattern<IREESeq::HL::CopyOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct LowerCopyOpPattern
+    : public SequencerLoweringPattern<IREESeq::HL::CopyOp> {
+  using SequencerLoweringPattern::SequencerLoweringPattern;
 
-  PatternMatchResult matchAndRewrite(IREESeq::HL::CopyOp op,
-                                     PatternRewriter &rewriter) const {
+  PatternMatchResult matchAndRewrite(
+      IREESeq::HL::CopyOp op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    OperandAdaptor<IREESeq::HL::CopyOp> operandAdaptor(operands);
     auto *srcOffsetMemRef =
-        computeOffset(op.getLoc(), op.src(), op.srcIndices(), rewriter);
-    auto dstRange = computeRange(op.getLoc(), op.dst(), op.dstIndices(),
-                                 op.lengths(), rewriter);
+        computeOffset(op.getLoc(), operandAdaptor.src(),
+                      operandAdaptor.srcIndices(), rewriter);
+    auto dstRange = computeRange(op.getLoc(), operandAdaptor.dst(),
+                                 operandAdaptor.dstIndices(),
+                                 operandAdaptor.lengths(), rewriter);
     rewriter.replaceOpWithNewOp<IREESeq::LL::DynamicCopyOp>(
-        op, op.src(), srcOffsetMemRef, op.dst(), dstRange.first,
+        op, operandAdaptor.src(), srcOffsetMemRef, operandAdaptor.dst(),
+        dstRange.first, dstRange.second);
+    return matchSuccess();
+  }
+};
+
+struct LowerFillOpPattern
+    : public SequencerLoweringPattern<IREESeq::HL::FillOp> {
+  using SequencerLoweringPattern::SequencerLoweringPattern;
+
+  PatternMatchResult matchAndRewrite(
+      IREESeq::HL::FillOp op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    OperandAdaptor<IREESeq::HL::FillOp> operandAdaptor(operands);
+    auto dstRange = computeRange(op.getLoc(), operandAdaptor.dst(),
+                                 operandAdaptor.dstIndices(),
+                                 operandAdaptor.lengths(), rewriter);
+    rewriter.replaceOpWithNewOp<IREESeq::LL::DynamicFillOp>(
+        op, operandAdaptor.value(), operandAdaptor.dst(), dstRange.first,
         dstRange.second);
     return matchSuccess();
   }
 };
 
-struct LowerFillOpPattern : public OpRewritePattern<IREESeq::HL::FillOp> {
-  using OpRewritePattern::OpRewritePattern;
+struct LowerBranchOpPattern
+    : public SequencerLoweringPattern<IREESeq::HL::BranchOp> {
+  using SequencerLoweringPattern<
+      IREESeq::HL::BranchOp>::SequencerLoweringPattern;
 
-  PatternMatchResult matchAndRewrite(IREESeq::HL::FillOp op,
-                                     PatternRewriter &rewriter) const {
-    auto dstRange = computeRange(op.getLoc(), op.dst(), op.dstIndices(),
-                                 op.lengths(), rewriter);
-    rewriter.replaceOpWithNewOp<IREESeq::LL::DynamicFillOp>(
-        op, op.value(), op.dst(), dstRange.first, dstRange.second);
-    return matchSuccess();
-  }
-};
-
-struct LowerBranchOpPattern : public OpRewritePattern<IREESeq::HL::BranchOp> {
-  using OpRewritePattern<IREESeq::HL::BranchOp>::OpRewritePattern;
-
-  PatternMatchResult matchAndRewrite(IREESeq::HL::BranchOp op,
-                                     PatternRewriter &rewriter) const {
-    SmallVector<Value *, 8> operands{op.getOperation()->getOperands()};
-
-    rewriter.replaceOpWithNewOp<IREESeq::LL::BranchOp>(op, op.getDest(),
-                                                       operands);
+  PatternMatchResult matchAndRewrite(
+      IREESeq::HL::BranchOp op, ArrayRef<Value *> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREESeq::LL::BranchOp>(op, destinations[0],
+                                                       operands[0]);
     return matchSuccess();
   }
 };
 
 struct LowerCondCondBranchOpPattern
-    : public OpRewritePattern<IREESeq::HL::CondBranchOp> {
-  using OpRewritePattern<IREESeq::HL::CondBranchOp>::OpRewritePattern;
+    : public SequencerLoweringPattern<IREESeq::HL::CondBranchOp> {
+  using SequencerLoweringPattern<
+      IREESeq::HL::CondBranchOp>::SequencerLoweringPattern;
 
-  PatternMatchResult matchAndRewrite(IREESeq::HL::CondBranchOp op,
-                                     PatternRewriter &rewriter) const {
-    SmallVector<Value *, 8> trueOperands{op.getTrueOperands()};
-    SmallVector<Value *, 8> falseOperands{op.getFalseOperands()};
-
+  PatternMatchResult matchAndRewrite(
+      IREESeq::HL::CondBranchOp op, ArrayRef<Value *> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
+      ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREESeq::LL::CondBranchOp>(
-        op, op.getCondition(), op.getTrueDest(), trueOperands,
-        op.getFalseDest(), falseOperands);
+        op, properOperands[0],
+        destinations[IREESeq::HL::CondBranchOp::trueIndex],
+        operands[IREESeq::HL::CondBranchOp::trueIndex],
+        destinations[IREESeq::HL::CondBranchOp::falseIndex],
+        operands[IREESeq::HL::CondBranchOp::falseIndex]);
     return matchSuccess();
   }
 };
@@ -200,13 +233,20 @@ struct LowerCondCondBranchOpPattern
 // have the same name. They must also be constructed properly by the default
 // builders.
 template <typename SRC, typename DST>
-struct LowerIdenticalOpPattern : public OpRewritePattern<SRC> {
-  using OpRewritePattern<SRC>::OpRewritePattern;
+struct LowerIdenticalOpPattern : public SequencerLoweringPattern<SRC> {
+  using SequencerLoweringPattern<SRC>::SequencerLoweringPattern;
 
-  PatternMatchResult matchAndRewrite(SRC op, PatternRewriter &rewriter) const {
-    SmallVector<Type, 8> resultTypes{op.getOperation()->getResultTypes()};
-    SmallVector<Value *, 8> operands{op.getOperation()->getOperands()};
-
+  PatternMatchResult matchAndRewrite(
+      SRC op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type, 8> originalResultTypes{
+        op.getOperation()->getResultTypes()};
+    SmallVector<Type, 8> resultTypes;
+    if (failed(this->typeConverter_.convertTypes(originalResultTypes,
+                                                 resultTypes))) {
+      op.emitOpError() << "Failed to convert result types";
+      return this->matchFailure();
+    }
     rewriter.replaceOpWithNewOp<DST>(op, resultTypes, operands, op.getAttrs());
     return this->matchSuccess();
   }
@@ -214,36 +254,46 @@ struct LowerIdenticalOpPattern : public OpRewritePattern<SRC> {
 
 }  // namespace
 
-class LowerSequencerDialectPass
-    : public FunctionPass<LowerSequencerDialectPass> {
+class LowerSequencerDialectPass : public ModulePass<LowerSequencerDialectPass> {
  public:
-  void runOnFunction() override {
+  void runOnModule() override {
+    auto *ctx = &getContext();
+    LLTypeConverter typeConverter(ctx);
     OwningRewritePatternList patterns;
     patterns.insert<
         LowerIdenticalOpPattern<IREE::ConstantOp, IREESeq::LL::ConstantOp>,
         LowerIdenticalOpPattern<IREESeq::HL::DispatchOp,
                                 IREESeq::LL::DynamicDispatchOp>,
         LowerShapeOpPattern, LowerCopyOpPattern, LowerSliceOpPattern,
-        LowerBranchOpPattern, LowerCondCondBranchOpPattern>(&getContext());
+        LowerBranchOpPattern, LowerCondCondBranchOpPattern>(ctx, typeConverter);
 #define IDENTICAL_OP_LOWERING(op_name) \
   LowerIdenticalOpPattern<IREESeq::HL::op_name, IREESeq::LL::op_name>
     patterns.insert<
         IDENTICAL_OP_LOWERING(AllocHeapOp), IDENTICAL_OP_LOWERING(CloneOp),
         IDENTICAL_OP_LOWERING(ReshapeOp), IDENTICAL_OP_LOWERING(CallOp),
-        IDENTICAL_OP_LOWERING(ReturnOp)>(&getContext());
+        IDENTICAL_OP_LOWERING(ReturnOp)>(ctx, typeConverter);
 #undef IDENTICAL_OP_LOWERING
 
-    ConversionTarget target(getContext());
+    mlir::populateFuncOpTypeConversionPattern(patterns, ctx, typeConverter);
+    ConversionTarget target(*ctx);
     target.addLegalDialect<IREELLSequencerDialect>();
-    target.addLegalOp<FuncOp>();
+    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+      return typeConverter.isSignatureLegal(op.getType());
+    });
 
-    if (failed(applyFullConversion(getFunction(), target, patterns))) {
+    // TODO(b/142791494): The conversion framework will recurse into the
+    // executable if we just call it on the top-level module. This can't be a
+    // function pass because type conversion replaces the original functions.
+    auto funcsIt = getModule().getOps<FuncOp>();
+    std::vector<Operation *> funcs(funcsIt.begin(), funcsIt.end());
+
+    if (failed(applyFullConversion(funcs, target, patterns, &typeConverter))) {
       return signalPassFailure();
     }
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createLowerSequencerDialectPass() {
+std::unique_ptr<OpPassBase<ModuleOp>> createLowerSequencerDialectPass() {
   return std::make_unique<LowerSequencerDialectPass>();
 }
 

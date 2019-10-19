@@ -17,6 +17,7 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
@@ -32,6 +33,12 @@ static const int kIndexBitWidth = 32;
 class MemRefTypeConverter : public TypeConverter {
  public:
   explicit MemRefTypeConverter(MLIRContext *context) {}
+  Type convertType(Type type) override;
+};
+
+class LLTypeConverter : public TypeConverter {
+ public:
+  explicit LLTypeConverter(MLIRContext *context) {}
   Type convertType(Type type) override;
 };
 

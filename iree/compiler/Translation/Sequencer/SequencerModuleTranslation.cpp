@@ -139,9 +139,6 @@ void buildSequencerConversionPassPipeline(PassManager *passManager) {
   passManager->addPass(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
 
-  // Convert unsupported types (e.g. index -> i32, i1 -> i8).
-  passManager->addPass(createLegalizeTypeStoragePass());
-
   // Eliminate ops we don't care about based on a lack of side-effects.
   // IREE does not guarantee exception/error behavior of dead ops.
   passManager->addPass(createAggressiveOpEliminationPass());
