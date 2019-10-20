@@ -17,6 +17,7 @@
 
 #include <vector>
 
+#include "iree/base/api.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
 
@@ -24,6 +25,94 @@ namespace iree {
 namespace python {
 
 namespace py = pybind11;
+
+// Wrapper around a blob of memory.
+// Used to transport blobs back and forth between C++ and Python.
+class OpaqueBlob {
+ public:
+  OpaqueBlob() : data_(nullptr), size_(0) {}
+  OpaqueBlob(void* data, size_t size) : data_(data), size_(size) {}
+  virtual ~OpaqueBlob() = default;
+
+  void* data() { return data_; }
+  const void* data() const { return data_; }
+  size_t size() const { return size_; }
+
+  // Create a free function from the OpaqueBlob shared pointer.
+  using BufferFreeFn = void (*)(void* self, iree_byte_span_t);
+  static std::pair<BufferFreeFn, void*> CreateFreeFn(
+      std::shared_ptr<OpaqueBlob> blob) {
+    // Note that there are more efficient ways to write this which
+    // don't bounce through an extra heap alloc, but this is not
+    // intended to be a high impact code path.
+    struct Holder {
+      std::shared_ptr<OpaqueBlob> blob;
+    };
+    Holder* holder = new Holder{std::move(blob)};
+    auto free_fn = +([](void* self, iree_byte_span_t) {
+      Holder* self_holder = static_cast<Holder*>(self);
+      delete self_holder;
+    });
+    return {free_fn, holder};
+  }
+
+ protected:
+  void* data_;
+  size_t size_;
+};
+
+// Opaque blob that owns a vector.
+class OpaqueByteVectorBlob : public OpaqueBlob {
+ public:
+  OpaqueByteVectorBlob(std::vector<uint8_t> v)
+      : OpaqueBlob(), v_(std::move(v)) {
+    data_ = v_.data();
+    size_ = v_.size();
+  }
+
+ private:
+  std::vector<uint8_t> v_;
+};
+
+template <typename T>
+struct ApiPtrAdapter {};
+
+template <typename Self, typename T>
+class ApiRefCounted {
+ public:
+  ApiRefCounted() : instance_(nullptr) {}
+  ApiRefCounted(ApiRefCounted&& other) : instance_(other.instance_) {
+    other.instance_ = nullptr;
+  }
+  void operator=(const ApiRefCounted&) = delete;
+
+  ~ApiRefCounted() { Release(); }
+  static std::unique_ptr<Self> CreateRetained(T* retained_inst) {
+    auto self = std::make_unique<Self>();
+    self->instance_ = retained_inst;
+    return self;
+  }
+
+  T* instance() {
+    if (!instance_) {
+      throw std::invalid_argument("API object is null");
+    }
+    return instance_;
+  }
+  void Retain() {
+    if (instance_) {
+      ApiPtrAdapter<T>::Retain(instance_);
+    }
+  }
+  void Release() {
+    if (instance_) {
+      ApiPtrAdapter<T>::Release(instance_);
+    }
+  }
+
+ private:
+  T* instance_;
+};
 
 }  // namespace python
 }  // namespace iree

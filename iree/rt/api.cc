@@ -143,7 +143,7 @@ class ExternalModule final : public Module {
   }
 
   StatusOr<absl::string_view> GetFunctionName(Function::Linkage linkage,
-                                              int32_t ordinal) const {
+                                              int32_t ordinal) const override {
     IREE_TRACE_SCOPE0("ExternalModule::GetFunctionName");
     iree_string_view_t name;
     auto status = impl_.get_function_name(
@@ -244,9 +244,16 @@ iree_rt_module_lookup_function_by_ordinal(iree_rt_module_t* module,
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  IREE_API_ASSIGN_OR_RETURN(
-      auto function, handle->LookupFunctionByOrdinal(
-                         static_cast<Function::Linkage>(linkage), ordinal));
+  auto function_or = handle->LookupFunctionByOrdinal(
+      static_cast<Function::Linkage>(linkage), ordinal);
+  if (!function_or.ok()) {
+    // Map this invalid argument to not found, per the API spec.
+    if (IsInvalidArgument(function_or.status())) {
+      return IREE_STATUS_NOT_FOUND;
+    }
+    return ToApiStatus(function_or.status().code());
+  }
+  auto function = *function_or;
 
   out_function->module = module;
   out_function->linkage =

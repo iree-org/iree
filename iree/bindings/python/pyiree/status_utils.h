@@ -15,6 +15,7 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_
 
+#include "iree/base/api.h"
 #include "iree/base/status.h"
 #include "pybind11/pytypes.h"
 
@@ -37,6 +38,15 @@ T&& PyConsumeStatusOr(iree::StatusOr<T>&& sor) {
     return std::move(*sor);
   }
   throw StatusToPyExc(sor.status());
+}
+
+pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
+                                             const char* message);
+static void CheckApiStatus(iree_status_t status, const char* message) {
+  if (status == IREE_STATUS_OK) {
+    return;
+  }
+  throw ApiStatusToPyExc(status, message);
 }
 
 }  // namespace python

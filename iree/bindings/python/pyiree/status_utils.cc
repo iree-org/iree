@@ -14,6 +14,8 @@
 
 #include "iree/bindings/python/pyiree/status_utils.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace iree {
 namespace python {
 
@@ -32,11 +34,32 @@ PyObject* StatusToPyExcClass(const Status& status) {
   }
 }
 
+PyObject* ApiStatusToPyExcClass(iree_status_t status) {
+  switch (status) {
+    case IREE_STATUS_INVALID_ARGUMENT:
+      return PyExc_ValueError;
+    case IREE_STATUS_OUT_OF_RANGE:
+      return PyExc_IndexError;
+    case IREE_STATUS_UNIMPLEMENTED:
+      return PyExc_NotImplementedError;
+    default:
+      return PyExc_RuntimeError;
+  }
+}
+
 }  // namespace
 
 pybind11::error_already_set StatusToPyExc(const Status& status) {
   assert(!status.ok());
   PyErr_SetString(StatusToPyExcClass(status), status.error_message().c_str());
+  return pybind11::error_already_set();
+}
+
+pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
+                                             const char* message) {
+  assert(status != IREE_STATUS_OK);
+  auto full_message = absl::StrCat(message, ": ", static_cast<int>(status));
+  PyErr_SetString(ApiStatusToPyExcClass(status), full_message.c_str());
   return pybind11::error_already_set();
 }
 
