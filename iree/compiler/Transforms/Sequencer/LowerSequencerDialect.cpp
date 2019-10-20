@@ -285,7 +285,7 @@ class LowerSequencerDialectPass : public ModulePass<LowerSequencerDialectPass> {
     // executable if we just call it on the top-level module. This can't be a
     // function pass because type conversion replaces the original functions.
     auto funcsIt = getModule().getOps<FuncOp>();
-    std::vector<Operation *> funcs(funcsIt.begin(), funcsIt.end());
+    SmallVector<Operation *, 4> funcs(funcsIt.begin(), funcsIt.end());
 
     if (failed(applyFullConversion(funcs, target, patterns, &typeConverter))) {
       return signalPassFailure();
