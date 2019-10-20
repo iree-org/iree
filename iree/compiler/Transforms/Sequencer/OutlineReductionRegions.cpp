@@ -278,8 +278,8 @@ class OutlineReductionRegionsPass
     auto module = getModule();
 
     ModuleManager moduleManager(module);
-    std::vector<FuncOp> funcOps(module.getOps<FuncOp>().begin(),
-                                module.getOps<FuncOp>().end());
+    auto funcs = module.getOps<FuncOp>();
+    SmallVector<FuncOp, 4> funcOps(funcs.begin(), funcs.end());
     for (auto func : funcOps) {
       // Outline all of the iree.reduction_region ops in this function.
       std::vector<IREE::ReductionRegionOp> reductionRegionOps;

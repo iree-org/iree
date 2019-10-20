@@ -201,8 +201,8 @@ class OutlineDispatchRegionsPass
     auto module = getModule();
 
     ModuleManager moduleManager(module);
-    std::vector<FuncOp> funcOps(module.getOps<FuncOp>().begin(),
-                                module.getOps<FuncOp>().end());
+    auto funcs = module.getOps<FuncOp>();
+    SmallVector<FuncOp, 4> funcOps(funcs.begin(), funcs.end());
     for (auto func : funcOps) {
       // Perform marshaling of the dispatcher and dispatchee I/O.
       // This inserts the required stores and loads to make everything memrefs
@@ -218,7 +218,7 @@ class OutlineDispatchRegionsPass
       }
 
       // Outline all of the iree.dispatch_region ops in this function.
-      std::vector<IREE::DispatchRegionOp> dispatchRegionOps;
+      SmallVector<IREE::DispatchRegionOp, 8> dispatchRegionOps;
       func.walk(
           [&](IREE::DispatchRegionOp op) { dispatchRegionOps.push_back(op); });
       for (int i = 0; i < dispatchRegionOps.size(); ++i) {
