@@ -354,6 +354,7 @@ cc_library(
         ":extensibility_util",
         ":status_util",
         ":vulkan_device",
+        "//iree/base:memory",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:device_info",
