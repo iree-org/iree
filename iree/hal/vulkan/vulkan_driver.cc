@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "absl/container/inlined_vector.h"
+#include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
