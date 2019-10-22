@@ -48,3 +48,6 @@
 [submodule "third_party/benchmark"]
         path = third_party/benchmark
 	url = https://github.com/google/benchmark.git
+[submodule "benchmark"]
+	path = benchmark
+	url = https://github.com/google/benchmark.git
