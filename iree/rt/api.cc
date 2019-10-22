@@ -21,6 +21,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/api_detail.h"
 #include "iree/hal/buffer_view.h"
+#include "iree/hal/driver_registry.h"
 #include "iree/rt/context.h"
 #include "iree/rt/debug/debug_server.h"
 #include "iree/rt/function.h"
@@ -70,6 +71,30 @@ iree_rt_instance_release(iree_rt_instance_t* instance) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
   handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_instance_register_driver_ex(
+    iree_rt_instance_t* instance, iree_string_view_t driver_name) {
+  IREE_TRACE_SCOPE0("iree_rt_instance_register_driver_ex");
+  auto* handle = reinterpret_cast<Instance*>(instance);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(
+      auto driver, hal::DriverRegistry::shared_registry()->Create(
+                       absl::string_view{driver_name.data, driver_name.size}));
+  IREE_API_ASSIGN_OR_RETURN(auto available_devices,
+                            driver->EnumerateAvailableDevices());
+  for (const auto& device_info : available_devices) {
+    LOG(INFO) << "  Device: " << device_info.name();
+  }
+  LOG(INFO) << "Creating default device...";
+  IREE_API_ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());
+  IREE_API_RETURN_IF_ERROR(handle->device_manager()->RegisterDevice(device));
+  LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
+
   return IREE_STATUS_OK;
 }
 
@@ -252,7 +277,7 @@ iree_rt_module_lookup_function_by_ordinal(iree_rt_module_t* module,
     if (IsInvalidArgument(function_or.status())) {
       return IREE_STATUS_NOT_FOUND;
     }
-    return ToApiStatus(function_or.status().code());
+    return ToApiStatus(std::move(function_or).status());
   }
   auto function = *function_or;
 
@@ -434,6 +459,28 @@ iree_rt_context_id(const iree_rt_context_t* context) {
   return handle->id();
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_context_register_modules(
+    iree_rt_context_t* context, iree_rt_module_t** modules,
+    iree_host_size_t module_count) {
+  IREE_TRACE_SCOPE0("iree_rt_context_register_modules");
+  auto* handle = reinterpret_cast<Context*>(context);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (module_count && !modules) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  for (size_t i = 0; i < module_count; ++i) {
+    auto* module = reinterpret_cast<Module*>(modules[i]);
+    if (!module) {
+      return IREE_STATUS_INVALID_ARGUMENT;
+    }
+    IREE_API_RETURN_IF_ERROR(handle->RegisterModule(add_ref(module)));
+  }
+
+  return IREE_STATUS_OK;
+}
+
 IREE_API_EXPORT iree_rt_module_t* IREE_API_CALL
 iree_rt_context_lookup_module_by_name(const iree_rt_context_t* context,
                                       iree_string_view_t module_name) {
@@ -483,26 +530,68 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_context_resolve_function(
       out_function);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_context_register_modules(
-    iree_rt_context_t* context, const iree_rt_module_t** modules,
-    iree_host_size_t module_count) {
-  IREE_TRACE_SCOPE0("iree_rt_context_register_modules");
-  auto* handle = reinterpret_cast<Context*>(context);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_rt_context_allocate_device_visible_buffer(
+    iree_rt_context_t* context, iree_hal_buffer_usage_t buffer_usage,
+    iree_host_size_t allocation_size, iree_allocator_t allocator,
+    iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE0("iree_rt_context_allocate_device_visible_buffer");
+
+  if (!out_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  std::memset(out_buffer, 0, sizeof(*out_buffer));
+
+  const auto* handle = reinterpret_cast<const Context*>(context);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  if (module_count && !modules) {
+  } else if (!allocation_size) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  for (size_t i = 0; i < module_count; ++i) {
-    // Const-cast away so that we can add_ref.
-    iree_rt_module_t* module = const_cast<iree_rt_module_t*>(modules[i]);
-    if (!module) {
-      return IREE_STATUS_INVALID_ARGUMENT;
-    }
-    IREE_API_RETURN_IF_ERROR(
-        handle->RegisterModule(add_ref(reinterpret_cast<Module*>(module))));
+
+  // TODO(benvanik): reroute to context based on current policy.
+  auto* device_manager = handle->instance()->device_manager();
+  IREE_API_ASSIGN_OR_RETURN(auto device_placement,
+                            device_manager->ResolvePlacement({}));
+  IREE_API_ASSIGN_OR_RETURN(auto buffer,
+                            device_manager->AllocateDeviceVisibleBuffer(
+                                static_cast<hal::BufferUsage>(buffer_usage),
+                                allocation_size, {device_placement}));
+
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
+
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_rt_context_allocate_device_local_buffer(
+    iree_rt_context_t* context, iree_hal_buffer_usage_t buffer_usage,
+    iree_host_size_t allocation_size, iree_allocator_t allocator,
+    iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE0("iree_rt_context_allocate_device_local_buffer");
+
+  if (!out_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
   }
+  std::memset(out_buffer, 0, sizeof(*out_buffer));
+
+  const auto* handle = reinterpret_cast<const Context*>(context);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  } else if (!allocation_size) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // TODO(benvanik): reroute to context based on current policy.
+  auto* device_manager = handle->instance()->device_manager();
+  IREE_API_ASSIGN_OR_RETURN(auto device_placement,
+                            device_manager->ResolvePlacement({}));
+  IREE_API_ASSIGN_OR_RETURN(auto buffer,
+                            device_manager->AllocateDeviceLocalBuffer(
+                                static_cast<hal::BufferUsage>(buffer_usage),
+                                allocation_size, {device_placement}));
+
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
 
   return IREE_STATUS_OK;
 }
@@ -515,8 +604,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_invocation_create(
     iree_rt_context_t* context, iree_rt_function_t* function,
     iree_rt_policy_t* policy,
     const iree_rt_invocation_dependencies_t* dependencies,
-    const iree_hal_buffer_view_t** arguments, iree_host_size_t argument_count,
-    const iree_hal_buffer_view_t** results, iree_host_size_t result_count,
+    iree_hal_buffer_view_t** arguments, iree_host_size_t argument_count,
+    iree_hal_buffer_view_t** results, iree_host_size_t result_count,
     iree_allocator_t allocator, iree_rt_invocation_t** out_invocation) {
   IREE_TRACE_SCOPE0("iree_rt_invocation_create");
 
@@ -578,7 +667,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_invocation_create(
                    function->ordinal},
           add_ref(reinterpret_cast<Policy*>(policy)),
           std::move(dependent_invocations), std::move(argument_views),
-          std::move(result_views)));
+          result_views.empty()
+              ? absl::optional<absl::InlinedVector<hal::BufferView, 8>>(
+                    absl::nullopt)
+              : std::move(result_views)));
 
   *out_invocation =
       reinterpret_cast<iree_rt_invocation_t*>(invocation.release());
@@ -664,9 +756,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_invocation_consume_results(
     // Release already-retained buffer views on failure.
     for (int j = 0; j < i; ++j) {
       iree_hal_buffer_view_release(out_results[j]);
+      out_results[j] = nullptr;
     }
-    std::memset(out_results, 0,
-                sizeof(iree_hal_buffer_view_t*) * result_capacity);
   }
   return status;
 }

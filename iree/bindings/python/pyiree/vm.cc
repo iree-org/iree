@@ -23,7 +23,7 @@ RtModule CreateModuleFromBlob(std::shared_ptr<OpaqueBlob> blob) {
   iree_rt_module_t* module;
   auto free_fn = OpaqueBlob::CreateFreeFn(blob);
   auto status = iree_vm_bytecode_module_create_from_buffer(
-      {static_cast<uint8_t*>(blob->data()), blob->size()}, free_fn.first,
+      {static_cast<const uint8_t*>(blob->data()), blob->size()}, free_fn.first,
       free_fn.second, IREE_ALLOCATOR_DEFAULT, &module);
   CheckApiStatus(status, "Error creating vm module from blob");
   return RtModule::CreateRetained(module);

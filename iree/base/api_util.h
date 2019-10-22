@@ -18,13 +18,15 @@
 #include "absl/base/macros.h"
 #include "absl/time/time.h"
 #include "iree/base/api.h"
+#include "iree/base/logging.h"
 #include "iree/base/shape.h"
 #include "iree/base/status.h"
 
 namespace iree {
 
-constexpr iree_status_t ToApiStatus(StatusCode status_code) {
-  return static_cast<iree_status_t>(status_code);
+inline iree_status_t ToApiStatus(Status status) {
+  DLOG(ERROR) << status;
+  return static_cast<iree_status_t>(status.code());
 }
 
 inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
@@ -61,7 +63,7 @@ class StatusAdaptorForApiMacros {
   if (::iree::status_macro_internal::StatusAdaptorForApiMacros \
           status_adaptor = {expr}) {                           \
   } else /* NOLINT */                                          \
-    return ::iree::ToApiStatus(status_adaptor.Consume().code())
+    return ::iree::ToApiStatus(status_adaptor.Consume())
 
 #define IREE_API_RETURN_IF_API_ERROR(expr)  \
   IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_ \
@@ -92,7 +94,7 @@ class StatusAdaptorForApiMacros {
                                                       error_expression)     \
   auto statusor = (rexpr);                                                  \
   if (ABSL_PREDICT_FALSE(!statusor.ok())) {                                 \
-    return ::iree::ToApiStatus(std::move(statusor).status().code());        \
+    return ::iree::ToApiStatus(std::move(statusor).status());               \
   }                                                                         \
   lhs = std::move(statusor).ValueOrDie()
 

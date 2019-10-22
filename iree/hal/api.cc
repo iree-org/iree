@@ -277,12 +277,14 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_view_create");
 
-  if (!buffer || !out_buffer_view) {
+  if (!out_buffer_view) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
   *out_buffer_view = nullptr;
 
-  if (shape.rank > kMaxRank) {
+  if (!buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  } else if (shape.rank > kMaxRank || element_size <= 0) {
     return IREE_STATUS_OUT_OF_RANGE;
   }
 
@@ -291,7 +293,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
   IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
       allocator.self, sizeof(*handle), reinterpret_cast<void**>(&handle)));
   new (handle) iree_hal_buffer_view();
-  handle->AddReference();
+  handle->allocator = allocator;
 
   handle->impl.buffer = add_ref(reinterpret_cast<Buffer*>(buffer));
   handle->impl.shape = {shape.dims, shape.rank};

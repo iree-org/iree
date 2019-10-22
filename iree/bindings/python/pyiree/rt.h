@@ -138,6 +138,14 @@ class RtInstance : public ApiRefCounted<RtInstance, iree_rt_instance_t> {
     iree_rt_instance_t* inst;
     CheckApiStatus(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &inst),
                    "Error creating instance");
+
+    // TEMPORARY: until we have real registration exposed.
+    const char kDriverName[] = "interpreter";
+    CheckApiStatus(
+        iree_rt_instance_register_driver_ex(
+            inst, iree_string_view_t{kDriverName, sizeof(kDriverName) - 1}),
+        "Error registering drivers");
+
     return RtInstance::CreateRetained(inst);
   }
 };
@@ -183,7 +191,7 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
   int context_id() { return iree_rt_context_id(raw_ptr()); }
 
   void RegisterModules(std::vector<RtModule*> modules) {
-    std::vector<const iree_rt_module_t*> module_raw_ptrs;
+    std::vector<iree_rt_module_t*> module_raw_ptrs;
     module_raw_ptrs.resize(modules.size());
     for (size_t i = 0, e = modules.size(); i < e; ++i) {
       auto module_raw_ptr = modules[i]->raw_ptr();
@@ -196,7 +204,7 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
   }
 
   void RegisterModule(RtModule* module) {
-    const iree_rt_module_t* module_raw_ptr = module->raw_ptr();
+    iree_rt_module_t* module_raw_ptr = module->raw_ptr();
     CheckApiStatus(
         iree_rt_context_register_modules(raw_ptr(), &module_raw_ptr, 1),
         "Error registering module");
@@ -225,14 +233,14 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
   RtInvocation Invoke(RtFunction& f, RtPolicy& policy,
                       std::vector<HalBufferView*> arguments,
                       std::vector<HalBufferView*> results) {
-    absl::InlinedVector<const iree_hal_buffer_view_t*, 8> raw_arguments;
+    absl::InlinedVector<iree_hal_buffer_view_t*, 8> raw_arguments;
     raw_arguments.resize(arguments.size());
     for (size_t i = 0, e = arguments.size(); i < e; ++i) {
       auto inst = arguments[i];
       CheckApiNotNull(inst, "Argument buffer view cannot be None");
       raw_arguments[i] = inst->raw_ptr();
     }
-    absl::InlinedVector<const iree_hal_buffer_view_t*, 8> raw_results;
+    absl::InlinedVector<iree_hal_buffer_view_t*, 8> raw_results;
     raw_results.resize(results.size());
     for (size_t i = 0, e = results.size(); i < e; ++i) {
       auto inst = results[i];

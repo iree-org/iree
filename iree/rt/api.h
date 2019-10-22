@@ -146,6 +146,11 @@ iree_rt_instance_retain(iree_rt_instance_t* instance);
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_rt_instance_release(iree_rt_instance_t* instance);
 
+// TEMPORARY: until policies and placement are performed this can be used to
+// explicitly create and register drivers by name.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_instance_register_driver_ex(
+    iree_rt_instance_t* instance, iree_string_view_t driver_name);
+
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
@@ -262,7 +267,7 @@ iree_rt_context_id(const iree_rt_context_t* context);
 // Registers a list of modules with the context and resolves imports.
 // The modules will be retained by the context until destruction.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_context_register_modules(
-    iree_rt_context_t* context, const iree_rt_module_t** modules,
+    iree_rt_context_t* context, iree_rt_module_t** modules,
     iree_host_size_t module_count);
 
 // Returns a reference to the module registered with the given name or nullptr
@@ -278,6 +283,35 @@ iree_rt_context_lookup_module_by_name(const iree_rt_context_t* context,
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_context_resolve_function(
     const iree_rt_context_t* context, iree_string_view_t full_name,
     iree_rt_function_t* out_function);
+
+// Allocates a host-local buffer that is optimal for use on the host but is
+// usable by the given |device_placements| (at a possible performance
+// penalty). The buffer can be used for staging uploads to device-local
+// buffers and is useful for times when the buffer will be used more on the
+// host than the device. If a buffer never needs to be used with a device
+// prefer instead HeapBuffer::Allocate.
+//
+// Fails if it is not possible to allocate and satisfy all placements for the
+// requested |buffer_usage|.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_rt_context_allocate_device_visible_buffer(
+    iree_rt_context_t* context, iree_hal_buffer_usage_t buffer_usage,
+    iree_host_size_t allocation_size, iree_allocator_t allocator,
+    iree_hal_buffer_t** out_buffer);
+
+// Allocates a device-local buffer that is optimal for use with the given
+// |device_placements|. The buffer will not be host-visible and can only be
+// used from compatible device queues.
+//
+// Fails if it is not possible to allocate and satisfy all placements for the
+// requested |buffer_usage|.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_rt_context_allocate_device_local_buffer(
+    iree_rt_context_t* context, iree_hal_buffer_usage_t buffer_usage,
+    iree_host_size_t allocation_size, iree_allocator_t allocator,
+    iree_hal_buffer_t** out_buffer);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -306,8 +340,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_invocation_create(
     iree_rt_context_t* context, iree_rt_function_t* function,
     iree_rt_policy_t* policy,
     const iree_rt_invocation_dependencies_t* dependencies,
-    const iree_hal_buffer_view_t** arguments, iree_host_size_t argument_count,
-    const iree_hal_buffer_view_t** results, iree_host_size_t result_count,
+    iree_hal_buffer_view_t** arguments, iree_host_size_t argument_count,
+    iree_hal_buffer_view_t** results, iree_host_size_t result_count,
     iree_allocator_t allocator, iree_rt_invocation_t** out_invocation);
 
 // Retains the given |invocation| for the caller.

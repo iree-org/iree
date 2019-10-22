@@ -70,12 +70,12 @@ std::vector<TestParams> GetAvailableDriverTestParams() {
   return all_test_params;
 }
 
-class SimpleModuleTest : public ::testing::Test,
-                         public ::testing::WithParamInterface<TestParams> {
+class BytecodeModuleTest : public ::testing::Test,
+                           public ::testing::WithParamInterface<TestParams> {
  protected:
 };
 
-TEST_P(SimpleModuleTest, RunOnce) {
+TEST_P(BytecodeModuleTest, RunOnce) {
   auto instance = make_ref<Instance>();
 
   // Create driver for this test (based on params) and then get a default
@@ -160,7 +160,7 @@ TEST_P(SimpleModuleTest, RunOnce) {
   LOG(INFO) << "Results match!";
 }
 
-INSTANTIATE_TEST_SUITE_P(AllDrivers, SimpleModuleTest,
+INSTANTIATE_TEST_SUITE_P(AllDrivers, BytecodeModuleTest,
                          ::testing::ValuesIn(GetAvailableDriverTestParams()),
                          ::testing::PrintToStringParamName());
 

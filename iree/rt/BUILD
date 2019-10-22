@@ -18,6 +18,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:api",
         "//iree/hal:buffer_view",
+        "//iree/hal:driver_registry",
         "//iree/rt/debug:debug_server_interface",
         "@com_google_absl//absl/time",
     ],

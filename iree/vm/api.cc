@@ -29,7 +29,7 @@ namespace vm {
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_bytecode_module_create_from_buffer(
-    iree_byte_span_t buffer_data,
+    iree_const_byte_span_t buffer_data,
     void (*buffer_free_fn)(void* self, iree_byte_span_t buffer_data),
     void* buffer_free_self, iree_allocator_t allocator,
     iree_rt_module_t** out_module) {
@@ -50,7 +50,9 @@ iree_vm_bytecode_module_create_from_buffer(
           ModuleDefIdentifier(), {buffer_data.data, buffer_data.data_length},
           [buffer_free_fn, buffer_free_self, buffer_data]() {
             if (buffer_free_fn != nullptr) {
-              buffer_free_fn(buffer_free_self, buffer_data);
+              buffer_free_fn(buffer_free_self,
+                             {const_cast<uint8_t*>(buffer_data.data),
+                              buffer_data.data_length});
             }
           }));
 

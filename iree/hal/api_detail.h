@@ -31,6 +31,7 @@ struct iree_hal_buffer_view : public RefObject<iree_hal_buffer_view> {
   iree_allocator_t allocator;
 
   static void Delete(iree_hal_buffer_view* ptr) {
+    ptr->impl.buffer.reset();
     ptr->allocator.free(ptr->allocator.self, ptr);
   }
 };

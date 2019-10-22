@@ -42,6 +42,9 @@ iree_py_extension(
     ],
     features = ["-use_header_modules"],
     deps = [
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
         "//iree/base:api",
         "//iree/base:status",
         "//iree/compiler/Translation/Sequencer",
@@ -49,13 +52,16 @@ iree_py_extension(
         "//iree/rt:api",
         "//iree/schemas",
         "//iree/vm:api",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@iree_pybind11//:pybind11",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Parser",
+        "@iree_pybind11//:pybind11",
+
+        # These are the drivers we support running with and can produce
+        # executables for from the source MLIR.
+        "//iree/hal/interpreter:interpreter_driver_module",  # build-cleaner: keep
+        # TODO(benvanik): include SPIR-V.
+        # "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
     ],
 )
 
@@ -85,6 +91,9 @@ py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
     python_version = "PY3",
+    tags = [
+        "notap",
+    ],
     deps = [
         ":binding",
         "//iree/bindings/python:pathsetup",
