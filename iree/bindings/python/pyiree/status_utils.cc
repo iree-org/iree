@@ -63,5 +63,10 @@ pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
   return pybind11::error_already_set();
 }
 
+pybind11::error_already_set RaiseValueError(const char* message) {
+  PyErr_SetString(PyExc_ValueError, message);
+  return pybind11::error_already_set();
+}
+
 }  // namespace python
 }  // namespace iree

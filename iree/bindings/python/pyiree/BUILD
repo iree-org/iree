@@ -28,6 +28,8 @@ iree_py_extension(
         "binding.h",
         "compiler.cc",
         "compiler.h",
+        "hal.h",
+        "hal.cc",
         "rt.cc",
         "rt.h",
         "status_utils.cc",
@@ -58,6 +60,17 @@ iree_py_extension(
 py_test(
     name = "compiler_test",
     srcs = ["compiler_test.py"],
+    python_version = "PY3",
+    deps = [
+        ":binding",
+        "//iree/bindings/python:pathsetup",
+        "@absl_py//absl/testing:absltest",
+    ],
+)
+
+py_test(
+    name = "hal_test",
+    srcs = ["hal_test.py"],
     python_version = "PY3",
     deps = [
         ":binding",

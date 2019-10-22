@@ -17,9 +17,18 @@
 
 #include <vector>
 
+#include "absl/types/optional.h"
 #include "iree/base/api.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
+
+namespace pybind11 {
+namespace detail {
+// Make absl::optional act like the future C++17 optional for pybind11.
+template <typename T>
+struct type_caster<absl::optional<T>> : optional_caster<absl::optional<T>> {};
+}  // namespace detail
+}  // namespace pybind11
 
 namespace iree {
 namespace python {
@@ -87,13 +96,27 @@ class ApiRefCounted {
   void operator=(const ApiRefCounted&) = delete;
 
   ~ApiRefCounted() { Release(); }
-  static std::unique_ptr<Self> CreateRetained(T* retained_inst) {
-    auto self = std::make_unique<Self>();
-    self->instance_ = retained_inst;
+
+  // Creates an instance of the ref counted wrapper based on an instance
+  // that has already been retained. Ownership is transferred to the
+  // wrapper.
+  static Self CreateRetained(T* retained_inst) {
+    auto self = Self();
+    self.instance_ = retained_inst;
     return self;
   }
 
-  T* instance() {
+  // Creates a new instance, retaining the underlying object.
+  static Self RetainAndCreate(T* non_retained_inst) {
+    auto self = Self();
+    self.instance_ = non_retained_inst;
+    if (non_retained_inst) {
+      ApiPtrAdapter<T>::Retain(non_retained_inst);
+    }
+    return self;
+  }
+
+  T* raw_ptr() {
     if (!instance_) {
       throw std::invalid_argument("API object is null");
     }

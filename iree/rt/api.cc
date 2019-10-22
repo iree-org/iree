@@ -482,6 +482,30 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_context_resolve_function(
       out_function);
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_context_register_modules(
+    iree_rt_context_t* context, const iree_rt_module_t** modules,
+    iree_host_size_t module_count) {
+  IREE_TRACE_SCOPE0("iree_rt_context_register_modules");
+  auto* handle = reinterpret_cast<Context*>(context);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (module_count && !modules) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  for (size_t i = 0; i < module_count; ++i) {
+    // Const-cast away so that we can add_ref.
+    iree_rt_module_t* module = const_cast<iree_rt_module_t*>(modules[i]);
+    if (!module) {
+      return IREE_STATUS_INVALID_ARGUMENT;
+    }
+    IREE_API_RETURN_IF_ERROR(
+        handle->RegisterModule(add_ref(reinterpret_cast<Module*>(module))));
+  }
+
+  return IREE_STATUS_OK;
+}
+
 //===----------------------------------------------------------------------===//
 // iree::rt::Invocation
 //===----------------------------------------------------------------------===//

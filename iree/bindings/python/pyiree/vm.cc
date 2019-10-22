@@ -19,8 +19,7 @@
 namespace iree {
 namespace python {
 
-std::unique_ptr<RtModule> CreateModuleFromBlob(
-    std::shared_ptr<OpaqueBlob> blob) {
+RtModule CreateModuleFromBlob(std::shared_ptr<OpaqueBlob> blob) {
   iree_rt_module_t* module;
   auto free_fn = OpaqueBlob::CreateFreeFn(blob);
   auto status = iree_vm_bytecode_module_create_from_buffer(
