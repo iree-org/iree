@@ -19,6 +19,7 @@
 #include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/api_detail.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/rt/context.h"
 #include "iree/rt/debug/debug_server.h"
@@ -546,25 +547,25 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_invocation_create(
   // TODO(benvanik): unwrap without needing to retain here.
   absl::InlinedVector<hal::BufferView, 8> argument_views(argument_count);
   for (int i = 0; i < argument_count; ++i) {
-    const auto* buffer_view =
-        reinterpret_cast<const hal::BufferView*>(arguments[i]);
-    if (!buffer_view) {
+    const auto* api_buffer_view =
+        reinterpret_cast<const hal::iree_hal_buffer_view*>(arguments[i]);
+    if (!api_buffer_view) {
       return IREE_STATUS_INVALID_ARGUMENT;
     }
-    argument_views[i] =
-        hal::BufferView{add_ref(buffer_view->buffer), buffer_view->shape,
-                        buffer_view->element_size};
+    argument_views[i] = hal::BufferView{add_ref(api_buffer_view->impl.buffer),
+                                        api_buffer_view->impl.shape,
+                                        api_buffer_view->impl.element_size};
   }
 
   // TODO(benvanik): unwrap without needing to retain here.
   absl::InlinedVector<hal::BufferView, 8> result_views(result_count);
   for (int i = 0; i < result_count; ++i) {
-    const auto* buffer_view =
-        reinterpret_cast<const hal::BufferView*>(results[i]);
-    if (buffer_view) {
-      result_views[i] =
-          hal::BufferView{add_ref(buffer_view->buffer), buffer_view->shape,
-                          buffer_view->element_size};
+    const auto* api_buffer_view =
+        reinterpret_cast<const hal::iree_hal_buffer_view*>(results[i]);
+    if (api_buffer_view) {
+      result_views[i] = hal::BufferView{add_ref(api_buffer_view->impl.buffer),
+                                        api_buffer_view->impl.shape,
+                                        api_buffer_view->impl.element_size};
     }
   }
 

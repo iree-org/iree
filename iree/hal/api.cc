@@ -18,6 +18,7 @@
 #include "iree/base/api_util.h"
 #include "iree/base/shape.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/api_detail.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/fence.h"
@@ -211,7 +212,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_allocate(
       static_cast<MemoryTypeBitfield>(memory_type),
       static_cast<BufferUsageBitfield>(usage), allocation_size);
 
-  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(handle.release());
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(
+      static_cast<Buffer*>(handle.release()));
+
   return IREE_STATUS_OK;
 }
 
@@ -269,15 +272,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
 
-struct iree_hal_buffer_view : public RefObject<iree_hal_buffer_view> {
-  BufferView impl;
-  iree_allocator_t allocator;
-
-  static void Delete(iree_hal_buffer_view* ptr) {
-    ptr->allocator.free(ptr->allocator.self, ptr);
-  }
-};
-
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, iree_shape_t shape, int8_t element_size,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
@@ -292,9 +286,12 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     return IREE_STATUS_OUT_OF_RANGE;
   }
 
+  // Allocate and initialize the iree_hal_buffer_view struct.
   iree_hal_buffer_view* handle = nullptr;
   IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
       allocator.self, sizeof(*handle), reinterpret_cast<void**>(&handle)));
+  new (handle) iree_hal_buffer_view();
+  handle->AddReference();
 
   handle->impl.buffer = add_ref(reinterpret_cast<Buffer*>(buffer));
   handle->impl.shape = {shape.dims, shape.rank};

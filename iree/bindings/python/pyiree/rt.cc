@@ -51,6 +51,10 @@ void SetupRtBindings(pybind11::module m) {
            py::arg("full_name"))
       .def("invoke", &RtContext::Invoke, py::arg("f"), py::arg("policy"),
            py::arg("arguments"), py::arg("results"));
+
+  // RtInvocation.
+  py::class_<RtInvocation>(m, "Invocation")
+      .def("query_status", &RtInvocation::QueryStatus);
 }
 
 }  // namespace python

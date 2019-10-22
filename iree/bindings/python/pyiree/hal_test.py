@@ -30,7 +30,8 @@ class HalTest(absltest.TestCase):
       allocation_size=4096)
     self.assertIsNot(b, None)
     b.fill_zero(0, 4096)
-    bv = b.create_view(binding.hal.Shape([1, 1024]), 4)
+    shape = binding.hal.Shape([1, 1024])
+    bv = b.create_view(shape, 4)
 
 
 if __name__ == "__main__":

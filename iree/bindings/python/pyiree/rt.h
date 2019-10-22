@@ -155,6 +155,17 @@ class RtPolicy : public ApiRefCounted<RtPolicy, iree_rt_policy_t> {
 
 class RtInvocation : public ApiRefCounted<RtInvocation, iree_rt_invocation_t> {
  public:
+  bool QueryStatus() {
+    auto status = iree_rt_invocation_query_status(raw_ptr());
+    if (status == IREE_STATUS_OK) {
+      return true;
+    } else if (status == IREE_STATUS_UNAVAILABLE) {
+      return false;
+    } else {
+      CheckApiStatus(status, "Error in function invocation");
+      return false;
+    }
+  }
 };
 
 class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {

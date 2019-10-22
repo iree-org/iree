@@ -66,8 +66,8 @@ class StatusAdaptorForApiMacros {
 #define IREE_API_RETURN_IF_API_ERROR(expr)  \
   IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_ \
   if (iree_status_t status = (expr)) {      \
-  } else /* NOLINT */                       \
-    return status
+    return status;                          \
+  }
 
 #define IREE_API_ASSIGN_OR_RETURN(...)                               \
   IREE_API_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
