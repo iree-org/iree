@@ -45,3 +45,6 @@
 [submodule "third_party/swiftshader"]
 	path = third_party/swiftshader
 	url = https://github.com/google/swiftshader.git
+[submodule "third_party/benchmark"]
+	path = third_party/benchmark
+	url = https://github.com/google/benchmark.git
