@@ -25,35 +25,22 @@ def platform_trampoline_deps(basename):
     ]
 
 # A platform-sensitive list of copts for the Vulkan loader.
-#
-# These may set IREE_VK_ICD_FILENAMES to a path where a ICD manifest can be found,
-# to control which ICDs are available to applications.
 PLATFORM_VULKAN_LOADER_COPTS = select({
     "//iree/hal/vulkan:native_vk": [],
-    "//iree/hal/vulkan:swiftshader_vk": [
-        # TODO(b/138220713): Support SwiftShader use.
-    ],
+    "//iree/hal/vulkan:swiftshader_vk": [],
     "//conditions:default": [],
 })
 
 # A platform-sensitive list of dependencies for non-test targets using Vulkan.
-#
-# Define "IREE_VK=swiftshader" to include SwiftShader (if it is available).
 PLATFORM_VULKAN_DEPS = select({
     "//iree/hal/vulkan:native_vk": [],
-    "//iree/hal/vulkan:swiftshader_vk": [
-        # TODO(b/138220713): Support SwiftShader use.
-    ],
+    "//iree/hal/vulkan:swiftshader_vk": [],
     "//conditions:default": [],
 })
 
 # A platform-sensitive list of dependencies for tests using Vulkan.
-#
-# Define "IREE_VK=swiftshader" to include SwiftShader (if it is available).
 PLATFORM_VULKAN_TEST_DEPS = [
     "@com_google_googletest//:gtest_main",
-
-    # TODO(b/138220713): Support SwiftShader use.
 ]
 
 def iree_py_library(**kwargs):
