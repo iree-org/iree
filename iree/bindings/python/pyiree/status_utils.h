@@ -30,6 +30,11 @@ namespace python {
 //   }
 pybind11::error_already_set StatusToPyExc(const Status& status);
 
+// Raises a value error with the given message.
+// Correct usage:
+//   throw RaiseValueError("Foobar'd");
+pybind11::error_already_set RaiseValueError(const char* message);
+
 // Consumes a StatusOr<T>, returning an rvalue reference to the T if the
 // status is ok(). Otherwise, throws an exception.
 template <typename T>
@@ -42,6 +47,7 @@ T&& PyConsumeStatusOr(iree::StatusOr<T>&& sor) {
 
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
                                              const char* message);
+
 static void CheckApiStatus(iree_status_t status, const char* message) {
   if (status == IREE_STATUS_OK) {
     return;
@@ -49,11 +55,13 @@ static void CheckApiStatus(iree_status_t status, const char* message) {
   throw ApiStatusToPyExc(status, message);
 }
 
+static void CheckApiNotNull(const void* p, const char* message) {
+  if (!p) {
+    throw RaiseValueError(message);
+  }
+}
+
 }  // namespace python
 }  // namespace iree
-
-namespace pybind11 {
-namespace detail {}  // namespace detail
-}  // namespace pybind11
 
 #endif  // IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_

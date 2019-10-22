@@ -24,7 +24,10 @@ cc_library(
 cc_library(
     name = "api",
     srcs = ["api.cc"],
-    hdrs = ["api.h"],
+    hdrs = [
+        "api.h",
+        "api_detail.h",
+    ],
     visibility = ["//visibility:public"],
     deps = [
         ":api_hdrs",

@@ -12,25 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 from absl.testing import absltest
 
 from pyiree import binding as binding
 
 
-class RuntimeTest(absltest.TestCase):
-
-  def testModuleAndFunction(self):
-
-    blob = binding.compiler.compile_module_from_asm("""
+def create_simple_mul_module():
+  blob = binding.compiler.compile_module_from_asm("""
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
         %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
         return %0 : tensor<4xf32>
     }
     """)
-    self.assertTrue(blob)
-    print("Module blob:", blob)
-    m = binding.vm.create_module_from_blob(blob)
+  m = binding.vm.create_module_from_blob(blob)
+  return m
+
+
+def create_host_buffer_view():
+  b = binding.hal.Buffer.allocate_heap(
+      memory_type=int(binding.hal.MemoryType.HOST_LOCAL),
+      usage=int(binding.hal.BufferUsage.ALL),
+      allocation_size=16)
+  b.fill_zero(0, 16)
+  bv = b.create_view(binding.hal.Shape([4]), 4)
+  print("BUFFER VIEW:", bv)
+  return bv
+
+
+class RuntimeTest(absltest.TestCase):
+
+  def testModuleAndFunction(self):
+    m = create_simple_mul_module()
     print("Module:", m)
     print("Module name:", m.name)
     self.assertEqual("module", m.name)
@@ -57,6 +74,48 @@ class RuntimeTest(absltest.TestCase):
     # By name not found.
     f = m.lookup_function_by_name("not_here")
     self.assertIs(f, None)
+
+  def testInitialization(self):
+    policy = binding.rt.Policy()
+    print("policy =", policy)
+    instance = binding.rt.Instance()
+    print("instance =", instance)
+    context = binding.rt.Context(instance=instance, policy=policy)
+    print("context =", context)
+    context_id = context.context_id
+    print("context_id =", context.context_id)
+    self.assertGreater(context_id, 0)
+
+  def testRegisterModule(self):
+    policy = binding.rt.Policy()
+    instance = binding.rt.Instance()
+    context = binding.rt.Context(instance=instance, policy=policy)
+    m = create_simple_mul_module()
+    context.register_module(m)
+    self.assertIsNot(context.lookup_module_by_name("module"), None)
+    self.assertIs(context.lookup_module_by_name("nothere"), None)
+    f = context.resolve_function("module.simple_mul")
+    self.assertIsNot(f, None)
+    print("Resolved function:", f.name)
+    self.assertIs(context.resolve_function("module.nothere"), None)
+
+  def testInvoke(self):
+    policy = binding.rt.Policy()
+    instance = binding.rt.Instance()
+    context = binding.rt.Context(instance=instance, policy=policy)
+    m = create_simple_mul_module()
+    context.register_module(m)
+    f = context.resolve_function("module.simple_mul")
+    print("INVOKE F:", f)
+    arg0 = create_host_buffer_view()
+    arg1 = create_host_buffer_view()
+    result = create_host_buffer_view()
+    try:
+      inv = context.invoke(f, policy, [arg0, arg1], [result])
+      print("Status:", inv.query_status())
+      self.fail("Remove once invocation is working")
+    except:  # pylint: disable=bare-except
+      print("TODO(laurenzo): Invocation is not working yet.")
 
 
 if __name__ == "__main__":

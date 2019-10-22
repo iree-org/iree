@@ -21,19 +21,22 @@ from absl.testing import absltest
 from pyiree import binding as binding
 
 
-class CompilerTest(absltest.TestCase):
+class HalTest(absltest.TestCase):
 
-  def testModuleCompileAndIntrospectFromAsm(self):
+  def testEnums(self):
+    print("MemoryType =", binding.hal.MemoryType)
+    print("HOST_VISIBLE =", int(binding.hal.MemoryType.HOST_VISIBLE))
 
-    m = binding.compiler.compile_module_from_asm("""
-    func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
-          attributes { iree.module.export } {
-        %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-        return %0 : tensor<4xf32>
-    }
-    """)
-    self.assertTrue(m)
+  def testAllocateHeap(self):
+    b = binding.hal.Buffer.allocate_heap(
+        memory_type=int(binding.hal.MemoryType.HOST_LOCAL),
+        usage=int(binding.hal.BufferUsage.ALL),
+        allocation_size=4096)
+    self.assertIsNot(b, None)
+    b.fill_zero(0, 4096)
+    shape = binding.hal.Shape([1, 1024])
+    unused_bv = b.create_view(shape, 4)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
   absltest.main()

@@ -18,10 +18,12 @@ namespace iree {
 namespace python {
 
 void SetupRtBindings(pybind11::module m) {
+  // RtModule.
   py::class_<RtModule>(m, "Module")
       .def_property_readonly("name", &RtModule::name)
       .def("lookup_function_by_ordinal", &RtModule::lookup_function_by_ordinal)
       .def("lookup_function_by_name", &RtModule::lookup_function_by_name);
+  // RtFunction.
   py::class_<RtFunction>(m, "Function")
       .def_property_readonly("name", &RtFunction::name)
       .def_property_readonly("signature", &RtFunction::signature);
@@ -30,6 +32,29 @@ void SetupRtBindings(pybind11::module m) {
                     &iree_rt_function_signature_t::argument_count)
       .def_readonly("result_count",
                     &iree_rt_function_signature_t::result_count);
+
+  // RtPolicy.
+  py::class_<RtPolicy>(m, "Policy").def(py::init(&RtPolicy::Create));
+
+  // RtInstance.
+  py::class_<RtInstance>(m, "Instance").def(py::init(&RtInstance::Create));
+
+  // RtContext.
+  py::class_<RtContext>(m, "Context")
+      .def(py::init(&RtContext::Create), py::arg("instance"), py::arg("policy"))
+      .def_property_readonly("context_id", &RtContext::context_id)
+      .def("register_modules", &RtContext::RegisterModules, py::arg("modules"))
+      .def("register_module", &RtContext::RegisterModule, py::arg("module"))
+      .def("lookup_module_by_name", &RtContext::LookupModuleByName,
+           py::arg("name"))
+      .def("resolve_function", &RtContext::ResolveFunction,
+           py::arg("full_name"))
+      .def("invoke", &RtContext::Invoke, py::arg("f"), py::arg("policy"),
+           py::arg("arguments"), py::arg("results"));
+
+  // RtInvocation.
+  py::class_<RtInvocation>(m, "Invocation")
+      .def("query_status", &RtInvocation::QueryStatus);
 }
 
 }  // namespace python
