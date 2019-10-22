@@ -16,13 +16,25 @@
 #define IREE_BINDINGS_PYTHON_PYIREE_RT_H_
 
 #include "absl/container/inlined_vector.h"
+#include "iree/base/api.h"
 #include "iree/bindings/python/pyiree/binding.h"
 #include "iree/bindings/python/pyiree/hal.h"
+#include "iree/bindings/python/pyiree/initialize.h"
 #include "iree/bindings/python/pyiree/status_utils.h"
+#include "iree/hal/api.h"
 #include "iree/rt/api.h"
 
 namespace iree {
 namespace python {
+
+// When creating a buffer via the context, switch between the different
+// allocation entry-points via an enum (these are separate functions in the
+// C API).
+enum class BufferPlacement {
+  kHeap,
+  kDeviceVisible,
+  kDeviceLocal,
+};
 
 // Adapts API pointer access to retain/release API calls.
 template <>
@@ -134,19 +146,22 @@ class RtModule : public ApiRefCounted<RtModule, iree_rt_module_t> {
 class RtInstance : public ApiRefCounted<RtInstance, iree_rt_instance_t> {
  public:
   // TODO(laurenzo): Support optional allocator argument.
-  static RtInstance Create() {
-    iree_rt_instance_t* inst;
-    CheckApiStatus(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &inst),
+  static RtInstance Create(absl::optional<std::string> driver_name) {
+    InitializeExtension({});
+    iree_rt_instance_t* raw_inst;
+    CheckApiStatus(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &raw_inst),
                    "Error creating instance");
+    RtInstance inst = RtInstance::CreateRetained(raw_inst);
 
-    // TEMPORARY: until we have real registration exposed.
-    const char kDriverName[] = "interpreter";
-    CheckApiStatus(
-        iree_rt_instance_register_driver_ex(
-            inst, iree_string_view_t{kDriverName, sizeof(kDriverName) - 1}),
-        "Error registering drivers");
+    if (!driver_name) {
+      driver_name = "interpreter";
+    }
+    CheckApiStatus(iree_rt_instance_register_driver_ex(
+                       raw_inst, iree_string_view_t{driver_name->c_str(),
+                                                    driver_name->size()}),
+                   "Error registering drivers");
 
-    return RtInstance::CreateRetained(inst);
+    return inst;
   }
 };
 
@@ -228,6 +243,57 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
     }
     CheckApiStatus(status, "Error resolving function");
     return RtFunction(f);
+  }
+
+  // Convenience method to allocate host, device-visible or device-local
+  // buffers.
+  HalBuffer Allocate(iree_host_size_t allocation_size,
+                     BufferPlacement placement, int32_t usage) {
+    iree_hal_buffer_t* raw_buffer = nullptr;
+    switch (placement) {
+      case BufferPlacement::kHeap:
+        // Even though allocating a heap buffer does not require the context,
+        // provide it here to make the API easier to navigate.
+        CheckApiStatus(
+            iree_hal_heap_buffer_allocate(
+                IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+                static_cast<iree_hal_buffer_usage_t>(usage), allocation_size,
+                IREE_ALLOCATOR_DEFAULT, IREE_ALLOCATOR_DEFAULT, &raw_buffer),
+            "Error allocating heap buffer");
+        break;
+      case BufferPlacement::kDeviceLocal:
+        CheckApiStatus(
+            iree_rt_context_allocate_device_local_buffer(
+                raw_ptr(), static_cast<iree_hal_buffer_usage_t>(usage),
+                allocation_size, IREE_ALLOCATOR_DEFAULT, &raw_buffer),
+            "Error allocating device local buffer");
+        break;
+      case BufferPlacement::kDeviceVisible:
+        CheckApiStatus(
+            iree_rt_context_allocate_device_visible_buffer(
+                raw_ptr(), static_cast<iree_hal_buffer_usage_t>(usage),
+                allocation_size, IREE_ALLOCATOR_DEFAULT, &raw_buffer),
+            "Error allocating device visible buffer");
+        break;
+      default:
+        throw RaiseValueError("Unknown BufferPlacement");
+    }
+
+    return HalBuffer::CreateRetained(raw_buffer);
+  }
+
+  HalBuffer AllocateHeap(iree_host_size_t allocation_size, int32_t usage) {
+    return Allocate(allocation_size, BufferPlacement::kHeap, usage);
+  }
+
+  HalBuffer AllocateDeviceLocal(iree_host_size_t allocation_size,
+                                int32_t usage) {
+    return Allocate(allocation_size, BufferPlacement::kDeviceLocal, usage);
+  }
+
+  HalBuffer AllocateDeviceVisible(iree_host_size_t allocation_size,
+                                  int32_t usage) {
+    return Allocate(allocation_size, BufferPlacement::kDeviceVisible, usage);
   }
 
   RtInvocation Invoke(RtFunction& f, RtPolicy& policy,

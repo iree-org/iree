@@ -16,6 +16,7 @@
 
 #include "iree/bindings/python/pyiree/compiler.h"
 #include "iree/bindings/python/pyiree/hal.h"
+#include "iree/bindings/python/pyiree/initialize.h"
 #include "iree/bindings/python/pyiree/rt.h"
 #include "iree/bindings/python/pyiree/status_utils.h"
 #include "iree/bindings/python/pyiree/vm.h"
@@ -26,6 +27,7 @@ namespace python {
 PYBIND11_MODULE(binding, m) {
   m.doc() = "IREE Binding Backend Helpers";
   py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob");
+  m.def("initialize_extension", &InitializeExtension);
 
   auto compiler_m = m.def_submodule("compiler", "IREE compiler support");
   SetupCompilerBindings(compiler_m);

@@ -33,11 +33,8 @@ def create_simple_mul_module():
   return m
 
 
-def create_host_buffer_view():
-  b = binding.hal.Buffer.allocate_heap(
-      memory_type=int(binding.hal.MemoryType.HOST_LOCAL),
-      usage=int(binding.hal.BufferUsage.ALL),
-      allocation_size=16)
+def create_host_buffer_view(context):
+  b = context.allocate_device_visible(16)
   b.fill_zero(0, 16)
   bv = b.create_view(binding.hal.Shape([4]), 4)
   print("BUFFER VIEW:", bv)
@@ -107,16 +104,15 @@ class RuntimeTest(absltest.TestCase):
     context.register_module(m)
     f = context.resolve_function("module.simple_mul")
     print("INVOKE F:", f)
-    arg0 = create_host_buffer_view()
-    arg1 = create_host_buffer_view()
-    result = create_host_buffer_view()
-    try:
-      inv = context.invoke(f, policy, [arg0, arg1], [result])
-      print("Status:", inv.query_status())
-      self.fail("Remove once invocation is working")
-    except:  # pylint: disable=bare-except
-      print("TODO(laurenzo): Invocation is not working yet.")
+    arg0 = create_host_buffer_view(context)
+    arg1 = create_host_buffer_view(context)
+    result = create_host_buffer_view(context)
+
+    inv = context.invoke(f, policy, [arg0, arg1], [result])
+    print("Status:", inv.query_status())
 
 
 if __name__ == "__main__":
+  # Uncomment to initialize the extension with custom flags.
+  # binding.initialize_extension(["--logtostderr"])
   absltest.main()

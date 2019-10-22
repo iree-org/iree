@@ -19,7 +19,16 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["requirements.txt"])
+COMPILER_DEPS = [
+    "//iree/compiler/Translation/Sequencer",
+    "//iree/compiler/Translation/Interpreter",
+    "//iree/compiler/Translation/SPIRV",
+]
+
+DRIVER_DEPS = [
+    "//iree/hal/interpreter:interpreter_driver_module",
+    "//iree/hal/vulkan:vulkan_driver_module",
+]
 
 iree_py_extension(
     name = "binding",
@@ -30,6 +39,8 @@ iree_py_extension(
         "compiler.h",
         "hal.cc",
         "hal.h",
+        "initialize.cc",
+        "initialize.h",
         "rt.cc",
         "rt.h",
         "status_utils.cc",
@@ -46,8 +57,8 @@ iree_py_extension(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "//iree/base:api",
+        "//iree/base:init",
         "//iree/base:status",
-        "//iree/compiler/Translation/Sequencer",
         "//iree/hal:api",
         "//iree/rt:api",
         "//iree/schemas",
@@ -56,13 +67,7 @@ iree_py_extension(
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Parser",
         "@iree_pybind11//:pybind11",
-
-        # These are the drivers we support running with and can produce
-        # executables for from the source MLIR.
-        "//iree/hal/interpreter:interpreter_driver_module",  # build-cleaner: keep
-        # TODO(benvanik): include SPIR-V.
-        # "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
-    ],
+    ] + COMPILER_DEPS + DRIVER_DEPS,
 )
 
 py_test(
@@ -91,9 +96,6 @@ py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
     python_version = "PY3",
-    tags = [
-        "notap",
-    ],
     deps = [
         ":binding",
         "//iree/bindings/python:pathsetup",

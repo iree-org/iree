@@ -17,6 +17,7 @@
 #include <stdexcept>
 
 #include "iree/bindings/python/pyiree/binding.h"
+#include "iree/bindings/python/pyiree/initialize.h"
 #include "iree/bindings/python/pyiree/status_utils.h"
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/schemas/module_def_generated.h"
@@ -60,6 +61,8 @@ OwningModuleRef parseMLIRModuleFromString(StringRef contents,
 }  // namespace
 
 std::shared_ptr<OpaqueBlob> CompileModuleFromAsm(const std::string& moduleAsm) {
+  InitializeExtension({});
+
   MLIRContext context;
 
   // Arrange to get a view that includes a terminating null to avoid additional

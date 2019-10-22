@@ -18,6 +18,13 @@ namespace iree {
 namespace python {
 
 void SetupRtBindings(pybind11::module m) {
+  // BufferPlacement.
+  py::enum_<BufferPlacement>(m, "BufferPlacement")
+      .value("HEAP", BufferPlacement::kHeap)
+      .value("DEVICE_VISIBLE", BufferPlacement::kDeviceVisible)
+      .value("DEVICE_LOCAL", BufferPlacement::kDeviceLocal)
+      .export_values();
+
   // RtModule.
   py::class_<RtModule>(m, "Module")
       .def_property_readonly("name", &RtModule::name)
@@ -37,7 +44,9 @@ void SetupRtBindings(pybind11::module m) {
   py::class_<RtPolicy>(m, "Policy").def(py::init(&RtPolicy::Create));
 
   // RtInstance.
-  py::class_<RtInstance>(m, "Instance").def(py::init(&RtInstance::Create));
+  py::class_<RtInstance>(m, "Instance")
+      .def(py::init(&RtInstance::Create),
+           py::arg_v("driver_name", absl::optional<std::string>()));
 
   // RtContext.
   py::class_<RtContext>(m, "Context")
@@ -49,6 +58,15 @@ void SetupRtBindings(pybind11::module m) {
            py::arg("name"))
       .def("resolve_function", &RtContext::ResolveFunction,
            py::arg("full_name"))
+      .def("allocate", &RtContext::Allocate, py::arg("allocation_size"),
+           py::arg("placement") = BufferPlacement::kHeap,
+           py::arg("usage") = IREE_HAL_BUFFER_USAGE_ALL)
+      .def("allocate_device_local", &RtContext::AllocateDeviceLocal,
+           py::arg("allocation_size"),
+           py::arg("usage") = IREE_HAL_BUFFER_USAGE_ALL)
+      .def("allocate_device_visible", &RtContext::AllocateDeviceVisible,
+           py::arg("allocation_size"),
+           py::arg("usage") = IREE_HAL_BUFFER_USAGE_ALL)
       .def("invoke", &RtContext::Invoke, py::arg("f"), py::arg("policy"),
            py::arg("arguments"), py::arg("results"));
 
