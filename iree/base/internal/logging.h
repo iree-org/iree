@@ -21,6 +21,11 @@
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
 
+// WinGDI.h defines `ERROR`, undef to avoid conflict naming.
+#ifdef _WIN32
+#undef ERROR
+#endif
+
 namespace iree {
 
 // ------------------------------------------------------------------------- //

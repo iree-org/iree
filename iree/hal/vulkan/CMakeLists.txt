@@ -172,6 +172,7 @@ iree_cc_library(
     "extensibility_util.cc"
   DEPS
     absl::span
+    iree::base::memory
     iree::base::status
     iree::base::tracing
     iree::hal::vulkan::dynamic_symbols
@@ -385,6 +386,7 @@ iree_cc_library(
     "vulkan_driver.cc"
   DEPS
     absl::inlined_vector
+    iree::base::memory
     iree::base::status
     iree::base::tracing
     iree::hal::device_info
