@@ -17,7 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 from absl.testing import absltest
-
+import numpy as np
 from pyiree import binding as binding
 
 
@@ -104,15 +104,25 @@ class RuntimeTest(absltest.TestCase):
     context.register_module(m)
     f = context.resolve_function("module.simple_mul")
     print("INVOKE F:", f)
-    arg0 = create_host_buffer_view(context)
-    arg1 = create_host_buffer_view(context)
-    result = create_host_buffer_view(context)
+    arg0 = context.wrap_for_input(np.array([1., 2., 3., 4.], dtype=np.float32))
+    arg1 = context.wrap_for_input(np.array([4., 5., 6., 7.], dtype=np.float32))
 
-    inv = context.invoke(f, policy, [arg0, arg1], [result])
+    inv = context.invoke(f, policy, [arg0, arg1])
     print("Status:", inv.query_status())
+    inv.await()
+    results = inv.results
+    print("Results:", results)
+    result = results[0].map()
+    print("Mapped result:", result)
+    result_ary = np.array(result, copy=False)
+    print("NP result:", result_ary)
+    self.assertEqual(4., result_ary[0])
+    self.assertEqual(10., result_ary[1])
+    self.assertEqual(18., result_ary[2])
+    self.assertEqual(28., result_ary[3])
 
 
 if __name__ == "__main__":
   # Uncomment to initialize the extension with custom flags.
-  # binding.initialize_extension(["--logtostderr"])
+  binding.initialize_extension(["--logtostderr"])
   absltest.main()

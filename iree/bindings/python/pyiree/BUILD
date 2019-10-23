@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.bzl", "iree_py_extension")
+load("//iree:build_defs.bzl", "NUMPY_DEPS", "iree_py_extension")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -96,9 +96,8 @@ py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
     python_version = "PY3",
-    deps = [
+    deps = NUMPY_DEPS + [
         ":binding",
-        "//iree/bindings/python:pathsetup",
         "@absl_py//absl/testing:absltest",
     ],
 )

@@ -178,6 +178,8 @@ class RtPolicy : public ApiRefCounted<RtPolicy, iree_rt_policy_t> {
 
 class RtInvocation : public ApiRefCounted<RtInvocation, iree_rt_invocation_t> {
  public:
+  // Returns whether ready.
+  // Raises exception on error.
   bool QueryStatus() {
     auto status = iree_rt_invocation_query_status(raw_ptr());
     if (status == IREE_STATUS_OK) {
@@ -188,6 +190,52 @@ class RtInvocation : public ApiRefCounted<RtInvocation, iree_rt_invocation_t> {
       CheckApiStatus(status, "Error in function invocation");
       return false;
     }
+  }
+
+  // TODO(laurenzo): Convert to the pybind chrono support.
+  // Returns whether the invocation is ready.
+  bool AwaitOptional(iree_time_t epoch_nanos_deadline) {
+    auto status = iree_rt_invocation_await(raw_ptr(), epoch_nanos_deadline);
+    if (status == IREE_STATUS_OK) {
+      return true;
+    } else if (status == IREE_STATUS_DEADLINE_EXCEEDED) {
+      return false;
+    } else {
+      CheckApiStatus(status, "Error in invocation");
+      return false;
+    }
+  }
+
+  // Similar to AwaitOptional but will raise an error unless if the status
+  // is ready.
+  void Await(iree_time_t epoch_nanos_deadline) {
+    if (!AwaitOptional(epoch_nanos_deadline)) {
+      RaiseValueError("Deadline expired");
+    }
+  }
+
+  std::vector<HalBufferView> ConsumeResults() {
+    static constexpr size_t kInlineSize = 8;
+    iree_host_size_t result_count;
+    absl::InlinedVector<iree_hal_buffer_view_t*, kInlineSize> result_bvs;
+    result_bvs.resize(kInlineSize);
+    auto status = iree_rt_invocation_consume_results(
+        raw_ptr(), kInlineSize, IREE_ALLOCATOR_DEFAULT, &result_bvs[0],
+        &result_count);
+    if (status == IREE_STATUS_OUT_OF_RANGE) {
+      // Resize/retry.
+      result_bvs.resize(result_count);
+      status = iree_rt_invocation_consume_results(
+          raw_ptr(), result_count, IREE_ALLOCATOR_DEFAULT, &result_bvs[0],
+          &result_count);
+    }
+    CheckApiStatus(status, "Error consuming invocation results");
+    result_bvs.resize(result_count);
+    std::vector<HalBufferView> results;
+    for (auto* raw_bv : result_bvs) {
+      results.push_back(HalBufferView::CreateRetained(raw_bv));
+    }
+    return results;
   }
 };
 
@@ -296,9 +344,15 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
     return Allocate(allocation_size, BufferPlacement::kDeviceVisible, usage);
   }
 
+  // One stop convenience method for wrapping a python buffer protocol buffer
+  // for input to a function. At the runtime's discretion, this may make a copy
+  // or do something smarter, meaning the data in the backing python buffer
+  // will either be accessed immediately or at some future point.
+  HalBufferView WrapPyBufferForInput(py::buffer py_buffer);
+
   RtInvocation Invoke(RtFunction& f, RtPolicy& policy,
                       std::vector<HalBufferView*> arguments,
-                      std::vector<HalBufferView*> results) {
+                      absl::optional<std::vector<HalBufferView*>> results) {
     absl::InlinedVector<iree_hal_buffer_view_t*, 8> raw_arguments;
     raw_arguments.resize(arguments.size());
     for (size_t i = 0, e = arguments.size(); i < e; ++i) {
@@ -307,11 +361,13 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
       raw_arguments[i] = inst->raw_ptr();
     }
     absl::InlinedVector<iree_hal_buffer_view_t*, 8> raw_results;
-    raw_results.resize(results.size());
-    for (size_t i = 0, e = results.size(); i < e; ++i) {
-      auto inst = results[i];
-      CheckApiNotNull(inst, "Result buffer view cannot be None");
-      raw_results[i] = inst->raw_ptr();
+    if (results) {
+      raw_results.resize(results->size());
+      for (size_t i = 0, e = results->size(); i < e; ++i) {
+        auto inst = (*results)[i];
+        CheckApiNotNull(inst, "Result buffer view cannot be None");
+        raw_results[i] = inst->raw_ptr();
+      }
     }
 
     iree_rt_invocation_t* invocation;

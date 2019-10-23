@@ -14,8 +14,72 @@
 
 #include "iree/bindings/python/pyiree/rt.h"
 
+#include "iree/base/api.h"
+#include "iree/bindings/python/pyiree/status_utils.h"
+#include "iree/hal/api.h"
+
 namespace iree {
 namespace python {
+
+HalBufferView RtContext::WrapPyBufferForInput(py::buffer py_buffer) {
+  auto py_buffer_info = py_buffer.request(false /* writable */);
+  if (py_buffer_info.ndim > IREE_SHAPE_MAX_RANK || py_buffer_info.ndim < 0) {
+    RaiseValueError("Unsupported buffer rank");
+  }
+  if (py_buffer_info.size < 0) {
+    RaiseValueError("Illegal buffer size");
+  }
+
+  // For the moment, allocate a device visible buffer of equivalent size and
+  // copy into it.
+  // TODO(laurenzo): Once sequencer is in place, switch to HeapBuffer, wrap
+  // and retain the original buffer.
+  iree_host_size_t byte_size = py_buffer_info.size * py_buffer_info.itemsize;
+  HalBuffer buffer =
+      AllocateDeviceVisible(byte_size, IREE_HAL_BUFFER_USAGE_CONSTANT |
+                                           IREE_HAL_BUFFER_USAGE_TRANSFER |
+                                           IREE_HAL_BUFFER_USAGE_DISPATCH);
+  CheckApiStatus(iree_hal_buffer_write_data(buffer.raw_ptr(), 0,
+                                            py_buffer_info.ptr, byte_size),
+                 "Error writing to input buffer");
+
+  // Create the buffer view.
+  // TODO(laurenzo): This does no validation on dtype and only cares if the
+  // elementsize matches. Figure out where to enforce actual dtype.
+  iree_shape_t shape;
+  shape.rank = py_buffer_info.ndim;
+
+  // Verify strides are row-major.
+  // TODO(laurenzo): Test this with rank>1.
+  for (int i = 1; i < shape.rank; ++i) {
+    if ((py_buffer_info.strides[i - 1] * py_buffer_info.itemsize) !=
+        py_buffer_info.shape[i]) {
+      RaiseValueError("Expected row-major layout");
+    }
+  }
+  if (!py_buffer_info.strides.empty()) {
+    if (py_buffer_info.strides.back() != 1) {
+      RaiseValueError("Expected row-major layout");
+    }
+  }
+
+  // Populate shape.
+  for (int i = 0; i < shape.rank; ++i) {
+    ssize_t dim = py_buffer_info.shape[i];
+    if (dim < 0) {
+      RaiseValueError("Unsupported negative dim");
+    }
+    shape.dims[i] = dim;
+  }
+
+  iree_hal_buffer_view_t* bv;
+  CheckApiStatus(iree_hal_buffer_view_create(buffer.raw_ptr(), shape,
+                                             py_buffer_info.itemsize,
+                                             IREE_ALLOCATOR_DEFAULT, &bv),
+                 "Error allocating buffer view");
+
+  return HalBufferView::CreateRetained(bv);
+}
 
 void SetupRtBindings(pybind11::module m) {
   // BufferPlacement.
@@ -67,12 +131,19 @@ void SetupRtBindings(pybind11::module m) {
       .def("allocate_device_visible", &RtContext::AllocateDeviceVisible,
            py::arg("allocation_size"),
            py::arg("usage") = IREE_HAL_BUFFER_USAGE_ALL)
+      .def("wrap_for_input", &RtContext::WrapPyBufferForInput, py::arg("v"))
       .def("invoke", &RtContext::Invoke, py::arg("f"), py::arg("policy"),
-           py::arg("arguments"), py::arg("results"));
+           py::arg("arguments"),
+           py::arg("results") = absl::optional<std::vector<HalBufferView*>>());
 
   // RtInvocation.
   py::class_<RtInvocation>(m, "Invocation")
-      .def("query_status", &RtInvocation::QueryStatus);
+      .def("query_status", &RtInvocation::QueryStatus)
+      .def("await", &RtInvocation::Await,
+           py::arg("deadline") = IREE_TIME_INFINITE_FUTURE)
+      .def("await_optional", &RtInvocation::AwaitOptional,
+           py::arg("deadline") = IREE_TIME_INFINITE_FUTURE)
+      .def_property_readonly("results", &RtInvocation::ConsumeResults);
 }
 
 }  // namespace python

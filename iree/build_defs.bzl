@@ -5,6 +5,8 @@ load("@iree_native_python//:build_defs.bzl", "py_extension")
 load("@iree_core//build_tools/third_party/glslang:build_defs.bzl", "glsl_vulkan")
 load("@rules_python//python:defs.bzl", "py_library")
 
+NUMPY_DEPS = []
+
 def platform_trampoline_deps(basename):
     """Produce a list of deps for the given `basename` platform target.
 
