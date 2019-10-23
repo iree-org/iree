@@ -281,7 +281,7 @@ cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],
     deps = [
-        "//third_party/iree:target_config",
+        "//iree:target_config",
         "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ] + select({
         "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"],
