@@ -26,7 +26,7 @@ namespace vm {
 //===----------------------------------------------------------------------===//
 // iree::vm::BytecodeModule
 //===----------------------------------------------------------------------===//
-
+ // DO NOT SUBMIT
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_bytecode_module_create_from_buffer(
     iree_const_byte_span_t buffer_data,
