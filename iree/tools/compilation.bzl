@@ -1,6 +1,6 @@
 """Rules for compiling IREE executables, modules, and archives."""
 
-load("///build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 # TODO(benvanik): port to a full starlark rule, document, etc.
 def iree_bytecode_module(
@@ -16,13 +16,13 @@ def iree_bytecode_module(
         ],
         cmd = " && ".join([
             " ".join([
-                "$(location ///iree/tools:iree-translate)",
+                "$(location //iree/tools:iree-translate)",
                 "-mlir-to-iree-module",
                 "-o $(location %s.emod)" % (name),
             ] + ["$(locations %s)" % (src) for src in srcs]),
         ]),
         tools = [
-            "///iree/tools:iree-translate",
+            "//iree/tools:iree-translate",
         ],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,

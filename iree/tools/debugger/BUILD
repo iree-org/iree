@@ -37,11 +37,11 @@ package(
 #         "@com_google_absl//absl/types:optional",
 #         "//third_party/dear_imgui",
 #         "//third_party/dear_imgui:imgui_sdl_opengl3",
-#         "///iree/base:memory",
-#         "///iree/base:source_location",
-#         "///iree/base:status",
-#         "///iree/rt/debug:debug_client",
-#         "///iree/schemas",
+#         "//iree/base:memory",
+#         "//iree/base:source_location",
+#         "//iree/base:status",
+#         "//iree/rt/debug:debug_client",
+#         "//iree/schemas",
 #     ],
 # )
 #
@@ -59,8 +59,8 @@ package(
 #         "@com_google_absl//absl/strings",
 #         "@com_google_absl//absl/synchronization",
 #         "//third_party/dear_imgui",
-#         "///iree/base:memory",
-#         "///iree/base:status",
+#         "//iree/base:memory",
+#         "//iree/base:status",
 #     ],
 # )
 #
@@ -109,9 +109,9 @@ package(
 #         "@com_google_absl//absl/memory",
 #         "//third_party/dear_imgui",
 #         "//third_party/dear_imgui:imgui_sdl_opengl3",
-#         "///iree/base:init",
-#         "///iree/base:source_location",
-#         "///iree/base:status",
+#         "//iree/base:init",
+#         "//iree/base:source_location",
+#         "//iree/base:status",
 #     ],
 # )
 #
@@ -145,8 +145,8 @@ package(
 #         ":debug_app_embedded",
 #         "//third_party/GL/native:EGL",  # build-cleaner: keep
 #         "//third_party/GL/native:GLESv2",  # build-cleaner: keep
-#         "///iree/base:init",
-#         "///iree/base:status",
+#         "//iree/base:init",
+#         "//iree/base:status",
 #     ],
 # )
 #
@@ -156,8 +156,8 @@ package(
 #     deps = [
 #         ":debug_prompt",
 #         "@com_google_absl//absl/flags:flag",
-#         "///iree/base:init",
-#         "///iree/base:status",
+#         "//iree/base:init",
+#         "//iree/base:status",
 #     ],
 # )
 #
@@ -167,7 +167,7 @@ package(
 #     hdrs = ["debug_prompt.h"],
 #     deps = [
 #         "@com_google_absl//absl/strings",
-#         "///iree/base:status",
-#         "///iree/rt/debug:debug_client",
+#         "//iree/base:status",
+#         "//iree/rt/debug:debug_client",
 #     ],
 # )

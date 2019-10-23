@@ -10,8 +10,8 @@ cc_library(
     srcs = ["file_handle_win32.cc"],
     hdrs = ["file_handle_win32.h"],
     deps = [
-        "///iree/base:status",
-        "///iree/base:target_platform",
+        "//iree/base:status",
+        "//iree/base:target_platform",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -25,9 +25,9 @@ cc_library(
     ],
     deps = [
         ":file_handle_win32",
-        "///iree/base:file_io_hdrs",
-        "///iree/base:status",
-        "///iree/base:target_platform",
+        "//iree/base:file_io_hdrs",
+        "//iree/base:status",
+        "//iree/base:target_platform",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -41,9 +41,9 @@ cc_library(
     ],
     deps = [
         ":file_handle_win32",
-        "///iree/base:file_mapping_hdrs",
-        "///iree/base:target_platform",
-        "///iree/base:tracing",
+        "//iree/base:file_mapping_hdrs",
+        "//iree/base:target_platform",
+        "//iree/base:tracing",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -54,7 +54,7 @@ cc_library(
     srcs = ["init_internal.cc"],
     hdrs = ["init_internal.h"],
     deps = [
-        "///iree/base:target_platform",
+        "//iree/base:target_platform",
         "@com_google_absl//absl/flags:parse",
     ],
 )
@@ -95,8 +95,8 @@ cc_library(
     ],
     deps = [
         ":logging_internal",
-        "///iree/base:source_location",
-        "///iree/base:target_platform",
+        "//iree/base:source_location",
+        "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/debugging:stacktrace",
         "@com_google_absl//absl/flags:flag",
@@ -110,7 +110,7 @@ cc_library(
     testonly = 1,
     hdrs = ["status_matchers.h"],
     deps = [
-        "///iree/base:status",
+        "//iree/base:status",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_googletest//:gtest",

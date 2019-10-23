@@ -1,6 +1,6 @@
 # Common types and utilities used in the IREE codebase.
 
-load("///iree:build_defs.bzl", "platform_trampoline_deps")
+load("//iree:build_defs.bzl", "platform_trampoline_deps")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -281,7 +281,7 @@ cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],
     deps = [
-        "//:target_config",
+        "//third_party/iree:target_config",
         "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ] + select({
         "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"],

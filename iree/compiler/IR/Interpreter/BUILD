@@ -33,10 +33,10 @@ cc_library(
     deps = [
         ":HLOpsGen",
         ":LLOpsGen",
-        "///iree/compiler/IR",
-        "///iree/compiler/Serialization",
-        "///iree/compiler/Utils",
-        "///iree/schemas/bytecode:interpreter_bytecode_v0",
+        "//iree/compiler/IR",
+        "//iree/compiler/Serialization",
+        "//iree/compiler/Utils",
+        "//iree/schemas/bytecode:interpreter_bytecode_v0",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:StandardOps",
@@ -55,7 +55,7 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@local_config_mlir//:include/mlir/IR/OpBase.td",
-        "///iree/compiler/IR:OpBase.td",
+        "//iree/compiler/IR:OpBase.td",
     ],
 )
 
@@ -70,6 +70,6 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@local_config_mlir//:include/mlir/IR/OpBase.td",
-        "///iree/compiler/IR:OpBase.td",
+        "//iree/compiler/IR:OpBase.td",
     ],
 )

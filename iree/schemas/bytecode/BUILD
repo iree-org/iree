@@ -7,7 +7,7 @@ cc_library(
     name = "bytecode_v0",
     hdrs = ["bytecode_v0.h"],
     deps = [
-        "///iree/base:bitfield",
+        "//iree/base:bitfield",
         "@com_google_absl//absl/base:core_headers",
     ],
 )

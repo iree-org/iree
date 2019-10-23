@@ -1,6 +1,6 @@
 # Tests specific to lowering XLA to IREE.
 
-load("///iree:build_defs.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
+load("//iree:build_defs.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -9,8 +9,8 @@ package(
 
 iree_setup_lit_package(
     data = [
-        "///iree/tools:iree-opt",
-        "///iree/tools:iree-run-mlir",
+        "//iree/tools:iree-opt",
+        "//iree/tools:iree-run-mlir",
     ],
 )
 

@@ -2,7 +2,7 @@
 
 load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 load("@iree_native_python//:build_defs.bzl", "py_extension")
-load("@iree_core///build_tools/third_party/glslang:build_defs.bzl", "glsl_vulkan")
+load("@iree_core//build_tools/third_party/glslang:build_defs.bzl", "glsl_vulkan")
 load("@rules_python//python:defs.bzl", "py_library")
 
 NUMPY_DEPS = []
@@ -11,7 +11,7 @@ def platform_trampoline_deps(basename):
     """Produce a list of deps for the given `basename` platform target.
 
     Example:
-      "file_mapping" -> ["///iree/base/internal/file_mapping_internal"]
+      "file_mapping" -> ["//iree/base/internal/file_mapping_internal"]
 
     This is used for compatibility with various methods of including the
     library in foreign source control systems.
@@ -23,20 +23,20 @@ def platform_trampoline_deps(basename):
       sensitive way.
     """
     return [
-        "///iree/base/internal:%s_internal" % basename,
+        "//iree/base/internal:%s_internal" % basename,
     ]
 
 # A platform-sensitive list of copts for the Vulkan loader.
 PLATFORM_VULKAN_LOADER_COPTS = select({
-    "///iree/hal/vulkan:native_vk": [],
-    "///iree/hal/vulkan:swiftshader_vk": [],
+    "//iree/hal/vulkan:native_vk": [],
+    "//iree/hal/vulkan:swiftshader_vk": [],
     "//conditions:default": [],
 })
 
 # A platform-sensitive list of dependencies for non-test targets using Vulkan.
 PLATFORM_VULKAN_DEPS = select({
-    "///iree/hal/vulkan:native_vk": [],
-    "///iree/hal/vulkan:swiftshader_vk": [],
+    "//iree/hal/vulkan:native_vk": [],
+    "//iree/hal/vulkan:swiftshader_vk": [],
     "//conditions:default": [],
 })
 
@@ -85,7 +85,7 @@ def iree_setup_lit_package(data):
 
 def iree_glob_lit_tests(
         data = [":lit_test_utilities"],
-        driver = "///iree/tools:run_lit.sh",
+        driver = "//iree/tools:run_lit.sh",
         test_file_exts = ["mlir"]):
     """Globs lit test files into tests for a package.
 

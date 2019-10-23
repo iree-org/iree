@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("///iree:build_defs.bzl", "NUMPY_DEPS", "iree_py_extension")
+load("//iree:build_defs.bzl", "NUMPY_DEPS", "iree_py_extension")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -20,14 +20,14 @@ package(
 )
 
 COMPILER_DEPS = [
-    "///iree/compiler/Translation/Sequencer",
-    "///iree/compiler/Translation/Interpreter",
-    "///iree/compiler/Translation/SPIRV",
+    "//iree/compiler/Translation/Sequencer",
+    "//iree/compiler/Translation/Interpreter",
+    "//iree/compiler/Translation/SPIRV",
 ]
 
 DRIVER_DEPS = [
-    "///iree/hal/interpreter:interpreter_driver_module",
-    "///iree/hal/vulkan:vulkan_driver_module",
+    "//iree/hal/interpreter:interpreter_driver_module",
+    "//iree/hal/vulkan:vulkan_driver_module",
 ]
 
 iree_py_extension(
@@ -56,13 +56,13 @@ iree_py_extension(
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-        "///iree/base:api",
-        "///iree/base:init",
-        "///iree/base:status",
-        "///iree/hal:api",
-        "///iree/rt:api",
-        "///iree/schemas",
-        "///iree/vm:api",
+        "//iree/base:api",
+        "//iree/base:init",
+        "//iree/base:status",
+        "//iree/hal:api",
+        "//iree/rt:api",
+        "//iree/schemas",
+        "//iree/vm:api",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Parser",
@@ -76,7 +76,7 @@ py_test(
     python_version = "PY3",
     deps = [
         ":binding",
-        "///bindings/python:pathsetup",
+        "//bindings/python:pathsetup",
         "@absl_py//absl/testing:absltest",
     ],
 )
@@ -87,7 +87,7 @@ py_test(
     python_version = "PY3",
     deps = [
         ":binding",
-        "///bindings/python:pathsetup",
+        "//bindings/python:pathsetup",
         "@absl_py//absl/testing:absltest",
     ],
 )

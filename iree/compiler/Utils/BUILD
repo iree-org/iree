@@ -27,8 +27,8 @@ cc_library(
         "TypeConversionUtils.h",
     ],
     deps = [
-        "///iree/compiler/IR",
-        "///iree/schemas",
+        "//iree/compiler/IR",
+        "//iree/schemas",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",

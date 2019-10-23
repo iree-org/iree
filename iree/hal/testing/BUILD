@@ -10,7 +10,7 @@ cc_library(
     testonly = True,
     hdrs = ["mock_allocator.h"],
     deps = [
-        "///iree/hal:allocator",
+        "//iree/hal:allocator",
         "@com_google_googletest//:gtest",
     ],
 )
@@ -20,7 +20,7 @@ cc_library(
     testonly = True,
     hdrs = ["mock_command_buffer.h"],
     deps = [
-        "///iree/hal:command_buffer",
+        "//iree/hal:command_buffer",
         "@com_google_googletest//:gtest",
     ],
 )
@@ -30,7 +30,7 @@ cc_library(
     testonly = True,
     hdrs = ["mock_command_queue.h"],
     deps = [
-        "///iree/hal:command_queue",
+        "//iree/hal:command_queue",
         "@com_google_googletest//:gtest",
     ],
 )

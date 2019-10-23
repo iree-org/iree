@@ -1,5 +1,5 @@
-load("///iree:build_defs.bzl", "FLATBUFFER_SUPPORTS_REFLECTIONS", "iree_build_test", "iree_flatbuffer_cc_library")
-load("///build_tools/embed_data:build_defs.bzl", "cc_embed_data")
+load("//iree:build_defs.bzl", "FLATBUFFER_SUPPORTS_REFLECTIONS", "iree_build_test", "iree_flatbuffer_cc_library")
+load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
