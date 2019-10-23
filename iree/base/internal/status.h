@@ -22,6 +22,13 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/internal/logging.h"
+#include "iree/base/target_platform.h"
+
+// WinGDI.h, included indirectly through absl/flags/flag.h, defines `ERROR`.
+// undef to avoid name conflicts.
+#if defined(IREE_PLATFORM_WINDOWS)
+#undef ERROR
+#endif
 
 ABSL_DECLARE_FLAG(bool, iree_status_save_stack_trace);
 

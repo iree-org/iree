@@ -16,10 +16,9 @@
 
 #include "absl/memory/memory.h"
 #include "iree/base/target_platform.h"
+#include "iree/base/windows.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
-
-#include <windows.h>
 
 namespace iree {
 

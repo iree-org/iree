@@ -28,7 +28,7 @@
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
-#include <windows.h>
+#include "iree/base/windows.h"
 #else
 #include <dlfcn.h>
 #endif  // IREE_PLATFORM_WINDOWS

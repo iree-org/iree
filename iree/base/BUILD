@@ -360,3 +360,11 @@ cc_library(
 #         "//iree/testing:gtest_main",
 #     ],
 # )
+
+cc_library(
+    name = "windows",
+    hdrs = ["windows.h"],
+    deps = [
+        ":target_platform",
+    ],
+)
