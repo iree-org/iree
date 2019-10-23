@@ -2,6 +2,7 @@ name: Presubmits
 
 on:
   pull_request:
+    types: [opened, ready_for_review, synchronize]
 
 jobs:
   # Run clang-format and verify there are no errors. We don't want to bother
@@ -20,18 +21,9 @@ jobs:
         chmod +x /tmp/git-clang-format
     - name: Checking out latest version and all submodules
       run: |
+        git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
         git clone https://github.com/$GITHUB_REPOSITORY $GITHUB_WORKSPACE --no-checkout --no-tags
-        FORK=`jq .pull_request.head.repo.fork "$GITHUB_EVENT_PATH"`
-        if [[ "$FORK" == "true" ]]; then
-          # Check out remote branch based on pull request number
-          # Credit: https://github.community/t5/How-to-use-Git-and-GitHub/Checkout-a-branch-from-a-fork/m-p/78/highlight/true#M11
-          NUMBER=`jq .pull_request.number "$GITHUB_EVENT_PATH"`
-          git fetch origin pull/${NUMBER}/head:pr/${NUMBER}
-          git checkout "pr/${NUMBER}"
-          echo "Checked out code from pull request #${NUMBER}. Last commit: $(git log --oneline -n 1)"
-        else
-          git checkout $GITHUB_SHA
-        fi
+        git checkout $GITHUB_SHA
     - name: Running clang-format on changed source files
       # TODO(benvanik): actually filter to changed files.
       run: |
