@@ -1,0 +1,347 @@
+include "iree/schemas/function_def.fbs";
+include "iree/schemas/module_def.fbs";
+
+namespace iree.rt.debug.rpc;
+
+table Status {
+  code:int;
+  message:string;
+}
+
+table CreateSessionRequest {
+}
+table CreateSessionResponse {
+  session_id:int;
+}
+
+table MakeReadyRequest {
+  session_id:int;
+}
+table MakeReadyResponse {
+}
+
+table GetStatusRequest {
+  session_id:int;
+  // TODO(benvanik): caps debugger supports? version expected?
+}
+table GetStatusResponse {
+  protocol:int;
+  // TODO(benvanik): run state.
+  // TODO(benvanik): profiling state.
+}
+
+table NativeFunctionDef {
+  name:string;
+  // TODO(benvanik): more information about the fns (stack trace of registrant?)
+}
+
+table ContextDef {
+  context_id:int;
+  native_functions:[NativeFunctionDef];
+  module_names:[string];
+}
+
+table ListContextsRequest {
+  session_id:int;
+}
+
+table ListContextsResponse {
+  contexts:[ContextDef];
+}
+
+table GetModuleRequest {
+  session_id:int;
+  context_id:int;
+  module_name:string;
+}
+table GetModuleResponse {
+  module:ModuleDef;
+}
+
+table GetFunctionRequest {
+  session_id:int;
+  context_id:int;
+  module_name:string;
+  function_ordinal:int;
+}
+table GetFunctionResponse {
+  bytecode:BytecodeDef;
+  // TODO(benvanik): import info (linked module, etc).
+}
+
+table ResolveFunctionRequest {
+  session_id:int;
+  module_name:string;
+  function_name:string;
+}
+table ResolveFunctionResponse {
+  context_ids:[int];
+  function_ordinal:int;
+}
+
+table BufferViewDef {
+  is_valid:bool;
+  shape:[int];
+  element_size:int;
+  // TODO(benvanik): buffer attrs (type, access, usage).
+  // TODO(benvanik): buffer size/allocated_size.
+  // TODO(benvanik): buffer data (if accessible).
+}
+
+table StackFrameDef {
+  module_name:string;
+  function_ordinal:int;
+  offset:int;
+  locals:[BufferViewDef];
+}
+
+table InvocationDef {
+  invocation_id:int;
+  frames:[StackFrameDef];
+}
+
+table ListInvocationsRequest {
+  session_id:int;
+}
+table ListInvocationsResponse {
+  invocations:[InvocationDef];
+}
+
+table SuspendInvocationsRequest {
+  session_id:int;
+  invocation_ids:[int];
+}
+table SuspendInvocationsResponse {
+  invocations:[InvocationDef];
+}
+
+table ResumeInvocationsRequest {
+  session_id:int;
+  invocation_ids:[int];
+}
+table ResumeInvocationsResponse {
+}
+
+enum StepMode : uint8 {
+  STEP_ONCE = 0,
+  STEP_TO_OFFSET = 1,
+}
+
+table StepInvocationRequest {
+  session_id:int;
+  step_id:int;
+  invocation_id:int;
+  step_mode:StepMode;
+  bytecode_offset:int;
+}
+table StepInvocationResponse {}
+
+table GetInvocationLocalRequest {
+  session_id:int;
+  invocation_id:int;
+  frame_index:int;
+  local_index:int;
+}
+table GetInvocationLocalResponse {
+  value:BufferViewDef;
+}
+
+table SetInvocationLocalRequest {
+  session_id:int;
+  invocation_id:int;
+  frame_index:int;
+  local_index:int;
+  value:BufferViewDef;
+}
+table SetInvocationLocalResponse {
+  value:BufferViewDef;
+}
+
+enum BreakpointType : uint8 {
+  BYTECODE_FUNCTION = 0,
+  NATIVE_FUNCTION = 1,
+}
+
+table BreakpointDef {
+  breakpoint_id:int;
+  breakpoint_type:BreakpointType;
+
+  module_name:string;
+  function_name:string;
+  function_ordinal:int;
+  bytecode_offset:int;
+}
+
+table ListBreakpointsRequest {
+  session_id:int;
+}
+table ListBreakpointsResponse {
+  breakpoints:[BreakpointDef];
+}
+
+table AddBreakpointRequest {
+  session_id:int;
+  breakpoint:BreakpointDef;
+}
+table AddBreakpointResponse {
+  breakpoint:BreakpointDef;
+}
+
+table RemoveBreakpointRequest {
+  session_id:int;
+  breakpoint_id:int;
+}
+table RemoveBreakpointResponse {
+}
+
+table StartProfilingRequest {
+  session_id:int;
+  context_id:int;
+  // TODO(benvanik): profiling mode.
+  //   mode: sampling_timing, instrumented_coverage, instrumented_log,
+  //         invoke_log
+}
+table StartProfilingResponse {
+  // TODO(benvanik): current/new mode.
+}
+
+table StopProfilingRequest {
+  session_id:int;
+  context_id:int;
+}
+table StopProfilingResponse {
+  // TODO(benvanik): profiling data.
+}
+
+// TODO(benvanik): streaming profiling data query.
+
+table ServiceShutdownEvent {
+}
+
+table ContextRegisteredEvent {
+  context_id:int;
+}
+table ContextUnregisteredEvent {
+  context_id:int;
+}
+
+table ModuleLoadedEvent {
+  context_id:int;
+  module_name:string;
+}
+
+table InvocationRegisteredEvent {
+  invocation_id:int;
+}
+table InvocationUnregisteredEvent {
+  invocation_id:int;
+}
+
+table BreakpointResolvedEvent {
+  breakpoint:BreakpointDef;
+  context_id:int;
+}
+
+table BreakpointHitEvent {
+  breakpoint_id:int;
+  invocation:InvocationDef;
+}
+
+table StepCompletedEvent {
+  step_id:int;
+  invocations:[InvocationDef];
+}
+
+union RequestUnion {
+  CreateSessionRequest,
+  MakeReadyRequest,
+  GetStatusRequest,
+  ListContextsRequest,
+  GetModuleRequest,
+  GetFunctionRequest,
+  ResolveFunctionRequest,
+  ListInvocationsRequest,
+  SuspendInvocationsRequest,
+  ResumeInvocationsRequest,
+  StepInvocationRequest,
+  GetInvocationLocalRequest,
+  SetInvocationLocalRequest,
+  ListBreakpointsRequest,
+  AddBreakpointRequest,
+  RemoveBreakpointRequest,
+  StartProfilingRequest,
+  StopProfilingRequest,
+}
+
+union ResponseUnion {
+  CreateSessionResponse,
+  MakeReadyResponse,
+  GetStatusResponse,
+  ListContextsResponse,
+  GetModuleResponse,
+  GetFunctionResponse,
+  ResolveFunctionResponse,
+  ListInvocationsResponse,
+  SuspendInvocationsResponse,
+  ResumeInvocationsResponse,
+  StepInvocationResponse,
+  GetInvocationLocalResponse,
+  SetInvocationLocalResponse,
+  ListBreakpointsResponse,
+  AddBreakpointResponse,
+  RemoveBreakpointResponse,
+  StartProfilingResponse,
+  StopProfilingResponse,
+}
+
+union EventUnion {
+  ServiceShutdownEvent,
+  ContextRegisteredEvent,
+  ContextUnregisteredEvent,
+  ModuleLoadedEvent,
+  InvocationRegisteredEvent,
+  InvocationUnregisteredEvent,
+  BreakpointResolvedEvent,
+  BreakpointHitEvent,
+  StepCompletedEvent,
+}
+
+table Request {
+  message:RequestUnion;
+}
+
+table Response {
+  status:Status;
+  message:ResponseUnion;
+}
+
+table ServicePacket {
+  response:Response;
+  event:EventUnion;
+}
+
+// NOTE: we aren't using this yet as the FlatBuffers gRPC code is... suspect.
+rpc_service DebugServiceRpc {
+  MakeReady(MakeReadyRequest):MakeReadyResponse;
+
+  GetStatus(GetStatusRequest):GetStatusResponse;
+
+  ListContexts(ListContextsRequest):ListContextsResponse;
+  GetModule(GetModuleRequest):GetModuleResponse;
+  GetFunction(GetFunctionRequest):GetFunctionResponse;
+  ResolveFunction(ResolveFunctionRequest):ResolveFunctionResponse;
+
+  ListInvocations(ListInvocationsRequest):ListInvocationsResponse;
+  SuspendInvocations(SuspendInvocationsRequest):SuspendInvocationsResponse;
+  ResumeInvocations(ResumeInvocationsRequest):ResumeInvocationsResponse;
+  StepInvocation(StepInvocationRequest):StepInvocationResponse;
+  GetInvocationLocal(GetInvocationLocalRequest):GetInvocationLocalResponse;
+  SetInvocationLocal(SetInvocationLocalRequest):SetInvocationLocalResponse;
+
+  ListBreakpoints(ListBreakpointsRequest):ListBreakpointsResponse;
+  AddBreakpoint(AddBreakpointRequest):AddBreakpointResponse;
+  RemoveBreakpoint(RemoveBreakpointRequest):RemoveBreakpointResponse;
+
+  StartProfiling(StartProfilingRequest):StartProfilingResponse;
+  StopProfiling(StopProfilingRequest):StopProfilingResponse;
+}

@@ -17,7 +17,7 @@
 
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/status_utils.h"
-#include "hal/api.h"
+#include "iree/hal/api.h"
 
 namespace iree {
 namespace python {

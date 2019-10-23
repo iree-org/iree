@@ -19,13 +19,13 @@
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/initialize.h"
 #include "bindings/python/pyiree/status_utils.h"
-#include "compiler/Translation/Sequencer/SequencerModuleTranslation.h"
+#include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
+#include "iree/schemas/module_def_generated.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
-#include "schemas/module_def_generated.h"
 
 namespace py = pybind11;
 

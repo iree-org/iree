@@ -16,13 +16,13 @@
 #define IREE_BINDINGS_PYTHON_PYIREE_RT_H_
 
 #include "absl/container/inlined_vector.h"
-#include "base/api.h"
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/initialize.h"
 #include "bindings/python/pyiree/status_utils.h"
-#include "hal/api.h"
-#include "rt/api.h"
+#include "iree/base/api.h"
+#include "iree/hal/api.h"
+#include "iree/rt/api.h"
 
 namespace iree {
 namespace python {

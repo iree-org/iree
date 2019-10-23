@@ -14,7 +14,7 @@
 
 #include "bindings/python/pyiree/hal.h"
 
-#include "hal/api.h"
+#include "iree/hal/api.h"
 
 namespace iree {
 namespace python {

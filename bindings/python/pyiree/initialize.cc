@@ -18,7 +18,7 @@
 
 #include <mutex>  // NOLINT
 
-#include "base/init.h"
+#include "iree/base/init.h"
 
 namespace iree {
 namespace python {

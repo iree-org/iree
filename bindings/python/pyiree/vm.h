@@ -17,7 +17,7 @@
 
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/rt.h"
-#include "vm/api.h"
+#include "iree/vm/api.h"
 
 namespace iree {
 namespace python {

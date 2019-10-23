@@ -15,8 +15,8 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_STATUS_UTILS_H_
 
-#include "base/api.h"
-#include "base/status.h"
+#include "iree/base/api.h"
+#include "iree/base/status.h"
 #include "pybind11/pytypes.h"
 
 namespace iree {

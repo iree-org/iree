@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//:build_defs.google.bzl", "iree_py_library")
+load("///iree:build_defs.bzl", "iree_py_library")
 
 package(
     default_visibility = ["//visibility:public"],
