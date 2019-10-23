@@ -23,18 +23,38 @@ set -e
 #
 # Afterwards, set the VK_ICD_FILENAMES environment variable to the absolute
 # path of the corresponding vk_swiftshader_icd.json manifest file so the Vulkan
-# loader on your system loads it:
+# loader on your system loads it, for example:
+#   Windows
 #   $ set VK_ICD_FILENAMES=C:\dev\iree\build-swiftshader\Release\vk_swiftshader_icd_windows.json
+#
+#   Linux
+#   $ VK_ICD_FILENAMES=/dev/iree/build-swiftshader/Linux/vk_swiftshader_icd.json
 #
 # See https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
 # for further details about the Vulkan loader and ICDs.
 
 # Check that we're in the project root so our relative paths work as expected.
-if [ $(basename "$PWD") != "iree" ]
-then
+if [[ $(basename "$PWD") != "iree" ]]; then
     >&2 echo "******************************************************"
     >&2 echo "* This script should be run from IREE's project root *"
     >&2 echo "******************************************************"
+    exit 1
+fi
+
+if [[ "$OSTYPE" == "linux-gnu" ]]; then
+    PLATFORM_ARGS=""
+elif [[ "$OSTYPE" == "darwin" ]]; then
+    # TODO(scotttodd): Mac OSX args?
+    PLATFORM_ARGS=""
+elif [[ "$OSTYPE" == "msys" ]] || \
+     [[ "$OSTYPE" == "cygwin" ]] || \
+     [[ "$OSTYPE" == "win32" ]]; then
+    # Some sort of Windows platform.
+    PLATFORM_ARGS="-A x64 -Thost=x64"
+else
+    >&2 echo "*******************"
+    >&2 echo "* Unknown OS type *"
+    >&2 echo "*******************"
     exit 1
 fi
 
@@ -45,7 +65,7 @@ fi
 #   - Build Vulkan only, don't build GL
 #   - Don't build samples or tests
 cmake -B build-swiftshader/ \
-    -A x64 -Thost=x64 \
+    $PLATFORM_ARGS \
     -DBUILD_VULKAN=ON \
     -DBUILD_EGL=OFF -DBUILD_GLESv2=OFF -DBUILD_GLES_CM=OFF \
     -DBUILD_SAMPLES=OFF -DBUILD_TESTS=OFF \
@@ -55,9 +75,13 @@ cmake -B build-swiftshader/ \
 cmake --build build-swiftshader/ --config Release --target vk_swiftshader
 
 # Outputs if successful:
-#   Linux:   build-swiftshader/Release/vk_swiftshader.so
+#   Linux:   build-swiftshader/Linux/libvk_swiftshader.so
 #   Windows: build-swiftshader/Release/vk_swiftshader.dll
 
-# Copy the ICD manifest files into the build directory, so relative paths work.
-cp build_tools/third_party/swiftshader/vk_swiftshader_icd_windows.json build-swiftshader/Release/
-cp build_tools/third_party/swiftshader/vk_swiftshader_icd_linux.json build-swiftshader/Release/
+# On Windows, copy the ICD manifest file into the build directory, so relative
+# paths work. Linux already writes vk_swiftshader_icd.json into the build dir.
+if [[ "$OSTYPE" == "msys" ]] || \
+   [[ "$OSTYPE" == "cygwin" ]] || \
+   [[ "$OSTYPE" == "win32" ]]; then
+    cp build_tools/third_party/swiftshader/vk_swiftshader_icd_windows.json build-swiftshader/Release/
+fi
