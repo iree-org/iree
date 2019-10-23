@@ -18,6 +18,6 @@ package(
 
 cc_library(
     name = "pybind11",
-    hdrs = glob(["include/pybind11/*.h"]),
+    hdrs = glob(["include/pybind11/**/*.h"]),
     includes = ["include"],
 )

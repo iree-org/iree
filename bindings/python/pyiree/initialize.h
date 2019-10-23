@@ -15,6 +15,7 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_INITIALIZE_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_INITIALIZE_H_
 
+#include <string>
 #include <vector>
 
 namespace iree {

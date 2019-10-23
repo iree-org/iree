@@ -76,7 +76,7 @@ py_test(
     python_version = "PY3",
     deps = [
         ":binding",
-        "//bindings/python:pathsetup",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
     ],
 )
@@ -87,7 +87,7 @@ py_test(
     python_version = "PY3",
     deps = [
         ":binding",
-        "//bindings/python:pathsetup",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
     ],
 )
@@ -98,6 +98,7 @@ py_test(
     python_version = "PY3",
     deps = NUMPY_DEPS + [
         ":binding",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
     ],
 )
