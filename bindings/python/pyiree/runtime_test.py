@@ -109,7 +109,7 @@ class RuntimeTest(absltest.TestCase):
 
     inv = context.invoke(f, policy, [arg0, arg1])
     print("Status:", inv.query_status())
-    inv.await()
+    inv.await_ready()
     results = inv.results
     print("Results:", results)
     result = results[0].map()
@@ -124,5 +124,5 @@ class RuntimeTest(absltest.TestCase):
 
 if __name__ == "__main__":
   # Uncomment to initialize the extension with custom flags.
-  binding.initialize_extension(["--logtostderr"])
+  # binding.initialize_extension(["--logtostderr"])
   absltest.main()

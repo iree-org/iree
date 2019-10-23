@@ -14,6 +14,7 @@
 
 #include "bindings/python/pyiree/hal.h"
 
+#include "absl/container/inlined_vector.h"
 #include "iree/hal/api.h"
 
 namespace iree {
@@ -52,18 +53,16 @@ class HalMappedMemory {
   }
 
   py::buffer_info ToBufferInfo() {
-    iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(bv_);
     iree_shape_t shape;
     CheckApiStatus(iree_hal_buffer_view_shape(bv_, &shape),
                    "Error getting buffer view shape");
     int8_t element_size = iree_hal_buffer_view_element_size(bv_);
-    iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
-    absl::InlinedVector<ssize_t, IREE_SHAPE_MAX_RANK> dims;
+    absl::InlinedVector<py::ssize_t, IREE_SHAPE_MAX_RANK> dims;
     dims.resize(shape.rank);
     for (int i = 0; i < shape.rank; ++i) {
       dims[i] = shape.dims[i];
     }
-    absl::InlinedVector<ssize_t, IREE_SHAPE_MAX_RANK> strides;
+    absl::InlinedVector<py::ssize_t, IREE_SHAPE_MAX_RANK> strides;
     strides.resize(shape.rank);
     for (int i = 1; i < shape.rank; ++i) {
       strides[i - 1] = shape.dims[i] * element_size;

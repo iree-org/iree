@@ -48,14 +48,14 @@ T&& PyConsumeStatusOr(iree::StatusOr<T>&& sor) {
 pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
                                              const char* message);
 
-static void CheckApiStatus(iree_status_t status, const char* message) {
+inline void CheckApiStatus(iree_status_t status, const char* message) {
   if (status == IREE_STATUS_OK) {
     return;
   }
   throw ApiStatusToPyExc(status, message);
 }
 
-static void CheckApiNotNull(const void* p, const char* message) {
+inline void CheckApiNotNull(const void* p, const char* message) {
   if (!p) {
     throw RaiseValueError(message);
   }

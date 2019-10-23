@@ -153,3 +153,7 @@ maybe(new_local_repository,
     path = "third_party/pybind11",
     build_file = "build_tools/third_party/pybind11/BUILD.overlay",
 )
+
+maybe(local_repository,
+    name = "com_google_benchmark",
+    path = "third_party/benchmark")

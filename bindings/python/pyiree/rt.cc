@@ -139,9 +139,9 @@ void SetupRtBindings(pybind11::module m) {
   // RtInvocation.
   py::class_<RtInvocation>(m, "Invocation")
       .def("query_status", &RtInvocation::QueryStatus)
-      .def("await", &RtInvocation::Await,
+      .def("await_ready", &RtInvocation::Await,
            py::arg("deadline") = IREE_TIME_INFINITE_FUTURE)
-      .def("await_optional", &RtInvocation::AwaitOptional,
+      .def("await_ready_optional", &RtInvocation::AwaitOptional,
            py::arg("deadline") = IREE_TIME_INFINITE_FUTURE)
       .def_property_readonly("results", &RtInvocation::ConsumeResults);
 }
