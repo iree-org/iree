@@ -48,5 +48,5 @@ build:windows --experimental_enable_runfiles
 
 # The user.bazelrc file is not checked in but available for local mods.
 # Always keep this at the end of the file so that user flags override.
-try-import user.bazelrc
+try-import %workspace%/user.bazelrc
 

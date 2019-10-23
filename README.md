@@ -7,12 +7,24 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 
 ## Table of Contents
 
+-   [Quickstart](#quickstart)
 -   [Project Goals](#project-goals)
 -   [Milestones](#milestones)
 -   [Status](#status)
 -   [Dependencies](#dependencies)
--   [Quickstart](#quickstart)
 -   [License](#license)
+
+<a name="quickstart"></a>
+
+## Quickstart
+
+More Coming soon! Performing full model translation may require a few steps
+(such as ensuring you have a working TensorFlow build), however we'll have
+pre-translated example models that allow independent testing of the runtime
+portions.
+
+*   [Getting Started on Windows](docs/getting_started_on_windows.md)
+*   [Getting Started on Linux](docs/getting_started_on_linux.md)
 
 <a name="project-goals"></a>
 
@@ -156,12 +168,9 @@ Coming soon :)
 
 ### Build System and CI
 
-We are still working to port our build configuration to
-[Bazel](https://bazel.build/) and will be open sourcing the BUILD files and
-Starlark rules we use soon. We will also be maintaining a CMake build for
-integration with the dependent projects
-([Abseil](https://github.com/abseil/abseil-cpp) and
-[MLIR](https://github.com/tensorflow/mlir)).
+*   We support Bazel for builds of all parts of the project.
+*   We also maintain a CMake build for a subset of runtime components designed
+    to be used in other systems.
 
 ### Code and Style
 
@@ -231,17 +240,6 @@ targets that will use no dependencies.
 
 [Swiftshader](https://github.com/google/swiftshader) is used to provide fast
 hardware-independent testing of the Vulkan and SPIR-V portions of the toolchain.
-
-<a name="quickstart"></a>
-
-## Quickstart
-
-More Coming soon! Performing full model translation may require a few steps
-(such as ensuring you have a working TensorFlow build), however we'll have
-pre-translated example models that allow independent testing of the runtime
-portions.
-
-*   [Getting Started on Windows](docs/getting_started_on_windows.md)
 
 <a name="license"></a>
 
