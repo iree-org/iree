@@ -64,6 +64,7 @@ cc_library(
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
     deps = [
+        "//iree/base:target_platform",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/flags:flag",
     ],

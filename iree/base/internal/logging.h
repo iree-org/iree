@@ -20,9 +20,10 @@
 
 #include "absl/base/attributes.h"
 #include "absl/base/optimization.h"
+#include "iree/base/target_platform.h"
 
 // WinGDI.h defines `ERROR`, undef to avoid conflict naming.
-#ifdef _WIN32
+#if defined(IREE_PLATFORM_WINDOWS)
 #undef ERROR
 #endif
 
