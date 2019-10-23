@@ -18,7 +18,9 @@ set -e
 ls -lR ${RUNFILES_DIR}
 
 # Detect whether cygwin/msys2 paths need to be translated.
+set +e  # Ignore errors if not found.
 cygpath="$(which cygpath 2>/dev/null)"
+set -e
 
 # Bazel helpfully puts all data deps in the ${RUNFILES_DIR}, but
 # it unhelpfully preserves the nesting with no way to reason about
