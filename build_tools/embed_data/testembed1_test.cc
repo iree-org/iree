@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/build_tools/embed_data/testembed1.h"
+#include "build_tools/embed_data/testembed1.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

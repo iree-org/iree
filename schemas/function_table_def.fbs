@@ -1,0 +1,9 @@
+include "schemas/function_def.fbs";
+
+namespace iree;
+
+table FunctionTableDef {
+  functions:[FunctionDef];
+  imports:[int];
+  exports:[int];
+}

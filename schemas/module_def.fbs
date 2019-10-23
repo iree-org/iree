@@ -1,0 +1,20 @@
+include "schemas/executable_table_def.fbs";
+include "schemas/device_table_def.fbs";
+include "schemas/function_table_def.fbs";
+include "schemas/source_map_def.fbs";
+
+namespace iree;
+
+// 'Executable MODule'.
+file_identifier "EMOD";
+file_extension "emod";
+
+table ModuleDef {
+  name:string;
+  device_table:DeviceTableDef;
+  function_table:FunctionTableDef;
+  executable_table:ExecutableTableDef;
+  source_map:SourceMapDef;
+}
+
+root_type ModuleDef;

@@ -56,11 +56,11 @@ python_configure = repository_rule(
     ],
     attrs = {
         "_generate_script": attr.label(
-            default = Label("//build_tools/python:generate_build.py"),
+            default = Label("///build_tools/python:generate_build.py"),
             allow_single_file = True,
         ),
         "_build_defs": attr.label(
-            default = Label("//build_tools/python:build_defs.bzl"),
+            default = Label("///build_tools/python:build_defs.bzl"),
             allow_single_file = True,
         ),
     },

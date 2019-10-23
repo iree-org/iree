@@ -1,0 +1,30 @@
+# Main IREE build file.
+# Note that project-wide, bazel repo aliases are used:
+#   "//third_party/absl/python"
+#   "//third_party/absl"
+#   "//third_party/benchmark"
+#   "//third_party/llvm/llvm/projects/google_mlir"
+#   "//third_party/llvm/llvm"
+#   "//third_party/flatbuffers"
+#   "//third_party/tensorflow"
+#
+# Various scripts and helpers operate on these prefixes textually, so
+# avoid doing any systematic construction that would break the matching.
+
+package(
+    licenses = ["notice"],  # Apache 2.0
+)
+
+# Enables the debug service and other profiling features.
+# $ bazel build --define=IREE_DEBUG=1 :some_target
+config_setting(
+    name = "debug",
+    define_values = {"IREE_DEBUG": "1"},
+)
+
+# Marker library which can be extended to provide flags for things that
+# need to know the platform target.
+cc_library(
+    name = "target_config",
+    defines = ["IREE_UNSPECIFIED_TARGET=1"],
+)

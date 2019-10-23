@@ -1,0 +1,13 @@
+include "schemas/device_def.fbs";
+include "schemas/device_group_def.fbs";
+
+namespace iree;
+
+// A table of devices used for runtime device resolution and referencing.
+table DeviceTableDef {
+  // One or more virtual devices referenced by ordinal in the sequencer ops.
+  devices:[DeviceDef];
+
+  // Zero or more device groups that specify which devices must be compatible.
+  device_groups:[DeviceGroupDef];
+}

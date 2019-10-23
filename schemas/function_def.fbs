@@ -1,0 +1,18 @@
+include "schemas/bytecode_def.fbs";
+include "schemas/type_def.fbs";
+
+namespace iree;
+
+table FunctionAttributeDef {
+  key:string;
+  value:string;
+}
+
+table FunctionDef {
+  name:string;
+  type:FunctionTypeDef;
+
+  attrs:[FunctionAttributeDef];
+
+  bytecode:BytecodeDef;
+}

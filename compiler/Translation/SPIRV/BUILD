@@ -1,0 +1,50 @@
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "SPIRV",
+    srcs = [
+        "AffineExprCodegen.h",
+        "EmbeddedKernels.cpp",
+        "IREEIndexComputation.cpp",
+        "IREEToSPIRV.cpp",
+        "IREEToSPIRVPass.cpp",
+        "IndexComputation.cpp",
+        "SPIRVExecutableTranslation.cpp",
+        "SPIRVLowering.cpp",
+        "SPIRVLowering.h",
+        "XLAIndexPropagation.cpp",
+    ],
+    hdrs = [
+        "EmbeddedKernels.h",
+        "IREEIndexComputation.h",
+        "IREEToSPIRV.h",
+        "IREEToSPIRVPass.h",
+        "IndexComputation.h",
+        "SPIRVExecutableTranslation.h",
+        "XLAIndexPropagation.h",
+    ],
+    deps = [
+        "///compiler/IR",
+        "///compiler/Translation/SPIRV/Kernels",
+        "///compiler/Utils",
+        "///schemas",
+        "///schemas:spirv_executable_def_cc_fbs",
+        "@com_github_google_flatbuffers//:flatbuffers",
+        "@llvm//:support",
+        "@local_config_mlir//:IR",
+        "@local_config_mlir//:Pass",
+        "@local_config_mlir//:SPIRVDialect",
+        "@local_config_mlir//:SPIRVDialectRegistration",
+        "@local_config_mlir//:SPIRVSerialization",
+        "@local_config_mlir//:StandardDialectRegistration",
+        "@local_config_mlir//:StandardOps",
+        "@local_config_mlir//:Support",
+        "@local_config_mlir//:Transforms",
+        "@local_config_mlir//:Translation",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+    ],
+    alwayslink = 1,
+)

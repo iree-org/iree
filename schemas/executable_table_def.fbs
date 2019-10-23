@@ -1,0 +1,28 @@
+include "schemas/executable_def.fbs";
+
+namespace iree;
+
+// A fat executable containing multiple format variants for the same logical
+// entry points.
+table MultiArchExecutableDef {
+  // Friendly name of the executable used for diagnostics.
+  name:string;
+
+  // Number of available entry points.
+  // This is used for bytecode verification even when the executable is not
+  // fully loaded into a device. All executables must have the same entry
+  // points.
+  entry_point_count:uint;
+
+  // A set of executables of various formats and supported feature sets.
+  // The runtime will select the appropriate executable based on the dispatch
+  // requirements.
+  executables:[ExecutableDef];
+}
+
+// A table of executables used for runtime dispatch lookup.
+table ExecutableTableDef {
+  // One or more top level executables referenced by sequencer dispatch ops.
+  // Ordinal is referenced by dispatch ops to index into the table.
+  multi_arch_executables:[MultiArchExecutableDef];
+}

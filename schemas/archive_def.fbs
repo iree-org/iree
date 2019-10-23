@@ -1,0 +1,14 @@
+include "schemas/module_def.fbs";
+
+namespace iree;
+
+// 'Executable ARChive'.
+file_identifier "EARC";
+file_extension "earc";
+
+table ArchiveDef {
+  name:string;
+  modules:[ModuleDef];
+}
+
+root_type ArchiveDef;
