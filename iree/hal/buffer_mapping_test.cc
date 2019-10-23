@@ -21,11 +21,10 @@
 #include <utility>
 
 #include "absl/types/span.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/hal/buffer.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {

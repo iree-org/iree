@@ -33,9 +33,9 @@ cc_test(
         "//iree/hal:command_queue",
         "//iree/hal/testing:mock_command_buffer",
         "//iree/hal/testing:mock_command_queue",
+        "//iree/testing:gtest_main",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/time",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -83,8 +83,8 @@ cc_test(
         ":host_fence",
         "//iree/base:status",
         "//iree/base:status_matchers",
+        "//iree/testing:gtest_main",
         "@com_google_absl//absl/time",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -137,7 +137,7 @@ cc_test(
     srcs = ["host_submission_queue_test.cc"],
     deps = [
         ":host_submission_queue",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )
 

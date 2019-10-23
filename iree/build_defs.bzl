@@ -7,7 +7,7 @@ load("@rules_python//python:defs.bzl", "py_library")
 
 NUMPY_DEPS = []
 
-def platform_trampoline_deps(basename):
+def platform_trampoline_deps(basename, path = "base"):
     """Produce a list of deps for the given `basename` platform target.
 
     Example:
@@ -17,13 +17,14 @@ def platform_trampoline_deps(basename):
     library in foreign source control systems.
 
     Args:
-      basename: Library name prefix for a library in base/internal.
+      basename: Library name prefix for a library in iree/[path]/internal.
+      path: Folder name to work within.
     Returns:
       A list of dependencies for depending on the library in a platform
       sensitive way.
     """
     return [
-        "//iree/base/internal:%s_internal" % basename,
+        "//iree/%s/internal:%s_internal" % (path, basename),
     ]
 
 # A platform-sensitive list of copts for the Vulkan loader.
@@ -42,7 +43,7 @@ PLATFORM_VULKAN_DEPS = select({
 
 # A platform-sensitive list of dependencies for tests using Vulkan.
 PLATFORM_VULKAN_TEST_DEPS = [
-    "@com_google_googletest//:gtest_main",
+    "//iree/testing:gtest_main",
 ]
 
 def iree_py_library(**kwargs):

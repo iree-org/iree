@@ -21,10 +21,9 @@
 #include <type_traits>
 
 #include "absl/time/time.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
+#include "iree/testing/gtest.h"
 
 // StatusOr<bool> will be true if the status is ok, which is bad.
 #define ASSERT_STATUSOR_TRUE(x) ASSERT_TRUE(x.ValueOrDie())

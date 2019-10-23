@@ -14,7 +14,7 @@
 
 #include "iree/base/ref_ptr.h"
 
-#include "gtest/gtest.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace {

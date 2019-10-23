@@ -53,7 +53,7 @@ cc_test(
     deps = [
         ":dawn_driver",
         "//iree/base:status_matchers",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )
 

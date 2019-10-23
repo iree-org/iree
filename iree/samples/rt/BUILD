@@ -24,7 +24,6 @@ cc_test(
     ],
     deps = [
         ":simple_module_test_bytecode_module_cc",
-        "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/strings",
         "//iree/base:flatbuffer_util",
         "//iree/base:status",
@@ -33,6 +32,7 @@ cc_test(
         "//iree/hal:driver_registry",
         "//iree/rt",
         "//iree/schemas",
+        "//iree/testing:gtest_main",
         "//iree/vm:bytecode_module",
         "//iree/vm:sequencer_module",
 
@@ -55,12 +55,12 @@ cc_test(
     ],
     deps = [
         ":simple_module_test_bytecode_module_cc",
-        "@com_google_googletest//:gtest_main",
         "@com_google_absl//absl/strings",
         "//iree/base:api",
         "//iree/hal:api",
         "//iree/hal:driver_registry",
         "//iree/rt:api",
+        "//iree/testing:gtest_main",
         "//iree/vm:api",
 
         # These are the drivers we support running with and can produce

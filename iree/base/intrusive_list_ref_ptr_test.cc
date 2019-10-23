@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
 #include "iree/base/intrusive_list.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace {

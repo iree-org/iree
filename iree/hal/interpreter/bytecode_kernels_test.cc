@@ -14,10 +14,9 @@
 
 #include "iree/hal/interpreter/bytecode_kernels.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/memory.h"
 #include "iree/base/status_matchers.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {

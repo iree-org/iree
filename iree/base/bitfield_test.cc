@@ -17,7 +17,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "gtest/gtest.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 

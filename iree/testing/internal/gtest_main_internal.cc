@@ -12,18 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/host_submission_queue.h"
+#include "gtest/gtest.h"
+#include "iree/base/init.h"
 
-#include "iree/testing/gtest.h"
+extern "C" int main(int argc, char** argv) {
+  ::iree::InitializeEnvironment(&argc, &argv);
+  ::testing::InitGoogleTest(&argc, argv);
 
-namespace iree {
-namespace hal {
-namespace {
-
-TEST(HostSubmissionQueueTest, TBD) {
-  // TODO(benvanik): test!
+  return RUN_ALL_TESTS();
 }
-
-}  // namespace
-}  // namespace hal
-}  // namespace iree

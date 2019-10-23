@@ -14,10 +14,9 @@
 
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/status_matchers.h"
 #include "iree/hal/vulkan/status_util.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {

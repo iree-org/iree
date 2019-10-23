@@ -20,8 +20,6 @@
 
 #include "absl/memory/memory.h"
 #include "absl/time/time.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/base/time.h"
@@ -29,6 +27,7 @@
 #include "iree/hal/host/host_submission_queue.h"
 #include "iree/hal/testing/mock_command_buffer.h"
 #include "iree/hal/testing/mock_command_queue.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {

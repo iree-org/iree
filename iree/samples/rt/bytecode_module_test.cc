@@ -28,8 +28,6 @@
 #include "iree/vm/bytecode_module.h"
 
 #include "absl/strings/str_replace.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
@@ -39,6 +37,7 @@
 #include "iree/rt/instance.h"
 #include "iree/samples/rt/simple_module_test_bytecode_module.h"
 #include "iree/schemas/module_def_generated.h"
+#include "iree/testing/gtest.h"
 #include "iree/vm/sequencer_module.h"
 
 namespace iree {

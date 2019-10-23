@@ -13,8 +13,8 @@
 // limitations under the License.
 
 #include "absl/memory/memory.h"
-#include "gtest/gtest.h"
 #include "iree/base/intrusive_list.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace {

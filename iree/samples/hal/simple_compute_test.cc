@@ -27,8 +27,6 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/str_replace.h"
 #include "absl/time/time.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
@@ -37,6 +35,7 @@
 #include "iree/hal/driver_registry.h"
 #include "iree/samples/hal/simple_compute_test_module.h"
 #include "iree/schemas/module_def_generated.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {

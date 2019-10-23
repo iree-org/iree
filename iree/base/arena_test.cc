@@ -14,8 +14,7 @@
 
 #include "iree/base/arena.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace {

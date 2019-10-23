@@ -80,9 +80,9 @@ cc_test(
         ":heap_buffer",
         "//iree/base:status",
         "//iree/base:status_matchers",
+        "//iree/testing:gtest_main",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/types:span",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -111,7 +111,7 @@ cc_test(
         ":heap_buffer",
         "//iree/base:status",
         "//iree/base:status_matchers",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -137,7 +137,7 @@ cc_test(
         ":buffer_view_string_util",
         "//iree/base:status",
         "//iree/base:status_matchers",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -204,8 +204,8 @@ cc_test(
         ":heap_buffer",
         "//iree/base:status_matchers",
         "//iree/hal/testing:mock_allocator",
+        "//iree/testing:gtest_main",
         "@com_google_absl//absl/memory",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 

@@ -13,8 +13,7 @@
 // limitations under the License.
 
 #include "absl/strings/str_replace.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "iree/testing/gtest.h"
 
 // C API:
 #include "iree/base/api.h"

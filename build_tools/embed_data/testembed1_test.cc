@@ -14,8 +14,7 @@
 
 #include "build_tools/embed_data/testembed1.h"
 
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
+#include "iree/testing/gtest.h"
 
 namespace {
 

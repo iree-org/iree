@@ -12,18 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/host/host_submission_queue.h"
+#ifndef IREE_TESTING_GTEST_H_
+#define IREE_TESTING_GTEST_H_
 
-#include "iree/testing/gtest.h"
+#ifdef IREE_CONFIG_GOOGLE_INTERNAL
+#include "iree/testing/google/gtest_google.h"
+#else
+#include "iree/testing/internal/gtest_internal.h"
+#endif  // IREE_CONFIG_GOOGLE_INTERNAL
 
-namespace iree {
-namespace hal {
-namespace {
-
-TEST(HostSubmissionQueueTest, TBD) {
-  // TODO(benvanik): test!
-}
-
-}  // namespace
-}  // namespace hal
-}  // namespace iree
+#endif  // IREE_TESTING_GTEST_H_

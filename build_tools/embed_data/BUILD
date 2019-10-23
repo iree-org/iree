@@ -49,6 +49,6 @@ cc_test(
     srcs = ["testembed1_test.cc"],
     deps = [
         ":testembed1",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )

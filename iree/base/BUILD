@@ -54,7 +54,7 @@ cc_test(
     srcs = ["arena_test.cc"],
     deps = [
         ":arena",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -71,8 +71,8 @@ cc_test(
     srcs = ["bitfield_test.cc"],
     deps = [
         ":bitfield",
+        "//iree/testing:gtest_main",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -172,8 +172,8 @@ cc_test(
     ],
     deps = [
         ":intrusive_list",
+        "//iree/testing:gtest_main",
         "@com_google_absl//absl/memory",
-        "@com_google_googletest//:gtest_main",
     ],
 )
 
@@ -214,7 +214,7 @@ cc_test(
     srcs = ["ref_ptr_test.cc"],
     deps = [
         ":ref_ptr",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -239,7 +239,7 @@ cc_test(
         ":shape",
         ":status",
         ":status_matchers",
-        "@com_google_googletest//:gtest_main",
+        "//iree/testing:gtest_main",
     ],
 )
 
@@ -357,6 +357,6 @@ cc_library(
 #         ":status_matchers",
 #         ":wait_handle",
 #         "@com_google_absl//absl/time",
-#         "@com_google_googletest//:gtest_main",
+#         "//iree/testing:gtest_main",
 #     ],
 # )
