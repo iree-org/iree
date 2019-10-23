@@ -99,3 +99,26 @@ cc_binary(
         "@com_google_absl//absl/strings",
     ],
 )
+
+cc_binary(
+    name = "benchmark_module",
+    testonly = 1,
+    srcs = ["benchmark_module.cc"],
+    deps = [
+        "//iree/base:file_io",
+        "//iree/base:file_path",
+        "//iree/base:init",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/hal:buffer_view_string_util",
+        "//iree/hal:driver_registry",
+        "//iree/hal/interpreter:interpreter_driver_module",
+        "//iree/rt",
+        "//iree/rt/debug:debug_server_flags",
+        "//iree/schemas",
+        "//iree/vm:sequencer_module",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "@com_google_benchmark//:benchmark",
+    ],
+)

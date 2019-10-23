@@ -2,6 +2,7 @@
 # Note that project-wide, bazel repo aliases are used:
 #   "@com_google_absl//absl/python"
 #   "@com_google_absl//absl"
+#   "@com_google_benchmark//:benchmark"
 #   "@local_config_mlir//"
 #   "@llvm//"
 #   "@com_github_google_flatbuffers//:flatbuffers"
