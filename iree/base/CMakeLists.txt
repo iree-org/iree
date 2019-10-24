@@ -95,6 +95,7 @@ iree_cc_library(
   DEPS
     absl::memory
     absl::strings
+    iree::base::platform_headers
     iree::base::status
     iree::base::tracing
     iree::base::target_platform
@@ -114,6 +115,7 @@ iree_cc_library(
     absl::strings
     absl::span
     iree::base::file_handle
+    iree::base::platform_headers
     iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
@@ -133,6 +135,7 @@ iree_cc_library(
     absl::strings
     absl::span
     iree::base::file_handle
+    iree::base::platform_headers
     iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
@@ -219,6 +222,7 @@ iree_cc_library(
   DEPS
     absl::base
     absl::flags
+    iree::base::platform_headers
   PUBLIC
 )
 
@@ -239,6 +243,16 @@ iree_cc_library(
     "memory.h"
   DEPS
     absl::span
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    platform_headers
+  HDRS
+    "platform_headers.h"
+  DEPS
+    iree::base::target_platform
   PUBLIC
 )
 
@@ -330,6 +344,7 @@ iree_cc_library(
     absl::memory
     absl::strings
     iree::base::logging
+    iree::base::platform_headers
     iree::base::source_location
   PUBLIC
 )

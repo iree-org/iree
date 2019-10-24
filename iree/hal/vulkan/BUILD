@@ -130,6 +130,7 @@ cc_library(
     ],
     deps = [
         "//iree/base:file_path",
+        "//iree/base:platform_headers",
         "//iree/base:ref_ptr",
         "//iree/base:source_location",
         "//iree/base:status",
