@@ -36,8 +36,19 @@ py_binary(
     main = "dummy.py",
     python_version = "PY3",
     deps = [
-        ":binding",  # build_cleaner: keep
+        ":pyiree",  # build_cleaner: keep
         "//bindings/python:pathsetup",  # build_cleaner: keep
+    ],
+)
+
+py_library(
+    name = "pyiree",
+    srcs = [
+        "__init__.py",
+    ],
+    srcs_version = "PY3",
+    deps = [
+        ":binding",
     ],
 )
 
