@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +14,11 @@
 # limitations under the License.
 
 # Usage:
-#   build_tools/scripts/start_colab_kernel.py
+#   python3 build_tools/scripts/start_colab_kernel.py
+#
+# Note that in the case that multiple python interpreters are present on
+# your path, it is best to not risk it: use an explicit one.
+#
 # This will build the python bindings and start a colab kernel with them
 # on the path. It takes some care to ensure that the build is running with
 # the same python interpreter as is used to launch this script.
@@ -53,6 +57,11 @@ def setup_environment():
                                       cwd=repo_root,
                                       env=bazel_env).decode("utf-8")
   bazel_bin = bazel_bin.splitlines()[0]
+  # Bazel always reports the path with '/'. On windows, switch it
+  # since we need native path manipulation code below to have it the
+  # right way.
+  if os.path.sep == "\\":
+    bazel_bin = bazel_bin.replace("/", "\\")
   print("Found Bazel bin: %s" % (bazel_bin))
 
 
@@ -67,8 +76,12 @@ def build():
 
 def run():
   """Runs the Jupyter notebook."""
+  runfiles_suffix = ".runfiles"
+  if os.path.sep == "\\":
+    runfiles_suffix = ".exe.runfiles"  # Windows uses a special name
+
   runfiles_dir = os.path.join(bazel_bin, "bindings", "python", "pyiree",
-                              "everything_for_colab.runfiles")
+                              "everything_for_colab" + runfiles_suffix)
   # Top level directories under the runfiles get added to the sys path.
   extra_python_path = []
   # The iree_core/bindings/python directory under runfiles needs to come
