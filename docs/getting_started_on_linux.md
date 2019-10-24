@@ -32,7 +32,7 @@ Install python (note that if, on your distribution, python3 is the only option,
 you may be able to drop the "3").
 
 ```
-sudo apt install python3 pip3
+sudo apt install python3 python3-pip
 ```
 
 Verify python version with `python3 -V`. We have tested with >= 3.6. Some
