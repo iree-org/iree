@@ -149,17 +149,21 @@ ABSL_MUST_USE_RESULT Cleanup<DecayF> MakeCleanup(F&& f) {
 
 }  // namespace iree
 
-// If you see these macros being used it means that the code between is not
-// really under our control and not a leak we would be able to prevent.
 #if defined(__has_feature)
 #if __has_feature(address_sanitizer)
+#define IREE_CONFIG_ASAN 1
+#endif  // __has_feature(address_sanitizer)
+#endif  // __has_feature
+
+// If you see these macros being used it means that the code between is not
+// really under our control and not a leak we would be able to prevent.
+#if defined(IREE_CONFIG_ASAN)
 #include <sanitizer/lsan_interface.h>
 #define IREE_DISABLE_LEAK_CHECKS() __lsan_disable()
 #define IREE_ENABLE_LEAK_CHECKS() __lsan_enable()
 #else
 #define IREE_DISABLE_LEAK_CHECKS()
 #define IREE_ENABLE_LEAK_CHECKS()
-#endif  // __has_feature(address_sanitizer)
-#endif  // __has_feature
+#endif  // IREE_CONFIG_ASAN
 
 #endif  // IREE_BASE_MEMORY_H_

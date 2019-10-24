@@ -15,10 +15,9 @@
 #include "iree/base/internal/status_win32_errors.h"
 
 #include "absl/strings/str_cat.h"
+#include "iree/base/platform_headers.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
-
-#include <windows.h>
 
 namespace iree {
 

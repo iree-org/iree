@@ -16,11 +16,10 @@
 #include "absl/strings/str_cat.h"
 #include "iree/base/file_io.h"
 #include "iree/base/internal/file_handle_win32.h"
+#include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
-
-#include <windows.h>
 
 namespace iree {
 namespace file_io {

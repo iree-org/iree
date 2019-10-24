@@ -22,6 +22,7 @@
 #include "absl/flags/flag.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/internal/logging.h"
+#include "iree/base/platform_headers.h"
 
 ABSL_DECLARE_FLAG(bool, iree_status_save_stack_trace);
 

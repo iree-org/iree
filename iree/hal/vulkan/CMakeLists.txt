@@ -141,6 +141,7 @@ iree_cc_library(
   DEPS
     absl::core_headers
     absl::memory
+    iree::base::platform_headers
     iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform

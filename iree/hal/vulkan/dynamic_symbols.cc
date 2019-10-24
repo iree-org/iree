@@ -21,6 +21,7 @@
 #include "absl/base/macros.h"
 #include "absl/memory/memory.h"
 #include "iree/base/file_path.h"
+#include "iree/base/platform_headers.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
@@ -28,7 +29,6 @@
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
-#include <windows.h>
 #else
 #include <dlfcn.h>
 #endif  // IREE_PLATFORM_WINDOWS

@@ -200,6 +200,14 @@ cc_library(
 )
 
 cc_library(
+    name = "platform_headers",
+    hdrs = ["platform_headers.h"],
+    deps = [
+        ":target_platform",
+    ],
+)
+
+cc_library(
     name = "ref_ptr",
     hdrs = ["ref_ptr.h"],
     deps = [
