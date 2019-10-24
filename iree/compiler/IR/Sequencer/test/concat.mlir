@@ -1,4 +1,4 @@
-// RUN: iree-opt -canonicalize %s --split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt -pass-pipeline='func(canonicalize)' %s --split-input-file | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: func @concat.1D
 // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]+]]

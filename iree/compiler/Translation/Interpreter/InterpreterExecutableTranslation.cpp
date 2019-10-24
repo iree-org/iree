@@ -53,25 +53,27 @@ namespace {
 // Builds a pass pipeline that optimizes and legalizes the module to the form
 // expected by translation.
 void buildLegalizeInputPassPipeline(PassManager *passManager) {
+  OpPassManager &optPM = passManager->nest<FuncOp>();
+
   // Standard passes that shake out a lot of garbage.
   // Some may have been run prior to translation but this ensures we are always
   // in a known state.
-  passManager->addPass(createCanonicalizerPass());
-  passManager->addPass(createLoopFusionPass());
-  passManager->addPass(createLoopInvariantCodeMotionPass());
-  passManager->addPass(createMemRefDataFlowOptPass());
-  passManager->addPass(createCanonicalizerPass());
-  passManager->addPass(createSimplifyAffineStructuresPass());
-  passManager->addPass(createCSEPass());
-  passManager->addPass(createCanonicalizerPass());
+  optPM.addPass(createCanonicalizerPass());
+  optPM.addPass(createLoopFusionPass());
+  optPM.addPass(createLoopInvariantCodeMotionPass());
+  optPM.addPass(createMemRefDataFlowOptPass());
+  optPM.addPass(createCanonicalizerPass());
+  optPM.addPass(createSimplifyAffineStructuresPass());
+  optPM.addPass(createCSEPass());
+  optPM.addPass(createCanonicalizerPass());
 
   // Eliminate ops we don't care about based on a lack of side-effects.
   // IREE does not guarantee exception/error behavior of dead ops.
-  passManager->addPass(createAggressiveOpEliminationPass());
+  optPM.addPass(createAggressiveOpEliminationPass());
 
   // Expand uses of tuples into independent args/results.
   passManager->addPass(createConvertFromTupleCallingConventionPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
 }
 
 // Builds a pass pipeline that converts functions to the iree_hl_interp dialect.
@@ -83,12 +85,12 @@ void buildInterpreterConversionPassPipeline(PassManager *passManager) {
   // Convert to the memref calling convention and optimize away as many
   // loads and stores as we can prior to progressing.
   passManager->addPass(createConvertToMemRefCallingConventionPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
 
   // Convert various dialects to IREE opcodes and cleanup leftover conversions.
   passManager->addPass(createLowerToInterpreterDialectPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createAggressiveOpEliminationPass());
 
   // Widen reduction functions (that have iree.executable.reduction attrs) to
@@ -102,13 +104,13 @@ void buildInterpreterConversionPassPipeline(PassManager *passManager) {
 
   // Perform any last-minute optimizations to trim down the IR.
   passManager->addPass(createAggressiveOpEliminationPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createLoopFusionPass());
   passManager->addPass(createLoopInvariantCodeMotionPass());
   passManager->addPass(createMemRefDataFlowOptPass());
-  passManager->addPass(createCanonicalizerPass());
-  passManager->addPass(createCSEPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCSEPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // Drop all functions that are not reachable.
   passManager->addPass(createDropUnreachableExecutableFunctionsPass());

@@ -70,18 +70,18 @@ void buildLegalizeInputPassPipeline(PassManager *passManager) {
   // Standard passes that shake out a lot of garbage.
   // Some may have been run prior to translation but this ensures we are always
   // in a known state.
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createLoopFusionPass());
   passManager->addPass(createLoopInvariantCodeMotionPass());
   passManager->addPass(createMemRefDataFlowOptPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createSimplifyAffineStructuresPass());
-  passManager->addPass(createCSEPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCSEPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // Expand uses of tuples into independent args/results.
   passManager->addPass(createConvertFromTupleCallingConventionPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
 }
 
 // Builds a pass pipeline that partitions the module into sequencer functions
@@ -92,11 +92,11 @@ void buildPartitioningPassPipeline(PassManager *passManager) {
   // fused reduction regions as possible. The remaining ops will be put into
   // dispatch regions.
   passManager->addPass(createIdentifyReductionRegionsPass());
-  passManager->addPass(createCSEPass());
+  passManager->addNestedPass<FuncOp>(createCSEPass());
 
   // Create all of the dispatch regions, CSE their workloads, and fold.
   passManager->addPass(createIdentifyDispatchRegionsPass());
-  passManager->addPass(createCSEPass());
+  passManager->addNestedPass<FuncOp>(createCSEPass());
   passManager->addPass(createFoldCompatibleDispatchRegionsPass());
 
   // Note that as we are rematerializing things here it's critical we do not run
@@ -110,7 +110,7 @@ void buildPartitioningPassPipeline(PassManager *passManager) {
   passManager->addPass(createOutlineReductionRegionsPass());
 
   // Cleanup identity sequencer tensor-to-memref ops that clutter up the IR.
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // Drop all functions that are no longer reachable.
   // This is important as many of the functions remaining are probably
@@ -136,7 +136,7 @@ void buildSequencerConversionPassPipeline(PassManager *passManager) {
 
   // Cleanup identity sequencer tensor-to-memref ops and other memory accesses
   // that clutter up the IR.
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
 
   // Eliminate ops we don't care about based on a lack of side-effects.
@@ -144,9 +144,9 @@ void buildSequencerConversionPassPipeline(PassManager *passManager) {
   passManager->addPass(createAggressiveOpEliminationPass());
 
   // Perform any last-minute optimizations to trim down the IR.
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
-  passManager->addPass(createCSEPass());
+  passManager->addNestedPass<FuncOp>(createCSEPass());
 }
 
 // Builds a pass pipeline that lowers the iree_seq.hl dialect to the iree_seq.ll
@@ -154,7 +154,7 @@ void buildSequencerConversionPassPipeline(PassManager *passManager) {
 void buildSequencerLoweringPassPipeline(PassManager *passManager) {
   // Lower iree_hl_seq -> iree_ll_seq.
   passManager->addPass(createLowerSequencerDialectPass());
-  passManager->addPass(createCanonicalizerPass());
+  passManager->addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager->addPass(createMemRefDataFlowOptPass());
   passManager->addPass(createAggressiveOpEliminationPass());
 

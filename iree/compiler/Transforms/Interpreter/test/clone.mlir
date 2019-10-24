@@ -1,4 +1,4 @@
-// RUN: iree-opt %s -canonicalize -split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt %s -pass-pipeline='func(canonicalize)' -split-input-file | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: @necessary_clone_not_removed
 func @necessary_clone_not_removed() -> (memref<i32>, memref<i32>) {
