@@ -10,3 +10,16 @@ module {
     iree.return
   }
 }
+
+// -----
+
+module {
+  func @exp(%arg0: memref<12x42xf32>, %arg2 : memref<12x42xf32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
+    //CHECK: {{%.*}} = spv.GLSL.Exp {{%.*}} : f32
+    %2 = "xla_hlo.exp"(%0) : (tensor<12x42xf32>) -> tensor<12x42xf32>
+    iree.store_output(%2 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
+    iree.return
+  }
+}

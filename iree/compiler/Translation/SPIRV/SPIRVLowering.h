@@ -228,8 +228,7 @@ inline Value *genPointerOffset(OpBuilder &builder, Location loc,
                                AffineExprCodegen &affineExprCodegen,
                                AffineMap indexMap,
                                spirv::GlobalVariableOp &var) {
-  auto basePtr = builder.create<spirv::AddressOfOp>(
-      loc, var.type(), builder.getSymbolRefAttr(var.sym_name()));
+  auto basePtr = builder.create<spirv::AddressOfOp>(loc, var);
   auto varPtrType = var.type().cast<spirv::PointerType>().getPointeeType();
   // The variable has to be a struct type with a single element.
   assert(varPtrType.isa<spirv::StructType>() &&
@@ -240,22 +239,21 @@ inline Value *genPointerOffset(OpBuilder &builder, Location loc,
          "element");
   auto varType = varStructType.getElementType(0);
 
-  SmallVector<Value *, 2> accessIndex;
+  SmallVector<Value *, 2> accessIndices;
   /// For scalar values, the index-map computed with already map to the 0-th
   /// element. For arrays, they map to the position accessed. So just for arrays
   /// we need to add an extra 0 to index into the struct.
-  if (varType.isa<spirv::ArrayType>() ||
-      varType.isa<spirv::RuntimeArrayType>()) {
-    auto i32Type = builder.getIntegerType(32);
+  auto i32Type = builder.getIntegerType(32);
+  if (varType.isa<spirv::ArrayType>()) {
     auto zero = builder.create<spirv::ConstantOp>(loc, i32Type,
                                                   builder.getI32IntegerAttr(0));
-    accessIndex.push_back(zero);
+    accessIndices.push_back(zero);
   }
   for (auto indexExpr : indexMap.getResults()) {
-    accessIndex.push_back(affineExprCodegen.getValue(
+    accessIndices.push_back(affineExprCodegen.getValue(
         indexExpr, builder.saveInsertionPoint(), loc));
   }
-  return builder.create<spirv::AccessChainOp>(loc, basePtr, accessIndex);
+  return builder.create<spirv::AccessChainOp>(loc, basePtr, accessIndices);
 }
 
 /// Lower return statements during SPIR-V codegeneration.
@@ -294,27 +292,18 @@ class SPIRVCodegen {
   }
 
  private:
-  /// Helper method to create the entry function. Creates global variables for
-  /// all inputs and outputs. Inserts the spv.EntryPoint operations as well.
-  LogicalResult createEntryFn(OpBuilder &builder, FuncOp &fn,
-                              AffineExprCodegen &affineExprCodegen,
-                              ValueCache &valueCache) {
-    auto loc = fn.getLoc();
-    // TODO(ravishankarm) : This should actually be part of the SPIR-V
-    // conversion framework in MLIR core. Move it there.
-    auto convertType = [&loc](Type t,
-                              spirv::PointerType &varType) -> LogicalResult {
-      auto shapedType = t.dyn_cast<ShapedType>();
-      if (!shapedType) {
-        return emitError(loc, "expected ShapedType argument");
-      }
-      auto elementType = shapedType.getElementType();
-      if (!elementType.isIntOrFloat()) {
-        return emitError(loc, "unhandled element type ")
-               << elementType << " while lowering to SPIR-V";
-      }
+  /// Returns the type of the SPIR-V GlobalVariable for an argument of the
+  /// dispatch function.
+  LogicalResult convertArgTypeToVariableType(Location loc, MemRefType argType,
+                                             spirv::PointerType &varType) {
+    auto elementType = argType.getElementType();
+    if (!elementType.isIntOrFloat()) {
+      return emitError(loc, "unhandled element type ")
+             << elementType << " while lowering to SPIR-V";
+    }
+    if (argType.hasStaticShape()) {
       int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
-      for (auto dim : reverse(shapedType.getShape())) {
+      for (auto dim : reverse(argType.getShape())) {
         if (dim <= 0) {
           return emitError(loc, "expected tensor dimensions to be non-zero");
         }
@@ -323,14 +312,48 @@ class SPIRVCodegen {
             static_cast<spirv::ArrayType::LayoutInfo>(stride));
         stride *= dim;
       }
-      // TODO(ravishankarm): Verify that the type of the variable passes
-      // spirv-val.
-      varType = spirv::PointerType::get(
-          spirv::StructType::get(elementType,
-                                 static_cast<spirv::StructType::LayoutInfo>(0)),
-          spirv::StorageClass::StorageBuffer);
-      return success();
-    };
+    }
+    varType = spirv::PointerType::get(
+        spirv::StructType::get(elementType,
+                               static_cast<spirv::StructType::LayoutInfo>(0)),
+        spirv::StorageClass::StorageBuffer);
+    return success();
+  }
+
+  /// Inserts a spv.globalVariable for every argument in the function signature.
+  LogicalResult createGlobalVariableForArg(Location loc, OpBuilder &builder,
+                                           unsigned argIndex, Type argType,
+                                           StringRef varName,
+                                           spirv::GlobalVariableOp &var) {
+    auto descriptorSetAttrName = convertToSnakeCase(
+        stringifyDecoration(spirv::Decoration::DescriptorSet));
+    auto bindingAttrName =
+        convertToSnakeCase(stringifyDecoration(spirv::Decoration::Binding));
+    auto argMemrefType = argType.dyn_cast<MemRefType>();
+    if (!argMemrefType) {
+      return emitError(loc,
+                       "unhandled non-memref type argument in SPIR-V lowering");
+    }
+    spirv::PointerType varType;
+    if (failed(convertArgTypeToVariableType(loc, argMemrefType, varType))) {
+      return failure();
+    }
+    var = builder.create<spirv::GlobalVariableOp>(
+        loc, TypeAttr::get(varType), builder.getStringAttr(varName), nullptr);
+    // Set descriptor_set to 0.
+    var.setAttr(descriptorSetAttrName, builder.getI32IntegerAttr(0));
+    // Set binding to argument number.
+    var.setAttr(bindingAttrName, builder.getI32IntegerAttr(argIndex));
+
+    return success();
+  }
+
+  /// Helper method to create the entry function. Creates global variables for
+  /// all inputs and outputs. Inserts the spv.EntryPoint operations as well.
+  LogicalResult createEntryFn(OpBuilder &builder, FuncOp &fn,
+                              AffineExprCodegen &affineExprCodegen,
+                              ValueCache &valueCache) {
+    auto loc = fn.getLoc();
 
     // Convert functions arguments and return values to
     // spirv::GlobalVariables. All global variables are given a descriptor set
@@ -341,38 +364,24 @@ class SPIRVCodegen {
     auto bindingAttrName =
         convertToSnakeCase(stringifyDecoration(spirv::Decoration::Binding));
     for (auto argType : enumerate(fnType.getInputs())) {
-      spirv::PointerType varType;
-      if (failed(convertType(argType.value(), varType))) {
-        return failure();
-      }
+      auto &var = inputArgToVariable[fn.getArgument(argType.index())];
       auto varName =
           fn.getName().str() + "_arg_" + std::to_string(argType.index());
-      auto var = builder.create<spirv::GlobalVariableOp>(
-          loc, TypeAttr::get(varType), builder.getStringAttr(varName), nullptr);
-      // Set descriptor_set to 0.
-      var.setAttr(descriptorSetAttrName, builder.getI32IntegerAttr(0));
-      // Set binding to argument number.
-      var.setAttr(bindingAttrName, builder.getI32IntegerAttr(argType.index()));
-
-      inputArgToVariable[fn.getArgument(argType.index())] = var;
-    }
-    for (auto resType : enumerate(fnType.getResults())) {
-      spirv::PointerType varType;
-      if (failed(convertType(resType.value(), varType))) {
+      if (failed(createGlobalVariableForArg(loc, builder, argType.index(),
+                                            argType.value(), varName, var))) {
         return failure();
       }
+    }
+    resultIndexToVariable.resize(fnType.getNumResults());
+    for (auto resType : enumerate(fnType.getResults())) {
+      auto &var = resultIndexToVariable[resType.index()];
       auto varName =
-          fn.getName().str() + "_res_" + std::to_string(resType.index());
-      auto var = builder.create<spirv::GlobalVariableOp>(
-          loc, TypeAttr::get(varType), builder.getStringAttr(varName), nullptr);
-      // Set descriptor_set to 0.
-      var.setAttr(descriptorSetAttrName, builder.getI32IntegerAttr(0));
-      // Set binding to (result number + num arguments)
-      var.setAttr(
-          bindingAttrName,
-          builder.getI32IntegerAttr(fnType.getNumInputs() + resType.index()));
-
-      resultIndexToVariable.push_back(var);
+          fn.getName().str() + "_result_" + std::to_string(resType.index());
+      if (failed(createGlobalVariableForArg(
+              loc, builder, resType.index() + fnType.getNumInputs(),
+              resType.value(), varName, var))) {
+        return failure();
+      }
     }
 
     auto entryFnType =
