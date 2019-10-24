@@ -26,6 +26,10 @@ portions.
 *   [Getting Started on Windows](docs/getting_started_on_windows.md)
 *   [Getting Started on Linux](docs/getting_started_on_linux.md)
 
+See also:
+
+*   [Using Colab](docs/using_colab.md)
+
 <a name="project-goals"></a>
 
 ## Project Goals

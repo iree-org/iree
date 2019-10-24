@@ -30,6 +30,17 @@ DRIVER_DEPS = [
     "//iree/hal/vulkan:vulkan_driver_module",
 ]
 
+py_binary(
+    name = "everything_for_colab",
+    srcs = ["dummy.py"],
+    main = "dummy.py",
+    python_version = "PY3",
+    deps = [
+        ":binding",  # build_cleaner: keep
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+    ],
+)
+
 iree_py_extension(
     name = "binding",
     srcs = [
