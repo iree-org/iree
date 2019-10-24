@@ -15,8 +15,8 @@
 #include "iree/base/internal/file_handle_win32.h"
 
 #include "absl/memory/memory.h"
+#include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/windows.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 

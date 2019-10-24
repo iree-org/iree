@@ -16,8 +16,8 @@
 #include "absl/strings/str_cat.h"
 #include "iree/base/file_io.h"
 #include "iree/base/internal/file_handle_win32.h"
+#include "iree/base/platform_headers.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/windows.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 

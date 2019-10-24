@@ -10,9 +10,9 @@ cc_library(
     srcs = ["file_handle_win32.cc"],
     hdrs = ["file_handle_win32.h"],
     deps = [
+        "//iree/base:platform_headers",
         "//iree/base:status",
         "//iree/base:target_platform",
-        "//iree/base:windows",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -27,9 +27,9 @@ cc_library(
     deps = [
         ":file_handle_win32",
         "//iree/base:file_io_hdrs",
+        "//iree/base:platform_headers",
         "//iree/base:status",
         "//iree/base:target_platform",
-        "//iree/base:windows",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -44,9 +44,9 @@ cc_library(
     deps = [
         ":file_handle_win32",
         "//iree/base:file_mapping_hdrs",
+        "//iree/base:platform_headers",
         "//iree/base:target_platform",
         "//iree/base:tracing",
-        "//iree/base:windows",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -67,7 +67,7 @@ cc_library(
     srcs = ["logging.cc"],
     hdrs = ["logging.h"],
     deps = [
-        "//iree/base:target_platform",
+        "//iree/base:platform_headers",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/flags:flag",
     ],
@@ -99,9 +99,9 @@ cc_library(
     ],
     deps = [
         ":logging_internal",
+        "//iree/base:platform_headers",
         "//iree/base:source_location",
         "//iree/base:target_platform",
-        "//iree/base:windows",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/debugging:stacktrace",
         "@com_google_absl//absl/flags:flag",

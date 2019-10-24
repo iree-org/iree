@@ -20,9 +20,9 @@
 
 #include "absl/memory/memory.h"
 #include "absl/strings/string_view.h"
+#include "iree/base/platform_headers.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
-#include "iree/base/windows.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
 

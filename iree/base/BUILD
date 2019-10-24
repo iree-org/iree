@@ -362,8 +362,8 @@ cc_library(
 # )
 
 cc_library(
-    name = "windows",
-    hdrs = ["windows.h"],
+    name = "platform_headers",
+    hdrs = ["platform_headers.h"],
     deps = [
         ":target_platform",
     ],

@@ -12,12 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BASE_WINDOWS_H_
-#define IREE_BASE_WINDOWS_H_
+#ifndef IREE_BASE_PLATFORM_HEADERS_H_
+#define IREE_BASE_PLATFORM_HEADERS_H_
 
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_PLATFORM_WINDOWS)
+
+#if defined(_MSC_VER)
+// Abseil compatibility: don't include incompatible winsock versions.
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif  // WIN32_LEAN_AND_MEAN
+// Abseil compatibility: don't define min and max macros.
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif  // NOMINMAX
+#endif  // _MSC_VER
 
 #include <windows.h>
 
@@ -26,4 +37,4 @@
 
 #endif  // IREE_PLATFORM_WINDOWS
 
-#endif  // IREE_BASE_WINDOWS_H_
+#endif  // IREE_BASE_PLATFORM_HEADERS_H_
