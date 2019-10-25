@@ -29,6 +29,7 @@ portions.
 See also:
 
 *   [Using Colab](docs/using_colab.md)
+*   [Vulkan and SPIR-V](docs/vulkan_and_spirv.md)
 
 <a name="project-goals"></a>
 
