@@ -76,6 +76,8 @@ SAVED_MODEL_REQUIRED_KERNEL_DEPS = [
     "@org_tensorflow//tensorflow/core/kernels:partitioned_function_ops",
     "@org_tensorflow//tensorflow/core/kernels:identity_op",
     "@org_tensorflow//tensorflow/core/kernels:identity_n_op",
+    "@org_tensorflow//tensorflow/core/kernels:resource_variable_ops",
+    "@org_tensorflow//tensorflow/core/kernels:state",
 ]
 
 cc_library(
