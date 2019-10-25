@@ -6,6 +6,7 @@ load("@iree_core//build_tools/third_party/glslang:build_defs.bzl", "glsl_vulkan"
 load("@rules_python//python:defs.bzl", "py_library")
 
 NUMPY_DEPS = []
+PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 
 def platform_trampoline_deps(basename, path = "base"):
     """Produce a list of deps for the given `basename` platform target.
@@ -54,12 +55,9 @@ def iree_py_library(**kwargs):
     #   imports
     py_library(**kwargs)
 
-def iree_py_extension(deps = [], **kwargs):
+def iree_py_extension(**kwargs):
     """Delegates to the real py_extension."""
-    py_extension(
-        deps = ["@iree_native_python//:python_headers"] + deps,
-        **kwargs
-    )
+    py_extension(**kwargs)
 
 def iree_build_test(name, targets):
     """Dummy rule to ensure that targets build.

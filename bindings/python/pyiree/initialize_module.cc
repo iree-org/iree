@@ -13,12 +13,12 @@
 // limitations under the License.
 
 #include "bindings/python/pyiree/binding.h"
-
 #include "bindings/python/pyiree/compiler.h"
 #include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/initialize.h"
 #include "bindings/python/pyiree/rt.h"
 #include "bindings/python/pyiree/status_utils.h"
+#include "bindings/python/pyiree/tensorflow/register_tensorflow.h"
 #include "bindings/python/pyiree/vm.h"
 
 namespace iree {
@@ -40,6 +40,12 @@ PYBIND11_MODULE(binding, m) {
 
   auto vm_m = m.def_submodule("vm", "IREE VM api");
   SetupVmBindings(vm_m);
+
+// TensorFlow.
+#if defined(IREE_TENSORFLOW_ENABLED)
+  auto tf_m = m.def_submodule("tf_interop", "IREE TensorFlow interop");
+  SetupTensorFlowBindings(tf_m);
+#endif
 }
 
 }  // namespace python

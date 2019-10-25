@@ -1,0 +1,3 @@
+LIBRARY BINDING
+EXPORTS
+  PyInit_binding @1
