@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.bzl", "NUMPY_DEPS", "iree_py_extension")
+load("//iree:build_defs.bzl", "NUMPY_DEPS", "PYTHON_HEADERS_DEPS",
+                              "iree_py_extension")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -52,11 +53,27 @@ py_library(
     ],
 )
 
+cc_library(
+    name = "base",
+    hdrs = [
+        "binding.h",
+        "status_utils.h",
+    ],
+    srcs = [
+        "status_utils.cc",
+    ],
+    deps = [
+        "@com_google_absl//absl/types:optional",
+        "@iree_pybind11//:pybind11",
+        "//iree/base:api",
+        "//iree/base:status",
+    ] + PYTHON_HEADERS_DEPS,
+)
+
 iree_py_extension(
     name = "binding",
     srcs = [
-        "binding.cc",
-        "binding.h",
+        "initialize_module.cc",
         "compiler.cc",
         "compiler.h",
         "hal.cc",
@@ -65,22 +82,23 @@ iree_py_extension(
         "initialize.h",
         "rt.cc",
         "rt.h",
-        "status_utils.cc",
-        "status_utils.h",
         "vm.cc",
         "vm.h",
     ],
+    linkstatic = 1,
     copts = [
         "-fexceptions",
     ],
     features = ["-use_header_modules"],
+    win_def_file = "export.def",
     deps = [
+        ":base",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
+        "//bindings/python/pyiree/tensorflow",
         "//iree/base:api",
         "//iree/base:init",
-        "//iree/base:status",
         "//iree/hal:api",
         "//iree/rt:api",
         "//iree/schemas",
@@ -89,7 +107,7 @@ iree_py_extension(
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Parser",
         "@iree_pybind11//:pybind11",
-    ] + COMPILER_DEPS + DRIVER_DEPS,
+    ] + COMPILER_DEPS + DRIVER_DEPS + PYTHON_HEADERS_DEPS,
 )
 
 py_test(

@@ -46,6 +46,31 @@ build:windows --copt=-DNOGDI --host_copt=-DNOGDI
 # system settings.
 build:windows --experimental_enable_runfiles
 
+###############################################################################
+# Flags to make tensorflow build.
+# Some of these are also of general use and fine to enable globally for windows.
+build:windows --copt=/arch:AVX
+# Host and target are the same in windows so don't waste time building both.
+build:windows --distinct_host_configuration=false
+# Avoids incompatible versions of winsock and other badness.
+build:windows --copt=/DWIN32_LEAN_AND_MEAN --host_copt=/DWIN32_LEAN_AND_MEAN
+# That is one way to have less warnings :(
+build:windows --per_file_copt=tensorflow@-w
+# This is used a lot and shouldn't be an error.
+build:windows --per_file_copt=tensorflow@-Wno-microsoft-unqualified-friend
+# Why are min/max macros? No one knows.
+build:windows --copt=/DNOMINMAX --host_copt=/DNOMINMAX
+# Yay for security warnings. Boo for non-standard.
+build:windows --copt=/D_CRT_SECURE_NO_WARNINGS --host_copt=/D_CRT_SECURE_NO_WARNINGS
+# TensorFlow requires the "monolithic" build mode for now on Windows.
+build:windows --define framework_shared_object=false
+# TODO(laurenzo): Clang uses runtime functions for 128bit math that require the
+# rt library and there is not a convenient way to link it. Figure out how to
+# do the following:
+# See: http://clang-developers.42468.n3.nabble.com/Issue-with-Clang-on-Windows-and-compiler-rt-builtins-td4059230.html
+build:windows --linkopt=/DEFAULTLIB:clang_rt.builtins-x86_64.lib
+###############################################################################
+
 # The user.bazelrc file is not checked in but available for local mods.
 # Always keep this at the end of the file so that user flags override.
 try-import %workspace%/user.bazelrc

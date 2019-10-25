@@ -9,9 +9,11 @@ def py_extension(
         data = [],
         copts = [],
         linkopts = [],
+        linkstatic = 0,
         deps = [],
         features = [],
-        visibility = []):
+        visibility = [],
+        win_def_file = None):
     """Builds a platform specific native python extension shared library.
 
     Note that you typically need to add some dependency on the python headers,
@@ -31,6 +33,7 @@ def py_extension(
     pyd_file = name + ".pyd"
     so_file = name + ".so"
     for platform_so_name in [dll_file, so_file]:
+        actual_def_file = win_def_file if platform_so_name == dll_file else None
         cc_binary(
             name = platform_so_name,
             srcs = srcs,
@@ -39,8 +42,10 @@ def py_extension(
             linkopts = linkopts,
             deps = deps,
             linkshared = True,
+            linkstatic = linkstatic,
             features = features,
             visibility = visibility,
+            win_def_file = actual_def_file,
         )
 
     # TODO(laurenzo): Bug the bazel team about letting a cc_binary output
