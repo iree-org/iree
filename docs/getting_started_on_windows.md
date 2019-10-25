@@ -159,13 +159,13 @@ bazel test --config=windows //iree/compiler/...
 bazel run --config=windows iree/tools/iree-run-mlir -- \
     $(pwd)/iree/samples/hal/simple_compute_test.mlir \
     --input_values="4xf32=1.0 2.0 3.0 4.0\n4xf32=2.0 4.0 6.0 8.0" \
-    --iree_logtostderr --target_backends=interpreter-bytecode
+    --target_backends=interpreter-bytecode
 
 # Sample computation via vulkan/spirv.
 bazel run --config=windows iree/tools/iree-run-mlir -- \
     $(pwd)/iree/samples/hal/simple_compute_test.mlir \
     --input_values="4xf32=1.0 2.0 3.0 4.0\n4xf32=2.0 4.0 6.0 8.0" \
-    --iree_logtostderr --target_backends=vulkan
+    --target_backends=vulkan
 ```
 
 ## Recommended user.bazelrc

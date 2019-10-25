@@ -22,7 +22,6 @@ ABSL_FLAG(int, iree_minloglevel, 0,
           "Minimum logging level. 0 = INFO and above.");
 ABSL_FLAG(int, iree_v, 0,
           "Verbosity level maximum. 1 = VLOG(0-1), 2 = VLOG(0-2).");
-ABSL_FLAG(bool, iree_logtostderr, false, "Logs to stderr instead of stdout");
 
 namespace iree {
 namespace internal {
@@ -87,8 +86,7 @@ int64_t LogMessage::MinVLogLevel() {
 
 void LogMessage::EmitLogMessage() {
   // TODO(scotttodd): Include current system time
-  fprintf(absl::GetFlag(FLAGS_iree_logtostderr) ? stderr : stdout,
-          "%c %s:%d] %s\n", "IWEF"[severity_], file_name_, line_,
+  fprintf(stderr, "%c %s:%d] %s\n", "IWEF"[severity_], file_name_, line_,
           str().c_str());
 }
 
