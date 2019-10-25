@@ -95,6 +95,16 @@ class XLAReverseOpIndexPropagation final
       SmallVectorImpl<AffineMap> &indexMap) const override;
 };
 
+/// Index propogation for XLA Slice.
+class XLASliceOpIndexPropagation final
+    : public SliceOpIndexPropagation<xla_hlo::SliceOp> {
+ public:
+  using SliceOpIndexPropagation<xla_hlo::SliceOp>::SliceOpIndexPropagation;
+  LogicalResult propagateIndexMap(
+      Operation *op, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &indexMap) const override;
+};
+
 /// Index propogation for XLA Transpose.
 class XLATransposeOpIndexPropagation final
     : public TransposeOpIndexPropagation<xla_hlo::TransposeOp> {

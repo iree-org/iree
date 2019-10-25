@@ -107,6 +107,25 @@ LogicalResult XLAReverseOpIndexPropagation::propagateIndexMap(
 }
 
 //===----------------------------------------------------------------------===//
+// SliceOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult XLASliceOpIndexPropagation::propagateIndexMap(
+    Operation *op, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &indexMap) const {
+  auto sliceOp = cast<xla_hlo::SliceOp>(op);
+  SmallVector<unsigned, 4> start_indices, strides;
+  for (auto index : sliceOp.start_indices()) {
+    start_indices.push_back(index.getZExtValue());
+  }
+  for (auto stride : sliceOp.strides()) {
+    strides.push_back(stride.getZExtValue());
+  }
+  return propagateIndexMapImpl(op, start_indices, strides, resultIndex,
+                               indexMap);
+}
+
+//===----------------------------------------------------------------------===//
 // TransposeOp
 //===----------------------------------------------------------------------===//
 

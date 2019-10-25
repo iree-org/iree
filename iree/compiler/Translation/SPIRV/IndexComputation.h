@@ -204,6 +204,39 @@ class ReverseOpIndexPropagation : public IndexPropagationOp<OpTy> {
   }
 };
 
+// ===-------------------------------------------------------------------- ===//
+// SliceOp
+// ===-------------------------------------------------------------------- ===//
+
+/// Propagates the index map from result to operands of slice type operation.
+/// See https://www.tensorflow.org/xla/operation_semantics#slice for more
+/// details.
+template <typename OpTy>
+class SliceOpIndexPropagation : public IndexPropagationOp<OpTy> {
+ public:
+  using IndexPropagationOp<OpTy>::IndexPropagationOp;
+  virtual ~SliceOpIndexPropagation() = default;
+
+ protected:
+  LogicalResult propagateIndexMapImpl(
+      Operation *op, SmallVector<unsigned, 4> start_indices,
+      SmallVector<unsigned, 4> strides, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &operandIndices) const {
+    Builder builder(op->getContext());
+    SmallVector<AffineExpr, 4> exprs;
+    auto shaped_type = op->getOperand(0)->getType().cast<ShapedType>();
+    int rank = shaped_type.getRank();
+    for (int i = 0; i < rank; ++i) {
+      exprs.push_back(builder.getAffineDimExpr(i) * strides[i] +
+                      start_indices[i]);
+    }
+    auto sliceAffineMap = AffineMap::get(rank, /*symbolCount=*/0, exprs);
+    auto operandMap = sliceAffineMap.compose(resultIndex);
+    operandIndices.push_back(operandMap);
+    return success();
+  }
+};
+
 /// Index map of the operand of a transpose op is obtained by composing the
 /// affine map of the result with the affine map that represents the inverse of
 /// the transpose permutation vector. The permutation vector must be supplied by

@@ -93,13 +93,13 @@ void IREEToSPIRVPass::runOnModule() {
                        // TODO(ravishankarm): conv, dot.
                        // TODO(ravishankarm): gather.
                        // TODO(ravishankarm): pad.
-                       // TODO(ravishankarm): slice.
+                       // TODO(hanchung): dynamic_slice.
                        NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
                        ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
                        NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
                        XLABroadcastOpIndexPropagation,
                        XLABroadcastInDimOpIndexPropagation,
-                       XLAReverseOpIndexPropagation,
+                       XLAReverseOpIndexPropagation, XLASliceOpIndexPropagation,
                        XLATransposeOpIndexPropagation>
       indexPropagation;
 
@@ -148,6 +148,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVIndexOpLowering<xla_hlo::CopyOp>,
       SPIRVIndexOpLowering<xla_hlo::ReshapeOp>,
       SPIRVIndexOpLowering<xla_hlo::ReverseOp>,
+      SPIRVIndexOpLowering<xla_hlo::SliceOp>,
       SPIRVIndexOpLowering<xla_hlo::TransposeOp>>
       spirvCodegen;
 
