@@ -26,6 +26,10 @@
 //     ERROR   Logs an error.
 //     FATAL   Logs an error and exit(1).
 //
+// DLOG(severity) << ...;
+//   Behaves like `LOG` in debug mode (i.e. `#ifndef NDEBUG`).
+//   Otherwise, it compiles away and does nothing.
+//
 // VLOG(level) << ...;
 //   Logs a verbose message at the given verbosity level.
 //

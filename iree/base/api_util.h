@@ -25,6 +25,7 @@
 namespace iree {
 
 inline iree_status_t ToApiStatus(Status status) {
+  DLOG(ERROR) << status;
   return static_cast<iree_status_t>(status.code());
 }
 

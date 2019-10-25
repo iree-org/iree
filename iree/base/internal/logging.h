@@ -94,6 +94,15 @@ inline NullStream& operator<<(NullStream& str,
 
 #define LOG(severity) _IREE_LOG_##severity
 
+#ifndef NDEBUG
+#define DLOG LOG
+#else
+#define DLOG(severity) \
+  switch (0)           \
+  default:             \
+    ::iree::internal::NullStream().stream()
+#endif
+
 #define VLOG_IS_ON(lvl) ((lvl) <= ::iree::internal::LogMessage::MinVLogLevel())
 
 #define VLOG(lvl)                          \
