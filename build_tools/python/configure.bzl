@@ -81,7 +81,7 @@ def _get_python_bin(repository_ctx):
         return str(python_bin)  # buildozer: disable=print
 
     fail((
-        "Unable to find python binary (via %s on on PATH %s) " +
+        "Unable to find python binary (via %s on PATH %s) " +
         "Note that PATH resolution on Windows is unreliable. Prefer " +
         "explicit configuration."
     ) % (
