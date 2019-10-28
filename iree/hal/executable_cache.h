@@ -78,7 +78,7 @@ using ExecutableCachingModeBitfield = ExecutableCachingMode;
 // A cache of prepared executables for a particular device.
 // Caches may be shared across multiple devices from the same driver or specific
 // to individual devices. Caches may persist prepared executables across process
-// launches or reprepare them each run. Callers should assume that the cache is
+// launches or re-prepare them each run. Callers should assume that the cache is
 // a no-op and the returned Executables only live for as long as the cache does.
 //
 // The term 'cache' here is rather optimistic - it's perfectly acceptable for
@@ -98,7 +98,7 @@ class ExecutableCache {
   // TODO(b/137153339): serialization/deserialization.
 
   // Returns true if the executable cache can prepare the given executable input
-  // format. Perparation may still fail if the particular version or features
+  // format. Preparation may still fail if the particular version or features
   // required by the executable are not supported.
   virtual bool CanPrepareFormat(ExecutableFormat format) const = 0;
 
