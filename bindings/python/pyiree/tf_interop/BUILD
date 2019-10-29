@@ -12,6 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load(
+    "//iree:build_defs.bzl",
+    "INTREE_TENSORFLOW_PY_DEPS",
+)
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
@@ -25,28 +30,21 @@ DEFAULT_FEATURES = [
     "-use_header_modules",  # Incompatible with exceptions builds.
 ]
 
-config_setting(
-    name = "enable",
-    define_values = {
-        "iree_tensorflow": "true",
-    },
-)
-
 cc_library(
-    name = "tensorflow",
+    name = "tf_interop",
     hdrs = [
         "register_tensorflow.h",
     ],
     copts = DEFAULT_COPTS,
     defines = select({
-        ":enable": [
+        "//iree:enable_tensorflow": [
             "IREE_TENSORFLOW_ENABLED",
         ],
         "//conditions:default": [],
     }),
     features = DEFAULT_FEATURES,
     deps = select({
-        ":enable": [
+        "//iree:enable_tensorflow": [
             ":tensorflow_impl",
         ],
         "//conditions:default": [
@@ -80,6 +78,10 @@ SAVED_MODEL_REQUIRED_KERNEL_DEPS = [
     "@org_tensorflow//tensorflow/core/kernels:state",
 ]
 
+TF_XLA_PASS_DEPS = [
+    "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
+]
+
 cc_library(
     name = "tensorflow_impl",
     srcs = [
@@ -92,12 +94,14 @@ cc_library(
     features = DEFAULT_FEATURES,
     visibility = ["//visibility:private"],
     deps = [
-        "@local_config_mlir//:IR",
-        "@llvm//:support",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:translate_lib",
-        "//bindings/python/pyiree:base",
-    ] + SAVED_MODEL_TF_RUNTIME_DEPS + SAVED_MODEL_REQUIRED_KERNEL_DEPS,
+               "@local_config_mlir//:IR",
+               "@llvm//:support",
+               "@org_tensorflow//tensorflow/cc/saved_model:loader",
+               "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+               "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
+               "//bindings/python/pyiree:base",
+           ] + SAVED_MODEL_TF_RUNTIME_DEPS + SAVED_MODEL_REQUIRED_KERNEL_DEPS +
+           TF_XLA_PASS_DEPS,
 )
 
 cc_library(
@@ -113,4 +117,17 @@ cc_library(
     deps = [
         "//bindings/python/pyiree:base",
     ],
+)
+
+py_test(
+    name = "saved_model_test",
+    srcs = ["saved_model_test.py"],
+    python_version = "PY3",
+    tags = [
+        "oss_only",
+    ],
+    deps = [
+        "//bindings/python/pyiree:binding",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+    ] + INTREE_TENSORFLOW_PY_DEPS,
 )

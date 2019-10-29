@@ -23,9 +23,9 @@
 #include "iree/schemas/module_def_generated.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassRegistry.h"
 
 namespace py = pybind11;
 
@@ -60,33 +60,122 @@ OwningModuleRef parseMLIRModuleFromString(StringRef contents,
 
 }  // namespace
 
-std::shared_ptr<OpaqueBlob> CompileModuleFromAsm(const std::string& moduleAsm) {
+CompilerContextBundle::CompilerContextBundle() {
   InitializeExtension({});
+  // Setup a diagnostic handler.
+  mlir_context()->getDiagEngine().registerHandler(
+      [this](mlir::Diagnostic& d) { diagnostics_.push_back(std::move(d)); });
+}
+CompilerContextBundle::~CompilerContextBundle() = default;
 
-  MLIRContext context;
+std::string CompilerContextBundle::ConsumeDiagnosticsAsString() {
+  std::string s;
+  llvm::raw_string_ostream sout(s);
+  bool first = true;
+  for (auto& d : diagnostics_) {
+    if (!first) {
+      sout << "\n\n";
+    } else {
+      first = false;
+    }
 
+    switch (d.getSeverity()) {
+      case DiagnosticSeverity::Note:
+        sout << "[NOTE]";
+        break;
+      case DiagnosticSeverity::Warning:
+        sout << "[WARNING]";
+        break;
+      case DiagnosticSeverity::Error:
+        sout << "[ERROR]";
+        break;
+      case DiagnosticSeverity::Remark:
+        sout << "[REMARK]";
+        break;
+      default:
+        sout << "[UNKNOWN]";
+    }
+    // Message.
+    sout << ": " << d << "\n\t";
+
+    // Location.
+    d.getLocation().print(sout);
+  }
+
+  diagnostics_.clear();
+  return sout.str();
+}
+
+void CompilerContextBundle::ClearDiagnostics() { diagnostics_.clear(); }
+
+CompilerModuleBundle CompilerContextBundle::ParseAsm(
+    const std::string& asm_text) {
   // Arrange to get a view that includes a terminating null to avoid additional
   // copy.
-  const char* moduleAsmChars = moduleAsm.c_str();
-  StringRef moduleAsmSr(moduleAsmChars, moduleAsm.size() + 1);
+  const char* asm_chars = asm_text.c_str();
+  StringRef asm_sr(asm_chars, asm_text.size() + 1);
 
-  // TODO(laurenzo): This error handling is super hoaky. Hook into the MLIR
-  // error reporter and plumb through properly.
-  OwningModuleRef mlirModule = parseMLIRModuleFromString(moduleAsmSr, &context);
-  if (!mlirModule) {
-    throw std::runtime_error("Failed to parse MLIR asm");
+  auto module_ref = parseMLIRModuleFromString(asm_sr, mlir_context());
+  if (!module_ref) {
+    throw RaiseValueError("Failed to parse MLIR asm");
   }
+  return CompilerModuleBundle(shared_from_this(), module_ref.release());
+}
 
-  auto moduleBlob =
-      mlir::iree_compiler::translateMlirToIreeSequencerModule(mlirModule.get());
-  if (moduleBlob.empty()) {
+std::string CompilerModuleBundle::ToAsm() {
+  // Print to asm.
+  std::string asm_output;
+  llvm::raw_string_ostream sout(asm_output);
+  OpPrintingFlags print_flags;
+  module_op().print(sout, print_flags);
+  return sout.str();
+}
+
+std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob() {
+  auto module_blob =
+      mlir::iree_compiler::translateMlirToIreeSequencerModule(module_op());
+  if (module_blob.empty()) {
     throw std::runtime_error("Failed to translate MLIR module");
   }
-  return std::make_shared<OpaqueByteVectorBlob>(std::move(moduleBlob));
+  return std::make_shared<OpaqueByteVectorBlob>(std::move(module_blob));
+}
+
+void CompilerModuleBundle::RunPassPipeline(
+    const std::vector<std::string>& pipelines) {
+  mlir::PassManager pm(context_->mlir_context());
+
+  // Parse the pass pipelines.
+  std::string error;
+  llvm::raw_string_ostream error_stream(error);
+  for (const auto& pipeline : pipelines) {
+    if (failed(mlir::parsePassPipeline(pipeline, pm, error_stream))) {
+      throw RaiseValueError(error_stream.str().c_str());
+    }
+  }
+
+  // Run them.
+  if (failed(pm.run(module_op_))) {
+    throw RaisePyError(PyExc_RuntimeError,
+                       "Error running pass pipelines (see diagnostics)");
+  }
 }
 
 void SetupCompilerBindings(pybind11::module m) {
-  m.def("compile_module_from_asm", CompileModuleFromAsm);
+  py::class_<CompilerContextBundle, std::shared_ptr<CompilerContextBundle>>(
+      m, "CompilerContext")
+      .def(py::init<>([]() {
+        // Need explicit make_shared to avoid UB with enable_shared_from_this.
+        return std::make_shared<CompilerContextBundle>();
+      }))
+      .def("parse_asm", &CompilerContextBundle::ParseAsm)
+      .def("get_diagnostics",
+           &CompilerContextBundle::ConsumeDiagnosticsAsString)
+      .def("clear_diagnostics", &CompilerContextBundle::ClearDiagnostics);
+  py::class_<CompilerModuleBundle>(m, "CompilerModule")
+      .def("to_asm", &CompilerModuleBundle::ToAsm)
+      .def("compile_to_sequencer_blob",
+           &CompilerModuleBundle::CompileToSequencerBlob)
+      .def("run_pass_pipeline", &CompilerModuleBundle::RunPassPipeline);
 }
 
 }  // namespace python

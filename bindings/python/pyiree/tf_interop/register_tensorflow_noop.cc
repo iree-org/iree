@@ -12,19 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_BINDINGS_PYTHON_PYIREE_TENSORFLOW_REGISTER_TENSORFLOW_H_
-#define IREE_BINDINGS_PYTHON_PYIREE_TENSORFLOW_REGISTER_TENSORFLOW_H_
-
-#include <string>
-
-#include "bindings/python/pyiree/binding.h"
+#include "bindings/python/pyiree/tf_interop/register_tensorflow.h"
 
 namespace iree {
 namespace python {
 
-void SetupTensorFlowBindings(pybind11::module m);
+void SetupTensorFlowBindings(pybind11::module m) {}
 
 }  // namespace python
 }  // namespace iree
-
-#endif  // IREE_BINDINGS_PYTHON_PYIREE_TENSORFLOW_REGISTER_TENSORFLOW_H_

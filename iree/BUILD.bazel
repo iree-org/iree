@@ -29,3 +29,10 @@ cc_library(
     name = "target_config",
     defines = ["IREE_UNSPECIFIED_TARGET=1"],
 )
+
+config_setting(
+    name = "enable_tensorflow",
+    define_values = {
+        "iree_tensorflow": "true",
+    },
+)

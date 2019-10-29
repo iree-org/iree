@@ -63,8 +63,9 @@ pybind11::error_already_set ApiStatusToPyExc(iree_status_t status,
   return pybind11::error_already_set();
 }
 
-pybind11::error_already_set RaiseValueError(const char* message) {
-  PyErr_SetString(PyExc_ValueError, message);
+pybind11::error_already_set RaisePyError(PyObject* exc_class,
+                                         const char* message) {
+  PyErr_SetString(exc_class, message);
   return pybind11::error_already_set();
 }
 

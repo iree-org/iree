@@ -32,8 +32,16 @@ pybind11::error_already_set StatusToPyExc(const Status& status);
 
 // Raises a value error with the given message.
 // Correct usage:
+//   throw RaiseValueError(PyExc_ValueError, "Foobar'd");
+pybind11::error_already_set RaisePyError(PyObject* exc_class,
+                                         const char* message);
+
+// Raises a value error with the given message.
+// Correct usage:
 //   throw RaiseValueError("Foobar'd");
-pybind11::error_already_set RaiseValueError(const char* message);
+inline pybind11::error_already_set RaiseValueError(const char* message) {
+  return RaisePyError(PyExc_ValueError, message);
+}
 
 // Consumes a StatusOr<T>, returning an rvalue reference to the T if the
 // status is ok(). Otherwise, throws an exception.

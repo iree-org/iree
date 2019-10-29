@@ -8,6 +8,10 @@ load("@rules_python//python:defs.bzl", "py_library")
 NUMPY_DEPS = []
 PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 
+# Optional deps to enable an intree TensorFlow python. This build configuration
+# defaults to getting TensorFlow from the python environment (empty).
+INTREE_TENSORFLOW_PY_DEPS = []
+
 def platform_trampoline_deps(basename, path = "base"):
     """Produce a list of deps for the given `basename` platform target.
 
