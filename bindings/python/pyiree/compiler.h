@@ -18,9 +18,57 @@
 #include <string>
 
 #include "bindings/python/pyiree/binding.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/Module.h"
 
 namespace iree {
 namespace python {
+
+class CompilerContextBundle;
+class CompilerModuleBundle;
+
+// Wraps an MLIR module and its producing context.
+class CompilerModuleBundle {
+ public:
+  CompilerModuleBundle(std::shared_ptr<CompilerContextBundle> context,
+                       mlir::ModuleOp module_op)
+      : context_(std::move(context)), module_op_(std::move(module_op)) {}
+
+  mlir::ModuleOp& module_op() { return module_op_; }
+  std::string ToAsm();
+
+  // Runs one or more pass pipelines (as is mlir::parsePassPipeline).
+  void RunPassPipeline(const std::vector<std::string>& pipelines);
+
+  // Compiles the MLIR module to an IREE sequencer module.
+  std::shared_ptr<OpaqueBlob> CompileToSequencerBlob();
+
+ private:
+  std::shared_ptr<CompilerContextBundle> context_;
+  mlir::ModuleOp module_op_;
+};
+
+// Bundle of MLIRContext related things that facilitates interop with
+// Python.
+class CompilerContextBundle
+    : public std::enable_shared_from_this<CompilerContextBundle> {
+ public:
+  CompilerContextBundle();
+  ~CompilerContextBundle();
+
+  mlir::MLIRContext* mlir_context() { return &mlir_context_; }
+
+  CompilerModuleBundle ParseAsm(const std::string& asm_text);
+
+  // Consumes/clears diagnostics.
+  std::string ConsumeDiagnosticsAsString();
+  void ClearDiagnostics();
+
+ private:
+  mlir::MLIRContext mlir_context_;
+  std::vector<mlir::Diagnostic> diagnostics_;
+};
 
 void SetupCompilerBindings(pybind11::module m);
 

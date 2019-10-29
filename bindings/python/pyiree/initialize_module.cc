@@ -18,7 +18,7 @@
 #include "bindings/python/pyiree/initialize.h"
 #include "bindings/python/pyiree/rt.h"
 #include "bindings/python/pyiree/status_utils.h"
-#include "bindings/python/pyiree/tensorflow/register_tensorflow.h"
+#include "bindings/python/pyiree/tf_interop/register_tensorflow.h"
 #include "bindings/python/pyiree/vm.h"
 
 namespace iree {

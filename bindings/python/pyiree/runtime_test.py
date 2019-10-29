@@ -22,14 +22,16 @@ from pyiree import binding as binding
 
 
 def create_simple_mul_module():
-  blob = binding.compiler.compile_module_from_asm("""
+  ctx = binding.compiler.CompilerContext()
+  input_module = ctx.parse_asm("""
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
         %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
         return %0 : tensor<4xf32>
     }
     """)
-  m = binding.vm.create_module_from_blob(blob)
+  binary = input_module.compile_to_sequencer_blob()
+  m = binding.vm.create_module_from_blob(binary)
   return m
 
 
