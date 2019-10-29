@@ -33,7 +33,7 @@ config_setting(
 )
 
 cc_library(
-    name = "tensorflow",
+    name = "tf_interop",
     hdrs = [
         "register_tensorflow.h",
     ],
@@ -80,6 +80,10 @@ SAVED_MODEL_REQUIRED_KERNEL_DEPS = [
     "@org_tensorflow//tensorflow/core/kernels:state",
 ]
 
+TF_XLA_PASS_DEPS = [
+    "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
+]
+
 cc_library(
     name = "tensorflow_impl",
     srcs = [
@@ -97,7 +101,8 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:translate_lib",
         "//bindings/python/pyiree:base",
-    ] + SAVED_MODEL_TF_RUNTIME_DEPS + SAVED_MODEL_REQUIRED_KERNEL_DEPS,
+    ] + SAVED_MODEL_TF_RUNTIME_DEPS + SAVED_MODEL_REQUIRED_KERNEL_DEPS +
+        TF_XLA_PASS_DEPS,
 )
 
 cc_library(
@@ -112,5 +117,16 @@ cc_library(
     features = DEFAULT_FEATURES,
     deps = [
         "//bindings/python/pyiree:base",
+    ],
+)
+
+py_test(
+    name = "saved_model_test",
+    srcs = ["saved_model_test.py"],
+    python_version = "PY3",
+    deps = [
+        "//bindings/python/pyiree:binding",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+        #"@absl_py//absl/testing:absltest",
     ],
 )

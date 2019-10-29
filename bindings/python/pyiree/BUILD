@@ -69,6 +69,7 @@ cc_library(
     name = "base",
     hdrs = [
         "binding.h",
+        "compiler.h",
         "status_utils.h",
     ],
     copts = DEFAULT_COPTS,
@@ -77,6 +78,7 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@iree_pybind11//:pybind11",
+        "@local_config_mlir//:IR",
         "//iree/base:api",
         "//iree/base:status",
     ] + PYTHON_HEADERS_DEPS,
@@ -86,7 +88,6 @@ iree_py_extension(
     name = "binding",
     srcs = [
         "compiler.cc",
-        "compiler.h",
         "hal.cc",
         "hal.h",
         "initialize.cc",
@@ -107,7 +108,7 @@ iree_py_extension(
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-        "//bindings/python/pyiree/tensorflow",
+        "//bindings/python/pyiree/tf_interop",
         "//iree/base:api",
         "//iree/base:init",
         "//iree/hal:api",

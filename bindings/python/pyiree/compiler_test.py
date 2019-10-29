@@ -23,16 +23,24 @@ from pyiree import binding as binding
 
 class CompilerTest(absltest.TestCase):
 
-  def testModuleCompileAndIntrospectFromAsm(self):
+  def testParseError(self):
+    ctx = binding.compiler.CompilerContext()
+    with self.assertRaises(ValueError):
+      ctx.parse_asm("""FOOBAR: I SHOULD NOT PARSE""")
+    diag_str = ctx.get_diagnostics()
+    self.assertRegex(diag_str, "custom op 'FOOBAR' is unknown")
 
-    m = binding.compiler.compile_module_from_asm("""
-    func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
-          attributes { iree.module.export } {
-        %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-        return %0 : tensor<4xf32>
-    }
-    """)
-    self.assertTrue(m)
+  def testParseAndCompileToSequencer(self):
+    ctx = binding.compiler.CompilerContext()
+    input_module = ctx.parse_asm("""
+      func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
+            attributes { iree.module.export } {
+          %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+          return %0 : tensor<4xf32>
+      }
+      """)
+    binary = input_module.compile_to_sequencer_blob()
+    self.assertTrue(binary)
 
 
 if __name__ == '__main__':
