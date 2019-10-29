@@ -21,6 +21,7 @@
 
 #include "iree/compiler/Translation/SPIRV/IREEIndexComputation.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRV.h"
+#include "iree/compiler/Translation/SPIRV/XLAToSPIRV.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -41,66 +42,66 @@ void IREEToSPIRVPass::runOnModule() {
   OpBuilder builder(module.getBodyRegion());
 
   // Initialize the index computation.
-  IndexPropagationList<IndexPropagationOp<ConstantOp>,
-                       // IREE-specific ops:
-                       IndexPropagationOp<IREE::ReturnOp>,
-                       IREELoadIndexPropagation, IREEStoreIndexPropagation,
-                       // Standard dialect unary elementwise ops:
-                       NoBroadcastPwOpIndexPropagation<SIToFPOp>,
-                       NoBroadcastPwOpIndexPropagation<SignExtendIOp>,
-                       // Standard dialect binary elementwise ops:
-                       NoBroadcastPwOpIndexPropagation<AddFOp>,
-                       NoBroadcastPwOpIndexPropagation<AddIOp>,
-                       NoBroadcastPwOpIndexPropagation<AndOp>,
-                       NoBroadcastPwOpIndexPropagation<CmpFOp>,
-                       NoBroadcastPwOpIndexPropagation<CmpIOp>,
-                       NoBroadcastPwOpIndexPropagation<DivFOp>,
-                       NoBroadcastPwOpIndexPropagation<DivISOp>,
-                       NoBroadcastPwOpIndexPropagation<DivIUOp>,
-                       NoBroadcastPwOpIndexPropagation<MulFOp>,
-                       NoBroadcastPwOpIndexPropagation<MulIOp>,
-                       NoBroadcastPwOpIndexPropagation<OrOp>,
-                       NoBroadcastPwOpIndexPropagation<RemFOp>,
-                       NoBroadcastPwOpIndexPropagation<RemISOp>,
-                       NoBroadcastPwOpIndexPropagation<RemIUOp>,
-                       NoBroadcastPwOpIndexPropagation<SubFOp>,
-                       NoBroadcastPwOpIndexPropagation<SubFOp>,
-                       NoBroadcastPwOpIndexPropagation<SubIOp>,
-                       NoBroadcastPwOpIndexPropagation<TruncateIOp>,
-                       NoBroadcastPwOpIndexPropagation<XOrOp>,
-                       NoBroadcastPwOpIndexPropagation<ZeroExtendIOp>,
-                       // XLA unary elementwise ops:
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::AbsOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::CeilOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::ConvertOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::CosOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::ExpOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::FloorOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::LogOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::NegOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::RsqrtOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::SignOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::TanhOp>,
-                       // XLA binary elementwise ops:
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::AndOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::DivOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::MaxOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::MinOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::SubOp>,
-                       // XLA other ops:
-                       // TODO(ravishankarm): conv, dot.
-                       // TODO(ravishankarm): gather.
-                       // TODO(ravishankarm): pad.
-                       // TODO(hanchung): dynamic_slice.
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
-                       ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
-                       NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
-                       XLABroadcastOpIndexPropagation,
-                       XLABroadcastInDimOpIndexPropagation,
-                       XLAReverseOpIndexPropagation, XLASliceOpIndexPropagation,
-                       XLATransposeOpIndexPropagation>
+  IndexPropagationList<
+      IndexPropagationOp<ConstantOp>,
+      // IREE-specific ops:
+      IndexPropagationOp<IREE::ReturnOp>, IREELoadIndexPropagation,
+      IREEStoreIndexPropagation,
+      // Standard dialect unary elementwise ops:
+      NoBroadcastPwOpIndexPropagation<SIToFPOp>,
+      NoBroadcastPwOpIndexPropagation<SignExtendIOp>,
+      // Standard dialect binary elementwise ops:
+      NoBroadcastPwOpIndexPropagation<AddFOp>,
+      NoBroadcastPwOpIndexPropagation<AddIOp>,
+      NoBroadcastPwOpIndexPropagation<AndOp>,
+      NoBroadcastPwOpIndexPropagation<CmpFOp>,
+      NoBroadcastPwOpIndexPropagation<CmpIOp>,
+      NoBroadcastPwOpIndexPropagation<DivFOp>,
+      NoBroadcastPwOpIndexPropagation<DivISOp>,
+      NoBroadcastPwOpIndexPropagation<DivIUOp>,
+      NoBroadcastPwOpIndexPropagation<MulFOp>,
+      NoBroadcastPwOpIndexPropagation<MulIOp>,
+      NoBroadcastPwOpIndexPropagation<OrOp>,
+      NoBroadcastPwOpIndexPropagation<RemFOp>,
+      NoBroadcastPwOpIndexPropagation<RemISOp>,
+      NoBroadcastPwOpIndexPropagation<RemIUOp>,
+      NoBroadcastPwOpIndexPropagation<SubFOp>,
+      NoBroadcastPwOpIndexPropagation<SubFOp>,
+      NoBroadcastPwOpIndexPropagation<SubIOp>,
+      NoBroadcastPwOpIndexPropagation<TruncateIOp>,
+      NoBroadcastPwOpIndexPropagation<XOrOp>,
+      NoBroadcastPwOpIndexPropagation<ZeroExtendIOp>,
+      // XLA unary elementwise ops:
+      NoBroadcastPwOpIndexPropagation<xla_hlo::AbsOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::CeilOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::ConvertOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::CosOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::ExpOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::FloorOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::LogOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::NegOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::RsqrtOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::SignOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::TanhOp>,
+      // XLA binary elementwise ops:
+      NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::AndOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::DivOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::MaxOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::MinOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::SubOp>,
+      // XLA other ops:
+      // TODO(ravishankarm): conv, dot.
+      // TODO(ravishankarm): gather.
+      // TODO(ravishankarm): pad.
+      // TODO(hanchung): dynamic_slice.
+      NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
+      ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
+      XLABroadcastOpIndexPropagation, XLABroadcastInDimOpIndexPropagation,
+      XLAPadOpIndexPropagation, XLAReverseOpIndexPropagation,
+      XLASliceOpIndexPropagation, XLATransposeOpIndexPropagation>
       indexPropagation;
 
   // Initialize the spir-v codegenerator.
@@ -149,7 +150,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVIndexOpLowering<xla_hlo::ReshapeOp>,
       SPIRVIndexOpLowering<xla_hlo::ReverseOp>,
       SPIRVIndexOpLowering<xla_hlo::SliceOp>,
-      SPIRVIndexOpLowering<xla_hlo::TransposeOp>>
+      SPIRVIndexOpLowering<xla_hlo::TransposeOp>, XLAPadOpSPIRVLowering>
       spirvCodegen;
 
   // Create a spirv.module Op.

@@ -35,6 +35,7 @@ class IREELoadOpSPIRVLowering final
 
   LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
                                AffineMap index, ArrayRef<Value *> operands,
+                               AffineExprCodegen &affineExprCodegen,
                                ValueCache &valueCache) const override;
 };
 

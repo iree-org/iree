@@ -16,6 +16,7 @@ cc_library(
         "SPIRVLowering.cpp",
         "SPIRVLowering.h",
         "XLAIndexPropagation.cpp",
+        "XLAToSPIRV.cpp",
     ],
     hdrs = [
         "EmbeddedKernels.h",
@@ -25,6 +26,7 @@ cc_library(
         "IndexComputation.h",
         "SPIRVExecutableTranslation.h",
         "XLAIndexPropagation.h",
+        "XLAToSPIRV.h",
     ],
     deps = [
         "//iree/compiler/IR",

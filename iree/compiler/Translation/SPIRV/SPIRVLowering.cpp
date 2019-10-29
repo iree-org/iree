@@ -27,7 +27,7 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 LogicalResult ConstantOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index, ArrayRef<Value *>,
-    ValueCache &valueCache) const {
+    AffineExprCodegen &affineExprCodegen, ValueCache &valueCache) const {
   auto constOp = cast<ConstantOp>(op);
   auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
   if (!attr || !attr.isSplat()) {
@@ -57,7 +57,8 @@ LogicalResult ConstantOpSPIRVLowering::lowerOperation(
 //===----------------------------------------------------------------------===//
 LogicalResult CmpFOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, ValueCache &valueCache) const {
+    ArrayRef<Value *> operands, AffineExprCodegen &affineExprCodegen,
+    ValueCache &valueCache) const {
   if (operands.size() != 2) {
     return op->emitError("expected two operands in spir-v lowering of CmpFOp");
   }

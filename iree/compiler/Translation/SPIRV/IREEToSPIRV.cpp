@@ -26,7 +26,8 @@ namespace iree_compiler {
 /// the value of the operand.
 LogicalResult IREELoadOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, ValueCache &valueCache) const {
+    ArrayRef<Value *> operands, AffineExprCodegen &affineExprCodegen,
+    ValueCache &valueCache) const {
   auto loadOp = cast<IREE::LoadInputOp>(op);
   auto result = loadOp.getResult();
   valueCache.setOperandDstValue(result, index, operands[0]);

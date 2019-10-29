@@ -27,6 +27,7 @@ iree_cc_library(
     "SPIRVExecutableTranslation.h"
     "SPIRVLowering.h"
     "XLAIndexPropagation.h"
+    "XLAToSPIRV.h"
   SRCS
     "EmbeddedKernels.cpp"
     "IndexComputation.cpp"
@@ -36,6 +37,7 @@ iree_cc_library(
     "SPIRVExecutableTranslation.cpp"
     "SPIRVLowering.cpp"
     "XLAIndexPropagation.cpp"
+    "XLAToSPIRV.cpp"
   DEPS
     flatbuffers
     iree::compiler::IR

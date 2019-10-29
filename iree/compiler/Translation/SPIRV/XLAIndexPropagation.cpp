@@ -92,6 +92,47 @@ LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
 }
 
 //===----------------------------------------------------------------------===//
+// PadOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult XLAPadOpIndexPropagation::propagateIndexMap(
+    Operation *op, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &operandIndices) const {
+  auto padOp = cast<xla_hlo::PadOp>(op);
+  /// For pad operation, if result index at a particular dimension is d_i, then
+  /// the input tensor index is computed as (d_i - edge_padding_low[i]) /
+  /// (interior_padding[i]+1). Note that multiple indices of the output tensor
+  /// could map to the same element of the padded tensor. The final lowering has
+  /// to insert a condition to make sure that the padding_value is used when the
+  /// index corresponds to a padded element.
+  const auto &edge_padding_low = padOp.edge_padding_low();
+  const auto &interior_padding = padOp.interior_padding();
+  OpBuilder builder(op->getContext());
+
+  /// Index for the tensor operand.
+  SmallVector<AffineExpr, 4> exprs(
+      padOp.operand()->getType().cast<RankedTensorType>().getRank());
+  for (auto resultExpr : enumerate(resultIndex.getResults())) {
+    auto i = resultExpr.index();
+    int64_t padding_low = edge_padding_low.getValue<IntegerAttr>(i).getInt();
+    int64_t padding_stride =
+        interior_padding.getValue<IntegerAttr>(i).getInt() + 1;
+    exprs[resultExpr.index()] =
+        (resultExpr.value() - padding_low).floorDiv(padding_stride);
+  }
+  auto operandMap = AffineMap::get(resultIndex.getNumDims(),
+                                   resultIndex.getNumSymbols(), exprs);
+  operandIndices.push_back(operandMap);
+
+  // Scalar operand is just mapped to a single element {0};
+  auto scalarMap =
+      AffineMap::get(resultIndex.getNumDims(), resultIndex.getNumSymbols(),
+                     builder.getAffineConstantExpr(0));
+  operandIndices.push_back(scalarMap);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // ReverseOp
 //===----------------------------------------------------------------------===//
 

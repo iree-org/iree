@@ -57,6 +57,7 @@ class SPIRVLowering {
   virtual LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
                                        AffineMap index,
                                        ArrayRef<Value *> operands,
+                                       AffineExprCodegen &affineExprCodegen,
                                        ValueCache &valueCache) const {
     return failure();
   }
@@ -89,6 +90,7 @@ class ConstantOpSPIRVLowering final : public SPIRVOpLowering<ConstantOp> {
   using SPIRVOpLowering<ConstantOp>::SPIRVOpLowering;
   LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
                                AffineMap index, ArrayRef<Value *> operands,
+                               AffineExprCodegen &affineExprCodegen,
                                ValueCache &valueCache) const override;
 };
 
@@ -99,6 +101,7 @@ class CmpFOpSPIRVLowering final : public SPIRVOpLowering<CmpFOp> {
 
   LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
                                AffineMap index, ArrayRef<Value *> operands,
+                               AffineExprCodegen &affineExprCodegen,
                                ValueCache &valueCache) const override;
 };
 
@@ -109,6 +112,7 @@ class CmpSelectOpSPIRVLowering final : public SPIRVOpLowering<OpTy> {
   using SPIRVOpLowering<OpTy>::SPIRVOpLowering;
   LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
                                AffineMap index, ArrayRef<Value *> operands,
+                               AffineExprCodegen &affineExprCodegen,
                                ValueCache &valueCache) const override {
     if (op->getNumOperands() != 2) {
       return op->emitError(
@@ -160,6 +164,7 @@ class SPIRVPwOpLowering final : public SPIRVOpLowering<OpTy> {
   LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
                                AffineMap index,
                                ArrayRef<Value *> scalarOperands,
+                               AffineExprCodegen &affineExprCodegen,
                                ValueCache &valueCache) const override {
     // TODO(ravishankarm) : This check should really be a static_assert. See if
     // that can be changed.
@@ -209,6 +214,7 @@ class SPIRVIndexOpLowering final : public SPIRVOpLowering<OpTy> {
   LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
                                AffineMap index,
                                ArrayRef<Value *> scalarOperands,
+                               AffineExprCodegen &affineExprCodegen,
                                ValueCache &valueCache) const override {
     if (op->getNumOperands() != 1) {
       return op->emitError(
@@ -557,7 +563,8 @@ class SPIRVCodegen {
         scalarOperands.push_back(scalarArg);
       }
       if (failed(opCodegenList[opName]->lowerOperation(
-              op, builder, index, scalarOperands, valueCache))) {
+              op, builder, index, scalarOperands, affineExprCodegen,
+              valueCache))) {
         return failure();
       }
     }
