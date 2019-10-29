@@ -38,6 +38,12 @@ iree_flatbuffer_cc_library(
 )
 
 iree_flatbuffer_cc_library(
+    name = "buffer_data_def_cc_fbs",
+    srcs = ["buffer_data_def.fbs"],
+    flatc_args = FLATC_ARGS,
+)
+
+iree_flatbuffer_cc_library(
     name = "bytecode_def_cc_fbs",
     srcs = ["bytecode_def.fbs"],
     flatc_args = FLATC_ARGS,
@@ -194,6 +200,7 @@ cc_library(
     name = "schemas",
     hdrs = [
         ":archive_def_generated.h",
+        ":buffer_data_def_generated.h",
         ":bytecode_def_generated.h",
         ":debug_service_generated.h",
         ":device_def_generated.h",
@@ -209,6 +216,7 @@ cc_library(
     ],
     deps = [
         ":archive_def_cc_fbs",
+        ":buffer_data_def_cc_fbs",
         ":bytecode_def_cc_fbs",
         ":debug_service_cc_fbs",
         ":device_def_cc_fbs",
@@ -228,6 +236,7 @@ cc_library(
 
 REFLECTION_SRCS = [] if not FLATBUFFER_SUPPORTS_REFLECTIONS else [
     "archive_def.bfbs",
+    "buffer_data_def.bfbs",
     "bytecode_def.bfbs",
     "debug_service.bfbs",
     "executable_def.bfbs",
