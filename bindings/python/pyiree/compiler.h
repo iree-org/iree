@@ -49,6 +49,28 @@ class CompilerModuleBundle {
   mlir::ModuleOp module_op_;
 };
 
+// Registers to receive diagnostics for a scope.
+// When this goes out of scope, any remaining diagnostics will be added to
+// the parent.
+class DiagnosticCapture {
+ public:
+  DiagnosticCapture(mlir::MLIRContext* mlir_context, DiagnosticCapture* parent);
+  ~DiagnosticCapture();
+  DiagnosticCapture(DiagnosticCapture&& other);
+
+  std::vector<mlir::Diagnostic>& diagnostics() { return diagnostics_; }
+
+  // Consumes/clears diagnostics.
+  std::string ConsumeDiagnosticsAsString(const char* error_message);
+  void ClearDiagnostics();
+
+ private:
+  mlir::MLIRContext* mlir_context_;
+  DiagnosticCapture* parent_;
+  std::vector<mlir::Diagnostic> diagnostics_;
+  mlir::DiagnosticEngine::HandlerID handler_id_;
+};
+
 // Bundle of MLIRContext related things that facilitates interop with
 // Python.
 class CompilerContextBundle
@@ -61,13 +83,24 @@ class CompilerContextBundle
 
   CompilerModuleBundle ParseAsm(const std::string& asm_text);
 
+  // Gets the default diagnostic capture.
+  DiagnosticCapture& DefaultDiagnosticCapture() { return default_capture_; }
+
+  // Creates a new diagnostic region.
+  // Note that this only supports one deep at present.
+  DiagnosticCapture CaptureDiagnostics() {
+    return DiagnosticCapture(&mlir_context_, &default_capture_);
+  }
+
   // Consumes/clears diagnostics.
-  std::string ConsumeDiagnosticsAsString();
-  void ClearDiagnostics();
+  std::string ConsumeDiagnosticsAsString() {
+    return default_capture_.ConsumeDiagnosticsAsString(nullptr);
+  }
+  void ClearDiagnostics() { default_capture_.ClearDiagnostics(); }
 
  private:
   mlir::MLIRContext mlir_context_;
-  std::vector<mlir::Diagnostic> diagnostics_;
+  DiagnosticCapture default_capture_;
 };
 
 void SetupCompilerBindings(pybind11::module m);

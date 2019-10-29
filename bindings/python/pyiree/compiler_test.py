@@ -25,10 +25,8 @@ class CompilerTest(absltest.TestCase):
 
   def testParseError(self):
     ctx = binding.compiler.CompilerContext()
-    with self.assertRaises(ValueError):
+    with self.assertRaisesRegex(ValueError, "custom op 'FOOBAR' is unknown"):
       ctx.parse_asm("""FOOBAR: I SHOULD NOT PARSE""")
-    diag_str = ctx.get_diagnostics()
-    self.assertRegex(diag_str, "custom op 'FOOBAR' is unknown")
 
   def testParseAndCompileToSequencer(self):
     ctx = binding.compiler.CompilerContext()
