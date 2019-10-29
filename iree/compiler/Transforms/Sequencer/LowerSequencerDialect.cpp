@@ -280,14 +280,12 @@ class LowerSequencerDialectPass : public ModulePass<LowerSequencerDialectPass> {
     target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());
     });
+    target.addLegalOp<ModuleOp, ModuleTerminatorOp,
+                      IREE::MultiArchExecutableOp>();
+    target.markOpRecursivelyLegal<IREE::MultiArchExecutableOp>();
 
-    // TODO(b/142791494): The conversion framework will recurse into the
-    // executable if we just call it on the top-level module. This can't be a
-    // function pass because type conversion replaces the original functions.
-    auto funcsIt = getModule().getOps<FuncOp>();
-    SmallVector<Operation *, 4> funcs(funcsIt.begin(), funcsIt.end());
-
-    if (failed(applyFullConversion(funcs, target, patterns, &typeConverter))) {
+    if (failed(applyFullConversion(getModule(), target, patterns,
+                                   &typeConverter))) {
       return signalPassFailure();
     }
   }
