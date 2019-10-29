@@ -32,7 +32,7 @@
 #include "absl/time/time.h"
 #include "iree/base/file_io.h"
 #include "iree/base/file_path.h"
-#include "iree/base/init.h"
+#include "iree/base/initializer.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 

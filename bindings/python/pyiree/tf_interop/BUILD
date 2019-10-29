@@ -123,9 +123,6 @@ py_test(
     name = "saved_model_test",
     srcs = ["saved_model_test.py"],
     python_version = "PY3",
-    tags = [
-        "oss_only",
-    ],
     deps = [
         "//bindings/python/pyiree:binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep

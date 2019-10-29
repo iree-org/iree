@@ -15,17 +15,6 @@
 #ifndef IREE_BASE_INIT_H_
 #define IREE_BASE_INIT_H_
 
-// Initializer macros are defined in separate files:
-//   IREE_DECLARE_MODULE_INITIALIZER(name)
-//   IREE_REGISTER_MODULE_INITIALIZER(name, body)
-//   IREE_REGISTER_MODULE_INITIALIZER_SEQUENCE(name1, name2)
-//   IREE_REQUIRE_MODULE_INITIALIZED(name)
-//   IREE_RUN_MODULE_INITIALIZERS()
-//   IREE_REQUIRE_MODULE_LINKED(name)
-//
-// These macros allow for arranging pieces of initialization code to be
-// executed at a well-defined time and in a well-defined order.
-//
 // Initialization happens automatically during InitializeEnvironment(), which
 // should be called early in main(), before other code runs.
 

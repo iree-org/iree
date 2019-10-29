@@ -17,7 +17,6 @@
 #include <stdexcept>
 
 #include "bindings/python/pyiree/binding.h"
-#include "bindings/python/pyiree/initialize.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/schemas/module_def_generated.h"
@@ -61,7 +60,6 @@ OwningModuleRef parseMLIRModuleFromString(StringRef contents,
 }  // namespace
 
 CompilerContextBundle::CompilerContextBundle() {
-  InitializeExtension({});
   // Setup a diagnostic handler.
   mlir_context()->getDiagEngine().registerHandler(
       [this](mlir::Diagnostic& d) { diagnostics_.push_back(std::move(d)); });

@@ -125,6 +125,4 @@ class RuntimeTest(absltest.TestCase):
 
 
 if __name__ == "__main__":
-  # Uncomment to initialize the extension with custom flags.
-  # binding.initialize_extension(["--logtostderr"])
   absltest.main()

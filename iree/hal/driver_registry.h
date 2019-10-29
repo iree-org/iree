@@ -20,7 +20,7 @@
 
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
-#include "iree/base/init.h"
+#include "iree/base/initializer.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver.h"
 

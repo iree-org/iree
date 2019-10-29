@@ -18,7 +18,6 @@
 #include "absl/container/inlined_vector.h"
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/hal.h"
-#include "bindings/python/pyiree/initialize.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -147,7 +146,6 @@ class RtInstance : public ApiRefCounted<RtInstance, iree_rt_instance_t> {
  public:
   // TODO(laurenzo): Support optional allocator argument.
   static RtInstance Create(absl::optional<std::string> driver_name) {
-    InitializeExtension({});
     iree_rt_instance_t* raw_inst;
     CheckApiStatus(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &raw_inst),
                    "Error creating instance");

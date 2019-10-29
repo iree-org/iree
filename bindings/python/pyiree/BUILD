@@ -70,7 +70,6 @@ cc_library(
     srcs = [
         "compiler.cc",
         "hal.cc",
-        "initialize.cc",
         "rt.cc",
         "status_utils.cc",
         "vm.cc",
@@ -79,7 +78,6 @@ cc_library(
         "binding.h",
         "compiler.h",
         "hal.h",
-        "initialize.h",
         "rt.h",
         "status_utils.h",
         "vm.h",
@@ -93,7 +91,6 @@ cc_library(
         "@local_config_mlir//:IR",
         "//iree/base:api",
         "//iree/base:status",
-        "//iree/base:init",
         "//iree/hal:api",
         "//iree/rt:api",
         "//iree/schemas",
@@ -117,6 +114,7 @@ iree_py_extension(
     deps = [
         ":base",
         "//bindings/python/pyiree/tf_interop",
+        "//iree/base:initializer",
     ],
 )
 

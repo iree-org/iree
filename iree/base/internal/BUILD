@@ -57,6 +57,7 @@ cc_library(
     srcs = ["init_internal.cc"],
     hdrs = ["init_internal.h"],
     deps = [
+        "//iree/base:initializer",
         "//iree/base:target_platform",
         "@com_google_absl//absl/flags:parse",
     ],

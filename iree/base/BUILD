@@ -151,6 +151,15 @@ cc_library(
 )
 
 cc_library(
+    name = "initializer",
+    srcs = ["initializer.cc"],
+    hdrs = ["initializer.h"],
+    deps = [
+        ":target_platform",
+    ],
+)
+
+cc_library(
     name = "intrusive_list",
     hdrs = [
         "intrusive_list.h",
@@ -305,7 +314,7 @@ cc_library(
     ],
     visibility = ["//visibility:private"],
     deps = [
-        ":init",
+        ":initializer",
         ":logging",
         "@com_google_absl//absl/flags:flag",
         "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
@@ -323,7 +332,7 @@ cc_library(
     deps = [
         ":file_io",
         ":file_path",
-        ":init",
+        ":initializer",
         ":logging",
         ":status",
         "@com_google_absl//absl/base:core_headers",
