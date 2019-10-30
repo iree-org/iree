@@ -93,7 +93,10 @@ DiagnosticCapture::DiagnosticCapture(DiagnosticCapture&& other) {
 
 // Custom location printer that prints prettier, multi-line file output
 // suitable for human readable error messages. The standard printer just prints
-// a long nested expression not particularly human friendly).
+// a long nested expression not particularly human friendly). Note that there
+// is a location pretty printer in the MLIR AsmPrinter. It is private and
+// doesn't do any path shortening, which seems to make long Python stack traces
+// a bit easier to scan.
 void PrintLocation(Location loc, llvm::raw_ostream& out) {
   switch (loc->getKind()) {
     case StandardAttributes::OpaqueLocation:
