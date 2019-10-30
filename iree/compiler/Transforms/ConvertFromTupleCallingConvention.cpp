@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/iterator_range.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/ArrayRef.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/iterator_range.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"

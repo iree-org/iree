@@ -16,7 +16,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/schemas/source_map_def_generated.h"
-#include "llvm/Support/raw_ostream.h"
+#include "third_party/llvm/llvm/include/llvm/Support/raw_ostream.h"
 #include "mlir/IR/Identifier.h"
 #include "mlir/IR/Location.h"
 

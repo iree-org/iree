@@ -20,13 +20,13 @@
 
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/schemas/executable_def_generated.h"
-#include "llvm/ADT/StringMap.h"
-#include "llvm/ADT/StringRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/StringMap.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/StringRef.h"
 
 namespace mlir {
 namespace iree_compiler {

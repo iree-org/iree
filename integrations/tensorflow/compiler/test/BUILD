@@ -42,7 +42,7 @@ py_test(
         "--filecheck_binary=$(location //third_party/llvm/llvm:FileCheck)",
     ],
     data = [
-        "@llvm//:FileCheck",
+        "//third_party/llvm/llvm:FileCheck",
     ],
     python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + [

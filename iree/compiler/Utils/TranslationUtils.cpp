@@ -14,8 +14,8 @@
 
 #include "iree/compiler/Utils/TranslationUtils.h"
 
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/ErrorHandling.h"
+#include "third_party/llvm/llvm/include/llvm/Support/Debug.h"
+#include "third_party/llvm/llvm/include/llvm/Support/ErrorHandling.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LogicalResult.h"
 

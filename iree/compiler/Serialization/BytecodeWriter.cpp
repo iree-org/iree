@@ -17,7 +17,7 @@
 #include <algorithm>
 
 #include "iree/compiler/Utils/Macros.h"
-#include "llvm/Support/raw_ostream.h"
+#include "third_party/llvm/llvm/include/llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Support/LLVM.h"

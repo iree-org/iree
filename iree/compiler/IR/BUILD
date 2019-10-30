@@ -43,7 +43,7 @@ cc_library(
         ":EnumsGen",
         ":OpsGen",
         ":StructureOpsGen",
-        "@llvm//:support",
+        "//third_party/llvm/llvm:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:StandardOps",
         "@local_config_mlir//:Support",

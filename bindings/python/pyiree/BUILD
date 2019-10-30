@@ -96,7 +96,7 @@ cc_library(
         "//iree/rt:api",
         "//iree/schemas",
         "//iree/vm:api",
-        "@llvm//:support",
+        "//third_party/llvm/llvm:support",
         "@local_config_mlir//:Parser",
         "@local_config_mlir//:Pass",
         "@iree_pybind11//:pybind11",

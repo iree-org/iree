@@ -17,16 +17,16 @@
 // We need this entry function because we want to register PassManager CLI
 // options, which is missing in MLIR's translation main entry function.
 
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/Support/TranslateClParser.h"
+#include "third_party/llvm/llvm/include/llvm/Support/InitLLVM.h"
+#include "third_party/llvm/llvm/include/llvm/Support/MemoryBuffer.h"
+#include "third_party/llvm/llvm/include/llvm/Support/SourceMgr.h"
+#include "third_party/llvm/llvm/include/llvm/Support/ToolOutputFile.h"
 
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),

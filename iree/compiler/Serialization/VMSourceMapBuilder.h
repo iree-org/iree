@@ -19,9 +19,9 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/schemas/source_map_def_generated.h"
-#include "llvm/ADT/StringMap.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/MLIRContext.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/StringMap.h"
 
 namespace mlir {
 namespace iree_compiler {

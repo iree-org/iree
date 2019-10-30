@@ -17,9 +17,9 @@
 
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
 #include "iree/schemas/bytecode/sequencer_bytecode_v0.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/StringRef.h"
 #include "mlir/Support/LLVM.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/Optional.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/StringRef.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -15,7 +15,7 @@
 #include "iree/compiler/Serialization/VMFunctionTableBuilder.h"
 
 #include "iree/compiler/Serialization/VMSourceMapBuilder.h"
-#include "llvm/Support/raw_ostream.h"
+#include "third_party/llvm/llvm/include/llvm/Support/raw_ostream.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -17,10 +17,10 @@
 
 #include <cstdint>
 
-#include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/DenseMapInfo.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/StringSwitch.h"
 
 // Order matters.
 #include "iree/compiler/IR/Enums.h.inc"

@@ -82,7 +82,7 @@ def iree_setup_lit_package(data):
         name = "lit_test_utilities",
         testonly = True,
         data = data + [
-            "@llvm//:FileCheck",
+            "//third_party/llvm/llvm:FileCheck",
         ],
     )
 

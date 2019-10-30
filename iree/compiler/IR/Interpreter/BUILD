@@ -37,7 +37,7 @@ cc_library(
         "//iree/compiler/Serialization",
         "//iree/compiler/Utils",
         "//iree/schemas/bytecode:interpreter_bytecode_v0",
-        "@llvm//:support",
+        "//third_party/llvm/llvm:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:StandardOps",
     ],

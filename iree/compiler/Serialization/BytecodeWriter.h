@@ -21,7 +21,6 @@
 
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/schemas/bytecode/bytecode_v0.h"
-#include "llvm/ADT/Optional.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/Function.h"
@@ -29,6 +28,7 @@
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/Optional.h"
 
 namespace mlir {
 namespace iree_compiler {

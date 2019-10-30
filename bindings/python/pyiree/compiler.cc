@@ -21,14 +21,14 @@
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/compiler/Utils/TranslationUtils.h"
 #include "iree/schemas/module_def_generated.h"
-#include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
-#include "third_party/llvm/llvm-project/llvm/include/llvm/Support/raw_ostream.h"
+#include "third_party/llvm/llvm/include/llvm/Support/SourceMgr.h"
+#include "third_party/llvm/llvm/include/llvm/Support/raw_ostream.h"
 
 namespace py = pybind11;
 

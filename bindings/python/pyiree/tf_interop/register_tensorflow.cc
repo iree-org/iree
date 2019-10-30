@@ -19,11 +19,11 @@
 
 #include "bindings/python/pyiree/compiler.h"
 #include "bindings/python/pyiree/status_utils.h"
-#include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
 #include "tensorflow/cc/saved_model/loader.h"
 #include "tensorflow/compiler/mlir/tensorflow/translate/import_model.h"
+#include "third_party/llvm/llvm/include/llvm/Support/raw_ostream.h"
 
 using namespace mlir;  // NOLINT
 

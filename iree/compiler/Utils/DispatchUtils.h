@@ -24,12 +24,12 @@
 
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/IR/StructureOps.h"
-#include "llvm/ADT/ArrayRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/ArrayRef.h"
 
 namespace mlir {
 namespace iree_compiler {

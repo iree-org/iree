@@ -14,8 +14,8 @@
 
 #include "iree/compiler/IR/Ops.h"
 
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/SMLoc.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
+#include "third_party/llvm/llvm/include/llvm/Support/SMLoc.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"

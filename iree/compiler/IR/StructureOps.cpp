@@ -15,9 +15,9 @@
 #include "iree/compiler/IR/StructureOps.h"
 
 #include "iree/compiler/IR/Types.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallString.h"
-#include "llvm/ADT/SmallVector.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/STLExtras.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/SmallString.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"

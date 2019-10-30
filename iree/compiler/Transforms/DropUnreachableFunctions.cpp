@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/Utils/ModuleUtils.h"
-#include "llvm/ADT/SetVector.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/SetVector.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/Pass/Pass.h"

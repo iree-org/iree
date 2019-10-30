@@ -26,7 +26,7 @@ cc_library(
         "//iree/compiler/IR/Interpreter",
         "//iree/compiler/IR/Sequencer",
         "//iree/compiler/Utils",
-        "@llvm//:support",
+        "//third_party/llvm/llvm:support",
         "@local_config_mlir//:Analysis",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",

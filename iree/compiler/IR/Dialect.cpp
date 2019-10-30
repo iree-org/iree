@@ -18,7 +18,7 @@
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/IR/Types.h"
-#include "llvm/Support/SourceMgr.h"
+#include "third_party/llvm/llvm/include/llvm/Support/SourceMgr.h"
 
 namespace mlir {
 namespace iree_compiler {

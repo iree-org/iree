@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Serialization/BytecodeTables.h"
 
-#include "llvm/ADT/STLExtras.h"
+#include "third_party/llvm/llvm/include/llvm/ADT/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {
