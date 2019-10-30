@@ -1,0 +1,159 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package(default_visibility = ["//visibility:public"])
+
+sdl_includes = ["include"]
+
+SDL_DEFAULT_SRC_EXCLUDES = [
+    # Ignore test files.
+    "src/test/*.c",
+    # Unfortunately, thread/generic does not contain any guards to
+    # prevent collisions against thread/pthread.
+    "src/thread/generic/*.c",
+    # Don't include Windows support.
+    "src/render/direct3d*/**",
+    "src/render/SDL_d3d*",
+    "src/haptic/windows/**",
+    # Remove support for QNX
+    "src/video/qnx/**",
+]
+
+sdl_sources = select({
+    "@bazel_tools//src/conditions:windows": glob(
+        include = [
+            "src/**/*.c",
+            "src/**/*.h",
+        ],
+        exclude = [
+            "src/test/*.c",
+            "src/video/qnx/**",
+            "src/core/linux/**",
+            "src/thread/**",
+            "src/core/unix/**",
+        ],
+    ) + glob([
+        "src/thread/*",
+        "src/thread/windows/*",
+        "src/thread/generic/SDL_syscond.*",
+    ]),
+    "//conditions:default": glob(
+        include = [
+            "src/**/*.c",
+            "src/**/*.h",
+        ],
+        exclude = SDL_DEFAULT_SRC_EXCLUDES,
+    ),
+})
+
+sdl_headers = [
+    "include/begin_code.h",
+    "include/close_code.h",
+    "include/SDL.h",
+    "include/SDL_assert.h",
+    "include/SDL_atomic.h",
+    "include/SDL_audio.h",
+    "include/SDL_bits.h",
+    "include/SDL_blendmode.h",
+    "include/SDL_clipboard.h",
+    "include/SDL_config_minimal.h",
+    "include/SDL_cpuinfo.h",
+    "include/SDL_egl.h",
+    "include/SDL_endian.h",
+    "include/SDL_error.h",
+    "include/SDL_events.h",
+    "include/SDL_filesystem.h",
+    "include/SDL_gamecontroller.h",
+    "include/SDL_gesture.h",
+    "include/SDL_haptic.h",
+    "include/SDL_hints.h",
+    "include/SDL_joystick.h",
+    "include/SDL_keyboard.h",
+    "include/SDL_keycode.h",
+    "include/SDL_loadso.h",
+    "include/SDL_log.h",
+    "include/SDL_main.h",
+    "include/SDL_messagebox.h",
+    "include/SDL_metal.h",
+    "include/SDL_mouse.h",
+    "include/SDL_mutex.h",
+    "include/SDL_name.h",
+    "include/SDL_opengl.h",
+    "include/SDL_opengl_glext.h",
+    "include/SDL_opengles.h",
+    "include/SDL_opengles2.h",
+    "include/SDL_pixels.h",
+    "include/SDL_platform.h",
+    "include/SDL_power.h",
+    "include/SDL_quit.h",
+    "include/SDL_rect.h",
+    "include/SDL_render.h",
+    "include/SDL_revision.h",
+    "include/SDL_rwops.h",
+    "include/SDL_scancode.h",
+    "include/SDL_sensor.h",
+    "include/SDL_shape.h",
+    "include/SDL_stdinc.h",
+    "include/SDL_surface.h",
+    "include/SDL_system.h",
+    "include/SDL_syswm.h",
+    "include/SDL_thread.h",
+    "include/SDL_timer.h",
+    "include/SDL_touch.h",
+    "include/SDL_version.h",
+    "include/SDL_video.h",
+    "include/SDL_vulkan.h",
+]
+
+sdl_copts = select({
+    "//conditions:default": [
+        "-Wno-string-conversion",
+        "-pthread",
+        "-includestdio.h",  # Adds `#include <stdio.h>`, which some files need.
+    ],
+})
+
+sdl_linkopts = select({
+    "@bazel_tools//src/conditions:windows": [
+        "-Wl,advapi32.lib",
+        "-Wl,gdi32.lib",
+        "-Wl,imm32.lib",
+        "-Wl,ole32.lib",
+        "-Wl,oleaut32.lib",
+        "-Wl,opengl32.lib",
+        "-Wl,shell32.lib",
+        "-Wl,user32.lib",
+        "-Wl,version.lib",
+        "-Wl,winmm.lib",
+    ],
+    "//conditions:default": [
+        "-ldl",
+        "-lrt",
+    ],
+})
+
+sdl_deps = [
+    "@sdl2_config//:headers",
+]
+
+cc_library(
+    name = "SDL2",
+    srcs = sdl_sources,
+    hdrs = sdl_headers,
+    copts = sdl_copts,
+    includes = sdl_includes,
+    linkopts = sdl_linkopts,
+    linkstatic = 1,
+    deps = sdl_deps,
+)

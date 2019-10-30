@@ -81,3 +81,21 @@ cc_test(
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
     ] + PLATFORM_VULKAN_TEST_DEPS,
 )
+
+cc_binary(
+    name = "vk_triangle",
+    srcs = ["vk_triangle.cc"],
+    tags = [
+        "manual",
+        "notap",
+    ],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:logging",
+        "//iree/hal:api",
+        "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
+        "//iree/rt:api",
+        "//iree/vm:api",
+        "@sdl2//:SDL2",
+    ],
+)

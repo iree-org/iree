@@ -32,3 +32,18 @@ iree_cc_test(
     iree::hal::interpreter::interpreter_driver_module
     iree::hal::vulkan::vulkan_driver_module
 )
+
+iree_cc_binary(
+    NAME
+      vk_triangle
+    SRCS
+      "vk_triangle.cc"
+    DEPS
+      iree::base::api
+      iree::base::logging
+      iree::hal::api
+      iree::hal::vulkan::vulkan_driver_module
+      iree::rt::api
+      iree::vm::api
+      SDL2-static
+)
