@@ -20,6 +20,7 @@ cc_binary(
         "//iree/compiler/Transforms/Interpreter",
         "//iree/compiler/Transforms/Sequencer",
         "//iree/compiler/Translation/SPIRV",
+        "//third_party/iree/integrations/tensorflow/compiler:tensorflow",
         "@llvm//:support",
         "@local_config_mlir//:AffineDialectRegistration",
         "@local_config_mlir//:MlirOptLib",

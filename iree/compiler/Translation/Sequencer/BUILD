@@ -17,6 +17,7 @@ cc_library(
         "//iree/compiler/Utils",
         "//iree/hal:executable_format",
         "//iree/schemas",
+        "//third_party/iree/integrations/tensorflow/compiler:tensorflow",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm//:support",
         "@local_config_mlir//:IR",
