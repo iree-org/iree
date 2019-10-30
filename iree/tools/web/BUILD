@@ -67,7 +67,6 @@ cc_binary(
 auto_wasm_binary(
     name = "run_module_emscripten_binary",
     cc_target = ":run_module_emscripten",
-    tags = ["manual"],
     threads = "emscripten",
 )
 
