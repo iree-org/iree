@@ -19,12 +19,16 @@
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
+#include "iree/compiler/Utils/TranslationUtils.h"
 #include "iree/schemas/module_def_generated.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Location.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "third_party/llvm/llvm-project/llvm/include/llvm/Support/raw_ostream.h"
 
 namespace py = pybind11;
 
@@ -87,6 +91,55 @@ DiagnosticCapture::DiagnosticCapture(DiagnosticCapture&& other) {
   other.mlir_context_ = nullptr;
 }
 
+// Custom location printer that prints prettier, multi-line file output
+// suitable for human readable error messages. The standard printer just prints
+// a long nested expression not particularly human friendly).
+void PrintLocation(Location loc, llvm::raw_ostream& out) {
+  switch (loc->getKind()) {
+    case StandardAttributes::OpaqueLocation:
+      PrintLocation(loc.cast<OpaqueLoc>().getFallbackLocation(), out);
+      break;
+    case StandardAttributes::UnknownLocation:
+      out << "  [unknown location]\n";
+      break;
+    case StandardAttributes::FileLineColLocation: {
+      auto line_col_loc = loc.cast<FileLineColLoc>();
+      StringRef this_filename = line_col_loc.getFilename();
+      auto slash_pos = this_filename.find_last_of("/\\");
+      bool has_basename = false;
+      StringRef basename = this_filename;
+      if (slash_pos != StringRef::npos) {
+        has_basename = true;
+        basename = this_filename.substr(slash_pos + 1);
+      }
+      out << "  at: " << basename << " [" << line_col_loc.getLine() << ":"
+          << line_col_loc.getColumn() << "]";
+      if (has_basename) {
+        out << "\t(" << this_filename << ")";
+      }
+      out << "\n";
+      break;
+    }
+    case StandardAttributes::NameLocation: {
+      auto nameLoc = loc.cast<NameLoc>();
+      out << "  @'" << nameLoc.getName() << "':\n";
+      auto childLoc = nameLoc.getChildLoc();
+      if (!childLoc.isa<UnknownLoc>()) {
+        out << "(...\n";
+        PrintLocation(childLoc, out);
+        out << ")\n";
+      }
+      break;
+    }
+    case StandardAttributes::CallSiteLocation: {
+      auto call_site = loc.cast<CallSiteLoc>();
+      PrintLocation(call_site.getCaller(), out);
+      PrintLocation(call_site.getCallee(), out);
+      break;
+    }
+  }
+}
+
 std::string DiagnosticCapture::ConsumeDiagnosticsAsString(
     const char* error_message) {
   std::string s;
@@ -120,10 +173,8 @@ std::string DiagnosticCapture::ConsumeDiagnosticsAsString(
         sout << "[UNKNOWN]";
     }
     // Message.
-    sout << ": " << d << "\n\t";
-
-    // Location.
-    d.getLocation().print(sout);
+    sout << ": " << d << "\n";
+    PrintLocation(d.getLocation(), sout);
   }
 
   diagnostics_.clear();
@@ -152,19 +203,31 @@ CompilerModuleBundle CompilerContextBundle::ParseAsm(
   return CompilerModuleBundle(shared_from_this(), module_ref.release());
 }
 
-std::string CompilerModuleBundle::ToAsm() {
+std::string CompilerModuleBundle::ToAsm(bool enableDebugInfo, bool prettyForm,
+                                        int64_t largeElementLimit) {
   // Print to asm.
   std::string asm_output;
   llvm::raw_string_ostream sout(asm_output);
   OpPrintingFlags print_flags;
+  if (enableDebugInfo) {
+    print_flags.enableDebugInfo(prettyForm);
+  }
+  if (largeElementLimit >= 0) {
+    print_flags.elideLargeElementsAttrs(largeElementLimit);
+  }
   module_op().print(sout, print_flags);
   return sout.str();
 }
 
-std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob() {
+std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
+    bool print_mlir, std::vector<std::string> target_backends) {
+  ModuleTranslationOptions options;
+  options.print_mlir = print_mlir;
+  options.target_backends = std::move(target_backends);
+
   auto diag_capture = context_->CaptureDiagnostics();
-  auto module_blob =
-      mlir::iree_compiler::translateMlirToIreeSequencerModule(module_op());
+  auto module_blob = mlir::iree_compiler::translateMlirToIreeSequencerModule(
+      module_op(), options);
   if (module_blob.empty()) {
     throw RaiseValueError(
         diag_capture
@@ -209,9 +272,13 @@ void SetupCompilerBindings(pybind11::module m) {
            &CompilerContextBundle::ConsumeDiagnosticsAsString)
       .def("clear_diagnostics", &CompilerContextBundle::ClearDiagnostics);
   py::class_<CompilerModuleBundle>(m, "CompilerModule")
-      .def("to_asm", &CompilerModuleBundle::ToAsm)
+      .def("to_asm", &CompilerModuleBundle::ToAsm,
+           py::arg("debug_info") = false, py::arg("pretty") = false,
+           py::arg("large_element_limit") = -1)
       .def("compile_to_sequencer_blob",
-           &CompilerModuleBundle::CompileToSequencerBlob)
+           &CompilerModuleBundle::CompileToSequencerBlob,
+           py::arg("print_mlir") = false,
+           py::arg("target_backends") = std::vector<std::string>())
       .def("run_pass_pipeline", &CompilerModuleBundle::RunPassPipeline);
 }
 

@@ -36,13 +36,15 @@ class CompilerModuleBundle {
       : context_(std::move(context)), module_op_(std::move(module_op)) {}
 
   mlir::ModuleOp& module_op() { return module_op_; }
-  std::string ToAsm();
+  std::string ToAsm(bool enableDebugInfo, bool prettyForm,
+                    int64_t largeElementLimit);
 
   // Runs one or more pass pipelines (as is mlir::parsePassPipeline).
   void RunPassPipeline(const std::vector<std::string>& pipelines);
 
   // Compiles the MLIR module to an IREE sequencer module.
-  std::shared_ptr<OpaqueBlob> CompileToSequencerBlob();
+  std::shared_ptr<OpaqueBlob> CompileToSequencerBlob(
+      bool print_mlir, std::vector<std::string> target_backends);
 
  private:
   std::shared_ptr<CompilerContextBundle> context_;
