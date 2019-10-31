@@ -153,7 +153,7 @@ inline LogicalResult getAffineExprForReshape(
                                                             linearizedExpr, val)
                                     : val);
     if (doAffineExprSimplify) {
-      linearizedExpr = simplifyAffineExpr(val, numDims, numSymbols);
+      linearizedExpr = simplifyAffineExpr(linearizedExpr, numDims, numSymbols);
     }
   }
 

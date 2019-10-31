@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="12xf32=[1 2 3 4 5 6 7 8 9 10 11 12]" | FileCheck %s
-// TODO(b/143512082): Test --target_backends=vulkan-spirv as well.
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="12xf32=[1 2 3 4 5 6 7 8 9 10 11 12]" | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir --target_backends=vulkan-spirv %s --input_values="12xf32=[1 2 3 4 5 6 7 8 9 10 11 12]" | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: EXEC @reshape_1D_2D
 func @reshape_1D_2D(%arg : tensor<12xf32>) -> tensor<3x4xf32> {
