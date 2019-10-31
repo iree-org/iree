@@ -4,6 +4,7 @@
 experimental playground for low-level/tightly integrated machine learning
 libraries that make use of modern hardware acceleration APIs and techniques (see
 [non goals](#non-goals)).
+**soman
 
 ## Table of Contents
 
