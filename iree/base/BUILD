@@ -289,6 +289,51 @@ cc_test(
 )
 
 cc_library(
+    name = "shaped_buffer",
+    hdrs = ["shaped_buffer.h"],
+    deps = [
+        ":logging",
+        ":memory",
+        ":shape",
+        "@com_google_absl//absl/container:fixed_array",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "shaped_buffer_string_util",
+    srcs = ["shaped_buffer_string_util.cc"],
+    hdrs = ["shaped_buffer_string_util.h"],
+    deps = [
+        ":buffer_string_util",
+        ":memory",
+        ":shape",
+        ":shaped_buffer",
+        ":source_location",
+        ":status",
+        "@com_google_absl//absl/container:fixed_array",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "shaped_buffer_string_util_test",
+    srcs = ["shaped_buffer_string_util_test.cc"],
+    deps = [
+        ":buffer_string_util",
+        ":memory",
+        ":shaped_buffer",
+        ":shaped_buffer_string_util",
+        ":status",
+        ":status_matchers",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
     name = "source_location",
     hdrs = ["source_location.h"],
     deps = platform_trampoline_deps("source_location"),
