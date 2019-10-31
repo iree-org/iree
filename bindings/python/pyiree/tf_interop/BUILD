@@ -95,7 +95,7 @@ cc_library(
     visibility = ["//visibility:private"],
     deps = [
                "@local_config_mlir//:IR",
-               "//third_party/llvm/llvm:support",
+               "@llvm//:support",
                "@org_tensorflow//tensorflow/cc/saved_model:loader",
                "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
                "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",

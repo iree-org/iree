@@ -26,7 +26,7 @@ cc_library(
         "//iree/compiler/Transforms",
         "//iree/compiler/Utils",
         "//iree/schemas/bytecode:interpreter_bytecode_v0",
-        "//third_party/llvm/llvm:support",
+        "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:StandardOps",

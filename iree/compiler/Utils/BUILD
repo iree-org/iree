@@ -29,7 +29,7 @@ cc_library(
     deps = [
         "//iree/compiler/IR",
         "//iree/schemas",
-        "//third_party/llvm/llvm:support",
+        "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:StandardOps",
