@@ -155,10 +155,9 @@ Status Run() {
   }
   for (int i = 0; i < results.size(); ++i) {
     const auto& result = results[i];
-    auto print_mode = hal::BufferViewPrintMode::kFloatingPoint;
+    auto print_mode = BufferDataPrintMode::kFloatingPoint;
     if (!output_types.empty()) {
-      ASSIGN_OR_RETURN(print_mode,
-                       hal::ParseBufferViewPrintMode(output_types[i]));
+      ASSIGN_OR_RETURN(print_mode, ParseBufferDataPrintMode(output_types[i]));
     }
     ASSIGN_OR_RETURN(auto result_str,
                      PrintBufferViewToString(result, print_mode, 1024));

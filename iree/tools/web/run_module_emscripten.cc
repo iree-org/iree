@@ -101,7 +101,7 @@ StatusOr<std::string> RunIreeModule(std::string module_file_data,
   // TODO(scotttodd): Return list of outputs instead of just the first (proto?)
   for (int i = 0; i < results.size(); ++i) {
     const auto& result = results[i];
-    auto print_mode = hal::BufferViewPrintMode::kFloatingPoint;
+    auto print_mode = BufferDataPrintMode::kFloatingPoint;
     ASSIGN_OR_RETURN(auto result_str,
                      PrintBufferViewToString(result, print_mode, 1024));
     const auto& buffer = result.buffer;

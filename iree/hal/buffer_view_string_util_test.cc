@@ -33,31 +33,6 @@ StatusOr<std::vector<T>> ReadBuffer(const ref_ptr<Buffer>& buffer) {
   return result;
 }
 
-TEST(BufferViewUtilTest, GetTypeElementSize) {
-  EXPECT_EQ(1, GetTypeElementSize("1").ValueOrDie());
-  EXPECT_EQ(7, GetTypeElementSize("7").ValueOrDie());
-  EXPECT_EQ(4, GetTypeElementSize("i32").ValueOrDie());
-  EXPECT_EQ(8, GetTypeElementSize("f64").ValueOrDie());
-
-  EXPECT_FALSE(GetTypeElementSize("").ok());
-  EXPECT_FALSE(GetTypeElementSize(" ").ok());
-  EXPECT_FALSE(GetTypeElementSize("a").ok());
-  EXPECT_FALSE(GetTypeElementSize("ib").ok());
-  EXPECT_FALSE(GetTypeElementSize("i").ok());
-  EXPECT_FALSE(GetTypeElementSize("i543ff").ok());
-}
-
-TEST(BufferViewUtilTest, ParseShape) {
-  EXPECT_EQ((Shape{}), ParseShape("").ValueOrDie());
-  EXPECT_EQ((Shape{1}), ParseShape("1").ValueOrDie());
-  EXPECT_EQ((Shape{1, 2}), ParseShape("1x2").ValueOrDie());
-  EXPECT_EQ((Shape{1, 2}), ParseShape(" 1 x 2 ").ValueOrDie());
-
-  EXPECT_FALSE(ParseShape("abc").ok());
-  EXPECT_FALSE(ParseShape("1xf").ok());
-  EXPECT_FALSE(ParseShape("1xff23").ok());
-}
-
 TEST(BufferViewUtilTest, ParseBufferViewFromStringEmpty) {
   // Empty string = empty buffer_view.
   ASSERT_OK_AND_ASSIGN(auto m0, ParseBufferViewFromString(""));
@@ -163,21 +138,6 @@ TEST(BufferViewUtilTest, ParseBufferViewFromStringFloat) {
   EXPECT_FALSE(ParseBufferViewFromString("4xf32=asodfj").ok());
   EXPECT_FALSE(ParseBufferViewFromString("4xf32=0").ok());
   EXPECT_FALSE(ParseBufferViewFromString("4xf32=0 1 2 3 4").ok());
-}
-
-TEST(BufferViewUtilTest, ParseBufferViewPrintMode) {
-  EXPECT_EQ(BufferViewPrintMode::kBinary,
-            ParseBufferViewPrintMode("b").ValueOrDie());
-  EXPECT_EQ(BufferViewPrintMode::kSignedInteger,
-            ParseBufferViewPrintMode("i").ValueOrDie());
-  EXPECT_EQ(BufferViewPrintMode::kUnsignedInteger,
-            ParseBufferViewPrintMode("u").ValueOrDie());
-  EXPECT_EQ(BufferViewPrintMode::kFloatingPoint,
-            ParseBufferViewPrintMode("f").ValueOrDie());
-
-  EXPECT_FALSE(ParseBufferViewPrintMode("").ok());
-  EXPECT_FALSE(ParseBufferViewPrintMode("s").ok());
-  EXPECT_FALSE(ParseBufferViewPrintMode("asdfasdf").ok());
 }
 
 }  // namespace

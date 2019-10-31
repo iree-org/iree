@@ -77,6 +77,34 @@ cc_test(
 )
 
 cc_library(
+    name = "buffer_string_util",
+    srcs = ["buffer_string_util.cc"],
+    hdrs = ["buffer_string_util.h"],
+    deps = [
+        ":memory",
+        ":shape",
+        ":source_location",
+        ":status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "buffer_string_util_test",
+    srcs = ["buffer_string_util_test.cc"],
+    deps = [
+        ":buffer_string_util",
+        ":memory",
+        ":status",
+        ":status_matchers",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
     name = "file_io",
     hdrs = ["file_io.h"],
     deps = [

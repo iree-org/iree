@@ -123,6 +123,7 @@ cc_library(
         ":allocator",
         ":buffer_view",
         ":heap_buffer",
+        "//iree/base:buffer_string_util",
         "//iree/base:source_location",
         "//iree/base:status",
         "@com_google_absl//absl/strings",
