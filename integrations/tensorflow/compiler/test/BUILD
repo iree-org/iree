@@ -35,7 +35,6 @@ iree_glob_lit_tests()
 py_test(
     name = "saved_model_adopt_exports",
     srcs = [
-        "iree_tf_test_driver.py",
         "saved_model_adopt_exports.py",
     ],
     args = [

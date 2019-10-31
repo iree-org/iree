@@ -20,7 +20,7 @@
 
 #include "iree/base/tracing.h"
 
-#include <thread>  // NOLINT: Fiber doesn't work during startup on Android.
+#include <thread>  // NOLINT
 
 #include "absl/base/attributes.h"
 #include "absl/base/const_init.h"
@@ -29,7 +29,6 @@
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
 #include "absl/time/clock.h"
-#include "absl/time/time.h"
 #include "iree/base/file_io.h"
 #include "iree/base/file_path.h"
 #include "iree/base/initializer.h"
@@ -39,7 +38,7 @@
 ABSL_FLAG(int32_t, iree_trace_file_period, 5,
           "Seconds between automatic flushing of WTF trace files. 0 to "
           "disable auto-flush.");
-ABSL_FLAG(std::string, iree_trace_file, "/dev/null",
+ABSL_FLAG(std::string, iree_trace_file, "",
           "wtf-trace file to save if --define=GLOBAL_WTF_ENABLE=1 was used "
           "when building.");
 
@@ -85,17 +84,43 @@ void RollTraceFiles(const std::string& path) {
 }
 
 // Flushes all recorded trace data since the last flush.
-void FlushTraceFile() ABSL_EXCLUSIVE_LOCKS_REQUIRED(global_tracing_mutex) {
+void FlushTraceFile(absl::optional<absl::string_view> explicit_trace_path)
+    ABSL_EXCLUSIVE_LOCKS_REQUIRED(global_tracing_mutex) {
   if (!global_tracing_initialized) return;
 
-  const auto& trace_path = absl::GetFlag(FLAGS_iree_trace_file);
-
+  static std::string* current_trace_path = nullptr;
   static ::wtf::Runtime::SaveCheckpoint checkpoint;
   static bool is_first_flush = true;
 
-  if (is_first_flush && trace_path != "/dev/null") {
+  // Detect whether explicitly overriding the trace file.
+  if (explicit_trace_path) {
+    if (!current_trace_path || *current_trace_path != *explicit_trace_path) {
+      // Reset.
+      delete current_trace_path;
+      current_trace_path = new std::string(*explicit_trace_path);
+
+      // Trigger first flush semantics.
+      is_first_flush = true;
+      checkpoint = ::wtf::Runtime::SaveCheckpoint();
+    }
+  } else if (!current_trace_path) {
+    // Resolve implicitly from flags.
+    const auto& implicit_trace_path = absl::GetFlag(FLAGS_iree_trace_file);
+    if (!implicit_trace_path.empty()) {
+      current_trace_path = new std::string(implicit_trace_path);
+      // Trigger first flush semantics.
+      is_first_flush = true;
+      checkpoint = ::wtf::Runtime::SaveCheckpoint();
+    }
+  }
+
+  if (!current_trace_path) {
+    return;
+  }
+
+  if (is_first_flush) {
     // Backup existing any existing trace files at the specified path.
-    RollTraceFiles(trace_path);
+    RollTraceFiles(*current_trace_path);
   }
 
   auto save_options =
@@ -108,12 +133,12 @@ void FlushTraceFile() ABSL_EXCLUSIVE_LOCKS_REQUIRED(global_tracing_mutex) {
   is_first_flush = false;
 
   auto* runtime = ::wtf::Runtime::GetInstance();
-  if (!runtime->SaveToFile(trace_path, save_options)) {
-    LOG(ERROR) << "Error saving WTF file: " << trace_path;
+  if (!runtime->SaveToFile(*current_trace_path, save_options)) {
+    LOG(ERROR) << "Error saving WTF file: " << *current_trace_path;
     return;
   }
 
-  VLOG(1) << "Flushed WTF trace to: " << trace_path;
+  VLOG(1) << "Flushed WTF trace to: " << *current_trace_path;
 }
 
 }  // namespace
@@ -145,17 +170,28 @@ void InitializeTracing() {
     auto flush_thread = std::thread(+[]() {
       absl::Duration period =
           absl::Seconds(absl::GetFlag(FLAGS_iree_trace_file_period));
+      StartTracingAutoFlush(period);
+    });
+  }
+}
+
+bool IsTracingAvailable() { return ::wtf::kMasterEnable; }
+
+void StartTracingAutoFlush(absl::Duration period) {
+  static std::thread flush_thread = ([period]() -> std::thread {
+    flush_thread = std::thread([period]() {
       while (true) {
         absl::SleepFor(period);
         absl::MutexLock lock(&global_tracing_mutex);
         if (!global_tracing_initialized) {
           return;
         }
-        FlushTraceFile();
+        FlushTraceFile(absl::optional<absl::string_view>());
       }
     });
     flush_thread.detach();
-  }
+    return std::move(flush_thread);
+  })();
 }
 
 // Stops tracing if currently initialized.
@@ -165,7 +201,7 @@ void StopTracing() {
   if (!global_tracing_initialized) return;
 
   // Flush any pending trace data.
-  FlushTraceFile();
+  FlushTraceFile(absl::optional<absl::string_view>());
 
   // Mark WTF as uninitialized to kill the flush thread.
   global_tracing_initialized = false;
@@ -174,11 +210,11 @@ void StopTracing() {
             << absl::GetFlag(FLAGS_iree_trace_file);
 }
 
-void FlushTrace() {
+void FlushTrace(absl::optional<absl::string_view> explicit_trace_path) {
   if (!::wtf::kMasterEnable) return;
   absl::MutexLock lock(&global_tracing_mutex);
   if (!global_tracing_initialized) return;
-  FlushTraceFile();
+  FlushTraceFile(explicit_trace_path);
 }
 
 }  // namespace iree

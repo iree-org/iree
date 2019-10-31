@@ -18,23 +18,23 @@ from __future__ import print_function
 
 from absl.testing import absltest
 
-from pyiree import binding as binding
+import pyiree
 
 
 class HalTest(absltest.TestCase):
 
   def testEnums(self):
-    print("MemoryType =", binding.hal.MemoryType)
-    print("HOST_VISIBLE =", int(binding.hal.MemoryType.HOST_VISIBLE))
+    print("MemoryType =", pyiree.binding.hal.MemoryType)
+    print("HOST_VISIBLE =", int(pyiree.binding.hal.MemoryType.HOST_VISIBLE))
 
   def testAllocateHeap(self):
-    b = binding.hal.Buffer.allocate_heap(
-        memory_type=int(binding.hal.MemoryType.HOST_LOCAL),
-        usage=int(binding.hal.BufferUsage.ALL),
+    b = pyiree.binding.hal.Buffer.allocate_heap(
+        memory_type=int(pyiree.binding.hal.MemoryType.HOST_LOCAL),
+        usage=int(pyiree.binding.hal.BufferUsage.ALL),
         allocation_size=4096)
     self.assertIsNot(b, None)
     b.fill_zero(0, 4096)
-    shape = binding.hal.Shape([1, 1024])
+    shape = pyiree.binding.hal.Shape([1, 1024])
     unused_bv = b.create_view(shape, 4)
 
 

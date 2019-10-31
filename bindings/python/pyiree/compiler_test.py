@@ -18,18 +18,18 @@ from __future__ import print_function
 
 from absl.testing import absltest
 
-from pyiree import binding as binding
+import pyiree
 
 
 class CompilerTest(absltest.TestCase):
 
   def testParseError(self):
-    ctx = binding.compiler.CompilerContext()
+    ctx = pyiree.CompilerContext()
     with self.assertRaisesRegex(ValueError, "custom op 'FOOBAR' is unknown"):
       ctx.parse_asm("""FOOBAR: I SHOULD NOT PARSE""")
 
   def testParseAndCompileToSequencer(self):
-    ctx = binding.compiler.CompilerContext()
+    ctx = pyiree.CompilerContext()
     input_module = ctx.parse_asm("""
       func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
             attributes { iree.module.export } {

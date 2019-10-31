@@ -17,20 +17,24 @@
 # pylint: disable=invalid-name
 # pylint: disable=g-import-not-at-top
 
+# Always make the low-level native bindings accessible.
+from . import binding
 
-def __import_submodules():
-  """Force a relative sub-module import.
+# Alias public compiler symbols.
+from .binding.compiler import CompilerContext
+from .binding.compiler import CompilerModule
 
-  Python makes this hard when the package is at the top and this works
-  around it, ensuring that submodules are loaded into the pyiree namespace.
-  """
-  import importlib
+# Alias symbols from the native tf_interop module.
+if hasattr(binding, "tf_interop"):
+  from .binding.tf_interop import load_saved_model as tf_load_saved_model
 
-  def import_rel(m):
-    abs_m = __package__ + "." + m
-    importlib.import_module(abs_m)
+### Load non-native py_library deps here ###
+### Order matters because these typically have a back-reference on this
+### module (being constructed). Issues should fail-fast and be easy to see.
 
-  import_rel("binding")
-
-
-__import_submodules()
+# Alias the tf_test_driver if available (optional - only if testing is linked
+# in).
+try:
+  from .tf_interop import tf_test_driver
+except ImportError:
+  pass

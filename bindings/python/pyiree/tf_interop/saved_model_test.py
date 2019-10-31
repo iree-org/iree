@@ -21,10 +21,10 @@ import os
 import sys
 import tempfile
 
-from pyiree import binding as binding
+import pyiree
 
 # Determine if compiled with tf_interop support.
-if not hasattr(binding, "tf_interop"):
+if not hasattr(pyiree, "tf_interop"):
   print("Not running tests because tf_interop support not compiled")
   sys.exit(0)
 
@@ -70,8 +70,8 @@ class RuntimeTest(tf.test.TestCase):
       tf.saved_model.save(my_module, sm_dir, options=options)
 
       # Load it up.
-      ctx = binding.compiler.CompilerContext()
-      input_module = binding.tf_interop.load_saved_model(ctx, sm_dir)
+      ctx = pyiree.CompilerContext()
+      input_module = pyiree.tf_load_saved_model(ctx, sm_dir)
       input_asm = input_module.to_asm()
       print("LOADED ASM:\n", input_asm)
       # Should have out exported name and have executor islands.

@@ -298,7 +298,9 @@ cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],
     deps = [
-        "//iree:target_config",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
         "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ] + select({
         "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"],
@@ -314,9 +316,10 @@ cc_library(
     ],
     visibility = ["//visibility:private"],
     deps = [
-        ":initializer",
-        ":logging",
         "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
         "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ],
     alwayslink = 1,
@@ -340,6 +343,7 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/synchronization",
         "@com_google_absl//absl/time",
+        "@com_google_absl//absl/types:optional",
         "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ],
     alwayslink = 1,

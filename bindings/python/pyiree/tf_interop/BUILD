@@ -119,6 +119,12 @@ cc_library(
     ],
 )
 
+py_library(
+    name = "tf_test_driver",
+    srcs = ["tf_test_driver.py"],
+    deps = INTREE_TENSORFLOW_PY_DEPS,
+)
+
 py_test(
     name = "saved_model_test",
     srcs = ["saved_model_test.py"],

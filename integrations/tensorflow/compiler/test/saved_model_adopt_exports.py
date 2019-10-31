@@ -15,14 +15,10 @@
 
 # pylint: disable=invalid-name
 # pylint: disable=missing-docstring
-# pylint: disable=g-import-not-at-top
 
-# Always load the test driver as a relative import.
-import os
-import sys
-sys.path.insert(0, os.path.dirname(__file__))
-import iree_tf_test_driver
 import tensorflow.compat.v2 as tf
+
+import pyiree
 
 SAVED_MODEL_IMPORT_PASSES = [
     "tf-executor-graph-pruning",
@@ -50,7 +46,7 @@ class T0001_FlatArgsResultsNoBoundGlobals(tf.Module):
     return a * b
 
 
-iree_tf_test_driver.add_test(
+pyiree.tf_test_driver.add_test(
     test_name="T0001_FlatArgsResultsNoBoundGlobals",
     tf_module_builder=T0001_FlatArgsResultsNoBoundGlobals,
     passes=SAVED_MODEL_IMPORT_PASSES,
@@ -75,7 +71,7 @@ class T0002_FlatArgsResultsBoundGlobalVar(tf.Module):
     return a * b + self.v
 
 
-iree_tf_test_driver.add_test(
+pyiree.tf_test_driver.add_test(
     test_name="T0002_FlatArgsResultsBoundGlobalVar",
     tf_module_builder=T0002_FlatArgsResultsBoundGlobalVar,
     passes=SAVED_MODEL_IMPORT_PASSES,
@@ -98,7 +94,7 @@ class T0003_StructuredArgs(tf.Module):
     return d["x"] * d["y"]
 
 
-iree_tf_test_driver.add_test(
+pyiree.tf_test_driver.add_test(
     test_name="T0003_StructuredArgs",
     tf_module_builder=T0003_StructuredArgs,
     passes=SAVED_MODEL_IMPORT_PASSES,
@@ -122,7 +118,7 @@ class T0003_StructuredMultipleResult(tf.Module):
     return {"x": product, "x_squared": product * product}
 
 
-iree_tf_test_driver.add_test(
+pyiree.tf_test_driver.add_test(
     test_name="T0003_StructuredMultipleResult",
     tf_module_builder=T0003_StructuredMultipleResult,
     passes=SAVED_MODEL_IMPORT_PASSES,
@@ -146,7 +142,7 @@ class T0004_StructuredSingleResult(tf.Module):
     return {"x": product}
 
 
-iree_tf_test_driver.add_test(
+pyiree.tf_test_driver.add_test(
     test_name="T0004_StructuredSingleResult",
     tf_module_builder=T0004_StructuredSingleResult,
     passes=SAVED_MODEL_IMPORT_PASSES,
@@ -174,7 +170,7 @@ class T0005_MultipleExportedFuncNames(tf.Module):
 T0005_MultipleExportedFuncNames.another_copy = (
     T0005_MultipleExportedFuncNames.simple_mul)
 
-iree_tf_test_driver.add_test(
+pyiree.tf_test_driver.add_test(
     test_name="T0005_MultipleExportedFuncNames",
     tf_module_builder=T0005_MultipleExportedFuncNames,
     passes=SAVED_MODEL_IMPORT_PASSES,
@@ -182,4 +178,4 @@ iree_tf_test_driver.add_test(
     expect_pass_failure=True)
 
 if __name__ == "__main__":
-  iree_tf_test_driver.run_tests(__file__, with_filecheck=True)
+  pyiree.tf_test_driver.run_tests(__file__, with_filecheck=True)

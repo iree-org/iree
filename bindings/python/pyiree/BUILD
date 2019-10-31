@@ -62,7 +62,13 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":binding",
-    ],
+    ] + select({
+        "//iree:enable_tensorflow": [
+            "//bindings/python/pyiree/tf_interop:tf_test_driver",
+        ],
+        "//conditions:default": [
+        ],
+    }),
 )
 
 cc_library(
@@ -116,6 +122,7 @@ iree_py_extension(
         ":base",
         "//bindings/python/pyiree/tf_interop",
         "//iree/base:initializer",
+        "//iree/base:tracing",
     ],
 )
 
@@ -124,7 +131,7 @@ py_test(
     srcs = ["compiler_test.py"],
     python_version = "PY3",
     deps = [
-        ":binding",
+        ":pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
     ],
@@ -135,7 +142,7 @@ py_test(
     srcs = ["hal_test.py"],
     python_version = "PY3",
     deps = [
-        ":binding",
+        ":pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
     ],
@@ -146,7 +153,7 @@ py_test(
     srcs = ["runtime_test.py"],
     python_version = "PY3",
     deps = NUMPY_DEPS + [
-        ":binding",
+        ":pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
     ],

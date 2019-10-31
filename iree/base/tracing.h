@@ -28,7 +28,11 @@
 #ifndef IREE_BASE_TRACING_H_
 #define IREE_BASE_TRACING_H_
 
-#if defined(WTF_ENABLE) || defined(IREE_CONFIG_GOOGLE_INTERNAL)
+#include "absl/strings/string_view.h"
+#include "absl/time/time.h"
+#include "absl/types/optional.h"
+
+#if defined(WTF_ENABLE)
 
 #include "wtf/event.h"   // IWYU pragma: export
 #include "wtf/macros.h"  // IWYU pragma: export
@@ -39,11 +43,19 @@ namespace iree {
 // Does nothing if already initialized.
 void InitializeTracing();
 
+// Returns whether tracing support is compiled into the binary.
+bool IsTracingAvailable();
+
+// Starts a background auto flush thread (if not already started). This will
+// cause the trace file to be appended to at the given period.
+void StartTracingAutoFlush(absl::Duration period);
+
 // Stops tracing and flushes any pending data.
 void StopTracing();
 
 // Flushes pending trace data to disk, if enabled.
-void FlushTrace();
+void FlushTrace(absl::optional<absl::string_view> explicit_trace_path =
+                    absl::optional<absl::string_view>());
 
 // Enables the current thread for WTF profiling/tracing.
 #define IREE_TRACE_THREAD_ENABLE(name) WTF_THREAD_ENABLE(name);
@@ -73,8 +85,11 @@ void FlushTrace();
 namespace iree {
 
 inline void InitializeTracing() {}
+inline bool IsTracingAvailable() { return false; }
+inline void StartTracingAutoFlush(absl::Duration period) {}
 inline void StopTracing() {}
-inline void FlushTrace() {}
+inline void FlushTrace(absl::optional<absl::string_view> explicit_trace_path =
+                           absl::optional<absl::string_view>()) {}
 
 #define IREE_TRACE_THREAD_ENABLE(name)
 #define IREE_TRACE_SCOPE0(name_spec)

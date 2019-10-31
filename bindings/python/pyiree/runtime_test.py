@@ -18,11 +18,11 @@ from __future__ import print_function
 
 from absl.testing import absltest
 import numpy as np
-from pyiree import binding as binding
+import pyiree
 
 
 def create_simple_mul_module():
-  ctx = binding.compiler.CompilerContext()
+  ctx = pyiree.CompilerContext()
   input_module = ctx.parse_asm("""
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
           attributes { iree.module.export } {
@@ -31,14 +31,14 @@ def create_simple_mul_module():
     }
     """)
   binary = input_module.compile_to_sequencer_blob()
-  m = binding.vm.create_module_from_blob(binary)
+  m = pyiree.binding.vm.create_module_from_blob(binary)
   return m
 
 
 def create_host_buffer_view(context):
   b = context.allocate_device_visible(16)
   b.fill_zero(0, 16)
-  bv = b.create_view(binding.hal.Shape([4]), 4)
+  bv = b.create_view(pyiree.binding.hal.Shape([4]), 4)
   print("BUFFER VIEW:", bv)
   return bv
 
@@ -75,20 +75,20 @@ class RuntimeTest(absltest.TestCase):
     self.assertIs(f, None)
 
   def testInitialization(self):
-    policy = binding.rt.Policy()
+    policy = pyiree.binding.rt.Policy()
     print("policy =", policy)
-    instance = binding.rt.Instance()
+    instance = pyiree.binding.rt.Instance()
     print("instance =", instance)
-    context = binding.rt.Context(instance=instance, policy=policy)
+    context = pyiree.binding.rt.Context(instance=instance, policy=policy)
     print("context =", context)
     context_id = context.context_id
     print("context_id =", context.context_id)
     self.assertGreater(context_id, 0)
 
   def testRegisterModule(self):
-    policy = binding.rt.Policy()
-    instance = binding.rt.Instance()
-    context = binding.rt.Context(instance=instance, policy=policy)
+    policy = pyiree.binding.rt.Policy()
+    instance = pyiree.binding.rt.Instance()
+    context = pyiree.binding.rt.Context(instance=instance, policy=policy)
     m = create_simple_mul_module()
     context.register_module(m)
     self.assertIsNot(context.lookup_module_by_name("module"), None)
@@ -99,9 +99,9 @@ class RuntimeTest(absltest.TestCase):
     self.assertIs(context.resolve_function("module.nothere"), None)
 
   def testInvoke(self):
-    policy = binding.rt.Policy()
-    instance = binding.rt.Instance()
-    context = binding.rt.Context(instance=instance, policy=policy)
+    policy = pyiree.binding.rt.Policy()
+    instance = pyiree.binding.rt.Instance()
+    context = pyiree.binding.rt.Context(instance=instance, policy=policy)
     m = create_simple_mul_module()
     context.register_module(m)
     f = context.resolve_function("module.simple_mul")

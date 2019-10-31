@@ -20,9 +20,29 @@
 #include "bindings/python/pyiree/tf_interop/register_tensorflow.h"
 #include "bindings/python/pyiree/vm.h"
 #include "iree/base/initializer.h"
+#include "iree/base/tracing.h"
 
 namespace iree {
 namespace python {
+
+namespace {
+
+void SetupTracingBindings(pybind11::module m) {
+  m.def("is_available", []() { return IsTracingAvailable(); });
+  m.def(
+      "flush",
+      [](absl::optional<absl::string_view> explicit_trace_path) {
+        FlushTrace(explicit_trace_path);
+      },
+      py::arg("explicit_trace_path") = absl::optional<absl::string_view>());
+  m.def(
+      "autoflush",
+      [](float period) { StartTracingAutoFlush(absl::Seconds(period)); },
+      py::arg("period") = 5.0f);
+  m.def("stop", []() { StopTracing(); });
+}
+
+}  // namespace
 
 PYBIND11_MODULE(binding, m) {
   IREE_RUN_MODULE_INITIALIZERS();
@@ -41,6 +61,9 @@ PYBIND11_MODULE(binding, m) {
 
   auto vm_m = m.def_submodule("vm", "IREE VM api");
   SetupVmBindings(vm_m);
+
+  auto tracing_m = m.def_submodule("tracing", "IREE tracing api");
+  SetupTracingBindings(tracing_m);
 
 // TensorFlow.
 #if defined(IREE_TENSORFLOW_ENABLED)
