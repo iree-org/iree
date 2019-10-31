@@ -11,12 +11,10 @@
 // match constant input operands and do the folding by replacing output operands
 // with the new values.
 
-#ifdef IREE_SEQUENCER_LL_OPS
-#else
+#ifndef IREE_SEQUENCER_LL_OPS
 #define IREE_SEQUENCER_LL_OPS
 
-#ifdef IREE_OP_BASE
-#else
+#ifndef IREE_OP_BASE
 include "iree/compiler/IR/OpBase.td"
 #endif  // IREE_OP_BASE
 

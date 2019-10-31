@@ -1,11 +1,9 @@
 // Common IREE op definitions shared by the interpreter and sequencer dialects.
 
-#ifdef IREE_OP_BASE
-#else
+#ifndef IREE_OP_BASE
 #define IREE_OP_BASE
 
-#ifdef OP_BASE
-#else
+#ifndef OP_BASE
 include "mlir/IR/OpBase.td"
 #endif  // OP_BASE
 

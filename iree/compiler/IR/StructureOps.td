@@ -3,12 +3,10 @@
 // the sequencer level (coarse control flow/scheduling) and ops that perform
 // actual work (math/etc) on runtime execution backends.
 
-#ifdef IREE_STRUCTURE_OPS
-#else
+#ifndef IREE_STRUCTURE_OPS
 #define IREE_STRUCTURE_OPS
 
-#ifdef IREE_OP_BASE
-#else
+#ifndef IREE_OP_BASE
 include "iree/compiler/IR/OpBase.td"
 #endif  // IREE_OP_BASE
 

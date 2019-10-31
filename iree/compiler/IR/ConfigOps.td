@@ -3,8 +3,7 @@
 // Multiple config ops are allowed within a single scope to indicate that the
 // parent IR node should be processed for multiple targets.
 
-#ifdef IREE_CONFIG_OPS
-#else
+#ifndef IREE_CONFIG_OPS
 #define IREE_CONFIG_OPS
 
 include "iree/compiler/IR/OpBase.td"

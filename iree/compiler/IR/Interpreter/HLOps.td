@@ -10,12 +10,10 @@
 // The source of truth for bytecode opcodes is:
 //   https://github.com/google/iree/tree/master/iree/iree/schemas/bytecode/interpreter_bytecode_v0.h
 
-#ifdef IREE_INTERPRETER_HL_OPS
-#else
+#ifndef IREE_INTERPRETER_HL_OPS
 #define IREE_INTERPRETER_HL_OPS
 
-#ifdef IREE_OP_BASE
-#else
+#ifndef IREE_OP_BASE
 include "iree/compiler/IR/OpBase.td"
 #endif  // IREE_OP_BASE
 

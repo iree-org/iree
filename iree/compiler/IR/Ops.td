@@ -2,12 +2,10 @@
 // These are used by common transforms between the sequencer and interpreter and
 // allow us to share some of the common lowering passes from other dialects.
 
-#ifdef IREE_OPS
-#else
+#ifndef IREE_OPS
 #define IREE_OPS
 
-#ifdef IREE_OP_BASE
-#else
+#ifndef IREE_OP_BASE
 include "iree/compiler/IR/OpBase.td"
 #endif  // IREE_OP_BASE
 
