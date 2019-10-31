@@ -123,6 +123,7 @@ iree_py_extension(
         "//bindings/python/pyiree/tf_interop",
         "//iree/base:initializer",
         "//iree/base:tracing",
+        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ],
 )
 

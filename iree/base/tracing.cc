@@ -90,7 +90,7 @@ void FlushTraceFile(absl::optional<absl::string_view> explicit_trace_path)
 
   static std::string* current_trace_path = nullptr;
   static ::wtf::Runtime::SaveCheckpoint checkpoint;
-  static bool is_first_flush = true;
+  static bool is_first_flush = false;
 
   // Detect whether explicitly overriding the trace file.
   if (explicit_trace_path) {
@@ -156,22 +156,21 @@ void InitializeTracing() {
   if (global_tracing_initialized) return;
   global_tracing_initialized = true;
 
-  LOG(INFO) << "Tracing enabled and streaming to: "
-            << absl::GetFlag(FLAGS_iree_trace_file);
-
   // Enable tracing on this thread, which we know is main.
   IREE_TRACE_THREAD_ENABLE("main");
 
   // Register atexit callback to stop tracking.
   atexit(StopTracing);
 
+  LOG(INFO) << "Tracing enabled and streaming to: "
+            << absl::GetFlag(FLAGS_iree_trace_file);
+
   // Launch a thread to periodically flush the trace.
-  if (absl::GetFlag(FLAGS_iree_trace_file_period) > 0) {
-    auto flush_thread = std::thread(+[]() {
-      absl::Duration period =
-          absl::Seconds(absl::GetFlag(FLAGS_iree_trace_file_period));
-      StartTracingAutoFlush(period);
-    });
+  if (absl::GetFlag(FLAGS_iree_trace_file_period) > 0 &&
+      !absl::GetFlag(FLAGS_iree_trace_file).empty()) {
+    absl::Duration period =
+        absl::Seconds(absl::GetFlag(FLAGS_iree_trace_file_period));
+    StartTracingAutoFlush(period);
   }
 }
 

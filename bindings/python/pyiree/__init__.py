@@ -16,6 +16,7 @@
 
 # pylint: disable=invalid-name
 # pylint: disable=g-import-not-at-top
+# pylint: disable=g-bad-import-order
 
 # Always make the low-level native bindings accessible.
 from . import binding
@@ -23,6 +24,9 @@ from . import binding
 # Alias public compiler symbols.
 from .binding.compiler import CompilerContext
 from .binding.compiler import CompilerModule
+
+# Alias tracing symbols.
+from .binding import tracing
 
 # Alias symbols from the native tf_interop module.
 if hasattr(binding, "tf_interop"):
