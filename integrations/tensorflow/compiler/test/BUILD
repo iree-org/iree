@@ -38,7 +38,7 @@ py_test(
         "saved_model_adopt_exports.py",
     ],
     args = [
-        "--filecheck_binary=$(location //third_party/llvm/llvm:FileCheck)",
+        "--filecheck_binary=$(location //third_party/llvm/llvm-project/llvm:FileCheck)",
     ],
     data = [
         "@llvm//:FileCheck",

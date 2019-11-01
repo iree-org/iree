@@ -16,7 +16,7 @@
 
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Utils/DispatchUtils.h"
-#include "third_party/llvm/llvm/include/llvm/Support/Debug.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"

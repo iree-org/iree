@@ -15,13 +15,13 @@
 #ifndef IREE_COMPILER_UTILS_TYPEUTILS_H_
 #define IREE_COMPILER_UTILS_TYPEUTILS_H_
 
+#include "llvm/ADT/ArrayRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/ArrayRef.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -15,7 +15,7 @@
 #include "iree/compiler/IR/Sequencer/LLOps.h"
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Utils/OpUtils.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/StringMap.h"
+#include "llvm/ADT/StringMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"

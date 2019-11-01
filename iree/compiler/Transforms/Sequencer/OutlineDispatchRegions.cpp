@@ -21,7 +21,7 @@
 #include "iree/compiler/Utils/DispatchUtils.h"
 #include "iree/compiler/Utils/MemRefUtils.h"
 #include "iree/compiler/Utils/TypeConversionUtils.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SetVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"

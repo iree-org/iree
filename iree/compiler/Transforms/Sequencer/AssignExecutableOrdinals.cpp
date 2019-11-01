@@ -14,7 +14,7 @@
 
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Utils/OpUtils.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/MLIRContext.h"

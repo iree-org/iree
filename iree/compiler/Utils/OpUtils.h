@@ -15,13 +15,13 @@
 #ifndef IREE_COMPILER_UTILS_OPUTILS_H_
 #define IREE_COMPILER_UTILS_OPUTILS_H_
 
+#include "llvm/ADT/None.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SetVector.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/Value.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/None.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/Optional.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SetVector.h"
 
 namespace mlir {
 namespace iree_compiler {

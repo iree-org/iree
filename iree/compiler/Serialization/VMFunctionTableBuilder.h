@@ -22,10 +22,10 @@
 #include "iree/compiler/Serialization/VMSourceMapBuilder.h"
 #include "iree/schemas/function_def_generated.h"
 #include "iree/schemas/function_table_def_generated.h"
+#include "llvm/ADT/StringSet.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OperationSupport.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/StringSet.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -14,7 +14,7 @@
 
 #include "iree/compiler/IR/Sequencer/HLOps.h"
 #include "iree/compiler/IR/StructureOps.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SetVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/Pass/Pass.h"

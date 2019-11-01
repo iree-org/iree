@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Utils/ModuleUtils.h"
 
-#include "third_party/llvm/llvm/include/llvm/ADT/SetVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "mlir/IR/Function.h"
 
 namespace mlir {
