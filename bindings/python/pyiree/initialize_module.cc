@@ -57,7 +57,7 @@ class PyScopedEvent {
     auto it = scoped_event_intern_.find(name_spec);
     if (it == scoped_event_intern_.end()) {
       // Name spec must live forever.
-      std::string* dup_name_spec = new string(std::move(name_spec));
+      std::string* dup_name_spec = new std::string(std::move(name_spec));
       // So must the event.
       auto scoped_event = new ::wtf::ScopedEvent<>(dup_name_spec->c_str());
       scoped_event_intern_.insert(std::make_pair(*dup_name_spec, scoped_event));
