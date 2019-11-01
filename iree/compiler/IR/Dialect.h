@@ -26,7 +26,7 @@ class IREEDialect : public Dialect {
   static StringRef getDialectNamespace() { return "iree"; }
 
   /// Parses a type registered to this dialect.
-  Type parseType(DialectAsmParser& parser, Location loc) const override;
+  Type parseType(DialectAsmParser& parser) const override;
 
   /// Prints a type registered to this dialect.
   void printType(Type type, DialectAsmPrinter& os) const override;

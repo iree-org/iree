@@ -49,22 +49,21 @@ IREEDialect::IREEDialect(MLIRContext *context)
 // Type Parsing
 //===----------------------------------------------------------------------===//
 
-#define IREE_TYPE_PARSER(NAME, KIND, TYPE)                            \
-  static Type parse##TYPE(IREEDialect const &dialect, StringRef spec, \
-                          Location loc) {                             \
-    spec.consume_front(NAME);                                         \
-    return TYPE::get(dialect.getContext());                           \
+#define IREE_TYPE_PARSER(NAME, KIND, TYPE)                              \
+  static Type parse##TYPE(IREEDialect const &dialect, StringRef spec) { \
+    spec.consume_front(NAME);                                           \
+    return TYPE::get(dialect.getContext());                             \
   }
 IREE_TYPE_TABLE(IREE_TYPE_PARSER);
 
 #define IREE_PARSE_TYPE(NAME, KIND, TYPE) \
   if (spec.startswith(NAME)) {            \
-    return parse##TYPE(*this, spec, loc); \
+    return parse##TYPE(*this, spec);      \
   }
-Type IREEDialect::parseType(DialectAsmParser &parser, Location loc) const {
+Type IREEDialect::parseType(DialectAsmParser &parser) const {
   llvm::StringRef spec = parser.getFullSymbolSpec();
   IREE_TYPE_TABLE(IREE_PARSE_TYPE);
-  emitError(loc, "unknown IREE type: ") << spec;
+  parser.emitError(parser.getNameLoc(), "unknown IREE type: ") << spec;
   return Type();
 }
 
