@@ -22,7 +22,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
-#include "third_party/iree/integrations/tensorflow/compiler/Passes.h"
+#include "integrations/tensorflow/compiler/Passes.h"
 #include "iree/base/status.h"
 #include "iree/compiler/IR/ConfigOps.h"
 #include "iree/compiler/IR/Sequencer/OpWriters.h"

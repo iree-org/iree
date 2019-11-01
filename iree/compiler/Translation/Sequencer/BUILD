@@ -8,6 +8,7 @@ cc_library(
     srcs = ["SequencerModuleTranslation.cpp"],
     hdrs = ["SequencerModuleTranslation.h"],
     deps = [
+        "//integrations/tensorflow/compiler:tensorflow",
         "//iree/base:status",
         "//iree/compiler/IR",
         "//iree/compiler/IR/Sequencer",
@@ -17,7 +18,6 @@ cc_library(
         "//iree/compiler/Utils",
         "//iree/hal:executable_format",
         "//iree/schemas",
-        "//third_party/iree/integrations/tensorflow/compiler:tensorflow",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm//:support",
         "@local_config_mlir//:IR",
