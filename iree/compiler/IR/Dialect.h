@@ -26,10 +26,10 @@ class IREEDialect : public Dialect {
   static StringRef getDialectNamespace() { return "iree"; }
 
   /// Parses a type registered to this dialect.
-  Type parseType(llvm::StringRef spec, Location loc) const override;
+  Type parseType(DialectAsmParser& parser, Location loc) const override;
 
   /// Prints a type registered to this dialect.
-  void printType(Type type, llvm::raw_ostream& os) const override;
+  void printType(Type type, DialectAsmPrinter& os) const override;
 };
 
 }  // namespace iree_compiler

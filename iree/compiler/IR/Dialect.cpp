@@ -19,6 +19,7 @@
 #include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/IR/Types.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/IR/DialectImplementation.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -60,7 +61,8 @@ IREE_TYPE_TABLE(IREE_TYPE_PARSER);
   if (spec.startswith(NAME)) {            \
     return parse##TYPE(*this, spec, loc); \
   }
-Type IREEDialect::parseType(StringRef spec, Location loc) const {
+Type IREEDialect::parseType(DialectAsmParser &parser, Location loc) const {
+  llvm::StringRef spec = parser.getFullSymbolSpec();
   IREE_TYPE_TABLE(IREE_PARSE_TYPE);
   emitError(loc, "unknown IREE type: ") << spec;
   return Type();
@@ -71,14 +73,14 @@ Type IREEDialect::parseType(StringRef spec, Location loc) const {
 //===----------------------------------------------------------------------===//
 
 #define IREE_TYPE_PRINTER(NAME, KIND, TYPE) \
-  static void print##TYPE(TYPE type, llvm::raw_ostream &os) { os << NAME; }
+  static void print##TYPE(TYPE type, DialectAsmPrinter &os) { os << NAME; }
 IREE_TYPE_TABLE(IREE_TYPE_PRINTER);
 
 #define IREE_PRINT_TYPE(NAME, KIND, TYPE) \
   case KIND:                              \
     print##TYPE(type.cast<TYPE>(), os);   \
     return;
-void IREEDialect::printType(Type type, llvm::raw_ostream &os) const {
+void IREEDialect::printType(Type type, DialectAsmPrinter &os) const {
   switch (type.getKind()) {
     IREE_TYPE_TABLE(IREE_PRINT_TYPE);
     default:
