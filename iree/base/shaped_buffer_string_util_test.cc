@@ -162,15 +162,15 @@ TEST(ShapedBufferStringUtilTest, RoundTripParsePrint) {
 }
 
 TEST(ShapedBufferStringUtilTest, RoundTripPrintParse) {
-  RoundTripTest(ShapedBuffer::Create<int8>({4}, {0, 1, 2, 3}),
+  RoundTripTest(ShapedBuffer::Create<int8_t>({4}, {0, 1, 2, 3}),
                 BufferDataPrintMode::kSignedInteger);
-  RoundTripTest(ShapedBuffer::Create<int16>({4}, {0, 1, 2, 3}),
+  RoundTripTest(ShapedBuffer::Create<int16_t>({4}, {0, 1, 2, 3}),
                 BufferDataPrintMode::kSignedInteger);
-  RoundTripTest(ShapedBuffer::Create<uint16>({4}, {0, 1, 2, 3}),
+  RoundTripTest(ShapedBuffer::Create<uint16_t>({4}, {0, 1, 2, 3}),
                 BufferDataPrintMode::kSignedInteger);
   RoundTripTest(ShapedBuffer::Create<float>({4}, {0, 1.1, 2, 3}),
                 BufferDataPrintMode::kSignedInteger);
-  RoundTripTest(ShapedBuffer::Create<int8>({1, 2, 3}, {0, 1, 2, 3, 4, 5}),
+  RoundTripTest(ShapedBuffer::Create<int8_t>({1, 2, 3}, {0, 1, 2, 3, 4, 5}),
                 BufferDataPrintMode::kSignedInteger);
   RoundTripTest(ShapedBuffer(1, {4}, {0, 1, 2, 3}),
                 BufferDataPrintMode::kBinary);
