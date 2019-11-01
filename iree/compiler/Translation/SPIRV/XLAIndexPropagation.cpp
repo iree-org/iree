@@ -92,6 +92,38 @@ LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
 }
 
 //===----------------------------------------------------------------------===//
+// ConcatenateOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult XLAConcatenateOpIndexPropagation::propagateIndexMap(
+    Operation *op, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &operandIndices) const {
+  OpBuilder builder(op->getContext());
+  auto concatenateOp = cast<xla_hlo::ConcatenateOp>(op);
+  int append_dim = concatenateOp.dimension().getZExtValue();
+
+  // For concatenate operation, the operands will be shifted along the given
+  // dimension.
+  int offset = 0;
+  for (Value *operand : op->getOperands()) {
+    auto operandType = operand->getType().cast<RankedTensorType>();
+    int rank = operandType.getRank();
+    SmallVector<AffineExpr, 4> exprs;
+    for (int i = 0; i < rank; ++i) {
+      AffineExpr e = builder.getAffineDimExpr(i);
+      if (i == append_dim) e = e - offset;
+      exprs.push_back(e);
+    }
+    offset += operandType.getDimSize(append_dim);
+    AffineMap shiftedMap = AffineMap::get(resultIndex.getNumDims(),
+                                          resultIndex.getNumSymbols(), exprs);
+    AffineMap operandMap = shiftedMap.compose(resultIndex);
+    operandIndices.push_back(operandMap);
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // PadOp
 //===----------------------------------------------------------------------===//
 

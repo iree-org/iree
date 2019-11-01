@@ -100,8 +100,9 @@ void IREEToSPIRVPass::runOnModule() {
       ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
       XLABroadcastOpIndexPropagation, XLABroadcastInDimOpIndexPropagation,
-      XLAPadOpIndexPropagation, XLAReverseOpIndexPropagation,
-      XLASliceOpIndexPropagation, XLATransposeOpIndexPropagation>
+      XLAConcatenateOpIndexPropagation, XLAPadOpIndexPropagation,
+      XLAReverseOpIndexPropagation, XLASliceOpIndexPropagation,
+      XLATransposeOpIndexPropagation>
       indexPropagation;
 
   // Initialize the spir-v codegenerator.
@@ -150,7 +151,8 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVIndexOpLowering<xla_hlo::ReshapeOp>,
       SPIRVIndexOpLowering<xla_hlo::ReverseOp>,
       SPIRVIndexOpLowering<xla_hlo::SliceOp>,
-      SPIRVIndexOpLowering<xla_hlo::TransposeOp>, XLAPadOpSPIRVLowering>
+      SPIRVIndexOpLowering<xla_hlo::TransposeOp>, XLAConcatenateOpSPIRVLowering,
+      XLAPadOpSPIRVLowering>
       spirvCodegen;
 
   // Create a spirv.module Op.

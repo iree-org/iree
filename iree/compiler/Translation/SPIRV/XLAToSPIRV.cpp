@@ -24,6 +24,51 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// ConcatenateOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
+    Operation *op, OpBuilder &builder, AffineMap index,
+    ArrayRef<Value *> operands, AffineExprCodegen &affineExprCodegen,
+    ValueCache &valueCache) const {
+  auto concatenateOp = cast<xla_hlo::ConcatenateOp>(op);
+  auto loc = concatenateOp.getLoc();
+  auto i32Type = builder.getIntegerType(32);
+  auto i1Type = builder.getI1Type();
+  int append_dim = concatenateOp.dimension().getZExtValue();
+  auto dimIndex = affineExprCodegen.getValue(index.getResult(append_dim),
+                                             builder.saveInsertionPoint(), loc);
+
+  int offset = op->getOperand(0)
+                   ->getType()
+                   .cast<RankedTensorType>()
+                   .getShape()[append_dim];
+  Value *resultVal = operands[0];
+  for (auto operandIt : llvm::enumerate(op->getOperands())) {
+    // The first operand is already saved in resultVal.
+    if (operandIt.index() == 0) continue;
+
+    // Only select values that offset <= d < offset + operand_shape[append_dim].
+    // Since later values will be replaced in the later iterations, only check
+    // d >= offset here.
+    Value *cond = builder.create<spirv::ConstantOp>(loc, i1Type,
+                                                    builder.getBoolAttr(true));
+    auto offsetVar = builder.create<spirv::ConstantOp>(
+        loc, i32Type, builder.getI32IntegerAttr(offset));
+    auto checkLb = builder.create<spirv::SGreaterThanEqualOp>(
+        loc, i1Type, dimIndex, offsetVar);
+    cond = builder.create<spirv::LogicalAndOp>(loc, i1Type, cond, checkLb);
+    resultVal = builder.create<spirv::SelectOp>(
+        loc, cond, operands[operandIt.index()], resultVal);
+    auto operandShape =
+        operandIt.value()->getType().cast<RankedTensorType>().getShape();
+    offset += operandShape[append_dim];
+  }
+  valueCache.setOperandDstValue(op->getResult(0), index, resultVal);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // PadOp
 //===----------------------------------------------------------------------===//
 
