@@ -41,12 +41,12 @@ cc_library(
             "@local_config_mlir//:Support",
             "@local_config_mlir//:TransformUtils",
             "@local_config_mlir//:IR",
+            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         ],
         "//conditions:default": [
         ],
     }) + [
         "@local_config_mlir//:Pass",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
     ],
     alwayslink = 1,
 )
