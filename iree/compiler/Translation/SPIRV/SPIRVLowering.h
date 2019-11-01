@@ -21,6 +21,7 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_SPIRVLOWERING_H
 
 #include "iree/compiler/Translation/SPIRV/AffineExprCodegen.h"
+#include "iree/compiler/Translation/SPIRV/IREECodegenUtils.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Support/StringExtras.h"
@@ -228,7 +229,7 @@ class SPIRVIndexOpLowering final : public SPIRVOpLowering<OpTy> {
   }
 };
 
-/// Ggenerates spv.AccessChain instruction to get the pointer value at a given
+/// Generates spv.AccessChain instruction to get the pointer value at a given
 /// location of a spv.globalVariable.
 inline Value *genPointerOffset(OpBuilder &builder, Location loc,
                                AffineExprCodegen &affineExprCodegen,
@@ -414,7 +415,7 @@ class SPIRVCodegen {
     }
 
     // Create the entry point instructions for the entry function.
-    if (failed(createEntryPoint(builder, loc, entryFn))) {
+    if (failed(createEntryPoint(fn, builder, loc, entryFn))) {
       return failure();
     }
     return success();
@@ -447,12 +448,16 @@ class SPIRVCodegen {
         builder.getSymbolRefAttr(globalInvocationID.getOperation()));
     auto id = builder.create<spirv::LoadOp>(loc, idType, globalInvocationIDPtr,
                                             nullptr, nullptr);
+
     auto id_x = builder.create<spirv::CompositeExtractOp>(
         loc, i32Type, id, builder.getArrayAttr(builder.getI32IntegerAttr(0)));
+    globalInvocationIDs.push_back(id_x);
     auto id_y = builder.create<spirv::CompositeExtractOp>(
         loc, i32Type, id, builder.getArrayAttr(builder.getI32IntegerAttr(1)));
+    globalInvocationIDs.push_back(id_y);
     auto id_z = builder.create<spirv::CompositeExtractOp>(
         loc, i32Type, id, builder.getArrayAttr(builder.getI32IntegerAttr(2)));
+    globalInvocationIDs.push_back(id_z);
     affineExprCodegen.setDimDstValue(0, id_x);
     affineExprCodegen.setDimDstValue(1, id_y);
     affineExprCodegen.setDimDstValue(2, id_z);
@@ -485,19 +490,74 @@ class SPIRVCodegen {
 
   /// Adds the spv.EntryPointOp and records all the interface variables used in
   /// the entryFn.
-  LogicalResult createEntryPoint(OpBuilder &builder, Location loc,
+  LogicalResult createEntryPoint(FuncOp fn, OpBuilder &builder, Location loc,
                                  FuncOp entryFn) {
     builder.create<spirv::EntryPointOp>(
         loc,
         builder.getI32IntegerAttr(
             static_cast<int32_t>(spirv::ExecutionModel::GLCompute)),
         builder.getSymbolRefAttr(entryFn), builder.getArrayAttr(interface));
+
+    // Get the workgroup size.
+    SmallVector<int32_t, 3> workGroupSize;
+    if (failed(getWorkGroupSize(fn, workGroupSize))) {
+      return failure();
+    }
     builder.create<spirv::ExecutionModeOp>(
         loc, builder.getSymbolRefAttr(entryFn),
         builder.getI32IntegerAttr(
             static_cast<int32_t>(spirv::ExecutionMode::LocalSize)),
-        builder.getI32ArrayAttr({1, 1, 1}));
+        builder.getI32ArrayAttr(workGroupSize));
     interface.clear();
+    return success();
+  }
+
+  /// Creates the spirv::SelectionOp that checks that the global invocation ID
+  /// of the workitem is less than the launch bounds.
+  LogicalResult createLaunchGuard(OpBuilder &builder, FuncOp fn) {
+    // First check that the global invocation id is in bounds.
+    SmallVector<int64_t, 3> launchSize;
+    if (failed(getLaunchSize(fn, launchSize))) {
+      return failure();
+    }
+    auto loc = fn.getLoc();
+    auto i1Type = builder.getI1Type();
+    auto i32Type = builder.getIntegerType(32);
+    Value *condn = builder.create<spirv::ConstantOp>(loc, i1Type,
+                                                     builder.getBoolAttr(true));
+    for (auto launchDim : enumerate(launchSize)) {
+      if (launchDim.value() == 1) {
+        continue;
+      }
+      Value *id = getGlobalInvocationID(launchDim.index());
+      auto extent = builder.create<spirv::ConstantOp>(
+          loc, i32Type, builder.getI32IntegerAttr(launchDim.value()));
+      auto check = builder.create<spirv::SLessThanOp>(loc, i1Type, id, extent);
+      condn = builder.create<spirv::LogicalAndOp>(loc, i1Type, condn, check);
+    }
+    auto selectionControl = builder.getI32IntegerAttr(
+        static_cast<uint32_t>(spirv::SelectionControl::None));
+    auto selectionOp =
+        builder.create<spirv::SelectionOp>(loc, selectionControl);
+    selectionOp.addMergeBlock();
+
+    // Create the header block and then blocks.
+    auto headerBlock = builder.createBlock(&selectionOp.body(),
+                                           std::prev(selectionOp.body().end()));
+    auto thenBlock = builder.createBlock(&selectionOp.body(),
+                                         std::prev(selectionOp.body().end()));
+
+    // Add branch to the header block.
+    builder.setInsertionPointToEnd(headerBlock);
+    builder.create<spirv::BranchConditionalOp>(
+        loc, condn, thenBlock, ArrayRef<Value *>(), selectionOp.getMergeBlock(),
+        ArrayRef<Value *>());
+
+    // Add branch to merge block in the then block.
+    builder.setInsertionPointToEnd(thenBlock);
+    auto branchOp =
+        builder.create<spirv::BranchOp>(loc, selectionOp.getMergeBlock());
+    builder.setInsertionPoint(branchOp);
     return success();
   }
 
@@ -505,6 +565,10 @@ class SPIRVCodegen {
   LogicalResult lowerFunction(OpBuilder &builder, FuncOp fn, FuncOp entryFn,
                               AffineExprCodegen &affineExprCodegen,
                               ValueCache &valueCache) {
+    if (failed(createLaunchGuard(builder, fn))) {
+      return failure();
+    }
+
     for (auto arg : fn.getArguments()) {
       // Load values of the argument at all indices needed for computation
       // within the dispatch function.
@@ -523,6 +587,8 @@ class SPIRVCodegen {
         }
       }
     }
+    builder.setInsertionPointToEnd(&(entryFn.getBody().back()));
+    builder.create<spirv::ReturnOp>(fn.getLoc());
     return success();
   }
 
@@ -581,6 +647,15 @@ class SPIRVCodegen {
     }
   }
 
+  /// Gets the global invocation ID along a particular dimension (0 -> x, 1 ->
+  /// y, 2 -> z).
+  Value *getGlobalInvocationID(unsigned dim) {
+    if (dim < globalInvocationIDs.size()) {
+      return globalInvocationIDs[dim];
+    }
+    return nullptr;
+  }
+
   /// List of classes that implement the operation lowering from tensor
   /// operations to SPIR-V.
   OpCodegenListT opCodegenList;
@@ -598,7 +673,7 @@ class SPIRVCodegen {
   SmallVector<spirv::GlobalVariableOp, 1> resultIndexToVariable;
 
   /// GlobalInvocationID variable.
-  spirv::GlobalVariableOp globalInvocationID;
+  SmallVector<Value *, 3> globalInvocationIDs;
 };
 
 }  // namespace iree_compiler

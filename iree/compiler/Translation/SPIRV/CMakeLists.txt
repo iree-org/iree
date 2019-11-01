@@ -21,6 +21,7 @@ iree_cc_library(
     "AffineExprCodegen.h"
     "EmbeddedKernels.h"
     "IndexComputation.h"
+    "IREECodegenUtils.h"
     "IREEIndexComputation.h"
     "IREEToSPIRV.h"
     "IREEToSPIRVPass.h"

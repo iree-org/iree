@@ -7,12 +7,13 @@ module {
   // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   // CHECK: func [[FN:@broadcast_in_dim_2D_3D]]()
   func @broadcast_in_dim_2D_3D(%arg0: memref<12x42xi32>, %arg1: memref<3x12x42xi32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 3]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 3]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]
     // CHECK: [[GLOBALID:%.*]] = spv.Load "Input" [[GLOBALIDPTR]]
     // CHECK: [[GLOBALIDX:%.*]] = spv.CompositeExtract [[GLOBALID]][0 : i32]
     // CHECK: [[GLOBALIDY:%.*]] = spv.CompositeExtract [[GLOBALID]][1 : i32]
     // CHECK: [[GLOBALIDZ:%.*]] = spv.CompositeExtract [[GLOBALID]][2 : i32]
+    // CHECK-LABEL: spv.selection
     // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK: [[ZERO1:%.*]] = spv.constant 0 : i32
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO1]], [[GLOBALIDY]], [[GLOBALIDX]]{{\]}}
@@ -37,12 +38,13 @@ module {
   // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   // CHECK: func [[FN:@broadcast_in_dim_scalar_3D]]()
   func @broadcast_in_dim_scalar_3D(%arg0: memref<i32>, %arg1: memref<3x12x42xi32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 3]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 3]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]
     // CHECK: [[GLOBALID:%.*]] = spv.Load "Input" [[GLOBALIDPTR]]
     // CHECK: [[GLOBALIDX:%.*]] = spv.CompositeExtract [[GLOBALID]][0 : i32]
     // CHECK: [[GLOBALIDY:%.*]] = spv.CompositeExtract [[GLOBALID]][1 : i32]
     // CHECK: [[GLOBALIDZ:%.*]] = spv.CompositeExtract [[GLOBALID]][2 : i32]
+    // CHECK-LABEL: spv.selection
     // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK: [[ZERO:%.*]] = spv.constant 0 : i32
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO]]{{\]}}
@@ -62,7 +64,7 @@ module {
 
 module {
   func @const_float_splat(%arg0: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: spv.constant 1.000000e+00 : f32
     %0 = constant dense<1.0> : tensor<12xf32>
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xf32>) -> tensor<12x42xf32>
@@ -75,7 +77,7 @@ module {
 
 module {
   func @const_int_splat(%arg0: memref<12x42xi64>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: spv.constant 42 : i64
     %0 = constant dense<42> : tensor<12xi64>
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xi64>) -> tensor<12x42xi64>
@@ -88,7 +90,7 @@ module {
 
 module {
   func @const_int_splat_err(%arg0: memref<2x12x42xi64>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 2]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 2]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // expected-error @+1{{unhandled constant lowering unless value is a splat dense element attribute}}
     %0 = constant dense<[42, 21]> : tensor<2xi64>
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<2xi64>) -> tensor<2x12x42xi64>

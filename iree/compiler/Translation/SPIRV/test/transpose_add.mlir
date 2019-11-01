@@ -5,11 +5,12 @@ module {
   // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
   // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
  func @transpose_add(%arg0: memref<12x12xf32>, %arg1: memref<12x12xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[12, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[12, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]
     // CHECK: [[GLOBALID:%.*]] = spv.Load "Input" [[GLOBALIDPTR]]
     // CHECK: [[GLOBALIDX:%.*]] = spv.CompositeExtract [[GLOBALID]][0 : i32]
     // CHECK: [[GLOBALIDY:%.*]] = spv.CompositeExtract [[GLOBALID]][1 : i32]
+    // CHECK-LABEL: spv.selection
     // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK: [[ZERO1:%.*]] = spv.constant 0 : i32
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO1]], [[GLOBALIDY]], [[GLOBALIDX]]{{\]}}

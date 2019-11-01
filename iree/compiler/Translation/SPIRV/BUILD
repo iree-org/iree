@@ -20,6 +20,7 @@ cc_library(
     ],
     hdrs = [
         "EmbeddedKernels.h",
+        "IREECodegenUtils.h",
         "IREEIndexComputation.h",
         "IREEToSPIRV.h",
         "IREEToSPIRVPass.h",

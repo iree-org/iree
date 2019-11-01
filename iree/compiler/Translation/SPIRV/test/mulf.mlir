@@ -6,10 +6,11 @@ module {
   // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   // CHECK: spv.globalVariable [[ARG2VAR:@.*]] bind(0, 2)
   func @mul_1D(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]
     // CHECK: [[GLOBALID:%.*]] = spv.Load "Input" [[GLOBALIDPTR]]
     // CHECK: [[GLOBALIDX:%.*]] = spv.CompositeExtract [[GLOBALID]][0 : i32]
+    // CHECK-LABEL: spv.selection
     // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK: [[ZERO1:%.*]] = spv.constant 0 : i32
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO1]], [[GLOBALIDX]]{{\]}}

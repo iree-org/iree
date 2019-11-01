@@ -20,45 +20,12 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_H
 
-#include "iree/compiler/IR/Ops.h"
-#include "iree/compiler/IR/StructureOps.h"
+#include "iree/compiler/Translation/SPIRV/IREECodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/XLAIndexPropagation.h"
 #include "mlir/IR/Function.h"
 
 namespace mlir {
 namespace iree_compiler {
-
-/// Gets the launch size associated with the dispatch function that this op is
-/// part of.
-inline LogicalResult getLaunchSize(Operation *op,
-                                   SmallVectorImpl<int64_t> &launchSize) {
-  auto funcOp = op->getParentOfType<FuncOp>();
-  if (!funcOp || !funcOp.getAttr("iree.executable.export")) {
-    return op->emitError(
-        "expected operation to be in dispatch function to get launch size");
-  }
-  auto workloadAttr =
-      funcOp.getAttrOfType<DenseElementsAttr>("iree.executable.workload");
-  if (!workloadAttr) {
-    op->emitError(
-        "unable to find workload size, missing attribute "
-        "iree.executable.workload in dispatch function");
-  }
-  launchSize.clear();
-  for (auto value : workloadAttr.getValues<APInt>()) {
-    launchSize.push_back(value.getSExtValue());
-  }
-  // Drop trailing ones.
-  auto dropFrom = launchSize.size() - 1;
-  while (dropFrom > 0 && launchSize[dropFrom] == 1) {
-    --dropFrom;
-  }
-  if (dropFrom > 0) {
-    launchSize.erase(std::next(launchSize.begin(), dropFrom + 1),
-                     launchSize.end());
-  }
-  return success();
-}
 
 /// Index propagation for iree.load_input operation. This operation is
 /// essentially a copy from a memref to a tensor. So just copy the index map to

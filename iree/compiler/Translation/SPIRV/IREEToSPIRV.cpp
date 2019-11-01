@@ -70,7 +70,6 @@ LogicalResult IREEReturnOpSPIRVLowering::lowerOperation(
     ValueCache &valueCache,
     DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
     ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
-  builder.create<spirv::ReturnOp>(op->getLoc());
   return success();
 }
 

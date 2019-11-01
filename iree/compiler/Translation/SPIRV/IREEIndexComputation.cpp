@@ -62,7 +62,12 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
   }
 
   SmallVector<int64_t, 3> launchSize;
-  if (failed(getLaunchSize(operation, launchSize))) {
+  auto funcOp = operation->getParentOfType<FuncOp>();
+  if (!funcOp) {
+    return operation->emitError(
+        "expected operation to be in dispatch function to get launch size");
+  }
+  if (failed(getLaunchSize(funcOp, launchSize))) {
     return failure();
   }
 

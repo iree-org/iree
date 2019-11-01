@@ -2,7 +2,7 @@
 
 module {
   func @select_ford_ge(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FOrdGreaterThanEqual {{%.*}}, {{%.*}}
@@ -18,7 +18,7 @@ module {
 
 module {
   func @select_ford_eq(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FOrdEqual {{%.*}}, {{%.*}}
@@ -33,7 +33,7 @@ module {
 
 module {
   func @select_ford_gt(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FOrdGreaterThan {{%.*}}, {{%.*}}
@@ -48,7 +48,7 @@ module {
 
 module {
   func @select_ford_lt(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FOrdLessThan {{%.*}}, {{%.*}}
@@ -63,7 +63,7 @@ module {
 
 module {
   func @select_ford_le(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FOrdLessThanEqual {{%.*}}, {{%.*}}
@@ -78,7 +78,7 @@ module {
 
 module {
   func @select_ford_ne(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FOrdNotEqual {{%.*}}, {{%.*}}
@@ -93,7 +93,7 @@ module {
 
 module {
   func @select_funord_eq(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FUnordEqual {{%.*}}, {{%.*}}
@@ -108,7 +108,7 @@ module {
 
 module {
   func @select_funord_ge(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FUnordGreaterThanEqual {{%.*}}, {{%.*}}
@@ -123,7 +123,7 @@ module {
 
 module {
   func @select_funord_gt(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FUnordGreaterThan {{%.*}}, {{%.*}}
@@ -138,7 +138,7 @@ module {
 
 module {
   func @select_funord_lt(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FUnordLessThan {{%.*}}, {{%.*}}
@@ -153,7 +153,7 @@ module {
 
 module {
   func @select_funord_le(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FUnordLessThanEqual {{%.*}}, {{%.*}}
@@ -168,7 +168,7 @@ module {
 
 module {
   func @select_funord_ne(%arg0: memref<12x42xf32>, %arg1: memref<12x42xf32>, %arg2: memref<12x42xf32>)
-  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xf32>) : tensor<12x42xf32>
     %1 = iree.load_input(%arg1 : memref<12x42xf32>) : tensor<12x42xf32>
     //CHECK: [[COMPARE:%.*]] = spv.FUnordNotEqual {{%.*}}, {{%.*}}

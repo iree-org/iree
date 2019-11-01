@@ -78,6 +78,12 @@ LogicalResult attributeExecutableEntryPointWorkload(
   entryPointOp.setAttr("iree.executable.workload",
                        workloadInfo.staticWorkloads.front());
 
+  // Hardwire workgroup size to {32, 1, 1}
+  SmallVector<int64_t, 3> workGroupInfo = {32, 1, 1};
+  auto context = entryPointOp.getOperation()->getContext();
+  auto workGroupAttr = DenseIntElementsAttr::get<int64_t>(
+      RankedTensorType::get(3, IntegerType::get(64, context)), workGroupInfo);
+  entryPointOp.setAttr("iree.executable.workgroup_size", workGroupAttr);
   return success();
 }
 
