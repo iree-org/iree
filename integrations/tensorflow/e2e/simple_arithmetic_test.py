@@ -18,6 +18,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import tempfile
 import timeit
 
@@ -69,8 +70,11 @@ class SimpleArithmeticTest(tf.test.TestCase):
   @classmethod
   def tearDownClass(cls):
     super().tearDownClass()
-    print("Flushing trace file...")
-    pyiree.tracing.flush("/tmp/simple_arithmetic_test.wtf-trace")
+    trace_file = os.path.join(tempfile.gettempdir(),
+                              "simple_arithmetic_test.wtf-trace")
+    print("Flushing trace file to:", trace_file)
+    pyiree.tracing.flush(trace_file)
+    print("Flush complete")
 
   @classmethod
   def setUpClass(cls):

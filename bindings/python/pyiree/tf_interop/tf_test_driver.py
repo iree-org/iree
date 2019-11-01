@@ -17,6 +17,7 @@
 
 import contextlib
 import io
+import os
 import subprocess
 import sys
 import tempfile
@@ -87,6 +88,23 @@ def _internal_run_tests():
   print("FINISHED: RAN", test_count, "TESTS", file=sys.stderr)
 
 
+def _find_filecheck():
+  filecheck_binary = FLAGS.filecheck_binary
+  if os.path.isabs(filecheck_binary):
+    return filecheck_binary
+  # TODO(laurenzo): Why is this runfiles resolution so hard and undocumented.
+  # Talk to bazel team.
+  runfiles_dir = os.environ.get("RUNFILES_DIR")
+  if runfiles_dir:
+    workspace_name = os.environ.get("TEST_WORKSPACE")
+    if workspace_name:
+      runfiles_dir = os.path.join(runfiles_dir, workspace_name)
+    filecheck_binary = os.path.join(runfiles_dir, filecheck_binary)
+  # Convert forward slash version to platform default (Windows).
+  filecheck_binary = filecheck_binary.replace("/", os.path.sep)
+  return filecheck_binary
+
+
 def run_tests(main_file, with_filecheck=True):
   """Main entry point."""
 
@@ -101,9 +119,11 @@ def run_tests(main_file, with_filecheck=True):
         _internal_run_tests()
       filecheck_capture_io.flush()
       filecheck_input = filecheck_capture_io.getvalue()
-      p = subprocess.Popen(
-          [FLAGS.filecheck_binary, main_file, "--dump-input=fail"],
-          stdin=subprocess.PIPE)
+      # Convert forward slash version to platform default (Windows).
+      filecheck_binary = _find_filecheck()
+      filecheck_args = [filecheck_binary, main_file, "--dump-input=fail"]
+      print("LAUNCHING FILECHECK:", filecheck_args, file=sys.stderr)
+      p = subprocess.Popen(filecheck_args, stdin=subprocess.PIPE)
       p.communicate(filecheck_input.encode("UTF-8"))
       sys.exit(p.returncode)
     else:

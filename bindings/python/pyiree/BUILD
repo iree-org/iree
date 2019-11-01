@@ -62,6 +62,7 @@ py_library(
     srcs_version = "PY3",
     deps = [
         ":binding",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
     ] + select({
         "//iree:enable_tensorflow": [
             "//bindings/python/pyiree/tf_interop:tf_test_driver",

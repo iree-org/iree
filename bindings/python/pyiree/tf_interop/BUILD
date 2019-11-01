@@ -96,7 +96,7 @@ cc_library(
     deps = [
                "@local_config_mlir//:IR",
                "@llvm//:support",
-               "@org_tensorflow//tensorflow/cc/saved_model:loader",
+               "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
                "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
                "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
                "//bindings/python/pyiree:base",

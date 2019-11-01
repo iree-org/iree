@@ -12,6 +12,9 @@ PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 # defaults to getting TensorFlow from the python environment (empty).
 INTREE_TENSORFLOW_PY_DEPS = []
 
+# Target to the FileCheck binary.
+INTREE_FILECHECK_TARGET = "@llvm//:FileCheck"
+
 def platform_trampoline_deps(basename, path = "base"):
     """Produce a list of deps for the given `basename` platform target.
 

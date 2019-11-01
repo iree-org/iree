@@ -14,6 +14,7 @@
 
 load(
     "//iree:build_defs.bzl",
+    "INTREE_FILECHECK_TARGET",
     "INTREE_TENSORFLOW_PY_DEPS",
     "iree_glob_lit_tests",
     "iree_setup_lit_package",
@@ -38,10 +39,10 @@ py_test(
         "saved_model_adopt_exports.py",
     ],
     args = [
-        "--filecheck_binary=$(location //third_party/llvm/llvm-project/llvm:FileCheck)",
+        "--filecheck_binary=$(rootpath %s)" % INTREE_FILECHECK_TARGET,
     ],
     data = [
-        "@llvm//:FileCheck",
+        INTREE_FILECHECK_TARGET,
     ],
     python_version = "PY3",
     deps = INTREE_TENSORFLOW_PY_DEPS + [
