@@ -123,6 +123,23 @@ cc_library(
 
 # TODO(benvanik): re-enable debugger after refactoring.
 # cc_library(
+#     name = "debug_client_tcp",
+#     srcs = ["debug_client_tcp.cc"],
+#     deps = [
+#         ":debug_tcp_util",
+#         "@com_google_absl//absl/container:flat_hash_map",
+#         "@com_google_absl//absl/memory",
+#         "@com_google_absl//absl/strings",
+#         "@com_google_absl//absl/types:span",
+#         "@com_github_google_flatbuffers//:flatbuffers",
+#         "//iree/base:flatbuffer_util",
+#         "//iree/base:status",
+#         "//iree/rt",
+#         "//iree/schemas",
+#     ],
+# )
+#
+# cc_library(
 #     name = "debug_server_flags",
 #     srcs = ["debug_server_flags.cc"],
 #     hdrs = ["debug_server_flags.h"],

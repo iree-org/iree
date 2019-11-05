@@ -45,7 +45,7 @@ class InterpreterDevice final : public Device {
     return RawPtrSpan(absl::MakeSpan(command_queues_));
   }
 
-  std::shared_ptr<ExecutableCache> CreateExecutableCache() override;
+  ref_ptr<ExecutableCache> CreateExecutableCache() override;
 
   StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
       CommandBufferModeBitfield mode,

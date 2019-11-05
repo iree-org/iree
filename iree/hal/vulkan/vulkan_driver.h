@@ -42,21 +42,11 @@ class VulkanDriver final : public Driver {
     ExtensibilitySpec device_extensibility;
   };
 
-  static StatusOr<std::shared_ptr<VulkanDriver>> Create(
-      Options options, ref_ptr<DynamicSymbols> syms);
+  static StatusOr<ref_ptr<VulkanDriver>> Create(Options options,
+                                                ref_ptr<DynamicSymbols> syms);
 
   // TODO(benvanik): method to wrap an existing instance/device (interop).
 
-  // Private constructor.
-  struct CtorKey {
-   private:
-    friend class VulkanDriver;
-    CtorKey() = default;
-  };
-  VulkanDriver(CtorKey ctor_key, ref_ptr<DynamicSymbols> syms,
-               VkInstance instance,
-               std::unique_ptr<DebugReporter> debug_reporter,
-               ExtensibilitySpec device_extensibility_spec);
   ~VulkanDriver() override;
 
   const ref_ptr<DynamicSymbols>& syms() const { return syms_; }
@@ -65,12 +55,16 @@ class VulkanDriver final : public Driver {
 
   StatusOr<std::vector<DeviceInfo>> EnumerateAvailableDevices() override;
 
-  StatusOr<std::shared_ptr<Device>> CreateDefaultDevice() override;
+  StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
-  StatusOr<std::shared_ptr<Device>> CreateDevice(
+  StatusOr<ref_ptr<Device>> CreateDevice(
       const DeviceInfo& device_info) override;
 
  private:
+  VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,
+               std::unique_ptr<DebugReporter> debug_reporter,
+               ExtensibilitySpec device_extensibility_spec);
+
   ref_ptr<DynamicSymbols> syms_;
   VkInstance instance_;
   std::unique_ptr<DebugReporter> debug_reporter_;

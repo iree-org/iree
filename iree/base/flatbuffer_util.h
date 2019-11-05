@@ -28,6 +28,7 @@
 #include "absl/types/span.h"
 #include "flatbuffers/flatbuffers.h"
 #include "iree/base/memory.h"
+#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 
 namespace iree {
@@ -39,7 +40,7 @@ inline absl::string_view WrapString(const ::flatbuffers::String* value) {
 }
 
 // Base type for FlatBufferFile<T>. See below.
-class FlatBufferFileBase {
+class FlatBufferFileBase : public RefObject<FlatBufferFileBase> {
  public:
   using Identifier = absl::optional<const char*>;
 
@@ -96,7 +97,7 @@ class FlatBufferFile final : public FlatBufferFileBase {
   //
   // This assumes that the root pointer has already been verified as valid.
   // If verification is required instead use FromBuffer on the original buffer.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> Create(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> Create(
       const T* root, std::function<void()> deleter);
 
   // Creates a FlatBufferFile from an in-memory root pointer and the detached
@@ -109,7 +110,7 @@ class FlatBufferFile final : public FlatBufferFileBase {
   //  auto my_type = FlatBufferFile<MyType>::CreateWithBackingBuffer(
   //      fbb.Release());
   //  my_type->foo();
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> CreateWithBackingBuffer(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> CreateWithBackingBuffer(
       ::flatbuffers::DetachedBuffer backing_buffer);
 
   // Wraps a caller-owned in-memory root pointer.
@@ -118,39 +119,39 @@ class FlatBufferFile final : public FlatBufferFileBase {
   //
   // This assumes that the root pointer has already been verified as valid.
   // If verification is required instead use FromBuffer on the original buffer.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> Wrap(const T* root);
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> Wrap(const T* root);
 
   // Creates a FlatBufferFile wrapping an external data buffer with a deleter
   // function that will be called when the FlatBufferFile is destructed.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromBuffer(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> FromBuffer(
       Identifier identifier, absl::Span<const uint8_t> buffer_data,
       std::function<void()> deleter);
 
   // Creates a FlatBufferFile from a serialized data buffer.
   // The FlatBufferFile takes ownership of the vector.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromBuffer(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> FromBuffer(
       Identifier identifier, std::vector<uint8_t> buffer_data);
 
   // Loads a FlatBufferFile from an external buffer owned by the caller.
   // The buffer must remain valid until the Pipeline is destroyed.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> WrapBuffer(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> WrapBuffer(
       Identifier identifier, absl::Span<const uint8_t> buffer_data);
 
   // Loads the FlatBufferFile from a serialized byte-based STL container.
   template <typename Container>
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromContainer(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> FromContainer(
       Identifier identifier, Container buffer_data);
 
   // Loads a FlatBufferFile from a serialized string.
   // The FlatBufferFile takes ownership of the string.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromString(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> FromString(
       Identifier identifier, std::string buffer_data) {
     return FromContainer(identifier, std::move(buffer_data));
   }
 
   // Loads a FlatBufferFile from a serialized byte vector.
   // The FlatBufferFile takes ownership of the vector.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> FromVector(
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> FromVector(
       Identifier identifier, std::vector<uint8_t> buffer_data) {
     return FromContainer(identifier, std::move(buffer_data));
   }
@@ -158,13 +159,8 @@ class FlatBufferFile final : public FlatBufferFileBase {
   // Loads a FlatBufferFile from a serialized file on the file system.
   // This will attempt to mmap the file and is the preferred way of loading as
   // only those pages that contain requested tables will be read.
-  static StatusOr<std::unique_ptr<FlatBufferFile<T>>> LoadFile(
-      Identifier identifier, std::string path);
-
-  // Returns a vector of file references that share the same underlying data
-  // buffer. The buffer will be kept alive until the last file is released.
-  static StatusOr<std::vector<std::unique_ptr<FlatBufferFile<T>>>>
-  CreateShareGroup(std::unique_ptr<FlatBufferFile<T>> file, int count);
+  static StatusOr<ref_ptr<FlatBufferFile<T>>> LoadFile(Identifier identifier,
+                                                       std::string path);
 
   ~FlatBufferFile() override = default;
 
@@ -206,9 +202,9 @@ Status FlatBufferFileBase::FromContainer(Identifier identifier,
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Create(
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Create(
     const T* root, std::function<void()> deleter) {
-  std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
+  ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   RETURN_IF_ERROR(base_file->Create(root, std::move(deleter)));
   return std::move(flat_buffer_file);
@@ -216,10 +212,9 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Create(
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>>
-FlatBufferFile<T>::CreateWithBackingBuffer(
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::CreateWithBackingBuffer(
     ::flatbuffers::DetachedBuffer backing_buffer) {
-  std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
+  ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   auto* root_ptr = ::flatbuffers::GetRoot<T>(backing_buffer.data());
   RETURN_IF_ERROR(
@@ -229,9 +224,8 @@ FlatBufferFile<T>::CreateWithBackingBuffer(
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Wrap(
-    const T* root) {
-  std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Wrap(const T* root) {
+  ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   RETURN_IF_ERROR(base_file->Wrap(root));
   return std::move(flat_buffer_file);
@@ -239,10 +233,10 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::Wrap(
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromBuffer(
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromBuffer(
     Identifier identifier, absl::Span<const uint8_t> buffer_data,
     std::function<void()> deleter) {
-  std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
+  ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   RETURN_IF_ERROR(base_file->FromBuffer(
       identifier, buffer_data, std::move(deleter), sizeof(T), VerifierFnT));
@@ -251,7 +245,7 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromBuffer(
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromBuffer(
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromBuffer(
     Identifier identifier, std::vector<uint8_t> buffer_data) {
   auto* buffer_data_ptr = new decltype(buffer_data);
   (*buffer_data_ptr) = std::move(buffer_data);
@@ -261,9 +255,9 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromBuffer(
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::WrapBuffer(
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::WrapBuffer(
     Identifier identifier, absl::Span<const uint8_t> buffer_data) {
-  std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
+  ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   RETURN_IF_ERROR(
       base_file->WrapBuffer(identifier, buffer_data, sizeof(T), VerifierFnT));
@@ -273,9 +267,9 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::WrapBuffer(
 // static
 template <typename T>
 template <typename Container>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromContainer(
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromContainer(
     Identifier identifier, Container buffer_data) {
-  std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
+  ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   RETURN_IF_ERROR(base_file->FromContainer(identifier, std::move(buffer_data),
                                            sizeof(T), VerifierFnT));
@@ -284,36 +278,13 @@ StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::FromContainer(
 
 // static
 template <typename T>
-StatusOr<std::unique_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::LoadFile(
+StatusOr<ref_ptr<FlatBufferFile<T>>> FlatBufferFile<T>::LoadFile(
     Identifier identifier, std::string path) {
-  std::unique_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
+  ref_ptr<FlatBufferFile<T>> flat_buffer_file{new FlatBufferFile<T>};
   auto* base_file = static_cast<FlatBufferFileBase*>(flat_buffer_file.get());
   RETURN_IF_ERROR(
       base_file->LoadFile(identifier, std::move(path), sizeof(T), VerifierFnT));
   return std::move(flat_buffer_file);
-}
-
-// static
-template <typename T>
-StatusOr<std::vector<std::unique_ptr<FlatBufferFile<T>>>>
-FlatBufferFile<T>::CreateShareGroup(std::unique_ptr<FlatBufferFile<T>> file,
-                                    int count) {
-  // Create a shared_ptr wrapper for the base file that will be.
-  std::shared_ptr<FlatBufferFile<T>> shared_file{file.release()};
-
-  // Create N files. We wrap and keep the shared_ptr alive in the deleter
-  // capture. By wrapping we avoid reverifying the entire buffer.
-  std::vector<std::unique_ptr<FlatBufferFile<T>>> list;
-  for (int i = 0; i < count; ++i) {
-    ASSIGN_OR_RETURN(auto new_file, FlatBufferFile<T>::Create(
-                                        shared_file->root(), [shared_file]() {
-                                          // Each new file keeps a reference to
-                                          // the shared file to keep it alive.
-                                          (void)shared_file;
-                                        }));
-    list.push_back(std::move(new_file));
-  }
-  return std::move(list);
 }
 
 }  // namespace iree

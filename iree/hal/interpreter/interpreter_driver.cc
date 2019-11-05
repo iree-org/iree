@@ -48,13 +48,13 @@ InterpreterDriver::EnumerateAvailableDevices() {
   return device_infos;
 }
 
-StatusOr<std::shared_ptr<Device>> InterpreterDriver::CreateDefaultDevice() {
+StatusOr<ref_ptr<Device>> InterpreterDriver::CreateDefaultDevice() {
   return CreateDevice(GetDefaultDeviceInfo());
 }
 
-StatusOr<std::shared_ptr<Device>> InterpreterDriver::CreateDevice(
+StatusOr<ref_ptr<Device>> InterpreterDriver::CreateDevice(
     const DeviceInfo& device_info) {
-  auto device = std::make_shared<InterpreterDevice>(device_info);
+  auto device = make_ref<InterpreterDevice>(device_info);
   return device;
 }
 

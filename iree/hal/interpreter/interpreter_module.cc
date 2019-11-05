@@ -40,8 +40,8 @@ StatusOr<ref_ptr<rt::Module>> InterpreterModule::FromDef(
   return {std::move(module)};
 }
 
-InterpreterModule::InterpreterModule(
-    hal::Allocator* allocator, std::unique_ptr<vm::ModuleFile> module_file)
+InterpreterModule::InterpreterModule(hal::Allocator* allocator,
+                                     ref_ptr<vm::ModuleFile> module_file)
     : vm::BytecodeModule(std::move(module_file),
                          vm::interpreter_opcode_table()),
       allocator_(allocator) {}

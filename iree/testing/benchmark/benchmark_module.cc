@@ -61,7 +61,7 @@ StatusOr<std::vector<hal::BufferView>> BufferViewsFromConstants(
 }  // namespace
 
 Status RunModuleBenchmark(benchmark::State& state,
-                          std::unique_ptr<vm::ModuleFile> main_module_file,
+                          ref_ptr<vm::ModuleFile> main_module_file,
                           absl::string_view main_function_name,
                           absl::string_view driver_name,
                           absl::Span<const ShapedBuffer> arguments_data) {
@@ -70,7 +70,7 @@ Status RunModuleBenchmark(benchmark::State& state,
   ASSIGN_OR_RETURN(auto driver,
                    hal::DriverRegistry::shared_registry()->Create(driver_name));
   ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());
-  RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(device));
+  RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(add_ref(device)));
   auto policy = make_ref<rt::Policy>();
   auto context = make_ref<rt::Context>(add_ref(instance), std::move(policy));
 

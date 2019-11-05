@@ -27,7 +27,7 @@
 namespace iree {
 
 Status RunModuleBenchmark(benchmark::State& state,
-                          std::unique_ptr<vm::ModuleFile> main_module_file,
+                          ref_ptr<vm::ModuleFile> main_module_file,
                           absl::string_view main_function_name,
                           absl::string_view driver_name,
                           absl::Span<const ShapedBuffer> arguments);

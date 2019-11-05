@@ -23,8 +23,8 @@ namespace iree {
 namespace hal {
 namespace {
 
-StatusOr<std::shared_ptr<Driver>> CreateInterpreterDriver() {
-  return std::make_shared<InterpreterDriver>();
+StatusOr<ref_ptr<Driver>> CreateInterpreterDriver() {
+  return make_ref<InterpreterDriver>();
 }
 
 }  // namespace

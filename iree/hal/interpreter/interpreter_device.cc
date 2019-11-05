@@ -112,8 +112,8 @@ InterpreterDevice::InterpreterDevice(DeviceInfo device_info)
 
 InterpreterDevice::~InterpreterDevice() = default;
 
-std::shared_ptr<ExecutableCache> InterpreterDevice::CreateExecutableCache() {
-  return std::make_shared<BytecodeCache>(add_ref(instance_), &allocator_);
+ref_ptr<ExecutableCache> InterpreterDevice::CreateExecutableCache() {
+  return make_ref<BytecodeCache>(add_ref(instance_), &allocator_);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> InterpreterDevice::CreateCommandBuffer(

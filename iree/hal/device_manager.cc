@@ -31,7 +31,7 @@ DeviceManager::~DeviceManager() {
   WaitIdle().IgnoreError();
 }
 
-Status DeviceManager::RegisterDevice(std::shared_ptr<Device> device) {
+Status DeviceManager::RegisterDevice(ref_ptr<Device> device) {
   IREE_TRACE_SCOPE0("DeviceManager::RegisterDevice");
   absl::MutexLock lock(&device_mutex_);
   if (std::find(devices_.begin(), devices_.end(), device) != devices_.end()) {
@@ -46,7 +46,7 @@ Status DeviceManager::UnregisterDevice(Device* device) {
   IREE_TRACE_SCOPE0("DeviceManager::UnregisterDevice");
   absl::MutexLock lock(&device_mutex_);
   auto it = std::find_if(devices_.begin(), devices_.end(),
-                         [device](const std::shared_ptr<Device>& other_device) {
+                         [device](const ref_ptr<Device>& other_device) {
                            return device == other_device.get();
                          });
   if (it == devices_.end()) {
@@ -68,7 +68,7 @@ StatusOr<DevicePlacement> DeviceManager::ResolvePlacement(
   QCHECK_EQ(devices_.size(), 1)
       << "Multiple devices not yet supported (need placement)";
   DevicePlacement device_placement;
-  device_placement.device = devices_.front();
+  device_placement.device = devices_.front().get();
 
   return device_placement;
 }

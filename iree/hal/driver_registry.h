@@ -21,6 +21,7 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/base/initializer.h"
+#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/driver.h"
 
@@ -45,7 +46,7 @@ namespace hal {
 // Thread-safe.
 class DriverRegistry final {
  public:
-  using FactoryFn = std::function<StatusOr<std::shared_ptr<Driver>>()>;
+  using FactoryFn = std::function<StatusOr<ref_ptr<Driver>>()>;
 
   // The shared driver registry singleton that modules use when linked in.
   static DriverRegistry* shared_registry();
@@ -66,7 +67,7 @@ class DriverRegistry final {
 
   // TODO(benvanik): flags for enabling debug validation/control/etc.
   // Creates a driver by name.
-  StatusOr<std::shared_ptr<Driver>> Create(absl::string_view driver_name) const;
+  StatusOr<ref_ptr<Driver>> Create(absl::string_view driver_name) const;
 
  private:
   mutable absl::Mutex mutex_;

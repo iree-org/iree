@@ -36,7 +36,7 @@ namespace hal {
 namespace vulkan {
 namespace {
 
-StatusOr<std::shared_ptr<Driver>> CreateVulkanDriver() {
+StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   IREE_TRACE_SCOPE0("CreateVulkanDriver");
 
   // Load the Vulkan library. This will fail if the library cannot be found or

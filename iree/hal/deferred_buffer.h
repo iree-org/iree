@@ -32,7 +32,7 @@ namespace hal {
 //
 // Usage:
 //  // Setup two spans referencing ranges of a deferred buffer.
-//  auto deferred_buffer = std::make_shared<DeferredBuffer>(..., 200);
+//  auto deferred_buffer = make_ref<DeferredBuffer>(..., 200);
 //  ASSIGN_OR_RETURN(auto span0, Buffer::Subspan(deferred_buffer, 0, 100));
 //  ASSIGN_OR_RETURN(auto span1, Buffer::Subspan(deferred_buffer, 100, 100));
 //

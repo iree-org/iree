@@ -25,6 +25,7 @@
 #include "iree/base/memory.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/device.h"
+#include "iree/hal/driver.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
@@ -37,25 +38,12 @@ namespace vulkan {
 
 class VulkanDevice final : public Device {
  public:
-  static StatusOr<std::shared_ptr<VulkanDevice>> Create(
-      const DeviceInfo& device_info, VkPhysicalDevice physical_device,
+  static StatusOr<ref_ptr<VulkanDevice>> Create(
+      ref_ptr<Driver> driver, const DeviceInfo& device_info,
+      VkPhysicalDevice physical_device,
       const ExtensibilitySpec& extensibility_spec,
       const ref_ptr<DynamicSymbols>& syms);
 
-  // Private constructor.
-  struct CtorKey {
-   private:
-    friend class VulkanDevice;
-    CtorKey() = default;
-  };
-  VulkanDevice(
-      CtorKey ctor_key, const DeviceInfo& device_info,
-      VkPhysicalDevice physical_device, ref_ptr<VkDeviceHandle> logical_device,
-      std::unique_ptr<Allocator> allocator,
-      absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
-      ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
-      ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-      ref_ptr<LegacyFencePool> legacy_fence_pool);
   ~VulkanDevice() override;
 
   const ref_ptr<DynamicSymbols>& syms() const {
@@ -72,7 +60,7 @@ class VulkanDevice final : public Device {
     return absl::MakeSpan(transfer_queues_);
   }
 
-  std::shared_ptr<ExecutableCache> CreateExecutableCache() override;
+  ref_ptr<ExecutableCache> CreateExecutableCache() override;
 
   StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
       CommandBufferModeBitfield mode,
@@ -94,6 +82,16 @@ class VulkanDevice final : public Device {
   Status WaitIdle(absl::Time deadline) override;
 
  private:
+  VulkanDevice(
+      ref_ptr<Driver> driver, const DeviceInfo& device_info,
+      VkPhysicalDevice physical_device, ref_ptr<VkDeviceHandle> logical_device,
+      std::unique_ptr<Allocator> allocator,
+      absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
+      ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
+      ref_ptr<VkCommandPoolHandle> transfer_command_pool,
+      ref_ptr<LegacyFencePool> legacy_fence_pool);
+
+  ref_ptr<Driver> driver_;
   VkPhysicalDevice physical_device_;
   ref_ptr<VkDeviceHandle> logical_device_;
 

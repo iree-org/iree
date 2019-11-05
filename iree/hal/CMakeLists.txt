@@ -236,6 +236,7 @@ iree_cc_library(
     "device.h"
   DEPS
     absl::time
+    iree::base::ref_ptr
     iree::base::status
     iree::base::time
     iree::hal::allocator
@@ -297,6 +298,7 @@ iree_cc_library(
   HDRS
     "driver.h"
   DEPS
+    iree::base::ref_ptr
     iree::base::status
     iree::hal::device
     iree::hal::device_info

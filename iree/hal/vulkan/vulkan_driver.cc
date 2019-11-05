@@ -77,7 +77,7 @@ StatusOr<DeviceInfo> PopulateDeviceInfo(VkPhysicalDevice physical_device,
 }  // namespace
 
 // static
-StatusOr<std::shared_ptr<VulkanDriver>> VulkanDriver::Create(
+StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
     Options options, ref_ptr<DynamicSymbols> syms) {
   IREE_TRACE_SCOPE0("VulkanDriver::Create");
 
@@ -149,13 +149,12 @@ StatusOr<std::shared_ptr<VulkanDriver>> VulkanDriver::Create(
                          instance, syms, /*allocation_callbacks=*/nullptr));
   }
 
-  return std::make_shared<VulkanDriver>(
-      CtorKey{}, std::move(syms), instance, std::move(debug_reporter),
-      std::move(options.device_extensibility));
+  return assign_ref(new VulkanDriver(std::move(syms), instance,
+                                     std::move(debug_reporter),
+                                     std::move(options.device_extensibility)));
 }
 
-VulkanDriver::VulkanDriver(CtorKey ctor_key, ref_ptr<DynamicSymbols> syms,
-                           VkInstance instance,
+VulkanDriver::VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,
                            std::unique_ptr<DebugReporter> debug_reporter,
                            ExtensibilitySpec device_extensibility_spec)
     : Driver("vulkan"),
@@ -194,7 +193,7 @@ StatusOr<std::vector<DeviceInfo>> VulkanDriver::EnumerateAvailableDevices() {
   return device_infos;
 }
 
-StatusOr<std::shared_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
+StatusOr<ref_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
   IREE_TRACE_SCOPE0("VulkanDriver::CreateDefaultDevice");
 
   // Query available devices.
@@ -207,7 +206,7 @@ StatusOr<std::shared_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
   return CreateDevice(available_devices.front());
 }
 
-StatusOr<std::shared_ptr<Device>> VulkanDriver::CreateDevice(
+StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
     const DeviceInfo& device_info) {
   IREE_TRACE_SCOPE0("VulkanDriver::CreateDevice");
 
@@ -217,9 +216,9 @@ StatusOr<std::shared_ptr<Device>> VulkanDriver::CreateDevice(
   // Attempt to create the device.
   // This may fail if the device was enumerated but is in exclusive use,
   // disabled by the system, or permission is denied.
-  ASSIGN_OR_RETURN(auto device,
-                   VulkanDevice::Create(device_info, physical_device,
-                                        device_extensibility_spec_, syms()));
+  ASSIGN_OR_RETURN(auto device, VulkanDevice::Create(
+                                    add_ref(this), device_info, physical_device,
+                                    device_extensibility_spec_, syms()));
 
   return device;
 }

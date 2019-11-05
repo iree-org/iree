@@ -43,7 +43,7 @@ StatusOr<ref_ptr<rt::Module>> SequencerModule::FromDef(
 
 // static
 StatusOr<ref_ptr<rt::Module>> SequencerModule::FromFile(
-    std::unique_ptr<ModuleFile> module_file) {
+    ref_ptr<ModuleFile> module_file) {
   if (module_file->root() == nullptr) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "No root ModuleDef present";
   }
@@ -60,7 +60,7 @@ StatusOr<ref_ptr<rt::Module>> SequencerModule::FromFile(
   return {std::move(module)};
 }
 
-SequencerModule::SequencerModule(std::unique_ptr<ModuleFile> module_file)
+SequencerModule::SequencerModule(ref_ptr<ModuleFile> module_file)
     : BytecodeModule(std::move(module_file), sequencer_opcode_table()) {}
 
 SequencerModule::~SequencerModule() = default;

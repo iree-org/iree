@@ -77,7 +77,7 @@ StatusOr<std::vector<DeviceInfo>> DawnDriver::EnumerateAvailableDevices() {
   return device_infos;
 }
 
-StatusOr<std::shared_ptr<Device>> DawnDriver::CreateDefaultDevice() {
+StatusOr<ref_ptr<Device>> DawnDriver::CreateDefaultDevice() {
   IREE_TRACE_SCOPE0("DawnDriver::CreateDefaultDevice");
 
   // Query available devices.
@@ -98,7 +98,7 @@ StatusOr<std::shared_ptr<Device>> DawnDriver::CreateDefaultDevice() {
   return CreateDevice(available_devices.front());
 }
 
-StatusOr<std::shared_ptr<Device>> DawnDriver::CreateDevice(
+StatusOr<ref_ptr<Device>> DawnDriver::CreateDevice(
     const DeviceInfo& device_info) {
   IREE_TRACE_SCOPE0("DawnDriver::CreateDevice");
 
@@ -112,7 +112,7 @@ StatusOr<std::shared_ptr<Device>> DawnDriver::CreateDevice(
   dawnSetProcs(&backend_procs);
   ::dawn::Device backend_device = ::dawn::Device::Acquire(c_backend_device);
 
-  return std::make_shared<DawnDevice>(device_info, backend_device);
+  return make_ref<DawnDevice>(device_info, backend_device);
 }
 
 }  // namespace dawn

@@ -1,5 +1,6 @@
 # Samples demonstrating use of the RT API.
 
+load("//iree:build_defs.bzl", "PLATFORM_VULKAN_TEST_DEPS")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(
@@ -32,16 +33,14 @@ cc_test(
         "//iree/hal:driver_registry",
         "//iree/rt",
         "//iree/schemas",
-        "//iree/testing:gtest_main",
         "//iree/vm:bytecode_module",
         "//iree/vm:sequencer_module",
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.
         "//iree/hal/interpreter:interpreter_driver_module",  # build-cleaner: keep
-        # TODO(benvanik): include SPIR-V.
-        # "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
-    ],
+        "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
+    ] + PLATFORM_VULKAN_TEST_DEPS,
 )
 
 cc_test(
@@ -60,13 +59,11 @@ cc_test(
         "//iree/hal:api",
         "//iree/hal:driver_registry",
         "//iree/rt:api",
-        "//iree/testing:gtest_main",
         "//iree/vm:api",
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.
         "//iree/hal/interpreter:interpreter_driver_module",  # build-cleaner: keep
-        # TODO(benvanik): include SPIR-V.
-        # "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
-    ],
+        "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
+    ] + PLATFORM_VULKAN_TEST_DEPS,
 )

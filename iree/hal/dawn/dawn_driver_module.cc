@@ -25,9 +25,7 @@ namespace hal {
 namespace dawn {
 namespace {
 
-StatusOr<std::shared_ptr<Driver>> CreateDawnDriver() {
-  return std::make_shared<DawnDriver>();
-}
+StatusOr<ref_ptr<Driver>> CreateDawnDriver() { return make_ref<DawnDriver>(); }
 
 }  // namespace
 }  // namespace dawn

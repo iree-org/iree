@@ -335,6 +335,7 @@ cc_library(
         "//iree/hal:command_buffer_validation",
         "//iree/hal:command_queue",
         "//iree/hal:device",
+        "//iree/hal:driver",
         "//iree/hal:fence",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",

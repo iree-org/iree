@@ -314,7 +314,7 @@ class TcpDebugClient final : public DebugClient {
     TcpDebugClient* client_;
     bool has_requested_module_def_ = false;
     std::vector<LoadCallback> load_callbacks_;
-    std::unique_ptr<ModuleFile> module_file_;
+    ref_ptr<ModuleFile> module_file_;
     std::vector<std::unique_ptr<RemoteFunction>> functions_;
   };
 

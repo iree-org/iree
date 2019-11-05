@@ -15,8 +15,6 @@
 #ifndef IREE_HAL_DEVICE_PLACEMENT_H_
 #define IREE_HAL_DEVICE_PLACEMENT_H_
 
-#include <memory>
-
 namespace iree {
 namespace hal {
 
@@ -24,7 +22,7 @@ class Device;
 
 // TODO(benvanik): define device-specific placement info - possibly opaque.
 struct DevicePlacement {
-  std::shared_ptr<Device> device;
+  Device* device = nullptr;
   int queue_id = 0;
 };
 

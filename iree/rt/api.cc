@@ -92,8 +92,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_instance_register_driver_ex(
   }
   LOG(INFO) << "Creating default device...";
   IREE_API_ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());
-  IREE_API_RETURN_IF_ERROR(handle->device_manager()->RegisterDevice(device));
   LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
+  IREE_API_RETURN_IF_ERROR(
+      handle->device_manager()->RegisterDevice(std::move(device)));
 
   return IREE_STATUS_OK;
 }

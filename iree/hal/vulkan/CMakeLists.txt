@@ -361,6 +361,7 @@ iree_cc_library(
     iree::hal::command_buffer_validation
     iree::hal::command_queue
     iree::hal::device
+    iree::hal::driver
     iree::hal::fence
     iree::hal::vulkan::descriptor_pool_cache
     iree::hal::vulkan::direct_command_buffer

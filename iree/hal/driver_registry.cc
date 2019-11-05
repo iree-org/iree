@@ -61,7 +61,7 @@ std::vector<std::string> DriverRegistry::EnumerateAvailableDrivers() const {
   return driver_names;
 }
 
-StatusOr<std::shared_ptr<Driver>> DriverRegistry::Create(
+StatusOr<ref_ptr<Driver>> DriverRegistry::Create(
     absl::string_view driver_name) const {
   FactoryFn factory_fn;
   {

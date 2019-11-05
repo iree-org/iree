@@ -33,9 +33,9 @@ class DawnDriver final : public Driver {
 
   StatusOr<std::vector<DeviceInfo>> EnumerateAvailableDevices() override;
 
-  StatusOr<std::shared_ptr<Device>> CreateDefaultDevice() override;
+  StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
-  StatusOr<std::shared_ptr<Device>> CreateDevice(
+  StatusOr<ref_ptr<Device>> CreateDevice(
       const DeviceInfo& device_info) override;
 
  private:

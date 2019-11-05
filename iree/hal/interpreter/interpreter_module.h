@@ -43,7 +43,7 @@ class InterpreterModule final : public vm::BytecodeModule {
 
  private:
   InterpreterModule(hal::Allocator* allocator,
-                    std::unique_ptr<vm::ModuleFile> module_file);
+                    ref_ptr<vm::ModuleFile> module_file);
 
   hal::Allocator* allocator_;
   mutable kernels::RuntimeState kernel_runtime_state_;

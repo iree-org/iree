@@ -81,7 +81,6 @@ cc_test(
         "//iree/base:status",
         "//iree/base:status_matchers",
         "//iree/testing:gtest_main",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -221,6 +220,7 @@ cc_library(
         ":event",
         ":executable_cache",
         ":semaphore",
+        "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:time",
         "@com_google_absl//absl/time",
@@ -269,6 +269,7 @@ cc_library(
     deps = [
         ":device",
         ":device_info",
+        "//iree/base:ref_ptr",
         "//iree/base:status",
     ],
 )
@@ -280,6 +281,7 @@ cc_library(
     deps = [
         ":driver",
         "//iree/base:initializer",
+        "//iree/base:ref_ptr",
         "//iree/base:status",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/synchronization",

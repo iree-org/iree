@@ -81,8 +81,7 @@ class BytecodeModule : public rt::Module {
       int executable_ordinal) const;
 
  protected:
-  BytecodeModule(std::unique_ptr<ModuleFile> module_file,
-                 OpcodeTable opcode_table);
+  BytecodeModule(ref_ptr<ModuleFile> module_file, OpcodeTable opcode_table);
 
   static Status ValidateArgType(const hal::BufferView& arg,
                                 const MemRefTypeDef& expected_type);
@@ -91,7 +90,7 @@ class BytecodeModule : public rt::Module {
   StatusOr<int32_t> MapFunctionOrdinal(rt::Function::Linkage linkage,
                                        int32_t ordinal) const;
 
-  std::unique_ptr<ModuleFile> module_file_;
+  ref_ptr<ModuleFile> module_file_;
   const ModuleDef& module_def_;
   mutable SourceMapResolver source_resolver_;
   mutable std::unique_ptr<rt::Disassembler> disassembler_;

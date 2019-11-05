@@ -80,8 +80,8 @@ DawnDevice::DawnDevice(const DeviceInfo& device_info,
 
 DawnDevice::~DawnDevice() = default;
 
-std::shared_ptr<ExecutableCache> DawnDevice::CreateExecutableCache() {
-  return std::make_shared<NoopExecutableCache>();
+ref_ptr<ExecutableCache> DawnDevice::CreateExecutableCache() {
+  return make_ref<NoopExecutableCache>();
 }
 
 StatusOr<ref_ptr<CommandBuffer>> DawnDevice::CreateCommandBuffer(

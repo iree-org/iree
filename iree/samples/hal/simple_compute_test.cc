@@ -59,7 +59,7 @@ std::ostream& operator<<(std::ostream& os, const TestParams& params) {
 }
 
 // Loads the precompiled module file (from simple_compute_test.mlir).
-std::unique_ptr<ModuleFile> LoadModuleFile() {
+ref_ptr<ModuleFile> LoadModuleFile() {
   const auto* file_toc = simple_compute_test_module_create();
   return ModuleFile::WrapBuffer(
              ModuleDefIdentifier(),
@@ -94,7 +94,7 @@ class SimpleComputeTest : public ::testing::Test,
  protected:
   virtual void SetUp() { module_file_ = LoadModuleFile(); }
 
-  std::unique_ptr<ModuleFile> module_file_;
+  ref_ptr<ModuleFile> module_file_;
 };
 
 TEST_P(SimpleComputeTest, RunOnce) {
@@ -111,7 +111,7 @@ TEST_P(SimpleComputeTest, RunOnce) {
     GTEST_SKIP();
     return;
   }
-  ASSERT_OK_AND_ASSIGN(auto driver, driver_or);
+  ASSERT_OK_AND_ASSIGN(auto driver, std::move(driver_or));
   ASSERT_OK_AND_ASSIGN(auto available_devices,
                        driver->EnumerateAvailableDevices());
   for (const auto& device_info : available_devices) {

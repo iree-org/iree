@@ -27,7 +27,7 @@ class SequencerModule final : public BytecodeModule {
  public:
   static StatusOr<ref_ptr<rt::Module>> FromDef(const ModuleDef& module_def);
   static StatusOr<ref_ptr<rt::Module>> FromFile(
-      std::unique_ptr<ModuleFile> module_file);
+      ref_ptr<ModuleFile> module_file);
 
   ~SequencerModule() override;
 
@@ -37,7 +37,7 @@ class SequencerModule final : public BytecodeModule {
       absl::InlinedVector<hal::BufferView, 8>* results) const override;
 
  private:
-  explicit SequencerModule(std::unique_ptr<ModuleFile> module_file);
+  explicit SequencerModule(ref_ptr<ModuleFile> module_file);
 };
 
 }  // namespace vm

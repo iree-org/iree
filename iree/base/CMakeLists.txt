@@ -169,6 +169,7 @@ iree_cc_library(
     absl::strings
     flatbuffers
     iree::base::memory
+    iree::base::ref_ptr
     iree::base::status
     iree::base::tracing
   PUBLIC

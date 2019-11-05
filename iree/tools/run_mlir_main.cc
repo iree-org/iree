@@ -227,7 +227,7 @@ Status EvaluateFunctions(absl::string_view target_backend,
   ASSIGN_OR_RETURN(auto driver, hal::DriverRegistry::shared_registry()->Create(
                                     target_backend));
   ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());
-  RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(device));
+  RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(add_ref(device)));
 
   if (absl::GetFlag(FLAGS_print_bytecode)) {
     RETURN_IF_ERROR(rt::PrintModuleToStream(

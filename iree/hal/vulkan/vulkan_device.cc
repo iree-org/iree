@@ -160,8 +160,9 @@ StatusOr<ref_ptr<VkCommandPoolHandle>> CreateTransientCommandPool(
 }  // namespace
 
 // static
-StatusOr<std::shared_ptr<VulkanDevice>> VulkanDevice::Create(
-    const DeviceInfo& device_info, VkPhysicalDevice physical_device,
+StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
+    ref_ptr<Driver> driver, const DeviceInfo& device_info,
+    VkPhysicalDevice physical_device,
     const ExtensibilitySpec& extensibility_spec,
     const ref_ptr<DynamicSymbols>& syms) {
   IREE_TRACE_SCOPE0("VulkanDevice::Create");
@@ -307,15 +308,15 @@ StatusOr<std::shared_ptr<VulkanDevice>> VulkanDevice::Create(
   ASSIGN_OR_RETURN(auto legacy_fence_pool,
                    LegacyFencePool::Create(add_ref(logical_device)));
 
-  return std::make_shared<VulkanDevice>(
-      CtorKey{}, device_info, physical_device, std::move(logical_device),
-      std::move(allocator), std::move(command_queues),
-      std::move(dispatch_command_pool), std::move(transfer_command_pool),
-      std::move(legacy_fence_pool));
+  return assign_ref(new VulkanDevice(
+      std::move(driver), device_info, physical_device,
+      std::move(logical_device), std::move(allocator),
+      std::move(command_queues), std::move(dispatch_command_pool),
+      std::move(transfer_command_pool), std::move(legacy_fence_pool)));
 }
 
 VulkanDevice::VulkanDevice(
-    CtorKey ctor_key, const DeviceInfo& device_info,
+    ref_ptr<Driver> driver, const DeviceInfo& device_info,
     VkPhysicalDevice physical_device, ref_ptr<VkDeviceHandle> logical_device,
     std::unique_ptr<Allocator> allocator,
     absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
@@ -323,6 +324,7 @@ VulkanDevice::VulkanDevice(
     ref_ptr<VkCommandPoolHandle> transfer_command_pool,
     ref_ptr<LegacyFencePool> legacy_fence_pool)
     : Device(device_info),
+      driver_(std::move(driver)),
       physical_device_(physical_device),
       logical_device_(std::move(logical_device)),
       allocator_(std::move(allocator)),
@@ -365,9 +367,9 @@ VulkanDevice::~VulkanDevice() {
   logical_device_.reset();
 }
 
-std::shared_ptr<ExecutableCache> VulkanDevice::CreateExecutableCache() {
+ref_ptr<ExecutableCache> VulkanDevice::CreateExecutableCache() {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateExecutableCache");
-  return std::make_shared<PipelineCache>(logical_device_);
+  return make_ref<PipelineCache>(logical_device_);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(

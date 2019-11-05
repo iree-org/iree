@@ -168,7 +168,7 @@ Status BytecodeModule::ValidateStructure(const ModuleDef& module_def) {
   return OkStatus();
 }
 
-BytecodeModule::BytecodeModule(std::unique_ptr<ModuleFile> module_file,
+BytecodeModule::BytecodeModule(ref_ptr<ModuleFile> module_file,
                                OpcodeTable opcode_table)
     : module_file_(std::move(module_file)),
       module_def_(*module_file_->root()),

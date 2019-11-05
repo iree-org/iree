@@ -60,7 +60,7 @@ class DeviceManager final {
   // The device will be used to resolve placements. Any placements resolved
   // prior to the addition of the device will need to be refreshed by the caller
   // if they want to make use of the new device.
-  Status RegisterDevice(std::shared_ptr<Device> device);
+  Status RegisterDevice(ref_ptr<Device> device);
 
   // Unregisters a device with the manager.
   // Placements that resolved to the device prior to unregistering will remain
@@ -200,7 +200,7 @@ class DeviceManager final {
 
  private:
   mutable absl::Mutex device_mutex_;
-  std::vector<std::shared_ptr<Device>> devices_ ABSL_GUARDED_BY(device_mutex_);
+  std::vector<ref_ptr<Device>> devices_ ABSL_GUARDED_BY(device_mutex_);
 };
 
 }  // namespace hal

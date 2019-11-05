@@ -79,8 +79,8 @@ class MockBuffer : public Buffer {
 
 TEST(MemoryMappingTest, MapWholeBuffer) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -93,8 +93,8 @@ TEST(MemoryMappingTest, MapWholeBuffer) {
 
 TEST(MemoryMappingTest, MapPartialBuffer) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 4, 12, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -125,8 +125,8 @@ TEST(MemoryMappingTest, EmptyHandle) {
 
 TEST(MemoryMappingTest, MoveHandle) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
 
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
@@ -146,8 +146,8 @@ TEST(MemoryMappingTest, MoveHandle) {
 
 TEST(MemoryMappingTest, ReadOnlyAccess) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kRead, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kRead,
+                           BufferUsage::kAll, 128);
 
   // Should succeed to map for reading.
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
@@ -178,9 +178,9 @@ TEST(MemoryMappingTest, ReadOnlyAccess) {
 }
 
 TEST(MemoryMappingTest, ReadWriteAccess) {
-  auto buffer = std::make_shared<MockBuffer>(
-      nullptr, MemoryType::kHostLocal,
-      MemoryAccess::kRead | MemoryAccess::kWrite, BufferUsage::kAll, 128);
+  auto buffer = make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal,
+                                     MemoryAccess::kRead | MemoryAccess::kWrite,
+                                     BufferUsage::kAll, 128);
 
   // Should succeed to map for reading and/or writing.
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
@@ -207,9 +207,9 @@ TEST(MemoryMappingTest, ReadWriteAccess) {
 }
 
 TEST(MemoryMappingTest, WriteOnlyAccess) {
-  auto buffer = std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                             MemoryAccess::kWrite,
-                                             BufferUsage::kAll, 128);
+  auto buffer =
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal,
+                           MemoryAccess::kWrite, BufferUsage::kAll, 128);
 
   // Should succeed to map for writing.
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
@@ -244,9 +244,9 @@ TEST(MemoryMappingTest, WriteOnlyAccess) {
 }
 
 TEST(MemoryMappingTest, WriteDiscardAccess) {
-  auto buffer = std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                             MemoryAccess::kDiscardWrite,
-                                             BufferUsage::kAll, 128);
+  auto buffer =
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal,
+                           MemoryAccess::kDiscardWrite, BufferUsage::kAll, 128);
 
   // Should succeed to map for writing with discard.
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
@@ -275,8 +275,8 @@ TEST(MemoryMappingTest, WriteDiscardAccess) {
 
 TEST(MemoryMappingTest, Subspan) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -312,8 +312,8 @@ TEST(MemoryMappingTest, Subspan) {
 
 TEST(MemoryMappingTest, SubspanOutOfRange) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -333,8 +333,8 @@ TEST(MemoryMappingTest, SubspanOutOfRange) {
 
 TEST(MemoryMappingTest, MutableSubspan) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -370,8 +370,8 @@ TEST(MemoryMappingTest, MutableSubspan) {
 
 TEST(MemoryMappingTest, MutableSubspanOutOfRange) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -391,8 +391,8 @@ TEST(MemoryMappingTest, MutableSubspanOutOfRange) {
 
 TEST(MemoryMappingTest, ElementOperator) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -409,8 +409,8 @@ TEST(MemoryMappingTest, ElementOperator) {
 
 TEST(MemoryMappingTest, Invalidate) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostVisible,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostVisible,
+                           MemoryAccess::kAll, BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -435,8 +435,8 @@ TEST(MemoryMappingTest, Invalidate) {
 
 TEST(MemoryMappingTest, InvalidateOutOfRange) {
   auto buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostVisible,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostVisible,
+                           MemoryAccess::kAll, BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                      MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -457,8 +457,8 @@ TEST(MemoryMappingTest, InvalidateOutOfRange) {
 TEST(MemoryMappingTest, InvalidateBadMode) {
   // Invalidate is not required on coherent memory.
   auto coherent_buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostLocal,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostLocal, MemoryAccess::kAll,
+                           BufferUsage::kAll, 128);
   EXPECT_CALL(*coherent_buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                               MemoryAccess::kRead, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));
@@ -471,7 +471,7 @@ TEST(MemoryMappingTest, InvalidateBadMode) {
 }
 
 TEST(MemoryMappingTest, Flush) {
-  auto buffer = std::make_shared<MockBuffer>(
+  auto buffer = make_ref<MockBuffer>(
       nullptr, MemoryType::kHostVisible | MemoryType::kHostCached,
       MemoryAccess::kAll, BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
@@ -497,7 +497,7 @@ TEST(MemoryMappingTest, Flush) {
 }
 
 TEST(MemoryMappingTest, FlushOutOfRange) {
-  auto buffer = std::make_shared<MockBuffer>(
+  auto buffer = make_ref<MockBuffer>(
       nullptr, MemoryType::kHostVisible | MemoryType::kHostCached,
       MemoryAccess::kAll, BufferUsage::kAll, 128);
   EXPECT_CALL(*buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
@@ -520,8 +520,8 @@ TEST(MemoryMappingTest, FlushOutOfRange) {
 TEST(MemoryMappingTest, FlushBadMode) {
   // Flush is not required on uncached memory.
   auto uncached_buffer =
-      std::make_shared<MockBuffer>(nullptr, MemoryType::kHostVisible,
-                                   MemoryAccess::kAll, BufferUsage::kAll, 128);
+      make_ref<MockBuffer>(nullptr, MemoryType::kHostVisible,
+                           MemoryAccess::kAll, BufferUsage::kAll, 128);
   EXPECT_CALL(*uncached_buffer, MapMemoryImpl(MockBuffer::MappingMode::kScoped,
                                               MemoryAccess::kWrite, 0, 128, _))
       .WillOnce(DoAll(SetArgPointee<4>(kValidPtr), Return(OkStatus())));

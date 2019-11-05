@@ -19,6 +19,7 @@
 
 #include "absl/time/clock.h"
 #include "absl/time/time.h"
+#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"
 #include "iree/hal/allocator.h"
@@ -32,7 +33,7 @@
 namespace iree {
 namespace hal {
 
-class Device {
+class Device : public RefObject<Device> {
  public:
   virtual ~Device() = default;
 
@@ -72,7 +73,7 @@ class Device {
   //
   // Returns a thread-safe cache that must remain alive until all executables
   // using the cache are no longer in-flight.
-  virtual std::shared_ptr<ExecutableCache> CreateExecutableCache() = 0;
+  virtual ref_ptr<ExecutableCache> CreateExecutableCache() = 0;
 
   // Creates a command buffer for recording commands to submit to queues owned
   // by this device. The command buffer may come from a pool but will be reset

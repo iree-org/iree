@@ -19,6 +19,7 @@
 #include <string>
 #include <vector>
 
+#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/device.h"
 #include "iree/hal/device_info.h"
@@ -26,7 +27,7 @@
 namespace iree {
 namespace hal {
 
-class Driver {
+class Driver : public RefObject<Driver> {
  public:
   virtual ~Driver() = default;
 
@@ -42,10 +43,10 @@ class Driver {
 
   // Creates the driver-defined 'default' device.
   // This may simply be the first device enumerated.
-  virtual StatusOr<std::shared_ptr<Device>> CreateDefaultDevice() = 0;
+  virtual StatusOr<ref_ptr<Device>> CreateDefaultDevice() = 0;
 
   // Creates a device as queried with the given |device_info|.
-  virtual StatusOr<std::shared_ptr<Device>> CreateDevice(
+  virtual StatusOr<ref_ptr<Device>> CreateDevice(
       const DeviceInfo& device_info) = 0;
 
  protected:

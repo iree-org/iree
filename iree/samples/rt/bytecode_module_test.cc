@@ -89,7 +89,7 @@ TEST_P(BytecodeModuleTest, RunOnce) {
     GTEST_SKIP();
     return;
   }
-  ASSERT_OK_AND_ASSIGN(auto driver, driver_or);
+  ASSERT_OK_AND_ASSIGN(auto driver, std::move(driver_or));
   ASSERT_OK_AND_ASSIGN(auto available_devices,
                        driver->EnumerateAvailableDevices());
   for (const auto& device_info : available_devices) {
@@ -97,7 +97,7 @@ TEST_P(BytecodeModuleTest, RunOnce) {
   }
   LOG(INFO) << "Creating default device...";
   ASSERT_OK_AND_ASSIGN(auto device, driver->CreateDefaultDevice());
-  ASSERT_OK(instance->device_manager()->RegisterDevice(device));
+  ASSERT_OK(instance->device_manager()->RegisterDevice(add_ref(device)));
   LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
 
   // Make a new context and load the precompiled module file (from
@@ -121,14 +121,14 @@ TEST_P(BytecodeModuleTest, RunOnce) {
   // on the device. Not all devices support this, but the ones we have now do.
   LOG(INFO) << "Creating I/O buffers...";
   constexpr int kElementCount = 4;
-  ASSERT_OK_AND_ASSIGN(
-      auto arg0_buffer,
-      instance->device_manager()->AllocateDeviceVisibleBuffer(
-          hal::BufferUsage::kAll, sizeof(float) * kElementCount, {{device}}));
-  ASSERT_OK_AND_ASSIGN(
-      auto arg1_buffer,
-      instance->device_manager()->AllocateDeviceVisibleBuffer(
-          hal::BufferUsage::kAll, sizeof(float) * kElementCount, {{device}}));
+  ASSERT_OK_AND_ASSIGN(auto arg0_buffer,
+                       instance->device_manager()->AllocateDeviceVisibleBuffer(
+                           hal::BufferUsage::kAll,
+                           sizeof(float) * kElementCount, {{device.get()}}));
+  ASSERT_OK_AND_ASSIGN(auto arg1_buffer,
+                       instance->device_manager()->AllocateDeviceVisibleBuffer(
+                           hal::BufferUsage::kAll,
+                           sizeof(float) * kElementCount, {{device.get()}}));
 
   // Populate initial values for 4 * 2 = 8.
   ASSERT_OK(arg0_buffer->Fill32(4.0f));

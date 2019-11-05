@@ -21,7 +21,7 @@ cc_library(
         "//iree/hal/host:host_local_allocator",
         "//third_party/dawn:dawn_headers",
         "//third_party/dawn:dawn_native",
-        "//third_party/dawn:dawn_static_proc",
+        "//third_party/dawn:dawn_static_proc",  # build-cleaner: keep
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
@@ -40,7 +40,7 @@ cc_library(
         "//iree/hal:driver",
         "//third_party/dawn:dawn_headers",
         "//third_party/dawn:dawn_native",
-        "//third_party/dawn:dawn_static_proc",
+        "//third_party/dawn:dawn_static_proc",  # build-cleaner: keep
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],
@@ -66,7 +66,6 @@ cc_library(
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:driver_registry",
-        "@com_google_absl//absl/flags:flag",
     ],
     alwayslink = 1,
 )

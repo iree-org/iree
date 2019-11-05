@@ -89,7 +89,7 @@ using ExecutableCachingModeBitfield = ExecutableCachingMode;
 //
 // Thread-safe - multiple threads may prepare executables (including the *same*
 // executable) simultaneously.
-class ExecutableCache {
+class ExecutableCache : public RefObject<ExecutableCache> {
  public:
   virtual ~ExecutableCache();
 

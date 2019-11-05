@@ -86,7 +86,7 @@ Status Run() {
   ASSIGN_OR_RETURN(auto driver, hal::DriverRegistry::shared_registry()->Create(
                                     "interpreter"));
   ASSIGN_OR_RETURN(auto device, driver->CreateDefaultDevice());
-  RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(device));
+  RETURN_IF_ERROR(instance->device_manager()->RegisterDevice(add_ref(device)));
   auto policy = make_ref<rt::Policy>();
   auto context = make_ref<rt::Context>(add_ref(instance), std::move(policy));
 

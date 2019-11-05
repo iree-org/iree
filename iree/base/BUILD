@@ -160,11 +160,11 @@ cc_library(
     deps = [
         ":file_mapping",
         ":memory",
+        ":ref_ptr",
         ":source_location",
         ":status",
         ":tracing",
         "@com_github_google_flatbuffers//:flatbuffers",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
