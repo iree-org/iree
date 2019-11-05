@@ -185,6 +185,30 @@ typedef enum {
 typedef struct iree_file_mapping iree_file_mapping_t;
 
 //===----------------------------------------------------------------------===//
+// Error handling macros
+//===----------------------------------------------------------------------===//
+
+#define IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y) x##y
+#define IREE_API_STATUS_MACROS_IMPL_CONCAT_(x, y) \
+  IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y)
+#define IREE_API_STATUS_MACROS_IMPL_RETURN_IF_API_ERROR_(var, expr) \
+  iree_status_t var = (expr);                                       \
+  if (var) return var;
+
+// Propagates the error returned by (expr) by returning from the current
+// function on non-OK status.
+//
+// Example:
+//  iree_status_t OtherFunc(...);
+//  iree_status_t MyFunc(...) {
+//    IREE_API_RETURN_IF_API_ERROR(OtherFunc(...));
+//    return IREE_STATUS_OK;
+//  }
+#define IREE_API_RETURN_IF_API_ERROR(expr)          \
+  IREE_API_STATUS_MACROS_IMPL_RETURN_IF_API_ERROR_( \
+      IREE_API_STATUS_MACROS_IMPL_CONCAT_(__status_, __COUNTER__), (expr))
+
+//===----------------------------------------------------------------------===//
 // iree Core API
 //===----------------------------------------------------------------------===//
 

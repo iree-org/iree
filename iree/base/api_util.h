@@ -38,10 +38,6 @@ inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_(x, y) \
   IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y)
 
-// clang-format off
-#define IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_ switch (0) case 0: default:  // NOLINT
-// clang-format on
-
 namespace status_macro_internal {
 class StatusAdaptorForApiMacros {
  public:
@@ -58,18 +54,16 @@ class StatusAdaptorForApiMacros {
 };
 }  // namespace status_macro_internal
 
+// clang-format off
+#define IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_ switch (0) case 0: default:  // NOLINT
+// clang-format on
+
 #define IREE_API_RETURN_IF_ERROR(expr)                         \
   IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_                    \
   if (::iree::status_macro_internal::StatusAdaptorForApiMacros \
           status_adaptor = {expr}) {                           \
   } else /* NOLINT */                                          \
     return ::iree::ToApiStatus(status_adaptor.Consume())
-
-#define IREE_API_RETURN_IF_API_ERROR(expr)  \
-  IREE_API_STATUS_MACROS_IMPL_ELSE_BLOCKER_ \
-  if (iree_status_t status = (expr)) {      \
-    return status;                          \
-  }
 
 #define IREE_API_ASSIGN_OR_RETURN(...)                               \
   IREE_API_STATUS_MACROS_IMPL_GET_VARIADIC_(                         \
