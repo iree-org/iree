@@ -37,7 +37,7 @@ namespace IREE {
 
 // Parses an op that has no inputs and no outputs.
 static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState &state) {
-  if (failed(parser.parseOptionalAttributeDict(state.attributes))) {
+  if (failed(parser.parseOptionalAttrDict(state.attributes))) {
     return failure();
   }
   return success();
@@ -62,7 +62,7 @@ static ParseResult parseModuleOp(OpAsmParser &parser, OperationState &state) {
   if (parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{})) {
     return failure();
   }
-  if (parser.parseOptionalAttributeDict(state.attributes)) {
+  if (parser.parseOptionalAttrDict(state.attributes)) {
     return failure();
   }
   ModuleOp::ensureTerminator(*body, parser.getBuilder(), state.location);
@@ -117,7 +117,7 @@ static ParseResult parseMultiArchExecutableOp(OpAsmParser &parser,
     return failure();
   }
   if (succeeded(parser.parseOptionalKeyword("attributes"))) {
-    if (failed(parser.parseOptionalAttributeDict(state.attributes))) {
+    if (failed(parser.parseOptionalAttrDict(state.attributes))) {
       return failure();
     }
   }
@@ -199,7 +199,7 @@ static ParseResult parseExecutableOp(OpAsmParser &parser,
     return failure();
   }
   if (succeeded(parser.parseOptionalKeyword("attributes"))) {
-    if (failed(parser.parseOptionalAttributeDict(state.attributes))) {
+    if (failed(parser.parseOptionalAttrDict(state.attributes))) {
       return failure();
     }
   }

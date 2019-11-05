@@ -40,7 +40,7 @@ static ParseResult parseConstantOp(OpAsmParser &parser,
   if (parser.parseLSquare() ||
       parser.parseAttribute(valueAttr, "value", result.attributes) ||
       parser.parseRSquare() ||
-      parser.parseOptionalAttributeDict(result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
       parser.parseColonType(type))
     return failure();
 
@@ -330,7 +330,7 @@ ParseResult parseDispatchRegionOp(OpAsmParser &parser, OperationState &state) {
   // Parse region body.
   Region *body = state.addRegion();
   if (failed(parser.parseRegion(*body, regionArgs, regionArgTypes)) ||
-      failed(parser.parseOptionalAttributeDict(state.attributes))) {
+      failed(parser.parseOptionalAttrDict(state.attributes))) {
     return failure();
   }
   return success();
@@ -494,7 +494,7 @@ ParseResult parseReductionRegionOp(OpAsmParser &parser, OperationState &state) {
   // Parse region body.
   Region *body = state.addRegion();
   if (failed(parser.parseRegion(*body, regionArgs, regionArgTypes)) ||
-      failed(parser.parseOptionalAttributeDict(state.attributes))) {
+      failed(parser.parseOptionalAttrDict(state.attributes))) {
     return failure();
   }
 

@@ -37,7 +37,7 @@ namespace IREE {
 
 // Parses an op that has no inputs and no outputs.
 static ParseResult parseNoIOOp(OpAsmParser &parser, OperationState &state) {
-  if (failed(parser.parseOptionalAttributeDict(state.attributes))) {
+  if (failed(parser.parseOptionalAttrDict(state.attributes))) {
     return failure();
   }
   return success();
@@ -74,7 +74,7 @@ static ParseResult parseExecutableTargetConfigOp(OpAsmParser &parser,
     return failure();
   }
   if (succeeded(parser.parseOptionalKeyword("attributes"))) {
-    if (failed(parser.parseOptionalAttributeDict(state.attributes))) {
+    if (failed(parser.parseOptionalAttrDict(state.attributes))) {
       return failure();
     }
   }

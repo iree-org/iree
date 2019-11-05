@@ -37,7 +37,7 @@ static ParseResult parseCallOp(OpAsmParser &parser, OperationState &state) {
   auto calleeLoc = parser.getNameLoc();
   if (parser.parseAttribute(calleeAttr, "callee", state.attributes) ||
       parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren) ||
-      parser.parseOptionalAttributeDict(state.attributes) ||
+      parser.parseOptionalAttrDict(state.attributes) ||
       parser.parseColonType(calleeType) ||
       parser.addTypesToList(calleeType.getResults(), state.types) ||
       parser.resolveOperands(operands, calleeType.getInputs(), calleeLoc,
@@ -75,7 +75,7 @@ static ParseResult parseCallIndirectOp(OpAsmParser &parser,
   return failure(
       parser.parseOperand(callee) || parser.getCurrentLocation(&operandsLoc) ||
       parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren) ||
-      parser.parseOptionalAttributeDict(result.attributes) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
       parser.parseColonType(calleeType) ||
       parser.resolveOperand(callee, calleeType, result.operands) ||
       parser.resolveOperands(operands, calleeType.getInputs(), operandsLoc,
