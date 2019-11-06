@@ -124,8 +124,10 @@ class SimpleArithmeticTest(tf.test.TestCase):
 
     f = context.resolve_function("module.simple_matmul")
     tf_f = self.tf_module.simple_matmul
-    a = np.zeros((128, 3072), dtype=np.float32) + 1
-    b = np.ones((3072, 256), dtype=np.float32) + 2
+    np.random.seed(12345)
+    # Note: scaling by a small value to increase numerical stability.
+    a = np.random.random((128, 3072)).astype(np.float32) * 1e-3
+    b = np.random.random((3072, 256)).astype(np.float32) * 1e-3
 
     iree_event = pyiree.tracing.ScopedEvent(
         "SimpleArithmeticTest#simple_matmul")
@@ -152,9 +154,9 @@ class SimpleArithmeticTest(tf.test.TestCase):
       return result.numpy()
 
     # Check that results are equal.
-    self.assertAllEqual(invoke_iree(), invoke_tf())
+    self.assertAllClose(invoke_iree(), invoke_tf())
     # Quick benchmark.
-    iterations = 5  # TODO(laurenzo): Increase when AVX bug fixed.
+    iterations = 100
     print("+++BM simple_matmul:")
     iree_time = timeit.timeit(invoke_iree, number=iterations)
     print("IREE -> TIME/ITERATION =", (iree_time / iterations) * 1000, "ms")

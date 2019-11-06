@@ -94,6 +94,7 @@ cc_library(
     deps = [
         "//iree/base:shape",
         "//iree/base:status",
+        "//iree/base:tracing",
         "//iree/hal:buffer_view",
         "@com_google_absl//absl/algorithm",
         "@com_google_absl//absl/base:core_headers",

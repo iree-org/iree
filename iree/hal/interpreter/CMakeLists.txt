@@ -97,6 +97,7 @@ iree_cc_library(
     absl::span
     iree::base::shape
     iree::base::status
+    iree::base::tracing
     iree::hal::buffer_view
     ruy
   PUBLIC
