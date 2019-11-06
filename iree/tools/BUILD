@@ -17,6 +17,8 @@ cc_binary(
     name = "iree-opt",
     deps = [
         "//integrations/tensorflow/compiler:tensorflow",
+        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Transforms",
         "//iree/compiler/Transforms/Interpreter",
         "//iree/compiler/Transforms/Sequencer",
@@ -58,6 +60,16 @@ cc_binary(
         # TODO(b/142004903): enable when Dawn HAL implementation is functional
         # "//iree/hal/dawn:dawn_driver_module",
         "//iree/hal/vulkan:vulkan_driver_module",
+    ],
+)
+
+cc_binary(
+    name = "iree-tblgen",
+    deps = [
+        "//iree/compiler/Dialect/VM/Tools",
+        "@local_config_mlir//:MlirTableGenMain",
+        "@local_config_mlir//:Support",
+        "@local_config_mlir//:TableGen",
     ],
 )
 
