@@ -79,6 +79,9 @@ cc_binary(
 
 cc_binary(
     name = "iree-tblgen",
+    linkopts = [
+        "-lpthread",
+    ],
     deps = [
         "//iree/compiler/Dialect/VM/Tools",
         "@local_config_mlir//:MlirTableGenMain",

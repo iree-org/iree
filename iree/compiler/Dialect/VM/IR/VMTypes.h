@@ -19,9 +19,9 @@
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/DenseMapInfo.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/StringSwitch.h"
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSwitch.h"
 
 // Order matters.
 #include "iree/compiler/Dialect/VM/IR/VMEnums.h.inc"

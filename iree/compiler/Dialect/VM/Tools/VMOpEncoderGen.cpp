@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "third_party/llvm/llvm/include/llvm/Support/FormatVariadic.h"
-#include "third_party/llvm/llvm/include/llvm/TableGen/Record.h"
-#include "third_party/llvm/llvm/include/llvm/TableGen/TableGenBackend.h"
+#include "llvm/Support/FormatVariadic.h"
+#include "llvm/TableGen/Record.h"
+#include "llvm/TableGen/TableGenBackend.h"
 #include "mlir/Support/STLExtras.h"
 #include "mlir/TableGen/Attribute.h"
 #include "mlir/TableGen/GenInfo.h"
