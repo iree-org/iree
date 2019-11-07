@@ -20,6 +20,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/SPIRV/IndexComputation.h"
 
+#include "iree/compiler/Translation/SPIRV/IndexComputationAttribute.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -237,6 +238,15 @@ LogicalResult IndexPropagation::propagateIndexMap(
     for (auto arg : enumerate(op->getOperands())) {
       indexMap[arg.value()][operandIndices[arg.index()]];
       resultIndexMap.second.push_back(operandIndices[arg.index()]);
+
+      if (failed(index_computation_attribute::addNewIndexMapForValue(
+              arg.value(), operandIndices[arg.index()]))) {
+        return failure();
+      }
+    }
+    if (failed(index_computation_attribute::addOperandIndexMap(
+            op, resultIndexMap.first, operandIndices))) {
+      return failure();
     }
   }
   return success();

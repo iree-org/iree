@@ -28,22 +28,9 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 
 LogicalResult IREELoadIndexPropagation::propagateIndexMap(
-    Operation *operation, IndexComputationCache &indexMap) const {
-  auto loadOp = cast<IREE::LoadInputOp>(operation);
-  auto result = operation->getResult(0);
-  auto src = loadOp.src();
-  auto resultType = result->getType().dyn_cast<RankedTensorType>();
-  auto srcType = src->getType().dyn_cast<MemRefType>();
-  if (!resultType || !srcType || resultType.getShape() != srcType.getShape()) {
-    return loadOp.emitError(
-        "mismatch in shape of the result tensor and source memref");
-  }
-  // Initialize the storage for the src.
-  indexMap[src];
-  for (auto &resultIndexMap : indexMap[operation->getResult(0)]) {
-    indexMap[src][resultIndexMap.first];
-    resultIndexMap.second.push_back(resultIndexMap.first);
-  }
+    Operation *operation, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &operandIndices) const {
+  operandIndices.push_back(resultIndex);
   return success();
 }
 

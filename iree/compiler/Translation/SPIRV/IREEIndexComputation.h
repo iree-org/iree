@@ -36,7 +36,8 @@ class IREELoadIndexPropagation final
   using IndexPropagationOp<IREE::LoadInputOp>::IndexPropagationOp;
 
   LogicalResult propagateIndexMap(
-      Operation *operation, IndexComputationCache &indexMap) const override;
+      Operation *operation, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &operandIndices) const override;
 };
 
 /// Index propagation for iree.store_output operation. The launch size is
