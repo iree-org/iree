@@ -73,10 +73,8 @@ static ParseResult parseExecutableTargetConfigOp(OpAsmParser &parser,
   if (failed(parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
     return failure();
   }
-  if (succeeded(parser.parseOptionalKeyword("attributes"))) {
-    if (failed(parser.parseOptionalAttrDict(state.attributes))) {
-      return failure();
-    }
+  if (failed(parser.parseOptionalAttrDictWithKeyword(state.attributes))) {
+    return failure();
   }
 
   ExecutableTargetConfigOp::ensureTerminator(*body, parser.getBuilder(),
@@ -92,14 +90,8 @@ static void printExecutableTargetConfigOp(OpAsmPrinter &printer,
   printer.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                       /*printBlockTerminators=*/false);
 
-  // Print out executable attributes, if present.
-  SmallVector<StringRef, 1> ignoredAttrs = {
-      "backend",
-  };
-  if (op.getAttrs().size() > ignoredAttrs.size()) {
-    printer << "\n  attributes ";
-    printer.printOptionalAttrDict(op.getAttrs(), ignoredAttrs);
-  }
+  printer.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                           /*elidedAttrs=*/{"backend"});
 }
 
 #define GET_OP_CLASSES

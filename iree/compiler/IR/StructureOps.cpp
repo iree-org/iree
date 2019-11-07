@@ -116,10 +116,8 @@ static ParseResult parseMultiArchExecutableOp(OpAsmParser &parser,
   if (failed(parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
     return failure();
   }
-  if (succeeded(parser.parseOptionalKeyword("attributes"))) {
-    if (failed(parser.parseOptionalAttrDict(state.attributes))) {
-      return failure();
-    }
+  if (failed(parser.parseOptionalAttrDictWithKeyword(state.attributes))) {
+    return failure();
   }
 
   MultiArchExecutableOp::ensureTerminator(*body, builder, state.location);
@@ -139,19 +137,9 @@ static void printMultiArchExecutableOp(OpAsmPrinter &printer,
   printer.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                       /*printBlockTerminators=*/false);
 
-  // Print out executable attributes, if present.
-  SmallVector<StringRef, 2> ignoredAttrs = {
-      SymbolTable::getSymbolAttrName(),
-      "iree.ordinal",
-  };
-  SmallVector<NamedAttribute, 4> attrs(
-      llvm::make_filter_range(op.getAttrs(), [&](const NamedAttribute &attr) {
-        return llvm::count(ignoredAttrs, attr.first) == 0;
-      }));
-  if (!attrs.empty()) {
-    printer << "\n    attributes ";
-    printer.printOptionalAttrDict(attrs);
-  }
+  printer.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{SymbolTable::getSymbolAttrName(), "iree.ordinal"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -198,10 +186,8 @@ static ParseResult parseExecutableOp(OpAsmParser &parser,
   if (failed(parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{}))) {
     return failure();
   }
-  if (succeeded(parser.parseOptionalKeyword("attributes"))) {
-    if (failed(parser.parseOptionalAttrDict(state.attributes))) {
-      return failure();
-    }
+  if (failed(parser.parseOptionalAttrDictWithKeyword(state.attributes))) {
+    return failure();
   }
 
   ExecutableOp::ensureTerminator(*body, parser.getBuilder(), state.location);
@@ -227,19 +213,8 @@ static void printExecutableOp(OpAsmPrinter &printer, ExecutableOp op) {
   printer.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                       /*printBlockTerminators=*/false);
 
-  // Print out executable attributes, if present.
-  SmallVector<StringRef, 2> ignoredAttrs = {
-      "iree.ordinal",
-      "format",
-  };
-  SmallVector<NamedAttribute, 4> attrs(
-      llvm::make_filter_range(op.getAttrs(), [&](const NamedAttribute &attr) {
-        return llvm::count(ignoredAttrs, attr.first) == 0;
-      }));
-  if (!attrs.empty()) {
-    printer << "\n      attributes ";
-    printer.printOptionalAttrDict(attrs);
-  }
+  printer.printOptionalAttrDictWithKeyword(
+      op.getAttrs(), /*elidedAttrs=*/{"iree.ordinal", "format"});
 }
 
 #define GET_OP_CLASSES
