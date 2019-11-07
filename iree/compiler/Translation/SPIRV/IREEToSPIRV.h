@@ -33,10 +33,10 @@ class IREELoadOpSPIRVLowering final
  public:
   using SPIRVOpLowering<IREE::LoadInputOp>::SPIRVOpLowering;
 
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index, ArrayRef<Value *> operands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override;
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const override;
 };
 
 /// Translation of iree.return operation.
@@ -45,8 +45,8 @@ class IREEReturnOpSPIRVLowering final : public SPIRVOpLowering<IREE::ReturnOp> {
   using SPIRVOpLowering<IREE::ReturnOp>::SPIRVOpLowering;
 
   LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder, AffineExprCodegen &codegen,
-      ValueCache &valueCache,
+      Operation *op, OpBuilder &builder,
+      TensorIndexToScalarValueMap &valueCache,
       DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
       ArrayRef<spirv::GlobalVariableOp> outputBuffers) const override;
 };
@@ -58,8 +58,8 @@ class IREEStoreOpSPIRVLowering final
   using SPIRVOpLowering<IREE::StoreOutputOp>::SPIRVOpLowering;
 
   LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder, AffineExprCodegen &codegen,
-      ValueCache &valueCache,
+      Operation *op, OpBuilder &builder,
+      TensorIndexToScalarValueMap &valueCache,
       DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
       ArrayRef<spirv::GlobalVariableOp> outputBuffers) const override;
 };

@@ -20,28 +20,15 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_SPIRVLOWERING_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_SPIRVLOWERING_H
 
-#include "iree/compiler/Translation/SPIRV/AffineExprCodegen.h"
 #include "iree/compiler/Translation/SPIRV/IREECodegenUtils.h"
+#include "iree/compiler/Translation/SPIRV/IndexComputationAttribute.h"
+#include "iree/compiler/Translation/SPIRV/TensorIndexToScalarValueMap.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Support/StringExtras.h"
 
 namespace mlir {
 namespace iree_compiler {
-
-class ValueCache {
- public:
-  Value *getOperandDstValue(Value *value, AffineMap index) {
-    return convertedValueMap.lookup(value).lookup(index);
-  }
-
-  void setOperandDstValue(Value *value, AffineMap index, Value *scalar) {
-    convertedValueMap[value][index] = scalar;
-  }
-
- private:
-  DenseMap<Value *, DenseMap<AffineMap, Value *>> convertedValueMap;
-};
 
 /// Base class for lowering tensor operations in the dispatch function to SPIR-V
 /// op.
@@ -55,11 +42,10 @@ class SPIRVLowering {
   /// needed to compute this value is passed in within `operands`. The methods
   /// have to insert the scalar result value of the generated operation into the
   /// `valueCache`.
-  virtual LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                                       AffineMap index,
-                                       ArrayRef<Value *> operands,
-                                       AffineExprCodegen &affineExprCodegen,
-                                       ValueCache &valueCache) const {
+  virtual LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const {
     return failure();
   }
 
@@ -68,8 +54,8 @@ class SPIRVLowering {
   /// when the `op` has no result value, typically store operations and return
   /// operations.
   virtual LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder, AffineExprCodegen &affineExprCodegen,
-      ValueCache &valueCache,
+      Operation *op, OpBuilder &builder,
+      TensorIndexToScalarValueMap &valueCache,
       DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
       ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
     return failure();
@@ -89,10 +75,10 @@ class SPIRVOpLowering : public SPIRVLowering {
 class ConstantOpSPIRVLowering final : public SPIRVOpLowering<ConstantOp> {
  public:
   using SPIRVOpLowering<ConstantOp>::SPIRVOpLowering;
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index, ArrayRef<Value *> operands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override;
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const override;
 };
 
 /// SPIR-V lowering for CmpFOp.
@@ -100,10 +86,10 @@ class CmpFOpSPIRVLowering final : public SPIRVOpLowering<CmpFOp> {
  public:
   using SPIRVOpLowering<CmpFOp>::SPIRVOpLowering;
 
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index, ArrayRef<Value *> operands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override;
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const override;
 };
 
 /// SPIR-V lowering for Min/Max operations.
@@ -111,10 +97,10 @@ template <typename OpTy, typename CmpOpTy, typename CmpFOpTy>
 class CmpSelectOpSPIRVLowering final : public SPIRVOpLowering<OpTy> {
  public:
   using SPIRVOpLowering<OpTy>::SPIRVOpLowering;
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index, ArrayRef<Value *> operands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override {
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const override {
     if (op->getNumOperands() != 2) {
       return op->emitError(
           "unhandled SPIR-V lowering for more than 2 operands");
@@ -143,8 +129,7 @@ class CmpSelectOpSPIRVLowering final : public SPIRVOpLowering<OpTy> {
     auto selectOp = builder.create<spirv::SelectOp>(
         op->getLoc(), operands[0]->getType(), cmpOp->getResult(0), operands[0],
         operands[1]);
-    valueCache.setOperandDstValue(op->getResult(0), index,
-                                  selectOp.getResult());
+    valueCache.setValueAtIndex(op->getResult(0), index, selectOp.getResult());
     return success();
   }
 };
@@ -162,11 +147,10 @@ class SPIRVPwOpLowering final : public SPIRVOpLowering<OpTy> {
  public:
   using SPIRVOpLowering<OpTy>::SPIRVOpLowering;
 
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index,
-                               ArrayRef<Value *> scalarOperands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override {
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> scalarOperands,
+      TensorIndexToScalarValueMap &valueCache) const override {
     // TODO(ravishankarm) : This check should really be a static_assert. See if
     // that can be changed.
     if (op->getNumOperands() == 0) {
@@ -198,8 +182,7 @@ class SPIRVPwOpLowering final : public SPIRVOpLowering<OpTy> {
     if (!scalarOp) {
       return op->emitError("unable to lower operation");
     }
-    valueCache.setOperandDstValue(pwOp.getResult(), index,
-                                  scalarOp->getResult(0));
+    valueCache.setValueAtIndex(pwOp.getResult(), index, scalarOp->getResult(0));
     return success();
   }
 };
@@ -212,19 +195,17 @@ class SPIRVIndexOpLowering final : public SPIRVOpLowering<OpTy> {
  public:
   using SPIRVOpLowering<OpTy>::SPIRVOpLowering;
 
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index,
-                               ArrayRef<Value *> scalarOperands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override {
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> scalarOperands,
+      TensorIndexToScalarValueMap &valueCache) const override {
     if (op->getNumOperands() != 1) {
       return op->emitError(
           "unhandled lowering of index transformation operation with multiple "
           "operands");
     }
     auto indexOp = cast<OpTy>(op);
-    valueCache.setOperandDstValue(indexOp.getResult(), index,
-                                  scalarOperands[0]);
+    valueCache.setValueAtIndex(indexOp.getResult(), index, scalarOperands[0]);
     return success();
   }
 };
@@ -232,9 +213,9 @@ class SPIRVIndexOpLowering final : public SPIRVOpLowering<OpTy> {
 /// Generates spv.AccessChain instruction to get the pointer value at a given
 /// location of a spv.globalVariable.
 inline Value *genPointerOffset(OpBuilder &builder, Location loc,
-                               AffineExprCodegen &affineExprCodegen,
+                               TensorIndexToScalarValueMap &valueCache,
                                AffineMap indexMap,
-                               spirv::GlobalVariableOp &var) {
+                               spirv::GlobalVariableOp var) {
   auto basePtr = builder.create<spirv::AddressOfOp>(loc, var);
   auto varPtrType = var.type().cast<spirv::PointerType>().getPointeeType();
   // The variable has to be a struct type with a single element.
@@ -257,8 +238,8 @@ inline Value *genPointerOffset(OpBuilder &builder, Location loc,
     accessIndices.push_back(zero);
   }
   for (auto indexExpr : indexMap.getResults()) {
-    accessIndices.push_back(affineExprCodegen.getValue(
-        indexExpr, builder.saveInsertionPoint(), loc));
+    accessIndices.push_back(valueCache.getAffineExprValue(
+        builder.saveInsertionPoint(), loc, indexExpr));
   }
   return builder.create<spirv::AccessChainOp>(loc, basePtr, accessIndices);
 }
@@ -269,8 +250,8 @@ class ReturnOpSPIRVLowering : public SPIRVOpLowering<ReturnOp> {
   using SPIRVOpLowering<ReturnOp>::SPIRVOpLowering;
 
   LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder, AffineExprCodegen &affineExprCodegen,
-      ValueCache &valueCache,
+      Operation *op, OpBuilder &builder,
+      TensorIndexToScalarValueMap &valueCache,
       DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
       ArrayRef<spirv::GlobalVariableOp> outputBuffers) const override;
 };
@@ -284,8 +265,7 @@ class SPIRVCodegen {
   explicit SPIRVCodegen() { insert(); }
 
   LogicalResult codegen(spirv::ModuleOp &spirvModule, FuncOp &fn,
-                        AffineExprCodegen &affineExprCodegen,
-                        ValueCache &valueCache) {
+                        TensorIndexToScalarValueMap &valueCache) {
     if (fn.getBlocks().size() != 1) {
       return emitError(
           fn.getLoc(),
@@ -295,7 +275,7 @@ class SPIRVCodegen {
     OpBuilder builder(spirvModule.body());
     // Create the entry function and generate global invocation ID. Creates a
     // global variable for all inputs and output tensors.
-    return createEntryFn(builder, fn, affineExprCodegen, valueCache);
+    return createEntryFn(builder, fn, valueCache);
   }
 
  private:
@@ -358,8 +338,7 @@ class SPIRVCodegen {
   /// Helper method to create the entry function. Creates global variables for
   /// all inputs and outputs. Inserts the spv.EntryPoint operations as well.
   LogicalResult createEntryFn(OpBuilder &builder, FuncOp &fn,
-                              AffineExprCodegen &affineExprCodegen,
-                              ValueCache &valueCache) {
+                              TensorIndexToScalarValueMap &valueCache) {
     auto loc = fn.getLoc();
 
     // Convert functions arguments and return values to
@@ -403,13 +382,11 @@ class SPIRVCodegen {
       builder.setInsertionPointToStart(entryFn.addEntryBlock());
 
       // Create the Global invocation ID.
-      if (failed(createGlobalInvocationID(builder, fn.getLoc(),
-                                          affineExprCodegen))) {
+      if (failed(createGlobalInvocationID(builder, fn.getLoc(), valueCache))) {
         return failure();
       }
 
-      if (failed(lowerFunction(builder, fn, entryFn, affineExprCodegen,
-                               valueCache))) {
+      if (failed(lowerFunction(builder, fn, entryFn, valueCache))) {
         return failure();
       }
     }
@@ -423,8 +400,9 @@ class SPIRVCodegen {
 
   /// Creates the global variable for GlobalInvocationID, and gets the ID at x,
   /// y and z dimensions.
-  LogicalResult createGlobalInvocationID(OpBuilder &builder, Location loc,
-                                         AffineExprCodegen &affineExprCodegen) {
+  LogicalResult createGlobalInvocationID(
+      OpBuilder &builder, Location loc,
+      TensorIndexToScalarValueMap &valueCache) {
     auto moduleOp = builder.getInsertionBlock()
                         ->getParentOp()
                         ->getParentOfType<spirv::ModuleOp>();
@@ -458,9 +436,9 @@ class SPIRVCodegen {
     auto id_z = builder.create<spirv::CompositeExtractOp>(
         loc, i32Type, id, builder.getArrayAttr(builder.getI32IntegerAttr(2)));
     globalInvocationIDs.push_back(id_z);
-    affineExprCodegen.setDimDstValue(0, id_x);
-    affineExprCodegen.setDimDstValue(1, id_y);
-    affineExprCodegen.setDimDstValue(2, id_z);
+    valueCache.setDimValue(0, id_x);
+    valueCache.setDimValue(1, id_y);
+    valueCache.setDimValue(2, id_z);
     return success();
   }
 
@@ -468,8 +446,8 @@ class SPIRVCodegen {
   /// arguments of the dispatch function at all indices needed within the
   /// dispatch function.
   LogicalResult initArgValues(OpBuilder &builder, Location loc,
-                              AffineExprCodegen &affineExprCodegen,
-                              ValueCache &valueCache, Value *origArg) {
+                              TensorIndexToScalarValueMap &valueCache,
+                              Value *origArg) {
     SmallVector<AffineMap, 4> indices;
     index_computation_attribute::getIndexMapsForValue(origArg, indices);
     for (auto indexMap : indices) {
@@ -478,14 +456,13 @@ class SPIRVCodegen {
         return emitError(
             loc, "undefined SPIR-V global variable for tensor argument");
       }
-      auto ptr =
-          genPointerOffset(builder, loc, affineExprCodegen, indexMap, var);
+      auto ptr = genPointerOffset(builder, loc, valueCache, indexMap, var);
       auto elementType =
           ptr->getType().template cast<spirv::PointerType>().getPointeeType();
       auto val = builder.create<spirv::LoadOp>(loc, elementType, ptr,
                                                /*memory_access =*/nullptr,
                                                /*alignment = */ nullptr);
-      valueCache.setOperandDstValue(origArg, indexMap, val);
+      valueCache.setValueAtIndex(origArg, indexMap, val);
     }
     return success();
   }
@@ -565,8 +542,7 @@ class SPIRVCodegen {
 
   /// Lowers the body of the function in the original dialect to SPIR-V dialect.
   LogicalResult lowerFunction(OpBuilder &builder, FuncOp fn, FuncOp entryFn,
-                              AffineExprCodegen &affineExprCodegen,
-                              ValueCache &valueCache) {
+                              TensorIndexToScalarValueMap &valueCache) {
     if (failed(createLaunchGuard(builder, fn))) {
       return failure();
     }
@@ -574,8 +550,7 @@ class SPIRVCodegen {
     for (auto arg : fn.getArguments()) {
       // Load values of the argument at all indices needed for computation
       // within the dispatch function.
-      if (failed(initArgValues(builder, fn.getLoc(), affineExprCodegen,
-                               valueCache, arg))) {
+      if (failed(initArgValues(builder, fn.getLoc(), valueCache, arg))) {
         return failure();
       }
     }
@@ -583,8 +558,7 @@ class SPIRVCodegen {
     for (auto &block : fn) {
       for (auto &op : block) {
         // Lower individual operations.
-        if (failed(
-                lowerOperation(builder, affineExprCodegen, valueCache, &op))) {
+        if (failed(lowerOperation(builder, valueCache, &op))) {
           return failure();
         }
       }
@@ -597,8 +571,8 @@ class SPIRVCodegen {
   /// Dispatches the lowering of tensor operation to SPIR-V scalar
   /// operation.
   LogicalResult lowerOperation(OpBuilder &builder,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache, Operation *op) {
+                               TensorIndexToScalarValueMap &valueCache,
+                               Operation *op) {
     auto opName = op->getName().getStringRef();
     if (!opCodegenList.count(opName)) {
       return op->emitError("unhandled codegen");
@@ -610,8 +584,7 @@ class SPIRVCodegen {
     // Zero return case.
     if (!op->getNumResults()) {
       return opCodegenList[opName]->lowerOperation(
-          op, builder, affineExprCodegen, valueCache, inputArgToVariable,
-          resultIndexToVariable);
+          op, builder, valueCache, inputArgToVariable, resultIndexToVariable);
     }
 
     // Single return case.
@@ -624,7 +597,7 @@ class SPIRVCodegen {
                                                            operandIndices);
       SmallVector<Value *, 2> scalarOperands;
       for (auto arg : llvm::enumerate(op->getOperands())) {
-        auto scalarArg = valueCache.getOperandDstValue(
+        auto scalarArg = valueCache.getValueAtIndex(
             arg.value(), operandIndices[arg.index()]);
         if (!scalarArg) {
           return op->emitError("argument ")
@@ -633,8 +606,7 @@ class SPIRVCodegen {
         scalarOperands.push_back(scalarArg);
       }
       if (failed(opCodegenList[opName]->lowerOperation(
-              op, builder, index, scalarOperands, affineExprCodegen,
-              valueCache))) {
+              op, builder, index, scalarOperands, valueCache))) {
         return failure();
       }
     }

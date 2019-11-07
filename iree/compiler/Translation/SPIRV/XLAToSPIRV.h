@@ -32,10 +32,10 @@ class XLAConcatenateOpSPIRVLowering final
     : public SPIRVOpLowering<xla_hlo::ConcatenateOp> {
  public:
   using SPIRVOpLowering<xla_hlo::ConcatenateOp>::SPIRVOpLowering;
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index, ArrayRef<Value *> operands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override;
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const override;
 };
 
 /// Lowers a xla_hlo.pad_op to SPIR-V. Based on the value of the result index
@@ -44,10 +44,10 @@ class XLAConcatenateOpSPIRVLowering final
 class XLAPadOpSPIRVLowering final : public SPIRVOpLowering<xla_hlo::PadOp> {
  public:
   using SPIRVOpLowering<xla_hlo::PadOp>::SPIRVOpLowering;
-  LogicalResult lowerOperation(Operation *op, OpBuilder &builder,
-                               AffineMap index, ArrayRef<Value *> operands,
-                               AffineExprCodegen &affineExprCodegen,
-                               ValueCache &valueCache) const override;
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const override;
 };
 
 }  // namespace iree_compiler

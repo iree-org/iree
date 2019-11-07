@@ -26,19 +26,17 @@ namespace iree_compiler {
 /// the value of the operand.
 LogicalResult IREELoadOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, AffineExprCodegen &affineExprCodegen,
-    ValueCache &valueCache) const {
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
   auto loadOp = cast<IREE::LoadInputOp>(op);
   auto result = loadOp.getResult();
-  valueCache.setOperandDstValue(result, index, operands[0]);
+  valueCache.setValueAtIndex(result, index, operands[0]);
   return success();
 }
 
 /// IREE::StoreOp needs to write to the spv.globalVariable created for the
 /// memref that holds the result of the dispatch function.
 LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder, AffineExprCodegen &affineExprCodegen,
-    ValueCache &valueCache,
+    Operation *op, OpBuilder &builder, TensorIndexToScalarValueMap &valueCache,
     DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
     ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
   auto storeOp = cast<IREE::StoreOutputOp>(op);
@@ -55,9 +53,9 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
     return storeOp.emitError(
         "unable to find spv.globalVariable that corresponds to the dst memref");
   }
-  auto ptr = genPointerOffset(builder, storeOp.getLoc(), affineExprCodegen,
-                              indices[0], var);
-  auto scalarValue = valueCache.getOperandDstValue(src, indices[0]);
+  auto ptr =
+      genPointerOffset(builder, storeOp.getLoc(), valueCache, indices[0], var);
+  auto scalarValue = valueCache.getValueAtIndex(src, indices[0]);
   builder.create<spirv::StoreOp>(storeOp.getLoc(), ptr, scalarValue,
                                  /*memory_access = */ nullptr,
                                  /*alignment = */ nullptr);
@@ -67,8 +65,7 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
 /// IREE::ReturnOp in dispatch functions lowered to SPIR-V should have no
 /// operands.
 LogicalResult IREEReturnOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder, AffineExprCodegen &affineExprCodegen,
-    ValueCache &valueCache,
+    Operation *op, OpBuilder &builder, TensorIndexToScalarValueMap &valueCache,
     DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
     ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
   return success();

@@ -20,7 +20,6 @@ package(
 cc_library(
     name = "SPIRV",
     srcs = [
-        "AffineExprCodegen.h",
         "EmbeddedKernels.cpp",
         "IREEIndexComputation.cpp",
         "IREEToSPIRV.cpp",
@@ -43,6 +42,7 @@ cc_library(
         "IndexComputation.h",
         "IndexComputationAttribute.h",
         "SPIRVExecutableTranslation.h",
+        "TensorIndexToScalarValueMap.h",
         "XLAIndexPropagation.h",
         "XLAToSPIRV.h",
     ],

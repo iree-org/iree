@@ -27,7 +27,7 @@ namespace iree_compiler {
 //===----------------------------------------------------------------------===//
 LogicalResult ConstantOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index, ArrayRef<Value *>,
-    AffineExprCodegen &affineExprCodegen, ValueCache &valueCache) const {
+    TensorIndexToScalarValueMap &valueCache) const {
   auto constOp = cast<ConstantOp>(op);
   auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
   if (!attr || !attr.isSplat()) {
@@ -47,8 +47,8 @@ LogicalResult ConstantOpSPIRVLowering::lowerOperation(
   Attribute constVal = attr.getSplatValue();
   auto spirvConstOp =
       builder.create<spirv::ConstantOp>(op->getLoc(), resultElemType, constVal);
-  valueCache.setOperandDstValue(constOp.getResult(), index,
-                                spirvConstOp.getResult());
+  valueCache.setValueAtIndex(constOp.getResult(), index,
+                             spirvConstOp.getResult());
   return success();
 }
 
@@ -57,8 +57,7 @@ LogicalResult ConstantOpSPIRVLowering::lowerOperation(
 //===----------------------------------------------------------------------===//
 LogicalResult CmpFOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, AffineExprCodegen &affineExprCodegen,
-    ValueCache &valueCache) const {
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
   if (operands.size() != 2) {
     return op->emitError("expected two operands in spir-v lowering of CmpFOp");
   }
@@ -95,7 +94,7 @@ LogicalResult CmpFOpSPIRVLowering::lowerOperation(
     default:
       return op->emitError("unhandled predicate attribute for SPIR-V lowering");
   }
-  valueCache.setOperandDstValue(op->getResult(0), index, spirvOp->getResult(0));
+  valueCache.setValueAtIndex(op->getResult(0), index, spirvOp->getResult(0));
   return success();
 }
 
@@ -103,8 +102,7 @@ LogicalResult CmpFOpSPIRVLowering::lowerOperation(
 // ReturnOp
 //===----------------------------------------------------------------------===//
 LogicalResult ReturnOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder, AffineExprCodegen &affineExprCodegen,
-    ValueCache &valueCache,
+    Operation *op, OpBuilder &builder, TensorIndexToScalarValueMap &valueCache,
     DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
     ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
   auto returnOp = cast<ReturnOp>(op);
@@ -121,9 +119,9 @@ LogicalResult ReturnOpSPIRVLowering::lowerOperation(
   }
   assert(outputBuffers.size() == 1 && "Expected a single output buffer");
   auto var = outputBuffers[0];
-  auto ptr = genPointerOffset(builder, returnOp.getLoc(), affineExprCodegen,
-                              indices[0], var);
-  auto scalarVal = valueCache.getOperandDstValue(returnTensor, indices[0]);
+  auto ptr =
+      genPointerOffset(builder, returnOp.getLoc(), valueCache, indices[0], var);
+  auto scalarVal = valueCache.getValueAtIndex(returnTensor, indices[0]);
   builder.create<spirv::StoreOp>(returnOp.getLoc(), ptr, scalarVal,
                                  /*memory_access = */ nullptr,
                                  /*alignment = */ nullptr);

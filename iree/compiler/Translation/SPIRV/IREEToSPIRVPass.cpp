@@ -110,10 +110,8 @@ void IREEToSPIRVPass::runOnModule() {
     // are not lowered to SPIR-V. Fix this limitation.
     if (!funcOp.getAttr("iree.executable.export")) continue;
 
-    ValueCache valueCache;
-    AffineExprCodegen affineExprCodegen(spvModule);
-    if (failed(spirvCodegen.codegen(spvModule, funcOp, affineExprCodegen,
-                                    valueCache))) {
+    TensorIndexToScalarValueMap valueCache(spvModule.getContext());
+    if (failed(spirvCodegen.codegen(spvModule, funcOp, valueCache))) {
       return signalPassFailure();
     }
   }

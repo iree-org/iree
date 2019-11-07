@@ -29,15 +29,14 @@ namespace iree_compiler {
 
 LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, AffineExprCodegen &affineExprCodegen,
-    ValueCache &valueCache) const {
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
   auto concatenateOp = cast<xla_hlo::ConcatenateOp>(op);
   auto loc = concatenateOp.getLoc();
   auto i32Type = builder.getIntegerType(32);
   auto i1Type = builder.getI1Type();
   int append_dim = concatenateOp.dimension().getZExtValue();
-  auto dimIndex = affineExprCodegen.getValue(index.getResult(append_dim),
-                                             builder.saveInsertionPoint(), loc);
+  auto dimIndex = valueCache.getAffineExprValue(
+      builder.saveInsertionPoint(), loc, index.getResult(append_dim));
 
   int offset = op->getOperand(0)
                    ->getType()
@@ -64,7 +63,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
         operandIt.value()->getType().cast<RankedTensorType>().getShape();
     offset += operandShape[append_dim];
   }
-  valueCache.setOperandDstValue(op->getResult(0), index, resultVal);
+  valueCache.setValueAtIndex(op->getResult(0), index, resultVal);
   return success();
 }
 
@@ -74,8 +73,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
 
 LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, AffineExprCodegen &affineExprCodegen,
-    ValueCache &valueCache) const {
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
   auto padOp = cast<xla_hlo::PadOp>(op);
   const auto &edgePaddingLow = padOp.edge_padding_low();
   const auto &interiorPadding = padOp.interior_padding();
@@ -122,8 +120,8 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
     auto bound = builder.create<spirv::IAddOp>(loc, i32Type, edgePadding, t1);
 
     // d_i
-    auto dimIndex = affineExprCodegen.getValue(
-        resultIndex.value(), builder.saveInsertionPoint(), loc);
+    auto dimIndex = valueCache.getAffineExprValue(builder.saveInsertionPoint(),
+                                                  loc, resultIndex.value());
 
     // d_i < (edge_padding_low[i] + stride * operand_shape[i])
     auto checkUb =
@@ -150,7 +148,7 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
   }
   Value *resultVal =
       builder.create<spirv::SelectOp>(loc, cond, operands[0], operands[1]);
-  valueCache.setOperandDstValue(op->getResult(0), index, resultVal);
+  valueCache.setValueAtIndex(op->getResult(0), index, resultVal);
   return success();
 }
 

@@ -18,7 +18,6 @@ iree_cc_library(
   NAME
     SPIRV
   HDRS
-    "AffineExprCodegen.h"
     "EmbeddedKernels.h"
     "IndexComputation.h"
     "IndexComputationAttribute.h"
@@ -28,6 +27,7 @@ iree_cc_library(
     "IREEToSPIRVPass.h"
     "SPIRVExecutableTranslation.h"
     "SPIRVLowering.h"
+    "TensorIndexToScalarValueMap.h"
     "XLAIndexPropagation.h"
     "XLAToSPIRV.h"
   SRCS
