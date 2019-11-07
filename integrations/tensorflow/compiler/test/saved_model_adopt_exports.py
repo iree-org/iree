@@ -16,9 +16,8 @@
 # pylint: disable=invalid-name
 # pylint: disable=missing-docstring
 
-import tensorflow.compat.v2 as tf
-
 import pyiree
+import tensorflow.compat.v2 as tf
 
 SAVED_MODEL_IMPORT_PASSES = [
     "tf-executor-graph-pruning",

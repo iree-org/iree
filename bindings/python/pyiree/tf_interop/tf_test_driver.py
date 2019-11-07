@@ -26,7 +26,8 @@ import traceback
 from absl import app
 from absl import flags
 import tensorflow.compat.v2 as tf
-import pyiree
+
+from .. import binding
 
 flags.DEFINE_string("filecheck_binary", "filecheck",
                     "Location of the filecheck binary.")
@@ -46,11 +47,11 @@ def _run_test(test_dict):
   """Runs an individual test dict."""
   tf_module_builder_lambda = test_dict["tf_module_builder"]
   tf_module = tf_module_builder_lambda()
-  ctx = pyiree.CompilerContext()
+  ctx = binding.compiler.CompilerContext()
   with tempfile.TemporaryDirectory() as sm_path:
     options = tf.saved_model.SaveOptions(save_debug_info=True)
     tf.saved_model.save(tf_module, sm_path, options=options)
-    input_module = pyiree.tf_load_saved_model(ctx, sm_path)
+    input_module = binding.tf_interop.load_saved_model(ctx, sm_path)
 
   passes = test_dict.get("passes")
   expect_pass_failure = test_dict.get("expect_pass_failure")

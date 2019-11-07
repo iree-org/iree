@@ -23,8 +23,8 @@ import tempfile
 import timeit
 
 import numpy as np
-import tensorflow.compat.v2 as tf
 import pyiree
+import tensorflow.compat.v2 as tf
 
 
 class SimpleArithmeticModule(tf.Module):

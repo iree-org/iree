@@ -133,8 +133,8 @@ py_test(
     srcs = ["compiler_test.py"],
     python_version = "PY3",
     deps = [
-        ":pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep
+        "//bindings/python/pyiree",
         "@absl_py//absl/testing:absltest",
     ],
 )
@@ -144,8 +144,8 @@ py_test(
     srcs = ["hal_test.py"],
     python_version = "PY3",
     deps = [
-        ":pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep
+        "//bindings/python/pyiree",
         "@absl_py//absl/testing:absltest",
     ],
 )
@@ -155,8 +155,8 @@ py_test(
     srcs = ["runtime_test.py"],
     python_version = "PY3",
     deps = NUMPY_DEPS + [
-        ":pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
+        "//bindings/python/pyiree",
     ],
 )

@@ -130,7 +130,7 @@ py_test(
     srcs = ["saved_model_test.py"],
     python_version = "PY3",
     deps = [
-        "//bindings/python/pyiree:binding",
+        "//bindings/python/pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep
     ] + INTREE_TENSORFLOW_PY_DEPS,
 )
