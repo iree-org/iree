@@ -41,70 +41,6 @@ void IREEToSPIRVPass::runOnModule() {
   auto module = getModule();
   OpBuilder builder(module.getBodyRegion());
 
-  // Initialize the index computation.
-  IndexPropagationList<
-      IndexPropagationOp<ConstantOp>,
-      // IREE-specific ops:
-      IndexPropagationOp<IREE::ReturnOp>, IREELoadIndexPropagation,
-      IREEStoreIndexPropagation,
-      // Standard dialect unary elementwise ops:
-      NoBroadcastPwOpIndexPropagation<SIToFPOp>,
-      NoBroadcastPwOpIndexPropagation<SignExtendIOp>,
-      // Standard dialect binary elementwise ops:
-      NoBroadcastPwOpIndexPropagation<AddFOp>,
-      NoBroadcastPwOpIndexPropagation<AddIOp>,
-      NoBroadcastPwOpIndexPropagation<AndOp>,
-      NoBroadcastPwOpIndexPropagation<CmpFOp>,
-      NoBroadcastPwOpIndexPropagation<CmpIOp>,
-      NoBroadcastPwOpIndexPropagation<DivFOp>,
-      NoBroadcastPwOpIndexPropagation<DivISOp>,
-      NoBroadcastPwOpIndexPropagation<DivIUOp>,
-      NoBroadcastPwOpIndexPropagation<MulFOp>,
-      NoBroadcastPwOpIndexPropagation<MulIOp>,
-      NoBroadcastPwOpIndexPropagation<OrOp>,
-      NoBroadcastPwOpIndexPropagation<RemFOp>,
-      NoBroadcastPwOpIndexPropagation<RemISOp>,
-      NoBroadcastPwOpIndexPropagation<RemIUOp>,
-      NoBroadcastPwOpIndexPropagation<SubFOp>,
-      NoBroadcastPwOpIndexPropagation<SubFOp>,
-      NoBroadcastPwOpIndexPropagation<SubIOp>,
-      NoBroadcastPwOpIndexPropagation<TruncateIOp>,
-      NoBroadcastPwOpIndexPropagation<XOrOp>,
-      NoBroadcastPwOpIndexPropagation<ZeroExtendIOp>,
-      // XLA unary elementwise ops:
-      NoBroadcastPwOpIndexPropagation<xla_hlo::AbsOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::CeilOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::ConvertOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::CosOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::ExpOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::FloorOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::LogOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::NegOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::RsqrtOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::SignOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::TanhOp>,
-      // XLA binary elementwise ops:
-      NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::AndOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::DivOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::MaxOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::MinOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::SubOp>,
-      // XLA other ops:
-      // TODO(ravishankarm): conv, dot.
-      // TODO(ravishankarm): gather.
-      // TODO(ravishankarm): pad.
-      // TODO(hanchung): dynamic_slice.
-      NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
-      ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
-      XLABroadcastOpIndexPropagation, XLABroadcastInDimOpIndexPropagation,
-      XLAConcatenateOpIndexPropagation, XLAPadOpIndexPropagation,
-      XLAReverseOpIndexPropagation, XLASliceOpIndexPropagation,
-      XLATransposeOpIndexPropagation>
-      indexPropagation;
-
   // Initialize the spir-v codegenerator.
   SPIRVCodegen<
       ConstantOpSPIRVLowering,
@@ -174,14 +110,8 @@ void IREEToSPIRVPass::runOnModule() {
     // are not lowered to SPIR-V. Fix this limitation.
     if (!funcOp.getAttr("iree.executable.export")) continue;
 
-    IndexComputationCache indexMap;
-    if (failed(indexPropagation.propagate(funcOp.getBody(), indexMap))) {
-      return signalPassFailure();
-    }
-    // dumpIndexCache(indexMap);
-
     ValueCache valueCache;
-    AffineExprCodegen affineExprCodegen(spvModule, indexMap);
+    AffineExprCodegen affineExprCodegen(spvModule);
     if (failed(spirvCodegen.codegen(spvModule, funcOp, affineExprCodegen,
                                     valueCache))) {
       return signalPassFailure();

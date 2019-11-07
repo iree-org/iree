@@ -43,7 +43,8 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
     ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
   auto storeOp = cast<IREE::StoreOutputOp>(op);
   auto src = storeOp.src();
-  auto indices = affineExprCodegen.getIndices(src);
+  SmallVector<AffineMap, 1> indices;
+  index_computation_attribute::getIndexMapsForValue(src, indices);
   if (indices.size() != 1) {
     return storeOp.emitError(
         "expected to compute a single element of the tensor that is stored "

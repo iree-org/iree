@@ -39,7 +39,7 @@ LogicalResult IREELoadIndexPropagation::propagateIndexMap(
 //===----------------------------------------------------------------------===//
 
 LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
-    Operation *operation, IndexComputationCache &indexMap) const {
+    Operation *operation) const {
   auto storeOp = cast<IREE::StoreOutputOp>(operation);
   auto src = storeOp.src();
   auto srcType = src->getType().dyn_cast<ShapedType>();
@@ -92,8 +92,7 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
         "unable to map from launch id to element to compute within a "
         "workitem");
   }
-  indexMap[src][srcMap];
-  return success();
+  return index_computation_attribute::addNewIndexMapForValue(src, srcMap);
 }
 }  // namespace iree_compiler
 }  // namespace mlir

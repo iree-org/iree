@@ -105,10 +105,30 @@ ArrayAttr updateIndexComputationAttrWithOperandIndices(
   return ArrayAttr::get(updatedList, context);
 }
 
-/// Records the `resultIndexMap` representing an access of an element of the
-/// `blockArg` to the index computation attribute.
-LogicalResult addBlockArgIndexMap(BlockArgument *blockArg,
-                                  AffineMap resultIndexMap) {
+/// Returns the name of the attribute.
+StringRef getIndexComputationAttrName() {
+  return "iree.index_computation_info";
+}
+
+/// Gets the attribute that records the index maps associated with a block
+/// argument.
+ArrayAttr getIndexComputationAttr(BlockArgument *blockArg) {
+  auto block = blockArg->getOwner();
+  auto funcOp = dyn_cast<FuncOp>(block->getParentOp());
+  if (!funcOp) {
+    emitError(blockArg->getLoc(),
+              "unimplemented index computation for block argument when "
+              "block is not in a function");
+    return nullptr;
+  }
+  auto attrName = getIndexComputationAttrName();
+  return funcOp.getArgAttrOfType<ArrayAttr>(blockArg->getArgNumber(), attrName);
+}
+
+/// Sets the attribute that records the index maps associated with a block
+/// argument.
+LogicalResult setIndexComputationAttr(BlockArgument *blockArg,
+                                      ArrayAttr updatedAttr) {
   auto block = blockArg->getOwner();
   auto funcOp = dyn_cast<FuncOp>(block->getParentOp());
   if (!funcOp) {
@@ -119,12 +139,36 @@ LogicalResult addBlockArgIndexMap(BlockArgument *blockArg,
   auto attrName = getIndexComputationAttrName();
   auto currAttr =
       funcOp.getArgAttrOfType<ArrayAttr>(blockArg->getArgNumber(), attrName);
-  auto updatedAttr = updateIndexComputationAttrWithResultIndex(
-      blockArg->getContext(), currAttr, resultIndexMap, /*numOperands=*/0);
   if (currAttr != updatedAttr) {
     funcOp.setArgAttr(blockArg->getArgNumber(), attrName, updatedAttr);
   }
   return success();
+}
+
+/// Gets the attribute that records the index maps associated with an operation.
+ArrayAttr getIndexComputationAttr(Operation *op) {
+  auto attrName = getIndexComputationAttrName();
+  return op->getAttrOfType<ArrayAttr>(attrName);
+}
+
+/// Sets the attribute that records the index maps association with an operation
+LogicalResult setIndexComputationAttr(Operation *op, ArrayAttr updatedAttr) {
+  auto attrName = getIndexComputationAttrName();
+  auto currAttr = op->getAttrOfType<ArrayAttr>(attrName);
+  if (currAttr != updatedAttr) {
+    op->setAttr(attrName, updatedAttr);
+  }
+  return success();
+}
+
+/// Records the `resultIndexMap` representing an access of an element of the
+/// `blockArg` to the index computation attribute.
+LogicalResult addBlockArgIndexMap(BlockArgument *blockArg,
+                                  AffineMap resultIndexMap) {
+  auto currAttr = getIndexComputationAttr(blockArg);
+  auto updatedAttr = updateIndexComputationAttrWithResultIndex(
+      blockArg->getContext(), currAttr, resultIndexMap, 0);
+  return setIndexComputationAttr(blockArg, updatedAttr);
 }
 
 /// Records the `resultIndexMap` representing an access to the result of the
@@ -136,20 +180,12 @@ LogicalResult addOpResultIndexMap(Operation *op, AffineMap resultIndexMap) {
         "unimplemented index propagation for op with multiple results");
   }
   auto numOperands = op->getNumOperands();
-  auto attrName = getIndexComputationAttrName();
-  auto currAttr = op->getAttrOfType<ArrayAttr>(attrName);
+  auto currAttr = getIndexComputationAttr(op);
   auto updatedAttr = updateIndexComputationAttrWithResultIndex(
       op->getContext(), currAttr, resultIndexMap, numOperands);
-  if (currAttr != updatedAttr) {
-    op->setAttr(attrName, updatedAttr);
-  }
-  return success();
+  return setIndexComputationAttr(op, updatedAttr);
 }
 }  // namespace
-
-StringRef getIndexComputationAttrName() {
-  return "iree.index_computation_info";
-}
 
 LogicalResult addNewIndexMapForValue(Value *value, AffineMap resultIndexMap) {
   // Check if the Value is a block argument or has a defining operation.
@@ -160,16 +196,51 @@ LogicalResult addNewIndexMapForValue(Value *value, AffineMap resultIndexMap) {
   return addOpResultIndexMap(value->getDefiningOp(), resultIndexMap);
 }
 
-LogicalResult addOperandIndexMap(Operation *op, AffineMap resultIndexMap,
-                                 ArrayRef<AffineMap> operandIndices) {
-  auto attrName = getIndexComputationAttrName();
-  auto currAttr = op->getAttrOfType<ArrayAttr>(attrName);
+LogicalResult addOperandsIndexMap(Operation *op, AffineMap resultIndexMap,
+                                  ArrayRef<AffineMap> operandIndices) {
+  auto currAttr = getIndexComputationAttr(op);
   auto updatedAttr = updateIndexComputationAttrWithOperandIndices(
       op->getContext(), currAttr, resultIndexMap, operandIndices);
-  if (currAttr != updatedAttr) {
-    op->setAttr(attrName, updatedAttr);
+  return setIndexComputationAttr(op, updatedAttr);
+}
+
+void getIndexMapsForValue(Value *value, SmallVectorImpl<AffineMap> &indices) {
+  auto valueKind = value->getKind();
+  ArrayAttr allIndices =
+      (valueKind == Value::Kind::BlockArgument
+           ? getIndexComputationAttr(cast<BlockArgument>(value))
+           : getIndexComputationAttr(value->getDefiningOp()));
+  if (!allIndices) {
+    return;
   }
-  return success();
+  for (auto attr : allIndices) {
+    auto affineMapList = attr.cast<ArrayAttr>().getValue();
+    if (affineMapList.empty()) {
+      continue;
+    }
+    indices.push_back(affineMapList.front().cast<AffineMapAttr>().getValue());
+  }
+}
+
+void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
+                             SmallVectorImpl<AffineMap> &operandIndices) {
+  ArrayAttr allIndices = getIndexComputationAttr(op);
+  if (!allIndices) {
+    return;
+  }
+  if (op->getNumResults() == 0) {
+    return;
+  }
+  assert(op->getNumResults() == 1);
+  for (auto affineMapList : allIndices) {
+    auto currList = affineMapList.cast<ArrayAttr>().getValue();
+    assert(currList.size() >= op->getNumResults());
+    if (currList[0].cast<AffineMapAttr>().getValue() == resultIndex) {
+      for (auto operandIndex : currList.drop_front()) {
+        operandIndices.push_back(operandIndex.cast<AffineMapAttr>().getValue());
+      }
+    }
+  }
 }
 
 }  // namespace index_computation_attribute

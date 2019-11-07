@@ -28,6 +28,10 @@ namespace iree_compiler {
 // Generates a spirv::ModuleOp from the module within an IREE Executable with
 // target-config vulkan-spirv.
 std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass();
+
+// Performs analysis to compute affine maps that represent the index of the
+// elements of tensor values needed within a workitem.
+std::unique_ptr<OpPassBase<FuncOp>> createIndexComputationPass();
 }  // namespace iree_compiler
 }  // namespace mlir
 

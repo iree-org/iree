@@ -470,7 +470,9 @@ class SPIRVCodegen {
   LogicalResult initArgValues(OpBuilder &builder, Location loc,
                               AffineExprCodegen &affineExprCodegen,
                               ValueCache &valueCache, Value *origArg) {
-    for (auto indexMap : affineExprCodegen.getIndices(origArg)) {
+    SmallVector<AffineMap, 4> indices;
+    index_computation_attribute::getIndexMapsForValue(origArg, indices);
+    for (auto indexMap : indices) {
       auto var = inputArgToVariable.lookup(origArg);
       if (!var) {
         return emitError(
@@ -614,10 +616,12 @@ class SPIRVCodegen {
 
     // Single return case.
     auto resultTensor = op->getResult(0);
-    auto indices = affineExprCodegen.getIndices(resultTensor);
+    SmallVector<AffineMap, 4> indices;
+    index_computation_attribute::getIndexMapsForValue(resultTensor, indices);
     for (auto &index : indices) {
-      auto operandIndices =
-          affineExprCodegen.getOperandIndices(resultTensor, index);
+      SmallVector<AffineMap, 2> operandIndices;
+      index_computation_attribute::getIndexMapsForOperands(op, index,
+                                                           operandIndices);
       SmallVector<Value *, 2> scalarOperands;
       for (auto arg : llvm::enumerate(op->getOperands())) {
         auto scalarArg = valueCache.getOperandDstValue(

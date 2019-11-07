@@ -595,7 +595,9 @@ void printLoadInputOp(OpAsmPrinter &printer, Operation *op) {
   printer.printOperand(inputValue);
   printer << " : ";
   printer.printType(inputValue->getType());
-  printer << ") : ";
+  printer << ") ";
+  printer.printOptionalAttrDict(op->getAttrs());
+  printer << " : ";
   printer.printType(outputValue->getType());
 }
 
@@ -628,7 +630,8 @@ void printStoreOutputOp(OpAsmPrinter &printer, Operation *op) {
   printer.printOperand(outputValue);
   printer << " : ";
   printer.printType(outputValue->getType());
-  printer << ")";
+  printer << ") ";
+  printer.printOptionalAttrDict(op->getAttrs());
 }
 
 #define GET_OP_CLASSES

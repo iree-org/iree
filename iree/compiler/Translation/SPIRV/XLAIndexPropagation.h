@@ -23,6 +23,7 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_XLAINDEXPROPOGATION_H
 
 #include "iree/compiler/Translation/SPIRV/IndexComputation.h"
+#include "iree/compiler/Translation/SPIRV/IndexComputationAttribute.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Function.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
@@ -59,8 +60,7 @@ class ReturnOpIndexPropagation : public IndexPropagationOp<OpTy> {
  public:
   using IndexPropagationOp<OpTy>::IndexPropagationOp;
 
-  LogicalResult propagateIndexMap(
-      Operation *operation, IndexComputationCache &indexMap) const override {
+  LogicalResult propagateIndexMap(Operation *operation) const override {
     if (operation->getNumOperands() != 1) {
       return operation->emitError("unhandled multiple return values");
     }
@@ -71,16 +71,15 @@ class ReturnOpIndexPropagation : public IndexPropagationOp<OpTy> {
       return operation->emitError("unhandled return tensor of dimension ")
              << returnType.getShape().size();
     }
-    // Have as many symbols as the rank of the input tensor. These symbols map
-    // to GlobalInvocationID along the three dimensions.
+    // Have as many dimensions as the rank of the input tensor. These symbols
+    // map to GlobalInvocationID along the three dimensions.
     Builder builder(operation->getContext());
     SmallVector<AffineExpr, 4> affineExprs;
     for (size_t i = returnRank; i > 0; --i) {
       affineExprs.push_back(builder.getAffineDimExpr(i - 1));
     }
-    indexMap[operation->getOperand(0)]
-            [AffineMap::get(returnRank, 0, affineExprs)];
-    return success();
+    return index_computation_attribute::addNewIndexMapForValue(
+        operation->getOperand(0), AffineMap::get(returnRank, 0, affineExprs));
   }
 };
 

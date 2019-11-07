@@ -47,16 +47,20 @@ namespace index_computation_attribute {
 /// operands computed based on the semantics of the operation for a given index
 /// map at the [0]-the position.
 
-/// Returns the name of the attribute.
-StringRef getIndexComputationAttrName();
-
 /// Records an index map for a tensor value.
 LogicalResult addNewIndexMapForValue(Value *value, AffineMap indexMap);
 
 /// Records the operand index maps for a given result index map,
 /// computed based on the `op` semantics.
-LogicalResult addOperandIndexMap(Operation *op, AffineMap resultIndexMap,
-                                 ArrayRef<AffineMap> operandIndices);
+LogicalResult addOperandsIndexMap(Operation *op, AffineMap resultIndexMap,
+                                  ArrayRef<AffineMap> operandIndices);
+
+/// Gets the index map associated with the value.
+void getIndexMapsForValue(Value *value, SmallVectorImpl<AffineMap> &indices);
+
+/// Gets the index map for the operands given the index map of the result.
+void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
+                             SmallVectorImpl<AffineMap> &operandIndices);
 
 }  // namespace index_computation_attribute
 }  // namespace iree_compiler

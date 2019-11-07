@@ -113,7 +113,8 @@ LogicalResult ReturnOpSPIRVLowering::lowerOperation(
         "unhandled lowering of return statement with multiple returns");
   }
   auto returnTensor = returnOp.getOperand(0);
-  auto indices = affineExprCodegen.getIndices(returnTensor);
+  SmallVector<AffineMap, 1> indices;
+  index_computation_attribute::getIndexMapsForValue(returnTensor, indices);
   if (indices.size() != 1) {
     return returnOp.emitError(
         "expected to compute a single element of the return tensor");

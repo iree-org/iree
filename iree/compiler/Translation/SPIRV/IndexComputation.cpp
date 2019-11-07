@@ -213,8 +213,7 @@ LogicalResult getReshapeOperandMap(Builder &builder, AffineMap resultIndexMap,
   return success();
 }
 
-LogicalResult IndexPropagation::propagateIndexMap(
-    Operation *op, IndexComputationCache &indexMap) const {
+LogicalResult IndexPropagation::propagateIndexMap(Operation *op) const {
   if (op->getNumResults() == 0) {
     // Nothing to do for this op.
     return success();
@@ -223,56 +222,27 @@ LogicalResult IndexPropagation::propagateIndexMap(
     return op->emitError(
         "default index propagation handles case with a single-return value");
   }
-  // Initialize the storage for all the operands.
-  for (auto arg : op->getOperands()) {
-    indexMap[arg];
-  }
-  for (auto &resultIndexMap : indexMap[op->getResult(0)]) {
+  SmallVector<AffineMap, 4> indices;
+  index_computation_attribute::getIndexMapsForValue(op->getResult(0), indices);
+  for (auto &resultIndexMap : indices) {
     SmallVector<AffineMap, 4> operandIndices;
-    if (failed(this->propagateIndexMap(op, resultIndexMap.first,
-                                       operandIndices))) {
+    if (failed(this->propagateIndexMap(op, resultIndexMap, operandIndices))) {
       return failure();
     }
     assert(operandIndices.size() == op->getNumOperands() &&
            "Expected as many indices as operands");
     for (auto arg : enumerate(op->getOperands())) {
-      indexMap[arg.value()][operandIndices[arg.index()]];
-      resultIndexMap.second.push_back(operandIndices[arg.index()]);
-
       if (failed(index_computation_attribute::addNewIndexMapForValue(
               arg.value(), operandIndices[arg.index()]))) {
         return failure();
       }
     }
-    if (failed(index_computation_attribute::addOperandIndexMap(
-            op, resultIndexMap.first, operandIndices))) {
+    if (failed(index_computation_attribute::addOperandsIndexMap(
+            op, resultIndexMap, operandIndices))) {
       return failure();
     }
   }
   return success();
-}
-
-void dumpIndexCache(IndexComputationCache &indexMap) {
-  for (auto &el : indexMap) {
-    // llvm::errs() << "Value : " << *(el.first);
-    // llvm::errs().flush();
-    if (isa<OpResult>(el.first)) {
-      llvm::errs() << "Operation : " << el.first->getDefiningOp()->getName();
-    } else if (isa<BlockArgument>(el.first)) {
-      llvm::errs() << "BlockArgument";
-    }
-    for (auto &used : el.second) {
-      llvm::errs() << "\n\t" << used.first << " : [";
-      std::string sep = "";
-      for (auto &operand : used.second) {
-        llvm::errs() << sep << operand;
-        sep = ", ";
-      }
-      llvm::errs() << "]";
-    }
-    llvm::errs() << "\n";
-  }
-  llvm::errs() << "\n";
 }
 
 }  // namespace iree_compiler

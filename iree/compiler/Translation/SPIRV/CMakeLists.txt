@@ -34,6 +34,7 @@ iree_cc_library(
     "EmbeddedKernels.cpp"
     "IndexComputation.cpp"
     "IndexComputationAttribute.cpp"
+    "IndexComputationPass.cpp"
     "IREEIndexComputation.cpp"
     "IREEToSPIRV.cpp"
     "IREEToSPIRVPass.cpp"

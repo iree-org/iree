@@ -50,8 +50,7 @@ class IREEStoreIndexPropagation final
  public:
   using IndexPropagationOp<IREE::StoreOutputOp>::IndexPropagationOp;
 
-  LogicalResult propagateIndexMap(
-      Operation *operation, IndexComputationCache &indexMap) const override;
+  LogicalResult propagateIndexMap(Operation *operation) const override;
 };
 
 }  // namespace iree_compiler

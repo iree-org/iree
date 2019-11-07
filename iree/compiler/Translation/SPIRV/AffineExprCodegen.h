@@ -30,11 +30,8 @@ namespace iree_compiler {
 /// Codegenerator for affine expressions.
 class AffineExprCodegen : public AffineExprVisitor<AffineExprCodegen, Value *> {
  public:
-  explicit AffineExprCodegen(spirv::ModuleOp module,
-                             IndexComputationCache &tensorIndices)
-      : builder(module.getContext()),
-        location(module.getLoc()),
-        tensorIndices(tensorIndices) {}
+  explicit AffineExprCodegen(spirv::ModuleOp module)
+      : builder(module.getContext()), location(module.getLoc()) {}
 
   Value *visitAddExpr(AffineBinaryOpExpr expr) {
     auto operand1 = getValueInternal(expr.getLHS());
@@ -92,23 +89,6 @@ class AffineExprCodegen : public AffineExprVisitor<AffineExprCodegen, Value *> {
     return val;
   }
 
-  /// Returns a list of indices of a particular tensor in the source dialect
-  /// needed within the dispatch function (obtained from the
-  /// IndexComputationCache)
-  SmallVector<AffineMap, 4> getIndices(Value *value) {
-    SmallVector<AffineMap, 4> indices;
-    for (auto &index : tensorIndices[value]) {
-      indices.push_back(index.first);
-    }
-    return indices;
-  }
-
-  /// For a given tensor in the source dialect and index, return the index of
-  /// all operands needed to compute the result.
-  ArrayRef<AffineMap> getOperandIndices(Value *value, AffineMap index) {
-    return tensorIndices[value][index];
-  }
-
  private:
   /// Returns the Value corresponding to the AffineExpr `expr` by either
   /// previously generated value for the same index, or by generating the value.
@@ -132,10 +112,6 @@ class AffineExprCodegen : public AffineExprVisitor<AffineExprCodegen, Value *> {
   /// need to be changed if we are handling control flow within the dispatch
   /// function.
   DenseMap<AffineExpr, Value *> exprToDstValue;
-
-  /// Map from tensor value in source dialect to list of indices of the tensor
-  /// needed within a workitem to compute the results of the dispatch function.
-  IndexComputationCache &tensorIndices;
 };
 }  // namespace iree_compiler
 }  // namespace mlir

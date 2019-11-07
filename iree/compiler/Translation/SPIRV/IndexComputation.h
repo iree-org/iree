@@ -37,14 +37,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// For each tensor Value* within the dispatch function, store the map
-/// representing the index of that tensor needed for a workitem. For each index
-/// also store the index of the operands needed to not recompute it later on.
-/// TODO(ravishankarm): This sort of assumes each operation has a single result
-/// value. Might need to be changed later on.
-using IndexComputationCache =
-    DenseMap<Value *, llvm::MapVector<AffineMap, SmallVector<AffineMap, 4>>>;
-
 /// Base class used to construct a map from opname to the
 /// computation that propagates the index map from result to
 /// operands.
@@ -59,8 +51,7 @@ class IndexPropagation {
   /// implementation should evaluate the indices of the operands needed for all
   /// indices of the result value needed. The default implementation only
   /// handles operations with a zero or single-return value.
-  virtual LogicalResult propagateIndexMap(
-      Operation *operation, IndexComputationCache &indexMap) const;
+  virtual LogicalResult propagateIndexMap(Operation *operation) const;
 
   /// Propagates the index map from result to operands for a given index of the
   /// result operand.
@@ -280,8 +271,7 @@ class IndexPropagationList {
   explicit IndexPropagationList() { insert(); }
 
   /// Performs the propagation.
-  LogicalResult propagate(Region &region,
-                          IndexComputationCache &indexMap) const {
+  LogicalResult propagate(Region &region) const {
     if (region.getBlocks().size() != 1) {
       return emitError(
           region.getLoc(),
@@ -295,19 +285,8 @@ class IndexPropagationList {
         if (!indexPropagationList.count(opName)) {
           return op.emitError("unhandled index propagation");
         }
-        for (auto rt = op.result_begin(), re = op.result_end(); rt != re;
-             ++rt) {
-          auto resultValue = *rt;
-          auto type = resultValue->getType().dyn_cast<RankedTensorType>();
-          if (!type) {
-            return op.emitError("expected return value to be a tensor");
-          }
-          if (!indexMap.count(*rt)) {
-            return op.emitError("missing index map of result");
-          }
-        }
         auto propagate = indexPropagationList.find(opName);
-        if (failed(propagate->getValue()->propagateIndexMap(&op, indexMap))) {
+        if (failed(propagate->getValue()->propagateIndexMap(&op))) {
           return failure();
         }
       }
@@ -333,9 +312,6 @@ class IndexPropagationList {
   /// List of methods for propagation indexed using opname.
   IndexPropagationListT indexPropagationList;
 };
-
-/// Debug method to just dump the indexMap to llvm::errs.
-void dumpIndexCache(IndexComputationCache &indexMap);
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -27,6 +27,7 @@ cc_library(
         "IREEToSPIRVPass.cpp",
         "IndexComputation.cpp",
         "IndexComputationAttribute.cpp",
+        "IndexComputationPass.cpp",
         "SPIRVExecutableTranslation.cpp",
         "SPIRVLowering.cpp",
         "SPIRVLowering.h",
