@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/IREEDialect.h"
 
 #include "iree/compiler/Dialect/Types.h"
-#include "third_party/llvm/llvm/include/llvm/Support/SourceMgr.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"

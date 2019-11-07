@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
 #include "iree/compiler/Dialect/Types.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Matchers.h"
