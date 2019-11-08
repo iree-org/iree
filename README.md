@@ -5,6 +5,8 @@ experimental playground for low-level/tightly integrated machine learning
 libraries that make use of modern hardware acceleration APIs and techniques (see
 [non goals](#non-goals)).
 
+![ci-status](https://github.com/google/iree/workflows/Continuous%20Integration/badge.svg)
+
 ## Table of Contents
 
 -   [Quickstart](#quickstart)
