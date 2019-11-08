@@ -25,3 +25,6 @@ user.bazelrc
 
 # Dear ImGui Ini files
 imgui.ini
+
+# Emacs autosaves
+*~
