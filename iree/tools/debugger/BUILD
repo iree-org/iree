@@ -44,7 +44,7 @@ package(
 #     hdrs = ["debug_app.h"],
 #     deps = [
 #         "//third_party/GL:GLES2_headers",
-#         "//third_party/SDL2",
+#         "@sdl2//:SDL2",
 #         "@com_google_absl//absl/flags:flag",
 #         "@com_google_absl//absl/memory",
 #         "@com_google_absl//absl/strings",
@@ -67,7 +67,7 @@ package(
 #     hdrs = ["debug_app_embedded.h"],
 #     deps = [
 #         ":debug_app_library",
-#         "//third_party/SDL2",
+#         "@sdl2//:SDL2",
 #         "@com_google_absl//absl/base:core_headers",
 #         "@com_google_absl//absl/memory",
 #         "@com_google_absl//absl/strings",
@@ -119,7 +119,7 @@ package(
 #     ],
 #     deps = [
 #         ":debug_app_library",
-#         "//third_party/SDL2",
+#         "@sdl2//:SDL2",
 #         "@com_google_absl//absl/memory",
 #         "//third_party/dear_imgui",
 #         "//third_party/dear_imgui:imgui_sdl_opengl3",
