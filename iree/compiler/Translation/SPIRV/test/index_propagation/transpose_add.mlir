@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv %s | FileCheck %s
+// RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | FileCheck %s
 
 // CHECK-DAG: [[MAP0:\#.*]] = ([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM1]], [[DIM0]])
 // CHECK-DAG: [[MAP1:\#.*]] = ([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM0]], [[DIM1]])

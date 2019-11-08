@@ -22,6 +22,7 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_TENSORINDEXTOSCALARVALUEMAP_H
 
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineExprVisitor.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Builders.h"
@@ -63,10 +64,16 @@ class TensorIndexToScalarValueMap {
     tensorIndexToScalarValueMap[tensor][index] = scalar;
   }
 
-  /// Records the `value` to use for an AffineDimExpr while generate code for
+  /// Records the `value` to use for an AffineDimExpr while generating code for
   /// AffineExpr trees.
   void setDimValue(unsigned dim, Value *value) {
     return affineExprCodegen.setDimValue(dim, value);
+  }
+
+  /// Records the `value` to use for an AffineSymbolExpr while generating code
+  /// for AffineExpr trees.
+  void setSymbolValue(unsigned pos, Value *value) {
+    return affineExprCodegen.setSymbolValue(pos, value);
   }
 
  private:
@@ -121,12 +128,14 @@ class TensorIndexToScalarValueMap {
       return builder.create<spirv::IMulOp>(location, operand1, operand2);
     }
     Value *visitSymbolExpr(AffineSymbolExpr expr) {
-      // TODO(ravishankarm): Implement symbol expr codegen.
-      llvm_unreachable("Unimplemented affine AffineSymbolExpr codegen");
-      return nullptr;
+      return symbolPosToValue.lookup(expr.getPosition());
     }
     void setDimValue(unsigned dim, Value *value) {
       threadDimToValue[dim] = value;
+    }
+    void setSymbolValue(unsigned pos, Value *value) {
+      assert(!symbolPosToValue.count(pos));
+      symbolPosToValue[pos] = value;
     }
 
    private:
@@ -144,6 +153,10 @@ class TensorIndexToScalarValueMap {
     /// Mapping from AffineDimExpr to Value to use in generating scalar code to
     /// compute an AffineExpr tree.
     DenseMap<unsigned, Value *> threadDimToValue;
+
+    /// Mapping from AffineSymbolExpr to Value to use in generating scalar code
+    /// to compute an AffineExpr tree.
+    DenseMap<unsigned, Value *> symbolPosToValue;
 
     OpBuilder builder;
     Location location;

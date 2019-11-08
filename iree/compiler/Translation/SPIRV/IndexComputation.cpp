@@ -187,7 +187,8 @@ inline LogicalResult getAffineExprForReshape(
 }
 }  // namespace
 
-LogicalResult getReshapeOperandMap(Builder &builder, AffineMap resultIndexMap,
+LogicalResult getReshapeOperandMap(FuncOp funcOp, Builder &builder,
+                                   AffineMap resultIndexMap,
                                    ArrayRef<int64_t> resultShapeRef,
                                    ArrayRef<int64_t> operandShapeRef,
                                    AffineMap &operandIndexMap) {
@@ -207,8 +208,7 @@ LogicalResult getReshapeOperandMap(Builder &builder, AffineMap resultIndexMap,
   assert(operandExprs.size() == operandShape.size() &&
          "expected as many exprs for the operand as the rank of the operand");
   operandIndexMap =
-      AffineMap::get(resultIndexMap.getNumDims(),
-                     resultIndexMap.getNumSymbols(), operandExprs);
+      index_computation_attribute::getAffineMap(funcOp, operandExprs);
 
   return success();
 }

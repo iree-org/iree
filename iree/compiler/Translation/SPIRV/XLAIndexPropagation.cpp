@@ -38,9 +38,8 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
   Builder builder(operation->getContext());
   if (!broadcastDim) {
     // This is a scalar. So all indices map to the same element.
-    AffineMap scalarMap =
-        AffineMap::get(resultIndex.getNumDims(), resultIndex.getNumSymbols(),
-                       builder.getAffineConstantExpr(0));
+    AffineMap scalarMap = index_computation_attribute::getAffineMap(
+        operation->getParentOfType<FuncOp>(), builder.getAffineConstantExpr(0));
     indexMap.push_back(scalarMap);
     return success();
   }
@@ -55,8 +54,8 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
       exprs.push_back(resultExpr.value());
     }
   }
-  auto operandMap = AffineMap::get(resultIndex.getNumDims(),
-                                   resultIndex.getNumSymbols(), exprs);
+  auto operandMap = index_computation_attribute::getAffineMap(
+      operation->getParentOfType<FuncOp>(), exprs);
   indexMap.push_back(operandMap);
   return success();
 }
@@ -85,8 +84,8 @@ LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
     // The result is a scalar. Just add a constant expr 0.
     exprs.push_back(builder.getAffineConstantExpr(0));
   }
-  auto operandMap = AffineMap::get(resultIndex.getNumDims(),
-                                   resultIndex.getNumSymbols(), exprs);
+  auto operandMap = index_computation_attribute::getAffineMap(
+      operation->getParentOfType<FuncOp>(), exprs);
   indexMap.push_back(operandMap);
   return success();
 }
@@ -115,10 +114,131 @@ LogicalResult XLAConcatenateOpIndexPropagation::propagateIndexMap(
       exprs.push_back(e);
     }
     offset += operandType.getDimSize(append_dim);
-    AffineMap shiftedMap = AffineMap::get(resultIndex.getNumDims(),
-                                          resultIndex.getNumSymbols(), exprs);
+    AffineMap shiftedMap = index_computation_attribute::getAffineMap(
+        op->getParentOfType<FuncOp>(), exprs);
     AffineMap operandMap = shiftedMap.compose(resultIndex);
     operandIndices.push_back(operandMap);
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// GatherOp
+//===----------------------------------------------------------------------===//
+namespace {
+
+template <typename T>
+void getElementsAsSet(DenseElementsAttr attr, DenseSet<T> &set) {
+  for (auto val : attr.getValues<int64_t>()) {
+    set.insert(val);
+  }
+}
+
+template <typename T>
+void getElementsAsSortedVector(DenseElementsAttr attr,
+                               SmallVectorImpl<T> &values) {
+  DenseSet<T> set;
+  getElementsAsSet(attr, set);
+  values.append(set.begin(), set.end());
+}
+}  // namespace
+
+LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
+    Operation *op, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &operandIndices) const {
+  auto context = op->getContext();
+  auto gatherOp = cast<xla_hlo::GatherOp>(op);
+  Value *startIndices = gatherOp.start_indices();
+  int64_t startIndicesRank =
+      startIndices->getType().cast<ShapedType>().getRank();
+  Value *operand = gatherOp.operand();
+  int64_t operandRank = operand->getType().cast<ShapedType>().getRank();
+  Value *result = gatherOp.getResult();
+  int64_t resultRank = result->getType().cast<ShapedType>().getRank();
+  ArrayRef<AffineExpr> resultExprs = resultIndex.getResults();
+  int64_t indexVectorDim = gatherOp.index_vector_dim().getSExtValue();
+
+  // Get the batch dims;
+  DenseSet<int64_t> offsetDimsSet, batchDimsSet;
+  getElementsAsSet(gatherOp.offset_dims(), offsetDimsSet);
+  for (auto i : llvm::seq<int64_t>(0, resultRank)) {
+    if (!offsetDimsSet.count(i)) {
+      batchDimsSet.insert(i);
+    }
+  }
+
+  // Compute the "G" set.
+  SmallVector<AffineExpr, 2> gOrig(batchDimsSet.size());
+  for (auto batchDim : enumerate(batchDimsSet)) {
+    gOrig[batchDim.index()] = resultExprs[batchDim.value()];
+  }
+  if (startIndicesRank != 0 && gOrig.size() + 1 != startIndicesRank) {
+    return op->emitError("unhanled configuration of gather operation");
+  }
+
+  // Compute remapped_offset_dims.
+  DenseSet<int64_t> collapsedSliceDims;
+  getElementsAsSet(gatherOp.collapsed_slice_dims(), collapsedSliceDims);
+  SmallVector<int64_t, 2> offsetDims(offsetDimsSet.begin(),
+                                     offsetDimsSet.end());
+  SmallVector<int64_t, 4> remappedOffsetDims(offsetDims.size());
+  int64_t operandRankNum = 0;
+  for (auto i : llvm::seq<int64_t>(0, offsetDims.size())) {
+    while (collapsedSliceDims.count(operandRankNum)) operandRankNum++;
+    remappedOffsetDims[i] = operandRankNum++;
+  }
+
+  // Compute the "starting index".
+  auto startIndexMapAttr = gatherOp.start_index_map();
+  auto startIndexMapSize =
+      startIndexMapAttr.getType().cast<ShapedType>().getShape()[0];
+  if (startIndexMapSize != 1) {
+    return op->emitError(
+        "unhandled index propagation for gather op with start_index_map shape "
+        "not equal to tensor<1xi64>");
+  }
+  for (auto k : llvm::seq<unsigned>(0, startIndexMapSize)) {
+    SmallVector<AffineExpr, 4> exprs(operandRank);
+
+    auto g = gOrig;
+    auto insertPos =
+        (indexVectorDim == 0 ? g.begin()
+                             : std::next(g.begin(), indexVectorDim));
+    g.insert(insertPos, getAffineConstantExpr(k, context));
+
+    auto indexAccessMap = index_computation_attribute::getAffineMap(
+        op->getParentOfType<FuncOp>(), g);
+    auto symbolNum =
+        index_computation_attribute::addNewSymbolNumberForTensorIndex(
+            startIndices, indexAccessMap);
+    if (!symbolNum) {
+      return failure();
+    }
+    exprs[startIndexMapAttr.getValue<int64_t>(k)] =
+        getAffineSymbolExpr(symbolNum.getValue(), context);
+
+    // Add the offset index.
+    for (auto k : llvm::seq<unsigned>(0, operandRank)) {
+      if (k < offsetDims.size()) {
+        auto &expr = exprs[remappedOffsetDims[k]];
+        if (expr) {
+          expr = getAffineBinaryOpExpr(AffineExprKind::Add, expr,
+                                       resultExprs[offsetDims[k]]);
+        } else {
+          expr = resultExprs[offsetDims[k]];
+        }
+      }
+    }
+
+    // Fill in zeros for missing indices
+    for (auto &expr : exprs) {
+      if (!expr) {
+        expr = getAffineConstantExpr(0, context);
+      }
+    }
+    operandIndices.push_back(index_computation_attribute::getAffineMap(
+        op->getParentOfType<FuncOp>(), exprs));
+    operandIndices.push_back(indexAccessMap);
   }
   return success();
 }
@@ -131,17 +251,17 @@ LogicalResult XLAPadOpIndexPropagation::propagateIndexMap(
     Operation *op, AffineMap resultIndex,
     SmallVectorImpl<AffineMap> &operandIndices) const {
   auto padOp = cast<xla_hlo::PadOp>(op);
-  /// For pad operation, if result index at a particular dimension is d_i, then
-  /// the input tensor index is computed as (d_i - edge_padding_low[i]) /
-  /// (interior_padding[i]+1). Note that multiple indices of the output tensor
-  /// could map to the same element of the padded tensor. The final lowering has
-  /// to insert a condition to make sure that the padding_value is used when the
-  /// index corresponds to a padded element.
+  // For pad operation, if result index at a particular dimension is d_i, then
+  // the input tensor index is computed as (d_i - edge_padding_low[i]) /
+  // (interior_padding[i]+1). Note that multiple indices of the output tensor
+  // could map to the same element of the padded tensor. The final lowering has
+  // to insert a condition to make sure that the padding_value is used when the
+  // index corresponds to a padded element.
   const auto &edge_padding_low = padOp.edge_padding_low();
   const auto &interior_padding = padOp.interior_padding();
   OpBuilder builder(op->getContext());
 
-  /// Index for the tensor operand.
+  // Index for the tensor operand.
   SmallVector<AffineExpr, 4> exprs(
       padOp.operand()->getType().cast<RankedTensorType>().getRank());
   for (auto resultExpr : enumerate(resultIndex.getResults())) {

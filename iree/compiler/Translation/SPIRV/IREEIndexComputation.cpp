@@ -78,7 +78,8 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
     }
     numElements *= launchSize[i - 1];
   }
-  auto launchMap = AffineMap::get(launchSize.size(), 0, affineExprs);
+  auto launchMap =
+      index_computation_attribute::getAffineMap(funcOp, affineExprs);
 
   // The stored tensor can be a reshape of the launch dimension. It still
   // retains the requirement that each workitem is computing a single element
@@ -86,7 +87,7 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
   AffineMap srcMap;
   SmallVector<int64_t, 3> revLaunchSize(reverse(launchSize));
   if (numElements != srcType.getNumElements() ||
-      failed(getReshapeOperandMap(builder, launchMap, revLaunchSize,
+      failed(getReshapeOperandMap(funcOp, builder, launchMap, revLaunchSize,
                                   srcType.getShape(), srcMap))) {
     return storeOp.emitError(
         "unable to map from launch id to element to compute within a "

@@ -21,6 +21,8 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_H
 
+#include "iree/compiler/Translation/SPIRV/IREECodegenUtils.h"
+#include "iree/compiler/Translation/SPIRV/IndexComputationAttribute.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -32,7 +34,6 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
-#include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -112,7 +113,8 @@ class NoBroadcastPwOpIndexPropagation : public IndexPropagationOp<OpTy> {
 
 /// Computes the index map representing the element of the operand accessed
 /// given the index map of the result for a reshape operation.
-LogicalResult getReshapeOperandMap(Builder &builder, AffineMap resultIndexMap,
+LogicalResult getReshapeOperandMap(FuncOp funcOp, Builder &builder,
+                                   AffineMap resultIndexMap,
                                    ArrayRef<int64_t> resultShapeRef,
                                    ArrayRef<int64_t> operandShapeRef,
                                    AffineMap &operandIndexMap);
@@ -146,7 +148,8 @@ class ReshapeOpIndexPropagation final : public IndexPropagationOp<OpTy> {
     // Check if the reshape is a adding or removing a dimension of size 1 (and
     // build the index for the operand accordingly).
     AffineMap operandIndexMap;
-    if (failed(getReshapeOperandMap(builder, resultIndex, resultType.getShape(),
+    if (failed(getReshapeOperandMap(op->getParentOfType<FuncOp>(), builder,
+                                    resultIndex, resultType.getShape(),
                                     operandType.getShape(), operandIndexMap))) {
       return op->emitError("unhandled reshape index propagation");
     }
@@ -277,6 +280,16 @@ class IndexPropagationList {
           region.getLoc(),
           "unimplemented handling multiple blocks within a region");
     }
+
+    // Set the attribute for the number of launch dims.
+    auto funcOp = region.getParentOfType<FuncOp>();
+    SmallVector<int64_t, 3> launchSize;
+    if (failed(getLaunchSize(funcOp, launchSize))) {
+      return emitError(region.getLoc(),
+                       "expected region of index propagation to be in dispatch "
+                       "function to get launch size");
+    }
+    index_computation_attribute::setNumLaunchDims(funcOp, launchSize.size());
     // TODO(ravishankarm) : Need to process blocks in reverse topological order.
     for (auto it = region.rbegin(), ie = region.rend(); it != ie; ++it) {
       for (auto jt = it->rbegin(), je = it->rend(); jt != je; ++jt) {

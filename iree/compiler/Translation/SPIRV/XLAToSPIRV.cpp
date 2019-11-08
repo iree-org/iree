@@ -68,6 +68,16 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
 }
 
 //===----------------------------------------------------------------------===//
+// GatherOp
+//===----------------------------------------------------------------------===//
+LogicalResult XLAGatherOpSPIRVLowering::lowerOperation(
+    Operation *op, OpBuilder &builder, AffineMap index,
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+  valueCache.setValueAtIndex(op->getResult(0), index, operands[0]);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // PadOp
 //===----------------------------------------------------------------------===//
 

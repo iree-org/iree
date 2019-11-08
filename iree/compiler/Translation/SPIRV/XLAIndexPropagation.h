@@ -94,6 +94,16 @@ class XLAConcatenateOpIndexPropagation final
       SmallVectorImpl<AffineMap> &operandIndices) const override;
 };
 
+class XLAGatherOpIndexPropagation final
+    : public IndexPropagationOp<xla_hlo::GatherOp> {
+ public:
+  using IndexPropagationOp<xla_hlo::GatherOp>::IndexPropagationOp;
+
+  LogicalResult propagateIndexMap(
+      Operation *operation, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &operandIndices) const override;
+};
+
 /// Index propogation for XLA PadOp. If `d_i` is the index of the result
 /// accessed in a workitem at dimension `i`, then set the index of the operand
 /// needed as (`d_i` - `edge_padding_low`[i]) / (`interior_padding`[i] + 1)).

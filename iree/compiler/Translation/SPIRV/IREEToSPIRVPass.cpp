@@ -88,7 +88,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVIndexOpLowering<xla_hlo::ReverseOp>,
       SPIRVIndexOpLowering<xla_hlo::SliceOp>,
       SPIRVIndexOpLowering<xla_hlo::TransposeOp>, XLAConcatenateOpSPIRVLowering,
-      XLAPadOpSPIRVLowering>
+      XLAGatherOpSPIRVLowering, XLAPadOpSPIRVLowering>
       spirvCodegen;
 
   // Create a spirv.module Op.

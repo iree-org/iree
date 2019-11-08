@@ -25,7 +25,10 @@
 
 namespace mlir {
 
+class AffineExpr;
 class AffineMap;
+class BlockArgument;
+class FuncOp;
 class Operation;
 class Value;
 
@@ -50,10 +53,21 @@ namespace index_computation_attribute {
 /// Records an index map for a tensor value.
 LogicalResult addNewIndexMapForValue(Value *value, AffineMap indexMap);
 
+/// Records the symbol number that is used to refer to an element of a tensor
+/// and is needed to express the index maps for all tensors within the dispatch
+/// function. The tensor `value` has to be the result of an iree.load_input
+/// operation.
+Optional<int64_t> addNewSymbolNumberForTensorIndex(Value *value,
+                                                   AffineMap index);
+
 /// Records the operand index maps for a given result index map,
 /// computed based on the `op` semantics.
 LogicalResult addOperandsIndexMap(Operation *op, AffineMap resultIndexMap,
                                   ArrayRef<AffineMap> operandIndices);
+
+/// Builds the AffineMap that represents the index of a tensor accessed within
+/// the dispatch function.
+AffineMap getAffineMap(FuncOp funcOp, ArrayRef<AffineExpr> exprs);
 
 /// Gets the index map associated with the value.
 void getIndexMapsForValue(Value *value, SmallVectorImpl<AffineMap> &indices);
@@ -61,6 +75,16 @@ void getIndexMapsForValue(Value *value, SmallVectorImpl<AffineMap> &indices);
 /// Gets the index map for the operands given the index map of the result.
 void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
                              SmallVectorImpl<AffineMap> &operandIndices);
+
+/// Gets the symbol numbers that map to values read from the tensor. For now the
+/// tensors are restricted to be block arguments (which are really of memref
+/// type).
+void getSymbolNumberForTensorIndex(
+    BlockArgument *arg,
+    SmallVectorImpl<std::pair<AffineMap, unsigned>> &symbolInfo);
+
+/// Sets the number of launch dimensions for the dispatch function.
+void setNumLaunchDims(FuncOp funcOp, unsigned numLaunchDims);
 
 }  // namespace index_computation_attribute
 }  // namespace iree_compiler

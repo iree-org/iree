@@ -442,6 +442,29 @@ class SPIRVCodegen {
     return success();
   }
 
+  /// Method to load the values of globalVariables at an index.
+  Value *loadArgValueAtIndex(OpBuilder &builder, Location loc,
+                             TensorIndexToScalarValueMap &valueCache,
+                             Value *origArg, AffineMap indexMap) {
+    Value *val = valueCache.getValueAtIndex(origArg, indexMap);
+    if (val) {
+      return val;
+    }
+    auto var = inputArgToVariable.lookup(origArg);
+    if (!var) {
+      emitError(loc, "undefined SPIR-V global variable for tensor argument");
+      return nullptr;
+    }
+    auto ptr = genPointerOffset(builder, loc, valueCache, indexMap, var);
+    auto elementType =
+        ptr->getType().template cast<spirv::PointerType>().getPointeeType();
+    val = builder.create<spirv::LoadOp>(loc, elementType, ptr,
+                                        /*memory_access =*/nullptr,
+                                        /*alignment = */ nullptr);
+    valueCache.setValueAtIndex(origArg, indexMap, val);
+    return val;
+  }
+
   /// Method to load the values of globalVariables corresponding to the
   /// arguments of the dispatch function at all indices needed within the
   /// dispatch function.
@@ -451,18 +474,42 @@ class SPIRVCodegen {
     SmallVector<AffineMap, 4> indices;
     index_computation_attribute::getIndexMapsForValue(origArg, indices);
     for (auto indexMap : indices) {
-      auto var = inputArgToVariable.lookup(origArg);
-      if (!var) {
-        return emitError(
-            loc, "undefined SPIR-V global variable for tensor argument");
+      if (!loadArgValueAtIndex(builder, loc, valueCache, origArg, indexMap)) {
+        return failure();
       }
-      auto ptr = genPointerOffset(builder, loc, valueCache, indexMap, var);
-      auto elementType =
-          ptr->getType().template cast<spirv::PointerType>().getPointeeType();
-      auto val = builder.create<spirv::LoadOp>(loc, elementType, ptr,
-                                               /*memory_access =*/nullptr,
-                                               /*alignment = */ nullptr);
-      valueCache.setValueAtIndex(origArg, indexMap, val);
+    }
+    return success();
+  }
+
+  /// Method to load values that correspond to symbols used in affine maps.
+  LogicalResult initSymbolValues(OpBuilder &builder, Location loc,
+                                 TensorIndexToScalarValueMap &valueCache,
+                                 Value *origArg) {
+    // Add values corresponding to the symbol numbers.
+    SmallVector<std::pair<AffineMap, unsigned>, 2> symbolInfo;
+    index_computation_attribute::getSymbolNumberForTensorIndex(
+        cast<BlockArgument>(origArg), symbolInfo);
+    for (auto element : symbolInfo) {
+      // Load the value at the index.
+      auto val =
+          loadArgValueAtIndex(builder, loc, valueCache, origArg, element.first);
+      if (!val) {
+        return failure();
+      }
+      // Check the the value is 32-bit integer and truncate it to 32-bits if
+      // needed.
+      // TODO: Avoid hardwiring the mapping of index types to 32-bit
+      // integers. (It is done in a few places here which need to be abstracted
+      // out).
+      auto valType = val->getType().template dyn_cast<IntegerType>();
+      if (!valType || valType.getWidth() != 64) {
+        return emitError(loc,
+                         "expected tensors that contain values used to access "
+                         "other tensors to be i64 type");
+      }
+      val = builder.create<spirv::SConvertOp>(
+          loc, IntegerType::get(32, valType.getContext()), val);
+      valueCache.setSymbolValue(element.second, val);
     }
     return success();
   }
@@ -545,6 +592,14 @@ class SPIRVCodegen {
                               TensorIndexToScalarValueMap &valueCache) {
     if (failed(createLaunchGuard(builder, fn))) {
       return failure();
+    }
+
+    for (auto arg : fn.getArguments()) {
+      // Load values of the argument at all indices needed for computation
+      // within the dispatch function.
+      if (failed(initSymbolValues(builder, fn.getLoc(), valueCache, arg))) {
+        return failure();
+      }
     }
 
     for (auto arg : fn.getArguments()) {

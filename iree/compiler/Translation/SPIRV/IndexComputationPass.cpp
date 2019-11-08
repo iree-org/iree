@@ -94,9 +94,9 @@ void IndexComputationPass::runOnFunction() {
       ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,
       XLABroadcastOpIndexPropagation, XLABroadcastInDimOpIndexPropagation,
-      XLAConcatenateOpIndexPropagation, XLAPadOpIndexPropagation,
-      XLAReverseOpIndexPropagation, XLASliceOpIndexPropagation,
-      XLATransposeOpIndexPropagation>
+      XLAConcatenateOpIndexPropagation, XLAGatherOpIndexPropagation,
+      XLAPadOpIndexPropagation, XLAReverseOpIndexPropagation,
+      XLASliceOpIndexPropagation, XLATransposeOpIndexPropagation>
       indexPropagation;
 
   auto funcOp = getFunction();
