@@ -18,19 +18,18 @@
 # pylint: disable=g-import-not-at-top
 # pylint: disable=g-bad-import-order
 
-# Always make the low-level native bindings accessible.
+# Top-level modules that are imported verbatim.
 from . import binding
+from . import compiler
+from .binding import tracing
 
 # Alias public compiler symbols.
+# TODO(laurenzo): Remove these aliases.
 from .binding.compiler import CompilerContext
 from .binding.compiler import CompilerModule
 
-# Alias tracing symbols.
-from .binding import tracing
-
-# Alias symbols from the native tf_interop module.
-if hasattr(binding, "tf_interop"):
-  from .binding.tf_interop import load_saved_model as tf_load_saved_model
+# Alias specific native functions.
+from .binding.vm import create_module_from_blob
 
 ### Load non-native py_library deps here ###
 ### Order matters because these typically have a back-reference on this
@@ -40,5 +39,6 @@ if hasattr(binding, "tf_interop"):
 # in).
 try:
   from .tf_interop import tf_test_driver
+  from .tf_interop import test_utils as tf_test_utils
 except ImportError:
   pass

@@ -12,9 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+# Lint as: python3
 
 from absl.testing import absltest
 import pyiree
@@ -23,12 +21,12 @@ import pyiree
 class CompilerTest(absltest.TestCase):
 
   def testParseError(self):
-    ctx = pyiree.CompilerContext()
+    ctx = pyiree.compiler.Context()
     with self.assertRaisesRegex(ValueError, "custom op 'FOOBAR' is unknown"):
       ctx.parse_asm("""FOOBAR: I SHOULD NOT PARSE""")
 
   def testParseAndCompileToSequencer(self):
-    ctx = pyiree.CompilerContext()
+    ctx = pyiree.compiler.Context()
     input_module = ctx.parse_asm("""
       func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
             attributes { iree.module.export } {

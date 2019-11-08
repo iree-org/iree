@@ -122,7 +122,17 @@ cc_library(
 py_library(
     name = "tf_test_driver",
     srcs = ["tf_test_driver.py"],
-    deps = INTREE_TENSORFLOW_PY_DEPS,
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//bindings/python/pyiree:binding",
+    ],
+)
+
+py_library(
+    name = "test_utils",
+    srcs = ["test_utils.py"],
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//bindings/python/pyiree:binding",
+    ],
 )
 
 py_test(

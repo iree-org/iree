@@ -71,30 +71,7 @@ class RuntimeTest(tf.test.TestCase):
       tf.saved_model.save(my_module, sm_dir, options=options)
 
       # Load it up.
-      ctx = pyiree.CompilerContext()
-      input_module = pyiree.tf_load_saved_model(ctx, sm_dir)
-      input_asm = input_module.to_asm()
-      print("LOADED ASM:\n", input_asm)
-      # Should have out exported name and have executor islands.
-      self.assertRegex(input_asm,
-                       r"""tf_saved_model.exported_names = \["add"\]""")
-      self.assertRegex(input_asm, r"""tf_executor\.island""")
-
-      # Run the necessary lowering passes. Makes sure that these are linked in.
-      input_module.run_pass_pipeline([
-          "tf-executor-graph-pruning",
-          "tf-standard-pipeline",
-          "canonicalize",
-      ])
-      lowered_asm = input_module.to_asm()
-      print("LOWERED ASM:\n", lowered_asm)
-      # Should have collapsed all executor islands.
-      self.assertNotRegex(lowered_asm, r"""tf_executor\.island""")
-
-      # And legalize to XLA.
-      input_module.run_pass_pipeline([
-          "xla-legalize-tf",
-      ])
+      input_module = pyiree.compiler.tf_load_saved_model(sm_dir)
       xla_asm = input_module.to_asm()
       print("XLA ASM:", xla_asm)
       self.assertRegex(xla_asm, "xla_hlo.tanh")
