@@ -36,9 +36,7 @@ HalBufferView RtContext::WrapPyBufferForInput(py::buffer py_buffer) {
   // and retain the original buffer.
   iree_host_size_t byte_size = py_buffer_info.size * py_buffer_info.itemsize;
   HalBuffer buffer =
-      AllocateDeviceVisible(byte_size, IREE_HAL_BUFFER_USAGE_CONSTANT |
-                                           IREE_HAL_BUFFER_USAGE_TRANSFER |
-                                           IREE_HAL_BUFFER_USAGE_DISPATCH);
+      AllocateDeviceVisible(byte_size, IREE_HAL_BUFFER_USAGE_ALL);
   CheckApiStatus(iree_hal_buffer_write_data(buffer.raw_ptr(), 0,
                                             py_buffer_info.ptr, byte_size),
                  "Error writing to input buffer");
