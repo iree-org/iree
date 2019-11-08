@@ -122,6 +122,14 @@ export BAZEL_LLVM=C:/Users/$USERNAME/scoop/apps/llvm/current
 export BAZEL_SH=C:/Users/$USERNAME/scoop/apps/msys2/current/usr/bin/bash.exe
 ```
 
+## Install the Vulkan SDK
+
+Some parts of the project link against the Vulkan SDK and require it be
+installed on your system. If you are planning on building these, or see linker
+errors about undefined references to `vk` symbols, download and install the
+Vulkan SDK from https://vulkan.lunarg.com/, and check that the VULKAN_SDK
+environment variable is set when you are building.
+
 ## Optional: Configure Git
 
 ### Git SSH

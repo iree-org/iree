@@ -76,6 +76,7 @@ endif()
 
 if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
   add_subdirectory(third_party/sdl2 EXCLUDE_FROM_ALL)
+  add_subdirectory(build_tools/third_party/dear_imgui EXCLUDE_FROM_ALL)
 endif()
 
 #-------------------------------------------------------------------------------

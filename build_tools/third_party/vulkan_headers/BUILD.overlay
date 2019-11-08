@@ -25,3 +25,13 @@ cc_library(
     includes = ["include"],
     textual_hdrs = glob(["include/vulkan/*.h"]),
 )
+
+# Exports all headers, including C function prototypes. Useful if statically
+# linking against the Vulkan SDK.
+# Not all headers are hermetic, so they are just included as textual
+# headers to disable additional validation.
+cc_library(
+    name = "vulkan_headers",
+    includes = ["include"],
+    textual_hdrs = glob(["include/vulkan/*.h"]),
+)
