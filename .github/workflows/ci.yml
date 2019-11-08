@@ -26,6 +26,6 @@ jobs:
         env:
           CXX: clang++
           CC: clang
-          PYTHON_3: /usr/bin/python3
+          PYTHON_BIN: /usr/bin/python3
         run: |
           bazel build iree/...
