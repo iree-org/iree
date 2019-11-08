@@ -245,6 +245,7 @@ LogicalResult SequencerTranslator::runTensorFlowImportPasses(ModuleOp module) {
 #else
 LogicalResult SequencerTranslator::runTensorFlowImportPasses(ModuleOp module) {
   // NO-OP
+  return success();
 }
 #endif
 
