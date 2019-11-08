@@ -72,19 +72,25 @@ class RefObjectType : public Type {
   using Type::Type;
 
   static bool classof(Type type) {
-    return type.getKind() == IREE::TypeKind::OpaqueRefObject ||
-           type.getKind() == IREE::TypeKind::ConstBuffer ||
-           type.getKind() == HAL::TypeKind::Buffer ||
-           type.getKind() == HAL::TypeKind::CommandBuffer ||
-           type.getKind() == HAL::TypeKind::Device ||
-           type.getKind() == HAL::TypeKind::Event ||
-           type.getKind() == HAL::TypeKind::Executable ||
-           type.getKind() == HAL::TypeKind::Fence ||
-           type.getKind() == HAL::TypeKind::Semaphore ||
-           type.getKind() == SEQ::TypeKind::Device ||
-           type.getKind() == SEQ::TypeKind::Policy ||
-           type.getKind() == SEQ::TypeKind::Resource ||
-           type.getKind() == SEQ::TypeKind::Timeline;
+    switch (type.getKind()) {
+      case IREE::TypeKind::OpaqueRefObject:
+      case IREE::TypeKind::ConstBuffer:
+      case HAL::TypeKind::Buffer:
+      case HAL::TypeKind::CommandBuffer:
+      case HAL::TypeKind::Device:
+      case HAL::TypeKind::Event:
+      case HAL::TypeKind::Executable:
+      case HAL::TypeKind::Fence:
+      case HAL::TypeKind::Semaphore:
+      case SEQ::TypeKind::Device:
+      case SEQ::TypeKind::Policy:
+      case SEQ::TypeKind::Resource:
+      case SEQ::TypeKind::Timeline:
+        return true;
+      default:
+        break;
+    }
+    return false;
   }
 };
 
