@@ -34,7 +34,8 @@ try:
   # (i.e. we only want the tensorflow from the environment).
   tf = importlib.import_module("tensorflow")
   # Just in case if linked against a pre-V2 defaulted version.
-  tf.enable_v2_behavior()
+  if hasattr(tf, "enable_v2_behavior"):
+    tf.enable_v2_behavior()
   tf = tf.compat.v2
 except ImportError:
   print("Not running tests because tensorflow is not available")
