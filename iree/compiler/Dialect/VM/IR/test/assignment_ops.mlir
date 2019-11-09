@@ -1,7 +1,6 @@
 // Tests printing and parsing of assignment ops.
 
-// RUN: iree-opt -split-input-file %s | \
-// RUN:     FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file %s | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: @select_i32
 vm.module @my_module {

@@ -1,8 +1,6 @@
 // Tests folding and canonicalization of global ops.
 
-// RUN: iree-opt -split-input-file \
-// RUN:     -pass-pipeline='vm.module(canonicalize)' %s | \
-// RUN:     FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: @global_i32_folds
 vm.module @global_i32_folds {
