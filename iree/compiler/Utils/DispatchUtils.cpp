@@ -309,13 +309,13 @@ bool areDispatchRegionWorkloadsCompatible(IREE::DispatchRegionOp &lhs,
 }
 
 // Returns true if |value| depends in any way on |op| through any path.
-// Only works if the operations are within the same block.
 bool doesValueDependOnOperation(Value *value, Operation *op) {
   if (!value->getDefiningOp()) {
     return false;
   } else if (value->getDefiningOp() == op) {
     return true;
-  } else if (value->getDefiningOp()->isBeforeInBlock(op)) {
+  } else if (value->getDefiningOp()->getBlock() == op->getBlock() &&
+             value->getDefiningOp()->isBeforeInBlock(op)) {
     // Can't depend on |op| as it is defined prior to it.
     return false;
   }
