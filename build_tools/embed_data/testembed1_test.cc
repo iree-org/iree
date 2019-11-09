@@ -20,18 +20,18 @@ namespace {
 
 TEST(Generator, TestContents) {
   auto* toc = ::foobar::testembed1_create();
-  ASSERT_EQ("file1.txt", string(toc->name));
+  ASSERT_EQ("file1.txt", std::string(toc->name));
   ASSERT_EQ(R"(Are you '"Still"' here?)"
             "\n",
-            string(toc->data));
+            std::string(toc->data));
   ASSERT_EQ(24, toc->size);
   ASSERT_EQ(0, *(toc->data + toc->size));
 
   ++toc;
-  ASSERT_EQ("file2.txt", string(toc->name));
+  ASSERT_EQ("file2.txt", std::string(toc->name));
   ASSERT_EQ(R"(¯\_(ツ)_/¯)"
             "\n",
-            string(toc->data));
+            std::string(toc->data));
   ASSERT_EQ(14, toc->size);
   ASSERT_EQ(0, *(toc->data + toc->size));
 
