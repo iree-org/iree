@@ -47,3 +47,10 @@ jobs:
           PYTHON_BIN: /usr/bin/python3
         run: |
           bazel build //...
+      - name: Testing with bazel
+        env:
+          CXX: clang++
+          CC: clang
+          PYTHON_BIN: /usr/bin/python3
+        run: |
+          bazel test -- //... -//integrations/...
