@@ -16,7 +16,6 @@ load(
     "//iree:build_defs.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
-    "PLATFORM_VULKAN_DEPS",
 )
 
 package(
@@ -28,8 +27,7 @@ py_test(
     name = "simple_arithmetic_test",
     srcs = ["simple_arithmetic_test.py"],
     python_version = "PY3",
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + PLATFORM_VULKAN_DEPS + [
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//bindings/python/pyiree",
-        "//iree/hal/vulkan:vulkan_driver_module",
     ],
 )

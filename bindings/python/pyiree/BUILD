@@ -15,6 +15,7 @@
 load(
     "//iree:build_defs.bzl",
     "NUMPY_DEPS",
+    "PLATFORM_VULKAN_DEPS",
     "PYTHON_HEADERS_DEPS",
     "iree_py_extension",
 )
@@ -38,7 +39,7 @@ COMPILER_DEPS = [
     "//iree/compiler/Translation/SPIRV",
 ]
 
-DRIVER_DEPS = [
+DRIVER_DEPS = PLATFORM_VULKAN_DEPS + [
     "//iree/hal/interpreter:interpreter_driver_module",
     "//iree/hal/vulkan:vulkan_driver_module",
 ]
