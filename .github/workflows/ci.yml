@@ -23,6 +23,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      CXX: clang++
+      CC: clang
+      PYTHON_BIN: /usr/bin/python3
     steps:
       - name: Installing bazel
         run: |
@@ -41,9 +45,7 @@ jobs:
           git checkout $GITHUB_SHA
           git submodule update --init --depth 1000 --jobs 8
       - name: Building with bazel
-        env:
-          CXX: clang++
-          CC: clang
-          PYTHON_BIN: /usr/bin/python3
-        run: |
-          bazel build //...
+        run: bazel build //...
+      - name: Testing with bazel
+        # TODO(gcmn) Enable all tests once they're passing
+        run: bazel test -- //... -//integrations/... -//bindings/... -//iree/hal/vulkan:dynamic_symbols_test -//iree/samples/rt:bytecode_module_api_test
