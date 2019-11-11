@@ -171,3 +171,18 @@ maybe(new_local_repository,
 maybe(local_repository,
     name = "com_google_benchmark",
     path = "third_party/benchmark")
+
+maybe(new_local_repository,
+    name = "sdl2",
+    path = "third_party/sdl2",
+    build_file = "build_tools/third_party/sdl2/BUILD.overlay",
+)
+
+maybe(new_local_repository,
+    name = "sdl2_config",
+    path = "build_tools/third_party/sdl2",
+    build_file_content = """
+package(default_visibility = ["//visibility:public"])
+cc_library(name = "headers", srcs = glob(["*.h"]))
+""",
+)
