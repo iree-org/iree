@@ -9,8 +9,7 @@ module {
     // CHECK: [[ADDRESS_ARG1:%.*]] = spv._address_of [[ARG1]]
     // CHECK: [[ZERO1:%.*]] = spv.constant 0
     // CHECK: [[LOAD_ADDRESS_ARG1:%.*]] = spv.AccessChain [[ADDRESS_ARG1]]{{\[}}[[ZERO1]]{{\]}}
-    // CHECK: [[INDEX1_64:%.*]] = spv.Load {{".*"}} [[LOAD_ADDRESS_ARG1]]
-    // CHECK: [[INDEX1:%.*]] = spv.SConvert [[INDEX1_64]]
+    // CHECK: [[INDEX1:%.*]] = spv.Load {{".*"}} [[LOAD_ADDRESS_ARG1]]
     // CHECK: [[ADDRESS_ARG0:%.*]] = spv._address_of [[ARG0]]
     // CHECK: [[ZERO2:%.*]] = spv.constant 0
     // CHECK: {{%.*}} = spv.AccessChain [[ADDRESS_ARG0]]{{\[}}[[ZERO2]], [[INDEX1]]

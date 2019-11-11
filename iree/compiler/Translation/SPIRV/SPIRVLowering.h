@@ -288,6 +288,13 @@ class SPIRVCodegen {
       return emitError(loc, "unhandled element type ")
              << elementType << " while lowering to SPIR-V";
     }
+    if (auto intElementType = elementType.dyn_cast<IntegerType>()) {
+      if (intElementType.getWidth() > 32) {
+        // TODO(ravishankarm): Maybe its better to report a warning when this
+        // happens.
+        elementType = IntegerType::get(32, elementType.getContext());
+      }
+    }
     if (argType.hasStaticShape()) {
       int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
       for (auto dim : reverse(argType.getShape())) {
@@ -496,19 +503,6 @@ class SPIRVCodegen {
       if (!val) {
         return failure();
       }
-      // Check the the value is 32-bit integer and truncate it to 32-bits if
-      // needed.
-      // TODO: Avoid hardwiring the mapping of index types to 32-bit
-      // integers. (It is done in a few places here which need to be abstracted
-      // out).
-      auto valType = val->getType().template dyn_cast<IntegerType>();
-      if (!valType || valType.getWidth() != 64) {
-        return emitError(loc,
-                         "expected tensors that contain values used to access "
-                         "other tensors to be i64 type");
-      }
-      val = builder.create<spirv::SConvertOp>(
-          loc, IntegerType::get(32, valType.getContext()), val);
       valueCache.setSymbolValue(element.second, val);
     }
     return success();

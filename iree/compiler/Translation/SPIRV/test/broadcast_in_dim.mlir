@@ -76,12 +76,12 @@ module {
 // -----
 
 module {
-  func @const_int_splat(%arg0: memref<12x42xi64>)
+  func @const_int_splat(%arg0: memref<12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
-    // CHECK: spv.constant 42 : i64
-    %0 = constant dense<42> : tensor<12xi64>
-    %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xi64>) -> tensor<12x42xi64>
-    iree.store_output(%1 : tensor<12x42xi64>, %arg0 : memref<12x42xi64>)
+    // CHECK: spv.constant 42 : i32
+    %0 = constant dense<42> : tensor<12xi32>
+    %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xi32>) -> tensor<12x42xi32>
+    iree.store_output(%1 : tensor<12x42xi32>, %arg0 : memref<12x42xi32>)
     iree.return
   }
 }
@@ -89,12 +89,12 @@ module {
 // -----
 
 module {
-  func @const_int_splat_err(%arg0: memref<2x12x42xi64>)
+  func @const_int_splat_err(%arg0: memref<2x12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 2]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // expected-error @+1{{unhandled constant lowering unless value is a splat dense element attribute}}
-    %0 = constant dense<[42, 21]> : tensor<2xi64>
-    %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<2xi64>) -> tensor<2x12x42xi64>
-    iree.store_output(%1 : tensor<2x12x42xi64>, %arg0 : memref<2x12x42xi64>)
+    %0 = constant dense<[42, 21]> : tensor<2xi32>
+    %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<2xi32>) -> tensor<2x12x42xi32>
+    iree.store_output(%1 : tensor<2x12x42xi32>, %arg0 : memref<2x12x42xi32>)
     iree.return
   }
 }
