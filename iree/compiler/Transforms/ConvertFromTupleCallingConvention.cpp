@@ -241,6 +241,12 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
   OpBuilder builder(newFunction.getBody());
   BlockAndValueMapping mapping;
 
+  for (auto attr : oldFunction.getAttrs()) {
+    if (attr.first != oldFunction.getTypeAttrName()) {
+      newFunction.setAttr(attr.first, attr.second);
+    }
+  }
+
   newFunction.getBlocks().clear();
   for (auto &oldBlock : oldFunction.getBlocks()) {
     auto *newBlock = builder.createBlock(&newFunction.getBody());
