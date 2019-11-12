@@ -106,7 +106,10 @@ PYBIND11_MODULE(binding, m) {
   IREE_RUN_MODULE_INITIALIZERS();
 
   m.doc() = "IREE Binding Backend Helpers";
-  py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob");
+  py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob")
+      .def_property_readonly("bytes", [](OpaqueBlob* self) -> py::bytes {
+        return py::bytes(static_cast<const char*>(self->data()), self->size());
+      });
 
   auto compiler_m = m.def_submodule("compiler", "IREE compiler support");
   SetupCompilerBindings(compiler_m);
