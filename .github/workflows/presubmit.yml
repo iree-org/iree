@@ -42,4 +42,5 @@ jobs:
       # TODO(benvanik): actually filter to changed files.
       run: |
         /tmp/git-clang-format origin/master --binary=clang-format-9
+        echo foo
         git diff --exit-code
