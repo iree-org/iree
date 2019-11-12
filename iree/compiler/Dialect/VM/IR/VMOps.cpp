@@ -67,8 +67,9 @@ static ParseResult parseModuleOp(OpAsmParser &parser, OperationState *result) {
 static void printModuleOp(OpAsmPrinter &p, ModuleOp &op) {
   p << op.getOperationName() << ' ';
   p.printSymbolName(op.sym_name());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     {mlir::SymbolTable::getSymbolAttrName()});
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   p.printRegion(op.getBodyRegion(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
 }
@@ -598,7 +599,9 @@ static ParseResult parseConstI32ZeroOp(OpAsmParser &parser,
 }
 
 static void printConstI32ZeroOp(OpAsmPrinter &p, ConstI32ZeroOp &op) {
-  p << op.getOperationName() << " : ";
+  p << op.getOperationName();
+  p.printOptionalAttrDict(op.getAttrs());
+  p << " : ";
   p.printType(op.getResult()->getType());
 }
 
@@ -622,13 +625,14 @@ static ParseResult parseConstRefZeroOp(OpAsmParser &parser,
 }
 
 static void printConstRefZeroOp(OpAsmPrinter &p, ConstRefZeroOp &op) {
-  p << op.getOperationName() << " : ";
+  p << op.getOperationName();
+  p.printOptionalAttrDict(op.getAttrs());
+  p << " : ";
   p.printType(op.getResult()->getType());
 }
 
 void ConstRefZeroOp::build(Builder *builder, OperationState &result,
                            Type objectType) {
-  result.addAttribute("type", TypeAttr::get(objectType));
   result.addTypes(objectType);
 }
 
@@ -851,12 +855,16 @@ static ParseResult parseBranchOp(OpAsmParser &parser, OperationState *result) {
     return failure();
   }
   result->addSuccessor(dest, destOperands);
+  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
+    return failure();
+  }
   return success();
 }
 
 static void printBranchOp(OpAsmPrinter &p, BranchOp &op) {
   p << op.getOperationName() << ' ';
   p.printSuccessorAndUseList(op.getOperation(), 0);
+  p.printOptionalAttrDict(op.getAttrs());
 }
 
 Block *BranchOp::getDest() { return getOperation()->getSuccessor(0); }
@@ -897,6 +905,10 @@ static ParseResult parseCondBranchOp(OpAsmParser &parser,
   }
   result->addSuccessor(dest, destOperands);
 
+  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
+    return failure();
+  }
+
   return success();
 }
 
@@ -907,6 +919,7 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp &op) {
   p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::trueIndex);
   p << ", ";
   p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::falseIndex);
+  p.printOptionalAttrDict(op.getAttrs());
 }
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState *result) {
@@ -955,6 +968,7 @@ static void printReturnOp(OpAsmPrinter &p, ReturnOp &op) {
   if (op.getNumOperands() > 0) {
     p << ' ';
     p.printOperands(op.operand_begin(), op.operand_end());
+    p.printOptionalAttrDict(op.getAttrs());
     p << " : ";
     interleaveComma(op.getOperandTypes(), p);
   }

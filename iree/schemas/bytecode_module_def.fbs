@@ -1,0 +1,164 @@
+// Copyright 2019 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+namespace iree.vm;
+
+// 'Bytecode MODule'.
+file_identifier "BMOD";
+file_extension "bmod";
+
+// Defines a function signature.
+//
+// The types specifed are defined as:
+//   0x00: invalid
+//   0x01: i32
+//   0x02-0xFF: (reserved)
+//   0xFF-*: a ref_ptr type matching iree_vm_ref_type_t
+table FunctionSignatureDef {
+  // Arguments, in order, as described in the FunctionSignatureDef.
+  argument_types:[uint32];
+
+  // Results, in order, as described in the FunctionSignatureDef.
+  result_types:[uint32];
+}
+
+// Defines a runtime-resolved import function.
+table ImportFunctionDef {
+  // Fully-qualified name of the function (including the module namespace).
+  full_name:string;
+
+  // Signature of the function expected used for verifying that imports match.
+  signature:FunctionSignatureDef;
+}
+
+// Defines a runtime-resolved export function.
+table ExportFunctionDef {
+  // Local name of the function (excluding the module namespace).
+  local_name:string;
+
+  // Signature of the function expected used for verifying that imports match.
+  signature:FunctionSignatureDef;
+
+  // Ordinal in the internal_functions table that implements this function.
+  internal_ordinal:int32;
+}
+
+// Defines a bytecode function.
+table InternalFunctionDef {
+  // Local name of the function or empty if the names have been stripped.
+  // The full name of the function when referenced from external modules will
+  // include the BytecodeModuleDef.name prefix.
+  local_name:string;
+
+  // Signature of the function used for reflection.
+  signature:FunctionSignatureDef;
+}
+
+table UncompressedDataDef {
+}
+
+union CompressionTypeDef {
+  UncompressedDataDef,
+}
+
+// Read-only data segment.
+table RodataSegmentDef {
+  // The compression format used for the data, including required decompression
+  // arguments. Omitted if the data is uncompressed.
+  compression_type:CompressionTypeDef;
+
+  // Contents in a format defined by CompressionTypeDef.
+  data:[uint8] (force_align: 16);
+}
+
+// Read-write data segment.
+table RwdataSegmentDef {
+  // Total byte capacity.
+  byte_size:int32;
+}
+
+// Defines the per-instance module state.
+table ModuleStateDef {
+  // Bytes used for global primitive value storage. All are initialized to zero
+  // on module state allocation.
+  global_bytes_capacity:int32;
+
+  // Total number of global ref_ptr values.
+  global_ref_count:int32;
+}
+
+// Static function descriptor used for stack frame allocation.
+struct FunctionDescriptor {
+  // Offset and length within the larger bytecode data block.
+  bytecode_offset:int32;
+  bytecode_length:int32;
+  // Total number of i32 registers used by the function.
+  i32_register_count:int8;
+  // Total number of ref_ptr registers used by the function.
+  ref_register_count:int8;
+}
+
+// Defines a bytecode module containing the information required to serve the
+// iree_vm_module_interface_t interface.
+//
+// Modules are similar to shared objects in that they provide a set of exported
+// functions that can be queried and called externally as well as any number of
+// internal function definitions. Imports can also be used to have the loader
+// dynamically link in exports of other modules upon loading.
+//
+// Modules can contain read-only segments containing (optionally) compressed
+// data that is used by the module. Read-write segments define uninitialized
+// reservations and are similar to .bss, and custom initializer functions can
+// be embedded to treat them as if they were .data segments.
+//
+// State can be defined per active runtime context (effectively like
+// thread-local storage) using ModuleStateDef. The runtime will prepare this
+// state and maintain it for the lifetime of contexts and ensure that ops that
+// use it (such as vm.global.load.*) are always associated with the appropriate
+// state.
+table BytecodeModuleDef {
+  // Module namespace used for fully-qualified function lookups.
+  name:string (required);
+
+  // Imported function definitions used to resolve imports.
+  imported_functions:[ImportFunctionDef];
+
+  // Exported function definitions used to resolve imports.
+  exported_functions:[ExportFunctionDef];
+
+  // All functions with internal linkage.
+  internal_functions:[InternalFunctionDef];
+
+  // Read-only data segments (like non-code .text).
+  // May optionally be compressed and decompressed by the loader.
+  rodata_segments:[RodataSegmentDef];
+
+  // Read-write data segments of uninitialized memory (like .bss).
+  rwdata_segments:[RwdataSegmentDef];
+
+  // Global module state information (like TLS).
+  module_state:ModuleStateDef;
+
+  // References to ranges in the bytecode contents buffer where each internal
+  // function is located. This table is kept unnested within InternalFunctionDef
+  // to avoid the need to walk the FlatBuffer hierarchy at runtime when
+  // resolving call targets. Multiple functions may alias the same ranges in
+  // bytecode_data.
+  function_descriptors:[FunctionDescriptor];
+
+  // Bytecode contents. One large buffer containing all of the function op data.
+  bytecode_data:[uint8] (force_align: 4);
+}
+
+root_type BytecodeModuleDef;

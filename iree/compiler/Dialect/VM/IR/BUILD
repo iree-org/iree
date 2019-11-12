@@ -96,7 +96,7 @@ gentbl(
 gentbl(
     name = "VMOpEncoderGen",
     tbl_outs = [
-        ("-gen-vm-op-encoder-defs", "VMOpEncoder.cpp.inc"),
+        ("-gen-iree-vm-op-encoder-defs", "VMOpEncoder.cpp.inc"),
     ],
     tblgen = "//iree/tools:iree-tblgen",
     td_file = "VMOps.td",

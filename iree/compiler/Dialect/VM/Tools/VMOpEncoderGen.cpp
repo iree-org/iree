@@ -50,7 +50,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
         },
         " ||\n      ");
     os << ") {\n";
-    os << "    return emitOpError() << \"failed to encode\";\n";
+    os << "    return emitOpError() << \"failed to encode (internal)\";\n";
     os << "  }\n";
 
     os << "  return success();\n";
@@ -61,7 +61,7 @@ bool emitEncodeFnDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
 }
 
 static GenRegistration genVMOpEncoderDefs(
-    "gen-vm-op-encoder-defs",
+    "gen-iree-vm-op-encoder-defs",
     "Generates IREE VM operation encoder definitions (.cpp)",
     [](const llvm::RecordKeeper &records, raw_ostream &os) {
       return emitEncodeFnDefs(records, os);

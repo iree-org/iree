@@ -35,6 +35,7 @@ bool emitOpTableDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
   llvm::emitSourceFileHeader("IREE VM Operation Tables", os);
 
   std::vector<const Record *> opRecords(256);
+  std::vector<const Record *> opEncodings(256);
   auto defs = recordKeeper.getAllDerivedDefinitions("VM_Op");
   for (const auto *def : defs) {
     if (def->isValueUnset("encoding")) continue;
@@ -43,6 +44,7 @@ bool emitOpTableDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
       if (encodingExpr->getType()->getAsString() == "VM_EncOpcode") {
         auto *opcode = encodingExpr->getValueAsDef("opcode");
         opRecords[opcode->getValueAsInt("value")] = def;
+        opEncodings[opcode->getValueAsInt("value")] = opcode;
         break;
       }
     }
@@ -52,8 +54,7 @@ bool emitOpTableDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
   for (int i = 0; i < 256; ++i) {
     auto *def = opRecords[i];
     if (def) {
-      auto encodingExprs = def->getValueAsListOfDefs("encoding");
-      auto *opcode = encodingExprs.front()->getValueAsDef("opcode");
+      auto *opcode = opEncodings[i];
       os << formatv("  IREE_VM_OP_{0} = {1}",
                     opcode->getValueAsString("symbol"), format_hex(i, 4, true));
     } else {
@@ -68,8 +69,7 @@ bool emitOpTableDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
   for (int i = 0; i < 256; ++i) {
     auto *def = opRecords[i];
     if (def) {
-      auto encodingExprs = def->getValueAsListOfDefs("encoding");
-      auto *opcode = encodingExprs.front()->getValueAsDef("opcode");
+      auto *opcode = opEncodings[i];
       os << formatv("    OPC({0}, {1})", format_hex(i, 4, true),
                     opcode->getValueAsString("symbol"));
     } else {
@@ -85,7 +85,7 @@ bool emitOpTableDefs(const llvm::RecordKeeper &recordKeeper, raw_ostream &os) {
 }
 
 static GenRegistration genVMOpDispatcherDefs(
-    "gen-vm-op-table-defs",
+    "gen-iree-vm-op-table-defs",
     "Generates IREE VM operation table macros for runtime use",
     [](const llvm::RecordKeeper &records, raw_ostream &os) {
       return emitOpTableDefs(records, os);

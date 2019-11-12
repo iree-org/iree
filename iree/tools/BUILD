@@ -32,7 +32,9 @@ cc_binary(
     deps = [
         "//integrations/tensorflow/compiler:tensorflow",
         "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/VM/Analysis",
         "//iree/compiler/Dialect/VM/IR",
+        "//iree/compiler/Dialect/VM/Transforms",
         "//iree/compiler/Transforms",
         "//iree/compiler/Transforms/Interpreter",
         "//iree/compiler/Transforms/Sequencer",
@@ -94,6 +96,7 @@ cc_binary(
     name = "iree-translate",
     srcs = ["iree_translate_main.cc"],
     deps = [
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation/Interpreter",
         "//iree/compiler/Translation/SPIRV",
         "//iree/compiler/Translation/Sequencer",

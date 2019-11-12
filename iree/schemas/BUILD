@@ -65,6 +65,15 @@ iree_flatbuffer_cc_library(
     ],
 )
 
+# TODO(benvanik): also expose as C using flatcc.
+iree_flatbuffer_cc_library(
+    name = "bytecode_module_def_cc_fbs",
+    srcs = ["bytecode_module_def.fbs"],
+    flatc_args = FLATC_ARGS,
+    includes = [
+    ],
+)
+
 iree_flatbuffer_cc_library(
     name = "debug_service_cc_fbs",
     srcs = ["debug_service.fbs"],

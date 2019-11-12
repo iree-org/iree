@@ -253,8 +253,8 @@ class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
     "e.encodeStrAttr(getAttr(\"" # name # "\"))">;
 class VM_EncBranch<string blockName, string operandsName> : VM_EncEncodeExpr<
     "e.encodeBranch(" # blockName # "(), " # operandsName # "())">;
-class VM_EncOperand<string name> : VM_EncEncodeExpr<
-    "e.encodeOperand(" # name # "())">;
+class VM_EncOperand<string name, int ordinal> : VM_EncEncodeExpr<
+    "e.encodeOperand(" # name # "(), " # ordinal # ")">;
 class VM_EncVariadicOperands<string name> : VM_EncEncodeExpr<
     "e.encodeOperands(" # name # "())">;
 class VM_EncResult<string name> : VM_EncEncodeExpr<
@@ -322,6 +322,8 @@ def VM_FullBarrier : NativeOpTrait<"IREE::VM::FullBarrier">;
 
 def VM_GlobalRefAttr : AliasedSymbolRefAttr;
 def VM_FuncRefAttr : AliasedSymbolRefAttr;
+
+def VM_Ordinal : IntegerAttrBase<I32, "ordinal value">;
 
 def VM_CondValue : I<32> {
   let typeDescription = [{

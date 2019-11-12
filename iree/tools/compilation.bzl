@@ -20,6 +20,7 @@ load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 def iree_bytecode_module(
         name,
         srcs,
+        translation = "-mlir-to-iree-module",
         cc_namespace = None,
         visibility = None):
     native.genrule(
@@ -31,7 +32,7 @@ def iree_bytecode_module(
         cmd = " && ".join([
             " ".join([
                 "$(location //iree/tools:iree-translate)",
-                "-mlir-to-iree-module",
+                translation,
                 "-o $(location %s.emod)" % (name),
             ] + ["$(locations %s)" % (src) for src in srcs]),
         ]),

@@ -64,7 +64,7 @@ class VMFuncEncoder {
                                      Operation::operand_range operands) = 0;
 
   // Encodes an operand value (by reference).
-  virtual LogicalResult encodeOperand(Value *value) = 0;
+  virtual LogicalResult encodeOperand(Value *value, int ordinal) = 0;
 
   // Encodes a variable list of operands (by reference), including a count.
   virtual LogicalResult encodeOperands(Operation::operand_range values) = 0;

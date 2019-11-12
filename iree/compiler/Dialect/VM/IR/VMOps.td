@@ -39,8 +39,9 @@ def VM_ModuleOp : VM_Op<"module", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name
+    StrAttr:$sym_name,
     // TODO(benvanik): add compatibility and versioning attributes.
+    OptionalAttr<DictionaryAttr>:$ordinal_counts
   );
 
   let regions = (region SizedRegion<1>:$body);
@@ -88,7 +89,8 @@ def VM_FuncOp : VM_Op<"func", [
   }];
 
   let arguments = (ins
-    UnitAttr:$is_export
+    UnitAttr:$is_export,
+    OptionalAttr<VM_Ordinal>:$ordinal
   );
 
   let regions = (region AnyRegion:$body);
@@ -150,7 +152,8 @@ def VM_ExportOp : VM_Op<"export", [
 
   let arguments = (ins
     FlatSymbolRefAttr:$function_ref,
-    StrAttr:$export_name
+    StrAttr:$export_name,
+    OptionalAttr<VM_Ordinal>:$ordinal
   );
 
   let skipDefaultBuilders = 1;
@@ -183,7 +186,8 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     TypeAttr:$type,
     UnitAttr:$is_mutable,
     OptionalAttr<FlatSymbolRefAttr>:$initializer,
-    OptionalAttr<attr_type>:$initial_value
+    OptionalAttr<attr_type>:$initial_value,
+    OptionalAttr<VM_Ordinal>:$ordinal
   );
 
   let skipDefaultBuilders = 1;
@@ -282,7 +286,7 @@ def VM_GlobalStoreI32Op : VM_GlobalStoreOp<I32, "global.store.i32"> {
   let encoding = [
     VM_EncOpcode<VM_OPC_GlobalStoreI32>,
     VM_EncGlobalAttr<"global">,
-    VM_EncOperand<"value">,
+    VM_EncOperand<"value", 0>,
   ];
 }
 
@@ -312,7 +316,7 @@ def VM_GlobalStoreRefOp : VM_GlobalStoreOp<AnyRefPtr, "global.store.ref"> {
     VM_EncOpcode<VM_OPC_GlobalStoreRef>,
     VM_EncGlobalAttr<"global">,
     VM_EncTypeOf<"value">,
-    VM_EncOperand<"value">,
+    VM_EncOperand<"value", 0>,
   ];
 }
 
@@ -405,6 +409,7 @@ def VM_ConstI32ZeroOp : VM_PureOp<"const.i32.zero", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ConstI32Zero>,
+    VM_EncResult<"result">,
   ];
 
   let skipDefaultBuilders = 1;
@@ -463,7 +468,8 @@ def VM_RodataOp : VM_Op<"rodata", [
 
   let arguments = (ins
     StrAttr:$sym_name,
-    ElementsAttr:$value
+    ElementsAttr:$value,
+    OptionalAttr<VM_Ordinal>:$ordinal
   );
 
   let skipDefaultBuilders = 1;
@@ -552,9 +558,9 @@ class VM_SelectPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
 
   let encoding = [
     VM_EncOpcode<opcode>,
-    VM_EncOperand<"condition">,
-    VM_EncOperand<"true_value">,
-    VM_EncOperand<"false_value">,
+    VM_EncOperand<"condition", 0>,
+    VM_EncOperand<"true_value", 1>,
+    VM_EncOperand<"false_value", 2>,
     VM_EncResult<"result">,
   ];
 
@@ -589,10 +595,10 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_SelectRef>,
-    VM_EncOperand<"condition">,
+    VM_EncOperand<"condition", 0>,
     VM_EncTypeOf<"true_value">,
-    VM_EncOperand<"true_value">,
-    VM_EncOperand<"false_value">,
+    VM_EncOperand<"true_value", 1>,
+    VM_EncOperand<"false_value", 2>,
     VM_EncResult<"result">,
   ];
 
@@ -621,7 +627,7 @@ class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
 
   let encoding = [
     VM_EncOpcode<opcode>,
-    VM_EncOperand<"operand">,
+    VM_EncOperand<"operand", 0>,
     VM_EncResult<"result">,
   ];
 
@@ -645,8 +651,8 @@ class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
 
   let encoding = [
     VM_EncOpcode<opcode>,
-    VM_EncOperand<"lhs">,
-    VM_EncOperand<"rhs">,
+    VM_EncOperand<"lhs", 0>,
+    VM_EncOperand<"rhs", 1>,
     VM_EncResult<"result">,
   ];
 
@@ -744,7 +750,7 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
 
   let encoding = [
     VM_EncOpcode<opcode>,
-    VM_EncOperand<"operand">,
+    VM_EncOperand<"operand", 0>,
     VM_EncIntAttr<"amount", type.bitwidth>,
     VM_EncResult<"result">,
   ];
@@ -796,7 +802,7 @@ class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 
   let encoding = [
     VM_EncOpcode<opcode>,
-    VM_EncOperand<"operand">,
+    VM_EncOperand<"operand", 0>,
     VM_EncResult<"result">,
   ];
 
@@ -824,8 +830,8 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
 
   let encoding = [
     VM_EncOpcode<opcode>,
-    VM_EncOperand<"lhs">,
-    VM_EncOperand<"rhs">,
+    VM_EncOperand<"lhs", 0>,
+    VM_EncOperand<"rhs", 1>,
     VM_EncResult<"result">,
   ];
 
@@ -997,7 +1003,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBranch>,
-    VM_EncOperand<"condition">,
+    VM_EncOperand<"condition", 0>,
     VM_EncBranch<"getTrueDest", "getTrueOperands">,
     VM_EncBranch<"getFalseDest", "getFalseOperands">,
   ];
