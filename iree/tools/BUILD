@@ -129,3 +129,16 @@ cc_binary(
         "@com_google_absl//absl/strings",
     ],
 )
+
+cc_binary(
+    name = "iree_dump_module",
+    srcs = ["dump_module.cc"],
+    deps = [
+        "//iree/base:file_io",  # build-cleaner: keep
+        "//iree/base:flatbuffer_util",
+        "//iree/base:init",
+        "//iree/schemas",
+        "//iree/schemas:reflection_data",
+        "@com_github_google_flatbuffers//:flatbuffers",
+    ],
+)
