@@ -74,7 +74,7 @@ LogicalResult buildReductionExecutable(IREE::ExecutableOp executableOp,
   }
 
   auto module = executableOp.getInnerModule();
-  auto applyFuncAttr = entryFuncOp.getAttrOfType<SymbolRefAttr>(
+  auto applyFuncAttr = entryFuncOp.getAttrOfType<FlatSymbolRefAttr>(
       "iree.executable.reduction.apply");
   auto applyFuncOp = module.lookupSymbol(applyFuncAttr.getValue());
 

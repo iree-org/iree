@@ -149,7 +149,7 @@ def VM_ExportOp : VM_Op<"export", [
   }];
 
   let arguments = (ins
-    SymbolRefAttr:$function_ref,
+    FlatSymbolRefAttr:$function_ref,
     StrAttr:$export_name
   );
 
@@ -160,7 +160,7 @@ def VM_ExportOp : VM_Op<"export", [
       StringRef exportName = "", ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, SymbolRefAttr functionRef,
+      Builder *builder, OperationState &result, FlatSymbolRefAttr functionRef,
       StringRef exportName = "", ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
@@ -182,7 +182,7 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     StrAttr:$sym_name,
     TypeAttr:$type,
     UnitAttr:$is_mutable,
-    OptionalAttr<SymbolRefAttr>:$initializer,
+    OptionalAttr<FlatSymbolRefAttr>:$initializer,
     OptionalAttr<attr_type>:$initial_value
   );
 
@@ -1131,7 +1131,7 @@ class VM_CallBaseOp<string mnemonic, VM_OPC opcode, list<OpTrait> traits = []> :
       result.addTypes(callee.getType().getResults());
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, SymbolRefAttr callee,
+      Builder *builder, OperationState &result, FlatSymbolRefAttr callee,
       ArrayRef<Type> resultTypes, ArrayRef<Value *> operands = {}
     }], [{
       result.addOperands(operands);
@@ -1162,7 +1162,7 @@ class VM_CallBaseOp<string mnemonic, VM_OPC opcode, list<OpTrait> traits = []> :
 
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
-      return getAttrOfType<SymbolRefAttr>("callee");
+      return getAttrOfType<FlatSymbolRefAttr>("callee");
     }
   }];
 }

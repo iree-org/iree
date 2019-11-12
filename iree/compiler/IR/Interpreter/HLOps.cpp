@@ -31,7 +31,7 @@ namespace HL {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState &state) {
-  SymbolRefAttr calleeAttr;
+  FlatSymbolRefAttr calleeAttr;
   FunctionType calleeType;
   SmallVector<OpAsmParser::OperandType, 4> operands;
   auto calleeLoc = parser.getNameLoc();

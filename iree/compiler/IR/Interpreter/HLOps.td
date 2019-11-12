@@ -51,7 +51,7 @@ class IREEInterpHL_PureOp<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def IREEInterpHL_CallOp : IREEInterpHL_Op<"call"> {
-  let arguments = (ins SymbolRefAttr:$callee, Variadic<IREEHL_MemRef>);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<IREEHL_MemRef>);
   let results = (outs Variadic<IREEHL_MemRef>);
 
   let builders = [OpBuilder<

@@ -67,7 +67,7 @@ def IREEInterpLL_ConstantOp : IREEInterpLL_PureOp<"constant"> {
 }
 
 def IREEInterpLL_CallOp : IREEInterpLL_Op<"call"> {
-  let arguments = (ins SymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
   let results = (outs Variadic<IREELL_MemRef>);
 
   let builders = [OpBuilder<
@@ -105,7 +105,7 @@ def IREEInterpLL_CallOp : IREEInterpLL_Op<"call"> {
 
 // TODO(benvanik): add verifier that target isExternal.
 def IREEInterpLL_CallImportOp : IREEInterpLL_Op<"call_import"> {
-  let arguments = (ins SymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
   let results = (outs Variadic<IREELL_MemRef>);
 
   let builders = [OpBuilder<

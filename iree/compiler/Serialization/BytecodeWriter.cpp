@@ -141,7 +141,7 @@ LogicalResult BytecodeWriter::WriteAttributeData(Attribute baseAttr) {
     // TODO(benvanik): other attribute encodings.
   } else if (auto attr = baseAttr.dyn_cast<TypeAttr>()) {
     // TODO(benvanik): other attribute encodings.
-  } else if (auto attr = baseAttr.dyn_cast<SymbolRefAttr>()) {
+  } else if (auto attr = baseAttr.dyn_cast<FlatSymbolRefAttr>()) {
     // TODO(benvanik): other attribute encodings.
   } else if (auto attr = baseAttr.dyn_cast<SplatElementsAttr>()) {
     return WriteAttributeData(attr.getSplatValue());

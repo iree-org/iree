@@ -45,9 +45,9 @@ class IntegerAttrInRange<int min, int max> : AttrConstraint<
     "within the range [" # min # ", " # max # "] inclusive">;
 
 
-class AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<SymbolRefAttr>()">,
+class AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
                                         "symbol reference attribute"> {
-  let storageType = [{ SymbolRefAttr }];
+  let storageType = [{ FlatSymbolRefAttr }];
   let returnType = [{ StringRef }];
   let constBuilderCall = "$_builder.getSymbolRefAttr($0)";
 }

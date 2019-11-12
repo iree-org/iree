@@ -51,7 +51,7 @@ class IREESeqHL_PureOp<string mnemonic, list<OpTrait> traits = []> :
 //===----------------------------------------------------------------------===//
 
 def IREESeqHL_CallOp : IREESeqHL_PureOp<"call"> {
-  let arguments = (ins SymbolRefAttr:$callee, Variadic<IREEHL_MemRef>);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<IREEHL_MemRef>);
   let results = (outs Variadic<IREEHL_MemRef>);
 
   let builders = [OpBuilder<
@@ -255,8 +255,8 @@ def IREESeqHL_CondBranchOp : IREESeqHL_Op<"cond_br", [Terminator]> {
 
 def IREESeqHL_DispatchOp : IREESeqHL_Op<"dispatch"> {
   let arguments = (ins
-    SymbolRefAttr:$executable,
-    SymbolRefAttr:$entry_point,
+    FlatSymbolRefAttr:$executable,
+    FlatSymbolRefAttr:$entry_point,
     IREEHL_IntMemRef:$workload,
     Variadic<IREEHL_MemRef>:$operands
   );

@@ -129,7 +129,7 @@ struct InlineConstGlobalLoadI32Op : public OpRewritePattern<GlobalLoadI32Op> {
   using OpRewritePattern<GlobalLoadI32Op>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(GlobalLoadI32Op op,
                                      PatternRewriter &rewriter) const override {
-    auto globalAttr = op.getAttrOfType<SymbolRefAttr>("global");
+    auto globalAttr = op.getAttrOfType<FlatSymbolRefAttr>("global");
     auto globalOp =
         op.getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalI32Op>(
             globalAttr.getValue());
@@ -159,7 +159,7 @@ struct InlineConstGlobalLoadRefOp : public OpRewritePattern<GlobalLoadRefOp> {
   using OpRewritePattern<GlobalLoadRefOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(GlobalLoadRefOp op,
                                      PatternRewriter &rewriter) const override {
-    auto globalAttr = op.getAttrOfType<SymbolRefAttr>("global");
+    auto globalAttr = op.getAttrOfType<FlatSymbolRefAttr>("global");
     auto globalOp =
         op.getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalRefOp>(
             globalAttr.getValue());

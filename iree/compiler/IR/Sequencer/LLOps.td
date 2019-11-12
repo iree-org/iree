@@ -82,7 +82,7 @@ def IREESeqLL_ConstantOp : IREESeqLL_PureOp<"constant"> {
 }
 
 def IREESeqLL_CallOp : IREESeqLL_Op<"call"> {
-  let arguments = (ins SymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
   let results = (outs Variadic<IREELL_MemRef>);
 
   let builders = [OpBuilder<
@@ -120,7 +120,7 @@ def IREESeqLL_CallOp : IREESeqLL_Op<"call"> {
 
 // TODO(benvanik): add verifier that target isExternal.
 def IREESeqLL_CallImportOp : IREESeqLL_Op<"call_import"> {
-  let arguments = (ins SymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
+  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
   let results = (outs Variadic<IREELL_MemRef>);
 
   let builders = [OpBuilder<
@@ -323,8 +323,8 @@ def IREESeqLL_CondBranchOp : IREESeqLL_Op<"cond_br", [Terminator]> {
 
 def IREESeqLL_DynamicDispatchOp : IREESeqLL_Op<"dynamic_dispatch"> {
   let arguments = (ins
-    SymbolRefAttr:$executable,
-    SymbolRefAttr:$entry_point,
+    FlatSymbolRefAttr:$executable,
+    FlatSymbolRefAttr:$entry_point,
     IREELL_IntMemRef:$workload,
     Variadic<IREELL_MemRef>:$operands
   );
@@ -375,8 +375,8 @@ def IREESeqLL_DynamicDispatchOp : IREESeqLL_Op<"dynamic_dispatch"> {
 
 def IREESeqLL_StaticDispatchOp : IREESeqLL_Op<"static_dispatch"> {
   let arguments = (ins
-    SymbolRefAttr:$executable,
-    SymbolRefAttr:$entry_point,
+    FlatSymbolRefAttr:$executable,
+    FlatSymbolRefAttr:$entry_point,
     I32ElementsAttr:$workload,
     Variadic<IREELL_MemRef>:$operands
   );

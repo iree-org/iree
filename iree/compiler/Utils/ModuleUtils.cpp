@@ -47,7 +47,7 @@ void insertUsedFunctions(ModuleOp module, FuncOp func,
     for (auto &op : block) {
       // TODO(benvanik): replace with iree_hl.call check.
       if (auto calleeAttr = op.getAttr("callee")) {
-        onCalledFunction(calleeAttr.cast<SymbolRefAttr>().getValue());
+        onCalledFunction(calleeAttr.cast<FlatSymbolRefAttr>().getValue());
       }
     }
   }

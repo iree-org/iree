@@ -92,7 +92,7 @@ static ParseResult parseMultiArchExecutableOp(OpAsmParser &parser,
   auto &builder = parser.getBuilder();
 
   // Parse the name as a symbol reference attr and then convert to a string.
-  SymbolRefAttr nameAttr;
+  FlatSymbolRefAttr nameAttr;
   if (failed(parser.parseAttribute(nameAttr, SymbolTable::getSymbolAttrName(),
                                    state.attributes))) {
     return failure();

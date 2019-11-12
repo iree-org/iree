@@ -135,8 +135,8 @@ LogicalResult expandReductionFunction(FuncOp entryFunc) {
   } else if (!entryFunc.getAttr("iree.executable.reduction.dimension")) {
     return entryFunc.emitError() << "Windowed reductions are not yet supported";
   }
-  auto applySym =
-      entryFunc.getAttrOfType<SymbolRefAttr>("iree.executable.reduction.apply");
+  auto applySym = entryFunc.getAttrOfType<FlatSymbolRefAttr>(
+      "iree.executable.reduction.apply");
   if (!applySym) {
     return entryFunc.emitError() << "No reduction application function defined";
   }

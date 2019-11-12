@@ -140,7 +140,7 @@ LogicalResult FuncOp::verifyType() {
 }
 
 static ParseResult parseExportOp(OpAsmParser &parser, OperationState *result) {
-  SymbolRefAttr functionRefAttr;
+  FlatSymbolRefAttr functionRefAttr;
   if (failed(parser.parseAttribute(functionRefAttr, "function_ref",
                                    result->attributes))) {
     return failure();
@@ -184,7 +184,7 @@ void ExportOp::build(Builder *builder, OperationState &result,
 }
 
 void ExportOp::build(Builder *builder, OperationState &result,
-                     SymbolRefAttr functionRef, StringRef exportName,
+                     FlatSymbolRefAttr functionRef, StringRef exportName,
                      ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("function_ref", functionRef);
   result.addAttribute("export_name", builder->getStringAttr(exportName));
@@ -208,7 +208,7 @@ static ParseResult parseGlobalOp(OpAsmParser &parser, OperationState *result) {
   }
 
   if (succeeded(parser.parseOptionalKeyword("init"))) {
-    SymbolRefAttr initializerAttr;
+    FlatSymbolRefAttr initializerAttr;
     if (failed(parser.parseLParen()) ||
         failed(parser.parseAttribute(initializerAttr, "initializer",
                                      result->attributes)) ||
@@ -243,7 +243,7 @@ static void printGlobalOp(OpAsmPrinter &p, Operation *op) {
   if (op->getAttrOfType<UnitAttr>("is_mutable")) {
     p << " mutable";
   }
-  if (auto initializer = op->getAttrOfType<SymbolRefAttr>("initializer")) {
+  if (auto initializer = op->getAttrOfType<FlatSymbolRefAttr>("initializer")) {
     p << " init(";
     p.printSymbolName(initializer.getValue());
     p << ')';
@@ -261,7 +261,7 @@ static LogicalResult verifyGlobalOp(Operation *op) {
   auto globalName =
       op->getAttrOfType<StringAttr>(SymbolTable::getSymbolAttrName());
   auto globalType = op->getAttrOfType<TypeAttr>("type");
-  auto initializerAttr = op->getAttrOfType<SymbolRefAttr>("initializer");
+  auto initializerAttr = op->getAttrOfType<FlatSymbolRefAttr>("initializer");
   auto initialValueAttr = op->getAttr("initial_value");
   if (initializerAttr && initialValueAttr) {
     return op->emitOpError()
@@ -376,7 +376,7 @@ void GlobalRefOp::build(Builder *builder, OperationState &result,
 
 static ParseResult parseGlobalLoadOp(OpAsmParser &parser,
                                      OperationState *result) {
-  SymbolRefAttr globalAttr;
+  FlatSymbolRefAttr globalAttr;
   Type valueType;
   if (failed(parser.parseAttribute(globalAttr, "global", result->attributes)) ||
       failed(parser.parseOptionalAttrDict(result->attributes)) ||
@@ -389,14 +389,14 @@ static ParseResult parseGlobalLoadOp(OpAsmParser &parser,
 
 static void printGlobalLoadOp(OpAsmPrinter &p, Operation *op) {
   p << op->getName() << ' ';
-  p.printSymbolName(op->getAttrOfType<SymbolRefAttr>("global").getValue());
+  p.printSymbolName(op->getAttrOfType<FlatSymbolRefAttr>("global").getValue());
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"global"});
   p << " : ";
   p.printType(op->getResult(0)->getType());
 }
 
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
-  auto globalAttr = op->getAttrOfType<SymbolRefAttr>("global");
+  auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
   if (!globalOp) {
@@ -414,7 +414,7 @@ static LogicalResult verifyGlobalLoadOp(Operation *op) {
 
 static ParseResult parseGlobalStoreOp(OpAsmParser &parser,
                                       OperationState *result) {
-  SymbolRefAttr globalAttr;
+  FlatSymbolRefAttr globalAttr;
   OpAsmParser::OperandType value;
   Type valueType;
   if (failed(parser.parseAttribute(globalAttr, "global", result->attributes)) ||
@@ -429,7 +429,7 @@ static ParseResult parseGlobalStoreOp(OpAsmParser &parser,
 
 static void printGlobalStoreOp(OpAsmPrinter &p, Operation *op) {
   p << op->getName() << ' ';
-  p.printSymbolName(op->getAttrOfType<SymbolRefAttr>("global").getValue());
+  p.printSymbolName(op->getAttrOfType<FlatSymbolRefAttr>("global").getValue());
   p << ", ";
   p.printOperand(op->getOperand(0));
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"global"});
@@ -438,7 +438,7 @@ static void printGlobalStoreOp(OpAsmPrinter &p, Operation *op) {
 }
 
 static LogicalResult verifyGlobalStoreOp(Operation *op) {
-  auto globalAttr = op->getAttrOfType<SymbolRefAttr>("global");
+  auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
       op->getParentOfType<VM::ModuleOp>().lookupSymbol(globalAttr.getValue());
   if (!globalOp) {
@@ -460,7 +460,7 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
 
 static ParseResult parseGlobalResetRefOp(OpAsmParser &parser,
                                          OperationState *result) {
-  SymbolRefAttr globalAttr;
+  FlatSymbolRefAttr globalAttr;
   if (failed(parser.parseAttribute(globalAttr, "global", result->attributes)) ||
       failed(parser.parseOptionalAttrDict(result->attributes))) {
     return failure();
@@ -525,8 +525,8 @@ static void printConstI32Op(OpAsmPrinter &p, ConstI32Op &op) {
 
 // static
 bool ConstI32Op::isBuildableWith(Attribute value, Type type) {
-  // SymbolRefAttr can only be used with a function type.
-  if (value.isa<SymbolRefAttr>()) {
+  // FlatSymbolRefAttr can only be used with a function type.
+  if (value.isa<FlatSymbolRefAttr>()) {
     return false;
   }
   // Otherwise, the attribute must have the same type as 'type'.
@@ -653,7 +653,7 @@ static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
 
 static ParseResult parseConstRefRodataOp(OpAsmParser &parser,
                                          OperationState *result) {
-  SymbolRefAttr rodataAttr;
+  FlatSymbolRefAttr rodataAttr;
   Type valueType;
   if (failed(parser.parseAttribute(rodataAttr, "rodata", result->attributes)) ||
       failed(parser.parseOptionalAttrDict(result->attributes)) ||
@@ -910,7 +910,7 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp &op) {
 }
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState *result) {
-  SymbolRefAttr calleeAttr;
+  FlatSymbolRefAttr calleeAttr;
   FunctionType calleeType;
   SmallVector<OpAsmParser::OperandType, 4> operands;
   auto calleeLoc = parser.getNameLoc();

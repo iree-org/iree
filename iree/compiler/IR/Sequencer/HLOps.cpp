@@ -52,7 +52,7 @@ static LogicalResult verifyWorkload(Operation *op, Value *workload) {
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseCallOp(OpAsmParser &parser, OperationState &state) {
-  SymbolRefAttr calleeAttr;
+  FlatSymbolRefAttr calleeAttr;
   FunctionType calleeType;
   SmallVector<OpAsmParser::OperandType, 4> operands;
   auto calleeLoc = parser.getNameLoc();
@@ -213,8 +213,8 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp op) {
 static ParseResult parseDispatchOp(OpAsmParser &parser, OperationState &state) {
   auto executableLoc = parser.getNameLoc();
 
-  SymbolRefAttr executableAttr;
-  SymbolRefAttr entryPointAttr;
+  FlatSymbolRefAttr executableAttr;
+  FlatSymbolRefAttr entryPointAttr;
   FunctionType entryPointType;
   if (failed(parser.parseAttribute(executableAttr, "executable",
                                    state.attributes)) ||
