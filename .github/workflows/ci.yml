@@ -55,4 +55,4 @@ jobs:
           bazel build //...
       - name: Testing with bazel
         # TODO(gcmn) Enable all tests once they're passing
-        run: bazel test -- //... -//integrations/... -//bindings/... -//iree/hal/vulkan:dynamic_symbols_test -//iree/samples/rt:bytecode_module_api_test
+        run: bazel test --test_output=errors -- //... -//integrations/... -//bindings/... -//iree/hal/vulkan:dynamic_symbols_test -//iree/samples/rt:bytecode_module_api_test
