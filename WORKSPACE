@@ -109,6 +109,14 @@ maybe(python_configure,
 )
 ###############################################################################
 
+###############################################################################
+# Find and configure the Vulkan SDK, if installed.
+load("//build_tools/third_party/vulkan_sdk:repo.bzl", "vulkan_sdk_setup")
+maybe(vulkan_sdk_setup,
+    name = "vulkan_sdk",
+)
+###############################################################################
+
 maybe(local_repository,
      name = "com_google_absl",
      path = "third_party/abseil-cpp",
@@ -185,4 +193,10 @@ maybe(new_local_repository,
 package(default_visibility = ["//visibility:public"])
 cc_library(name = "headers", srcs = glob(["*.h"]))
 """,
+)
+
+maybe(new_local_repository,
+    name = "dear_imgui",
+    path = "third_party/dear_imgui",
+    build_file = "build_tools/third_party/dear_imgui/BUILD.overlay",
 )

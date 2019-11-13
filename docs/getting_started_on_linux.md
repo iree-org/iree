@@ -61,6 +61,16 @@ Install packages:
 sudo pip3 install numpy
 ```
 
+### Install the Vulkan SDK
+
+Some parts of the project link against the Vulkan SDK and require it be
+installed on your system. If you are planning on building these, or see linker
+errors about undefined references to `vk` symbols, download and install the
+Vulkan SDK from https://vulkan.lunarg.com/, and check that the `VULKAN_SDK`
+environment variable is set when you are building. You may find it useful to add
+`source [PATH TO VULKAN SDK]/setup-env.sh` to your `~/.bashrc` file to simplify
+environment variable setup.
+
 ## Building with Bazel
 
 We support both Bazel and CMake, however, the Bazel build covers more parts of

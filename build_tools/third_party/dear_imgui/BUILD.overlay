@@ -1,0 +1,75 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "dear_imgui",
+    hdrs = [
+        "imgui.h",
+        "imstb_textedit.h",
+        "imstb_truetype.h",
+        "imstb_rectpack.h",
+    ],
+    include_prefix = "third_party/dear_imgui",
+    deps = [":dear_imgui_srcs"],
+)
+
+# Split into two rules so that include_prefix can be used.
+cc_library(
+    name = "dear_imgui_srcs",
+    srcs = [
+        "imgui.cpp",
+        "imgui_demo.cpp",
+        "imgui_draw.cpp",
+        "imgui_widgets.cpp",
+    ],
+    hdrs = [
+        "imconfig.h",
+        "imgui.h",
+        "imgui_internal.h",
+        "imstb_textedit.h",
+        "imstb_truetype.h",
+        "imstb_rectpack.h",
+    ],
+)
+
+cc_library(
+    name = "imgui_sdl_vulkan",
+    hdrs = [
+        "examples/imgui_impl_vulkan.h",
+        "examples/imgui_impl_sdl.h",
+    ],
+    deps = [":imgui_sdl_vulkan_srcs"],
+    include_prefix = "third_party/dear_imgui",
+)
+
+# Split into two rules so that include_prefix can be used.
+cc_library(
+    name = "imgui_sdl_vulkan_srcs",
+    srcs = [
+        "examples/imgui_impl_vulkan.cpp",
+        "examples/imgui_impl_sdl.cpp",
+    ],
+    hdrs = [
+        "examples/imgui_impl_vulkan.h",
+        "examples/imgui_impl_sdl.h",
+    ],
+    deps = [
+        ":dear_imgui_srcs",
+        "@vulkan_headers//:vulkan_headers",
+        "@vulkan_sdk//:sdk",
+        "@sdl2//:SDL2",
+    ],
+)

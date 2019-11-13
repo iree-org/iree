@@ -23,6 +23,8 @@ iree_cc_library(
     "debug_reporter.h"
   SRCS
     "debug_reporter.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     iree::base::status
     iree::base::tracing
@@ -39,6 +41,8 @@ iree_cc_library(
     "descriptor_pool_cache.h"
   SRCS
     "descriptor_pool_cache.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::inlined_vector
     iree::base::ref_ptr
@@ -58,6 +62,8 @@ iree_cc_library(
     "descriptor_set_arena.h"
   SRCS
     "descriptor_set_arena.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     iree::base::arena
     iree::base::math
@@ -79,6 +85,8 @@ iree_cc_library(
     "direct_command_buffer.h"
   SRCS
     "direct_command_buffer.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::core_headers
     absl::inlined_vector
@@ -106,6 +114,8 @@ iree_cc_library(
     "direct_command_queue.h"
   SRCS
     "direct_command_queue.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::core_headers
     absl::synchronization
@@ -138,6 +148,8 @@ iree_cc_library(
     "dynamic_symbols.h"
   SRCS
     "dynamic_symbols.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::core_headers
     absl::memory
@@ -157,6 +169,8 @@ iree_cc_test(
     dynamic_symbols_test
   SRCS
     "dynamic_symbols_test.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     iree::base::status_matchers
     iree::hal::vulkan::status_util
@@ -171,6 +185,8 @@ iree_cc_library(
     "extensibility_util.h"
   SRCS
     "extensibility_util.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::span
     iree::base::memory
@@ -187,6 +203,8 @@ iree_cc_library(
     handle_util
   HDRS
     "handle_util.h"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::synchronization
     absl::utility
@@ -204,6 +222,8 @@ iree_cc_library(
     "legacy_fence.h"
   SRCS
     "legacy_fence.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::core_headers
     absl::inlined_vector
@@ -227,6 +247,8 @@ iree_cc_library(
     "native_binary_semaphore.h"
   SRCS
     "native_binary_semaphore.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     iree::hal::semaphore
     iree::hal::vulkan::handle_util
@@ -241,6 +263,8 @@ iree_cc_library(
     "native_event.h"
   SRCS
     "native_event.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     iree::hal::vulkan::handle_util
     iree::hal::event
@@ -255,6 +279,8 @@ iree_cc_library(
     "pipeline_cache.h"
   SRCS
     "pipeline_cache.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::core_headers
     absl::inlined_vector
@@ -280,6 +306,8 @@ iree_cc_library(
     "pipeline_executable.h"
   SRCS
     "pipeline_executable.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::inlined_vector
     iree::base::memory
@@ -302,6 +330,8 @@ iree_cc_library(
     "status_util.h"
   SRCS
     "status_util.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     iree::base::status
     Vulkan::Headers
@@ -320,6 +350,7 @@ iree_cc_library(
     "vma_allocator.cc"
     "vma_buffer.cc"
   COPTS
+    "-DVK_NO_PROTOTYPES"
     # Only needed in the implementation cc and not by external users.
     "-DVMA_STATIC_VULKAN_FUNCTIONS=0"
   INCLUDES
@@ -348,6 +379,8 @@ iree_cc_library(
     "vulkan_device.h"
   SRCS
     "vulkan_device.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::inlined_vector
     absl::memory
@@ -386,6 +419,8 @@ iree_cc_library(
     "vulkan_driver.h"
   SRCS
     "vulkan_driver.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::inlined_vector
     iree::base::memory
@@ -407,6 +442,8 @@ iree_cc_library(
     vulkan_driver_module
   SRCS
     "vulkan_driver_module.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
   DEPS
     absl::flags
     iree::base::init

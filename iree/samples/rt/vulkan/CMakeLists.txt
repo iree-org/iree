@@ -12,25 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(vulkan)
-
-iree_cc_test(
-  NAME
-    bytecode_module_test
-  SRCS
-    "bytecode_module_test.cc"
-  DEPS
-    absl::strings
-    gtest_main
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::base::status_matchers
-    iree::hal::buffer_view
-    iree::hal::driver_registry
-    iree::schemas
-    iree::rt
-    iree::vm::bytecode_module
-    # Enabled drivers:
-    iree::hal::interpreter::interpreter_driver_module
-    iree::hal::vulkan::vulkan_driver_module
+iree_cc_binary(
+    NAME
+      vk_graphics_integration
+    SRCS
+      "vk_graphics_integration.cc"
+    DEPS
+      absl::base
+      dear_imgui::dear_imgui
+      dear_imgui::impl_sdl
+      dear_imgui::impl_vulkan
+      iree::base::api
+      iree::base::logging
+      iree::hal::api
+      iree::hal::vulkan::vulkan_driver_module
+      iree::rt::api
+      iree::vm::api
+      SDL2-static
 )

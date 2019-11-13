@@ -139,11 +139,3 @@ set(MLIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/to
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
 )
-
-#-------------------------------------------------------------------------------
-# Third party: vulkan
-#-------------------------------------------------------------------------------
-
-list(APPEND IREE_DEFAULT_COPTS
-  "-DVK_NO_PROTOTYPES"
-)
