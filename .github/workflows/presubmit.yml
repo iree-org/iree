@@ -24,7 +24,7 @@ jobs:
   # TODO(benvanik): add other checks (license, etc).
   lint:
     name: Code Style Check
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
     - name: Installing dependencies
       run: |
