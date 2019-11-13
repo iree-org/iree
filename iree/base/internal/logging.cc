@@ -100,5 +100,54 @@ LogMessageFatal::~LogMessageFatal() {
   abort();
 }
 
+template <>
+void MakeCheckOpValueString(std::ostream* os, const char& v) {
+  if (v >= 32 && v <= 126) {
+    (*os) << "'" << v << "'";
+  } else {
+    (*os) << "char value " << static_cast<int16_t>(v);
+  }
+}
+
+template <>
+void MakeCheckOpValueString(std::ostream* os, const int8_t& v) {
+  if (v >= 32 && v <= 126) {
+    (*os) << "'" << v << "'";
+  } else {
+    (*os) << "signed char value " << static_cast<int16_t>(v);
+  }
+}
+
+template <>
+void MakeCheckOpValueString(std::ostream* os, const uint8_t& v) {
+  if (v >= 32 && v <= 126) {
+    (*os) << "'" << v << "'";
+  } else {
+    (*os) << "unsigned char value " << static_cast<uint16_t>(v);
+  }
+}
+
+template <>
+void MakeCheckOpValueString(std::ostream* os, const std::nullptr_t& p) {
+  (*os) << "nullptr";
+}
+
+CheckOpMessageBuilder::CheckOpMessageBuilder(const char* exprtext)
+    : stream_(new std::ostringstream) {
+  *stream_ << "Check failed: " << exprtext << " (";
+}
+
+CheckOpMessageBuilder::~CheckOpMessageBuilder() { delete stream_; }
+
+std::ostream* CheckOpMessageBuilder::ForVar2() {
+  *stream_ << " vs. ";
+  return stream_;
+}
+
+std::string* CheckOpMessageBuilder::NewString() {
+  *stream_ << ")";
+  return new std::string(stream_->str());
+}
+
 }  // namespace internal
 }  // namespace iree
