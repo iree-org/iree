@@ -130,6 +130,7 @@ iree_cc_library(
     "buffer_view_string_util.cc"
   DEPS
     absl::strings
+    iree::base::buffer_string_util
     iree::base::status
     iree::hal::allocator
     iree::hal::buffer_view
@@ -315,7 +316,7 @@ iree_cc_library(
   DEPS
     absl::base
     absl::synchronization
-    iree::base::init
+    iree::base::initializer
     iree::base::status
     iree::hal::driver
   PUBLIC

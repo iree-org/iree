@@ -87,6 +87,36 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    "buffer_string_util"
+  SRCS
+    "buffer_string_util.cc"
+  HDRS
+    "buffer_string_util.h"
+  DEPS
+    absl::strings
+    absl::span
+    iree::base::memory
+    iree::base::shape
+    iree::base::source_location
+    iree::base::status
+)
+
+iree_cc_test(
+  NAME
+    "buffer_string_util_test"
+  SRCS
+    "buffer_string_util_test.cc"
+  DEPS
+    gtest_main
+    iree::base::buffer_string_util
+    iree::base::memory
+    iree::base::status
+    iree::base::status_matchers
+    absl::strings
+)
+
+iree_cc_library(
+  NAME
     file_handle
   SRCS
     "internal/file_handle_win32.cc"
@@ -185,6 +215,18 @@ iree_cc_library(
     "internal/init_internal.cc"
   DEPS
     absl::flags
+    iree::base::target_platform
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    initializer
+  HDRS
+    "initializer.h"
+  SRCS
+    "initializer.cc"
+  DEPS
     iree::base::target_platform
   PUBLIC
 )
@@ -398,7 +440,7 @@ if(${IREE_ENABLE_TRACING})
       absl::synchronization
       absl::time
       iree::base::file_io
-      iree::base::init
+      iree::base::inititializer
       iree::base::logging
       iree::base::status
     PUBLIC
@@ -450,4 +492,3 @@ endif()
 #     iree::base::status_matchers
 #     iree::base::wait_handle
 # )
-
