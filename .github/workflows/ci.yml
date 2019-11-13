@@ -22,7 +22,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     env:
       CXX: clang++
       CC: clang
