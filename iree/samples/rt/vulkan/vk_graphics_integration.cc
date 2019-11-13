@@ -23,20 +23,29 @@
 #include <SDL_vulkan.h>
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <string>
+#include <vector>
 
-#include "absl/base/macros.h"
+// IREE's C API:
 #include "iree/base/api.h"
-#include "iree/base/logging.h"
 #include "iree/hal/api.h"
 #include "iree/rt/api.h"
 #include "iree/vm/api.h"
+
+// Other dependencies (helpers, etc.)
+#include "absl/base/macros.h"
+#include "absl/types/span.h"
+#include "iree/base/logging.h"
 
 // NOTE: order matters here, imgui must come first:
 #include "third_party/dear_imgui/imgui.h"
 // NOTE: must follow imgui.h:
 #include "third_party/dear_imgui/examples/imgui_impl_sdl.h"
 #include "third_party/dear_imgui/examples/imgui_impl_vulkan.h"
+
+// Compiled module embedded here to avoid file IO:
+#include "iree/samples/rt/vulkan/simple_mul_bytecode_module.h"
 
 static VkAllocationCallbacks* g_Allocator = NULL;
 static VkInstance g_Instance = VK_NULL_HANDLE;
@@ -55,9 +64,10 @@ static int g_SwapChainResizeHeight = 0;
 
 static void check_vk_result(VkResult err) {
   if (err == 0) return;
-  printf("VkResult %d\n", err);
-  if (err < 0) abort();
+  LOG(FATAL) << "VkResult: " << err;
 }
+
+#define CHECK_IREE_OK(status) CHECK_EQ(IREE_STATUS_OK, (status))
 
 static void SetupVulkan(const char** extensions, uint32_t extensions_count) {
   VkResult err;
@@ -195,6 +205,10 @@ static void SetupVulkanWindow(ImGui_ImplVulkanH_Window* wd,
   ImGui_ImplVulkanH_CreateWindow(g_Instance, g_PhysicalDevice, g_Device, wd,
                                  g_QueueFamily, g_Allocator, width, height,
                                  g_MinImageCount);
+
+  // Set clear color.
+  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  memcpy(&wd->ClearValue.color.float32[0], &clear_color, 4 * sizeof(float));
 }
 
 static void CleanupVulkan() {
@@ -296,18 +310,6 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd) {
 
 extern "C" int main(int argc, char** argv) {
   // --------------------------------------------------------------------------
-  // Check IREE API version.
-  iree_api_version_t actual_version;
-  iree_status_t status =
-      iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version);
-  if (status != IREE_STATUS_OK) {
-    LOG(FATAL) << "Unsupported runtime API version " << actual_version;
-  } else {
-    LOG(INFO) << "IREE runtime API version " << actual_version;
-  }
-  // --------------------------------------------------------------------------
-
-  // --------------------------------------------------------------------------
   // Create a window.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
     LOG(FATAL) << "Failed to initialize SDL";
@@ -317,9 +319,9 @@ extern "C" int main(int argc, char** argv) {
   // Setup window
   SDL_WindowFlags window_flags = (SDL_WindowFlags)(
       SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-  SDL_Window* window =
-      SDL_CreateWindow("IREE Samples - Vulkan Triangle", SDL_WINDOWPOS_CENTERED,
-                       SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
+  SDL_Window* window = SDL_CreateWindow(
+      "IREE Samples - Vulkan Graphics Integration", SDL_WINDOWPOS_CENTERED,
+      SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
 
   // Setup Vulkan
   uint32_t extensions_count = 0;
@@ -399,7 +401,67 @@ extern "C" int main(int argc, char** argv) {
 
   // Demo state.
   bool show_demo_window = true;
-  ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+  bool show_iree_window = true;
+  // --------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------
+  // Setup IREE.
+  CHECK_IREE_OK(iree_api_init(&argc, &argv));
+
+  // Check API version.
+  iree_api_version_t actual_version;
+  iree_status_t status =
+      iree_api_version_check(IREE_API_VERSION_LATEST, &actual_version);
+  if (status != IREE_STATUS_OK) {
+    LOG(FATAL) << "Unsupported runtime API version " << actual_version;
+  } else {
+    LOG(INFO) << "IREE runtime API version " << actual_version;
+  }
+
+  // Initialize using Vulkan.
+  // TODO(scotttodd): Pass Vulkan device in here and reuse
+  iree_rt_instance_t* instance = nullptr;
+  CHECK_IREE_OK(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &instance));
+  std::string driver_name = "vulkan";
+  LOG(INFO) << "Creating driver '" << driver_name << "'";
+  CHECK_IREE_OK(iree_rt_instance_register_driver_ex(
+      instance, iree_string_view_t{driver_name.data(), driver_name.size()}));
+  LOG(INFO) << "Created driver '" << driver_name << "'";
+
+  // Allocate a context that will hold the module state across invocations.
+  iree_rt_policy_t* dummy_policy = nullptr;
+  CHECK_IREE_OK(iree_rt_policy_create(IREE_ALLOCATOR_DEFAULT, &dummy_policy));
+  iree_rt_context_t* context = nullptr;
+  CHECK_IREE_OK(iree_rt_context_create(instance, dummy_policy,
+                                       IREE_ALLOCATOR_DEFAULT, &context));
+  iree_rt_policy_release(dummy_policy);
+
+  // Load bytecode module from embedded data.
+  LOG(INFO) << "Loading simple_mul.mlir...";
+  const auto* module_file_toc =
+      iree::rt::samples::simple_mul_bytecode_module_create();
+  iree_rt_module_t* bytecode_module = nullptr;
+  CHECK_IREE_OK(iree_vm_bytecode_module_create_from_buffer(
+      iree_const_byte_span_t{
+          reinterpret_cast<const uint8_t*>(module_file_toc->data),
+          module_file_toc->size},
+      nullptr, nullptr, IREE_ALLOCATOR_DEFAULT, &bytecode_module));
+
+  // Register bytecode module within the context.
+  std::vector<iree_rt_module_t*> modules;
+  modules.push_back(bytecode_module);
+  CHECK_IREE_OK(
+      iree_rt_context_register_modules(context, &modules[0], modules.size()));
+  iree_rt_module_release(bytecode_module);
+  LOG(INFO) << "Module loaded and context is ready for use";
+
+  // Lookup the entry point function.
+  iree_rt_function_t main_function;
+  const char kMainFunctionName[] = "module.simple_mul";
+  CHECK_IREE_OK(iree_rt_context_resolve_function(
+      context,
+      iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
+      &main_function));
   // --------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------
@@ -444,22 +506,122 @@ extern "C" int main(int argc, char** argv) {
 
     // Custom window.
     {
-      ImGui::Begin("Hello, world!");
+      ImGui::Begin("IREE Vulkan Integration Demo", &show_iree_window,
+                   ImGuiWindowFlags_AlwaysAutoResize);
 
-      ImGui::Checkbox("Demo Window", &show_demo_window);
+      ImGui::Checkbox("Show ImGui Demo Window", &show_demo_window);
       ImGui::Separator();
 
-      ImGui::ColorEdit3("Clear Color", (float*)&clear_color);
+      // ImGui Inputs for two input tensors.
+      // Run computation whenever any of the values changes.
+      static bool dirty = true;
+      static float input_x[] = {4.0f, 4.0f, 4.0f, 4.0f};
+      static float input_y[] = {2.0f, 2.0f, 2.0f, 2.0f};
+      static float latest_output[] = {0.0f, 0.0f, 0.0f, 0.0f};
+      ImGui::Text("Multiply numbers using IREE");
+      ImGui::PushItemWidth(60);
+      // clang-format off
+      if (ImGui::DragFloat("= x[0]", &input_x[0], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; } ImGui::SameLine();  // NOLINT
+      if (ImGui::DragFloat("= x[1]", &input_x[1], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; } ImGui::SameLine();  // NOLINT
+      if (ImGui::DragFloat("= x[2]", &input_x[2], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; } ImGui::SameLine();  // NOLINT
+      if (ImGui::DragFloat("= x[3]", &input_x[3], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; }                     // NOLINT
+      if (ImGui::DragFloat("= y[0]", &input_y[0], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; } ImGui::SameLine();  // NOLINT
+      if (ImGui::DragFloat("= y[1]", &input_y[1], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; } ImGui::SameLine();  // NOLINT
+      if (ImGui::DragFloat("= y[2]", &input_y[2], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; } ImGui::SameLine();  // NOLINT
+      if (ImGui::DragFloat("= y[3]", &input_y[3], 0.5f, 0.f, 0.f, "%.1f")) { dirty = true; }                     // NOLINT
+      // clang-format on
+      ImGui::PopItemWidth();
+
+      if (dirty) {
+        // Some input values changed, run the computation.
+        // This is synchronous and doesn't reuse buffers for now.
+
+        // Allocate buffers that can be mapped on the CPU and that can also be
+        // used on the device. Not all devices support this, but the ones we
+        // have now do.
+        DLOG(INFO) << "Creating I/O buffers...";
+        constexpr int kElementCount = 4;
+        iree_hal_buffer_t* arg0_buffer = nullptr;
+        iree_hal_buffer_t* arg1_buffer = nullptr;
+        CHECK_IREE_OK(iree_rt_context_allocate_device_visible_buffer(
+            context, IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount,
+            IREE_ALLOCATOR_DEFAULT, &arg0_buffer));
+        CHECK_IREE_OK(iree_rt_context_allocate_device_visible_buffer(
+            context, IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount,
+            IREE_ALLOCATOR_DEFAULT, &arg1_buffer));
+
+        // Write inputs into the mappable buffers.
+        CHECK_IREE_OK(iree_hal_buffer_write_data(arg0_buffer, 0, &input_x,
+                                                 sizeof(input_x)));
+        CHECK_IREE_OK(iree_hal_buffer_write_data(arg1_buffer, 0, &input_y,
+                                                 sizeof(input_y)));
+
+        // Wrap buffers in buffer views to provide shape information.
+        std::array<iree_hal_buffer_view_t*, 2> arg_buffer_views;
+        CHECK_IREE_OK(iree_hal_buffer_view_create(
+            arg0_buffer, iree_shape_t{1, {kElementCount}}, sizeof(float),
+            IREE_ALLOCATOR_DEFAULT, &arg_buffer_views[0]));
+        CHECK_IREE_OK(iree_hal_buffer_view_create(
+            arg1_buffer, iree_shape_t{1, {kElementCount}}, sizeof(float),
+            IREE_ALLOCATOR_DEFAULT, &arg_buffer_views[1]));
+        iree_hal_buffer_release(arg0_buffer);
+        iree_hal_buffer_release(arg1_buffer);
+
+        // Call into the @simple_mul function.
+        DLOG(INFO) << "Calling @simple_mul...";
+        iree_rt_invocation_t* invocation = nullptr;
+        CHECK_IREE_OK(iree_rt_invocation_create(
+            context, &main_function, nullptr, nullptr, arg_buffer_views.data(),
+            2, nullptr, 0, IREE_ALLOCATOR_DEFAULT, &invocation));
+        CHECK_IREE_OK(iree_hal_buffer_view_release(arg_buffer_views[0]));
+        CHECK_IREE_OK(iree_hal_buffer_view_release(arg_buffer_views[1]));
+        // TODO(scotttodd): Make this async. Poll each render frame?
+        CHECK_IREE_OK(
+            iree_rt_invocation_await(invocation, IREE_TIME_INFINITE_FUTURE));
+
+        // Get the result buffers from the invocation.
+        DLOG(INFO) << "Retrieving results...";
+        std::array<iree_hal_buffer_view_t*, 2> result_buffer_views;
+        iree_host_size_t result_count;
+        CHECK_IREE_OK(iree_rt_invocation_consume_results(
+            invocation, result_buffer_views.size(), IREE_ALLOCATOR_DEFAULT,
+            result_buffer_views.data(), &result_count));
+        iree_rt_invocation_release(invocation);
+
+        // Read back the results.
+        DLOG(INFO) << "Reading back results...";
+        iree_hal_buffer_t* result_buffer =
+            iree_hal_buffer_view_buffer(result_buffer_views[0]);
+        iree_hal_mapped_memory_t mapped_memory;
+        CHECK_IREE_OK(iree_hal_buffer_map(result_buffer,
+                                          IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                          IREE_WHOLE_BUFFER, &mapped_memory));
+        memcpy(&latest_output, mapped_memory.contents.data,
+               mapped_memory.contents.data_length);
+        CHECK_IREE_OK(iree_hal_buffer_unmap(result_buffer, &mapped_memory));
+
+        iree_hal_buffer_view_release(result_buffer_views[0]);
+
+        dirty = false;
+      }
+
+      // Display the latest computation output.
+      ImGui::Text("X * Y = [%f, %f, %f, %f]",
+                  latest_output[0],  //
+                  latest_output[1],  //
+                  latest_output[2],  //
+                  latest_output[3]);
       ImGui::Separator();
 
+      // Framerate counter.
       ImGui::Text("Application average %.3f ms/frame (%.1f FPS)",
                   1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
       ImGui::End();
     }
 
     // Rendering
     ImGui::Render();
-    memcpy(&wd->ClearValue.color.float32[0], &clear_color, 4 * sizeof(float));
     FrameRender(wd);
 
     FramePresent(wd);
@@ -468,6 +630,9 @@ extern "C" int main(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Cleanup
+  iree_rt_context_release(context);
+  iree_rt_instance_release(instance);
+
   err = vkDeviceWaitIdle(g_Device);
   check_vk_result(err);
   ImGui_ImplVulkan_Shutdown();
