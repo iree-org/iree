@@ -274,21 +274,6 @@ LogicalResult VMFunctionBuilder::WriteOperation(Block *block, Operation *baseOp,
     if (memRefTypeOffset.IsNull()) return {};
     typeDefUnion = memRefTypeOffset.Union();
     typeUnionType = iree::TypeDefUnion::MemRefTypeDef;
-  } else if (auto deviceType = type.dyn_cast<DeviceType>()) {
-    typeDefUnion = iree::CreateDeviceTypeDef(*fbb).Union();
-    typeUnionType = iree::TypeDefUnion::DeviceTypeDef;
-  } else if (auto commandBufferType = type.dyn_cast<CommandBufferType>()) {
-    typeDefUnion = iree::CreateCommandBufferTypeDef(*fbb).Union();
-    typeUnionType = iree::TypeDefUnion::CommandBufferTypeDef;
-  } else if (auto eventType = type.dyn_cast<EventType>()) {
-    typeDefUnion = iree::CreateEventTypeDef(*fbb).Union();
-    typeUnionType = iree::TypeDefUnion::EventTypeDef;
-  } else if (auto semaphoreType = type.dyn_cast<SemaphoreType>()) {
-    typeDefUnion = iree::CreateSemaphoreTypeDef(*fbb).Union();
-    typeUnionType = iree::TypeDefUnion::SemaphoreTypeDef;
-  } else if (auto fenceType = type.dyn_cast<FenceType>()) {
-    typeDefUnion = iree::CreateFenceTypeDef(*fbb).Union();
-    typeUnionType = iree::TypeDefUnion::FenceTypeDef;
   } else {
     function_.emitError() << "Function " << function_.getName().str()
                           << " has unsupported I/O with type " << type;

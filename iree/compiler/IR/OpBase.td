@@ -41,12 +41,6 @@ class IREE_ScalarMemRefOf<list<Type> allowedTypes> :
 // Op traits
 //===----------------------------------------------------------------------===//
 
-def IREE_IsModuleOnlyPred :
-  CPred<"llvm::isa_and_nonnull<IREE::ModuleOp>($_op.getParentOp())">;
-def IREE_ModuleOnly :
-  PredOpTrait<"op can only be used in an 'iree.module' block",
-              IREE_IsModuleOnlyPred>;
-
 def IREE_IsMultiArchExecutableOnlyPred :
   CPred<"llvm::isa_and_nonnull<IREE::MultiArchExecutableOp>($_op.getParentOp())">;
 def IREE_MultiArchExecutableOnly :

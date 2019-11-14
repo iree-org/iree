@@ -30,34 +30,8 @@ class IREE_StructureOp<string mnemonic, list<OpTrait> traits = []> :
   let printer = [{ print$cppClass(p, *this); }];
 }
 
-def IREE_ModuleOp :
-    IREE_StructureOp<"module", [
-      SingleBlockImplicitTerminator<"ModuleEndOp">,
-      NativeOpTrait<"SymbolTable">
-    ]> {
-  let regions = (region SizedRegion<1>:$body);
-  let extraClassDeclaration = [{
-    Block& getBlock() {
-      return this->getOperation()->getRegion(0).front();
-    }
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [OpBuilder<"Builder *, OperationState &state">];
-}
-
-def IREE_ModuleEndOp :
-    IREE_StructureOp<"_module_end", [
-      IREE_ModuleOnly,
-      Terminator
-    ]> {
-  let parser = [{ return parseNoIOOp(parser, result); }];
-  let printer = [{ printNoIOOp(getOperation(), p); }];
-}
-
 def IREE_MultiArchExecutableOp :
     IREE_StructureOp<"multi_arch_executable", [
-      // TODO(benvanik): make iree.module work and make this IREE_ModuleOnly.
       SingleBlockImplicitTerminator<"MultiArchExecutableEndOp">
     ]> {
   let arguments = (ins

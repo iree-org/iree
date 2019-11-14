@@ -15,39 +15,3 @@
 #include "iree/compiler/IR/Types.h"
 
 #include "iree/compiler/IR/Enums.cpp.inc"
-
-namespace mlir {
-namespace iree_compiler {
-
-// static
-DeviceType DeviceType::get(MLIRContext *context) {
-  return Base::get(context, TypeKind::Device);
-}
-
-// static
-DeviceGroupType DeviceGroupType::get(MLIRContext *context) {
-  return Base::get(context, TypeKind::DeviceGroup);
-}
-
-// static
-CommandBufferType CommandBufferType::get(MLIRContext *context) {
-  return Base::get(context, TypeKind::CommandBuffer);
-}
-
-// static
-EventType EventType::get(MLIRContext *context) {
-  return Base::get(context, TypeKind::Event);
-}
-
-// static
-SemaphoreType SemaphoreType::get(MLIRContext *context) {
-  return Base::get(context, TypeKind::Semaphore);
-}
-
-// static
-FenceType FenceType::get(MLIRContext *context) {
-  return Base::get(context, TypeKind::Fence);
-}
-
-}  // namespace iree_compiler
-}  // namespace mlir

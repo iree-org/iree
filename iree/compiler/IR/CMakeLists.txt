@@ -23,7 +23,6 @@ iree_cc_library(
     "Dialect.h"
     "Ops.h"
     "StructureOps.h"
-    "Traits.h"
     "Types.h"
   SRCS
     "ConfigOps.cpp"
@@ -36,7 +35,6 @@ iree_cc_library(
     "StructureOps.cpp"
     "StructureOps.cpp.inc"
     "StructureOps.h.inc"
-    "Traits.cpp"
     "Types.cpp"
   DEPS
     iree::compiler::IR::ConfigOpsGen

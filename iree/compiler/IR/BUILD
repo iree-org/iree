@@ -37,7 +37,6 @@ cc_library(
         "Ops.cpp.inc",
         "StructureOps.cpp",
         "StructureOps.cpp.inc",
-        "Traits.cpp",
         "Types.cpp",
     ],
     hdrs = [
@@ -49,7 +48,6 @@ cc_library(
         "Ops.h.inc",
         "StructureOps.h",
         "StructureOps.h.inc",
-        "Traits.h",
         "Types.h",
     ],
     deps = [

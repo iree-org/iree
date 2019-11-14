@@ -50,33 +50,6 @@ static void printNoIOOp(Operation *op, OpAsmPrinter &printer) {
 }
 
 //===----------------------------------------------------------------------===//
-// iree.module
-//===----------------------------------------------------------------------===//
-
-void ModuleOp::build(Builder *builder, OperationState &state) {
-  ensureTerminator(*state.addRegion(), *builder, state.location);
-}
-
-static ParseResult parseModuleOp(OpAsmParser &parser, OperationState &state) {
-  Region *body = state.addRegion();
-  if (parser.parseRegion(*body, /*arguments=*/{}, /*argTypes=*/{})) {
-    return failure();
-  }
-  if (parser.parseOptionalAttrDict(state.attributes)) {
-    return failure();
-  }
-  ModuleOp::ensureTerminator(*body, parser.getBuilder(), state.location);
-  return success();
-}
-
-static void printModuleOp(OpAsmPrinter &printer, Operation *op) {
-  printer << op->getName();
-  printer.printRegion(op->getRegion(0), /*printEntryBlockArgs=*/false,
-                      /*printBlockTerminators=*/false);
-  printer.printOptionalAttrDict(op->getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
 // iree.multi_arch_executable
 //===----------------------------------------------------------------------===//
 

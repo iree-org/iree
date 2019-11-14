@@ -28,9 +28,6 @@ static DialectRegistration<IREEDialect> iree_dialect;
 
 IREEDialect::IREEDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
-#define IREE_ADD_TYPE(NAME, KIND, TYPE) addTypes<TYPE>();
-  IREE_TYPE_TABLE(IREE_ADD_TYPE);
-
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/IR/Ops.cpp.inc"
@@ -43,48 +40,6 @@ IREEDialect::IREEDialect(MLIRContext *context)
   addOperations<
 #include "iree/compiler/IR/StructureOps.cpp.inc"
       >();
-}
-
-//===----------------------------------------------------------------------===//
-// Type Parsing
-//===----------------------------------------------------------------------===//
-
-#define IREE_TYPE_PARSER(NAME, KIND, TYPE)                              \
-  static Type parse##TYPE(IREEDialect const &dialect, StringRef spec) { \
-    spec.consume_front(NAME);                                           \
-    return TYPE::get(dialect.getContext());                             \
-  }
-IREE_TYPE_TABLE(IREE_TYPE_PARSER);
-
-#define IREE_PARSE_TYPE(NAME, KIND, TYPE) \
-  if (spec.startswith(NAME)) {            \
-    return parse##TYPE(*this, spec);      \
-  }
-Type IREEDialect::parseType(DialectAsmParser &parser) const {
-  llvm::StringRef spec = parser.getFullSymbolSpec();
-  IREE_TYPE_TABLE(IREE_PARSE_TYPE);
-  parser.emitError(parser.getNameLoc(), "unknown IREE type: ") << spec;
-  return Type();
-}
-
-//===----------------------------------------------------------------------===//
-// Type Printing
-//===----------------------------------------------------------------------===//
-
-#define IREE_TYPE_PRINTER(NAME, KIND, TYPE) \
-  static void print##TYPE(TYPE type, DialectAsmPrinter &os) { os << NAME; }
-IREE_TYPE_TABLE(IREE_TYPE_PRINTER);
-
-#define IREE_PRINT_TYPE(NAME, KIND, TYPE) \
-  case KIND:                              \
-    print##TYPE(type.cast<TYPE>(), os);   \
-    return;
-void IREEDialect::printType(Type type, DialectAsmPrinter &os) const {
-  switch (type.getKind()) {
-    IREE_TYPE_TABLE(IREE_PRINT_TYPE);
-    default:
-      llvm_unreachable("unhandled IREE type");
-  }
 }
 
 }  // namespace iree_compiler
