@@ -15,6 +15,7 @@ cc_test(
         ":bytecode_dispatch_test_module_cc",
         ":bytecode_module",
         ":module",
+        "//iree/base:logging",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/strings",
     ],

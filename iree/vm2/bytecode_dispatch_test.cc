@@ -19,6 +19,7 @@
 // that we can't run the full MLIR compiler stack on.
 
 #include "absl/strings/match.h"
+#include "iree/base/logging.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm2/bytecode_dispatch_test_module.h"
 #include "iree/vm2/bytecode_module.h"

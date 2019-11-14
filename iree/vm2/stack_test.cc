@@ -14,6 +14,8 @@
 
 #include "iree/vm2/stack.h"
 
+#include <cstring>
+
 #include "iree/base/api.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
