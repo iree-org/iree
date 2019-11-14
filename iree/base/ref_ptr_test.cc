@@ -318,7 +318,7 @@ TEST(RefPtrTest, VirtualDestructor) {
   // Lifecycle.
   EXPECT_EQ(0, VirtualDtorTypeA::alloc_count_a);
   EXPECT_EQ(0, VirtualDtorTypeB::alloc_count_b);
-  ref_ptr<VirtualDtorTypeB> a = make_ref<VirtualDtorTypeB>();
+  ref_ptr<VirtualDtorTypeA> a = make_ref<VirtualDtorTypeB>();
   EXPECT_EQ(1, VirtualDtorTypeA::alloc_count_a);
   EXPECT_EQ(1, VirtualDtorTypeB::alloc_count_b);
   a.reset();

@@ -94,6 +94,24 @@ extern "C" {
 #define IREE_API_PTR
 #endif  // _WIN32
 
+#if defined(_MSC_VER)
+#define IREE_ALIGNAS(x) __declspec(align(x))
+#else
+#define IREE_ALIGNAS(x) __attribute__((aligned(x)))
+#endif  // _MSC_VER
+
+#if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
+     __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
+#define IREE_IS_LITTLE_ENDIAN 1
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_BIG_ENDIAN__) && \
+    __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define IREE_IS_BIG_ENDIAN 1
+#elif defined(_WIN32)
+#define IREE_IS_LITTLE_ENDIAN 1
+#else
+#error "IREE endian detection needs to be set up for your compiler"
+#endif  // __BYTE_ORDER__
+
 // Well-known status codes matching iree::StatusCode.
 typedef enum {
   IREE_STATUS_OK = 0,
@@ -132,15 +150,24 @@ typedef struct {
   // User-defined pointer passed to all functions.
   void* self;
   // Allocates |byte_length| of memory and stores the pointer in |out_ptr|.
+  // Systems should align to 16 byte boundaries (or otherwise their natural
+  // SIMD alignment). The runtime pools internally and small allocations
+  // (usually) won't be made through this interface.
   iree_status_t(IREE_API_PTR* alloc)(void* self, iree_host_size_t byte_length,
                                      void** out_ptr);
   // Frees |ptr| from a previous alloc call.
   iree_status_t(IREE_API_PTR* free)(void* self, void* ptr);
 } iree_allocator_t;
 
-// TODO(benvanik): ensure this works correctly.
+// Allocates using the iree_allocator_alloc and iree_allocator_free methods.
+// These will usually be backed by malloc and free.
 #define IREE_ALLOCATOR_DEFAULT \
   { 0, iree_allocator_alloc, iree_allocator_free }
+
+// Does not perform any allocation or deallocation; used to wrap objects that
+// are owned by external code/live in read-only memory/etc.
+#define IREE_ALLOCATOR_NULL \
+  { 0, 0, 0 }
 
 // Like absl::Time, represented as nanoseconds since unix epoch.
 // TODO(benvanik): pick something easy to get into/outof time_t/etc.

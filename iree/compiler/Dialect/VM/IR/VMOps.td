@@ -89,8 +89,8 @@ def VM_FuncOp : VM_Op<"func", [
   }];
 
   let arguments = (ins
-    UnitAttr:$is_export,
-    OptionalAttr<VM_Ordinal>:$ordinal
+    OptionalAttr<VM_Ordinal>:$ordinal,
+    OptionalAttr<UnitAttr>:$noinline
   );
 
   let regions = (region AnyRegion:$body);
@@ -437,6 +437,7 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ConstRefZero>,
+    VM_EncResult<"result">,
   ];
 
   let skipDefaultBuilders = 1;

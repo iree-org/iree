@@ -101,6 +101,15 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   bool isLegalToInline(Region *dest, Region *src,
                        BlockAndValueMapping &valueMapping) const final {
     // TODO(benvanik): disallow inlining across async calls.
+
+    // Don't inline functions with the 'noinline' attribute.
+    // Useful primarily for benchmarking.
+    if (auto funcOp = dyn_cast<VM::FuncOp>(src->getParentOp())) {
+      if (funcOp.noinline()) {
+        return false;
+      }
+    }
+
     return true;
   }
 

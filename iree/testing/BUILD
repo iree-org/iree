@@ -22,6 +22,17 @@ package(
 )
 
 cc_library(
+    name = "benchmark_main",
+    testonly = 1,
+    srcs = ["benchmark_main.cc"],
+    deps = [
+        "//iree/base:init",
+        "@com_google_benchmark//:benchmark",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
     name = "gtest",
     testonly = 1,
     hdrs = ["gtest.h"],

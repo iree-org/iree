@@ -263,6 +263,7 @@ class RefObject {
         V::Delete(p);
       }
     }
+    static void Destroy(V* p) { V::Delete(p); }
   };
 
   template <typename V>
@@ -279,6 +280,7 @@ class RefObject {
         delete p;
       }
     }
+    static void Destroy(V* p) { delete p; }
   };
 
  public:
@@ -298,6 +300,16 @@ class RefObject {
     delete_thunk<T, has_custom_deleter::value>::Delete(p);
   }
 
+  // Deletes the object (precondition: ref count is zero).
+  friend void ref_ptr_destroy_ref(T* p) {
+    delete_thunk<T, has_custom_deleter::value>::Destroy(p);
+  }
+
+  // Deletes the object (precondition: ref count is zero).
+  static void DirectDestroy(void* p) {
+    ref_ptr_destroy_ref(reinterpret_cast<T*>(p));
+  }
+
   // Adds a reference.
   // ref_ptr should be used instead of this in most cases. This is required
   // for when interoperating with marshaling APIs.
@@ -307,6 +319,19 @@ class RefObject {
   // ref_ptr should be used instead of this in most cases. This is required
   // for when interoperating with marshaling APIs.
   void ReleaseReference() { ref_ptr_release_ref(static_cast<T*>(this)); }
+
+  // Returns the offset of the reference counter field from the start of the
+  // type T.
+  //
+  // This is generally unsafe to use and is here for support of the
+  // iree_vm_ref_t glue that allows RefObject-derived types to be round-tripped
+  // through the VM.
+  //
+  // For simple POD types or non-virtual classes we expect this to return 0.
+  // If the type has virtual methods (dtors/etc) then it should be 4 or 8
+  // (depending on pointer width). It may be other things, and instead of too
+  // much crazy magic we just rely on offsetof doing the right thing here.
+  static constexpr size_t offsetof_counter() { return offsetof(T, counter_); }
 
  protected:
   RefObject() { ref_ptr_add_ref(static_cast<T*>(this)); }
