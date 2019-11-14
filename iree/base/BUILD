@@ -30,6 +30,7 @@ cc_library(
         ":api_hdrs",
         ":api_util",
         ":file_mapping",
+        ":init",
         ":tracing",
     ],
 )
