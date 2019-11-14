@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
@@ -721,6 +722,50 @@ void CondBranchOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<SimplifyConstCondBranchPred, SimplifySameTargetCondBranchOp,
                  SwapInvertedCondBranchOpTargets>(context);
+}
+
+namespace {
+
+/// Removes vm.call ops to functions that are marked as having no side-effects
+/// if the results are unused.
+struct EraseUnusedCallOp : public OpRewritePattern<CallOp> {
+  using OpRewritePattern<CallOp>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(CallOp op,
+                                     PatternRewriter &rewriter) const override {
+    // First check if the call is unused - this ensures we only do the symbol
+    // lookup if we are actually going to use it.
+    for (auto result : op.getResults()) {
+      if (!result->use_empty()) {
+        return matchFailure();
+      }
+    }
+
+    auto calleeOp = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
+        op.getParentOfType<ModuleOp>(), op.callee()));
+
+    bool hasNoSideEffects = false;
+    if (calleeOp.getAttr("nosideeffects")) {
+      hasNoSideEffects = true;
+    } else if (auto import =
+                   dyn_cast<ImportInterface>(calleeOp.getOperation())) {
+      hasNoSideEffects = !import.hasSideEffects();
+    }
+    if (!hasNoSideEffects) {
+      // Op has side-effects (or may have them); can't remove.
+      return matchFailure();
+    }
+
+    // Erase op as it is unused.
+    rewriter.eraseOp(op);
+    return matchSuccess();
+  }
+};
+
+}  // namespace
+
+void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                         MLIRContext *context) {
+  results.insert<EraseUnusedCallOp>(context);
 }
 
 //===----------------------------------------------------------------------===//

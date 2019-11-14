@@ -292,6 +292,34 @@ def VM_OpInterface : OpInterface<"VMOp"> {
   let methods = [];
 }
 
+def VM_ImportInterface : OpInterface<"ImportInterface"> {
+  let description = [{
+    Interface used for ops in other dialects to expose additional ABI
+    information for better marshaling and versioning.
+
+    Ops that implement this interface will be lowered to generic VM import
+    declarations and matching vm.call ops during conversion. Ops that do not
+    implement this (or are unknown) will be loosely defined based on usage only.
+  }];
+
+  let methods = [
+    // TODO(benvanik): query ABI information.
+    // TODO(benvanik): call builder conversion method?
+    // TODO(benvanik): module name override ability? (not just dialect name).
+
+    InterfaceMethod<[{
+      Returns true if the import has side-effects (or may have them).
+
+      Implementers should also return true if any arguments are modified
+      in-place (such as output buffers being passed in). Returning false will
+      allow the op to be removed entirely during optimization and must be
+      guaranteed to have no impact on the program if its return values are
+      unused.
+    }],
+    "bool", "hasSideEffects", (ins)>,
+  ];
+}
+
 class VM_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<VM_Dialect, mnemonic,
        !listconcat(traits, [VM_OpInterface])> {

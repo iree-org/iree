@@ -1181,7 +1181,7 @@ def VM_CallOp :
     Calls an internal VM function with the given arguments.
   }];
 
-  // TODO(benvanik): allow removal if target is empty/nosideffects.
+  let hasCanonicalizer = 1;
 }
 
 def VM_ReturnOp : VM_Op<"return", [

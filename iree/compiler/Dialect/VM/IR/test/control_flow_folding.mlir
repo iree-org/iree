@@ -67,4 +67,12 @@ vm.module @cond_br_folds {
   ^bb2(%1 : i32):
     vm.return %1 : i32
   }
+
+  // CHECK-LABEL: @erase_unused_pure_call
+  vm.func @erase_unused_pure_call() {
+    // CHECK-NEXT: vm.return
+    %0 = vm.call @target_func() : () -> i32
+    vm.return
+  }
+  vm.func @target_func() -> i32 attributes {nosideeffects}
 }
