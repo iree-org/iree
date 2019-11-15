@@ -19,6 +19,7 @@
 
 #include "iree/base/api_util.h"
 #include "iree/base/file_mapping.h"
+#include "iree/base/init.h"
 #include "iree/base/tracing.h"
 
 namespace iree {
@@ -34,6 +35,12 @@ iree_api_version_check(iree_api_version_t expected_version,
   *out_actual_version = actual_version;
   return expected_version == actual_version ? IREE_STATUS_OK
                                             : IREE_STATUS_OUT_OF_RANGE;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
+                                                          char*** argv) {
+  InitializeEnvironment(argc, argv);
+  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL

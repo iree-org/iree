@@ -24,14 +24,16 @@
 namespace iree {
 
 void InitializeEnvironment(int* argc, char*** argv) {
-  auto positional_args = absl::ParseCommandLine(*argc, *argv);
-  if (positional_args.size() < *argc) {
-    // Edit the passed argument refs to only include positional args.
-    *argc = positional_args.size();
-    for (int i = 0; i < *argc; ++i) {
-      (*argv)[i] = positional_args[i];
+  if (argc != nullptr && argv != nullptr && *argc != 0) {
+    auto positional_args = absl::ParseCommandLine(*argc, *argv);
+    if (positional_args.size() < *argc) {
+      // Edit the passed argument refs to only include positional args.
+      *argc = positional_args.size();
+      for (int i = 0; i < *argc; ++i) {
+        (*argv)[i] = positional_args[i];
+      }
+      (*argv)[*argc + 1] = nullptr;
     }
-    (*argv)[*argc + 1] = nullptr;
   }
 
   IREE_RUN_MODULE_INITIALIZERS();
