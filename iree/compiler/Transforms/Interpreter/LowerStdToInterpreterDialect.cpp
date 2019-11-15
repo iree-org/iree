@@ -259,6 +259,9 @@ BINARY_OP_LOWERING(MulFOp, IREEInterp::HL::MulFOp);
 BINARY_OP_LOWERING(DivISOp, IREEInterp::HL::DivISOp);
 BINARY_OP_LOWERING(DivIUOp, IREEInterp::HL::DivIUOp);
 BINARY_OP_LOWERING(DivFOp, IREEInterp::HL::DivFOp);
+BINARY_OP_LOWERING(RemISOp, IREEInterp::HL::RemISOp);
+BINARY_OP_LOWERING(RemIUOp, IREEInterp::HL::RemIUOp);
+BINARY_OP_LOWERING(RemFOp, IREEInterp::HL::RemFOp);
 // BINARY_OP_LOWERING(MulAddIOp, IREEInterp::HL::MulAddIOp);
 // BINARY_OP_LOWERING(MulAddFOp, IREEInterp::HL::MulAddFOp);
 // UNARY_OP_LOWERING(ExpFOp, IREEInterp::HL::ExpFOp);
@@ -296,7 +299,7 @@ void populateLowerStdToInterpreterPatterns(OwningRewritePatternList &patterns,
       // Arithmetic ops.
       AddIOpLowering, AddFOpLowering, SubIOpLowering, SubFOpLowering,
       MulIOpLowering, MulFOpLowering, DivISOpLowering, DivIUOpLowering,
-      DivFOpLowering>(ctx);
+      DivFOpLowering, RemFOpLowering, RemISOpLowering, RemIUOpLowering>(ctx);
 }
 
 }  // namespace iree_compiler

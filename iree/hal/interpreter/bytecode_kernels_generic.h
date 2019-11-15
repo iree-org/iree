@@ -427,6 +427,15 @@ Status Div::Execute(absl::Span<const T> lhs_buffer,
 }
 
 template <typename T>
+Status Rem::Execute(absl::Span<const T> lhs_buffer,
+                    absl::Span<const T> rhs_buffer, absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = remainder(lhs_buffer[i], rhs_buffer[i]);
+  }
+  return OkStatus();
+}
+
+template <typename T>
 Status MulAdd::Execute(absl::Span<const T> a_buffer,
                        absl::Span<const T> b_buffer,
                        absl::Span<const T> c_buffer, absl::Span<T> dst_buffer) {

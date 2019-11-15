@@ -601,6 +601,16 @@ Status Dispatch(hal::Allocator* allocator,
     RETURN_IF_ERROR(DispatchElementwiseBinaryOpF<kernels::Div>(&reader));
   });
 
+  DISPATCH_CORE_OPCODE(kRemIS, {
+    RETURN_IF_ERROR(DispatchElementwiseBinaryOpIS<kernels::Rem>(&reader));
+  });
+  DISPATCH_CORE_OPCODE(kRemIU, {
+    RETURN_IF_ERROR(DispatchElementwiseBinaryOpIU<kernels::Rem>(&reader));
+  });
+  DISPATCH_FLOAT_OPCODE(kRemF, {
+    RETURN_IF_ERROR(DispatchElementwiseBinaryOpF<kernels::Rem>(&reader));
+  });
+
   DISPATCH_CORE_OPCODE(kMulAddI, {
     RETURN_IF_ERROR(DispatchElementwiseTernaryOpIU<kernels::MulAdd>(&reader));
   });

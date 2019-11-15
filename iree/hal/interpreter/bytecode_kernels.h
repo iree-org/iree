@@ -213,6 +213,13 @@ struct Div {
                         absl::Span<T> dst_buffer);
 };
 
+struct Rem {
+  template <typename T>
+  static Status Execute(absl::Span<const T> lhs_buffer,
+                        absl::Span<const T> rhs_buffer,
+                        absl::Span<T> dst_buffer);
+};
+
 // a + (b * c)
 struct MulAdd {
   template <typename T>
