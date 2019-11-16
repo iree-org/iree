@@ -18,6 +18,8 @@
 #include <vector>
 
 #include "absl/synchronization/mutex.h"
+#include "absl/time/clock.h"
+#include "absl/time/time.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 #include "iree/base/time.h"

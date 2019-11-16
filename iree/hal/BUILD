@@ -268,6 +268,7 @@ cc_library(
         "//iree/base:time",
         "//iree/base:tracing",
         "@com_google_absl//absl/synchronization",
+        "@com_google_absl//absl/time",
         "@com_google_absl//absl/types:span",
     ],
 )
