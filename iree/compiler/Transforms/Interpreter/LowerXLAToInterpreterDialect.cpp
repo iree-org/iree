@@ -235,6 +235,31 @@ struct DynamicUpdateSliceOpLowering
 };
 
 template <typename XlaOpType, typename IreeFloatOpType, typename IreeIntOpType>
+struct UnaryFloatIntOpLowering : public XlaOpLowering<XlaOpType> {
+  using XlaOpLowering<XlaOpType>::XlaOpLowering;
+
+  Operation *rewriteInternal(
+      XlaOpType *op, ArrayRef<Value *> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto *val = operands[0];
+    auto inputType = val->getType().cast<MemRefType>();
+    auto elementType = inputType.getElementType();
+
+    if (elementType.isa<FloatType>()) {
+      return rewriter.create<IreeFloatOpType>(op->getLoc(), inputType, val);
+    }
+
+    return rewriter.create<IreeIntOpType>(op->getLoc(), inputType, val);
+  }
+};
+
+struct AbsOpLowering
+    : public UnaryFloatIntOpLowering<xla_hlo::AbsOp, IREEInterp::HL::AbsFOp,
+                                     IREEInterp::HL::AbsIOp> {
+  using UnaryFloatIntOpLowering::UnaryFloatIntOpLowering;
+};
+
+template <typename XlaOpType, typename IreeFloatOpType, typename IreeIntOpType>
 struct BinaryFloatIntOpLowering : public XlaOpLowering<XlaOpType> {
   using XlaOpLowering<XlaOpType>::XlaOpLowering;
 
@@ -528,13 +553,13 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
 
 void populateLowerXlaToInterpreterPatterns(OwningRewritePatternList &patterns,
                                            MLIRContext *ctx) {
-  patterns
-      .insert<BroadcastInDimOpLowering, ConcatOpLowering, ConvertLowering,
-              CopyOpLowering, DotOpLowering, DynamicUpdateSliceOpLowering,
-              ExpOpLowering, FloorOpLowering, GatherOpLowering, LogOpLowering,
-              MaxOpLowering, MinOpLowering, PadOpLowering, ReshapeOpLowering,
-              ReverseOpLowering, RsqrtOpLowering, SelectOpLowering,
-              SliceOpLowering, TransposeOpLowering, TanhOpLowering>(ctx);
+  patterns.insert<AbsOpLowering, BroadcastInDimOpLowering, ConcatOpLowering,
+                  ConvertLowering, CopyOpLowering, DotOpLowering,
+                  DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
+                  GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
+                  PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
+                  RsqrtOpLowering, SelectOpLowering, SliceOpLowering,
+                  TransposeOpLowering, TanhOpLowering>(ctx);
 }
 
 namespace {
