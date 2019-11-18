@@ -150,23 +150,49 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   }
 
   return assign_ref(new VulkanDriver(std::move(syms), instance,
+                                     /*owns_instance=*/true,
                                      std::move(debug_reporter),
                                      std::move(options.device_extensibility)));
 }
 
+// static
+StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
+    Options options, ref_ptr<DynamicSymbols> syms, VkInstance instance) {
+  IREE_TRACE_SCOPE0("VulkanDriver::CreateUsingInstance");
+
+  if (instance == VK_NULL_HANDLE) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "VkInstance must not be VK_NULL_HANDLE";
+  }
+
+  // TODO(scotttodd): Use options (validate, find enabled extensions, etc.)
+
+  RETURN_IF_ERROR(syms->LoadFromInstance(instance));
+
+  // TODO(scotttodd): DebugReporter
+
+  return assign_ref(new VulkanDriver(
+      std::move(syms), instance, /*owns_instance=*/false,
+      /*debug_reporter=*/nullptr, std::move(options.device_extensibility)));
+}
+
 VulkanDriver::VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,
+                           bool owns_instance,
                            std::unique_ptr<DebugReporter> debug_reporter,
                            ExtensibilitySpec device_extensibility_spec)
     : Driver("vulkan"),
       syms_(std::move(syms)),
       instance_(instance),
+      owns_instance_(owns_instance),
       debug_reporter_(std::move(debug_reporter)),
       device_extensibility_spec_(std::move(device_extensibility_spec)) {}
 
 VulkanDriver::~VulkanDriver() {
   IREE_TRACE_SCOPE0("VulkanDriver::dtor");
   debug_reporter_.reset();
-  syms()->vkDestroyInstance(instance_, /*pAllocator=*/nullptr);
+  if (owns_instance_) {
+    syms()->vkDestroyInstance(instance_, /*pAllocator=*/nullptr);
+  }
 }
 
 StatusOr<std::vector<DeviceInfo>> VulkanDriver::EnumerateAvailableDevices() {

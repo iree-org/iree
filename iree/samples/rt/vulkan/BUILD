@@ -40,7 +40,7 @@ cc_binary(
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/hal:api",
-        "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
+        "//iree/hal/vulkan:api",
         "//iree/rt:api",
         "//iree/vm:api",
         "@com_google_absl//absl/base:core_headers",

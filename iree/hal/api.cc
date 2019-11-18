@@ -21,6 +21,8 @@
 #include "iree/hal/api_detail.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
+#include "iree/hal/device.h"
+#include "iree/hal/driver.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/semaphore.h"
@@ -428,6 +430,58 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_retain(iree_hal_fence_t* fence) {
 IREE_API_EXPORT iree_status_t iree_hal_fence_release(iree_hal_fence_t* fence) {
   IREE_TRACE_SCOPE0("iree_hal_fence_release");
   auto* handle = reinterpret_cast<Fence*>(fence);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Device
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t
+iree_hal_device_retain(iree_hal_device_t* device) {
+  IREE_TRACE_SCOPE0("iree_hal_device_retain");
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->AddReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_device_release(iree_hal_device_t* device) {
+  IREE_TRACE_SCOPE0("iree_hal_device_release");
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Driver
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_retain(iree_hal_driver_t* driver) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_retain");
+  auto* handle = reinterpret_cast<Driver*>(driver);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->AddReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_release(iree_hal_driver_t* driver) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_release");
+  auto* handle = reinterpret_cast<Driver*>(driver);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }

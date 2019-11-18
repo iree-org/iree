@@ -51,6 +51,8 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::buffer
     iree::hal::buffer_view
+    iree::hal::device
+    iree::hal::driver
     iree::hal::fence
     iree::hal::heap_buffer
     iree::hal::semaphore

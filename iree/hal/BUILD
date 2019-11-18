@@ -47,6 +47,8 @@ cc_library(
         ":api_hdrs",
         ":buffer",
         ":buffer_view",
+        ":device",
+        ":driver",
         ":fence",
         ":heap_buffer",
         ":semaphore",

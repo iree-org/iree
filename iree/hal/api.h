@@ -33,6 +33,8 @@ typedef struct iree_hal_buffer iree_hal_buffer_t;
 typedef struct iree_hal_buffer_view iree_hal_buffer_view_t;
 typedef struct iree_hal_semaphore iree_hal_semaphore_t;
 typedef struct iree_hal_fence iree_hal_fence_t;
+typedef struct iree_hal_device iree_hal_device_t;
+typedef struct iree_hal_driver iree_hal_driver_t;
 
 // Reference to a buffer's mapped memory.
 typedef struct {
@@ -356,6 +358,43 @@ iree_hal_fence_retain(iree_hal_fence_t* fence);
 // Releases the given |fence| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_fence_release(iree_hal_fence_t* fence);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Device
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// HAL devices are created via HAL drivers.
+
+// Retains the given |device| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_retain(iree_hal_device_t* device);
+
+// Releases the given |device| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_release(iree_hal_device_t* device);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Driver
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// HAL drivers are created for concrete implementations (e.g. Vulkan with
+// iree_hal_vulkan_driver_create).
+
+// Retains the given |driver| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_retain(iree_hal_driver_t* driver);
+
+// Releases the given |driver| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_release(iree_hal_driver_t* driver);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

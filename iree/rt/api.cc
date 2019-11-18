@@ -99,6 +99,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_instance_register_driver_ex(
   return IREE_STATUS_OK;
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_instance_register_device(
+    iree_rt_instance_t* instance, iree_hal_device_t* device) {
+  IREE_TRACE_SCOPE0("iree_rt_instance_register_device");
+  auto* handle = reinterpret_cast<Instance*>(instance);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_RETURN_IF_ERROR(handle->device_manager()->RegisterDevice(
+      add_ref(reinterpret_cast<hal::Device*>(device))));
+
+  return IREE_STATUS_OK;
+}
+
 //===----------------------------------------------------------------------===//
 // iree::rt::Module
 //===----------------------------------------------------------------------===//
