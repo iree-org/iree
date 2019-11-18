@@ -27,19 +27,20 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
 )
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
-  CLANG_OR_GCC
+  CLANG
     "-Wno-strict-prototypes"
     "-Wno-shadow-uncaptured-local"
-    "-Wno-unused-parameter"
     "-Wno-gnu-zero-variadic-macro-arguments"
     "-Wno-shadow-field-in-constructor"
     "-Wno-unreachable-code-return"
-    "-Wno-undef"
     "-Wno-unused-private-field"
     "-Wno-missing-variable-declarations"
     "-Wno-gnu-label-as-value"
     "-Wno-unused-local-typedef"
     "-Wno-gnu-zero-variadic-macro-arguments"
+  CLANG_OR_GCC
+    "-Wno-unused-parameter"
+    "-Wno-undef"
   MSVC_OR_CLANG_CL
     "/DWIN32_LEAN_AND_MEAN"
     # TODO(benvanik): figure out if really required or accidentally enabled.
@@ -85,7 +86,7 @@ set(FLATBUFFERS_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatbuffers/include/"
 )
 iree_select_compiler_opts(FLATBUFFERS_COPTS
-  CLANG_OR_GCC
+  CLANG
     # Flatbuffers has a bunch of incorrect documentation annotations.
     "-Wno-documentation"
     "-Wno-documentation-unknown-command"
