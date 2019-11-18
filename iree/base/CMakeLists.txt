@@ -22,6 +22,7 @@ iree_cc_library(
   DEPS
     iree::base::api_util
     iree::base::file_mapping
+    iree::base::init
     iree::base::tracing
   PUBLIC
 )
@@ -215,6 +216,8 @@ iree_cc_library(
     "internal/init_internal.cc"
   DEPS
     absl::flags
+    absl::flags_parse
+    iree::base::initializer
     iree::base::target_platform
   PUBLIC
 )
