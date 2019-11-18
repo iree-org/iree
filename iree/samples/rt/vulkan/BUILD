@@ -14,9 +14,17 @@
 
 # Samples demonstrating use of the RT API with Vulkan.
 
+load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_bytecode_module(
+    name = "simple_mul_bytecode_module",
+    srcs = ["simple_mul.mlir"],
+    cc_namespace = "iree::rt::samples",
 )
 
 cc_binary(
@@ -28,6 +36,7 @@ cc_binary(
         "notap",
     ],
     deps = [
+        ":simple_mul_bytecode_module_cc",
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/hal:api",
