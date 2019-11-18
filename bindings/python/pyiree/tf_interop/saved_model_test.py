@@ -42,17 +42,17 @@ except ImportError:
   sys.exit(0)
 
 
-class StatefulModule(tf.Module):
+class StatelessModule(tf.Module):
 
   def __init__(self):
-    self.v = tf.Variable([4], dtype=tf.float32)
+    pass
 
   @tf.function(input_signature=[
       tf.TensorSpec([4], tf.float32),
       tf.TensorSpec([4], tf.float32)
   ])
   def add(self, a, b):
-    return tf.tanh(self.v * a + b)
+    return tf.tanh(a + b)
 
 
 class RuntimeTest(tf.test.TestCase):
@@ -66,7 +66,7 @@ class RuntimeTest(tf.test.TestCase):
     with tempfile.TemporaryDirectory() as temp_dir:
       sm_dir = os.path.join(temp_dir, "simple.sm")
       print("Saving to:", sm_dir)
-      my_module = StatefulModule()
+      my_module = StatelessModule()
       options = tf.saved_model.SaveOptions(save_debug_info=True)
       tf.saved_model.save(my_module, sm_dir, options=options)
 
