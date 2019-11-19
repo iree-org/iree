@@ -35,7 +35,7 @@ By default, tests run on TensorFlow and the IREE CPU interpreter, as it never
 needs additional environment setup. If you have your environment setup to use
 IREE with Vulkan (see [the doc](../../../docs/vulkan_and_spirv.md)), then you
 can enable the backends by setting the environment variable
-`IREE_TEST_BACKENDS=tf,iree.interpreter,iree.vulkan`.
+`IREE_TEST_BACKENDS=tf,iree_interpreter,iree_vulkan`.
 
 ## Running tests
 
@@ -55,8 +55,5 @@ bazel test ... --test_env=IREE_TEST_BACKENDS=tf,iree_interpreter,iree_vulkan \
 
 ### Simple function tests
 
-See `simple_arithmetic_test.py` for some examples of single function tests.
-These are done by extending a tf_test_utils.SavedModelTestCase and then
-annotating individual test methods with
-`@tf_test_utils.per_backend_test("function_name")` to get a function that will
-run and compare on all backends.
+See `simple_arithmetic_test.py` for some examples of writing a test case that
+runs on multiple backends.
