@@ -54,7 +54,7 @@ struct BytecodeTargetOptions {
 // See iree/schemas/bytecode_module_def.fbs for the description of the
 // serialized module format.
 //
-// Exposed via the --vm-mlir-to-bytecode-module translation.
+// Exposed via the --iree-vm-ir-to-bytecode-module translation.
 LogicalResult translateModuleToBytecode(BytecodeTargetOptions targetOptions,
                                         IREE::VM::ModuleOp moduleOp,
                                         llvm::raw_ostream &output);

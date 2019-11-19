@@ -32,6 +32,9 @@ cc_binary(
     deps = [
         "//integrations/tensorflow/compiler:tensorflow",
         "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/Flow/Analysis",
+        "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/VM/Analysis",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
