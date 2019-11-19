@@ -12,26 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_CONSTANTENCODER_H_
-#define IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_CONSTANTENCODER_H_
+#ifndef IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_TRANSLATIONFLAGS_H_
+#define IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_TRANSLATIONFLAGS_H_
 
-#include "flatbuffers/flatbuffers.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Location.h"
+#include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-// Serializes a constant attribute to the FlatBuffer as a binary blob.
-flatbuffers::Offset<flatbuffers::Vector<uint8_t>> serializeConstant(
-    Location loc, ElementsAttr elementsAttr,
-    flatbuffers::FlatBufferBuilder &fbb);
+// Returns a BytecodeTargetOptions struct initialized with the
+// --iree-vm-bytecode-* flags.
+BytecodeTargetOptions getBytecodeTargetOptionsFromFlags();
 
 }  // namespace VM
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_CONSTANTENCODER_H_
+#endif  // IREE_COMPILER_DIALECT_VM_TARGET_BYTECODE_TRANSLATIONFLAGS_H_

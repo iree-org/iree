@@ -71,6 +71,7 @@ cc_binary(
         "//iree/compiler/Translation/Sequencer",
         "//iree/compiler/Translation/Interpreter",
         "//iree/compiler/Translation/SPIRV",
+        "//iree/compiler/Translation:IREEVM",
         "//iree/hal:buffer_view_string_util",
         "//iree/hal:driver_registry",
         "//iree/schemas",
@@ -101,6 +102,7 @@ cc_binary(
     srcs = ["iree_translate_main.cc"],
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/Interpreter",
         "//iree/compiler/Translation/SPIRV",
         "//iree/compiler/Translation/Sequencer",

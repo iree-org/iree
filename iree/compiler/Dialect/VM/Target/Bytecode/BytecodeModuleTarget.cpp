@@ -38,6 +38,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace VM {
 
 namespace {
 
@@ -351,8 +353,8 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   return bmd.Finish();
 }
 
-LogicalResult translateModuleToBytecode(BytecodeTargetOptions targetOptions,
-                                        IREE::VM::ModuleOp moduleOp,
+LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
+                                        BytecodeTargetOptions targetOptions,
                                         llvm::raw_ostream &output) {
   if (failed(canonicalizeModule(targetOptions, moduleOp))) {
     return moduleOp.emitError()
@@ -412,5 +414,18 @@ LogicalResult translateModuleToBytecode(BytecodeTargetOptions targetOptions,
   return success();
 }
 
+LogicalResult translateModuleToBytecode(mlir::ModuleOp outerModuleOp,
+                                        BytecodeTargetOptions targetOptions,
+                                        llvm::raw_ostream &output) {
+  auto moduleOps = outerModuleOp.getOps<IREE::VM::ModuleOp>();
+  if (moduleOps.empty()) {
+    return outerModuleOp.emitError()
+           << "outer module does not contain a vm.module op";
+  }
+  return translateModuleToBytecode(*moduleOps.begin(), targetOptions, output);
+}
+
+}  // namespace VM
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

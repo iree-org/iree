@@ -21,6 +21,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace VM {
 
 struct EncodedBytecodeFunction {
   std::vector<uint8_t> bytecodeData;
@@ -40,6 +42,8 @@ class BytecodeEncoder : public VMFuncEncoder {
   ~BytecodeEncoder() = default;
 };
 
+}  // namespace VM
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 

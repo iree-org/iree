@@ -21,6 +21,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace VM {
 
 namespace {
 
@@ -138,5 +140,7 @@ Offset<Vector<uint8_t>> serializeConstant(Location loc,
   return {};
 }
 
+}  // namespace VM
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

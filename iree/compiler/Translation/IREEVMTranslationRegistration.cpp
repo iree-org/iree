@@ -12,25 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
-#include "mlir/IR/Module.h"
-#include "mlir/IR/Visitors.h"
+#include "iree/compiler/Translation/IREEVM.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {
-namespace IREE {
-namespace VM {
 
-static TranslateFromMLIRRegistration toBytecodeModule(
-    "iree-vm-ir-to-bytecode-module",
-    [](mlir::ModuleOp moduleOp, llvm::raw_ostream &output) {
-      return translateModuleToBytecode(
-          moduleOp, getBytecodeTargetOptionsFromFlags(), output);
-    });
+static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
+    ModuleOp moduleOp, llvm::raw_ostream &output) {
+  // TODO(benvanik): parse flags.
+  auto executableTargetOptions = IREE::HAL::ExecutableTargetOptions{};
+  auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
+  return translateFromMLIRToVMBytecodeModule(moduleOp, executableTargetOptions,
+                                             bytecodeTargetOptions, output);
+}
 
-}  // namespace VM
-}  // namespace IREE
+static TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
+    "iree-mlir-to-vm-bytecode-module",
+    translateFromMLIRToVMBytecodeModuleWithFlags);
+
 }  // namespace iree_compiler
 }  // namespace mlir
