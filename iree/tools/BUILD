@@ -33,6 +33,7 @@ cc_binary(
         "//integrations/tensorflow/compiler:tensorflow",
         "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/VM/Analysis",
+        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/compiler/Transforms",
