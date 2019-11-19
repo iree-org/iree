@@ -47,7 +47,7 @@ bazel test ... --test_output=errors
 bazel test simple_arithmetic_test --test_output=streamed
 
 # Run tests with an altered list of backends.
-bazel test ... --test_env=IREE_TEST_BACKENDS=tf,iree.interpreter,iree.vulkan \
+bazel test ... --test_env=IREE_TEST_BACKENDS=tf,iree_interpreter,iree_vulkan \
     --test_output=errors
 ```
 
