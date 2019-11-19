@@ -20,6 +20,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/dawn/dawn_device.h"
 #include "iree/hal/device_info.h"
+#include "third_party/dawn/src/include/dawn/dawn_proc.h"
 
 namespace iree {
 namespace hal {
@@ -109,7 +110,7 @@ StatusOr<ref_ptr<Device>> DawnDriver::CreateDevice(
     return InternalErrorBuilder(IREE_LOC) << "Failed to create a Dawn device";
   }
   DawnProcTable backend_procs = dawn_native::GetProcs();
-  dawnSetProcs(&backend_procs);
+  dawnProcSetProcs(&backend_procs);
   ::dawn::Device backend_device = ::dawn::Device::Acquire(c_backend_device);
 
   return make_ref<DawnDevice>(device_info, backend_device);
