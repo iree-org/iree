@@ -49,10 +49,18 @@ jobs:
           git clone https://github.com/$GITHUB_REPOSITORY $GITHUB_WORKSPACE --no-checkout --no-tags
           git checkout $GITHUB_SHA
           git submodule update --init --depth 1000 --jobs 8
-      - name: Building with bazel
+      - name: Building and testing with bazel
         run: |
           source ~/vulkan/1.1.126.0/setup-env.sh
-          bazel build //...
-      - name: Testing with bazel
-        # TODO(gcmn) Enable all tests once they're passing
-        run: bazel test --test_output=errors -- //... -//integrations/... -//bindings/... -//iree/hal/vulkan:dynamic_symbols_test -//iree/samples/rt:bytecode_module_api_test
+          # Build and test everything not explicitly marked as excluded from CI
+          # (using the tag "notap", "Test Automation Platform").
+          # Note that somewhat contrary to its name `bazel test` will also build
+          # any non-test targets specified.
+          # We use `bazel query //...` piped to `bazel test` rather than the
+          # simpler `bazel test //...` because the latter excludes targets
+          # tagged "manual". The "manual" tag allows targets to be excluded from
+          # human wildcard builds, but we want them built by CI unless they are
+          # excluded with "notap".
+          # TODO(gcmn) Enable all tests except notap once we can run them on the CI
+          bazel query '//... except attr("tags", "notap", //...) except //bindings/... except //integrations/... except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test' | xargs bazel test --test_output=errors
+
