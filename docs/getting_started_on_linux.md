@@ -38,7 +38,8 @@ and verify with: `bazel --version`.
 sudo apt install clang
 ```
 
-Verify version with `clang++ -v`. We have verified with the following versions:
+Verify version with `clang++ --version`. We have verified with the following
+versions:
 
 *   6.0.1
 
