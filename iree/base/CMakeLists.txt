@@ -199,6 +199,7 @@ iree_cc_library(
     absl::span
     absl::strings
     flatbuffers
+    iree::base::file_mapping
     iree::base::memory
     iree::base::ref_ptr
     iree::base::status
