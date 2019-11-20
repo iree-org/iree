@@ -35,6 +35,7 @@ if HAS_TENSORFLOW:
       "tf-executor-graph-pruning",
       "tf-standard-pipeline",
       "canonicalize",
+      "xla-legalize-tf-control-flow",
       "xla-legalize-tf",
   )
 
@@ -92,6 +93,7 @@ if HAS_TENSORFLOW:
     Returns:
       An OpaqueBlob representing the compiled module.
     """
+    print(pass_pipeline)
     input_module = tf_load_saved_model(saved_model_dir, compiler_context,
                                        exported_names, pass_pipeline)
     return input_module.compile_to_sequencer_blob(

@@ -24,6 +24,15 @@ package(
 )
 
 py_test(
+    name = "control_flow_test",
+    srcs = ["control_flow_test.py"],
+    python_version = "PY3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//bindings/python/pyiree",
+    ],
+)
+
+py_test(
     name = "simple_arithmetic_test",
     srcs = ["simple_arithmetic_test.py"],
     python_version = "PY3",
