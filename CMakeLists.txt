@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 cmake_policy(SET CMP0077 NEW)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
