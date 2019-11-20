@@ -21,7 +21,7 @@ on:
       - ci-test # A branch specifically for testing CI
 
 jobs:
-  build:
+  bazel:
     runs-on: ubuntu-18.04
     env:
       CXX: clang++
@@ -33,10 +33,10 @@ jobs:
           echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
           sudo apt install curl
           curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
-          sudo apt update && sudo apt install bazel
+          sudo apt-get update && sudo apt-get install bazel
       - name: Installing dependencies
         run: |
-          sudo apt install clang libsdl2-dev python3 python3-pip
+          sudo apt-get install clang libsdl2-dev python3 python3-pip
           sudo pip install numpy
       - name: Checking out latest version and all submodules
         run: |
@@ -58,3 +58,25 @@ jobs:
           # TODO(gcmn) Enable all tests except notap once we can run them on the CI
           bazel query '//... except attr("tags", "notap", //...) except //bindings/... except //integrations/... except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test' | xargs bazel test --test_output=errors
 
+  cmake:
+    runs-on: ubuntu-18.04
+    env:
+      CXX: clang++
+      CC: clang
+      PYTHON_BIN: /usr/bin/python3
+    steps:
+      - name: Installing dependencies
+        run: |
+          sudo apt-get install clang libsdl2-dev python3 python3-pip
+          sudo pip install numpy
+      - name: Checking out latest version and all submodules
+        run: |
+          git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
+          git clone https://github.com/$GITHUB_REPOSITORY $GITHUB_WORKSPACE --no-checkout --no-tags
+          git checkout $GITHUB_SHA
+          git submodule update --init --depth 1000 --jobs 8
+      - name: Building with cmake
+        run: |
+          mkdir build && cd build
+          cmake -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
+          cmake --build .
