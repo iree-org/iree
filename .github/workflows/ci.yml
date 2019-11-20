@@ -61,6 +61,6 @@ jobs:
           # tagged "manual". The "manual" tag allows targets to be excluded from
           # human wildcard builds, but we want them built by CI unless they are
           # excluded with "notap".
-          # TODO(gcmn) Enable all tests once they're passing
-          bazel query '//... except attr("tags", "notap", //...) except //bindings/... except //integrations/...' | xargs bazel test --test_output=errors
+          # TODO(gcmn) Enable all tests except notap once we can run them on the CI
+          bazel query '//... except attr("tags", "notap", //...) except //bindings/... except //integrations/... except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test' | xargs bazel test --test_output=errors
 
