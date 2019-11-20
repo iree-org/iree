@@ -42,10 +42,20 @@ class VulkanDriver final : public Driver {
     ExtensibilitySpec device_extensibility;
   };
 
+  // Creates a VulkanDriver that manages its own VkInstance.
   static StatusOr<ref_ptr<VulkanDriver>> Create(Options options,
                                                 ref_ptr<DynamicSymbols> syms);
 
-  // TODO(benvanik): method to wrap an existing instance/device (interop).
+  // Creates a VulkanDriver that shares an externally managed VkInstance.
+  //
+  // |options| are checked for compatibility.
+  //
+  // |syms| must at least have |vkGetInstanceProcAddr| set. Other symbols will
+  // be loaded as needed from |instance|.
+  //
+  // |instance| must remain valid for the life of the returned VulkanDriver.
+  static StatusOr<ref_ptr<VulkanDriver>> CreateUsingInstance(
+      Options options, ref_ptr<DynamicSymbols> syms, VkInstance instance);
 
   ~VulkanDriver() override;
 
@@ -62,11 +72,13 @@ class VulkanDriver final : public Driver {
 
  private:
   VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,
+               bool owns_instance,
                std::unique_ptr<DebugReporter> debug_reporter,
                ExtensibilitySpec device_extensibility_spec);
 
   ref_ptr<DynamicSymbols> syms_;
   VkInstance instance_;
+  bool owns_instance_;
   std::unique_ptr<DebugReporter> debug_reporter_;
   ExtensibilitySpec device_extensibility_spec_;
 };

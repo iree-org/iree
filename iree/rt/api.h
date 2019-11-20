@@ -151,6 +151,10 @@ iree_rt_instance_release(iree_rt_instance_t* instance);
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_instance_register_driver_ex(
     iree_rt_instance_t* instance, iree_string_view_t driver_name);
 
+// Registers a HAL device with the runtime instance.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_rt_instance_register_device(
+    iree_rt_instance_t* instance, iree_hal_device_t* device);
+
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//

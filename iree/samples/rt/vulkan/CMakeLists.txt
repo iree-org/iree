@@ -25,7 +25,7 @@ iree_cc_binary(
       iree::base::api
       iree::base::logging
       iree::hal::api
-      iree::hal::vulkan::vulkan_driver_module
+      iree::hal::vulkan::api
       iree::rt::api
       iree::vm::api
       SDL2-static

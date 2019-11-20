@@ -18,6 +18,27 @@ set(VMA_SRC_ROOT
 
 iree_cc_library(
   NAME
+    api
+  HDRS
+    "api.h"
+  SRCS
+    "api.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
+  DEPS
+    iree::base::api
+    iree::base::api_util
+    iree::base::tracing
+    iree::hal::api
+    iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::vulkan_device
+    iree::hal::vulkan::vulkan_driver
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     debug_reporter
   HDRS
     "debug_reporter.h"

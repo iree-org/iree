@@ -30,6 +30,7 @@
 // IREE's C API:
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/vulkan/api.h"
 #include "iree/rt/api.h"
 #include "iree/vm/api.h"
 
@@ -406,6 +407,8 @@ extern "C" int main(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Setup IREE.
+  // This call to |iree_api_init| is not technically required, but it is
+  // included for completeness.
   CHECK_IREE_OK(iree_api_init(&argc, &argv));
 
   // Check API version.
@@ -418,22 +421,40 @@ extern "C" int main(int argc, char** argv) {
     LOG(INFO) << "IREE runtime API version " << actual_version;
   }
 
-  // Initialize using Vulkan.
-  // TODO(scotttodd): Pass Vulkan device in here and reuse
-  iree_rt_instance_t* instance = nullptr;
-  CHECK_IREE_OK(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &instance));
-  std::string driver_name = "vulkan";
-  LOG(INFO) << "Creating driver '" << driver_name << "'";
-  CHECK_IREE_OK(iree_rt_instance_register_driver_ex(
-      instance, iree_string_view_t{driver_name.data(), driver_name.size()}));
-  LOG(INFO) << "Created driver '" << driver_name << "'";
+  // Create a runtime Instance.
+  iree_rt_instance_t* iree_instance = nullptr;
+  CHECK_IREE_OK(
+      iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &iree_instance));
+
+  // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
+  LOG(INFO) << "Creating Vulkan driver/device";
+  iree_hal_vulkan_syms_t* iree_vk_syms = nullptr;
+  CHECK_IREE_OK(iree_hal_vulkan_syms_create(
+      reinterpret_cast<void*>(&vkGetInstanceProcAddr), &iree_vk_syms));
+  iree_hal_driver_t* iree_vk_driver = nullptr;
+  // TODO(scotttodd): pass VkInstance
+  iree_hal_vulkan_driver_options_t options;
+  options.extensibility_options =
+      static_cast<iree_hal_vulkan_extensibility_options_t>(
+          IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS |
+          IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
+          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+  CHECK_IREE_OK(iree_hal_vulkan_driver_create_using_instance(
+      options, iree_vk_syms, g_Instance, &iree_vk_driver));
+  iree_hal_device_t* iree_vk_device = nullptr;
+  // TODO(scotttodd): pass VkDevice
+  CHECK_IREE_OK(iree_hal_vulkan_driver_create_default_device(iree_vk_driver,
+                                                             &iree_vk_device));
+  CHECK_IREE_OK(
+      iree_rt_instance_register_device(iree_instance, iree_vk_device));
+  LOG(INFO) << "Created Vulkan driver/device";
 
   // Allocate a context that will hold the module state across invocations.
   iree_rt_policy_t* dummy_policy = nullptr;
   CHECK_IREE_OK(iree_rt_policy_create(IREE_ALLOCATOR_DEFAULT, &dummy_policy));
-  iree_rt_context_t* context = nullptr;
-  CHECK_IREE_OK(iree_rt_context_create(instance, dummy_policy,
-                                       IREE_ALLOCATOR_DEFAULT, &context));
+  iree_rt_context_t* iree_context = nullptr;
+  CHECK_IREE_OK(iree_rt_context_create(iree_instance, dummy_policy,
+                                       IREE_ALLOCATOR_DEFAULT, &iree_context));
   iree_rt_policy_release(dummy_policy);
 
   // Load bytecode module from embedded data.
@@ -450,8 +471,8 @@ extern "C" int main(int argc, char** argv) {
   // Register bytecode module within the context.
   std::vector<iree_rt_module_t*> modules;
   modules.push_back(bytecode_module);
-  CHECK_IREE_OK(
-      iree_rt_context_register_modules(context, &modules[0], modules.size()));
+  CHECK_IREE_OK(iree_rt_context_register_modules(iree_context, &modules[0],
+                                                 modules.size()));
   iree_rt_module_release(bytecode_module);
   LOG(INFO) << "Module loaded and context is ready for use";
 
@@ -459,7 +480,7 @@ extern "C" int main(int argc, char** argv) {
   iree_rt_function_t main_function;
   const char kMainFunctionName[] = "module.simple_mul";
   CHECK_IREE_OK(iree_rt_context_resolve_function(
-      context,
+      iree_context,
       iree_string_view_t{kMainFunctionName, sizeof(kMainFunctionName) - 1},
       &main_function));
   // --------------------------------------------------------------------------
@@ -544,11 +565,13 @@ extern "C" int main(int argc, char** argv) {
         iree_hal_buffer_t* arg0_buffer = nullptr;
         iree_hal_buffer_t* arg1_buffer = nullptr;
         CHECK_IREE_OK(iree_rt_context_allocate_device_visible_buffer(
-            context, IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount,
-            IREE_ALLOCATOR_DEFAULT, &arg0_buffer));
+            iree_context, IREE_HAL_BUFFER_USAGE_ALL,
+            sizeof(float) * kElementCount, IREE_ALLOCATOR_DEFAULT,
+            &arg0_buffer));
         CHECK_IREE_OK(iree_rt_context_allocate_device_visible_buffer(
-            context, IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount,
-            IREE_ALLOCATOR_DEFAULT, &arg1_buffer));
+            iree_context, IREE_HAL_BUFFER_USAGE_ALL,
+            sizeof(float) * kElementCount, IREE_ALLOCATOR_DEFAULT,
+            &arg1_buffer));
 
         // Write inputs into the mappable buffers.
         CHECK_IREE_OK(iree_hal_buffer_write_data(arg0_buffer, 0, &input_x,
@@ -571,8 +594,9 @@ extern "C" int main(int argc, char** argv) {
         DLOG(INFO) << "Calling @simple_mul...";
         iree_rt_invocation_t* invocation = nullptr;
         CHECK_IREE_OK(iree_rt_invocation_create(
-            context, &main_function, nullptr, nullptr, arg_buffer_views.data(),
-            2, nullptr, 0, IREE_ALLOCATOR_DEFAULT, &invocation));
+            iree_context, &main_function, nullptr, nullptr,
+            arg_buffer_views.data(), 2, nullptr, 0, IREE_ALLOCATOR_DEFAULT,
+            &invocation));
         CHECK_IREE_OK(iree_hal_buffer_view_release(arg_buffer_views[0]));
         CHECK_IREE_OK(iree_hal_buffer_view_release(arg_buffer_views[1]));
         // TODO(scotttodd): Make this async. Poll each render frame?
@@ -630,8 +654,11 @@ extern "C" int main(int argc, char** argv) {
 
   // --------------------------------------------------------------------------
   // Cleanup
-  iree_rt_context_release(context);
-  iree_rt_instance_release(instance);
+  iree_hal_device_release(iree_vk_device);
+  iree_hal_driver_release(iree_vk_driver);
+  iree_hal_vulkan_syms_release(iree_vk_syms);
+  iree_rt_context_release(iree_context);
+  iree_rt_instance_release(iree_instance);
 
   err = vkDeviceWaitIdle(g_Device);
   check_vk_result(err);

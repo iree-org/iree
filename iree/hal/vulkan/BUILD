@@ -38,6 +38,23 @@ config_setting(
 )
 
 cc_library(
+    name = "api",
+    srcs = ["api.cc"],
+    hdrs = ["api.h"],
+    visibility = ["//visibility:public"],
+    deps = [
+        ":dynamic_symbols",
+        ":vulkan_device",
+        ":vulkan_driver",
+        "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:tracing",
+        "//iree/hal:api",
+        "@vulkan_headers//:vulkan_headers_no_prototypes",
+    ],
+)
+
+cc_library(
     name = "debug_reporter",
     srcs = ["debug_reporter.cc"],
     hdrs = ["debug_reporter.h"],
