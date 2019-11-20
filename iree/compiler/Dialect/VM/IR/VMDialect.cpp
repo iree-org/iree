@@ -37,7 +37,11 @@ namespace {
 struct VMOpAsmInterface : public OpAsmDialectInterface {
   using OpAsmDialectInterface::OpAsmDialectInterface;
 
-  void getOpResultName(Operation *op, raw_ostream &os) const final {
+  void getAsmResultNames(Operation *op,
+                         OpAsmSetValueNameFn setNameFn) const final {
+    SmallString<32> osBuffer;
+    llvm::raw_svector_ostream os(osBuffer);
+
     // TODO(b/143187291): tablegen this by adding a value name prefix field.
     if (op->getResult(0)->getType().isa<VectorType>()) {
       os << "v";
@@ -91,6 +95,8 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
     } else if (isa<CmpNZRefOp>(op)) {
       os << "rnz";
     }
+
+    setNameFn(op->getResult(0), os.str());
   }
 };
 
