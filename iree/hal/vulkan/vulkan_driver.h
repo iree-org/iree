@@ -24,6 +24,7 @@
 #include "iree/hal/vulkan/debug_reporter.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
+#include "iree/hal/vulkan/queues_info.h"
 
 namespace iree {
 namespace hal {
@@ -69,6 +70,14 @@ class VulkanDriver final : public Driver {
 
   StatusOr<ref_ptr<Device>> CreateDevice(
       const DeviceInfo& device_info) override;
+
+  // Creates a device that shares an externally managed VkDevice.
+  //
+  // The device will schedule commands against the provided queues.
+  StatusOr<ref_ptr<Device>> CreateDevice(
+      VkPhysicalDevice physical_device, VkDevice logical_device,
+      const QueuesInfo* compute_queues_infos,
+      const QueuesInfo* transfer_queues_infos);
 
  private:
   VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,

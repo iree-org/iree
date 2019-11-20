@@ -249,8 +249,9 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   device_create_info.queueCreateInfoCount = queue_create_info.size();
   device_create_info.pQueueCreateInfos = queue_create_info.data();
   device_create_info.pEnabledFeatures = nullptr;
-  auto logical_device = make_ref<VkDeviceHandle>(
-      syms, enabled_device_extensions, /*allocator=*/nullptr);
+  auto logical_device =
+      make_ref<VkDeviceHandle>(syms, enabled_device_extensions,
+                               /*owns_device=*/true, /*allocator=*/nullptr);
   VK_RETURN_IF_ERROR(syms->vkCreateDevice(physical_device, &device_create_info,
                                           logical_device->allocator(),
                                           logical_device->mutable_value()));
@@ -313,6 +314,106 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
       std::move(logical_device), std::move(allocator),
       std::move(command_queues), std::move(dispatch_command_pool),
       std::move(transfer_command_pool), std::move(legacy_fence_pool)));
+}
+
+// static
+StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
+    ref_ptr<Driver> driver, const DeviceInfo& device_info,
+    VkPhysicalDevice physical_device, VkDevice logical_device,
+    const ExtensibilitySpec& extensibility_spec,
+    const QueuesInfo* compute_queues_infos,
+    const QueuesInfo* transfer_queues_infos,
+    const ref_ptr<DynamicSymbols>& syms) {
+  IREE_TRACE_SCOPE0("VulkanDevice::Create");
+
+  if (compute_queues_infos == nullptr ||
+      compute_queues_infos->queue_indices_count == 0) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "At least one compute queue is required";
+  }
+
+  // Find the extensions we need (or want) that are also available on the
+  // device. This will fail when required ones are not present.
+  //
+  // Since the device is already created, we can't actually enable any
+  // extensions or query if they are really enabled - we just have to trust
+  // that the caller already enabled them for us (or we may fail later).
+  ASSIGN_OR_RETURN(auto enabled_extension_names,
+                   MatchAvailableDeviceExtensions(physical_device,
+                                                  extensibility_spec, *syms));
+  auto enabled_device_extensions =
+      PopulateEnabledDeviceExtensions(enabled_extension_names);
+
+  // Wrap the provided VkDevice with a VkDeviceHandle for use within the HAL.
+  auto device_handle =
+      make_ref<VkDeviceHandle>(syms, enabled_device_extensions,
+                               /*owns_device=*/false, /*allocator=*/nullptr);
+  *device_handle->mutable_value() = logical_device;
+
+  // Create the device memory allocator.
+  // TODO(benvanik): allow other types to be plugged in.
+  ASSIGN_OR_RETURN(auto allocator,
+                   VmaAllocator::Create(physical_device, device_handle));
+
+  bool has_dedicated_transfer_queues =
+      transfer_queues_infos != nullptr &&
+      transfer_queues_infos->queue_indices_count > 0;
+
+  // Create command pools for each queue family. If we don't have a transfer
+  // queue then we'll ignore that one and just use the dispatch pool.
+  // If we wanted to expose the pools through the HAL to allow the VM to more
+  // effectively manage them (pool per fiber, etc) we could, however I doubt the
+  // overhead of locking the pool will be even a blip.
+  ASSIGN_OR_RETURN(
+      auto dispatch_command_pool,
+      CreateTransientCommandPool(device_handle,
+                                 compute_queues_infos->queue_family_index));
+  ref_ptr<VkCommandPoolHandle> transfer_command_pool;
+  if (has_dedicated_transfer_queues) {
+    ASSIGN_OR_RETURN(
+        transfer_command_pool,
+        CreateTransientCommandPool(device_handle,
+                                   transfer_queues_infos->queue_family_index));
+  }
+
+  // Get the queues and create the HAL wrappers.
+  absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues;
+  for (uint32_t i = 0; i < compute_queues_infos->queue_indices_count; ++i) {
+    uint32_t queue_index = compute_queues_infos->queue_indices[i];
+    VkQueue queue = VK_NULL_HANDLE;
+    syms->vkGetDeviceQueue(*device_handle,
+                           compute_queues_infos->queue_family_index,
+                           queue_index, &queue);
+    std::string queue_name =
+        absl::StrCat(device_info.name(), ":d", queue_index);
+    command_queues.push_back(absl::make_unique<DirectCommandQueue>(
+        std::move(queue_name),
+        CommandCategory::kDispatch | CommandCategory::kTransfer, device_handle,
+        queue));
+  }
+  if (has_dedicated_transfer_queues) {
+    for (uint32_t i = 0; i < transfer_queues_infos->queue_indices_count; ++i) {
+      uint32_t queue_index = transfer_queues_infos->queue_indices[i];
+      VkQueue queue = VK_NULL_HANDLE;
+      syms->vkGetDeviceQueue(*device_handle,
+                             transfer_queues_infos->queue_family_index,
+                             queue_index, &queue);
+      std::string queue_name = absl::StrCat(device_info.name(), ":t", i);
+      command_queues.push_back(absl::make_unique<DirectCommandQueue>(
+          std::move(queue_name), CommandCategory::kTransfer, device_handle,
+          queue));
+    }
+  }
+
+  // TODO(b/140141417): implement timeline semaphore fences and switch here.
+  ASSIGN_OR_RETURN(auto legacy_fence_pool,
+                   LegacyFencePool::Create(add_ref(device_handle)));
+
+  return assign_ref(new VulkanDevice(
+      std::move(driver), device_info, physical_device, std::move(device_handle),
+      std::move(allocator), std::move(command_queues),
+      std::move(dispatch_command_pool), std::move(transfer_command_pool),
+      std::move(legacy_fence_pool)));
 }
 
 VulkanDevice::VulkanDevice(

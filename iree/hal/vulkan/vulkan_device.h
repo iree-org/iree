@@ -31,6 +31,7 @@
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/legacy_fence.h"
+#include "iree/hal/vulkan/queues_info.h"
 
 namespace iree {
 namespace hal {
@@ -38,10 +39,20 @@ namespace vulkan {
 
 class VulkanDevice final : public Device {
  public:
+  // Creates a device that manages its own VkDevice.
   static StatusOr<ref_ptr<VulkanDevice>> Create(
       ref_ptr<Driver> driver, const DeviceInfo& device_info,
       VkPhysicalDevice physical_device,
       const ExtensibilitySpec& extensibility_spec,
+      const ref_ptr<DynamicSymbols>& syms);
+
+  // Creates a device that shares an externally managed VkDevice.
+  static StatusOr<ref_ptr<VulkanDevice>> Create(
+      ref_ptr<Driver> driver, const DeviceInfo& device_info,
+      VkPhysicalDevice physical_device, VkDevice logical_device,
+      const ExtensibilitySpec& extensibility_spec,
+      const QueuesInfo* compute_queues_infos,
+      const QueuesInfo* transfer_queues_infos,
       const ref_ptr<DynamicSymbols>& syms);
 
   ~VulkanDevice() override;
