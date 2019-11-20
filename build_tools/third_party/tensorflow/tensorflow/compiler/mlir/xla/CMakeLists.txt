@@ -67,6 +67,21 @@ external_tablegen_library(
   PACKAGE
     tensorflow
   NAME
+    mlir_xla_canonicalize_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_XLA_SRC_ROOT}
+  SRCS
+    "transforms/canonicalize.td"
+  OUTS
+    -gen-rewriters transforms/generated_canonicalize.inc
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
     mlir_xla_hlo_ops_gen
   TBLGEN
     MLIR
