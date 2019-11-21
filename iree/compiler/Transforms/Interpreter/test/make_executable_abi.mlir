@@ -16,7 +16,7 @@
 
 // CHECK-LABEL: func @staticOutputEntry
 func @staticOutputEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>)
-    // CHECK-NEXT: attributes
+    // CHECK: attributes
     attributes {iree.executable.export} {
   // CHECK-NEXT: %0 = iree.memref_to_tensor(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>
   %0 = iree.load_input(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>
@@ -40,7 +40,7 @@ func @staticOutput(%arg0 : tensor<4x2xf32>) -> tensor<4x2xf32>
 
 // CHECK-LABEL: func @scalarFnEntry
 func @scalarFnEntry(%arg0: memref<f32>, %arg1: memref<f32>)
-    // CHECK-NEXT: attributes
+    // CHECK: attributes
     attributes {iree.executable.export} {
   // CHECK-NEXT: %0 = load %arg0[] : memref<f32>
   %0 = iree.load_input(%arg0 : memref<f32>) : f32
@@ -61,7 +61,7 @@ func @scalarFn(%arg0 : f32) -> f32
 
 // CHECK-LABEL: func @scalarTensorFnEntry
 func @scalarTensorFnEntry(%arg0: memref<f32>, %arg1: memref<f32>)
-    // CHECK-NEXT: attributes
+    // CHECK: attributes
     attributes {iree.executable.export} {
   // CHECK-NEXT: %0 = iree.memref_to_tensor(%arg0 : memref<f32>) : tensor<f32>
   %0 = iree.load_input(%arg0 : memref<f32>) : tensor<f32>
@@ -85,7 +85,7 @@ func @scalarTensorFn(%arg0 : tensor<f32>) -> tensor<f32>
 
 // CHECK-LABEL: func @returnValuesEntry
 func @returnValuesEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>, %arg2: memref<4x2xf32>) -> (memref<4x2xf32>, memref<4x2xf32>)
-    // CHECK-NEXT: attributes
+    // CHECK: attributes
     attributes {iree.executable.export} {
   // CHECK-NEXT: %0 = iree.memref_to_tensor(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>
   %0 = iree.load_input(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>
@@ -116,7 +116,7 @@ func @returnValues(%arg0 : tensor<4x2xf32>) -> (tensor<4x2xf32>, tensor<4x2xf32>
 
 // CHECK-LABEL: func @aliasInputsEntry
 func @aliasInputsEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>)
-    // CHECK-NEXT: attributes
+    // CHECK: attributes
     attributes {iree.executable.export} {
   // CHECK-NEXT: %0 = iree.memref_to_tensor(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>
   %0 = iree.load_input(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>
@@ -142,7 +142,7 @@ func @aliasInputs(%arg0 : tensor<4x2xf32>, %arg1 : tensor<4x2xf32>) -> tensor<4x
 
 // CHECK-LABEL: func @aliasOutputsEntry
 func @aliasOutputsEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>)
-    // CHECK-NEXT: attributes
+    // CHECK: attributes
     attributes {iree.executable.export} {
   // CHECK-NEXT: %0 = iree.memref_to_tensor(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>
   %0 = iree.load_input(%arg0 : memref<4x2xf32>) : tensor<4x2xf32>

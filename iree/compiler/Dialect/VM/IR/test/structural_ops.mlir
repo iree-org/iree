@@ -41,7 +41,7 @@ vm.module @module_structure {
   }
 
   // CHECK-LABEL: vm.func @fn_attributed(%arg0: i32) -> i32
-  // CHECK-NEXT: attributes {a}
+  // CHECK: attributes {a}
   vm.func @fn_attributed(%arg0 : i32) -> i32
       attributes {a} {
     vm.return %arg0 : i32

@@ -33,7 +33,7 @@ SAVED_MODEL_IMPORT_PASSES = [
 # CHECK: module
 # CHECK-NOT: tf_saved_model.semantics
 # CHECK: @simple_mul_no_capture
-# CHECK-NEXT: iree.module.export
+# CHECK: iree.module.export
 # CHECK: FINISH_TEST
 class T0001_FlatArgsResultsNoBoundGlobals(tf.Module):
 

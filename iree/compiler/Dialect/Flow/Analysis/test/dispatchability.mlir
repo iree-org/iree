@@ -15,7 +15,7 @@
 // RUN: iree-opt -split-input-file -test-iree-flow-dispatchability %s | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: @empty
-// CHECK-NEXT: dispatchable = true
+// CHECK-SAME: dispatchable = true
 func @empty() {
   return
 }
@@ -23,7 +23,7 @@ func @empty() {
 // -----
 
 // CHECK-LABEL: @simpleMath
-// CHECK-NEXT: dispatchable = true
+// CHECK-SAME: dispatchable = true
 func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
   return %0 : tensor<4xf32>
@@ -32,7 +32,7 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 // CHECK-LABEL: @stdElementwiseOps
-// CHECK-NEXT: dispatchable = true
+// CHECK-SAME: dispatchable = true
 func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = addf %arg0, %arg0 : tensor<4xf32>
   %1 = subf %0, %arg0 : tensor<4xf32>
@@ -43,7 +43,7 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 // CHECK-LABEL: @hloElementwiseOps
-// CHECK-NEXT: dispatchable = true
+// CHECK-SAME: dispatchable = true
 func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
   %1 = xla_hlo.sub %0, %arg0 : tensor<4xf32>
@@ -54,7 +54,7 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 // CHECK-LABEL: @interleavedDot
-// CHECK-NEXT: dispatchable = false
+// CHECK-SAME: dispatchable = false
 func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
   %1 = "xla_hlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
@@ -65,7 +65,7 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // -----
 
 // CHECK-LABEL: @caller
-// CHECK-NEXT: dispatchable = true
+// CHECK-SAME: dispatchable = true
 func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
   %1 = call @callee(%0) : (tensor<4xf32>) -> tensor<4xf32>
@@ -73,7 +73,7 @@ func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   return %2 : tensor<4xf32>
 }
 // CHECK-LABEL: func @callee
-// CHECK-NEXT: dispatchable = true
+// CHECK-SAME: dispatchable = true
 func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.mul %arg0, %arg0 : tensor<4xf32>
   return %0 : tensor<4xf32>
@@ -82,7 +82,7 @@ func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // -----
 
 // CHECK-LABEL: @dotCaller
-// CHECK-NEXT: dispatchable = false
+// CHECK-SAME: dispatchable = false
 func @dotCaller(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
   %1 = call @dotCallee(%0) : (tensor<4x4xf32>) -> tensor<4x4xf32>
@@ -90,7 +90,7 @@ func @dotCaller(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   return %2 : tensor<4x4xf32>
 }
 // CHECK-LABEL: func @dotCallee
-// CHECK-NEXT: dispatchable = false
+// CHECK-SAME: dispatchable = false
 func @dotCallee(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   %0 = "xla_hlo.dot"(%arg0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   return %0 : tensor<4x4xf32>
