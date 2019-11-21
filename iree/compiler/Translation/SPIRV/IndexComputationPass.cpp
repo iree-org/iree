@@ -90,6 +90,7 @@ void IndexComputationPass::runOnFunction() {
       // TODO(ravishankarm): gather.
       // TODO(ravishankarm): pad.
       // TODO(hanchung): dynamic_slice.
+      IndexPropagationOp<xla_hlo::ConstOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::CopyOp>,
       ReshapeOpIndexPropagation<xla_hlo::ReshapeOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::SelectOp>,

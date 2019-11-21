@@ -78,6 +78,54 @@ LogicalResult XLAGatherOpSPIRVLowering::lowerOperation(
 }
 
 //===----------------------------------------------------------------------===//
+// ConstOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult XLAConstOpSPIRVLowering::lowerOperation(
+    Operation *op, OpBuilder &builder, AffineMap index,
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+  auto constOp = cast<xla_hlo::ConstOp>(op);
+  auto loc = constOp.getLoc();
+  auto argType = constOp.getType().dyn_cast<ShapedType>();
+  auto elementType = argType.getElementType();
+
+  if (!argType.hasStaticShape()) {
+    return constOp.emitError("expected static shaped tensor");
+  }
+
+  // Build the array type.
+  int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
+  for (auto dim : reverse(argType.getShape())) {
+    elementType = spirv::ArrayType::get(
+        elementType, dim, static_cast<spirv::ArrayType::LayoutInfo>(stride));
+    stride *= dim;
+  }
+
+  auto pointerType =
+      spirv::PointerType::get(elementType, spirv::StorageClass::Function);
+  auto spirvConstOp =
+      builder.create<spirv::ConstantOp>(loc, elementType, constOp.value());
+  auto spirvVarOp = builder.create<spirv::VariableOp>(
+      loc, pointerType,
+      builder.getI32IntegerAttr(
+          static_cast<int32_t>(spirv::StorageClass::Function)),
+      ArrayRef<Value *>(spirvConstOp.getResult()));
+
+  SmallVector<Value *, 2> accessIndices;
+  for (auto indexExpr : index.getResults()) {
+    accessIndices.push_back(valueCache.getAffineExprValue(
+        builder.saveInsertionPoint(), loc, indexExpr));
+  }
+  auto valPtr =
+      builder.create<spirv::AccessChainOp>(loc, spirvVarOp, accessIndices);
+  auto val =
+      builder.create<spirv::LoadOp>(loc, valPtr, /*memory_access=*/nullptr,
+                                    /*alignment=*/nullptr);
+  valueCache.setValueAtIndex(op->getResult(0), index, val.getResult());
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // PadOp
 //===----------------------------------------------------------------------===//
 
