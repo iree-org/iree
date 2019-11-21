@@ -61,7 +61,7 @@ Value *calculateWorkload(Operation *op, ShapedType baseOperandType) {
   auto constantType = RankedTensorType::get({3}, builder.getIntegerType(32));
   return builder.create<ConstantOp>(
       op->getLoc(), constantType,
-      DenseIntElementsAttr::get<int32_t>(constantType, workload));
+      DenseIntElementsAttr::get(constantType, workload));
 }
 
 }  // namespace Flow

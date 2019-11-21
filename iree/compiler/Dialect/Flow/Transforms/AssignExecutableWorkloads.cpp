@@ -79,7 +79,7 @@ LogicalResult attributeExecutableEntryPointWorkload(
 
   // Hardwire workgroup size to {32, 1, 1}
   SmallVector<int32_t, 3> workGroupInfo = {32, 1, 1};
-  auto workGroupAttr = DenseIntElementsAttr::get<int32_t>(
+  auto workGroupAttr = DenseIntElementsAttr::get(
       RankedTensorType::get(3,
                             IntegerType::get(32, entryPointOp->getContext())),
       workGroupInfo);
