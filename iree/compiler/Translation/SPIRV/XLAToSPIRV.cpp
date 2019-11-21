@@ -20,6 +20,9 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV.h"
 
+#include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/IR/StandardTypes.h"
+
 namespace mlir {
 namespace iree_compiler {
 
@@ -64,6 +67,53 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
     offset += operandShape[append_dim];
   }
   valueCache.setValueAtIndex(op->getResult(0), index, resultVal);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// ConvertOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
+    Operation *op, OpBuilder &builder, AffineMap index,
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+  auto convertOp = cast<xla_hlo::ConvertOp>(op);
+  auto loc = convertOp.getLoc();
+  auto resultElemType =
+      convertOp.getResult()->getType().dyn_cast<ShapedType>().getElementType();
+  if (auto intElemType = resultElemType.dyn_cast<IntegerType>()) {
+    if (intElemType.getWidth() > 32)
+      resultElemType = IntegerType::get(32, resultElemType.getContext());
+  }
+  auto operandElemType =
+      convertOp.getOperand()->getType().dyn_cast<ShapedType>().getElementType();
+
+  if (resultElemType == operandElemType) {
+    valueCache.setValueAtIndex(op->getResult(0), index, operands[0]);
+  } else {
+    // TODO(hanchung): Use template lambda after migrating to C++20.
+    auto buildOp = [&](auto *type_ptr) {
+      return builder
+          .create<std::remove_pointer_t<decltype(type_ptr)>>(
+              loc, resultElemType, operands, ArrayRef<NamedAttribute>())
+          .getOperation();
+    };
+    Operation *scalarOp = nullptr;
+    if (resultElemType.isa<IntegerType>()) {
+      if (operandElemType.isa<IntegerType>()) {
+        scalarOp = buildOp(static_cast<spirv::SConvertOp *>(nullptr));
+      } else {
+        scalarOp = buildOp(static_cast<spirv::ConvertFToSOp *>(nullptr));
+      }
+    } else {
+      if (operandElemType.isa<FloatType>()) {
+        scalarOp = buildOp(static_cast<spirv::FConvertOp *>(nullptr));
+      } else {
+        scalarOp = buildOp(static_cast<spirv::ConvertSToFOp *>(nullptr));
+      }
+    }
+    valueCache.setValueAtIndex(op->getResult(0), index, scalarOp->getResult(0));
+  }
   return success();
 }
 

@@ -38,6 +38,18 @@ class XLAConcatenateOpSPIRVLowering final
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
+/// Lowers a xla_hlo.convert op to SPIR-V. If the source type is as same as the
+/// destination type, it will be a NOP.
+class XLAConvertOpSPIRVLowering final
+    : public SPIRVOpLowering<xla_hlo::ConvertOp> {
+ public:
+  using SPIRVOpLowering<xla_hlo::ConvertOp>::SPIRVOpLowering;
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      ArrayRef<Value *> operands,
+      TensorIndexToScalarValueMap &valueCache) const override;
+};
+
 /// Lowers a xla_hlo.gather_op to SPIR-V.
 class XLAGatherOpSPIRVLowering final
     : public SPIRVOpLowering<xla_hlo::GatherOp> {

@@ -60,7 +60,6 @@ void IREEToSPIRVPass::runOnModule() {
       // XLA unary elementwise ops:
       SPIRVPwOpLowering<xla_hlo::AbsOp, spirv::GLSLSAbsOp, spirv::GLSLFAbsOp>,
       SPIRVPwOpLowering<xla_hlo::CeilOp, spirv::GLSLCeilOp>,
-      // TODO(ravishankarm): xla_hlo::ConvertOp
       SPIRVPwOpLowering<xla_hlo::CosOp, spirv::GLSLCosOp>,
       SPIRVPwOpLowering<xla_hlo::ExpOp, spirv::GLSLExpOp>,
       SPIRVPwOpLowering<xla_hlo::FloorOp, spirv::GLSLFloorOp>,
@@ -70,6 +69,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVPwOpLowering<xla_hlo::SignOp, spirv::GLSLSSignOp,
                         spirv::GLSLFSignOp>,
       SPIRVPwOpLowering<xla_hlo::TanhOp, spirv::GLSLTanhOp>,
+      XLAConvertOpSPIRVLowering,
       // XLA binary elementwise ops:
       SPIRVPwOpLowering<xla_hlo::AddOp, spirv::IAddOp, spirv::FAddOp>,
       SPIRVPwOpLowering<xla_hlo::AndOp, spirv::LogicalAndOp>,
