@@ -28,6 +28,11 @@ class FlowDialect : public Dialect {
  public:
   explicit FlowDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "flow"; }
+
+  static bool isDialectOp(Operation *op) {
+    return op && op->getDialect() &&
+           op->getDialect()->getNamespace() == getDialectNamespace();
+  }
 };
 
 }  // namespace Flow

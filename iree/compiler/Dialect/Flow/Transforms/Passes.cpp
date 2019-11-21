@@ -67,6 +67,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Assign attributes and negotiate each executable's ABI signature.
   passManager.addPass(IREE::Flow::createAssignExecutableWorkloadsPass());
 
+  // Form streams.
+  passManager.addPass(IREE::Flow::createFormStreamsPass());
+
   // TODO(benvanik): run symbol DCE pass.
 }
 

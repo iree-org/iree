@@ -94,6 +94,15 @@ std::unique_ptr<OpPassBase<ModuleOp>> createOutlineReductionRegionsPass(
 // shaped, adjusting types, etc).
 
 //===----------------------------------------------------------------------===//
+// Stream Formation and Folding
+//===----------------------------------------------------------------------===//
+
+// Identifies dispatches that can be grouped into streams within functions.
+std::unique_ptr<OpPassBase<FuncOp>> createFormStreamsPass();
+
+// TODO(benvanik): cross-function stream flows.
+
+//===----------------------------------------------------------------------===//
 // Module Analysis and Finalization
 //===----------------------------------------------------------------------===//
 

@@ -103,7 +103,9 @@ def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
 // Partitioned regions
 //===----------------------------------------------------------------------===//
 
-def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region"> {
+def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
+    IsolatedFromAbove,
+  ]> {
   let summary = [{partitioned region representing a dispatched workload}];
   let description = [{
     A closure that represents a functional dispatch unit. These perform
@@ -146,6 +148,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region"> {
 }
 
 def FLOW_ReductionRegionOp : FLOW_PureOp<"reduction.region", [
+    IsolatedFromAbove,
     SameVariadicOperandSize,
     // TODO(benvanik): verify operands and initial values have the same element
     // types (but NOT the same shapes).
@@ -437,5 +440,37 @@ def FLOW_WindowedReductionEntryOp : FLOW_Op<"windowed_reduction.entry", [
 // TODO(benvanik): tensor casts for widening/narrowing? or rely on std?
 // TODO(benvanik): DynamicUpdateSlice-equivalent?
 // TODO(benvanik): structured control flow (if we want it here).
+
+//===----------------------------------------------------------------------===//
+// Streams
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): replace with real segmented stream ops.
+def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
+    IsolatedFromAbove,
+  ]> {
+  let summary = [{experimental op for defining formed stream regions}];
+  let description = [{
+    Represents a region where all of the dispatches are meant to target the
+    same execution stream. This will be replaced with a segmented verison.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$args
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
+      ArrayRef<Value *> args, ArrayRef<NamedAttribute> attributes = {}
+    }]>,
+  ];
+}
 
 #endif  // IREE_DIALECT_FLOW_OPS

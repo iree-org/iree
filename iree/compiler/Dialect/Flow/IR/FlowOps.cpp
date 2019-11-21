@@ -868,6 +868,91 @@ static void printWindowedReductionEntryOp(OpAsmPrinter &p,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.ex.stream.fragment
+//===----------------------------------------------------------------------===//
+
+void ExStreamFragmentOp::build(Builder *builder, OperationState &state,
+                               ArrayRef<Type> resultTypes,
+                               ArrayRef<Value *> operands,
+                               ArrayRef<NamedAttribute> attributes) {
+  state.addTypes(resultTypes);
+  state.addOperands(operands);
+  state.addAttributes(attributes);
+  state.addRegion();
+  state.setOperandListToResizable();
+}
+
+ParseResult parseExStreamFragmentOp(OpAsmParser &parser,
+                                    OperationState *result) {
+  SmallVector<OpAsmParser::OperandType, 16> regionArgs;
+  SmallVector<Type, 16> regionArgTypes;
+  if (failed(parser.parseLParen())) {
+    return failure();
+  }
+  if (failed(parser.parseOptionalRParen())) {
+    SmallVector<OpAsmParser::OperandType, 16> regionOperands;
+    auto argsLoc = parser.getCurrentLocation();
+    do {
+      // Reserve entries in the lists.
+      regionArgs.emplace_back();
+      regionOperands.emplace_back();
+      regionArgTypes.emplace_back();
+      if (failed(parser.parseRegionArgument(regionArgs.back())) ||
+          failed(parser.parseEqual()) ||
+          failed(parser.parseOperand(regionOperands.back())) ||
+          failed(parser.parseColonType(regionArgTypes.back()))) {
+        return failure();
+      }
+    } while (succeeded(parser.parseOptionalComma()));
+    if (failed(parser.parseRParen()) ||
+        failed(parser.resolveOperands(regionOperands, regionArgTypes, argsLoc,
+                                      result->operands))) {
+      return failure();
+    }
+  }
+  result->setOperandListToResizable();
+
+  // Parse (optional) results.
+  if (failed(parser.parseOptionalArrowTypeList(result->types))) {
+    return failure();
+  }
+
+  // Parse region body.
+  Region *body = result->addRegion();
+  if (failed(parser.parseRegion(*body, regionArgs, regionArgTypes)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes))) {
+    return failure();
+  }
+  return success();
+}
+
+void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
+  p << op.getOperationName();
+
+  // Print the data argument remapping.
+  p << "(";
+  interleaveComma(llvm::zip(op.body().front().getArguments(), op.args()), p,
+                  [&](std::tuple<BlockArgument *, Value *> it) {
+                    p << *std::get<0>(it) << " = " << *std::get<1>(it);
+                    p << " : ";
+                    p << std::get<1>(it)->getType();
+                  });
+  p << ")";
+
+  // Print the result types, if any.
+  if (op.getNumResults() > 0) {
+    p << " -> ";
+    if (op.getNumResults() > 1) p << "(";
+    interleaveComma(op.getResultTypes(), p);
+    if (op.getNumResults() > 1) p << ")";
+  }
+
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
+  p.printOptionalAttrDict(op.getAttrs(),
+                          /*elidedAttrs=*/{});
+}
+
+//===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)
 //===----------------------------------------------------------------------===//
 

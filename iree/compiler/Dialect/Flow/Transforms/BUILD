@@ -24,6 +24,7 @@ cc_library(
         "DispatchabilityAnalysis.cpp",
         "FlattenTuplesInCFG.cpp",
         "FoldCompatibleDispatchRegions.cpp",
+        "FormStreams.cpp",
         "IdentifyDispatchRegions.cpp",
         "IdentifyReductionRegions.cpp",
         "OutlineDispatchRegions.cpp",
