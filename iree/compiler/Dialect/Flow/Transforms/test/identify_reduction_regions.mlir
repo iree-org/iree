@@ -20,7 +20,7 @@ func @single_reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   // CHECK: constant dense<[4, 1, 1]>
   // CHECK-NEXT: %0 = flow.reduction.region
   // CHECK-SAME: [%cst_0 : tensor<3xi32>]
-  // CHECK-SAME: (%arg0) : (tensor<4x8xf32>) -> (tensor<4xf32>)
+  // CHECK-SAME: (%arg0) : (tensor<4x8xf32>) -> tensor<4xf32>
   %1 = "xla_hlo.reduce"(%arg0, %0) ( {
   // CHECK-NEXT: invocation((%arg1, %arg2) = %cst : tensor<f32>) {
   ^bb0(%arg1 : tensor<f32>, %arg2 : tensor<f32>):

@@ -323,7 +323,7 @@ ParseResult parseDispatchRegionOp(OpAsmParser &parser, OperationState *result) {
   result->setOperandListToResizable();
 
   // Parse (optional) results.
-  if (failed(parser.parseOptionalColonTypeList(result->types))) {
+  if (failed(parser.parseOptionalArrowTypeList(result->types))) {
     return failure();
   }
 
@@ -358,8 +358,10 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 
   // Print the result types, if any.
   if (op.getNumResults() > 0) {
-    p << " : ";
+    p << " -> ";
+    if (op.getNumResults() > 1) p << "(";
     interleaveComma(op.getResultTypes(), p);
+    if (op.getNumResults() > 1) p << ")";
   }
 
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
@@ -478,9 +480,10 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
     interleaveComma(op.operands(), p,
                     [&](Value *operand) { p.printType(operand->getType()); });
     p << ")";
-    p << " -> (";
+    p << " -> ";
+    if (op.getNumResults() > 1) p << "(";
     interleaveComma(op.getResultTypes(), p);
-    p << ")";
+    if (op.getNumResults() > 1) p << ")";
   }
   p << "\n";
 

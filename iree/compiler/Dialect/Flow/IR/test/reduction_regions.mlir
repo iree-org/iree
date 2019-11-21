@@ -22,12 +22,12 @@ func @singleReduction(%arg0 : tensor<5x1xf32>) {
   %workload = "some.shape"(%arg0) : (tensor<5x1xf32>) -> tensor<1xi32>
   // CHECK: %1 = "some.constant"() : () -> tensor<f32>
   %initialValueF = "some.constant"() : () -> tensor<f32>
-  // CHECK: %2 = flow.reduction.region[%0 : tensor<1xi32>](%arg0) : (tensor<5x1xf32>) -> (tensor<1xf32>)
+  // CHECK: %2 = flow.reduction.region[%0 : tensor<1xi32>](%arg0) : (tensor<5x1xf32>) -> tensor<1xf32>
   // CHECK-NEXT:     invocation((%arg1, %arg2) = %1 : tensor<f32>) {
   // CHECK-NEXT:   %3 = "my.add"(%arg1, %arg2) : (tensor<f32>, tensor<f32>) -> tensor<f32>
   // CHECK-NEXT:   flow.return %3 : tensor<f32>
   // CHECK-NEXT: } {dimensions = dense<[1, 2]> : tensor<2xi32>}
-  %ret = flow.reduction.region[%workload : tensor<1xi32>](%arg0) : (tensor<5x1xf32>) -> (tensor<1xf32>)
+  %ret = flow.reduction.region[%workload : tensor<1xi32>](%arg0) : (tensor<5x1xf32>) -> tensor<1xf32>
       invocation((%i0, %i1) = %initialValueF : tensor<f32>) {
     %resultF = "my.add"(%i0, %i1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     flow.return %resultF : tensor<f32>
