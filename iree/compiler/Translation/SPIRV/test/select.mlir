@@ -192,3 +192,94 @@ module {
     iree.return
   }
 }
+
+// -----
+
+module {
+  func @select_int_eq(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>, %arg2: memref<12x42xi32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
+    %1 = iree.load_input(%arg1 : memref<12x42xi32>) : tensor<12x42xi32>
+    //CHECK: [[COMPARE:%.*]] = spv.IEqual {{%.*}}, {{%.*}}
+    %2 = cmpi "eq", %0, %1 : tensor<12x42xi32>
+    %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
+    iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
+    iree.return
+  }
+}
+
+// -----
+
+module {
+  func @select_int_ne(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>, %arg2: memref<12x42xi32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
+    %1 = iree.load_input(%arg1 : memref<12x42xi32>) : tensor<12x42xi32>
+    //CHECK: [[COMPARE:%.*]] = spv.INotEqual {{%.*}}, {{%.*}}
+    %2 = cmpi "ne", %0, %1 : tensor<12x42xi32>
+    %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
+    iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
+    iree.return
+  }
+}
+
+// -----
+
+module {
+  func @select_int_lt(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>, %arg2: memref<12x42xi32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
+    %1 = iree.load_input(%arg1 : memref<12x42xi32>) : tensor<12x42xi32>
+    //CHECK: [[COMPARE:%.*]] = spv.SLessThan {{%.*}}, {{%.*}}
+    %2 = cmpi "slt", %0, %1 : tensor<12x42xi32>
+    %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
+    iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
+    iree.return
+  }
+}
+
+// -----
+
+module {
+  func @select_int_le(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>, %arg2: memref<12x42xi32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
+    %1 = iree.load_input(%arg1 : memref<12x42xi32>) : tensor<12x42xi32>
+    //CHECK: [[COMPARE:%.*]] = spv.SLessThanEqual {{%.*}}, {{%.*}}
+    %2 = cmpi "sle", %0, %1 : tensor<12x42xi32>
+    %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
+    iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
+    iree.return
+  }
+}
+
+// -----
+
+module {
+  func @select_int_ge(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>, %arg2: memref<12x42xi32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
+    %1 = iree.load_input(%arg1 : memref<12x42xi32>) : tensor<12x42xi32>
+    //CHECK: [[COMPARE:%.*]] = spv.SGreaterThanEqual {{%.*}}, {{%.*}}
+    %2 = cmpi "sge", %0, %1 : tensor<12x42xi32>
+    //CHECK: {{%.*}} = spv.Select [[COMPARE]], {{%.*}}, {{%.*}}
+    %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
+    iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
+    iree.return
+  }
+}
+
+// -----
+
+module {
+  func @select_int_gt(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>, %arg2: memref<12x42xi32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
+    %1 = iree.load_input(%arg1 : memref<12x42xi32>) : tensor<12x42xi32>
+    //CHECK: [[COMPARE:%.*]] = spv.SGreaterThan {{%.*}}, {{%.*}}
+    %2 = cmpi "sgt", %0, %1 : tensor<12x42xi32>
+    %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
+    iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
+    iree.return
+  }
+}

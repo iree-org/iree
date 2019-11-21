@@ -79,7 +79,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVPwOpLowering<xla_hlo::MulOp, spirv::IMulOp, spirv::FMulOp>,
       SPIRVPwOpLowering<xla_hlo::SubOp, spirv::ISubOp, spirv::FSubOp>,
       // XLA other ops:
-      CmpFOpSPIRVLowering,
+      CmpIOpSPIRVLowering, CmpFOpSPIRVLowering,
       SPIRVPwOpLowering<xla_hlo::SelectOp, spirv::SelectOp>,
       SPIRVIndexOpLowering<xla_hlo::BroadcastOp>,
       SPIRVIndexOpLowering<xla_hlo::BroadcastInDimOp>,

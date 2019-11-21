@@ -53,6 +53,46 @@ LogicalResult ConstantOpSPIRVLowering::lowerOperation(
 }
 
 //===----------------------------------------------------------------------===//
+// CmpIOp
+//===----------------------------------------------------------------------===//
+LogicalResult CmpIOpSPIRVLowering::lowerOperation(
+    Operation *op, OpBuilder &builder, AffineMap index,
+    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+  if (operands.size() != 2) {
+    return op->emitError("expected two operands in spir-v lowering of CmpIOp");
+  }
+  Operation *spirvOp = nullptr;
+  auto opInfo = op->getAttrOfType<IntegerAttr>(CmpIOp::getPredicateAttrName());
+  if (!opInfo) {
+    return op->emitError("expected CmpIOp to contain ")
+           << CmpIOp::getPredicateAttrName() << " attribute";
+  }
+  auto boolType = builder.getI1Type();
+  auto predicateVal = static_cast<CmpIPredicate>(opInfo.getInt());
+  switch (predicateVal) {
+#define DISPATCH(caseLabel, opName)                                       \
+  case caseLabel:                                                         \
+    spirvOp = builder.create<opName>(op->getLoc(), boolType, operands[0], \
+                                     operands[1]);                        \
+    break;
+
+    DISPATCH(CmpIPredicate::eq, spirv::IEqualOp);
+    DISPATCH(CmpIPredicate::ne, spirv::INotEqualOp);
+    DISPATCH(CmpIPredicate::slt, spirv::SLessThanOp);
+    DISPATCH(CmpIPredicate::sle, spirv::SLessThanEqualOp);
+    DISPATCH(CmpIPredicate::sgt, spirv::SGreaterThanOp);
+    DISPATCH(CmpIPredicate::sge, spirv::SGreaterThanEqualOp);
+
+#undef DISPATCH
+
+    default:
+      return op->emitError("unhandled predicate attribute for SPIR-V lowering");
+  }
+  valueCache.setValueAtIndex(op->getResult(0), index, spirvOp->getResult(0));
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // CmpFOp
 //===----------------------------------------------------------------------===//
 LogicalResult CmpFOpSPIRVLowering::lowerOperation(
