@@ -26,8 +26,7 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-class LegalizeInputOpsPass
-    : public FunctionPass<LegalizeInputOpsPass> {
+class LegalizeInputOpsPass : public FunctionPass<LegalizeInputOpsPass> {
  public:
   void runOnFunction() override {
     OwningRewritePatternList patterns;

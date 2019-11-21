@@ -58,8 +58,7 @@ bool isConstantSmall(ConstantOp constantOp) {
 // Returns true if the dispatch region is allowed to have constants inside.
 // Certain regions that may get replaced or turned into kernel imports shouldn't
 // have the constants moved into them as they'll just get lost.
-bool canDispatchRegionContainConstants(
-    DispatchRegionOp dispatchRegionOp) {
+bool canDispatchRegionContainConstants(DispatchRegionOp dispatchRegionOp) {
   for (auto &block : dispatchRegionOp.body()) {
     for (auto &op : block) {
       // TODO(b/144530470): replace with tablegen attributes/interfaces.
