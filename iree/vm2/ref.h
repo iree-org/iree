@@ -211,7 +211,7 @@ IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
 typedef struct {
   iree_vm_ref_object_t ref_object;
   iree_const_byte_span_t data;
-} iree_vm_const_buffer_ref_t;
+} iree_vm_byte_buffer_ref_t;
 
 #ifdef __cplusplus
 }  // extern "C"

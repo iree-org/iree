@@ -28,8 +28,8 @@ static DialectRegistration<IREEXDialect> base_dialect;
 
 IREEXDialect::IREEXDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
-  addTypes<IREE::ConstBufferType, IREE::OpaqueRefObjectType,
-           IREE::RefPtrType>();
+  addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType,
+           IREE::OpaqueRefObjectType, IREE::RefPtrType>();
 }
 
 //===----------------------------------------------------------------------===//
@@ -56,13 +56,18 @@ Type IREEXDialect::parseType(DialectAsmParser& parser) const {
   } else if (spec == "opaque_ref") {
     return IREE::RefPtrType::getChecked(
         IREE::OpaqueRefObjectType::get(getContext()), loc);
-  } else if (spec == "const_buffer_ref") {
+  } else if (spec == "byte_buffer_ref") {
+    return IREE::RefPtrType::getChecked(IREE::ByteBufferType::get(getContext()),
+                                        loc);
+  } else if (spec == "mutable_byte_buffer_ref") {
     return IREE::RefPtrType::getChecked(
-        IREE::ConstBufferType::get(getContext()), loc);
+        IREE::MutableByteBufferType::get(getContext()), loc);
   } else if (spec == "opaque") {
     return IREE::OpaqueRefObjectType::get(getContext());
-  } else if (spec == "const_buffer") {
-    return IREE::ConstBufferType::get(getContext());
+  } else if (spec == "byte_buffer") {
+    return IREE::ByteBufferType::get(getContext());
+  } else if (spec == "mutable_byte_buffer") {
+    return IREE::MutableByteBufferType::get(getContext());
   }
   emitError(loc, "unknown IREE type: ") << spec;
   return Type();
@@ -72,8 +77,10 @@ void IREEXDialect::printType(Type type, DialectAsmPrinter& os) const {
   switch (type.getKind()) {
     case IREE::TypeKind::RefPtr: {
       auto objectType = type.cast<IREE::RefPtrType>().getObjectType();
-      if (objectType.isa<IREE::ConstBufferType>()) {
-        os << "const_buffer_ref";
+      if (objectType.isa<IREE::ByteBufferType>()) {
+        os << "byte_buffer_ref";
+      } else if (objectType.isa<IREE::MutableByteBufferType>()) {
+        os << "mutable_byte_buffer_ref";
       } else if (objectType.isa<IREE::OpaqueRefObjectType>()) {
         os << "opaque_ref";
       } else {
@@ -84,8 +91,11 @@ void IREEXDialect::printType(Type type, DialectAsmPrinter& os) const {
     case IREE::TypeKind::OpaqueRefObject:
       os << "opaque";
       break;
-    case IREE::TypeKind::ConstBuffer:
-      os << "const_buffer";
+    case IREE::TypeKind::ByteBuffer:
+      os << "byte_buffer";
+      break;
+    case IREE::TypeKind::MutableByteBuffer:
+      os << "mutable_byte_buffer";
       break;
     default:
       llvm_unreachable("unhandled IREE type");

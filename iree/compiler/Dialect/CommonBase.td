@@ -103,16 +103,26 @@ class RefPtrOf<Type type> :
                   type.predicate>
     ]>, "ref<" # type.description # ">">;
 
-def ConstBufferType : DialectType<
+def ByteBufferType : DialectType<
     IREEX_Dialect,
-    CPred<"$_self.isa<IREE::ConstBufferType>()">,
-    "const_buffer"> {
+    CPred<"$_self.isa<IREE::ByteBufferType>()">,
+    "byte_buffer"> {
   let typeDescription = [{
     A constant buffer of mapped host memory.
   }];
 }
-def ConstBufferRef : RefPtrOf<ConstBufferType>;
-def ConstBufferRefAttr : AliasedSymbolRefAttr;
+def ByteBufferRef : RefPtrOf<ByteBufferType>;
+def ByteBufferRefAttr : AliasedSymbolRefAttr;
+
+def MutableByteBufferType : DialectType<
+    IREEX_Dialect,
+    CPred<"$_self.isa<IREE::MutableByteBufferType>()">,
+    "mutable_byte_buffer"> {
+  let typeDescription = [{
+    A buffer of read-write host memory.
+  }];
+}
+def MutableByteBufferRef : RefPtrOf<MutableByteBufferType>;
 
 //===----------------------------------------------------------------------===//
 // Common traits

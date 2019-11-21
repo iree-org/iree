@@ -52,9 +52,9 @@ vm.module @my_module {
 vm.module @my_module {
   vm.rodata @buf0 dense<[0, 1, 2]> : tensor<3xi8>
   // CHECK-LABEL: @const_ref_rodata
-  vm.func @const_ref_rodata() -> !ireex.const_buffer_ref {
-    // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !ireex.const_buffer_ref
-    %buf0 = vm.const.ref.rodata @buf0 : !ireex.const_buffer_ref
-    vm.return %buf0 : !ireex.const_buffer_ref
+  vm.func @const_ref_rodata() -> !ireex.byte_buffer_ref {
+    // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !ireex.byte_buffer_ref
+    %buf0 = vm.const.ref.rodata @buf0 : !ireex.byte_buffer_ref
+    vm.return %buf0 : !ireex.byte_buffer_ref
   }
 }

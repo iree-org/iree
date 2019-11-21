@@ -77,7 +77,7 @@ typedef struct {
   // Right now these don't do much, however we can perform lazy caching and
   // on-the-fly decompression using this information.
   int32_t rodata_ref_count;
-  iree_vm_const_buffer_ref_t* rodata_ref_table;
+  iree_vm_byte_buffer_ref_t* rodata_ref_table;
 
   // Resolved function imports.
   int32_t import_count;

@@ -29,7 +29,8 @@ enum Kind {
   // TODO(b/143787186): move back down to +0 when old dialects are removed.
   RefPtr = Type::FIRST_IREE_TYPE + 60,
   OpaqueRefObject,
-  ConstBuffer,
+  ByteBuffer,
+  MutableByteBuffer,
 
   FIRST_HAL_TYPE = Type::FIRST_IREE_TYPE + 20,
   FIRST_SEQ_TYPE = Type::FIRST_IREE_TYPE + 40,
@@ -74,7 +75,8 @@ class RefObjectType : public Type {
   static bool classof(Type type) {
     switch (type.getKind()) {
       case IREE::TypeKind::OpaqueRefObject:
-      case IREE::TypeKind::ConstBuffer:
+      case IREE::TypeKind::ByteBuffer:
+      case IREE::TypeKind::MutableByteBuffer:
       case HAL::TypeKind::Buffer:
       case HAL::TypeKind::CommandBuffer:
       case HAL::TypeKind::Device:
@@ -111,14 +113,29 @@ class OpaqueRefObjectType
 };
 
 /// A buffer of constant mapped memory.
-class ConstBufferType : public Type::TypeBase<ConstBufferType, RefObjectType> {
+class ByteBufferType : public Type::TypeBase<ByteBufferType, RefObjectType> {
  public:
   using Base::Base;
 
-  static bool kindof(unsigned kind) { return kind == TypeKind::ConstBuffer; }
+  static bool kindof(unsigned kind) { return kind == TypeKind::ByteBuffer; }
 
-  static ConstBufferType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::ConstBuffer);
+  static ByteBufferType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::ByteBuffer);
+  }
+};
+
+/// A buffer of read-write memory.
+class MutableByteBufferType
+    : public Type::TypeBase<MutableByteBufferType, RefObjectType> {
+ public:
+  using Base::Base;
+
+  static bool kindof(unsigned kind) {
+    return kind == TypeKind::MutableByteBuffer;
+  }
+
+  static MutableByteBufferType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::MutableByteBuffer);
   }
 };
 

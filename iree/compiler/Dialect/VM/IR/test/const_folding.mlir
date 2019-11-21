@@ -58,11 +58,11 @@ vm.module @const_rodata_folds {
   // CHECK-NEXT: vm.rodata @r2
   vm.rodata @r2 dense<[9, 9, 9]> : tensor<3xi32>
   // CHECK-NEXT: @cse_rodata_loads
-  vm.func @cse_rodata_loads() -> (!ireex.const_buffer_ref, !ireex.const_buffer_ref) {
-    // CHECK-NEXT: %r2 = vm.const.ref.rodata @r2 : !ireex.const_buffer_ref
-    // CHECK-NEXT: vm.return %r2, %r2 : !ireex.const_buffer_ref, !ireex.const_buffer_ref
-    %0 = vm.const.ref.rodata @r2 : !ireex.const_buffer_ref
-    %1 = vm.const.ref.rodata @r2 : !ireex.const_buffer_ref
-    vm.return %0, %1 : !ireex.const_buffer_ref, !ireex.const_buffer_ref
+  vm.func @cse_rodata_loads() -> (!ireex.byte_buffer_ref, !ireex.byte_buffer_ref) {
+    // CHECK-NEXT: %r2 = vm.const.ref.rodata @r2 : !ireex.byte_buffer_ref
+    // CHECK-NEXT: vm.return %r2, %r2 : !ireex.byte_buffer_ref, !ireex.byte_buffer_ref
+    %0 = vm.const.ref.rodata @r2 : !ireex.byte_buffer_ref
+    %1 = vm.const.ref.rodata @r2 : !ireex.byte_buffer_ref
+    vm.return %0, %1 : !ireex.byte_buffer_ref, !ireex.byte_buffer_ref
   }
 }

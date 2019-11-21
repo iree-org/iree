@@ -491,11 +491,11 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   }];
 
   let arguments = (ins
-    ConstBufferRefAttr:$rodata
+    ByteBufferRefAttr:$rodata
   );
 
   let results = (outs
-    ConstBufferRef:$value
+    ByteBufferRef:$value
   );
 
   let encoding = [
