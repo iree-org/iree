@@ -45,7 +45,6 @@ cc_library(
     deps = [
         ":dynamic_symbols",
         ":extensibility_util",
-        ":queues_info",
         ":vulkan_device",
         ":vulkan_driver",
         "//iree/base:api",
@@ -300,14 +299,6 @@ cc_library(
 )
 
 cc_library(
-    name = "queues_info",
-    hdrs = ["queues_info.h"],
-    deps = [
-        "@vulkan_headers//:vulkan_headers_no_prototypes",
-    ],
-)
-
-cc_library(
     name = "status_util",
     srcs = ["status_util.cc"],
     hdrs = ["status_util.h"],
@@ -367,9 +358,9 @@ cc_library(
         ":native_binary_semaphore",
         ":native_event",
         ":pipeline_cache",
-        ":queues_info",
         ":status_util",
         ":vma_allocator",
+        "//iree/base:math",
         "//iree/base:memory",
         "//iree/base:status",
         "//iree/base:tracing",
@@ -396,7 +387,6 @@ cc_library(
         ":debug_reporter",
         ":dynamic_symbols",
         ":extensibility_util",
-        ":queues_info",
         ":status_util",
         ":vulkan_device",
         "//iree/base:memory",

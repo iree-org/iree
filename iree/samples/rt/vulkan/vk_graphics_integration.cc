@@ -531,15 +531,15 @@ extern "C" int main(int argc, char** argv) {
   // Create a device sharing our VkDevice and queue.
   // We could also create a separate (possibly low priority) compute queue for
   // IREE, and/or provide a dedicated transfer queue.
-  iree_hal_vulkan_queues_info_t compute_queues_info;
-  compute_queues_info.queue_family_index = g_QueueFamily;
-  uint32_t queue_index = 0;
-  compute_queues_info.queue_indices = &queue_index;
-  compute_queues_info.queue_indices_count = 1;
+  iree_hal_vulkan_queue_set_t compute_queue_set;
+  compute_queue_set.queue_family_index = g_QueueFamily;
+  compute_queue_set.queue_indices = 1 << 0;
+  iree_hal_vulkan_queue_set_t transfer_queue_set;
+  transfer_queue_set.queue_indices = 0;
   iree_hal_device_t* iree_vk_device = nullptr;
   CHECK_IREE_OK(iree_hal_vulkan_driver_create_device(
-      iree_vk_driver, g_PhysicalDevice, g_Device, &compute_queues_info,
-      /*transfer_queues_info=*/nullptr, &iree_vk_device));
+      iree_vk_driver, g_PhysicalDevice, g_Device, compute_queue_set,
+      transfer_queue_set, &iree_vk_device));
   // Register the device.
   CHECK_IREE_OK(
       iree_rt_instance_register_device(iree_instance, iree_vk_device));

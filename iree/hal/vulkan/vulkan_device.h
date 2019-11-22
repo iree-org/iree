@@ -31,11 +31,20 @@
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/handle_util.h"
 #include "iree/hal/vulkan/legacy_fence.h"
-#include "iree/hal/vulkan/queues_info.h"
 
 namespace iree {
 namespace hal {
 namespace vulkan {
+
+// A set of queues within a specific queue family on a VkDevice.
+struct QueueSet {
+  // The index of a particular queue family on a VkPhysicalDevice, as described
+  // by vkGetPhysicalDeviceQueueFamilyProperties.
+  uint32_t queue_family_index;
+
+  // Bitfield of queue indices within the queue family at |queue_family_index|.
+  uint64_t queue_indices;
+};
 
 class VulkanDevice final : public Device {
  public:
@@ -51,8 +60,7 @@ class VulkanDevice final : public Device {
       ref_ptr<Driver> driver, const DeviceInfo& device_info,
       VkPhysicalDevice physical_device, VkDevice logical_device,
       const ExtensibilitySpec& extensibility_spec,
-      const QueuesInfo* compute_queues_infos,
-      const QueuesInfo* transfer_queues_infos,
+      const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
       const ref_ptr<DynamicSymbols>& syms);
 
   ~VulkanDevice() override;

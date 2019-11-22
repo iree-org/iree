@@ -21,6 +21,7 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/synchronization/mutex.h"
+#include "iree/base/math.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"
@@ -321,13 +322,14 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     ref_ptr<Driver> driver, const DeviceInfo& device_info,
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const ExtensibilitySpec& extensibility_spec,
-    const QueuesInfo* compute_queues_infos,
-    const QueuesInfo* transfer_queues_infos,
+    const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
     const ref_ptr<DynamicSymbols>& syms) {
   IREE_TRACE_SCOPE0("VulkanDevice::Create");
 
-  if (compute_queues_infos == nullptr ||
-      compute_queues_infos->queue_indices_count == 0) {
+  uint64_t compute_queue_count = CountOnes64(compute_queue_set.queue_indices);
+  uint64_t transfer_queue_count = CountOnes64(transfer_queue_set.queue_indices);
+
+  if (compute_queue_count == 0) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "At least one compute queue is required";
   }
@@ -355,49 +357,44 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   ASSIGN_OR_RETURN(auto allocator,
                    VmaAllocator::Create(physical_device, device_handle));
 
-  bool has_dedicated_transfer_queues =
-      transfer_queues_infos != nullptr &&
-      transfer_queues_infos->queue_indices_count > 0;
+  bool has_dedicated_transfer_queues = transfer_queue_count > 0;
 
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
   // If we wanted to expose the pools through the HAL to allow the VM to more
   // effectively manage them (pool per fiber, etc) we could, however I doubt the
   // overhead of locking the pool will be even a blip.
-  ASSIGN_OR_RETURN(
-      auto dispatch_command_pool,
-      CreateTransientCommandPool(device_handle,
-                                 compute_queues_infos->queue_family_index));
+  ASSIGN_OR_RETURN(auto dispatch_command_pool,
+                   CreateTransientCommandPool(
+                       device_handle, compute_queue_set.queue_family_index));
   ref_ptr<VkCommandPoolHandle> transfer_command_pool;
   if (has_dedicated_transfer_queues) {
-    ASSIGN_OR_RETURN(
-        transfer_command_pool,
-        CreateTransientCommandPool(device_handle,
-                                   transfer_queues_infos->queue_family_index));
+    ASSIGN_OR_RETURN(transfer_command_pool,
+                     CreateTransientCommandPool(
+                         device_handle, transfer_queue_set.queue_family_index));
   }
 
   // Get the queues and create the HAL wrappers.
   absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues;
-  for (uint32_t i = 0; i < compute_queues_infos->queue_indices_count; ++i) {
-    uint32_t queue_index = compute_queues_infos->queue_indices[i];
+  for (uint32_t i = 0; i < compute_queue_count; ++i) {
+    if (!(compute_queue_set.queue_indices & (1 << i))) continue;
+
     VkQueue queue = VK_NULL_HANDLE;
-    syms->vkGetDeviceQueue(*device_handle,
-                           compute_queues_infos->queue_family_index,
-                           queue_index, &queue);
-    std::string queue_name =
-        absl::StrCat(device_info.name(), ":d", queue_index);
+    syms->vkGetDeviceQueue(*device_handle, compute_queue_set.queue_family_index,
+                           i, &queue);
+    std::string queue_name = absl::StrCat(device_info.name(), ":d", i);
     command_queues.push_back(absl::make_unique<DirectCommandQueue>(
         std::move(queue_name),
         CommandCategory::kDispatch | CommandCategory::kTransfer, device_handle,
         queue));
   }
   if (has_dedicated_transfer_queues) {
-    for (uint32_t i = 0; i < transfer_queues_infos->queue_indices_count; ++i) {
-      uint32_t queue_index = transfer_queues_infos->queue_indices[i];
+    for (uint32_t i = 0; i < transfer_queue_count; ++i) {
+      if (!(transfer_queue_set.queue_indices & (1 << i))) continue;
+
       VkQueue queue = VK_NULL_HANDLE;
       syms->vkGetDeviceQueue(*device_handle,
-                             transfer_queues_infos->queue_family_index,
-                             queue_index, &queue);
+                             transfer_queue_set.queue_family_index, i, &queue);
       std::string queue_name = absl::StrCat(device_info.name(), ":t", i);
       command_queues.push_back(absl::make_unique<DirectCommandQueue>(
           std::move(queue_name), CommandCategory::kTransfer, device_handle,

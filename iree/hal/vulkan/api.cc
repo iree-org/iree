@@ -19,7 +19,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
-#include "iree/hal/vulkan/queues_info.h"
 #include "iree/hal/vulkan/vulkan_device.h"
 #include "iree/hal/vulkan/vulkan_driver.h"
 
@@ -272,8 +271,8 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_vulkan_driver_create_device(
     iree_hal_driver_t* driver, VkPhysicalDevice physical_device,
-    VkDevice logical_device, iree_hal_vulkan_queues_info_t* compute_queues_info,
-    iree_hal_vulkan_queues_info_t* transfer_queues_info,
+    VkDevice logical_device, iree_hal_vulkan_queue_set_t compute_queue_set,
+    iree_hal_vulkan_queue_set_t transfer_queue_set,
     iree_hal_device_t** out_device) {
   IREE_TRACE_SCOPE0("iree_hal_vulkan_driver_create_device");
   if (!out_device) {
@@ -287,12 +286,15 @@ iree_hal_vulkan_driver_create_device(
   }
 
   LOG(INFO) << "Creating VulkanDevice...";
+  QueueSet compute_qs;
+  compute_qs.queue_family_index = compute_queue_set.queue_family_index;
+  compute_qs.queue_indices = compute_queue_set.queue_indices;
+  QueueSet transfer_qs;
+  transfer_qs.queue_family_index = transfer_queue_set.queue_family_index;
+  transfer_qs.queue_indices = transfer_queue_set.queue_indices;
   IREE_API_ASSIGN_OR_RETURN(
-      auto device,
-      handle->CreateDevice(
-          physical_device, logical_device,
-          reinterpret_cast<const QueuesInfo*>(compute_queues_info),
-          reinterpret_cast<const QueuesInfo*>(transfer_queues_info)));
+      auto device, handle->CreateDevice(physical_device, logical_device,
+                                        compute_qs, transfer_qs));
   LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());

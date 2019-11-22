@@ -49,18 +49,15 @@ typedef struct {
   iree_hal_vulkan_extensibility_options_t extensibility_options;
 } iree_hal_vulkan_driver_options_t;
 
-// A list of queues within a specific queue family on a VkDevice.
+// A set of queues within a specific queue family on a VkDevice.
 typedef struct {
   // The index of a particular queue family on a VkPhysicalDevice, as described
   // by vkGetPhysicalDeviceQueueFamilyProperties.
   uint32_t queue_family_index;
 
-  // A list of queue indices within the queue family at |queue_family_index|.
-  uint32_t* queue_indices;
-
-  // The number of elements in |queue_indices|.
-  uint32_t queue_indices_count;
-} iree_hal_vulkan_queues_info_t;
+  // Bitfield of queue indices within the queue family at |queue_family_index|.
+  uint64_t queue_indices;
+} iree_hal_vulkan_queue_set_t;
 
 typedef struct iree_hal_vulkan_syms iree_hal_vulkan_syms_t;
 
@@ -193,7 +190,7 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 // options provided during driver creation.
 //
 // The device will schedule commands against the queues in
-// |compute_queues_info| and (if set) |transfer_queues_info|.
+// |compute_queue_set| and (if set) |transfer_queue_set|.
 //
 // Applications may choose how these queues are created and selected in order
 // to control how commands submitted by this device are prioritized and
@@ -202,17 +199,17 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 // for latency-sensitive processing.
 //
 // Dedicated compute queues (no graphics capabilities) are preferred within
-// |compute_queues_info|, if they are available.
+// |compute_queue_set|, if they are available.
 // Similarly, dedicated transfer queues (no compute or graphics) are preferred
-// within |transfer_queues_info|.
+// within |transfer_queue_set|.
 // The queues may be the same.
 //
 // |out_device| must be released by the caller (see |iree_hal_device_release|).
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_vulkan_driver_create_device(
     iree_hal_driver_t* driver, VkPhysicalDevice physical_device,
-    VkDevice logical_device, iree_hal_vulkan_queues_info_t* compute_queues_info,
-    iree_hal_vulkan_queues_info_t* transfer_queues_info,
+    VkDevice logical_device, iree_hal_vulkan_queue_set_t compute_queue_set,
+    iree_hal_vulkan_queue_set_t transfer_queue_set,
     iree_hal_device_t** out_device);
 
 #endif  // IREE_API_NO_PROTOTYPES

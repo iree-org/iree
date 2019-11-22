@@ -32,7 +32,6 @@ iree_cc_library(
     iree::hal::api
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::extensibility_util
-    iree::hal::vulkan::queues_info
     iree::hal::vulkan::vulkan_device
     iree::hal::vulkan::vulkan_driver
     Vulkan::Headers
@@ -348,16 +347,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    queues_info
-  HDRS
-    "queues_info.h"
-  DEPS
-    Vulkan::Headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     status_util
   HDRS
     "status_util.h"
@@ -420,6 +409,7 @@ iree_cc_library(
     absl::strings
     absl::synchronization
     absl::span
+    iree::base::math
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -439,7 +429,6 @@ iree_cc_library(
     iree::hal::vulkan::native_binary_semaphore
     iree::hal::vulkan::native_event
     iree::hal::vulkan::pipeline_cache
-    iree::hal::vulkan::queues_info
     iree::hal::vulkan::status_util
     iree::hal::vulkan::vma_allocator
     Vulkan::Headers
@@ -465,7 +454,6 @@ iree_cc_library(
     iree::hal::vulkan::debug_reporter
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::extensibility_util
-    iree::hal::vulkan::queues_info
     iree::hal::vulkan::status_util
     iree::hal::vulkan::vulkan_device
     Vulkan::Headers

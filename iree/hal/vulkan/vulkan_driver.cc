@@ -23,7 +23,6 @@
 #include "iree/hal/device_info.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
-#include "iree/hal/vulkan/vulkan_device.h"
 
 namespace iree {
 namespace hal {
@@ -271,8 +270,7 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
 
 StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
     VkPhysicalDevice physical_device, VkDevice logical_device,
-    const QueuesInfo* compute_queues_infos,
-    const QueuesInfo* transfer_queues_infos) {
+    const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set) {
   IREE_TRACE_SCOPE0("VulkanDriver::CreateDevice");
 
   ASSIGN_OR_RETURN(auto device_info,
@@ -280,11 +278,11 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
 
   // Attempt to create the device.
   // This may fail if the VkDevice does not support all necessary features.
-  ASSIGN_OR_RETURN(auto device,
-                   VulkanDevice::Create(
-                       add_ref(this), device_info, physical_device,
-                       logical_device, device_extensibility_spec_,
-                       compute_queues_infos, transfer_queues_infos, syms()));
+  ASSIGN_OR_RETURN(
+      auto device,
+      VulkanDevice::Create(add_ref(this), device_info, physical_device,
+                           logical_device, device_extensibility_spec_,
+                           compute_queue_set, transfer_queue_set, syms()));
   return device;
 }
 
