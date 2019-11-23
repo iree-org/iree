@@ -159,6 +159,7 @@ py_test(
     deps = [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "//bindings/python/pyiree",
+        "//third_party/py/numpy",
         "@absl_py//absl/testing:absltest",
     ],
 )

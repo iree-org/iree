@@ -18,6 +18,7 @@ from __future__ import print_function
 
 from absl.testing import absltest
 
+import numpy as np
 import pyiree
 
 
@@ -36,6 +37,19 @@ class HalTest(absltest.TestCase):
     b.fill_zero(0, 4096)
     shape = pyiree.binding.hal.Shape([1, 1024])
     unused_bv = b.create_view(shape, 4)
+
+  def testStrideCalculation(self):
+    b = pyiree.binding.hal.Buffer.allocate_heap(
+        memory_type=int(pyiree.binding.hal.MemoryType.HOST_LOCAL),
+        usage=int(pyiree.binding.hal.BufferUsage.ALL),
+        allocation_size=4096)
+    self.assertIsNot(b, None)
+    b.fill_zero(0, 4096)
+    shape = pyiree.binding.hal.Shape([16, 1, 8, 4, 2])
+    bv = b.create_view(shape, 4)
+    self.assertEqual(
+        np.array(bv.map()).strides,
+        (1 * 8 * 4 * 2 * 4, 8 * 4 * 2 * 4, 4 * 2 * 4, 2 * 4, 4))
 
 
 if __name__ == "__main__":

@@ -64,11 +64,11 @@ class HalMappedMemory {
     }
     absl::InlinedVector<py::ssize_t, IREE_SHAPE_MAX_RANK> strides;
     strides.resize(shape.rank);
-    for (int i = 1; i < shape.rank; ++i) {
-      strides[i - 1] = shape.dims[i] * element_size;
-    }
     if (!strides.empty()) {
-      strides.back() = 1 * element_size;
+      strides[shape.rank - 1] = element_size;
+      for (int i = shape.rank - 2; i >= 0; --i) {
+        strides[i] = strides[i + 1] * shape.dims[i + 1];
+      }
     }
 
     // TODO(laurenzo): We need to figure out how to propagate dtype in the
