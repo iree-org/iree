@@ -386,8 +386,8 @@ void ReductionRegionOp::build(Builder *builder, OperationState &state,
   state.addAttribute(
       "dimensions",
       DenseIntElementsAttr::get(
-          RankedTensorType::get({static_cast<int32_t>(dimensions.size())},
-                                builder->getIntegerType(32)),
+          VectorType::get({static_cast<int32_t>(dimensions.size())},
+                          builder->getIntegerType(32)),
           dimensions));
   state.addAttributes(attributes);
   state.addRegion();
@@ -525,26 +525,26 @@ void WindowedReductionRegionOp::build(
   state.addAttribute(
       "window_dimensions",
       DenseIntElementsAttr::get(
-          RankedTensorType::get({static_cast<int32_t>(windowDimensions.size())},
-                                builder->getIntegerType(32)),
+          VectorType::get({static_cast<int32_t>(windowDimensions.size())},
+                          builder->getIntegerType(32)),
           windowDimensions));
   state.addAttribute(
       "window_strides",
       DenseIntElementsAttr::get(
-          RankedTensorType::get({static_cast<int32_t>(windowStrides.size())},
-                                builder->getIntegerType(32)),
+          VectorType::get({static_cast<int32_t>(windowStrides.size())},
+                          builder->getIntegerType(32)),
           windowStrides));
   state.addAttribute(
       "base_dilations",
       DenseIntElementsAttr::get(
-          RankedTensorType::get({static_cast<int32_t>(baseDilations.size())},
-                                builder->getIntegerType(32)),
+          VectorType::get({static_cast<int32_t>(baseDilations.size())},
+                          builder->getIntegerType(32)),
           baseDilations));
   state.addAttribute(
       "window_dilations",
       DenseIntElementsAttr::get(
-          RankedTensorType::get({static_cast<int32_t>(windowDilations.size())},
-                                builder->getIntegerType(32)),
+          VectorType::get({static_cast<int32_t>(windowDilations.size())},
+                          builder->getIntegerType(32)),
           windowDilations));
   state.addAttribute("padding_mode", builder->getI32IntegerAttr(
                                          static_cast<int32_t>(paddingMode)));

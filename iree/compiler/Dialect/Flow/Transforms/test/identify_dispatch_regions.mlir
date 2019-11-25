@@ -26,7 +26,7 @@ func @empty() {
 func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: constant dense<[4, 1, 1]>
   // CHECK-NEXT: %0 = flow.dispatch.region
-  // CHECK-SAME: [%cst : tensor<3xi32>]
+  // CHECK-SAME: [%cst : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
@@ -42,7 +42,7 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: constant dense<[4, 1, 1]>
   // CHECK-NEXT: %0 = flow.dispatch.region
-  // CHECK-SAME: [%cst : tensor<3xi32>]
+  // CHECK-SAME: [%cst : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT:   %1 = addf %arg1, %arg1 : tensor<4xf32>
   %0 = addf %arg0, %arg0 : tensor<4xf32>
@@ -62,7 +62,7 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: constant dense<[4, 1, 1]>
   // CHECK-NEXT: %0 = flow.dispatch.region
-  // CHECK-SAME: [%cst : tensor<3xi32>]
+  // CHECK-SAME: [%cst : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
@@ -82,23 +82,23 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK-NEXT: %cst = constant dense<[4, 4, 1]>
   // CHECK-NEXT: %0 = flow.dispatch.region
-  // CHECK-SAME: [%cst : tensor<3xi32>]
+  // CHECK-SAME: [%cst : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK-NEXT:   %3 = xla_hlo.add %arg1, %arg1 : tensor<4x4xf32>
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
   // CHECK-NEXT: flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
-  // CHECK-NEXT: %cst_0 = constant dense<[4, 4, 1]> : tensor<3xi32>
+  // CHECK-NEXT: %cst_0 = constant dense<[4, 4, 1]> : vector<3xi32>
   // CHECK-NEXT: %1 = flow.dispatch.region
-  // CHECK-SAME: [%cst_0 : tensor<3xi32>]
+  // CHECK-SAME: [%cst_0 : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %0 : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK-NEXT:   %3 = "xla_hlo.dot"(%arg1, %arg2) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   %1 = "xla_hlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
-  // CHECK-NEXT: %cst_1 = constant dense<[4, 4, 1]> : tensor<3xi32>
+  // CHECK-NEXT: %cst_1 = constant dense<[4, 4, 1]> : vector<3xi32>
   // CHECK-NEXT: %2 = flow.dispatch.region
-  // CHECK-SAME: [%cst_1 : tensor<3xi32>]
+  // CHECK-SAME: [%cst_1 : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %1 : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK-NEXT:   %3 = xla_hlo.mul %arg1, %arg2 : tensor<4x4xf32>
   %2 = xla_hlo.mul %1, %arg0 : tensor<4x4xf32>
@@ -114,7 +114,7 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: constant dense<[4, 1, 1]>
   // CHECK-NEXT: %0 = flow.dispatch.region
-  // CHECK-SAME: [%cst : tensor<3xi32>]
+  // CHECK-SAME: [%cst : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
@@ -131,7 +131,7 @@ func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: constant dense<[4, 1, 1]>
   // CHECK-NEXT: %0 = flow.dispatch.region
-  // CHECK-SAME: [%cst : tensor<3xi32>]
+  // CHECK-SAME: [%cst : vector<3xi32>]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT:   %1 = xla_hlo.mul %arg1, %arg1 : tensor<4xf32>
   %0 = xla_hlo.mul %arg0, %arg0 : tensor<4xf32>

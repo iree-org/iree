@@ -17,8 +17,8 @@
 
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-      workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>,
-      workload = dense<[4, 1, 1]> : tensor<3xi32>
+      workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
+      workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
@@ -35,7 +35,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // INTERP-NEXT:     module {
 // INTERP-NEXT:       func @simpleMath_rgn_dispatch_0(%arg0: memref<4xf32>, %arg1: memref<4xf32>) attributes {
 // INTERP-SAME:           iree.executable.export,
-// INTERP-SAME:           iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>,
+// INTERP-SAME:           iree.executable.workload = dense<[4, 1, 1]> : vector<3xi32>,
 // INTERP-SAME:           iree.ordinal = 0 : i32} {
 // INTERP-NEXT:         %0 = "iree_ll_interp.alloc_heap"() : () -> memref<4xf32>
 // INTERP-NEXT:         "iree_ll_interp.add_f"(%arg0, %arg0, %0) : (memref<4xf32>, memref<4xf32>, memref<4xf32>) -> ()
@@ -68,8 +68,8 @@ flow.executable @simpleMath_ex_dispatch_0 {
 flow.executable @reduction_ex_reduce_0_dim_0 {
   flow.reduction.entry @reduction_rgn_reduce_0_dim_0_entry apply(@reduction_rgn_reduce_0_dim_0) attributes {
     dimension = 1 : i32,
-    workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>,
-    workload = dense<[4, 1, 1]> : tensor<3xi32>
+    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
+    workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   module {
     func @reduction_rgn_reduce_0_dim_0_entry(tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>

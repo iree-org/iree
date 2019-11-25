@@ -91,7 +91,7 @@ def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariableRefAttr : AliasedSymbolRefAttr;
 
 // TODO(benvanik): use index types instead of i32.
-def FLOW_Workload : 1DTensorOf<[I32]> {
+def FLOW_Workload : VectorOfLengthAndType<[3], [I32]> {
   let typeDescription = [{
     Describes the total untiled invocations along one or more dimensions.
     Tiling may later divide this value for workgroup sizes.
@@ -101,7 +101,7 @@ def FLOW_Workload : 1DTensorOf<[I32]> {
 // TODO(cl/277443143): moving into OpBase.td.
 // A `width`-bit integer elements attribute. The attribute should be
 // ranked and has a shape as specified in `dims`.
-class FLOW_RankedIntElementsAttr<int width, list<int> dims> : ElementsAttrBase<
+class FLOW_RankedIntVectorAttr<int width, list<int> dims> : ElementsAttrBase<
   CPred<"$_self.isa<DenseIntElementsAttr>() &&"
       "$_self.cast<DenseIntElementsAttr>().getType()."
       "getElementType().isInteger(" # width # ") && "
@@ -116,13 +116,13 @@ class FLOW_RankedIntElementsAttr<int width, list<int> dims> : ElementsAttrBase<
   let returnType = [{ DenseIntElementsAttr }];
 
   let constBuilderCall = "DenseElementsAttr::get("
-    "RankedTensorType::get({" # StrJoinInt<dims>.result #
+    "VectorType::get({" # StrJoinInt<dims>.result #
     "}, $_builder.getIntegerType(" # width # ")), "
     "llvm::makeArrayRef($0)).cast<DenseIntElementsAttr>()";
   let convertFromStorage = "$_self";
 }
 
-def FLOW_WorkloadAttr : FLOW_RankedIntElementsAttr<32, [3]>;
+def FLOW_WorkloadAttr : FLOW_RankedIntVectorAttr<32, [3]>;
 
 // Use no padding and clamp the window to the valid area, possibly stopping
 // early prior to having covered all data.

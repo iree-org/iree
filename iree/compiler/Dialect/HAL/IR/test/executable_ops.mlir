@@ -43,7 +43,7 @@ hal.executable @ex_with_source {
       // CHECK-NEXT: func @dispatch0
       func @dispatch0(%arg0: memref<4xf32>, %arg1: memref<4xf32>) attributes {
           iree.executable.export,
-          iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>,
+          iree.executable.workload = dense<[4, 1, 1]> : vector<3xi32>,
           iree.ordinal = 0 : i32} {
         %0 = "iree_ll_interp.alloc_heap"() : () -> memref<4xf32>
         "iree_ll_interp.add_f"(%arg0, %arg0, %0) : (memref<4xf32>, memref<4xf32>, memref<4xf32>) -> ()

@@ -56,7 +56,7 @@ vm.module @const_ref_folds {
 // CHECK-LABEL: @const_rodata_folds
 vm.module @const_rodata_folds {
   // CHECK-NEXT: vm.rodata @r2
-  vm.rodata @r2 dense<[9, 9, 9]> : tensor<3xi32>
+  vm.rodata @r2 dense<[9, 9, 9]> : vector<3xi32>
   // CHECK-NEXT: @cse_rodata_loads
   vm.func @cse_rodata_loads() -> (!ireex.byte_buffer_ref, !ireex.byte_buffer_ref) {
     // CHECK-NEXT: %r2 = vm.const.ref.rodata @r2 : !ireex.byte_buffer_ref

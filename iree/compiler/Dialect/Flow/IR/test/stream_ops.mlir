@@ -28,11 +28,11 @@ flow.executable @dispatch_0 {
 
 // CHECK-LABEL: func @fragment
 func @fragment(%arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
-  %cst = constant dense<[4, 1, 1]> : tensor<3xi32>
-  // CHECK: %0:2 = flow.ex.stream.fragment(%arg1 = %cst : tensor<3xi32>, %arg2 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
-  %0:2 = flow.ex.stream.fragment(%arg1 = %cst : tensor<3xi32>, %arg2 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
+  %cst = constant dense<[4, 1, 1]> : vector<3xi32>
+  // CHECK: %0:2 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
+  %0:2 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
     // CHECK-NEXT: flow.dispatch
-    %1 = flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1 : tensor<3xi32>](%arg2) : (tensor<4xf32>) -> tensor<4xf32>
+    %1 = flow.dispatch @dispatch_0::@rgn_dispatch_0[%arg1 : vector<3xi32>](%arg2) : (tensor<4xf32>) -> tensor<4xf32>
     // CHECK-NEXT: flow.return
     flow.return %1, %1 : tensor<4xf32>, tensor<4xf32>
     // CHECK-NEXT: }
