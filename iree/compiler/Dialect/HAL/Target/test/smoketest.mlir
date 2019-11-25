@@ -29,6 +29,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 }
 
 // INTERP-LABEL: hal.executable @simpleMath_ex_dispatch_0 {
+// INTERP-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {ordinal = 0 : i32, workgroup_size = dense<[32, 1, 1]> : vector<3xi32>}
 // INTERP-NEXT:   hal.executable.binary attributes {
 // INTERP-SAME:     data = dense
 // INTERP-SAME:     format = 1230128453 : i32} {
@@ -49,6 +50,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // INTERP-NEXT: }
 
 // VKSPV-LABEL: hal.executable @simpleMath_ex_dispatch_0 {
+// VKSPV-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {ordinal = 0 : i32, workgroup_size = dense<[32, 1, 1]> : vector<3xi32>}
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32} {
@@ -81,6 +83,7 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
 }
 
 // INTERP-LABEL: hal.executable @reduction_ex_reduce_0_dim_0 {
+// INTERP-NEXT:   hal.executable.entry_point @reduction_rgn_reduce_0_dim_0_entry attributes {ordinal = 0 : i32, workgroup_size = dense<1> : vector<3xi32>}
 // INTERP-NEXT:   hal.executable.binary attributes {
 // INTERP-SAME:     data = dense
 // INTERP-SAME:     format = 1230128453 : i32} {
@@ -92,6 +95,7 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
 //      INTERP:         "iree_ll_interp.reduce_sum_f"(%arg0, %arg1, %0) {dimension = 1 : i32} : (memref<4x8xf32>, memref<f32>, memref<4xf32>) -> ()
 
 // VKSPV-LABEL: hal.executable @reduction_ex_reduce_0_dim_0 {
+// VKSPV-NEXT:   hal.executable.entry_point @reduction_rgn_reduce_0_dim_0_entry attributes {ordinal = 0 : i32, workgroup_size = dense<1> : vector<3xi32>}
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32} {

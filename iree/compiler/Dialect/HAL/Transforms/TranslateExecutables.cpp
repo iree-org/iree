@@ -14,8 +14,11 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
@@ -63,6 +66,9 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
       auto targetOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
 
+      // Annotate the entry points.
+      addEntryPointOps(sourceOp, targetOp);
+
       // Translate for each backend. Variants will be added to the targetOp.
       for (auto targetBackend : targetBackends) {
         auto targetFn = getExecutableTargetRegistry().find(targetBackend);
@@ -86,6 +92,36 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
   }
 
  private:
+  // Adds the entry point ops with assigned ordinals for each entry function.
+  void addEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
+                        IREE::HAL::ExecutableOp targetOp) {
+    OpBuilder builder(targetOp.getContext());
+    builder.setInsertionPointToStart(&targetOp.getBlock());
+    int nextOrdinal = 0;
+    for (auto &op : sourceOp.getBlock()) {
+      if (auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
+        builder.create<IREE::HAL::ExecutableEntryPointOp>(
+            dispatchEntryOp.getLoc(),
+            builder.getStringAttr(dispatchEntryOp.sym_name()),
+            builder.getI32IntegerAttr(nextOrdinal++),
+            DenseIntElementsAttr::get(
+                VectorType::get({3}, builder.getIntegerType(32)),
+                llvm::to_vector<3>(dispatchEntryOp.workgroup_size()
+                                       .getValue()
+                                       .getIntValues())));
+      } else if (auto reductionEntryOp =
+                     dyn_cast<IREE::Flow::ReductionEntryOp>(op)) {
+        builder.create<IREE::HAL::ExecutableEntryPointOp>(
+            reductionEntryOp.getLoc(),
+            builder.getStringAttr(reductionEntryOp.sym_name()),
+            builder.getI32IntegerAttr(nextOrdinal++),
+            DenseIntElementsAttr::get(
+                VectorType::get({3}, builder.getIntegerType(32)),
+                ArrayRef<int32_t>{1, 1, 1}));
+      }
+    }
+  }
+
   ExecutableTargetOptions executableOptions_;
 };
 

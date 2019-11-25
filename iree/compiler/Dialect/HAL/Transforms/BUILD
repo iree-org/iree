@@ -27,6 +27,7 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
         "@llvm//:support",

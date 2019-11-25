@@ -177,11 +177,39 @@ def HAL_Dim : I<32>;
 def HAL_Dims : VectorOf<[HAL_Dim]>;
 def HAL_Shape : TypeAlias<HAL_Dims>;
 
-def HAL_Workload : VectorOfLengthAndType<[3], [I32]> {
+def HAL_Workgroups : VectorOfLengthAndType<[3], [I32]> {
   let typeDescription = [{
-    An (X, Y, Z) invocation count describing the workload of an operation.
+    An (X, Y, Z) workgroup count for a dispatch. These values will be multiplied
+    by the workgroup size of the executable being dispatched to compute the
+    total invocation count.
   }];
 }
+
+// TODO(cl/277443143): moving into OpBase.td.
+// A `width`-bit integer elements attribute. The attribute should be
+// ranked and has a shape as specified in `dims`.
+class HAL_RankedIntElementsAttr<int width, list<int> dims> : ElementsAttrBase<
+  CPred<"$_self.isa<DenseIntElementsAttr>() &&"
+      "$_self.cast<DenseIntElementsAttr>().getType()."
+      "getElementType().isInteger(" # width # ") && "
+      // Check that this is ranked and has the specified shape.
+      "$_self.cast<DenseIntElementsAttr>().getType().hasRank() && "
+      "$_self.cast<DenseIntElementsAttr>().getType().getShape() == "
+      "llvm::ArrayRef<int64_t>({" # StrJoinInt<dims>.result # "})">,
+  width # "-bit integer elements attribute of shape [" #
+  StrJoinInt<dims>.result # "]"> {
+
+  let storageType = [{ DenseIntElementsAttr }];
+  let returnType = [{ DenseIntElementsAttr }];
+
+  let constBuilderCall = "DenseElementsAttr::get("
+    "VectorType::get({" # StrJoinInt<dims>.result #
+    "}, $_builder.getIntegerType(" # width # ")), "
+    "llvm::makeArrayRef($0)).cast<DenseIntElementsAttr>()";
+  let convertFromStorage = "$_self";
+}
+
+def HAL_WorkgroupSizeAttr : HAL_RankedIntElementsAttr<32, [3]>;
 
 def HAL_HostBufferRef : AnyTypeOf<[
   RefPtrOf<ByteBufferType>,

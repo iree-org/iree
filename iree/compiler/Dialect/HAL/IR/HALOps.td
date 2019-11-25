@@ -27,6 +27,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
     Symbol,
+    SymbolTable,
   ]> {
   let summary = [{target-specific executable module}];
   let description = [{
@@ -62,6 +63,20 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
   let summary = [{terminator pseudo-op for the executable op}];
   let parser = [{ return parseRegionEndOp(parser, &result); }];
   let printer = [{ return printRegionEndOp(p, *this); }];
+}
+
+def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
+  let summary = [{compiled executable binary data}];
+  let description = [{
+    A compiled executable binary with an optional nested module containing the
+    IR prior to serialization (for debugging).
+  }];
+
+  let arguments = (ins
+    StrAttr:$sym_name,
+    HAL_OrdinalAttr:$ordinal,
+    HAL_WorkgroupSizeAttr:$workgroup_size
+  );
 }
 
 // TODO(benvanik): add HAL_ExecutableSourceOp for auto serialization.

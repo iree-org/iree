@@ -18,6 +18,13 @@
 
 // CHECK-LABEL: @ex
 hal.executable @ex {
+  // CHECK-NEXT: hal.executable.entry_point @entry0 attributes {
+  // CHECK-SAME:     ordinal = 0 : i32
+  // CHECK-SAME:     workgroup_size = dense<[4, 1, 1]> : vector<3xi32>
+  hal.executable.entry_point @entry0 attributes {
+    ordinal = 0 : i32,
+    workgroup_size = dense<[4, 1, 1]> : vector<3xi32>
+  }
   // CHECK-NEXT: hal.executable.binary
   hal.executable.binary attributes {
     // CHECK-SAME: data = dense<1> : vector<128xi8>,

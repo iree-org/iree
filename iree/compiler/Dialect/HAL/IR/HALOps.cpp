@@ -83,6 +83,30 @@ static void printRegionEndOp(OpAsmPrinter &p, Operation *op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.executable.entry_point
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseExecutableEntryPointOp(OpAsmParser &parser,
+                                               OperationState *result) {
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printExecutableEntryPointOp(OpAsmPrinter &p,
+                                        ExecutableEntryPointOp op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"sym_name"});
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable.binary
 //===----------------------------------------------------------------------===//
 
