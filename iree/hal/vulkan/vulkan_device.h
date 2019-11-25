@@ -55,8 +55,8 @@ class VulkanDevice final : public Device {
       const ExtensibilitySpec& extensibility_spec,
       const ref_ptr<DynamicSymbols>& syms);
 
-  // Creates a device that shares an externally managed VkDevice.
-  static StatusOr<ref_ptr<VulkanDevice>> Create(
+  // Creates a device that wraps an externally managed VkDevice.
+  static StatusOr<ref_ptr<VulkanDevice>> Wrap(
       ref_ptr<Driver> driver, const DeviceInfo& device_info,
       VkPhysicalDevice physical_device, VkDevice logical_device,
       const ExtensibilitySpec& extensibility_spec,

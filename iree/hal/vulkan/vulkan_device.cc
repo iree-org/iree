@@ -318,13 +318,13 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
 }
 
 // static
-StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
+StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
     ref_ptr<Driver> driver, const DeviceInfo& device_info,
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const ExtensibilitySpec& extensibility_spec,
     const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
     const ref_ptr<DynamicSymbols>& syms) {
-  IREE_TRACE_SCOPE0("VulkanDevice::Create");
+  IREE_TRACE_SCOPE0("VulkanDevice::Wrap");
 
   uint64_t compute_queue_count = CountOnes64(compute_queue_set.queue_indices);
   uint64_t transfer_queue_count = CountOnes64(transfer_queue_set.queue_indices);

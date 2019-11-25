@@ -71,13 +71,13 @@ class VulkanDriver final : public Driver {
   StatusOr<ref_ptr<Device>> CreateDevice(
       const DeviceInfo& device_info) override;
 
-  // Creates a device that shares an externally managed VkDevice.
+  // Creates a device that wraps an externally managed VkDevice.
   //
   // The device will schedule commands against the provided queues.
-  StatusOr<ref_ptr<Device>> CreateDevice(VkPhysicalDevice physical_device,
-                                         VkDevice logical_device,
-                                         const QueueSet& compute_queue_set,
-                                         const QueueSet& transfer_queue_set);
+  StatusOr<ref_ptr<Device>> WrapDevice(VkPhysicalDevice physical_device,
+                                       VkDevice logical_device,
+                                       const QueueSet& compute_queue_set,
+                                       const QueueSet& transfer_queue_set);
 
  private:
   VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,

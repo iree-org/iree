@@ -268,10 +268,10 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
   return device;
 }
 
-StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
+StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
     VkPhysicalDevice physical_device, VkDevice logical_device,
     const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set) {
-  IREE_TRACE_SCOPE0("VulkanDriver::CreateDevice");
+  IREE_TRACE_SCOPE0("VulkanDriver::WrapDevice");
 
   ASSIGN_OR_RETURN(auto device_info,
                    PopulateDeviceInfo(physical_device, syms()));
@@ -280,9 +280,9 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
   // This may fail if the VkDevice does not support all necessary features.
   ASSIGN_OR_RETURN(
       auto device,
-      VulkanDevice::Create(add_ref(this), device_info, physical_device,
-                           logical_device, device_extensibility_spec_,
-                           compute_queue_set, transfer_queue_set, syms()));
+      VulkanDevice::Wrap(add_ref(this), device_info, physical_device,
+                         logical_device, device_extensibility_spec_,
+                         compute_queue_set, transfer_queue_set, syms()));
   return device;
 }
 

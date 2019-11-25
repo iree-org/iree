@@ -537,7 +537,7 @@ extern "C" int main(int argc, char** argv) {
   iree_hal_vulkan_queue_set_t transfer_queue_set;
   transfer_queue_set.queue_indices = 0;
   iree_hal_device_t* iree_vk_device = nullptr;
-  CHECK_IREE_OK(iree_hal_vulkan_driver_create_device(
+  CHECK_IREE_OK(iree_hal_vulkan_driver_wrap_device(
       iree_vk_driver, g_PhysicalDevice, g_Device, compute_queue_set,
       transfer_queue_set, &iree_vk_device));
   // Register the device.

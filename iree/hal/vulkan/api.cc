@@ -268,8 +268,7 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
   return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_create_device(
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
     iree_hal_driver_t* driver, VkPhysicalDevice physical_device,
     VkDevice logical_device, iree_hal_vulkan_queue_set_t compute_queue_set,
     iree_hal_vulkan_queue_set_t transfer_queue_set,
@@ -292,9 +291,9 @@ iree_hal_vulkan_driver_create_device(
   QueueSet transfer_qs;
   transfer_qs.queue_family_index = transfer_queue_set.queue_family_index;
   transfer_qs.queue_indices = transfer_queue_set.queue_indices;
-  IREE_API_ASSIGN_OR_RETURN(
-      auto device, handle->CreateDevice(physical_device, logical_device,
-                                        compute_qs, transfer_qs));
+  IREE_API_ASSIGN_OR_RETURN(auto device,
+                            handle->WrapDevice(physical_device, logical_device,
+                                               compute_qs, transfer_qs));
   LOG(INFO) << "Successfully created device '" << device->info().name() << "'";
 
   *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());

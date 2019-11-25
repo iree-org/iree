@@ -180,7 +180,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
                                              iree_hal_device_t** out_device);
 
-// Creates a Vulkan HAL device using |driver| that shares an existing VkDevice.
+// Creates a Vulkan HAL device using |driver| that wraps an existing VkDevice.
 //
 // HAL devices created in this way may share Vulkan resources and synchronize
 // within the same physical VkPhysicalDevice and logical VkDevice directly.
@@ -205,8 +205,7 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 // The queues may be the same.
 //
 // |out_device| must be released by the caller (see |iree_hal_device_release|).
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_driver_create_device(
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_wrap_device(
     iree_hal_driver_t* driver, VkPhysicalDevice physical_device,
     VkDevice logical_device, iree_hal_vulkan_queue_set_t compute_queue_set,
     iree_hal_vulkan_queue_set_t transfer_queue_set,
