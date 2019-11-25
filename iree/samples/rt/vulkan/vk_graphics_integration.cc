@@ -73,7 +73,7 @@ static void check_vk_result(VkResult err) {
 #define CHECK_IREE_OK(status) CHECK_EQ(IREE_STATUS_OK, (status))
 
 static std::vector<const char*> GetInstanceExtensions(
-    SDL_Window* window, iree_hal_vulkan_extensibility_options_t options) {
+    SDL_Window* window, iree_hal_vulkan_features_t vulkan_features) {
   // Ask SDL for its list of required instance extensions.
   uint32_t sdl_extensions_count = 0;
   SDL_Vulkan_GetInstanceExtensions(window, &sdl_extensions_count, NULL);
@@ -83,25 +83,27 @@ static std::vector<const char*> GetInstanceExtensions(
 
   // Ask IREE for its list of required instance extensions.
   iree_host_size_t iree_required_extensions_count = 0;
-  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED, options, 0,
-                                 NULL, &iree_required_extensions_count);
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED,
+                                 vulkan_features, 0, NULL,
+                                 &iree_required_extensions_count);
   const char** iree_required_extensions =
       new const char*[iree_required_extensions_count];
-  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED, options,
-                                 iree_required_extensions_count,
-                                 iree_required_extensions,
-                                 &iree_required_extensions_count);
+  iree_hal_vulkan_get_extensions(
+      IREE_HAL_VULKAN_INSTANCE_REQUIRED, vulkan_features,
+      iree_required_extensions_count, iree_required_extensions,
+      &iree_required_extensions_count);
 
   // Ask IREE for its list of optional instance extensions.
   iree_host_size_t iree_optional_extensions_count = 0;
-  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, options, 0,
-                                 NULL, &iree_optional_extensions_count);
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL,
+                                 vulkan_features, 0, NULL,
+                                 &iree_optional_extensions_count);
   const char** iree_optional_extensions =
       new const char*[iree_optional_extensions_count];
-  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, options,
-                                 iree_optional_extensions_count,
-                                 iree_optional_extensions,
-                                 &iree_optional_extensions_count);
+  iree_hal_vulkan_get_extensions(
+      IREE_HAL_VULKAN_INSTANCE_OPTIONAL, vulkan_features,
+      iree_optional_extensions_count, iree_optional_extensions,
+      &iree_optional_extensions_count);
 
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;
@@ -119,26 +121,30 @@ static std::vector<const char*> GetInstanceExtensions(
 }
 
 static std::vector<const char*> GetDeviceExtensions(
-    iree_hal_vulkan_extensibility_options_t options) {
+    iree_hal_vulkan_features_t vulkan_features) {
   // Ask IREE for its list of required device extensions.
   iree_host_size_t iree_required_extensions_count = 0;
-  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_DEVICE_REQUIRED, options, 0,
-                                 NULL, &iree_required_extensions_count);
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_DEVICE_REQUIRED,
+                                 vulkan_features, 0, NULL,
+                                 &iree_required_extensions_count);
   const char** iree_required_extensions =
       new const char*[iree_required_extensions_count];
   iree_hal_vulkan_get_extensions(
-      IREE_HAL_VULKAN_DEVICE_REQUIRED, options, iree_required_extensions_count,
-      iree_required_extensions, &iree_required_extensions_count);
+      IREE_HAL_VULKAN_DEVICE_REQUIRED, vulkan_features,
+      iree_required_extensions_count, iree_required_extensions,
+      &iree_required_extensions_count);
 
   // Ask IREE for its list of optional device extensions.
   iree_host_size_t iree_optional_extensions_count = 0;
-  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_DEVICE_OPTIONAL, options, 0,
-                                 NULL, &iree_optional_extensions_count);
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_DEVICE_OPTIONAL,
+                                 vulkan_features, 0, NULL,
+                                 &iree_optional_extensions_count);
   const char** iree_optional_extensions =
       new const char*[iree_optional_extensions_count];
   iree_hal_vulkan_get_extensions(
-      IREE_HAL_VULKAN_DEVICE_OPTIONAL, options, iree_optional_extensions_count,
-      iree_optional_extensions, &iree_optional_extensions_count);
+      IREE_HAL_VULKAN_DEVICE_OPTIONAL, vulkan_features,
+      iree_optional_extensions_count, iree_optional_extensions,
+      &iree_optional_extensions_count);
 
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;
@@ -153,7 +159,7 @@ static std::vector<const char*> GetDeviceExtensions(
   return extensions;
 }
 
-static void SetupVulkan(iree_hal_vulkan_extensibility_options_t options,
+static void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
                         const char** instance_layers,
                         uint32_t instance_layers_count,
                         const char** instance_extensions,
@@ -209,7 +215,8 @@ static void SetupVulkan(iree_hal_vulkan_extensibility_options_t options,
 
   // Create Logical Device (with 1 queue)
   {
-    std::vector<const char*> device_extensions = GetDeviceExtensions(options);
+    std::vector<const char*> device_extensions =
+        GetDeviceExtensions(vulkan_features);
     const float queue_priority[] = {1.0f};
     g_QueueInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     g_QueueInfos[0].queueFamilyIndex = g_QueueFamily;
@@ -416,14 +423,14 @@ extern "C" int main(int argc, char** argv) {
   // Setup Vulkan
   int layers_count = 1;
   const char* layers[] = {"VK_LAYER_LUNARG_standard_validation"};
-  iree_hal_vulkan_extensibility_options_t iree_extensibility_options =
-      static_cast<iree_hal_vulkan_extensibility_options_t>(
+  iree_hal_vulkan_features_t iree_vulkan_features =
+      static_cast<iree_hal_vulkan_features_t>(
           IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
           IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
   std::vector<const char*> extensions =
-      GetInstanceExtensions(window, iree_extensibility_options);
-  SetupVulkan(iree_extensibility_options, layers, layers_count,
-              extensions.data(), extensions.size());
+      GetInstanceExtensions(window, iree_vulkan_features);
+  SetupVulkan(iree_vulkan_features, layers, layers_count, extensions.data(),
+              extensions.size());
 
   // Create Window Surface
   VkSurfaceKHR surface;
@@ -528,10 +535,9 @@ extern "C" int main(int argc, char** argv) {
   // Create the driver sharing our VkInstance.
   iree_hal_driver_t* iree_vk_driver = nullptr;
   iree_hal_vulkan_driver_options_t options;
-  options.extensibility_options =
-      static_cast<iree_hal_vulkan_extensibility_options_t>(
-          IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+  options.features = static_cast<iree_hal_vulkan_features_t>(
+      IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
+      IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
   CHECK_IREE_OK(iree_hal_vulkan_driver_create_using_instance(
       options, iree_vk_syms, g_Instance, &iree_vk_driver));
   // Create a device sharing our VkDevice and queue.

@@ -42,14 +42,14 @@ typedef enum {
   IREE_HAL_VULKAN_DEVICE_OPTIONAL = 3,
 } iree_hal_vulkan_extensibility_set_t;
 
-// Bitfield that defines Vulkan extensibility options.
+// Bitfield that defines sets of Vulkan features.
 typedef enum {
-  // Enables VK_EXT_debug_utils, records markers, and logs errors.
+  // Use VK_EXT_debug_utils, record markers, and log errors.
   IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS = 1 << 0,
 
-  // Enables use of vkCmdPushDescriptorSetKHR.
+  // Use vkCmdPushDescriptorSetKHR.
   IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS = 1 << 1,
-} iree_hal_vulkan_extensibility_options_t;
+} iree_hal_vulkan_features_t;
 
 // Vulkan driver creation options.
 typedef struct {
@@ -57,8 +57,8 @@ typedef struct {
   // Driver creation will fail if the required version is not available.
   uint32_t api_version = VK_API_VERSION_1_0;
 
-  // Vulkan options to request.
-  iree_hal_vulkan_extensibility_options_t extensibility_options;
+  // Vulkan features to request.
+  iree_hal_vulkan_features_t features;
 } iree_hal_vulkan_driver_options_t;
 
 // A set of queues within a specific queue family on a VkDevice.
@@ -111,8 +111,7 @@ iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
 
 #ifndef IREE_API_NO_PROTOTYPES
 
-// Gets the names of the Vulkan extensions used for a given set of
-// |extensibility_options|.
+// Gets the names of the Vulkan extensions used for a given set of |features|.
 //
 // Instance extensions should be enabled on VkInstances passed to
 // |iree_hal_vulkan_driver_create_using_instance| and device extensions should
@@ -126,9 +125,8 @@ iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
 // may be passed as nullptr.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
-    iree_hal_vulkan_extensibility_options_t extensibility_options,
-    iree_host_size_t extensions_capacity, const char** out_extensions,
-    iree_host_size_t* out_extensions_count);
+    iree_hal_vulkan_features_t features, iree_host_size_t extensions_capacity,
+    const char** out_extensions, iree_host_size_t* out_extensions_count);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -175,7 +173,7 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 //
 // |logical_device| is expected to have been created with all extensions
 // returned by |iree_hal_vulkan_get_extensions| and
-// IREE_HAL_VULKAN_DEVICE_REQUIRED using the options provided during driver
+// IREE_HAL_VULKAN_DEVICE_REQUIRED using the features provided during driver
 // creation.
 //
 // The device will schedule commands against the queues in

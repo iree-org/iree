@@ -87,13 +87,13 @@ iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms) {
 namespace {
 
 ExtensibilitySpec GetInstanceExtensibilitySpec(
-    const iree_hal_vulkan_extensibility_options_t& options) {
+    const iree_hal_vulkan_features_t& features) {
   ExtensibilitySpec spec;
 
-  if (options & IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS) {
+  if (features & IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS) {
     spec.optional_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
-  if (options & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
+  if (features & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
     spec.optional_extensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
   }
@@ -102,7 +102,7 @@ ExtensibilitySpec GetInstanceExtensibilitySpec(
 }
 
 ExtensibilitySpec GetDeviceExtensibilitySpec(
-    const iree_hal_vulkan_extensibility_options_t& options) {
+    const iree_hal_vulkan_features_t& features) {
   ExtensibilitySpec spec;
 
   // REQUIRED: these are required extensions that must be present for IREE to
@@ -110,7 +110,7 @@ ExtensibilitySpec GetDeviceExtensibilitySpec(
   spec.required_extensions.push_back(
       VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
 
-  if (options & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
+  if (features & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
     spec.optional_extensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
   }
 
@@ -121,9 +121,8 @@ ExtensibilitySpec GetDeviceExtensibilitySpec(
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
-    iree_hal_vulkan_extensibility_options_t extensibility_options,
-    iree_host_size_t extensions_capacity, const char** out_extensions,
-    iree_host_size_t* out_extensions_count) {
+    iree_hal_vulkan_features_t features, iree_host_size_t extensions_capacity,
+    const char** out_extensions, iree_host_size_t* out_extensions_count) {
   if (!out_extensions_count) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -152,9 +151,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
       return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  ExtensibilitySpec spec =
-      is_instance ? GetInstanceExtensibilitySpec(extensibility_options)
-                  : GetDeviceExtensibilitySpec(extensibility_options);
+  ExtensibilitySpec spec = is_instance ? GetInstanceExtensibilitySpec(features)
+                                       : GetDeviceExtensibilitySpec(features);
   *out_extensions_count = is_required ? spec.required_extensions.size()
                                       : spec.optional_extensions.size();
 
@@ -187,9 +185,9 @@ VulkanDriver::Options ConvertDriverOptions(
   VulkanDriver::Options driver_options;
   driver_options.api_version = options.api_version;
   driver_options.instance_extensibility =
-      GetInstanceExtensibilitySpec(options.extensibility_options);
+      GetInstanceExtensibilitySpec(options.features);
   driver_options.device_extensibility =
-      GetDeviceExtensibilitySpec(options.extensibility_options);
+      GetDeviceExtensibilitySpec(options.features);
   return driver_options;
 }
 
