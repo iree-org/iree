@@ -38,10 +38,12 @@ cc_library(
     }),
     deps = select({
         "//iree:enable_tensorflow": [
+            "@llvm//:support",
             "@local_config_mlir//:Support",
             "@local_config_mlir//:TransformUtils",
             "@local_config_mlir//:IR",
             "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+            "//iree/compiler/Dialect/Flow/IR",
         ],
         "//conditions:default": [
         ],

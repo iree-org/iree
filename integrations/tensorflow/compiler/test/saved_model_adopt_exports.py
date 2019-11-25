@@ -15,6 +15,7 @@
 
 # pylint: disable=invalid-name
 # pylint: disable=missing-docstring
+# pylint: disable=line-too-long
 
 import pyiree
 import tensorflow.compat.v2 as tf
@@ -51,28 +52,129 @@ pyiree.tf_test_driver.add_test(
     passes=SAVED_MODEL_IMPORT_PASSES,
     print_input_module=True)
 
+# T0002: Tests that bound global vars import properly.
 
-# Tests that a bound global var imports properly.
-# NOTE: This is currently an error and needs to be implemented
-# CHECK-LABEL: RUN_TEST: T0002_FlatArgsResultsBoundGlobalVar
-# CHECK: [ERROR]: This pass doesn't support global tensors yet
-# CHECK: FINISH_TEST_WITH_EXCEPTION
-class T0002_FlatArgsResultsBoundGlobalVar(tf.Module):
+
+# CHECK-LABEL: RUN_TEST: T0002a_SimpleVarRead
+# CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
+# CHECK: func @f() -> (tensor<f32> {tf_saved_model.index_path = []})
+# CHECK: attributes{{.*}}iree.module.export
+# CHECK:   flow.variable.load @v : tensor<f32>
+# CHECK: FINISH_TEST
+class T0002a_SimpleVarRead(tf.Module):
 
   def __init__(self):
-    self.v = tf.Variable([1., 2., 3., 4.])
+    self.v = tf.Variable(0.)
 
-  @tf.function(input_signature=[
-      tf.TensorSpec([4], tf.float32),
-      tf.TensorSpec([4], tf.float32)
-  ])
-  def simple_mul(self, a, b):
-    return a * b + self.v
+  @tf.function(input_signature=[])
+  def f(self):
+    return self.v
+
+
+# CHECK-LABEL: RUN_TEST: T0002b_SimpleVarWrite
+# CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
+# CHECK: func @f(%arg0: tensor<f32> {tf_saved_model.index_path = [0]})
+# CHECK: attributes{{.*}}iree.module.export
+# CHECK:   flow.variable.store @v, %arg0 : tensor<f32>
+# CHECK: FINISH_TEST
+class T0002b_SimpleVarWrite(tf.Module):
+
+  def __init__(self):
+    self.v = tf.Variable(0.)
+
+  @tf.function(input_signature=[tf.TensorSpec([], tf.float32)])
+  def f(self, a):
+    self.v.assign(a)
+
+
+# CHECK-LABEL: RUN_TEST: T0002c_SimpleConst
+#  flow.variable [[CONST:@.+]] dense<0.000000e+00> : tensor<f32>
+#  func @f() -> (tensor<f32> {tf_saved_model.index_path = []})
+#  attributes{{.*}}iree.module.export
+#    flow.variable.load [[CONST]] : tensor<f32>
+# CHECK: FINISH_TEST
+class T0002c_SimpleConst(tf.Module):
+
+  def __init__(self):
+    self.c = tf.constant(0.)
+
+  @tf.function(input_signature=[])
+  def f(self):
+    return self.c
+
+
+# CHECK-LABEL: RUN_TEST: T0002d_VarCompatibleShapeChange
+# CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<1xf32>
+# CHECK: func @f()
+# CHECK: attributes{{.*}}iree.module.export
+# CHECK:   [[CONST_2xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>} : () -> tensor<2xf32>
+# CHECK:   [[CONST_3xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00, 2.000000e+00]> : tensor<3xf32>} : () -> tensor<3xf32>
+# CHECK:   flow.variable.store @v, [[CONST_2xf32]] : tensor<2xf32>
+# CHECK:   flow.variable.store @v, [[CONST_3xf32]] : tensor<3xf32>
+# CHECK: FINISH_TEST
+class T0002d_VarCompatibleShapeChange(tf.Module):
+
+  def __init__(self):
+    self.v = tf.Variable([0.], shape=[None])
+
+  @tf.function(input_signature=[])
+  def f(self):
+    self.v.assign(tf.constant([0., 1.]))
+    self.v.assign(tf.constant([0., 1., 2.]))
+
+
+# CHECK-LABEL: RUN_TEST: T0002e_Error_VarMultipleExportedNames
+# CHECK: [ERROR]: Multiple exported names for global tensor not supported yet
+# CHECK: FINISH_TEST
+class T0002e_Error_VarMultipleExportedNames(tf.Module):
+
+  def __init__(self):
+    self.v = tf.Variable(0.)
+    self.v2 = self.v
+
+
+# CHECK-LABEL: RUN_TEST: T0002f_Error_UnsupportedResourceOp
+# CHECK: [ERROR]: unknown op operating on resource for global tensor
+# CHECK: FINISH_TEST
+class T0002f_Error_UnsupportedResourceOp(tf.Module):
+
+  def __init__(self):
+    self.v = tf.Variable([0.], shape=[None])
+
+  @tf.function(input_signature=[])
+  def f(self):
+    self.v.assign_add(tf.constant([0., 1.]))
 
 
 pyiree.tf_test_driver.add_test(
-    test_name="T0002_FlatArgsResultsBoundGlobalVar",
-    tf_module_builder=T0002_FlatArgsResultsBoundGlobalVar,
+    test_name="T0002a_SimpleVarRead",
+    tf_module_builder=T0002a_SimpleVarRead,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True)
+pyiree.tf_test_driver.add_test(
+    test_name="T0002b_SimpleVarWrite",
+    tf_module_builder=T0002b_SimpleVarWrite,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True)
+pyiree.tf_test_driver.add_test(
+    test_name="T0002c_SimpleConst",
+    tf_module_builder=T0002c_SimpleConst,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True)
+pyiree.tf_test_driver.add_test(
+    test_name="T0002d_VarCompatibleShapeChange",
+    tf_module_builder=T0002d_VarCompatibleShapeChange,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True)
+pyiree.tf_test_driver.add_test(
+    test_name="T0002e_Error_VarMultipleExportedNames",
+    tf_module_builder=T0002e_Error_VarMultipleExportedNames,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True,
+    expect_pass_failure=True)
+pyiree.tf_test_driver.add_test(
+    test_name="T0002f_Error_UnsupportedResourceOp",
+    tf_module_builder=T0002f_Error_UnsupportedResourceOp,
     passes=SAVED_MODEL_IMPORT_PASSES,
     print_input_module=True,
     expect_pass_failure=True)
