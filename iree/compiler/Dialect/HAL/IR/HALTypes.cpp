@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
-#include "third_party/llvm/llvm/include/llvm/ADT/StringExtras.h"
+#include "llvm/ADT/StringExtras.h"
 
 // Order matters:
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"

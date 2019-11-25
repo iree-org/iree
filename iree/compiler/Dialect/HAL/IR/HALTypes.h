@@ -18,14 +18,14 @@
 #include <cstdint>
 
 #include "iree/compiler/Dialect/Types.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/DenseMap.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/DenseMapInfo.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/Optional.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/SmallVector.h"
-#include "third_party/llvm/llvm/include/llvm/ADT/StringSwitch.h"
 
 // Order matters.
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.h.inc"

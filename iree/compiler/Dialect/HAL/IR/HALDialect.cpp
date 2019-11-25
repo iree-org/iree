@@ -16,9 +16,9 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
-#include "third_party/llvm/llvm/include/llvm/Support/SourceMgr.h"
 
 namespace mlir {
 namespace iree_compiler {
