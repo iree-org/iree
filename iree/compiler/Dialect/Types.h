@@ -49,6 +49,7 @@ enum Kind {
   Executable,
   ExecutableCache,
   Fence,
+  RingBuffer,
   Semaphore,
 };
 }  // namespace TypeKind
@@ -77,12 +78,15 @@ class RefObjectType : public Type {
       case IREE::TypeKind::OpaqueRefObject:
       case IREE::TypeKind::ByteBuffer:
       case IREE::TypeKind::MutableByteBuffer:
+      case HAL::TypeKind::Allocator:
       case HAL::TypeKind::Buffer:
       case HAL::TypeKind::CommandBuffer:
       case HAL::TypeKind::Device:
       case HAL::TypeKind::Event:
       case HAL::TypeKind::Executable:
+      case HAL::TypeKind::ExecutableCache:
       case HAL::TypeKind::Fence:
+      case HAL::TypeKind::RingBuffer:
       case HAL::TypeKind::Semaphore:
       case SEQ::TypeKind::Device:
       case SEQ::TypeKind::Policy:

@@ -35,6 +35,7 @@ cc_binary(
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
+        "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/VM/Analysis",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
