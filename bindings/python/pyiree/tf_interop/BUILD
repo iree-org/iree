@@ -55,29 +55,6 @@ cc_library(
     ],
 )
 
-# Runtime deps needed to compile the tensorflow compiler.
-SAVED_MODEL_TF_RUNTIME_DEPS = [
-    "@org_tensorflow//tensorflow/core:core_cpu",
-    "@org_tensorflow//tensorflow/core:direct_session",
-    "@org_tensorflow//tensorflow/core:ops",
-]
-
-# Kernels that the current version of the GraphDef/SavedModel importer
-# needs. This has been manually curated and may need tweaking. As-is,
-# this adds about 7MB to the binary (on win64) vs >300MB if all kernels
-# are pulled in. As such, curating is a big enough savings to be worth the
-# trouble in this case. Also, there is discussion about severing the
-# importer from needing these things.
-SAVED_MODEL_REQUIRED_KERNEL_DEPS = [
-    "@org_tensorflow//tensorflow/core/kernels:constant_op",
-    "@org_tensorflow//tensorflow/core/kernels:io",
-    "@org_tensorflow//tensorflow/core/kernels:partitioned_function_ops",
-    "@org_tensorflow//tensorflow/core/kernels:identity_op",
-    "@org_tensorflow//tensorflow/core/kernels:identity_n_op",
-    "@org_tensorflow//tensorflow/core/kernels:resource_variable_ops",
-    "@org_tensorflow//tensorflow/core/kernels:state",
-]
-
 TF_XLA_PASS_DEPS = [
     "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
 ]
@@ -94,14 +71,13 @@ cc_library(
     features = DEFAULT_FEATURES,
     visibility = ["//visibility:private"],
     deps = [
-               "@local_config_mlir//:IR",
-               "@llvm//:support",
-               "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
-               "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-               "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
-               "//bindings/python/pyiree:base",
-           ] + SAVED_MODEL_TF_RUNTIME_DEPS + SAVED_MODEL_REQUIRED_KERNEL_DEPS +
-           TF_XLA_PASS_DEPS,
+        "@local_config_mlir//:IR",
+        "@llvm//:support",
+        "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
+        "//bindings/python/pyiree:base",
+    ] + TF_XLA_PASS_DEPS,
 )
 
 cc_library(

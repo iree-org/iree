@@ -28,9 +28,7 @@
 using namespace mlir;  // NOLINT
 
 using tensorflow::ConvertSavedModelToMlir;
-using tensorflow::RunOptions;
-using tensorflow::SavedModelBundle;
-using tensorflow::SessionOptions;
+using tensorflow::SavedModelV2Bundle;
 
 namespace iree {
 namespace python {
@@ -41,14 +39,9 @@ CompilerModuleBundle LoadSavedModel(
     std::shared_ptr<CompilerContextBundle> context_bundle,
     const std::string& saved_model_dir,
     const std::vector<std::string>& exported_names) {
-  SessionOptions session_options;
-  RunOptions run_options;
-  SavedModelBundle bundle;
-  std::unordered_set<std::string> tags{"serve"};
-  auto load_status = LoadSavedModel(
-      session_options, run_options,
-      std::string(saved_model_dir.data(), saved_model_dir.length()), tags,
-      &bundle);
+  SavedModelV2Bundle bundle;
+  auto load_status = SavedModelV2Bundle::Load(
+      std::string(saved_model_dir.data(), saved_model_dir.length()), &bundle);
   if (!load_status.ok()) {
     std::stringstream msg;
     msg << "Failed to load saved model '" << saved_model_dir
@@ -60,7 +53,7 @@ CompilerModuleBundle LoadSavedModel(
   // span of external names.
   std::vector<std::string> mutable_exported_names = exported_names;
   auto module_or =
-      ConvertSavedModelToMlir(bundle, context_bundle->mlir_context(),
+      ConvertSavedModelToMlir(&bundle, context_bundle->mlir_context(),
                               absl::MakeSpan(mutable_exported_names));
   if (!module_or.status().ok()) {
     std::stringstream msg;
