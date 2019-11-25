@@ -18,29 +18,28 @@ package(
 )
 
 cc_library(
-    name = "IREEVM",
+    name = "VulkanSPIRV",
     srcs = [
-        "IREEVM.cpp",
-        "IREEVMTranslationRegistration.cpp",
+        "VulkanSPIRVTarget.cpp",
     ],
-    hdrs = ["IREEVM.h"],
+    hdrs = [
+        "VulkanSPIRVTarget.h",
+    ],
     deps = [
-        "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
-        "//iree/compiler/Dialect/Flow/Transforms",
-        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-        "//iree/compiler/Dialect/HAL/Transforms",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
-        "//iree/compiler/Dialect/VM/IR",
-        "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/IR",
+        "//iree/compiler/Translation/SPIRV",
+        "//iree/schemas",
+        "//iree/schemas:spirv_executable_def_cc_fbs",
+        "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
-        "@local_config_mlir//:StandardDialectRegistration",
-        "@local_config_mlir//:StandardOps",
+        "@local_config_mlir//:SPIRVDialect",
+        "@local_config_mlir//:SPIRVSerialization",
         "@local_config_mlir//:Support",
-        "@local_config_mlir//:Translation",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
     alwayslink = 1,
 )

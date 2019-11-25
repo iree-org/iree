@@ -21,8 +21,9 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-static llvm::cl::OptionCategory vmBytecodeOptionsCategory(
-    "IREE VM bytecode options");
+// TODO(b/145140345): fix LLVM category registration with ASAN.
+// static llvm::cl::OptionCategory vmBytecodeOptionsCategory(
+//     "IREE VM bytecode options");
 
 static llvm::cl::opt<BytecodeOutputFormat> outputFormatFlag{
     "iree-vm-bytecode-module-output-format",
@@ -42,28 +43,24 @@ static llvm::cl::opt<bool> optimizeFlag{
     llvm::cl::desc(
         "Optimizes the VM module with CSE/inlining/etc prior to serialization"),
     llvm::cl::init(true),
-    llvm::cl::cat(vmBytecodeOptionsCategory),
 };
 
 static llvm::cl::opt<bool> stripSymbolsFlag{
     "iree-vm-bytecode-module-strip-symbols",
     llvm::cl::desc("Strips all internal symbol names from the module"),
     llvm::cl::init(false),
-    llvm::cl::cat(vmBytecodeOptionsCategory),
 };
 
 static llvm::cl::opt<bool> stripSourceMapFlag{
     "iree-vm-bytecode-module-strip-source-map",
     llvm::cl::desc("Strips the source map from the module"),
     llvm::cl::init(false),
-    llvm::cl::cat(vmBytecodeOptionsCategory),
 };
 
 static llvm::cl::opt<bool> stripDebugOpsFlag{
     "iree-vm-bytecode-module-strip-debug-ops",
     llvm::cl::desc("Strips debug-only ops from the module"),
     llvm::cl::init(false),
-    llvm::cl::cat(vmBytecodeOptionsCategory),
 };
 
 BytecodeTargetOptions getBytecodeTargetOptionsFromFlags() {

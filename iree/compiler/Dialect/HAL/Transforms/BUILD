@@ -18,29 +18,22 @@ package(
 )
 
 cc_library(
-    name = "IREEVM",
+    name = "Transforms",
     srcs = [
-        "IREEVM.cpp",
-        "IREEVMTranslationRegistration.cpp",
+        "Passes.cpp",
+        "TranslateExecutables.cpp",
     ],
-    hdrs = ["IREEVM.h"],
+    hdrs = [
+        "Passes.h",
+    ],
     deps = [
-        "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
-        "//iree/compiler/Dialect/Flow/Transforms",
-        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-        "//iree/compiler/Dialect/HAL/Transforms",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
-        "//iree/compiler/Dialect/VM/IR",
-        "//iree/compiler/Dialect/VM/Target/Bytecode",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
-        "@local_config_mlir//:StandardDialectRegistration",
-        "@local_config_mlir//:StandardOps",
         "@local_config_mlir//:Support",
-        "@local_config_mlir//:Translation",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
+        "@local_config_mlir//:Transforms",
     ],
     alwayslink = 1,
 )

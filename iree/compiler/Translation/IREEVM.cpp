@@ -16,6 +16,8 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
@@ -50,7 +52,12 @@ LogicalResult convertToFlowModule(ModuleOp moduleOp) {
 // TODO(benvanik): replace with the real HAL dialect.
 static LogicalResult convertToTemporaryHALModule(
     ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions) {
-  // TODO(benvanik): flow -> HAL
+  PassManager passManager(moduleOp.getContext());
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+  if (failed(passManager.run(moduleOp))) {
+    return moduleOp.emitError()
+           << "failed to run flow transformation pass pipeline";
+  }
   return success();
 }
 
@@ -60,6 +67,7 @@ static LogicalResult convertToTemporaryHALModule(
 static LogicalResult convertToVMModule(ModuleOp moduleOp) {
   ConversionTarget conversionTarget(*moduleOp.getContext());
   conversionTarget.addLegalDialect<IREE::VM::VMDialect>();
+  conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
   conversionTarget.addIllegalDialect<StandardOpsDialect>();
   // NOTE: we need to allow the outermost std.module to be legal.
   conversionTarget.addDynamicallyLegalOp<mlir::ModuleOp>(
@@ -70,6 +78,7 @@ static LogicalResult convertToVMModule(ModuleOp moduleOp) {
       });
 
   OwningRewritePatternList conversionPatterns;
+  populateHALToVMPatterns(moduleOp.getContext(), conversionPatterns);
   populateStandardToVMPatterns(moduleOp.getContext(), conversionPatterns);
 
   // TODO(benvanik): HAL -> VM conversion.

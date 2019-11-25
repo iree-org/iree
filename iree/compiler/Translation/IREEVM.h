@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_IREEVM_H_
 #define IREE_COMPILER_TRANSLATION_IREEVM_H_
 
+#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Module.h"
@@ -22,13 +23,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// TODO(benvanik): move to HAL dialect.
-namespace IREE {
-namespace HAL {
-struct ExecutableTargetOptions {};
-}  // namespace HAL
-}  // namespace IREE
 
 // Performs initial dialect conversion to get the canonical input lowered into
 // the IREE execution/dataflow dialect.

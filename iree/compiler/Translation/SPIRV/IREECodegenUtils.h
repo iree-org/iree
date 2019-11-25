@@ -38,7 +38,7 @@ inline LogicalResult getLaunchSize(FuncOp funcOp,
   auto workloadAttr =
       funcOp.getAttrOfType<DenseElementsAttr>("iree.executable.workload");
   if (!workloadAttr) {
-    funcOp.emitError(
+    return funcOp.emitError(
         "unable to find workload size, missing attribute "
         "iree.executable.workload in dispatch function");
   }
@@ -68,7 +68,7 @@ inline LogicalResult getWorkGroupSize(FuncOp funcOp,
   auto workGroupSizeAttr =
       funcOp.getAttrOfType<DenseElementsAttr>("iree.executable.workgroup_size");
   if (!workGroupSizeAttr) {
-    funcOp.emitError(
+    return funcOp.emitError(
         "unable to find workload size, missing attribute "
         "iree.executable.workload in dispatch function");
   }

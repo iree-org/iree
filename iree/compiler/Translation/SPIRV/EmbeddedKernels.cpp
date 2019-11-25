@@ -62,8 +62,7 @@ void addSpecializationMapEntry(
   specializationInfoDef->map_entries.push_back(std::move(specValue));
 }
 
-LogicalResult buildReductionExecutable(IREE::ExecutableOp executableOp,
-                                       FuncOp entryFuncOp,
+LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
                                        iree::SpirVExecutableDefT *out_def) {
   auto funcType = entryFuncOp.getType();
   auto arg0 = funcType.getInput(0).cast<ShapedType>();
@@ -73,10 +72,9 @@ LogicalResult buildReductionExecutable(IREE::ExecutableOp executableOp,
            << "Only floating point reduction is implemented";
   }
 
-  auto module = executableOp.getInnerModule();
   auto applyFuncAttr = entryFuncOp.getAttrOfType<FlatSymbolRefAttr>(
       "iree.executable.reduction.apply");
-  auto applyFuncOp = module.lookupSymbol(applyFuncAttr.getValue());
+  auto applyFuncOp = moduleOp.lookupSymbol(applyFuncAttr.getValue());
 
   // TODO(benvanik): specialize (template on shapes/types/etc).
   std::string kernelName = "reduce_untiled.spv";
@@ -141,8 +139,8 @@ LogicalResult buildReductionExecutable(IREE::ExecutableOp executableOp,
 
 // Builds a SPIR-V executable from a well-known matmul executable.
 // |out_def| will be populated with all required information for serialization.
-LogicalResult buildMatMulExecutable(IREE::ExecutableOp executableOp,
-                                    FuncOp entryFuncOp, xla_hlo::DotOp dotOp,
+LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
+                                    xla_hlo::DotOp dotOp,
                                     iree::SpirVExecutableDefT *out_def) {
   auto arg0 = dotOp.getOperand(0)->getType().cast<ShapedType>();
   auto arg1 = dotOp.getOperand(1)->getType().cast<ShapedType>();
@@ -183,13 +181,12 @@ LogicalResult buildMatMulExecutable(IREE::ExecutableOp executableOp,
 
 }  // namespace
 
-bool tryEmbeddedKernelRewrite(IREE::ExecutableOp executableOp,
+bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
                               iree::SpirVExecutableDefT *out_def) {
-  auto module = executableOp.getInnerModule();
-  for (auto funcOp : module.getOps<FuncOp>()) {
+  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     if (funcOp.getAttr("iree.executable.reduction")) {
-      if (failed(buildReductionExecutable(executableOp, funcOp, out_def))) {
-        executableOp.emitOpError() << "Failed to splat in the reduction kernel";
+      if (failed(buildReductionExecutable(moduleOp, funcOp, out_def))) {
+        moduleOp.emitOpError() << "Failed to splat in the reduction kernel";
         return false;
       }
       return true;
@@ -198,13 +195,11 @@ bool tryEmbeddedKernelRewrite(IREE::ExecutableOp executableOp,
     for (auto &block : funcOp) {
       for (auto &op : block) {
         if (isa<xla_hlo::ConvOp>(&op)) {
-          executableOp.emitOpError() << "Conv not yet implemented";
+          moduleOp.emitOpError() << "Conv not yet implemented";
           return false;
         } else if (auto dotOp = dyn_cast_or_null<xla_hlo::DotOp>(&op)) {
-          if (failed(buildMatMulExecutable(executableOp, funcOp, dotOp,
-                                           out_def))) {
-            executableOp.emitOpError()
-                << "Failed to splat in the matmul kernel";
+          if (failed(buildMatMulExecutable(moduleOp, funcOp, dotOp, out_def))) {
+            moduleOp.emitOpError() << "Failed to splat in the matmul kernel";
             return false;
           }
           return true;

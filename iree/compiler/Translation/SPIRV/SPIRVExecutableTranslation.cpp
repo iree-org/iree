@@ -81,7 +81,8 @@ std::unique_ptr<iree::ExecutableDefT> SPIRVTranslator::translateExecutable(
   // Try first to match against an embedded kernel (such as matmul) and
   // otherwise fall back to generating the kernel.
   iree::SpirVExecutableDefT spirvExecutableDef;
-  if (!tryEmbeddedKernelRewrite(executableOp, &spirvExecutableDef)) {
+  if (!tryEmbeddedKernelRewrite(executableOp.getInnerModule(),
+                                &spirvExecutableDef)) {
     // The sequencer and runtime use ordinals instead of names. We provide the
     // list of entry point names here that are then passed in
     // VkShaderModuleCreateInfo.

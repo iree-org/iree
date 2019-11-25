@@ -12,24 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_EMBEDDEDKERNELS_H_
-#define IREE_COMPILER_TRANSLATION_SPIRV_EMBEDDEDKERNELS_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LEGACYUTIL_H_
+#define IREE_COMPILER_DIALECT_HAL_TARGET_LEGACYUTIL_H_
 
-#include "flatbuffers/flatbuffers.h"
-#include "iree/compiler/IR/StructureOps.h"
-#include "iree/schemas/spirv_executable_def_generated.h"
-#include "mlir/Support/LogicalResult.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "mlir/IR/Module.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace HAL {
 
-// Tries to match the |executableOp| against an embedded kernel and if matched
-// will populate |out_def| with the kernel.
-// Returns true if the kernel matched and was populated.
-bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
-                              iree::SpirVExecutableDefT* out_def);
+// Inserts the iree.load_input/iree.store_output ops to match the legacy ABI.
+void makeLegacyExecutableABI(IREE::Flow::ExecutableOp executableOp,
+                             ModuleOp moduleOp);
 
+}  // namespace HAL
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_EMBEDDEDKERNELS_H_
+#endif  // IREE_COMPILER_DIALECT_HAL_TARGET_LEGACYUTIL_H_

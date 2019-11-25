@@ -27,6 +27,12 @@ exports_files([
     "sanitizer_suppressions.txt",
 ])
 
+TARGET_COMPILER_BACKENDS = [
+    "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
+    "//iree/compiler/Dialect/HAL/Target/VMLA",
+    "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
+]
+
 cc_binary(
     name = "iree-opt",
     deps = [
@@ -36,6 +42,7 @@ cc_binary(
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/VM/Analysis",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
@@ -51,7 +58,7 @@ cc_binary(
         "@local_config_mlir//:StandardDialectRegistration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
-    ],
+    ] + TARGET_COMPILER_BACKENDS,
 )
 
 cc_binary(
@@ -77,7 +84,7 @@ cc_binary(
         "//iree/hal:driver_registry",
         "//iree/schemas",
         "//iree/rt/debug:debug_server_flags",
-    ] + PLATFORM_VULKAN_DEPS + [
+    ] + TARGET_COMPILER_BACKENDS + PLATFORM_VULKAN_DEPS + [
         "//iree/hal/interpreter:interpreter_driver_module",
         # TODO(b/142004903): enable when Dawn HAL implementation is functional
         # "//iree/hal/dawn:dawn_driver_module",
@@ -116,7 +123,7 @@ cc_binary(
         "@local_config_mlir//:TranslateClParser",
         "@local_config_mlir//:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
-    ],
+    ] + TARGET_COMPILER_BACKENDS,
 )
 
 cc_binary(

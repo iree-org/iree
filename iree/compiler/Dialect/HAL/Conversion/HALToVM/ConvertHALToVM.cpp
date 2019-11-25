@@ -12,24 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_EMBEDDEDKERNELS_H_
-#define IREE_COMPILER_TRANSLATION_SPIRV_EMBEDDEDKERNELS_H_
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 
-#include "flatbuffers/flatbuffers.h"
-#include "iree/compiler/IR/StructureOps.h"
-#include "iree/schemas/spirv_executable_def_generated.h"
-#include "mlir/Support/LogicalResult.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
+#include "mlir/IR/Module.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Tries to match the |executableOp| against an embedded kernel and if matched
-// will populate |out_def| with the kernel.
-// Returns true if the kernel matched and was populated.
-bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
-                              iree::SpirVExecutableDefT* out_def);
+void populateHALToVMPatterns(MLIRContext *context,
+                             OwningRewritePatternList &patterns) {
+  // TODO(benvanik): hal-to-vm patterns.
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_EMBEDDEDKERNELS_H_
