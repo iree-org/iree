@@ -127,6 +127,9 @@ iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
 // IREE_STATUS_OUT_OF_RANGE will be returned with the required capacity in
 // |out_extensions_count|. To only query the required capacity |out_extensions|
 // may be passed as nullptr.
+//
+// Extension string lifetime is tied to the loader shared object or instance,
+// depending on where they came from.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features, iree_host_size_t extensions_capacity,
