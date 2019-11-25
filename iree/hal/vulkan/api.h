@@ -30,7 +30,19 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
-// Bitfield that defines Vulkan extensibility options to enable, if available.
+// Describes the type of a set of Vulkan extensions.
+typedef enum {
+  // A set of required instance extension names.
+  IREE_HAL_VULKAN_INSTANCE_REQUIRED = 0,
+  // A set of optional instance extension names.
+  IREE_HAL_VULKAN_INSTANCE_OPTIONAL = 1,
+  // A set of required device extension names.
+  IREE_HAL_VULKAN_DEVICE_REQUIRED = 2,
+  // A set of optional device extension names.
+  IREE_HAL_VULKAN_DEVICE_OPTIONAL = 3,
+} iree_hal_vulkan_extensibility_set_t;
+
+// Bitfield that defines Vulkan extensibility options.
 typedef enum {
   // Enables VK_EXT_debug_utils, records markers, and logs errors.
   IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS = 1 << 0,
@@ -99,49 +111,24 @@ iree_hal_vulkan_syms_release(iree_hal_vulkan_syms_t* syms);
 
 #ifndef IREE_API_NO_PROTOTYPES
 
-// Gets the names of the Vulkan instance extensions needed to create a driver
-// with |iree_hal_vulkan_driver_create_using_instance| and |options|.
+// Gets the names of the Vulkan extensions used for a given set of
+// |extensibility_options|.
 //
-// |out_count| is a pointer to an integer related to the number of extensions.
-// |out_extensions| is either nullptr or a pointer to an array to be filled with
-// the required Vulkan driver extensions.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_required_instance_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions);
-
-// Gets the names of optional Vulkan instance extensions requested for creating
-// a driver with |iree_hal_vulkan_driver_create_using_instance| and |options|.
+// Instance extensions should be enabled on VkInstances passed to
+// |iree_hal_vulkan_driver_create_using_instance| and device extensions should
+// be enabled on VkDevices passed to |iree_hal_vulkan_driver_wrap_device|.
 //
-// |out_count| is a pointer to an integer related to the number of extensions.
-// |out_extensions| is either nullptr or a pointer to an array to be filled with
-// the optional Vulkan instance extensions.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_optional_instance_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions);
-
-// Gets the names of the Vulkan device extensions needed to create a device
-// with |iree_hal_vulkan_driver_create_device| and |options|.
-//
-// |out_count| is a pointer to an integer related to the number of extensions.
-// |out_extensions| is either nullptr or a pointer to an array to be filled with
-// the required Vulkan device extensions.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_required_device_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions);
-
-// Gets the names of optional the Vulkan device extensions requested for
-// creating a device with |iree_hal_vulkan_driver_create_device| and |options|.
-//
-// |out_count| is a pointer to an integer related to the number of extensions.
-// |out_extensions| is either nullptr or a pointer to an array to be filled with
-// the optional Vulkan device extensions.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_optional_device_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions);
+// |extensions_capacity| defines the number of elements available in
+// |out_extensions| and |out_extensions_count| will be set with the actual
+// number of extensions returned. If |extensions_capacity| is too small
+// IREE_STATUS_OUT_OF_RANGE will be returned with the required capacity in
+// |out_extensions_count|. To only query the required capacity |out_extensions|
+// may be passed as nullptr.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
+    iree_hal_vulkan_extensibility_set_t extensibility_set,
+    iree_hal_vulkan_extensibility_options_t extensibility_options,
+    iree_host_size_t extensions_capacity, const char** out_extensions,
+    iree_host_size_t* out_extensions_count);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -163,7 +150,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_driver_create(
 // Creates a Vulkan HAL driver that shares an existing VkInstance.
 //
 // |instance| is expected to have been created with all extensions returned by
-// |iree_hal_vulkan_get_required_instance_extensions| using |options| enabled.
+// |iree_hal_vulkan_get_extensions| and IREE_HAL_VULKAN_INSTANCE_REQUIRED using
+// |options| enabled.
 //
 // |instance| must remain valid for the life of |out_driver| and |out_driver|
 // itself must be released by the caller (see |iree_hal_driver_release|).
@@ -186,8 +174,9 @@ iree_hal_vulkan_driver_create_default_device(iree_hal_driver_t* driver,
 // within the same physical VkPhysicalDevice and logical VkDevice directly.
 //
 // |logical_device| is expected to have been created with all extensions
-// returned by |iree_hal_vulkan_get_required_device_extensions| using the
-// options provided during driver creation.
+// returned by |iree_hal_vulkan_get_extensions| and
+// IREE_HAL_VULKAN_DEVICE_REQUIRED using the options provided during driver
+// creation.
 //
 // The device will schedule commands against the queues in
 // |compute_queue_set| and (if set) |transfer_queue_set|.

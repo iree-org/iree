@@ -82,22 +82,26 @@ static std::vector<const char*> GetInstanceExtensions(
                                    sdl_extensions);
 
   // Ask IREE for its list of required instance extensions.
-  uint32_t iree_required_extensions_count = 0;
-  iree_hal_vulkan_get_required_instance_extensions(
-      options, &iree_required_extensions_count, NULL);
+  iree_host_size_t iree_required_extensions_count = 0;
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED, options, 0,
+                                 NULL, &iree_required_extensions_count);
   const char** iree_required_extensions =
       new const char*[iree_required_extensions_count];
-  iree_hal_vulkan_get_required_instance_extensions(
-      options, &iree_required_extensions_count, iree_required_extensions);
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED, options,
+                                 iree_required_extensions_count,
+                                 iree_required_extensions,
+                                 &iree_required_extensions_count);
 
   // Ask IREE for its list of optional instance extensions.
-  uint32_t iree_optional_extensions_count = 0;
-  iree_hal_vulkan_get_optional_instance_extensions(
-      options, &iree_optional_extensions_count, NULL);
+  iree_host_size_t iree_optional_extensions_count = 0;
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, options, 0,
+                                 NULL, &iree_optional_extensions_count);
   const char** iree_optional_extensions =
       new const char*[iree_optional_extensions_count];
-  iree_hal_vulkan_get_optional_instance_extensions(
-      options, &iree_optional_extensions_count, iree_optional_extensions);
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, options,
+                                 iree_optional_extensions_count,
+                                 iree_optional_extensions,
+                                 &iree_optional_extensions_count);
 
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;
@@ -117,22 +121,24 @@ static std::vector<const char*> GetInstanceExtensions(
 static std::vector<const char*> GetDeviceExtensions(
     iree_hal_vulkan_extensibility_options_t options) {
   // Ask IREE for its list of required device extensions.
-  uint32_t iree_required_extensions_count = 0;
-  iree_hal_vulkan_get_required_device_extensions(
-      options, &iree_required_extensions_count, NULL);
+  iree_host_size_t iree_required_extensions_count = 0;
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_DEVICE_REQUIRED, options, 0,
+                                 NULL, &iree_required_extensions_count);
   const char** iree_required_extensions =
       new const char*[iree_required_extensions_count];
-  iree_hal_vulkan_get_required_device_extensions(
-      options, &iree_required_extensions_count, iree_required_extensions);
+  iree_hal_vulkan_get_extensions(
+      IREE_HAL_VULKAN_DEVICE_REQUIRED, options, iree_required_extensions_count,
+      iree_required_extensions, &iree_required_extensions_count);
 
   // Ask IREE for its list of optional device extensions.
-  uint32_t iree_optional_extensions_count = 0;
-  iree_hal_vulkan_get_optional_instance_extensions(
-      options, &iree_optional_extensions_count, NULL);
+  iree_host_size_t iree_optional_extensions_count = 0;
+  iree_hal_vulkan_get_extensions(IREE_HAL_VULKAN_DEVICE_OPTIONAL, options, 0,
+                                 NULL, &iree_optional_extensions_count);
   const char** iree_optional_extensions =
       new const char*[iree_optional_extensions_count];
-  iree_hal_vulkan_get_optional_device_extensions(
-      options, &iree_optional_extensions_count, iree_optional_extensions);
+  iree_hal_vulkan_get_extensions(
+      IREE_HAL_VULKAN_DEVICE_OPTIONAL, options, iree_optional_extensions_count,
+      iree_optional_extensions, &iree_optional_extensions_count);
 
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;

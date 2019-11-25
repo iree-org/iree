@@ -93,7 +93,6 @@ ExtensibilitySpec GetInstanceExtensibilitySpec(
   if (options & IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS) {
     spec.optional_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
-
   if (options & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
     spec.optional_extensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
@@ -120,67 +119,60 @@ ExtensibilitySpec GetDeviceExtensibilitySpec(
 
 }  // namespace
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_required_instance_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions) {
-  if (!count) return IREE_STATUS_INVALID_ARGUMENT;
-
-  ExtensibilitySpec spec = GetInstanceExtensibilitySpec(options);
-  *count = spec.required_extensions.size();
-  if (!out_extensions) return IREE_STATUS_OK;
-
-  for (int i = 0; i < spec.required_extensions.size(); ++i) {
-    out_extensions[i] = spec.required_extensions[i];
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
+    iree_hal_vulkan_extensibility_set_t extensibility_set,
+    iree_hal_vulkan_extensibility_options_t extensibility_options,
+    iree_host_size_t extensions_capacity, const char** out_extensions,
+    iree_host_size_t* out_extensions_count) {
+  if (!out_extensions_count) {
+    return IREE_STATUS_INVALID_ARGUMENT;
   }
-  return IREE_STATUS_OK;
-}
+  *out_extensions_count = 0;
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_optional_instance_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions) {
-  if (!count) return IREE_STATUS_INVALID_ARGUMENT;
-
-  ExtensibilitySpec spec = GetInstanceExtensibilitySpec(options);
-  *count = spec.optional_extensions.size();
-  if (!out_extensions) return IREE_STATUS_OK;
-
-  for (int i = 0; i < spec.optional_extensions.size(); ++i) {
-    out_extensions[i] = spec.optional_extensions[i];
+  bool is_instance;
+  bool is_required;
+  switch (extensibility_set) {
+    case IREE_HAL_VULKAN_INSTANCE_REQUIRED:
+      is_instance = true;
+      is_required = true;
+      break;
+    case IREE_HAL_VULKAN_INSTANCE_OPTIONAL:
+      is_instance = true;
+      is_required = false;
+      break;
+    case IREE_HAL_VULKAN_DEVICE_REQUIRED:
+      is_instance = false;
+      is_required = true;
+      break;
+    case IREE_HAL_VULKAN_DEVICE_OPTIONAL:
+      is_instance = false;
+      is_required = false;
+      break;
+    default:
+      return IREE_STATUS_INVALID_ARGUMENT;
   }
-  return IREE_STATUS_OK;
-}
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_required_device_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions) {
-  if (!count) return IREE_STATUS_INVALID_ARGUMENT;
+  ExtensibilitySpec spec =
+      is_instance ? GetInstanceExtensibilitySpec(extensibility_options)
+                  : GetDeviceExtensibilitySpec(extensibility_options);
+  *out_extensions_count = is_required ? spec.required_extensions.size()
+                                      : spec.optional_extensions.size();
 
-  ExtensibilitySpec spec = GetDeviceExtensibilitySpec(options);
-  *count = spec.required_extensions.size();
-  if (!out_extensions) return IREE_STATUS_OK;
-
-  for (int i = 0; i < spec.required_extensions.size(); ++i) {
-    out_extensions[i] = spec.required_extensions[i];
+  // Return early if only querying number of extensions in this configuration.
+  if (!out_extensions) {
+    return IREE_STATUS_OK;
   }
-  return IREE_STATUS_OK;
-}
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_vulkan_get_optional_device_extensions(
-    iree_hal_vulkan_extensibility_options_t options, uint32_t* count,
-    const char** out_extensions) {
-  if (!count) return IREE_STATUS_INVALID_ARGUMENT;
-
-  ExtensibilitySpec spec = GetDeviceExtensibilitySpec(options);
-  *count = spec.optional_extensions.size();
-  if (!out_extensions) return IREE_STATUS_OK;
-
-  for (int i = 0; i < spec.optional_extensions.size(); ++i) {
-    out_extensions[i] = spec.optional_extensions[i];
+  if (extensions_capacity < *out_extensions_count) {
+    return IREE_STATUS_OUT_OF_RANGE;
   }
+
+  const std::vector<const char*>& extensions =
+      is_required ? spec.required_extensions : spec.optional_extensions;
+  for (int i = 0; i < extensions.size(); ++i) {
+    out_extensions[i] = extensions[i];
+  }
+
   return IREE_STATUS_OK;
 }
 
