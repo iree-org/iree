@@ -100,15 +100,11 @@ static std::vector<const char*> GetInstanceExtensions(
 
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;
-  for (int i = 0; i < sdl_extensions_count; ++i) {
-    ext_set.insert(sdl_extensions[i]);
-  }
-  for (int i = 0; i < iree_required_extensions.size(); ++i) {
-    ext_set.insert(iree_required_extensions[i]);
-  }
-  for (int i = 0; i < iree_optional_extensions.size(); ++i) {
-    ext_set.insert(iree_optional_extensions[i]);
-  }
+  ext_set.insert(sdl_extensions.begin(), sdl_extensions.end());
+  ext_set.insert(iree_required_extensions.begin(),
+                 iree_required_extensions.end());
+  ext_set.insert(iree_optional_extensions.begin(),
+                 iree_optional_extensions.end());
   std::vector<const char*> extensions(ext_set.begin(), ext_set.end());
   return extensions;
 }
@@ -123,12 +119,10 @@ static std::vector<const char*> GetDeviceExtensions(
   // Merge extensions lists, including optional and required for simplicity.
   std::set<const char*> ext_set;
   ext_set.insert("VK_KHR_swapchain");
-  for (int i = 0; i < iree_required_extensions.size(); ++i) {
-    ext_set.insert(iree_required_extensions[i]);
-  }
-  for (int i = 0; i < iree_optional_extensions.size(); ++i) {
-    ext_set.insert(iree_optional_extensions[i]);
-  }
+  ext_set.insert(iree_required_extensions.begin(),
+                 iree_required_extensions.end());
+  ext_set.insert(iree_optional_extensions.begin(),
+                 iree_optional_extensions.end());
   std::vector<const char*> extensions(ext_set.begin(), ext_set.end());
   return extensions;
 }
