@@ -32,14 +32,18 @@ extern "C" {
 
 // Describes the type of a set of Vulkan extensions.
 typedef enum {
+  IREE_HAL_VULKAN_REQUIRED_BIT = 1 << 0,
+  IREE_HAL_VULKAN_INSTANCE_BIT = 1 << 1,
+
   // A set of required instance extension names.
-  IREE_HAL_VULKAN_INSTANCE_REQUIRED = 0,
+  IREE_HAL_VULKAN_INSTANCE_REQUIRED =
+      IREE_HAL_VULKAN_INSTANCE_BIT | IREE_HAL_VULKAN_REQUIRED_BIT,
   // A set of optional instance extension names.
-  IREE_HAL_VULKAN_INSTANCE_OPTIONAL = 1,
+  IREE_HAL_VULKAN_INSTANCE_OPTIONAL = IREE_HAL_VULKAN_INSTANCE_BIT,
   // A set of required device extension names.
-  IREE_HAL_VULKAN_DEVICE_REQUIRED = 2,
+  IREE_HAL_VULKAN_DEVICE_REQUIRED = IREE_HAL_VULKAN_REQUIRED_BIT,
   // A set of optional device extension names.
-  IREE_HAL_VULKAN_DEVICE_OPTIONAL = 3,
+  IREE_HAL_VULKAN_DEVICE_OPTIONAL = 0,
 } iree_hal_vulkan_extensibility_set_t;
 
 // Bitfield that defines sets of Vulkan features.

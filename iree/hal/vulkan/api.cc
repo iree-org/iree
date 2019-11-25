@@ -128,28 +128,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
   }
   *out_extensions_count = 0;
 
-  bool is_instance;
-  bool is_required;
-  switch (extensibility_set) {
-    case IREE_HAL_VULKAN_INSTANCE_REQUIRED:
-      is_instance = true;
-      is_required = true;
-      break;
-    case IREE_HAL_VULKAN_INSTANCE_OPTIONAL:
-      is_instance = true;
-      is_required = false;
-      break;
-    case IREE_HAL_VULKAN_DEVICE_REQUIRED:
-      is_instance = false;
-      is_required = true;
-      break;
-    case IREE_HAL_VULKAN_DEVICE_OPTIONAL:
-      is_instance = false;
-      is_required = false;
-      break;
-    default:
-      return IREE_STATUS_INVALID_ARGUMENT;
-  }
+  bool is_instance = extensibility_set & IREE_HAL_VULKAN_INSTANCE_BIT;
+  bool is_required = extensibility_set & IREE_HAL_VULKAN_REQUIRED_BIT;
 
   ExtensibilitySpec spec = is_instance ? GetInstanceExtensibilitySpec(features)
                                        : GetDeviceExtensibilitySpec(features);
