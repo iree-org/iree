@@ -19,9 +19,7 @@
 #ifndef IREE_OPS
 #define IREE_OPS
 
-#ifndef IREE_OP_BASE
 include "iree/compiler/IR/OpBase.td"
-#endif  // IREE_OP_BASE
 
 class IREE_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<IREE_Dialect, mnemonic, traits> {

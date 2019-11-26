@@ -15,9 +15,7 @@
 #ifndef IREE_DIALECT_COMMON_BASE
 #define IREE_DIALECT_COMMON_BASE
 
-#ifndef OP_BASE
 include "mlir/IR/OpBase.td"
-#endif  // OP_BASE
 
 //===----------------------------------------------------------------------===//
 // IREE base dialect used for types common across IREE subdialects.

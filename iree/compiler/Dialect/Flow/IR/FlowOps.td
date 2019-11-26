@@ -15,9 +15,7 @@
 #ifndef IREE_DIALECT_FLOW_OPS
 #define IREE_DIALECT_FLOW_OPS
 
-#ifndef IREE_DIALECT_FLOW_BASE
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
-#endif  // IREE_DIALECT_FLOW_BASE
 
 //===----------------------------------------------------------------------===//
 // Variables

@@ -15,13 +15,8 @@
 #ifndef IREE_DIALECT_VM_OPS
 #define IREE_DIALECT_VM_OPS
 
-#ifndef MLIR_CALLINTERFACES
 include "mlir/Analysis/CallInterfaces.td"
-#endif // MLIR_CALLINTERFACES
-
-#ifndef IREE_DIALECT_VM_BASE
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
-#endif  // IREE_DIALECT_VM_BASE
 
 //===----------------------------------------------------------------------===//
 // Structural ops

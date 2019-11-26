@@ -15,9 +15,7 @@
 #ifndef IREE_DIALECT_FLOW_BASE
 #define IREE_DIALECT_FLOW_BASE
 
-#ifndef IREE_DIALECT_COMMON_BASE
 include "iree/compiler/Dialect/CommonBase.td"
-#endif  // IREE_DIALECT_COMMON_BASE
 
 //===----------------------------------------------------------------------===//
 // IREE execution flow dialect

@@ -17,9 +17,7 @@
 #ifndef IREE_OP_BASE
 #define IREE_OP_BASE
 
-#ifndef OP_BASE
 include "mlir/IR/OpBase.td"
-#endif  // OP_BASE
 
 //===----------------------------------------------------------------------===//
 // Top-level IREE dialect
