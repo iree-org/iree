@@ -30,6 +30,7 @@ iree_cc_test(
     iree::schemas
     iree::rt
     iree::vm::bytecode_module
+    iree::vm::sequencer_module
     # Enabled drivers:
     iree::hal::interpreter::interpreter_driver_module
     iree::hal::vulkan::vulkan_driver_module
