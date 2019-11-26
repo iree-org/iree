@@ -62,6 +62,12 @@ Install packages:
 sudo pip3 install numpy
 ```
 
+If using Colab, you may also want to install TensorFlow:
+
+```shell
+sudo pip3 install tf-nightly
+```
+
 ### Install the Vulkan SDK
 
 Some parts of the project link against the Vulkan SDK and require it be

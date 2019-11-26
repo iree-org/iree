@@ -280,3 +280,9 @@ python ~/Downloads/get-pip.py
 ```shell
 pip install numpy
 ```
+
+If using Colab, you may also want to install TensorFlow:
+
+```shell
+pip install tf-nightly
+```
