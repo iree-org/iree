@@ -370,7 +370,7 @@ iree_rt_invocation_query_status(iree_rt_invocation_t* invocation);
 // |result_capacity| defines the number of elements available in |out_results|
 // and |out_result_count| will be set with the actual number of results
 // available. If |result_capacity| is too small IREE_STATUS_OUT_OF_RANGE will be
-// returned wtih the required capacity in |out_result_count|. To only query the
+// returned with the required capacity in |out_result_count|. To only query the
 // required capacity |out_results| may be passed as nullptr.
 //
 // Ownership of returned results will be transferred to the caller and they must
