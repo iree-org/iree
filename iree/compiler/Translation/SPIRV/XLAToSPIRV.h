@@ -61,15 +61,6 @@ class XLAGatherOpSPIRVLowering final
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
-class XLAConstOpSPIRVLowering final : public SPIRVOpLowering<xla_hlo::ConstOp> {
- public:
-  using SPIRVOpLowering<xla_hlo::ConstOp>::SPIRVOpLowering;
-  LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder, AffineMap index,
-      ArrayRef<Value *> operands,
-      TensorIndexToScalarValueMap &valueCache) const override;
-};
-
 /// Lowers a xla_hlo.pad_op to SPIR-V. Based on the value of the result index
 /// computed at a thread, if the index falls in a padding location, the padding
 /// value is to be used. If not use the value obtained from the tensor operand.

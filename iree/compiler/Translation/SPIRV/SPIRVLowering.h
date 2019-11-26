@@ -79,6 +79,14 @@ class ConstantOpSPIRVLowering final : public SPIRVOpLowering<ConstantOp> {
       Operation *op, OpBuilder &builder, AffineMap index,
       ArrayRef<Value *> operands,
       TensorIndexToScalarValueMap &valueCache) const override;
+
+ private:
+  LogicalResult lowerSplatConstant(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      TensorIndexToScalarValueMap &valueCache) const;
+  LogicalResult lowerNonSplatConstant(
+      Operation *op, OpBuilder &builder, AffineMap index,
+      TensorIndexToScalarValueMap &valueCache) const;
 };
 
 /// SPIR-V lowering for CmpIOp.

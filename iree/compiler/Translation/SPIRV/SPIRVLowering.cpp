@@ -31,10 +31,16 @@ LogicalResult ConstantOpSPIRVLowering::lowerOperation(
   auto constOp = cast<ConstantOp>(op);
   auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
   if (!attr || !attr.isSplat()) {
-    return op->emitError(
-        "unhandled constant lowering unless value is a splat dense element "
-        "attribute");
+    return lowerNonSplatConstant(op, builder, index, valueCache);
   }
+  return lowerSplatConstant(op, builder, index, valueCache);
+}
+
+LogicalResult ConstantOpSPIRVLowering::lowerSplatConstant(
+    Operation *op, OpBuilder &builder, AffineMap index,
+    TensorIndexToScalarValueMap &valueCache) const {
+  auto constOp = cast<ConstantOp>(op);
+  auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
   auto resultType = constOp.getResult()->getType();
   Type resultElemType;
   if (resultType.isIntOrFloat()) {
@@ -49,6 +55,50 @@ LogicalResult ConstantOpSPIRVLowering::lowerOperation(
       builder.create<spirv::ConstantOp>(op->getLoc(), resultElemType, constVal);
   valueCache.setValueAtIndex(constOp.getResult(), index,
                              spirvConstOp.getResult());
+  return success();
+}
+
+LogicalResult ConstantOpSPIRVLowering::lowerNonSplatConstant(
+    Operation *op, OpBuilder &builder, AffineMap index,
+    TensorIndexToScalarValueMap &valueCache) const {
+  auto constOp = cast<ConstantOp>(op);
+  auto loc = constOp.getLoc();
+  auto argType = constOp.getType().dyn_cast<ShapedType>();
+  auto elementType = argType.getElementType();
+
+  if (!argType.hasStaticShape()) {
+    return constOp.emitError("expected static shaped tensor");
+  }
+
+  // Build the array type.
+  int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
+  for (auto dim : reverse(argType.getShape())) {
+    elementType = spirv::ArrayType::get(
+        elementType, dim, static_cast<spirv::ArrayType::LayoutInfo>(stride));
+    stride *= dim;
+  }
+
+  auto pointerType =
+      spirv::PointerType::get(elementType, spirv::StorageClass::Function);
+  auto spirvConstOp =
+      builder.create<spirv::ConstantOp>(loc, elementType, constOp.value());
+  auto spirvVarOp = builder.create<spirv::VariableOp>(
+      loc, pointerType,
+      builder.getI32IntegerAttr(
+          static_cast<int32_t>(spirv::StorageClass::Function)),
+      ArrayRef<Value *>(spirvConstOp.getResult()));
+
+  SmallVector<Value *, 2> accessIndices;
+  for (auto indexExpr : index.getResults()) {
+    accessIndices.push_back(valueCache.getAffineExprValue(
+        builder.saveInsertionPoint(), loc, indexExpr));
+  }
+  auto valPtr =
+      builder.create<spirv::AccessChainOp>(loc, spirvVarOp, accessIndices);
+  auto val =
+      builder.create<spirv::LoadOp>(loc, valPtr, /*memory_access=*/nullptr,
+                                    /*alignment=*/nullptr);
+  valueCache.setValueAtIndex(op->getResult(0), index, val.getResult());
   return success();
 }
 

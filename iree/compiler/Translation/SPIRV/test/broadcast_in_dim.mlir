@@ -105,7 +105,7 @@ module {
 module {
   func @const_int_splat_err(%arg0: memref<2x12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 2]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
-    // expected-error @+1{{unhandled constant lowering unless value is a splat dense element attribute}}
+    // CHECK: spv.constant dense<[42, 21]> : tensor<2xi32> : !spv.array<2 x i32 [4]>
     %0 = constant dense<[42, 21]> : tensor<2xi32>
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<2xi32>) -> tensor<2x12x42xi32>
     iree.store_output(%1 : tensor<2x12x42xi32>, %arg0 : memref<2x12x42xi32>)

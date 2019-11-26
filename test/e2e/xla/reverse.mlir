@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // RUN: iree-run-mlir --target_backends=interpreter-bytecode %s | FileCheck %s --dump-input=fail
-// Fails: iree-run-mlir --target_backends=vulkan-spirv %s | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir --target_backends=vulkan-spirv %s | FileCheck %s --dump-input=fail
 
 // -----
 
