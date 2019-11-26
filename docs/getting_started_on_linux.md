@@ -117,4 +117,20 @@ level.
 
 ## Building with CMake
 
-TODO
+### Environment variables
+
+The following environment variables must be set.
+
+```shell
+export CXX=clang++
+```
+
+### Build
+
+```shell
+mkdir build && cd build
+
+cmake -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
+
+cmake --build .
+```
