@@ -52,13 +52,11 @@ class OrdinalAllocationPass
     for (auto &op : getOperation().getBlock().getOperations()) {
       Optional<int> ordinal = llvm::None;
       if (auto funcOp = dyn_cast<FuncOp>(op)) {
-        if (funcOp.isExternal()) {
-          ordinal = nextImportOrdinal++;
-        } else {
-          ordinal = nextFuncOrdinal++;
-        }
+        ordinal = nextFuncOrdinal++;
       } else if (isa<ExportOp>(op)) {
         ordinal = nextExportOrdinal++;
+      } else if (isa<ImportOp>(op)) {
+        ordinal = nextImportOrdinal++;
       } else if (isa<GlobalI32Op>(op)) {
         ordinal = nextGlobalBytesOrdinal;
         nextGlobalBytesOrdinal += 4;

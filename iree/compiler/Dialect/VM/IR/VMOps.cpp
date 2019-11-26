@@ -18,12 +18,15 @@
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/FunctionSupport.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -190,6 +193,128 @@ void ExportOp::build(Builder *builder, OperationState &result,
   result.addAttribute("function_ref", functionRef);
   result.addAttribute("export_name", builder->getStringAttr(exportName));
   result.attributes.append(attrs.begin(), attrs.end());
+}
+
+static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
+  auto builder = parser.getBuilder();
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseLParen())) {
+    return parser.emitError(parser.getNameLoc()) << "invalid import name";
+  }
+  SmallVector<NamedAttributeList, 8> argAttrs;
+  SmallVector<Type, 8> argTypes;
+  while (failed(parser.parseOptionalRParen())) {
+    OpAsmParser::OperandType operand;
+    Type operandType;
+    auto operandLoc = parser.getCurrentLocation();
+    if (failed(parser.parseOperand(operand)) ||
+        failed(parser.parseColonType(operandType))) {
+      return parser.emitError(operandLoc) << "invalid operand";
+    }
+    argTypes.push_back(operandType);
+    NamedAttributeList argAttrList;
+    argAttrList.set(builder.getIdentifier("vm.name"),
+                    builder.getStringAttr(operand.name));
+    argAttrs.push_back(argAttrList);
+    if (succeeded(parser.parseOptionalEllipsis())) {
+      result->addAttribute("is_variadic", UnitAttr::get(result->getContext()));
+    }
+    if (failed(parser.parseOptionalComma())) continue;
+  }
+  SmallVector<Type, 8> resultTypes;
+  if (failed(parser.parseOptionalArrowTypeList(resultTypes))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "invalid result type list";
+  }
+  for (int i = 0; i < argAttrs.size(); ++i) {
+    SmallString<8> argName;
+    mlir::impl::getArgAttrName(i, argName);
+    result->addAttribute(argName, argAttrs[i].getDictionary());
+  }
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  auto functionType =
+      FunctionType::get(argTypes, resultTypes, result->getContext());
+  result->addAttribute(mlir::impl::getTypeAttrName(),
+                       TypeAttr::get(functionType));
+
+  // No clue why this is required.
+  result->addRegion();
+
+  return success();
+}
+
+static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.getName());
+  p << "(";
+  for (int i = 0; i < op.getNumFuncArguments(); ++i) {
+    if (auto name = op.getArgAttrOfType<StringAttr>(i, "vm.name")) {
+      p << name.getValue() << " : ";
+    }
+    p.printType(op.getType().getInput(i));
+    if (i < op.getNumFuncArguments() - 1) {
+      p << ", ";
+    } else {
+      if (op.is_variadic()) {
+        p << "...";
+      }
+    }
+  }
+  p << ")";
+  if (op.getNumFuncResults() == 1) {
+    p << " -> ";
+    p.printType(op.getType().getResult(0));
+  } else if (op.getNumFuncResults() > 1) {
+    p << " -> (";
+    interleaveComma(op.getType().getResults(), p);
+    p << ")";
+  }
+  mlir::impl::printFunctionAttributes(p, op, op.getNumFuncArguments(),
+                                      op.getNumFuncResults(),
+                                      /*elided=*/
+                                      {
+                                          "is_variadic",
+                                      });
+}
+
+void ImportOp::build(Builder *builder, OperationState &result, StringRef name,
+                     FunctionType type, bool isVariadic,
+                     ArrayRef<NamedAttribute> attrs,
+                     ArrayRef<NamedAttributeList> argAttrs) {
+  result.addAttribute(SymbolTable::getSymbolAttrName(),
+                      builder->getStringAttr(name));
+  result.addAttribute("type", TypeAttr::get(type));
+  if (isVariadic) {
+    result.addAttribute("is_variadic", UnitAttr::get(builder->getContext()));
+  }
+  result.attributes.append(attrs.begin(), attrs.end());
+  if (argAttrs.empty()) {
+    return;
+  }
+
+  unsigned numInputs = type.getNumInputs();
+  assert(numInputs == argAttrs.size() &&
+         "expected as many argument attribute lists as arguments");
+  SmallString<8> argAttrName;
+  for (unsigned i = 0; i < numInputs; ++i) {
+    if (auto argDict = argAttrs[i].getDictionary()) {
+      result.addAttribute(getArgAttrName(i, argAttrName), argDict);
+    }
+  }
+}
+
+LogicalResult ImportOp::verifyType() {
+  auto type = getTypeAttr().getValue();
+  if (!type.isa<FunctionType>())
+    return emitOpError("requires '" + getTypeAttrName() +
+                       "' attribute of function type");
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -655,6 +780,13 @@ static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   p.printAttribute(op.value());
 }
 
+void RodataOp::build(Builder *builder, OperationState &result, StringRef name,
+                     ElementsAttr value, ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute("sym_name", builder->getStringAttr(name));
+  result.addAttribute("value", value);
+  result.addAttributes(attrs);
+}
+
 static ParseResult parseConstRefRodataOp(OpAsmParser &parser,
                                          OperationState *result) {
   FlatSymbolRefAttr rodataAttr;
@@ -687,7 +819,7 @@ static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
 void ConstRefRodataOp::build(Builder *builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute("rodata", builder->getStringAttr(rodataName));
+  result.addAttribute("rodata", builder->getSymbolRefAttr(rodataName));
   auto type = RefPtrType::get(ByteBufferType::get(builder->getContext()));
   result.addTypes({type});
   result.addAttributes(attrs);

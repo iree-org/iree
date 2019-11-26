@@ -70,13 +70,11 @@ static ModuleCounts computeModuleSymbolCounts(IREE::VM::ModuleOp moduleOp) {
   ModuleCounts counts;
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
-      if (funcOp.isExternal()) {
-        ++counts.importFuncs;
-      } else {
-        ++counts.internalFuncs;
-      }
+      ++counts.internalFuncs;
     } else if (isa<IREE::VM::ExportOp>(op)) {
       ++counts.exportFuncs;
+    } else if (isa<IREE::VM::ImportOp>(op)) {
+      ++counts.importFuncs;
     } else if (isa<IREE::VM::GlobalI32Op>(op)) {
       ++counts.globalBytes;
     } else if (isa<IREE::VM::GlobalRefOp>(op)) {
@@ -202,7 +200,7 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   auto symbolCounts = computeModuleSymbolCounts(moduleOp);
 
   // Find all structural ops in the module.
-  std::vector<IREE::VM::FuncOp> importFuncOps;
+  std::vector<IREE::VM::ImportOp> importFuncOps;
   std::vector<IREE::VM::ExportOp> exportFuncOps;
   std::vector<IREE::VM::FuncOp> internalFuncOps;
   std::vector<IREE::VM::RodataOp> rodataOps;
@@ -212,13 +210,11 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   rodataOps.resize(symbolCounts.rodatas);
   for (auto &op : moduleOp.getBlock().getOperations()) {
     if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(op)) {
-      if (funcOp.isExternal()) {
-        importFuncOps[funcOp.ordinal().getValue().getLimitedValue()] = funcOp;
-      } else {
-        internalFuncOps[funcOp.ordinal().getValue().getLimitedValue()] = funcOp;
-      }
+      internalFuncOps[funcOp.ordinal().getValue().getLimitedValue()] = funcOp;
     } else if (auto exportOp = dyn_cast<IREE::VM::ExportOp>(op)) {
       exportFuncOps[exportOp.ordinal().getValue().getLimitedValue()] = exportOp;
+    } else if (auto importOp = dyn_cast<IREE::VM::ImportOp>(op)) {
+      importFuncOps[importOp.ordinal().getValue().getLimitedValue()] = importOp;
     } else if (auto rodataOp = dyn_cast<IREE::VM::RodataOp>(op)) {
       rodataOps[rodataOp.ordinal().getValue().getLimitedValue()] = rodataOp;
     }

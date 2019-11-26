@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
+#include "iree/compiler/Dialect/Types.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -44,6 +45,8 @@ class VmTypeConverter : public TypeConverter {
         // Promote i1 -> i32.
         return IntegerType::get(32, t.getContext());
       }
+    } else if (t.isa<IREE::RefPtrType>()) {
+      return t;
     }
     // Default to not supporting the type. This dialect is very limited
     // with respect to valid types and the above should be expanded as

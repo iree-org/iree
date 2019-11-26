@@ -73,11 +73,9 @@ class V0BytecodeEncoder : public BytecodeEncoder {
       return symbolOp->emitOpError() << "missing ordinal";
     }
     int32_t ordinal = ordinalAttr.getInt();
-    if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(symbolOp)) {
-      if (funcOp.isExternal()) {
-        // Imported functions have their MSB set.
-        ordinal |= 0x80000000u;
-      }
+    if (isa<IREE::VM::ImportOp>(symbolOp)) {
+      // Imported functions have their MSB set.
+      ordinal |= 0x80000000u;
     }
     return writeInt32(ordinal);
   }

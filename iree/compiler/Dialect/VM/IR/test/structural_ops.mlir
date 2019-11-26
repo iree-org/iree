@@ -64,3 +64,20 @@ vm.module @export_funcs {
   // CHECK-LABEL: vm.export @fn as("fn_attributed") attributes {a}
   vm.export @fn as("fn_attributed") attributes {a}
 }
+
+// -----
+
+// CHECK-LABEL: @import_funcs
+vm.module @import_funcs {
+  // CHECK-NEXT: vm.import @my.fn_empty()
+  vm.import @my.fn_empty()
+
+  // CHECK-NEXT: vm.import @my.fn(%foo : i32, %bar : i32) -> i32
+  vm.import @my.fn(%foo : i32, %bar : i32) -> i32
+
+  // CHECK-NEXT: vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
+  vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
+
+  // CHECK-NEXT: vm.import @my.fn_varargs(%foo : i32, %bar : tuple<i32, i32>...) -> i32
+  vm.import @my.fn_varargs(%foo : i32, %bar : tuple<i32, i32>...) -> i32
+}

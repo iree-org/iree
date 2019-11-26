@@ -104,6 +104,12 @@ def VM_FuncOp : VM_Op<"func", [
     /// to match the signature of the function.
     Block *addEntryBlock();
 
+    Block *addBlock() {
+      assert(!empty() && "function should at least have an entry block");
+      push_back(new Block());
+      return &back();
+    }
+
     /// Returns the type of this function.
     FunctionType getType() {
       return getAttrOfType<TypeAttr>(getTypeAttrName())
@@ -162,6 +168,64 @@ def VM_ExportOp : VM_Op<"export", [
       StringRef exportName = "", ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
+}
+
+def VM_ImportOp : VM_Op<"import", [
+    Symbol,
+    HasParent<"IREE::VM::ModuleOp">,
+    NativeOpTrait<"FunctionLike">,
+    CallableOpInterface,
+  ]> {
+  let summary = [{imports a function from an external module}];
+  let description = [{
+    Specifies a function that should be imported from either the runtime or
+    an external VM module.
+  }];
+
+  let arguments = (ins
+    UnitAttr:$is_variadic,
+    OptionalAttr<VM_Ordinal>:$ordinal
+  );
+
+  let regions = (region AnyRegion:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, StringRef name,
+      FunctionType type, bool isVariadic, ArrayRef<NamedAttribute> attrs = {},
+      ArrayRef<NamedAttributeList> argAttrs = {}
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    /// Returns the type of this function.
+    FunctionType getType() {
+      return getAttrOfType<TypeAttr>(getTypeAttrName())
+          .getValue()
+          .cast<FunctionType>();
+    }
+
+    /// Hook for OpTrait::FunctionLike, returns the number of function
+    /// arguments. Depends on the type attribute being correct as checked by
+    /// verifyType.
+    unsigned getNumFuncArguments() { return getType().getInputs().size(); }
+
+    /// Hook for OpTrait::FunctionLike, returns the number of function results.
+    /// Depends on the type attribute being correct as checked by verifyType.
+    unsigned getNumFuncResults() { return getType().getResults().size(); }
+
+    /// Hook for OpTrait::FunctionLike, called after verifying that the 'type'
+    /// attribute is present. This can check for preconditions of the
+    /// getNumArguments hook not failing.
+    LogicalResult verifyType();
+
+    Region *getCallableRegion(CallInterfaceCallable) { return nullptr; }
+    void getCallableRegions(SmallVectorImpl<Region *> &callables) {}
+    ArrayRef<Type> getCallableResults(Region *region) {
+      return getType().getResults();
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
