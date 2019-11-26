@@ -69,9 +69,23 @@ func @command_buffer_begin_end(%arg0 : !ireex.ref<!hal.command_buffer>) {
 
 // CHECK-LABEL: @command_buffer_execution_barrier
 func @command_buffer_execution_barrier(%arg0 : !ireex.ref<!hal.command_buffer>) {
-  %0 = "test_hal.barrier_list"() : () -> tuple<>
-  // CHECK: hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess", memory_barriers=%0 : tuple<>, buffer_barriers=%0 : tuple<>
-  hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess", memory_barriers=%0 : tuple<>, buffer_barriers=%0 : tuple<>
+  %0 = "test_hal.buffer"() : () -> !ireex.ref<!hal.buffer>
+  %1 = "test_hal.offset"() : () -> i32
+  %2 = "test_hal.length"() : () -> i32
+  %memory_barrier = hal.make_memory_barrier "HostRead|HostWrite", "MemoryRead|MemoryWrite" : tuple<i32, i32>
+  %buffer_barrier = hal.make_buffer_barrier "HostRead|HostWrite", "MemoryRead|MemoryWrite", %0, %1, %2 : tuple<i32, i32, !ireex.ref<!hal.buffer>, i32, i32>
+  // CHECK: hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess"
+  hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess"
+  // CHECK-NEXT: hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess", memory_barriers=[%memory_barrier, %memory_barrier]
+  hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess",
+      memory_barriers=[%memory_barrier, %memory_barrier]
+  // CHECK-NEXT: hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess", buffer_barriers=[%buffer_barrier, %buffer_barrier]
+  hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess",
+      buffer_barriers=[%buffer_barrier, %buffer_barrier]
+  // CHECK-NEXT: hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess", memory_barriers=[%memory_barrier, %memory_barrier], buffer_barriers=[%buffer_barrier, %buffer_barrier]
+  hal.command_buffer.execution_barrier %arg0, "CommandIssue", "CommandProcess",
+      memory_barriers=[%memory_barrier, %memory_barrier],
+      buffer_barriers=[%buffer_barrier, %buffer_barrier]
   return
 }
 

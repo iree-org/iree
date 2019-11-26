@@ -203,34 +203,6 @@ static void printMakeMemoryBarrierOp(OpAsmPrinter &p, MakeMemoryBarrierOp op) {
   p.printType(op.result()->getType());
 }
 
-static ParseResult parseMakeMemoryBarrierListOp(OpAsmParser &parser,
-                                                OperationState *result) {
-  llvm::SMLoc operandLoc;
-  SmallVector<OpAsmParser::OperandType, 3> operands;
-  Type resultType;
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.getCurrentLocation(&operandLoc)) ||
-      failed(parser.resolveOperands(
-          operands,
-          MemoryBarrierListType::get(operands.size(), result->getContext()),
-          operandLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printMakeMemoryBarrierListOp(OpAsmPrinter &p,
-                                         MakeMemoryBarrierListOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperands(op.memory_barriers());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.list()->getType());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.make_buffer_barrier
 //===----------------------------------------------------------------------===//
@@ -293,34 +265,6 @@ static void printMakeBufferBarrierOp(OpAsmPrinter &p, MakeBufferBarrierOp op) {
       /*elidedAttrs=*/{"source_scope", "target_scope"});
   p << " : ";
   p.printType(op.result()->getType());
-}
-
-static ParseResult parseMakeBufferBarrierListOp(OpAsmParser &parser,
-                                                OperationState *result) {
-  llvm::SMLoc operandLoc;
-  SmallVector<OpAsmParser::OperandType, 3> operands;
-  Type resultType;
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.getCurrentLocation(&operandLoc)) ||
-      failed(parser.resolveOperands(
-          operands,
-          BufferBarrierListType::get(operands.size(), result->getContext()),
-          operandLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printMakeBufferBarrierListOp(OpAsmPrinter &p,
-                                         MakeBufferBarrierListOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperands(op.buffer_barriers());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.list()->getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -969,15 +913,22 @@ static void printCommandBufferEndOp(OpAsmPrinter &p, CommandBufferEndOp op) {
 void CommandBufferExecutionBarrierOp::build(
     Builder *builder, OperationState &state, Value *commandBuffer,
     IREE::HAL::ExecutionStageBitfield sourceStageMask,
-    IREE::HAL::ExecutionStageBitfield targetStageMask, Value *memoryBarriers,
-    Value *bufferBarriers) {
+    IREE::HAL::ExecutionStageBitfield targetStageMask,
+    ArrayRef<Value *> memoryBarriers, ArrayRef<Value *> bufferBarriers) {
   state.addAttribute(
       "source_stage_mask",
       builder->getI32IntegerAttr(static_cast<int32_t>(sourceStageMask)));
   state.addAttribute(
       "target_stage_mask",
       builder->getI32IntegerAttr(static_cast<int32_t>(targetStageMask)));
-  state.addOperands({commandBuffer, memoryBarriers, bufferBarriers});
+  state.addOperands(commandBuffer);
+  state.addOperands(memoryBarriers);
+  state.addOperands(bufferBarriers);
+  state.addAttribute("operand_segment_sizes",
+                     DenseIntElementsAttr::get(
+                         VectorType::get({3}, builder->getIntegerType(32)),
+                         {1, static_cast<int>(memoryBarriers.size()),
+                          static_cast<int>(bufferBarriers.size())}));
 }
 
 static ParseResult parseCommandBufferExecutionBarrierOp(
@@ -998,29 +949,39 @@ static ParseResult parseCommandBufferExecutionBarrierOp(
           parser, "target_stage_mask", result->attributes))) {
     return failure();
   }
-  // TODO(benvanik): variadic arguments.
-  OpAsmParser::OperandType memoryBarriers;
-  Type memoryBarriersType;
-  if (failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("memory_barriers")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperand(memoryBarriers)) ||
-      failed(parser.parseColonType(memoryBarriersType)) ||
-      failed(parser.resolveOperand(memoryBarriers, memoryBarriersType,
-                                   result->operands))) {
-    return failure();
+  SmallVector<OpAsmParser::OperandType, 4> memoryBarriers;
+  bool expectMoreOperands = succeeded(parser.parseOptionalComma());
+  if (expectMoreOperands &&
+      succeeded(parser.parseOptionalKeyword("memory_barriers"))) {
+    if (failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
+        failed(parser.parseOperandList(memoryBarriers)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.resolveOperands(
+            memoryBarriers, MemoryBarrierType::get(result->getContext()),
+            result->operands))) {
+      return failure();
+    }
+    expectMoreOperands = succeeded(parser.parseOptionalComma());
   }
-  OpAsmParser::OperandType bufferBarriers;
-  Type bufferBarriersType;
-  if (failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("buffer_barriers")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperand(bufferBarriers)) ||
-      failed(parser.parseColonType(bufferBarriersType)) ||
-      failed(parser.resolveOperand(bufferBarriers, bufferBarriersType,
-                                   result->operands))) {
-    return failure();
+  SmallVector<OpAsmParser::OperandType, 4> bufferBarriers;
+  if (expectMoreOperands &&
+      succeeded(parser.parseOptionalKeyword("buffer_barriers"))) {
+    if (failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
+        failed(parser.parseOperandList(bufferBarriers)) ||
+        failed(parser.parseRSquare()) ||
+        failed(parser.resolveOperands(
+            bufferBarriers, BufferBarrierType::get(result->getContext()),
+            result->operands))) {
+      return failure();
+    }
+    expectMoreOperands = succeeded(parser.parseOptionalComma());
   }
+  result->addAttribute(
+      "operand_segment_sizes",
+      DenseIntElementsAttr::get(
+          VectorType::get({3}, parser.getBuilder().getIntegerType(32)),
+          {1, static_cast<int>(memoryBarriers.size()),
+           static_cast<int>(bufferBarriers.size())}));
   if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -1035,18 +996,23 @@ static void printCommandBufferExecutionBarrierOp(
   p << stringifyExecutionStageBitfield(op.source_stage_mask());
   p << "\", \"";
   p << stringifyExecutionStageBitfield(op.target_stage_mask());
-  // TODO(benvanik): variadic arguments.
-  p << "\", memory_barriers=";
-  p.printOperand(op.memory_barriers());
-  p << " : ";
-  p.printType(op.memory_barriers()->getType());
-  p << ", buffer_barriers=";
-  p.printOperand(op.buffer_barriers());
-  p << " : ";
-  p.printType(op.buffer_barriers()->getType());
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"source_stage_mask", "target_stage_mask"});
+  p << "\"";
+  if (!op.memory_barriers().empty()) {
+    p << ", memory_barriers=[";
+    p.printOperands(op.memory_barriers());
+    p << "]";
+  }
+  if (!op.buffer_barriers().empty()) {
+    p << ", buffer_barriers=[";
+    p.printOperands(op.buffer_barriers());
+    p << "]";
+  }
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{
+                                         "source_stage_mask",
+                                         "target_stage_mask",
+                                         "operand_segment_sizes",
+                                     });
 }
 
 //===----------------------------------------------------------------------===//
