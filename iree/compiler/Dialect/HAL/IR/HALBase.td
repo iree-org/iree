@@ -47,6 +47,152 @@ def HAL_Dialect : Dialect {
 }
 
 //===----------------------------------------------------------------------===//
+// HAL enums
+//===----------------------------------------------------------------------===//
+
+def HAL_MemoryType_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_MemoryType_Transient : BitEnumAttrCase<"Transient", 0x0001>;
+def HAL_MemoryType_HostVisible : BitEnumAttrCase<"HostVisible", 0x0002>;
+def HAL_MemoryType_HostCoherent : BitEnumAttrCase<"HostCoherent", 0x0004>;
+def HAL_MemoryType_HostCached : BitEnumAttrCase<"HostCached", 0x0008>;
+def HAL_MemoryType_HostLocal : BitEnumAttrCase<"HostLocal", 0x0006>;
+def HAL_MemoryType_DeviceVisible : BitEnumAttrCase<"DeviceVisible", 0x0010>;
+def HAL_MemoryType_DeviceLocal : BitEnumAttrCase<"DeviceLocal", 0x0030>;
+def HAL_MemoryTypeBitfieldAttr :
+    BitEnumAttr<"MemoryTypeBitfield", "valid MemoryType", [
+      HAL_MemoryType_None,
+      HAL_MemoryType_Transient,
+      HAL_MemoryType_HostVisible,
+      HAL_MemoryType_HostCoherent,
+      HAL_MemoryType_HostCached,
+      HAL_MemoryType_HostLocal,
+      HAL_MemoryType_DeviceVisible,
+      HAL_MemoryType_DeviceLocal
+    ]> {
+  let returnType = "mlir::iree_compiler::IREE::HAL::MemoryTypeBitfield";
+  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::MemoryTypeBitfield>($_self.getInt())";
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_MemoryAccess_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_MemoryAccess_Read : BitEnumAttrCase<"Read", 0x0001>;
+def HAL_MemoryAccess_Write : BitEnumAttrCase<"Write", 0x0002>;
+def HAL_MemoryAccess_Discard : BitEnumAttrCase<"Discard", 0x0004>;
+def HAL_MemoryAccess_DiscardWrite : BitEnumAttrCase<"DiscardWrite", 0x0006>;
+def HAL_MemoryAccess_All : BitEnumAttrCase<"All", 0x0007>;
+def HAL_MemoryAccessBitfieldAttr :
+    BitEnumAttr<"MemoryAccessBitfield", "valid MemoryAccess", [
+      HAL_MemoryAccess_None,
+      HAL_MemoryAccess_Read,
+      HAL_MemoryAccess_Write,
+      HAL_MemoryAccess_Discard,
+      HAL_MemoryAccess_DiscardWrite,
+      HAL_MemoryAccess_All
+    ]> {
+  let returnType = "mlir::iree_compiler::IREE::HAL::MemoryAccessBitfield";
+  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::MemoryAccessBitfield>($_self.getInt())";
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_BufferUsage_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_BufferUsage_Constant : BitEnumAttrCase<"Constant", 0x0001>;
+def HAL_BufferUsage_Transfer : BitEnumAttrCase<"Transfer", 0x0002>;
+def HAL_BufferUsage_Mapping : BitEnumAttrCase<"Mapping", 0x0004>;
+def HAL_BufferUsage_Dispatch : BitEnumAttrCase<"Dispatch", 0x0008>;
+def HAL_BufferUsage_All : BitEnumAttrCase<"All", 0x000F>;
+def HAL_BufferUsageBitfieldAttr :
+    BitEnumAttr<"BufferUsageBitfield", "valid BufferUsage", [
+      HAL_BufferUsage_None,
+      HAL_BufferUsage_Constant,
+      HAL_BufferUsage_Transfer,
+      HAL_BufferUsage_Mapping,
+      HAL_BufferUsage_Dispatch,
+      HAL_BufferUsage_All
+    ]> {
+  let returnType = "mlir::iree_compiler::IREE::HAL::BufferUsageBitfield";
+  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::BufferUsageBitfield>($_self.getInt())";
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_CommandBufferMode_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_CommandBufferMode_OneShot : BitEnumAttrCase<"OneShot", 0x0001>;
+def HAL_CommandBufferModeBitfieldAttr :
+    BitEnumAttr<"CommandBufferModeBitfield", "valid CommandBufferMode", [
+      HAL_CommandBufferMode_None,
+      HAL_CommandBufferMode_OneShot
+    ]> {
+  let returnType = "mlir::iree_compiler::IREE::HAL::CommandBufferModeBitfield";
+  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::CommandBufferModeBitfield>($_self.getInt())";
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_CommandCategory_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_CommandCategory_Transfer : BitEnumAttrCase<"Transfer", 0x0001>;
+def HAL_CommandCategory_Dispatch : BitEnumAttrCase<"Dispatch", 0x0002>;
+def HAL_CommandCategoryBitfieldAttr :
+    BitEnumAttr<"CommandCategoryBitfield", "valid CommandCategory", [
+      HAL_CommandCategory_None,
+      HAL_CommandCategory_Transfer,
+      HAL_CommandCategory_Dispatch
+    ]> {
+  let returnType = "mlir::iree_compiler::IREE::HAL::CommandCategoryBitfield";
+  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::CommandCategoryBitfield>($_self.getInt())";
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_ExecutionStage_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecutionStage_CommandIssue : BitEnumAttrCase<"CommandIssue", 0x0001>;
+def HAL_ExecutionStage_CommandProcess : BitEnumAttrCase<"CommandProcess", 0x0002>;
+def HAL_ExecutionStage_Dispatch : BitEnumAttrCase<"Dispatch", 0x0004>;
+def HAL_ExecutionStage_Transfer : BitEnumAttrCase<"Transfer", 0x0008>;
+def HAL_ExecutionStage_CommandRetire : BitEnumAttrCase<"CommandRetire", 0x0010>;
+def HAL_ExecutionStage_Host : BitEnumAttrCase<"Host", 0x0020>;
+def HAL_ExecutionStageBitfieldAttr :
+    BitEnumAttr<"ExecutionStageBitfield", "valid ExecutionStage", [
+      HAL_ExecutionStage_None,
+      HAL_ExecutionStage_CommandIssue,
+      HAL_ExecutionStage_CommandProcess,
+      HAL_ExecutionStage_Dispatch,
+      HAL_ExecutionStage_Transfer,
+      HAL_ExecutionStage_CommandRetire,
+      HAL_ExecutionStage_Host
+    ]> {
+  let returnType = "mlir::iree_compiler::IREE::HAL::ExecutionStageBitfield";
+  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::ExecutionStageBitfield>($_self.getInt())";
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_AccessScope_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_AccessScope_IndirectCommandRead : BitEnumAttrCase<"IndirectCommandRead", 0x0001>;
+def HAL_AccessScope_ConstantRead : BitEnumAttrCase<"ConstantRead", 0x0002>;
+def HAL_AccessScope_DispatchRead : BitEnumAttrCase<"DispatchRead", 0x0004>;
+def HAL_AccessScope_DispatchWrite : BitEnumAttrCase<"DispatchWrite", 0x0008>;
+def HAL_AccessScope_TransferRead : BitEnumAttrCase<"TransferRead", 0x0010>;
+def HAL_AccessScope_TransferWrite : BitEnumAttrCase<"TransferWrite", 0x0020>;
+def HAL_AccessScope_HostRead : BitEnumAttrCase<"HostRead", 0x0040>;
+def HAL_AccessScope_HostWrite : BitEnumAttrCase<"HostWrite", 0x0080>;
+def HAL_AccessScope_MemoryRead : BitEnumAttrCase<"MemoryRead", 0x0100>;
+def HAL_AccessScope_MemoryWrite : BitEnumAttrCase<"MemoryWrite", 0x0200>;
+def HAL_AccessScopeBitfieldAttr :
+    BitEnumAttr<"AccessScopeBitfield", "valid AccessScope", [
+      HAL_AccessScope_None,
+      HAL_AccessScope_IndirectCommandRead,
+      HAL_AccessScope_ConstantRead,
+      HAL_AccessScope_DispatchRead,
+      HAL_AccessScope_DispatchWrite,
+      HAL_AccessScope_TransferRead,
+      HAL_AccessScope_TransferWrite,
+      HAL_AccessScope_HostRead,
+      HAL_AccessScope_HostWrite,
+      HAL_AccessScope_MemoryRead,
+      HAL_AccessScope_MemoryWrite
+    ]> {
+  let returnType = "mlir::iree_compiler::IREE::HAL::AccessScopeBitfield";
+  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::AccessScopeBitfield>($_self.getInt())";
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+//===----------------------------------------------------------------------===//
 // HAL types
 //===----------------------------------------------------------------------===//
 
@@ -215,6 +361,84 @@ def HAL_HostBufferRef : AnyTypeOf<[
   RefPtrOf<ByteBufferType>,
   RefPtrOf<MutableByteBufferType>,
 ]>;
+
+def HAL_CommandQueueAffinityAttr : IntElementsAttr<32> {
+  // TODO(b/143184519): add typeDescription support to other things.
+  // let typeDescription = [{
+  //   A bitmask defining which queues an operation is allowed to execute on.
+  //   The selection is wrapped to the total number of available queues, so 0b0101
+  //   would enable queues 0 and 2 if there were four queues or queue 0 if there
+  //   were two queues.
+  // }];
+}
+
+def HAL_DurationMillisAttr : IntElementsAttr<32> {
+  // TODO(b/143184519): add typeDescription support to other things.
+  // let typeDescription = [{
+  //   A duration to wait in milliseconds. 0 indicates that the operation should
+  //   return immediately without waiting and can be used as a way to poll handles.
+  //   INT32_MAX will wait forever until the handle is signaled.
+  // }];
+}
+
+//===----------------------------------------------------------------------===//
+// HAL structs
+//===----------------------------------------------------------------------===//
+
+def HAL_MemoryBarrier : NamedTupleOf<[
+    NamedTupleElement<0, "source_scope", I32>,
+    NamedTupleElement<1, "target_scope", I32>
+  ], "MemoryBarrier"> {
+  let typeDescription = [{
+    MemoryBarrier struct that can be passed to the command buffer barrier
+    operations.
+  }];
+}
+def HAL_MemoryBarrierList : TupleOf<[HAL_MemoryBarrier]>;
+
+def HAL_BufferBarrier : NamedTupleOf<[
+    NamedTupleElement<0, "source_scope", I32>,
+    NamedTupleElement<1, "target_scope", I32>,
+    NamedTupleElement<2, "buffer", RefPtrOf<HAL_Buffer>>,
+    NamedTupleElement<3, "offset", HAL_DeviceSize>,
+    NamedTupleElement<4, "length", HAL_DeviceSize>
+  ], "BufferBarrier"> {
+  let typeDescription = [{
+    BufferBarrier struct that can be passed to the command buffer barrier
+    operations.
+  }];
+}
+def HAL_BufferBarrierList : TupleOf<[HAL_BufferBarrier]>;
+
+def HAL_BufferBinding : NamedTupleOf<[
+    NamedTupleElement<0, "access", I32>,
+    NamedTupleElement<1, "buffer", RefPtrOf<HAL_Buffer>>,
+    NamedTupleElement<2, "buffer_offset", HAL_DeviceSize>,
+    NamedTupleElement<3, "buffer_length", HAL_DeviceSize>,
+  ], "BufferBinding"> {
+  let typeDescription = [{
+    BufferBinding struct that can be passed to the command buffer dispatch
+    recording operations.
+  }];
+}
+
+def HAL_FenceValue : NamedTupleOf<[
+    NamedTupleElement<0, "fence", RefPtrOf<HAL_Fence>>,
+    NamedTupleElement<1, "value", I64>
+  ], "FenceValue"> {
+  let typeDescription = [{
+    A reference to a fence and associated payload value.
+  }];
+}
+
+def HAL_SemaphoreValue : NamedTupleOf<[
+    NamedTupleElement<0, "semaphore", RefPtrOf<HAL_Semaphore>>,
+    NamedTupleElement<1, "value", I64>
+  ], "SemaphoreValue"> {
+  let typeDescription = [{
+    A reference to a timline semaphore and associated payload value.
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // Base HAL op classes

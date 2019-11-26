@@ -16,6 +16,594 @@
 #define IREE_DIALECT_HAL_OPS
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
+include "mlir/IR/OpAsmInterface.td"
+
+//===----------------------------------------------------------------------===//
+// Magic temporary hacks
+//===----------------------------------------------------------------------===//
+// TODO(benvanik): remove these as the sequencer/other HAL ops are added.
+
+def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let results = (outs
+    RefPtrOf<HAL_Device>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state
+    }], [{
+      state.addTypes({RefPtrType::get(DeviceType::get(builder->getContext()))});
+    }]>,
+  ];
+}
+
+def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device,
+    FlatSymbolRefAttr:$executable
+  );
+  let results = (outs
+    RefPtrOf<HAL_Executable>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      Value *device, StringRef executable
+    }], [{
+      state.addOperands({device});
+      state.addAttribute("executable", builder->getSymbolRefAttr(executable));
+      state.addTypes({RefPtrType::get(ExecutableType::get(builder->getContext()))});
+    }]>,
+  ];
+}
+
+def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device,
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// HAL struct definition ops
+//===----------------------------------------------------------------------===//
+
+def HAL_MakeMemoryBarrierOp : HAL_MakeTupleOp<"make_memory_barrier", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{temporary memory barrier allocation operation}];
+  let description = [{
+    Allocates a temporary MemoryBarrier struct that can be passed to the
+    command buffer barrier operations.
+  }];
+
+  let arguments = (ins
+    HAL_AccessScopeBitfieldAttr:$source_scope,
+    HAL_AccessScopeBitfieldAttr:$target_scope
+  );
+  let results = (outs
+    HAL_MemoryBarrier:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      IREE::HAL::AccessScopeBitfield sourceScope,
+      IREE::HAL::AccessScopeBitfield targetScope
+    }]>,
+  ];
+}
+
+def HAL_MakeMemoryBarrierListOp : HAL_PureOp<"make_memory_barrier_list"> {
+  let summary = [{memory barrier list construction operation}];
+
+  let arguments = (ins
+    Variadic<HAL_MemoryBarrier>:$memory_barriers
+  );
+  let results = (outs
+    HAL_MemoryBarrierList:$list
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      ArrayRef<Value *> memoryBarriers = {}
+    }], [{
+      state.addOperands(memoryBarriers);
+      state.addTypes({MemoryBarrierListType::get(memoryBarriers.size(),
+                                                 builder->getContext())});
+    }]>,
+  ];
+}
+
+def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{temporary buffer barrier allocation operation}];
+  let description = [{
+    Allocates a temporary BufferBarrier struct that can be passed to the
+    command buffer barrier operations.
+  }];
+
+  let arguments = (ins
+    HAL_AccessScopeBitfieldAttr:$source_scope,
+    HAL_AccessScopeBitfieldAttr:$target_scope,
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length
+  );
+  let results = (outs
+    HAL_BufferBarrier:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      IREE::HAL::AccessScopeBitfield sourceScope,
+      IREE::HAL::AccessScopeBitfield targetScope,
+      Value *buffer, Value *offset, Value *length
+    }]>,
+  ];
+}
+
+def HAL_MakeBufferBarrierListOp : HAL_PureOp<"make_buffer_barrier_list"> {
+  let summary = [{buffer barrier list construction operation}];
+
+  let arguments = (ins
+    Variadic<HAL_BufferBarrier>:$buffer_barriers
+  );
+  let results = (outs
+    HAL_BufferBarrierList:$list
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      ArrayRef<Value *> bufferBarriers = {}
+    }], [{
+      state.addOperands(bufferBarriers);
+      state.addTypes({BufferBarrierListType::get(bufferBarriers.size(),
+                                                 builder->getContext())});
+    }]>,
+  ];
+}
+
+def HAL_MakeBufferBindingOp : HAL_MakeTupleOp<"make_buffer_binding", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{temporary buffer binding allocation operation}];
+  let description = [{
+    Allocates a temporary BufferBinding struct that can be passed to the
+    command buffer dispatch recording operations.
+  }];
+
+  let arguments = (ins
+    HAL_MemoryAccessBitfieldAttr:$access,
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length
+  );
+  let results = (outs
+    HAL_BufferBinding:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      IREE::HAL::MemoryAccessBitfield access,
+      Value *buffer, Value *offset, Value *length
+    }]>,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Allocator
+//===----------------------------------------------------------------------===//
+
+def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer allocation size computation operation}];
+  let description = [{
+    Computes the byte size required for a buffer of the given shape and type.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_Shape:$shape,
+    I32Attr:$element_size
+  );
+  let results = (outs
+    HAL_DeviceSize:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *allocator,
+      IREE::HAL::MemoryTypeBitfield memoryTypes,
+      IREE::HAL::BufferUsageBitfield bufferUsage,
+      Value *shape, int32_t elementSize
+    }]>,
+  ];
+}
+
+def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{empty buffer allocation operation}];
+  let description = [{
+    Allocates a buffer from the allocator.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_DeviceSize:$allocation_size
+  );
+  let results = (outs
+    RefPtrOf<HAL_Buffer>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *allocator,
+      IREE::HAL::MemoryTypeBitfield memoryTypes,
+      IREE::HAL::BufferUsageBitfield bufferUsage,
+      Value *allocationSize
+    }]>,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Buffer
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): clone buffer op.
+
+def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer subspan operation}];
+  let description = [{
+    Returns a reference to a subspan of the buffer.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    HAL_DeviceSize:$length
+  );
+  let results = (outs
+    RefPtrOf<HAL_Buffer>:$result
+  );
+}
+
+def HAL_BufferFillOp : HAL_Op<"buffer.fill"> {
+  let summary = [{buffer fill operation}];
+  let description = [{
+    Fills the target buffer with the given repeating value.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length,
+    I32:$pattern
+  );
+}
+
+def HAL_BufferReadDataOp : HAL_Op<"buffer.read_data"> {
+  let summary = [{buffer-to-heap read operation}];
+  let description = [{
+    Reads a block of byte data from the resource at the given offset.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    RefPtrOf<MutableByteBufferType>:$target_buffer,
+    HAL_DeviceSize:$length
+  );
+}
+
+def HAL_BufferWriteDataOp : HAL_Op<"buffer.write_data"> {
+  let summary = [{heap-to-buffer write operation}];
+  let description = [{
+    Writes a block of byte data into the resource at the given offset.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_HostBufferRef:$source_buffer,
+    HAL_DeviceSize:$length
+  );
+}
+
+def HAL_BufferCopyDataOp : HAL_Op<"buffer.copy_data"> {
+  let summary = [{buffer-to-buffer copy operation}];
+  let description = [{
+    Copies data from the provided source_buffer into the buffer.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::BufferView
+//===----------------------------------------------------------------------===//
+
+def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer view indices to byte offset computation operation}];
+  let description = [{
+    Computes an element byte offset within a buffer.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Shape:$shape,
+    HAL_Dims:$indices
+  );
+
+  let results = (outs
+    HAL_DeviceSize:$offset
+  );
+}
+
+def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer view byte range computation operation}];
+  let description = [{
+    Computes a byte range within a buffer for one or more elements.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Shape:$shape,
+    HAL_Dims:$indices,
+    HAL_Dims:$lengths
+  );
+  let results = (outs
+    // TODO(benvanik): return a strides tuple instead, or one per dim.
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length
+  );
+}
+
+def HAL_BufferViewSliceOp : HAL_PureOp<"buffer_view.slice", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer view slice operation}];
+  let description = [{
+    Returns a view into a buffer. The buffer is not copied and both the original
+    and sliced references must be synchronized.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Shape:$shape,
+    HAL_Dims:$indices,
+    HAL_Dims:$lengths
+  );
+  let results = (outs
+    RefPtrOf<HAL_Buffer>:$result
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::CommandBuffer
+//===----------------------------------------------------------------------===//
+
+def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{command buffer allocation operation}];
+  let description = [{
+    Returns a command buffer from the device pool ready to begin recording.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device,
+    HAL_CommandBufferModeBitfieldAttr:$modes,
+    HAL_CommandCategoryBitfieldAttr:$command_categories
+  );
+  let results = (outs
+    RefPtrOf<HAL_CommandBuffer>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *device,
+      IREE::HAL::CommandBufferModeBitfield modes,
+      IREE::HAL::CommandCategoryBitfield commandCategories
+    }]>,
+  ];
+}
+
+def HAL_CommandBufferBeginOp : HAL_Op<"command_buffer.begin"> {
+  let summary = [{command buffer recording begin operation}];
+  let description = [{
+    Resets and begins recording into the command buffer, clearing all previously
+    recorded contents.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer
+  );
+}
+
+def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
+  let summary = [{command buffer recording end operation}];
+  let description = [{
+    Ends recording into the command buffer.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer
+  );
+}
+
+def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier"> {
+  let summary = [{command buffer execution barrier recording operation}];
+  let description = [{
+    Defines a memory dependency between commands recorded before and after the
+    barrier.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    HAL_ExecutionStageBitfieldAttr:$source_stage_mask,
+    HAL_ExecutionStageBitfieldAttr:$target_stage_mask,
+    // TODO(b/143186888): support multiple variadic operands.
+    HAL_MemoryBarrierList:$memory_barriers,
+    HAL_BufferBarrierList:$buffer_barriers
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *commandBuffer,
+      IREE::HAL::ExecutionStageBitfield sourceStageMask,
+      IREE::HAL::ExecutionStageBitfield targetStageMask,
+      Value *memoryBarriers, Value *bufferBarriers
+    }]>,
+  ];
+}
+
+// TODO(benvanik): event ops.
+
+def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
+  let summary = [{command buffer buffer fill recording operation}];
+  let description = [{
+    Fills the target buffer with the given repeating value.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length,
+    I32:$pattern
+  );
+}
+
+// TODO(benvanik): update buffer op.
+
+def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
+  let summary = [{command buffer buffer copy recording operation}];
+  let description = [{
+    Copies a range of one buffer to another.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_DeviceSize:$source_offset,
+    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
+    HAL_DeviceSize:$length
+  );
+}
+
+def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
+  let summary = [{command buffer dispatch recording operation}];
+  let description = [{
+    Dispatches an execution request.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    RefPtrOf<HAL_Executable>:$executable,
+    SymbolRefAttr:$entry_point,
+    HAL_Workgroups:$workgroups,
+    Variadic<HAL_BufferBinding>:$bindings
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *commandBuffer,
+      Value *executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
+      Value *workgroups, ArrayRef<Value *> bufferBindings
+    }]>,
+  ];
+}
+
+def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indirect"> {
+  let summary = [{command buffer indirect dispatch recording operation}];
+  let description = [{
+    Dispatches an execution request with the dispatch parameters loaded from the
+    given buffer.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    RefPtrOf<HAL_Executable>:$executable,
+    SymbolRefAttr:$entry_point,
+    HAL_BufferBinding:$workgroups,
+    Variadic<HAL_BufferBinding>:$bindings
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Device
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{device allocator accessor operation}];
+  let description = [{
+    Returns the allocator that can be used to allocate buffers compatible with
+    the device.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device
+  );
+  let results = (outs
+    RefPtrOf<HAL_Allocator>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *device
+    }], [{
+      state.addOperands({device});
+      state.addTypes({RefPtrType::get(AllocatorType::get(builder->getContext()))});
+    }]>,
+  ];
+}
+
+// TODO(benvanik): additional factory functions and submission ops.
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Executable
@@ -129,5 +717,29 @@ def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
   let parser = [{ return parseRegionEndOp(parser, &result); }];
   let printer = [{ return printRegionEndOp(p, *this); }];
 }
+
+//===----------------------------------------------------------------------===//
+// iree::hal::ExecutableCache
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): executable cache.
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Fence
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): fence query.
+
+//===----------------------------------------------------------------------===//
+// iree::hal::RingBuffer
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): ring buffer.
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Semaphore
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): semaphore query/set.
 
 #endif  // IREE_DIALECT_HAL_OPS

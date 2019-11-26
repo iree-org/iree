@@ -70,7 +70,7 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@local_config_mlir//:StdOpsTdFiles",
     ],
 )
 
@@ -85,7 +85,7 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@local_config_mlir//:StdOpsTdFiles",
     ],
 )
 
@@ -100,6 +100,6 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@local_config_mlir//:StdOpsTdFiles",
     ],
 )

@@ -23,6 +23,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 #include "mlir/Support/LLVM.h"
@@ -35,7 +36,11 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-class AllocatorType : public Type::TypeBase<AllocatorType, Type> {
+//===----------------------------------------------------------------------===//
+// RefObject types
+//===----------------------------------------------------------------------===//
+
+class AllocatorType : public Type::TypeBase<AllocatorType, RefObjectType> {
  public:
   using Base::Base;
   static AllocatorType get(MLIRContext *context) {
@@ -44,7 +49,7 @@ class AllocatorType : public Type::TypeBase<AllocatorType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Allocator; }
 };
 
-class BufferType : public Type::TypeBase<BufferType, Type> {
+class BufferType : public Type::TypeBase<BufferType, RefObjectType> {
  public:
   using Base::Base;
   static BufferType get(MLIRContext *context) {
@@ -53,7 +58,8 @@ class BufferType : public Type::TypeBase<BufferType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Buffer; }
 };
 
-class CommandBufferType : public Type::TypeBase<CommandBufferType, Type> {
+class CommandBufferType
+    : public Type::TypeBase<CommandBufferType, RefObjectType> {
  public:
   using Base::Base;
   static CommandBufferType get(MLIRContext *context) {
@@ -62,7 +68,7 @@ class CommandBufferType : public Type::TypeBase<CommandBufferType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::CommandBuffer; }
 };
 
-class DeviceType : public Type::TypeBase<DeviceType, Type> {
+class DeviceType : public Type::TypeBase<DeviceType, RefObjectType> {
  public:
   using Base::Base;
   static DeviceType get(MLIRContext *context) {
@@ -71,7 +77,7 @@ class DeviceType : public Type::TypeBase<DeviceType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Device; }
 };
 
-class EventType : public Type::TypeBase<EventType, Type> {
+class EventType : public Type::TypeBase<EventType, RefObjectType> {
  public:
   using Base::Base;
   static EventType get(MLIRContext *context) {
@@ -80,7 +86,7 @@ class EventType : public Type::TypeBase<EventType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Event; }
 };
 
-class ExecutableType : public Type::TypeBase<ExecutableType, Type> {
+class ExecutableType : public Type::TypeBase<ExecutableType, RefObjectType> {
  public:
   using Base::Base;
   static ExecutableType get(MLIRContext *context) {
@@ -89,7 +95,8 @@ class ExecutableType : public Type::TypeBase<ExecutableType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Executable; }
 };
 
-class ExecutableCacheType : public Type::TypeBase<ExecutableCacheType, Type> {
+class ExecutableCacheType
+    : public Type::TypeBase<ExecutableCacheType, RefObjectType> {
  public:
   using Base::Base;
   static ExecutableCacheType get(MLIRContext *context) {
@@ -100,7 +107,7 @@ class ExecutableCacheType : public Type::TypeBase<ExecutableCacheType, Type> {
   }
 };
 
-class FenceType : public Type::TypeBase<FenceType, Type> {
+class FenceType : public Type::TypeBase<FenceType, RefObjectType> {
  public:
   using Base::Base;
   static FenceType get(MLIRContext *context) {
@@ -109,7 +116,7 @@ class FenceType : public Type::TypeBase<FenceType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::Fence; }
 };
 
-class RingBufferType : public Type::TypeBase<RingBufferType, Type> {
+class RingBufferType : public Type::TypeBase<RingBufferType, RefObjectType> {
  public:
   using Base::Base;
   static RingBufferType get(MLIRContext *context) {
@@ -118,13 +125,74 @@ class RingBufferType : public Type::TypeBase<RingBufferType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::RingBuffer; }
 };
 
-class SemaphoreType : public Type::TypeBase<SemaphoreType, Type> {
+class SemaphoreType : public Type::TypeBase<SemaphoreType, RefObjectType> {
  public:
   using Base::Base;
   static SemaphoreType get(MLIRContext *context) {
     return Base::get(context, TypeKind::Semaphore);
   }
   static bool kindof(unsigned kind) { return kind == TypeKind::Semaphore; }
+};
+
+//===----------------------------------------------------------------------===//
+// Struct types
+//===----------------------------------------------------------------------===//
+
+class BufferBarrierType {
+ public:
+  static TupleType get(MLIRContext *context) {
+    return TupleType::get(
+        {
+            IntegerType::get(32, context),
+            IntegerType::get(32, context),
+            RefPtrType::get(BufferType::get(context)),
+            IntegerType::get(32, context),
+            IntegerType::get(32, context),
+        },
+        context);
+  }
+};
+
+class BufferBarrierListType {
+ public:
+  static TupleType get(size_t count, MLIRContext *context) {
+    SmallVector<Type, 4> elementTypes(count, BufferBarrierType::get(context));
+    return TupleType::get(elementTypes, context);
+  }
+};
+
+class MemoryBarrierType {
+ public:
+  static TupleType get(MLIRContext *context) {
+    return TupleType::get(
+        {
+            IntegerType::get(32, context),
+            IntegerType::get(32, context),
+        },
+        context);
+  }
+};
+
+class MemoryBarrierListType {
+ public:
+  static TupleType get(size_t count, MLIRContext *context) {
+    SmallVector<Type, 4> elementTypes(count, MemoryBarrierType::get(context));
+    return TupleType::get(elementTypes, context);
+  }
+};
+
+class BufferBindingType {
+ public:
+  static TupleType get(MLIRContext *context) {
+    return TupleType::get(
+        {
+            IntegerType::get(32, context),
+            RefPtrType::get(BufferType::get(context)),
+            IntegerType::get(32, context),
+            IntegerType::get(32, context),
+        },
+        context);
+  }
 };
 
 }  // namespace HAL
