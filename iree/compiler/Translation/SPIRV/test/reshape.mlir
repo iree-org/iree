@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | FileCheck %s
+// RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | FileCheck %s --enable-var-scope
 
 module {
   // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
@@ -23,7 +23,7 @@ module {
     // CHECK: [[GLOBALID:%.*]] = spv.Load "Input" [[GLOBALIDPTR]]
     // CHECK: [[GLOBALIDX:%.*]] = spv.CompositeExtract [[GLOBALID]][0 : i32]
     // CHECK: [[GLOBALIDY:%.*]] = spv.CompositeExtract [[GLOBALID]][1 : i32]
-    // CHECK-LABEL: spv.selection
+    // CHECK: spv.selection
     // CHECK-DAG: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK-DAG: [[ZERO1:%.*]] = spv.constant 0 : i32
     // CHECK-DAG: [[STRIDE0:%.*]] = spv.constant 42 : i32
@@ -47,7 +47,7 @@ module {
   // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0) : !spv.ptr<!spv.struct<!spv.array<4 x !spv.array<6 x !spv.array<21 x i32 [4]> [84]> [504]> [0]>, StorageBuffer>
   func @reshape_3D_2D(%arg0: memref<4x6x21xi32>, %arg1: memref<12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
-    // CHECK-LABEL: spv.selection
+    // CHECK: spv.selection
     // CHECK-DAG: [[STRIDE1:%.*]] = spv.constant 126 : i32
     // CHECK-DAG: [[I0:%.*]] = spv.SDiv [[L1:%.*]], [[STRIDE2]] : i32
     // CHECK-DAG: [[I1:%.*]] = spv.SMod [[L1]], [[STRIDE2]] : i32
@@ -75,7 +75,7 @@ module {
     // CHECK: [[GLOBALID:%.*]] = spv.Load "Input" [[GLOBALIDPTR]]
     // CHECK: [[GLOBALIDX:%.*]] = spv.CompositeExtract [[GLOBALID]][0 : i32]
     // CHECK: [[GLOBALIDY:%.*]] = spv.CompositeExtract [[GLOBALID]][1 : i32]
-    // CHECK-LABEL: spv.selection
+    // CHECK: spv.selection
     // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK-DAG: [[ZERO:%.*]] = spv.constant 0 : i32
     // CHECK-DAG: [[FORTYTWO:%.*]] = spv.constant 42 : i32
