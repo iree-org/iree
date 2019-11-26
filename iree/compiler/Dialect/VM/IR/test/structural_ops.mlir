@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of structural ops.
 
-// RUN: iree-opt -split-input-file %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @module_empty
 vm.module @module_empty {}

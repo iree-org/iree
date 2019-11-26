@@ -14,7 +14,7 @@
 
 // Tests folding and canonicalization of constant ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(cse),vm.module(canonicalize)' %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(cse),vm.module(canonicalize)' %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @const_i32_folds
 vm.module @const_i32_folds {

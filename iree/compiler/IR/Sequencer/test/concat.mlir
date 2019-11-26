@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -pass-pipeline='func(canonicalize)' %s --split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt -pass-pipeline='func(canonicalize)' %s --split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: func @concat.1D
 // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]+]]

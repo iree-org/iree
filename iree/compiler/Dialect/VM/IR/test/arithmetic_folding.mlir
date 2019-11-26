@@ -14,7 +14,7 @@
 
 // Tests folding and canonicalization of arithmetic ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @add_i32_folds
 vm.module @add_i32_folds {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values=1xi32=42 --output_types=i | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values=1xi32=42 --output_types=i | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: EXEC @narrow_int
 func @narrow_int(%arg : tensor<1xi32>) -> tensor<1xi8> {

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="f32=42.0" --output_types="i,i,i,i,i,i" | FileCheck %s
+// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="f32=42.0" --output_types="i,i,i,i,i,i" | FileCheck %s --enable-var-scope
 
 // CHECK-LABEL: EXEC @cmpf
 func @cmpf(%42 : f32) -> (i1, i1, i1, i1, i1, i1) { // need at least one arg to avoid constant folding

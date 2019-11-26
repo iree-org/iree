@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt %s -iree-make-executable-abi -split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt %s -iree-make-executable-abi -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: func @staticOutputEntry
 func @staticOutputEntry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>)

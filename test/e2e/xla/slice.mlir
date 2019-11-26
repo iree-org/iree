@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="3x4xf32= 1 2 3 4 5 6 7 8 9 10 11 12" | FileCheck %s
-// RUN: iree-run-mlir --target_backends=vulkan-spirv %s --input_values="3x4xf32= 1 2 3 4 5 6 7 8 9 10 11 12" | FileCheck %s
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="3x4xf32= 1 2 3 4 5 6 7 8 9 10 11 12" | FileCheck %s --enable-var-scope
+// RUN: iree-run-mlir --target_backends=vulkan-spirv %s --input_values="3x4xf32= 1 2 3 4 5 6 7 8 9 10 11 12" | FileCheck %s --enable-var-scope
 
 // CHECK-LABEL: EXEC @slice_whole_buffer
 func @slice_whole_buffer(%arg : tensor<3x4xf32>) -> tensor<3x4xf32> {

@@ -14,7 +14,7 @@
 
 // Tests folding and canonicalization of control flow ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @cond_br_folds
 vm.module @cond_br_folds {

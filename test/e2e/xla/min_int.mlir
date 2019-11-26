@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xi32> {

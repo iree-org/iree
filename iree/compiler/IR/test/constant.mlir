@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt %s | iree-opt | FileCheck %s --dump-input=fail
+// RUN: iree-opt %s | iree-opt | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @const
 func @const() -> (memref<i32>, memref<i32>, memref<i32>, memref<i32>) {

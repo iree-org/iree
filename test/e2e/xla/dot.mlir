@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode -input_values="2xf32=0.3, 0.5" %s | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode -input_values="2xf32=0.3, 0.5" %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: EXEC @dot_passthrough
 func @dot_passthrough(%arg0: tensor<2xf32>) -> tensor<1x3xf32> {

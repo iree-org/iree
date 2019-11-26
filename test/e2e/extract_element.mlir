@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="i8=4" --output_types=i | FileCheck %s
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="i8=4" --output_types=i | FileCheck %s --enable-var-scope
 
 // CHECK-LABEL: @extract_element
 func @extract_element(%arg0: tensor<i8>) -> i8 {

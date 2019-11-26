@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt --lower-xla-to-iree-interpreter %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt --lower-xla-to-iree-interpreter %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @slice
 // CHECK-SAME: [[ARG:%[a-zA-Z0-9]+]]

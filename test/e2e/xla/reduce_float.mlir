@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --output_types="f" | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --output_types="f" | FileCheck %s --enable-var-scope --dump-input=fail
 // TODO(b/142903911): figure out swiftshader+asan crash:
 // RUN: iree-run-mlir %s --target_backends=vulkan-spirv --output_types="f" --norun
 
