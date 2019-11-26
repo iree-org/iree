@@ -42,10 +42,22 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
     Operation *operation) const {
   auto storeOp = cast<IREE::StoreOutputOp>(operation);
   auto src = storeOp.src();
-  auto srcType = src->getType().dyn_cast<ShapedType>();
-  if (!srcType || !srcType.hasStaticShape()) {
-    return storeOp.emitError(
-        "can only handle store with src being tensor of static shape");
+  SmallVector<int64_t, 4> srcShape;
+  int64_t srcNumElements = 0;
+  Type srcType = src->getType();
+  if (auto srcShapedType = srcType.dyn_cast<ShapedType>()) {
+    if (!srcShapedType.hasStaticShape()) {
+      return storeOp.emitError(
+          "can only handle store with src being tensor of static shape");
+    }
+    srcShape.append(srcShapedType.getShape().begin(),
+                    srcShapedType.getShape().end());
+    srcNumElements = srcShapedType.getNumElements();
+  } else if (srcType.isIntOrFloat()) {
+    srcShape.push_back(1);
+    srcNumElements = 1;
+  } else {
+    return storeOp.emitError("unhandled src type for iree.store operation");
   }
 
   SmallVector<int64_t, 3> launchSize;
@@ -86,9 +98,9 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
   // of the stored tensor.
   AffineMap srcMap;
   SmallVector<int64_t, 3> revLaunchSize(reverse(launchSize));
-  if (numElements != srcType.getNumElements() ||
+  if (numElements != srcNumElements ||
       failed(getReshapeOperandMap(funcOp, builder, launchMap, revLaunchSize,
-                                  srcType.getShape(), srcMap))) {
+                                  srcShape, srcMap))) {
     return storeOp.emitError(
         "unable to map from launch id to element to compute within a "
         "workitem");

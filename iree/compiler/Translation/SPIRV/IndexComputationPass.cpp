@@ -37,7 +37,7 @@ class IndexComputationPass : public FunctionPass<IndexComputationPass> {
 void IndexComputationPass::runOnFunction() {
   // Initialize the index computation.
   IndexPropagationList<
-      IndexPropagationOp<ConstantOp>,
+      IndexPropagationOp<ConstantOp>, ExtractElementOpIndexPropagation,
       // IREE-specific ops:
       IndexPropagationOp<IREE::ReturnOp>, IREELoadIndexPropagation,
       IREEStoreIndexPropagation,

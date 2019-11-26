@@ -75,6 +75,19 @@ class IndexPropagationOp : public IndexPropagation {
 };
 
 // ===-------------------------------------------------------------------- ===//
+// ExtractElementOp
+// ===-------------------------------------------------------------------- ===//
+class ExtractElementOpIndexPropagation final
+    : public IndexPropagationOp<ExtractElementOp> {
+ public:
+  using IndexPropagationOp<ExtractElementOp>::IndexPropagationOp;
+
+  LogicalResult propagateIndexMap(
+      Operation *operation, AffineMap resultIndex,
+      SmallVectorImpl<AffineMap> &operandIndices) const override;
+};
+
+// ===-------------------------------------------------------------------- ===//
 // NoBroadCastPwOp
 // ===-------------------------------------------------------------------- ===//
 

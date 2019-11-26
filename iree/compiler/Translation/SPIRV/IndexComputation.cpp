@@ -245,5 +245,36 @@ LogicalResult IndexPropagation::propagateIndexMap(Operation *op) const {
   return success();
 }
 
+// ===-------------------------------------------------------------------- ===//
+// ExtractElementOp
+// ===-------------------------------------------------------------------- ===//
+
+LogicalResult ExtractElementOpIndexPropagation::propagateIndexMap(
+    Operation *operation, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &operandIndices) const {
+  assert(resultIndex.getResults().size() == 1);
+  // TODO(ravishankarm) : For now just implement the case for 0-D tensors. For
+  // rank > 0, the indices are of index type, i.e. scalars. So the index maps
+  // for those would just have results as (0). For the aggregate, create as many
+  // symbols as the number of indices. Support that when needed, and have a
+  // clearer picture as to what index types become at the time of SPIR-V
+  // lowering since they do not have an equivalent XLA-HLO representation.
+  auto extractElementOp = cast<ExtractElementOp>(operation);
+  if (extractElementOp.aggregate()->getType().cast<ShapedType>().getRank() >
+      0) {
+    return extractElementOp.emitError(
+        "unhandled index propagation for non-zero ranked tensor types");
+  }
+  auto scalarMap = index_computation_attribute::getAffineMap(
+      operation->getParentOfType<FuncOp>(),
+      getAffineConstantExpr(0, resultIndex.getContext()));
+  if (failed(index_computation_attribute::addNewIndexMapForValue(
+          extractElementOp.aggregate(), scalarMap))) {
+    return failure();
+  }
+  operandIndices.push_back(scalarMap);
+  return success();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
