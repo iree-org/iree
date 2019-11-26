@@ -33,6 +33,7 @@ package(
 spirv_kernel_cc_library(
     name = "Kernels",
     srcs = [
+        "conv2d_nhwc.comp",
         "matmul.comp",
         "reduce_untiled.comp",
     ],

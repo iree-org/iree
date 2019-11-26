@@ -1,0 +1,145 @@
+// Copyright 2019 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Simple conv2d for NHWC and HWIO ordering.
+// The compiler emits this handwritten kernel for Conv2d operations. Right now
+// this prevents fusion with the Conv dispatch, however in the future we can
+// do some SPIR-V module merging tricks to make fusing possible.
+//
+// Since this is a special well-known kernel we can use specialization constants
+// if we want to create variants for other layouts. Alternative vendor-specific
+// implementations will need to be in separate files as we need some special
+// handing for required extensions.
+
+#version 450
+
+// TODO(namiller): tile.
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, binding = 0) buffer readonly arg0_binding {
+   float arg0[];
+};
+layout(std430, binding = 1) buffer readonly arg1_binding {
+   float arg1[];
+};
+layout(std430, binding = 2) buffer writeonly ret0_binding {
+   float ret0[];
+};
+
+struct Padding {
+  int low;
+  int high;
+};
+
+// Padding parameters.
+layout(constant_id = 100) const int kPaddingLow0 = 0;
+layout(constant_id = 101) const int kPaddingHigh0 = 0;
+layout(constant_id = 102) const int kPaddingLow1 = 0;
+layout(constant_id = 103) const int kPaddingHigh1 = 0;
+
+Padding paddings[2] = Padding[2](
+  Padding(kPaddingLow0, kPaddingHigh0),
+  Padding(kPaddingLow1, kPaddingHigh1));
+
+// LHS Extents (size of each dimension) in the buffer order.
+layout(constant_id = 110) const int kLhsExtentN = 0;
+layout(constant_id = 111) const int kLhsExtentH = 0;
+layout(constant_id = 112) const int kLhsExtentW = 0;
+layout(constant_id = 113) const int kLhsExtentC = 0;
+int lhsExtents[4] = int[4](
+  kLhsExtentN, kLhsExtentH, kLhsExtentW, kLhsExtentC);
+
+// RHS Extents (size of each dimension) in the buffer order.
+layout(constant_id = 120) const int kRhsExtentH = 0;
+layout(constant_id = 121) const int kRhsExtentW = 0;
+layout(constant_id = 122) const int kRhsExtentI = 0;
+layout(constant_id = 123) const int kRhsExtentO = 0;
+int rhsExtents[4] = int[4](
+  kRhsExtentH, kRhsExtentW, kRhsExtentI, kRhsExtentO);
+
+// Ret extents in NHWC order (computed).
+int retExtents[4] = int[4](
+  kLhsExtentN, // input batch size.
+  // lhs + padding - rhs + 1
+  kLhsExtentH - kRhsExtentH + kPaddingLow0 + kPaddingHigh0 + 1,
+  kLhsExtentW - kRhsExtentW + kPaddingLow1 + kPaddingHigh1 + 1,
+  kRhsExtentO); // output feature size.
+
+// The location in NHWC order. Takes into account padding.
+float readLhs(int[4] loc) {
+  int index = 0;
+  int mulAcc = 1;
+  // Iterate in reverse buffer order.
+  for (int dim = 3; dim >= 0; --dim) {
+    Padding padding = Padding(0, 0);
+    if (dim == 1 || dim == 2) {
+      // Read padding if we are operating on a spatial dim.
+      padding = paddings[dim-1];
+    }
+    if (loc[dim] - padding.low >= lhsExtents[dim] ||
+        loc[dim] - padding.low < 0) {
+      return 0;
+    }
+    index += mulAcc * (loc[dim] - padding.low);
+    mulAcc *= lhsExtents[dim];
+  }
+  return arg0[index];
+}
+
+// The location in HWIO order.
+float readRhs(int[4] loc) {
+  int index = 0;
+  int mulAcc = 1;
+  for (int dim = 3; dim >= 0; --dim) {
+    if (loc[dim] >= rhsExtents[dim] || loc[dim] < 0) {
+      return 0;
+    }
+    index += mulAcc * loc[dim];
+    mulAcc *= rhsExtents[dim];
+  }
+  return arg1[index];
+}
+
+// The output location in NHWC order.
+void writeRet(int[4] loc, float val) {
+  int index = 0;
+  int mulAcc = 1;
+  for (int dim = 3; dim >= 0; --dim) {
+    if (loc[dim] >= retExtents[dim] || loc[dim] < 0) {
+      return;
+    }
+    index += mulAcc * loc[dim];
+    mulAcc *= retExtents[dim];
+  }
+  ret0[index] = val;
+}
+
+void main() {
+  int batch = int(gl_GlobalInvocationID.z); // 0..kBatchSize
+  int o_y = int(gl_GlobalInvocationID.y);   // 0..kOutputHeight
+  int o_x = int(gl_GlobalInvocationID.x);   // 0..kOutputWidth
+  for (int o_feature = 0; o_feature < kRhsExtentO; ++o_feature) {
+    float acc = 0;
+    for (int i_feature = 0; i_feature < kRhsExtentI; ++i_feature) {
+      for (int k_y = 0; k_y < kRhsExtentH; ++k_y) {
+        for (int k_x = 0; k_x < kRhsExtentW; ++k_x) {
+          acc += readLhs(int[4](batch, o_y + k_y, o_x + k_x, i_feature)) *
+                 readRhs(int[4](k_y, k_x, i_feature, o_feature));
+        }
+      }
+    }
+    writeRet(int[4](batch, o_y, o_x, o_feature), acc);
+  }
+}
+
