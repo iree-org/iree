@@ -44,6 +44,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":dynamic_symbols",
+        ":extensibility_util",
         ":vulkan_device",
         ":vulkan_driver",
         "//iree/base:api",
@@ -359,6 +360,7 @@ cc_library(
         ":pipeline_cache",
         ":status_util",
         ":vma_allocator",
+        "//iree/base:math",
         "//iree/base:memory",
         "//iree/base:status",
         "//iree/base:tracing",

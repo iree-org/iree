@@ -36,12 +36,31 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
+// A set of queues within a specific queue family on a VkDevice.
+struct QueueSet {
+  // The index of a particular queue family on a VkPhysicalDevice, as described
+  // by vkGetPhysicalDeviceQueueFamilyProperties.
+  uint32_t queue_family_index;
+
+  // Bitfield of queue indices within the queue family at |queue_family_index|.
+  uint64_t queue_indices;
+};
+
 class VulkanDevice final : public Device {
  public:
+  // Creates a device that manages its own VkDevice.
   static StatusOr<ref_ptr<VulkanDevice>> Create(
       ref_ptr<Driver> driver, const DeviceInfo& device_info,
       VkPhysicalDevice physical_device,
       const ExtensibilitySpec& extensibility_spec,
+      const ref_ptr<DynamicSymbols>& syms);
+
+  // Creates a device that wraps an externally managed VkDevice.
+  static StatusOr<ref_ptr<VulkanDevice>> Wrap(
+      ref_ptr<Driver> driver, const DeviceInfo& device_info,
+      VkPhysicalDevice physical_device, VkDevice logical_device,
+      const ExtensibilitySpec& extensibility_spec,
+      const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set,
       const ref_ptr<DynamicSymbols>& syms);
 
   ~VulkanDevice() override;

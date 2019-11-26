@@ -23,7 +23,6 @@
 #include "iree/hal/device_info.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
-#include "iree/hal/vulkan/vulkan_device.h"
 
 namespace iree {
 namespace hal {
@@ -165,15 +164,35 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
            << "VkInstance must not be VK_NULL_HANDLE";
   }
 
-  // TODO(scotttodd): Use options (validate, find enabled extensions, etc.)
+  // Find the extensions we need (or want) that are also available on the
+  // instance. This will fail when required ones are not present.
+  //
+  // Since the instance is already created, we can't actually enable any
+  // extensions or query if they are really enabled - we just have to trust
+  // that the caller already enabled them for us (or we may fail later).
+  ASSIGN_OR_RETURN(
+      auto enabled_extension_names,
+      MatchAvailableInstanceExtensions(options.instance_extensibility, *syms));
+  auto instance_extensions =
+      PopulateEnabledInstanceExtensions(enabled_extension_names);
 
   RETURN_IF_ERROR(syms->LoadFromInstance(instance));
 
-  // TODO(scotttodd): DebugReporter
+  // TODO(benvanik): strip in release builds.
+  std::unique_ptr<DebugReporter> debug_reporter;
+  if (instance_extensions.debug_utils) {
+    ASSIGN_OR_RETURN(debug_reporter, DebugReporter::CreateDebugUtilsMessenger(
+                                         instance, syms,
+                                         /*allocation_callbacks=*/nullptr));
+  } else if (instance_extensions.debug_report) {
+    ASSIGN_OR_RETURN(debug_reporter,
+                     DebugReporter::CreateDebugReportCallback(
+                         instance, syms, /*allocation_callbacks=*/nullptr));
+  }
 
   return assign_ref(new VulkanDriver(
       std::move(syms), instance, /*owns_instance=*/false,
-      /*debug_reporter=*/nullptr, std::move(options.device_extensibility)));
+      std::move(debug_reporter), std::move(options.device_extensibility)));
 }
 
 VulkanDriver::VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,
@@ -246,6 +265,24 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
                                     add_ref(this), device_info, physical_device,
                                     device_extensibility_spec_, syms()));
 
+  return device;
+}
+
+StatusOr<ref_ptr<Device>> VulkanDriver::WrapDevice(
+    VkPhysicalDevice physical_device, VkDevice logical_device,
+    const QueueSet& compute_queue_set, const QueueSet& transfer_queue_set) {
+  IREE_TRACE_SCOPE0("VulkanDriver::WrapDevice");
+
+  ASSIGN_OR_RETURN(auto device_info,
+                   PopulateDeviceInfo(physical_device, syms()));
+
+  // Attempt to create the device.
+  // This may fail if the VkDevice does not support all necessary features.
+  ASSIGN_OR_RETURN(
+      auto device,
+      VulkanDevice::Wrap(add_ref(this), device_info, physical_device,
+                         logical_device, device_extensibility_spec_,
+                         compute_queue_set, transfer_queue_set, syms()));
   return device;
 }
 

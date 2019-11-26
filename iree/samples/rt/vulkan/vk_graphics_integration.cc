@@ -24,6 +24,7 @@
 #include <vulkan/vulkan.h>
 
 #include <array>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -53,6 +54,7 @@ static VkInstance g_Instance = VK_NULL_HANDLE;
 static VkPhysicalDevice g_PhysicalDevice = VK_NULL_HANDLE;
 static VkDevice g_Device = VK_NULL_HANDLE;
 static uint32_t g_QueueFamily = (uint32_t)-1;
+static VkDeviceQueueCreateInfo g_QueueInfos[1] = {};
 static VkQueue g_Queue = VK_NULL_HANDLE;
 static VkPipelineCache g_PipelineCache = VK_NULL_HANDLE;
 static VkDescriptorPool g_DescriptorPool = VK_NULL_HANDLE;
@@ -70,15 +72,76 @@ static void check_vk_result(VkResult err) {
 
 #define CHECK_IREE_OK(status) CHECK_EQ(IREE_STATUS_OK, (status))
 
-static void SetupVulkan(const char** extensions, uint32_t extensions_count) {
+std::vector<const char*> GetIreeExtensions(
+    iree_hal_vulkan_extensibility_set_t extensibility_set,
+    iree_hal_vulkan_features_t features) {
+  iree_host_size_t required_count;
+  iree_hal_vulkan_get_extensions(extensibility_set, features, 0, NULL,
+                                 &required_count);
+  std::vector<const char*> extensions(required_count);
+  iree_hal_vulkan_get_extensions(extensibility_set, features, extensions.size(),
+                                 extensions.data(), &required_count);
+  return extensions;
+}
+
+static std::vector<const char*> GetInstanceExtensions(
+    SDL_Window* window, iree_hal_vulkan_features_t vulkan_features) {
+  // Ask SDL for its list of required instance extensions.
+  uint32_t sdl_extensions_count = 0;
+  SDL_Vulkan_GetInstanceExtensions(window, &sdl_extensions_count, NULL);
+  std::vector<const char*> sdl_extensions(sdl_extensions_count);
+  SDL_Vulkan_GetInstanceExtensions(window, &sdl_extensions_count,
+                                   sdl_extensions.data());
+
+  std::vector<const char*> iree_required_extensions =
+      GetIreeExtensions(IREE_HAL_VULKAN_INSTANCE_REQUIRED, vulkan_features);
+  std::vector<const char*> iree_optional_extensions =
+      GetIreeExtensions(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, vulkan_features);
+
+  // Merge extensions lists, including optional and required for simplicity.
+  std::set<const char*> ext_set;
+  ext_set.insert(sdl_extensions.begin(), sdl_extensions.end());
+  ext_set.insert(iree_required_extensions.begin(),
+                 iree_required_extensions.end());
+  ext_set.insert(iree_optional_extensions.begin(),
+                 iree_optional_extensions.end());
+  std::vector<const char*> extensions(ext_set.begin(), ext_set.end());
+  return extensions;
+}
+
+static std::vector<const char*> GetDeviceExtensions(
+    iree_hal_vulkan_features_t vulkan_features) {
+  std::vector<const char*> iree_required_extensions =
+      GetIreeExtensions(IREE_HAL_VULKAN_DEVICE_REQUIRED, vulkan_features);
+  std::vector<const char*> iree_optional_extensions =
+      GetIreeExtensions(IREE_HAL_VULKAN_DEVICE_OPTIONAL, vulkan_features);
+
+  // Merge extensions lists, including optional and required for simplicity.
+  std::set<const char*> ext_set;
+  ext_set.insert("VK_KHR_swapchain");
+  ext_set.insert(iree_required_extensions.begin(),
+                 iree_required_extensions.end());
+  ext_set.insert(iree_optional_extensions.begin(),
+                 iree_optional_extensions.end());
+  std::vector<const char*> extensions(ext_set.begin(), ext_set.end());
+  return extensions;
+}
+
+static void SetupVulkan(iree_hal_vulkan_features_t vulkan_features,
+                        const char** instance_layers,
+                        uint32_t instance_layers_count,
+                        const char** instance_extensions,
+                        uint32_t instance_extensions_count) {
   VkResult err;
 
   // Create Vulkan Instance
   {
     VkInstanceCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    create_info.enabledExtensionCount = extensions_count;
-    create_info.ppEnabledExtensionNames = extensions;
+    create_info.enabledLayerCount = instance_layers_count;
+    create_info.ppEnabledLayerNames = instance_layers;
+    create_info.enabledExtensionCount = instance_extensions_count;
+    create_info.ppEnabledExtensionNames = instance_extensions;
     err = vkCreateInstance(&create_info, g_Allocator, &g_Instance);
     check_vk_result(err);
   }
@@ -100,7 +163,8 @@ static void SetupVulkan(const char** extensions, uint32_t extensions_count) {
     free(gpus);
   }
 
-  // Select graphics queue family
+  // Select queue family. We want a single queue with graphics and compute for
+  // simplicity, but we could also discover and use separate queues for each.
   {
     uint32_t count;
     vkGetPhysicalDeviceQueueFamilyProperties(g_PhysicalDevice, &count, NULL);
@@ -108,7 +172,8 @@ static void SetupVulkan(const char** extensions, uint32_t extensions_count) {
         sizeof(VkQueueFamilyProperties) * count);
     vkGetPhysicalDeviceQueueFamilyProperties(g_PhysicalDevice, &count, queues);
     for (uint32_t i = 0; i < count; i++)
-      if (queues[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+      if (queues[i].queueFlags &
+          (VK_QUEUE_GRAPHICS_BIT | VK_QUEUE_COMPUTE_BIT)) {
         g_QueueFamily = i;
         break;
       }
@@ -118,21 +183,20 @@ static void SetupVulkan(const char** extensions, uint32_t extensions_count) {
 
   // Create Logical Device (with 1 queue)
   {
-    int device_extension_count = 1;
-    const char* device_extensions[] = {"VK_KHR_swapchain"};
+    std::vector<const char*> device_extensions =
+        GetDeviceExtensions(vulkan_features);
     const float queue_priority[] = {1.0f};
-    VkDeviceQueueCreateInfo queue_info[1] = {};
-    queue_info[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_info[0].queueFamilyIndex = g_QueueFamily;
-    queue_info[0].queueCount = 1;
-    queue_info[0].pQueuePriorities = queue_priority;
+    g_QueueInfos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    g_QueueInfos[0].queueFamilyIndex = g_QueueFamily;
+    g_QueueInfos[0].queueCount = 1;
+    g_QueueInfos[0].pQueuePriorities = queue_priority;
     VkDeviceCreateInfo create_info = {};
     create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     create_info.queueCreateInfoCount =
-        sizeof(queue_info) / sizeof(queue_info[0]);
-    create_info.pQueueCreateInfos = queue_info;
-    create_info.enabledExtensionCount = device_extension_count;
-    create_info.ppEnabledExtensionNames = device_extensions;
+        sizeof(g_QueueInfos) / sizeof(g_QueueInfos[0]);
+    create_info.pQueueCreateInfos = g_QueueInfos;
+    create_info.enabledExtensionCount = device_extensions.size();
+    create_info.ppEnabledExtensionNames = device_extensions.data();
     err =
         vkCreateDevice(g_PhysicalDevice, &create_info, g_Allocator, &g_Device);
     check_vk_result(err);
@@ -325,12 +389,16 @@ extern "C" int main(int argc, char** argv) {
       SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
 
   // Setup Vulkan
-  uint32_t extensions_count = 0;
-  SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, NULL);
-  const char** extensions = new const char*[extensions_count];
-  SDL_Vulkan_GetInstanceExtensions(window, &extensions_count, extensions);
-  SetupVulkan(extensions, extensions_count);
-  delete[] extensions;
+  int layers_count = 1;
+  const char* layers[] = {"VK_LAYER_LUNARG_standard_validation"};
+  iree_hal_vulkan_features_t iree_vulkan_features =
+      static_cast<iree_hal_vulkan_features_t>(
+          IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
+          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+  std::vector<const char*> extensions =
+      GetInstanceExtensions(window, iree_vulkan_features);
+  SetupVulkan(iree_vulkan_features, layers, layers_count, extensions.data(),
+              extensions.size());
 
   // Create Window Surface
   VkSurfaceKHR surface;
@@ -428,23 +496,31 @@ extern "C" int main(int argc, char** argv) {
 
   // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
   LOG(INFO) << "Creating Vulkan driver/device";
+  // Load symbols from our static `vkGetInstanceProcAddr` for IREE to use.
   iree_hal_vulkan_syms_t* iree_vk_syms = nullptr;
   CHECK_IREE_OK(iree_hal_vulkan_syms_create(
       reinterpret_cast<void*>(&vkGetInstanceProcAddr), &iree_vk_syms));
+  // Create the driver sharing our VkInstance.
   iree_hal_driver_t* iree_vk_driver = nullptr;
-  // TODO(scotttodd): pass VkInstance
   iree_hal_vulkan_driver_options_t options;
-  options.extensibility_options =
-      static_cast<iree_hal_vulkan_extensibility_options_t>(
-          IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS |
-          IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+  options.features = static_cast<iree_hal_vulkan_features_t>(
+      IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
+      IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
   CHECK_IREE_OK(iree_hal_vulkan_driver_create_using_instance(
       options, iree_vk_syms, g_Instance, &iree_vk_driver));
+  // Create a device sharing our VkDevice and queue.
+  // We could also create a separate (possibly low priority) compute queue for
+  // IREE, and/or provide a dedicated transfer queue.
+  iree_hal_vulkan_queue_set_t compute_queue_set;
+  compute_queue_set.queue_family_index = g_QueueFamily;
+  compute_queue_set.queue_indices = 1 << 0;
+  iree_hal_vulkan_queue_set_t transfer_queue_set;
+  transfer_queue_set.queue_indices = 0;
   iree_hal_device_t* iree_vk_device = nullptr;
-  // TODO(scotttodd): pass VkDevice
-  CHECK_IREE_OK(iree_hal_vulkan_driver_create_default_device(iree_vk_driver,
-                                                             &iree_vk_device));
+  CHECK_IREE_OK(iree_hal_vulkan_driver_wrap_device(
+      iree_vk_driver, g_PhysicalDevice, g_Device, compute_queue_set,
+      transfer_queue_set, &iree_vk_device));
+  // Register the device.
   CHECK_IREE_OK(
       iree_rt_instance_register_device(iree_instance, iree_vk_device));
   LOG(INFO) << "Created Vulkan driver/device";

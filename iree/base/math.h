@@ -193,6 +193,18 @@ IREE_FORCEINLINE int LeadingZeros(T x) {
                         : CountLeadingZeros32(static_cast<uint32_t>(x));
 }
 
+// Returns the number of 1 bits in a 32 bit value.
+IREE_FORCEINLINE int CountOnes32(uint32_t n) {
+  n -= ((n >> 1) & 0x55555555);
+  n = ((n >> 2) & 0x33333333) + (n & 0x33333333);
+  return static_cast<int>((((n + (n >> 4)) & 0xF0F0F0F) * 0x1010101) >> 24);
+}
+
+// Returns the number of 1 bits in a 64 bit value.
+IREE_FORCEINLINE int CountOnes64(uint64_t n) {
+  return CountOnes32(n >> 32) + CountOnes32(n & 0xffffffff);
+}
+
 // Rounds up the value to the nearest power of 2 (if not already a power of 2).
 IREE_FORCEINLINE int RoundUpToNearestPow2(int n) {
   return n ? ~0u >> LeadingZeros(n) : 1;

@@ -31,6 +31,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::api
     iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::extensibility_util
     iree::hal::vulkan::vulkan_device
     iree::hal::vulkan::vulkan_driver
     Vulkan::Headers
@@ -408,6 +409,7 @@ iree_cc_library(
     absl::strings
     absl::synchronization
     absl::span
+    iree::base::math
     iree::base::memory
     iree::base::status
     iree::base::tracing
