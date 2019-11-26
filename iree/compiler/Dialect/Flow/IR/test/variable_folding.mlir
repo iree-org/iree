@@ -14,7 +14,7 @@
 
 // Tests folding and canonicalization of variable ops.
 
-// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -canonicalize %s | iree-opt -split-input-file | FileCheck %s --dump-input=fail
 
 // CHECK: flow.variable @v_initialized dense<4> : tensor<4xi32>
 flow.variable @v_initialized init(@initializer) : tensor<4xi32>

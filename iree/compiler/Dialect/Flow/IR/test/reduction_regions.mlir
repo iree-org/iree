@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of reduction region ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --dump-input=fail
 
 // CHECK-LABEL: @singleReduction
 func @singleReduction(%arg0 : tensor<5x1xf32>) {
