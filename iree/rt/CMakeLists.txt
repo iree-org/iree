@@ -28,6 +28,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::api
     iree::hal::buffer_view
+    iree::hal::driver_registry
     iree::rt
   PUBLIC
 )
