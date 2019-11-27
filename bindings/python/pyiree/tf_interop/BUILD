@@ -55,6 +55,11 @@ cc_library(
     ],
 )
 
+# Runtime deps needed to compile the tensorflow compiler.
+SAVED_MODEL_TF_RUNTIME_DEPS = [
+    "@org_tensorflow//tensorflow/core:ops",
+]
+
 TF_XLA_PASS_DEPS = [
     "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
 ]
@@ -77,7 +82,7 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
         "//bindings/python/pyiree:base",
-    ] + TF_XLA_PASS_DEPS,
+    ] + SAVED_MODEL_TF_RUNTIME_DEPS + TF_XLA_PASS_DEPS,
 )
 
 cc_library(

@@ -32,6 +32,12 @@ Follow the
 [install instructions](https://docs.bazel.build/versions/master/install-ubuntu.html)
 and verify with: `bazel --version`.
 
+If you are planning on using TensorFlow/Colab, make sure that the Bazel version
+you install is
+[supported by TensorFlow](https://www.tensorflow.org/install/source#install_bazel).
+A .bazelversion file is also provided if you want to use
+[Bazelisk](https://github.com/bazelbuild/bazelisk) to manage Bazel versions.
+
 ### Install clang
 
 ```
@@ -60,6 +66,12 @@ Install packages:
 
 ```
 sudo pip3 install numpy
+```
+
+If using Colab, you may also want to install TensorFlow:
+
+```shell
+sudo pip3 install tf-nightly
 ```
 
 ### Install the Vulkan SDK
