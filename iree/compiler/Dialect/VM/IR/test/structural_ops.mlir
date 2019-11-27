@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of structural ops.
 
-// RUN: iree-opt -split-input-file %s | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @module_empty
 vm.module @module_empty {}
@@ -78,6 +78,6 @@ vm.module @import_funcs {
   // CHECK-NEXT: vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
   vm.import @my.fn_attrs(%foo : i32, %bar : i32) -> i32 attributes {a}
 
-  // CHECK-NEXT: vm.import @my.fn_varargs(%foo : i32, %bar : tuple<i32, i32>...) -> i32
-  vm.import @my.fn_varargs(%foo : i32, %bar : tuple<i32, i32>...) -> i32
+  // CHECK-NEXT: vm.import @my.fn_varargs(%foo : vector<3xi32>..., %bar : tuple<i32, i32>...) -> i32
+  vm.import @my.fn_varargs(%foo : vector<3xi32>..., %bar : tuple<i32, i32>...) -> i32
 }

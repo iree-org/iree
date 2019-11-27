@@ -183,7 +183,6 @@ def VM_ImportOp : VM_Op<"import", [
   }];
 
   let arguments = (ins
-    UnitAttr:$is_variadic,
     OptionalAttr<VM_Ordinal>:$ordinal
   );
 
@@ -193,7 +192,7 @@ def VM_ImportOp : VM_Op<"import", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &result, StringRef name,
-      FunctionType type, bool isVariadic, ArrayRef<NamedAttribute> attrs = {},
+      FunctionType type, ArrayRef<NamedAttribute> attrs = {},
       ArrayRef<NamedAttributeList> argAttrs = {}
     }]>,
   ];
@@ -204,6 +203,16 @@ def VM_ImportOp : VM_Op<"import", [
       return getAttrOfType<TypeAttr>(getTypeAttrName())
           .getValue()
           .cast<FunctionType>();
+    }
+
+    /// Returns the name of the given function argument.
+    StringRef getFuncArgumentName(int i) {
+      return getArgAttrOfType<StringAttr>(i, "vm.name").getValue();
+    }
+
+    /// Returns true if the given function argument is a variadic/packed value.
+    bool isFuncArgumentVariadic(int i) {
+      return !!getArgAttrOfType<UnitAttr>(i, "vm.variadic");
     }
 
     /// Hook for OpTrait::FunctionLike, returns the number of function

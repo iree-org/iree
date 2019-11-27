@@ -218,11 +218,18 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     NamedAttributeList argAttrList;
     argAttrList.set(builder.getIdentifier("vm.name"),
                     builder.getStringAttr(operand.name));
-    argAttrs.push_back(argAttrList);
     if (succeeded(parser.parseOptionalEllipsis())) {
-      result->addAttribute("is_variadic", UnitAttr::get(result->getContext()));
+      argAttrList.set(builder.getIdentifier("vm.variadic"),
+                      builder.getUnitAttr());
     }
-    if (failed(parser.parseOptionalComma())) continue;
+    argAttrs.push_back(argAttrList);
+    if (failed(parser.parseOptionalComma())) {
+      if (failed(parser.parseRParen())) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "invalid argument list (expected rparen)";
+      }
+      break;
+    }
   }
   SmallVector<Type, 8> resultTypes;
   if (failed(parser.parseOptionalArrowTypeList(resultTypes))) {
@@ -258,12 +265,11 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
       p << name.getValue() << " : ";
     }
     p.printType(op.getType().getInput(i));
+    if (op.getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
+      p << "...";
+    }
     if (i < op.getNumFuncArguments() - 1) {
       p << ", ";
-    } else {
-      if (op.is_variadic()) {
-        p << "...";
-      }
     }
   }
   p << ")";
@@ -284,15 +290,11 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
 }
 
 void ImportOp::build(Builder *builder, OperationState &result, StringRef name,
-                     FunctionType type, bool isVariadic,
-                     ArrayRef<NamedAttribute> attrs,
+                     FunctionType type, ArrayRef<NamedAttribute> attrs,
                      ArrayRef<NamedAttributeList> argAttrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder->getStringAttr(name));
   result.addAttribute("type", TypeAttr::get(type));
-  if (isVariadic) {
-    result.addAttribute("is_variadic", UnitAttr::get(builder->getContext()));
-  }
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
     return;
