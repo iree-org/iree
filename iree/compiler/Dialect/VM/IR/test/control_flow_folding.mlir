@@ -69,10 +69,24 @@ vm.module @cond_br_folds {
   }
 
   // CHECK-LABEL: @erase_unused_pure_call
-  vm.func @erase_unused_pure_call() {
+  vm.func @erase_unused_pure_call(%arg0 : i32) {
+    %0 = vm.call @nonvariadic_pure_func(%arg0) : (i32) -> i32
+    %1 = vm.call.variadic @variadic_pure_func([%arg0]) : (i32 ...) -> i32
     // CHECK-NEXT: vm.return
-    %0 = vm.call @target_func() : () -> i32
     vm.return
   }
-  vm.func @target_func() -> i32 attributes {nosideeffects}
+  vm.import @nonvariadic_pure_func(%arg0 : i32) -> i32 attributes {nosideeffects}
+  vm.import @variadic_pure_func(%arg0 : i32 ...) -> i32 attributes {nosideeffects}
+
+  // CHECK-LABEL: @convert_nonvariadic_to_call
+  vm.func @convert_nonvariadic_to_call(%arg0 : i32) -> (i32, i32) {
+    // CHECK-NEXT: vm.call @nonvariadic_func(%arg0) : (i32) -> i32
+    %0 = vm.call.variadic @nonvariadic_func(%arg0) : (i32) -> i32
+    // CHECK-NEXT: vm.call.variadic @variadic_func
+    %1 = vm.call.variadic @variadic_func(%arg0, []) : (i32, i32 ...) -> i32
+    // CHECK-NEXT: vm.return
+    vm.return %0, %1 : i32, i32
+  }
+  vm.import @nonvariadic_func(%arg0 : i32) -> i32
+  vm.import @variadic_func(%arg0 : i32, %arg1 : i32 ...) -> i32
 }

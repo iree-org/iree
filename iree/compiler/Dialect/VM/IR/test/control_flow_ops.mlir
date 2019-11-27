@@ -70,11 +70,71 @@ vm.module @my_module {
 
 // CHECK-LABEL: @call_fn
 vm.module @my_module {
-  vm.func @import_fn(%arg0 : i32) -> i32
+  vm.import @import_fn(%arg0 : i32) -> i32
   vm.func @call_fn(%arg0 : i32) -> i32 {
     // CHECK: %0 = vm.call @import_fn(%arg0) : (i32) -> i32
     %0 = vm.call @import_fn(%arg0) : (i32) -> i32
     vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @call_variadic_but_not_really
+vm.module @my_module {
+  vm.import @import_fn(%arg0 : i32) -> i32
+  vm.func @call_variadic_but_not_really(%arg0 : i32) -> i32 {
+    // CHECK: %0 = vm.call.variadic @import_fn(%arg0) : (i32) -> i32
+    %0 = vm.call.variadic @import_fn(%arg0) : (i32) -> i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @call_variadic_empty
+vm.module @my_module {
+  vm.import @import_fn(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>...) -> i32
+  vm.func @call_variadic_empty(%arg0 : i32) -> i32 {
+    // CHECK: %0 = vm.call.variadic @import_fn(%arg0, []) : (i32, !ireex.ref<!hal.buffer>...) -> i32
+    %0 = vm.call.variadic @import_fn(%arg0, []) : (i32, !ireex.ref<!hal.buffer>...) -> i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @call_variadic
+vm.module @my_module {
+  vm.import @import_fn(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>...) -> i32
+  vm.func @call_variadic(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>) -> i32 {
+    // CHECK: %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1]) : (i32, !ireex.ref<!hal.buffer>...) -> i32
+    %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1]) : (i32, !ireex.ref<!hal.buffer>...) -> i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @call_variadic_multiple
+vm.module @my_module {
+  vm.import @import_fn(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>...) -> i32
+  vm.func @call_variadic_multiple(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>) -> i32 {
+    // CHECK: %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !ireex.ref<!hal.buffer>..., !ireex.ref<!hal.buffer>...) -> i32
+    %0 = vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !ireex.ref<!hal.buffer>..., !ireex.ref<!hal.buffer>...) -> i32
+    vm.return %0 : i32
+  }
+}
+
+// -----
+
+// CHECK-LABEL: @call_variadic_no_results
+vm.module @my_module {
+  vm.import @import_fn(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>...)
+  vm.func @call_variadic_no_results(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>) {
+    // CHECK: vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !ireex.ref<!hal.buffer>..., !ireex.ref<!hal.buffer>...)
+    vm.call.variadic @import_fn(%arg0, [%arg1, %arg1], [%arg1]) : (i32, !ireex.ref<!hal.buffer>..., !ireex.ref<!hal.buffer>...)
+    vm.return
   }
 }
 

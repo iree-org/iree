@@ -125,16 +125,17 @@ def VM_OPC_CmpNZRef              : VM_OPC<0x3C, "CmpNZRef">;
 def VM_OPC_Branch                : VM_OPC<0x40, "Branch">;
 def VM_OPC_CondBranch            : VM_OPC<0x41, "CondBranch">;
 def VM_OPC_Call                  : VM_OPC<0x42, "Call">;
-def VM_OPC_Return                : VM_OPC<0x43, "Return">;
+def VM_OPC_CallVariadic          : VM_OPC<0x43, "CallVariadic">;
+def VM_OPC_Return                : VM_OPC<0x44, "Return">;
 
 // Async/fiber ops:
-def VM_OPC_Yield                 : VM_OPC<0x44, "Yield">;
+def VM_OPC_Yield                 : VM_OPC<0x50, "Yield">;
 
 // Debugging:
-def VM_OPC_Trace                 : VM_OPC<0x50, "Trace">;
-def VM_OPC_Print                 : VM_OPC<0x51, "Print">;
-def VM_OPC_CondBreak             : VM_OPC<0x52, "CondBreak">;
-def VM_OPC_Break                 : VM_OPC<0x53, "Break">;
+def VM_OPC_Trace                 : VM_OPC<0x60, "Trace">;
+def VM_OPC_Print                 : VM_OPC<0x61, "Print">;
+def VM_OPC_CondBreak             : VM_OPC<0x62, "CondBreak">;
+def VM_OPC_Break                 : VM_OPC<0x63, "Break">;
 
 def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     // Core VM opcodes (0x00-0x7F):
@@ -179,6 +180,7 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_Branch,
     VM_OPC_CondBranch,
     VM_OPC_Call,
+    VM_OPC_CallVariadic,
     VM_OPC_Return,
     VM_OPC_Yield,
     VM_OPC_Trace,
@@ -244,11 +246,15 @@ class VM_EncRodataAttr<string name> : VM_EncEncodeExpr<
 class VM_EncTypeOf<string name> : VM_EncEncodeExpr<
     "e.encodeType(" # name # "())">;
 class VM_EncIntAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
-    "e.encodeIntAttr(getAttr(\"" # name # "\"))"> {
+    "e.encodeIntAttr(getAttrOfType<IntegerAttr>(\"" # name # "\"))"> {
+  int bitwidth = thisBitwidth;
+}
+class VM_EncIntArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
+    "e.encodeIntArrayAttr(getAttrOfType<DenseIntElementsAttr>(\"" # name # "\"))"> {
   int bitwidth = thisBitwidth;
 }
 class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
-    "e.encodeStrAttr(getAttr(\"" # name # "\"))">;
+    "e.encodeStrAttr(getAttrOfType<StringAttr>(\"" # name # "\"))">;
 class VM_EncBranch<string blockName, string operandsName> : VM_EncEncodeExpr<
     "e.encodeBranch(" # blockName # "(), " # operandsName # "())">;
 class VM_EncOperand<string name, int ordinal> : VM_EncEncodeExpr<

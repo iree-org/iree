@@ -1176,11 +1176,36 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   let hasCanonicalizer = 1;
 }
 
-class VM_CallBaseOp<string mnemonic, VM_OPC opcode, list<OpTrait> traits = []> :
+class VM_CallBaseOp<string mnemonic, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
       CallOpInterface,
     ])> {
+  let extraClassDeclaration = [{
+    // TODO(b/132296600): make tablegen follow the style guide.
+    StringRef getCallee() { return callee(); }
+
+    // TODO(b/133879130): make tablegen support variadic operand accessors.
+    /// Get the argument operands to the called function.
+    operand_range getArgOperands() {
+      return {arg_operand_begin(), arg_operand_end()};
+    }
+    operand_iterator arg_operand_begin() { return operand_begin(); }
+    operand_iterator arg_operand_end() { return operand_end(); }
+
+    /// Return the callee of this operation.
+    CallInterfaceCallable getCallableForCallee() {
+      return getAttrOfType<FlatSymbolRefAttr>("callee");
+    }
+  }];
+}
+
+def VM_CallOp : VM_CallBaseOp<"call"> {
+  let summary = [{call operation}];
+  let description = [{
+    Calls an internal VM function with the given arguments.
+  }];
+
   let arguments = (ins
     VM_FuncRefAttr:$callee,
     Variadic<VM_AnyType>:$operands
@@ -1190,12 +1215,13 @@ class VM_CallBaseOp<string mnemonic, VM_OPC opcode, list<OpTrait> traits = []> :
   );
 
   let encoding = [
-    VM_EncOpcode<opcode>,
+    VM_EncOpcode<VM_OPC_Call>,
     VM_EncFuncAttr<"callee">,
     VM_EncVariadicOperands<"operands">,
     VM_EncVariadicResults<"results">,
   ];
 
+  let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &result, IREE::VM::FuncOp callee,
@@ -1222,32 +1248,58 @@ class VM_CallBaseOp<string mnemonic, VM_OPC opcode, list<OpTrait> traits = []> :
     }]>,
   ];
 
-  let extraClassDeclaration = [{
-    // TODO(b/132296600): make tablegen follow the style guide.
-    StringRef getCallee() { return callee(); }
-    FunctionType getCalleeType();
-
-    // TODO(b/133879130): make tablegen support variadic operand accessors.
-    /// Get the argument operands to the called function.
-    operand_range getArgOperands() {
-      return {arg_operand_begin(), arg_operand_end()};
-    }
-    operand_iterator arg_operand_begin() { return operand_begin(); }
-    operand_iterator arg_operand_end() { return operand_end(); }
-
-    /// Return the callee of this operation.
-    CallInterfaceCallable getCallableForCallee() {
-      return getAttrOfType<FlatSymbolRefAttr>("callee");
-    }
-  }];
+  let hasCanonicalizer = 1;
 }
 
-def VM_CallOp :
-    VM_CallBaseOp<"call", VM_OPC_Call> {
-  let summary = [{call operation}];
+def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
+  let summary = [{call operation with variadic arguments}];
   let description = [{
-    Calls an internal VM function with the given arguments.
+    Calls an internal VM function with the given arguments. One or more of the
+    arguments may be variadic, encoded as segmented sized operand lists.
+
+    Variadic arguments must be specified with a total count in the segment_sizes
+    attribute.
   }];
+
+  let arguments = (ins
+    VM_FuncRefAttr:$callee,
+    IntElementsAttr<8>:$segment_sizes,
+    TypeArrayAttr:$segment_types,
+    Variadic<VM_AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<VM_AnyType>:$results
+  );
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_CallVariadic>,
+    VM_EncFuncAttr<"callee">,
+    VM_EncIntArrayAttr<"segment_sizes", 8>,
+    VM_EncVariadicOperands<"operands">,
+    VM_EncVariadicResults<"results">,
+  ];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, FlatSymbolRefAttr callee,
+      ArrayRef<Type> resultTypes, ArrayRef<int8_t> segmentSizes = {},
+      ArrayRef<Type> segmentTypes = {}, ArrayRef<Value *> operands = {}
+    }], [{
+      result.addAttribute("callee", callee);
+      result.addAttribute("segment_sizes",
+          DenseIntElementsAttr::get(
+              VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+                              builder->getIntegerType(8)),
+              segmentSizes));
+      result.addAttribute("segment_types", builder->getArrayAttr(
+          llvm::to_vector<4>(llvm::map_range(segmentTypes, [&](Type type) {
+              return TypeAttr::get(type).cast<Attribute>();
+          }))));
+      result.addOperands(operands);
+      result.addTypes(resultTypes);
+    }]>,
+  ];
 
   let hasCanonicalizer = 1;
 }

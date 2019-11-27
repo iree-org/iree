@@ -559,7 +559,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 
     DISPATCH_OP(Call, {
       // let encoding = [
-      //   VM_EncOpcode<opcode>,
+      //   VM_EncOpcode<VM_OPC_Call>,
       //   VM_EncFuncAttr<"callee">,
       //   VM_EncVariadicOperands<"operands">,
       //   VM_EncVariadicResults<"results">,
@@ -628,6 +628,18 @@ iree_status_t iree_vm_bytecode_dispatch(
         regs->ref_register_count = function_descriptor->ref_register_count;
         offset = callee_frame->offset;
       }
+    });
+
+    DISPATCH_OP(CallVariadic, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_CallVariadic>,
+      //   VM_EncFuncAttr<"callee">,
+      //   VM_EncIntArrayAttr<"segment_sizes", 8>,
+      //   VM_EncVariadicOperands<"operands">,
+      //   VM_EncVariadicResults<"results">,
+      // ];
+      // TODO(benvanik): implement variadic calls.
+      return IREE_STATUS_UNIMPLEMENTED;
     });
 
     DISPATCH_OP(Return, {

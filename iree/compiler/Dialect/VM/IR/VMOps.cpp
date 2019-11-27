@@ -1080,12 +1080,166 @@ static void printCallOp(OpAsmPrinter &p, CallOp &op) {
   p << ')';
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
   p << " : ";
-  p.printType(op.getCalleeType());
+  p.printType(FunctionType::get(llvm::to_vector<4>(op.getOperandTypes()),
+                                llvm::to_vector<4>(op.getResultTypes()),
+                                op.getContext()));
 }
 
-FunctionType CallOp::getCalleeType() {
-  return FunctionType::get(llvm::to_vector<4>(getOperandTypes()),
-                           llvm::to_vector<4>(getResultTypes()), getContext());
+static ParseResult parseCallVariadicOp(OpAsmParser &parser,
+                                       OperationState *result) {
+  FlatSymbolRefAttr calleeAttr;
+  FunctionType calleeType;
+  auto calleeLoc = parser.getNameLoc();
+  if (failed(parser.parseAttribute(calleeAttr, "callee", result->attributes)) ||
+      failed(parser.parseLParen())) {
+    return parser.emitError(calleeLoc) << "invalid callee symbol";
+  }
+
+  SmallVector<OpAsmParser::OperandType, 4> flatOperands;
+  SmallVector<int8_t, 4> segmentSizes;
+  while (failed(parser.parseOptionalRParen())) {
+    if (succeeded(parser.parseOptionalLSquare())) {
+      // Variadic list.
+      SmallVector<OpAsmParser::OperandType, 4> segmentOperands;
+      while (failed(parser.parseOptionalRSquare())) {
+        OpAsmParser::OperandType segmentOperand;
+        if (failed(parser.parseOperand(segmentOperand))) {
+          return parser.emitError(parser.getCurrentLocation())
+                 << "invalid operand";
+        }
+        segmentOperands.push_back(segmentOperand);
+        if (failed(parser.parseOptionalComma())) {
+          if (failed(parser.parseRSquare())) {
+            return parser.emitError(parser.getCurrentLocation())
+                   << "malformed variadic operand list";
+          }
+          break;
+        }
+      }
+      segmentSizes.push_back(segmentOperands.size());
+      flatOperands.append(segmentOperands.begin(), segmentOperands.end());
+    } else {
+      // Normal single operand.
+      OpAsmParser::OperandType operand;
+      if (failed(parser.parseOperand(operand))) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "malformed non-variadic operand";
+      }
+      segmentSizes.push_back(-1);
+      flatOperands.push_back(operand);
+    }
+    if (failed(parser.parseOptionalComma())) {
+      if (failed(parser.parseRParen())) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "expected closing )";
+      }
+      break;
+    }
+  }
+
+  if (failed(parser.parseOptionalAttrDict(result->attributes)) ||
+      failed(parser.parseColon()) || failed(parser.parseLParen())) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "malformed optional attributes list";
+  }
+  SmallVector<Type, 4> flatOperandTypes;
+  SmallVector<Type, 4> segmentTypes;
+  int segmentIndex = 0;
+  while (failed(parser.parseOptionalRParen())) {
+    Type operandType;
+    if (failed(parser.parseType(operandType))) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "invalid operand type";
+    }
+    bool isVariadic = succeeded(parser.parseOptionalEllipsis());
+    if (isVariadic) {
+      for (int i = 0; i < segmentSizes[segmentIndex]; ++i) {
+        flatOperandTypes.push_back(operandType);
+      }
+    } else {
+      flatOperandTypes.push_back(operandType);
+    }
+    segmentTypes.push_back(operandType);
+    ++segmentIndex;
+
+    if (failed(parser.parseOptionalComma())) {
+      if (failed(parser.parseRParen())) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "expected closing )";
+      }
+      break;
+    }
+  }
+  if (failed(parser.resolveOperands(flatOperands, flatOperandTypes, calleeLoc,
+                                    result->operands))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "operands do not match type list";
+  }
+  result->addAttribute(
+      "segment_sizes",
+      DenseIntElementsAttr::get(
+          VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+                          parser.getBuilder().getIntegerType(8)),
+          segmentSizes));
+  result->addAttribute("segment_types",
+                       parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
+                           llvm::map_range(segmentTypes, [&](Type type) {
+                             return TypeAttr::get(type).cast<Attribute>();
+                           }))));
+
+  if (failed(parser.parseOptionalArrowTypeList(result->types))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "malformed function type results";
+  }
+
+  return success();
+}
+
+static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
+  p << op.getOperationName() << ' ' << op.getAttr("callee") << '(';
+  int operand = 0;
+  interleaveComma(op.segment_sizes(), p, [&](APInt segmentSize) {
+    if (segmentSize.getSExtValue() == -1) {
+      p.printOperand(op.getOperand(operand++));
+    } else {
+      p << '[';
+      SmallVector<Value *, 4> segmentOperands;
+      for (int i = 0; i < segmentSize.getZExtValue(); ++i) {
+        segmentOperands.push_back(op.getOperand(operand++));
+      }
+      interleaveComma(segmentOperands, p,
+                      [&](Value *operand) { p.printOperand(operand); });
+      p << ']';
+    }
+  });
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+                              "callee",
+                              "segment_sizes",
+                              "segment_types",
+                          });
+  p << " : (";
+  interleaveComma(llvm::zip(op.segment_sizes(), op.segment_types()), p,
+                  [&](std::pair<APInt, Attribute> segmentSizeType) {
+                    int segmentSize = segmentSizeType.first.getSExtValue();
+                    Type segmentType =
+                        segmentSizeType.second.cast<TypeAttr>().getValue();
+                    if (segmentSize == -1) {
+                      p.printType(segmentType);
+                    } else {
+                      p.printType(segmentType);
+                      p << "...";
+                    }
+                  });
+  p << ")";
+  if (op.getNumResults() == 1) {
+    p << " -> ";
+    p.printType(op.getResult(0)->getType());
+  } else if (op.getNumResults() > 1) {
+    p << " -> (";
+    interleaveComma(op.getResultTypes(), p);
+    p << ")";
+  }
 }
 
 static ParseResult parseReturnOp(OpAsmParser &parser, OperationState *result) {

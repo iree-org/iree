@@ -728,9 +728,12 @@ namespace {
 
 /// Removes vm.call ops to functions that are marked as having no side-effects
 /// if the results are unused.
-struct EraseUnusedCallOp : public OpRewritePattern<CallOp> {
-  using OpRewritePattern<CallOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CallOp op,
+template <typename T>
+struct EraseUnusedCallOp : public OpRewritePattern<T> {
+  using OpRewritePattern<T>::OpRewritePattern;
+  using OpRewritePattern<T>::matchSuccess;
+  using OpRewritePattern<T>::matchFailure;
+  PatternMatchResult matchAndRewrite(T op,
                                      PatternRewriter &rewriter) const override {
     // First check if the call is unused - this ensures we only do the symbol
     // lookup if we are actually going to use it.
@@ -740,14 +743,13 @@ struct EraseUnusedCallOp : public OpRewritePattern<CallOp> {
       }
     }
 
-    auto calleeOp = dyn_cast<FuncOp>(SymbolTable::lookupSymbolIn(
-        op.getParentOfType<ModuleOp>(), op.callee()));
+    auto *calleeOp = SymbolTable::lookupSymbolIn(
+        op.template getParentOfType<ModuleOp>(), op.callee());
 
     bool hasNoSideEffects = false;
-    if (calleeOp.getAttr("nosideeffects")) {
+    if (calleeOp->getAttr("nosideeffects")) {
       hasNoSideEffects = true;
-    } else if (auto import =
-                   dyn_cast<ImportInterface>(calleeOp.getOperation())) {
+    } else if (auto import = dyn_cast<ImportInterface>(calleeOp)) {
       hasNoSideEffects = !import.hasSideEffects();
     }
     if (!hasNoSideEffects) {
@@ -765,7 +767,35 @@ struct EraseUnusedCallOp : public OpRewritePattern<CallOp> {
 
 void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                          MLIRContext *context) {
-  results.insert<EraseUnusedCallOp>(context);
+  results.insert<EraseUnusedCallOp<CallOp>>(context);
+}
+
+namespace {
+
+/// Converts a vm.call.variadic to a non-variadic function to a normal vm.call.
+struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
+  using OpRewritePattern<CallVariadicOp>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(CallVariadicOp op,
+                                     PatternRewriter &rewriter) const override {
+    // If any segment size is != -1 (which indicates variadic) we bail.
+    for (auto segmentSize : op.segment_sizes()) {
+      if (segmentSize.getSExtValue() != -1) {
+        return matchFailure();
+      }
+    }
+    rewriter.replaceOpWithNewOp<CallOp>(op, op.callee(),
+                                        llvm::to_vector<4>(op.getResultTypes()),
+                                        llvm::to_vector<4>(op.getOperands()));
+    return matchSuccess();
+  }
+};
+
+}  // namespace
+
+void CallVariadicOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<EraseUnusedCallOp<CallVariadicOp>, ConvertNonVariadicToCallOp>(
+      context);
 }
 
 //===----------------------------------------------------------------------===//
