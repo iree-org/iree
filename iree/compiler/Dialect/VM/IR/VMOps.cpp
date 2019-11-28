@@ -18,6 +18,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/FunctionImplementation.h"
 #include "mlir/IR/FunctionSupport.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
