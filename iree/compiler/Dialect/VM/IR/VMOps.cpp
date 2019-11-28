@@ -1219,18 +1219,19 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
                               "segment_types",
                           });
   p << " : (";
-  interleaveComma(llvm::zip(op.segment_sizes(), op.segment_types()), p,
-                  [&](std::pair<APInt, Attribute> segmentSizeType) {
-                    int segmentSize = segmentSizeType.first.getSExtValue();
-                    Type segmentType =
-                        segmentSizeType.second.cast<TypeAttr>().getValue();
-                    if (segmentSize == -1) {
-                      p.printType(segmentType);
-                    } else {
-                      p.printType(segmentType);
-                      p << "...";
-                    }
-                  });
+  interleaveComma(
+      llvm::zip(op.segment_sizes(), op.segment_types()), p,
+      [&](std::tuple<APInt, Attribute> segmentSizeType) {
+        int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
+        Type segmentType =
+            std::get<1>(segmentSizeType).cast<TypeAttr>().getValue();
+        if (segmentSize == -1) {
+          p.printType(segmentType);
+        } else {
+          p.printType(segmentType);
+          p << "...";
+        }
+      });
   p << ")";
   if (op.getNumResults() == 1) {
     p << " -> ";
