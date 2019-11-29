@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | FileCheck %s
+// RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | FileCheck %s --enable-var-scope
 
 // CHECK: [[MAP0:\#.*]] = ([[DIM00:d.*]], [[DIM01:d.*]], [[DIM02:d.*]]) -> (s0, 0, [[DIM00]])
 // CHECK: [[MAP1:\#.*]] = ([[DIM10:d.*]], [[DIM11:d.*]], [[DIM12:d.*]]) -> (0)
 // CHECK: [[MAP2:\#.*]] = ([[DIM20:d.*]], [[DIM21:d.*]], [[DIM22:d.*]]) -> (0, [[DIM20]])
 
 module {
-  // CHECK-LABEL: func @foo
+  // CHECK: func @foo
   // CHECK-SAME: [[ARG0:%.*]]: memref<5x1x10xf32> {iree.index_computation_info = {{\[\[}}[[MAP0]]{{\]\]}}}
   // CHECK-SAME: [[ARG1:%.*]]: memref<i64> {iree.index_computation_info = {{\[\[}}[[MAP1]]{{\]\]}}, iree.symbol_number_info = {{\[\[}}[[MAP1]], 0 : i32{{\]\]}}}
   func @foo(%arg0: memref<5x1x10xf32>, %arg1: memref<i64>, %arg2: memref<1x10xf32>)

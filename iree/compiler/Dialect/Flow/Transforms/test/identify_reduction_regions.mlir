@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -iree-flow-identify-reduction-regions %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -iree-flow-identify-reduction-regions %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @single_reduction
 func @single_reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {

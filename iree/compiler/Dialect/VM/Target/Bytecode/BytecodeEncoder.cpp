@@ -73,11 +73,9 @@ class V0BytecodeEncoder : public BytecodeEncoder {
       return symbolOp->emitOpError() << "missing ordinal";
     }
     int32_t ordinal = ordinalAttr.getInt();
-    if (auto funcOp = dyn_cast<IREE::VM::FuncOp>(symbolOp)) {
-      if (funcOp.isExternal()) {
-        // Imported functions have their MSB set.
-        ordinal |= 0x80000000u;
-      }
+    if (isa<IREE::VM::ImportOp>(symbolOp)) {
+      // Imported functions have their MSB set.
+      ordinal |= 0x80000000u;
     }
     return writeInt32(ordinal);
   }
@@ -94,7 +92,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
                        mlir::Type::FIRST_IREE_TYPE);
   }
 
-  LogicalResult encodeIntAttr(Attribute value) override {
+  LogicalResult encodeIntAttr(IntegerAttr value) override {
     auto attr = value.cast<IntegerAttr>();
     int bitWidth = attr.getType().getIntOrFloatBitWidth();
     uint64_t limitedValue = attr.getValue().extractBitsAsZExtValue(bitWidth, 0);
@@ -111,8 +109,21 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     }
   }
 
-  LogicalResult encodeStrAttr(Attribute value) override {
-    auto stringValue = value.cast<StringAttr>().getValue();
+  LogicalResult encodeIntArrayAttr(DenseIntElementsAttr value) override {
+    if (value.getNumElements() > UINT8_MAX ||
+        failed(writeUint8(value.getNumElements()))) {
+      return currentOp_->emitOpError() << "integer array size out of bounds";
+    }
+    for (auto el : value.getAttributeValues()) {
+      if (failed(encodeIntAttr(el.cast<IntegerAttr>()))) {
+        return currentOp_->emitOpError() << "failed to encode element " << el;
+      }
+    }
+    return success();
+  }
+
+  LogicalResult encodeStrAttr(StringAttr value) override {
+    auto stringValue = value.getValue();
     if (stringValue.size() > UINT16_MAX) {
       return currentOp_->emitOpError()
              << "string attribute too large for 16-bit p-string (needs "

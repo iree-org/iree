@@ -102,29 +102,6 @@ def HAL_MakeMemoryBarrierOp : HAL_MakeTupleOp<"make_memory_barrier", [
   ];
 }
 
-def HAL_MakeMemoryBarrierListOp : HAL_PureOp<"make_memory_barrier_list"> {
-  let summary = [{memory barrier list construction operation}];
-
-  let arguments = (ins
-    Variadic<HAL_MemoryBarrier>:$memory_barriers
-  );
-  let results = (outs
-    HAL_MemoryBarrierList:$list
-  );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state,
-      ArrayRef<Value *> memoryBarriers = {}
-    }], [{
-      state.addOperands(memoryBarriers);
-      state.addTypes({MemoryBarrierListType::get(memoryBarriers.size(),
-                                                 builder->getContext())});
-    }]>,
-  ];
-}
-
 def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
@@ -152,29 +129,6 @@ def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
       IREE::HAL::AccessScopeBitfield sourceScope,
       IREE::HAL::AccessScopeBitfield targetScope,
       Value *buffer, Value *offset, Value *length
-    }]>,
-  ];
-}
-
-def HAL_MakeBufferBarrierListOp : HAL_PureOp<"make_buffer_barrier_list"> {
-  let summary = [{buffer barrier list construction operation}];
-
-  let arguments = (ins
-    Variadic<HAL_BufferBarrier>:$buffer_barriers
-  );
-  let results = (outs
-    HAL_BufferBarrierList:$list
-  );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state,
-      ArrayRef<Value *> bufferBarriers = {}
-    }], [{
-      state.addOperands(bufferBarriers);
-      state.addTypes({BufferBarrierListType::get(bufferBarriers.size(),
-                                                 builder->getContext())});
     }]>,
   ];
 }
@@ -470,7 +424,9 @@ def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
   );
 }
 
-def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier"> {
+def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier", [
+    AttrSizedOperandSegments,
+  ]> {
   let summary = [{command buffer execution barrier recording operation}];
   let description = [{
     Defines a memory dependency between commands recorded before and after the
@@ -481,9 +437,8 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
     RefPtrOf<HAL_CommandBuffer>:$command_buffer,
     HAL_ExecutionStageBitfieldAttr:$source_stage_mask,
     HAL_ExecutionStageBitfieldAttr:$target_stage_mask,
-    // TODO(b/143186888): support multiple variadic operands.
-    HAL_MemoryBarrierList:$memory_barriers,
-    HAL_BufferBarrierList:$buffer_barriers
+    Variadic<HAL_MemoryBarrier>:$memory_barriers,
+    Variadic<HAL_BufferBarrier>:$buffer_barriers
   );
 
   let skipDefaultBuilders = 1;
@@ -492,7 +447,7 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
       Builder *builder, OperationState &state, Value *commandBuffer,
       IREE::HAL::ExecutionStageBitfield sourceStageMask,
       IREE::HAL::ExecutionStageBitfield targetStageMask,
-      Value *memoryBarriers, Value *bufferBarriers
+      ArrayRef<Value *> memoryBarriers, ArrayRef<Value *> bufferBarriers
     }]>,
   ];
 }

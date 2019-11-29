@@ -23,6 +23,9 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 
 ![ci-status](https://github.com/google/iree/workflows/Continuous%20Integration/badge.svg)
 
+To find the last passing commit, choose the latest passing run
+[here](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+is%3Asuccess).
+
 ## Table of Contents
 
 -   [Quickstart](#quickstart)

@@ -86,6 +86,12 @@ scoop install vscode
 
 TODO: Upgrade to head python.
 
+If you are planning on using TensorFlow/Colab, make sure that the Bazel version
+you install is
+[supported by TensorFlow](https://www.tensorflow.org/install/source#install_bazel).
+A .bazelversion file is also provided if you want to use
+[Bazelisk](https://github.com/bazelbuild/bazelisk) to manage Bazel versions.
+
 ## Setup MSYS2
 
 Then run msys2 for the first time for subsequent setup by doing one of:
@@ -279,4 +285,10 @@ python ~/Downloads/get-pip.py
 
 ```shell
 pip install numpy
+```
+
+If using Colab, you may also want to install TensorFlow:
+
+```shell
+pip install tf-nightly
 ```

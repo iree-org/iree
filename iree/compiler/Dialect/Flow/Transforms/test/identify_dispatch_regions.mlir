@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -iree-flow-dispatchability-analysis -iree-flow-identify-dispatch-regions %s | FileCheck %s --dump-input=always
+// RUN: iree-opt -split-input-file -iree-flow-dispatchability-analysis -iree-flow-identify-dispatch-regions %s | FileCheck %s --enable-var-scope --dump-input=always
 
 // CHECK-LABEL: @empty
 func @empty() {

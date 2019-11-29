@@ -30,30 +30,43 @@
 # Setup colab (https://research.google.com/colaboratory/local-runtimes.html)
 #   python3 -m pip install jupyter_http_over_ws
 #   jupyter serverextension enable --py jupyter_http_over_ws
+# If you plan on using TensorFlow, enable the TensorFlow parts of IREE's
+# compiler by adding a define to your user.bazelrc file:
+#   build --define=iree_tensorflow=true
 
 import os
 import subprocess
+import shutil
 import sys
 
 repo_root = None
 bazel_env = dict(os.environ)
 bazel_bin = None
+bazel_exe = None
 
 
 def setup_environment():
   """Sets up some environment globals."""
   global bazel_bin
   global repo_root
+  global bazel_exe
 
   # Determine the repository root (two dir-levels up).
   repo_root = os.path.dirname(
       os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
   print("Repository root: %s" % (repo_root,))
 
+  # Use 'bazelisk' instead of 'bazel' if it exists on the path.
+  # Bazelisk is an optional utility that pick versions of Bazel to use and
+  # passes through all command-line arguments to the real Bazel binary:
+  # https://github.com/bazelbuild/bazelisk
+  bazel_exe = "bazelisk" if shutil.which("bazelisk") else "bazel"
+  print("Using bazel executable: %s" % (bazel_exe))
+
   # Detect python and query bazel for its output.
   print("Setting Bazel PYTHON_BIN=%s" % (sys.executable,))
   bazel_env["PYTHON_BIN"] = sys.executable
-  bazel_bin = subprocess.check_output(["bazel", "info", "bazel-bin"],
+  bazel_bin = subprocess.check_output([bazel_exe, "info", "bazel-bin"],
                                       cwd=repo_root,
                                       env=bazel_env).decode("utf-8")
   bazel_bin = bazel_bin.splitlines()[0]
@@ -69,7 +82,7 @@ def build():
   """Builds the python bundle."""
   print("Building python bindings...")
   subprocess.check_call(
-      ["bazel", "build", "//bindings/python/pyiree:everything_for_colab"],
+      [bazel_exe, "build", "//bindings/python/pyiree:everything_for_colab"],
       cwd=repo_root,
       env=bazel_env)
 

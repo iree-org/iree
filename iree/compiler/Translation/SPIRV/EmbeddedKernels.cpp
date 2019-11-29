@@ -62,14 +62,24 @@ void addSpecializationMapEntry(
   specializationInfoDef->map_entries.push_back(std::move(specValue));
 }
 
+void addSpecializationMapEntryVector(
+    uint32_t constant_start, const std::vector<int> &values,
+    iree::VkSpecializationInfoDefT *specializationInfoDef) {
+  for (int i = 0; i < values.size(); ++i) {
+    addSpecializationMapEntry(constant_start + i,
+                              *reinterpret_cast<const uint32_t *>(&values[i]),
+                              specializationInfoDef);
+  }
+}
+
 LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
-                                       iree::SpirVExecutableDefT *out_def) {
+                                       iree::SpirVExecutableDefT *outDef) {
   auto funcType = entryFuncOp.getType();
   auto arg0 = funcType.getInput(0).cast<ShapedType>();
   if (!arg0.getElementType().isF32()) {
     // When we do other types we'll need other shaders.
     return entryFuncOp.emitOpError()
-           << "Only floating point reduction is implemented";
+           << "only floating point reduction is implemented";
   }
 
   auto applyFuncAttr = entryFuncOp.getAttrOfType<FlatSymbolRefAttr>(
@@ -90,13 +100,13 @@ LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
   });
   if (!operationId.hasValue()) {
     applyFuncOp->dump();
-    return applyFuncOp->emitOpError() << "Unsupported reduction operator";
+    return applyFuncOp->emitOpError() << "unsupported reduction operator";
   }
 
-  out_def->tag = "__reduce__";
-  out_def->entry_points = {"main"};
+  outDef->tag = "__reduce__";
+  outDef->entry_points = {"main"};
 
-  out_def->code = readEmbeddedKernelCode(kernelName);
+  outDef->code = readEmbeddedKernelCode(kernelName);
 
   // arg0, arg1, ret0
   auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
@@ -106,7 +116,7 @@ LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
   addDescriptorSetLayoutBinding(1, dsl.get());
   addDescriptorSetLayoutBinding(2, dsl.get());
   pipelineLayoutDef->descriptor_set_layouts.push_back(std::move(dsl));
-  out_def->pipeline_layout = std::move(pipelineLayoutDef);
+  outDef->pipeline_layout = std::move(pipelineLayoutDef);
 
   // See the shader source for documentation on the values of A/B/C/R.
   int64_t reductionDimension =
@@ -132,24 +142,141 @@ LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
   addSpecializationMapEntry(/*kB*/ 102, b, specializationInfoDef.get());
   addSpecializationMapEntry(/*kC*/ 103, c, specializationInfoDef.get());
   addSpecializationMapEntry(/*kR*/ 104, r, specializationInfoDef.get());
-  out_def->specialization_info = std::move(specializationInfoDef);
+  outDef->specialization_info = std::move(specializationInfoDef);
+
+  return success();
+}
+
+LogicalResult buildConvExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
+                                  xla_hlo::ConvOp convOp,
+                                  iree::SpirVExecutableDefT *outDef) {
+  auto lhs = convOp.lhs()->getType().cast<ShapedType>();
+  auto rhs = convOp.rhs()->getType().cast<ShapedType>();
+  if (convOp.feature_group_count() != 1) {
+    return entryFuncOp.emitOpError()
+           << "only feature group counts of 1 supported";
+  }
+  if (lhs.getRank() != 4 || rhs.getRank() != 4) {
+    return entryFuncOp.emitOpError() << "only Conv2d supported";
+  }
+
+  auto specializationInfoDef =
+      std::make_unique<iree::VkSpecializationInfoDefT>();
+  // Get the padding specializations.
+  {
+    std::vector<int> paddings;
+    if (convOp.padding().hasValue()) {
+      for (const auto &elm : convOp.padding().getValue().getIntValues()) {
+        paddings.push_back(elm.getSExtValue());
+      }
+    }
+    addSpecializationMapEntryVector(100, paddings, specializationInfoDef.get());
+  }
+  // LHS (image) dimensions in NCHW order - should map to NHWC ie [0,3,1,2].
+  {
+    std::vector<int> lhsOrdering{
+        static_cast<int>(
+            convOp.dimension_numbers().input_batch_dimension().getInt()),
+        static_cast<int>(
+            convOp.dimension_numbers().input_feature_dimension().getInt())};
+    for (const auto &dim :
+         convOp.dimension_numbers().input_spatial_dimensions()) {
+      lhsOrdering.push_back(dim.getSExtValue());
+    }
+    if (lhsOrdering.size() != 4 || lhsOrdering[0] != 0 || lhsOrdering[1] != 3 ||
+        lhsOrdering[2] != 1 || lhsOrdering[3] != 2) {
+      return entryFuncOp.emitOpError() << "only NHWC tensor ordering supported";
+    }
+
+    // Extents in buffer order.
+    std::vector<int> lhsExtents(lhsOrdering.size());
+    for (int i = 0; i < lhs.getRank(); ++i) {
+      lhsExtents[i] = lhs.getDimSize(i);
+    }
+    addSpecializationMapEntryVector(110, lhsExtents,
+                                    specializationInfoDef.get());
+  }
+  // RHS (kernel) dimension OIHW - should map to HWIO ie [3,2,0,1].
+  {
+    std::vector<int> rhsOrdering{
+        static_cast<int>(convOp.dimension_numbers()
+                             .kernel_output_feature_dimension()
+                             .getInt()),
+        static_cast<int>(convOp.dimension_numbers()
+                             .kernel_input_feature_dimension()
+                             .getInt())};
+    for (const auto &dim :
+         convOp.dimension_numbers().kernel_spatial_dimensions()) {
+      rhsOrdering.push_back(dim.getSExtValue());
+    }
+    if (rhsOrdering.size() != 4 || rhsOrdering[0] != 3 || rhsOrdering[1] != 2 ||
+        rhsOrdering[2] != 0 || rhsOrdering[3] != 1) {
+      return entryFuncOp.emitOpError() << "only HWIO kernel ordering supported";
+    }
+
+    // Extents in buffer order.
+    std::vector<int> rhsExtents(rhsOrdering.size());
+    for (int i = 0; i < rhs.getRank(); ++i) {
+      rhsExtents[i] = rhs.getDimSize(i);
+    }
+    // TODO(namiller): Remove this condition after debugging workgroup failure.
+    // Currently if the output features are not equal to 1, the workgroups are
+    // calculated incorrectly. Specifically the gl_NumWorkgroups.z value seems
+    // to be the product of all extents rather than the number of batches.
+    if (rhsExtents[3] != 1) {
+      return entryFuncOp.emitOpError()
+             << "only single output channels supported";
+    }
+    addSpecializationMapEntryVector(120, rhsExtents,
+                                    specializationInfoDef.get());
+  }
+  // Result dimension order NCHW - should map to NHWC ie [0,3,1,2].
+  {
+    std::vector<int> retOrdering{
+        static_cast<int>(
+            convOp.dimension_numbers().output_batch_dimension().getInt()),
+        static_cast<int>(
+            convOp.dimension_numbers().output_feature_dimension().getInt())};
+    for (const auto &dim :
+         convOp.dimension_numbers().output_spatial_dimensions()) {
+      retOrdering.push_back(dim.getSExtValue());
+    }
+    if (retOrdering.size() != 4 || retOrdering[0] != 0 || retOrdering[1] != 3 ||
+        retOrdering[2] != 1 || retOrdering[3] != 2) {
+      return entryFuncOp.emitOpError() << "only HWIO kernel ordering supported";
+    }
+  }
+
+  outDef->tag = "__conv2d_nhwc__";
+  outDef->entry_points = {"main"};
+  outDef->code = readEmbeddedKernelCode("conv2d_nhwc.spv");
+
+  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
+  pipelineLayoutDef->buffer_binding_set = 0;
+  auto dsl = std::make_unique<iree::VkDescriptorSetLayoutDefT>();
+  addDescriptorSetLayoutBinding(0, dsl.get());
+  addDescriptorSetLayoutBinding(1, dsl.get());
+  addDescriptorSetLayoutBinding(2, dsl.get());
+  pipelineLayoutDef->descriptor_set_layouts.push_back(std::move(dsl));
+  outDef->pipeline_layout = std::move(pipelineLayoutDef);
+  outDef->specialization_info = std::move(specializationInfoDef);
 
   return success();
 }
 
 // Builds a SPIR-V executable from a well-known matmul executable.
-// |out_def| will be populated with all required information for serialization.
+// |outDef| will be populated with all required information for serialization.
 LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
                                     xla_hlo::DotOp dotOp,
-                                    iree::SpirVExecutableDefT *out_def) {
+                                    iree::SpirVExecutableDefT *outDef) {
   auto arg0 = dotOp.getOperand(0)->getType().cast<ShapedType>();
   auto arg1 = dotOp.getOperand(1)->getType().cast<ShapedType>();
 
-  out_def->tag = "__matmul__";
-  out_def->entry_points = {"main"};
+  outDef->tag = "__matmul__";
+  outDef->entry_points = {"main"};
 
   // TODO(benvanik): specialize (template on shapes/types/etc).
-  out_def->code = readEmbeddedKernelCode("matmul.spv");
+  outDef->code = readEmbeddedKernelCode("matmul.spv");
 
   // arg0, arg1, ret0
   auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
@@ -159,7 +286,7 @@ LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
   addDescriptorSetLayoutBinding(1, dsl.get());
   addDescriptorSetLayoutBinding(2, dsl.get());
   pipelineLayoutDef->descriptor_set_layouts.push_back(std::move(dsl));
-  out_def->pipeline_layout = std::move(pipelineLayoutDef);
+  outDef->pipeline_layout = std::move(pipelineLayoutDef);
 
   // Shapes of [arg0, arg1, ret0].
   //   arg0 = [b0, m, k]
@@ -174,7 +301,7 @@ LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
   addSpecializationMapEntry(/*kMatrixM*/ 100, m, specializationInfoDef.get());
   addSpecializationMapEntry(/*kMatrixK*/ 101, k, specializationInfoDef.get());
   addSpecializationMapEntry(/*kMatrixN*/ 102, n, specializationInfoDef.get());
-  out_def->specialization_info = std::move(specializationInfoDef);
+  outDef->specialization_info = std::move(specializationInfoDef);
 
   return success();
 }
@@ -182,11 +309,11 @@ LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
 }  // namespace
 
 bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
-                              iree::SpirVExecutableDefT *out_def) {
+                              iree::SpirVExecutableDefT *outDef) {
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     if (funcOp.getAttr("iree.executable.reduction")) {
-      if (failed(buildReductionExecutable(moduleOp, funcOp, out_def))) {
-        moduleOp.emitOpError() << "Failed to splat in the reduction kernel";
+      if (failed(buildReductionExecutable(moduleOp, funcOp, outDef))) {
+        moduleOp.emitOpError() << "failed to splat in the reduction kernel";
         return false;
       }
       return true;
@@ -194,12 +321,15 @@ bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
 
     for (auto &block : funcOp) {
       for (auto &op : block) {
-        if (isa<xla_hlo::ConvOp>(&op)) {
-          moduleOp.emitOpError() << "Conv not yet implemented";
-          return false;
+        if (auto convOp = dyn_cast_or_null<xla_hlo::ConvOp>(&op)) {
+          if (failed(buildConvExecutable(moduleOp, funcOp, convOp, outDef))) {
+            moduleOp.emitOpError() << "failed to splat in the conv kernel";
+            return false;
+          }
+          return true;
         } else if (auto dotOp = dyn_cast_or_null<xla_hlo::DotOp>(&op)) {
-          if (failed(buildMatMulExecutable(moduleOp, funcOp, dotOp, out_def))) {
-            moduleOp.emitOpError() << "Failed to splat in the matmul kernel";
+          if (failed(buildMatMulExecutable(moduleOp, funcOp, dotOp, outDef))) {
+            moduleOp.emitOpError() << "failed to splat in the matmul kernel";
             return false;
           }
           return true;

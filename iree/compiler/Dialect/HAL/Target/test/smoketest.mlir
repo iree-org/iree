@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -iree-hal-translate-executables -iree-hal-target-backends=legacy-interpreter %s | FileCheck %s --dump-input=fail -check-prefix=INTERP
-// RUN: iree-opt -split-input-file -iree-hal-translate-executables -iree-hal-target-backends=vulkan-spirv %s | FileCheck %s --dump-input=fail -check-prefix=VKSPV
+// RUN: iree-opt -split-input-file -iree-hal-translate-executables -iree-hal-target-backends=legacy-interpreter %s | FileCheck %s --enable-var-scope --dump-input=fail -check-prefix=INTERP
+// RUN: iree-opt -split-input-file -iree-hal-translate-executables -iree-hal-target-backends=vulkan-spirv %s | FileCheck %s --enable-var-scope --dump-input=fail -check-prefix=VKSPV
 
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {

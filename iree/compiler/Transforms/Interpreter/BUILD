@@ -49,7 +49,7 @@ cc_library(
         "@local_config_mlir//:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_standard",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_lower_general_dot",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_lower",
     ],
     alwayslink = 1,
 )

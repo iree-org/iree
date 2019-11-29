@@ -156,11 +156,10 @@ py_test(
     name = "hal_test",
     srcs = ["hal_test.py"],
     python_version = "PY3",
-    deps = [
+    deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
-        "//bindings/python/pyiree",
-        "//third_party/py/numpy",
         "@absl_py//absl/testing:absltest",
+        "//bindings/python/pyiree",
     ],
 )
 

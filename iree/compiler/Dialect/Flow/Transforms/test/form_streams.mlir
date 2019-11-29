@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -iree-flow-form-streams %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -iree-flow-form-streams %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 flow.executable @outerOps_ex_dispatch_0 {
   flow.dispatch.entry @outerOps_rgn_dispatch_0 attributes {

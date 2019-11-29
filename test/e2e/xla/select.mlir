@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="4xi8=[1 0 200 0]" | FileCheck %s
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="4xi8=[1 0 200 0]" | FileCheck %s --enable-var-scope
 // CHECK-LABEL: EXEC @select
 func @select(%cond : tensor<4xi1>) -> tensor<4xf32> {
   %lhs = constant dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf32>

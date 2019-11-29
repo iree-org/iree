@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of hal.buffer ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @buffer_subspan
 func @buffer_subspan() -> !ireex.ref<!hal.buffer> {

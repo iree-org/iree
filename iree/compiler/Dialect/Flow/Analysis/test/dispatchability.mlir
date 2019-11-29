@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -test-iree-flow-dispatchability %s | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file -test-iree-flow-dispatchability %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @empty
 // CHECK-SAME: dispatchable = true

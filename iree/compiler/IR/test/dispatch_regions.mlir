@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt %s -split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt %s -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: @singleArg
 func @singleArg(%arg0 : tensor<?xf32>) {

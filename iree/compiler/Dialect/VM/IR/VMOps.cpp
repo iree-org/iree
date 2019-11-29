@@ -18,12 +18,16 @@
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/FunctionImplementation.h"
+#include "mlir/IR/FunctionSupport.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -190,6 +194,130 @@ void ExportOp::build(Builder *builder, OperationState &result,
   result.addAttribute("function_ref", functionRef);
   result.addAttribute("export_name", builder->getStringAttr(exportName));
   result.attributes.append(attrs.begin(), attrs.end());
+}
+
+static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
+  auto builder = parser.getBuilder();
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseLParen())) {
+    return parser.emitError(parser.getNameLoc()) << "invalid import name";
+  }
+  SmallVector<NamedAttributeList, 8> argAttrs;
+  SmallVector<Type, 8> argTypes;
+  while (failed(parser.parseOptionalRParen())) {
+    OpAsmParser::OperandType operand;
+    Type operandType;
+    auto operandLoc = parser.getCurrentLocation();
+    if (failed(parser.parseOperand(operand)) ||
+        failed(parser.parseColonType(operandType))) {
+      return parser.emitError(operandLoc) << "invalid operand";
+    }
+    argTypes.push_back(operandType);
+    NamedAttributeList argAttrList;
+    argAttrList.set(builder.getIdentifier("vm.name"),
+                    builder.getStringAttr(operand.name));
+    if (succeeded(parser.parseOptionalEllipsis())) {
+      argAttrList.set(builder.getIdentifier("vm.variadic"),
+                      builder.getUnitAttr());
+    }
+    argAttrs.push_back(argAttrList);
+    if (failed(parser.parseOptionalComma())) {
+      if (failed(parser.parseRParen())) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "invalid argument list (expected rparen)";
+      }
+      break;
+    }
+  }
+  SmallVector<Type, 8> resultTypes;
+  if (failed(parser.parseOptionalArrowTypeList(resultTypes))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "invalid result type list";
+  }
+  for (int i = 0; i < argAttrs.size(); ++i) {
+    SmallString<8> argName;
+    mlir::impl::getArgAttrName(i, argName);
+    result->addAttribute(argName, argAttrs[i].getDictionary());
+  }
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  auto functionType =
+      FunctionType::get(argTypes, resultTypes, result->getContext());
+  result->addAttribute(mlir::impl::getTypeAttrName(),
+                       TypeAttr::get(functionType));
+
+  // No clue why this is required.
+  result->addRegion();
+
+  return success();
+}
+
+static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.getName());
+  p << "(";
+  for (int i = 0; i < op.getNumFuncArguments(); ++i) {
+    if (auto name = op.getArgAttrOfType<StringAttr>(i, "vm.name")) {
+      p << name.getValue() << " : ";
+    }
+    p.printType(op.getType().getInput(i));
+    if (op.getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
+      p << "...";
+    }
+    if (i < op.getNumFuncArguments() - 1) {
+      p << ", ";
+    }
+  }
+  p << ")";
+  if (op.getNumFuncResults() == 1) {
+    p << " -> ";
+    p.printType(op.getType().getResult(0));
+  } else if (op.getNumFuncResults() > 1) {
+    p << " -> (";
+    interleaveComma(op.getType().getResults(), p);
+    p << ")";
+  }
+  mlir::impl::printFunctionAttributes(p, op, op.getNumFuncArguments(),
+                                      op.getNumFuncResults(),
+                                      /*elided=*/
+                                      {
+                                          "is_variadic",
+                                      });
+}
+
+void ImportOp::build(Builder *builder, OperationState &result, StringRef name,
+                     FunctionType type, ArrayRef<NamedAttribute> attrs,
+                     ArrayRef<NamedAttributeList> argAttrs) {
+  result.addAttribute(SymbolTable::getSymbolAttrName(),
+                      builder->getStringAttr(name));
+  result.addAttribute("type", TypeAttr::get(type));
+  result.attributes.append(attrs.begin(), attrs.end());
+  if (argAttrs.empty()) {
+    return;
+  }
+
+  unsigned numInputs = type.getNumInputs();
+  assert(numInputs == argAttrs.size() &&
+         "expected as many argument attribute lists as arguments");
+  SmallString<8> argAttrName;
+  for (unsigned i = 0; i < numInputs; ++i) {
+    if (auto argDict = argAttrs[i].getDictionary()) {
+      result.addAttribute(getArgAttrName(i, argAttrName), argDict);
+    }
+  }
+}
+
+LogicalResult ImportOp::verifyType() {
+  auto type = getTypeAttr().getValue();
+  if (!type.isa<FunctionType>())
+    return emitOpError("requires '" + getTypeAttrName() +
+                       "' attribute of function type");
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -655,6 +783,13 @@ static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   p.printAttribute(op.value());
 }
 
+void RodataOp::build(Builder *builder, OperationState &result, StringRef name,
+                     ElementsAttr value, ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute("sym_name", builder->getStringAttr(name));
+  result.addAttribute("value", value);
+  result.addAttributes(attrs);
+}
+
 static ParseResult parseConstRefRodataOp(OpAsmParser &parser,
                                          OperationState *result) {
   FlatSymbolRefAttr rodataAttr;
@@ -687,7 +822,7 @@ static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
 void ConstRefRodataOp::build(Builder *builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute("rodata", builder->getStringAttr(rodataName));
+  result.addAttribute("rodata", builder->getSymbolRefAttr(rodataName));
   auto type = RefPtrType::get(ByteBufferType::get(builder->getContext()));
   result.addTypes({type});
   result.addAttributes(attrs);
@@ -946,12 +1081,167 @@ static void printCallOp(OpAsmPrinter &p, CallOp &op) {
   p << ')';
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
   p << " : ";
-  p.printType(op.getCalleeType());
+  p.printType(FunctionType::get(llvm::to_vector<4>(op.getOperandTypes()),
+                                llvm::to_vector<4>(op.getResultTypes()),
+                                op.getContext()));
 }
 
-FunctionType CallOp::getCalleeType() {
-  return FunctionType::get(llvm::to_vector<4>(getOperandTypes()),
-                           llvm::to_vector<4>(getResultTypes()), getContext());
+static ParseResult parseCallVariadicOp(OpAsmParser &parser,
+                                       OperationState *result) {
+  FlatSymbolRefAttr calleeAttr;
+  FunctionType calleeType;
+  auto calleeLoc = parser.getNameLoc();
+  if (failed(parser.parseAttribute(calleeAttr, "callee", result->attributes)) ||
+      failed(parser.parseLParen())) {
+    return parser.emitError(calleeLoc) << "invalid callee symbol";
+  }
+
+  SmallVector<OpAsmParser::OperandType, 4> flatOperands;
+  SmallVector<int8_t, 4> segmentSizes;
+  while (failed(parser.parseOptionalRParen())) {
+    if (succeeded(parser.parseOptionalLSquare())) {
+      // Variadic list.
+      SmallVector<OpAsmParser::OperandType, 4> segmentOperands;
+      while (failed(parser.parseOptionalRSquare())) {
+        OpAsmParser::OperandType segmentOperand;
+        if (failed(parser.parseOperand(segmentOperand))) {
+          return parser.emitError(parser.getCurrentLocation())
+                 << "invalid operand";
+        }
+        segmentOperands.push_back(segmentOperand);
+        if (failed(parser.parseOptionalComma())) {
+          if (failed(parser.parseRSquare())) {
+            return parser.emitError(parser.getCurrentLocation())
+                   << "malformed variadic operand list";
+          }
+          break;
+        }
+      }
+      segmentSizes.push_back(segmentOperands.size());
+      flatOperands.append(segmentOperands.begin(), segmentOperands.end());
+    } else {
+      // Normal single operand.
+      OpAsmParser::OperandType operand;
+      if (failed(parser.parseOperand(operand))) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "malformed non-variadic operand";
+      }
+      segmentSizes.push_back(-1);
+      flatOperands.push_back(operand);
+    }
+    if (failed(parser.parseOptionalComma())) {
+      if (failed(parser.parseRParen())) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "expected closing )";
+      }
+      break;
+    }
+  }
+
+  if (failed(parser.parseOptionalAttrDict(result->attributes)) ||
+      failed(parser.parseColon()) || failed(parser.parseLParen())) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "malformed optional attributes list";
+  }
+  SmallVector<Type, 4> flatOperandTypes;
+  SmallVector<Type, 4> segmentTypes;
+  int segmentIndex = 0;
+  while (failed(parser.parseOptionalRParen())) {
+    Type operandType;
+    if (failed(parser.parseType(operandType))) {
+      return parser.emitError(parser.getCurrentLocation())
+             << "invalid operand type";
+    }
+    bool isVariadic = succeeded(parser.parseOptionalEllipsis());
+    if (isVariadic) {
+      for (int i = 0; i < segmentSizes[segmentIndex]; ++i) {
+        flatOperandTypes.push_back(operandType);
+      }
+    } else {
+      flatOperandTypes.push_back(operandType);
+    }
+    segmentTypes.push_back(operandType);
+    ++segmentIndex;
+
+    if (failed(parser.parseOptionalComma())) {
+      if (failed(parser.parseRParen())) {
+        return parser.emitError(parser.getCurrentLocation())
+               << "expected closing )";
+      }
+      break;
+    }
+  }
+  if (failed(parser.resolveOperands(flatOperands, flatOperandTypes, calleeLoc,
+                                    result->operands))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "operands do not match type list";
+  }
+  result->addAttribute(
+      "segment_sizes",
+      DenseIntElementsAttr::get(
+          VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+                          parser.getBuilder().getIntegerType(8)),
+          segmentSizes));
+  result->addAttribute("segment_types",
+                       parser.getBuilder().getArrayAttr(llvm::to_vector<4>(
+                           llvm::map_range(segmentTypes, [&](Type type) {
+                             return TypeAttr::get(type).cast<Attribute>();
+                           }))));
+
+  if (failed(parser.parseOptionalArrowTypeList(result->types))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "malformed function type results";
+  }
+
+  return success();
+}
+
+static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
+  p << op.getOperationName() << ' ' << op.getAttr("callee") << '(';
+  int operand = 0;
+  interleaveComma(op.segment_sizes(), p, [&](APInt segmentSize) {
+    if (segmentSize.getSExtValue() == -1) {
+      p.printOperand(op.getOperand(operand++));
+    } else {
+      p << '[';
+      SmallVector<Value *, 4> segmentOperands;
+      for (int i = 0; i < segmentSize.getZExtValue(); ++i) {
+        segmentOperands.push_back(op.getOperand(operand++));
+      }
+      interleaveComma(segmentOperands, p,
+                      [&](Value *operand) { p.printOperand(operand); });
+      p << ']';
+    }
+  });
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+                              "callee",
+                              "segment_sizes",
+                              "segment_types",
+                          });
+  p << " : (";
+  interleaveComma(
+      llvm::zip(op.segment_sizes(), op.segment_types()), p,
+      [&](std::tuple<APInt, Attribute> segmentSizeType) {
+        int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
+        Type segmentType =
+            std::get<1>(segmentSizeType).cast<TypeAttr>().getValue();
+        if (segmentSize == -1) {
+          p.printType(segmentType);
+        } else {
+          p.printType(segmentType);
+          p << "...";
+        }
+      });
+  p << ")";
+  if (op.getNumResults() == 1) {
+    p << " -> ";
+    p.printType(op.getResult(0)->getType());
+  } else if (op.getNumResults() > 1) {
+    p << " -> (";
+    interleaveComma(op.getResultTypes(), p);
+    p << ")";
+  }
 }
 
 static ParseResult parseReturnOp(OpAsmParser &parser, OperationState *result) {

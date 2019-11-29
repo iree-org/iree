@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of stream ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --dump-input=fail
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
 
 flow.executable @dispatch_0 {
   flow.dispatch.entry @rgn_dispatch_0

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="2x3xi32=[1 2 3 4 5 6]" --output_types=i | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="2x3xi32=[1 2 3 4 5 6]" --output_types=i | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: EXEC @pad
 func @pad(%0: tensor<2x3xi32>) -> tensor<4x13xi32>

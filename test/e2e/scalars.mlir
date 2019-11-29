@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir %s | FileCheck %s --dump-input=fail
+// RUN: iree-run-mlir %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK-LABEL: EXEC @scalars
 func @scalars() -> tensor<f32> {

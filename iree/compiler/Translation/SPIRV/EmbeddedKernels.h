@@ -27,7 +27,7 @@ namespace iree_compiler {
 // will populate |out_def| with the kernel.
 // Returns true if the kernel matched and was populated.
 bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
-                              iree::SpirVExecutableDefT* out_def);
+                              iree::SpirVExecutableDefT* outDef);
 
 }  // namespace iree_compiler
 }  // namespace mlir

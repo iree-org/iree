@@ -247,7 +247,6 @@ def HAL_Event : DialectType<
     across CommandBuffers from the same device or others.
   }];
 }
-def HAL_EventList : TupleOf<[RefPtrOf<HAL_Event>]>;
 
 def HAL_Executable : DialectType<
     HAL_Dialect,

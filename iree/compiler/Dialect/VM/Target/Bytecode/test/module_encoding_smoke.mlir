@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-translate -split-input-file -iree-vm-ir-to-bytecode-module -iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s --dump-input=fail
+// RUN: iree-translate -split-input-file -iree-vm-ir-to-bytecode-module -iree-vm-bytecode-module-output-format=flatbuffer-text %s | FileCheck %s --enable-var-scope --dump-input=fail
 
 // CHECK: name: "simple_module"
 vm.module @simple_module {
@@ -31,5 +31,5 @@ vm.module @simple_module {
   // CHECK-NEXT: bytecode_length: 3
   // CHECK-NEXT: i32_register_count: 1
   // CHECK-NEXT: ref_register_count: 0
-  // CHECK: bytecode_data: [ 67, 1, 0 ]
+  // CHECK: bytecode_data: [ 68, 1, 0 ]
 }
