@@ -159,3 +159,10 @@ cc_binary(
         "@com_github_google_flatbuffers//:flatbuffers",
     ],
 )
+
+sh_binary(
+    name = "IreeFileCheck",
+    testonly = True,
+    srcs = ["IreeFileCheck.sh"],
+    data = ["@llvm//:FileCheck"],
+)

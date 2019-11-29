@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt %s | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt %s | IreeFileCheck %s
 
 // CHECK-LABEL: @dispatch_entry
 func @dispatch_entry(%arg0: memref<4x2xf32>, %arg1: memref<4x2xf32>) {

@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of hal.device ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @device_allocator
 func @device_allocator() -> !ireex.ref<!hal.allocator> {

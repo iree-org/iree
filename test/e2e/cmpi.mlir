@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="i32=42" --output_types="i,i,i,i,i,i,i,i,i,i" | FileCheck %s --enable-var-scope
+// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="i32=42" --output_types="i,i,i,i,i,i,i,i,i,i" | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @cmpi
 func @cmpi(%42 : i32) -> (i1, i1, i1, i1, i1, i1, i1, i1, i1, i1) { // need at least one arg to avoid constant folding

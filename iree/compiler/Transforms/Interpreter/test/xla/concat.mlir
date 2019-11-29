@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt --lower-xla-to-iree-interpreter %s --split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt --lower-xla-to-iree-interpreter %s --split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: func @concat.1D
 // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]+]]

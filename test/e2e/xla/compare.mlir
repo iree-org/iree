@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | FileCheck %s --enable-var-scope
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @compare_tensor
 func @compare_tensor() -> tensor<4xi1> {

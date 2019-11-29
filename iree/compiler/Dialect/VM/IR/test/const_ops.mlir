@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of constant definition ops.
 
-// RUN: iree-opt -split-input-file %s | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt -split-input-file %s | IreeFileCheck %s
 
 vm.module @my_module {
   // CHECK-LABEL: @const_i32_zero

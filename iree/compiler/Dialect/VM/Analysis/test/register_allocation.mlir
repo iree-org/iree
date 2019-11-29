@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(test-iree-vm-register-allocation)' %s | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(test-iree-vm-register-allocation)' %s | IreeFileCheck %s
 
 // CHECK-LABEL: @module
 vm.module @module {

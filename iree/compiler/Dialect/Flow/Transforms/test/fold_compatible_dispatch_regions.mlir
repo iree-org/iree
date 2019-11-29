@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -split-input-file -iree-flow-fold-compatible-dispatch-regions %s | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt -split-input-file -iree-flow-fold-compatible-dispatch-regions %s | IreeFileCheck %s
 
 func @noFolding(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %cst = constant dense<[4, 1, 1]> : vector<3xi32>

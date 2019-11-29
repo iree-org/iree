@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]\ni64=2" --output_types=i | FileCheck %s --enable-var-scope --dump-input=fail
-// RUN: iree-run-mlir --target_backends=vulkan-spirv %s --input_values="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]\ni64=2" --output_types=i | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]\ni64=2" --output_types=i | IreeFileCheck %s
+// RUN: iree-run-mlir --target_backends=vulkan-spirv %s --input_values="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]\ni64=2" --output_types=i | IreeFileCheck %s
 
 module {
   // CHECK-LABEL: EXEC @foo

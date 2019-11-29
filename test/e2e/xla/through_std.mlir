@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir %s | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-run-mlir %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @xla_through_stdops
 func @xla_through_stdops () -> (tensor<f32>, tensor<f32>) {

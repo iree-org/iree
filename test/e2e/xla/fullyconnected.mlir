@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s --enable-var-scope --dump-input=fail
-// RUN: iree-run-mlir %s --target_backends=vulkan-spirv --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
+// RUN: iree-run-mlir %s --target_backends=vulkan-spirv --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @main
 func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5x1x5xf32>>
@@ -95,7 +95,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   return %55 : tuple<tensor<5x1x5xf32>>
 }
 
-// On separate lines to avoid "[[" which FileCheck interprets as substitutions
+// On separate lines to avoid "[[" which IreeFileCheck interprets as substitutions
 // CHECK: 5x1x5xf32=[
 // CHECK-SAME:   [0 0 0 0 0]
 // CHECK-SAME: ][

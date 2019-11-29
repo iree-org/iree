@@ -14,7 +14,7 @@
 
 // Tests printing and parsing of experimental ops.
 
-// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @shared_device
 func @shared_device() -> !ireex.ref<!hal.device> {

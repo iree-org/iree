@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | FileCheck %s --enable-var-scope
+// RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | IreeFileCheck %s
 
 // CHECK: [[MAP0:\#.*]] = ([[DIM00:d.*]], [[DIM01:d.*]], [[DIM02:d.*]]) -> (s0, 0, [[DIM00]])
 // CHECK: [[MAP1:\#.*]] = ([[DIM10:d.*]], [[DIM11:d.*]], [[DIM12:d.*]]) -> (0)

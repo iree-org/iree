@@ -14,7 +14,7 @@
 
 // Tests folding and canonicalization of assignment ops.
 
-// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt -split-input-file -pass-pipeline='vm.module(canonicalize)' %s | IreeFileCheck %s
 
 // CHECK-LABEL: @select_i32_folds
 vm.module @select_i32_folds {

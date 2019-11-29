@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt %s -iree-drop-unreachable-module-functions -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail --implicit-check-not @unused
+// RUN: iree-opt %s -iree-drop-unreachable-module-functions -split-input-file | IreeFileCheck %s --implicit-check-not @unused
 
 // CHECK-LABEL: @exportedModuleFn
 func @exportedModuleFn(%arg0 : memref<?xf32>) -> memref<?xf32>

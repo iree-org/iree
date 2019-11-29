@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-opt %s -pass-pipeline='func(canonicalize)' -split-input-file | FileCheck %s --enable-var-scope --dump-input=fail
+// RUN: iree-opt %s -pass-pipeline='func(canonicalize)' -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @necessary_clone_not_removed
 func @necessary_clone_not_removed() -> (memref<i32>, memref<i32>) {
