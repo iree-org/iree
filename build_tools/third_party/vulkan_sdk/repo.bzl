@@ -25,11 +25,17 @@ def _impl(repository_ctx):
         sdk_path = repository_ctx.os.environ["VULKAN_SDK"]
         repository_ctx.symlink(sdk_path, "vulkan-sdk")
 
-        # TODO(scotttodd): Windows (Lib/vulkan-1.lib)?
         repository_ctx.file("BUILD", """
 cc_library(
     name = "sdk",
-    srcs = ["vulkan-sdk/lib/libvulkan.so.1"],
+    srcs = select({
+        "@bazel_tools//src/conditions:windows": [
+            "Lib/vulkan-1.lib"
+        ],
+        "//conditions:default": [
+            "vulkan-sdk/lib/libvulkan.so.1",
+        ],
+    }),
     visibility = ["//visibility:public"],
 )""")
     else:
