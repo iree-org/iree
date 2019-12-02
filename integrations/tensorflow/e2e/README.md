@@ -37,6 +37,9 @@ IREE with Vulkan (see [the doc](../../../docs/vulkan_and_spirv.md)), then you
 can enable the backends by setting the environment variable
 `IREE_TEST_BACKENDS=tf,iree_interpreter,iree_vulkan`.
 
+You can also pass this as a command line argument when running individual tests:
+`--target_backends=tf,iree_interpreter,iree_vulkan`.
+
 ## Running tests
 
 ```shell

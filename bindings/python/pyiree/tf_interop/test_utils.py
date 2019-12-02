@@ -25,8 +25,16 @@ import tempfile
 
 from .. import binding
 from .. import compiler
+from absl import flags
+from absl import logging
 import numpy as np
 import tensorflow.compat.v2 as tf
+
+flags.DEFINE_string(
+    "target_backends", None,
+    "Explicit comma-delimited list of target backends. "
+    "(Overrides environment variables and auto detection)")
+FLAGS = flags.FLAGS
 
 
 def save_and_compile_tf_module(tf_module, target_backends=()):
@@ -261,6 +269,13 @@ def _make_multi_result_class(named_tuple_class):
                                     (disagreements, self))
       return self
 
+    def assert_all_equal(self):
+      predicate = np.array_equal
+      has_disagreement, disagreements = _collect_disagreements(self, predicate)
+      assert not has_disagreement, ("Multiple backends disagree (%r):\n%r" %
+                                    (disagreements, self))
+      return self
+
     def print(self):
       print(self)
       return self
@@ -386,7 +401,15 @@ BackendInfo.add(
 def get_default_test_backends():
   """Gets the default sequence of BackendInfo instances to test against."""
 
-  backends_env = os.environ.get("IREE_TEST_BACKENDS")
+  if FLAGS.target_backends is not None:
+    backends_env = FLAGS.target_backends
+    logging.info("Using backends from command line: %s", backends_env)
+  else:
+    backends_env = os.environ.get("IREE_TEST_BACKENDS")
+    if backends_env is not None:
+      logging.info("Using backends from environment IREE_TEST_BACKENDS: %s",
+                   backends_env)
+
   if backends_env:
     backends = []
     for backend_name in backends_env.split(","):
@@ -397,6 +420,7 @@ def get_default_test_backends():
                          (backend_name))
     return backends
   else:
+    logging.info("Using default backends")
     return BackendInfo.ALL["tf"], BackendInfo.ALL["iree_interpreter"]
 
 
