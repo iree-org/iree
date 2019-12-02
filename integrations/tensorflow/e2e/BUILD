@@ -42,14 +42,10 @@ py_test(
 )
 
 py_test(
-    name = "conv_test",
-    srcs = ["conv_test.py"],
+    name = "vulkan_conv_test",
+    srcs = ["vulkan_conv_test.py"],
     python_version = "PY3",
-    deps = [
-        "//bindings/python:pathsetup",  # build_cleaner: keep
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "//bindings/python/pyiree",
-        "//third_party/py/numpy",
-        "//third_party/py/tensorflow",
-        "@absl_py//absl/testing:absltest",
     ],
 )
