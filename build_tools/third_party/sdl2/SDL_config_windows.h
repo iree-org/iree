@@ -4,6 +4,12 @@
 
 #include "SDL_platform.h"
 
+// Explicitly include headers for SSE intrinsics.
+// SDL itself conditionally chooses to not include these on Windows, but they
+// appear to be needed on some systems anyway.
+#include <intrin.h>
+#include <xmmintrin.h>
+
 /* This is a set of defines to configure the SDL features */
 
 #if !defined(_STDINT_H_) && (!defined(HAVE_STDINT_H) || !_HAVE_STDINT_H)
@@ -64,6 +70,7 @@ typedef unsigned int uintptr_t;
 
 /* This is disabled by default to avoid C runtime dependencies and manifest
  * requirements */
+#define HAVE_LIBC 1  // Enable it anyway :D
 #ifdef HAVE_LIBC
 /* Useful headers */
 #define STDC_HEADERS 1

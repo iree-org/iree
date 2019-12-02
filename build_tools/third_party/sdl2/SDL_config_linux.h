@@ -1,5 +1,6 @@
-#ifndef _SDL_config_linux_h
-#define _SDL_config_linux_h
+#ifndef SDL_config_linux_h
+#define SDL_config_linux_h
+#define SDL_config_h_
 
 /**
  *  \file SDL_config_linux.h
@@ -401,4 +402,4 @@
 /* Enable dynamic libsamplerate support */
 /* #undef SDL_LIBSAMPLERATE_DYNAMIC */
 
-#endif /* _SDL_config_linux_h */
+#endif /* SDL_config_linux_h */

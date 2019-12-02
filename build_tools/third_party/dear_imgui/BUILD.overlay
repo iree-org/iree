@@ -73,3 +73,15 @@ cc_library(
         "@sdl2//:SDL2",
     ],
 )
+
+cc_binary(
+    name = "example_sdl_vulkan",
+    srcs = [
+        "examples/example_sdl_vulkan/main.cpp",
+    ],
+    deps = [
+        ":dear_imgui_srcs",
+        ":imgui_sdl_vulkan_srcs",
+    ],
+    includes = ["examples/"],
+)
