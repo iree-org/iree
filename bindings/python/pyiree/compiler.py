@@ -32,11 +32,24 @@ if HAS_TENSORFLOW:
   # Pass pipeline that should run to lower a TF saved_model to a form suitable
   # for input to the IREE compiler.
   TF_IMPORT_PASS_PIPELINE = (
+      # Clean up tf_executor and extraneous unused functions.
+      "tf-saved-model-delete-unused-funcs",
       "tf-executor-graph-pruning",
       "tf-standard-pipeline",
       "canonicalize",
-      "xla-legalize-tf-control-flow",
-      "xla-legalize-tf",
+
+      # Clean up control flow
+      "tf-functional-control-flow-to-cfg",
+      "inline",
+      "tf-saved-model-delete-unused-funcs",
+      "canonicalize",
+
+      # Legalize to XLA
+      "xla-legalize-tf{allow-partial-conversion=true}",
+      "canonicalize",
+
+      # Now that the IR is starting to look nice, optimize global tensors.
+      "tf-saved-model-optimize-global-tensors",
   )
 
   def tf_load_saved_model(

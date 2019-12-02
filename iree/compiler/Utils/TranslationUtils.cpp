@@ -113,6 +113,10 @@ std::unique_ptr<PassManager> createPassManager(
   if (translationOptions.print_mlir) {
     enableIRPrinting(passManager.get());
   }
+  if (!translationOptions.crash_reproducer.empty()) {
+    passManager->enableCrashReproducerGeneration(
+        translationOptions.crash_reproducer);
+  }
 
   return passManager;
 }

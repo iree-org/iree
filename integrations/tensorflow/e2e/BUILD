@@ -23,29 +23,19 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-py_test(
-    name = "control_flow_test",
-    srcs = ["control_flow_test.py"],
-    python_version = "PY3",
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//bindings/python/pyiree",
-    ],
-)
-
-py_test(
-    name = "simple_arithmetic_test",
-    srcs = ["simple_arithmetic_test.py"],
-    python_version = "PY3",
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//bindings/python/pyiree",
-    ],
-)
-
-py_test(
-    name = "vulkan_conv_test",
-    srcs = ["vulkan_conv_test.py"],
-    python_version = "PY3",
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//bindings/python/pyiree",
-    ],
-)
+[
+    py_test(
+        name = name,
+        srcs = [name + ".py"],
+        python_version = "PY3",
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//bindings/python/pyiree",
+        ],
+    )
+    for name in [
+        "control_flow_test",
+        "exported_names_test",
+        "simple_arithmetic_test",
+        "vulkan_conv_test",
+    ]
+]

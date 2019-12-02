@@ -37,12 +37,13 @@ flags.DEFINE_string(
 FLAGS = flags.FLAGS
 
 
-def save_and_compile_tf_module(tf_module, target_backends=()):
+def save_and_compile_tf_module(tf_module, exported_names=(),
+                               target_backends=()):
   with tempfile.TemporaryDirectory() as sm_path:
     options = tf.saved_model.SaveOptions(save_debug_info=True)
     tf.saved_model.save(tf_module, sm_path, options=options)
     return compiler.tf_compile_saved_model(
-        sm_path, target_backends=target_backends)
+        sm_path, exported_names=exported_names, target_backends=target_backends)
 
 
 def dump_iree_module(m):
@@ -60,14 +61,15 @@ def dump_iree_module(m):
 class CompiledModule(object):
   """Base class for per-backend compiled module facade."""
 
-  def __init__(self, ctor, backend):
+  def __init__(self, ctor, exported_names, backend):
     self._ctor = ctor
+    self._exported_names = exported_names
     self._backend = backend
 
   @staticmethod
-  def create(ctor, backend):
+  def create(ctor, exported_names, backend):
     compiled_module_class = backend.CompiledModule
-    return compiled_module_class(ctor, backend)
+    return compiled_module_class(ctor, exported_names, backend)
 
   @property
   def ctor(self):
@@ -129,10 +131,12 @@ class _TfFunctionWrapper(object):
 class IreeCompiledModule(CompiledModule):
   """Iree compiled module."""
 
-  def __init__(self, ctor, backend):
-    super().__init__(ctor, backend)
+  def __init__(self, ctor, exported_names, backend):
+    super().__init__(ctor, exported_names, backend)
     self._iree_module_blob = save_and_compile_tf_module(
-        ctor(), target_backends=backend.iree_compiler_targets)
+        ctor(),
+        exported_names=exported_names,
+        target_backends=backend.iree_compiler_targets)
     self._iree_module = binding.vm.create_module_from_blob(
         self._iree_module_blob)
 
@@ -359,7 +363,10 @@ def compile_modules(backends=None, **kwargs):
     for name, ctor in kwargs.items():
       assert name not in cls._modules_to_compile, (
           "@compile_modules called with duplicate module names '%s'" % (name,))
-      cls._modules_to_compile[name] = (ctor, backends)
+      exported_names = ()
+      if isinstance(ctor, tuple):
+        ctor, exported_names = ctor
+      cls._modules_to_compile[name] = (ctor, exported_names, backends)
 
     return cls
 
@@ -428,7 +435,7 @@ class SavedModelTestCase(tf.test.TestCase):
   """Tests against a SavedModel."""
 
   # Will be initialized to a dict by the @compile_modules decorator.
-  # The dict maps module name to (ctor, backend_names).
+  # The dict maps module name to (ctor, exported_names, backend_names).
   _modules_to_compile = None
 
   # Will be initialized in setUpClass to a dict of (name, CompiledModule)
@@ -446,11 +453,12 @@ class SavedModelTestCase(tf.test.TestCase):
     super().setUpClass()
     cls.compiled_modules = {}
     if cls._modules_to_compile:
-      for name, (ctor, backends) in cls._modules_to_compile.items():
+      for name, (ctor, exported_names,
+                 backends) in cls._modules_to_compile.items():
         if backends is None:
           backends = get_default_test_backends()
         cls.compiled_modules[name] = dict([
-            (backend.name, CompiledModule.create(ctor, backend))
+            (backend.name, CompiledModule.create(ctor, exported_names, backend))
             for backend in backends
         ])
 

@@ -57,4 +57,6 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_standard",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_lower",
     ],
+    # To pick up registered passes.
+    alwayslink = 1,
 )

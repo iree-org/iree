@@ -48,5 +48,8 @@ std::unique_ptr<OpPassBase<FuncOp>> createLegalizeInputOpsPass() {
   return std::make_unique<LegalizeInputOpsPass>();
 }
 
+static PassRegistration<LegalizeInputOpsPass> pass("iree-legalize-input-ops",
+                                                   "Legalizes input ops.");
+
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -38,6 +38,10 @@ struct TranslationOptions {
   // command line flags or overridden programmatically via this flag.
   bool print_mlir = false;
 
+  // Enables MLIR's dumping of crash reproducers.
+  // If non-empty, should be a file name for the crash reproducer.
+  std::string crash_reproducer;
+
   void CopyFrom(const TranslationOptions &other) {
     print_mlir = other.print_mlir;
   }

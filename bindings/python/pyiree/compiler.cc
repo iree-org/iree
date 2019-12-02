@@ -222,9 +222,11 @@ std::string CompilerModuleBundle::ToAsm(bool enableDebugInfo, bool prettyForm,
 }
 
 std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
-    bool print_mlir, std::vector<std::string> target_backends) {
+    bool print_mlir, const std::string& crash_reproducer,
+    std::vector<std::string> target_backends) {
   ModuleTranslationOptions options;
   options.print_mlir = print_mlir;
+  options.crash_reproducer = crash_reproducer;
   options.target_backends = std::move(target_backends);
 
   auto diag_capture = context_->CaptureDiagnostics();
@@ -240,8 +242,12 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
 }
 
 void CompilerModuleBundle::RunPassPipeline(
-    const std::vector<std::string>& pipelines) {
+    const std::vector<std::string>& pipelines,
+    const std::string& crash_reproducer) {
   mlir::PassManager pm(context_->mlir_context());
+  if (!crash_reproducer.empty()) {
+    pm.enableCrashReproducerGeneration(crash_reproducer);
+  }
 
   // Parse the pass pipelines.
   std::string error;
@@ -279,9 +285,11 @@ void SetupCompilerBindings(pybind11::module m) {
            py::arg("large_element_limit") = -1)
       .def("compile_to_sequencer_blob",
            &CompilerModuleBundle::CompileToSequencerBlob,
-           py::arg("print_mlir") = false,
+           py::arg("print_mlir") = false, py::arg("crash_reproducer") = "",
            py::arg("target_backends") = std::vector<std::string>())
-      .def("run_pass_pipeline", &CompilerModuleBundle::RunPassPipeline);
+      .def("run_pass_pipeline", &CompilerModuleBundle::RunPassPipeline,
+           py::arg("pipelines") = std::vector<std::string>(),
+           py::arg("crash_reproducer") = "");
 }
 
 }  // namespace python

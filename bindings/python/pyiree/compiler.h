@@ -40,11 +40,13 @@ class CompilerModuleBundle {
                     int64_t largeElementLimit);
 
   // Runs one or more pass pipelines (as is mlir::parsePassPipeline).
-  void RunPassPipeline(const std::vector<std::string>& pipelines);
+  void RunPassPipeline(const std::vector<std::string>& pipelines,
+                       const std::string& crash_reproducer);
 
   // Compiles the MLIR module to an IREE sequencer module.
   std::shared_ptr<OpaqueBlob> CompileToSequencerBlob(
-      bool print_mlir, std::vector<std::string> target_backends);
+      bool print_mlir, const std::string& crash_reproducer,
+      std::vector<std::string> target_backends);
 
  private:
   std::shared_ptr<CompilerContextBundle> context_;

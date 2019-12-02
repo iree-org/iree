@@ -58,6 +58,7 @@ cc_binary(
         "@local_config_mlir//:StandardDialectRegistration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
     ] + TARGET_COMPILER_BACKENDS,
 )
 
