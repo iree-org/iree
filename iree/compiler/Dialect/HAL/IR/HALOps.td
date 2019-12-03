@@ -303,7 +303,36 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   let hasCanonicalizer = 1;
 }
 
-def HAL_AllocatorAllocateShapedOp : HAL_Op<"allocator.allocate_shaped", [
+def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{constant buffer allocation operation}];
+  let description = [{
+    Allocates a buffer from the allocator with the given constant contents.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    ElementsAttr:$value
+  );
+  let results = (outs
+    RefPtrOf<HAL_Buffer>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *allocator,
+      IREE::HAL::MemoryTypeBitfield memoryTypes,
+      IREE::HAL::BufferUsageBitfield bufferUsage,
+      ElementsAttr value
+    }]>,
+  ];
+}
+
+def HAL_AllocatorAllocateShapedOp : HAL_Op<"allocator.allocate.shaped", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
   let summary = [{empty buffer allocation operation}];

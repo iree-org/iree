@@ -131,7 +131,7 @@ void VariableStoreOp::getCanonicalizationPatterns(
 namespace {
 
 /// Simplifies a hal.allocator.compute_size + hal.allocator.allocate pair into
-/// a single hal.allocator.allocate_shaped when there are no other paired
+/// a single hal.allocator.allocate.shaped when there are no other paired
 /// allocations.
 struct SimplifyAllocatorAllocateShapedOp
     : public OpRewritePattern<AllocatorAllocateOp> {

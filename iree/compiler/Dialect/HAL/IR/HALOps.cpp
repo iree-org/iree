@@ -730,7 +730,72 @@ static void printAllocatorAllocateOp(OpAsmPrinter &p, AllocatorAllocateOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.allocator.allocate_shaped
+// hal.allocator.allocate.const
+//===----------------------------------------------------------------------===//
+
+void AllocatorAllocateConstOp::build(Builder *builder, OperationState &state,
+                                     Value *allocator,
+                                     IREE::HAL::MemoryTypeBitfield memoryTypes,
+                                     IREE::HAL::BufferUsageBitfield bufferUsage,
+                                     ElementsAttr value) {
+  state.addOperands({allocator});
+  state.addAttribute("memory_types", builder->getI32IntegerAttr(
+                                         static_cast<int32_t>(memoryTypes)));
+  state.addAttribute("buffer_usage", builder->getI32IntegerAttr(
+                                         static_cast<int32_t>(bufferUsage)));
+  state.addAttribute("value", value);
+  state.addTypes({RefPtrType::get(BufferType::get(builder->getContext()))});
+}
+
+void AllocatorAllocateConstOp::getAsmResultNames(
+    function_ref<void(Value *, StringRef)> setNameFn) {
+  setNameFn(result(), "cbuffer");
+}
+
+static ParseResult parseAllocatorAllocateConstOp(OpAsmParser &parser,
+                                                 OperationState *result) {
+  OpAsmParser::OperandType allocator;
+  ElementsAttr valueAttr;
+  Type resultType;
+  if (failed(parser.parseOperand(allocator)) ||
+      failed(parser.resolveOperand(
+          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
+          parser, "memory_types", result->attributes)) ||
+      failed(parser.parseComma()) ||
+      failed(parseEnumAttr<BufferUsageBitfield, symbolizeBufferUsageBitfield>(
+          parser, "buffer_usage", result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.parseColonType(resultType)) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
+    return failure();
+  }
+  result->addTypes(resultType);
+  return success();
+}
+
+static void printAllocatorAllocateConstOp(OpAsmPrinter &p,
+                                          AllocatorAllocateConstOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.allocator());
+  p << ", ";
+  p << "\"" << stringifyMemoryTypeBitfield(op.memory_types()) << "\"";
+  p << ", ";
+  p << "\"" << stringifyBufferUsageBitfield(op.buffer_usage()) << "\"";
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{"memory_types", "buffer_usage", "value"});
+  p << " : ";
+  p.printType(op.result()->getType());
+  p << " = ";
+  p.printAttribute(op.value());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.allocator.allocate.shaped
 //===----------------------------------------------------------------------===//
 
 void AllocatorAllocateShapedOp::build(

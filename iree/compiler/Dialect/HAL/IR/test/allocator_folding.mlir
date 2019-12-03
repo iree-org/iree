@@ -22,9 +22,9 @@ func @simplify_allocate_shapedy() -> !ireex.ref<!hal.buffer> {
   %0 = "test_hal.allocator"() : () -> !ireex.ref<!hal.allocator>
   // CHECK-DAG: [[SH:%.+]]:2 = "test_hal.shape"
   %1:2 = "test_hal.shape"() : () -> (i32, i32)
-  // CHECK-NEXT: %buffer = hal.allocator.allocate_shaped [[AL]], "HostVisible|HostCoherent", "Transfer", shape=[
-// CHECK-SAME:     [[SH]]#0, [[SH]]#1
-// CHECK-SAME: ], element_size=4 : !ireex.ref<!hal.buffer>
+  // CHECK-NEXT: %buffer = hal.allocator.allocate.shaped [[AL]], "HostVisible|HostCoherent", "Transfer", shape=[
+  // CHECK-SAME:     [[SH]]#0, [[SH]]#1
+  // CHECK-SAME: ], element_size=4 : !ireex.ref<!hal.buffer>
   %sz = hal.allocator.compute_size %0, "HostVisible|HostCoherent", "Transfer", shape=[%1#0, %1#1], element_size=4
   %buffer = hal.allocator.allocate %0, "HostVisible|HostCoherent", "Transfer", %sz : !ireex.ref<!hal.buffer>
   // CHECK-NEXT: return %buffer
