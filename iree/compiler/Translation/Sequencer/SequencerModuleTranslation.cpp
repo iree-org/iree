@@ -250,7 +250,9 @@ LogicalResult SequencerTranslator::runTensorFlowImportPasses(ModuleOp module) {
 #endif
 
 std::vector<uint8_t> SequencerTranslator::translateModule(ModuleOp module) {
-  runTensorFlowImportPasses(module);
+  if (failed(runTensorFlowImportPasses(module))) {
+    return {};
+  }
 
   // Run one large set of passes to get to a partitioned module.
   auto partitioningPasses = createPassManager(module.getContext(), options());
