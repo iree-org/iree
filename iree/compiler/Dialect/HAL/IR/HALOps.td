@@ -491,7 +491,8 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   let arguments = (ins
     RefPtrOf<HAL_Buffer>:$buffer,
     HAL_Shape:$shape,
-    HAL_Dims:$indices
+    HAL_Dims:$indices,
+    I32Attr:$element_size
   );
 
   let results = (outs
@@ -512,7 +513,8 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
     RefPtrOf<HAL_Buffer>:$buffer,
     HAL_Shape:$shape,
     HAL_Dims:$indices,
-    HAL_Dims:$lengths
+    HAL_Dims:$lengths,
+    I32Attr:$element_size
   );
   let results = (outs
     // TODO(benvanik): return a strides tuple instead, or one per dim.
@@ -535,7 +537,8 @@ def HAL_BufferViewSliceOp : HAL_PureOp<"buffer_view.slice", [
     RefPtrOf<HAL_Buffer>:$buffer,
     HAL_Shape:$shape,
     HAL_Dims:$indices,
-    HAL_Dims:$lengths
+    HAL_Dims:$lengths,
+    I32Attr:$element_size
   );
   let results = (outs
     RefPtrOf<HAL_Buffer>:$result

@@ -1147,7 +1147,8 @@ static void printBufferStoreOp(OpAsmPrinter &p, BufferStoreOp op) {
   p.printOperand(op.target_offset());
   p << "] : ";
   p.printType(op.value()->getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"element_size"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1164,6 +1165,7 @@ static ParseResult parseBufferViewComputeOffsetOp(OpAsmParser &parser,
   OpAsmParser::OperandType buffer;
   SmallVector<OpAsmParser::OperandType, 4> shape;
   SmallVector<OpAsmParser::OperandType, 4> indices;
+  IntegerAttr elementSize;
   if (failed(parser.parseOperand(buffer)) ||
       failed(parser.resolveOperand(
           buffer, RefPtrType::get(BufferType::get(result->getContext())),
@@ -1179,6 +1181,12 @@ static ParseResult parseBufferViewComputeOffsetOp(OpAsmParser &parser,
           parser.parseOperandList(indices, OpAsmParser::Delimiter::Square)) ||
       failed(parser.resolveOperands(indices, getDimType(parser),
                                     result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseKeyword("element_size")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(elementSize,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "element_size", result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -1194,8 +1202,9 @@ static void printBufferViewComputeOffsetOp(OpAsmPrinter &p,
   p.printOperands(op.shape());
   p << "], indices=[";
   p.printOperands(op.indices());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p << "], element_size=" << op.element_size();
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"element_size"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1214,6 +1223,7 @@ static ParseResult parseBufferViewComputeRangeOp(OpAsmParser &parser,
   SmallVector<OpAsmParser::OperandType, 4> shape;
   SmallVector<OpAsmParser::OperandType, 4> indices;
   SmallVector<OpAsmParser::OperandType, 4> lengths;
+  IntegerAttr elementSize;
   if (failed(parser.parseOperand(buffer)) ||
       failed(parser.resolveOperand(
           buffer, RefPtrType::get(BufferType::get(result->getContext())),
@@ -1235,6 +1245,12 @@ static ParseResult parseBufferViewComputeRangeOp(OpAsmParser &parser,
           parser.parseOperandList(lengths, OpAsmParser::Delimiter::Square)) ||
       failed(parser.resolveOperands(lengths, getDimType(parser),
                                     result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseKeyword("element_size")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(elementSize,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "element_size", result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -1252,8 +1268,9 @@ static void printBufferViewComputeRangeOp(OpAsmPrinter &p,
   p.printOperands(op.indices());
   p << "], lengths=[";
   p.printOperands(op.lengths());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p << "], element_size=" << op.element_size();
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"element_size"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1271,6 +1288,7 @@ static ParseResult parseBufferViewSliceOp(OpAsmParser &parser,
   SmallVector<OpAsmParser::OperandType, 4> shape;
   SmallVector<OpAsmParser::OperandType, 4> indices;
   SmallVector<OpAsmParser::OperandType, 4> lengths;
+  IntegerAttr elementSize;
   if (failed(parser.parseOperand(buffer)) ||
       failed(parser.resolveOperand(
           buffer, RefPtrType::get(BufferType::get(result->getContext())),
@@ -1292,6 +1310,12 @@ static ParseResult parseBufferViewSliceOp(OpAsmParser &parser,
           parser.parseOperandList(lengths, OpAsmParser::Delimiter::Square)) ||
       failed(parser.resolveOperands(lengths, getDimType(parser),
                                     result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseKeyword("element_size")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(elementSize,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "element_size", result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
@@ -1308,8 +1332,9 @@ static void printBufferViewSliceOp(OpAsmPrinter &p, BufferViewSliceOp op) {
   p.printOperands(op.indices());
   p << "], lengths=[";
   p.printOperands(op.lengths());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p << "], element_size=" << op.element_size();
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"element_size"});
 }
 
 //===----------------------------------------------------------------------===//
