@@ -17,7 +17,7 @@
 # Build the project with bazel using Kokoro.
 
 # Having separate build scripts with this indirection is recommended by the
-# Kokoro setup instructions. 
+# Kokoro setup instructions.
 
 set -e
 
