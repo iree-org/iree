@@ -36,14 +36,64 @@ flags.DEFINE_string(
     "(Overrides environment variables and auto detection)")
 FLAGS = flags.FLAGS
 
+ORIGNAL_SAVED_MODEL_PATH_ATTR = "_ORIGINAL_SAVED_MODEL_PATH"
+
 
 def save_and_compile_tf_module(tf_module, exported_names=(),
                                target_backends=()):
-  with tempfile.TemporaryDirectory() as sm_path:
-    options = tf.saved_model.SaveOptions(save_debug_info=True)
-    tf.saved_model.save(tf_module, sm_path, options=options)
+  """Saves and compiles a TensorFlow tf.Module.
+
+  Note that if the module has the special _ORIGINAL_SAVED_MODEL_PATH attribute,
+  then it will be compiled directly from that path instead of saved and then
+  loaded.
+
+  Args:
+    tf_module: A tf.Module.
+    exported_names: Iterable of dotted function names to consider for
+      compilation.
+    target_backends: Iterable of string backend names to compile for.
+
+  Returns:
+    An _IreeCompiledModule.
+  """
+
+  def compile_from_path(sm_path):
     return compiler.tf_compile_saved_model(
         sm_path, exported_names=exported_names, target_backends=target_backends)
+
+  if hasattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR):
+    # Compile directly from the original path.
+    sm_path = getattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR)
+    logging.info(
+        "Compiling from original saved_model path (not round-tripping): %s",
+        sm_path)
+    return compile_from_path(sm_path)
+  else:
+    # Round-trip through a temporary director.
+    with tempfile.TemporaryDirectory() as sm_path:
+      options = tf.saved_model.SaveOptions(save_debug_info=True)
+      tf.saved_model.save(tf_module, sm_path, options=options)
+      return compile_from_path(sm_path)
+
+
+def load_tf_module(path):
+  """Wrapper around tf.saved_model.load which preserves the path.
+
+  Args:
+    path: The path to load from.
+
+  Returns:
+    The loaded module with an extra property _ORIGINAL_SAVED_MODEL_PATH added.
+    This is used on subsequent compiles to load directly from the original
+    path, which gives us unmolested access to the original debug information,
+    which TensorFlow tends to lose on round-trip.
+  """
+  tf_module = tf.saved_model.load(path)
+  assert not hasattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR), (
+      "Saved model (%s) already has attribute %s" %
+      (path, ORIGNAL_SAVED_MODEL_PATH_ATTR))
+  setattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR, path)
+  return tf_module
 
 
 def dump_iree_module(m):
