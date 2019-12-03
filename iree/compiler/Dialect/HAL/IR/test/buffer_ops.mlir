@@ -78,6 +78,27 @@ func @buffer_copy_data(%arg0 : !ireex.ref<!hal.buffer>, %arg1 : !ireex.ref<!hal.
 
 // -----
 
+// CHECK-LABEL: @buffer_load
+func @buffer_load(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
+  %0 = "test_hal.device_size"() : () -> i32
+  // CHECK: [[VAL:%.+]] = hal.buffer.load %arg0[%0] : i32
+  %1 = hal.buffer.load %arg0[%0] : i32
+  // CHECK-NEXT: return [[VAL]]
+  return %1 : i32
+}
+
+// -----
+
+// CHECK-LABEL: @buffer_store
+func @buffer_store(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>) {
+  %0 = "test_hal.device_size"() : () -> i32
+  // CHECK: hal.buffer.store %arg0, %arg1[%0] : i32
+  hal.buffer.store %arg0, %arg1[%0] : i32
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_view_compute_offset
 func @buffer_view_compute_offset(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)

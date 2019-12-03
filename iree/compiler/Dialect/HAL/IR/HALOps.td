@@ -333,6 +333,34 @@ def HAL_BufferCopyDataOp : HAL_Op<"buffer.copy_data"> {
   );
 }
 
+def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
+  let summary = [{buffer element load operation}];
+  let description = [{
+    Loads a value from a buffer by mapping it.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_DeviceSize:$source_offset
+  );
+  let results = (outs
+    AnyTypeOf<[HAL_PrimitiveType, AnyVector]>:$result
+  );
+}
+
+def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
+  let summary = [{buffer element store operation}];
+  let description = [{
+    Stores a value into a buffer by mapping it.
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[HAL_PrimitiveType, AnyVector]>:$value,
+    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_DeviceSize:$target_offset
+  );
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
@@ -588,7 +616,7 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
 // iree::hal::DescriptorSet
 //===----------------------------------------------------------------------===//
 
-def HAL_DescriptorSetAllocateOp : HAL_PureOp<"descriptor_set.allocate", [
+def HAL_DescriptorSetAllocateOp : HAL_Op<"descriptor_set.allocate", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
   let summary = [{allocates a descriptor set from the device pool}];

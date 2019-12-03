@@ -336,6 +336,8 @@ def HAL_TimelineValue : TypeAlias<I32>;
 
 def HAL_Status : TypeAlias<I32>;
 
+def HAL_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
+
 def HAL_Dim : I<32>;
 def HAL_Dims : Variadic<HAL_Dim>;
 def HAL_Shape : Variadic<HAL_Dim>;

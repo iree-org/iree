@@ -756,6 +756,82 @@ static void printBufferCopyDataOp(OpAsmPrinter &p, BufferCopyDataOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.buffer.load
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseBufferLoadOp(OpAsmParser &parser,
+                                     OperationState *result) {
+  OpAsmParser::OperandType sourceBuffer;
+  OpAsmParser::OperandType sourceOffset;
+  Type resultType;
+  if (failed(parser.parseOperand(sourceBuffer)) ||
+      failed(parser.resolveOperand(
+          sourceBuffer, RefPtrType::get(BufferType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseLSquare()) ||
+      failed(parser.parseOperand(sourceOffset)) ||
+      failed(parser.parseRSquare()) ||
+      failed(parser.resolveOperand(sourceOffset, getDeviceSizeType(parser),
+                                   result->operands)) ||
+      failed(parser.parseColonType(resultType)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  result->addTypes({resultType});
+  return success();
+}
+
+static void printBufferLoadOp(OpAsmPrinter &p, BufferLoadOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.source_buffer());
+  p << "[";
+  p.printOperand(op.source_offset());
+  p << "] : ";
+  p.printType(op.result()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.buffer.store
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseBufferStoreOp(OpAsmParser &parser,
+                                      OperationState *result) {
+  OpAsmParser::OperandType value;
+  OpAsmParser::OperandType targetBuffer;
+  OpAsmParser::OperandType targetOffset;
+  Type valueType;
+  if (failed(parser.parseOperand(value)) || failed(parser.parseComma()) ||
+      failed(parser.parseOperand(targetBuffer)) ||
+      failed(parser.parseLSquare()) ||
+      failed(parser.parseOperand(targetOffset)) ||
+      failed(parser.parseRSquare()) ||
+      failed(parser.parseColonType(valueType)) ||
+      failed(parser.resolveOperand(value, valueType, result->operands)) ||
+      failed(parser.resolveOperand(
+          targetBuffer, RefPtrType::get(BufferType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.resolveOperand(targetOffset, getDeviceSizeType(parser),
+                                   result->operands)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printBufferStoreOp(OpAsmPrinter &p, BufferStoreOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.value());
+  p << ", ";
+  p.printOperand(op.target_buffer());
+  p << "[";
+  p.printOperand(op.target_offset());
+  p << "] : ";
+  p.printType(op.value()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
 // hal.buffer_view.compute_offset
 //===----------------------------------------------------------------------===//
 
