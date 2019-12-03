@@ -553,7 +553,9 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     RefPtrOf<HAL_CommandBuffer>:$command_buffer,
     RefPtrOf<HAL_Executable>:$executable,
     HAL_OrdinalAttr:$entry_point,
-    HAL_Workgroups:$workgroups
+    HAL_Dim:$workgroup_x,
+    HAL_Dim:$workgroup_y,
+    HAL_Dim:$workgroup_z
   );
 
   let skipDefaultBuilders = 1;
@@ -561,7 +563,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     OpBuilder<[{
       Builder *builder, OperationState &state, Value *commandBuffer,
       Value *executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
-      Value *workgroups
+      Value *workgroupX, Value *workgroupY, Value *workgroupZ
     }]>,
   ];
 }

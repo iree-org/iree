@@ -340,14 +340,6 @@ def HAL_Dim : I<32>;
 def HAL_Dims : Variadic<HAL_Dim>;
 def HAL_Shape : Variadic<HAL_Dim>;
 
-def HAL_Workgroups : VectorOfLengthAndType<[3], [I32]> {
-  let typeDescription = [{
-    An (X, Y, Z) workgroup count for a dispatch. These values will be multiplied
-    by the workgroup size of the executable being dispatched to compute the
-    total invocation count.
-  }];
-}
-
 // TODO(cl/277443143): moving into OpBase.td.
 // A `width`-bit integer elements attribute. The attribute should be
 // ranked and has a shape as specified in `dims`.

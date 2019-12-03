@@ -123,9 +123,11 @@ func @command_buffer_bind_descriptor_set(%arg0 : !ireex.ref<!hal.command_buffer>
 // CHECK-LABEL: @command_buffer_dispatch
 func @command_buffer_dispatch(%arg0 : !ireex.ref<!hal.command_buffer>) {
   %0 = "test_hal.executable"() : () -> !ireex.ref<!hal.executable>
-  %1 = "test_hal.workgroups"() : () -> vector<3xi32>
-  // CHECK: hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroups=%1
-  hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroups=%1
+  %1 = "test_hal.workgroup_x"() : () -> i32
+  %2 = "test_hal.workgroup_y"() : () -> i32
+  %3 = "test_hal.workgroup_z"() : () -> i32
+  // CHECK: hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroup_xyz=[%1, %2, %3]
+  hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroup_xyz=[%1, %2, %3]
   return
 }
 

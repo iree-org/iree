@@ -1292,8 +1292,9 @@ static void printCommandBufferBindDescriptorSetOp(
 void CommandBufferDispatchOp::build(
     Builder *builder, OperationState &state, Value *commandBuffer,
     Value *executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
-    Value *workgroups) {
-  state.addOperands({commandBuffer, executable, workgroups});
+    Value *workgroupX, Value *workgroupY, Value *workgroupZ) {
+  state.addOperands(
+      {commandBuffer, executable, workgroupX, workgroupY, workgroupZ});
   state.addAttribute("entry_point",
                      builder->getIntegerAttr(builder->getIntegerType(32),
                                              entryPoint.ordinal()));
@@ -1304,7 +1305,7 @@ static ParseResult parseCommandBufferDispatchOp(OpAsmParser &parser,
   OpAsmParser::OperandType commandBuffer;
   OpAsmParser::OperandType executable;
   IntegerAttr entryPointAttr;
-  OpAsmParser::OperandType workgroups;
+  OpAsmParser::OperandType workgroupX, workgroupY, workgroupZ;
   SmallVector<OpAsmParser::OperandType, 4> bindings;
   auto operandsLoc = parser.getCurrentLocation();
   if (failed(parser.parseOperand(commandBuffer)) ||
@@ -1316,18 +1317,26 @@ static ParseResult parseCommandBufferDispatchOp(OpAsmParser &parser,
                                    parser.getBuilder().getIntegerType(32),
                                    "entry_point", result->attributes)) ||
       failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("workgroups")) ||
-      failed(parser.parseEqual()) || failed(parser.parseOperand(workgroups)) ||
+      failed(parser.parseKeyword("workgroup_xyz")) ||
+      failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
+      failed(parser.parseOperand(workgroupX)) || failed(parser.parseComma()) ||
+      failed(parser.parseOperand(workgroupY)) || failed(parser.parseComma()) ||
+      failed(parser.parseOperand(workgroupZ)) ||
+      failed(parser.parseRSquare()) ||
       failed(parser.resolveOperands(
           ArrayRef<OpAsmParser::OperandType>{
               commandBuffer,
               executable,
-              workgroups,
+              workgroupX,
+              workgroupY,
+              workgroupZ,
           },
           ArrayRef<Type>{
               RefPtrType::get(CommandBufferType::get(result->getContext())),
               RefPtrType::get(ExecutableType::get(result->getContext())),
-              VectorType::get({3}, parser.getBuilder().getIntegerType(32)),
+              parser.getBuilder().getIntegerType(32),
+              parser.getBuilder().getIntegerType(32),
+              parser.getBuilder().getIntegerType(32),
           },
           operandsLoc, result->operands)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
@@ -1342,8 +1351,11 @@ static void printCommandBufferDispatchOp(OpAsmPrinter &p,
   p.printOperand(op.command_buffer());
   p << ", ";
   p.printOperand(op.executable());
-  p << ", entry_point=" << op.entry_point() << ", workgroups=";
-  p.printOperand(op.workgroups());
+  p << ", entry_point=" << op.entry_point() << ", workgroup_xyz=[";
+  interleaveComma(
+      ArrayRef<Value *>{op.workgroup_x(), op.workgroup_y(), op.workgroup_z()},
+      p, [&](Value *value) { p.printOperand(value); });
+  p << "]";
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
                               "entry_point",
                           });
