@@ -36,17 +36,6 @@ func @make_buffer_barrier(%arg0 : !ireex.ref<!hal.buffer>) -> tuple<i32, i32, !i
 
 // -----
 
-// CHECK-LABEL: @make_buffer_binding
-func @make_buffer_binding(%arg0 : !ireex.ref<!hal.buffer>) -> tuple<i32, !ireex.ref<!hal.buffer>, i32, i32> {
-  %0 = "test_hal.offset"() : () -> i32
-  %1 = "test_hal.length"() : () -> i32
-  // CHECK: %buffer_binding = hal.make_buffer_binding "Read|Write", %arg0, %0, %1 : tuple<i32, !ireex.ref<!hal.buffer>, i32, i32>
-  %buffer_binding = hal.make_buffer_binding "Read|Write", %arg0, %0, %1 : tuple<i32, !ireex.ref<!hal.buffer>, i32, i32>
-  return %buffer_binding : tuple<i32, !ireex.ref<!hal.buffer>, i32, i32>
-}
-
-// -----
-
 // CHECK-LABEL: @command_buffer_create
 func @command_buffer_create(%arg0 : !ireex.ref<!hal.device>) {
   // CHECK: %cmd = hal.command_buffer.create %arg0, "OneShot", "Transfer|Dispatch" : !ireex.ref<!hal.command_buffer>
@@ -117,13 +106,26 @@ func @command_buffer_copy_buffer(%arg0 : !ireex.ref<!hal.command_buffer>) {
 
 // -----
 
+// CHECK-LABEL: @command_buffer_bind_descriptor_set
+func @command_buffer_bind_descriptor_set(%arg0 : !ireex.ref<!hal.command_buffer>) {
+  %0 = "test_hal.executable"() : () -> !ireex.ref<!hal.executable>
+  %1 = "test_hal.descriptor_set"() : () -> !ireex.ref<!hal.descriptor_set>
+  %2 = "test_hal.offset"() : () -> i32
+  // CHECK: hal.command_buffer.bind_descriptor_set %arg0, %0, set=0, %1
+  hal.command_buffer.bind_descriptor_set %arg0, %0, set=0, %1
+  // CHECK-NEXT: hal.command_buffer.bind_descriptor_set %arg0, %0, set=0, %1, offsets=[%2]
+  hal.command_buffer.bind_descriptor_set %arg0, %0, set=0, %1, offsets=[%2]
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @command_buffer_dispatch
 func @command_buffer_dispatch(%arg0 : !ireex.ref<!hal.command_buffer>) {
   %0 = "test_hal.executable"() : () -> !ireex.ref<!hal.executable>
   %1 = "test_hal.workgroups"() : () -> vector<3xi32>
-  %2 = "test_hal.binding"() : () -> tuple<i32, !ireex.ref<!hal.buffer>, i32, i32>
-  // CHECK: hal.command_buffer.dispatch %arg0, %0, @entry[%1](%2, %2, %2)
-  hal.command_buffer.dispatch %arg0, %0, @entry[%1](%2, %2, %2)
+  // CHECK: hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroups=%1
+  hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroups=%1
   return
 }
 
@@ -132,9 +134,9 @@ func @command_buffer_dispatch(%arg0 : !ireex.ref<!hal.command_buffer>) {
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 func @command_buffer_dispatch_indirect(%arg0 : !ireex.ref<!hal.command_buffer>) {
   %0 = "test_hal.executable"() : () -> !ireex.ref<!hal.executable>
-  %1 = "test_hal.workgroups"() : () -> tuple<i32, !ireex.ref<!hal.buffer>, i32, i32>
-  %2 = "test_hal.binding"() : () -> tuple<i32, !ireex.ref<!hal.buffer>, i32, i32>
-  // CHECK: hal.command_buffer.dispatch.indirect %arg0, %0, @entry[%1](%2, %2, %2)
-  hal.command_buffer.dispatch.indirect %arg0, %0, @entry[%1](%2, %2, %2)
+  %1 = "test_hal.buffer"() : () -> !ireex.ref<!hal.buffer>
+  %2 = "test_hal.offset"() : () -> i32
+  // CHECK: hal.command_buffer.dispatch.indirect %arg0, %0, entry_point=0, workgroups=%1[%2]
+  hal.command_buffer.dispatch.indirect %arg0, %0, entry_point=0, workgroups=%1[%2]
   return
 }

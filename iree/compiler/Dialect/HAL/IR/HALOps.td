@@ -64,6 +64,19 @@ def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
   ];
 }
 
+def HAL_ExExecutableDescriptorSetLayoutOp :
+  HAL_PureOp<"ex.executable_descriptor_set_layout", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let arguments = (ins
+    RefPtrOf<HAL_Executable>:$executable,
+    I32Attr:$set
+  );
+  let results = (outs
+    RefPtrOf<HAL_DescriptorSetLayout>:$result
+  );
+}
+
 def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
   let arguments = (ins
     RefPtrOf<HAL_Device>:$device,
@@ -128,35 +141,6 @@ def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
       Builder *builder, OperationState &state,
       IREE::HAL::AccessScopeBitfield sourceScope,
       IREE::HAL::AccessScopeBitfield targetScope,
-      Value *buffer, Value *offset, Value *length
-    }]>,
-  ];
-}
-
-def HAL_MakeBufferBindingOp : HAL_MakeTupleOp<"make_buffer_binding", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{temporary buffer binding allocation operation}];
-  let description = [{
-    Allocates a temporary BufferBinding struct that can be passed to the
-    command buffer dispatch recording operations.
-  }];
-
-  let arguments = (ins
-    HAL_MemoryAccessBitfieldAttr:$access,
-    RefPtrOf<HAL_Buffer>:$buffer,
-    HAL_DeviceSize:$offset,
-    HAL_DeviceSize:$length
-  );
-  let results = (outs
-    HAL_BufferBinding:$result
-  );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state,
-      IREE::HAL::MemoryAccessBitfield access,
       Value *buffer, Value *offset, Value *length
     }]>,
   ];
@@ -273,6 +257,7 @@ def HAL_BufferReadDataOp : HAL_Op<"buffer.read_data"> {
     RefPtrOf<HAL_Buffer>:$source_buffer,
     HAL_DeviceSize:$source_offset,
     RefPtrOf<MutableByteBufferType>:$target_buffer,
+    HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
 }
@@ -284,9 +269,10 @@ def HAL_BufferWriteDataOp : HAL_Op<"buffer.write_data"> {
   }];
 
   let arguments = (ins
+    HAL_HostBufferRef:$source_buffer,
+    HAL_DeviceSize:$source_offset,
     RefPtrOf<HAL_Buffer>:$target_buffer,
     HAL_DeviceSize:$target_offset,
-    HAL_HostBufferRef:$source_buffer,
     HAL_DeviceSize:$length
   );
 }
@@ -487,6 +473,32 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   );
 }
 
+def HAL_CommandBufferBindDescriptorSetOp :
+    HAL_Op<"command_buffer.bind_descriptor_set"> {
+  let summary = [{command buffer descriptor set binding operation}];
+  let description = [{
+    Binds a descriptor set to the given set number. The provided descriptor set
+    must not be modified once bound to a command buffer.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    RefPtrOf<HAL_Executable>:$executable,
+    I32Attr:$set,
+    RefPtrOf<HAL_DescriptorSet>:$descriptor_set,
+    Variadic<HAL_DeviceSize>:$dynamic_offsets
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *commandBuffer,
+      Value *executable, uint32_t set, Value *descriptorSet,
+      ArrayRef<Value *> dynamicOffsets = {}
+    }]>,
+  ];
+}
+
 def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let summary = [{command buffer dispatch recording operation}];
   let description = [{
@@ -496,9 +508,8 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let arguments = (ins
     RefPtrOf<HAL_CommandBuffer>:$command_buffer,
     RefPtrOf<HAL_Executable>:$executable,
-    SymbolRefAttr:$entry_point,
-    HAL_Workgroups:$workgroups,
-    Variadic<HAL_BufferBinding>:$bindings
+    HAL_OrdinalAttr:$entry_point,
+    HAL_Workgroups:$workgroups
   );
 
   let skipDefaultBuilders = 1;
@@ -506,7 +517,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     OpBuilder<[{
       Builder *builder, OperationState &state, Value *commandBuffer,
       Value *executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
-      Value *workgroups, ArrayRef<Value *> bufferBindings
+      Value *workgroups
     }]>,
   ];
 }
@@ -521,9 +532,76 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   let arguments = (ins
     RefPtrOf<HAL_CommandBuffer>:$command_buffer,
     RefPtrOf<HAL_Executable>:$executable,
-    SymbolRefAttr:$entry_point,
-    HAL_BufferBinding:$workgroups,
-    Variadic<HAL_BufferBinding>:$bindings
+    HAL_OrdinalAttr:$entry_point,
+    RefPtrOf<HAL_Buffer>:$workgroups_buffer,
+    HAL_DeviceSize:$workgroups_offset
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSet
+//===----------------------------------------------------------------------===//
+
+def HAL_DescriptorSetAllocateOp : HAL_PureOp<"descriptor_set.allocate", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{allocates a descriptor set from the device pool}];
+  let description = [{
+    Allocates a DescriptorSet from the device pool.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device,
+    RefPtrOf<HAL_DescriptorSetLayout>:$set_layout
+  );
+  let results = (outs
+    RefPtrOf<HAL_DescriptorSet>:$result
+  );
+}
+
+def HAL_DescriptorSetMakeBindingOp :
+  HAL_MakeTupleOp<"descriptor_set.make_binding", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{temporary buffer binding allocation operation}];
+  let description = [{
+    Allocates a temporary DescriptorSet binding struct that can be passed to the
+    hal.descriptor_set.update operation.
+  }];
+
+  let arguments = (ins
+    I32Attr:$binding,
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length,
+    HAL_MemoryAccessBitfieldAttr:$access
+  );
+  let results = (outs
+    HAL_DescriptorSetBinding:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      int32_t binding, Value *buffer, Value *offset, Value *length,
+      IREE::HAL::MemoryAccessBitfield access
+    }]>,
+  ];
+}
+
+def HAL_DescriptorSetUpdateOp : HAL_Op<"descriptor_set.update"> {
+  let summary = [{updates one or more bindings in a descriptor set}];
+  let description = [{
+    Updates bindings in a descriptor set. The descriptor set must not be
+    recorded into any command buffer that has not yet completed; updating when
+    in use will cause undefined behavior.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device,
+    RefPtrOf<HAL_DescriptorSet>:$set,
+    Variadic<HAL_DescriptorSetBinding>:$bindings
   );
 }
 

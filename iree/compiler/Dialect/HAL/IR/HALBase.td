@@ -228,6 +228,24 @@ def HAL_CommandBuffer : DialectType<
   }];
 }
 
+def HAL_DescriptorSet : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::DescriptorSetType>()">,
+    "descriptor_set"> {
+  let typeDescription = [{
+    Descriptor set.
+  }];
+}
+
+def HAL_DescriptorSetLayout : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::DescriptorSetLayoutType>()">,
+    "descriptor_set_layout"> {
+  let typeDescription = [{
+    Descriptor set layout.
+  }];
+}
+
 def HAL_Device : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::DeviceType>()">,
@@ -409,15 +427,17 @@ def HAL_BufferBarrier : NamedTupleOf<[
 }
 def HAL_BufferBarrierList : TupleOf<[HAL_BufferBarrier]>;
 
-def HAL_BufferBinding : NamedTupleOf<[
-    NamedTupleElement<0, "access", I32>,
+def HAL_DescriptorSetBinding : NamedTupleOf<[
+    NamedTupleElement<0, "binding", I32>,
     NamedTupleElement<1, "buffer", RefPtrOf<HAL_Buffer>>,
     NamedTupleElement<2, "buffer_offset", HAL_DeviceSize>,
     NamedTupleElement<3, "buffer_length", HAL_DeviceSize>,
-  ], "BufferBinding"> {
+    NamedTupleElement<4, "access", I32>,
+  ], "DescriptorSetBinding"> {
   let typeDescription = [{
-    BufferBinding struct that can be passed to the command buffer dispatch
-    recording operations.
+    DescriptorSetBinding struct that can be passed to the
+    hal.descriptor_set.update operation. Constructed via the
+    hal.descriptor_set.make_binding operation.
   }];
 }
 

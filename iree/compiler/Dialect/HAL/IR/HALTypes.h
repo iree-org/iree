@@ -68,6 +68,28 @@ class CommandBufferType
   static bool kindof(unsigned kind) { return kind == TypeKind::CommandBuffer; }
 };
 
+class DescriptorSetType
+    : public Type::TypeBase<DescriptorSetType, RefObjectType> {
+ public:
+  using Base::Base;
+  static DescriptorSetType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::DescriptorSet);
+  }
+  static bool kindof(unsigned kind) { return kind == TypeKind::DescriptorSet; }
+};
+
+class DescriptorSetLayoutType
+    : public Type::TypeBase<DescriptorSetLayoutType, RefObjectType> {
+ public:
+  using Base::Base;
+  static DescriptorSetLayoutType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::DescriptorSetLayout);
+  }
+  static bool kindof(unsigned kind) {
+    return kind == TypeKind::DescriptorSetLayout;
+  }
+};
+
 class DeviceType : public Type::TypeBase<DeviceType, RefObjectType> {
  public:
   using Base::Base;
@@ -181,13 +203,14 @@ class MemoryBarrierListType {
   }
 };
 
-class BufferBindingType {
+class DescriptorSetBindingType {
  public:
   static TupleType get(MLIRContext *context) {
     return TupleType::get(
         {
             IntegerType::get(32, context),
             RefPtrType::get(BufferType::get(context)),
+            IntegerType::get(32, context),
             IntegerType::get(32, context),
             IntegerType::get(32, context),
         },

@@ -45,8 +45,9 @@ func @buffer_read_data(%arg0 : !ireex.ref<!hal.buffer>) {
   %0 = "test_hal.device_size"() : () -> i32
   %1 = "test_hal.mutable_data"() : () -> !ireex.mutable_byte_buffer_ref
   %2 = "test_hal.device_size"() : () -> i32
-  // CHECK: hal.buffer.read_data %arg0, %0, %1, %2 : !ireex.mutable_byte_buffer_ref
-  hal.buffer.read_data %arg0, %0, %1, %2 : !ireex.mutable_byte_buffer_ref
+  %3 = "test_hal.device_size"() : () -> i32
+  // CHECK: hal.buffer.read_data %arg0, %0, %1, %2, %3 : !ireex.mutable_byte_buffer_ref
+  hal.buffer.read_data %arg0, %0, %1, %2, %3 : !ireex.mutable_byte_buffer_ref
   return
 }
 
@@ -54,11 +55,12 @@ func @buffer_read_data(%arg0 : !ireex.ref<!hal.buffer>) {
 
 // CHECK-LABEL: @buffer_write_data
 func @buffer_write_data(%arg0 : !ireex.ref<!hal.buffer>) {
-  %0 = "test_hal.device_size"() : () -> i32
-  %1 = "test_hal.mutable_data"() : () -> !ireex.mutable_byte_buffer_ref
+  %0 = "test_hal.mutable_data"() : () -> !ireex.mutable_byte_buffer_ref
+  %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.device_size"() : () -> i32
-  // CHECK: hal.buffer.write_data %arg0, %0, %1, %2 : !ireex.mutable_byte_buffer_ref
-  hal.buffer.write_data %arg0, %0, %1, %2 : !ireex.mutable_byte_buffer_ref
+  %3 = "test_hal.device_size"() : () -> i32
+  // CHECK: hal.buffer.write_data %0, %1, %arg0, %2, %3 : !ireex.mutable_byte_buffer_ref
+  hal.buffer.write_data %0, %1, %arg0, %2, %3 : !ireex.mutable_byte_buffer_ref
   return
 }
 

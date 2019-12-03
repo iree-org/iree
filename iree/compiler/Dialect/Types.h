@@ -44,6 +44,8 @@ enum Kind {
   Buffer,
   BufferView,
   CommandBuffer,
+  DescriptorSet,
+  DescriptorSetLayout,
   Device,
   Event,
   Executable,
@@ -81,6 +83,8 @@ class RefObjectType : public Type {
       case HAL::TypeKind::Allocator:
       case HAL::TypeKind::Buffer:
       case HAL::TypeKind::CommandBuffer:
+      case HAL::TypeKind::DescriptorSet:
+      case HAL::TypeKind::DescriptorSetLayout:
       case HAL::TypeKind::Device:
       case HAL::TypeKind::Event:
       case HAL::TypeKind::Executable:

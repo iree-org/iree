@@ -31,9 +31,9 @@ static DialectRegistration<HALDialect> hal_dialect;
 
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
-  addTypes<AllocatorType, BufferType, CommandBufferType, DeviceType, EventType,
-           ExecutableType, ExecutableCacheType, FenceType, RingBufferType,
-           SemaphoreType>();
+  addTypes<AllocatorType, BufferType, CommandBufferType, DescriptorSetType,
+           DescriptorSetLayoutType, DeviceType, EventType, ExecutableType,
+           ExecutableCacheType, FenceType, RingBufferType, SemaphoreType>();
 
 #define GET_OP_LIST
   addOperations<
@@ -53,6 +53,9 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("allocator", AllocatorType::get(getContext()))
           .Case("buffer", BufferType::get(getContext()))
           .Case("command_buffer", CommandBufferType::get(getContext()))
+          .Case("descriptor_set", DescriptorSetType::get(getContext()))
+          .Case("descriptor_set_layout",
+                DescriptorSetLayoutType::get(getContext()))
           .Case("device", DeviceType::get(getContext()))
           .Case("event", EventType::get(getContext()))
           .Case("executable", ExecutableType::get(getContext()))
@@ -75,6 +78,10 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "buffer";
   } else if (type.isa<CommandBufferType>()) {
     p << "command_buffer";
+  } else if (type.isa<DescriptorSetType>()) {
+    p << "descriptor_set";
+  } else if (type.isa<DescriptorSetLayoutType>()) {
+    p << "descriptor_set_layout";
   } else if (type.isa<DeviceType>()) {
     p << "device";
   } else if (type.isa<EventType>()) {
