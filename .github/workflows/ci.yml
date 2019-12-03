@@ -27,18 +27,26 @@ jobs:
       CXX: clang++
       CC: clang
       PYTHON_BIN: /usr/bin/python3
+      # Install a specific version of Bazel that is supported by TensorFlow
+      # (see https://www.tensorflow.org/install/source#install_bazel).
+      BAZEL_VERSION: 1.1.0
     steps:
       - name: Installing bazel
         run: |
-          echo "deb [arch=amd64] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
-          sudo apt install curl
-          curl https://bazel.build/bazel-release.pub.gpg | sudo apt-key add -
-          sudo apt-get update && sudo apt-get install bazel
+          # https://docs.bazel.build/versions/master/install-ubuntu.html
+          sudo apt-get install unzip zip
+          wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
+          chmod +x bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
+          ./bazel-$BAZEL_VERSION-installer-linux-x86_64.sh --user
+          rm bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
+          echo "::add-path::$HOME/bin"
       - name: Installing dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install clang libsdl2-dev python3 python3-pip
-          sudo pip install numpy
+          sudo apt-get install clang libsdl2-dev python3 python3-pip python3-setuptools
+          # Update pip before using it so it picks up the latest versions of our dependencies.
+          sudo python3 -m pip install --upgrade pip
+          sudo python3 -m pip install numpy tf-nightly
       - name: Checking out latest version and all submodules
         run: |
           git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
@@ -57,7 +65,7 @@ jobs:
           # human wildcard builds, but we want them built by CI unless they are
           # excluded with "notap".
           # TODO(gcmn) Enable all tests except notap once we can run them on the CI
-          bazel query '//... except attr("tags", "notap", //...) except //bindings/... except //integrations/... except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test' | xargs bazel test --test_output=errors
+          bazel query '//... except attr("tags", "notap", //...) except //integrations/tensorflow/e2e:vulkan_conv_test except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test' | xargs bazel test --define=iree_tensorflow=true --test_output=errors
 
   cmake:
     runs-on: ubuntu-18.04
