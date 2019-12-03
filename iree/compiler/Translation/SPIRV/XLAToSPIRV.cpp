@@ -100,8 +100,20 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
     };
     Operation *scalarOp = nullptr;
     if (resultElemType.isa<IntegerType>()) {
-      if (operandElemType.isa<IntegerType>()) {
-        scalarOp = buildOp(static_cast<spirv::SConvertOp *>(nullptr));
+      if (auto intOperandType = operandElemType.dyn_cast<IntegerType>()) {
+        // spv.SConvertOp does not support converting a bool to integer, use
+        // spv.SelectOp instead.
+        if (intOperandType.getWidth() == 1) {
+          Value *zero = builder.create<spirv::ConstantOp>(
+              loc, resultElemType, builder.getIntegerAttr(resultElemType, 0));
+          Value *one = builder.create<spirv::ConstantOp>(
+              loc, resultElemType, builder.getIntegerAttr(resultElemType, 1));
+          scalarOp =
+              builder.create<spirv::SelectOp>(loc, operands[0], one, zero)
+                  .getOperation();
+        } else {
+          scalarOp = buildOp(static_cast<spirv::SConvertOp *>(nullptr));
+        }
       } else {
         scalarOp = buildOp(static_cast<spirv::ConvertFToSOp *>(nullptr));
       }

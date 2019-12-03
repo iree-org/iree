@@ -89,3 +89,19 @@ module {
     iree.return
   }
 }
+
+// -----
+
+module {
+  func @convert_b2i(%arg0: memref<12xi1>, %arg1 : memref<12xi32>)
+  attributes  {iree.executable.export, iree.executable.workload = dense<[12]> : tensor<1xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    // CHECK: [[VAL0:%.*]] = spv.Load "StorageBuffer" %{{.*}} : i1
+    // CHECK: [[ZERO:%.*]] = spv.constant 0 : i32
+    // CHECK: [[ONE:%.*]] = spv.constant 1 : i32
+    // CHECK: spv.Select [[VAL0]], [[ONE]], [[ZERO]] : i1, i32
+    %0 = iree.load_input(%arg0 : memref<12xi1>) : tensor<12xi1>
+    %1 = "xla_hlo.convert"(%0) : (tensor<12xi1>) -> tensor<12xi32>
+    iree.store_output(%1 : tensor<12xi32>, %arg1 : memref<12xi32>)
+    iree.return
+  }
+}
