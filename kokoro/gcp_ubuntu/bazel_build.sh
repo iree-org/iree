@@ -25,6 +25,6 @@ set -x
 
 # Relative to the root of the repository. Kokoro will make sure we're in the
 # ${KOKORO_ARTIFACTS_DIR}/github/iree directory (which is equivalent) before
-# invoking this
+# invoking this.
 
 ./build_tools/bazel_build.sh
