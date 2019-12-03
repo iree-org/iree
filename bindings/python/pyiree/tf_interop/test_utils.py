@@ -505,12 +505,29 @@ class SavedModelTestCase(tf.test.TestCase):
     if cls._modules_to_compile:
       for name, (ctor, exported_names,
                  backends) in cls._modules_to_compile.items():
-        if backends is None:
-          backends = get_default_test_backends()
-        cls.compiled_modules[name] = dict([
-            (backend.name, CompiledModule.create(ctor, exported_names, backend))
-            for backend in backends
-        ])
+        # Setup crash reproducer
+        crash_reproducer_path = os.path.join(FLAGS.test_tmpdir, cls.__name__,
+                                             name + ".mlir")
+        try:
+          os.makedirs(os.path.dirname(crash_reproducer_path))
+        except IOError:
+          logging.exception("Error creating crash reproducer dir for: %s",
+                            crash_reproducer_path)
+        compiler.Context.default_crash_reproducer_path = crash_reproducer_path
+
+        try:
+          # Compile.
+          if backends is None:
+            backends = get_default_test_backends()
+          cls.compiled_modules[name] = dict([
+              (backend.name, CompiledModule.create(ctor, exported_names,
+                                                   backend))
+              for backend in backends
+          ])
+        finally:
+          # Disable crash reproducer (to avoid inadvertently overwriting this
+          # path on a subsequent interaction).
+          compiler.Context.default_crash_reproducer_path = None
 
   @classmethod
   def tearDownClass(cls):

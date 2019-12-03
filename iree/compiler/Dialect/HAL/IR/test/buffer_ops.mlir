@@ -103,8 +103,8 @@ func @buffer_store(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>) {
 func @buffer_view_compute_offset(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   %1:2 = "test_hal.indices"() : () -> (i32, i32)
-  // CHECK: %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1]
-  %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1]
+  // CHECK: %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], element_size=4
+  %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], element_size=4
   return %off : i32
 }
 
@@ -115,8 +115,8 @@ func @buffer_view_compute_range(%arg0 : !ireex.ref<!hal.buffer>) -> (i32, i32) {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   %1:2 = "test_hal.indices"() : () -> (i32, i32)
   %2:2 = "test_hal.lengths"() : () -> (i32, i32)
-  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
-  %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
+  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
+  %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
   return %off, %len : i32, i32
 }
 
@@ -127,7 +127,7 @@ func @buffer_view_slice(%arg0 : !ireex.ref<!hal.buffer>) -> !ireex.ref<!hal.buff
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   %1:2 = "test_hal.indices"() : () -> (i32, i32)
   %2:2 = "test_hal.lengths"() : () -> (i32, i32)
-  // CHECK: %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
-  %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
+  // CHECK: %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
+  %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
   return %slice : !ireex.ref<!hal.buffer>
 }

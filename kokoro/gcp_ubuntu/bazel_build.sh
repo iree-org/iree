@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,34 +14,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Python
-*.pyc
+# Build the project with bazel using Kokoro.
 
-# Visual Studio files
-.vs/
-.vscode/
-*.sdf
-*.opensdf
-*.VC.opendb
-*.suo
-*.user
+# Having separate build scripts with this indirection is recommended by the
+# Kokoro setup instructions.
 
-# macOS files
-.DS_Store
+set -e
 
-# CMake artifacts
-build/
-build-*/
+set -x
 
-# Bazel artifacts
-/bazel-*
+# Relative to the root of the repository. Kokoro will make sure we're in the
+# ${KOKORO_ARTIFACTS_DIR}/github/iree directory (which is equivalent) before
+# invoking this.
 
-# Local-only config options
-user.bazelrc
-
-# Dear ImGui Ini files
-imgui.ini
-
-# Emacs autosaves
-*~
-\#*\#
+./build_tools/bazel_build.sh
