@@ -210,8 +210,8 @@ def FLOW_WindowedReductionRegionOp : FLOW_PureOp<"windowed_reduction.region", [
 
   let arguments = (ins
     FLOW_Workload:$workload,
-    Variadic<AnyType>:$operands,
-    Variadic<AnyType>:$initial_values,
+    Variadic<FLOW_Tensor>:$operands,
+    Variadic<FLOW_Tensor>:$initial_values,
     // TODO(benvanik): use index types instead of i32.
     I32ElementsAttr:$window_dimensions,
     I32ElementsAttr:$window_strides,
@@ -220,7 +220,7 @@ def FLOW_WindowedReductionRegionOp : FLOW_PureOp<"windowed_reduction.region", [
     FLOW_PaddingModeAttr:$padding_mode
   );
   let results = (outs
-    Variadic<AnyType>:$results
+    Variadic<FLOW_Tensor>:$results
   );
 
   let regions = (region AnyRegion:$body);
@@ -261,48 +261,6 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
       build(builder, result, llvm::None);
     }]>,
   ];
-}
-
-//===----------------------------------------------------------------------===//
-// Dispatch ops
-//===----------------------------------------------------------------------===//
-
-def FLOW_DispatchOp : FLOW_PureOp<"dispatch"> {
-  let summary = [{a dispatch to an outlined dispatch region}];
-  let description = [{
-    Dispatches a workload to the specified executable function.
-  }];
-
-  let arguments = (ins
-    // TODO(benvanik): replace with SymbolRefAttr.
-    // TODO(benvanik): validate target is an executable.
-    FlatSymbolRefAttr:$executable,
-    FlatSymbolRefAttr:$entry_point,
-    FLOW_Workload:$workload,
-    Variadic<AnyType>:$operands
-  );
-  let results = (outs
-    Variadic<AnyType>:$results
-  );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef executable,
-      StringRef entryPoint, Value *workload,
-      ArrayRef<Type> results, ArrayRef<Value *> operands = {}
-    }], [{
-      result.addOperands({workload});
-      result.addOperands(operands);
-      result.addAttribute("executable", builder->getSymbolRefAttr(executable));
-      result.addAttribute("entry_point", builder->getSymbolRefAttr(entryPoint));
-      result.addTypes(results);
-    }]>,
-  ];
-
-  let extraClassDeclaration = [{
-    FunctionType getEntryPointType();
-  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -432,12 +390,244 @@ def FLOW_WindowedReductionEntryOp : FLOW_Op<"windowed_reduction.entry", [
 }
 
 //===----------------------------------------------------------------------===//
+// Dispatch ops
+//===----------------------------------------------------------------------===//
+
+def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
+    FLOW_StreamableOp,
+  ]> {
+  let summary = [{a dispatch to an outlined dispatch region}];
+  let description = [{
+    Dispatches a workload to the specified executable function.
+  }];
+
+  let arguments = (ins
+    // TODO(benvanik): replace with SymbolRefAttr.
+    // TODO(benvanik): validate target is an executable.
+    FlatSymbolRefAttr:$executable,
+    FlatSymbolRefAttr:$entry_point,
+    FLOW_Workload:$workload,
+    Variadic<AnyType>:$operands
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, StringRef executable,
+      StringRef entryPoint, Value *workload,
+      ArrayRef<Type> results, ArrayRef<Value *> operands = {}
+    }], [{
+      result.addOperands({workload});
+      result.addOperands(operands);
+      result.addAttribute("executable", builder->getSymbolRefAttr(executable));
+      result.addAttribute("entry_point", builder->getSymbolRefAttr(entryPoint));
+      result.addTypes(results);
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    FunctionType getEntryPointType();
+
+    // StreamableOpInterface:
+    bool isTransfer() { return false; }
+    bool isUsableInStream() { return true; }
+    bool isStreamOnly() { return true; }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // Tensor ops
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): tensor casts for widening/narrowing? or rely on std?
-// TODO(benvanik): DynamicUpdateSlice-equivalent?
-// TODO(benvanik): structured control flow (if we want it here).
+def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
+    FLOW_StreamableOp,
+    AllElementTypesMatch<["source", "result"]>,
+  ]> {
+  let summary = [{reshapes a tensor}];
+  let description = [{
+    Reshapes a tensor to a new shape without modifying the contents.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$source
+    // TODO(benvanik): FLOW_Shape:$shape when supporting dynamic shapes.
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+    bool isUsableInStream() { return true; }
+    // TODO(benvanik): allow out of stream to act as a shape manipulation.
+    bool isStreamOnly() { return true; }
+  }];
+
+  // TODO(benvanik): canonicalize away if resulting ops don't care.
+  let hasFolder = 1;
+}
+
+def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load"> {
+  let summary = [{loads a value from a tensor element}];
+  let description = [{
+    Returns the element at the given location from within the tensor.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$source,
+    Variadic<FLOW_Dim>:$indices
+  );
+  let results = (outs
+    AnyTypeOf<[FLOW_PrimitiveType, AnyVector]>:$result
+  );
+
+  // TODO(benvanik): canonicalize to slice+load if dims are known.
+  let hasFolder = 1;
+}
+
+def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store"> {
+  let summary = [{stores a value into a tensor element}];
+  let description = [{
+    Returns a tensor with the element at the given index set to the given value.
+  }];
+
+  let arguments = (ins
+    AnyTypeOf<[FLOW_PrimitiveType, AnyVector]>:$value,
+    FLOW_Tensor:$target,
+    Variadic<FLOW_Dim>:$indices
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let hasFolder = 1;
+}
+
+def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
+    FLOW_StreamableOp,
+  ]> {
+  let summary = [{splats a value into a shaped tensor}];
+  let description = [{
+    Returns a tensor initialized to the given primitive value.
+  }];
+
+  let arguments = (ins
+    FLOW_PrimitiveType:$value
+    // TODO(benvanik): FLOW_Shape:$shape when supporting dynamic shapes.
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+    bool isUsableInStream() { return true; }
+    // TODO(benvanik): allow out of stream to act as a hal.buffer.fill.
+    bool isStreamOnly() { return true; }
+  }];
+
+  // TODO(benvanik): canonicalize splat+slice to smaller splat.
+  let hasFolder = 1;
+}
+
+def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
+    FLOW_StreamableOp,
+    SameOperandsAndResultType,
+  ]> {
+  let summary = [{performs a full tensor clone operation}];
+  let description = [{
+    Clones the input tensor into an identical output tensor.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$operand
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+    bool isUsableInStream() { return true; }
+    // TODO(benvanik): allow out of stream to act as a hal.buffer.copy.
+    bool isStreamOnly() { return true; }
+  }];
+
+  // TODO(benvanik): canonicalize away entirely in most cases.
+  let hasFolder = 1;
+}
+
+def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
+    FLOW_StreamableOp,
+    AllRanksMatch<["source", "result"]>,
+    AllElementTypesMatch<["source", "result"]>,
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{slices out a subregion of a tensor}];
+  let description = [{
+    Clones a subregion of a tensor.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$source,
+    Variadic<FLOW_Dim>:$start_indices,
+    Variadic<FLOW_Dim>:$lengths
+    // TODO(benvanik): strides.
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+    bool isUsableInStream() { return true; }
+    // TODO(benvanik): allow out of stream to act as a hal.buffer.slice.
+    bool isStreamOnly() { return true; }
+  }];
+
+  // TODO(benvanik): canonicalize multiple slices (traverse upward through ssa).
+  let hasFolder = 1;
+}
+
+def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
+    FLOW_StreamableOp,
+    AllRanksMatch<["update", "target", "result"]>,
+    AllShapesMatch<["target", "result"]>,
+    AllElementTypesMatch<["update", "target", "result"]>,
+  ]> {
+  let summary = [{updates a tensor with the contents of another tensor}];
+  let description = [{
+    Updates the target tensor with the contents of the update tensor at the
+    given offset indices.
+  }];
+
+  let arguments = (ins
+    FLOW_Tensor:$update,
+    FLOW_Tensor:$target,
+    Variadic<FLOW_Dim>:$start_indices
+  );
+  let results = (outs
+    FLOW_Tensor:$result
+  );
+
+  let extraClassDeclaration = [{
+    // StreamableOpInterface:
+    bool isTransfer() { return true; }
+    bool isUsableInStream() { return true; }
+    // TODO(benvanik): allow out of stream to act as a hal.buffer.copy.
+    bool isStreamOnly() { return true; }
+  }];
+
+  // TODO(benvanik): canonicalize contiguous updates/across slices.
+  let hasFolder = 1;
+}
 
 //===----------------------------------------------------------------------===//
 // Streams

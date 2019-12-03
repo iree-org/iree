@@ -22,6 +22,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Support/LogicalResult.h"
@@ -627,82 +628,6 @@ static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.dispatch
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseDispatchOp(OpAsmParser &parser,
-                                   OperationState *result) {
-  auto executableLoc = parser.getNameLoc();
-
-  // TODO(benvanik): replace with SymbolRefAttr.
-  StringAttr executableAttr;
-  StringAttr entryPointAttr;
-  if (failed(parser.parseSymbolName(executableAttr, "executable",
-                                    result->attributes)) ||
-      failed(parser.parseColon()) || failed(parser.parseColon()) ||
-      failed(parser.parseSymbolName(entryPointAttr, "entry_point",
-                                    result->attributes))) {
-    return failure();
-  }
-  result->attributes[0].second =
-      parser.getBuilder().getSymbolRefAttr(executableAttr.getValue());
-  result->attributes[1].second =
-      parser.getBuilder().getSymbolRefAttr(entryPointAttr.getValue());
-
-  OpAsmParser::OperandType workloadArg;
-  Type workloadArgType;
-  if (failed(parser.parseLSquare()) ||
-      failed(parser.parseOperand(workloadArg)) ||
-      failed(parser.parseColonType(workloadArgType)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.resolveOperand(workloadArg, workloadArgType,
-                                   result->operands))) {
-    return failure();
-  }
-
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  FunctionType entryPointType;
-  if (failed(
-          parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(entryPointType)) ||
-      failed(
-          parser.addTypesToList(entryPointType.getResults(), result->types)) ||
-      failed(parser.resolveOperands(operands, entryPointType.getInputs(),
-                                    executableLoc, result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printDispatchOp(OpAsmPrinter &p, DispatchOp op) {
-  p << op.getOperationName() << ' ';
-  // TODO(benvanik): replace with SymbolRefAttr.
-  p.printSymbolName(op.executable());
-  p << "::";
-  p.printSymbolName(op.entry_point());
-  p << "[";
-  p.printOperand(op.workload());
-  p << " : ";
-  p.printType(op.workload()->getType());
-  p << "](";
-  p.printOperands(op.operands());
-  p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
-                              "executable",
-                              "entry_point",
-                          });
-  p << " : ";
-  p.printType(op.getEntryPointType());
-}
-
-FunctionType DispatchOp::getEntryPointType() {
-  SmallVector<Type, 4> resultTypes(getResultTypes());
-  SmallVector<Type, 8> argTypes(operand_type_range{operands()});
-  return FunctionType::get(argTypes, resultTypes, getContext());
-}
-
-//===----------------------------------------------------------------------===//
 // flow.executable
 //===----------------------------------------------------------------------===//
 
@@ -868,6 +793,347 @@ static void printWindowedReductionEntryOp(OpAsmPrinter &p,
   }
   p.printOptionalAttrDictWithKeyword(
       op.getAttrs(), /*elidedAttrs=*/{"apply_ref", "function_ref", "sym_name"});
+}
+
+//===----------------------------------------------------------------------===//
+// flow.dispatch
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseDispatchOp(OpAsmParser &parser,
+                                   OperationState *result) {
+  auto executableLoc = parser.getNameLoc();
+
+  // TODO(benvanik): replace with SymbolRefAttr.
+  StringAttr executableAttr;
+  StringAttr entryPointAttr;
+  if (failed(parser.parseSymbolName(executableAttr, "executable",
+                                    result->attributes)) ||
+      failed(parser.parseColon()) || failed(parser.parseColon()) ||
+      failed(parser.parseSymbolName(entryPointAttr, "entry_point",
+                                    result->attributes))) {
+    return failure();
+  }
+  result->attributes[0].second =
+      parser.getBuilder().getSymbolRefAttr(executableAttr.getValue());
+  result->attributes[1].second =
+      parser.getBuilder().getSymbolRefAttr(entryPointAttr.getValue());
+
+  OpAsmParser::OperandType workloadArg;
+  Type workloadArgType;
+  if (failed(parser.parseLSquare()) ||
+      failed(parser.parseOperand(workloadArg)) ||
+      failed(parser.parseColonType(workloadArgType)) ||
+      failed(parser.parseRSquare()) ||
+      failed(parser.resolveOperand(workloadArg, workloadArgType,
+                                   result->operands))) {
+    return failure();
+  }
+
+  SmallVector<OpAsmParser::OperandType, 4> operands;
+  FunctionType entryPointType;
+  if (failed(
+          parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes)) ||
+      failed(parser.parseColonType(entryPointType)) ||
+      failed(
+          parser.addTypesToList(entryPointType.getResults(), result->types)) ||
+      failed(parser.resolveOperands(operands, entryPointType.getInputs(),
+                                    executableLoc, result->operands))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printDispatchOp(OpAsmPrinter &p, DispatchOp op) {
+  p << op.getOperationName() << ' ';
+  // TODO(benvanik): replace with SymbolRefAttr.
+  p.printSymbolName(op.executable());
+  p << "::";
+  p.printSymbolName(op.entry_point());
+  p << "[";
+  p.printOperand(op.workload());
+  p << " : ";
+  p.printType(op.workload()->getType());
+  p << "](";
+  p.printOperands(op.operands());
+  p << ')';
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
+                              "executable",
+                              "entry_point",
+                          });
+  p << " : ";
+  p.printType(op.getEntryPointType());
+}
+
+FunctionType DispatchOp::getEntryPointType() {
+  SmallVector<Type, 4> resultTypes(getResultTypes());
+  SmallVector<Type, 8> argTypes(operand_type_range{operands()});
+  return FunctionType::get(argTypes, resultTypes, getContext());
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.reshape
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseTensorReshapeOp(OpAsmParser &parser,
+                                        OperationState *result) {
+  OpAsmParser::OperandType sourceOperand;
+  ShapedType sourceType;
+  ShapedType resultType;
+  if (failed(parser.parseOperand(sourceOperand)) ||
+      failed(parser.parseColonType(sourceType)) ||
+      failed(parser.parseArrow()) || failed(parser.parseType(resultType)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  if (failed(
+          parser.resolveOperand(sourceOperand, sourceType, result->operands))) {
+    return failure();
+  }
+  result->addTypes({resultType});
+  return success();
+}
+
+static void printTensorReshapeOp(OpAsmPrinter &p, TensorReshapeOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.source());
+  p << " : ";
+  p.printType(op.source()->getType());
+  p << " -> ";
+  p.printType(op.result()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.load
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseTensorLoadOp(OpAsmParser &parser,
+                                     OperationState *result) {
+  OpAsmParser::OperandType sourceOperand;
+  SmallVector<OpAsmParser::OperandType, 4> indexOperands;
+  ShapedType sourceType;
+  if (failed(parser.parseOperand(sourceOperand)) ||
+      failed(parser.parseOperandList(indexOperands,
+                                     OpAsmParser::Delimiter::OptionalSquare)) ||
+      failed(parser.parseColonType(sourceType)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(
+          parser.resolveOperand(sourceOperand, sourceType, result->operands)) ||
+      failed(parser.resolveOperands(indexOperands,
+                                    parser.getBuilder().getIntegerType(32),
+                                    result->operands))) {
+    return failure();
+  }
+  result->addTypes({sourceType.getElementType()});
+  return success();
+}
+
+static void printTensorLoadOp(OpAsmPrinter &p, TensorLoadOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.source());
+  if (!op.indices().empty()) {
+    p << '[';
+    p.printOperands(op.indices());
+    p << ']';
+  }
+  p << " : ";
+  p.printType(op.source()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.store
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseTensorStoreOp(OpAsmParser &parser,
+                                      OperationState *result) {
+  OpAsmParser::OperandType valueOperand;
+  OpAsmParser::OperandType targetOperand;
+  SmallVector<OpAsmParser::OperandType, 4> indexOperands;
+  ShapedType targetType;
+  if (failed(parser.parseOperand(valueOperand)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseOperand(targetOperand)) ||
+      failed(parser.parseOperandList(indexOperands,
+                                     OpAsmParser::Delimiter::OptionalSquare)) ||
+      failed(parser.parseColonType(targetType)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.resolveOperand(valueOperand, targetType.getElementType(),
+                                   result->operands)) ||
+      failed(
+          parser.resolveOperand(targetOperand, targetType, result->operands)) ||
+      failed(parser.resolveOperands(indexOperands,
+                                    parser.getBuilder().getIntegerType(32),
+                                    result->operands))) {
+    return failure();
+  }
+  result->addTypes({targetType});
+  return success();
+}
+
+static void printTensorStoreOp(OpAsmPrinter &p, TensorStoreOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.value());
+  p << ", ";
+  p.printOperand(op.target());
+  if (!op.indices().empty()) {
+    p << '[';
+    p.printOperands(op.indices());
+    p << ']';
+  }
+  p << " : ";
+  p.printType(op.target()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.splat
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseTensorSplatOp(OpAsmParser &parser,
+                                      OperationState *result) {
+  OpAsmParser::OperandType valueOperand;
+  ShapedType targetType;
+  if (failed(parser.parseOperand(valueOperand)) ||
+      failed(parser.parseColonType(targetType)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.resolveOperand(valueOperand, targetType.getElementType(),
+                                   result->operands))) {
+    return failure();
+  }
+  result->addTypes({targetType});
+  return success();
+}
+
+static void printTensorSplatOp(OpAsmPrinter &p, TensorSplatOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.value());
+  p << " : ";
+  p.printType(op.result()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.clone
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseTensorCloneOp(OpAsmParser &parser,
+                                      OperationState *result) {
+  OpAsmParser::OperandType operand;
+  ShapedType type;
+  if (failed(parser.parseOperand(operand)) ||
+      failed(parser.parseColonType(type)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.resolveOperand(operand, type, result->operands))) {
+    return failure();
+  }
+  result->addTypes({type});
+  return success();
+}
+
+static void printTensorCloneOp(OpAsmPrinter &p, TensorCloneOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.operand());
+  p << " : ";
+  p.printType(op.result()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.slice
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseTensorSliceOp(OpAsmParser &parser,
+                                      OperationState *result) {
+  OpAsmParser::OperandType sourceOperand;
+  SmallVector<OpAsmParser::OperandType, 4> indexOperands;
+  SmallVector<OpAsmParser::OperandType, 4> lengthOperands;
+  ShapedType sourceType;
+  ShapedType resultType;
+  if (failed(parser.parseOperand(sourceOperand)) ||
+      failed(parser.parseLSquare()) ||
+      failed(parser.parseOperandList(indexOperands,
+                                     OpAsmParser::Delimiter::None)) ||
+      failed(parser.parseKeyword("for")) ||
+      failed(parser.parseOperandList(lengthOperands,
+                                     OpAsmParser::Delimiter::None)) ||
+      failed(parser.parseRSquare()) ||
+      failed(parser.parseColonType(sourceType)) ||
+      failed(parser.parseArrow()) || failed(parser.parseType(resultType)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(
+          parser.resolveOperand(sourceOperand, sourceType, result->operands)) ||
+      failed(parser.resolveOperands(indexOperands,
+                                    parser.getBuilder().getIntegerType(32),
+                                    result->operands)) ||
+      failed(parser.resolveOperands(lengthOperands,
+                                    parser.getBuilder().getIntegerType(32),
+                                    result->operands))) {
+    return failure();
+  }
+  result->addTypes({resultType});
+  return success();
+}
+
+static void printTensorSliceOp(OpAsmPrinter &p, TensorSliceOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.source());
+  p << '[';
+  p.printOperands(op.start_indices());
+  p << " for ";
+  p.printOperands(op.lengths());
+  p << "] : ";
+  p.printType(op.source()->getType());
+  p << " -> ";
+  p.printType(op.result()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.update
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseTensorUpdateOp(OpAsmParser &parser,
+                                       OperationState *result) {
+  OpAsmParser::OperandType updateOperand;
+  OpAsmParser::OperandType targetOperand;
+  SmallVector<OpAsmParser::OperandType, 4> indexOperands;
+  ShapedType updateType;
+  ShapedType targetType;
+  if (failed(parser.parseOperand(updateOperand)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseOperand(targetOperand)) ||
+      failed(parser.parseOperandList(indexOperands,
+                                     OpAsmParser::Delimiter::Square)) ||
+      failed(parser.parseColonType(updateType)) ||
+      failed(parser.parseArrow()) || failed(parser.parseType(targetType)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(
+          parser.resolveOperand(updateOperand, updateType, result->operands)) ||
+      failed(
+          parser.resolveOperand(targetOperand, targetType, result->operands)) ||
+      failed(parser.resolveOperands(indexOperands,
+                                    parser.getBuilder().getIntegerType(32),
+                                    result->operands))) {
+    return failure();
+  }
+  result->addTypes({targetType});
+  return success();
+}
+
+static void printTensorUpdateOp(OpAsmPrinter &p, TensorUpdateOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.update());
+  p << ", ";
+  p.printOperand(op.target());
+  p << '[';
+  p.printOperands(op.start_indices());
+  p << "] : ";
+  p.printType(op.update()->getType());
+  p << " -> ";
+  p.printType(op.result()->getType());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//

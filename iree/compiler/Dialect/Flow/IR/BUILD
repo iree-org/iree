@@ -30,6 +30,7 @@ cc_library(
         "FlowDialect.cpp",
         "FlowEnums.cpp.inc",
         "FlowOpFolders.cpp",
+        "FlowOpInterface.cpp.inc",
         "FlowOps.cpp",
         "FlowOps.cpp.inc",
         "FlowTypes.cpp",
@@ -37,12 +38,14 @@ cc_library(
     hdrs = [
         "FlowDialect.h",
         "FlowEnums.h.inc",
+        "FlowOpInterface.h.inc",
         "FlowOps.h",
         "FlowOps.h.inc",
         "FlowTypes.h",
     ],
     deps = [
         ":FlowEnumsGen",
+        ":FlowOpInterfaceGen",
         ":FlowOpsGen",
         "//iree/compiler/Dialect",
         "@llvm//:support",
@@ -66,6 +69,21 @@ gentbl(
         ":td_files",
         "//iree/compiler/Dialect:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
+    ],
+)
+
+gentbl(
+    name = "FlowOpInterfaceGen",
+    tbl_outs = [
+        ("-gen-op-interface-decls", "FlowOpInterface.h.inc"),
+        ("-gen-op-interface-defs", "FlowOpInterface.cpp.inc"),
+    ],
+    tblgen = "@local_config_mlir//:mlir-tblgen",
+    td_file = "FlowBase.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect:td_files",
+        "@local_config_mlir//:StdOpsTdFiles",
     ],
 )
 

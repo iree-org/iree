@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <numeric>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -124,6 +125,133 @@ struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
 void VariableStoreOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<EraseUnusedVariableStoreOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// Tensor ops
+//===----------------------------------------------------------------------===//
+
+/// Reduces the provided multidimensional index into a flattended 1D row-major
+/// index. The |type| is expected to be statically shaped (as all constants
+/// are).
+static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
+  assert(type.hasStaticShape() && "for use on statically shaped types only");
+  auto rank = type.getRank();
+  auto shape = type.getShape();
+  uint64_t valueIndex = 0;
+  uint64_t dimMultiplier = 1;
+  for (int i = rank - 1; i >= 0; --i) {
+    valueIndex += index[i] * dimMultiplier;
+    dimMultiplier *= shape[i];
+  }
+  return valueIndex;
+}
+
+OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
+  auto sourceType = source()->getType().cast<ShapedType>();
+  auto resultType = result()->getType().cast<ShapedType>();
+  if (sourceType.hasStaticShape() && sourceType == resultType) {
+    // No-op.
+    return source();
+  }
+
+  // Skip intermediate reshapes.
+  if (auto definingOp =
+          dyn_cast_or_null<TensorReshapeOp>(source()->getDefiningOp())) {
+    setOperand(definingOp.getOperand());
+    return result();
+  }
+
+  return {};
+}
+
+OpFoldResult TensorLoadOp::fold(ArrayRef<Attribute> operands) {
+  if (auto source = operands[0].dyn_cast_or_null<ElementsAttr>()) {
+    // Load directly from the constant source tensor.
+    auto indices = operands.drop_front();
+    if (llvm::count(indices, nullptr) == 0) {
+      return source.getValue(
+          llvm::to_vector<4>(llvm::map_range(indices, [](Attribute value) {
+            return value.cast<IntegerAttr>().getValue().getZExtValue();
+          })));
+    }
+  }
+  return {};
+}
+
+OpFoldResult TensorStoreOp::fold(ArrayRef<Attribute> operands) {
+  if (!operands[0]) return {};
+  auto &value = operands[0];
+  if (auto target = operands[1].dyn_cast_or_null<ElementsAttr>()) {
+    // Store into the constant target tensor.
+    if (target.getType().getRank() == 0) {
+      return DenseElementsAttr::get(target.getType(), {value});
+    }
+    auto indices = operands.drop_front(2);
+    if (llvm::count(indices, nullptr) == 0) {
+      uint64_t offset = getFlattenedIndex(
+          target.getType(),
+          llvm::to_vector<4>(llvm::map_range(indices, [](Attribute value) {
+            return value.cast<IntegerAttr>().getValue().getZExtValue();
+          })));
+      SmallVector<Attribute, 16> newContents(target.getValues<Attribute>());
+      newContents[offset] = value;
+      return DenseElementsAttr::get(target.getType(), newContents);
+    }
+  }
+  return {};
+}
+
+OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {
+  // TODO(benvanik): only fold when shape is constant.
+  if (operands[0]) {
+    // Splat value is constant and we can fold the operation.
+    return SplatElementsAttr::get(result()->getType().cast<ShapedType>(),
+                                  operands[0]);
+  }
+  return {};
+}
+
+OpFoldResult TensorCloneOp::fold(ArrayRef<Attribute> operands) {
+  if (operands[0]) {
+    return operands[0];
+  }
+  // TODO(benvanik): fold if clone device placements differ.
+  return operand();
+}
+
+OpFoldResult TensorSliceOp::fold(ArrayRef<Attribute> operands) {
+  if (operands[0] && operands[1] && operands[2]) {
+    // Fully constant arguments so we can perform the slice here.
+    // TODO(benvanik): constant slice.
+    return {};
+  }
+  return {};
+}
+
+static ElementsAttr tensorUpdate(ElementsAttr update, ElementsAttr target,
+                                 ArrayRef<Attribute> startIndicesAttrs) {
+  // TODO(benvanik): tensor update constant folding.
+  return {};
+}
+
+OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
+  auto indices = operands.drop_front(2);
+  bool allIndicesConstant = llvm::count(indices, nullptr) == 0;
+  if (operands[0] && operands[1] && allIndicesConstant) {
+    // Fully constant arguments so we can perform the update here.
+    return tensorUpdate(operands[0].cast<ElementsAttr>(),
+                        operands[1].cast<ElementsAttr>(), indices);
+  } else {
+    // Replace the entire tensor when the sizes match.
+    auto updateType = update()->getType().cast<ShapedType>();
+    auto targetType = target()->getType().cast<ShapedType>();
+    if (updateType.hasStaticShape() && targetType.hasStaticShape() &&
+        updateType == targetType) {
+      return update();
+    }
+  }
+  return {};
 }
 
 }  // namespace Flow

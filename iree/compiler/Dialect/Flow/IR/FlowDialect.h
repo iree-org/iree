@@ -24,6 +24,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOpInterface.h.inc"
+
 class FlowDialect : public Dialect {
  public:
   explicit FlowDialect(MLIRContext *context);

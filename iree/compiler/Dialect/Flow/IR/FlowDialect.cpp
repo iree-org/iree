@@ -27,6 +27,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOpInterface.cpp.inc"
+
 static DialectRegistration<FlowDialect> flow_dialect;
 
 namespace {
