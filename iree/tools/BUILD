@@ -29,7 +29,6 @@ exports_files([
 
 TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
-    "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
 ]
 

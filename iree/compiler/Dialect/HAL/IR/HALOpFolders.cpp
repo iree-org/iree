@@ -29,7 +29,42 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// TODO(benvanik): folders.
+//===----------------------------------------------------------------------===//
+// iree::hal::Allocator
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Simplifies a hal.allocator.compute_size + hal.allocator.allocate pair into
+/// a single hal.allocator.allocate_shaped when there are no other paired
+/// allocations.
+struct SimplifyAllocatorAllocateShapedOp
+    : public OpRewritePattern<AllocatorAllocateOp> {
+  using OpRewritePattern<AllocatorAllocateOp>::OpRewritePattern;
+
+  PatternMatchResult matchAndRewrite(AllocatorAllocateOp op,
+                                     PatternRewriter &rewriter) const override {
+    if (auto computeSizeOp = dyn_cast_or_null<AllocatorComputeSizeOp>(
+            op.allocation_size()->getDefiningOp())) {
+      if (op.memory_types() == computeSizeOp.memory_types() &&
+          op.buffer_usage() == computeSizeOp.buffer_usage()) {
+        rewriter.replaceOpWithNewOp<AllocatorAllocateShapedOp>(
+            op, op.allocator(), op.memory_types(), op.buffer_usage(),
+            llvm::to_vector<4>(computeSizeOp.shape()),
+            computeSizeOp.element_size().getZExtValue());
+        return matchSuccess();
+      }
+    }
+    return matchFailure();
+  }
+};
+
+}  // namespace
+
+void AllocatorAllocateOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SimplifyAllocatorAllocateShapedOp>(context);
+}
 
 }  // namespace HAL
 }  // namespace IREE

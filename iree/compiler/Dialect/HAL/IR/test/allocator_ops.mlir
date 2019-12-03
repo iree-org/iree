@@ -19,9 +19,9 @@
 // CHECK-LABEL: @allocator_compute_size
 func @allocator_compute_size() -> i32 {
   %0 = "test_hal.allocator"() : () -> !ireex.ref<!hal.allocator>
-  %1 = "test_hal.shape"() : () -> vector<2xi32>
-  // CHECK: [[SZ:%.+]] = hal.allocator.compute_size %0, "HostVisible|HostCoherent", "Transfer", %1, 4 : vector<2xi32>
-  %sz = hal.allocator.compute_size %0, "HostLocal", "Transfer", %1, 4 : vector<2xi32>
+  %1:2 = "test_hal.shape"() : () -> (i32, i32)
+  // CHECK: [[SZ:%.+]] = hal.allocator.compute_size %0, "HostVisible|HostCoherent", "Transfer", shape=[%1#0, %1#1], element_size=4
+  %sz = hal.allocator.compute_size %0, "HostLocal", "Transfer", shape=[%1#0, %1#1], element_size=4
   // CHECK-NEXT: return [[SZ]]
   return %sz : i32
 }
@@ -36,6 +36,20 @@ func @allocator_allocate() -> !ireex.ref<!hal.buffer> {
   %1 = "test_hal.allocator"() : () -> !ireex.ref<!hal.allocator>
   // CHECK: [[CB:%.+]] = hal.allocator.allocate [[AL]], "HostVisible|HostCoherent", "Transfer", [[C123]] : !ireex.ref<!hal.buffer>
   %buffer = hal.allocator.allocate %1, "HostLocal", "Transfer", %0 : !ireex.ref<!hal.buffer>
+  // CHECK-NEXT: return [[CB]]
+  return %buffer : !ireex.ref<!hal.buffer>
+}
+
+// -----
+
+// CHECK-LABEL: @allocator_allocate_shaped
+func @allocator_allocate_shaped() -> !ireex.ref<!hal.buffer> {
+  // CHECK-DAG: [[AL:%.+]] = "test_hal.allocator"
+  %0 = "test_hal.allocator"() : () -> !ireex.ref<!hal.allocator>
+  // CHECK-DAG: {{.+}} = "test_hal.shape"
+  %1:2 = "test_hal.shape"() : () -> (i32, i32)
+  // CHECK: [[CB:%.+]] = hal.allocator.allocate_shaped [[AL]], "HostVisible|HostCoherent", "Transfer", shape=[{{.+}}#0, {{.+}}#1], element_size=4 : !ireex.ref<!hal.buffer>
+  %buffer = hal.allocator.allocate_shaped %0, "HostLocal", "Transfer", shape=[%1#0, %1#1], element_size=4 : !ireex.ref<!hal.buffer>
   // CHECK-NEXT: return [[CB]]
   return %buffer : !ireex.ref<!hal.buffer>
 }

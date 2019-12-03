@@ -337,8 +337,8 @@ def HAL_TimelineValue : TypeAlias<I32>;
 def HAL_Status : TypeAlias<I32>;
 
 def HAL_Dim : I<32>;
-def HAL_Dims : VectorOf<[HAL_Dim]>;
-def HAL_Shape : TypeAlias<HAL_Dims>;
+def HAL_Dims : Variadic<HAL_Dim>;
+def HAL_Shape : Variadic<HAL_Dim>;
 
 def HAL_Workgroups : VectorOfLengthAndType<[3], [I32]> {
   let typeDescription = [{

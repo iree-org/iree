@@ -77,6 +77,13 @@ def HAL_ExExecutableDescriptorSetLayoutOp :
   );
 }
 
+// TODO(benvanik): replace with resource sets.
+def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
+  let arguments = (ins
+    AnyRefPtr:$operand
+  );
+}
+
 def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
   let arguments = (ins
     RefPtrOf<HAL_Device>:$device,
@@ -175,7 +182,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
       Builder *builder, OperationState &state, Value *allocator,
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
-      Value *shape, int32_t elementSize
+      ArrayRef<Value *> shape, int32_t elementSize
     }]>,
   ];
 }
@@ -205,6 +212,40 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
       Value *allocationSize
+    }]>,
+  ];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_AllocatorAllocateShapedOp : HAL_Op<"allocator.allocate_shaped", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{empty buffer allocation operation}];
+  let description = [{
+    Allocates a buffer from the allocator.
+    Acts as a fusion of hal.allocator.compute_size and hal.allocator.allocate
+    for when only a single buffer is being allocated.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    HAL_Shape:$shape,
+    I32Attr:$element_size
+  );
+  let results = (outs
+    RefPtrOf<HAL_Buffer>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *allocator,
+      IREE::HAL::MemoryTypeBitfield memoryTypes,
+      IREE::HAL::BufferUsageBitfield bufferUsage,
+      ArrayRef<Value *> shape, int32_t elementSize
     }]>,
   ];
 }
@@ -298,6 +339,7 @@ def HAL_BufferCopyDataOp : HAL_Op<"buffer.copy_data"> {
 
 def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
   ]> {
   let summary = [{buffer view indices to byte offset computation operation}];
   let description = [{
@@ -317,6 +359,7 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
 
 def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
   ]> {
   let summary = [{buffer view byte range computation operation}];
   let description = [{
@@ -338,6 +381,7 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
 
 def HAL_BufferViewSliceOp : HAL_PureOp<"buffer_view.slice", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
   ]> {
   let summary = [{buffer view slice operation}];
   let description = [{

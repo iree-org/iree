@@ -80,10 +80,10 @@ func @buffer_copy_data(%arg0 : !ireex.ref<!hal.buffer>, %arg1 : !ireex.ref<!hal.
 
 // CHECK-LABEL: @buffer_view_compute_offset
 func @buffer_view_compute_offset(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
-  %0 = "test_hal.shape"() : () -> vector<3xi32>
-  %1 = "test_hal.indices"() : () -> vector<3xi32>
-  // CHECK: %off = hal.buffer_view.compute_offset %arg0, %0, %1 : vector<3xi32>
-  %off = hal.buffer_view.compute_offset %arg0, %0, %1 : vector<3xi32>
+  %0:2 = "test_hal.shape"() : () -> (i32, i32)
+  %1:2 = "test_hal.indices"() : () -> (i32, i32)
+  // CHECK: %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1]
+  %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1]
   return %off : i32
 }
 
@@ -91,11 +91,11 @@ func @buffer_view_compute_offset(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
 
 // CHECK-LABEL: @buffer_view_compute_range
 func @buffer_view_compute_range(%arg0 : !ireex.ref<!hal.buffer>) -> (i32, i32) {
-  %0 = "test_hal.shape"() : () -> vector<3xi32>
-  %1 = "test_hal.indices"() : () -> vector<3xi32>
-  %2 = "test_hal.lengths"() : () -> vector<3xi32>
-  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, %0, %1, %2 : vector<3xi32>
-  %off, %len = hal.buffer_view.compute_range %arg0, %0, %1, %2 : vector<3xi32>
+  %0:2 = "test_hal.shape"() : () -> (i32, i32)
+  %1:2 = "test_hal.indices"() : () -> (i32, i32)
+  %2:2 = "test_hal.lengths"() : () -> (i32, i32)
+  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
+  %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
   return %off, %len : i32, i32
 }
 
@@ -103,10 +103,10 @@ func @buffer_view_compute_range(%arg0 : !ireex.ref<!hal.buffer>) -> (i32, i32) {
 
 // CHECK-LABEL: @buffer_view_slice
 func @buffer_view_slice(%arg0 : !ireex.ref<!hal.buffer>) -> !ireex.ref<!hal.buffer> {
-  %0 = "test_hal.shape"() : () -> vector<3xi32>
-  %1 = "test_hal.indices"() : () -> vector<3xi32>
-  %2 = "test_hal.lengths"() : () -> vector<3xi32>
-  // CHECK: %slice = hal.buffer_view.slice %arg0, %0, %1, %2 : vector<3xi32>
-  %slice = hal.buffer_view.slice %arg0, %0, %1, %2 : vector<3xi32>
+  %0:2 = "test_hal.shape"() : () -> (i32, i32)
+  %1:2 = "test_hal.indices"() : () -> (i32, i32)
+  %2:2 = "test_hal.lengths"() : () -> (i32, i32)
+  // CHECK: %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
+  %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1]
   return %slice : !ireex.ref<!hal.buffer>
 }
