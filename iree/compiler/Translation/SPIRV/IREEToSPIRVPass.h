@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- IREEToSPIRVPass.cpp -------------------------------------*- C++//-*-===//
+//===- IREEToSPIRVPass.h ---------------------------------------*- C++//-*-===//
 //
 // Pass to translate iree executables for vulkan-spirv.
 //

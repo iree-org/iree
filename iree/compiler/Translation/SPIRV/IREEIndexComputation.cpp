@@ -14,7 +14,7 @@
 
 //===- IREEIndexComputation.cpp --------------------------------*- C++//-*-===//
 //
-// Implementaiton of Index Propagation for IREE statements that are used in
+// Implementation of Index Propagation for IREE statements that are used in
 // dispatch functions.
 //
 //===----------------------------------------------------------------------===//
@@ -72,7 +72,7 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
 
   // The launch dimensions are [x, y, z] co-ordinates. The reverse of this is
   // used to determine the location of the tensor element computed by a
-  // workitem. The choice is failry arbitrary but is done to enable the common
+  // workitem. The choice is fairly arbitrary but is done to enable the common
   // case where consecutive workitems compute "logically" adjacent tensor
   // elements.
   Builder builder(storeOp.getContext());
