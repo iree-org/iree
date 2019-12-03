@@ -41,6 +41,10 @@ using llvm::StringRef;
 namespace iree {
 namespace python {
 
+/* static */ std::mutex CompilerContextBundle::static_config_lock_;
+/* static */ absl::optional<std::string>
+    CompilerContextBundle::default_crash_reproducer_path_;
+
 namespace {
 
 OwningModuleRef parseMLIRModuleFromString(StringRef contents,
@@ -222,11 +226,13 @@ std::string CompilerModuleBundle::ToAsm(bool enableDebugInfo, bool prettyForm,
 }
 
 std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
-    bool print_mlir, const std::string& crash_reproducer,
-    std::vector<std::string> target_backends) {
+    bool print_mlir, std::vector<std::string> target_backends) {
   ModuleTranslationOptions options;
   options.print_mlir = print_mlir;
-  options.crash_reproducer = crash_reproducer;
+  auto crash_reproducer_path = context_->crash_reproducer_path();
+  if (crash_reproducer_path) {
+    options.crash_reproducer = *crash_reproducer_path;
+  }
   options.target_backends = std::move(target_backends);
 
   auto diag_capture = context_->CaptureDiagnostics();
@@ -242,11 +248,11 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
 }
 
 void CompilerModuleBundle::RunPassPipeline(
-    const std::vector<std::string>& pipelines,
-    const std::string& crash_reproducer) {
+    const std::vector<std::string>& pipelines) {
   mlir::PassManager pm(context_->mlir_context());
-  if (!crash_reproducer.empty()) {
-    pm.enableCrashReproducerGeneration(crash_reproducer);
+  auto crash_reproducer_path = context_->crash_reproducer_path();
+  if (crash_reproducer_path) {
+    pm.enableCrashReproducerGeneration(*crash_reproducer_path);
   }
 
   // Parse the pass pipelines.
@@ -278,18 +284,29 @@ void SetupCompilerBindings(pybind11::module m) {
       .def("parse_asm", &CompilerContextBundle::ParseAsm)
       .def("get_diagnostics",
            &CompilerContextBundle::ConsumeDiagnosticsAsString)
-      .def("clear_diagnostics", &CompilerContextBundle::ClearDiagnostics);
+      .def("clear_diagnostics", &CompilerContextBundle::ClearDiagnostics)
+      .def_property_static(
+          "default_crash_reproducer_path",
+          [](py::object /* cls */) {
+            return CompilerContextBundle::default_crash_reproducer_path();
+          },
+          [](py::object /* cls */, absl::optional<std::string> p) {
+            CompilerContextBundle::set_default_crash_reproducer_path(
+                std::move(p));
+          })
+      .def_property("crash_reproducer_path",
+                    &CompilerContextBundle::crash_reproducer_path,
+                    &CompilerContextBundle::set_crash_reproducer_path);
   py::class_<CompilerModuleBundle>(m, "CompilerModule")
       .def("to_asm", &CompilerModuleBundle::ToAsm,
            py::arg("debug_info") = false, py::arg("pretty") = false,
            py::arg("large_element_limit") = -1)
       .def("compile_to_sequencer_blob",
            &CompilerModuleBundle::CompileToSequencerBlob,
-           py::arg("print_mlir") = false, py::arg("crash_reproducer") = "",
+           py::arg("print_mlir") = false,
            py::arg("target_backends") = std::vector<std::string>())
       .def("run_pass_pipeline", &CompilerModuleBundle::RunPassPipeline,
-           py::arg("pipelines") = std::vector<std::string>(),
-           py::arg("crash_reproducer") = "");
+           py::arg("pipelines") = std::vector<std::string>());
 }
 
 }  // namespace python

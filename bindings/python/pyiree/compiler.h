@@ -15,6 +15,7 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_COMPILER_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_COMPILER_H_
 
+#include <mutex>  // NOLINT
 #include <string>
 
 #include "bindings/python/pyiree/binding.h"
@@ -40,13 +41,11 @@ class CompilerModuleBundle {
                     int64_t largeElementLimit);
 
   // Runs one or more pass pipelines (as is mlir::parsePassPipeline).
-  void RunPassPipeline(const std::vector<std::string>& pipelines,
-                       const std::string& crash_reproducer);
+  void RunPassPipeline(const std::vector<std::string>& pipelines);
 
   // Compiles the MLIR module to an IREE sequencer module.
   std::shared_ptr<OpaqueBlob> CompileToSequencerBlob(
-      bool print_mlir, const std::string& crash_reproducer,
-      std::vector<std::string> target_backends);
+      bool print_mlir, std::vector<std::string> target_backends);
 
  private:
   std::shared_ptr<CompilerContextBundle> context_;
@@ -102,9 +101,38 @@ class CompilerContextBundle
   }
   void ClearDiagnostics() { default_capture_.ClearDiagnostics(); }
 
+  // Default crash reproducer path.
+  static absl::optional<std::string> default_crash_reproducer_path() {
+    std::lock_guard<std::mutex> lock(static_config_lock_);
+    return default_crash_reproducer_path_;
+  }
+  static void set_default_crash_reproducer_path(
+      absl::optional<std::string> default_crash_reproducer_path) {
+    std::lock_guard<std::mutex> lock(static_config_lock_);
+    default_crash_reproducer_path_ = std::move(default_crash_reproducer_path);
+  }
+
+  // Crash reproducer (if not set, uses the static default).
+  // If neither are set or are the empty string, then the crash reproducer
+  // will not be used.
+  absl::optional<std::string> crash_reproducer_path() const {
+    if (crash_reproducer_path_) {
+      return crash_reproducer_path_;
+    }
+    return default_crash_reproducer_path();
+  }
+  void set_crash_reproducer_path(
+      absl::optional<std::string> crash_reproducer_path) {
+    crash_reproducer_path_ = std::move(crash_reproducer_path);
+  }
+
  private:
+  static std::mutex static_config_lock_;
+  static absl::optional<std::string> default_crash_reproducer_path_;
+
   mlir::MLIRContext mlir_context_;
   DiagnosticCapture default_capture_;
+  absl::optional<std::string> crash_reproducer_path_;
 };
 
 void SetupCompilerBindings(pybind11::module m);
