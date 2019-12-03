@@ -86,8 +86,8 @@ def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
   }];
 
   let arguments = (ins
-    FLOW_VariableRefAttr:$variable,
-    AnyRankedTensor:$value
+    AnyRankedTensor:$value,
+    FLOW_VariableRefAttr:$variable
   );
 
   let verifier = [{ return verifyVariableStoreOp(*this); }];

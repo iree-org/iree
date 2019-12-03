@@ -75,7 +75,7 @@ class T0002a_SimpleVarRead(tf.Module):
 # CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
 # CHECK: func @f(%arg0: tensor<f32> {tf_saved_model.index_path = [0]})
 # CHECK: attributes{{.*}}iree.module.export
-# CHECK:   flow.variable.store @v, %arg0 : tensor<f32>
+# CHECK:   flow.variable.store %arg0, @v : tensor<f32>
 # CHECK: FINISH_TEST
 class T0002b_SimpleVarWrite(tf.Module):
 
@@ -109,8 +109,8 @@ class T0002c_SimpleConst(tf.Module):
 # CHECK: attributes{{.*}}iree.module.export
 # CHECK:   [[CONST_2xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>} : () -> tensor<2xf32>
 # CHECK:   [[CONST_3xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00, 2.000000e+00]> : tensor<3xf32>} : () -> tensor<3xf32>
-# CHECK:   flow.variable.store @v, [[CONST_2xf32]] : tensor<2xf32>
-# CHECK:   flow.variable.store @v, [[CONST_3xf32]] : tensor<3xf32>
+# CHECK:   flow.variable.store [[CONST_2xf32]], @v : tensor<2xf32>
+# CHECK:   flow.variable.store [[CONST_3xf32]], @v : tensor<3xf32>
 # CHECK: FINISH_TEST
 class T0002d_VarCompatibleShapeChange(tf.Module):
 

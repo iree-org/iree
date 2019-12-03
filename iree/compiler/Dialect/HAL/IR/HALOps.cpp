@@ -22,6 +22,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/TypeUtilities.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -335,6 +336,259 @@ static void printMakeBufferBarrierOp(OpAsmPrinter &p, MakeBufferBarrierOp op) {
       /*elidedAttrs=*/{"source_scope", "target_scope"});
   p << " : ";
   p.printType(op.result()->getType());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.variable
+//===----------------------------------------------------------------------===//
+
+// Returns true if the given |accessType| is compatible with the |variableType|.
+// For example, this will return true if the variable type is a tensor<?xf32>
+// and the access is tensor<4xf32>.
+static bool isVariableTypeCompatible(Type variableType, Type accessType) {
+  return succeeded(mlir::verifyCompatibleShape(variableType, accessType));
+}
+
+static ParseResult parseVariableOp(OpAsmParser &parser,
+                                   OperationState *result) {
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes))) {
+    return failure();
+  }
+
+  if (succeeded(parser.parseOptionalKeyword("mutable"))) {
+    result->addAttribute("is_mutable", UnitAttr::get(result->getContext()));
+  }
+
+  if (succeeded(parser.parseOptionalKeyword("init"))) {
+    FlatSymbolRefAttr initializerAttr;
+    if (failed(parser.parseLParen()) ||
+        failed(parser.parseAttribute(initializerAttr, "initializer",
+                                     result->attributes)) ||
+        failed(parser.parseRParen())) {
+      return failure();
+    }
+  }
+
+  if (failed(parser.parseOptionalColon())) {
+    Attribute initialValueAttr;
+    if (failed(parser.parseAttribute(initialValueAttr, "initial_value",
+                                     result->attributes))) {
+      return failure();
+    }
+    result->addAttribute("type", TypeAttr::get(initialValueAttr.getType()));
+  } else {
+    Type type;
+    if (failed(parser.parseType(type))) {
+      return failure();
+    }
+    result->addAttribute("type", TypeAttr::get(type));
+  }
+
+  return success();
+}
+
+static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
+  if (op.is_mutable()) {
+    p << " mutable";
+  }
+  if (op.initializer().hasValue()) {
+    p << " init(";
+    p.printSymbolName(op.initializer().getValue());
+    p << ')';
+  }
+  if (op.initial_value().hasValue()) {
+    p << ' ';
+    p.printAttribute(op.initial_value().getValue());
+  } else {
+    p << " : ";
+    p.printType(op.type());
+  }
+}
+
+static LogicalResult verifyVariableOp(VariableOp op) {
+  if (op.initializer().hasValue() && op.initial_value().hasValue()) {
+    return op.emitOpError()
+           << "variables can have either an initializer or an initial value";
+  } else if (op.initializer().hasValue()) {
+    // Ensure initializer returns the same type as the variable.
+    auto *symbolOp =
+        SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
+    if (!symbolOp) {
+      return op.emitOpError() << "initializer function "
+                              << op.initializer().getValue() << " not found";
+    }
+    auto initializerOp = dyn_cast<FuncOp>(symbolOp);
+    if (initializerOp.getNumArguments() != 0 ||
+        initializerOp.getNumResults() != 1 ||
+        initializerOp.getType().getResult(0) != op.type()) {
+      return op.emitOpError()
+             << "initializer type mismatch; variable " << op.sym_name()
+             << " is " << op.type() << " but initializer function "
+             << initializerOp.getName() << " is " << initializerOp.getType();
+    }
+  } else if (op.initial_value().hasValue()) {
+    // Ensure the value is something we can store in the variable
+    if (!isVariableTypeCompatible(op.type(), op.initial_value()->getType())) {
+      return op.emitOpError()
+             << "initial value type mismatch; variable " << op.sym_name()
+             << " is " << op.type() << " but initial value provided is "
+             << op.initial_value()->getType();
+    }
+  }
+  return success();
+}
+
+void VariableOp::build(Builder *builder, OperationState &state, StringRef name,
+                       bool isMutable, Type type,
+                       Optional<StringRef> initializer,
+                       Optional<Attribute> initialValue,
+                       ArrayRef<NamedAttribute> attrs) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder->getStringAttr(name));
+  if (isMutable) {
+    state.addAttribute("is_mutable", builder->getUnitAttr());
+  }
+  if (initializer.hasValue()) {
+    state.addAttribute("initializer",
+                       builder->getSymbolRefAttr(initializer.getValue()));
+  } else if (initialValue.hasValue()) {
+    state.addAttribute("initial_value", initialValue.getValue());
+  }
+  state.addAttribute("type", TypeAttr::get(type));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
+void VariableOp::build(Builder *builder, OperationState &state, StringRef name,
+                       bool isMutable, mlir::FuncOp initializer,
+                       ArrayRef<NamedAttribute> attrs) {
+  state.addAttribute(SymbolTable::getSymbolAttrName(),
+                     builder->getStringAttr(name));
+  if (isMutable) {
+    state.addAttribute("is_mutable", builder->getUnitAttr());
+  }
+  state.addAttribute("initializer", builder->getSymbolRefAttr(initializer));
+  state.addAttribute("type", TypeAttr::get(initializer.getType().getResult(0)));
+  state.attributes.append(attrs.begin(), attrs.end());
+}
+
+void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
+                       bool isMutable, Type type, Attribute initialValue,
+                       ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(SymbolTable::getSymbolAttrName(),
+                      builder->getStringAttr(name));
+  if (isMutable) {
+    result.addAttribute("is_mutable", builder->getUnitAttr());
+  }
+  result.addAttribute("initial_value", initialValue);
+  result.addAttribute("type", TypeAttr::get(type));
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
+                       bool isMutable, Type type,
+                       ArrayRef<NamedAttribute> attrs) {
+  result.addAttribute(SymbolTable::getSymbolAttrName(),
+                      builder->getStringAttr(name));
+  if (isMutable) {
+    result.addAttribute("is_mutable", builder->getUnitAttr());
+  }
+  result.addAttribute("type", TypeAttr::get(type));
+  result.attributes.append(attrs.begin(), attrs.end());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.variable.load
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseVariableLoadOp(OpAsmParser &parser,
+                                       OperationState *result) {
+  FlatSymbolRefAttr variableAttr;
+  Type valueType;
+  if (failed(parser.parseAttribute(variableAttr, "variable",
+                                   result->attributes)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes)) ||
+      failed(parser.parseColonType(valueType))) {
+    return failure();
+  }
+  result->addTypes({valueType});
+  return success();
+}
+
+static void printVariableLoadOp(OpAsmPrinter &p, VariableLoadOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.variable());
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
+  p << " : ";
+  p.printType(op.result()->getType());
+}
+
+static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
+  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
+  if (!symbolOp) {
+    return op.emitOpError() << "undefined variable: " << op.variable();
+  }
+  auto variableOp = dyn_cast<VariableOp>(symbolOp);
+  auto loadType = op.result()->getType();
+  if (!isVariableTypeCompatible(variableOp.type(), loadType)) {
+    return op.emitOpError()
+           << "variable type mismatch; variable " << op.variable() << " is "
+           << variableOp.type() << " but load is " << loadType;
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// hal.variable.store
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseVariableStoreOp(OpAsmParser &parser,
+                                        OperationState *result) {
+  OpAsmParser::OperandType value;
+  FlatSymbolRefAttr variableAttr;
+  Type valueType;
+  if (failed(parser.parseOperand(value)) || failed(parser.parseComma()) ||
+      failed(parser.parseAttribute(variableAttr, "variable",
+                                   result->attributes)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes)) ||
+      failed(parser.parseColonType(valueType)) ||
+      failed(parser.resolveOperand(value, valueType, result->operands))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printVariableStoreOp(OpAsmPrinter &p, VariableStoreOp &op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.value());
+  p << ", ";
+  p.printSymbolName(op.variable());
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
+  p << " : ";
+  p.printType(op.value()->getType());
+}
+
+static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
+  auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
+  if (!symbolOp) {
+    return op.emitOpError() << "undefined variable: " << op.variable();
+  }
+  auto variableOp = dyn_cast<VariableOp>(symbolOp);
+  auto storeType = op.value()->getType();
+  if (!isVariableTypeCompatible(variableOp.type(), storeType)) {
+    return op.emitOpError()
+           << "variable type mismatch; variable " << op.variable() << " is "
+           << variableOp.type() << " but store is " << storeType;
+  }
+  if (!variableOp.is_mutable()) {
+    return op.emitOpError() << "variable " << op.variable()
+                            << " is not mutable and cannot be stored to";
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//

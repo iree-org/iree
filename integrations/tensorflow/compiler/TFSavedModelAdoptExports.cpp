@@ -87,8 +87,8 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
                   dyn_cast<TF::AssignVariableOp>(operand.getOwner())) {
             OpBuilder(assign_variable)
                 .create<IREE::Flow::VariableStoreOp>(assign_variable.getLoc(),
-                                                     flow_sym_ref,
-                                                     assign_variable.value());
+                                                     assign_variable.value(),
+                                                     flow_sym_ref);
             assign_variable.erase();
             continue;
           }

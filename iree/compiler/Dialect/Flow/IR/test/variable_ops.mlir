@@ -37,7 +37,7 @@ func @initializer() -> tensor<4xi32>
 flow.variable @v_loaded : tensor<4xi32>
 // CHECK-LABEL: @loaded
 func @loaded() {
-  // CHECK-NEXT: %0 = flow.variable.load @v_loaded : tensor<4xi32>
+  // CHECK-NEXT: = flow.variable.load @v_loaded : tensor<4xi32>
   %0 = flow.variable.load @v_loaded : tensor<4xi32>
   return
 }
@@ -47,9 +47,9 @@ func @loaded() {
 flow.variable @v_stored mutable : tensor<4xi32>
 // CHECK-LABEL: @stored
 func @stored() {
-  // CHECK-NEXT: = constant
+  // CHECK-NEXT: [[VAL:%.+]] = constant
   %cst = constant dense<5> : tensor<4xi32>
-  // CHECK-NEXT: flow.variable.store @v_stored, %cst : tensor<4xi32>
-  flow.variable.store @v_stored, %cst : tensor<4xi32>
+  // CHECK-NEXT: flow.variable.store [[VAL]], @v_stored : tensor<4xi32>
+  flow.variable.store %cst, @v_stored : tensor<4xi32>
   return
 }

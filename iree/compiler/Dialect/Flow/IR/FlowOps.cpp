@@ -222,12 +222,12 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
 
 static ParseResult parseVariableStoreOp(OpAsmParser &parser,
                                         OperationState *result) {
-  FlatSymbolRefAttr variableAttr;
   OpAsmParser::OperandType value;
+  FlatSymbolRefAttr variableAttr;
   Type valueType;
-  if (failed(parser.parseAttribute(variableAttr, "variable",
+  if (failed(parser.parseOperand(value)) || failed(parser.parseComma()) ||
+      failed(parser.parseAttribute(variableAttr, "variable",
                                    result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(value)) ||
       failed(parser.parseOptionalAttrDict(result->attributes)) ||
       failed(parser.parseColonType(valueType)) ||
       failed(parser.resolveOperand(value, valueType, result->operands))) {
@@ -238,9 +238,9 @@ static ParseResult parseVariableStoreOp(OpAsmParser &parser,
 
 static void printVariableStoreOp(OpAsmPrinter &p, VariableStoreOp &op) {
   p << op.getOperationName() << ' ';
-  p.printSymbolName(op.variable());
-  p << ", ";
   p.printOperand(op.value());
+  p << ", ";
+  p.printSymbolName(op.variable());
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
   p << " : ";
   p.printType(op.value()->getType());

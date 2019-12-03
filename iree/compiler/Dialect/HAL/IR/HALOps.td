@@ -154,6 +154,91 @@ def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
 }
 
 //===----------------------------------------------------------------------===//
+// Global variables
+//===----------------------------------------------------------------------===//
+
+def HAL_VariableOp : HAL_Op<"variable", [
+    Symbol,
+  ]> {
+  let summary = [{stateful variable declaration}];
+  let description = [{
+    Declares a global variable that maintains its value across invocations.
+    The value is tied to the execution context of the module and different
+    contexts will have different variable storage.
+  }];
+
+  let arguments = (ins
+    StrAttr:$sym_name,
+    TypeAttr:$type,
+    UnitAttr:$is_mutable,
+    // TODO(benvanik): verify matches $type.
+    OptionalAttr<FlatSymbolRefAttr>:$initializer,
+    // TODO(benvanik): verify matches $type.
+    OptionalAttr<AnyAttr>:$initial_value
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, StringRef name, bool isMutable,
+      Type type,
+      Optional<StringRef> initializer, Optional<Attribute> initialValue,
+      ArrayRef<NamedAttribute> attrs = {}
+    }]>,
+    OpBuilder<[{
+      Builder *builder, OperationState &result, StringRef name, bool isMutable,
+      mlir::FuncOp initializer, ArrayRef<NamedAttribute> attrs = {}
+    }]>,
+    OpBuilder<[{
+      Builder *builder, OperationState &result, StringRef name, bool isMutable,
+      Type type, Attribute initialValue, ArrayRef<NamedAttribute> attrs = {}
+    }]>,
+    OpBuilder<[{
+      Builder *builder, OperationState &result, StringRef name, bool isMutable,
+      Type type, ArrayRef<NamedAttribute> attrs = {}
+    }]>,
+  ];
+
+  let verifier = [{ return verifyVariableOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_VariableLoadOp : HAL_Op<"variable.load"> {
+  let summary = [{loads a value from a global variable}];
+  let description = [{
+    Returns a copy of the variable value.
+  }];
+
+  let arguments = (ins
+    HAL_VariableRefAttr:$variable
+  );
+  let results = (outs
+    HAL_VariableType:$result
+  );
+
+  let verifier = [{ return verifyVariableLoadOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_VariableStoreOp : HAL_Op<"variable.store"> {
+  let summary = [{stores a value into a global variable}];
+  let description = [{
+    Stores a copy of the value into a variable.
+  }];
+
+  let arguments = (ins
+    HAL_VariableType:$value,
+    HAL_VariableRefAttr:$variable
+  );
+
+  let verifier = [{ return verifyVariableStoreOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // iree::hal::Allocator
 //===----------------------------------------------------------------------===//
 
