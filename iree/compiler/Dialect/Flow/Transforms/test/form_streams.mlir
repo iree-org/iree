@@ -117,11 +117,9 @@ flow.executable @independentOps_ex_dispatch_0 {
     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
-  module {
-    func @independentOps_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-      %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-      return %0 : tensor<4xf32>
-    }
+  flow.dispatch.entry @independentOps_rgn_dispatch_1 attributes {
+    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
+    workload = dense<[4, 1, 1]> : vector<3xi32>
   }
 }
 // CHECK-LABEL: func @independentOps(
@@ -129,13 +127,13 @@ func @independentOps(%arg0: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
   // CHECK-NEXT: %cst = constant dense<[4, 1, 1]> : vector<3xi32>
   %cst = constant dense<[4, 1, 1]> : vector<3xi32>
   // CHECK-NEXT: %0:2 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
-  // CHECK-NEXT:   %1 = flow.dispatch @outerOps_ex_dispatch_0::@outerOps_rgn_dispatch_0[%arg1 : vector<3xi32>](%arg2) : (tensor<4xf32>) -> tensor<4xf32>
-  %0 = flow.dispatch @outerOps_ex_dispatch_0::@outerOps_rgn_dispatch_0[%cst : vector<3xi32>](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   %2 = flow.dispatch @outerOps_ex_dispatch_0::@outerOps_rgn_dispatch_0[%arg1 : vector<3xi32>](%arg2) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   flow.return %1, %2 : tensor<4xf32>, tensor<4xf32>
+  // CHECK-DAG:    = flow.dispatch @independentOps_ex_dispatch_0::@independentOps_rgn_dispatch_0[%arg1 : vector<3xi32>](%arg2)
+  %0 = flow.dispatch @independentOps_ex_dispatch_0::@independentOps_rgn_dispatch_0[%cst : vector<3xi32>](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-DAG:    = flow.dispatch @independentOps_ex_dispatch_0::@independentOps_rgn_dispatch_1[%arg1 : vector<3xi32>](%arg2)
+  %1 = flow.dispatch @independentOps_ex_dispatch_0::@independentOps_rgn_dispatch_1[%cst : vector<3xi32>](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK-NEXT:   flow.return {{%.+}}, {{%.+}}
   // CHECK-NEXT: }
-  %1 = flow.dispatch @outerOps_ex_dispatch_0::@outerOps_rgn_dispatch_0[%cst : vector<3xi32>](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT: return %0#0, %0#1 : tensor<4xf32>, tensor<4xf32>
+  // CHECK-NEXT: return {{%.+}}, {{%.+}}
   return %0, %1 : tensor<4xf32>, tensor<4xf32>
 }
 

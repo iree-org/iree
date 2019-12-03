@@ -30,6 +30,7 @@ cc_library(
         "OutlineDispatchRegions.cpp",
         "OutlineReductionRegions.cpp",
         "Passes.cpp",
+        "PrePostPartitioningConversion.cpp",
         "RematerializeDispatchConstants.cpp",
     ],
     hdrs = [
@@ -37,8 +38,11 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/Analysis",
+        "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
+        "//iree/compiler/Dialect/Flow/Conversion/StandardToFlow",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Utils",
+        "//iree/compiler/Utils",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
@@ -47,6 +51,7 @@ cc_library(
         "@local_config_mlir//:TransformUtils",
         "@local_config_mlir//:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
     ],
     alwayslink = 1,
 )

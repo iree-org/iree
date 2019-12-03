@@ -23,6 +23,7 @@ cc_library(
     name = "Utils",
     srcs = [
         "DispatchUtils.cpp",
+        "GraphUtils.cpp",
         "MemRefUtils.cpp",
         "ModuleUtils.cpp",
         "OpCreationUtils.cpp",
@@ -32,6 +33,7 @@ cc_library(
     ],
     hdrs = [
         "DispatchUtils.h",
+        "GraphUtils.h",
         "Macros.h",
         "MemRefUtils.h",
         "ModuleUtils.h",

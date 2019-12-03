@@ -14,10 +14,15 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 
+#include <iterator>
+
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/StandardTypes.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 #include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
@@ -35,35 +40,33 @@ struct ConstOpLowering : public OpRewritePattern<xla_hlo::ConstOp> {
   }
 };
 
-// TODO(benvanik): dynamic update slice.
+struct DynamicUpdateSliceOpLowering
+    : public OpRewritePattern<xla_hlo::DynamicUpdateSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(xla_hlo::DynamicUpdateSliceOp op,
+                                     PatternRewriter &rewriter) const override {
+    auto startIndices = llvm::to_vector<4>(
+        llvm::map_range(op.start_indices(), [&](Value *tensorValue) {
+          return rewriter.createOrFold<ExtractElementOp>(op.getLoc(),
+                                                         tensorValue);
+        }));
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(
+        op, op.getResult()->getType(), op.update(), op.operand(), startIndices);
+    return matchSuccess();
+  }
+};
 
 }  // namespace
 
-void setupHLOToFlowConversion(MLIRContext *context,
-                              ConversionTarget &conversionTarget,
-                              OwningRewritePatternList &patterns) {
-  conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
+void setupDirectHLOToFlowLegality(MLIRContext *context,
+                                  ConversionTarget &conversionTarget) {
+  conversionTarget
+      .addIllegalOp<xla_hlo::ConstOp, xla_hlo::DynamicUpdateSliceOp>();
+}
 
-  // Standard ops always pass through as import code may have produced some
-  // and control flow should have been legalized from HLO to std.
-  // The flow dialect uses std.module and std.func for its structure and they
-  // must be allowed.
-  conversionTarget.addLegalDialect<StandardOpsDialect>();
-  conversionTarget.addLegalOp<ModuleOp, ModuleTerminatorOp, FuncOp>();
-
-  // Allow all non-blacklisted HLO ops by default. Partitioning will move most
-  // of them into executables.
-  conversionTarget.addLegalDialect<xla_hlo::XlaHloDialect>();
-
-  // Control flow must be converted to standard form via
-  // xla_hlo::createLegalizeControlFlowPass() prior to conversion.
-  conversionTarget.addIllegalOp<xla_hlo::ConditionalOp, xla_hlo::WhileOp>();
-
-  conversionTarget.addIllegalOp<xla_hlo::DotGeneralOp>();
-  xla_hlo::PopulateGeneralDotOpLoweringPatterns(&patterns, context);
-
-  conversionTarget.addIllegalOp<xla_hlo::ConstOp>();
-  patterns.insert<ConstOpLowering>(context);
+void populateHLOToFlowPatterns(MLIRContext *context,
+                               OwningRewritePatternList &patterns) {
+  patterns.insert<ConstOpLowering, DynamicUpdateSliceOpLowering>(context);
 }
 
 }  // namespace iree_compiler

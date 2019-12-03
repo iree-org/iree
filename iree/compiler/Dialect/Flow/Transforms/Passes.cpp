@@ -18,6 +18,7 @@
 
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
+#include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -25,9 +26,21 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  // Flatten structured control flow to our CFG.
+  passManager.addNestedPass<FuncOp>(xla_hlo::createLegalizeControlFlowPass());
+
   // Flatten tuples (like tuple<tensor<...>, tensor<...>>) so we can do
   // fine-grained tensor tracking.
   passManager.addPass(IREE::Flow::createFlattenTuplesInCFGPass());
+
+  // Perform inlining and cleanup after CFG manipulation.
+  passManager.addPass(createInlinerPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+
+  // Convert into our expected input and (hopefully) some flow ops.
+  passManager.addNestedPass<FuncOp>(
+      IREE::Flow::createPrePartitioningConversionPass());
 
   // Find reduction ops and create flow.reduction.regions. We do this prior to
   // performing dispatch region identification so that we can build as big of
@@ -63,6 +76,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+
+  // Convert any leftover ops outside of dispatch regions to flow ops.
+  passManager.addNestedPass<FuncOp>(createPostPartitioningConversionPass());
 
   // Assign attributes and negotiate each executable's ABI signature.
   passManager.addPass(IREE::Flow::createAssignExecutableWorkloadsPass());

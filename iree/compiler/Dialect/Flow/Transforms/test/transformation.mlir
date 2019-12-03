@@ -170,63 +170,6 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // -----
 
-func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  %1 = call @callee(%0) : (tensor<4xf32>) -> tensor<4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
-  return %2 : tensor<4xf32>
-}
-func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %0 = xla_hlo.mul %arg0, %arg0 : tensor<4xf32>
-  return %0 : tensor<4xf32>
-}
-
-// CHECK-LABEL: flow.executable @caller_ex_dispatch_0 {
-// CHECK-NEXT:   flow.dispatch.entry @caller_rgn_dispatch_0 attributes {
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
-// CHECK-SAME:     workload = dense<[4, 1, 1]> : vector<3xi32>
-// CHECK-SAME:   }
-// CHECK-NEXT:   module {
-// CHECK-NEXT:     func @caller_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       %1 = call @callee(%0) : (tensor<4xf32>) -> tensor<4xf32>
-// CHECK-NEXT:       %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       return %2 : tensor<4xf32>
-// CHECK-NEXT:     }
-// CHECK-NEXT:     func @callee(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.mul %arg0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       return %0 : tensor<4xf32>
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
-// CHECK-NEXT: }
-// CHECK-NEXT: func @caller(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:   %cst = constant dense<[4, 1, 1]> : vector<3xi32>
-// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:     %1 = flow.dispatch @caller_ex_dispatch_0::@caller_rgn_dispatch_0[%arg1 : vector<3xi32>](%arg2) : (tensor<4xf32>) -> tensor<4xf32>
-// CHECK-NEXT:     flow.return %1 : tensor<4xf32>
-// CHECK-NEXT:   }
-// CHECK-NEXT:   return %0 : tensor<4xf32>
-// CHECK-NEXT: }
-// CHECK-NEXT: flow.executable @callee_ex_dispatch_0 {
-// CHECK-NEXT:   flow.dispatch.entry @callee_rgn_dispatch_0
-// CHECK-NEXT:   module {
-// CHECK-NEXT:     func @callee_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.mul %arg0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       return %0 : tensor<4xf32>
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
-// CHECK-NEXT: }
-// CHECK-NEXT: func @callee(%arg0: tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:   %cst = constant dense<[4, 1, 1]> : vector<3xi32>
-// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:     %1 = flow.dispatch @callee_ex_dispatch_0::@callee_rgn_dispatch_0[%arg1 : vector<3xi32>](%arg2) : (tensor<4xf32>) -> tensor<4xf32>
-// CHECK-NEXT:     flow.return %1 : tensor<4xf32>
-// CHECK-NEXT:   }
-// CHECK-NEXT:   return %0 : tensor<4xf32>
-// CHECK-NEXT: }
-
-// -----
-
 func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   %0 = constant dense<0.0> : tensor<f32>
   %1 = "xla_hlo.reduce"(%arg0, %0) ( {
@@ -259,4 +202,33 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:     flow.return %1 : tensor<4xf32>
 // CHECK-NEXT:   }
 // CHECK-NEXT:   return %0 : tensor<4xf32>
+// CHECK-NEXT: }
+
+// -----
+
+func @dynamicUpdateSlice(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, %indices_0 : tensor<i32>, %indices_1 : tensor<i32>) -> tensor<2x4xi32> {
+  %0 = "xla_hlo.dynamic-update-slice"(%operand, %update, %indices_0, %indices_1) : (tensor<2x4xi32>, tensor<1x1xi32>, tensor<i32>, tensor<i32>) -> tensor<2x4xi32>
+  %1 = xla_hlo.add %operand, %0 : tensor<2x4xi32>
+  return %1 : tensor<2x4xi32>
+}
+
+// CHECK-LABEL: flow.executable @dynamicUpdateSlice_ex_dispatch_0 {
+// CHECK-NEXT: flow.dispatch.entry @dynamicUpdateSlice_rgn_dispatch_0 attributes {workgroup_size = dense<[32, 1, 1]> : vector<3xi32>, workload = dense<[4, 2, 1]> : vector<3xi32>}
+// CHECK-NEXT:   module {
+// CHECK-NEXT:     func @dynamicUpdateSlice_rgn_dispatch_0(%arg0: tensor<2x4xi32>, %arg1: tensor<2x4xi32>) -> tensor<2x4xi32> {
+// CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg1 : tensor<2x4xi32>
+// CHECK-NEXT:       return %0 : tensor<2x4xi32>
+// CHECK-NEXT:     }
+// CHECK-NEXT:   }
+// CHECK-NEXT: }
+// CHECK-NEXT: func @dynamicUpdateSlice(%arg0: tensor<2x4xi32>, %arg1: tensor<1x1xi32>, %arg2: tensor<i32>, %arg3: tensor<i32>) -> tensor<2x4xi32> {
+// CHECK-NEXT:   %cst = constant dense<[4, 2, 1]> : vector<3xi32>
+// CHECK-NEXT:   %0 = flow.tensor.load %arg2 : tensor<i32>
+// CHECK-NEXT:   %1 = flow.tensor.load %arg3 : tensor<i32>
+// CHECK-NEXT:   %2 = flow.ex.stream.fragment(%arg4 = %arg1 : tensor<1x1xi32>, %arg5 = %arg0 : tensor<2x4xi32>, %arg6 = %0 : i32, %arg7 = %1 : i32, %arg8 = %cst : vector<3xi32>) -> tensor<2x4xi32> {
+// CHECK-NEXT:     %3 = flow.tensor.update %arg4, %arg5[%arg6, %arg7] : tensor<1x1xi32> -> tensor<2x4xi32>
+// CHECK-NEXT:     %4 = flow.dispatch @dynamicUpdateSlice_ex_dispatch_0::@dynamicUpdateSlice_rgn_dispatch_0[%arg8 : vector<3xi32>](%arg5, %3) : (tensor<2x4xi32>, tensor<2x4xi32>) -> tensor<2x4xi32>
+// CHECK-NEXT:     flow.return %4 : tensor<2x4xi32>
+// CHECK-NEXT:   }
+// CHECK-NEXT:   return %2 : tensor<2x4xi32>
 // CHECK-NEXT: }

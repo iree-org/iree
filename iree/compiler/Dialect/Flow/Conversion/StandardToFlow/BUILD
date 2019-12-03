@@ -18,12 +18,12 @@ package(
 )
 
 cc_library(
-    name = "HLOToFlow",
+    name = "StandardToFlow",
     srcs = [
-        "ConvertHLOToFlow.cpp",
+        "ConvertStandardToFlow.cpp",
     ],
     hdrs = [
-        "ConvertHLOToFlow.h",
+        "ConvertStandardToFlow.h",
     ],
     deps = [
         "//iree/compiler/Dialect",
@@ -32,7 +32,6 @@ cc_library(
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:StandardOps",
         "@local_config_mlir//:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
     alwayslink = 1,
 )

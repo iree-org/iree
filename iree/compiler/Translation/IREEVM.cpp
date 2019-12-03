@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Translation/IREEVM.h"
 
-#include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -27,25 +26,14 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Runs the flow transform pipeline to partition and produce the flow module.
 LogicalResult convertToFlowModule(ModuleOp moduleOp) {
-  // Convert to canonical HLO and - for some special ops - the flow dialect.
-  ConversionTarget conversionTarget(*moduleOp.getContext());
-  OwningRewritePatternList conversionPatterns;
-  setupHLOToFlowConversion(moduleOp.getContext(), conversionTarget,
-                           conversionPatterns);
-  if (failed(applyFullConversion(moduleOp, conversionTarget,
-                                 conversionPatterns))) {
-    return moduleOp.emitError() << "module is not in a compatible input format";
-  }
-
-  // Run the flow transform pipeline to partition and produce the flow module.
   PassManager passManager(moduleOp.getContext());
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError()
            << "failed to run flow transformation pass pipeline";
   }
-
   return success();
 }
 

@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
+#include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -50,7 +51,7 @@ namespace {
 // identification is conservative.
 bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
   // TODO(b/144530470): replace with tablegen attributes/interfaces.
-  if (op->getDialect() && op->getDialect()->getNamespace().startswith("flow")) {
+  if (FlowDialect::isDialectOp(op)) {
     // Ignore things we've already produced as they should only relate to
     // sequencer operations.
     return false;
@@ -70,8 +71,9 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
     // constants across all dispatches instead of just on an individual basis
     // as we do here.
     return false;
-  } else if (isa<xla_hlo::DynamicUpdateSliceOp>(op)) {
-    // TODO(benvanik): lower these to the sequencer dialect prior to ID'ing.
+  } else if (op->getNumResults() &&
+             !op->getResult(0)->getType().isa<ShapedType>()) {
+    // We don't put scalar manipulation into dispatch regions.
     return false;
   }
   return true;
@@ -115,40 +117,6 @@ bool isFusableOp(Operation *op) {
     return false;
   }
   return true;
-}
-
-// Puts all of the |unsortedOps| into |sortedOps| in an arbitrary topological
-// order.
-// https://en.wikipedia.org/wiki/Topological_sorting#Depth-first_search
-//
-// Preconditions: |unsortedOps| has no cycles within the set of ops.
-std::vector<Operation *> sortOpsTopologically(
-    const llvm::SetVector<Operation *> &unsortedOps) {
-  llvm::SetVector<Operation *> unmarkedOps;
-  unmarkedOps.insert(unsortedOps.begin(), unsortedOps.end());
-  llvm::SetVector<Operation *> markedOps;
-
-  using VisitFn = std::function<void(Operation * op)>;
-  VisitFn visit = [&](Operation *op) {
-    if (markedOps.count(op) > 0) return;
-    for (auto *result : op->getResults()) {
-      for (auto *user : result->getUsers()) {
-        // Don't visit ops not in our set.
-        if (unsortedOps.count(user) == 0) continue;
-        visit(user);
-      }
-    }
-    markedOps.insert(op);
-  };
-
-  while (!unmarkedOps.empty()) {
-    auto *op = unmarkedOps.pop_back_val();
-    visit(op);
-  }
-
-  auto sortedOps = markedOps.takeVector();
-  std::reverse(sortedOps.begin(), sortedOps.end());
-  return sortedOps;
 }
 
 // Recursively traverses the IR DAG along the operand edges to find ops we are

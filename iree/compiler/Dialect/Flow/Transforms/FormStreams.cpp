@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -35,6 +36,14 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+// Returns true if the given op can be used within a stream.
+static bool isStreamableOp(Operation *op) {
+  if (auto streamableOp = dyn_cast<StreamableOpInterface>(op)) {
+    return streamableOp.isUsableInStream();
+  }
+  return false;
+}
 
 // Temporary hack to get the experimental stream ops constructed. In the future
 // this will run an analysis to identify compatible dispatches across the entire
@@ -106,7 +115,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
         // Op has side-effects and should split the current stream.
         resetCurrentStream();
         return;
-      } else if (!FlowDialect::isDialectOp(op)) {
+      } else if (!isStreamableOp(op)) {
         // Op is not from the flow dialect and should be ignored.
         markOpDAGOutside(op);
         return;
@@ -131,9 +140,9 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
           // cross-block dependencies.
           markOpDAGOutside(depOp);
           continue;
-        } else if (!depOp->hasNoSideEffect()) {
-          // Source op has side effects meaning that we can't fold it into the
-          // stream region.
+        } else if (!depOp->hasNoSideEffect() || !isStreamableOp(depOp)) {
+          // Source op has side effects or isn't streamable meaning that we
+          // can't fold it into the stream region.
           markOpDAGOutside(depOp);
           continue;
         } else if (blockerOp && depOp->isBeforeInBlock(blockerOp)) {
@@ -163,7 +172,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
           opsWithSideEffects.empty() ? nullptr : opsWithSideEffects.back();
 
       // Scan all ops and try to pull them into a stream.
-      if (FlowDialect::isDialectOp(&op)) {
+      if (isStreamableOp(&op)) {
         scanList.insert(&op);
         while (!scanList.empty()) {
           scanAndFormStream(scanList.pop_back_val(), blockerOp);
@@ -172,9 +181,11 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
     }
     resetCurrentStream();
 
-    // Reverse the streams and ops as we iterated in reverse order.
+    // Reverse the streams as we iterated in reverse order.
+    // We need to sort all of the ops within each stream as they may have been
+    // inserted out of order during the scan.
     for (auto &stream : streams) {
-      std::reverse(stream.begin(), stream.end());
+      stream = sortOpsTopologically<8>(stream);
     }
     std::reverse(streams.begin(), streams.end());
     return streams;
