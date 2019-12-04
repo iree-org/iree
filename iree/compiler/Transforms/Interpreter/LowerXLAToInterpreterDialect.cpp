@@ -60,6 +60,7 @@ UNARY_OP_LOWERING(ExpOp, IREEInterp::HL::ExpFOp);
 UNARY_OP_LOWERING(LogOp, IREEInterp::HL::LogFOp);
 UNARY_OP_LOWERING(FloorOp, IREEInterp::HL::FloorFOp);
 UNARY_OP_LOWERING(RsqrtOp, IREEInterp::HL::RsqrtFOp);
+UNARY_OP_LOWERING(SqrtOp, IREEInterp::HL::SqrtFOp);
 UNARY_OP_LOWERING(TanhOp, IREEInterp::HL::TanhFOp);
 TERNARY_OP_LOWERING(SelectOp, IREEInterp::HL::SelectOp);
 
@@ -558,8 +559,8 @@ void populateLowerXlaToInterpreterPatterns(OwningRewritePatternList &patterns,
                   DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
                   GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
                   PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
-                  RsqrtOpLowering, SelectOpLowering, SliceOpLowering,
-                  TransposeOpLowering, TanhOpLowering>(ctx);
+                  RsqrtOpLowering, SqrtOpLowering, SelectOpLowering,
+                  SliceOpLowering, TransposeOpLowering, TanhOpLowering>(ctx);
 }
 
 namespace {

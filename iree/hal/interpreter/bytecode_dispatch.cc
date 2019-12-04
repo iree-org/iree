@@ -626,6 +626,9 @@ Status Dispatch(hal::Allocator* allocator,
   DISPATCH_FLOAT_OPCODE(kRsqrtF, {
     RETURN_IF_ERROR(DispatchElementwiseUnaryOpF<kernels::Rsqrt>(&reader));
   });
+  DISPATCH_FLOAT_OPCODE(kSqrtF, {
+    RETURN_IF_ERROR(DispatchElementwiseUnaryOpF<kernels::Sqrt>(&reader));
+  });
   DISPATCH_FLOAT_OPCODE(kCosF, {
     RETURN_IF_ERROR(DispatchElementwiseUnaryOpF<kernels::Cos>(&reader));
   });

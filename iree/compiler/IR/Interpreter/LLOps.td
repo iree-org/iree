@@ -536,6 +536,7 @@ def IREEInterpLL_MulAddFOp : IREEInterpLL_BinaryOp<"madd_f", IREELL_FloatMemRef>
 def IREEInterpLL_ExpFOp : IREEInterpLL_UnaryOp<"exp_f", IREELL_FloatMemRef>;
 def IREEInterpLL_LogFOp : IREEInterpLL_UnaryOp<"log_f", IREELL_FloatMemRef>;
 def IREEInterpLL_RsqrtFOp : IREEInterpLL_UnaryOp<"rsqrt_f", IREELL_FloatMemRef>;
+def IREEInterpLL_SqrtFOp : IREEInterpLL_UnaryOp<"sqrt_f", IREELL_FloatMemRef>;
 def IREEInterpLL_CosFOp : IREEInterpLL_UnaryOp<"cos_f", IREELL_FloatMemRef>;
 def IREEInterpLL_SinFOp : IREEInterpLL_UnaryOp<"sin_f", IREELL_FloatMemRef>;
 def IREEInterpLL_TanhFOp : IREEInterpLL_UnaryOp<"tanh_f", IREELL_FloatMemRef>;

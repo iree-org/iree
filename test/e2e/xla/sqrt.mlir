@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=vulkan-spirv %s --output_types=f | IreeFileCheck %s
+// RUN: iree-run-mlir %s --output_types=f | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {

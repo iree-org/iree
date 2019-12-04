@@ -178,11 +178,11 @@ namespace iree {
   OPC(0x81, kExpF, "exp_f", FLAG(kDefault), "so", FF)                         \
   OPC(0x82, kLogF, "log_f", FLAG(kDefault), "so", FF)                         \
   OPC(0x83, kRsqrtF, "rsqrt_f", FLAG(kDefault), "so", FF)                     \
-  OPC(0x84, kRemIS, "rem_i_s", FLAG(kDefault), "sso", FF)                     \
-  OPC(0x85, kRemIU, "rem_i_u", FLAG(kDefault), "sso", FF)                     \
-  OPC(0x86, kRemF, "rem_f", FLAG(kDefault), "sso", FF)                        \
+  OPC(0x84, kSqrtF, "sqrt_f", FLAG(kDefault), "so", FF)                       \
+  OPC(0x85, kRemIS, "rem_i_s", FLAG(kDefault), "sso", FF)                     \
+  OPC(0x86, kRemIU, "rem_i_u", FLAG(kDefault), "sso", FF)                     \
+  OPC(0x87, kRemF, "rem_f", FLAG(kDefault), "sso", FF)                        \
                                                                               \
-  RSV(0x87, RESERVED_OPC)                                                     \
   RSV(0x88, RESERVED_OPC)                                                     \
   RSV(0x89, RESERVED_OPC)                                                     \
   RSV(0x8A, RESERVED_OPC)                                                     \

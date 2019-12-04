@@ -246,6 +246,12 @@ struct Rsqrt {
                         absl::Span<T> dst_buffer);
 };
 
+struct Sqrt {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<T> dst_buffer);
+};
+
 struct Cos {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,

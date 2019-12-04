@@ -463,6 +463,14 @@ Status Rsqrt::Execute(absl::Span<const T> src_buffer,
 }
 
 template <typename T>
+Status Sqrt::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
+  for (size_t i = 0; i < dst_buffer.size(); ++i) {
+    dst_buffer[i] = std::sqrt(src_buffer[i]);
+  }
+  return OkStatus();
+}
+
+template <typename T>
 Status Log::Execute(absl::Span<const T> src_buffer, absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {
     dst_buffer[i] = std::log(src_buffer[i]);

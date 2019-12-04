@@ -525,6 +525,7 @@ def IREEInterpHL_MulAddFOp : IREEInterpHL_TernaryOp<"madd_f", IREEHL_FloatMemRef
 def IREEInterpHL_ExpFOp : IREEInterpHL_UnaryElementwiseFloatOp<"exp_f">;
 def IREEInterpHL_LogFOp : IREEInterpHL_UnaryElementwiseFloatOp<"log_f">;
 def IREEInterpHL_RsqrtFOp : IREEInterpHL_UnaryElementwiseFloatOp<"rsqrt_f">;
+def IREEInterpHL_SqrtFOp : IREEInterpHL_UnaryElementwiseFloatOp<"sqrt_f">;
 def IREEInterpHL_CosFOp : IREEInterpHL_UnaryElementwiseFloatOp<"cos_f">;
 def IREEInterpHL_SinFOp : IREEInterpHL_UnaryElementwiseFloatOp<"sin_f">;
 def IREEInterpHL_TanhFOp : IREEInterpHL_UnaryElementwiseFloatOp<"tanh_f">;
