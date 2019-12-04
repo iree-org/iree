@@ -110,6 +110,16 @@ func @buffer_view_compute_offset(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
 
 // -----
 
+// CHECK-LABEL: @buffer_view_compute_length
+func @buffer_view_compute_length(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
+  %0:2 = "test_hal.shape"() : () -> (i32, i32)
+  // CHECK: %len = hal.buffer_view.compute_length %arg0, shape=[%0#0, %0#1], element_size=4
+  %len = hal.buffer_view.compute_length %arg0, shape=[%0#0, %0#1], element_size=4
+  return %len : i32
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_view_compute_range
 func @buffer_view_compute_range(%arg0 : !ireex.ref<!hal.buffer>) -> (i32, i32) {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)

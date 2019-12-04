@@ -64,6 +64,17 @@ def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
   ];
 }
 
+// TODO(benvanik): remove and replace with descriptor sets.
+def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
+  let arguments = (ins
+    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    I32Attr:$ordinal,
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Shape:$shape,
+    I32Attr:$element_size
+  );
+}
+
 def HAL_ExExecutableDescriptorSetLayoutOp :
   HAL_PureOp<"ex.executable_descriptor_set_layout", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
@@ -498,6 +509,42 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   let results = (outs
     HAL_DeviceSize:$offset
   );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *buffer,
+      ArrayRef<Value *> shape, ArrayRef<Value *> indices, int32_t elementSize
+    }]>,
+  ];
+}
+
+def HAL_BufferViewComputeLengthOp : HAL_PureOp<"buffer_view.compute_length", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{buffer view shape to byte size computation operation}];
+  let description = [{
+    Computes a shaped buffer view length in bytes.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Shape:$shape,
+    I32Attr:$element_size
+  );
+
+  let results = (outs
+    HAL_DeviceSize:$length
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *buffer,
+      ArrayRef<Value *> shape, int32_t elementSize
+    }]>,
+  ];
 }
 
 def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
@@ -521,6 +568,15 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
     HAL_DeviceSize:$offset,
     HAL_DeviceSize:$length
   );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value *buffer,
+      ArrayRef<Value *> shape, ArrayRef<Value *> indices,
+      ArrayRef<Value *> lengths, int32_t elementSize
+    }]>,
+  ];
 }
 
 def HAL_BufferViewSliceOp : HAL_PureOp<"buffer_view.slice", [

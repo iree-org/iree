@@ -79,10 +79,8 @@ class TensorLoadOpConversion
     auto sourceShape = IREE::HAL::getShapeDims(loadOp.source(), rewriter);
     auto *sourceOffset =
         rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
-            loadOp.getLoc(), rewriter.getIntegerType(32), operands.source(),
-            sourceShape, operands.indices(),
-            APInt(32, IREE::HAL::getRoundedElementByteWidth(
-                          sourceType.getElementType())));
+            loadOp.getLoc(), operands.source(), sourceShape, operands.indices(),
+            IREE::HAL::getRoundedElementByteWidth(sourceType.getElementType()));
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
         loadOp, converter.convertType(loadOp.result()->getType()),
         operands.source(), sourceOffset);
@@ -107,10 +105,9 @@ class TensorStoreOpConversion
     auto targetShape = IREE::HAL::getShapeDims(storeOp.target(), rewriter);
     auto *targetOffset =
         rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
-            storeOp.getLoc(), rewriter.getIntegerType(32), operands.target(),
-            targetShape, operands.indices(),
-            APInt(32, IREE::HAL::getRoundedElementByteWidth(
-                          targetType.getElementType())));
+            storeOp.getLoc(), operands.target(), targetShape,
+            operands.indices(),
+            IREE::HAL::getRoundedElementByteWidth(targetType.getElementType()));
     rewriter.create<IREE::HAL::BufferStoreOp>(
         storeOp.getLoc(), operands.value(), operands.target(), targetOffset);
     rewriter.replaceOp(storeOp, {operands.value()});

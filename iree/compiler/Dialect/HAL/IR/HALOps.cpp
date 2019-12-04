@@ -133,6 +133,60 @@ static void printExCacheExecutableOp(OpAsmPrinter &p, ExCacheExecutableOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.ex.push_binding
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseExPushBindingOp(OpAsmParser &parser,
+                                        OperationState *result) {
+  OpAsmParser::OperandType commandBuffer;
+  OpAsmParser::OperandType buffer;
+  SmallVector<OpAsmParser::OperandType, 4> shape;
+  IntegerAttr ordinalAttr;
+  IntegerAttr elementSizeAttr;
+  if (failed(parser.parseOperand(commandBuffer)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.resolveOperand(
+          commandBuffer,
+          RefPtrType::get(CommandBufferType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseAttribute(ordinalAttr,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "ordinal", result->attributes)) ||
+      failed(parser.parseComma()) || failed(parser.parseOperand(buffer)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.resolveOperand(
+          buffer, RefPtrType::get(BufferType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseKeyword("shape")) || failed(parser.parseEqual()) ||
+      failed(parser.parseOperandList(shape, OpAsmParser::Delimiter::Square)) ||
+      failed(parser.resolveOperands(shape, getDimType(parser),
+                                    result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseKeyword("element_size")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(elementSizeAttr,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "element_size", result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printExPushBindingOp(OpAsmPrinter &p, ExPushBindingOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.command_buffer());
+  p << ", " << op.ordinal() << ", ";
+  p.printOperand(op.buffer());
+  p << ", shape=[";
+  interleaveComma(op.shape(), p, [&](Value *value) { p.printOperand(value); });
+  p << "], element_size=" << op.element_size();
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{"ordinal", "element_size"});
+}
+
+//===----------------------------------------------------------------------===//
 // hal.ex.executable_descriptor_set_layout
 //===----------------------------------------------------------------------===//
 
@@ -1155,6 +1209,17 @@ static void printBufferStoreOp(OpAsmPrinter &p, BufferStoreOp op) {
 // hal.buffer_view.compute_offset
 //===----------------------------------------------------------------------===//
 
+void BufferViewComputeOffsetOp::build(Builder *builder, OperationState &state,
+                                      Value *buffer, ArrayRef<Value *> shape,
+                                      ArrayRef<Value *> indices,
+                                      int32_t elementSize) {
+  state.addOperands({buffer});
+  state.addOperands(shape);
+  state.addOperands(indices);
+  state.addAttribute("element_size", builder->getI32IntegerAttr(elementSize));
+  state.addTypes({builder->getIntegerType(32)});
+}
+
 void BufferViewComputeOffsetOp::getAsmResultNames(
     function_ref<void(Value *, StringRef)> setNameFn) {
   setNameFn(offset(), "off");
@@ -1208,8 +1273,77 @@ static void printBufferViewComputeOffsetOp(OpAsmPrinter &p,
 }
 
 //===----------------------------------------------------------------------===//
+// hal.buffer_view.compute_length
+//===----------------------------------------------------------------------===//
+
+void BufferViewComputeLengthOp::build(Builder *builder, OperationState &state,
+                                      Value *buffer, ArrayRef<Value *> shape,
+                                      int32_t elementSize) {
+  state.addOperands({buffer});
+  state.addOperands(shape);
+  state.addAttribute("element_size", builder->getI32IntegerAttr(elementSize));
+  state.addTypes({builder->getIntegerType(32)});
+}
+
+void BufferViewComputeLengthOp::getAsmResultNames(
+    function_ref<void(Value *, StringRef)> setNameFn) {
+  setNameFn(length(), "len");
+}
+
+static ParseResult parseBufferViewComputeLengthOp(OpAsmParser &parser,
+                                                  OperationState *result) {
+  OpAsmParser::OperandType buffer;
+  SmallVector<OpAsmParser::OperandType, 4> shape;
+  IntegerAttr elementSize;
+  if (failed(parser.parseOperand(buffer)) ||
+      failed(parser.resolveOperand(
+          buffer, RefPtrType::get(BufferType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("shape")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseOperandList(shape, OpAsmParser::Delimiter::Square)) ||
+      failed(parser.resolveOperands(shape, getDimType(parser),
+                                    result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseKeyword("element_size")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(elementSize,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "element_size", result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  result->addTypes(getDeviceSizeType(parser));
+  return success();
+}
+
+static void printBufferViewComputeLengthOp(OpAsmPrinter &p,
+                                           BufferViewComputeLengthOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.buffer());
+  p << ", shape=[";
+  p.printOperands(op.shape());
+  p << "], element_size=" << op.element_size();
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"element_size"});
+}
+
+//===----------------------------------------------------------------------===//
 // hal.buffer_view.compute_range
 //===----------------------------------------------------------------------===//
+
+void BufferViewComputeRangeOp::build(Builder *builder, OperationState &state,
+                                     Value *buffer, ArrayRef<Value *> shape,
+                                     ArrayRef<Value *> indices,
+                                     ArrayRef<Value *> lengths,
+                                     int32_t elementSize) {
+  state.addOperands({buffer});
+  state.addOperands(shape);
+  state.addOperands(indices);
+  state.addOperands(lengths);
+  state.addAttribute("element_size", builder->getI32IntegerAttr(elementSize));
+  state.addTypes({builder->getIntegerType(32), builder->getIntegerType(32)});
+}
 
 void BufferViewComputeRangeOp::getAsmResultNames(
     function_ref<void(Value *, StringRef)> setNameFn) {
