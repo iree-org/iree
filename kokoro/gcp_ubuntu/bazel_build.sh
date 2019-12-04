@@ -23,10 +23,10 @@ set -e
 
 set -x
 
-echo "Installing dependencies"
-sudo apt-get install clang
-sudo apt-get install python3 python3-pip
-sudo pip3 install numpy
+# echo "Installing dependencies"
+# sudo apt-get install clang
+# sudo apt-get install python3 python3-pip
+# sudo pip3 install numpy
 
 # Some debug information
 bazel --version
