@@ -23,8 +23,8 @@ set -e
 
 set -x
 
+echo "Installing bazel $BAZEL_VERSION"
 export BAZEL_VERSION=1.1.0
-echo "Installing up bazel $BAZEL_VERSION"
 # https://docs.bazel.build/versions/master/install-ubuntu.html
 sudo apt-get install unzip zip
 wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
@@ -32,22 +32,17 @@ chmod +x bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
 ./bazel-$BAZEL_VERSION-installer-linux-x86_64.sh --user
 rm bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
 export PATH=$HOME/bin:$PATH
-
-bazel help startup_options
 bazel --version
 
-# echo "Installing dependencies"
-# sudo apt-get install clang
-# sudo apt-get install python3 python3-pip
-# sudo pip3 install numpy
-
-
-
-# Some debug information
+echo "Installing clang"
+sudo apt-get install clang || true # Continue even if this fails
+clang --version
 clang++ --version
+
+#echo "Installing python"
+#sudo apt-get install python3 python3-pip
 python3 -V
-
-
+#sudo pip3 install numpy
 
 export CXX=clang++
 export CC=clang
