@@ -23,6 +23,24 @@ set -e
 
 set -x
 
+echo "Installing dependencies"
+sudo apt-get install clang
+sudo apt-get install python3 python3-pip
+sudo pip3 install numpy
+
+# Some debug information
+bazel --version
+clang++ --version
+python3 -V
+
+export CXX=clang++
+export CC=clang
+export PYTHON_BIN="$(which python3)"
+
+echo "$CXX"
+echo "$CC"
+echo "$PYTHON_BIN"
+
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR}/github/iree
 ./build_tools/bazel_build.sh
