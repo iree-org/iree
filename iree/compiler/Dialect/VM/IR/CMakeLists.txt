@@ -75,6 +75,8 @@ iree_tablegen_library(
     VMOps.td
   OUTS
     -gen-iree-vm-op-encoder-defs VMOpEncoder.cpp.inc
+  TBLGEN
+    IREE
 )
 
 iree_tablegen_library(
