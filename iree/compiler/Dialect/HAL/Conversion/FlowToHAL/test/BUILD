@@ -12,31 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree:build_defs.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "Transforms",
-    srcs = [
-        "Passes.cpp",
-        "TranslateExecutables.cpp",
+iree_setup_lit_package(
+    data = [
+        "//iree/tools:iree-opt",
     ],
-    hdrs = [
-        "Passes.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Pass",
-        "@local_config_mlir//:StandardOps",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:Transforms",
-    ],
-    alwayslink = 1,
 )
+
+iree_glob_lit_tests()

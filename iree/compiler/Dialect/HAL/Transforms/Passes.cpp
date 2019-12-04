@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -26,10 +27,15 @@ namespace HAL {
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    ExecutableTargetOptions executableOptions) {
-  // Cleanup identity sequencer tensor-to-memref ops that clutter up the IR.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 
   // TODO(benvanik): run symbol DCE pass.
+
+  passManager.addPass(createTranslateExecutablesPass(executableOptions));
+  passManager.addPass(createConvertFlowToHALPass());
+
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
 }
 
 static PassPipelineRegistration<> transformPassPipeline(
