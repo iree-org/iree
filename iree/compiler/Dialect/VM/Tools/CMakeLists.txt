@@ -20,9 +20,9 @@ iree_cc_library(
     "VMOpTableGen.cpp"
   DEPS
     LLVMSupport
-    LLVMTablegen
+    LLVMTableGen
     MLIRSupport
-    MLIRTablegen
+    LLVMMLIRTableGen
   ALWAYSLINK
   PUBLIC
 )
