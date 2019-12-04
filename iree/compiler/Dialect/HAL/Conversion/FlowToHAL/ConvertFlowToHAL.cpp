@@ -31,6 +31,11 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Populates only the flow.stream.* conversion patterns.
+void populateFlowStreamToHALPatterns(MLIRContext *context,
+                                     OwningRewritePatternList &patterns,
+                                     TypeConverter &converter);
+
 // Populates only the structural (module/function/etc) conversion patterns.
 void populateFlowStructuralToHALPatterns(MLIRContext *context,
                                          OwningRewritePatternList &patterns,
@@ -82,6 +87,7 @@ class ConvertFlowToHALPass : public ModulePass<ConvertFlowToHALPass> {
     FlowTensorTypeConverter typeConverter(context);
 
     OwningRewritePatternList patterns;
+    populateFlowStreamToHALPatterns(context, patterns, typeConverter);
     populateFlowStructuralToHALPatterns(context, patterns, typeConverter);
     populateFlowTensorToHALPatterns(context, patterns, typeConverter);
     populateFlowVariableToHALPatterns(context, patterns, typeConverter);

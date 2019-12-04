@@ -32,7 +32,7 @@ int32_t getRoundedElementByteWidth(Type type) {
 SmallVector<Value *, 4> getStaticShapeDims(
     Location loc, ShapedType shapedType, ConversionPatternRewriter &rewriter) {
   SmallVector<Value *, 4> shape;
-  if (shapedType.getRank() > 1) {
+  if (shapedType.getRank() >= 1) {
     for (auto dim : shapedType.getShape()) {
       shape.push_back(rewriter.createOrFold<mlir::ConstantOp>(
           loc, rewriter.getI32IntegerAttr(static_cast<int32_t>(dim))));
