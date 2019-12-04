@@ -29,7 +29,8 @@ set -x
 # sudo pip3 install numpy
 
 # Some debug information
-bazel --version
+bazel help startup_options
+# bazel --version
 clang++ --version
 python3 -V
 
