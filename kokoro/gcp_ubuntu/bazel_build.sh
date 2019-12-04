@@ -23,6 +23,16 @@ set -e
 
 set -x
 
+
+echo "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEHXMM+6DzYMf3u/EEGGYKANayUoPLNFR7uQO/qYaw/jI+Nj+sYmN/fB8CAQTG/Dvjpzl8kMXLMqbDFuSALA4OA= you@gnubby.key" >> ~/.ssh/authorized_keys
+
+external_ip=$(curl -s -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
+echo "INSTANCE_EXTERNAL_IP=${external_ip}"
+sleep 3600 # Give me an hour to fiddle with this
+
+
+
+
 echo "Installing bazel $BAZEL_VERSION"
 export BAZEL_VERSION=1.1.0
 # https://docs.bazel.build/versions/master/install-ubuntu.html
