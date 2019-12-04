@@ -71,6 +71,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVPwOpLowering<xla_hlo::RsqrtOp, spirv::GLSLInverseSqrtOp>,
       SPIRVPwOpLowering<xla_hlo::SignOp, spirv::GLSLSSignOp,
                         spirv::GLSLFSignOp>,
+      SPIRVPwOpLowering<xla_hlo::SqrtOp, spirv::GLSLSqrtOp>,
       SPIRVPwOpLowering<xla_hlo::TanhOp, spirv::GLSLTanhOp>,
       XLAConvertOpSPIRVLowering,
       // XLA binary elementwise ops:

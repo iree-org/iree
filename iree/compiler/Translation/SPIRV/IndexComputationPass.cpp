@@ -76,6 +76,7 @@ void IndexComputationPass::runOnFunction() {
       NoBroadcastPwOpIndexPropagation<xla_hlo::NegOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::RsqrtOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::SignOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::SqrtOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::TanhOp>,
       // XLA binary elementwise ops:
       NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
