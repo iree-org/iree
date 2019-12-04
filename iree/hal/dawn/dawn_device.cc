@@ -47,7 +47,7 @@ class NoopExecutableCache final : public ExecutableCache {
 }  // namespace
 
 DawnDevice::DawnDevice(const DeviceInfo& device_info,
-                       ::dawn::Device backend_device)
+                       ::wgpu::Device backend_device)
     : Device(device_info), backend_device_(backend_device) {
   IREE_TRACE_SCOPE0("DawnDevice::ctor");
 

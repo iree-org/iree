@@ -20,7 +20,7 @@
 #include "iree/base/memory.h"
 #include "iree/hal/device.h"
 #include "iree/hal/host/host_local_allocator.h"
-#include "third_party/dawn/src/include/dawn/dawncpp.h"
+#include "third_party/dawn/src/include/dawn/webgpu_cpp.h"
 #include "third_party/dawn/src/include/dawn_native/DawnNative.h"
 
 namespace iree {
@@ -30,7 +30,7 @@ namespace dawn {
 class DawnDevice final : public Device {
  public:
   explicit DawnDevice(const DeviceInfo& device_info,
-                      ::dawn::Device backend_device);
+                      ::wgpu::Device backend_device);
   ~DawnDevice() override;
 
   Allocator* allocator() const override { return &allocator_; }
@@ -68,7 +68,7 @@ class DawnDevice final : public Device {
   mutable HostLocalAllocator allocator_;
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;
 
-  ::dawn::Device backend_device_;
+  ::wgpu::Device backend_device_;
 };
 
 }  // namespace dawn

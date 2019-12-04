@@ -105,13 +105,13 @@ StatusOr<ref_ptr<Device>> DawnDriver::CreateDevice(
 
   auto* adapter =
       static_cast<dawn_native::Adapter*>(device_info.driver_handle());
-  ::DawnDevice c_backend_device = adapter->CreateDevice();
+  ::WGPUDevice c_backend_device = adapter->CreateDevice();
   if (!c_backend_device) {
     return InternalErrorBuilder(IREE_LOC) << "Failed to create a Dawn device";
   }
   DawnProcTable backend_procs = dawn_native::GetProcs();
   dawnProcSetProcs(&backend_procs);
-  ::dawn::Device backend_device = ::dawn::Device::Acquire(c_backend_device);
+  ::wgpu::Device backend_device = ::wgpu::Device::Acquire(c_backend_device);
 
   return make_ref<DawnDevice>(device_info, backend_device);
 }

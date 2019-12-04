@@ -19,7 +19,7 @@
 #include <vector>
 
 #include "iree/hal/driver.h"
-#include "third_party/dawn/src/include/dawn/dawncpp.h"
+#include "third_party/dawn/src/include/dawn/webgpu_cpp.h"
 #include "third_party/dawn/src/include/dawn_native/DawnNative.h"
 
 namespace iree {
