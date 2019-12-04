@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=f | IreeFileCheck %s
+// RUN: iree-run-mlir %s --output_types=f | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {
@@ -31,13 +31,3 @@ func @scalar() -> tensor<f32> {
   return %result : tensor<f32>
 }
 // CHECK: f32=0.25
-
-// -----
-
-// CHECK-LABEL: EXEC @double
-func @double() -> tensor<f64> {
-  %input = constant dense<16.0> : tensor<f64>
-  %result = "xla_hlo.rsqrt"(%input) : (tensor<f64>) -> tensor<f64>
-  return %result : tensor<f64>
-}
-// CHECK: f64=0.25
