@@ -21,6 +21,13 @@ To run these notebooks with a local runtime, refer to the
 
 ## Notebooks
 
+### [edge_detection\.ipynb](edge_detection.ipynb)
+
+Constructs a TF module for performing image edge detection and runs it using
+IREE
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/master/colab/edge_detection.ipynb)
+
 ### [low_level_invoke_function\.ipynb](low_level_invoke_function.ipynb)
 
 Shows off some concepts of the low level IREE python bindings
