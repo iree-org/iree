@@ -19,10 +19,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(
-    ["VMOps.td"],
-    visibility = ["//third_party/iree:friends"],
-)
+exports_files(["VMOps.td"])
 
 filegroup(
     name = "td_files",
