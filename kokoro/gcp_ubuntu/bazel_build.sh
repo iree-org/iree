@@ -63,4 +63,6 @@ echo "$PYTHON_BIN"
 cd ${KOKORO_ARTIFACTS_DIR}/github/iree
 echo "Checking out submodules"
 git submodule update --init --depth 1000 --jobs 8
-./build_tools/bazel_build.sh
+bazel build //iree/compiler/Dialect/Flow/Transforms
+
+# ./build_tools/bazel_build.sh
