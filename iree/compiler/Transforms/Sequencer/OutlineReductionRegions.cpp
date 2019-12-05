@@ -277,7 +277,7 @@ class OutlineReductionRegionsPass
   void runOnModule() override {
     auto module = getModule();
 
-    ModuleManager moduleManager(module);
+    SymbolTable symbolTable(module);
     auto funcs = module.getOps<FuncOp>();
     SmallVector<FuncOp, 4> funcOps(funcs.begin(), funcs.end());
     for (auto func : funcOps) {
