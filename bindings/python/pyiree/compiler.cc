@@ -15,6 +15,7 @@
 #include "bindings/python/pyiree/compiler.h"
 
 #include <stdexcept>
+#include <string>
 
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/status_utils.h"
@@ -112,16 +113,38 @@ void PrintLocation(Location loc, llvm::raw_ostream& out) {
       auto line_col_loc = loc.cast<FileLineColLoc>();
       StringRef this_filename = line_col_loc.getFilename();
       auto slash_pos = this_filename.find_last_of("/\\");
+      // We print both the basename and extended names with a structure like
+      // `foo.py:35:4`. Even though technically the line/col
+      // information is redundant to include in both names, having it on both
+      // makes it easier to paste the paths into an editor and jump to the exact
+      // location.
+      std::string line_col_suffix =
+          ":" + std::to_string(line_col_loc.getLine()) + ":" +
+          std::to_string(line_col_loc.getColumn());
       bool has_basename = false;
       StringRef basename = this_filename;
       if (slash_pos != StringRef::npos) {
         has_basename = true;
         basename = this_filename.substr(slash_pos + 1);
       }
-      out << "  at: " << basename << " [" << line_col_loc.getLine() << ":"
-          << line_col_loc.getColumn() << "]";
+      out << "  at: " << basename << line_col_suffix;
       if (has_basename) {
-        out << "\t(" << this_filename << ")";
+        // When running through bazel, such as in our e2e test suite,
+        // the paths involved can be quite large, and will have a very long
+        // prefix before the sandboxed "runfiles" directory that the program
+        // runs in. Trim off that long prefix. By convention, the path names
+        // with this prefix dropped will correspond to the path in the source
+        // directory, which is probably what we want anyway.
+        StringRef kRunfiles(".runfiles/");
+        StringRef extended_name = this_filename;
+        auto runfiles_pos = extended_name.rfind(kRunfiles);
+        if (runfiles_pos != StringRef::npos) {
+          extended_name =
+              extended_name.drop_front(runfiles_pos + kRunfiles.size());
+        }
+        // Print out two tabs, as basenames usually vary in length by more than
+        // one tab width.
+        out << "\t\t( " << extended_name << line_col_suffix << " )";
       }
       out << "\n";
       break;
