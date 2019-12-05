@@ -19,6 +19,11 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+exports_files(
+    ["VMOps.td"],
+    visibility = ["//third_party/iree:friends"],
+)
+
 filegroup(
     name = "td_files",
     srcs = glob(["*.td"]),
