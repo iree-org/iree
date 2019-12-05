@@ -23,41 +23,28 @@ set -e
 
 set -x
 
-# Hackery to allow ssh into the VM for debugging 
-echo "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEHXMM+6DzYMf3u/EEGGYKANayUoPLNFR7uQO/qYaw/jI+Nj+sYmN/fB8CAQTG/Dvjpzl8kMXLMqbDFuSALA4OA= you@gnubby.key" >> ~/.ssh/authorized_keys
-
-external_ip=$(curl -s -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
-echo "INSTANCE_EXTERNAL_IP=${external_ip}"
-sleep 3600 # Give me an hour to fiddle with this
-
-
+# Hackery to allow SSHing into the VM for debugging 
+# echo "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEHXMM+6DzYMf3u/EEGGYKANayUoPLNFR7uQO/qYaw/jI+Nj+sYmN/fB8CAQTG/Dvjpzl8kMXLMqbDFuSALA4OA= you@gnubby.key" >> ~/.ssh/authorized_keys
+# external_ip=$(curl -s -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
+# echo "INSTANCE_EXTERNAL_IP=${external_ip}"
+# sleep 3600 # Give me an hour to fiddle with this
 
 
 echo "Installing bazel $BAZEL_VERSION"
 export BAZEL_VERSION=1.1.0
 # https://docs.bazel.build/versions/master/install-ubuntu.html
-sudo apt-get install unzip zip
 wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
 chmod +x bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
 ./bazel-$BAZEL_VERSION-installer-linux-x86_64.sh --user
-rm bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
 export PATH=$HOME/bin:$PATH
 bazel --version
 
-echo "Installing clang"
-sudo apt-get install clang || true # Continue even if this fails
-clang --version
-clang++ --version
-
-#echo "Installing python"
-#sudo apt-get install python3 python3-pip
 python3 -V
-#sudo pip3 install numpy
 
-export CXX=clang++
-export CC=clang
+echo "Preparing environment variables"
+export CXX=clang++-5.0
+export CC=clang-5.0
 export PYTHON_BIN="$(which python3)"
-
 
 echo "$CXX"
 echo "$CC"
@@ -65,4 +52,6 @@ echo "$PYTHON_BIN"
 
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR}/github/iree
+echo "Checking out submodules"
+git submodule update --init --depth 1000 --jobs 8
 ./build_tools/bazel_build.sh
