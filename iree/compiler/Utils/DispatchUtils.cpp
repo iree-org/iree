@@ -37,6 +37,44 @@
 namespace mlir {
 namespace iree_compiler {
 
+std::array<int32_t, 3> convWorkload(xla_hlo::ConvOp conv) {
+  std::array<int32_t, 3> workload = {1, 1, 1};
+  auto lhs = conv.lhs()->getType().cast<ShapedType>();
+  auto rhs = conv.rhs()->getType().cast<ShapedType>();
+  std::array<int32_t, 3> lhs_hw = {1, 1};
+  int i = 0;
+  for (const auto &spatial :
+       conv.dimension_numbers().input_spatial_dimensions()) {
+    if (i > 1) {
+      break;
+    }
+    lhs_hw[i++] = lhs.getDimSize(spatial.getSExtValue());
+  }
+  std::array<int32_t, 2> rhs_hw = {1, 1};
+  i = 0;
+  for (const auto &spatial :
+       conv.dimension_numbers().kernel_spatial_dimensions()) {
+    if (i > 1) {
+      break;
+    }
+    rhs_hw[i++] = rhs.getDimSize(spatial.getSExtValue());
+  }
+  std::array<int32_t, 2> padding = {0, 0};
+  i = 0;
+  for (const auto &pad : conv.padding().getValue().getIntValues()) {
+    if (i > 3) {
+      break;
+    }
+    padding[i++ / 2] += pad.getSExtValue();
+  }
+  // TODO(namiller): Generalize for other ranks and strides once supported.
+  workload[2] =
+      lhs.getDimSize(conv.dimension_numbers().input_batch_dimension().getInt());
+  workload[1] = lhs_hw[0] - rhs_hw[0] + padding[0] + 1;
+  workload[0] = lhs_hw[1] - rhs_hw[1] + padding[1] + 1;
+  return workload;
+}
+
 Value *calculateWorkload(Operation *op, Value *baseOperand) {
   OpBuilder builder(op);
 
@@ -44,7 +82,9 @@ Value *calculateWorkload(Operation *op, Value *baseOperand) {
 
   // TODO(b/139353314): lookup/calculate based on type/etc.
   auto resultType = baseOperand->getType();
-  if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
+  if (auto conv = dyn_cast_or_null<xla_hlo::ConvOp>(op)) {
+    workload = convWorkload(conv);
+  } else if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
     if (!shapedType.hasStaticShape()) {
       op->emitOpError() << "Dynamic shapes not yet supported";
       return nullptr;
@@ -62,7 +102,7 @@ Value *calculateWorkload(Operation *op, Value *baseOperand) {
     } else {
       // Need to flatten the shape to fit XYZ. For now we just squash from LHS.
       workload[2] = 1;
-      for (int i = 0; i < shape.size(); ++i) {
+      for (int i = 0; i < shape.size() - 2; ++i) {
         workload[2] *= shape[i];
       }
       workload[1] = shape[shape.size() - 2];

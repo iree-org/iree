@@ -33,6 +33,7 @@ cc_library(
         "@local_config_mlir//:IR",
         "@local_config_mlir//:StandardOps",
         "@local_config_mlir//:Support",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
     alwayslink = 1,
 )

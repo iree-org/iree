@@ -219,14 +219,6 @@ LogicalResult buildConvExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
     for (int i = 0; i < rhs.getRank(); ++i) {
       rhsExtents[i] = rhs.getDimSize(i);
     }
-    // TODO(namiller): Remove this condition after debugging workgroup failure.
-    // Currently if the output features are not equal to 1, the workgroups are
-    // calculated incorrectly. Specifically the gl_NumWorkgroups.z value seems
-    // to be the product of all extents rather than the number of batches.
-    if (rhsExtents[3] != 1) {
-      return entryFuncOp.emitOpError()
-             << "only single output channels supported";
-    }
     addSpecializationMapEntryVector(120, rhsExtents,
                                     specializationInfoDef.get());
   }
