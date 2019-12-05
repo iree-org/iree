@@ -61,13 +61,10 @@ bool matchPattern(StringRef value, StringRef pattern) {
 
 // Force enables IR printing on the |passManager|.
 void enableIRPrinting(PassManager *passManager) {
-  auto notVerifier = [](Pass *pass) {
-    return pass->getName() != "FunctionVerifier" &&
-           pass->getName() != "ModuleVerifier";
-  };
+  auto always = [](Pass *pass, Operation *op) { return true; };
   bool printModuleScope = false;
   passManager->enableIRPrinting(/*shouldPrintBeforePass=*/{},
-                                /*shouldPrintAfterPass=*/notVerifier,
+                                /*shouldPrintAfterPass=*/always,
                                 printModuleScope, llvm::dbgs());
   passManager->disableMultithreading();
 }
