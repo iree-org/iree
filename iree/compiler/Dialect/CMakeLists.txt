@@ -12,6 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(Flow/Analysis)
+add_subdirectory(Flow/Conversion/HLOToFlow)
+add_subdirectory(Flow/Conversion/StandardToFlow)
+add_subdirectory(Flow/IR)
+add_subdirectory(Flow/Transforms)
+add_subdirectory(Flow/Utils)
+
+add_subdirectory(HAL/Conversion/FlowToHAL)
+add_subdirectory(HAL/Conversion/HALtoVM)
+add_subdirectory(HAL/IR)
+add_subdirectory(HAL/Target)
+add_subdirectory(HAL/Transforms)
+add_subdirectory(HAL/Utils)
+
 add_subdirectory(VM/Analysis)
 add_subdirectory(VM/IR)
 add_subdirectory(VM/Target/Bytecode)
