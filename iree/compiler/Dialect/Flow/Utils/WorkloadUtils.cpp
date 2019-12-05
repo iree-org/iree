@@ -28,44 +28,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-std::array<int32_t, 3> convWorkload(xla_hlo::ConvOp conv) {
-  std::array<int32_t, 3> workload = {1, 1, 1};
-  auto lhs = conv.lhs()->getType().cast<ShapedType>();
-  auto rhs = conv.rhs()->getType().cast<ShapedType>();
-  std::array<int32_t, 3> lhs_hw = {1, 1};
-  int i = 0;
-  for (const auto &spatial :
-       conv.dimension_numbers().input_spatial_dimensions()) {
-    if (i > 1) {
-      break;
-    }
-    lhs_hw[i++] = lhs.getDimSize(spatial.getSExtValue());
-  }
-  std::array<int32_t, 2> rhs_hw = {1, 1};
-  i = 0;
-  for (const auto &spatial :
-       conv.dimension_numbers().kernel_spatial_dimensions()) {
-    if (i > 1) {
-      break;
-    }
-    rhs_hw[i++] = rhs.getDimSize(spatial.getSExtValue());
-  }
-  std::array<int32_t, 2> padding = {0, 0};
-  i = 0;
-  for (const auto &pad : conv.padding().getValue().getIntValues()) {
-    if (i > 3) {
-      break;
-    }
-    padding[i++ / 2] += pad.getSExtValue();
-  }
-  // TODO(namiller): Generalize for other ranks and strides once supported.
-  workload[2] =
-      lhs.getDimSize(conv.dimension_numbers().input_batch_dimension().getInt());
-  workload[1] = lhs_hw[0] - rhs_hw[0] + padding[0] + 1;
-  workload[0] = lhs_hw[1] - rhs_hw[1] + padding[1] + 1;
-  return workload;
-}
-
 Value *calculateWorkload(Operation *op, ShapedType baseOperandType) {
   OpBuilder builder(op);
 
@@ -76,10 +38,19 @@ Value *calculateWorkload(Operation *op, ShapedType baseOperandType) {
     op->emitOpError() << "Dynamic shapes not yet supported";
     return nullptr;
   }
-  if (auto conv = llvm::dyn_cast_or_null<xla_hlo::ConvOp>(op)) {
-    workload = convWorkload(conv);
+  auto shape = baseOperandType.getShape();
+  if (auto conv = dyn_cast_or_null<xla_hlo::ConvOp>(op)) {
+    workload[2] =
+        shape[conv.dimension_numbers().output_batch_dimension().getInt()];
+    int i = 0;
+    for (const auto &dim :
+         conv.dimension_numbers().output_spatial_dimensions().getIntValues()) {
+      if (i > 1) {
+        break;
+      }
+      workload[1 - i++] = shape[dim.getSExtValue()];
+    }
   } else {
-    auto shape = baseOperandType.getShape();
     // Drop the trailing ones from the shape.
     while (shape.size() > 1 && shape.back() == 1) {
       shape = shape.drop_back();
