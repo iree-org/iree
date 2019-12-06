@@ -23,7 +23,7 @@ iree_cc_library(
   DEPS
     iree::compiler::Dialect
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::VM:IR
+    iree::compiler::Dialect::VM::IR
     MLIRIR
     MLIRPass
     MLIRStandardOps
