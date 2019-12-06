@@ -20,7 +20,7 @@ add_subdirectory(Flow/Transforms)
 add_subdirectory(Flow/Utils)
 
 add_subdirectory(HAL/Conversion/FlowToHAL)
-add_subdirectory(HAL/Conversion/HALtoVM)
+add_subdirectory(HAL/Conversion/HALToVM)
 add_subdirectory(HAL/IR)
 add_subdirectory(HAL/Target)
 add_subdirectory(HAL/Transforms)
