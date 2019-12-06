@@ -70,6 +70,6 @@ iree_tablegen_library(
   SRCS
     HALOps.td
   OUTS
-    -gen-op-decls HALOpsGen.h.inc
-    -gen-op-defs HALOpsGen.cpp.inc
+    -gen-op-decls HALOps.h.inc
+    -gen-op-defs HALOps.cpp.inc
 )
