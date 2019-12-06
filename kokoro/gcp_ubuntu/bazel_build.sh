@@ -59,12 +59,13 @@ cd ${KOKORO_ARTIFACTS_DIR}/github/iree
 echo "Checking out submodules"
 git submodule update --init --depth 1000 --jobs 8
 export PATH=$HOME/bin:$PATH 
+
 # Hackery to allow SSHing into the VM for debugging 
-echo "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEHXMM+6DzYMf3u/EEGGYKANayUoPLNFR7uQO/qYaw/jI+Nj+sYmN/fB8CAQTG/Dvjpzl8kMXLMqbDFuSALA4OA= you@gnubby.key" >> ~/.ssh/authorized_keys
-external_ip=$(curl -s -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
-echo "INSTANCE_EXTERNAL_IP=${external_ip}"
-sleep 10000 # Give me a few hours
+# echo "ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEHXMM+6DzYMf3u/EEGGYKANayUoPLNFR7uQO/qYaw/jI+Nj+sYmN/fB8CAQTG/Dvjpzl8kMXLMqbDFuSALA4OA= you@gnubby.key" >> ~/.ssh/authorized_keys
+# external_ip=$(curl -s -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
+# echo "INSTANCE_EXTERNAL_IP=${external_ip}"
+# sleep 10000 # Give me a few hours
 
-bazel build //iree/compiler/Dialect/Flow/Transforms
+# bazel build //iree/compiler/Dialect/Flow/Transforms
 
-# ./build_tools/bazel_build.sh
+./build_tools/bazel_build.sh
