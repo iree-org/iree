@@ -70,6 +70,6 @@ iree_tablegen_library(
   SRCS
     FlowOps.td
   OUTS
-    -gen-op-decls FlowOpsGen.h.inc
-    -gen-op-defs FlowOpsGen.cpp.inc
+    -gen-op-decls FlowOps.h.inc
+    -gen-op-defs FlowOps.cpp.inc
 )
