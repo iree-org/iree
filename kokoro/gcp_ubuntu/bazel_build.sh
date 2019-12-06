@@ -23,9 +23,10 @@ set -e
 
 set -x
 
-
 echo "Deleting corrupted ppa sources"
 sudo rm -rf /etc/apt/sources.list.d/nvidia-docker.list*
+echo "Deleting old bazel version"
+sudo rm /usr/local/bin/bazel
 
 echo "Installing bazel $BAZEL_VERSION"
 export BAZEL_VERSION=1.1.0
@@ -50,10 +51,6 @@ export CXX=clang++-6.0
 export CC=clang-6.0
 export PYTHON_BIN="$(which python3)"
 
-echo "$CXX"
-echo "$CC"
-echo "$PYTHON_BIN"
-
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR}/github/iree
 echo "Checking out submodules"
@@ -66,6 +63,5 @@ export PATH=$HOME/bin:$PATH
 # echo "INSTANCE_EXTERNAL_IP=${external_ip}"
 # sleep 10000 # Give me a few hours
 
-# bazel build //iree/compiler/Dialect/Flow/Transforms
-
+echo "Building and testing with bazel"
 ./build_tools/bazel_build.sh
