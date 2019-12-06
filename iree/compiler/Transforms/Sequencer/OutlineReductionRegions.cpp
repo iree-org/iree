@@ -180,13 +180,14 @@ LogicalResult outlineReductionRegion(IREE::ReductionRegionOp regionOp,
   // We'll do this by chaining the original input through with the temporary
   // reduction results. The results we end up with will be the originally
   // requested shape and we can just substitute them.
+  using WindowTuple = std::tuple<int64_t, int64_t, int64_t, int64_t>;
+
   if (regionOp.isWindowed()) {
     auto windowDimensions = regionOp.window_dimensions().getValue();
     auto windowStrides = regionOp.window_strides().getValue();
     auto baseDilations = regionOp.base_dilations().getValue();
     auto windowDilations = regionOp.window_dilations().getValue();
-    SmallVector<std::tuple<int64_t, int64_t, int64_t, int64_t>, 4>
-        sortedWindowAttrs;
+    SmallVector<WindowTuple, 4> sortedWindowAttrs;
     for (uint64_t i = 0; i < windowDimensions.getNumElements(); ++i) {
       int64_t windowDimension =
           windowDimensions.getValue<IntegerAttr>({i}).getInt();
@@ -194,14 +195,12 @@ LogicalResult outlineReductionRegion(IREE::ReductionRegionOp regionOp,
       int64_t baseDilation = baseDilations.getValue<IntegerAttr>({i}).getInt();
       int64_t windowDilation =
           windowDilations.getValue<IntegerAttr>({i}).getInt();
-      sortedWindowAttrs.push_back(
-          {windowDimension, windowStride, baseDilation, windowDilation});
+      sortedWindowAttrs.push_back(WindowTuple(windowDimension, windowStride,
+                                              baseDilation, windowDilation));
     }
-    llvm::sort(sortedWindowAttrs,
-               [](std::tuple<int64_t, int64_t, int64_t, int64_t> a,
-                  std::tuple<int64_t, int64_t, int64_t, int64_t> b) {
-                 return std::get<0>(a) - std::get<0>(b);
-               });
+    llvm::sort(sortedWindowAttrs, [](WindowTuple a, WindowTuple b) {
+      return std::get<0>(a) - std::get<0>(b);
+    });
     for (auto windowAttrs : llvm::enumerate(sortedWindowAttrs)) {
       int64_t windowDimension = std::get<0>(windowAttrs.value());
       int64_t windowStride = std::get<1>(windowAttrs.value());

@@ -283,12 +283,13 @@ LogicalResult outlineWindowedReductionRegion(
   // We'll do this by chaining the original input through with the temporary
   // reduction results. The results we end up with will be the originally
   // requested shape and we can just substitute them.
+  using WindowTuple = std::tuple<int32_t, int32_t, int32_t, int32_t>;
+
   auto windowDimensions = regionOp.window_dimensions();
   auto windowStrides = regionOp.window_strides();
   auto baseDilations = regionOp.base_dilations();
   auto windowDilations = regionOp.window_dilations();
-  SmallVector<std::tuple<int32_t, int32_t, int32_t, int32_t>, 4>
-      sortedWindowAttrs;
+  SmallVector<WindowTuple, 4> sortedWindowAttrs;
   for (uint32_t i = 0; i < windowDimensions.getNumElements(); ++i) {
     int32_t windowDimension =
         windowDimensions.getValue<IntegerAttr>({i}).getInt();
@@ -296,14 +297,12 @@ LogicalResult outlineWindowedReductionRegion(
     int32_t baseDilation = baseDilations.getValue<IntegerAttr>({i}).getInt();
     int32_t windowDilation =
         windowDilations.getValue<IntegerAttr>({i}).getInt();
-    sortedWindowAttrs.push_back(
-        {windowDimension, windowStride, baseDilation, windowDilation});
+    sortedWindowAttrs.push_back(WindowTuple(windowDimension, windowStride,
+                                            baseDilation, windowDilation));
   }
-  llvm::sort(sortedWindowAttrs,
-             [](std::tuple<int32_t, int32_t, int32_t, int32_t> a,
-                std::tuple<int32_t, int32_t, int32_t, int32_t> b) {
-               return std::get<0>(a) - std::get<0>(b);
-             });
+  llvm::sort(sortedWindowAttrs, [](WindowTuple a, WindowTuple b) {
+    return std::get<0>(a) - std::get<0>(b);
+  });
   for (auto windowAttrs : llvm::enumerate(sortedWindowAttrs)) {
     int32_t windowDimension = std::get<0>(windowAttrs.value());
     int32_t windowStride = std::get<1>(windowAttrs.value());
