@@ -15,12 +15,15 @@
 # limitations under the License.
 
 # A script that allows accessing a Kokoro VM for debugging.
-# To use, set the SSH_PUBLIC_KEY variable to your SSH public key and then
-# run this on a Kokoro VM by setting it as the build file in the build
-# configuration for the relevant job (e.g.
-# https://github.com/google/iree/tree/master/iree/kokoro/gcp_ubuntu/continuous.cfg). After setup the VM
-# debug logs will print out the external IP address and you can SSH into
-# kbuilder@INSTANCE_EXTERNAL_IP.
+
+# For interactive access, set the SSH_PUBLIC_KEY variable to your SSH public key
+# and push to the kokoro-test branch, which will automatically trigger a build.
+# It is also possible to trigger manual runs, which will run against kokoro-test
+# HEAD.
+# After setup the VM will print out the external IP address to the debug logs
+# and you can SSH into kbuilder@INSTANCE_EXTERNAL_IP.
+# You can also substitute other debugging commands here for non-interactive
+# debugging or add additional setup before the sleep.
 
 set -e
 
@@ -28,7 +31,7 @@ set -x
 
 SSH_PUBLIC_KEY=""
 
-echo "${SSH_PUBLIC_KEY}" >> ~/.ssh/authorized_keys
+echo "${SSH_PUBLIC_KEY:?}" >> ~/.ssh/authorized_keys
 external_ip=$(curl -s -H "Metadata-Flavor: Google" http://metadata/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
 echo "INSTANCE_EXTERNAL_IP=${external_ip}"
 sleep 10000 # Keep the VM alive for a few hours
