@@ -21,7 +21,6 @@ cc_library(
     name = "IREEVM",
     srcs = [
         "IREEVM.cpp",
-        "IREEVMTranslationRegistration.cpp",
     ],
     hdrs = ["IREEVM.h"],
     deps = [
@@ -34,11 +33,11 @@ cc_library(
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Dialect/VM/Transforms",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:StandardDialectRegistration",
-        "@local_config_mlir//:StandardOps",
         "@local_config_mlir//:Support",
         "@local_config_mlir//:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",

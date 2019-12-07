@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_VM_TRANSFORMS_PASSES_H_
 
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "mlir/IR/Module.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -24,12 +25,35 @@ namespace IREE {
 namespace VM {
 
 //===----------------------------------------------------------------------===//
+// Helpers
+//===----------------------------------------------------------------------===//
+
+// Adds a set of passes to the given pass manager that run the required VM
+// transforms in the canonical order.
+//
+// Most translation code should prefer to use this instead of manually adding
+// the passes themselves to ensure that expected pass ordering is observed.
+//
+// The expected usage is:
+//   <run conversion to HAL/etc>
+//   buildVMTransformPassPipeline & run
+//   <run target serialization/etc>
+void buildVMTransformPassPipeline(OpPassManager &passManager);
+
+//===----------------------------------------------------------------------===//
+// Conversion
+//===----------------------------------------------------------------------===//
+
+// Converts from various dialects (standard, HAL, etc) to the VM dialect.
+std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass();
+
+//===----------------------------------------------------------------------===//
 // Module Analysis and Assignment
 //===----------------------------------------------------------------------===//
 
 // Assigns module-unique ordinals to function/global/etc symbols within the
 // module.
-std::unique_ptr<OpPassBase<ModuleOp>> createOrdinalAllocationPass();
+std::unique_ptr<OpPassBase<IREE::VM::ModuleOp>> createOrdinalAllocationPass();
 
 }  // namespace VM
 }  // namespace IREE

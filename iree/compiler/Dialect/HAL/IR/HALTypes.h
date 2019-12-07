@@ -175,14 +175,6 @@ class BufferBarrierType {
   }
 };
 
-class BufferBarrierListType {
- public:
-  static TupleType get(size_t count, MLIRContext *context) {
-    SmallVector<Type, 4> elementTypes(count, BufferBarrierType::get(context));
-    return TupleType::get(elementTypes, context);
-  }
-};
-
 class MemoryBarrierType {
  public:
   static TupleType get(MLIRContext *context) {
@@ -192,14 +184,6 @@ class MemoryBarrierType {
             IntegerType::get(32, context),
         },
         context);
-  }
-};
-
-class MemoryBarrierListType {
- public:
-  static TupleType get(size_t count, MLIRContext *context) {
-    SmallVector<Type, 4> elementTypes(count, MemoryBarrierType::get(context));
-    return TupleType::get(elementTypes, context);
   }
 };
 

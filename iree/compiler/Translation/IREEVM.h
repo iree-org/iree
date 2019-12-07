@@ -32,6 +32,16 @@ namespace iree_compiler {
 // unsupported SPIR-V lowering) or a bug.
 LogicalResult convertToFlowModule(ModuleOp moduleOp);
 
+// Runs the flow->HAL transform pipeline to lower a flow module and compile
+// executables for the specified target backends.
+LogicalResult convertToHALModule(
+    ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions);
+
+// Converts the lowered module to a canonical vm.module containing only vm ops.
+// This uses patterns to convert from standard ops and other dialects to their
+// vm ABI form.
+LogicalResult convertToVMModule(ModuleOp moduleOp);
+
 // Translates an MLIR module containing a set of supported IREE input dialects
 // to an IREE VM bytecode module for loading at runtime.
 //

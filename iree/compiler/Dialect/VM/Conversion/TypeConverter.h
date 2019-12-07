@@ -12,20 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_STANDARDTOVM_CONVERTSTANDARDTOVM_H_
-#define IREE_COMPILER_DIALECT_VM_CONVERSION_STANDARDTOVM_CONVERTSTANDARDTOVM_H_
+#ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_
+#define IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_
 
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Appends standard dialect to vm dialect patterns to the given pattern list.
-void populateStandardToVMPatterns(MLIRContext *context,
-                                  OwningRewritePatternList &patterns);
+class VMTypeConverter : public TypeConverter {
+ public:
+  Type convertType(Type t) override;
+};
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_STANDARDTOVM_CONVERTSTANDARDTOVM_H_
+#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_

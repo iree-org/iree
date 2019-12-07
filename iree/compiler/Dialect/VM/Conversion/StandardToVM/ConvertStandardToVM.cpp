@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
 #include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -28,32 +29,6 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-
-class VmTypeConverter : public TypeConverter {
- public:
-  static TypeConverter &getInstance() {
-    static VmTypeConverter instance;
-    return instance;
-  }
-
- private:
-  Type convertType(Type t) override {
-    if (auto integerType = t.dyn_cast<IntegerType>()) {
-      if (integerType.getIntOrFloatBitWidth() == 32) {
-        return t;
-      } else if (integerType.getIntOrFloatBitWidth() == 1) {
-        // Promote i1 -> i32.
-        return IntegerType::get(32, t.getContext());
-      }
-    } else if (t.isa<IREE::RefPtrType>()) {
-      return t;
-    }
-    // Default to not supporting the type. This dialect is very limited
-    // with respect to valid types and the above should be expanded as
-    // needed.
-    return {};
-  }
-};
 
 class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -90,7 +65,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
       FuncOp srcOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
-    TypeConverter &typeConverter = VmTypeConverter::getInstance();
+    VMTypeConverter typeConverter;
     TypeConverter::SignatureConversion signatureConversion(
         srcOp.getNumArguments());
 
@@ -326,7 +301,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
     CallOpOperandAdaptor srcAdaptor(operands);
     // Convert function result types. The conversion framework will ensure
     // that the callee has been equivalently converted.
-    auto &typeConverter = VmTypeConverter::getInstance();
+    VMTypeConverter typeConverter;
     SmallVector<Type, 4> resultTypes;
     for (auto resultType : srcOp.getResultTypes()) {
       resultType = typeConverter.convertType(resultType);
@@ -369,10 +344,6 @@ void populateStandardToVMPatterns(MLIRContext *context,
   // TODO(laurenzo): The standard dialect is missing shr ops. Add once in place.
   patterns.insert<ShiftArithmeticOpConversion<ShlISOp, IREE::VM::ShlI32Op>>(
       context);
-}
-
-TypeConverter *getStandardToVMTypeConverter() {
-  return &VmTypeConverter::getInstance();
 }
 
 }  // namespace iree_compiler

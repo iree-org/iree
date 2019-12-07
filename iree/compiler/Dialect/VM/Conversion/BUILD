@@ -18,19 +18,23 @@ package(
 )
 
 cc_library(
-    name = "ImportUtils",
+    name = "Conversion",
     srcs = [
+        "ConversionTarget.cpp",
         "ImportUtils.cpp",
+        "TypeConverter.cpp",
     ],
     hdrs = [
+        "ConversionTarget.h",
         "ImportUtils.h",
+        "TypeConverter.h",
     ],
     deps = [
         "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/VM/IR",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Parser",
-        "@local_config_mlir//:Support",
+        "@local_config_mlir//:StandardOps",
         "@local_config_mlir//:Transforms",
     ],
 )

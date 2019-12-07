@@ -14,6 +14,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm//:support",
         "@local_config_mlir//:IR",

@@ -6,12 +6,16 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "Conversion.cpp",
         "OrdinalAllocationPass.cpp",
+        "Passes.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/VM/Conversion",
+        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm//:support",
         "@local_config_mlir//:IR",

@@ -172,7 +172,6 @@ def VM_ExportOp : VM_Op<"export", [
 
 def VM_ImportOp : VM_Op<"import", [
     Symbol,
-    HasParent<"IREE::VM::ModuleOp">,
     NativeOpTrait<"FunctionLike">,
     CallableOpInterface,
   ]> {
@@ -260,6 +259,12 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
 
   let skipDefaultBuilders = 1;
   let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, StringRef name, bool isMutable,
+      Type type,
+      Optional<StringRef> initializer, Optional<Attribute> initialValue,
+      ArrayRef<NamedAttribute> attrs = {}
+    }]>,
     OpBuilder<[{
       Builder *builder, OperationState &result, StringRef name, bool isMutable,
       IREE::VM::FuncOp initializer, ArrayRef<NamedAttribute> attrs = {}

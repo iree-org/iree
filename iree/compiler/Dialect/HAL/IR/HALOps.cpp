@@ -497,62 +497,44 @@ static LogicalResult verifyVariableOp(VariableOp op) {
   return success();
 }
 
-void VariableOp::build(Builder *builder, OperationState &state, StringRef name,
+void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
                        bool isMutable, Type type,
                        Optional<StringRef> initializer,
                        Optional<Attribute> initialValue,
                        ArrayRef<NamedAttribute> attrs) {
-  state.addAttribute(SymbolTable::getSymbolAttrName(),
-                     builder->getStringAttr(name));
+  result.addAttribute(SymbolTable::getSymbolAttrName(),
+                      builder->getStringAttr(name));
   if (isMutable) {
-    state.addAttribute("is_mutable", builder->getUnitAttr());
+    result.addAttribute("is_mutable", builder->getUnitAttr());
   }
   if (initializer.hasValue()) {
-    state.addAttribute("initializer",
-                       builder->getSymbolRefAttr(initializer.getValue()));
+    result.addAttribute("initializer",
+                        builder->getSymbolRefAttr(initializer.getValue()));
   } else if (initialValue.hasValue()) {
-    state.addAttribute("initial_value", initialValue.getValue());
+    result.addAttribute("initial_value", initialValue.getValue());
   }
-  state.addAttribute("type", TypeAttr::get(type));
-  state.attributes.append(attrs.begin(), attrs.end());
+  result.addAttribute("type", TypeAttr::get(type));
+  result.attributes.append(attrs.begin(), attrs.end());
 }
 
-void VariableOp::build(Builder *builder, OperationState &state, StringRef name,
+void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
                        bool isMutable, mlir::FuncOp initializer,
                        ArrayRef<NamedAttribute> attrs) {
-  state.addAttribute(SymbolTable::getSymbolAttrName(),
-                     builder->getStringAttr(name));
-  if (isMutable) {
-    state.addAttribute("is_mutable", builder->getUnitAttr());
-  }
-  state.addAttribute("initializer", builder->getSymbolRefAttr(initializer));
-  state.addAttribute("type", TypeAttr::get(initializer.getType().getResult(0)));
-  state.attributes.append(attrs.begin(), attrs.end());
+  build(builder, result, name, isMutable, initializer.getType().getResult(0),
+        initializer.getName(), llvm::None, attrs);
 }
 
 void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
                        bool isMutable, Type type, Attribute initialValue,
                        ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
-  }
-  result.addAttribute("initial_value", initialValue);
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
+  build(builder, result, name, isMutable, type, llvm::None, initialValue,
+        attrs);
 }
 
 void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
                        bool isMutable, Type type,
                        ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
-  }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
+  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
 }
 
 //===----------------------------------------------------------------------===//

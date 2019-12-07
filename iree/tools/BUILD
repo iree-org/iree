@@ -50,6 +50,7 @@ cc_binary(
         "//iree/compiler/Transforms",
         "//iree/compiler/Transforms/Interpreter",
         "//iree/compiler/Transforms/Sequencer",
+        "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV",
         "@llvm//:support",
         "@local_config_mlir//:AffineDialectRegistration",

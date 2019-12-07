@@ -12,20 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_STANDARDTOVM_CONVERTSTANDARDTOVM_H_
-#define IREE_COMPILER_DIALECT_VM_CONVERSION_STANDARDTOVM_CONVERTSTANDARDTOVM_H_
+#include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/DialectConversion.h"
+#include "iree/compiler/Dialect/Types.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Appends standard dialect to vm dialect patterns to the given pattern list.
-void populateStandardToVMPatterns(MLIRContext *context,
-                                  OwningRewritePatternList &patterns);
+Type VMTypeConverter::convertType(Type t) {
+  if (auto integerType = t.dyn_cast<IntegerType>()) {
+    if (integerType.getIntOrFloatBitWidth() == 32) {
+      return t;
+    } else if (integerType.getIntOrFloatBitWidth() == 1) {
+      // Promote i1 -> i32.
+      return IntegerType::get(32, t.getContext());
+    }
+  } else if (t.isa<IREE::RefPtrType>()) {
+    return t;
+  }
+  // Default to not supporting the type. This dialect is very limited
+  // with respect to valid types and the above should be expanded as
+  // needed.
+  return {};
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_STANDARDTOVM_CONVERTSTANDARDTOVM_H_

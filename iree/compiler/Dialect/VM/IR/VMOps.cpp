@@ -217,6 +217,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
     }
     argTypes.push_back(operandType);
     NamedAttributeList argAttrList;
+    operand.name.consume_front("%");
     argAttrList.set(builder.getIdentifier("vm.name"),
                     builder.getStringAttr(operand.name));
     if (succeeded(parser.parseOptionalEllipsis())) {
@@ -263,7 +264,7 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
   p << "(";
   for (int i = 0; i < op.getNumFuncArguments(); ++i) {
     if (auto name = op.getArgAttrOfType<StringAttr>(i, "vm.name")) {
-      p << name.getValue() << " : ";
+      p << '%' << name.getValue() << " : ";
     }
     p.printType(op.getType().getInput(i));
     if (op.getArgAttrOfType<UnitAttr>(i, "vm.variadic")) {
@@ -394,20 +395,20 @@ static LogicalResult verifyGlobalOp(Operation *op) {
   auto initialValueAttr = op->getAttr("initial_value");
   if (initializerAttr && initialValueAttr) {
     return op->emitOpError()
-           << "Globals can have either an initializer or an initial value";
+           << "globals can have either an initializer or an initial value";
   } else if (initializerAttr) {
     // Ensure initializer returns the same value as the global.
     auto initializer = op->getParentOfType<ModuleOp>().lookupSymbol<FuncOp>(
         initializerAttr.getValue());
     if (!initializer) {
       return op->emitOpError()
-             << "Initializer function " << initializerAttr << " not found";
+             << "initializer function " << initializerAttr << " not found";
     }
     if (initializer.getType().getNumInputs() != 0 ||
         initializer.getType().getNumResults() != 1 ||
         initializer.getType().getResult(0) != globalType.getValue()) {
       return op->emitOpError()
-             << "Initializer type mismatch; global " << globalName << " is "
+             << "initializer type mismatch; global " << globalName << " is "
              << globalType << " but initializer function "
              << initializer.getName() << " is " << initializer.getType();
     }
@@ -415,7 +416,7 @@ static LogicalResult verifyGlobalOp(Operation *op) {
     // Ensure the value is something we can convert to a const.
     if (initialValueAttr.getType() != globalType.getValue()) {
       return op->emitOpError()
-             << "Initial value type mismatch; global " << globalName << " is "
+             << "initial value type mismatch; global " << globalName << " is "
              << globalType << " but initial value provided is "
              << initialValueAttr.getType();
     }
@@ -424,83 +425,85 @@ static LogicalResult verifyGlobalOp(Operation *op) {
 }
 
 void GlobalI32Op::build(Builder *builder, OperationState &result,
-                        StringRef name, bool isMutable, FuncOp initializer,
+                        StringRef name, bool isMutable, Type type,
+                        Optional<StringRef> initializer,
+                        Optional<Attribute> initialValue,
                         ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder->getStringAttr(name));
   if (isMutable) {
     result.addAttribute("is_mutable", builder->getUnitAttr());
   }
-  result.addAttribute("initializer", builder->getSymbolRefAttr(initializer));
-  result.addAttribute("type",
-                      TypeAttr::get(initializer.getType().getResult(0)));
+  if (initializer.hasValue()) {
+    result.addAttribute("initializer",
+                        builder->getSymbolRefAttr(initializer.getValue()));
+  } else if (initialValue.hasValue()) {
+    result.addAttribute("initial_value", initialValue.getValue());
+  }
+  result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
+}
+
+void GlobalI32Op::build(Builder *builder, OperationState &result,
+                        StringRef name, bool isMutable,
+                        IREE::VM::FuncOp initializer,
+                        ArrayRef<NamedAttribute> attrs) {
+  build(builder, result, name, isMutable, initializer.getType().getResult(0),
+        initializer.getName(), llvm::None, attrs);
 }
 
 void GlobalI32Op::build(Builder *builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         Attribute initialValue,
                         ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
-  }
-  result.addAttribute("initial_value", initialValue);
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
+  build(builder, result, name, isMutable, type, llvm::None, initialValue,
+        attrs);
 }
 
 void GlobalI32Op::build(Builder *builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
-  }
-  result.addAttribute("initial_value", builder->getZeroAttr(type));
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
+  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
 }
 
 void GlobalRefOp::build(Builder *builder, OperationState &result,
-                        StringRef name, bool isMutable, FuncOp initializer,
+                        StringRef name, bool isMutable, Type type,
+                        Optional<StringRef> initializer,
+                        Optional<Attribute> initialValue,
                         ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder->getStringAttr(name));
   if (isMutable) {
     result.addAttribute("is_mutable", builder->getUnitAttr());
   }
-  result.addAttribute("initializer", builder->getSymbolRefAttr(initializer));
-  result.addAttribute("type",
-                      TypeAttr::get(initializer.getType().getResult(0)));
+  if (initializer.hasValue()) {
+    result.addAttribute("initializer",
+                        builder->getSymbolRefAttr(initializer.getValue()));
+  }
+  result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
+}
+
+void GlobalRefOp::build(Builder *builder, OperationState &result,
+                        StringRef name, bool isMutable,
+                        IREE::VM::FuncOp initializer,
+                        ArrayRef<NamedAttribute> attrs) {
+  build(builder, result, name, isMutable, initializer.getType().getResult(0),
+        initializer.getName(), llvm::None, attrs);
 }
 
 void GlobalRefOp::build(Builder *builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         Attribute initialValue,
                         ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
-  }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
+  build(builder, result, name, isMutable, type, llvm::None, initialValue,
+        attrs);
 }
 
 void GlobalRefOp::build(Builder *builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
-  if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
-  }
-  result.addAttribute("type", TypeAttr::get(type));
-  result.attributes.append(attrs.begin(), attrs.end());
+  build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
 }
 
 static ParseResult parseGlobalLoadOp(OpAsmParser &parser,

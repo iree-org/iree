@@ -15,18 +15,17 @@
 #include "iree/compiler/Translation/IREEVM.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
+#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
-#include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Translation.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Runs the flow transform pipeline to partition and produce the flow module.
 LogicalResult convertToFlowModule(ModuleOp moduleOp) {
   PassManager passManager(moduleOp.getContext());
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
@@ -37,8 +36,7 @@ LogicalResult convertToFlowModule(ModuleOp moduleOp) {
   return success();
 }
 
-// TODO(benvanik): replace with the real HAL dialect.
-static LogicalResult convertToTemporaryHALModule(
+LogicalResult convertToHALModule(
     ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions) {
   PassManager passManager(moduleOp.getContext());
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
@@ -49,35 +47,25 @@ static LogicalResult convertToTemporaryHALModule(
   return success();
 }
 
-// Converts the lowered module to a canonical vm.module containing only vm ops.
-// This uses patterns to convert from standard ops and other dialects to their
-// vm ABI form.
-static LogicalResult convertToVMModule(ModuleOp moduleOp) {
-  ConversionTarget conversionTarget(*moduleOp.getContext());
-  conversionTarget.addLegalDialect<IREE::VM::VMDialect>();
-  conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
-  conversionTarget.addIllegalDialect<StandardOpsDialect>();
-  // NOTE: we need to allow the outermost std.module to be legal.
-  conversionTarget.addDynamicallyLegalOp<mlir::ModuleOp>(
-      [&](mlir::ModuleOp op) { return op.getParentOp() == nullptr; });
-  conversionTarget.addDynamicallyLegalOp<mlir::ModuleTerminatorOp>(
-      [&](mlir::ModuleTerminatorOp op) {
-        return op.getParentOp()->getParentOp() == nullptr;
-      });
-
-  OwningRewritePatternList conversionPatterns;
-  populateHALToVMPatterns(moduleOp.getContext(), conversionPatterns);
-  populateStandardToVMPatterns(moduleOp.getContext(), conversionPatterns);
-
-  // TODO(benvanik): HAL -> VM conversion.
-
-  if (failed(applyFullConversion(moduleOp, conversionTarget, conversionPatterns,
-                                 getStandardToVMTypeConverter()))) {
-    return moduleOp.emitError() << "conversion to vm.module failed";
+LogicalResult convertToVMModule(ModuleOp moduleOp) {
+  PassManager passManager(moduleOp.getContext());
+  IREE::VM::buildVMTransformPassPipeline(passManager);
+  if (failed(passManager.run(moduleOp))) {
+    return moduleOp.emitError()
+           << "failed to run VM transformation pass pipeline";
   }
-
   return success();
 }
+
+static PassPipelineRegistration<> transformPassPipeline(
+    "iree-transformation-pipeline",
+    "Runs the full IREE input to VM transformation pipeline",
+    [](OpPassManager &passManager) {
+      IREE::Flow::buildFlowTransformPassPipeline(passManager);
+      IREE::HAL::buildHALTransformPassPipeline(
+          passManager, IREE::HAL::getExecutableTargetOptionsFromFlags());
+      IREE::VM::buildVMTransformPassPipeline(passManager);
+    });
 
 LogicalResult translateFromMLIRToVMBytecodeModule(
     ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions,
@@ -86,15 +74,30 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
   // Convert from our source to a vm.module in canonical form.
   // After this completes we have a non-bytecode-specific vm.module that we
   // could lower to other forms (LLVM IR, C, etc).
-  if (failed(convertToFlowModule(moduleOp)) ||
-      failed(convertToTemporaryHALModule(moduleOp, executableOptions)) ||
-      failed(convertToVMModule(moduleOp))) {
+  PassManager passManager(moduleOp.getContext());
+  IREE::Flow::buildFlowTransformPassPipeline(passManager);
+  IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
+  IREE::VM::buildVMTransformPassPipeline(passManager);
+  if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
   }
 
   // Serialize to bytecode.
   return translateModuleToBytecode(moduleOp, bytecodeOptions, output);
 }
+
+static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
+    ModuleOp moduleOp, llvm::raw_ostream &output) {
+  auto executableTargetOptions =
+      IREE::HAL::getExecutableTargetOptionsFromFlags();
+  auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
+  return translateFromMLIRToVMBytecodeModule(moduleOp, executableTargetOptions,
+                                             bytecodeTargetOptions, output);
+}
+
+static TranslateFromMLIRRegistration toVMBytecodeModuleWithFlags(
+    "iree-mlir-to-vm-bytecode-module",
+    translateFromMLIRToVMBytecodeModuleWithFlags);
 
 }  // namespace iree_compiler
 }  // namespace mlir
