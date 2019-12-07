@@ -65,7 +65,8 @@ void enableIRPrinting(PassManager *passManager) {
   bool printModuleScope = false;
   passManager->enableIRPrinting(/*shouldPrintBeforePass=*/{},
                                 /*shouldPrintAfterPass=*/always,
-                                printModuleScope, llvm::dbgs());
+                                printModuleScope,
+                                /*printAfterOnlyOnChange=*/false, llvm::dbgs());
   passManager->disableMultithreading();
 }
 
