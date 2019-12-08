@@ -32,11 +32,13 @@ func @gather(%input : tensor<5x2x3xf32>, %start_indices : tensor<i64>) -> tensor
   // CHECK-DAG:  [[RESHAPED:%.+]] = "iree_hl_interp.reshape"([[DST]], [[NEW_SHAPE]])
   // CHECK-DAG:  [[RESULT_TENSOR:%.+]] = iree.memref_to_tensor([[RESHAPED]] : memref<2x3xf32>)
   %result = "xla_hlo.gather"(%input, %start_indices) {
+    dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
       offset_dims = dense<[0, 1]> : tensor<2xi64>,
-      slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>,
       start_index_map = dense<0> : tensor<1xi64>
+    },
+    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<i64>) -> tensor<2x3xf32>
   // CHECK-NEXT: return [[RESULT_TENSOR]]
   return %result : tensor<2x3xf32>
@@ -58,11 +60,13 @@ func @gather_nonscalar_indices(%input : tensor<5x2x3xf32>, %start_indices : tens
   // CHECK-DAG:  [[RESHAPED:%.+]] = "iree_hl_interp.reshape"([[DST]], [[NEW_SHAPE]])
   // CHECK-DAG:  [[RESULT_TENSOR:%.+]] = iree.memref_to_tensor([[RESHAPED]] : memref<2x3xf32>)
   %result = "xla_hlo.gather"(%input, %start_indices) {
+    dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
       offset_dims = dense<[0, 1]> : tensor<2xi64>,
-      slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>,
       start_index_map = dense<0> : tensor<1xi64>
+    },
+    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<1xi64>) -> tensor<2x3xf32>
   // CHECK-NEXT: return [[RESULT_TENSOR]]
   return %result : tensor<2x3xf32>
@@ -82,11 +86,13 @@ func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices 
   // CHECK-DAG:  [[RESHAPED:%.+]] = "iree_hl_interp.reshape"([[DST]], [[NEW_SHAPE]])
   // CHECK-DAG:  [[RESULT_TENSOR:%.+]] = iree.memref_to_tensor([[RESHAPED]] : memref<2x3xf32>)
   %result = "xla_hlo.gather"(%input, %start_indices) {
+    dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
       offset_dims = dense<[0, 1]> : tensor<2xi64>,
-      slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>,
       start_index_map = dense<0> : tensor<1xi64>
+    },
+    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<3xi64>) -> tensor<2x3xf32>
   // CHECK-NEXT: return [[RESULT_TENSOR]]
   return %result : tensor<2x3xf32>
@@ -98,38 +104,46 @@ func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices 
 func @gather_not_lowered(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) {
   // CHECK-NEXT "xla_hlo.gather"
   %axis_1 = "xla_hlo.gather"(%input, %start_indices) {
+    dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 1 : i64,
       offset_dims = dense<[0, 1, 2]> : tensor<3xi64>,
-      slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>,
       start_index_map = dense<0> : tensor<1xi64>
+    },
+    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<2x2xi64>) -> tensor<2x3xf32>
 
   // CHECK-NEXT "xla_hlo.gather"
   %collapse_1 = "xla_hlo.gather"(%input, %start_indices) {
+    dimension_numbers = {
       collapsed_slice_dims = dense<1> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
       offset_dims = dense<[0, 1, 2]> : tensor<3xi64>,
-      slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>,
       start_index_map = dense<0> : tensor<1xi64>
+    },
+    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<2x2xi64>) -> tensor<2x3xf32>
 
   // CHECK-NEXT "xla_hlo.gather"
   %transposes = "xla_hlo.gather"(%input, %start_indices) {
+    dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
       offset_dims = dense<[0, 1, 2]> : tensor<3xi64>,
-      slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>,
       start_index_map = dense<[1, 0]> : tensor<2xi64>
+    },
+    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<2x2xi64>) -> tensor<2x3xf32>
 
   // CHECK-NEXT "xla_hlo.gather"
   %has_batch_dims = "xla_hlo.gather"(%input, %start_indices) {
+    dimension_numbers = {
       collapsed_slice_dims = dense<0> : tensor<1xi64>,
       index_vector_dim = 0 : i64,
       offset_dims = dense<1> : tensor<1xi64>,
-      slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>,
       start_index_map = dense<[1, 0]> : tensor<2xi64>
+    },
+    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<2x2xi64>) -> tensor<2x3xf32>
   return
 }

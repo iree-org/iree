@@ -29,7 +29,15 @@ module {
     // CHECK: {{%.*}} = spv.AccessChain [[ADDRESS_ARG0]]{{\[}}[[ZERO2]], [[INDEX1]]
     %0 = iree.load_input(%arg0 : memref<5x1x10xf32>) : tensor<5x1x10xf32>
     %1 = iree.load_input(%arg1 : memref<i64>) : tensor<i64>
-    %2 = "xla_hlo.gather"(%0, %1) {collapsed_slice_dims = dense<0> : tensor<1xi64>, index_vector_dim = 0 : i64, offset_dims = dense<[0, 1]> : tensor<2xi64>, slice_sizes = dense<[1, 1, 10]> : tensor<3xi64>, start_index_map = dense<0> : tensor<1xi64>} : (tensor<5x1x10xf32>, tensor<i64>) -> tensor<1x10xf32>
+    %2 = "xla_hlo.gather"(%0, %1) {
+      dimension_numbers = {
+        collapsed_slice_dims = dense<0> : tensor<1xi64>,
+        index_vector_dim = 0 : i64,
+        offset_dims = dense<[0, 1]> : tensor<2xi64>,
+        start_index_map = dense<0> : tensor<1xi64>
+      },
+      slice_sizes = dense<[1, 1, 10]> : tensor<3xi64>
+    } : (tensor<5x1x10xf32>, tensor<i64>) -> tensor<1x10xf32>
     iree.store_output(%2 : tensor<1x10xf32>, %arg2 : memref<1x10xf32>)
     iree.return
   }

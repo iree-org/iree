@@ -333,20 +333,23 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
   PatternMatchResult matchAndRewrite(
       xla_hlo::GatherOp gatherOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (gatherOp.index_vector_dim() != 0) {
+    auto dimension_numbers = gatherOp.dimension_numbers();
+    if (dimension_numbers.index_vector_dim().getValue().getSExtValue() != 0) {
       gatherOp.emitRemark()
           << "Couldn't lower gather with index_vector_dim != 0";
       return matchFailure();
     }
-    if (gatherOp.start_index_map().getType().getRank() != 1 ||
-        gatherOp.start_index_map().getValue(0).cast<IntegerAttr>().getValue() !=
-            0) {
+    if (dimension_numbers.start_index_map().getType().getRank() != 1 ||
+        dimension_numbers.start_index_map()
+                .getValue(0)
+                .cast<IntegerAttr>()
+                .getValue() != 0) {
       gatherOp.emitRemark()
           << "Couldn't lower gather with start_index_map != [0]";
       return matchFailure();
     }
-    if (gatherOp.collapsed_slice_dims().getType().getRank() != 1 ||
-        gatherOp.collapsed_slice_dims()
+    if (dimension_numbers.collapsed_slice_dims().getType().getRank() != 1 ||
+        dimension_numbers.collapsed_slice_dims()
                 .getValue(0)
                 .cast<IntegerAttr>()
                 .getValue() != 0) {
@@ -356,13 +359,13 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
     }
 
     auto resultType = gatherOp.getResult()->getType().cast<RankedTensorType>();
-    if (gatherOp.offset_dims().getType().getNumElements() !=
+    if (dimension_numbers.offset_dims().getType().getNumElements() !=
         resultType.getRank()) {
       gatherOp.emitRemark() << "Couldn't lower gather with offset_dims != "
                                "[0,...,rank of output]";
       return matchFailure();
     }
-    for (auto it : llvm::enumerate(gatherOp.offset_dims())) {
+    for (auto it : llvm::enumerate(dimension_numbers.offset_dims())) {
       if (it.index() != it.value()) {
         gatherOp.emitRemark() << "Couldn't lower gather with offset_dims != "
                                  "[0,...,rank of output]";

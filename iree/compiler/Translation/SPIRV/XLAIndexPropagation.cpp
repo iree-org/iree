@@ -156,11 +156,12 @@ LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
   Value *result = gatherOp.getResult();
   int64_t resultRank = result->getType().cast<ShapedType>().getRank();
   ArrayRef<AffineExpr> resultExprs = resultIndex.getResults();
-  int64_t indexVectorDim = gatherOp.index_vector_dim().getSExtValue();
+  int64_t indexVectorDim =
+      gatherOp.dimension_numbers().index_vector_dim().getValue().getSExtValue();
 
   // Get the batch dims;
   DenseSet<int64_t> offsetDimsSet, batchDimsSet;
-  getElementsAsSet(gatherOp.offset_dims(), offsetDimsSet);
+  getElementsAsSet(gatherOp.dimension_numbers().offset_dims(), offsetDimsSet);
   for (auto i : llvm::seq<int64_t>(0, resultRank)) {
     if (!offsetDimsSet.count(i)) {
       batchDimsSet.insert(i);
@@ -178,7 +179,8 @@ LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
 
   // Compute remapped_offset_dims.
   DenseSet<int64_t> collapsedSliceDims;
-  getElementsAsSet(gatherOp.collapsed_slice_dims(), collapsedSliceDims);
+  getElementsAsSet(gatherOp.dimension_numbers().collapsed_slice_dims(),
+                   collapsedSliceDims);
   SmallVector<int64_t, 2> offsetDims(offsetDimsSet.begin(),
                                      offsetDimsSet.end());
   SmallVector<int64_t, 4> remappedOffsetDims(offsetDims.size());
@@ -189,7 +191,7 @@ LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
   }
 
   // Compute the "starting index".
-  auto startIndexMapAttr = gatherOp.start_index_map();
+  auto startIndexMapAttr = gatherOp.dimension_numbers().start_index_map();
   auto startIndexMapSize =
       startIndexMapAttr.getType().cast<ShapedType>().getShape()[0];
   if (startIndexMapSize != 1) {
