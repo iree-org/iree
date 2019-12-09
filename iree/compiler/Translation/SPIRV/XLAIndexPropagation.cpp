@@ -114,8 +114,9 @@ LogicalResult XLAConcatenateOpIndexPropagation::propagateIndexMap(
       exprs.push_back(e);
     }
     offset += operandType.getDimSize(append_dim);
-    AffineMap shiftedMap = index_computation_attribute::getAffineMap(
-        op->getParentOfType<FuncOp>(), exprs);
+    AffineMap shiftedMap =
+        AffineMap::get(resultIndex.getNumResults(), 0, exprs);
+
     AffineMap operandMap = shiftedMap.compose(resultIndex);
     operandIndices.push_back(operandMap);
   }
