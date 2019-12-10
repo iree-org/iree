@@ -15,15 +15,21 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_CONVERTHALTOVM_H_
 #define IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_CONVERTHALTOVM_H_
 
-#include "mlir/IR/PatternMatch.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Appends HAL to VM dialect patterns to the given pattern list.
-void populateHALToVMPatterns(MLIRContext *context,
-                             OwningRewritePatternList &patterns);
+// Appends the HAL import module containing the vm.import ops for all HAL
+// methods.
+LogicalResult appendHALImportModule(mlir::ModuleOp moduleOp);
+
+// Populates conversion patterns from the HAL dialect to the VM dialect.
+void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
+                             OwningRewritePatternList &patterns,
+                             TypeConverter &typeConverter);
 
 }  // namespace iree_compiler
 }  // namespace mlir

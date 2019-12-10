@@ -12,24 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_
-#define IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_
-
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-class VMTypeConverter : public TypeConverter {
- public:
-  Type convertType(Type t) override;
-
-  Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
-                                   ArrayRef<Value *> inputs,
-                                   Location loc) override;
-};
+void populateHALDeviceToVMPatterns(MLIRContext *context,
+                                   SymbolTable &importSymbols,
+                                   TypeConverter &typeConverter,
+                                   OwningRewritePatternList &patterns) {
+  patterns.insert<VMImportOpConversion<IREE::HAL::DeviceAllocatorOp>>(
+      context, importSymbols, typeConverter, "_hal.device.allocator");
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_DIALECT_VM_CONVERSION_TYPECONVERTER_H_

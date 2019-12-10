@@ -323,6 +323,8 @@ def HAL_Semaphore : DialectType<
 
 def HAL_OrdinalAttr : IntegerAttrBase<I32, "32-bit integer ordinal attribute">;
 
+// A four character code (FourCC) matching the executable format in
+// `iree/hal/executable_format.h`.
 def HAL_ExecutableFormatAttr : IntegerAttrBase<I32, "uint32_t">;
 def HAL_ExecutableDataAttr : IntElementsAttr<8>;
 

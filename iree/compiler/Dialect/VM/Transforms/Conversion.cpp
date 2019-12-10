@@ -14,6 +14,7 @@
 
 #include <tuple>
 
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
@@ -43,9 +44,15 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
         VMConversionTarget::nestModuleForConversion(getOperation());
 
     // TODO(benvanik): registration system for custom dialects.
+    appendHALImportModule(innerModuleOp);
 
     OwningRewritePatternList conversionPatterns;
     populateStandardToVMPatterns(context, conversionPatterns);
+
+    // TODO(benvanik): registration system for custom dialects.
+    SymbolTable importSymbols(innerModuleOp);
+    populateHALToVMPatterns(context, importSymbols, conversionPatterns,
+                            typeConverter);
 
     if (failed(applyFullConversion(outerModuleOp, conversionTarget,
                                    conversionPatterns, &typeConverter))) {

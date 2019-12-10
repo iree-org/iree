@@ -36,7 +36,7 @@ LogicalResult translateToVMLAExecutable(
     IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
     ExecutableTargetOptions executableOptions,
     VMLATargetOptions targetOptions) {
-  return sourceOp.emitError() << "VM/LA lowering not implemented";
+  return success();
 }
 
 static ExecutableTargetRegistration targetRegistration(

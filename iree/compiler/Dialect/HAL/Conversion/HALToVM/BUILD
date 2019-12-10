@@ -20,16 +20,27 @@ package(
 cc_library(
     name = "HALToVM",
     srcs = [
+        "ConvertAllocatorOps.cpp",
+        "ConvertBufferOps.cpp",
+        "ConvertCommandBufferOps.cpp",
+        "ConvertDeviceOps.cpp",
+        "ConvertExecutableOps.cpp",
+        "ConvertExperimentalOps.cpp",
         "ConvertHALToVM.cpp",
-        "ConvertHALToVMPass.cpp",
+        "ConvertVariableOps.cpp",
     ],
     hdrs = [
         "ConvertHALToVM.h",
     ],
     deps = [
         "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/HAL:hal_imports",
         "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/Utils",
+        "//iree/compiler/Dialect/VM/Conversion",
+        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
+        "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:StandardOps",

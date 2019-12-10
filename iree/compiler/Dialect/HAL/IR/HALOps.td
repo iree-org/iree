@@ -958,6 +958,9 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let description = [{
     A compiled executable binary with an optional nested module containing the
     IR prior to serialization (for debugging).
+
+    The `format` attribute specifies a four character code (FourCC) matching the
+    executable format in `iree/hal/executable_format.h`.
   }];
 
   let arguments = (ins

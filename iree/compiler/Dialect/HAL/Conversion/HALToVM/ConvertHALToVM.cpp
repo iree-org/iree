@@ -15,6 +15,13 @@
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
+#include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
+#include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -22,15 +29,103 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-void populateHALToVMPatterns(MLIRContext *context,
-                             OwningRewritePatternList &patterns) {
-  // TODO(benvanik): hal-to-vm patterns.
+LogicalResult appendHALImportModule(mlir::ModuleOp moduleOp) {
+  return appendImportModule(
+      StringRef(hal_imports_create()->data, hal_imports_create()->size),
+      moduleOp);
 }
+
+extern void populateHALAllocatorToVMPatterns(
+    MLIRContext *context, SymbolTable &importSymbols,
+    TypeConverter &typeConverter, OwningRewritePatternList &patterns);
+extern void populateHALBufferToVMPatterns(MLIRContext *context,
+                                          SymbolTable &importSymbols,
+                                          TypeConverter &typeConverter,
+                                          OwningRewritePatternList &patterns);
+extern void populateHALCommandBufferToVMPatterns(
+    MLIRContext *context, SymbolTable &importSymbols,
+    TypeConverter &typeConverter, OwningRewritePatternList &patterns);
+extern void populateHALDeviceToVMPatterns(MLIRContext *context,
+                                          SymbolTable &importSymbols,
+                                          TypeConverter &typeConverter,
+                                          OwningRewritePatternList &patterns);
+extern void populateHALExecutableToVMPatterns(
+    MLIRContext *context, SymbolTable &importSymbols,
+    TypeConverter &typeConverter, OwningRewritePatternList &patterns);
+extern void populateHALExperimentalToVMPatterns(
+    MLIRContext *context, SymbolTable &importSymbols,
+    TypeConverter &typeConverter, OwningRewritePatternList &patterns);
+extern void populateHALVariableToVMPatterns(MLIRContext *context,
+                                            SymbolTable &importSymbols,
+                                            TypeConverter &typeConverter,
+                                            OwningRewritePatternList &patterns);
+
+void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
+                             OwningRewritePatternList &patterns,
+                             TypeConverter &typeConverter) {
+  populateHALAllocatorToVMPatterns(context, importSymbols, typeConverter,
+                                   patterns);
+  populateHALBufferToVMPatterns(context, importSymbols, typeConverter,
+                                patterns);
+  populateHALCommandBufferToVMPatterns(context, importSymbols, typeConverter,
+                                       patterns);
+  populateHALDeviceToVMPatterns(context, importSymbols, typeConverter,
+                                patterns);
+  populateHALExecutableToVMPatterns(context, importSymbols, typeConverter,
+                                    patterns);
+  populateHALExperimentalToVMPatterns(context, importSymbols, typeConverter,
+                                      patterns);
+  populateHALVariableToVMPatterns(context, importSymbols, typeConverter,
+                                  patterns);
+}
+
+namespace {
+
+// A pass converting the IREE flow dialect into the IREE HAL dialect.
+class ConvertHALToVMPass : public ModulePass<ConvertHALToVMPass> {
+ public:
+  void runOnModule() override {
+    auto *context = &getContext();
+
+    VMConversionTarget conversionTarget(context);
+    VMTypeConverter typeConverter;
+
+    mlir::ModuleOp outerModuleOp, innerModuleOp;
+    std::tie(outerModuleOp, innerModuleOp) =
+        VMConversionTarget::nestModuleForConversion(getModule());
+
+    appendHALImportModule(innerModuleOp);
+
+    OwningRewritePatternList conversionPatterns;
+    populateStandardToVMPatterns(context, conversionPatterns);
+
+    SymbolTable importSymbols(innerModuleOp);
+    populateHALToVMPatterns(context, importSymbols, conversionPatterns,
+                            typeConverter);
+
+    if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
+                                      conversionPatterns, &typeConverter))) {
+      outerModuleOp.emitError() << "conversion to vm.module failed";
+      return signalPassFailure();
+    }
+  }
+};
+
+}  // namespace
+
+std::unique_ptr<OpPassBase<ModuleOp>> createConvertHALToVMPass() {
+  return std::make_unique<ConvertHALToVMPass>();  // NOLINT
+}
+
+static PassRegistration<ConvertHALToVMPass> pass(
+    "iree-convert-hal-to-vm",
+    "Convert the IREE HAL dialect to the IREE VM dialect");
 
 }  // namespace iree_compiler
 }  // namespace mlir
