@@ -227,9 +227,8 @@ LogicalResult BytecodeWriter::WriteLocal(Value *value) {
   return WriteUint16(static_cast<uint16_t>(ordinal.getValue()));
 }
 
-LogicalResult BytecodeWriter::WriteLocals(
-    llvm::iterator_range<Operation::operand_iterator> values) {
-  int count = std::distance(values.begin(), values.end());
+LogicalResult BytecodeWriter::WriteLocals(Operation::operand_range values) {
+  int count = values.size();
   RETURN_IF_FAILURE(WriteCount(count));
   for (auto *value : values) {
     RETURN_IF_FAILURE(WriteLocal(value));
@@ -237,9 +236,8 @@ LogicalResult BytecodeWriter::WriteLocals(
   return success();
 }
 
-LogicalResult BytecodeWriter::WriteLocals(
-    llvm::iterator_range<Operation::result_iterator> values) {
-  int count = std::distance(values.begin(), values.end());
+LogicalResult BytecodeWriter::WriteLocals(Operation::result_range values) {
+  int count = values.size();
   RETURN_IF_FAILURE(WriteCount(count));
   for (auto *value : values) {
     RETURN_IF_FAILURE(WriteLocal(value));

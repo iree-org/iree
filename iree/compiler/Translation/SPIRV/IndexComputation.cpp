@@ -231,7 +231,7 @@ LogicalResult IndexPropagation::propagateIndexMap(Operation *op) const {
     }
     assert(operandIndices.size() == op->getNumOperands() &&
            "Expected as many indices as operands");
-    for (auto arg : enumerate(op->getOperands())) {
+    for (auto arg : llvm::enumerate(op->getOperands())) {
       if (failed(index_computation_attribute::addNewIndexMapForValue(
               arg.value(), operandIndices[arg.index()]))) {
         return failure();

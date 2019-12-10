@@ -58,10 +58,8 @@ class BytecodeWriter {
   llvm::Optional<int> LookupLocalOrdinal(Value *value);
   LogicalResult PrepareLocal(Value *value);
   LogicalResult WriteLocal(Value *value);
-  LogicalResult WriteLocals(
-      llvm::iterator_range<Operation::operand_iterator> values);
-  LogicalResult WriteLocals(
-      llvm::iterator_range<Operation::result_iterator> values);
+  LogicalResult WriteLocals(Operation::operand_range values);
+  LogicalResult WriteLocals(Operation::result_range values);
 
   LogicalResult WriteBytes(const void *data, size_t dataLength);
   MutableArrayRef<uint8_t> ReserveBytes(size_t dataLength);

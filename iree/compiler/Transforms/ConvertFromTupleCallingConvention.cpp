@@ -84,13 +84,11 @@ bool recursiveUntuple(Value *value, Location loc, OpBuilder &builder,
   return false;
 }
 
-Value *recursiveRetuple(
-    Type oldType, llvm::iterator_range<Operation::result_iterator> *values,
-    OpBuilder &builder, Location loc) {
+Value *recursiveRetuple(Type oldType, Operation::result_range *values,
+                        OpBuilder &builder, Location loc) {
   if (!oldType.isa<TupleType>()) {
     Value *returnValue = *values->begin();
-    *values = llvm::iterator_range<Operation::result_iterator>(
-        values->begin() + 1, values->end());
+    *values = values->drop_front();
     return returnValue;
   }
 
