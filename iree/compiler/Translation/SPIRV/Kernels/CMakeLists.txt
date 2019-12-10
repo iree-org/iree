@@ -49,4 +49,4 @@ add_custom_command(
           reduce_untiled.spv
 )
 
-add_library(Kernels STATIC Kernels.cc)
+add_library(iree_compiler_Translation_SPIRV_Kernels STATIC Kernels.cc)
