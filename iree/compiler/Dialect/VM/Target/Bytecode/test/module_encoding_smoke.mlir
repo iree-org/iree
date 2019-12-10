@@ -31,5 +31,5 @@ vm.module @simple_module {
   // CHECK-NEXT: bytecode_length: 3
   // CHECK-NEXT: i32_register_count: 1
   // CHECK-NEXT: ref_register_count: 0
-  // CHECK: bytecode_data: [ 68, 1, 0 ]
+  // CHECK: bytecode_data: [ 84, 1, 0 ]
 }

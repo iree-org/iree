@@ -425,6 +425,26 @@ iree_status_t iree_vm_bytecode_dispatch(
     DISPATCH_OP_BINARY_ALU_I32(XorI32, uint32_t, ^);
 
     //===------------------------------------------------------------------===//
+    // Casting and type conversion/emulation
+    //===------------------------------------------------------------------===//
+
+    // let encoding = [
+    //   VM_EncOpcode<opcode>,
+    //   VM_EncOperand<"operand", 0>,
+    //   VM_EncResult<"result">,
+    // ];
+#define DISPATCH_OP_CAST_I32(op_name, src_type, dst_type) \
+  DISPATCH_OP(op_name, {                                  \
+    OP_R_I32(1) = (dst_type)((src_type)OP_R_I32(0));      \
+    offset += 1 + 1;                                      \
+  });
+
+    DISPATCH_OP_CAST_I32(TruncI8, uint8_t, uint32_t);
+    DISPATCH_OP_CAST_I32(TruncI16, uint16_t, uint32_t);
+    DISPATCH_OP_CAST_I32(ExtI8I32S, int8_t, int32_t);
+    DISPATCH_OP_CAST_I32(ExtI16I32S, int16_t, int32_t);
+
+    //===------------------------------------------------------------------===//
     // Native bitwise shifts and rotates
     //===------------------------------------------------------------------===//
 

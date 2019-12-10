@@ -849,6 +849,30 @@ def VM_ShrI32UOp : VM_ShiftArithmeticOp<I32, "shr.i32.u", VM_OPC_ShrI32U> {
 }
 
 //===----------------------------------------------------------------------===//
+// Casting and type conversion/emulation
+//===----------------------------------------------------------------------===//
+
+def VM_TruncI8Op : VM_UnaryArithmeticOp<I32, "trunc.i8", VM_OPC_TruncI8> {
+  let summary = [{integer truncate to 8 bits}];
+  let hasFolder = 1;
+}
+
+def VM_TruncI16Op : VM_UnaryArithmeticOp<I32, "trunc.i16", VM_OPC_TruncI16> {
+  let summary = [{integer truncate to 16 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI8I32SOp : VM_UnaryArithmeticOp<I32, "ext.i8.i32.s", VM_OPC_ExtI8I32S> {
+  let summary = [{integer sign extend 8 bits to 32 bits}];
+  let hasFolder = 1;
+}
+
+def VM_ExtI16I32SOp : VM_UnaryArithmeticOp<I32, "ext.i16.i32.s", VM_OPC_ExtI16I32S> {
+  let summary = [{integer sign extend 16 bits to 32 bits}];
+  let hasFolder = 1;
+}
+
+//===----------------------------------------------------------------------===//
 // Native reduction (horizontal) arithmetic
 //===----------------------------------------------------------------------===//
 
