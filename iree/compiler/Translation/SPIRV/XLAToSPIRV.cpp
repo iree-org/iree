@@ -81,10 +81,6 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
   auto loc = convertOp.getLoc();
   auto resultElemType =
       convertOp.getResult()->getType().dyn_cast<ShapedType>().getElementType();
-  if (auto intElemType = resultElemType.dyn_cast<IntegerType>()) {
-    if (intElemType.getWidth() > 32)
-      resultElemType = IntegerType::get(32, resultElemType.getContext());
-  }
   auto operandElemType =
       convertOp.getOperand()->getType().dyn_cast<ShapedType>().getElementType();
 

@@ -20,6 +20,7 @@ package(
 cc_library(
     name = "SPIRV",
     srcs = [
+        "AdjustIntegerWidthPass.cpp",
         "EmbeddedKernels.cpp",
         "IREEIndexComputation.cpp",
         "IREEToSPIRV.cpp",

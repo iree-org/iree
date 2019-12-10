@@ -307,13 +307,6 @@ class SPIRVCodegen {
       return emitError(loc, "unhandled element type ")
              << elementType << " while lowering to SPIR-V";
     }
-    if (auto intElementType = elementType.dyn_cast<IntegerType>()) {
-      if (intElementType.getWidth() > 32) {
-        // TODO(ravishankarm): Maybe its better to report a warning when this
-        // happens.
-        elementType = IntegerType::get(32, elementType.getContext());
-      }
-    }
     if (argType.hasStaticShape()) {
       int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
       for (auto dim : reverse(argType.getShape())) {

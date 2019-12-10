@@ -143,6 +143,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
     conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());
     conversionPassManager.addPass(createIndexComputationPass());
     conversionPassManager.addPass(createIREEToSPIRVPass());
+    conversionPassManager.addPass(createAdjustIntegerWidthPass());
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";
     }

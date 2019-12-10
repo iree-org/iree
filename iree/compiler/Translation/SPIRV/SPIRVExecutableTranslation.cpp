@@ -206,6 +206,7 @@ std::vector<uint32_t> SPIRVTranslator::translateAndSerializeShaderModule(
   spirvGenPasses->addPass(xla_hlo::createLegalizeToStdPass());
   spirvGenPasses->addPass(createIndexComputationPass());
   spirvGenPasses->addPass(createIREEToSPIRVPass());
+  spirvGenPasses->addPass(createAdjustIntegerWidthPass());
   if (failed(runPassPipeline(options(), spirvGenPasses.get(), module))) {
     executableOp.emitError() << "Failed to generate spv.module";
     return {};

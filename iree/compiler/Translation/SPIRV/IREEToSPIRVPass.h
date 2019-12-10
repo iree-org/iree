@@ -32,6 +32,11 @@ std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass();
 // Performs analysis to compute affine maps that represent the index of the
 // elements of tensor values needed within a workitem.
 std::unique_ptr<OpPassBase<FuncOp>> createIndexComputationPass();
+
+// Legalizes integer width from i1 and i64 types to i8 and i32 types
+// respectively.
+std::unique_ptr<Pass> createAdjustIntegerWidthPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

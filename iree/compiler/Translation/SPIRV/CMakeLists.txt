@@ -31,6 +31,7 @@ iree_cc_library(
     "XLAIndexPropagation.h"
     "XLAToSPIRV.h"
   SRCS
+    "AdjustIntegerWidthPass.cpp"
     "EmbeddedKernels.cpp"
     "IndexComputation.cpp"
     "IndexComputationAttribute.cpp"
