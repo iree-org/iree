@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRIR
     MLIRStandardOps
     MLIRSupport
+    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )
