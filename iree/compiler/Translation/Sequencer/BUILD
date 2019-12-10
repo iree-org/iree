@@ -22,7 +22,6 @@ cc_library(
     srcs = ["SequencerModuleTranslation.cpp"],
     hdrs = ["SequencerModuleTranslation.h"],
     deps = [
-        "//integrations/tensorflow/compiler:tensorflow",
         "//iree/base:status",
         "//iree/compiler/IR",
         "//iree/compiler/IR/Sequencer",

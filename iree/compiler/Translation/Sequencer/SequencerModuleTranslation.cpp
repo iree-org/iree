@@ -22,7 +22,6 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
-#include "integrations/tensorflow/compiler/Passes.h"
 #include "iree/base/status.h"
 #include "iree/compiler/IR/ConfigOps.h"
 #include "iree/compiler/IR/Sequencer/OpWriters.h"
@@ -212,48 +211,10 @@ class SequencerTranslator {
                                 VMModuleBuilder *moduleBuilder);
   LogicalResult defineFunction(FuncOp function, VMModuleBuilder *moduleBuilder);
 
-  // Optional pass pipelines.
-  LogicalResult runTensorFlowImportPasses(ModuleOp module);
-
   ModuleTranslationOptions options_;
 };
 
-#if defined(IREE_COMPILER_TENSORFLOW_ENABLED)
-// Builds a pass pipeline that imports a module imported from TensorFlow
-// (that has already been legalized to XLA HLO ops).
-// NOTE: We will likely pull in more of the XLA legalization over time as the
-// dependency story is worked out.
-void buildTensorFlowImportPassPipeline(PassManager *passManager) {
-  passManager->addPass(createTFSavedModelAdoptExportsPass());
-}
-
-LogicalResult SequencerTranslator::runTensorFlowImportPasses(ModuleOp module) {
-  if (!module.getAttr("tf_saved_model.semantics")) {
-    // Not a TensorFlow module. Do nothing.
-    return success();
-  }
-
-  // Run passes to import from TensorFlow.
-  auto tensorflowPasses = createPassManager(module.getContext(), options());
-  buildTensorFlowImportPassPipeline(tensorflowPasses.get());
-  if (failed(runPassPipeline(options(), tensorflowPasses.get(), module))) {
-    module.emitError() << "Failed to run TensorFlow import passes";
-    return failure();
-  }
-  return success();
-}
-#else
-LogicalResult SequencerTranslator::runTensorFlowImportPasses(ModuleOp module) {
-  // NO-OP
-  return success();
-}
-#endif
-
 std::vector<uint8_t> SequencerTranslator::translateModule(ModuleOp module) {
-  if (failed(runTensorFlowImportPasses(module))) {
-    return {};
-  }
-
   // Run one large set of passes to get to a partitioned module.
   auto partitioningPasses = createPassManager(module.getContext(), options());
   buildLegalizeInputPassPipeline(partitioningPasses.get());

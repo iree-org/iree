@@ -50,6 +50,9 @@ if HAS_TENSORFLOW:
 
       # Now that the IR is starting to look nice, optimize global tensors.
       "tf-saved-model-optimize-global-tensors",
+
+      # Adopt saved_model exports into IREE.
+      "iree-tf-saved-model-adopt-exports",
   )
 
   def tf_load_saved_model(
