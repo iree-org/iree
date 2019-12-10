@@ -26,12 +26,12 @@ module {
     // CHECK: spv.selection
     // CHECK-DAG: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK-DAG: [[ZERO1:%.*]] = spv.constant 0 : i32
-    // CHECK-DAG: [[STRIDE0:%.*]] = spv.constant 42 : i32
+    // CHECK-DAG: [[STRIDE0:%.*]] = spv.constant 2 : i32
     // CHECK-DAG: [[L1:%.*]] = spv.IMul [[GLOBALIDY]], [[STRIDE0]] : i32
-    // CHECK-DAG: [[L2:%.*]] = spv.IAdd [[L1]], [[GLOBALIDX]] : i32
     // CHECK-DAG: [[STRIDE2:%.*]] = spv.constant 21 : i32
-    // CHECK-DAG: [[INDEX0:%.*]] = spv.SDiv [[L2]], [[STRIDE2]] : i32
-    // CHECK-DAG: [[INDEX1:%.*]] = spv.SMod [[L2]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[L2:%.*]] = spv.SDiv [[GLOBALIDX]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[INDEX0:%.*]] = spv.IAdd [[L1]], [[L2]] : i32
+    // CHECK-DAG: [[INDEX1:%.*]] = spv.SMod [[GLOBALIDX]], [[STRIDE2]] : i32
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO1]], [[INDEX0]], [[INDEX1]]{{\]}}
     %0 = iree.load_input(%arg0 : memref<24x21xi32>) : tensor<24x21xi32>
     %1 = "xla_hlo.reshape"(%0) : (tensor<24x21xi32>) -> tensor<12x42xi32>
@@ -49,8 +49,8 @@ module {
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: spv.selection
     // CHECK-DAG: [[STRIDE1:%.*]] = spv.constant 126 : i32
-    // CHECK-DAG: [[I0:%.*]] = spv.SDiv [[L1:%.*]], [[STRIDE2]] : i32
-    // CHECK-DAG: [[I1:%.*]] = spv.SMod [[L1]], [[STRIDE2]] : i32
+    // CHECK-DAG: [[I0:%.*]] = spv.SDiv [[L1:%.*]], [[STRIDE1]] : i32
+    // CHECK-DAG: [[I1:%.*]] = spv.SMod [[L1]], [[STRIDE1]] : i32
     // CHECK-DAG: [[STRIDE2:%.*]] = spv.constant 21 : i32
     // CHECK-DAG: [[I2:%.*]] = spv.SDiv [[I1]], [[STRIDE2]] : i32
     // CHECK-DAG: [[I3:%.*]] = spv.SMod [[I1]], [[STRIDE2]] : i32
@@ -79,15 +79,14 @@ module {
     // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK-DAG: [[ZERO:%.*]] = spv.constant 0 : i32
     // CHECK-DAG: [[FORTYTWO:%.*]] = spv.constant 42 : i32
-    // CHECK-DAG: [[I1:%.*]] = spv.IMul [[GLOBALIDY]], [[FORTYTWO]] : i32
-    // CHECK-DAG: [[I2:%.*]] = spv.IAdd [[I1]], [[GLOBALIDX]] : i32
-    // CHECK-DAG: [[I3:%.*]] = spv.SDiv [[I2]], [[FORTYTWO]] : i32
-    // CHECK-DAG: [[I4:%.*]] = spv.IMul [[I3]], [[FORTYTWO]] : i32
-    // CHECK-DAG: [[I5:%.*]] = spv.SMod [[I2]], [[FORTYTWO]] : i32
+    // CHECK-DAG: [[I1:%.*]] = spv.SDiv [[GLOBALIDX]], [[FORTYTWO]] : i32
+    // CHECK-DAG: [[I2:%.*]] = spv.IAdd [[GLOBALIDY]], [[I1]] : i32
+    // CHECK-DAG: [[I3:%.*]] = spv.IMul [[I2]], [[FORTYTWO]] : i32
+    // CHECK-DAG: [[I5:%.*]] = spv.SMod [[GLOBALIDX]], [[FORTYTWO]] : i32
     // CHECK: [[SEVEN:%.*]] = spv.constant 7 : i32
     // CHECK-DAG: [[I6:%.*]] = spv.SDiv [[I5]], [[SEVEN]] : i32
     // CHECK-DAG: [[I7:%.*]] = spv.IMul [[I6]], [[SEVEN]] : i32
-    // CHECK-DAG: [[I8:%.*]] = spv.IAdd [[I4]], [[I7]] : i32
+    // CHECK-DAG: [[I8:%.*]] = spv.IAdd [[I3]], [[I7]] : i32
     // CHECK-DAG: [[I9:%.*]] = spv.SMod [[I5]], [[SEVEN]] : i32
     // CHECK-DAG: [[I10:%.*]] = spv.IAdd [[I8]], [[I9]] : i32
     // CHECK: [[TWENTYONE:%.*]] = spv.constant 21 : i32
@@ -96,7 +95,7 @@ module {
     // CHECK: {{%.*}} = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO]], [[I11]], [[I12]]
     // CHECK-DAG: [[ARG1PTR:%.*]] = spv._address_of [[ARG1VAR]]
     // CHECK-DAG: [[ZERO2:%.*]] = spv.constant 0 : i32
-    // CHECK: {{%.*}} = spv.AccessChain [[ARG1PTR]]{{\[}}[[ZERO2]], [[I3]], [[I6]], [[I9]]{{\]}}
+    // CHECK: {{%.*}} = spv.AccessChain [[ARG1PTR]]{{\[}}[[ZERO2]], [[I2]], [[I6]], [[I9]]{{\]}}
     %0 = iree.load_input(%arg0 : memref<24x21xi32>) : tensor<24x21xi32>
     %1 = "xla_hlo.reshape"(%0) : (tensor<24x21xi32>) -> tensor<12x6x7xi32>
     iree.store_output(%1 : tensor<12x6x7xi32>, %arg1 : memref<12x6x7xi32>)

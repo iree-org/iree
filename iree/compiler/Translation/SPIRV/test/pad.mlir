@@ -111,10 +111,10 @@ module {
     // CHECK: spv.selection
     // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK: [[ZERO1:%.*]] = spv.constant 0 : i32
-    // CHECK: [[LOWER_PAD0:%.*]] = spv.constant -4 : i32
-    // CHECK: [[SUB_PAD0:%.*]] = spv.IAdd [[GLOBALIDY]], [[LOWER_PAD0]] : i32
     // CHECK: [[INTERIOR0:%.*]] = spv.constant 2 : i32
-    // CHECK: [[INDEX0:%.*]] = spv.SDiv [[SUB_PAD0]], [[INTERIOR0]] : i32
+    // CHECK: [[SUB_PAD0:%.*]] = spv.SDiv [[GLOBALIDY]], [[INTERIOR0]] : i32
+    // CHECK: [[LOWER_PAD0:%.*]] = spv.constant -2 : i32
+    // CHECK: [[INDEX0:%.*]] = spv.IAdd [[SUB_PAD0]], [[LOWER_PAD0]] : i32
     // CHECK: [[LOWER_PAD1:%.*]] = spv.constant -5 : i32
     // CHECK: [[SUB_PAD1:%.*]] = spv.IAdd [[GLOBALIDX]], [[LOWER_PAD1]] : i32
     // CHECK: [[INTERIOR1:%.*]] = spv.constant 3 : i32
