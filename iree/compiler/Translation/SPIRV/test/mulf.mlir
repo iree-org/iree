@@ -15,10 +15,10 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
 module {
-  // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
-  // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
-  // CHECK: spv.globalVariable [[ARG2VAR:@.*]] bind(0, 2)
+  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
+  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
+  // CHECK-DAG: spv.globalVariable [[ARG2VAR:@.*]] bind(0, 2)
   func @mul_1D(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xf32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]

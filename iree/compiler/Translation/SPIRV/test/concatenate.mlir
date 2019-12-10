@@ -15,9 +15,9 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
 module {
-  // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
-  // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
+  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
+  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   func @concatenate(%arg0: memref<1x64xf32>, %arg1 : memref<1x10xf32>, %arg2 : memref<1x74xf32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[1, 74]> : tensor<2xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]

@@ -19,9 +19,9 @@ module {
   // VAR3 = (x mod 3) + 1
   // VAR0 = (x / 3)
   // VAR2 = (X mod 3)
-  // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
-  // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
+  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
+  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   func @slice_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)
   attributes {iree.executable.export, iree.executable.workload = dense<[6, 1]> : tensor<2xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]
@@ -58,9 +58,9 @@ module {
   // VAR4 = (x mod 3) * 2 + 1
   // VAR0 = (x / 3)
   // VAR2 = (x mod 3)
-  // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
-  // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
+  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
+  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   func @slice_non_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)
   attributes {iree.executable.export, iree.executable.workload = dense<[6, 1]> : tensor<2xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]

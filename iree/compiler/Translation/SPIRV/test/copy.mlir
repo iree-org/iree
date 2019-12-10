@@ -16,9 +16,9 @@
 
 module {
   // CHECK:spv.module "Logical" "GLSL450"
-  // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0) : !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
-  // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1) : !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
+  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0) : !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
+  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1) : !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
   // CHECK: func [[FN:@simple_load_store]]()
   func @simple_load_store(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {

@@ -30,11 +30,9 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-
 class IREEToSPIRVPass : public ModulePass<IREEToSPIRVPass> {
   void runOnModule() override;
 };
-
 }  // namespace
 
 void IREEToSPIRVPass::runOnModule() {
@@ -97,17 +95,9 @@ void IREEToSPIRVPass::runOnModule() {
 
   // Create a spirv.module Op.
   auto spvModule = builder.create<spirv::ModuleOp>(
-      module.getLoc(),
-      builder.getI32IntegerAttr(
-          static_cast<int32_t>(spirv::AddressingModel::Logical)),
-      builder.getI32IntegerAttr(
-          static_cast<int32_t>(spirv::MemoryModel::GLSL450)));
-  SmallVector<StringRef, 2> caps;
-  caps.push_back(spirv::stringifyCapability(spirv::Capability::Shader));
-  spvModule.setAttr("capabilities", builder.getStrArrayAttr(caps));
-  SmallVector<StringRef, 2> exts;
-  exts.push_back("SPV_KHR_storage_buffer_storage_class");
-  spvModule.setAttr("extensions", builder.getStrArrayAttr(exts));
+      module.getLoc(), spirv::AddressingModel::Logical,
+      spirv::MemoryModel::GLSL450, spirv::Capability::Shader,
+      spirv::Extension::SPV_KHR_storage_buffer_storage_class);
 
   for (auto funcOp : module.getOps<FuncOp>()) {
     // TODO(ravishankarm): FuncOps in executable that are not dispatch functions
@@ -127,6 +117,5 @@ std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass() {
 static PassRegistration<IREEToSPIRVPass> pass(
     "convert-iree-to-spirv",
     "Convert IREE dispatch functions to SPIR-V dialect");
-
 }  // namespace iree_compiler
 }  // namespace mlir

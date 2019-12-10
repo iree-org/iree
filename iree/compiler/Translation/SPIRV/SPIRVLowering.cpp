@@ -23,6 +23,335 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// SPIR-V codegen implementation
+//===----------------------------------------------------------------------===//
+
+Value *genPointerOffset(OpBuilder &builder, Location loc,
+                        TensorIndexToScalarValueMap &valueCache,
+                        AffineMap indexMap, spirv::GlobalVariableOp var) {
+  auto basePtr = builder.create<spirv::AddressOfOp>(loc, var);
+  auto varPtrType = var.type().cast<spirv::PointerType>().getPointeeType();
+  // The variable has to be a struct type with a single element.
+  assert(varPtrType.isa<spirv::StructType>() &&
+         "expected variable type to be a spv.ptr<spv.struct<...>>");
+  auto varStructType = varPtrType.cast<spirv::StructType>();
+  assert(varStructType.getNumElements() == 1 &&
+         "expected variable type to be a spv.ptr of spv.struct with a single "
+         "element");
+  auto varType = varStructType.getElementType(0);
+
+  SmallVector<Value *, 2> accessIndices;
+  /// For scalar values, the index-map computed with already map to the 0-th
+  /// element. For arrays, they map to the position accessed. So just for arrays
+  /// we need to add an extra 0 to index into the struct.
+  auto i32Type = builder.getIntegerType(32);
+  if (varType.isa<spirv::ArrayType>()) {
+    auto zero = builder.create<spirv::ConstantOp>(loc, i32Type,
+                                                  builder.getI32IntegerAttr(0));
+    accessIndices.push_back(zero);
+  }
+  for (auto indexExpr : indexMap.getResults()) {
+    accessIndices.push_back(valueCache.getAffineExprValue(
+        builder.saveInsertionPoint(), loc, indexExpr));
+  }
+  return builder.create<spirv::AccessChainOp>(loc, basePtr, accessIndices);
+}
+
+/// Returns the type of the global variable to use for an argument of the
+/// dispatch function.
+static spirv::PointerType convertArgTypeToVariableType(Location loc,
+                                                       MemRefType argType) {
+  auto elementType = argType.getElementType();
+  if (!elementType.isIntOrFloat()) {
+    emitError(loc, "unhandled element type ")
+        << elementType << " while lowering to SPIR-V";
+    return nullptr;
+  }
+  if (!argType.hasStaticShape()) {
+    // TODO(ravishankarm): Handle dynamic shapes.
+    emitError(loc, "unhandled dynamic shape of argument");
+    return nullptr;
+  }
+  int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
+  for (auto dim : reverse(argType.getShape())) {
+    if (dim <= 0) {
+      emitError(loc, "expected tensor dimensions to be non-zero");
+      return nullptr;
+    }
+    elementType = spirv::ArrayType::get(
+        elementType, dim, static_cast<spirv::ArrayType::LayoutInfo>(stride));
+    stride *= dim;
+  }
+  return spirv::PointerType::get(
+      spirv::StructType::get(elementType,
+                             static_cast<spirv::StructType::LayoutInfo>(0)),
+      spirv::StorageClass::StorageBuffer);
+}
+
+/// Returns a spirv::GlobalVariable op for a give argument of type `argType` and
+/// argument idnex `argIndex`.
+static spirv::GlobalVariableOp createGlobalVariableForArg(Location loc,
+                                                          OpBuilder &builder,
+                                                          unsigned argIndex,
+                                                          Type argType,
+                                                          StringRef varName) {
+  auto argMemrefType = argType.dyn_cast<MemRefType>();
+  if (!argMemrefType) {
+    emitError(loc, "unhandled non-memref type argument in SPIR-V lowering");
+    return nullptr;
+  }
+  auto varType = convertArgTypeToVariableType(loc, argMemrefType);
+  if (!varType) {
+    return nullptr;
+  }
+  auto var = builder.create<spirv::GlobalVariableOp>(loc, varType, varName, 0,
+                                                     argIndex);
+  return var;
+}
+
+static spirv::GlobalVariableOp createGlobalInvocationID(OpBuilder &builder,
+                                                        Location loc) {
+  auto i32Type = builder.getIntegerType(32);
+  auto idType = VectorType::get(3, i32Type);
+  auto ptrIdType = spirv::PointerType::get(idType, spirv::StorageClass::Input);
+  return builder.create<spirv::GlobalVariableOp>(
+      loc, ptrIdType, "globalInvocationID", spirv::BuiltIn::GlobalInvocationId);
+}
+
+namespace detail {
+LogicalResult SPIRVCodegenImpl::createEntryFn(
+    OpBuilder &builder, FuncOp &fn, TensorIndexToScalarValueMap &valueCache) {
+  auto loc = fn.getLoc();
+
+  // Convert functions arguments and return values to
+  // spirv::GlobalVariables. All global variables are given a descriptor set
+  // of 0 and binding is the argument number.
+  auto fnType = fn.getType();
+  for (auto argType : enumerate(fnType.getInputs())) {
+    auto &var = inputArgToVariable[fn.getArgument(argType.index())];
+    auto varName =
+        fn.getName().str() + "_arg_" + std::to_string(argType.index());
+    var = createGlobalVariableForArg(loc, builder, argType.index(),
+                                     argType.value(), varName);
+    if (!var) {
+      return failure();
+    }
+  }
+  resultIndexToVariable.resize(fnType.getNumResults());
+  for (auto resType : enumerate(fnType.getResults())) {
+    auto &var = resultIndexToVariable[resType.index()];
+    auto varName =
+        fn.getName().str() + "_result_" + std::to_string(resType.index());
+    var = createGlobalVariableForArg(loc, builder,
+                                     resType.index() + fnType.getNumInputs(),
+                                     resType.value(), varName);
+    if (!var) {
+      return failure();
+    }
+  }
+
+  // Create the Global invocation ID.
+  auto globalInvocationID = createGlobalInvocationID(builder, fn.getLoc());
+  interface.push_back(builder.getSymbolRefAttr(globalInvocationID.sym_name()));
+
+  auto entryFnType =
+      builder.getFunctionType(ArrayRef<Type>(), ArrayRef<Type>());
+  auto entryFn = builder.create<FuncOp>(loc, fn.getName(), entryFnType,
+                                        ArrayRef<NamedAttribute>());
+
+  // Start a scope to create an insertion guard to reset the builder once the
+  // function is lowered.
+  {
+    assert(globalInvocationIDs.empty());
+    OpBuilder::InsertionGuard funcInsertGuard(builder);
+    builder.setInsertionPointToStart(entryFn.addEntryBlock());
+
+    auto globalInvocationIDPtr =
+        builder.create<spirv::AddressOfOp>(loc, globalInvocationID);
+    auto id = builder.create<spirv::LoadOp>(loc, globalInvocationIDPtr, nullptr,
+                                            nullptr);
+
+    auto id_x = builder.create<spirv::CompositeExtractOp>(loc, id, 0);
+    globalInvocationIDs.push_back(id_x);
+    auto id_y = builder.create<spirv::CompositeExtractOp>(loc, id, 1);
+    globalInvocationIDs.push_back(id_y);
+    auto id_z = builder.create<spirv::CompositeExtractOp>(loc, id, 2);
+    globalInvocationIDs.push_back(id_z);
+
+    for (auto id : enumerate(globalInvocationIDs)) {
+      valueCache.setDimValue(id.index(), id.value());
+    }
+
+    if (failed(lowerFunction(builder, fn, entryFn, valueCache))) {
+      return failure();
+    }
+  }
+
+  // Create the entry point instructions for the entry function.
+  if (failed(createEntryPoint(fn, builder, loc, entryFn))) {
+    return failure();
+  }
+  return success();
+}
+
+LogicalResult SPIRVCodegenImpl::createEntryPoint(FuncOp fn, OpBuilder &builder,
+                                                 Location loc, FuncOp entryFn) {
+  builder.create<spirv::EntryPointOp>(loc, spirv::ExecutionModel::GLCompute,
+                                      entryFn, interface);
+
+  // Get the workgroup size.
+  SmallVector<int32_t, 3> workGroupSize;
+  if (failed(getWorkGroupSize(fn, workGroupSize))) {
+    return failure();
+  }
+  builder.create<spirv::ExecutionModeOp>(
+      loc, entryFn, spirv::ExecutionMode::LocalSize, workGroupSize);
+  interface.clear();
+  return success();
+}
+
+LogicalResult SPIRVCodegenImpl::createLaunchGuard(OpBuilder &builder,
+                                                  FuncOp fn) {
+  // First check that the global invocation id is in bounds.
+  SmallVector<int64_t, 3> launchSize;
+  if (failed(getLaunchSize(fn, launchSize))) {
+    return failure();
+  }
+  auto loc = fn.getLoc();
+  auto i1Type = builder.getI1Type();
+  auto i32Type = builder.getIntegerType(32);
+  Value *condn = spirv::ConstantOp::getOne(i1Type, loc, &builder);
+  for (auto launchDim : enumerate(launchSize)) {
+    if (launchDim.value() == 1) {
+      continue;
+    }
+    Value *id = getGlobalInvocationID(launchDim.index());
+    auto extent = builder.create<spirv::ConstantOp>(
+        loc, i32Type, builder.getI32IntegerAttr(launchDim.value()));
+    auto check = builder.create<spirv::SLessThanOp>(loc, i1Type, id, extent);
+    condn = builder.create<spirv::LogicalAndOp>(loc, i1Type, condn, check);
+  }
+  auto selectionOp =
+      builder.create<spirv::SelectionOp>(loc, spirv::SelectionControl::None);
+  selectionOp.addMergeBlock();
+
+  // Create the header block and then blocks.
+  auto headerBlock = builder.createBlock(&selectionOp.body(),
+                                         std::prev(selectionOp.body().end()));
+  auto thenBlock = builder.createBlock(&selectionOp.body(),
+                                       std::prev(selectionOp.body().end()));
+
+  // Add branch to the header block.
+  builder.setInsertionPointToEnd(headerBlock);
+  builder.create<spirv::BranchConditionalOp>(
+      loc, condn, thenBlock, ArrayRef<Value *>(), selectionOp.getMergeBlock(),
+      ArrayRef<Value *>());
+
+  // Add branch to merge block in the then block.
+  builder.setInsertionPointToEnd(thenBlock);
+  auto branchOp =
+      builder.create<spirv::BranchOp>(loc, selectionOp.getMergeBlock());
+  builder.setInsertionPoint(branchOp);
+  return success();
+}
+
+Value *SPIRVCodegenImpl::getGlobalInvocationID(unsigned dim) {
+  if (dim < globalInvocationIDs.size()) {
+    return globalInvocationIDs[dim];
+  }
+  return nullptr;
+}
+
+LogicalResult SPIRVCodegenImpl::initArgValues(
+    OpBuilder &builder, Location loc, TensorIndexToScalarValueMap &valueCache,
+    Value *origArg) {
+  SmallVector<AffineMap, 4> indices;
+  index_computation_attribute::getIndexMapsForValue(origArg, indices);
+  for (auto indexMap : indices) {
+    if (!loadArgValueAtIndex(builder, loc, valueCache, origArg, indexMap)) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+LogicalResult SPIRVCodegenImpl::initSymbolValues(
+    OpBuilder &builder, Location loc, TensorIndexToScalarValueMap &valueCache,
+    Value *origArg) {
+  // Add values corresponding to the symbol numbers.
+  SmallVector<std::pair<AffineMap, unsigned>, 2> symbolInfo;
+  index_computation_attribute::getSymbolNumberForTensorIndex(
+      cast<BlockArgument>(origArg), symbolInfo);
+  for (auto element : symbolInfo) {
+    // Load the value at the index.
+    auto val =
+        loadArgValueAtIndex(builder, loc, valueCache, origArg, element.first);
+    if (!val) {
+      return failure();
+    }
+    valueCache.setSymbolValue(element.second, val);
+  }
+  return success();
+}
+
+Value *SPIRVCodegenImpl::loadArgValueAtIndex(
+    OpBuilder &builder, Location loc, TensorIndexToScalarValueMap &valueCache,
+    Value *origArg, AffineMap indexMap) {
+  Value *val = valueCache.getValueAtIndex(origArg, indexMap);
+  if (val) {
+    return val;
+  }
+  auto var = inputArgToVariable.lookup(origArg);
+  if (!var) {
+    emitError(loc, "undefined SPIR-V global variable for tensor argument");
+    return nullptr;
+  }
+  auto ptr = genPointerOffset(builder, loc, valueCache, indexMap, var);
+  val = builder.create<spirv::LoadOp>(loc, ptr,
+                                      /*memory_access =*/nullptr,
+                                      /*alignment = */ nullptr);
+  valueCache.setValueAtIndex(origArg, indexMap, val);
+  return val;
+}
+
+LogicalResult SPIRVCodegenImpl::lowerFunction(
+    OpBuilder &builder, FuncOp fn, FuncOp entryFn,
+    TensorIndexToScalarValueMap &valueCache) {
+  if (failed(createLaunchGuard(builder, fn))) {
+    return failure();
+  }
+
+  for (auto arg : fn.getArguments()) {
+    // Load values of the argument at all indices needed for computation
+    // within the dispatch function.
+    if (failed(initSymbolValues(builder, fn.getLoc(), valueCache, arg))) {
+      return failure();
+    }
+  }
+
+  for (auto arg : fn.getArguments()) {
+    // Load values of the argument at all indices needed for computation
+    // within the dispatch function.
+    if (failed(initArgValues(builder, fn.getLoc(), valueCache, arg))) {
+      return failure();
+    }
+  }
+
+  for (auto &block : fn) {
+    for (auto &op : block) {
+      // Lower individual operations.
+      if (failed(lowerOperation(builder, valueCache, &op))) {
+        return failure();
+      }
+    }
+  }
+  builder.setInsertionPointToEnd(&(entryFn.getBody().back()));
+  builder.create<spirv::ReturnOp>(fn.getLoc());
+  return success();
+}
+}  // namespace detail
+
+//===----------------------------------------------------------------------===//
 // ConstantOp
 //===----------------------------------------------------------------------===//
 LogicalResult ConstantOpSPIRVLowering::lowerOperation(

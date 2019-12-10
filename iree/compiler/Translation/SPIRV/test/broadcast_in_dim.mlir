@@ -16,9 +16,9 @@
 
 module {
   // CHECK:spv.module "Logical" "GLSL450"
-  // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
-  // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
+  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
+  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   // CHECK: func [[FN:@broadcast_in_dim_2D_3D]]()
   func @broadcast_in_dim_2D_3D(%arg0: memref<12x42xi32>, %arg1: memref<3x12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 3]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
@@ -47,9 +47,9 @@ module {
 
 module {
   // CHECK:spv.module "Logical" "GLSL450"
-  // CHECK: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-  // CHECK: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
+  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   // CHECK: func [[FN:@broadcast_in_dim_scalar_3D]]()
   func @broadcast_in_dim_scalar_3D(%arg0: memref<i32>, %arg1: memref<3x12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 3]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
