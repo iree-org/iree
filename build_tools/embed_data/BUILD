@@ -44,11 +44,23 @@ cc_embed_data(
     h_file_output = "testembed1.h",
 )
 
+cc_embed_data(
+    name = "testembed2",
+    srcs = [
+        "data/file3.txt",
+    ],
+    cc_file_output = "testembed2.cc",
+    cpp_namespace = "foobar",
+    flatten = True,
+    h_file_output = "testembed2.h",
+)
+
 cc_test(
-    name = "testembed1_test",
-    srcs = ["testembed1_test.cc"],
+    name = "cc_embed_data_test",
+    srcs = ["cc_embed_data_test.cc"],
     deps = [
         ":testembed1",
+        ":testembed2",
         "//iree/testing:gtest_main",
     ],
 )

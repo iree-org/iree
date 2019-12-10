@@ -13,31 +13,39 @@
 // limitations under the License.
 
 #include "build_tools/embed_data/testembed1.h"
-
+#include "build_tools/embed_data/testembed2.h"
 #include "iree/testing/gtest.h"
 
 namespace {
 
 TEST(Generator, TestContents) {
-  auto* toc = ::foobar::testembed1_create();
-  ASSERT_EQ("file1.txt", std::string(toc->name));
+  auto* toc1 = ::foobar::testembed1_create();
+  ASSERT_EQ("file1.txt", std::string(toc1->name));
   ASSERT_EQ(R"(Are you '"Still"' here?)"
             "\n",
-            std::string(toc->data));
-  ASSERT_EQ(24, toc->size);
-  ASSERT_EQ(0, *(toc->data + toc->size));
+            std::string(toc1->data));
+  ASSERT_EQ(24, toc1->size);
+  ASSERT_EQ(0, *(toc1->data + toc1->size));
 
-  ++toc;
-  ASSERT_EQ("file2.txt", std::string(toc->name));
+  ++toc1;
+  ASSERT_EQ("file2.txt", std::string(toc1->name));
   ASSERT_EQ(R"(¯\_(ツ)_/¯)"
             "\n",
-            std::string(toc->data));
-  ASSERT_EQ(14, toc->size);
-  ASSERT_EQ(0, *(toc->data + toc->size));
+            std::string(toc1->data));
+  ASSERT_EQ(14, toc1->size);
+  ASSERT_EQ(0, *(toc1->data + toc1->size));
 
-  ++toc;
-  ASSERT_EQ(nullptr, toc->name);
-  ASSERT_EQ(nullptr, toc->data);
+  ++toc1;
+  ASSERT_EQ(nullptr, toc1->name);
+  ASSERT_EQ(nullptr, toc1->data);
+
+  auto* toc2 = ::foobar::testembed2_create();
+  ASSERT_EQ("file3.txt", std::string(toc2->name));
+  ASSERT_EQ(R"(ᕕ( ᐛ )ᕗ)"
+            "\n",
+            std::string(toc2->data));
+  ASSERT_EQ(14, toc2->size);
+  ASSERT_EQ(0, *(toc2->data + toc2->size));
 }
 
 }  // namespace

@@ -55,11 +55,16 @@ void GenerateNamespaceClose(std::ofstream& f) {
 }
 
 void GenerateTocStruct(std::ofstream& f) {
+  f << "#ifndef IREE_FILE_TOC\n";
+  f << "#define IREE_FILE_TOC\n";
+  f << "namespace iree {\n";
   f << "struct FileToc {\n";
   f << "  const char* name;             // the file's original name\n";
   f << "  const char* data;             // beginning of the file\n";
   f << "  std::size_t size;             // length of the file\n";
   f << "};\n";
+  f << "}  // namespace iree\n";
+  f << "#endif  // IREE_FILE_TOC\n";
 }
 
 bool GenerateHeader(const std::string& header_file,
@@ -67,10 +72,10 @@ bool GenerateHeader(const std::string& header_file,
   std::ofstream f(header_file, std::ios::out | std::ios::trunc);
   f << "#pragma once\n";  // Pragma once isn't great but is the best we can do.
   f << "#include <cstddef>\n";
-  GenerateNamespaceOpen(f);
   GenerateTocStruct(f);
-  f << "extern const struct FileToc* " << absl::GetFlag(FLAGS_identifier)
-    << "_create();\n";
+  GenerateNamespaceOpen(f);
+  f << "extern const struct ::iree::FileToc* "
+    << absl::GetFlag(FLAGS_identifier) << "_create();\n";
   f << "static std::size_t " << absl::GetFlag(FLAGS_identifier)
     << "_size() { \n";
   f << "  return " << toc_files.size() << ";\n";
@@ -106,9 +111,9 @@ bool GenerateImpl(const std::string& impl_file,
                   const std::vector<std::string>& toc_files) {
   std::ofstream f(impl_file, std::ios::out | std::ios::trunc);
   f << "#include <cstddef>\n";
-  GenerateNamespaceOpen(f);
   GenerateTocStruct(f);
-  f << "static const struct FileToc toc[] = {\n";
+  GenerateNamespaceOpen(f);
+  f << "static const struct ::iree::FileToc toc[] = {\n";
   assert(input_files.size() == toc_files.size());
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "  {";
@@ -123,7 +128,7 @@ bool GenerateImpl(const std::string& impl_file,
   }
   f << "  {nullptr, nullptr, 0},\n";
   f << "};\n";
-  f << "const struct FileToc* " << absl::GetFlag(FLAGS_identifier)
+  f << "const struct ::iree::FileToc* " << absl::GetFlag(FLAGS_identifier)
     << "_create() {\n";
   f << "  return &toc[0];\n";
   f << "}\n";
