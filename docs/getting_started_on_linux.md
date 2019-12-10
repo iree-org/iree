@@ -108,7 +108,7 @@ that may be useful. We usually have something like this (make sure to make
 replacements as needed):
 
 ```
-build --disk_cache=/REPLACE/WITH/CACHE/DIR --experimental_guard_against_concurrent_changes
+build --disk_cache=/REPLACE/WITH/CACHE/DIR
 build:debug --compilation_mode=dbg --copt=-O2 --per_file_copt=iree@-O0 --strip=never
 ```
 

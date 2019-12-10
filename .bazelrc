@@ -12,6 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Import configuration for Remote Builds
+import %workspace%/rbe.bazelrc
+
+# Prevent invalid caching if input files are modified during a build.
+build --experimental_guard_against_concurrent_changes
+
 # Required bazel flags for building IREE.
 
 # Disable warnings we don't care about.
