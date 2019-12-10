@@ -23,7 +23,7 @@ cc_test(
 
 iree_bytecode_module(
     name = "bytecode_dispatch_test_module",
-    srcs = ["bytecode_dispatch_test.mlir"],
+    src = "bytecode_dispatch_test.mlir",
     cc_namespace = "iree::vm",
     translation = "-iree-vm-ir-to-bytecode-module",
 )
@@ -67,7 +67,7 @@ cc_test(
 
 iree_bytecode_module(
     name = "bytecode_module_benchmark_module",
-    srcs = ["bytecode_module_benchmark.mlir"],
+    src = "bytecode_module_benchmark.mlir",
     cc_namespace = "iree::vm",
     translation = "-iree-vm-ir-to-bytecode-module",
 )

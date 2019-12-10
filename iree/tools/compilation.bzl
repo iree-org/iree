@@ -19,13 +19,13 @@ load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 # TODO(benvanik): port to a full starlark rule, document, etc.
 def iree_bytecode_module(
         name,
-        srcs,
+        src,
         translation = "-mlir-to-iree-module",
         cc_namespace = None,
         visibility = None):
     native.genrule(
         name = name,
-        srcs = srcs,
+        srcs = [src],
         outs = [
             "%s.emod" % (name),
         ],
@@ -34,7 +34,8 @@ def iree_bytecode_module(
                 "$(location //iree/tools:iree-translate)",
                 translation,
                 "-o $(location %s.emod)" % (name),
-            ] + ["$(locations %s)" % (src) for src in srcs]),
+                "$(location %s)" % (src),
+            ]),
         ]),
         tools = [
             "//iree/tools:iree-translate",

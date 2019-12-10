@@ -24,7 +24,7 @@ package(
 
 iree_bytecode_module(
     name = "simple_module_test_bytecode_module",
-    srcs = ["simple_module_test.mlir"],
+    src = "simple_module_test.mlir",
     cc_namespace = "iree::rt::samples",
 )
 
