@@ -21,6 +21,10 @@ set(TF_MLIR_XLA_COPTS_BASE
   "-I${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/"
 )
 
+# Create directories in the build tree for external_tablegen_library targets to use.
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/ir")
+file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/transforms")
+
 external_cc_library(
   PACKAGE
     tensorflow
@@ -47,6 +51,7 @@ external_cc_library(
     ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/
   DEPS
     absl::core_headers
+    tensorflow_mlir_xla_canonicalize_gen
     tensorflow_mlir_xla_hlo_ops_gen
     tensorflow_mlir_xla_hlo_ops_base_gen
     tensorflow_mlir_xla_legalize_to_standard_patterns_gen
@@ -57,6 +62,21 @@ external_cc_library(
     MLIRPass
     MLIRTransformUtils
   PUBLIC
+)
+
+external_tablegen_library(
+  PACKAGE
+    tensorflow
+  NAME
+    mlir_xla_canonicalize_gen
+  TBLGEN
+    MLIR
+  ROOT
+    ${TF_MLIR_XLA_SRC_ROOT}
+  SRCS
+    "transforms/canonicalize.td"
+  OUTS
+    -gen-rewriters transforms/generated_canonicalize.inc
 )
 
 external_tablegen_library(
