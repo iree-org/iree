@@ -50,8 +50,9 @@ iree_cc_library(
     iree::compiler::Serialization
     iree::compiler::Transforms
     iree::compiler::Transforms::Sequencer
-    # TODO(benvanik): generate filetoc for kernels.
+    # TODO(marbre): Use instead of Kernels target, as soon as build with iree_glsl_cc_library
     #iree::compiler::Translation::SPIRV::Kernels
+    iree_compiler_Translation_SPIRV_Kernels
     iree::compiler::Utils
     iree::schemas
     iree::schemas::spirv_executable_def_cc_fbs

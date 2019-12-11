@@ -23,3 +23,30 @@
 #    "reduce_untiled.comp"
 #   PUBLIC
 # )
+
+add_custom_command(
+  OUTPUT matmul.spv
+  COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/matmul.comp" -o matmul.spv
+  DEPENDS glslangValidator
+)
+
+add_custom_command(
+  OUTPUT reduce_untiled.spv
+  COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/reduce_untiled.comp" -o reduce_untiled.spv
+  DEPENDS glslangValidator
+)
+
+add_custom_command(
+  OUTPUT Kernels.h Kernels.cc
+  COMMAND generate_cc_embed_data matmul.spv reduce_untiled.spv
+          --output_header=Kernels.h
+          --output_impl=Kernels.cc
+          --identifier=Kernels
+          --cpp_namespace=mlir::iree_compiler::spirv_kernels
+          --flatten
+  DEPENDS generate_cc_embed_data
+          matmul.spv
+          reduce_untiled.spv
+)
+
+add_library(iree_compiler_Translation_SPIRV_Kernels STATIC Kernels.cc)

@@ -92,6 +92,7 @@ add_subdirectory(iree/schemas)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
+  add_subdirectory(third_party/glslang EXCLUDE_FROM_ALL)
   add_subdirectory(iree/compiler)
 endif()
 

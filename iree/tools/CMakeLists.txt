@@ -45,8 +45,7 @@ if(${IREE_BUILD_COMPILER})
       ${_ALWAYSLINK_LIBS}
       iree::compiler::Translation::Interpreter
       iree::compiler::Translation::Sequencer
-      # TODO(benvanik): get the SPIR-V translation working.
-      #iree::compiler::Translation::SPIRV
+      iree::compiler::Translation::SPIRV
       MLIRTranslateClParser
   )
 
