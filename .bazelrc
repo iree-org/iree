@@ -12,14 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Import configuration for Remote Builds
-import %workspace%/rbe.bazelrc
-
-# Prevent invalid caching if input files are modified during a build.
-build --experimental_guard_against_concurrent_changes
-
-# Required bazel flags for building IREE.
-
 # Disable warnings we don't care about.
 build --copt=-Wno-unused-local-typedef
 
@@ -39,12 +31,17 @@ build:x86opt --copt=-mavx2
 
 ###############################################################################
 
+# Not strictly required, but generally good flags.
+
+# Prevent invalid caching if input files are modified during a build.
+build --experimental_guard_against_concurrent_changes
+
+###############################################################################
+
 # Configuration for building remotely using Remote Build Execution (RBE)
 # https://cloud.google.com/remote-build-execution/
 # Based on https://github.com/bazelbuild/bazel-toolchains/blob/master/bazelrc/bazel-1.0.0.bazelrc
 # Currently in development only usable by CI.
-
-# Reference to "rbe_default" matches rbe_autoconfig(name="rbe_default") in WORKSPACE
 
 # Depending on how many machines are in the remote execution instance, setting
 # this higher can make builds faster by allowing more jobs to run in parallel.
@@ -54,6 +51,7 @@ build:rbe --jobs=50
 
 # Flags related to specifying the platform, toolchain and java properties.
 # These flags must be adapted to work with toolchain containers other than rbe-ubuntu16-04
+# References to "rbe_default" matches rbe_autoconfig(name="rbe_default") in WORKSPACE
 build:rbe --host_javabase=@rbe_default//java:jdk
 build:rbe --javabase=@rbe_default//java:jdk
 build:rbe --host_java_toolchain=@bazel_tools//tools/jdk:toolchain_hostjdk8
@@ -121,6 +119,7 @@ build:windows --copt=-Wno-macro-redefined
 build:windows --experimental_enable_runfiles
 
 ###############################################################################
+
 # Flags to make tensorflow build.
 # Some of these are also of general use and fine to enable globally for windows.
 build:windows --copt=/arch:AVX
@@ -144,6 +143,7 @@ build:windows --define framework_shared_object=false
 # See: http://clang-developers.42468.n3.nabble.com/Issue-with-Clang-on-Windows-and-compiler-rt-builtins-td4059230.html
 build:windows --linkopt=/DEFAULTLIB:clang_rt.builtins-x86_64.lib
 build:windows --linkopt=/DEFAULTLIB:ws2_32.lib
+
 ###############################################################################
 
 # The user.bazelrc file is not checked in but available for local mods.
