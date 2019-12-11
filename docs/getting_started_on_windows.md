@@ -205,7 +205,7 @@ by git. The recommended contents for Windows are:
 
 ```
 build --config=windows
-build --disk_cache=c:/bazelcache --experimental_guard_against_concurrent_changes
+build --disk_cache=c:/bazelcache
 build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=never
 ```
 
@@ -239,7 +239,7 @@ between different sets of flags (ie. optimized and prod). Add this to your
 user.bazelrc:
 
 ```
-build --disk_cache=c:/bazelcache --experimental_guard_against_concurrent_changes
+build --disk_cache=c:/bazelcache
 ```
 
 ### Debugging

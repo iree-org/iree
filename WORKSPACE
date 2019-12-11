@@ -45,6 +45,24 @@ rules_python_setup()
 
 load("@rules_python//python:repositories.bzl", "py_repositories")
 py_repositories()
+
+###############################################################################
+
+###############################################################################
+# bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).
+http_archive(
+    name = "bazel_toolchains",
+    sha256 = "ca8aa49ceb47e9bee04dd67f0bec0b010032b37ebbe67147b535237e801d9a87",
+    strip_prefix = "bazel-toolchains-1.2.2",
+    urls = [
+        "https://github.com/bazelbuild/bazel-toolchains/releases/download/1.2.2/bazel-toolchains-1.2.2.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/1.2.2.tar.gz",
+    ],
+)
+
+load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
+rbe_autoconfig(name = "rbe_default")
+
 ###############################################################################
 
 ###############################################################################
