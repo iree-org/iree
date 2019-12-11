@@ -12,9 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
-add_subdirectory(Translation)
-add_subdirectory(Utils)
+iree_cc_library(
+  NAME
+    Bytecode
+  HDRS
+    "BytecodeModuleTarget.h"
+  SRCS
+    "BytecodeEncoder.cpp"
+    "BytecodeEncoder.h"
+    "BytecodeModuleTarget.cpp"
+    "ConstantEncoder.cpp"
+    "ConstantEncoder.h"
+    "TranslationRegistration.cpp"
+  DEPS
+    iree::compiler::Dialect
+    iree::compiler::Dialect::VM::Analysis
+    iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VM::Transforms
+    iree::schemas::bytecode_module_def_cc_fbs
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTransforms
+    MLIRTranslation
+  ALWAYSLINK
+  PUBLIC
+)

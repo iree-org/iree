@@ -12,9 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
-add_subdirectory(Translation)
-add_subdirectory(Utils)
+iree_cc_library(
+  NAME
+    Tools
+  SRCS
+    "VMOpEncoderGen.cpp"
+    "VMOpTableGen.cpp"
+  DEPS
+    LLVMSupport
+    LLVMTableGen
+    MLIRSupport
+    LLVMMLIRTableGen
+  ALWAYSLINK
+  PUBLIC
+)

@@ -12,9 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
-add_subdirectory(Translation)
-add_subdirectory(Utils)
+iree_cc_library(
+  NAME
+    StandardToVM
+  HDRS
+    "ConvertStandardToVM.h"
+  SRCS
+    "ConvertStandardToVM.cpp"
+    "ConvertStandardToVMPass.cpp"
+  DEPS
+    iree::compiler::Dialect
+    iree::compiler::Dialect::VM:IR
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransformUtils
+    MLIRTransforms
+  ALWAYSLINK
+  PUBLIC
+)

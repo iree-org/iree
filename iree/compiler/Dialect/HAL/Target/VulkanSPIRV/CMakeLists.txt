@@ -12,9 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
-add_subdirectory(Translation)
-add_subdirectory(Utils)
+iree_cc_library(
+  NAME
+    VulkanSPIRV
+  HDRS
+    "VulkanSPIRVTarget.h"
+  SRCS
+    "VulkanSPIRVTarget.cpp"
+  DEPS
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL:Target::ExecutableTarget
+    iree::compiler::IR
+    iree::compiler::Translation::SPIRV
+    iree::schemas
+    iree::schemas::spirv_executable_def_cc_fbs
+    flatbuffers
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSPIRVDialect
+    MLIRSPIRVSerialization
+    MLIRSupport
+    tensorflow::mlir_xla
+  ALWAYSLINK
+  PUBLIC
+)

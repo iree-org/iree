@@ -12,9 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
-add_subdirectory(Translation)
-add_subdirectory(Utils)
+iree_cc_library(
+  NAME
+    Transforms
+  HDRS
+    "Passes.h"
+  SRCS
+    "Passes.cpp"
+    "TranslateExecutables.cpp"
+  DEPS
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransforms
+  ALWAYSLINK
+  PUBLIC
+)

@@ -12,9 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
-add_subdirectory(Translation)
-add_subdirectory(Utils)
+iree_cc_library(
+  NAME
+    HLOToFlow
+  HDRS
+    "ConvertHLOToFlow.h"
+  SRCS
+    "ConvertHLOToFlow.cpp"
+  DEPS
+    iree::compiler::Dialect
+    iree::compiler::Dialect::Flow::IR
+    MLIRIR
+    MLIRPass
+    MLIRStandardOps
+    MLIRTransforms
+    tensorflow::mlir_xla
+  ALWAYSLINK
+  PUBLIC
+)

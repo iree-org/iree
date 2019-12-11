@@ -63,6 +63,14 @@ flatbuffer_cc_library(
 
 flatbuffer_cc_library(
   NAME
+    bytecode_module_def_cc_fbs
+  SRC
+    "bytecode_module_def.fbs"
+  PUBLIC
+)
+
+flatbuffer_cc_library(
+  NAME
     debug_service_cc_fbs
   SRCS
     "debug_service.fbs"

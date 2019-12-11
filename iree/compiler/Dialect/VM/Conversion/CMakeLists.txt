@@ -12,9 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
-add_subdirectory(Translation)
-add_subdirectory(Utils)
+iree_cc_library(
+  NAME
+    ImportUtils
+  HDRS
+    "ImportUtils.h"
+  SRCS
+    "ImportUtils.cpp"
+  DEPS
+    iree::compiler::Dialect
+    iree::compiler::Dialect::VM:IR
+    MLIRIR
+    MLIRParser
+    MLIRSupport
+    MLIRTransforms
+  ALWAYSLINK
+  PUBLIC
+)
