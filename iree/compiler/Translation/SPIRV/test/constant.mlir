@@ -15,9 +15,6 @@
 // RUN: iree-opt -xla-legalize-to-std -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
 module {
-  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
-  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   func @const_f32(%arg0: memref<2x3xf32>, %arg1: memref<2x3xf32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[2, 3]> : tensor<2xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[NUM0:%.*]] = spv.Load "StorageBuffer" {{%.*}} : f32
@@ -37,9 +34,6 @@ module {
 // -----
 
 module {
-  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
-  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1)
   func @splat_const_f32(%arg0: memref<2x3xf32>, %arg1: memref<2x3xf32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[2, 3]> : tensor<2xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[NUM0:%.*]] = spv.Load "StorageBuffer" {{%.*}} : f32
@@ -56,8 +50,6 @@ module {
 // -----
 
 module {
-  // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
   func @const_i32(%arg0: memref<2x3xi32>, %arg1: memref<2x3xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[2, 3]> : tensor<2xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[NUM0:%.*]] = spv.Load "StorageBuffer" {{%.*}} : i32
@@ -79,7 +71,6 @@ module {
 
 module {
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0)
   func @splat_const_i32(%arg0: memref<2x3xi32>, %arg1: memref<2x3xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[2, 3]> : tensor<2xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[NUM0:%.*]] = spv.Load "StorageBuffer" {{%.*}} : i32

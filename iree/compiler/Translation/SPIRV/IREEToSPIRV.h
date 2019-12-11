@@ -46,9 +46,7 @@ class IREEReturnOpSPIRVLowering final : public SPIRVOpLowering<IREE::ReturnOp> {
 
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder,
-      TensorIndexToScalarValueMap &valueCache,
-      DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
-      ArrayRef<spirv::GlobalVariableOp> outputBuffers) const override;
+      TensorIndexToScalarValueMap &valueCache) const override;
 };
 
 /// Translation of iree.store_output operation.
@@ -59,9 +57,7 @@ class IREEStoreOpSPIRVLowering final
 
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder,
-      TensorIndexToScalarValueMap &valueCache,
-      DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
-      ArrayRef<spirv::GlobalVariableOp> outputBuffers) const override;
+      TensorIndexToScalarValueMap &valueCache) const override;
 };
 
 }  // namespace iree_compiler

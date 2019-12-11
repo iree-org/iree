@@ -36,6 +36,9 @@ class TensorIndexToScalarValueMap {
   explicit TensorIndexToScalarValueMap(MLIRContext *context)
       : affineExprCodegen(context) {}
 
+  /// Returns the buffer associated with an argument in the dispatch function.
+  Value *getBufferForArgument(Value *arg) { return argToBufferMap.lookup(arg); }
+
   /// Returns the value in the lowered function that represents the scalar value
   /// of the `tensor` in the original function at a given `index`
   Value *getValueAtIndex(Value *tensor, AffineMap index) {
@@ -56,6 +59,11 @@ class TensorIndexToScalarValueMap {
   Value *getAffineExprValue(OpBuilder::InsertPoint ip, Location loc,
                             AffineExpr expr) {
     return affineExprCodegen.getExprValue(ip, loc, expr);
+  }
+
+  /// Records the `buffer` to use for an `argument` in the dispatch function.
+  void setBufferForArgument(Value *argument, Value *buffer) {
+    argToBufferMap[argument] = buffer;
   }
 
   /// Records the `scalar` value in the lowered function that represents the
@@ -164,6 +172,7 @@ class TensorIndexToScalarValueMap {
 
   AffineExprCodegen affineExprCodegen;
   DenseMap<Value *, DenseMap<AffineMap, Value *>> tensorIndexToScalarValueMap;
+  DenseMap<Value *, Value *> argToBufferMap;
 };
 
 }  // namespace iree_compiler

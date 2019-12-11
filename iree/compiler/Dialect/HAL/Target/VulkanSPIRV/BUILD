@@ -37,6 +37,7 @@ cc_library(
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:SPIRVDialect",
+        "@local_config_mlir//:SPIRVLowering",
         "@local_config_mlir//:SPIRVSerialization",
         "@local_config_mlir//:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",

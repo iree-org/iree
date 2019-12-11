@@ -30,6 +30,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/IR/Attributes.h"
@@ -206,6 +207,7 @@ std::vector<uint32_t> SPIRVTranslator::translateAndSerializeShaderModule(
   spirvGenPasses->addPass(xla_hlo::createLegalizeToStdPass());
   spirvGenPasses->addPass(createIndexComputationPass());
   spirvGenPasses->addPass(createIREEToSPIRVPass());
+  spirvGenPasses->addPass(spirv::createLowerABIAttributesPass());
   spirvGenPasses->addPass(createAdjustIntegerWidthPass());
   if (failed(runPassPipeline(options(), spirvGenPasses.get(), module))) {
     executableOp.emitError() << "Failed to generate spv.module";

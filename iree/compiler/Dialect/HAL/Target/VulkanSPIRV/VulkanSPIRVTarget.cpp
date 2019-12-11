@@ -26,6 +26,7 @@
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
 #include "mlir/IR/Builders.h"
@@ -143,6 +144,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
     conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());
     conversionPassManager.addPass(createIndexComputationPass());
     conversionPassManager.addPass(createIREEToSPIRVPass());
+    conversionPassManager.addPass(spirv::createLowerABIAttributesPass());
     conversionPassManager.addPass(createAdjustIntegerWidthPass());
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";

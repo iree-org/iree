@@ -55,9 +55,7 @@ class SPIRVLowering {
   /// operations.
   virtual LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder,
-      TensorIndexToScalarValueMap &valueCache,
-      DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
-      ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
+      TensorIndexToScalarValueMap &valueCache) const {
     return failure();
   }
 };
@@ -233,19 +231,7 @@ class SPIRVIndexOpLowering final : public SPIRVOpLowering<OpTy> {
 /// location of a spv.globalVariable.
 Value *genPointerOffset(OpBuilder &builder, Location loc,
                         TensorIndexToScalarValueMap &valueCache,
-                        AffineMap indexMap, spirv::GlobalVariableOp var);
-
-/// Lower return statements during SPIR-V codegeneration.
-class ReturnOpSPIRVLowering : public SPIRVOpLowering<ReturnOp> {
- public:
-  using SPIRVOpLowering<ReturnOp>::SPIRVOpLowering;
-
-  LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder,
-      TensorIndexToScalarValueMap &valueCache,
-      DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
-      ArrayRef<spirv::GlobalVariableOp> outputBuffers) const override;
-};
+                        AffineMap indexMap, Value *buffer);
 
 namespace detail {
 /// Implementation class for generating SPIR-V kernel.
@@ -353,8 +339,7 @@ class SPIRVCodegen : public detail::SPIRVCodegenImpl {
 
     // Zero return case.
     if (!op->getNumResults()) {
-      return opCodegenList[opName]->lowerOperation(
-          op, builder, valueCache, inputArgToVariable, resultIndexToVariable);
+      return opCodegenList[opName]->lowerOperation(op, builder, valueCache);
     }
 
     // Single return case.

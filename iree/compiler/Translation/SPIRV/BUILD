@@ -59,6 +59,7 @@ cc_library(
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:SPIRVDialect",
         "@local_config_mlir//:SPIRVDialectRegistration",
+        "@local_config_mlir//:SPIRVLowering",
         "@local_config_mlir//:SPIRVSerialization",
         "@local_config_mlir//:StandardDialectRegistration",
         "@local_config_mlir//:StandardOps",

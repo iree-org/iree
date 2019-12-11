@@ -17,9 +17,10 @@
 module {
   // CHECK:spv.module "Logical" "GLSL450"
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK-DAG: spv.globalVariable [[ARG0VAR:@.*]] bind(0, 0) : !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
-  // CHECK-DAG: spv.globalVariable [[ARG1VAR:@.*]] bind(0, 1) : !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
-  // CHECK: func [[FN:@simple_load_store]]()
+  // CHECK: func [[FN:@simple_load_store]]
+  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<12 x !spv.array<42 x i32 [4]> [168]> [0]>, StorageBuffer>
+  // CHECK-SAME: spirv.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}
   func @simple_load_store(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>)
   attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]
@@ -36,23 +37,19 @@ module {
     // CHECK: spv.selection {
     // CHECK: spv.BranchConditional [[COND2]], [[BB1:\^.*]], [[BB2:\^.*]]
     // CHECK: [[BB1]]:
-    // CHECK: [[ARG0PTR:%.*]] = spv._address_of [[ARG0VAR]]
     // CHECK: [[ZERO1:%.*]] = spv.constant 0 : i32
-    // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0PTR]]{{\[}}[[ZERO1]], [[GLOBALIDY]], [[GLOBALIDX]]{{\]}}
+    // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]{{\[}}[[ZERO1]], [[GLOBALIDY]], [[GLOBALIDX]]{{\]}}
     // CHECK: [[VAL:%.*]] = spv.Load "StorageBuffer" [[ARG0LOADPTR]]
     %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
     %1 = "xla_hlo.copy"(%0) : (tensor<12x42xi32>) -> tensor<12x42xi32>
-    // CHECK: [[ARG1PTR:%.*]] = spv._address_of [[ARG1VAR]]
     // CHECK: [[ZERO2:%.*]] = spv.constant 0 : i32
-    // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1PTR]]{{\[}}[[ZERO2]], [[GLOBALIDY]], [[GLOBALIDX]]{{\]}}
+    // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]{{\[}}[[ZERO2]], [[GLOBALIDY]], [[GLOBALIDX]]{{\]}}
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     // CHECK: spv.Branch [[BB2]]
     iree.store_output(%1 : tensor<12x42xi32>, %arg1 : memref<12x42xi32>)
     // CHECK: spv.Return
     iree.return
   }
-  // CHECK: spv.EntryPoint "GLCompute" [[FN]], [[GLOBALIDVAR]]
-  // CHECK: spv.ExecutionMode [[FN]] "LocalSize", 32, 1, 1
 }
 
 // -----

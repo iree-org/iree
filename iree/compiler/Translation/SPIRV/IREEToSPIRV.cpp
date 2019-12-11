@@ -36,9 +36,8 @@ LogicalResult IREELoadOpSPIRVLowering::lowerOperation(
 /// IREE::StoreOp needs to write to the spv.globalVariable created for the
 /// memref that holds the result of the dispatch function.
 LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder, TensorIndexToScalarValueMap &valueCache,
-    DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
-    ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
+    Operation *op, OpBuilder &builder,
+    TensorIndexToScalarValueMap &valueCache) const {
   auto storeOp = cast<IREE::StoreOutputOp>(op);
   auto src = storeOp.src();
   SmallVector<AffineMap, 1> indices;
@@ -48,10 +47,10 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
         "expected to compute a single element of the tensor that is stored "
         "into the output memref");
   }
-  auto var = inputBuffers.lookup(storeOp.dst());
+  auto var = valueCache.getBufferForArgument(storeOp.dst());
   if (!var) {
     return storeOp.emitError(
-        "unable to find spv.globalVariable that corresponds to the dst memref");
+        "unable to find buffer that corresponds to the dst memref");
   }
   auto ptr =
       genPointerOffset(builder, storeOp.getLoc(), valueCache, indices[0], var);
@@ -65,9 +64,8 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
 /// IREE::ReturnOp in dispatch functions lowered to SPIR-V should have no
 /// operands.
 LogicalResult IREEReturnOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder, TensorIndexToScalarValueMap &valueCache,
-    DenseMap<Value *, spirv::GlobalVariableOp> &inputBuffers,
-    ArrayRef<spirv::GlobalVariableOp> outputBuffers) const {
+    Operation *op, OpBuilder &builder,
+    TensorIndexToScalarValueMap &valueCache) const {
   return success();
 }
 
