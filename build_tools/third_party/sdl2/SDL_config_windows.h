@@ -4,6 +4,12 @@
 
 #include "SDL_platform.h"
 
+// Explicitly include headers for SSE intrinsics.
+// SDL itself conditionally chooses to not include these on Windows, but they
+// appear to be needed on some systems anyway.
+#include <intrin.h>
+#include <xmmintrin.h>
+
 /* This is a set of defines to configure the SDL features */
 
 #if !defined(_STDINT_H_) && (!defined(HAVE_STDINT_H) || !_HAVE_STDINT_H)
@@ -64,6 +70,7 @@ typedef unsigned int uintptr_t;
 
 /* This is disabled by default to avoid C runtime dependencies and manifest
  * requirements */
+#define HAVE_LIBC 1  // Enable it anyway :D
 #ifdef HAVE_LIBC
 /* Useful headers */
 #define STDC_HEADERS 1
@@ -180,35 +187,35 @@ typedef unsigned int uintptr_t;
 /* Enable various timer systems */
 #define SDL_TIMER_WINDOWS 1
 
-/* Enable various video drivers */
+/* Enable/disable various video drivers */
 #define SDL_VIDEO_DRIVER_DUMMY 1
 #define SDL_VIDEO_DRIVER_WINDOWS 1
 
 #ifndef SDL_VIDEO_RENDER_D3D
-#define SDL_VIDEO_RENDER_D3D 1
+#define SDL_VIDEO_RENDER_D3D 0
 #endif
 #ifndef SDL_VIDEO_RENDER_D3D11
 #define SDL_VIDEO_RENDER_D3D11 0
 #endif
 
-/* Enable OpenGL support */
+/* Disable OpenGL support, just use Vulkan */
 #ifndef SDL_VIDEO_OPENGL
-#define SDL_VIDEO_OPENGL 1
+#define SDL_VIDEO_OPENGL 0
 #endif
 #ifndef SDL_VIDEO_OPENGL_WGL
-#define SDL_VIDEO_OPENGL_WGL 1
+#define SDL_VIDEO_OPENGL_WGL 0
 #endif
 #ifndef SDL_VIDEO_RENDER_OGL
-#define SDL_VIDEO_RENDER_OGL 1
+#define SDL_VIDEO_RENDER_OGL 0
 #endif
 #ifndef SDL_VIDEO_RENDER_OGL_ES2
-#define SDL_VIDEO_RENDER_OGL_ES2 1
+#define SDL_VIDEO_RENDER_OGL_ES2 0
 #endif
 #ifndef SDL_VIDEO_OPENGL_ES2
-#define SDL_VIDEO_OPENGL_ES2 1
+#define SDL_VIDEO_OPENGL_ES2 0
 #endif
 #ifndef SDL_VIDEO_OPENGL_EGL
-#define SDL_VIDEO_OPENGL_EGL 1
+#define SDL_VIDEO_OPENGL_EGL 0
 #endif
 
 /* Enable Vulkan support */

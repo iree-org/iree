@@ -37,11 +37,15 @@ sdl_sources = select({
             "src/**/*.h",
         ],
         exclude = [
+            # Ignore test files
             "src/test/*.c",
-            "src/video/qnx/**",
+            # Ignore Linux/Unix
             "src/core/linux/**",
-            "src/thread/**",
             "src/core/unix/**",
+            # Ignore thread (exclude for thread/windows)
+            "src/thread/**",
+            # Remove support for QNX
+            "src/video/qnx/**",
         ],
     ) + glob([
         "src/thread/*",
@@ -117,6 +121,7 @@ sdl_headers = [
 ]
 
 sdl_copts = select({
+    "@bazel_tools//src/conditions:windows": [],
     "//conditions:default": [
         "-Wno-string-conversion",
         "-pthread",
@@ -126,16 +131,18 @@ sdl_copts = select({
 
 sdl_linkopts = select({
     "@bazel_tools//src/conditions:windows": [
-        "-Wl,advapi32.lib",
-        "-Wl,gdi32.lib",
-        "-Wl,imm32.lib",
-        "-Wl,ole32.lib",
-        "-Wl,oleaut32.lib",
-        "-Wl,opengl32.lib",
-        "-Wl,shell32.lib",
-        "-Wl,user32.lib",
-        "-Wl,version.lib",
-        "-Wl,winmm.lib",
+        "-DEFAULTLIB:user32",
+        "-DEFAULTLIB:gdi32",
+        "-DEFAULTLIB:winmm",
+        "-DEFAULTLIB:imm32",
+        "-DEFAULTLIB:ole32",
+        "-DEFAULTLIB:oleaut32",
+        "-DEFAULTLIB:version",
+        "-DEFAULTLIB:uuid",
+        "-DEFAULTLIB:shell32",
+        "-DEFAULTLIB:advapi32",
+        "-DEFAULTLIB:hid",
+        "-DEFAULTLIB:setupapi",
     ],
     "//conditions:default": [
         "-ldl",

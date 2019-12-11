@@ -30,7 +30,7 @@ cc_library(
     name = "sdk",
     srcs = select({
         "@bazel_tools//src/conditions:windows": [
-            "Lib/vulkan-1.lib"
+            "vulkan-sdk/Lib/vulkan-1.lib"
         ],
         "//conditions:default": [
             "vulkan-sdk/lib/libvulkan.so.1",

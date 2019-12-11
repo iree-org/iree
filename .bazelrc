@@ -50,9 +50,8 @@ build:x86opt --copt=-mavx2
 build:windows --copt=-Wno-builtin-macro-redefined --host_copt=-Wno-builtin-macro-redefined
 build:windows --copt=-Wno-unknown-argument --host_copt=-Wno-unknown-argument
 
-# Disables windows headers from pulling in GDI, which does a lot of terrible
-# things (such as defining the ERROR macro, which breaks the world).
-build:windows --copt=-DNOGDI --host_copt=-DNOGDI
+# Avoid warnings for WIN32_LEAN_AND_MEAN being defined multiple times.
+build:windows --copt=-Wno-macro-redefined
 
 # Enables unix-style runfiles link trees (requires symlink permission).
 # See: https://blogs.windows.com/windowsdeveloper/2016/12/02/symlinks-windows-10/
