@@ -88,6 +88,9 @@ build:rbe --google_default_credentials=true
 # Local disk cache is incompatible with remote execution (for obvious reasons).
 build:rbe --disk_cache=""
 
+# Point to the remote instance constructed in the iree-oss project
+build:rbe --remote_instance_name=projects/iree-oss/instances/default_instance
+
 ###############################################################################
 
 # Experimental config for building on Windows via clang-cl.
