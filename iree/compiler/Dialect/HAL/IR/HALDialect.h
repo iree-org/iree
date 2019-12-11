@@ -23,8 +23,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-#include "iree/compiler/Dialect/HAL/IR/HALOpInterface.h.inc"
-
 class HALDialect : public Dialect {
  public:
   explicit HALDialect(MLIRContext *context);

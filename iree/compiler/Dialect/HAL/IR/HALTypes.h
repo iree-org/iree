@@ -23,6 +23,7 @@
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
@@ -35,6 +36,8 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+#include "iree/compiler/Dialect/HAL/IR/HALOpInterface.h.inc"
 
 //===----------------------------------------------------------------------===//
 // RefObject types

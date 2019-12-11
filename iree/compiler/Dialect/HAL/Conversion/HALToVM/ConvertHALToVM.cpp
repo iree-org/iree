@@ -35,12 +35,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-LogicalResult appendHALImportModule(mlir::ModuleOp moduleOp) {
-  return appendImportModule(
-      StringRef(hal_imports_create()->data, hal_imports_create()->size),
-      moduleOp);
-}
-
 extern void populateHALAllocatorToVMPatterns(
     MLIRContext *context, SymbolTable &importSymbols,
     TypeConverter &typeConverter, OwningRewritePatternList &patterns);
@@ -100,7 +94,9 @@ class ConvertHALToVMPass : public ModulePass<ConvertHALToVMPass> {
     std::tie(outerModuleOp, innerModuleOp) =
         VMConversionTarget::nestModuleForConversion(getModule());
 
-    appendHALImportModule(innerModuleOp);
+    appendImportModule(
+        StringRef(hal_imports_create()->data, hal_imports_create()->size),
+        innerModuleOp);
 
     OwningRewritePatternList conversionPatterns;
     populateStandardToVMPatterns(context, conversionPatterns);

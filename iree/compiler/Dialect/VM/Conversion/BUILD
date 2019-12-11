@@ -25,6 +25,7 @@ cc_library(
         "TypeConverter.cpp",
     ],
     hdrs = [
+        "ConversionDialectInterface.h",
         "ConversionTarget.h",
         "ImportUtils.h",
         "TypeConverter.h",

@@ -29,21 +29,21 @@ filegroup(
 cc_library(
     name = "IR",
     srcs = [
-        "HALDialect.cpp",
         "HALEnums.cpp.inc",
         "HALOpFolders.cpp",
         "HALOpInterface.cpp.inc",
         "HALOps.cpp",
-        "HALOps.cpp.inc",
         "HALTypes.cpp",
     ],
     hdrs = [
-        "HALDialect.h",
         "HALEnums.h.inc",
         "HALOpInterface.h.inc",
         "HALOps.h",
         "HALOps.h.inc",
         "HALTypes.h",
+    ],
+    textual_hdrs = [
+        "HALOps.cpp.inc",
     ],
     deps = [
         ":HALEnumsGen",
@@ -52,6 +52,26 @@ cc_library(
         "//iree/compiler/Dialect",
         "@llvm//:support",
         "@local_config_mlir//:IR",
+        "@local_config_mlir//:Parser",
+        "@local_config_mlir//:StandardOps",
+        "@local_config_mlir//:Support",
+        "@local_config_mlir//:TransformUtils",
+    ],
+)
+
+cc_library(
+    name = "HALDialect",
+    srcs = ["HALDialect.cpp"],
+    hdrs = ["HALDialect.h"],
+    deps = [
+        ":IR",
+        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/HAL:hal_imports",
+        "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//iree/compiler/Dialect/VM/Conversion",
+        "@llvm//:support",
+        "@local_config_mlir//:IR",
+        "@local_config_mlir//:Parser",
         "@local_config_mlir//:StandardOps",
         "@local_config_mlir//:Support",
         "@local_config_mlir//:TransformUtils",

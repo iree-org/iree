@@ -17,7 +17,6 @@
 
 #include <cstdint>
 
-#include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Traits.h"
 #include "mlir/IR/Attributes.h"

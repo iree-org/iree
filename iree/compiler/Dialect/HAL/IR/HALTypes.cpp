@@ -24,7 +24,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// TODO(benvanik): struct types.
+#include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"
 
 }  // namespace HAL
 }  // namespace IREE

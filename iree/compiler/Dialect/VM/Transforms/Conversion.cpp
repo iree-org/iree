@@ -14,10 +14,12 @@
 
 #include <tuple>
 
-#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
+#include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -29,7 +31,29 @@ namespace iree_compiler {
 namespace IREE {
 namespace VM {
 
-// TODO(benvanik): import dialect registration.
+// Returns a stably sorted list of dialect interfaces of T for all dialects used
+// within the given module.
+template <typename T>
+SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
+  SmallPtrSet<const T *, 4> resultSet;
+  moduleOp.walk([&](Operation *op) {
+    auto *dialect = op->getDialect();
+    if (!dialect) return;
+    auto *dialectInterface = dialect->getRegisteredInterface<T>();
+    if (!dialectInterface) return;
+    resultSet.insert(dialectInterface);
+  });
+
+  // NOTE: to ensure deterministic output we sort the result so that imports are
+  // always added in a consistent order.
+  SmallVector<const T *, 4> results = {resultSet.begin(), resultSet.end()};
+  llvm::sort(
+      results, +[](const T *a, const T *b) {
+        return a->getDialect()->getNamespace().compare(
+                   b->getDialect()->getNamespace()) < 0;
+      });
+  return results;
+}
 
 // Runs conversion with registered input dialects.
 class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
@@ -43,16 +67,32 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
     std::tie(outerModuleOp, innerModuleOp) =
         VMConversionTarget::nestModuleForConversion(getOperation());
 
-    // TODO(benvanik): registration system for custom dialects.
-    appendHALImportModule(innerModuleOp);
+    // Append all vm.import ops from used dialects so that we can look them up
+    // during conversion.
+    auto usedDialects =
+        gatherUsedDialectInterfaces<VMConversionDialectInterface>(
+            innerModuleOp);
+    for (auto *dialectInterface : usedDialects) {
+      auto outerImportModuleOp = dialectInterface->getVMImportModule();
+      for (auto importModuleOp :
+           outerImportModuleOp->getOps<IREE::VM::ModuleOp>()) {
+        if (failed(appendImportModule(importModuleOp, innerModuleOp))) {
+          importModuleOp.emitError() << "failed to import module";
+          return signalPassFailure();
+        }
+      }
+    }
 
     OwningRewritePatternList conversionPatterns;
     populateStandardToVMPatterns(context, conversionPatterns);
 
-    // TODO(benvanik): registration system for custom dialects.
+    // Populate patterns from all used dialects, providing the imports they
+    // registered earlier.
     SymbolTable importSymbols(innerModuleOp);
-    populateHALToVMPatterns(context, importSymbols, conversionPatterns,
-                            typeConverter);
+    for (auto *dialectInterface : usedDialects) {
+      dialectInterface->populateVMConversionPatterns(
+          importSymbols, conversionPatterns, typeConverter);
+    }
 
     if (failed(applyFullConversion(outerModuleOp, conversionTarget,
                                    conversionPatterns, &typeConverter))) {

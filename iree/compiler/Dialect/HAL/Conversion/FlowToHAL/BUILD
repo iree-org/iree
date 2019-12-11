@@ -33,6 +33,7 @@ cc_library(
         "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
         "//iree/compiler/Dialect/HAL/Utils",
         "//iree/compiler/Dialect/VM/IR",

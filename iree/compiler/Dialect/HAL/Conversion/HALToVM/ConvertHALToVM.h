@@ -22,10 +22,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Appends the HAL import module containing the vm.import ops for all HAL
-// methods.
-LogicalResult appendHALImportModule(mlir::ModuleOp moduleOp);
-
 // Populates conversion patterns from the HAL dialect to the VM dialect.
 void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                              OwningRewritePatternList &patterns,

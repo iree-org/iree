@@ -14,23 +14,49 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/hal.imports.h"
+#include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Parser.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-#include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"
+namespace {
 
 static DialectRegistration<HALDialect> hal_dialect;
 
+class HALToVMConversionInterface : public VMConversionDialectInterface {
+ public:
+  using VMConversionDialectInterface::VMConversionDialectInterface;
+
+  OwningModuleRef getVMImportModule() const override {
+    return mlir::parseSourceString(
+        StringRef(hal_imports_create()->data, hal_imports_create()->size),
+        getDialect()->getContext());
+  }
+
+  void populateVMConversionPatterns(
+      SymbolTable &importSymbols, OwningRewritePatternList &patterns,
+      TypeConverter &typeConverter) const override {
+    populateHALToVMPatterns(getDialect()->getContext(), importSymbols, patterns,
+                            typeConverter);
+  }
+};
+
+}  // namespace
+
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
+  addInterfaces<HALToVMConversionInterface>();
+
   addTypes<AllocatorType, BufferType, CommandBufferType, DescriptorSetType,
            DescriptorSetLayoutType, DeviceType, EventType, ExecutableType,
            ExecutableCacheType, FenceType, RingBufferType, SemaphoreType>();
