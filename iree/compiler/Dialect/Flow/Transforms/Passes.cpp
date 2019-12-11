@@ -38,6 +38,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  // Legalize input types. We do this after flattening tuples so that we don't
+  // have to deal with them.
+  passManager.addPass(IREE::Flow::createLegalizeInputTypesPass());
+
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());

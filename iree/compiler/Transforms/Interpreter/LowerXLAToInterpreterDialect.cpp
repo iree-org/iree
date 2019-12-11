@@ -400,12 +400,18 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
                            ->getResult(0);
       }
 
-      llvm::SmallVector<int64_t, 4> zeroes;
-      zeroes.resize(extraDims, 0);
-
-      auto elementsAttr = DenseIntElementsAttr::get(
-          RankedTensorType::get(zeroes.size(), elementType),
-          llvm::makeArrayRef(zeroes));
+      ElementsAttr elementsAttr;
+      if (elementType.isInteger(32)) {
+        llvm::SmallVector<int32_t, 4> zeroes(extraDims);
+        elementsAttr = DenseIntElementsAttr::get(
+            RankedTensorType::get(zeroes.size(), elementType),
+            llvm::makeArrayRef(zeroes));
+      } else {
+        llvm::SmallVector<int64_t, 4> zeroes(extraDims);
+        elementsAttr = DenseIntElementsAttr::get(
+            RankedTensorType::get(zeroes.size(), elementType),
+            llvm::makeArrayRef(zeroes));
+      }
 
       auto extraStartIndices =
           rewriter.create<IREE::ConstantOp>(gatherOp.getLoc(), elementsAttr);

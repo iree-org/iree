@@ -51,6 +51,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager);
 // Flattens tuple values in function signatures and blocks.
 std::unique_ptr<OpPassBase<ModuleOp>> createFlattenTuplesInCFGPass();
 
+// Legalizes the input types to those supported by the flow dialect.
+// This will fail if types that cannot be supported at all are present, however
+// conditionally supported types (based on availability, etc) may still be
+// allowed to pass through successfully.
+std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeInputTypesPass();
+
 // Runs pre-partitioning conversion passes to convert to the flow dialect.
 // This converts some input ops directly to flow ops when doing so has a
 // benefit. Other ops are left unmodified and will be outlined later on.

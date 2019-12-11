@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/HLOToFlow/ConvertHLOToFlow.h"
 #include "iree/compiler/Dialect/Flow/Conversion/StandardToFlow/ConvertStandardToFlow.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -35,7 +36,9 @@ class PrePartitioningConversionPass
     : public FunctionPass<PrePartitioningConversionPass> {
  public:
   void runOnFunction() override {
-    ConversionTarget conversionTarget(getContext());
+    auto *context = &getContext();
+    FlowTypeConverter typeConverter;
+    ConversionTarget conversionTarget(*context);
     OwningRewritePatternList conversionPatterns;
 
     conversionTarget.addLegalDialect<IREE::Flow::FlowDialect>();
@@ -55,18 +58,17 @@ class PrePartitioningConversionPass
     conversionTarget.addIllegalOp<xla_hlo::ConditionalOp, xla_hlo::WhileOp>();
 
     conversionTarget.addIllegalOp<xla_hlo::DotGeneralOp>();
-    xla_hlo::PopulateGeneralDotOpLoweringPatterns(&conversionPatterns,
-                                                  &getContext());
+    xla_hlo::PopulateGeneralDotOpLoweringPatterns(&conversionPatterns, context);
 
     // Early conversion of ops that have matches we want to route through.
     // For example, DynamicUpdateSlice should end up as a stream operation.
-    setupDirectHLOToFlowLegality(&getContext(), conversionTarget);
-    populateHLOToFlowPatterns(&getContext(), conversionPatterns);
-    setupDirectStandardToFlowLegality(&getContext(), conversionTarget);
-    populateStandardToFlowPatterns(&getContext(), conversionPatterns);
+    setupDirectHLOToFlowLegality(context, conversionTarget);
+    populateHLOToFlowPatterns(context, conversionPatterns);
+    setupDirectStandardToFlowLegality(context, conversionTarget);
+    populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyFullConversion(getFunction(), conversionTarget,
-                                   conversionPatterns))) {
+                                   conversionPatterns, &typeConverter))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }
@@ -77,7 +79,9 @@ class PostPartitioningConversionPass
     : public FunctionPass<PostPartitioningConversionPass> {
  public:
   void runOnFunction() override {
+    auto *context = &getContext();
     ConversionTarget conversionTarget(getContext());
+    FlowTypeConverter typeConverter;
     OwningRewritePatternList conversionPatterns;
 
     // We have completed all flow op creation at this point.
@@ -91,11 +95,11 @@ class PostPartitioningConversionPass
     conversionTarget.addLegalOp<ModuleOp, ModuleTerminatorOp, FuncOp>();
 
     // Pick up any remaining HLO ops that were not partitioned.
-    populateHLOToFlowPatterns(&getContext(), conversionPatterns);
-    populateStandardToFlowPatterns(&getContext(), conversionPatterns);
+    populateHLOToFlowPatterns(context, conversionPatterns);
+    populateStandardToFlowPatterns(context, conversionPatterns);
 
     if (failed(applyFullConversion(getFunction(), conversionTarget,
-                                   conversionPatterns))) {
+                                   conversionPatterns, &typeConverter))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }

@@ -27,6 +27,7 @@ cc_library(
         "FormStreams.cpp",
         "IdentifyDispatchRegions.cpp",
         "IdentifyReductionRegions.cpp",
+        "LegalizeInputTypes.cpp",
         "OutlineDispatchRegions.cpp",
         "OutlineReductionRegions.cpp",
         "Passes.cpp",
@@ -38,6 +39,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/Analysis",
+        "//iree/compiler/Dialect/Flow/Conversion",
         "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",
         "//iree/compiler/Dialect/Flow/Conversion/StandardToFlow",
         "//iree/compiler/Dialect/Flow/IR",
