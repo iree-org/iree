@@ -143,7 +143,6 @@ sdl_linkopts = select({
         "-DEFAULTLIB:advapi32",
         "-DEFAULTLIB:hid",
         "-DEFAULTLIB:setupapi",
-        "-DEFAULTLIB:opengl32",
     ],
     "//conditions:default": [
         "-ldl",
