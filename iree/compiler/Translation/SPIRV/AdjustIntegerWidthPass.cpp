@@ -220,7 +220,7 @@ struct RemoveNopSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
     if (t1 != t2) return matchFailure();
     auto zero = spirv::ConstantOp::getZero(t1, op.getLoc(), &rewriter);
     rewriter.replaceOpWithNewOp<spirv::IAddOp>(op, op.operand(), zero);
-    return matchFailure();
+    return matchSuccess();
   }
 };
 
