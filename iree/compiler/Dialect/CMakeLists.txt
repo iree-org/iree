@@ -22,6 +22,8 @@ add_subdirectory(Flow/Utils)
 add_subdirectory(HAL)
 
 add_subdirectory(VM/Analysis)
+add_subdirectory(VM/Conversion)
+add_subdirectory(VM/Conversion/StandardToVM)
 add_subdirectory(VM/IR)
 add_subdirectory(VM/Target/Bytecode)
 add_subdirectory(VM/Tools)

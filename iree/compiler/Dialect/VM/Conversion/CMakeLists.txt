@@ -14,18 +14,22 @@
 
 iree_cc_library(
   NAME
-    ImportUtils
+    Conversion
   HDRS
+    "ConversionDialectInterface.h"
+    "ConversionTarget.h"
     "ImportUtils.h"
+    "TypeConverter.h"
   SRCS
+    "ConversionTarget.cpp"
     "ImportUtils.cpp"
+    "TypeConverter.cpp"
   DEPS
     iree::compiler::Dialect
-    iree::compiler::Dialect::VM:IR
+    iree::compiler::Dialect::VM::IR
     MLIRIR
     MLIRParser
     MLIRSupport
     MLIRTransforms
-  ALWAYSLINK
   PUBLIC
 )
