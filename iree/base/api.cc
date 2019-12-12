@@ -15,6 +15,7 @@
 #include "iree/base/api.h"
 
 #include <cstdlib>
+#include <cstring>
 #include <string>
 
 #include "iree/base/api_util.h"
@@ -71,6 +72,28 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_free(void* self,
     std::free(ptr);
   }
   return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// Utilities for working with API types
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_make_cstring_view(const char* str) {
+  iree_string_view_t result;
+  result.data = str;
+  result.size = strlen(str);
+  return result;
+}
+
+IREE_API_EXPORT int IREE_API_CALL
+iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
+  if (lhs.size < rhs.size) {
+    return -1;
+  } else if (lhs.size > rhs.size) {
+    return 1;
+  }
+  return strncmp(lhs.data, rhs.data, rhs.size);
 }
 
 //===----------------------------------------------------------------------===//

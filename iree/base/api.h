@@ -69,6 +69,7 @@
 #ifndef IREE_BASE_API_H_
 #define IREE_BASE_API_H_
 
+#include <memory.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -288,6 +289,23 @@ typedef iree_status_t(IREE_API_PTR* PFN_iree_allocator_alloc)(
     void* self, iree_host_size_t byte_length, void** out_ptr);
 typedef iree_status_t(IREE_API_PTR* PFN_iree_allocator_free)(void* self,
                                                              void* ptr);
+
+//===----------------------------------------------------------------------===//
+// Utilities for working with API types
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Returns a string view initialized with a reference to the given
+// NUL-terminated string literal.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_make_cstring_view(const char* str);
+
+// Like strncmp but with iree_string_view_t values.
+IREE_API_EXPORT int IREE_API_CALL
+iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
+
+#endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
 // iree::Shape
