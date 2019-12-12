@@ -635,8 +635,7 @@ void AllocatorComputeSizeOp::build(Builder *builder, OperationState &state,
                                    Value *allocator,
                                    IREE::HAL::MemoryTypeBitfield memoryTypes,
                                    IREE::HAL::BufferUsageBitfield bufferUsage,
-                                   ArrayRef<Value *> shape,
-                                   int32_t elementSize) {
+                                   ValueRange shape, int32_t elementSize) {
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addAttribute("memory_types", builder->getI32IntegerAttr(
@@ -837,7 +836,7 @@ static void printAllocatorAllocateConstOp(OpAsmPrinter &p,
 void AllocatorAllocateShapedOp::build(
     Builder *builder, OperationState &state, Value *allocator,
     IREE::HAL::MemoryTypeBitfield memoryTypes,
-    IREE::HAL::BufferUsageBitfield bufferUsage, ArrayRef<Value *> shape,
+    IREE::HAL::BufferUsageBitfield bufferUsage, ValueRange shape,
     int32_t elementSize) {
   state.addOperands({allocator});
   state.addOperands(shape);
@@ -1192,9 +1191,8 @@ static void printBufferStoreOp(OpAsmPrinter &p, BufferStoreOp op) {
 //===----------------------------------------------------------------------===//
 
 void BufferViewComputeOffsetOp::build(Builder *builder, OperationState &state,
-                                      Value *buffer, ArrayRef<Value *> shape,
-                                      ArrayRef<Value *> indices,
-                                      int32_t elementSize) {
+                                      Value *buffer, ValueRange shape,
+                                      ValueRange indices, int32_t elementSize) {
   state.addOperands({buffer});
   state.addOperands(shape);
   state.addOperands(indices);
@@ -1259,7 +1257,7 @@ static void printBufferViewComputeOffsetOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void BufferViewComputeLengthOp::build(Builder *builder, OperationState &state,
-                                      Value *buffer, ArrayRef<Value *> shape,
+                                      Value *buffer, ValueRange shape,
                                       int32_t elementSize) {
   state.addOperands({buffer});
   state.addOperands(shape);
@@ -1315,9 +1313,8 @@ static void printBufferViewComputeLengthOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void BufferViewComputeRangeOp::build(Builder *builder, OperationState &state,
-                                     Value *buffer, ArrayRef<Value *> shape,
-                                     ArrayRef<Value *> indices,
-                                     ArrayRef<Value *> lengths,
+                                     Value *buffer, ValueRange shape,
+                                     ValueRange indices, ValueRange lengths,
                                      int32_t elementSize) {
   state.addOperands({buffer});
   state.addOperands(shape);
@@ -1573,7 +1570,7 @@ void CommandBufferExecutionBarrierOp::build(
     Builder *builder, OperationState &state, Value *commandBuffer,
     IREE::HAL::ExecutionStageBitfield sourceStageMask,
     IREE::HAL::ExecutionStageBitfield targetStageMask,
-    ArrayRef<Value *> memoryBarriers, ArrayRef<Value *> bufferBarriers) {
+    ValueRange memoryBarriers, ValueRange bufferBarriers) {
   state.addAttribute(
       "source_stage_mask",
       builder->getI32IntegerAttr(static_cast<int32_t>(sourceStageMask)));
@@ -1748,7 +1745,7 @@ void CommandBufferBindDescriptorSetOp::build(Builder *builder,
                                              Value *commandBuffer,
                                              Value *executable, uint32_t set,
                                              Value *descriptorSet,
-                                             ArrayRef<Value *> dynamicOffsets) {
+                                             ValueRange dynamicOffsets) {
   state.addOperands({commandBuffer, executable, descriptorSet});
   state.addAttribute("set",
                      builder->getIntegerAttr(builder->getIntegerType(32), set));
@@ -1889,8 +1886,8 @@ static void printCommandBufferDispatchOp(OpAsmPrinter &p,
   p.printOperand(op.executable());
   p << ", entry_point=" << op.entry_point() << ", workgroup_xyz=[";
   interleaveComma(
-      ArrayRef<Value *>{op.workgroup_x(), op.workgroup_y(), op.workgroup_z()},
-      p, [&](Value *value) { p.printOperand(value); });
+      ValueRange{op.workgroup_x(), op.workgroup_y(), op.workgroup_z()}, p,
+      [&](Value *value) { p.printOperand(value); });
   p << "]";
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
                               "entry_point",

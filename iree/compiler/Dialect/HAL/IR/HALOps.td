@@ -278,7 +278,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
       Builder *builder, OperationState &state, Value *allocator,
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
-      ArrayRef<Value *> shape, int32_t elementSize
+      ValueRange shape, int32_t elementSize
     }]>,
   ];
 }
@@ -370,7 +370,7 @@ def HAL_AllocatorAllocateShapedOp : HAL_Op<"allocator.allocate.shaped", [
       Builder *builder, OperationState &state, Value *allocator,
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
-      ArrayRef<Value *> shape, int32_t elementSize
+      ValueRange shape, int32_t elementSize
     }]>,
   ];
 }
@@ -514,7 +514,7 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, Value *buffer,
-      ArrayRef<Value *> shape, ArrayRef<Value *> indices, int32_t elementSize
+      ValueRange shape, ValueRange indices, int32_t elementSize
     }]>,
   ];
 }
@@ -542,7 +542,7 @@ def HAL_BufferViewComputeLengthOp : HAL_PureOp<"buffer_view.compute_length", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, Value *buffer,
-      ArrayRef<Value *> shape, int32_t elementSize
+      ValueRange shape, int32_t elementSize
     }]>,
   ];
 }
@@ -573,8 +573,8 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, Value *buffer,
-      ArrayRef<Value *> shape, ArrayRef<Value *> indices,
-      ArrayRef<Value *> lengths, int32_t elementSize
+      ValueRange shape, ValueRange indices,
+      ValueRange lengths, int32_t elementSize
     }]>,
   ];
 }
@@ -678,7 +678,7 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
       Builder *builder, OperationState &state, Value *commandBuffer,
       IREE::HAL::ExecutionStageBitfield sourceStageMask,
       IREE::HAL::ExecutionStageBitfield targetStageMask,
-      ArrayRef<Value *> memoryBarriers, ArrayRef<Value *> bufferBarriers
+      ValueRange memoryBarriers, ValueRange bufferBarriers
     }]>,
   ];
 }
@@ -739,7 +739,7 @@ def HAL_CommandBufferBindDescriptorSetOp :
     OpBuilder<[{
       Builder *builder, OperationState &state, Value *commandBuffer,
       Value *executable, uint32_t set, Value *descriptorSet,
-      ArrayRef<Value *> dynamicOffsets = {}
+      ValueRange dynamicOffsets = {}
     }]>,
   ];
 }

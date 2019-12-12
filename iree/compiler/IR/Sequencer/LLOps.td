@@ -87,13 +87,13 @@ def IREESeqLL_CallOp : IREESeqLL_Op<"call"> {
 
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, FuncOp callee,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(callee.getType().getResults());
   }]>, OpBuilder<
     "Builder *builder, OperationState &result, StringRef callee,"
-    "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
+    "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(results);
@@ -125,13 +125,13 @@ def IREESeqLL_CallImportOp : IREESeqLL_Op<"call_import"> {
 
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, FuncOp callee,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(callee.getType().getResults());
   }]>, OpBuilder<
     "Builder *builder, OperationState &result, StringRef callee,"
-    "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
+    "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(results);
@@ -162,7 +162,7 @@ def IREESeqLL_CallIndirectOp : IREESeqLL_Op<"call_indirect"> {
 
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Value *callee,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.operands.push_back(callee);
       result.addOperands(operands);
       result.addTypes(callee->getType().cast<FunctionType>().getResults());
@@ -201,7 +201,7 @@ def IREESeqLL_BranchOp : IREESeqLL_Op<"br", [Terminator]> {
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Block *dest, "
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.addSuccessor(dest, operands);
   }]>];
 
@@ -226,8 +226,8 @@ def IREESeqLL_CondBranchOp : IREESeqLL_Op<"cond_br", [Terminator]> {
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Value *condition,"
-    "Block *trueDest, ArrayRef<Value *> trueOperands,"
-    "Block *falseDest, ArrayRef<Value *> falseOperands", [{
+    "Block *trueDest, ValueRange trueOperands,"
+    "Block *falseDest, ValueRange falseOperands", [{
       result.addOperands(condition);
       result.addSuccessor(trueDest, trueOperands);
       result.addSuccessor(falseDest, falseOperands);
@@ -333,7 +333,7 @@ def IREESeqLL_DynamicDispatchOp : IREESeqLL_Op<"dynamic_dispatch"> {
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, StringRef executable,"
     "StringRef entry_point, Value *workload,"
-    "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
+    "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addOperands({workload});
       result.addOperands(operands);
       result.addAttribute("executable", builder->getSymbolRefAttr(executable));
@@ -385,7 +385,7 @@ def IREESeqLL_StaticDispatchOp : IREESeqLL_Op<"static_dispatch"> {
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, StringRef executable,"
     "StringRef entry_point, ElementsAttr workload,"
-    "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
+    "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addAttribute("workload", workload);
       result.addOperands(operands);
       result.addAttribute("executable", builder->getSymbolRefAttr(executable));

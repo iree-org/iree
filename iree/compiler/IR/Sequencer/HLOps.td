@@ -54,13 +54,13 @@ def IREESeqHL_CallOp : IREESeqHL_PureOp<"call"> {
 
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, FuncOp callee,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(callee.getType().getResults());
   }]>, OpBuilder<
     "Builder *builder, OperationState &result, StringRef callee,"
-    "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
+    "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(results);
@@ -91,7 +91,7 @@ def IREESeqHL_CallIndirectOp : IREESeqHL_Op<"call_indirect"> {
 
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Value *callee,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.operands.push_back(callee);
       result.addOperands(operands);
       result.addTypes(callee->getType().cast<FunctionType>().getResults());
@@ -131,7 +131,7 @@ def IREESeqHL_BranchOp : IREESeqHL_Op<"br", [Terminator]> {
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Block *dest,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.addSuccessor(dest, operands);
   }]>];
 
@@ -156,8 +156,8 @@ def IREESeqHL_CondBranchOp : IREESeqHL_Op<"cond_br", [Terminator]> {
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Value *condition, "
-    "Block *trueDest, ArrayRef<Value *> trueOperands, "
-    "Block *falseDest, ArrayRef<Value *> falseOperands", [{
+    "Block *trueDest, ValueRange trueOperands, "
+    "Block *falseDest, ValueRange falseOperands", [{
       result.addOperands(condition);
       result.addSuccessor(trueDest, trueOperands);
       result.addSuccessor(falseDest, falseOperands);
@@ -264,7 +264,7 @@ def IREESeqHL_DispatchOp : IREESeqHL_Op<"dispatch"> {
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, StringRef executable,"
     "StringRef entry_point, Value *workload,"
-    "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
+    "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addOperands({workload});
       result.addOperands(operands);
       result.addAttribute("executable", builder->getSymbolRefAttr(executable));

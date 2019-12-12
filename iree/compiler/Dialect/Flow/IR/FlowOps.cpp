@@ -271,7 +271,7 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
 
 void DispatchRegionOp::build(Builder *builder, OperationState &state,
                              ArrayRef<Type> resultTypes, Value *workload,
-                             ArrayRef<Value *> operands,
+                             ValueRange operands,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands({workload});
@@ -376,8 +376,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 
 void ReductionRegionOp::build(Builder *builder, OperationState &state,
                               ArrayRef<Type> resultTypes, Value *workload,
-                              ArrayRef<Value *> operands,
-                              ArrayRef<Value *> initialValues,
+                              ValueRange operands, ValueRange initialValues,
                               ArrayRef<int32_t> dimensions,
                               ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
@@ -514,11 +513,10 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
 
 void WindowedReductionRegionOp::build(
     Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
-    Value *workload, ArrayRef<Value *> operands,
-    ArrayRef<Value *> initialValues, ArrayRef<int32_t> windowDimensions,
-    ArrayRef<int32_t> windowStrides, ArrayRef<int32_t> baseDilations,
-    ArrayRef<int32_t> windowDilations, PaddingMode paddingMode,
-    ArrayRef<NamedAttribute> attributes) {
+    Value *workload, ValueRange operands, ValueRange initialValues,
+    ArrayRef<int32_t> windowDimensions, ArrayRef<int32_t> windowStrides,
+    ArrayRef<int32_t> baseDilations, ArrayRef<int32_t> windowDilations,
+    PaddingMode paddingMode, ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands({workload});
   state.addOperands(operands);
@@ -1141,8 +1139,7 @@ static void printTensorUpdateOp(OpAsmPrinter &p, TensorUpdateOp &op) {
 //===----------------------------------------------------------------------===//
 
 void ExStreamFragmentOp::build(Builder *builder, OperationState &state,
-                               ArrayRef<Type> resultTypes,
-                               ArrayRef<Value *> operands,
+                               ArrayRef<Type> resultTypes, ValueRange operands,
                                ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands(operands);

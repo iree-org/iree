@@ -54,13 +54,13 @@ def IREEInterpHL_CallOp : IREEInterpHL_Op<"call"> {
 
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, FuncOp callee,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(callee.getType().getResults());
   }]>, OpBuilder<
     "Builder *builder, OperationState &result, StringRef callee,"
-    "ArrayRef<Type> results, ArrayRef<Value *> operands = {}", [{
+    "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
       result.addTypes(results);
@@ -90,7 +90,7 @@ def IREEInterpHL_CallIndirectOp : IREEInterpHL_Op<"call_indirect"> {
 
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Value *callee,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.operands.push_back(callee);
       result.addOperands(operands);
       result.addTypes(callee->getType().cast<FunctionType>().getResults());
@@ -129,7 +129,7 @@ def IREEInterpHL_BranchOp : IREEInterpHL_Op<"br", [Terminator]> {
 
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Block *dest,"
-    "ArrayRef<Value *> operands = {}", [{
+    "ValueRange operands = {}", [{
       result.addSuccessor(dest, operands);
   }]>];
 
@@ -153,8 +153,8 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
 
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Value *condition,"
-    "Block *trueDest, ArrayRef<Value *> trueOperands,"
-    "Block *falseDest, ArrayRef<Value *> falseOperands", [{
+    "Block *trueDest, ValueRange trueOperands,"
+    "Block *falseDest, ValueRange falseOperands", [{
       result.addOperands(condition);
       result.addSuccessor(trueDest, trueOperands);
       result.addSuccessor(falseDest, falseOperands);
