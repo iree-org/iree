@@ -134,6 +134,8 @@ set(MLIR_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir/include)
 set(MLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir)
 set(MLIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR)
 
+set(IREE_TABLEGEN_EXE iree-tblgen)
+
 #-------------------------------------------------------------------------------
 # Third party: tensorflow
 #-------------------------------------------------------------------------------
