@@ -684,13 +684,13 @@ struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
                                      PatternRewriter &rewriter) const override {
     if (matchPattern(op.condition(), m_NonZero())) {
       // True branch taken.
-      rewriter.replaceOpWithNewOp<BranchOp>(
-          op, op.getTrueDest(), llvm::to_vector<4>(op.getTrueOperands()));
+      rewriter.replaceOpWithNewOp<BranchOp>(op, op.getTrueDest(),
+                                            op.getTrueOperands());
       return matchSuccess();
     } else if (matchPattern(op.condition(), m_Zero())) {
       // False branch taken.
-      rewriter.replaceOpWithNewOp<BranchOp>(
-          op, op.getFalseDest(), llvm::to_vector<4>(op.getFalseOperands()));
+      rewriter.replaceOpWithNewOp<BranchOp>(op, op.getFalseDest(),
+                                            op.getFalseOperands());
       return matchSuccess();
     }
     return matchFailure();
@@ -731,9 +731,8 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
     }
     if (auto notOp = dyn_cast<NotI32Op>(op.getCondition()->getDefiningOp())) {
       rewriter.replaceOpWithNewOp<CondBranchOp>(
-          op, notOp.getOperand(), op.getFalseDest(),
-          llvm::to_vector<4>(op.getFalseOperands()), op.getTrueDest(),
-          llvm::to_vector<4>(op.getTrueOperands()));
+          op, notOp.getOperand(), op.getFalseDest(), op.getFalseOperands(),
+          op.getTrueDest(), op.getTrueOperands());
       return matchSuccess();
     }
     return matchFailure();
@@ -809,7 +808,7 @@ struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
     }
     rewriter.replaceOpWithNewOp<CallOp>(op, op.callee(),
                                         llvm::to_vector<4>(op.getResultTypes()),
-                                        llvm::to_vector<4>(op.getOperands()));
+                                        op.getOperands());
     return matchSuccess();
   }
 };
@@ -863,13 +862,12 @@ struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
       return matchFailure();
     }
 
-    SmallVector<Value *, 4> operands(op.getODSOperands(1));
     if (condValue.getValue() != 0) {
       // True - always break (to the same destination).
-      rewriter.replaceOpWithNewOp<BreakOp>(op, op.getDest(), operands);
+      rewriter.replaceOpWithNewOp<BreakOp>(op, op.getDest(), op.operands());
     } else {
       // False - skip the break.
-      rewriter.replaceOpWithNewOp<BranchOp>(op, op.getDest(), operands);
+      rewriter.replaceOpWithNewOp<BranchOp>(op, op.getDest(), op.operands());
     }
     return matchSuccess();
   }

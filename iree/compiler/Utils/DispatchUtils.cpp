@@ -298,10 +298,9 @@ IREE::DispatchRegionOp removeUnusedResults(IREE::DispatchRegionOp regionOp) {
   OpBuilder builder(regionOp);
 
   // Clone with new results.
-  SmallVector<Value *, 8> operands(regionOp.getArgOperands());
   auto newRegionOp = builder.create<IREE::DispatchRegionOp>(
-      regionOp.getLoc(), newReturnTypes, regionOp.getWorkload(), operands,
-      regionOp.getAttrs());
+      regionOp.getLoc(), newReturnTypes, regionOp.getWorkload(),
+      regionOp.getArgOperands(), regionOp.getAttrs());
   newRegionOp.getBody().takeBody(regionOp.getBody());
 
   // Replace uses of original values with the new values.

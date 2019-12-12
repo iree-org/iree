@@ -150,7 +150,6 @@ LogicalResult outlineReductionRegion(
   // Insert at the same place as the original region.
   OpBuilder dispatcherBuilder(regionOp);
 
-  SmallVector<Value *, 4> initialValues{regionOp.initial_values()};
   SmallVector<Value *, 4> temps{regionOp.operands()};
 
   // Create one dispatch per dimension being reduced.
@@ -169,11 +168,11 @@ LogicalResult outlineReductionRegion(
     ReductionEntryOp entryPointOp;
     std::tie(executableOp, entryPointOp) = createReductionExecutable(
         regionOp, outlinedRegionOrdinal, dimension.index(), dimension.value(),
-        initialValues, temps, dispatchableFuncOps);
+        regionOp.initial_values(), temps, dispatchableFuncOps);
 
     // Finally convert the dispatch region into a dispatch to the outlined func.
     temps = convertToDispatchOp(regionOp, executableOp, entryPointOp.getName(),
-                                dimension.value(), initialValues,
+                                dimension.value(), regionOp.initial_values(),
                                 std::move(temps), dispatcherBuilder);
     if (temps.empty()) {
       return regionOp.emitOpError()
