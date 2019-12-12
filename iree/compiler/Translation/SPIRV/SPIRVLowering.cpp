@@ -46,8 +46,7 @@ Value *genPointerOffset(OpBuilder &builder, Location loc,
   /// we need to add an extra 0 to index into the struct.
   auto i32Type = builder.getIntegerType(32);
   if (varType.isa<spirv::ArrayType>()) {
-    auto zero = builder.create<spirv::ConstantOp>(loc, i32Type,
-                                                  builder.getI32IntegerAttr(0));
+    auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
     accessIndices.push_back(zero);
   }
   for (auto indexExpr : indexMap.getResults()) {

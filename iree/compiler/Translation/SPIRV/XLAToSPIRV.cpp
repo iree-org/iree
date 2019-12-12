@@ -53,8 +53,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
     // Only select values that offset <= d < offset + operand_shape[append_dim].
     // Since later values will be replaced in the later iterations, only check
     // d >= offset here.
-    Value *cond = builder.create<spirv::ConstantOp>(loc, i1Type,
-                                                    builder.getBoolAttr(true));
+    Value *cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
     auto offsetVar = builder.create<spirv::ConstantOp>(
         loc, i32Type, builder.getI32IntegerAttr(offset));
     auto checkLb = builder.create<spirv::SGreaterThanEqualOp>(
@@ -100,10 +99,9 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
         // spv.SConvertOp does not support converting a bool to integer, use
         // spv.SelectOp instead.
         if (intOperandType.getWidth() == 1) {
-          Value *zero = builder.create<spirv::ConstantOp>(
-              loc, resultElemType, builder.getIntegerAttr(resultElemType, 0));
-          Value *one = builder.create<spirv::ConstantOp>(
-              loc, resultElemType, builder.getIntegerAttr(resultElemType, 1));
+          Value *zero =
+              spirv::ConstantOp::getZero(resultElemType, loc, &builder);
+          Value *one = spirv::ConstantOp::getOne(resultElemType, loc, &builder);
           scalarOp =
               builder.create<spirv::SelectOp>(loc, operands[0], one, zero)
                   .getOperation();
@@ -157,10 +155,8 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
   auto loc = padOp.getLoc();
   auto i32Type = builder.getIntegerType(32);
   auto i1Type = builder.getI1Type();
-  auto zero = builder.create<spirv::ConstantOp>(loc, i32Type,
-                                                builder.getI32IntegerAttr(0));
-  Value *cond = builder.create<spirv::ConstantOp>(loc, builder.getI1Type(),
-                                                  builder.getBoolAttr(true));
+  auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
+  Value *cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
   auto operandType = padOp.operand()->getType().cast<RankedTensorType>();
   if (!operandType.hasStaticShape()) {
     return padOp.emitError("pad op codegen supported only for static shapes");
