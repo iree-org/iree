@@ -224,13 +224,59 @@ struct RemoveNopSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
   }
 };
 
+/// Rewrite i64 constants to i32 constants.
+struct AdjustConstantOp : public OpRewritePattern<spirv::ConstantOp> {
+  using OpRewritePattern<spirv::ConstantOp>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(spirv::ConstantOp op,
+                                     PatternRewriter &rewriter) const {
+    Type constantType = op.getType();
+    if (!hasIntTypeOfWidth(constantType, {64})) {
+      return matchFailure();
+    }
+    Type newType = legalizeIntegerType(constantType);
+    rewriter.replaceOpWithNewOp<spirv::ConstantOp>(
+        op, newType,
+        IntegerAttr::get(newType, op.value().dyn_cast<IntegerAttr>().getInt()));
+    return matchSuccess();
+  }
+};
+
+/// Rewrite integer arithmetic operations that operate on 64-bit integers to
+/// operate on 32-bit integers.
+template <typename OpTy>
+struct AdjustIntegerArithmeticOperations : public OpRewritePattern<OpTy> {
+  using OpRewritePattern<OpTy>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(OpTy op, PatternRewriter &rewriter) const {
+    Type resultType = op.result()->getType();
+    if (!hasIntTypeOfWidth(resultType, {64})) {
+      return Pattern::matchFailure();
+    }
+    Type newType = legalizeIntegerType(op.getResult()->getType());
+    ValueRange operands(op.getOperation()->getOperands());
+    rewriter.replaceOpWithNewOp<OpTy>(op, newType, operands, op.getAttrs());
+    return Pattern::matchSuccess();
+  }
+};
+
 void AdjustIntegerWidthPass::runOnOperation() {
   OwningRewritePatternList patterns;
-  // TODO(hanchung): Support for adjusting integer width for integer arithmetic
-  // operations.
-  patterns
-      .insert<AdjustAccessChainOp, AdjustAddressOfOp, AdjustGlobalVariableWidth,
-              AdjustLoadOp, AdjustStoreOp, RemoveNopSConvertOp>(&getContext());
+  patterns.insert<
+      // Arithmetic ops:
+      AdjustIntegerArithmeticOperations<spirv::GLSLSAbsOp>,
+      AdjustIntegerArithmeticOperations<spirv::GLSLSSignOp>,
+      AdjustIntegerArithmeticOperations<spirv::IAddOp>,
+      AdjustIntegerArithmeticOperations<spirv::ISubOp>,
+      AdjustIntegerArithmeticOperations<spirv::IMulOp>,
+      AdjustIntegerArithmeticOperations<spirv::SDivOp>,
+      AdjustIntegerArithmeticOperations<spirv::SModOp>,
+      AdjustIntegerArithmeticOperations<spirv::SRemOp>,
+      AdjustIntegerArithmeticOperations<spirv::UDivOp>,
+      AdjustIntegerArithmeticOperations<spirv::UModOp>,
+      // Structure ops:
+      AdjustConstantOp,
+      // Others:
+      AdjustAccessChainOp, AdjustAddressOfOp, AdjustGlobalVariableWidth,
+      AdjustLoadOp, AdjustStoreOp, RemoveNopSConvertOp>(&getContext());
   Operation *op = getOperation();
   applyPatternsGreedily(op->getRegions(), patterns);
 }
