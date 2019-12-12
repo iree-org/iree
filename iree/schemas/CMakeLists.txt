@@ -35,21 +35,31 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    reflection_data
-  DEPS
-    iree::schemas
-  PUBLIC
-)
-
 flatbuffer_cc_library(
   NAME
     archive_def_cc_fbs
   SRCS
     "archive_def.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
+    iree::schemas::device_def_cc_fbs
+    iree::schemas::device_group_def_cc_fbs
+    iree::schemas::device_table_def_cc_fbs
+    iree::schemas::executable_def_cc_fbs
+    iree::schemas::executable_table_def_cc_fbs
+    iree::schemas::function_def_cc_fbs
+    iree::schemas::function_table_def_cc_fbs
     iree::schemas::module_def_cc_fbs
+    iree::schemas::source_map_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
+  PUBLIC
+)
+
+flatbuffer_cc_library(
+  NAME
+    buffer_data_def_cc_fbs
+  SRCS
+    "buffer_data_def.fbs"
   PUBLIC
 )
 
@@ -75,8 +85,17 @@ flatbuffer_cc_library(
   SRCS
     "debug_service.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
+    iree::schemas::device_def_cc_fbs
+    iree::schemas::device_group_def_cc_fbs
+    iree::schemas::device_table_def_cc_fbs
+    iree::schemas::executable_def_cc_fbs
+    iree::schemas::executable_table_def_cc_fbs
     iree::schemas::function_def_cc_fbs
+    iree::schemas::function_table_def_cc_fbs
     iree::schemas::module_def_cc_fbs
+    iree::schemas::source_map_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
   PUBLIC
 )
 
@@ -142,7 +161,9 @@ flatbuffer_cc_library(
   SRCS
     "function_table_def.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
     iree::schemas::function_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
   PUBLIC
 )
 
@@ -152,10 +173,16 @@ flatbuffer_cc_library(
   SRCS
     "module_def.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
+    iree::schemas::device_def_cc_fbs
+    iree::schemas::device_group_def_cc_fbs
     iree::schemas::device_table_def_cc_fbs
+    iree::schemas::executable_def_cc_fbs
     iree::schemas::executable_table_def_cc_fbs
+    iree::schemas::function_def_cc_fbs
     iree::schemas::function_table_def_cc_fbs
     iree::schemas::source_map_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
   PUBLIC
 )
 
