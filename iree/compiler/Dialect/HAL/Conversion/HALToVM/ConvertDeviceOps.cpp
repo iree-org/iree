@@ -24,7 +24,7 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
                                    TypeConverter &typeConverter,
                                    OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceAllocatorOp>>(
-      context, importSymbols, typeConverter, "_hal.device.allocator");
+      context, importSymbols, typeConverter, "hal.device.allocator");
 }
 
 }  // namespace iree_compiler

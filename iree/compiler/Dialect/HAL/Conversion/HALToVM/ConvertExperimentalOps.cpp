@@ -24,17 +24,17 @@ void populateHALExperimentalToVMPatterns(MLIRContext *context,
                                          TypeConverter &typeConverter,
                                          OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::ExSharedDeviceOp>>(
-      context, importSymbols, typeConverter, "_hal.ex.shared_device");
+      context, importSymbols, typeConverter, "hal.ex.shared_device");
   patterns.insert<VMImportOpConversion<IREE::HAL::ExPushBindingOp>>(
-      context, importSymbols, typeConverter, "_hal.ex.push_binding");
+      context, importSymbols, typeConverter, "hal.ex.push_binding");
   patterns.insert<
       VMImportOpConversion<IREE::HAL::ExExecutableDescriptorSetLayoutOp>>(
       context, importSymbols, typeConverter,
-      "_hal.ex.executable_descriptor_set_layout");
+      "hal.ex.executable_descriptor_set_layout");
   patterns.insert<VMImportOpConversion<IREE::HAL::ExDeferReleaseOp>>(
-      context, importSymbols, typeConverter, "_hal.ex.defer_release");
+      context, importSymbols, typeConverter, "hal.ex.defer_release");
   patterns.insert<VMImportOpConversion<IREE::HAL::ExSubmitAndWaitOp>>(
-      context, importSymbols, typeConverter, "_hal.ex.submit_and_wait");
+      context, importSymbols, typeConverter, "hal.ex.submit_and_wait");
 }
 
 }  // namespace iree_compiler

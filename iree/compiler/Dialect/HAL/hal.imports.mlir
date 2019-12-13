@@ -2,7 +2,7 @@
 //
 // This is embedded in the compiler binary and inserted into any module
 // containing HAL dialect ops (hal.*) that is lowered to the VM dialect.
-vm.module @_hal {
+vm.module @hal {
 
 //===----------------------------------------------------------------------===//
 // Experimental/temporary ops

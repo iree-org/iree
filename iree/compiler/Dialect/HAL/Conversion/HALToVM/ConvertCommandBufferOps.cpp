@@ -108,28 +108,28 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
   patterns.insert<RemoveMakeMemoryBarrierOpConversion>(context);
 
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCreateOp>>(
-      context, importSymbols, typeConverter, "_hal.command_buffer.create");
+      context, importSymbols, typeConverter, "hal.command_buffer.create");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferBeginOp>>(
-      context, importSymbols, typeConverter, "_hal.command_buffer.begin");
+      context, importSymbols, typeConverter, "hal.command_buffer.begin");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferEndOp>>(
-      context, importSymbols, typeConverter, "_hal.command_buffer.end");
+      context, importSymbols, typeConverter, "hal.command_buffer.end");
   patterns.insert<CommandBufferExecutionBarrierOpConversion>(
       context, importSymbols, typeConverter,
-      "_hal.command_buffer.execution_barrier");
+      "hal.command_buffer.execution_barrier");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferFillBufferOp>>(
-      context, importSymbols, typeConverter, "_hal.command_buffer.fill_buffer");
+      context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
-      context, importSymbols, typeConverter, "_hal.command_buffer.copy_buffer");
+      context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
   patterns.insert<
       VMImportOpConversion<IREE::HAL::CommandBufferBindDescriptorSetOp>>(
       context, importSymbols, typeConverter,
-      "_hal.command_buffer.bind_descriptor_set");
+      "hal.command_buffer.bind_descriptor_set");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchOp>>(
-      context, importSymbols, typeConverter, "_hal.command_buffer.dispatch");
+      context, importSymbols, typeConverter, "hal.command_buffer.dispatch");
   patterns
       .insert<VMImportOpConversion<IREE::HAL::CommandBufferDispatchIndirectOp>>(
           context, importSymbols, typeConverter,
-          "_hal.command_buffer.dispatch.indirect");
+          "hal.command_buffer.dispatch.indirect");
 }
 
 }  // namespace iree_compiler
