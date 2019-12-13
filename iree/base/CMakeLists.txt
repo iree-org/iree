@@ -363,6 +363,7 @@ iree_cc_test(
     "signature_mangle_test.cc"
   DEPS
     gtest_main
+    iree::base::logging
     iree::base::signature_mangle
 )
 
