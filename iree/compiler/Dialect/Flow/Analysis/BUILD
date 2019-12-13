@@ -27,9 +27,9 @@ cc_library(
         "Dispatchability.h",
     ],
     deps = [
-        "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Utils",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",

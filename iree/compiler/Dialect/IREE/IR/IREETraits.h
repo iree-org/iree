@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_TRAITS_H_
-#define IREE_COMPILER_DIALECT_TRAITS_H_
+#ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETRAITS_H_
+#define IREE_COMPILER_DIALECT_IREE_IR_IREETRAITS_H_
 
 #include "mlir/IR/OpDefinition.h"
 
@@ -43,4 +43,4 @@ class Unsafe : public OpTrait::TraitBase<ConcreteType, Unsafe> {
 }  // namespace OpTrait
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_TRAITS_H_
+#endif  // IREE_COMPILER_DIALECT_IREE_IR_IREETRAITS_H_

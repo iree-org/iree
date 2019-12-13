@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Flow)
-add_subdirectory(HAL)
-add_subdirectory(IREE)
-add_subdirectory(Interpreter)
-add_subdirectory(VM)
+add_subdirectory(Analysis)
+add_subdirectory(Conversion)
+add_subdirectory(IR)
+add_subdirectory(Target)
+add_subdirectory(Tools)
+add_subdirectory(Transforms)

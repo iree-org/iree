@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_TYPES_H_
-#define IREE_COMPILER_DIALECT_TYPES_H_
+#ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
+#define IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
@@ -186,4 +186,4 @@ class RefPtrType
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_TYPES_H_
+#endif  // IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_

@@ -53,7 +53,7 @@ cc_library(
         ":VMOpEncoderGen",
         ":VMOpInterfaceGen",
         ":VMOpsGen",
-        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:StandardOps",
@@ -73,7 +73,7 @@ gentbl(
     td_file = "VMBase.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
         "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
     ],
@@ -89,7 +89,7 @@ gentbl(
     td_file = "VMOps.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
         "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
     ],
@@ -104,7 +104,7 @@ gentbl(
     td_file = "VMOps.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
         "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
     ],
@@ -120,7 +120,7 @@ gentbl(
     td_file = "VMBase.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
         "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
     ],

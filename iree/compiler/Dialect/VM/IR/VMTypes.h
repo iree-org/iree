@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_IR_VMTYPES_H_
 #define IREE_COMPILER_DIALECT_VM_IR_VMTYPES_H_
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"

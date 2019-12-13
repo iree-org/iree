@@ -36,7 +36,7 @@ cc_library(
     name = "iree_opt_library",
     deps = [
         "//integrations/tensorflow/compiler:tensorflow",
-        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",

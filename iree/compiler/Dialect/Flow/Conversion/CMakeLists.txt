@@ -12,8 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Flow)
-add_subdirectory(HAL)
-add_subdirectory(IREE)
-add_subdirectory(Interpreter)
-add_subdirectory(VM)
+add_subdirectory(HLOToFlow)
+add_subdirectory(StandardToFlow)
+
+iree_cc_library(
+  NAME
+    Conversion
+  HDRS
+    "TypeConverter.h"
+  SRCS
+    "TypeConverter.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
+    MLIRTransformUtils
+  PUBLIC
+)
+

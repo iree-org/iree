@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/Conversion/TypeConverter.h"
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/IR/StandardTypes.h"
 
 namespace mlir {

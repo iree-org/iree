@@ -49,7 +49,7 @@ cc_library(
         ":HALEnumsGen",
         ":HALOpInterfaceGen",
         ":HALOpsGen",
-        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Parser",
@@ -65,9 +65,9 @@ cc_library(
     hdrs = ["HALDialect.h"],
     deps = [
         ":IR",
-        "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/HAL:hal_imports",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm//:support",
         "@local_config_mlir//:IR",
@@ -89,7 +89,7 @@ gentbl(
     td_file = "HALBase.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:StdOpsTdFiles",
     ],
 )
@@ -104,7 +104,7 @@ gentbl(
     td_file = "HALBase.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:StdOpsTdFiles",
     ],
 )
@@ -119,7 +119,7 @@ gentbl(
     td_file = "HALOps.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:StdOpsTdFiles",
     ],
 )

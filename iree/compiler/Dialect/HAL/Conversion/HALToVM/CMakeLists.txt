@@ -21,7 +21,7 @@ iree_cc_library(
     "ConvertHALToVM.cpp"
     "ConvertHALToVMPass.cpp"
   DEPS
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::VM::IR
     MLIRIR

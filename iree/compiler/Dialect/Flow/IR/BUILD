@@ -47,7 +47,7 @@ cc_library(
         ":FlowEnumsGen",
         ":FlowOpInterfaceGen",
         ":FlowOpsGen",
-        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:StandardOps",
@@ -67,7 +67,7 @@ gentbl(
     td_file = "FlowBase.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
     ],
 )
@@ -82,7 +82,7 @@ gentbl(
     td_file = "FlowBase.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:StdOpsTdFiles",
     ],
 )
@@ -97,7 +97,7 @@ gentbl(
     td_file = "FlowOps.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
     ],
 )

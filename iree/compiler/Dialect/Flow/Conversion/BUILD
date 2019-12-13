@@ -26,7 +26,7 @@ cc_library(
         "TypeConverter.h",
     ],
     deps = [
-        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Parser",
         "@local_config_mlir//:Transforms",

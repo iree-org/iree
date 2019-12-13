@@ -40,7 +40,7 @@ cc_library(
     deps = [
         ":custom_imports",
         ":custom_ops_gen",
-        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm//:support",
         "@local_config_mlir//:IR",
@@ -62,7 +62,7 @@ gentbl(
     td_file = "custom_ops.td",
     td_srcs = [
         ":td_files",
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "@local_config_mlir//:StdOpsTdFiles",
     ],
 )

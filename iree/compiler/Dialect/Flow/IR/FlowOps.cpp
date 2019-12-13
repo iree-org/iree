@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"

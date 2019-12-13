@@ -18,7 +18,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Analysis/RegisterAllocation.h"
 #include "iree/compiler/Dialect/VM/Analysis/ValueLiveness.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"

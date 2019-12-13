@@ -17,34 +17,28 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+exports_files(["IREEBase.td"])
+
+filegroup(
+    name = "td_files",
+    srcs = glob(["*.td"]),
+)
+
 cc_library(
-    name = "HALToVM",
+    name = "IR",
     srcs = [
-        "ConvertAllocatorOps.cpp",
-        "ConvertBufferOps.cpp",
-        "ConvertCommandBufferOps.cpp",
-        "ConvertDeviceOps.cpp",
-        "ConvertExecutableOps.cpp",
-        "ConvertExperimentalOps.cpp",
-        "ConvertHALToVM.cpp",
-        "ConvertVariableOps.cpp",
+        "IREEDialect.cpp",
     ],
     hdrs = [
-        "ConvertHALToVM.h",
+        "IREEDialect.h",
+        "IREETraits.h",
+        "IREETypes.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL:hal_imports",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
-        "//iree/compiler/Dialect/VM/IR",
         "@llvm//:support",
         "@local_config_mlir//:IR",
-        "@local_config_mlir//:Pass",
-        "@local_config_mlir//:StandardOps",
-        "@local_config_mlir//:Transforms",
+        "@local_config_mlir//:Parser",
+        "@local_config_mlir//:Support",
     ],
     alwayslink = 1,
 )

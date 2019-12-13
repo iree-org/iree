@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/IR/Attributes.h"

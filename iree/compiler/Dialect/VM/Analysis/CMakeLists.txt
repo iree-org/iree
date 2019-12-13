@@ -24,7 +24,7 @@ iree_cc_library(
     "ValueLiveness.cpp"
     "ValueLivenessTest.cpp"
   DEPS
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::IR
     LLVMSupport
     MLIRIR

@@ -12,33 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(
-    default_visibility = ["//visibility:public"],
-    licenses = ["notice"],  # Apache 2.0
-)
+add_subdirectory(Conversion)
+add_subdirectory(IR)
+add_subdirectory(Target)
+add_subdirectory(Transforms)
+add_subdirectory(Utils)
 
-exports_files(["CommonBase.td"])
-
-filegroup(
-    name = "td_files",
-    srcs = glob(["*.td"]),
-)
-
-cc_library(
-    name = "Dialect",
-    srcs = [
-        "IREEDialect.cpp",
-    ],
-    hdrs = [
-        "IREEDialect.h",
-        "Traits.h",
-        "Types.h",
-    ],
-    deps = [
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Parser",
-        "@local_config_mlir//:Support",
-    ],
-    alwayslink = 1,
-)

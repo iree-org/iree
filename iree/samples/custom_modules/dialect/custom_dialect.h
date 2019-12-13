@@ -15,7 +15,7 @@
 #ifndef IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_DIALECT_H_
 #define IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_DIALECT_H_
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
 

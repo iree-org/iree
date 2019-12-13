@@ -12,8 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Flow)
-add_subdirectory(HAL)
-add_subdirectory(IREE)
-add_subdirectory(Interpreter)
-add_subdirectory(VM)
+iree_cc_library(
+  NAME
+    IR
+  HDRS
+    "IREEDialect.h"
+    "IREETraits.h"
+    "IREETypes.h"
+  SRCS
+    "IREEDialect.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRSupport
+  ALWAYSLINK
+  PUBLIC
+)

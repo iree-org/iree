@@ -25,7 +25,7 @@ iree_cc_library(
     "ConstantEncoder.h"
     "TranslationRegistration.cpp"
   DEPS
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Analysis
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms

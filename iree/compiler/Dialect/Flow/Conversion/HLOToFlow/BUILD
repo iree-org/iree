@@ -26,8 +26,8 @@ cc_library(
         "ConvertHLOToFlow.h",
     ],
     deps = [
-        "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
         "@local_config_mlir//:StandardOps",

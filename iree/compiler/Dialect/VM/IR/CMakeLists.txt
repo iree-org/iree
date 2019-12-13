@@ -38,7 +38,7 @@ iree_cc_library(
     VMOpEncoderGen
     VMOpInterfaceGen
     VMOpsGen
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRStandardOps

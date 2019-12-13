@@ -20,7 +20,7 @@ iree_cc_library(
   SRCS
     "ConvertHLOToFlow.cpp"
   DEPS
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Flow::IR
     MLIRIR
     MLIRPass

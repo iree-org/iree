@@ -12,8 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Flow)
-add_subdirectory(HAL)
-add_subdirectory(IREE)
-add_subdirectory(Interpreter)
-add_subdirectory(VM)
+add_subdirectory(FlowToHAL)
+add_subdirectory(HALToVM)

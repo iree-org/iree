@@ -90,7 +90,7 @@ gentbl(
     tblgen = "//iree/tools:iree-tblgen",
     td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
     td_srcs = [
-        "//iree/compiler/Dialect:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
         "//iree/compiler/Dialect/VM/IR:td_files",
         "@local_config_mlir//:OpBaseTdFiles",
         "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",

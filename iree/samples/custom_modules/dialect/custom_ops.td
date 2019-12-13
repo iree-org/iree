@@ -15,8 +15,8 @@
 #ifndef IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_OPS
 #define IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_OPS
 
+include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/IR/OpBase.td"
-include "iree/compiler/Dialect/CommonBase.td"
 
 def CUSTOM_Dialect : Dialect {
   let name = "custom";
