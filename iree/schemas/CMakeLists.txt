@@ -17,8 +17,24 @@ add_subdirectory(bytecode)
 iree_cc_library(
   NAME
     schemas
+  HDRS
+    "archive_def_generated.h"
+    "buffer_data_def_generated.h"
+    "bytecode_def_generated.h"
+    "debug_service_generated.h"
+    "device_def_generated.h"
+    "device_group_def_generated.h"
+    "device_table_def_generated.h"
+    "executable_def_generated.h"
+    "executable_table_def_generated.h"
+    "function_def_generated.h"
+    "function_table_def_generated.h"
+    "module_def_generated.h"
+    "source_map_def_generated.h"
+    "type_def_generated.h"
   DEPS
     iree::schemas::archive_def_cc_fbs
+    iree::schemas::buffer_data_def_cc_fbs
     iree::schemas::bytecode_def_cc_fbs
     iree::schemas::debug_service_cc_fbs
     iree::schemas::device_def_cc_fbs
@@ -32,6 +48,7 @@ iree_cc_library(
     iree::schemas::source_map_def_cc_fbs
     iree::schemas::spirv_executable_def_cc_fbs
     iree::schemas::type_def_cc_fbs
+    flatbuffers
   PUBLIC
 )
 
