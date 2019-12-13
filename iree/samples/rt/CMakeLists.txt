@@ -19,8 +19,7 @@ add_custom_command(
   COMMAND iree-translate
           --mlir-to-iree-module "${CMAKE_CURRENT_SOURCE_DIR}/simple_module_test.mlir"
           -o simple_module_test_bytecode_module.emod
-  # TODO(marbre): Get iree_translate target working.
-  #DEPENDS iree_translate
+  DEPENDS iree::tools::iree_translate
 )
 
 add_custom_command(
@@ -31,8 +30,7 @@ add_custom_command(
           --identifier=simple_module_test_bytecode_module
           --cpp_namespace=iree::rt::samples
   DEPENDS generate_cc_embed_data
-          # TODO(marbre): Enable dep as soon as target is working.
-          #simple_module_test_bytecode_module.emod
+          simple_module_test_bytecode_module.emod
 )
 
 add_library(
