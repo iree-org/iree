@@ -136,13 +136,28 @@ typedef struct {
 // reference count goes to 0. NULL can be used to no-op the destruction if the
 // type is not owned by the VM.
 //
+// The |descriptor| must have a type ID populated of a valid builtin type. A
+// reference to the descriptor will be cached and reused in the future.
+//
+// WARNING: this function is not thread-safe and should only be used at startup
+// to register the types. Do not call this while any refs may be alive.
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_register_builtin_type(
+    const iree_vm_ref_type_descriptor_t* descriptor);
+
+// Registers a user-defined type with the IREE C ref system.
+// The provided destroy function will be used to destroy objects when their
+// reference count goes to 0. NULL can be used to no-op the destruction if the
+// type is not owned by the VM.
+//
+// TODO(benvanik): keep names alive for user types?
 // NOTE: the name is not retained and must be kept live by the caller. Ideally
 // it is stored in static read-only memory in the binary.
 //
 // WARNING: this function is not thread-safe and should only be used at startup
 // to register the types. Do not call this while any refs may be alive.
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_ref_register_builtin_type(iree_vm_ref_type_descriptor_t descriptor);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_ref_register_user_defined_type(
+    iree_vm_ref_type_descriptor_t* descriptor);
 
 // Wraps a raw pointer in a iree_vm_ref_t reference and assigns it to |out_ref|.
 // |out_ref| will be released if it already contains a reference. The target
@@ -165,6 +180,10 @@ iree_vm_ref_wrap(void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref);
 // Checks that the given reference-counted pointer |ref| is of |type|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_ref_check(iree_vm_ref_t* ref, iree_vm_ref_type_t type);
+
+#define IREE_VM_DEREF_OR_RETURN(value_type, value, ref, type) \
+  IREE_API_RETURN_IF_API_ERROR(iree_vm_ref_check(ref, type)); \
+  value_type* value = (value_type*)(ref)->ptr;
 
 // Retains the reference-counted pointer |ref|.
 // |out_ref| will be released if it already contains a reference.

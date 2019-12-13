@@ -405,6 +405,13 @@ static iree_status_t iree_vm_bytecode_module_execute(
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
+  const iree_vm_function_descriptor_t* function_descriptor =
+      &module->function_descriptor_table[frame->function.ordinal];
+  iree_vm_registers_t* regs = &frame->registers;
+  memset(&regs->ref[regs->ref_register_count], 0,
+         sizeof(iree_vm_ref_t) * (function_descriptor->ref_register_count -
+                                  regs->ref_register_count));
+
   return iree_vm_bytecode_dispatch(
       module, (iree_vm_bytecode_module_state_t*)frame->module_state, stack,
       frame, out_result);

@@ -52,13 +52,13 @@ template <typename T>
 static iree_vm_ref_t MakeRef() {
   // Safe to do multiple times, so we do it to ensure the tests don't care what
   // order they run in/don't need to preregister types.
-  iree_vm_ref_type_descriptor_t descriptor;
+  static iree_vm_ref_type_descriptor_t descriptor;
   descriptor.type = T::kRefType;
   descriptor.type_name =
       iree_string_view_t{typeid(T).name(), std::strlen(typeid(T).name())};
   descriptor.offsetof_counter = T::offsetof_counter();
   descriptor.destroy = T::DirectDestroy;
-  iree_vm_ref_register_builtin_type(descriptor);
+  iree_vm_ref_register_builtin_type(&descriptor);
 
   iree_vm_ref_t ref = {0};
   CHECK_EQ(IREE_STATUS_OK, iree_vm_ref_wrap(new T(), T::kRefType, &ref));
@@ -70,7 +70,7 @@ static intptr_t ReadCounter(iree_vm_ref_t* ref) {
 }
 
 static void RegisterTypeC() {
-  iree_vm_ref_type_descriptor_t descriptor;
+  static iree_vm_ref_type_descriptor_t descriptor;
   descriptor.type = IREE_VM_REF_TYPE_HAL_COMMAND_BUFFER;
   descriptor.type_name =
       iree_string_view_t{typeid(ref_object_c_t).name(),
@@ -78,7 +78,7 @@ static void RegisterTypeC() {
   descriptor.offsetof_counter = offsetof(ref_object_c_t, ref_object.counter);
   descriptor.destroy =
       +[](void* ptr) { delete reinterpret_cast<ref_object_c_t*>(ptr); };
-  iree_vm_ref_register_builtin_type(descriptor);
+  iree_vm_ref_register_builtin_type(&descriptor);
 }
 
 // Tests wrapping a simple C struct.
@@ -105,13 +105,13 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
     int DoSomething() override { return 123 + allocated_derived_types; }
   };
 
-  iree_vm_ref_type_descriptor_t descriptor;
+  static iree_vm_ref_type_descriptor_t descriptor;
   descriptor.type = IREE_VM_REF_TYPE_HAL_DEVICE;
   descriptor.type_name = iree_string_view_t{
       typeid(BaseType).name(), std::strlen(typeid(BaseType).name())};
   descriptor.offsetof_counter = BaseType::offsetof_counter();
   descriptor.destroy = BaseType::DirectDestroy;
-  iree_vm_ref_register_builtin_type(descriptor);
+  iree_vm_ref_register_builtin_type(&descriptor);
 
   allocated_derived_types = 0;
 

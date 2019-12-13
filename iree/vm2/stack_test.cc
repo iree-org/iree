@@ -214,13 +214,13 @@ static int dummy_object_count = 0;
 class DummyObject : public iree::RefObject<DummyObject> {
  public:
   static void RegisterType() {
-    iree_vm_ref_type_descriptor_t descriptor;
+    static iree_vm_ref_type_descriptor_t descriptor;
     descriptor.type = IREE_VM_REF_TYPE_HAL_ALLOCATOR;
     descriptor.type_name = iree_string_view_t{
         typeid(DummyObject).name(), std::strlen(typeid(DummyObject).name())};
     descriptor.offsetof_counter = DummyObject::offsetof_counter();
     descriptor.destroy = DummyObject::DirectDestroy;
-    iree_vm_ref_register_builtin_type(descriptor);
+    iree_vm_ref_register_builtin_type(&descriptor);
   }
 
   DummyObject() { ++dummy_object_count; }
@@ -242,6 +242,7 @@ TEST(VMStackTest, RefRegisterCleanup) {
   EXPECT_EQ(IREE_STATUS_OK,
             iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
   frame_a->registers.ref_register_count = 1;
+  memset(&frame_a->registers.ref[0], 0, sizeof(iree_vm_ref_t));
   EXPECT_EQ(IREE_STATUS_OK,
             iree_vm_ref_wrap(new DummyObject(), IREE_VM_REF_TYPE_HAL_ALLOCATOR,
                              &frame_a->registers.ref[0]));

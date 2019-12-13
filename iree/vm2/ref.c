@@ -25,32 +25,55 @@
 #define IREE_GET_REF_COUNTER_PTR(ref) \
   ((volatile atomic_intptr_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter))
 
+// TODO(benvanik): dynamic, if we care - otherwise keep small.
+#define IREE_VM_MAX_USER_DEFINED_TYPE_ID 15
+
 // A table of type descriptors registered at startup.
 // These provide quick dereferencing of destruction functions and type names for
-// debugging.
-static iree_vm_ref_type_descriptor_t iree_vm_ref_type_builtin_descriptors
-    [IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE] = {{0}};
+// debugging. Note that this just points to registered descriptors (or NULL) for
+// each type ID in the builtin range and does not own the descriptors.
+static const iree_vm_ref_type_descriptor_t* iree_vm_ref_type_builtin_descriptors
+    [IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE] = {0};
+
+// A table of user-registered type descriptors.
+static const iree_vm_ref_type_descriptor_t*
+    iree_vm_ref_type_user_descriptors[IREE_VM_MAX_USER_DEFINED_TYPE_ID] = {0};
 
 // Returns the type descriptor (or NULL) for the given type ID.
 static const iree_vm_ref_type_descriptor_t* iree_vm_ref_get_type_descriptor(
     iree_vm_ref_type_t type) {
   if (type < IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE) {
-    return iree_vm_ref_type_builtin_descriptors[type].type == type
-               ? &iree_vm_ref_type_builtin_descriptors[type]
-               : NULL;
-  } else {
-    // TODO(benvanik): user-defined types.
-    return NULL;
+    return iree_vm_ref_type_builtin_descriptors[type];
   }
+  type -= IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE;
+  if (type < IREE_VM_MAX_USER_DEFINED_TYPE_ID) {
+    return iree_vm_ref_type_user_descriptors[type];
+  }
+  return NULL;
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_ref_register_builtin_type(iree_vm_ref_type_descriptor_t descriptor) {
-  assert(descriptor.type < IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE);
-  if (descriptor.type >= IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE) {
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_register_builtin_type(
+    const iree_vm_ref_type_descriptor_t* descriptor) {
+  assert(descriptor->type < IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE);
+  if (descriptor->type >= IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE) {
     return;
   }
-  iree_vm_ref_type_builtin_descriptors[descriptor.type] = descriptor;
+  iree_vm_ref_type_builtin_descriptors[descriptor->type] = descriptor;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_ref_register_user_defined_type(
+    iree_vm_ref_type_descriptor_t* descriptor) {
+  for (int i = 0; i < IREE_VM_MAX_USER_DEFINED_TYPE_ID; ++i) {
+    if (!iree_vm_ref_type_user_descriptors[i]) {
+      iree_vm_ref_type_user_descriptors[i] = descriptor;
+      descriptor->type = IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE + i;
+      return IREE_STATUS_OK;
+    }
+  }
+  // Too many user-defined types registered; need to increase
+  // IREE_VM_MAX_USER_DEFINED_TYPE_ID.
+  return IREE_STATUS_RESOURCE_EXHAUSTED;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -141,15 +164,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_or_move_checked(
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_release(iree_vm_ref_t* ref) {
-  if (ref->ptr != NULL) {
-    volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(ref);
-    if (atomic_fetch_sub(counter, 1) == 1) {
-      const iree_vm_ref_type_descriptor_t* type_descriptor =
-          iree_vm_ref_get_type_descriptor(ref->type);
-      if (type_descriptor->destroy) {
-        // NOTE: this makes us not re-entrant, but I think that's OK.
-        type_descriptor->destroy(ref->ptr);
-      }
+  if (ref->ptr == NULL) return;
+
+  volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(ref);
+  if (atomic_fetch_sub(counter, 1) == 1) {
+    const iree_vm_ref_type_descriptor_t* type_descriptor =
+        iree_vm_ref_get_type_descriptor(ref->type);
+    if (type_descriptor->destroy) {
+      // NOTE: this makes us not re-entrant, but I think that's OK.
+      type_descriptor->destroy(ref->ptr);
     }
   }
 
