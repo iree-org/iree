@@ -2,6 +2,9 @@
 
 // CHECK: name: "simple_module"
 vm.module @simple_module {
+  // CHECK: types: [ {
+  // CHECK: full_name: "i32"
+
   // CHECK: exported_functions:
   // CHECK: local_name: "func"
   vm.export @func

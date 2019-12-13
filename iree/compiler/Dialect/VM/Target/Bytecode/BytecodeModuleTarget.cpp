@@ -14,6 +14,8 @@
 
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 
+#include <algorithm>
+
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
 #include "iree/compiler/Dialect/Types.h"
@@ -57,6 +59,11 @@ struct ModuleCounts {
   int rwdatas = 0;
 };
 
+struct TypeDef {
+  Type type;
+  std::string full_name;
+};
+
 }  // namespace
 
 // Computes symbol counts within the given |moduleOp|.
@@ -84,6 +91,45 @@ static ModuleCounts computeModuleSymbolCounts(IREE::VM::ModuleOp moduleOp) {
     }
   }
   return counts;
+}
+
+// Finds all types in the module and builds a type table mapping the index in
+// the vector to the type represented by the type ordinal.
+static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
+  llvm::DenseMap<Type, std::string> typeMap;
+  auto tryInsertType = [&](Type type) {
+    if (auto refPtrType = type.dyn_cast<RefPtrType>()) {
+      type = refPtrType.getObjectType();
+    }
+    std::string str;
+    llvm::raw_string_ostream sstream(str);
+    type.print(sstream);
+    sstream.flush();
+    typeMap.try_emplace(type, str);
+  };
+  for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
+    funcOp.walk([&](Operation *op) {
+      for (auto type : op->getOperandTypes()) tryInsertType(type);
+      for (auto type : op->getResultTypes()) tryInsertType(type);
+    });
+  }
+
+  std::vector<TypeDef> table;
+  table.reserve(typeMap.size());
+  for (auto typeString : typeMap) {
+    table.push_back(TypeDef{typeString.first, typeString.second});
+  }
+  llvm::sort(
+      table, +[](const TypeDef &lhs, const TypeDef &rhs) {
+        // Always sort builtins above custom types.
+        if (lhs.full_name[0] != '!' && rhs.full_name[0] == '!') {
+          return true;
+        } else if (lhs.full_name[0] == '!' && rhs.full_name[0] != '!') {
+          return false;
+        }
+        return lhs.full_name.compare(rhs.full_name) < 0;
+      });
+  return table;
 }
 
 // Canonicalizes the module to its final form prior to emission.
@@ -141,35 +187,27 @@ static Optional<Offset<Vector<T>>> createOptionalVector(
   return fbb.CreateVector(contents);
 }
 
-// Converts a Type of the expected IREE set (mostly integers and ref_ptrs) to an
-// enum matching the description in the flatbuffer. This is currently... loosely
-// defined.
-static uint32_t typeToKindEnum(Type type) {
-  if (type.isInteger(32)) {
-    return 1;
-  } else if (auto refPtrType = type.dyn_cast<IREE::RefPtrType>()) {
-    // TODO(benvanik): use a stable type ID.
-    return refPtrType.getObjectType().getKind() - Type::FIRST_IREE_TYPE;
-  }
-  type.dump();
-  llvm_unreachable("invalid type");
-  return 0;
-}
-
 // Returns a serialized function signature.
 static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
-    FunctionType functionType, FlatBufferBuilder &fbb) {
-  std::vector<uint32_t> argumentTypes;
-  argumentTypes.resize(functionType.getNumInputs());
+    FunctionType functionType, llvm::DenseMap<Type, int> &typeTable,
+    FlatBufferBuilder &fbb) {
+  std::vector<int32_t> argumentTypes(functionType.getNumInputs());
   for (int i = 0; i < argumentTypes.size(); ++i) {
-    argumentTypes[i] = typeToKindEnum(functionType.getInput(i));
+    Type type = functionType.getInput(i);
+    if (auto refPtrType = type.dyn_cast<RefPtrType>()) {
+      type = refPtrType.getObjectType();
+    }
+    argumentTypes[i] = typeTable.lookup(type);
   }
   auto argumentTypesOffset = createOptionalVector(argumentTypes, fbb);
 
-  std::vector<uint32_t> resultTypes;
-  resultTypes.resize(functionType.getNumResults());
+  std::vector<int32_t> resultTypes(functionType.getNumResults());
   for (int i = 0; i < resultTypes.size(); ++i) {
-    resultTypes[i] = typeToKindEnum(functionType.getResult(i));
+    Type type = functionType.getResult(i);
+    if (auto refPtrType = type.dyn_cast<RefPtrType>()) {
+      type = refPtrType.getObjectType();
+    }
+    resultTypes[i] = typeTable.lookup(type);
   }
   auto resultTypesOffset = createOptionalVector(resultTypes, fbb);
 
@@ -235,6 +273,15 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
     rodataContentOffsets.push_back(dataOffset);
   }
 
+  // Find all types in the module to build the type table.
+  // Note that we don't emit it yet as we want to keep it near the top of the
+  // file (which, in FlatBuffers, is written last).
+  auto typeTable = buildTypeTable(moduleOp);
+  llvm::DenseMap<Type, int> typeOrdinalMap;
+  for (auto typeDef : llvm::enumerate(typeTable)) {
+    typeOrdinalMap[typeDef.value().type] = typeDef.index();
+  }
+
   // Serialize function bytecode one at a time and then merge at the end.
   std::vector<std::vector<uint8_t>> bytecodeDataParts;
   std::vector<iree::vm::FunctionDescriptor> functionDescriptors;
@@ -242,7 +289,8 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   functionDescriptors.reserve(internalFuncOps.size());
   size_t totalBytecodeLength = 0;
   for (auto funcOp : internalFuncOps) {
-    auto encodedFunction = BytecodeEncoder::encodeFunction(funcOp, symbolTable);
+    auto encodedFunction =
+        BytecodeEncoder::encodeFunction(funcOp, typeOrdinalMap, symbolTable);
     if (!encodedFunction) {
       funcOp.emitError() << "failed to encode function bytecode";
       return {};
@@ -275,11 +323,20 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
     rodataSegmentOffsets.push_back(rsd.Finish());
   }
   std::vector<Offset<iree::vm::RwdataSegmentDef>> rwdataSegmentOffsets;
+  std::vector<Offset<iree::vm::TypeDef>> typeOffsets;
+  typeOffsets.reserve(typeTable.size());
+  for (auto &typeDef : typeTable) {
+    auto nameOffset = fbb.CreateString(typeDef.full_name);
+    iree::vm::TypeDefBuilder tdb(fbb);
+    tdb.add_full_name(nameOffset);
+    typeOffsets.push_back(tdb.Finish());
+  }
   std::vector<Offset<iree::vm::ImportFunctionDef>> importFuncOffsets;
   importFuncOffsets.reserve(importFuncOps.size());
   for (auto importOp : importFuncOps) {
     auto nameOffset = fbb.CreateString(importOp.getName().str());
-    auto signatureOffset = makeFunctionSignatureDef(importOp.getType(), fbb);
+    auto signatureOffset =
+        makeFunctionSignatureDef(importOp.getType(), typeOrdinalMap, fbb);
     iree::vm::ImportFunctionDefBuilder ifd(fbb);
     ifd.add_full_name(nameOffset);
     ifd.add_signature(signatureOffset);
@@ -290,7 +347,8 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   for (auto exportOp : exportFuncOps) {
     auto nameOffset = fbb.CreateString(exportOp.export_name().str());
     auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
-    auto signatureOffset = makeFunctionSignatureDef(funcOp.getType(), fbb);
+    auto signatureOffset =
+        makeFunctionSignatureDef(funcOp.getType(), typeOrdinalMap, fbb);
     iree::vm::ExportFunctionDefBuilder efd(fbb);
     efd.add_local_name(nameOffset);
     efd.add_signature(signatureOffset);
@@ -302,7 +360,8 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
     internalFuncOffsets.reserve(internalFuncOps.size());
     for (auto funcOp : internalFuncOps) {
       auto nameOffset = fbb.CreateString(funcOp.getName().str());
-      auto signatureOffset = makeFunctionSignatureDef(funcOp.getType(), fbb);
+      auto signatureOffset =
+          makeFunctionSignatureDef(funcOp.getType(), typeOrdinalMap, fbb);
       iree::vm::InternalFunctionDefBuilder ifd(fbb);
       ifd.add_local_name(nameOffset);
       ifd.add_signature(signatureOffset);
@@ -317,6 +376,7 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   auto internalFuncsOffset = fbb.CreateVector(internalFuncOffsets);
   auto exportFuncsOffset = fbb.CreateVector(exportFuncOffsets);
   auto importFuncsOffset = createOptionalVector(importFuncOffsets, fbb);
+  auto typesOffset = fbb.CreateVector(typeOffsets);
 
   Optional<Offset<iree::vm::ModuleStateDef>> moduleStateDef;
   if (symbolCounts.globalBytes || symbolCounts.globalRefs) {
@@ -331,6 +391,7 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
 
   iree::vm::BytecodeModuleDefBuilder bmd(fbb);
   bmd.add_name(nameOffset);
+  bmd.add_types(typesOffset);
   if (importFuncsOffset) {
     bmd.add_imported_functions(importFuncsOffset.getValue());
   }

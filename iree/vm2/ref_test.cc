@@ -25,23 +25,25 @@ namespace {
 
 class A : public iree::RefObject<A> {
  public:
-  static constexpr iree_vm_ref_type_t kRefType = IREE_VM_REF_TYPE_HAL_ALLOCATOR;
+  static iree_vm_ref_type_t kTypeID;
 
   int data() const { return data_; }
 
  private:
   int data_ = 1;
 };
+iree_vm_ref_type_t A::kTypeID = IREE_VM_REF_TYPE_NULL;
 
 class B : public iree::RefObject<B> {
  public:
-  static constexpr iree_vm_ref_type_t kRefType = IREE_VM_REF_TYPE_HAL_BUFFER;
+  static iree_vm_ref_type_t kTypeID;
 
   int data() const { return data_; }
 
  private:
   int data_ = 2;
 };
+iree_vm_ref_type_t B::kTypeID = IREE_VM_REF_TYPE_NULL;
 
 typedef struct {
   iree_vm_ref_object_t ref_object = {1};
@@ -52,16 +54,17 @@ template <typename T>
 static iree_vm_ref_t MakeRef() {
   // Safe to do multiple times, so we do it to ensure the tests don't care what
   // order they run in/don't need to preregister types.
-  static iree_vm_ref_type_descriptor_t descriptor;
-  descriptor.type = T::kRefType;
-  descriptor.type_name =
-      iree_string_view_t{typeid(T).name(), std::strlen(typeid(T).name())};
-  descriptor.offsetof_counter = T::offsetof_counter();
-  descriptor.destroy = T::DirectDestroy;
-  iree_vm_ref_register_builtin_type(&descriptor);
+  static iree_vm_ref_type_descriptor_t descriptor = {0};
+  if (descriptor.type == IREE_VM_REF_TYPE_NULL) {
+    descriptor.type_name = iree_make_cstring_view(typeid(T).name());
+    descriptor.offsetof_counter = T::offsetof_counter();
+    descriptor.destroy = T::DirectDestroy;
+    CHECK_EQ(IREE_STATUS_OK, iree_vm_ref_register_type(&descriptor));
+    T::kTypeID = descriptor.type;
+  }
 
   iree_vm_ref_t ref = {0};
-  CHECK_EQ(IREE_STATUS_OK, iree_vm_ref_wrap(new T(), T::kRefType, &ref));
+  CHECK_EQ(IREE_STATUS_OK, iree_vm_ref_wrap(new T(), T::kTypeID, &ref));
   return ref;
 }
 
@@ -69,16 +72,27 @@ static intptr_t ReadCounter(iree_vm_ref_t* ref) {
   return *((intptr_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter));
 }
 
+static iree_vm_ref_type_t kCTypeID = IREE_VM_REF_TYPE_NULL;
 static void RegisterTypeC() {
-  static iree_vm_ref_type_descriptor_t descriptor;
-  descriptor.type = IREE_VM_REF_TYPE_HAL_COMMAND_BUFFER;
-  descriptor.type_name =
-      iree_string_view_t{typeid(ref_object_c_t).name(),
-                         std::strlen(typeid(ref_object_c_t).name())};
-  descriptor.offsetof_counter = offsetof(ref_object_c_t, ref_object.counter);
-  descriptor.destroy =
-      +[](void* ptr) { delete reinterpret_cast<ref_object_c_t*>(ptr); };
-  iree_vm_ref_register_builtin_type(&descriptor);
+  static iree_vm_ref_type_descriptor_t descriptor = {0};
+  if (descriptor.type == IREE_VM_REF_TYPE_NULL) {
+    descriptor.type_name =
+        iree_make_cstring_view(typeid(ref_object_c_t).name());
+    descriptor.offsetof_counter = offsetof(ref_object_c_t, ref_object.counter);
+    descriptor.destroy =
+        +[](void* ptr) { delete reinterpret_cast<ref_object_c_t*>(ptr); };
+    CHECK_EQ(IREE_STATUS_OK, iree_vm_ref_register_type(&descriptor));
+    kCTypeID = descriptor.type;
+  }
+}
+
+// Tests type registration and lookup.
+TEST(VMRefTest, TypeRegistration) {
+  RegisterTypeC();
+  ASSERT_NE(nullptr, iree_vm_ref_lookup_registered_type(iree_make_cstring_view(
+                         typeid(ref_object_c_t).name())));
+  ASSERT_EQ(nullptr, iree_vm_ref_lookup_registered_type(
+                         iree_make_cstring_view("asodjfaoisdjfaoisdfj")));
 }
 
 // Tests wrapping a simple C struct.
@@ -86,8 +100,7 @@ TEST(VMRefTest, WrappingCStruct) {
   RegisterTypeC();
   iree_vm_ref_t ref = {0};
   EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_wrap(new ref_object_c_t(),
-                             IREE_VM_REF_TYPE_HAL_COMMAND_BUFFER, &ref));
+            iree_vm_ref_wrap(new ref_object_c_t(), kCTypeID, &ref));
   EXPECT_EQ(1, ReadCounter(&ref));
   iree_vm_ref_release(&ref);
 }
@@ -106,12 +119,10 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
   };
 
   static iree_vm_ref_type_descriptor_t descriptor;
-  descriptor.type = IREE_VM_REF_TYPE_HAL_DEVICE;
-  descriptor.type_name = iree_string_view_t{
-      typeid(BaseType).name(), std::strlen(typeid(BaseType).name())};
+  descriptor.type_name = iree_make_cstring_view(typeid(BaseType).name());
   descriptor.offsetof_counter = BaseType::offsetof_counter();
   descriptor.destroy = BaseType::DirectDestroy;
-  iree_vm_ref_register_builtin_type(&descriptor);
+  ASSERT_EQ(IREE_STATUS_OK, iree_vm_ref_register_type(&descriptor));
 
   allocated_derived_types = 0;
 
@@ -131,16 +142,16 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
 TEST(VMRefTest, WrappingRequriesTypeRegistration) {
   iree_vm_ref_t ref = {0};
   int dummy = 0;
-  EXPECT_EQ(IREE_STATUS_INVALID_ARGUMENT,
-            iree_vm_ref_wrap(&dummy, IREE_VM_REF_TYPE_OPAQUE, &ref));
+  EXPECT_EQ(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_vm_ref_wrap(&dummy, static_cast<iree_vm_ref_type_t>(1234), &ref));
 }
 
 // Tests that wrapping releases any existing ref in out_ref.
 TEST(VMRefTest, WrappingReleasesExisting) {
   RegisterTypeC();
   iree_vm_ref_t ref = {0};
-  iree_vm_ref_wrap(new ref_object_c_t(), IREE_VM_REF_TYPE_HAL_COMMAND_BUFFER,
-                   &ref);
+  iree_vm_ref_wrap(new ref_object_c_t(), kCTypeID, &ref);
   EXPECT_EQ(1, ReadCounter(&ref));
   iree_vm_ref_release(&ref);
 }
@@ -150,16 +161,17 @@ TEST(VMRefTest, CheckNull) {
   iree_vm_ref_t null_ref = {0};
   EXPECT_EQ(IREE_STATUS_OK,
             iree_vm_ref_check(&null_ref, IREE_VM_REF_TYPE_NULL));
-  EXPECT_EQ(IREE_STATUS_INVALID_ARGUMENT,
-            iree_vm_ref_check(&null_ref, IREE_VM_REF_TYPE_CONST_BUFFER));
+  EXPECT_EQ(
+      IREE_STATUS_INVALID_ARGUMENT,
+      iree_vm_ref_check(&null_ref, static_cast<iree_vm_ref_type_t>(1234)));
 }
+
 // Tests type checks.
 TEST(VMRefTest, Check) {
   iree_vm_ref_t a_ref = MakeRef<A>();
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_check(&a_ref, IREE_VM_REF_TYPE_HAL_ALLOCATOR));
+  EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_check(&a_ref, A::kTypeID));
   EXPECT_EQ(IREE_STATUS_INVALID_ARGUMENT,
-            iree_vm_ref_check(&a_ref, IREE_VM_REF_TYPE_HAL_BUFFER));
+            iree_vm_ref_check(&a_ref, B::kTypeID));
   iree_vm_ref_release(&a_ref);
 }
 
@@ -199,8 +211,7 @@ TEST(VMRefTest, RetainCheckedNull) {
   iree_vm_ref_t null_ref_0 = {0};
   iree_vm_ref_t null_ref_1 = {0};
   EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_retain_checked(
-                &null_ref_0, IREE_VM_REF_TYPE_HAL_ALLOCATOR, &null_ref_1));
+            iree_vm_ref_retain_checked(&null_ref_0, A::kTypeID, &null_ref_1));
 }
 
 // Tests that types are verified and retains fail if types don't match.
@@ -208,8 +219,7 @@ TEST(VMRefTest, RetainChecked) {
   iree_vm_ref_t a_ref_0 = MakeRef<A>();
   iree_vm_ref_t a_ref_1 = {0};
   EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_retain_checked(&a_ref_0, IREE_VM_REF_TYPE_HAL_ALLOCATOR,
-                                       &a_ref_1));
+            iree_vm_ref_retain_checked(&a_ref_0, A::kTypeID, &a_ref_1));
   iree_vm_ref_release(&a_ref_0);
   iree_vm_ref_release(&a_ref_1);
 }
@@ -259,8 +269,7 @@ TEST(VMRefTest, RetainOrMoveRetainingIntoSelf) {
 TEST(VMRefTest, RetainOrMoveMovingIntoSelf) {
   iree_vm_ref_t a_ref = MakeRef<A>();
   iree_vm_ref_retain_or_move(/*is_move=*/1, &a_ref, &a_ref);
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_check(&a_ref, IREE_VM_REF_TYPE_HAL_ALLOCATOR));
+  EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_check(&a_ref, A::kTypeID));
   iree_vm_ref_release(&a_ref);
 }
 
@@ -289,12 +298,12 @@ TEST(VMRefTest, RetainOrMoveMovingReleasesExisting) {
 TEST(VMRefTest, RetainOrMoveCheckedNull) {
   iree_vm_ref_t null_ref_0 = {0};
   iree_vm_ref_t null_ref_1 = {0};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_retain_or_move_checked(
-                                /*is_move=*/0, &null_ref_0,
-                                IREE_VM_REF_TYPE_HAL_ALLOCATOR, &null_ref_1));
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_retain_or_move_checked(
-                                /*is_move=*/1, &null_ref_0,
-                                IREE_VM_REF_TYPE_HAL_ALLOCATOR, &null_ref_1));
+  EXPECT_EQ(IREE_STATUS_OK,
+            iree_vm_ref_retain_or_move_checked(
+                /*is_move=*/0, &null_ref_0, A::kTypeID, &null_ref_1));
+  EXPECT_EQ(IREE_STATUS_OK,
+            iree_vm_ref_retain_or_move_checked(
+                /*is_move=*/1, &null_ref_0, A::kTypeID, &null_ref_1));
 }
 
 // Tests that retains/moves work when types match.
@@ -303,8 +312,7 @@ TEST(VMRefTest, RetainOrMoveCheckedMatch) {
   iree_vm_ref_t a_ref_0 = MakeRef<A>();
   iree_vm_ref_t a_ref_1 = {0};
   EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_retain_or_move_checked(
-                                /*is_move=*/0, &a_ref_0,
-                                IREE_VM_REF_TYPE_HAL_ALLOCATOR, &a_ref_1));
+                                /*is_move=*/0, &a_ref_0, A::kTypeID, &a_ref_1));
   EXPECT_EQ(1, iree_vm_ref_equal(&a_ref_0, &a_ref_1));
   EXPECT_EQ(2, ReadCounter(&a_ref_0));
   iree_vm_ref_release(&a_ref_0);
@@ -314,8 +322,7 @@ TEST(VMRefTest, RetainOrMoveCheckedMatch) {
   iree_vm_ref_t b_ref_0 = MakeRef<B>();
   iree_vm_ref_t b_ref_1 = {0};
   EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_retain_or_move_checked(
-                                /*is_move=*/1, &b_ref_0,
-                                IREE_VM_REF_TYPE_HAL_BUFFER, &b_ref_1));
+                                /*is_move=*/1, &b_ref_0, B::kTypeID, &b_ref_1));
   EXPECT_EQ(0, iree_vm_ref_equal(&b_ref_0, &b_ref_1));
   EXPECT_EQ(1, ReadCounter(&b_ref_1));
   iree_vm_ref_release(&b_ref_1);
@@ -326,10 +333,9 @@ TEST(VMRefTest, RetainOrMoveCheckedMismatch) {
   // Retain.
   iree_vm_ref_t a_ref_0 = MakeRef<A>();
   iree_vm_ref_t a_ref_1 = {0};
-  EXPECT_EQ(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_vm_ref_retain_or_move_checked(
-          /*is_move=*/0, &a_ref_0, IREE_VM_REF_TYPE_HAL_BUFFER, &a_ref_1));
+  EXPECT_EQ(IREE_STATUS_INVALID_ARGUMENT,
+            iree_vm_ref_retain_or_move_checked(
+                /*is_move=*/0, &a_ref_0, B::kTypeID, &a_ref_1));
   EXPECT_EQ(0, iree_vm_ref_equal(&a_ref_0, &a_ref_1));
   EXPECT_EQ(1, ReadCounter(&a_ref_0));
   iree_vm_ref_release(&a_ref_0);
@@ -337,10 +343,9 @@ TEST(VMRefTest, RetainOrMoveCheckedMismatch) {
   // Move.
   iree_vm_ref_t b_ref_0 = MakeRef<B>();
   iree_vm_ref_t b_ref_1 = {0};
-  EXPECT_EQ(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_vm_ref_retain_or_move_checked(
-          /*is_move=*/1, &b_ref_0, IREE_VM_REF_TYPE_HAL_ALLOCATOR, &b_ref_1));
+  EXPECT_EQ(IREE_STATUS_INVALID_ARGUMENT,
+            iree_vm_ref_retain_or_move_checked(
+                /*is_move=*/1, &b_ref_0, A::kTypeID, &b_ref_1));
   EXPECT_EQ(1, ReadCounter(&b_ref_0));
   iree_vm_ref_release(&b_ref_0);
 }
@@ -350,8 +355,7 @@ TEST(VMRefTest, RetainOrMoveCheckedReleasesExistingNull) {
   iree_vm_ref_t null_ref = {0};
   iree_vm_ref_t a_ref = MakeRef<A>();
   EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_retain_or_move_checked(
-                                /*is_move=*/0, &null_ref,
-                                IREE_VM_REF_TYPE_HAL_ALLOCATOR, &a_ref));
+                                /*is_move=*/0, &null_ref, A::kTypeID, &a_ref));
 }
 
 // Tests that existing references are released when being overwritten.
@@ -359,8 +363,7 @@ TEST(VMRefTest, RetainOrMoveCheckedReleasesExisting) {
   iree_vm_ref_t a_ref_0 = MakeRef<A>();
   iree_vm_ref_t a_ref_1 = MakeRef<A>();
   EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_retain_or_move_checked(
-                                /*is_move=*/1, &a_ref_0,
-                                IREE_VM_REF_TYPE_HAL_ALLOCATOR, &a_ref_1));
+                                /*is_move=*/1, &a_ref_0, A::kTypeID, &a_ref_1));
   iree_vm_ref_release(&a_ref_1);
 }
 
@@ -420,8 +423,7 @@ TEST(VMRefTest, MovingResetsSource) {
 TEST(VMRefTest, MovingIntoSelf) {
   iree_vm_ref_t a_ref = MakeRef<A>();
   iree_vm_ref_move(&a_ref, &a_ref);
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_check(&a_ref, IREE_VM_REF_TYPE_HAL_ALLOCATOR));
+  EXPECT_EQ(IREE_STATUS_OK, iree_vm_ref_check(&a_ref, A::kTypeID));
   iree_vm_ref_release(&a_ref);
 }
 

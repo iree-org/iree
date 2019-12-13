@@ -18,19 +18,21 @@ namespace iree.vm;
 file_identifier "BMOD";
 file_extension "bmod";
 
+// Defines a type within the type table.
+table TypeDef {
+  // Fully-qualified name of the type, such as `hal.buffer`.
+  full_name:string;
+}
+
 // Defines a function signature.
-//
-// The types specifed are defined as:
-//   0x00: invalid
-//   0x01: i32
-//   0x02-0xFF: (reserved)
-//   0xFF-*: a ref_ptr type matching iree_vm_ref_type_t
 table FunctionSignatureDef {
   // Arguments, in order, as described in the FunctionSignatureDef.
-  argument_types:[uint32];
+  // Maps to an entry in the module type table.
+  argument_types:[int32];
 
   // Results, in order, as described in the FunctionSignatureDef.
-  result_types:[uint32];
+  // Maps to an entry in the module type table.
+  result_types:[int32];
 }
 
 // Defines a runtime-resolved import function.
@@ -130,6 +132,9 @@ struct FunctionDescriptor {
 table BytecodeModuleDef {
   // Module namespace used for fully-qualified function lookups.
   name:string (required);
+
+  // Type table mapping type IDs used within the module to type signatures.
+  types:[TypeDef];
 
   // Imported function definitions used to resolve imports.
   imported_functions:[ImportFunctionDef];

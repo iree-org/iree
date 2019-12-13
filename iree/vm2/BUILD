@@ -43,6 +43,7 @@ cc_library(
         ":bytecode_op_table_gen",
         ":module",
         "//iree/base:api",
+        "//iree/base:flatbuffer_util",
         "//iree/base:target_platform",
         "//iree/schemas:bytecode_module_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",

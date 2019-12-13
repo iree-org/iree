@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
+#include "iree/base/flatbuffer_util.h"
 #include "iree/vm2/bytecode_module_impl.h"
 
 // TODO(benvanik): replace with flatcc version so this file can be pure C.
@@ -29,6 +30,49 @@
   ::flatbuffers::GetRoot<iree::vm::BytecodeModuleDef>( \
       module->flatbuffer_data.data)
 
+// Returns true if the given |type_def| is valid, meaning that the type it was
+// resolved from is registered or known to the system as a builtin.
+static bool iree_vm_type_def_is_valid(iree_vm_type_def_t type_def) {
+  return type_def.value_type != IREE_VM_VALUE_TYPE_NONE ||
+         type_def.ref_type != IREE_VM_REF_TYPE_NULL;
+}
+
+// Resolves a type through either builtin rules or the ref registered types.
+static iree_vm_type_def_t iree_vm_bytecode_module_resolve_type(
+    const iree::vm::TypeDef* type_def) {
+  auto full_name = iree::WrapString(type_def->full_name());
+  iree_vm_type_def_t result;
+  memset(&result, 0, sizeof(result));
+  if (full_name == "i32") {
+    result.value_type = IREE_VM_VALUE_TYPE_I32;
+  } else if (!full_name.empty() && full_name[0] == '!') {
+    full_name.remove_prefix(1);
+    const iree_vm_ref_type_descriptor_t* type_descriptor =
+        iree_vm_ref_lookup_registered_type(
+            iree_string_view_t{full_name.data(), full_name.size()});
+    if (type_descriptor) {
+      result.ref_type = type_descriptor->type;
+    }
+  }
+  return result;
+}
+
+// Resolves all types through either builtin rules or the ref registered types.
+// |type_table| can be omitted to just perform verification that all types are
+// registered.
+static iree_status_t iree_vm_bytecode_module_resolve_types(
+    const iree::vm::BytecodeModuleDef* module_def,
+    iree_vm_type_def_t* type_table) {
+  for (int i = 0; i < module_def->types()->size(); ++i) {
+    type_table[i] =
+        iree_vm_bytecode_module_resolve_type(module_def->types()->Get(i));
+    if (!iree_vm_type_def_is_valid(type_table[i])) {
+      return IREE_STATUS_NOT_FOUND;
+    }
+  }
+  return IREE_STATUS_OK;
+}
+
 // Verifies the structure of the flatbuffer so that we can avoid doing so during
 // runtime. There are still some conditions we must be aware of (such as omitted
 // names on functions with internal linkage), however we shouldn't need to
@@ -37,6 +81,11 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     const iree::vm::BytecodeModuleDef* module_def) {
   if (!module_def->name() || module_def->name()->size() == 0) {
     // All modules must have a name.
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  if (!module_def->types()) {
+    // Type table is mandatory, though it could be empty (in empty modules).
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
@@ -62,6 +111,22 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
   if (!module_def->bytecode_data()) {
     // Bytecode data is required if we have any functions.
     return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  for (int i = 0; i < module_def->types()->size(); ++i) {
+    const auto* type_def = module_def->types()->Get(i);
+    if (!type_def) {
+      // All types must be valid.
+      return IREE_STATUS_INVALID_ARGUMENT;
+    } else if (!type_def->full_name() || type_def->full_name()->size() == 0) {
+      // All types require a name.
+      return IREE_STATUS_INVALID_ARGUMENT;
+    }
+    if (!iree_vm_type_def_is_valid(
+            iree_vm_bytecode_module_resolve_type(type_def))) {
+      // No type registered.
+      return IREE_STATUS_INVALID_ARGUMENT;
+    }
   }
 
   if (module_def->imported_functions()) {
@@ -328,7 +393,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   total_state_struct_size += rwdata_storage_capacity;
   total_state_struct_size += global_ref_count * sizeof(iree_vm_ref_t);
   total_state_struct_size +=
-      rodata_ref_count * sizeof(iree_vm_byte_buffer_ref_t);
+      rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_ref_t);
   total_state_struct_size += import_function_count * sizeof(iree_vm_function_t);
 
   iree_vm_bytecode_module_state_t* state = NULL;
@@ -345,11 +410,20 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   state->global_ref_table = (iree_vm_ref_t*)p;
   p += global_ref_count * sizeof(state->global_ref_table);
   state->rodata_ref_count = rodata_ref_count;
-  state->rodata_ref_table = (iree_vm_byte_buffer_ref_t*)p;
+  state->rodata_ref_table = (iree_vm_ro_byte_buffer_ref_t*)p;
   p += rodata_ref_count * sizeof(*state->rodata_ref_table);
   state->import_count = import_function_count;
   state->import_table = (iree_vm_function_t*)p;
   p += import_function_count * sizeof(*state->import_table);
+
+  for (int i = 0; i < rodata_ref_count; ++i) {
+    const iree::vm::RodataSegmentDef* segment =
+        module_def->rodata_segments()->Get(i);
+    iree_vm_ro_byte_buffer_ref_t* ref = &state->rodata_ref_table[i];
+    ref->ref_object.counter = 1;
+    ref->data.data = segment->data()->Data();
+    ref->data.data_length = segment->data()->size();
+  }
 
   *out_module_state = (iree_vm_module_state_t*)state;
   return IREE_STATUS_OK;
@@ -439,9 +513,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
   IREE_API_RETURN_IF_API_ERROR(
       iree_vm_bytecode_module_flatbuffer_verify(module_def));
 
+  size_t type_table_size =
+      module_def->types()->size() * sizeof(iree_vm_type_def_t);
+
   iree_vm_bytecode_module_t* module = NULL;
   IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
-      allocator.self, sizeof(iree_vm_bytecode_module_t), (void**)&module));
+      allocator.self, sizeof(iree_vm_bytecode_module_t) + type_table_size,
+      (void**)&module));
   module->allocator = allocator;
 
   module->function_descriptor_count =
@@ -454,6 +532,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
 
   module->flatbuffer_data = flatbuffer_data;
   module->flatbuffer_allocator = flatbuffer_allocator;
+
+  module->type_count = module_def->types()->size();
+  module->type_table = (iree_vm_type_def_t*)((uint8_t*)module +
+                                             sizeof(iree_vm_bytecode_module_t));
+  iree_vm_bytecode_module_resolve_types(module_def, module->type_table);
 
   module->interface.self = module;
   module->interface.destroy = iree_vm_bytecode_module_destroy;

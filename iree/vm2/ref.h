@@ -32,28 +32,8 @@ extern "C" {
 typedef enum {
   IREE_VM_REF_TYPE_NULL = 0,
 
-  // TODO(benvanik): generate from tblgen.
-  // TODO(benvanik): shrink the table for builtin types and setup a custom user
-  // defined type table.
-  IREE_VM_REF_TYPE_OPAQUE = 61,
-  IREE_VM_REF_TYPE_CONST_BUFFER = 62,
-
-  IREE_VM_REF_TYPE_HAL_ALLOCATOR = 20,
-  IREE_VM_REF_TYPE_HAL_BUFFER = 21,
-  IREE_VM_REF_TYPE_HAL_BUFFER_VIEW = 22,
-  IREE_VM_REF_TYPE_HAL_COMMAND_BUFFER = 23,
-  IREE_VM_REF_TYPE_HAL_DEVICE = 24,
-  IREE_VM_REF_TYPE_HAL_EVENT = 25,
-  IREE_VM_REF_TYPE_HAL_EXECUTABLE = 26,
-  IREE_VM_REF_TYPE_HAL_EXECUTABLE_CACHE = 27,
-  IREE_VM_REF_TYPE_HAL_FENCE = 28,
-  IREE_VM_REF_TYPE_HAL_SEMAPHORE = 29,
-
-  // Base type ID for user-defined types. All type IDs following this are
-  // reserved for application usage. Type IDs must be agreed upon between the
-  // MLIR-side and the runtime-side. User types must be registered at startup
-  // with iree_vm_ref_register_user_defined_type.
-  IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE = 128,
+  // NOTE: these type values are assigned dynamically right now. Treat them as
+  // opaque and unstable across process invocations.
 
   // Maximum type ID value. Type IDs are limited to 24-bits.
   IREE_VM_REF_TYPE_MAX_VALUE = 0x00FFFFFFu,
@@ -69,13 +49,12 @@ typedef enum {
 //  void my_type_destroy(void* ptr) {
 //    free(ptr);
 //  }
-//  iree_vm_ref_type_descriptor_t my_type_descriptor;
-//  my_type_descriptor.type_id = IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE + 100;
+//  static iree_vm_ref_type_descriptor_t my_type_descriptor;
 //  my_type_descriptor.type_name = iree_string_view_t{"my_type", 7};
 //  my_type_descriptor.destroy = my_type_destroy;
 //  my_type_descriptor.offsetof_counter = offsetof(my_type_t,
 //                                                 ref_object.counter);
-//  iree_vm_ref_register_user_defined_type(my_type_descriptor);
+//  iree_vm_ref_register_defined_type(&my_type_descriptor);
 //
 // Usage (C++):
 //  Prefer using RefObject as a base type.
@@ -131,19 +110,6 @@ typedef struct {
   iree_string_view_t type_name;
 } iree_vm_ref_type_descriptor_t;
 
-// Registers a builtin type with the IREE C ref system.
-// The provided destroy function will be used to destroy objects when their
-// reference count goes to 0. NULL can be used to no-op the destruction if the
-// type is not owned by the VM.
-//
-// The |descriptor| must have a type ID populated of a valid builtin type. A
-// reference to the descriptor will be cached and reused in the future.
-//
-// WARNING: this function is not thread-safe and should only be used at startup
-// to register the types. Do not call this while any refs may be alive.
-IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_register_builtin_type(
-    const iree_vm_ref_type_descriptor_t* descriptor);
-
 // Registers a user-defined type with the IREE C ref system.
 // The provided destroy function will be used to destroy objects when their
 // reference count goes to 0. NULL can be used to no-op the destruction if the
@@ -156,8 +122,11 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_register_builtin_type(
 // WARNING: this function is not thread-safe and should only be used at startup
 // to register the types. Do not call this while any refs may be alive.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_ref_register_user_defined_type(
-    iree_vm_ref_type_descriptor_t* descriptor);
+iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor);
+
+// Returns the registered type descriptor for the given type, if found.
+IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL
+iree_vm_ref_lookup_registered_type(iree_string_view_t full_name);
 
 // Wraps a raw pointer in a iree_vm_ref_t reference and assigns it to |out_ref|.
 // |out_ref| will be released if it already contains a reference. The target
@@ -226,11 +195,16 @@ IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
 
 // The built-in constant buffer type.
 // This simply points at a span of memory. The memory could be owned (in which
-// case a destroy function must be provided) or unowned (NULL deostry function).
+// case a destroy function must be provided) or unowned (NULL destroy function).
 typedef struct {
   iree_vm_ref_object_t ref_object;
   iree_const_byte_span_t data;
-} iree_vm_byte_buffer_ref_t;
+  iree_vm_ref_destroy_t destroy;
+} iree_vm_ro_byte_buffer_ref_t;
+
+// Returns the type ID of the iree_vm_ro_byte_buffer_ref_t type.
+IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL
+iree_vm_ro_byte_buffer_ref_type_id();
 
 #ifdef __cplusplus
 }  // extern "C"

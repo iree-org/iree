@@ -147,12 +147,12 @@ iree_status_t iree_custom_native_module_register_types() {
   if (iree_custom_message_descriptor.type) {
     return IREE_STATUS_OK;  // Already registered.
   }
-  iree_custom_message_descriptor.type_name = iree_make_cstring_view("message");
+  iree_custom_message_descriptor.type_name =
+      iree_make_cstring_view("custom.message");
   iree_custom_message_descriptor.offsetof_counter =
       offsetof(iree_custom_message_t, ref_object.counter);
   iree_custom_message_descriptor.destroy = iree_custom_message_destroy;
-  return iree_vm_ref_register_user_defined_type(
-      &iree_custom_message_descriptor);
+  return iree_vm_ref_register_type(&iree_custom_message_descriptor);
 }
 
 //===----------------------------------------------------------------------===//

@@ -286,9 +286,12 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncTypeOf<"value">,
       //   VM_EncResult<"value">,
       // ];
+      int type_id = OP_I32(4);
+      type_id = type_id >= module->type_count ? 0 : type_id;
+      const iree_vm_type_def_t* type_def = &module->type_table[type_id];
       iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(8),
-                                         &OP_GLOBAL_REF(OP_I32(0)), OP_I32(4),
-                                         &OP_R_REF(8));
+                                         &OP_GLOBAL_REF(OP_I32(0)),
+                                         type_def->ref_type, &OP_R_REF(8));
       offset += 4 + 4 + 1;
     });
     DISPATCH_OP(GlobalStoreRef, {
@@ -298,8 +301,12 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncTypeOf<"value">,
       //   VM_EncOperand<"value", 0>,
       // ];
+      int type_id = OP_I32(4);
+      type_id = type_id >= module->type_count ? 0 : type_id;
+      const iree_vm_type_def_t* type_def = &module->type_table[type_id];
       iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(8), &OP_R_REF(8),
-                                         OP_I32(4), &OP_GLOBAL_REF(OP_I32(0)));
+                                         type_def->ref_type,
+                                         &OP_GLOBAL_REF(OP_I32(0)));
       offset += 4 + 4 + 1;
     });
     DISPATCH_OP(GlobalResetRef, {
@@ -352,7 +359,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       int32_t rodata_ordinal = OP_I32(0);
       // TODO(benvanik): allow decompression callbacks to run now (if needed).
       iree_vm_ref_wrap(&module_state->rodata_ref_table[rodata_ordinal],
-                       IREE_VM_REF_TYPE_CONST_BUFFER, &OP_R_REF(4));
+                       iree_vm_ro_byte_buffer_ref_type_id(), &OP_R_REF(4));
       offset += 4 + 1;
     });
 
@@ -381,15 +388,18 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncOperand<"false_value", 2>,
       //   VM_EncResult<"result">,
       // ];
+      int type_id = OP_I32(1);
+      type_id = type_id >= module->type_count ? 0 : type_id;
+      const iree_vm_type_def_t* type_def = &module->type_table[type_id];
       if (OP_R_I32(0)) {
         // Select LHS (+5).
         iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(5), &OP_R_REF(5),
-                                           OP_I32(1), &OP_R_REF(7));
+                                           type_def->ref_type, &OP_R_REF(7));
         if (OP_R_REF_IS_MOVE(6)) iree_vm_ref_release(&OP_R_REF(6));
       } else {
         // Select RHS (+6).
         iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(6), &OP_R_REF(6),
-                                           OP_I32(1), &OP_R_REF(7));
+                                           type_def->ref_type, &OP_R_REF(7));
         if (OP_R_REF_IS_MOVE(5)) iree_vm_ref_release(&OP_R_REF(5));
       }
       offset += 1 + 4 + 1 + 1 + 1;

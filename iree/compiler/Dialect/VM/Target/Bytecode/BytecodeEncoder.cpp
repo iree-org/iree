@@ -33,8 +33,9 @@ namespace {
 // in any emitted files!
 class V0BytecodeEncoder : public BytecodeEncoder {
  public:
-  explicit V0BytecodeEncoder(RegisterAllocation *registerAllocation)
-      : registerAllocation_(registerAllocation) {}
+  V0BytecodeEncoder(llvm::DenseMap<Type, int> *typeTable,
+                    RegisterAllocation *registerAllocation)
+      : typeTable_(typeTable), registerAllocation_(registerAllocation) {}
   ~V0BytecodeEncoder() = default;
 
   LogicalResult beginBlock(Block *block) override {
@@ -87,9 +88,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
              << "type " << value->getType()
              << " is not supported as a serialized type kind";
     }
-    // TODO(benvanik): use a stable type ID.
-    return writeUint32(refPtrType.getObjectType().getKind() -
-                       mlir::Type::FIRST_IREE_TYPE);
+    int typeOrdinal = typeTable_->lookup(refPtrType.getObjectType());
+    return writeUint32(typeOrdinal);
   }
 
   LogicalResult encodeIntAttr(IntegerAttr value) override {
@@ -257,6 +257,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return success();
   }
 
+  llvm::DenseMap<Type, int> *typeTable_;
   RegisterAllocation *registerAllocation_;
 
   Operation *currentOp_ = nullptr;
@@ -270,7 +271,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
 
 // static
 Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
-    IREE::VM::FuncOp funcOp, SymbolTable &symbolTable) {
+    IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
+    SymbolTable &symbolTable) {
   EncodedBytecodeFunction result;
 
   // Perform register allocation first so that we can quickly lookup values as
@@ -283,7 +285,7 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
   result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;
   result.refRegisterCount = registerAllocation.getMaxRefRegisterOrdinal() + 1;
 
-  V0BytecodeEncoder encoder(&registerAllocation);
+  V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
   for (auto &block : funcOp.getBlocks()) {
     if (failed(encoder.beginBlock(&block))) {
       funcOp.emitError() << "failed to begin block";
