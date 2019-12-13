@@ -32,8 +32,8 @@ TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
 ]
 
-cc_binary(
-    name = "iree-opt",
+cc_library(
+    name = "iree_opt_library",
     deps = [
         "//integrations/tensorflow/compiler:tensorflow",
         "//iree/compiler/Dialect",
@@ -56,12 +56,20 @@ cc_binary(
         "@llvm//:support",
         "@local_config_mlir//:AffineDialectRegistration",
         "@local_config_mlir//:MlirOptLib",
-        "@local_config_mlir//:MlirOptMain",
         "@local_config_mlir//:StandardDialectRegistration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
     ] + TARGET_COMPILER_BACKENDS,
+    alwayslink = 1,
+)
+
+cc_binary(
+    name = "iree-opt",
+    deps = [
+        ":iree_opt_library",
+        "@local_config_mlir//:MlirOptMain",
+    ],
 )
 
 cc_binary(
@@ -108,8 +116,8 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "iree-translate",
+cc_library(
+    name = "iree_translate_library",
     srcs = ["iree_translate_main.cc"],
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
@@ -127,6 +135,14 @@ cc_binary(
         "@local_config_mlir//:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ] + TARGET_COMPILER_BACKENDS,
+    alwayslink = 1,
+)
+
+cc_binary(
+    name = "iree-translate",
+    deps = [
+        ":iree_translate_library",
+    ],
 )
 
 cc_binary(

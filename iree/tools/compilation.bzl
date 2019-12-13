@@ -21,6 +21,7 @@ def iree_bytecode_module(
         name,
         src,
         translation = "-mlir-to-iree-module",
+        translate_tool = "//iree/tools:iree-translate",
         cc_namespace = None,
         visibility = None):
     native.genrule(
@@ -31,15 +32,13 @@ def iree_bytecode_module(
         ],
         cmd = " && ".join([
             " ".join([
-                "$(location //iree/tools:iree-translate)",
+                "$(location %s)" % (translate_tool),
                 translation,
                 "-o $(location %s.emod)" % (name),
                 "$(location %s)" % (src),
             ]),
         ]),
-        tools = [
-            "//iree/tools:iree-translate",
-        ],
+        tools = [translate_tool],
         message = "Compiling IREE module %s..." % (name),
         output_to_bindir = 1,
     )
