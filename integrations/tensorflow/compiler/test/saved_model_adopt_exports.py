@@ -57,8 +57,10 @@ pyiree.tf_test_driver.add_test(
 
 # CHECK-LABEL: RUN_TEST: T0002a_SimpleVarRead
 # CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
-# CHECK: func @f() -> (tensor<f32> {tf_saved_model.index_path = []})
-# CHECK: attributes{{.*}}iree.module.export
+# CHECK: func @f() -> tensor<f32>
+# CHECK: attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I1!R3!_0"}
 # CHECK:   flow.variable.load @v : tensor<f32>
 # CHECK: FINISH_TEST
 class T0002a_SimpleVarRead(tf.Module):
@@ -73,9 +75,11 @@ class T0002a_SimpleVarRead(tf.Module):
 
 # CHECK-LABEL: RUN_TEST: T0002b_SimpleVarWrite
 # CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<f32>
-# CHECK: func @f(%arg0: tensor<f32> {tf_saved_model.index_path = [0]})
-# CHECK: attributes{{.*}}iree.module.export
-# CHECK:   flow.variable.store %arg0, @v : tensor<f32>
+# CHECK: func @f(%arg0: tensor<f32>)
+# CHECK: attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R1!"}
+# CHECK: flow.variable.store %arg0, @v : tensor<f32>
 # CHECK: FINISH_TEST
 class T0002b_SimpleVarWrite(tf.Module):
 
@@ -88,10 +92,12 @@ class T0002b_SimpleVarWrite(tf.Module):
 
 
 # CHECK-LABEL: RUN_TEST: T0002c_SimpleConst
-#  flow.variable [[CONST:@.+]] dense<0.000000e+00> : tensor<f32>
-#  func @f() -> (tensor<f32> {tf_saved_model.index_path = []})
-#  attributes{{.*}}iree.module.export
-#    flow.variable.load [[CONST]] : tensor<f32>
+# CHECK: flow.variable [[CONST:@.+]] dense<0.000000e+00> : tensor<f32>
+# CHECK: func @f() -> tensor<f32>
+# CHECK: attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I1!R3!_0"}
+# CHECK: flow.variable.load [[CONST]] : tensor<f32>
 # CHECK: FINISH_TEST
 class T0002c_SimpleConst(tf.Module):
 
@@ -106,7 +112,9 @@ class T0002c_SimpleConst(tf.Module):
 # CHECK-LABEL: RUN_TEST: T0002d_VarCompatibleShapeChange
 # CHECK: flow.variable @v mutable dense<0.000000e+00> : tensor<1xf32>
 # CHECK: func @f()
-# CHECK: attributes{{.*}}iree.module.export
+# CHECK: attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I1!R1!"}
 # CHECK:   [[CONST_2xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>} : () -> tensor<2xf32>
 # CHECK:   [[CONST_3xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00, 2.000000e+00]> : tensor<3xf32>} : () -> tensor<3xf32>
 # CHECK:   flow.variable.store [[CONST_2xf32]], @v : tensor<2xf32>
@@ -182,10 +190,13 @@ pyiree.tf_test_driver.add_test(
 
 # Tests that a structured argument is handled properly.
 # NOTE: This is currently an error and needs to be implemented
-# CHECK-LABEL: RUN_TEST: T0003_StructuredArgs
-# CHECK: [ERROR]: This pass doesn't support structured arguments yet
-# CHECK: FINISH_TEST_WITH_EXCEPTION
-class T0003_StructuredArgs(tf.Module):
+# CHECK-LABEL: RUN_TEST: T0003a_StructuredArgs
+# CHECK: func @simple_mul
+# CHECK:      attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I23!S19!k0D13!K2!x_0K2!y_1R3!_0"}
+# CHECK: FINISH_TEST
+class T0003a_StructuredArgs(tf.Module):
 
   @tf.function(input_signature=[{
       "x": tf.TensorSpec([4], tf.float32),
@@ -196,19 +207,21 @@ class T0003_StructuredArgs(tf.Module):
 
 
 pyiree.tf_test_driver.add_test(
-    test_name="T0003_StructuredArgs",
-    tf_module_builder=T0003_StructuredArgs,
+    test_name="T0003a_StructuredArgs",
+    tf_module_builder=T0003a_StructuredArgs,
     passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True,
-    expect_pass_failure=True)
+    print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
 # NOTE: This is currently an error and needs to be implemented
-# CHECK-LABEL: RUN_TEST: T0003_StructuredMultipleResult
-# CHECK: [ERROR]: This pass doesn't support multiple results yet
-# CHECK: FINISH_TEST_WITH_EXCEPTION
-class T0003_StructuredMultipleResult(tf.Module):
+# CHECK-LABEL: RUN_TEST: T0003b_StructuredMultipleDictResult
+# CHECK: func @simple_mul
+# CHECK:      attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I12!S9!k0_0k1_1R26!D22!K2!x_0K10!x_squared_1"}
+# CHECK: FINISH_TEST
+class T0003b_StructuredMultipleDictResult(tf.Module):
 
   @tf.function(input_signature=[
       tf.TensorSpec([4], tf.float32),
@@ -220,19 +233,21 @@ class T0003_StructuredMultipleResult(tf.Module):
 
 
 pyiree.tf_test_driver.add_test(
-    test_name="T0003_StructuredMultipleResult",
-    tf_module_builder=T0003_StructuredMultipleResult,
+    test_name="T0003b_StructuredMultipleDictResult",
+    tf_module_builder=T0003b_StructuredMultipleDictResult,
     passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True,
-    expect_pass_failure=True)
+    print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.
 # NOTE: This is currently an error and needs to be implemented
-# CHECK-LABEL: RUN_TEST: T0004_StructuredSingleResult
-# CHECK: [ERROR]: This pass doesn't support structured results yet
-# CHECK: FINISH_TEST_WITH_EXCEPTION
-class T0004_StructuredSingleResult(tf.Module):
+# CHECK-LABEL: RUN_TEST: T0003c_StructuredSingleDictResult
+# CHECK: func @simple_mul
+# CHECK:      attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I12!S9!k0_0k1_1R10!D7!K2!x_0"}
+# CHECK: FINISH_TEST
+class T0003c_StructuredSingleDictResult(tf.Module):
 
   @tf.function(input_signature=[
       tf.TensorSpec([4], tf.float32),
@@ -244,11 +259,88 @@ class T0004_StructuredSingleResult(tf.Module):
 
 
 pyiree.tf_test_driver.add_test(
-    test_name="T0004_StructuredSingleResult",
-    tf_module_builder=T0004_StructuredSingleResult,
+    test_name="T0003c_StructuredSingleDictResult",
+    tf_module_builder=T0003c_StructuredSingleDictResult,
     passes=SAVED_MODEL_IMPORT_PASSES,
-    print_input_module=True,
-    expect_pass_failure=True)
+    print_input_module=True)
+
+
+# Tests that a structured argument is handled properly.
+# NOTE: This is currently an error and needs to be implemented
+# CHECK-LABEL: RUN_TEST: T0003d_StructuredSingleResult
+# CHECK: func @simple_mul
+# CHECK:      attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I12!S9!k0_0k1_1R3!_0"}
+# CHECK: FINISH_TEST
+class T0003d_StructuredSingleResult(tf.Module):
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([4], tf.float32),
+      tf.TensorSpec([4], tf.float32)
+  ])
+  def simple_mul(self, a, b):
+    product = a * b
+    return product
+
+
+pyiree.tf_test_driver.add_test(
+    test_name="T0003d_StructuredSingleResult",
+    tf_module_builder=T0003d_StructuredSingleResult,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True)
+
+
+# Tests that a structured argument is handled properly.
+# NOTE: This is currently an error and needs to be implemented
+# CHECK-LABEL: RUN_TEST: T0003e_StructuredSequenceResult
+# CHECK: func @simple_mul
+# CHECK:      attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I12!S9!k0_0k1_1R17!S13!k0_0k1_1k2_2"}
+# CHECK: FINISH_TEST
+class T0003e_StructuredSequenceResult(tf.Module):
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([4], tf.float32),
+      tf.TensorSpec([4], tf.float32)
+  ])
+  def simple_mul(self, a, b):
+    product = a * b
+    return product, a, b
+
+
+pyiree.tf_test_driver.add_test(
+    test_name="T0003e_StructuredSequenceResult",
+    tf_module_builder=T0003e_StructuredSequenceResult,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True)
+
+
+# Tests that a structured argument is handled properly.
+# NOTE: This is currently an error and needs to be implemented
+# CHECK-LABEL: RUN_TEST: T0003f_StructuredNestedResult
+# CHECK: func @simple_mul
+# CHECK:      attributes
+# CHECK-SAME: iree.module.export
+# CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I12!S9!k0_0k1_1R27!S23!k0_0k1D13!K2!a_1K2!b_2"}
+# CHECK: FINISH_TEST
+class T0003f_StructuredNestedResult(tf.Module):
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([4], tf.float32),
+      tf.TensorSpec([4], tf.float32)
+  ])
+  def simple_mul(self, a, b):
+    product = a * b
+    return product, {"a": a, "b": b}
+
+
+pyiree.tf_test_driver.add_test(
+    test_name="T0003f_StructuredNestedResult",
+    tf_module_builder=T0003f_StructuredNestedResult,
+    passes=SAVED_MODEL_IMPORT_PASSES,
+    print_input_module=True)
 
 
 # Tests that a structured argument is handled properly.

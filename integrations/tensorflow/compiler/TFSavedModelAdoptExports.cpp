@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "integrations/tensorflow/compiler/Passes.h"
+#include "iree/base/signature_mangle.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -30,7 +31,33 @@
 namespace mlir {
 namespace iree_compiler {
 
+using ::iree::SipSignatureMangler;
+
 namespace {
+
+LogicalResult setRawSignatureIndex(FuncOp funcOp, SipSignatureMangler &mangler,
+                                   int rawIndex, ArrayAttr indexPathAttr) {
+  llvm::SmallVector<SipSignatureMangler::Key, 8> indexKeys;
+  for (auto &indexAttr : indexPathAttr) {
+    if (auto stringAttr = indexAttr.dyn_cast<StringAttr>()) {
+      auto stringRef = stringAttr.getValue();
+      indexKeys.emplace_back(
+          absl::string_view(stringRef.data(), stringRef.size()));
+    } else if (auto intAttr = indexAttr.dyn_cast<IntegerAttr>()) {
+      indexKeys.emplace_back(intAttr.getInt());
+    } else {
+      return funcOp.emitError()
+             << "Each index path component must be a string or integer";
+    }
+  }
+
+  if (!mangler.SetRawSignatureIndex(rawIndex, indexKeys)) {
+    return funcOp.emitError()
+           << "Unable to generate mangled form for index path";
+  }
+
+  return success();
+}
 
 LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
   OpBuilder global_builder(module.getBodyRegion());
@@ -122,10 +149,24 @@ class TFSavedModelAdoptExportsPass
     : public ModulePass<TFSavedModelAdoptExportsPass> {
  public:
   void runOnModule() override {
+    if (failed(run())) {
+      signalPassFailure();
+    }
+  }
+
+  LogicalResult run() {
     mlir::Builder builder(getModule());
+    Identifier savedModelIndexPathIdent =
+        builder.getIdentifier("tf_saved_model.index_path");
+    Identifier ireeReflectionIdent = builder.getIdentifier("iree.reflection");
+    Identifier ireeModuleExportIdent =
+        builder.getIdentifier("iree.module.export");
+    Identifier sipIdent = builder.getIdentifier("sip");
+    Identifier abiIdent = builder.getIdentifier("abi");
+    Identifier abiVersionIdent = builder.getIdentifier("abiv");
 
     if (failed(ImportTfSavedModelGlobalTensorsToIREEFlow(getModule()))) {
-      return signalPassFailure();
+      return failure();
     }
 
     // Handle saved model exported functions.
@@ -134,56 +175,70 @@ class TFSavedModelAdoptExportsPass
       auto exported_names = mlir::tf_saved_model::GetExportedNames(func);
       if (exported_names.empty()) continue;
 
-      // TODO(laurenzo): After sequencer rework, we should just keep the
+      // TODO(laurenzo): After VM2 rework, we should just keep the
       // function name as-is and create explicit export ops for each exported
       // function.
       if (exported_names.size() > 1) {
-        func.emitError() << "Multiple exported names not supported yet";
-        signalPassFailure();
-        return;
+        return func.emitError() << "Multiple exported names not supported yet";
       }
       func.setName(exported_names.front());
 
+      // Function level reflection attributes.
+      SipSignatureMangler inputsMangler;
+      SipSignatureMangler resultsMangler;
+      SmallVector<NamedAttribute, 3> funcReflectAttrs;
+      funcReflectAttrs.push_back(
+          builder.getNamedAttr(abiIdent, builder.getStringAttr(sipIdent)));
+      funcReflectAttrs.push_back(
+          builder.getNamedAttr(abiVersionIdent, builder.getI32IntegerAttr(1)));
+
       // Tag it as an IREE exported function.
-      func.setAttr("iree.module.export", builder.getUnitAttr());
+      func.setAttr(ireeModuleExportIdent, builder.getUnitAttr());
 
-      // TODO(laurenzo): Validate and map structured arguments signaled via
-      // non-monotonic tf_saved_model.index_path attributes. For now, just fail
-      // if we encounter such arguments.
+      // Process per-argument attrs and generate reflection metadata.
       for (int i = 0, e = func.getNumArguments(); i < e; i++) {
-        auto array = func.getArgAttrOfType<mlir::ArrayAttr>(
-            i, "tf_saved_model.index_path");
-        if (!array) continue;
-        auto attrs = array.getValue();
-        if (attrs.size() == 1) {
-          if (auto integer = attrs.front().dyn_cast<IntegerAttr>()) {
-            if (integer.getValue() == i) {
-              continue;
-            }
-          }
+        auto indexPathAttr =
+            func.getArgAttrOfType<mlir::ArrayAttr>(i, savedModelIndexPathIdent);
+        if (!indexPathAttr) {
+          return func.emitError()
+                 << "Missing argument attribute: " << savedModelIndexPathIdent;
         }
-        func.emitError()
-            << "This pass doesn't support structured arguments yet";
-        signalPassFailure();
-        return;
+        func.removeArgAttr(i, savedModelIndexPathIdent);
+
+        if (failed(
+                setRawSignatureIndex(func, inputsMangler, i, indexPathAttr))) {
+          return failure();
+        }
       }
 
-      // TODO(laurenzo): Also accept structured results. For now, just fail
-      // if any are found.
-      if (func.getNumResults() > 1) {
-        func.emitError() << "This pass doesn't support multiple results yet";
-        signalPassFailure();
-        return;
-      }
+      // Process per-result attrs and generate reflection metadata.
       for (int i = 0, e = func.getNumResults(); i < e; i++) {
-        auto array = func.getResultAttrOfType<mlir::ArrayAttr>(
-            i, "tf_saved_model.index_path");
-        if (array && array.size() != 0) {
-          func.emitError()
-              << "This pass doesn't support structured results yet";
-          signalPassFailure();
-          return;
+        auto indexPathAttr = func.getResultAttrOfType<mlir::ArrayAttr>(
+            i, savedModelIndexPathIdent);
+        if (!indexPathAttr) {
+          return func.emitError()
+                 << "Missing result attribute: " << savedModelIndexPathIdent;
         }
+        func.removeResultAttr(i, savedModelIndexPathIdent);
+
+        if (failed(
+                setRawSignatureIndex(func, resultsMangler, i, indexPathAttr))) {
+          return failure();
+        }
+      }
+
+      // Add the function level reflection attribute.
+      auto functionSignature = SipSignatureMangler::ToFunctionSignature(
+          inputsMangler, resultsMangler);
+      if (!functionSignature) {
+        return func.emitError() << "Unable to generate sip function signature";
+      }
+      funcReflectAttrs.push_back(builder.getNamedAttr(
+          sipIdent, builder.getStringAttr(functionSignature->encoded())));
+
+      if (!funcReflectAttrs.empty()) {
+        func.setAttr(ireeReflectionIdent,
+                     builder.getDictionaryAttr(funcReflectAttrs));
       }
 
       // Remove its designation as a saved model export.
@@ -192,6 +247,7 @@ class TFSavedModelAdoptExportsPass
 
     // We should have now removed anything requiring saved model semantics.
     getModule().removeAttr("tf_saved_model.semantics");
+    return success();
   }
 };
 

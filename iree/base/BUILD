@@ -349,6 +349,28 @@ cc_test(
 )
 
 cc_library(
+    name = "signature_mangle",
+    srcs = ["signature_mangle.cc"],
+    hdrs = ["signature_mangle.h"],
+    deps = [
+        ":status",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "signature_mangle_test",
+    srcs = ["signature_mangle_test.cc"],
+    deps = [
+        ":signature_mangle",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "source_location",
     hdrs = ["source_location.h"],
     deps = platform_trampoline_deps("source_location"),

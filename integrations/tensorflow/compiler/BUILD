@@ -48,6 +48,7 @@ cc_library(
         "//conditions:default": [
         ],
     }) + [
+        "//iree/base:signature_mangle",
         "@local_config_mlir//:Pass",
     ],
     alwayslink = 1,

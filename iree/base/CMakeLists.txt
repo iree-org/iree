@@ -341,6 +341,31 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    signature_mangle
+  HDRS
+    "signature_mangle.h"
+  SRCS
+    "signature_mangle.cc"
+  DEPS
+    absl::memory
+    absl::optional
+    absl::span
+    absl::strings
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    signature_mangle_test
+  SRCS
+    "signature_mangle_test.cc"
+  DEPS
+    gtest_main
+    iree::base::signature_mangle
+)
+
 iree_cc_test(
   NAME
     shape_test
