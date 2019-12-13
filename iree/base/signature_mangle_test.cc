@@ -209,6 +209,68 @@ TEST(SignatureParserTest, ZeroLengthSpan) {
   EXPECT_EQ(SignatureParser::Type::kEnd, sp1.Next());
 }
 
+// -----------------------------------------------------------------------------
+// Raw signatures
+// -----------------------------------------------------------------------------
+
+TEST(RawSignatureManglerTest, DefaultBuffer) {
+  RawSignatureMangler sm;
+  sm.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32, {});
+  EXPECT_EQ("B1!", sm.builder().encoded());
+}
+
+TEST(RawSignatureManglerTest, FullBuffer) {
+  RawSignatureMangler sm;
+  std::vector<int> dims = {-1, 128, 64};
+  sm.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat64,
+                       absl::MakeSpan(dims));
+  EXPECT_EQ("B13!t2d-1d128d64", sm.builder().encoded());
+}
+
+TEST(RawSignatureManglerTest, AnyRef) {
+  RawSignatureMangler sm;
+  sm.AddAnyReference();
+  EXPECT_EQ("O1!", sm.builder().encoded());
+}
+
+TEST(RawSignatureParserTest, EmptySignature) {
+  RawSignatureMangler inputs;
+  RawSignatureMangler results;
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  RawSignatureParser p;
+  auto s = p.FunctionSignatureToString(sig.encoded());
+  ASSERT_TRUE(s) << *p.GetError();
+  EXPECT_EQ("() -> ()", *s);
+}
+
+TEST(RawSignatureParserTest, AllTypes) {
+  RawSignatureMangler inputs;
+  inputs.AddAnyReference();
+  std::vector<int> dims = {-1, 128, 64};
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32,
+                           absl::MakeSpan(dims));
+  RawSignatureMangler results;
+  std::vector<int> dims2 = {32, -1, 64};
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kUint64,
+                            absl::MakeSpan(dims2));
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I18!O1!B11!d-1d128d64R17!B13!t11d32d-1d64", sig.encoded());
+
+  RawSignatureParser p;
+  auto s = p.FunctionSignatureToString(sig.encoded());
+  ASSERT_TRUE(s) << *p.GetError();
+  EXPECT_EQ(
+      "(RefObject<?>, Buffer<float32[?x128x64]>) -> "
+      "(Buffer<uint64[32x?x64]>)",
+      *s);
+}
+
+// -----------------------------------------------------------------------------
+// Sip signatures
+// -----------------------------------------------------------------------------
+
 TEST_F(SipSignatureTest, NoInputsResults) {
   const char kExpectedInputs[] = R"()";
   const char kExpectedResults[] = R"()";

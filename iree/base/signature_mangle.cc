@@ -21,6 +21,30 @@
 namespace iree {
 
 // -----------------------------------------------------------------------------
+// AbiConstants
+// -----------------------------------------------------------------------------
+
+const std::array<size_t, 12> AbiConstants::kScalarTypeSize = {
+    4,  // kIeeeFloat32 = 0,
+    2,  // kIeeeFloat16 = 1,
+    8,  // kIeeeFloat64 = 2,
+    2,  // kGoogleBfloat16 = 3,
+    1,  // kSint8 = 4,
+    2,  // kSint16 = 5,
+    4,  // kSint32 = 6,
+    8,  // kSint64 = 7,
+    1,  // kUint8 = 8,
+    2,  // kUint16 = 9,
+    4,  // kUint32 = 10,
+    8,  // kUint64 = 11,
+};
+
+const std::array<const char*, 12> AbiConstants::kScalarTypeNames = {
+    "float32", "float16", "float64", "bfloat16", "sint8",  "sint16",
+    "sint32",  "sint64",  "uint8",   "uint16",   "uint32", "uint64",
+};
+
+// -----------------------------------------------------------------------------
 // SignatureBuilder and SignatureParser
 // -----------------------------------------------------------------------------
 
@@ -111,6 +135,98 @@ bool SignatureParser::SeekTag(char tag) {
     Next();
   }
   return next_type_ != Type::kEnd;
+}
+
+// -----------------------------------------------------------------------------
+// RawSignatureMangler
+// -----------------------------------------------------------------------------
+
+SignatureBuilder RawSignatureMangler::ToFunctionSignature(
+    RawSignatureMangler& inputs, RawSignatureMangler& results) {
+  SignatureBuilder func_builder;
+  inputs.builder_.AppendTo(func_builder, 'I');
+  results.builder_.AppendTo(func_builder, 'R');
+  return func_builder;
+}
+
+void RawSignatureMangler::AddAnyReference() {
+  // A more constrained ref object would have a non empty span.
+  builder_.Span(absl::string_view(), 'O');
+}
+
+void RawSignatureMangler::AddShapedNDBuffer(
+    AbiConstants::ScalarType element_type, absl::Span<int> shape) {
+  SignatureBuilder item_builder;
+  // Fields:
+  //   't': scalar type code
+  //   'd': shape dimension
+  if (static_cast<unsigned>(element_type) != 0) {
+    item_builder.Integer(static_cast<unsigned>(element_type), 't');
+  }
+  for (int d : shape) {
+    item_builder.Integer(d, 'd');
+  }
+  item_builder.AppendTo(builder_, 'B');
+}
+
+// -----------------------------------------------------------------------------
+// RawSignatureParser
+// -----------------------------------------------------------------------------
+
+void RawSignatureParser::Description::ToString(std::string& s) const {
+  switch (type) {
+    case Type::kBuffer: {
+      const char* scalar_type_name = "!BADTYPE!";
+      unsigned scalar_type_u = static_cast<unsigned>(buffer.scalar_type);
+      if (scalar_type_u >= 0 &&
+          scalar_type_u <= AbiConstants::kScalarTypeNames.size()) {
+        scalar_type_name = AbiConstants::kScalarTypeNames[static_cast<unsigned>(
+            scalar_type_u)];
+      }
+      absl::StrAppend(&s, "Buffer<", scalar_type_name, "[");
+      for (size_t i = 0; i < dims.size(); ++i) {
+        if (i > 0) s.push_back('x');
+        if (dims[i] >= 0) {
+          absl::StrAppend(&s, dims[i]);
+        } else {
+          s.push_back('?');
+        }
+      }
+      absl::StrAppend(&s, "]>");
+      break;
+    }
+    case Type::kRefObject:
+      absl::StrAppend(&s, "RefObject<?>");
+      break;
+    default:
+      absl::StrAppend(&s, "!UNKNOWN!");
+  }
+}
+
+absl::optional<std::string> RawSignatureParser::FunctionSignatureToString(
+    absl::string_view signature) {
+  std::string s;
+
+  bool print_sep = false;
+  auto visitor = [&print_sep, &s](const Description& d) {
+    if (print_sep) {
+      s.append(", ");
+    }
+    d.ToString(s);
+    print_sep = true;
+  };
+  s.push_back('(');
+  VisitInputs(signature, visitor);
+  s.append(") -> (");
+  print_sep = false;
+  VisitResults(signature, visitor);
+  s.push_back(')');
+
+  if (!GetError()) {
+    return s;
+  } else {
+    return absl::nullopt;
+  }
 }
 
 // -----------------------------------------------------------------------------
