@@ -35,7 +35,8 @@ use GitHub pull requests (PRs) for this purpose. Consult
 information on using pull requests.
 
 Each PR will be merged into the master branch as a single commit by our
-automation workflow. Please keep PRs small (focused on a single issue) to
+automation workflow with a description matching the initial PR
+comment/description. Please keep PRs small (focused on a single issue) to
 streamline review and ease later culprit-finding.
 
 ## Community Guidelines
