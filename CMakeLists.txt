@@ -34,6 +34,10 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 
+# Require python3
+find_package(PythonInterp 3 REQUIRED)
+find_package(PythonLibs 3 REQUIRED)
+
 #-------------------------------------------------------------------------------
 # IREE-specific CMake configuration
 #-------------------------------------------------------------------------------
