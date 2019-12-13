@@ -91,7 +91,7 @@ flatbuffer_cc_library(
 flatbuffer_cc_library(
   NAME
     bytecode_module_def_cc_fbs
-  SRC
+  SRCS
     "bytecode_module_def.fbs"
   PUBLIC
 )
