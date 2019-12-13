@@ -326,7 +326,8 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
     moduleStateDef = msd.Finish();
   }
 
-  auto nameOffset = fbb.CreateString(moduleOp.sym_name().str());
+  auto nameOffset = fbb.CreateString(
+      moduleOp.sym_name().empty() ? "module" : moduleOp.sym_name().str());
 
   iree::vm::BytecodeModuleDefBuilder bmd(fbb);
   bmd.add_name(nameOffset);

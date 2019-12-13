@@ -4,12 +4,11 @@
 module {
 module @simple_module {
 // CHECK: exported_functions:
-// TODO(benvanik): check with river on sym_vis to get exports working.
-// --CHECK: local_name: "func"
+// CHECK: local_name: "func"
 
 // CHECK: internal_functions:
 // CHECK: local_name: "func"
-func @func(%arg0 : i32) -> i32 {
+func @func(%arg0 : i32) -> i32 attributes { iree.module.export } {
   return %arg0 : i32
 }
 

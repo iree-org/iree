@@ -101,6 +101,12 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     rewriter.applySignatureConversion(&newFuncOp.getBody(),
                                       signatureConversion);
 
+    // Also add an export if the function is tagged. Ideally this would be
+    // replaced with river sym_vis magic.
+    if (srcOp.getAttr("iree.module.export")) {
+      rewriter.create<IREE::VM::ExportOp>(srcOp.getLoc(), newFuncOp);
+    }
+
     rewriter.replaceOp(srcOp, llvm::None);
     return matchSuccess();
   }
