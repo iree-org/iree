@@ -67,8 +67,8 @@ class PrePartitioningConversionPass
     setupDirectStandardToFlowLegality(context, conversionTarget);
     populateStandardToFlowPatterns(context, conversionPatterns);
 
-    if (failed(applyFullConversion(getFunction(), conversionTarget,
-                                   conversionPatterns, &typeConverter))) {
+    if (failed(applyPartialConversion(getFunction(), conversionTarget,
+                                      conversionPatterns, &typeConverter))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }
@@ -98,8 +98,8 @@ class PostPartitioningConversionPass
     populateHLOToFlowPatterns(context, conversionPatterns);
     populateStandardToFlowPatterns(context, conversionPatterns);
 
-    if (failed(applyFullConversion(getFunction(), conversionTarget,
-                                   conversionPatterns, &typeConverter))) {
+    if (failed(applyPartialConversion(getFunction(), conversionTarget,
+                                      conversionPatterns, &typeConverter))) {
       getFunction().emitError() << "module is not in a compatible input format";
       return signalPassFailure();
     }

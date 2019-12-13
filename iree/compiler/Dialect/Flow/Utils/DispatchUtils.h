@@ -33,6 +33,10 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
+// Returns true if we know about this dialect and have special dispatchability
+// information about it.
+bool isOpOfKnownDialect(Operation *op);
+
 // Builds a new dispatch region with the given |ops|.
 // The region will capture all required values and return all values used
 // outside of the |ops| provided. The region will be inserted at the location of

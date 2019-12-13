@@ -75,6 +75,9 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
              !op->getResult(0)->getType().isa<ShapedType>()) {
     // We don't put scalar manipulation into dispatch regions.
     return false;
+  } else if (!isOpOfKnownDialect(op)) {
+    // Probably a custom op.
+    return false;
   }
   return true;
 }

@@ -19,11 +19,22 @@
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+bool isOpOfKnownDialect(Operation *op) {
+  if (!op->getDialect()) return false;
+  // TODO(benvanik): replace with op dispatchability interface to allow dialects
+  // to opt into dispatch.
+  auto dialectNamespace = op->getDialect()->getNamespace();
+  return dialectNamespace == xla_hlo::XlaHloDialect::getDialectNamespace() ||
+         dialectNamespace == mlir::StandardOpsDialect::getDialectNamespace() ||
+         dialectNamespace == FlowDialect::getDialectNamespace();
+}
 
 namespace {
 

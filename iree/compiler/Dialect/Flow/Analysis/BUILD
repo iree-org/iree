@@ -29,6 +29,7 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/Flow/Utils",
         "@llvm//:support",
         "@local_config_mlir//:IR",
         "@local_config_mlir//:Pass",
