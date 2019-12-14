@@ -16,17 +16,17 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "HALEnums.cpp.inc"
-    "HALOpFolders.cpp"
-    "HALOpInterface.cpp.inc"
-    "HALOps.cpp"
-    "HALTypes.cpp"
-  SRCS
     "HALEnums.h.inc"
     "HALOpInterface.h.inc"
     "HALOps.h"
     "HALOps.h.inc"
     "HALTypes.h"
+  SRCS
+    "HALEnums.cpp.inc"
+    "HALOpFolders.cpp"
+    "HALOpInterface.cpp.inc"
+    "HALOps.cpp"
+    "HALTypes.cpp"
   DEPS
     HALEnumsGen
     HALOpInterfaceGen
