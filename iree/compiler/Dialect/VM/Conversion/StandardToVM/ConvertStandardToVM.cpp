@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -100,6 +100,12 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newFuncOp.getBody(),
                                       signatureConversion);
+
+    // Also add an export if the function is tagged. Ideally this would be
+    // replaced with river sym_vis magic.
+    if (srcOp.getAttr("iree.module.export")) {
+      rewriter.create<IREE::VM::ExportOp>(srcOp.getLoc(), newFuncOp);
+    }
 
     rewriter.replaceOp(srcOp, llvm::None);
     return matchSuccess();

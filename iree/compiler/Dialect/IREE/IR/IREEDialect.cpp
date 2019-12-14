@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"

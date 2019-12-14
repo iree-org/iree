@@ -12,37 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Flow/Analysis)
-add_subdirectory(Flow/Conversion/HLOToFlow)
-add_subdirectory(Flow/Conversion/StandardToFlow)
-add_subdirectory(Flow/IR)
-add_subdirectory(Flow/Transforms)
-add_subdirectory(Flow/Utils)
-
+add_subdirectory(Flow)
 add_subdirectory(HAL)
-
-add_subdirectory(VM/Analysis)
-add_subdirectory(VM/Conversion)
-add_subdirectory(VM/Conversion/StandardToVM)
-add_subdirectory(VM/IR)
-add_subdirectory(VM/Target/Bytecode)
-add_subdirectory(VM/Tools)
-add_subdirectory(VM/Transforms)
-
-iree_cc_library(
-  NAME
-    Dialect
-  HDRS
-    "IREEDialect.h"
-    "Traits.h"
-    "Types.h"
-  SRCS
-    "IREEDialect.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRSupport
-  ALWAYSLINK
-  PUBLIC
-)
+add_subdirectory(IREE)
+add_subdirectory(Interpreter)
+add_subdirectory(VM)

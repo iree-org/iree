@@ -151,10 +151,9 @@ LogicalResult convertToDispatchOp(IREE::DispatchRegionOp regionOp,
       wrapAsMemRef(regionOp.getWorkload(), regionOp, dispatcherBuilder);
 
   // Create the dispatch op to the executable function.
-  SmallVector<Value *, 8> operandValues(regionOp.getArgOperands());
   auto dispatchOp = dispatcherBuilder.create<IREESeq::HL::DispatchOp>(
       regionOp.getLoc(), executable.getName(), entryPoint.getName(), workload,
-      entryPoint.getType().getResults(), operandValues);
+      entryPoint.getType().getResults(), regionOp.getArgOperands());
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {

@@ -19,7 +19,7 @@ cc_library(
         "TranslationFlags.h",
     ],
     deps = [
-        "//iree/compiler/Dialect",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Analysis",
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Transforms",

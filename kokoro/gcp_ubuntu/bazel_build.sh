@@ -23,9 +23,6 @@ set -x
 # TODO(b/145697435) Kokoro VMs have bad public keys. Delete when this is fixed.
 echo "Deleting corrupted ppa sources"
 sudo rm -rf /etc/apt/sources.list.d/nvidia-docker.list*
-# Make sure we don't run the old version of bazel the VM comes with.
-echo "Deleting old bazel version"
-sudo rm /usr/local/bin/bazel
 
 export BAZEL_VERSION=1.1.0
 echo "Installing bazel ${BAZEL_VERSION}"
@@ -51,7 +48,7 @@ export CC=clang-6.0
 export PYTHON_BIN="$(which python3)"
 
 # Kokoro checks out the repository here.
-cd ${KOKORO_ARTIFACTS_DIR}/github/iree
+cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 echo "Checking out submodules"
 git submodule update --init --depth 1000 --jobs 8
 

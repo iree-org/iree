@@ -24,7 +24,7 @@ iree_cc_library(
     "ConvertTensorOps.cpp"
     "ConvertVariableOps.cpp"
   DEPS
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget

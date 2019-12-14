@@ -108,13 +108,13 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                       TypeConverter &typeConverter,
                                       OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorComputeSizeOp>>(
-      context, importSymbols, typeConverter, "_hal.allocator.compute_size");
+      context, importSymbols, typeConverter, "hal.allocator.compute_size");
   patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorAllocateOp>>(
-      context, importSymbols, typeConverter, "_hal.allocator.allocate");
+      context, importSymbols, typeConverter, "hal.allocator.allocate");
   patterns.insert<AllocatorAllocateConstOpConversion>(
-      context, importSymbols, typeConverter, "_hal.allocator.allocate.const");
+      context, importSymbols, typeConverter, "hal.allocator.allocate.const");
   patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorAllocateShapedOp>>(
-      context, importSymbols, typeConverter, "_hal.allocator.allocate.shaped");
+      context, importSymbols, typeConverter, "hal.allocator.allocate.shaped");
 }
 
 }  // namespace iree_compiler

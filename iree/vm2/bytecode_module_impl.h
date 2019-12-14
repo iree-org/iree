@@ -26,6 +26,24 @@
 extern "C" {
 #endif  // __cplusplus
 
+// Defines the type of a primitive value.
+typedef enum {
+  // Not a value type.
+  IREE_VM_VALUE_TYPE_NONE = 0,
+  // int32_t.
+  IREE_VM_VALUE_TYPE_I32 = 1,
+} iree_vm_value_type_t;
+
+// Describes a type in the type table, mapping from a local module type ID to
+// either a primitive value type or registered ref type.
+//
+// If value_type is non-zero (IREE_VM_VALUE_TYPE_NONE) then the type represents
+// a ref object of type ref_type.
+typedef struct {
+  iree_vm_value_type_t value_type : 8;
+  iree_vm_ref_type_t ref_type : 24;
+} iree_vm_type_def_t;
+
 // Matches the FunctionDescriptor struct in the flatbuffer.
 typedef struct {
   int32_t bytecode_offset;
@@ -55,6 +73,10 @@ typedef struct {
   // Underlying FlatBuffer data and allocator (which may be null).
   iree_const_byte_span_t flatbuffer_data;
   iree_allocator_t flatbuffer_allocator;
+
+  // Type table mapping module type IDs to registered VM types.
+  int32_t type_count;
+  iree_vm_type_def_t* type_table;
 } iree_vm_bytecode_module_t;
 
 // Per-instance module state.
@@ -73,11 +95,12 @@ typedef struct {
   int32_t global_ref_count;
   iree_vm_ref_t* global_ref_table;
 
+  // TODO(benvanik): move to iree_vm_bytecode_module_t if always static.
   // Initialized references to rodata segments.
   // Right now these don't do much, however we can perform lazy caching and
   // on-the-fly decompression using this information.
   int32_t rodata_ref_count;
-  iree_vm_byte_buffer_ref_t* rodata_ref_table;
+  iree_vm_ro_byte_buffer_ref_t* rodata_ref_table;
 
   // Resolved function imports.
   int32_t import_count;

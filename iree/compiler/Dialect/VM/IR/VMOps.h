@@ -17,7 +17,7 @@
 
 #include <cstdint>
 
-#include "iree/compiler/Dialect/Traits.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETraits.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMTraits.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"

@@ -15,7 +15,7 @@
 #ifndef IREE_DIALECT_VM_BASE
 #define IREE_DIALECT_VM_BASE
 
-include "iree/compiler/Dialect/CommonBase.td"
+include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 //===----------------------------------------------------------------------===//
 // IREE VM (Virtual Machine) dialect

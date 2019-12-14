@@ -133,7 +133,7 @@ def IREE_DispatchRegionOp : IREE_PureOp<"dispatch_region"> {
   let builders = [
     OpBuilder<"Builder *builder, OperationState &state,"
               "ArrayRef<Type> resultTypes, Value *workload,"
-              "ArrayRef<Value *> args,"
+              "ValueRange args,"
               "ArrayRef<NamedAttribute> attributes = {}">,
   ];
 }
@@ -176,13 +176,13 @@ def IREE_ReductionRegionOp : IREE_PureOp<"reduction_region", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<"Builder *builder, OperationState &state,"
-    "ArrayRef<Type> resultTypes, Value *workload, ArrayRef<Value *> operands,"
-    "ArrayRef<Value *> initialValues,"
+    "ArrayRef<Type> resultTypes, Value *workload, ValueRange operands,"
+    "ValueRange initialValues,"
     "ArrayRef<int64_t> dimensions,"
     "ArrayRef<NamedAttribute> attributes = {}">,
     OpBuilder<"Builder *builder, OperationState &state,"
-    "ArrayRef<Type> resultTypes, Value *workload, ArrayRef<Value *> operands,"
-    "ArrayRef<Value *> initialValues,"
+    "ArrayRef<Type> resultTypes, Value *workload, ValueRange operands,"
+    "ValueRange initialValues,"
     "ArrayRef<int64_t> windowDimensions, ArrayRef<int64_t> windowStrides,"
     "ArrayRef<int64_t> baseDilations, ArrayRef<int64_t> windowDilations,"
     "PaddingMode paddingMode,"

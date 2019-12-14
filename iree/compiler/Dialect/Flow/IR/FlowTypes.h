@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 #define IREE_COMPILER_DIALECT_FLOW_IR_FLOWTYPES_H_
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"

@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -136,7 +136,7 @@ class ExecutableOpConversion
           loc, formatRodataOp.getFirst()));
     }
     auto queryCallOp = funcBuilder.create<IREE::VM::CallOp>(
-        loc, "_hal.ex.match_supported_executable_format",
+        loc, "hal.ex.match_supported_executable_format",
         ArrayRef<Type>{funcBuilder.getIntegerType(32)}, queryCallArgs);
     Value *selectedFormat = queryCallOp.getResult(0);
 
@@ -180,7 +180,7 @@ class ExecutableOpConversion
       auto loadRodataOp =
           cacheBuilder.create<IREE::VM::ConstRefRodataOp>(loc, rodataOp);
       auto cacheOp = cacheBuilder.create<IREE::VM::CallOp>(
-          loc, "_hal.ex.cache_executable", ArrayRef<Type>{globalOp.type()},
+          loc, "hal.ex.cache_executable", ArrayRef<Type>{globalOp.type()},
           ArrayRef<Value *>{deviceArg, formatArg, loadRodataOp.value()});
       cacheBuilder.create<IREE::VM::BranchOp>(
           loc, switchExitBlock, ArrayRef<Value *>{cacheOp.getResult(0)});

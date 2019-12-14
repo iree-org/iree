@@ -39,7 +39,7 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), executableOp.getName(), entryPointOp.getName(),
       regionOp.workload(), outlinedFuncOp.getType().getResults(),
-      llvm::to_vector<8>(regionOp.args()));
+      regionOp.args());
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {

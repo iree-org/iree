@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(StandardToVM)
+
 iree_cc_library(
   NAME
     Conversion
@@ -25,10 +27,11 @@ iree_cc_library(
     "ImportUtils.cpp"
     "TypeConverter.cpp"
   DEPS
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::IR
     MLIRIR
     MLIRParser
+    MLIRStandardOps
     MLIRSupport
     MLIRTransforms
   PUBLIC

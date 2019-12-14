@@ -17,8 +17,24 @@ add_subdirectory(bytecode)
 iree_cc_library(
   NAME
     schemas
+  HDRS
+    "archive_def_generated.h"
+    "buffer_data_def_generated.h"
+    "bytecode_def_generated.h"
+    "debug_service_generated.h"
+    "device_def_generated.h"
+    "device_group_def_generated.h"
+    "device_table_def_generated.h"
+    "executable_def_generated.h"
+    "executable_table_def_generated.h"
+    "function_def_generated.h"
+    "function_table_def_generated.h"
+    "module_def_generated.h"
+    "source_map_def_generated.h"
+    "type_def_generated.h"
   DEPS
     iree::schemas::archive_def_cc_fbs
+    iree::schemas::buffer_data_def_cc_fbs
     iree::schemas::bytecode_def_cc_fbs
     iree::schemas::debug_service_cc_fbs
     iree::schemas::device_def_cc_fbs
@@ -32,14 +48,7 @@ iree_cc_library(
     iree::schemas::source_map_def_cc_fbs
     iree::schemas::spirv_executable_def_cc_fbs
     iree::schemas::type_def_cc_fbs
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    reflection_data
-  DEPS
-    iree::schemas
+    flatbuffers
   PUBLIC
 )
 
@@ -49,7 +58,25 @@ flatbuffer_cc_library(
   SRCS
     "archive_def.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
+    iree::schemas::device_def_cc_fbs
+    iree::schemas::device_group_def_cc_fbs
+    iree::schemas::device_table_def_cc_fbs
+    iree::schemas::executable_def_cc_fbs
+    iree::schemas::executable_table_def_cc_fbs
+    iree::schemas::function_def_cc_fbs
+    iree::schemas::function_table_def_cc_fbs
     iree::schemas::module_def_cc_fbs
+    iree::schemas::source_map_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
+  PUBLIC
+)
+
+flatbuffer_cc_library(
+  NAME
+    buffer_data_def_cc_fbs
+  SRCS
+    "buffer_data_def.fbs"
   PUBLIC
 )
 
@@ -64,7 +91,7 @@ flatbuffer_cc_library(
 flatbuffer_cc_library(
   NAME
     bytecode_module_def_cc_fbs
-  SRC
+  SRCS
     "bytecode_module_def.fbs"
   PUBLIC
 )
@@ -75,8 +102,17 @@ flatbuffer_cc_library(
   SRCS
     "debug_service.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
+    iree::schemas::device_def_cc_fbs
+    iree::schemas::device_group_def_cc_fbs
+    iree::schemas::device_table_def_cc_fbs
+    iree::schemas::executable_def_cc_fbs
+    iree::schemas::executable_table_def_cc_fbs
     iree::schemas::function_def_cc_fbs
+    iree::schemas::function_table_def_cc_fbs
     iree::schemas::module_def_cc_fbs
+    iree::schemas::source_map_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
   PUBLIC
 )
 
@@ -142,7 +178,9 @@ flatbuffer_cc_library(
   SRCS
     "function_table_def.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
     iree::schemas::function_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
   PUBLIC
 )
 
@@ -152,10 +190,16 @@ flatbuffer_cc_library(
   SRCS
     "module_def.fbs"
   DEPS
+    iree::schemas::bytecode_def_cc_fbs
+    iree::schemas::device_def_cc_fbs
+    iree::schemas::device_group_def_cc_fbs
     iree::schemas::device_table_def_cc_fbs
+    iree::schemas::executable_def_cc_fbs
     iree::schemas::executable_table_def_cc_fbs
+    iree::schemas::function_def_cc_fbs
     iree::schemas::function_table_def_cc_fbs
     iree::schemas::source_map_def_cc_fbs
+    iree::schemas::type_def_cc_fbs
   PUBLIC
 )
 

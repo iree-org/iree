@@ -16,6 +16,7 @@
 
 #include <list>
 
+#include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Builders.h"
@@ -93,7 +94,10 @@ Optional<bool> Dispatchability::computeDispatchability(FuncOp funcOp) {
   // TODO(b/144530470): replace with tablegen attributes/interfaces.
   for (auto &block : funcOp.getBlocks()) {
     for (auto &op : block.getOperations()) {
-      if (auto callOp = dyn_cast<CallOp>(op)) {
+      if (!IREE::Flow::isOpOfKnownDialect(&op)) {
+        // Custom dialects aren't dispatchable (yet).
+        return false;
+      } else if (auto callOp = dyn_cast<CallOp>(op)) {
         if (callOp.getCallee() == funcOp.getName()) {
           // Recursion.
           continue;

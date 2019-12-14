@@ -76,6 +76,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
 #ifndef NDEBUG
   memset(callee_frame->registers.i32, 0xCD,
          sizeof(callee_frame->registers.i32));
+  memset(callee_frame->registers.ref, 0xCD,
+         sizeof(callee_frame->registers.ref));
 #endif  // !NDEBUG
 
   *out_callee_frame = callee_frame;

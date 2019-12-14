@@ -30,9 +30,14 @@ are welcome but please file issues to track such work first.
 ## Code reviews
 
 All submissions, including submissions by project members, require review. We
-use GitHub pull requests for this purpose. Consult
+use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
+
+Each PR will be merged into the master branch as a single commit by our
+automation workflow with a description matching the initial PR
+comment/description. Please keep PRs small (focused on a single issue) to
+streamline review and ease later culprit-finding.
 
 ## Community Guidelines
 

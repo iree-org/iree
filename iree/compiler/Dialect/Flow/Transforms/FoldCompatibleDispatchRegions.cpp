@@ -129,8 +129,8 @@ DispatchRegionOp removeUnusedResults(DispatchRegionOp regionOp) {
 
   // Clone with new results.
   auto newRegionOp = builder.create<DispatchRegionOp>(
-      regionOp.getLoc(), newReturnTypes, regionOp.workload(),
-      llvm::to_vector<8>(regionOp.args()), regionOp.getAttrs());
+      regionOp.getLoc(), newReturnTypes, regionOp.workload(), regionOp.args(),
+      regionOp.getAttrs());
   newRegionOp.body().takeBody(regionOp.body());
 
   // Replace uses of original values with the new values.

@@ -47,10 +47,8 @@ struct LowerBranchOpPattern
 
   PatternMatchResult matchAndRewrite(IREEInterp::HL::BranchOp op,
                                      PatternRewriter &rewriter) const {
-    SmallVector<Value *, 8> operands{op.getOperation()->getOperands()};
-
-    rewriter.replaceOpWithNewOp<IREEInterp::LL::BranchOp>(op, op.getDest(),
-                                                          operands);
+    rewriter.replaceOpWithNewOp<IREEInterp::LL::BranchOp>(
+        op, op.getDest(), op.getOperation()->getOperands());
     return matchSuccess();
   }
 };
@@ -61,12 +59,9 @@ struct LowerCondCondBranchOpPattern
 
   PatternMatchResult matchAndRewrite(IREEInterp::HL::CondBranchOp op,
                                      PatternRewriter &rewriter) const {
-    SmallVector<Value *, 8> trueOperands{op.getTrueOperands()};
-    SmallVector<Value *, 8> falseOperands{op.getFalseOperands()};
-
     rewriter.replaceOpWithNewOp<IREEInterp::LL::CondBranchOp>(
-        op, op.getCondition(), op.getTrueDest(), trueOperands,
-        op.getFalseDest(), falseOperands);
+        op, op.getCondition(), op.getTrueDest(), op.getTrueOperands(),
+        op.getFalseDest(), op.getFalseOperands());
     return matchSuccess();
   }
 };

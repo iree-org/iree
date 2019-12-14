@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(HLOToFlow)
+add_subdirectory(StandardToFlow)
+
 iree_cc_library(
   NAME
     Conversion
@@ -20,10 +23,11 @@ iree_cc_library(
   SRCS
     "TypeConverter.cpp"
   DEPS
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
+    LLVMSupport
     MLIRIR
     MLIRParser
     MLIRTransforms
-  ALWAYSLINK
   PUBLIC
 )
+

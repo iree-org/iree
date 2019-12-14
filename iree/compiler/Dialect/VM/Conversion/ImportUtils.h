@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_
 
-#include "iree/compiler/Dialect/Types.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -25,14 +25,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-// Returns a symbol ref to the operation with the standard _ prefix.
-// Runtime-imported modules always have a _ prefix to prevent conflicts with
-// other VM-defined modules.
-//
-// Example:
-//   MyFooOp 'my.foo' resolves to '_my.foo'
-SymbolRefAttr getOpImportSymbolName(Operation *op);
 
 // Appends a set of vm.import ops from a module to a target VM module.
 // Imports will only be added if they are not already present in the target

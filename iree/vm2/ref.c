@@ -25,32 +25,52 @@
 #define IREE_GET_REF_COUNTER_PTR(ref) \
   ((volatile atomic_intptr_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter))
 
+// TODO(benvanik): dynamic, if we care - otherwise keep small.
+#define IREE_VM_MAX_TYPE_ID 64
+
 // A table of type descriptors registered at startup.
 // These provide quick dereferencing of destruction functions and type names for
-// debugging.
-static iree_vm_ref_type_descriptor_t iree_vm_ref_type_builtin_descriptors
-    [IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE] = {{0}};
+// debugging. Note that this just points to registered descriptors (or NULL) for
+// each type ID in the type range and does not own the descriptors.
+//
+// Note that [0] is always the NULL type and has a NULL descriptor. We don't
+// allow types to be registered there.
+static const iree_vm_ref_type_descriptor_t*
+    iree_vm_ref_type_descriptors[IREE_VM_MAX_TYPE_ID] = {0};
 
 // Returns the type descriptor (or NULL) for the given type ID.
 static const iree_vm_ref_type_descriptor_t* iree_vm_ref_get_type_descriptor(
     iree_vm_ref_type_t type) {
-  if (type < IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE) {
-    return iree_vm_ref_type_builtin_descriptors[type].type == type
-               ? &iree_vm_ref_type_builtin_descriptors[type]
-               : NULL;
-  } else {
-    // TODO(benvanik): user-defined types.
+  if (type >= IREE_VM_MAX_TYPE_ID) {
     return NULL;
   }
+  return iree_vm_ref_type_descriptors[type];
 }
 
-IREE_API_EXPORT void IREE_API_CALL
-iree_vm_ref_register_builtin_type(iree_vm_ref_type_descriptor_t descriptor) {
-  assert(descriptor.type < IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE);
-  if (descriptor.type >= IREE_VM_REF_TYPE_FIRST_USER_DEFINED_TYPE) {
-    return;
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor) {
+  for (int i = 1; i <= IREE_VM_MAX_TYPE_ID; ++i) {
+    if (!iree_vm_ref_type_descriptors[i]) {
+      iree_vm_ref_type_descriptors[i] = descriptor;
+      descriptor->type = i;
+      return IREE_STATUS_OK;
+    }
   }
-  iree_vm_ref_type_builtin_descriptors[descriptor.type] = descriptor;
+  // Too many user-defined types registered; need to increase
+  // IREE_VM_MAX_TYPE_ID.
+  return IREE_STATUS_RESOURCE_EXHAUSTED;
+}
+
+IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL
+iree_vm_ref_lookup_registered_type(iree_string_view_t full_name) {
+  for (int i = 1; i <= IREE_VM_MAX_TYPE_ID; ++i) {
+    if (!iree_vm_ref_type_descriptors[i]) break;
+    if (iree_string_view_compare(iree_vm_ref_type_descriptors[i]->type_name,
+                                 full_name) == 0) {
+      return iree_vm_ref_type_descriptors[i];
+    }
+  }
+  return NULL;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -141,15 +161,15 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_or_move_checked(
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_release(iree_vm_ref_t* ref) {
-  if (ref->ptr != NULL) {
-    volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(ref);
-    if (atomic_fetch_sub(counter, 1) == 1) {
-      const iree_vm_ref_type_descriptor_t* type_descriptor =
-          iree_vm_ref_get_type_descriptor(ref->type);
-      if (type_descriptor->destroy) {
-        // NOTE: this makes us not re-entrant, but I think that's OK.
-        type_descriptor->destroy(ref->ptr);
-      }
+  if (ref->ptr == NULL) return;
+
+  volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(ref);
+  if (atomic_fetch_sub(counter, 1) == 1) {
+    const iree_vm_ref_type_descriptor_t* type_descriptor =
+        iree_vm_ref_get_type_descriptor(ref->type);
+    if (type_descriptor->destroy) {
+      // NOTE: this makes us not re-entrant, but I think that's OK.
+      type_descriptor->destroy(ref->ptr);
     }
   }
 
@@ -191,4 +211,23 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
 IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
                                                     iree_vm_ref_t* rhs) {
   return memcmp(lhs, rhs, sizeof(*lhs)) == 0;
+}
+
+static void iree_vm_ro_byte_buffer_ref_destroy(void* ptr) {
+  iree_vm_ro_byte_buffer_ref_t* ref = (iree_vm_ro_byte_buffer_ref_t*)ptr;
+  if (ref->destroy) {
+    ref->destroy(ptr);
+  }
+}
+
+IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL
+iree_vm_ro_byte_buffer_ref_type_id() {
+  static iree_vm_ref_type_descriptor_t descriptor = {0};
+  if (descriptor.type == IREE_VM_REF_TYPE_NULL) {
+    descriptor.destroy = iree_vm_ro_byte_buffer_ref_destroy;
+    descriptor.offsetof_counter =
+        offsetof(iree_vm_ro_byte_buffer_ref_t, ref_object.counter);
+    descriptor.type_name = iree_make_cstring_view("ireex.byte_buffer");
+  }
+  return descriptor.type;
 }

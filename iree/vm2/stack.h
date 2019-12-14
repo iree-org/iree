@@ -35,8 +35,11 @@ extern "C" {
 #define IREE_I32_REGISTER_COUNT 128
 #define IREE_REF_REGISTER_COUNT 64
 
+#define IREE_I32_REGISTER_MASK 0x7F
+
 #define IREE_REF_REGISTER_TYPE_BIT 0x80
 #define IREE_REF_REGISTER_MOVE_BIT 0x40
+#define IREE_REF_REGISTER_MASK 0x3F
 
 // An opaque offset into a source map that a source resolver can calculate.
 // Do not assume that iree_vm_source_offset_t+1 means the next byte offset as

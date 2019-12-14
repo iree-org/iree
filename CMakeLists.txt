@@ -65,9 +65,9 @@ include(flatbuffer_cc_library)
 
 add_subdirectory(build_tools/third_party/ruy EXCLUDE_FROM_ALL)
 
+add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
-add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 if(${IREE_BUILD_COMPILER})
@@ -84,6 +84,8 @@ endif()
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
+
+add_subdirectory(build_tools/embed_data/)
 
 add_subdirectory(iree/base)
 add_subdirectory(iree/hal)

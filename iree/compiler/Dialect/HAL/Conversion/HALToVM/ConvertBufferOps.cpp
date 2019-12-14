@@ -85,28 +85,28 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                    TypeConverter &typeConverter,
                                    OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferSubspanOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer.subspan");
+      context, importSymbols, typeConverter, "hal.buffer.subspan");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferFillOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer.fill");
+      context, importSymbols, typeConverter, "hal.buffer.fill");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferReadDataOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer.read_data");
+      context, importSymbols, typeConverter, "hal.buffer.read_data");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferWriteDataOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer.write_data");
+      context, importSymbols, typeConverter, "hal.buffer.write_data");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferCopyDataOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer.copy_data");
+      context, importSymbols, typeConverter, "hal.buffer.copy_data");
   patterns.insert<BufferLoadOpConversion>(context, importSymbols, typeConverter,
-                                          "_hal.buffer.load");
+                                          "hal.buffer.load");
   patterns.insert<BufferStoreOpConversion>(context, importSymbols,
-                                           typeConverter, "_hal.buffer.store");
+                                           typeConverter, "hal.buffer.store");
 
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewComputeOffsetOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer_view.compute_offset");
+      context, importSymbols, typeConverter, "hal.buffer_view.compute_offset");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewComputeLengthOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer_view.compute_length");
+      context, importSymbols, typeConverter, "hal.buffer_view.compute_length");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewComputeRangeOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer_view.compute_range");
+      context, importSymbols, typeConverter, "hal.buffer_view.compute_range");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewSliceOp>>(
-      context, importSymbols, typeConverter, "_hal.buffer_view.slice");
+      context, importSymbols, typeConverter, "hal.buffer_view.slice");
 }
 
 }  // namespace iree_compiler

@@ -76,8 +76,7 @@ LogicalResult buildReductionRegion(Operation *originalOp,
   OpBuilder regionBuilder(reductionRegionOp.body());
   reductionRegionOp.walk([&](xla_hlo::ReturnOp returnOp) {
     regionBuilder.setInsertionPoint(returnOp);
-    SmallVector<Value *, 4> returnValues(returnOp.getOperands());
-    regionBuilder.create<ReturnOp>(returnOp.getLoc(), returnValues);
+    regionBuilder.create<ReturnOp>(returnOp.getLoc(), returnOp.getOperands());
     returnOp.erase();
   });
 

@@ -1057,7 +1057,7 @@ def VM_BranchOp : VM_Op<"br", [
   let builders = [
     OpBuilder<[{
       Builder *, OperationState &result, Block *dest,
-      ArrayRef<Value *> operands = {}
+      ValueRange operands = {}
     }], [{
       result.addSuccessor(dest, operands);
     }]>,
@@ -1109,8 +1109,8 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   let builders = [
     OpBuilder<[{
       Builder *, OperationState &result, Value *condition,
-      Block *trueDest, ArrayRef<Value *> trueOperands,
-      Block *falseDest, ArrayRef<Value *> falseOperands
+      Block *trueDest, ValueRange trueOperands,
+      Block *falseDest, ValueRange falseOperands
     }], [{
       result.addOperands(condition);
       result.addSuccessor(trueDest, trueOperands);
@@ -1254,7 +1254,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &result, IREE::VM::FuncOp callee,
-      ArrayRef<Value *> operands = {}
+      ValueRange operands = {}
     }], [{
       result.addOperands(operands);
       result.addAttribute("callee", builder->getSymbolRefAttr(callee));
@@ -1262,7 +1262,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
     }]>,
     OpBuilder<[{
       Builder *builder, OperationState &result, FlatSymbolRefAttr callee,
-      ArrayRef<Type> resultTypes, ArrayRef<Value *> operands = {}
+      ArrayRef<Type> resultTypes, ValueRange operands = {}
     }], [{
       result.addOperands(operands);
       result.addAttribute("callee", callee);
@@ -1270,7 +1270,7 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
     }]>,
     OpBuilder<[{
       Builder *builder, OperationState &result, StringRef callee,
-      ArrayRef<Type> resultTypes, ArrayRef<Value *> operands = {}
+      ArrayRef<Type> resultTypes, ValueRange operands = {}
     }], [{
       build(builder, result, builder->getSymbolRefAttr(callee),
             resultTypes, operands);
@@ -1313,7 +1313,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
     OpBuilder<[{
       Builder *builder, OperationState &result, FlatSymbolRefAttr callee,
       ArrayRef<Type> resultTypes, ArrayRef<int8_t> segmentSizes = {},
-      ArrayRef<Type> segmentTypes = {}, ArrayRef<Value *> operands = {}
+      ArrayRef<Type> segmentTypes = {}, ValueRange operands = {}
     }], [{
       result.addAttribute("callee", callee);
       result.addAttribute("segment_sizes",
@@ -1472,7 +1472,7 @@ def VM_BreakOp : VM_Op<"break", [
   let builders = [
     OpBuilder<[{
       Builder *, OperationState &result, Block *dest,
-      ArrayRef<Value *> operands = {}
+      ValueRange operands = {}
     }], [{
       result.addSuccessor(dest, operands);
     }]>,
@@ -1517,7 +1517,7 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
   let builders = [
     OpBuilder<[{
       Builder *, OperationState &result, Value *condition, Block *dest,
-      ArrayRef<Value *> operands = {}
+      ValueRange operands = {}
     }], [{
       result.addOperands({condition});
       result.addSuccessor(dest, operands);

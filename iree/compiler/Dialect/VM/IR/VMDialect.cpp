@@ -134,8 +134,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
 
     // Replace the return with a branch to the dest.
     OpBuilder builder(op);
-    builder.create<VM::BranchOp>(op->getLoc(), newDest,
-                                 llvm::to_vector<4>(returnOp.getOperands()));
+    builder.create<VM::BranchOp>(op->getLoc(), newDest, returnOp.getOperands());
     op->erase();
   }
 

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_TYPES_H_
-#define IREE_COMPILER_DIALECT_TYPES_H_
+#ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
+#define IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
@@ -76,31 +76,8 @@ class RefObjectType : public Type {
   using Type::Type;
 
   static bool classof(Type type) {
-    switch (type.getKind()) {
-      case IREE::TypeKind::OpaqueRefObject:
-      case IREE::TypeKind::ByteBuffer:
-      case IREE::TypeKind::MutableByteBuffer:
-      case HAL::TypeKind::Allocator:
-      case HAL::TypeKind::Buffer:
-      case HAL::TypeKind::CommandBuffer:
-      case HAL::TypeKind::DescriptorSet:
-      case HAL::TypeKind::DescriptorSetLayout:
-      case HAL::TypeKind::Device:
-      case HAL::TypeKind::Event:
-      case HAL::TypeKind::Executable:
-      case HAL::TypeKind::ExecutableCache:
-      case HAL::TypeKind::Fence:
-      case HAL::TypeKind::RingBuffer:
-      case HAL::TypeKind::Semaphore:
-      case SEQ::TypeKind::Device:
-      case SEQ::TypeKind::Policy:
-      case SEQ::TypeKind::Resource:
-      case SEQ::TypeKind::Timeline:
-        return true;
-      default:
-        break;
-    }
-    return false;
+    // TODO(benvanik): figure out how to do a semi-open type system.
+    return true;
   }
 };
 
@@ -209,4 +186,4 @@ class RefPtrType
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_TYPES_H_
+#endif  // IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_

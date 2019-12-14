@@ -8,6 +8,15 @@ func @empty() {
 
 // -----
 
+// CHECK-LABEL: @customOp
+// CHECK-SAME: dispatchable = false
+func @customOp() {
+  "do.foo"() : () -> ()
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @simpleMath
 // CHECK-SAME: dispatchable = true
 func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {

@@ -36,7 +36,8 @@ class BytecodeEncoder : public VMFuncEncoder {
   // Encodes a vm.func to bytecode and returns the result.
   // Returns None on failure.
   static Optional<EncodedBytecodeFunction> encodeFunction(
-      IREE::VM::FuncOp funcOp, SymbolTable &symbolTable);
+      IREE::VM::FuncOp funcOp, llvm::DenseMap<Type, int> &typeTable,
+      SymbolTable &symbolTable);
 
   BytecodeEncoder() = default;
   ~BytecodeEncoder() = default;

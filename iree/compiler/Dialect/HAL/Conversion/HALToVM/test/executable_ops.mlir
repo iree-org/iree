@@ -19,7 +19,7 @@ hal.executable @exe {
 // CHECK-NEXT: ^bb2:
 // CHECK-NEXT:   %c1230128453 = vm.const.i32 1230128453 : i32
 // CHECK-NEXT:   %c1230128454 = vm.const.i32 1230128454 : i32
-// CHECK-NEXT:   %1 = vm.call @_hal.ex.match_supported_executable_format(%arg0, %c1230128453, %c1230128454) : (!ireex.ref<!hal.device>, i32, i32) -> i32
+// CHECK-NEXT:   %1 = vm.call @hal.ex.match_supported_executable_format(%arg0, %c1230128453, %c1230128454) : (!ireex.ref<!hal.device>, i32, i32) -> i32
 // CHECK-NEXT:   vm.br ^bb3(%1 : i32)
 // CHECK-NEXT: ^bb3(%2: i32):
 // CHECK-NEXT:   %c1230128453_0 = vm.const.i32 1230128453 : i32
@@ -27,7 +27,7 @@ hal.executable @exe {
 // CHECK-NEXT:   vm.cond_br %eq, ^bb4(%2 : i32), ^bb5(%2 : i32)
 // CHECK-NEXT: ^bb4(%3: i32):
 // CHECK-NEXT:   %exe_data_11124442505 = vm.const.ref.rodata @exe_data_11124442505 : !ireex.byte_buffer_ref
-// CHECK-NEXT:   %ref = vm.call @_hal.ex.cache_executable(%arg0, %3, %exe_data_11124442505) : (!ireex.ref<!hal.device>, i32, !ireex.byte_buffer_ref) -> !ireex.ref<!hal.executable>
+// CHECK-NEXT:   %ref = vm.call @hal.ex.cache_executable(%arg0, %3, %exe_data_11124442505) : (!ireex.ref<!hal.device>, i32, !ireex.byte_buffer_ref) -> !ireex.ref<!hal.executable>
 // CHECK-NEXT:   vm.br ^bb7(%ref : !ireex.ref<!hal.executable>)
 // CHECK-NEXT: ^bb5(%4: i32):
 // CHECK-NEXT:   %c1230128454_1 = vm.const.i32 1230128454 : i32
@@ -35,7 +35,7 @@ hal.executable @exe {
 // CHECK-NEXT:   vm.cond_br %eq_2, ^bb6(%4 : i32), ^bb8
 // CHECK-NEXT: ^bb6(%5: i32):
 // CHECK-NEXT:   %exe_data_11124442506 = vm.const.ref.rodata @exe_data_11124442506 : !ireex.byte_buffer_ref
-// CHECK-NEXT:   %ref_3 = vm.call @_hal.ex.cache_executable(%arg0, %5, %exe_data_11124442506) : (!ireex.ref<!hal.device>, i32, !ireex.byte_buffer_ref) -> !ireex.ref<!hal.executable>
+// CHECK-NEXT:   %ref_3 = vm.call @hal.ex.cache_executable(%arg0, %5, %exe_data_11124442506) : (!ireex.ref<!hal.device>, i32, !ireex.byte_buffer_ref) -> !ireex.ref<!hal.executable>
 // CHECK-NEXT:   vm.br ^bb7(%ref_3 : !ireex.ref<!hal.executable>)
 // CHECK-NEXT: ^bb7(%6: !ireex.ref<!hal.executable>):
 // CHECK-NEXT:   vm.global.store.ref @exe_cached, %6 : !ireex.ref<!hal.executable>

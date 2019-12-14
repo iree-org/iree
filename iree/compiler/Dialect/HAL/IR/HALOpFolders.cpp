@@ -144,8 +144,7 @@ struct SimplifyAllocatorAllocateShapedOp
           op.buffer_usage() == computeSizeOp.buffer_usage()) {
         rewriter.replaceOpWithNewOp<AllocatorAllocateShapedOp>(
             op, op.allocator(), op.memory_types(), op.buffer_usage(),
-            llvm::to_vector<4>(computeSizeOp.shape()),
-            computeSizeOp.element_size().getZExtValue());
+            computeSizeOp.shape(), computeSizeOp.element_size().getZExtValue());
         return matchSuccess();
       }
     }

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_DIALECT_COMMON_BASE
-#define IREE_DIALECT_COMMON_BASE
+#ifndef IREE_DIALECT_IREE_BASE
+#define IREE_DIALECT_IREE_BASE
 
 include "mlir/IR/OpBase.td"
 
@@ -143,4 +143,4 @@ def YieldPoint : NativeOpTrait<"IREE::YieldPoint">;
 // runtime if loaded for dynamic execution.
 def Unsafe : NativeOpTrait<"IREE::Unsafe">;
 
-#endif  // IREE_DIALECT_COMMON_BASE
+#endif  // IREE_DIALECT_IREE_BASE

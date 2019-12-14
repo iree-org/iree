@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_IREEDIALECT_H_
-#define IREE_COMPILER_DIALECT_IREEDIALECT_H_
+#ifndef IREE_COMPILER_DIALECT_IREE_IR_IREEDIALECT_H_
+#define IREE_COMPILER_DIALECT_IREE_IR_IREEDIALECT_H_
 
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
@@ -38,4 +38,4 @@ class IREEXDialect : public Dialect {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_IREEDIALECT_H_
+#endif  // IREE_COMPILER_DIALECT_IREE_IR_IREEDIALECT_H_

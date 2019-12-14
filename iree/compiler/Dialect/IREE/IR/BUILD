@@ -17,7 +17,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["CommonBase.td"])
+exports_files(["IREEBase.td"])
 
 filegroup(
     name = "td_files",
@@ -25,14 +25,14 @@ filegroup(
 )
 
 cc_library(
-    name = "Dialect",
+    name = "IR",
     srcs = [
         "IREEDialect.cpp",
     ],
     hdrs = [
         "IREEDialect.h",
-        "Traits.h",
-        "Types.h",
+        "IREETraits.h",
+        "IREETypes.h",
     ],
     deps = [
         "@llvm//:support",

@@ -25,11 +25,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-SymbolRefAttr getOpImportSymbolName(Operation *op) {
-  return SymbolRefAttr::get(("_" + op->getName().getStringRef()).str(),
-                            op->getContext());
-}
-
 LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
                                  ModuleOp targetModuleOp) {
   SymbolTable symbolTable(targetModuleOp);

@@ -34,7 +34,7 @@ iree_cc_library(
     FlowEnumsGen
     FlowOpInterfaceGen
     FlowOpsGen
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRStandardOps

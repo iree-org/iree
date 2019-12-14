@@ -31,7 +31,7 @@ iree_cc_library(
     HALEnumsGen
     HALOpInterfaceGen
     HALOpsGen
-    iree::compiler::Dialect
+    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRParser

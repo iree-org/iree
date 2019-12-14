@@ -270,7 +270,7 @@ void MemRefToScalarOp::build(Builder *builder, OperationState &state,
 
 void DispatchRegionOp::build(Builder *builder, OperationState &state,
                              ArrayRef<Type> resultTypes, Value *workload,
-                             ArrayRef<Value *> operands,
+                             ValueRange operands,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands({workload});
@@ -374,8 +374,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 
 void ReductionRegionOp::build(Builder *builder, OperationState &state,
                               ArrayRef<Type> resultTypes, Value *workload,
-                              ArrayRef<Value *> operands,
-                              ArrayRef<Value *> initialValues,
+                              ValueRange operands, ValueRange initialValues,
                               ArrayRef<int64_t> dimensions,
                               ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
@@ -395,11 +394,10 @@ void ReductionRegionOp::build(Builder *builder, OperationState &state,
 
 void ReductionRegionOp::build(
     Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
-    Value *workload, ArrayRef<Value *> operands,
-    ArrayRef<Value *> initialValues, ArrayRef<int64_t> windowDimensions,
-    ArrayRef<int64_t> windowStrides, ArrayRef<int64_t> baseDilations,
-    ArrayRef<int64_t> windowDilations, PaddingMode paddingMode,
-    ArrayRef<NamedAttribute> attributes) {
+    Value *workload, ValueRange operands, ValueRange initialValues,
+    ArrayRef<int64_t> windowDimensions, ArrayRef<int64_t> windowStrides,
+    ArrayRef<int64_t> baseDilations, ArrayRef<int64_t> windowDilations,
+    PaddingMode paddingMode, ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands({workload});
   state.addOperands(operands);

@@ -33,10 +33,10 @@ cc_library(
         "ConvertHALToVM.h",
     ],
     deps = [
-        "//iree/compiler/Dialect",
         "//iree/compiler/Dialect/HAL:hal_imports",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Utils",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",

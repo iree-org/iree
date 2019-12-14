@@ -350,10 +350,10 @@ struct MakeDynamicDispatchOpStatic
     }
 
     SmallVector<Type, 8> resultTypes{dynamicDispatchOp.getResultTypes()};
-    SmallVector<Value *, 8> operands{dynamicDispatchOp.getArgOperands()};
     rewriter.replaceOpWithNewOp<IREESeq::LL::StaticDispatchOp>(
         dynamicDispatchOp, dynamicDispatchOp.getExecutable(),
-        dynamicDispatchOp.getEntryPoint(), workloadAttr, resultTypes, operands);
+        dynamicDispatchOp.getEntryPoint(), workloadAttr, resultTypes,
+        dynamicDispatchOp.getArgOperands());
     return matchSuccess();
   }
 };
