@@ -15,7 +15,9 @@
 // Tests that our bytecode module can call through into our native module.
 
 #include "absl/base/macros.h"
+#include "absl/strings/string_view.h"
 #include "iree/base/api.h"
+#include "iree/base/logging.h"
 #include "iree/samples/custom_modules/custom_modules_test_module.h"
 #include "iree/samples/custom_modules/native_module.h"
 #include "iree/testing/gtest.h"
