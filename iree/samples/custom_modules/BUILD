@@ -34,10 +34,12 @@ cc_test(
         ":custom_modules_test_module_cc",
         ":native_module",
         "//iree/base:api",
+        "//iree/base:logging",
         "//iree/testing:gtest_main",
         "//iree/vm2:bytecode_module",
         "//iree/vm2:module",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/strings",
     ],
 )
 
