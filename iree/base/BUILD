@@ -354,6 +354,7 @@ cc_library(
     hdrs = ["signature_mangle.h"],
     deps = [
         ":status",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
