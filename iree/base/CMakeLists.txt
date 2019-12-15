@@ -349,6 +349,7 @@ iree_cc_library(
   SRCS
     "signature_mangle.cc"
   DEPS
+    absl::container
     absl::memory
     absl::optional
     absl::span
