@@ -16,7 +16,7 @@
 // Depending on whether any manual conversion is performed this may get complex,
 // such as when versioning imports or performing optimizations.
 
-// RUN: third_party/iree/iree/samples/custom_modules/dialect/custom-opt %s -iree-vm-conversion -split-input-file | IreeFileCheck %s
+// RUN: custom-opt %s -iree-vm-conversion -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @printOp
 func @printOp(%arg0 : !ireex.ref<!custom.message>) {

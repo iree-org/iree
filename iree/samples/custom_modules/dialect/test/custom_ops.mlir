@@ -16,7 +16,7 @@
 // This doesn't have much meaning here as we don't define any custom printers or
 // parsers but does serve as a reference for the op usage.
 
-// RUN: third_party/iree/iree/samples/custom_modules/dialect/custom-opt -split-input-file %s | third_party/iree/iree/samples/custom_modules/dialect/custom-opt -split-input-file | IreeFileCheck %s
+// RUN: custom-opt -split-input-file %s | custom-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @printOp
 func @printOp(%arg0 : !ireex.ref<!custom.message>) {
