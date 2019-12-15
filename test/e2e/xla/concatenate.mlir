@@ -1,5 +1,5 @@
 // RUN: iree-run-mlir --target_backends=interpreter-bytecode --input_values="2x2xf32= 1 2 3 4\n2x3xf32= 5 6 7 8 9 10\n2x2xf32= 11 12 13 14" %s | IreeFileCheck %s
-// RUN: iree-run-mlir --target_backends=vulkan-spirv --input_values="2x2xf32= 1 2 3 4\n2x3xf32= 5 6 7 8 9 10\n2x2xf32= 11 12 13 14" %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv --input_values="2x2xf32= 1 2 3 4\n2x3xf32= 5 6 7 8 9 10\n2x2xf32= 11 12 13 14" %s | IreeFileCheck %s)
 
 // -----
 

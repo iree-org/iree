@@ -1,5 +1,5 @@
 // RUN: iree-run-mlir --target_backends=interpreter-bytecode %s | IreeFileCheck %s
-// RUN: iree-run-mlir --target_backends=vulkan-spirv %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // -----
 

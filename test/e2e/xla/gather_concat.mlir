@@ -1,5 +1,5 @@
 // RUN: iree-run-mlir --target_backends=interpreter-bytecode --input_values="1x2xf32= 1 2\n2x1x4xf32= 5 6 7 8 9 10 11 12\ni64= 0" --output_types=f %s | IreeFileCheck %s
-// RUN: iree-run-mlir --target_backends=vulkan-spirv --input_values="1x2xf32= 1 2\n2x1x4xf32= 5 6 7 8 9 10 11 12\ni64= 0" --output_types=f %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv --input_values="1x2xf32= 1 2\n2x1x4xf32= 5 6 7 8 9 10 11 12\ni64= 0" --output_types=f %s | IreeFileCheck %s)
 
 module {
   func @gather_concat(%arg0: tensor<1x2xf32>, %arg1: tensor<2x1x4xf32>, %arg2: tensor<i64>) -> tensor<1x6xf32> {
