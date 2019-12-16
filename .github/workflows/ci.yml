@@ -35,11 +35,11 @@ jobs:
         run: |
           # https://docs.bazel.build/versions/master/install-ubuntu.html
           sudo apt-get install unzip zip
-          wget https://github.com/bazelbuild/bazel/releases/download/$BAZEL_VERSION/bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
-          chmod +x bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
-          ./bazel-$BAZEL_VERSION-installer-linux-x86_64.sh --user
-          rm bazel-$BAZEL_VERSION-installer-linux-x86_64.sh
-          echo "::add-path::$HOME/bin"
+          wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+          chmod +x bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+          ./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh --user
+          rm bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+          echo "::add-path::${HOME?}/bin"
       - name: Installing dependencies
         run: |
           sudo apt-get update
@@ -50,8 +50,8 @@ jobs:
       - name: Checking out latest version and all submodules
         run: |
           git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
-          git clone https://github.com/$GITHUB_REPOSITORY $GITHUB_WORKSPACE --no-checkout --no-tags
-          git checkout $GITHUB_SHA
+          git clone https://github.com/${GITHUB_REPOSITORY?} ${GITHUB_WORKSPACE?} --no-checkout --no-tags
+          git checkout ${GITHUB_SHA?}
           git submodule update --init --depth 1000 --jobs 8
       - name: Building and testing with bazel
         run: |
@@ -82,8 +82,8 @@ jobs:
       - name: Checking out latest version and all submodules
         run: |
           git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
-          git clone https://github.com/$GITHUB_REPOSITORY $GITHUB_WORKSPACE --no-checkout --no-tags
-          git checkout $GITHUB_SHA
+          git clone https://github.com/${GITHUB_REPOSITORY?} ${GITHUB_WORKSPACE?} --no-checkout --no-tags
+          git checkout ${GITHUB_SHA?}
           git submodule update --init --depth 1000 --jobs 8
       - name: Building with cmake
         run: |
