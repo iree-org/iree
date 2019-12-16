@@ -17,12 +17,14 @@ iree_cc_library(
     Bytecode
   HDRS
     "BytecodeModuleTarget.h"
+    "TranslationFlags.h"
   SRCS
     "BytecodeEncoder.cpp"
     "BytecodeEncoder.h"
     "BytecodeModuleTarget.cpp"
     "ConstantEncoder.cpp"
     "ConstantEncoder.h"
+    "TranslationFlags.cpp"
     "TranslationRegistration.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR

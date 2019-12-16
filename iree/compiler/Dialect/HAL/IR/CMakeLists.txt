@@ -16,19 +16,16 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "HALDialect.h"
     "HALEnums.h.inc"
     "HALOpInterface.h.inc"
     "HALOps.h"
     "HALOps.h.inc"
     "HALTypes.h"
   SRCS
-    "HALDialect.cpp"
     "HALEnums.cpp.inc"
     "HALOpFolders.cpp"
     "HALOpInterface.cpp.inc"
     "HALOps.cpp"
-    "HALOps.cpp.inc"
     "HALTypes.cpp"
   DEPS
     HALEnumsGen
@@ -37,6 +34,30 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
+    MLIRParser
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransformUtils
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    HALDialect
+  HDRS
+    "HALDialect.cpp"
+  SRCS
+    "HALDialect.h"
+  DEPS
+    IR
+    iree::compiler::Dialect
+    iree_compiler_Dialect_HAL_hal_imports
+    iree::compiler::Dialect::HAL::Conversion::HALToVM
+    iree::compiler::Dialect::VM::Conversion
+    LLVMSupport
+    MLIRIR
+    MLIRParser
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils

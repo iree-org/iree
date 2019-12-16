@@ -22,7 +22,7 @@ iree_cc_library(
     "ConvertStandardToVMPass.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM:IR
+    iree::compiler::Dialect::VM::IR
     LLVMSupport
     MLIRIR
     MLIRPass

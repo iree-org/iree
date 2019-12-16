@@ -26,8 +26,8 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
-    MLIRSupport
-    MLIRTransformUtils
+    MLIRParser
+    MLIRTransforms
   PUBLIC
 )
 

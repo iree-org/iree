@@ -14,16 +14,30 @@
 
 iree_cc_library(
   NAME
-    HALtoVM
+    HALToVM
   HDRS
     "ConvertHALToVM.h"
   SRCS
+    "ConvertAllocatorOps.cpp"
+    "ConvertBufferOps.cpp"
+    "ConvertCommandBufferOps.cpp"
+    "ConvertDeviceOps.cpp"
+    "ConvertExecutableOps.cpp"
+    "ConvertExperimentalOps.cpp"
     "ConvertHALToVM.cpp"
-    "ConvertHALToVMPass.cpp"
+    "ConvertVariableOps.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::HAL::IR
+    iree_compiler_Dialect_HAL_hal_imports
+    iree::compiler::Dialect::HAL::IR::IR
+    iree::compiler::Dialect::HAL::IR::HALEnumsGen
+    iree::compiler::Dialect::HAL::IR::HALOpInterfaceGen
+    iree::compiler::Dialect::HAL::IR::HALOpsGen
+    iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR
+    LLVMSupport
     MLIRIR
     MLIRPass
     MLIRStandardOps
