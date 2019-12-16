@@ -54,7 +54,7 @@ class XLAConvertOpSPIRVLowering final
 class XLAGatherOpSPIRVLowering final
     : public SPIRVOpLowering<xla_hlo::GatherOp> {
  public:
-  using SPIRVOpLowering<xla_hlo::GatherOp>::SPIRVLowering;
+  using SPIRVOpLowering<xla_hlo::GatherOp>::SPIRVOpLowering;
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder, AffineMap index,
       ArrayRef<Value *> operands,
