@@ -14,7 +14,11 @@
 
 if(${IREE_BUILD_COMPILER})
 
-  # TODO(benvanik): fix the ALWAYSLINK property and force MLIR libs.
+  # Additional libraries containing statically registered functions/flags, which
+  # should always be linked in to binaries.
+  #
+  # TODO(scotttodd): Make the ALWAYSLINK property apply transitively and force
+  #                  MLIR libs to generally be ALWAYSLINK wherever used in IREE.
   set(_ALWAYSLINK_LIBS
     MLIRAffineOps
     MLIRAnalysis
@@ -23,6 +27,7 @@ if(${IREE_BUILD_COMPILER})
     MLIRPass
     MLIRSPIRV
     MLIRSPIRVSerialization
+    MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRTransforms
     MLIRTranslation
@@ -33,6 +38,16 @@ if(${IREE_BUILD_COMPILER})
     iree::compiler::IR::Interpreter
     tensorflow::mlir_xla
   )
+
+  foreach(LIB ${_ALWAYSLINK_LIBS})
+    # Aliased targets are always in-project, so we control them and can set
+    # ALWAYSLINK on them directly.
+    # TODO(scotttodd): add the ALWAYSLINK property to MLIR libraries elsewhere
+    get_target_property(_ALIASED_TARGET ${LIB} ALIASED_TARGET)
+    if(NOT _ALIASED_TARGET)
+      set_property(TARGET ${LIB} PROPERTY ALWAYSLINK 1)
+    endif()
+  endforeach(LIB)
 
   iree_cc_binary(
     NAME
