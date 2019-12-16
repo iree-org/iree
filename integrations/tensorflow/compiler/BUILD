@@ -53,3 +53,20 @@ cc_library(
     ],
     alwayslink = 1,
 )
+
+cc_binary(
+    name = "iree-tf-opt",
+    deps = [
+        ":tensorflow",
+        "//iree/tools:iree_opt_library",
+        "@local_config_mlir//:MlirOptMain",
+    ],
+)
+
+cc_binary(
+    name = "iree-tf-translate",
+    deps = [
+        ":tensorflow",
+        "//iree/tools:iree_translate_library",
+    ],
+)

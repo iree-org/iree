@@ -1,6 +1,6 @@
 // RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --output_types="f" | IreeFileCheck %s
 // TODO(b/142903911): figure out swiftshader+asan crash:
-// RUN: iree-run-mlir %s --target_backends=vulkan-spirv --output_types="f" --norun
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s --target_backends=vulkan-spirv --output_types="f" --norun)
 
 // Float sum values from [1.0, 10.0]
 // CHECK-LABEL: EXEC @reduce_sum_1x10xf32
