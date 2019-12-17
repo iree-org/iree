@@ -491,8 +491,7 @@ extern "C" int main(int argc, char** argv) {
 
   // Create a runtime Instance.
   iree_rt_instance_t* iree_instance = nullptr;
-  CHECK_IREE_OK(
-      iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &iree_instance));
+  CHECK_IREE_OK(iree_rt_instance_create(IREE_ALLOCATOR_SYSTEM, &iree_instance));
 
   // Create IREE Vulkan Driver and Device, sharing our VkInstance/VkDevice.
   LOG(INFO) << "Creating Vulkan driver/device";
@@ -527,10 +526,10 @@ extern "C" int main(int argc, char** argv) {
 
   // Allocate a context that will hold the module state across invocations.
   iree_rt_policy_t* dummy_policy = nullptr;
-  CHECK_IREE_OK(iree_rt_policy_create(IREE_ALLOCATOR_DEFAULT, &dummy_policy));
+  CHECK_IREE_OK(iree_rt_policy_create(IREE_ALLOCATOR_SYSTEM, &dummy_policy));
   iree_rt_context_t* iree_context = nullptr;
   CHECK_IREE_OK(iree_rt_context_create(iree_instance, dummy_policy,
-                                       IREE_ALLOCATOR_DEFAULT, &iree_context));
+                                       IREE_ALLOCATOR_SYSTEM, &iree_context));
   iree_rt_policy_release(dummy_policy);
 
   // Load bytecode module from embedded data.
@@ -542,7 +541,7 @@ extern "C" int main(int argc, char** argv) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      nullptr, nullptr, IREE_ALLOCATOR_DEFAULT, &bytecode_module));
+      nullptr, nullptr, IREE_ALLOCATOR_SYSTEM, &bytecode_module));
 
   // Register bytecode module within the context.
   std::vector<iree_rt_module_t*> modules;
@@ -642,11 +641,11 @@ extern "C" int main(int argc, char** argv) {
         iree_hal_buffer_t* arg1_buffer = nullptr;
         CHECK_IREE_OK(iree_rt_context_allocate_device_visible_buffer(
             iree_context, IREE_HAL_BUFFER_USAGE_ALL,
-            sizeof(float) * kElementCount, IREE_ALLOCATOR_DEFAULT,
+            sizeof(float) * kElementCount, IREE_ALLOCATOR_SYSTEM,
             &arg0_buffer));
         CHECK_IREE_OK(iree_rt_context_allocate_device_visible_buffer(
             iree_context, IREE_HAL_BUFFER_USAGE_ALL,
-            sizeof(float) * kElementCount, IREE_ALLOCATOR_DEFAULT,
+            sizeof(float) * kElementCount, IREE_ALLOCATOR_SYSTEM,
             &arg1_buffer));
 
         // Write inputs into the mappable buffers.
@@ -659,10 +658,10 @@ extern "C" int main(int argc, char** argv) {
         std::array<iree_hal_buffer_view_t*, 2> arg_buffer_views;
         CHECK_IREE_OK(iree_hal_buffer_view_create(
             arg0_buffer, iree_shape_t{1, {kElementCount}}, sizeof(float),
-            IREE_ALLOCATOR_DEFAULT, &arg_buffer_views[0]));
+            IREE_ALLOCATOR_SYSTEM, &arg_buffer_views[0]));
         CHECK_IREE_OK(iree_hal_buffer_view_create(
             arg1_buffer, iree_shape_t{1, {kElementCount}}, sizeof(float),
-            IREE_ALLOCATOR_DEFAULT, &arg_buffer_views[1]));
+            IREE_ALLOCATOR_SYSTEM, &arg_buffer_views[1]));
         iree_hal_buffer_release(arg0_buffer);
         iree_hal_buffer_release(arg1_buffer);
 
@@ -671,7 +670,7 @@ extern "C" int main(int argc, char** argv) {
         iree_rt_invocation_t* invocation = nullptr;
         CHECK_IREE_OK(iree_rt_invocation_create(
             iree_context, &main_function, nullptr, nullptr,
-            arg_buffer_views.data(), 2, nullptr, 0, IREE_ALLOCATOR_DEFAULT,
+            arg_buffer_views.data(), 2, nullptr, 0, IREE_ALLOCATOR_SYSTEM,
             &invocation));
         CHECK_IREE_OK(iree_hal_buffer_view_release(arg_buffer_views[0]));
         CHECK_IREE_OK(iree_hal_buffer_view_release(arg_buffer_views[1]));
@@ -684,7 +683,7 @@ extern "C" int main(int argc, char** argv) {
         std::array<iree_hal_buffer_view_t*, 2> result_buffer_views;
         iree_host_size_t result_count;
         CHECK_IREE_OK(iree_rt_invocation_consume_results(
-            invocation, result_buffer_views.size(), IREE_ALLOCATOR_DEFAULT,
+            invocation, result_buffer_views.size(), IREE_ALLOCATOR_SYSTEM,
             result_buffer_views.data(), &result_count));
         iree_rt_invocation_release(invocation);
 

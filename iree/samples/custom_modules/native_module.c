@@ -99,10 +99,8 @@ iree_status_t iree_custom_message_create(iree_string_view_t value,
                                          iree_vm_ref_t* out_message_ref) {
   // Note that we allocate the message and the string value together.
   iree_custom_message_t* message = NULL;
-  IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
-      allocator.self, sizeof(iree_custom_message_t) + value.size,
-      (void**)&message));
-  memset(message, 0, sizeof(iree_custom_message_t));
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator, sizeof(iree_custom_message_t) + value.size, (void**)&message));
   message->ref_object.counter = 1;
   message->allocator = allocator;
   message->value.data = (uint8_t*)message + sizeof(iree_custom_message_t);
@@ -116,8 +114,8 @@ iree_status_t iree_custom_message_wrap(iree_string_view_t value,
                                        iree_allocator_t allocator,
                                        iree_vm_ref_t* out_message_ref) {
   iree_custom_message_t* message = NULL;
-  IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
-      allocator.self, sizeof(iree_custom_message_t), (void**)&message));
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator, sizeof(iree_custom_message_t), (void**)&message));
   message->ref_object.counter = 1;
   message->allocator = allocator;
   message->value = value;  // Unowned.
@@ -127,7 +125,7 @@ iree_status_t iree_custom_message_wrap(iree_string_view_t value,
 
 void iree_custom_message_destroy(void* ptr) {
   iree_custom_message_t* message = (iree_custom_message_t*)ptr;
-  message->allocator.free(message->allocator.self, ptr);
+  iree_allocator_free(message->allocator, ptr);
 }
 
 iree_status_t iree_custom_message_read_value(iree_vm_ref_t* message_ref,
@@ -232,7 +230,7 @@ static iree_status_t iree_custom_native_get_unique_message_thunk(
 
 static iree_status_t iree_custom_native_module_destroy(void* self) {
   iree_custom_native_module_t* module = (iree_custom_native_module_t*)self;
-  return module->allocator.free(module->allocator.self, module);
+  return iree_allocator_free(module->allocator, module);
 }
 
 static iree_string_view_t iree_custom_native_module_name(void* self) {
@@ -338,10 +336,8 @@ static iree_status_t iree_custom_native_module_alloc_state(
   iree_custom_native_module_t* module = (iree_custom_native_module_t*)self;
 
   iree_custom_native_module_state_t* state = NULL;
-  IREE_API_RETURN_IF_API_ERROR(
-      allocator.alloc(allocator.self, sizeof(iree_custom_native_module_state_t),
-                      (void**)&state));
-  memset(state, 0, sizeof(iree_custom_native_module_state_t));
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator, sizeof(iree_custom_native_module_state_t), (void**)&state));
   state->allocator = allocator;
 
   // Allocate a unique ID to demonstrate per-context state.
@@ -364,7 +360,7 @@ static iree_status_t iree_custom_native_module_free_state(
   // Release any state we have been holding on to.
   iree_vm_ref_release(&state->unique_message);
 
-  return state->allocator.free(state->allocator.self, module_state);
+  return iree_allocator_free(state->allocator, module_state);
 }
 
 static iree_status_t iree_custom_native_module_resolve_import(
@@ -409,12 +405,12 @@ iree_status_t iree_custom_native_module_create(iree_allocator_t allocator,
   *out_module = NULL;
 
   iree_custom_native_module_t* module = NULL;
-  IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
-      allocator.self, sizeof(iree_custom_native_module_t), (void**)&module));
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator, sizeof(iree_custom_native_module_t), (void**)&module));
   module->allocator = allocator;
   module->next_unique_id = 0;
 
-  module->interface.self = module;
+  iree_vm_module_init(&module->interface, module);
   module->interface.destroy = iree_custom_native_module_destroy;
   module->interface.name = iree_custom_native_module_name;
   module->interface.signature = iree_custom_native_module_signature;

@@ -292,8 +292,8 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
 
   // Allocate and initialize the iree_hal_buffer_view struct.
   iree_hal_buffer_view* handle = nullptr;
-  IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
-      allocator.self, sizeof(*handle), reinterpret_cast<void**>(&handle)));
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator, sizeof(*handle), reinterpret_cast<void**>(&handle)));
   new (handle) iree_hal_buffer_view();
   handle->allocator = allocator;
 

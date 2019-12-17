@@ -62,7 +62,7 @@ class BytecodeModuleApiTest : public ::testing::Test,
 
 TEST_P(BytecodeModuleApiTest, RunOnce) {
   iree_rt_instance_t* instance = nullptr;
-  ASSERT_API_OK(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &instance));
+  ASSERT_API_OK(iree_rt_instance_create(IREE_ALLOCATOR_SYSTEM, &instance));
 
   // TEMPORARY: until policies and placement are performed with manually
   // register drivers via a magic function.
@@ -73,10 +73,10 @@ TEST_P(BytecodeModuleApiTest, RunOnce) {
 
   // Allocate a context that will hold the module state across invocations.
   iree_rt_policy_t* dummy_policy = nullptr;
-  ASSERT_API_OK(iree_rt_policy_create(IREE_ALLOCATOR_DEFAULT, &dummy_policy));
+  ASSERT_API_OK(iree_rt_policy_create(IREE_ALLOCATOR_SYSTEM, &dummy_policy));
   iree_rt_context_t* context = nullptr;
   ASSERT_API_OK(iree_rt_context_create(instance, dummy_policy,
-                                       IREE_ALLOCATOR_DEFAULT, &context));
+                                       IREE_ALLOCATOR_SYSTEM, &context));
   iree_rt_policy_release(dummy_policy);
 
   // Load bytecode module from the embedded data.
@@ -87,7 +87,7 @@ TEST_P(BytecodeModuleApiTest, RunOnce) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           module_file_toc->size},
-      nullptr, nullptr, IREE_ALLOCATOR_DEFAULT, &bytecode_module));
+      nullptr, nullptr, IREE_ALLOCATOR_SYSTEM, &bytecode_module));
 
   // Register modules that we want to be able to use in the context.
   std::vector<iree_rt_module_t*> modules;
@@ -113,10 +113,10 @@ TEST_P(BytecodeModuleApiTest, RunOnce) {
   iree_hal_buffer_t* arg1_buffer = nullptr;
   ASSERT_API_OK(iree_rt_context_allocate_device_visible_buffer(
       context, IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount,
-      IREE_ALLOCATOR_DEFAULT, &arg0_buffer));
+      IREE_ALLOCATOR_SYSTEM, &arg0_buffer));
   ASSERT_API_OK(iree_rt_context_allocate_device_visible_buffer(
       context, IREE_HAL_BUFFER_USAGE_ALL, sizeof(float) * kElementCount,
-      IREE_ALLOCATOR_DEFAULT, &arg1_buffer));
+      IREE_ALLOCATOR_SYSTEM, &arg1_buffer));
 
   // Populate initial values for 4 * 2 = 8.
   float kFloat4 = 4.0f;
@@ -130,10 +130,10 @@ TEST_P(BytecodeModuleApiTest, RunOnce) {
   std::array<iree_hal_buffer_view_t*, 2> arg_buffer_views;
   ASSERT_API_OK(iree_hal_buffer_view_create(
       arg0_buffer, iree_shape_t{1, {kElementCount}}, sizeof(float),
-      IREE_ALLOCATOR_DEFAULT, &arg_buffer_views[0]));
+      IREE_ALLOCATOR_SYSTEM, &arg_buffer_views[0]));
   ASSERT_API_OK(iree_hal_buffer_view_create(
       arg1_buffer, iree_shape_t{1, {kElementCount}}, sizeof(float),
-      IREE_ALLOCATOR_DEFAULT, &arg_buffer_views[1]));
+      IREE_ALLOCATOR_SYSTEM, &arg_buffer_views[1]));
   iree_hal_buffer_release(arg0_buffer);
   iree_hal_buffer_release(arg1_buffer);
 
@@ -142,7 +142,7 @@ TEST_P(BytecodeModuleApiTest, RunOnce) {
   iree_rt_invocation_t* invocation = nullptr;
   ASSERT_API_OK(iree_rt_invocation_create(
       context, &main_function, nullptr, nullptr, arg_buffer_views.data(), 2,
-      nullptr, 0, IREE_ALLOCATOR_DEFAULT, &invocation));
+      nullptr, 0, IREE_ALLOCATOR_SYSTEM, &invocation));
   ASSERT_API_OK(iree_hal_buffer_view_release(arg_buffer_views[0]));
   ASSERT_API_OK(iree_hal_buffer_view_release(arg_buffer_views[1]));
   ASSERT_API_OK(
@@ -153,7 +153,7 @@ TEST_P(BytecodeModuleApiTest, RunOnce) {
   std::array<iree_hal_buffer_view_t*, 2> result_buffer_views;
   iree_host_size_t result_count;
   ASSERT_API_OK(iree_rt_invocation_consume_results(
-      invocation, result_buffer_views.size(), IREE_ALLOCATOR_DEFAULT,
+      invocation, result_buffer_views.size(), IREE_ALLOCATOR_SYSTEM,
       result_buffer_views.data(), &result_count));
   iree_rt_invocation_release(invocation);
 

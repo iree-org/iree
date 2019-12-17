@@ -23,8 +23,10 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm2/bytecode_dispatch_test_module.h"
 #include "iree/vm2/bytecode_module.h"
+#include "iree/vm2/context.h"
+#include "iree/vm2/instance.h"
+#include "iree/vm2/invocation.h"
 #include "iree/vm2/module.h"
-#include "iree/vm2/stack.h"
 
 namespace {
 
@@ -47,7 +49,7 @@ std::vector<TestParams> GetModuleTestParams() {
                iree_const_byte_span_t{
                    reinterpret_cast<const uint8_t*>(module_file_toc->data),
                    module_file_toc->size},
-               IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_DEFAULT, &module))
+               IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
       << "Bytecode module failed to load";
   iree_vm_module_signature_t signature = module->signature(module->self);
   function_names.reserve(signature.export_function_count);
@@ -58,7 +60,7 @@ std::vector<TestParams> GetModuleTestParams() {
                                   i, nullptr, &name, nullptr));
     function_names.push_back({std::string(name.data, name.size)});
   }
-  module->destroy(module->self);
+  iree_vm_module_release(module);
 
   return function_names;
 }
@@ -68,6 +70,9 @@ class VMBytecodeDispatchTest
       public ::testing::WithParamInterface<TestParams> {
  protected:
   virtual void SetUp() {
+    CHECK_EQ(IREE_STATUS_OK,
+             iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
+
     const auto* module_file_toc =
         iree::vm::bytecode_dispatch_test_module_create();
     CHECK_EQ(IREE_STATUS_OK,
@@ -75,57 +80,38 @@ class VMBytecodeDispatchTest
                  iree_const_byte_span_t{
                      reinterpret_cast<const uint8_t*>(module_file_toc->data),
                      module_file_toc->size},
-                 IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_DEFAULT, &module_))
+                 IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
         << "Bytecode module failed to load";
 
-    CHECK_EQ(IREE_STATUS_OK,
-             module_->alloc_state(module_->self, IREE_ALLOCATOR_DEFAULT,
-                                  &module_state_));
-
-    // Since we only have a single state we pack it in the state_resolver ptr.
-    iree_vm_state_resolver_t state_resolver = {
-        module_state_,
-        +[](void* state_resolver, iree_vm_module_t* module,
-            iree_vm_module_state_t** out_module_state) -> iree_status_t {
-          *out_module_state = (iree_vm_module_state_t*)state_resolver;
-          return IREE_STATUS_OK;
-        }};
-
-    CHECK_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, &stack_));
+    std::vector<iree_vm_module_t*> modules = {bytecode_module_};
+    CHECK_EQ(IREE_STATUS_OK, iree_vm_context_create_with_modules(
+                                 instance_, modules.data(), modules.size(),
+                                 IREE_ALLOCATOR_SYSTEM, &context_));
   }
 
   virtual void TearDown() {
-    iree_vm_stack_deinit(&stack_);
-    module_->free_state(module_->self, module_state_);
-    module_state_ = nullptr;
-    module_->destroy(module_->self);
-    module_ = nullptr;
+    iree_vm_module_release(bytecode_module_);
+    iree_vm_context_release(context_);
+    iree_vm_instance_release(instance_);
   }
 
   iree_status_t RunFunction(absl::string_view function_name) {
     iree_vm_function_t function;
     CHECK_EQ(IREE_STATUS_OK,
-             module_->lookup_function(
-                 module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+             bytecode_module_->lookup_function(
+                 bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
                  iree_string_view_t{function_name.data(), function_name.size()},
                  &function))
         << "Exported function '" << function_name << "' not found";
 
-    iree_vm_stack_frame_t* entry_frame;
-    iree_vm_stack_function_enter(&stack_, function, &entry_frame);
-
-    iree_vm_execution_result_t result;
-    iree_status_t execution_result =
-        module_->execute(module_->self, &stack_, entry_frame, &result);
-
-    iree_vm_stack_function_leave(&stack_);
-
-    return execution_result;
+    return iree_vm_invoke(context_, function,
+                          /*policy=*/nullptr, /*inputs=*/nullptr,
+                          /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM);
   }
 
-  iree_vm_module_t* module_ = nullptr;
-  iree_vm_module_state_t* module_state_ = nullptr;
-  iree_vm_stack_t stack_;
+  iree_vm_instance_t* instance_ = nullptr;
+  iree_vm_context_t* context_ = nullptr;
+  iree_vm_module_t* bytecode_module_ = nullptr;
 };
 
 TEST_P(VMBytecodeDispatchTest, Check) {

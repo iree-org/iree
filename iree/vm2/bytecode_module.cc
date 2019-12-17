@@ -201,14 +201,12 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
 static iree_status_t iree_vm_bytecode_module_destroy(void* self) {
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
 
-  if (module->flatbuffer_allocator.free) {
-    module->flatbuffer_allocator.free(module->flatbuffer_allocator.self,
-                                      (void*)module->flatbuffer_data.data);
-  }
+  iree_allocator_free(module->flatbuffer_allocator,
+                      (void*)module->flatbuffer_data.data);
   module->flatbuffer_data = {NULL, 0};
   module->flatbuffer_allocator = IREE_ALLOCATOR_NULL;
 
-  return module->allocator.free(module->allocator.self, module);
+  return iree_allocator_free(module->allocator, module);
 }
 
 static iree_string_view_t iree_vm_bytecode_module_name(void* self) {
@@ -397,9 +395,8 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   total_state_struct_size += import_function_count * sizeof(iree_vm_function_t);
 
   iree_vm_bytecode_module_state_t* state = NULL;
-  IREE_API_RETURN_IF_API_ERROR(
-      allocator.alloc(allocator.self, total_state_struct_size, (void**)&state));
-  memset(state, 0, total_state_struct_size);
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator, total_state_struct_size, (void**)&state));
   state->allocator = allocator;
 
   uint8_t* p = ((uint8_t*)state) + sizeof(iree_vm_bytecode_module_state_t);
@@ -517,8 +514,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
       module_def->types()->size() * sizeof(iree_vm_type_def_t);
 
   iree_vm_bytecode_module_t* module = NULL;
-  IREE_API_RETURN_IF_API_ERROR(allocator.alloc(
-      allocator.self, sizeof(iree_vm_bytecode_module_t) + type_table_size,
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator, sizeof(iree_vm_bytecode_module_t) + type_table_size,
       (void**)&module));
   module->allocator = allocator;
 
@@ -538,7 +535,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
                                              sizeof(iree_vm_bytecode_module_t));
   iree_vm_bytecode_module_resolve_types(module_def, module->type_table);
 
-  module->interface.self = module;
+  iree_vm_module_init(&module->interface, module);
   module->interface.destroy = iree_vm_bytecode_module_destroy;
   module->interface.name = iree_vm_bytecode_module_name;
   module->interface.signature = iree_vm_bytecode_module_signature;

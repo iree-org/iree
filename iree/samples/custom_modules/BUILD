@@ -36,8 +36,8 @@ cc_test(
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/testing:gtest_main",
+        "//iree/vm2",
         "//iree/vm2:bytecode_module",
-        "//iree/vm2:module",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
     ],
@@ -49,6 +49,6 @@ cc_library(
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
-        "//iree/vm2:module",
+        "//iree/vm2",
     ],
 )

@@ -14,7 +14,7 @@ cc_test(
     deps = [
         ":bytecode_dispatch_test_module_cc",
         ":bytecode_module",
-        ":module",
+        ":vm2",
         "//iree/base:logging",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/strings",
@@ -42,6 +42,9 @@ cc_library(
     deps = [
         ":bytecode_op_table_gen",
         ":module",
+        ":ref",
+        ":stack",
+        ":value",
         "//iree/base:api",
         "//iree/base:flatbuffer_util",
         "//iree/base:target_platform",
@@ -56,7 +59,7 @@ cc_test(
     deps = [
         ":bytecode_module",
         ":bytecode_module_benchmark_module_cc",
-        ":module",
+        ":vm2",
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/testing:benchmark_main",
@@ -98,33 +101,53 @@ gentbl(
 )
 
 cc_library(
-    name = "module",
-    srcs = [
-        "ref.c",
-        "stack.c",
+    name = "context",
+    srcs = ["context.c"],
+    hdrs = ["context.h"],
+    deps = [
+        ":instance",
+        ":module",
+        ":stack",
+        "//iree/base:api",
     ],
-    hdrs = [
-        "module.h",
-        "ref.h",
-        "stack.h",
-    ],
+)
+
+cc_library(
+    name = "instance",
+    srcs = ["instance.c"],
+    hdrs = ["instance.h"],
     deps = [
         "//iree/base:api",
     ],
 )
 
 cc_library(
-    name = "module_base",
-    srcs = ["module_base.cc"],
-    hdrs = ["module_base.h"],
+    name = "invocation",
+    srcs = ["invocation.c"],
+    hdrs = ["invocation.h"],
     deps = [
+        ":context",
         ":module",
+        ":variant_list",
         "//iree/base:api",
-        "//iree/base:api_util",
-        "//iree/base:ref_ptr",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_library(
+    name = "module",
+    srcs = ["module.c"],
+    hdrs = ["module.h"],
+    deps = [
+        "//iree/base:api",
+    ],
+)
+
+cc_library(
+    name = "ref",
+    srcs = ["ref.c"],
+    hdrs = ["ref.h"],
+    deps = [
+        "//iree/base:api",
     ],
 )
 
@@ -132,10 +155,21 @@ cc_test(
     name = "ref_test",
     srcs = ["ref_test.cc"],
     deps = [
-        ":module",
+        ":ref",
         "//iree/base:api",
         "//iree/base:ref_ptr",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "stack",
+    srcs = ["stack.c"],
+    hdrs = ["stack.h"],
+    deps = [
+        ":module",
+        ":ref",
+        "//iree/base:api",
     ],
 )
 
@@ -143,9 +177,51 @@ cc_test(
     name = "stack_test",
     srcs = ["stack_test.cc"],
     deps = [
-        ":module",
+        ":ref",
+        ":stack",
+        ":vm2",
         "//iree/base:api",
         "//iree/base:ref_ptr",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "value",
+    hdrs = ["value.h"],
+)
+
+cc_library(
+    name = "variant_list",
+    srcs = ["variant_list.c"],
+    hdrs = ["variant_list.h"],
+    deps = [
+        ":ref",
+        ":value",
+    ],
+)
+
+cc_library(
+    name = "vm2",
+    hdrs = [
+        "context.h",
+        "instance.h",
+        "invocation.h",
+        "module.h",
+        "ref.h",
+        "stack.h",
+        "value.h",
+        "variant_list.h",
+    ],
+    deps = [
+        ":context",
+        ":instance",
+        ":invocation",
+        ":module",
+        ":ref",
+        ":stack",
+        ":value",
+        ":variant_list",
+        "//iree/base:api",
     ],
 )

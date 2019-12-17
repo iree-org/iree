@@ -73,7 +73,7 @@ HalBufferView RtContext::WrapPyBufferForInput(py::buffer py_buffer) {
   iree_hal_buffer_view_t* bv;
   CheckApiStatus(iree_hal_buffer_view_create(buffer.raw_ptr(), shape,
                                              py_buffer_info.itemsize,
-                                             IREE_ALLOCATOR_DEFAULT, &bv),
+                                             IREE_ALLOCATOR_SYSTEM, &bv),
                  "Error allocating buffer view");
 
   return HalBufferView::CreateRetained(bv);

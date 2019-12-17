@@ -21,18 +21,11 @@
 #include "iree/vm2/module.h"
 #include "iree/vm2/ref.h"
 #include "iree/vm2/stack.h"
+#include "iree/vm2/value.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
-
-// Defines the type of a primitive value.
-typedef enum {
-  // Not a value type.
-  IREE_VM_VALUE_TYPE_NONE = 0,
-  // int32_t.
-  IREE_VM_VALUE_TYPE_I32 = 1,
-} iree_vm_value_type_t;
 
 // Describes a type in the type table, mapping from a local module type ID to
 // either a primitive value type or registered ref type.

@@ -144,9 +144,18 @@ typedef uint64_t iree_device_size_t;
 // Whole length of the underlying buffer.
 #define IREE_WHOLE_BUFFER (iree_device_size_t(-1))
 
+// Defines how an allocation from an iree_allocator_t should be made.
+typedef enum {
+  // The contents of the allocation *must* be zeroed by the allocator prior to
+  // returning. Allocators may be able to elide the zeroing if they allocate
+  // fresh pages from the system. It is always safe to zero contents if the
+  // behavior of the allocator is not under our control.
+  IREE_ALLOCATION_MODE_ZERO_CONTENTS = 1 << 0,
+} iree_allocation_mode_t;
+
 // An allocator for host-memory allocations.
 // IREE will attempt to use this in place of the system malloc and free.
-// Pass the IREE_ALLOCATOR_DEFAULT macro to use the system allocator.
+// Pass the IREE_ALLOCATOR_SYSTEM macro to use the system allocator.
 typedef struct {
   // User-defined pointer passed to all functions.
   void* self;
@@ -154,16 +163,17 @@ typedef struct {
   // Systems should align to 16 byte boundaries (or otherwise their natural
   // SIMD alignment). The runtime pools internally and small allocations
   // (usually) won't be made through this interface.
-  iree_status_t(IREE_API_PTR* alloc)(void* self, iree_host_size_t byte_length,
+  iree_status_t(IREE_API_PTR* alloc)(void* self, iree_allocation_mode_t mode,
+                                     iree_host_size_t byte_length,
                                      void** out_ptr);
   // Frees |ptr| from a previous alloc call.
   iree_status_t(IREE_API_PTR* free)(void* self, void* ptr);
 } iree_allocator_t;
 
-// Allocates using the iree_allocator_alloc and iree_allocator_free methods.
+// Allocates using the iree_allocator_malloc and iree_allocator_free methods.
 // These will usually be backed by malloc and free.
-#define IREE_ALLOCATOR_DEFAULT \
-  { 0, iree_allocator_alloc, iree_allocator_free }
+#define IREE_ALLOCATOR_SYSTEM \
+  { 0, iree_allocator_system_allocate, iree_allocator_system_free }
 
 // Does not perform any allocation or deallocation; used to wrap objects that
 // are owned by external code/live in read-only memory/etc.
@@ -266,29 +276,30 @@ iree_api_version_check(iree_api_version_t expected_version,
 //
 // This should typically be called early in some sort of main() function once,
 // before calling most other API functions. Certain core API functions here
-// such as iree_api_version_check, iree_allocator_alloc, and iree_allocator_free
-// are safe to call before this.
+// such as iree_api_version_check, iree_allocator_malloc, and
+// iree_allocator_free are safe to call before this.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
                                                           char*** argv);
 
+// Allocates a block of |byte_length| bytes from the given allocator.
+// The contents of the returned memory is guaranteed to be zeroed.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
+    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr);
+
+// Frees a previously-allocated block of memory to the given allocator.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_allocator_free(iree_allocator_t allocator, void* ptr);
+
 // Allocates a block of |byte_length| bytes from the default system allocator.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_allocator_alloc(void* self, iree_host_size_t byte_length, void** out_ptr);
+iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
+                               iree_host_size_t byte_length, void** out_ptr);
 
 // Frees a previously-allocated block of memory to the default system allocator.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_free(void* self,
-                                                                void* ptr);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_allocator_system_free(void* self, void* ptr);
 
 #endif  // IREE_API_NO_PROTOTYPES
-
-typedef iree_status_t(IREE_API_PTR* PFN_iree_api_version_check)(
-    iree_api_version_t expected_version,
-    iree_api_version_t* out_actual_version);
-typedef iree_status_t(IREE_API_PTR* PFN_iree_api_init)(int* argc, char*** argv);
-typedef iree_status_t(IREE_API_PTR* PFN_iree_allocator_alloc)(
-    void* self, iree_host_size_t byte_length, void** out_ptr);
-typedef iree_status_t(IREE_API_PTR* PFN_iree_allocator_free)(void* self,
-                                                             void* ptr);
 
 //===----------------------------------------------------------------------===//
 // Utilities for working with API types
@@ -304,6 +315,13 @@ iree_make_cstring_view(const char* str);
 // Like strncmp but with iree_string_view_t values.
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
+
+// Splits |value| into two parts based on the first occurrence of |split_char|.
+// Returns the index of the |split_char| in the original |value| or -1 if not
+// found.
+IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
+    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
+    iree_string_view_t* out_rhs);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -340,16 +358,6 @@ IREE_API_EXPORT iree_byte_span_t IREE_API_CALL
 iree_file_mapping_data(iree_file_mapping_t* file_mapping);
 
 #endif  // IREE_API_NO_PROTOTYPES
-
-typedef iree_status_t(IREE_API_PTR* PFN_iree_file_mapping_open_read)(
-    iree_string_view_t path, iree_allocator_t allocator,
-    iree_file_mapping_t** out_file_mapping);
-typedef iree_status_t(IREE_API_PTR* PFN_iree_file_mapping_retain)(
-    iree_file_mapping_t* file_mapping);
-typedef iree_status_t(IREE_API_PTR* PFN_iree_file_mapping_release)(
-    iree_file_mapping_t* file_mapping);
-typedef iree_byte_span_t(IREE_API_PTR* PFN_iree_file_mapping_data)(
-    iree_file_mapping_t* file_mapping);
 
 #ifdef __cplusplus
 }  // extern "C"

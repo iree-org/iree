@@ -147,7 +147,7 @@ class RtInstance : public ApiRefCounted<RtInstance, iree_rt_instance_t> {
   // TODO(laurenzo): Support optional allocator argument.
   static RtInstance Create(absl::optional<std::string> driver_name) {
     iree_rt_instance_t* raw_inst;
-    CheckApiStatus(iree_rt_instance_create(IREE_ALLOCATOR_DEFAULT, &raw_inst),
+    CheckApiStatus(iree_rt_instance_create(IREE_ALLOCATOR_SYSTEM, &raw_inst),
                    "Error creating instance");
     RtInstance inst = RtInstance::CreateRetained(raw_inst);
 
@@ -168,7 +168,7 @@ class RtPolicy : public ApiRefCounted<RtPolicy, iree_rt_policy_t> {
   // TODO(laurenzo): Support optional allocator argument.
   static RtPolicy Create() {
     iree_rt_policy_t* policy;
-    CheckApiStatus(iree_rt_policy_create(IREE_ALLOCATOR_DEFAULT, &policy),
+    CheckApiStatus(iree_rt_policy_create(IREE_ALLOCATOR_SYSTEM, &policy),
                    "Error creating policy");
     return RtPolicy::CreateRetained(policy);
   }
@@ -218,13 +218,13 @@ class RtInvocation : public ApiRefCounted<RtInvocation, iree_rt_invocation_t> {
     absl::InlinedVector<iree_hal_buffer_view_t*, kInlineSize> result_bvs;
     result_bvs.resize(kInlineSize);
     auto status = iree_rt_invocation_consume_results(
-        raw_ptr(), kInlineSize, IREE_ALLOCATOR_DEFAULT, &result_bvs[0],
+        raw_ptr(), kInlineSize, IREE_ALLOCATOR_SYSTEM, &result_bvs[0],
         &result_count);
     if (status == IREE_STATUS_OUT_OF_RANGE) {
       // Resize/retry.
       result_bvs.resize(result_count);
       status = iree_rt_invocation_consume_results(
-          raw_ptr(), result_count, IREE_ALLOCATOR_DEFAULT, &result_bvs[0],
+          raw_ptr(), result_count, IREE_ALLOCATOR_SYSTEM, &result_bvs[0],
           &result_count);
     }
     CheckApiStatus(status, "Error consuming invocation results");
@@ -244,7 +244,7 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
     // TODO(laurenzo): Support optional allocator argument.
     CheckApiStatus(
         iree_rt_context_create(instance->raw_ptr(), policy->raw_ptr(),
-                               IREE_ALLOCATOR_DEFAULT, &context),
+                               IREE_ALLOCATOR_SYSTEM, &context),
         "Error creating instance");
     return RtContext::CreateRetained(context);
   }
@@ -304,21 +304,21 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
             iree_hal_heap_buffer_allocate(
                 IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
                 static_cast<iree_hal_buffer_usage_t>(usage), allocation_size,
-                IREE_ALLOCATOR_DEFAULT, IREE_ALLOCATOR_DEFAULT, &raw_buffer),
+                IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM, &raw_buffer),
             "Error allocating heap buffer");
         break;
       case BufferPlacement::kDeviceLocal:
         CheckApiStatus(
             iree_rt_context_allocate_device_local_buffer(
                 raw_ptr(), static_cast<iree_hal_buffer_usage_t>(usage),
-                allocation_size, IREE_ALLOCATOR_DEFAULT, &raw_buffer),
+                allocation_size, IREE_ALLOCATOR_SYSTEM, &raw_buffer),
             "Error allocating device local buffer");
         break;
       case BufferPlacement::kDeviceVisible:
         CheckApiStatus(
             iree_rt_context_allocate_device_visible_buffer(
                 raw_ptr(), static_cast<iree_hal_buffer_usage_t>(usage),
-                allocation_size, IREE_ALLOCATOR_DEFAULT, &raw_buffer),
+                allocation_size, IREE_ALLOCATOR_SYSTEM, &raw_buffer),
             "Error allocating device visible buffer");
         break;
       default:
@@ -373,7 +373,7 @@ class RtContext : public ApiRefCounted<RtContext, iree_rt_context_t> {
                        raw_ptr(), &f.raw_function(), policy.raw_ptr(),
                        nullptr /* dependencies */, raw_arguments.data(),
                        raw_arguments.size(), raw_results.data(),
-                       raw_results.size(), IREE_ALLOCATOR_DEFAULT, &invocation),
+                       raw_results.size(), IREE_ALLOCATOR_SYSTEM, &invocation),
                    "Error invoking function");
 
     return RtInvocation::CreateRetained(invocation);

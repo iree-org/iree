@@ -44,9 +44,25 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
   return IREE_STATUS_OK;
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
+    iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
+  if (!allocator.alloc) return IREE_STATUS_INVALID_ARGUMENT;
+  return allocator.alloc(allocator.self, IREE_ALLOCATION_MODE_ZERO_CONTENTS,
+                         byte_length, out_ptr);
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_allocator_alloc(void* self, iree_host_size_t byte_length, void** out_ptr) {
-  IREE_TRACE_SCOPE0("iree_allocator_alloc");
+iree_allocator_free(iree_allocator_t allocator, void* ptr) {
+  if (ptr && allocator.free) {
+    return allocator.free(allocator.self, ptr);
+  }
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_allocator_system_allocate(void* self, iree_allocation_mode_t mode,
+                               iree_host_size_t byte_length, void** out_ptr) {
+  IREE_TRACE_SCOPE0("iree_allocator_system_allocate");
 
   if (!out_ptr) {
     return IREE_STATUS_INVALID_ARGUMENT;
@@ -57,17 +73,23 @@ iree_allocator_alloc(void* self, iree_host_size_t byte_length, void** out_ptr) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  *out_ptr = std::malloc(byte_length);
-  if (!*out_ptr) {
+  void* ptr = nullptr;
+  if (mode & IREE_ALLOCATION_MODE_ZERO_CONTENTS) {
+    ptr = std::calloc(1, byte_length);
+  } else {
+    ptr = std::malloc(byte_length);
+  }
+  if (!ptr) {
     return IREE_STATUS_RESOURCE_EXHAUSTED;
   }
 
+  *out_ptr = ptr;
   return IREE_STATUS_OK;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_free(void* self,
-                                                                void* ptr) {
-  IREE_TRACE_SCOPE0("iree_allocator_free");
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_allocator_system_free(void* self, void* ptr) {
+  IREE_TRACE_SCOPE0("iree_allocator_system_free");
   if (ptr) {
     std::free(ptr);
   }
@@ -94,6 +116,29 @@ iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
     return 1;
   }
   return strncmp(lhs.data, rhs.data, rhs.size);
+}
+
+IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
+    iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
+    iree_string_view_t* out_rhs) {
+  if (!value.data || !value.size) {
+    return -1;
+  }
+  const void* first_ptr = std::memchr(value.data, split_char, value.size);
+  if (!first_ptr) {
+    return -1;
+  }
+  int offset =
+      static_cast<int>(reinterpret_cast<const char*>(first_ptr) - value.data);
+  if (out_lhs) {
+    out_lhs->data = value.data;
+    out_lhs->size = offset;
+  }
+  if (out_rhs) {
+    out_rhs->data = value.data + offset + 1;
+    out_rhs->size = value.size - offset - 1;
+  }
+  return offset;
 }
 
 //===----------------------------------------------------------------------===//

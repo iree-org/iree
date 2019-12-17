@@ -92,6 +92,7 @@ typedef struct {
 // TODO(benvanik): version this interface.
 typedef struct iree_vm_module {
   void* self;
+  _Atomic intptr_t ref_count;
 
   // Destroys |self| when all references to the module have been released.
   iree_status_t(IREE_API_PTR* destroy)(void* self);
@@ -140,6 +141,37 @@ typedef struct iree_vm_module {
                                        iree_vm_stack_frame_t* frame,
                                        iree_vm_execution_result_t* out_result);
 } iree_vm_module_t;
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Initializes the interface of a module handle.
+// This should be called by module implementations after they allocate
+// themselves to properly initialize the module interface prior to populating
+// interface function pointers. This ensures that version adaptation can be
+// performed by the library as needed.
+// TODO(benvanik): version/module size.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_module_init(iree_vm_module_t* module, void* self);
+
+// Retains the given |module| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_module_retain(iree_vm_module_t* module);
+
+// Releases the given |module| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_module_release(iree_vm_module_t* module);
+
+// Returns the name of the module (used during resolution).
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_module_name(const iree_vm_module_t* module);
+
+// Looks up a function with the given name and linkage in the |module|.
+// This may perform a linear scan and results should be cached.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_module_lookup_function(
+    const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
+    iree_string_view_t name, iree_vm_function_t* out_function);
+
+#endif  // IREE_API_NO_PROTOTYPES
 
 #ifdef __cplusplus
 }  // extern "C"
