@@ -19,7 +19,9 @@
 #include "absl/types/span.h"
 #include "bindings/python/pyiree/rt.h"
 #include "bindings/python/pyiree/status_utils.h"
+#include "iree/base/api.h"
 #include "iree/base/signature_mangle.h"
+#include "iree/hal/api.h"
 
 namespace iree {
 namespace python {
@@ -52,6 +54,7 @@ static_assert(kScalarTypePyFormat.size() ==
 // for testing. Typically, this will be created directly from a function
 // and the attribute introspection will happen internal to C++.
 std::unique_ptr<FunctionAbi> PyCreateAbi(
+    std::shared_ptr<HostTypeFactory> host_type_factory,
     std::vector<std::pair<std::string, std::string>> attrs) {
   auto lookup =
       [&attrs](absl::string_view key) -> absl::optional<absl::string_view> {
@@ -60,7 +63,7 @@ std::unique_ptr<FunctionAbi> PyCreateAbi(
     }
     return absl::nullopt;
   };
-  return FunctionAbi::Create(lookup);
+  return FunctionAbi::Create(std::move(host_type_factory), lookup);
 }
 
 std::unique_ptr<FunctionArgVariantList> PyRawPack(
@@ -77,6 +80,17 @@ std::unique_ptr<FunctionArgVariantList> PyRawPack(
   self->RawPack(context, descs, absl::MakeSpan(local_py_args),
                 absl::MakeSpan(f_list->contents()), writable);
   return f_list;
+}
+
+std::unique_ptr<FunctionArgVariantList> PyAllocateResults(
+    FunctionAbi* self, RtContext& context, FunctionArgVariantList* f_args) {
+  auto f_results = absl::make_unique<FunctionArgVariantList>();
+  f_results->contents().resize(self->raw_result_arity());
+  self->AllocateResults(context,
+                        absl::MakeConstSpan(self->raw_config().results),
+                        absl::MakeConstSpan(f_args->contents()),
+                        absl::MakeSpan(f_results->contents()));
+  return f_results;
 }
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
@@ -242,6 +256,9 @@ std::string FunctionArgVariantListRepr(FunctionArgVariantList* self) {
 
 }  // namespace
 
+//------------------------------------------------------------------------------
+// FunctionAbi
+//------------------------------------------------------------------------------
 std::string FunctionAbi::DebugString() const {
   RawSignatureParser p;
   auto s = p.FunctionSignatureToString(raw_config_.signature);
@@ -251,8 +268,10 @@ std::string FunctionAbi::DebugString() const {
   return absl::StrCat("<FunctionAbi ", *s, ">");
 }
 
-std::unique_ptr<FunctionAbi> FunctionAbi::Create(AttributeLookup lookup) {
-  auto abi = absl::make_unique<FunctionAbi>();
+std::unique_ptr<FunctionAbi> FunctionAbi::Create(
+    std::shared_ptr<HostTypeFactory> host_type_factory,
+    AttributeLookup lookup) {
+  auto abi = absl::make_unique<FunctionAbi>(std::move(host_type_factory));
 
   // Fetch key attributes for the raw ABI.
   auto raw_version = lookup("fv");
@@ -293,7 +312,9 @@ void FunctionAbi::RawPack(RtContext& context,
                           absl::Span<py::handle> py_args,
                           absl::Span<FunctionArgVariant> f_args,
                           bool writable) {
-  CHECK(descs.size() == py_args.size() == f_args.size());
+  if (descs.size() != py_args.size() || descs.size() != f_args.size()) {
+    throw RaiseValueError("Mismatched RawPack() input arity");
+  }
 
   for (size_t i = 0, e = descs.size(); i < e; ++i) {
     const Description& desc = descs[i];
@@ -301,6 +322,60 @@ void FunctionAbi::RawPack(RtContext& context,
       case RawSignatureParser::Type::kBuffer:
         PackBuffer(context, desc, py_args[i], f_args[i], writable);
         break;
+      case RawSignatureParser::Type::kRefObject:
+        throw RaisePyError(PyExc_NotImplementedError,
+                           "Ref objects not yet supported");
+        break;
+      default:
+        throw RaisePyError(PyExc_NotImplementedError,
+                           "Unsupported argument type");
+    }
+  }
+}
+
+void FunctionAbi::AllocateResults(RtContext& context,
+                                  absl::Span<const Description> descs,
+                                  absl::Span<const FunctionArgVariant> f_args,
+                                  absl::Span<FunctionArgVariant> f_results) {
+  if (descs.size() != f_results.size()) {
+    throw RaiseValueError("Mismatched AllocateResults() result arity");
+  }
+  if (f_args.size() != raw_config().inputs.size()) {
+    throw RaiseValueError("Mismatched AllocatResults() input arity");
+  }
+
+  for (size_t i = 0, e = descs.size(); i < e; ++i) {
+    const Description& desc = descs[i];
+    iree_device_size_t alloc_size =
+        AbiConstants::kScalarTypeSize[static_cast<int>(
+            desc.buffer.scalar_type)];
+    switch (desc.type) {
+      case RawSignatureParser::Type::kBuffer: {
+        BoundHalBufferFunctionArg bound_result;
+        for (auto dim : desc.dims) {
+          if (dim < 0) {
+            bound_result.dynamic_dims.push_back(dim);
+            // TODO(laurenzo): Should accumulate dynamic dim slices into an
+            // invocation of a result allocator function and then use it to
+            // invoke.
+            // TODO(laurenzo): Should fallback to completely unknown result
+            // thunk.
+            throw RaisePyError(
+                PyExc_NotImplementedError,
+                "AllocateResult() does not yet support dynamic dims");
+          }
+          alloc_size *= dim;
+        }
+
+        // Static cases are easy.
+        // TODO(laurenzo): This should probably be AllocateDeviceLocal
+        // with a memory type of HOST_VISIBLE, which is not yet plumbed
+        // through.
+        bound_result.buffer = context.AllocateDeviceVisible(
+            alloc_size, IREE_HAL_BUFFER_USAGE_ALL);
+        f_results[i] = std::move(bound_result);
+        break;
+      }
       case RawSignatureParser::Type::kRefObject:
         throw RaisePyError(PyExc_NotImplementedError,
                            "Ref objects not yet supported");
@@ -324,6 +399,7 @@ void SetupFunctionAbiBindings(pybind11::module m) {
                               absl::MakeConstSpan(self->raw_config().inputs),
                               py_args, false /* writable */);
            })
+      .def("allocate_results", &PyAllocateResults)
       .def("raw_pack_results",
            [](FunctionAbi* self, RtContext& context, py::sequence py_args) {
              return PyRawPack(self, context,

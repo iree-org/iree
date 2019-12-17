@@ -21,9 +21,11 @@
 #include "absl/container/inlined_vector.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
+#include "absl/types/span.h"
 #include "absl/types/variant.h"
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/hal.h"
+#include "bindings/python/pyiree/host_types.h"
 #include "iree/base/signature_mangle.h"
 
 namespace iree {
@@ -74,6 +76,8 @@ class FunctionAbi {
  public:
   using AttributeLookup =
       std::function<absl::optional<absl::string_view>(absl::string_view)>;
+  FunctionAbi(std::shared_ptr<HostTypeFactory> host_type_factory)
+      : host_type_factory_(std::move(host_type_factory)) {}
   virtual ~FunctionAbi() = default;
 
   using Description = RawSignatureParser::Description;
@@ -90,7 +94,9 @@ class FunctionAbi {
   };
 
   // Creates an instance based on the function attributes.
-  static std::unique_ptr<FunctionAbi> Create(AttributeLookup lookup);
+  static std::unique_ptr<FunctionAbi> Create(
+      std::shared_ptr<HostTypeFactory> host_type_factory,
+      AttributeLookup lookup);
 
   RawConfig& raw_config() { return raw_config_; }
   int raw_input_arity() const { return raw_config_.inputs.size(); }
@@ -106,10 +112,25 @@ class FunctionAbi {
                absl::Span<py::handle> py_args,
                absl::Span<FunctionArgVariant> f_args, bool writable);
 
+  // Given bound function arguments (from RawPack or equiv) and signature
+  // descriptors, allocates results for the function invocation. For fully
+  // specified result types, this can be done purely by matching up
+  // reflection metadata and an oracle for determining layout. For dynamically
+  // shaped or data-dependent shaped results, the metadata about the function
+  // arguments may be required to generate additional allocation function calls.
+  // Finally, in truly data-dependent cases, some results may not be resolvable
+  // ahead of time, resulting in a nullptr in f_results. In such cases, the
+  // invocation must ensure proper barriers are in place to fully execute the
+  // function prior to delivering results to the user layer.
+  void AllocateResults(RtContext& context, absl::Span<const Description> descs,
+                       absl::Span<const FunctionArgVariant> f_args,
+                       absl::Span<FunctionArgVariant> f_results);
+
   // Gets the string representation.
   std::string DebugString() const;
 
  private:
+  std::shared_ptr<HostTypeFactory> host_type_factory_;
   RawConfig raw_config_;
 };
 

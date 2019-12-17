@@ -18,6 +18,7 @@
 #include "bindings/python/pyiree/compiler.h"
 #include "bindings/python/pyiree/function_abi.h"
 #include "bindings/python/pyiree/hal.h"
+#include "bindings/python/pyiree/host_types.h"
 #include "bindings/python/pyiree/rt.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "bindings/python/pyiree/tf_interop/register_tensorflow.h"
@@ -117,6 +118,10 @@ PYBIND11_MODULE(binding, m) {
 
   auto function_abi = m.def_submodule("function_abi", "Function ABI support");
   SetupFunctionAbiBindings(function_abi);
+
+  auto host_types =
+      m.def_submodule("host_types", "Utilities for manipulating host types");
+  SetupHostTypesBindings(host_types);
 
   auto hal_m = m.def_submodule("hal", "IREE HAL support");
   SetupHalBindings(hal_m);

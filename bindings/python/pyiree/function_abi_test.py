@@ -36,14 +36,25 @@ ATTRS_1ARG_FLOAT32_DYNX128X64_TO_SINT32_DYNX8X64_V1 = (
 )
 
 
+class HostTypeFactory(absltest.TestCase):
+
+  def test_baseclass(self):
+    htf = pyiree.binding.host_types.HostTypeFactory()
+    print(htf)
+
+
 class FunctionAbiTest(absltest.TestCase):
 
-  def test_static_arg_success(self):
+  def setUp(self):
+    super().setUp()
+    self.htf = pyiree.binding.host_types.HostTypeFactory()
     rt_policy = pyiree.binding.rt.Policy()
     rt_instance = pyiree.binding.rt.Instance()
-    rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
+    self.rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
+
+  def test_static_arg_success(self):
     fabi = pyiree.binding.function_abi.create(
-        ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
+        self.htf, ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     print(fabi)
     self.assertEqual(
         "<FunctionAbi (Buffer<float32[10x128x64]>) -> "
@@ -52,17 +63,24 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual(1, fabi.raw_result_arity)
 
     arg = np.zeros((10, 128, 64), dtype=np.float32)
-    packed = fabi.raw_pack_inputs(rt_context, [arg])
+    packed = fabi.raw_pack_inputs(self.rt_context, [arg])
     print(packed)
     self.assertEqual("<FunctionArgVariantList(1): [HalBuffer(327680)]>",
                      repr(packed))
 
-  def test_dynamic_arg_success(self):
-    rt_policy = pyiree.binding.rt.Policy()
-    rt_instance = pyiree.binding.rt.Instance()
-    rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
+  def test_static_result_success(self):
     fabi = pyiree.binding.function_abi.create(
-        ATTRS_1ARG_FLOAT32_DYNX128X64_TO_SINT32_DYNX8X64_V1)
+        self.htf, ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
+    arg = np.zeros((10, 128, 64), dtype=np.float32)
+    f_args = fabi.raw_pack_inputs(self.rt_context, [arg])
+    f_results = fabi.allocate_results(self.rt_context, f_args)
+    print(f_results)
+    self.assertEqual("<FunctionArgVariantList(1): [HalBuffer(65536)]>",
+                     repr(f_results))
+
+  def test_dynamic_arg_success(self):
+    fabi = pyiree.binding.function_abi.create(
+        self.htf, ATTRS_1ARG_FLOAT32_DYNX128X64_TO_SINT32_DYNX8X64_V1)
     print(fabi)
     self.assertEqual(
         "<FunctionAbi (Buffer<float32[?x128x64]>) -> "
@@ -71,63 +89,51 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual(1, fabi.raw_result_arity)
 
     arg = np.zeros((10, 128, 64), dtype=np.float32)
-    packed = fabi.raw_pack_inputs(rt_context, [arg])
+    packed = fabi.raw_pack_inputs(self.rt_context, [arg])
     print(packed)
     self.assertEqual(
         "<FunctionArgVariantList(1): [HalBuffer(327680, dynamic_dims=[10])]>",
         repr(packed))
 
   def test_static_arg_rank_mismatch(self):
-    rt_policy = pyiree.binding.rt.Policy()
-    rt_instance = pyiree.binding.rt.Instance()
-    rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
     fabi = pyiree.binding.function_abi.create(
-        ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
+        self.htf, ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     print(fabi)
     arg = np.zeros((10,), dtype=np.float32)
     with self.assertRaisesRegex(
         ValueError,
         re.escape("Mismatched buffer rank (received: 1, expected: 3)")):
-      fabi.raw_pack_inputs(rt_context, [arg])
+      fabi.raw_pack_inputs(self.rt_context, [arg])
 
   def test_static_arg_eltsize_mismatch(self):
-    rt_policy = pyiree.binding.rt.Policy()
-    rt_instance = pyiree.binding.rt.Instance()
-    rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
     fabi = pyiree.binding.function_abi.create(
-        ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
+        self.htf, ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     print(fabi)
     arg = np.zeros((10, 128, 64), dtype=np.float64)
     with self.assertRaisesRegex(
         ValueError,
         re.escape("Mismatched buffer item size (received: 8, expected: 4)")):
-      fabi.raw_pack_inputs(rt_context, [arg])
+      fabi.raw_pack_inputs(self.rt_context, [arg])
 
   def test_static_arg_dtype_mismatch(self):
-    rt_policy = pyiree.binding.rt.Policy()
-    rt_instance = pyiree.binding.rt.Instance()
-    rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
     fabi = pyiree.binding.function_abi.create(
-        ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
+        self.htf, ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     print(fabi)
     arg = np.zeros((10, 128, 64), dtype=np.int32)
     with self.assertRaisesRegex(
         ValueError,
         re.escape("Mismatched buffer format (received: i, expected: f)")):
-      fabi.raw_pack_inputs(rt_context, [arg])
+      fabi.raw_pack_inputs(self.rt_context, [arg])
 
   def test_static_arg_static_dim_mismatch(self):
-    rt_policy = pyiree.binding.rt.Policy()
-    rt_instance = pyiree.binding.rt.Instance()
-    rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
     fabi = pyiree.binding.function_abi.create(
-        ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
+        self.htf, ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
     print(fabi)
     arg = np.zeros((10, 32, 64), dtype=np.float32)
     with self.assertRaisesRegex(
         ValueError,
         re.escape("Mismatched buffer dim (received: 32, expected: 128)")):
-      fabi.raw_pack_inputs(rt_context, [arg])
+      fabi.raw_pack_inputs(self.rt_context, [arg])
 
 
 if __name__ == "__main__":
