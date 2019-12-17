@@ -56,18 +56,11 @@ if(${IREE_BUILD_COMPILER})
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-      "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
-      "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
+      iree::compiler::Dialect::VM::Tools
       LLVMMLIRTableGen
       MLIRSupport
       LLVMTableGen
-      LLVMMC
-      LLVMDebugInfoCodeView
-      LLVMBinaryFormat
-      LLVMDebugInfoMSF
-      LLVMSupport
-      LLVMDemangle
     LINKOPTS
       "-lpthread"
   )
