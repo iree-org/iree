@@ -113,6 +113,7 @@ set(LLVM_INCLUDE_TESTS OFF)
 set(LLVM_INCLUDE_BENCHMARKS OFF)
 set(LLVM_APPEND_VC_REV OFF)
 set(LLVM_ENABLE_IDE ON)
+set(LLVM_ENABLE_RTTI ON)
 
 set(LLVM_TARGETS_TO_BUILD "WebAssembly")
 
@@ -132,6 +133,8 @@ set(MLIR_TABLEGEN_EXE mlir-tblgen)
 set(MLIR_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir/include)
 set(MLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir)
 set(MLIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR)
+
+set(IREE_TABLEGEN_EXE iree-tblgen)
 
 #-------------------------------------------------------------------------------
 # Third party: tensorflow

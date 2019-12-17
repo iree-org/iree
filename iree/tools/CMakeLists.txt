@@ -36,6 +36,30 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
+      iree_tblgen
+    OUT
+      iree-tblgen
+    SRCS
+      "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+      "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
+      "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
+    DEPS
+      LLVMMLIRTableGen
+      MLIRSupport
+      LLVMTableGen
+      LLVMMC
+      LLVMDebugInfoCodeView
+      LLVMBinaryFormat
+      LLVMDebugInfoMSF
+      LLVMSupport
+      LLVMDemangle
+    LINKOPTS
+      "-lpthread"
+  )
+  add_executable(iree-tblgen ALIAS iree_tools_iree_tblgen)
+
+  iree_cc_binary(
+    NAME
       iree_translate
     OUT
       iree-translate
