@@ -20,26 +20,12 @@ set -e
 
 set -x
 
-# TODO(b/145697435) Kokoro VMs have bad public keys. Delete when this is fixed.
-echo "Deleting corrupted ppa sources"
-sudo rm -rf /etc/apt/sources.list.d/nvidia-docker.list*
-
-export BAZEL_VERSION=1.1.0
-echo "Installing bazel ${BAZEL_VERSION}"
-# https://docs.bazel.build/versions/master/install-ubuntu.html
-wget "https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION}/bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh"
-chmod +x "bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh"
-./bazel-${BAZEL_VERSION}-installer-linux-x86_64.sh --user
+# bazel is currently installed in the user bin.
 export PATH="${HOME}/bin:${PATH}"
+
+# Check these exist and print the versions for later debugging
 bazel --version
-
-echo "Installing clang 6.0"
-wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-sudo apt-add-repository "deb http://apt.llvm.org/xenial/ llvm-toolchain-xenial-6.0 main"
-sudo apt-get update
-sudo apt-get install -y clang-6.0
 clang++-6.0 --version
-
 python3 -V
 
 echo "Preparing environment variables"
