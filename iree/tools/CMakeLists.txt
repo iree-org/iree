@@ -64,7 +64,7 @@ if(${IREE_BUILD_COMPILER})
     OUT
       iree-translate
     SRCS
-      "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-translate/mlir-translate.cpp"
+      "iree_translate_main.cc"
     DEPS
       ${_ALWAYSLINK_LIBS}
       iree::compiler::Translation::Interpreter
