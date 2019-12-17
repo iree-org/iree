@@ -37,6 +37,7 @@ package(
         "exported_names_test",
         "keras_lstm_test",
         "simple_stateful_test",
+        "mandelbrot_test",
         "simple_arithmetic_test",
         "vulkan_conv_test",
     ]
