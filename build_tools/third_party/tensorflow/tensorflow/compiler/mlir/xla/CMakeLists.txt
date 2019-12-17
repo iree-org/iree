@@ -33,14 +33,18 @@ external_cc_library(
   ROOT
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
+    "convert_op_folder.cc"
     "ir/dialect_registration.cc"
     "ir/hlo_ops.cc"
+    "ir/hlo_utils.cc"
     "ir/lhlo_ops.cc"
     "transforms/legalize_control_flow.cc"
     "transforms/legalize_to_standard.cc"
     "transforms/lower_general_dot.cc"
   HDRS
+    "convert_op_folder.h"
     "ir/hlo_ops.h"
+    "ir/hlo_utils.h"
     "ir/lhlo_ops.h"
     "transforms/passes.h"
     "transforms/rewriters.h"
@@ -61,6 +65,7 @@ external_cc_library(
     MLIRIR
     MLIRPass
     MLIRTransformUtils
+  ALWAYSLINK
   PUBLIC
 )
 
