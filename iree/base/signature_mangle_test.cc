@@ -244,6 +244,44 @@ TEST(RawSignatureParserTest, EmptySignature) {
   EXPECT_EQ("() -> ()", *s);
 }
 
+TEST(RawSignatureParserTest, StaticNdArrayBuffer) {
+  RawSignatureMangler inputs;
+  std::vector<int> dims = {10, 128, 64};
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32,
+                           absl::MakeSpan(dims));
+  RawSignatureMangler results;
+  std::vector<int> dims2 = {32, 8, 64};
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32,
+                            absl::MakeSpan(dims2));
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I15!B11!d10d128d64R15!B11!t6d32d8d64", sig.encoded());
+
+  RawSignatureParser p;
+  auto s = p.FunctionSignatureToString(sig.encoded());
+  ASSERT_TRUE(s) << *p.GetError();
+  EXPECT_EQ("(Buffer<float32[10x128x64]>) -> (Buffer<sint32[32x8x64]>)", *s);
+}
+
+TEST(RawSignatureParserTest, DynamicNdArrayBuffer) {
+  RawSignatureMangler inputs;
+  std::vector<int> dims = {-1, 128, 64};
+  inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32,
+                           absl::MakeSpan(dims));
+  RawSignatureMangler results;
+  std::vector<int> dims2 = {-1, 8, 64};
+  results.AddShapedNDBuffer(AbiConstants::ScalarType::kSint32,
+                            absl::MakeSpan(dims2));
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I15!B11!d-1d128d64R15!B11!t6d-1d8d64", sig.encoded());
+
+  RawSignatureParser p;
+  auto s = p.FunctionSignatureToString(sig.encoded());
+  ASSERT_TRUE(s) << *p.GetError();
+  EXPECT_EQ("(Buffer<float32[?x128x64]>) -> (Buffer<sint32[?x8x64]>)", *s);
+}
+
 TEST(RawSignatureParserTest, AllTypes) {
   RawSignatureMangler inputs;
   inputs.AddAnyReference();

@@ -89,6 +89,7 @@ cc_library(
     name = "base",
     srcs = [
         "compiler.cc",
+        "function_abi.cc",
         "hal.cc",
         "rt.cc",
         "status_utils.cc",
@@ -97,6 +98,7 @@ cc_library(
     hdrs = [
         "binding.h",
         "compiler.h",
+        "function_abi.h",
         "hal.h",
         "rt.h",
         "status_utils.h",
@@ -106,12 +108,16 @@ cc_library(
     features = DEFAULT_FEATURES,
     deps = [
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
+        "@com_google_absl//absl/types:span",
+        "@com_google_absl//absl/types:variant",
         "//iree/compiler/Utils",
         "@local_config_mlir//:IR",
         "//iree/base:api",
         "//iree/base:status",
+        "//iree/base:signature_mangle",
         "//iree/hal:api",
         "//iree/rt:api",
         "//iree/schemas",
@@ -149,6 +155,17 @@ py_test(
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "//bindings/python/pyiree",
         "@absl_py//absl/testing:absltest",
+    ],
+)
+
+py_test(
+    name = "function_abi_test",
+    srcs = ["function_abi_test.py"],
+    python_version = "PY3",
+    deps = NUMPY_DEPS + [
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+        "@absl_py//absl/testing:absltest",
+        "//bindings/python/pyiree",
     ],
 )
 

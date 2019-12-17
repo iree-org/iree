@@ -74,6 +74,10 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
     return HalBuffer::CreateRetained(buffer);
   }
 
+  iree_device_size_t byte_length() const {
+    return iree_hal_buffer_byte_length(raw_ptr());
+  }
+
   void FillZero(iree_device_size_t byte_offset,
                 iree_device_size_t byte_length) {
     CheckApiStatus(iree_hal_buffer_zero(raw_ptr(), byte_offset, byte_length),

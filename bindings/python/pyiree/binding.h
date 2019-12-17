@@ -97,6 +97,11 @@ class ApiRefCounted {
   ApiRefCounted(ApiRefCounted&& other) : instance_(other.instance_) {
     other.instance_ = nullptr;
   }
+  ApiRefCounted& operator=(ApiRefCounted&& other) {
+    instance_ = other.instance_;
+    other.instance_ = nullptr;
+    return *this;
+  }
   void operator=(const ApiRefCounted&) = delete;
 
   ~ApiRefCounted() { Release(); }
@@ -126,6 +131,11 @@ class ApiRefCounted {
     }
     return instance_;
   }
+
+  const T* raw_ptr() const {
+    return const_cast<ApiRefCounted*>(this)->raw_ptr();
+  }
+
   void Retain() {
     if (instance_) {
       ApiPtrAdapter<T>::Retain(instance_);

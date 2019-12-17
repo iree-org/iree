@@ -16,6 +16,7 @@
 
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/compiler.h"
+#include "bindings/python/pyiree/function_abi.h"
 #include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/rt.h"
 #include "bindings/python/pyiree/status_utils.h"
@@ -113,6 +114,9 @@ PYBIND11_MODULE(binding, m) {
 
   auto compiler_m = m.def_submodule("compiler", "IREE compiler support");
   SetupCompilerBindings(compiler_m);
+
+  auto function_abi = m.def_submodule("function_abi", "Function ABI support");
+  SetupFunctionAbiBindings(function_abi);
 
   auto hal_m = m.def_submodule("hal", "IREE HAL support");
   SetupHalBindings(hal_m);
