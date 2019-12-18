@@ -78,11 +78,16 @@ static void iree_vm_context_release_modules(iree_vm_context_t* context,
                                             int start, int end) {
   for (int i = end; i >= start; --i) {
     iree_vm_module_t* module = context->list.modules[i];
-    module->free_state(module->self, context->list.module_states[i]);
+    // It is possible in error states to have partially initialized.
+    if (context->list.module_states[i]) {
+      module->free_state(module->self, context->list.module_states[i]);
+    }
     context->list.module_states[i] = NULL;
   }
   for (int i = end; i >= start; --i) {
-    iree_vm_module_release(context->list.modules[i]);
+    if (context->list.modules[i]) {
+      iree_vm_module_release(context->list.modules[i]);
+    }
     context->list.modules[i] = NULL;
   }
 }
@@ -158,7 +163,9 @@ static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context) {
   if (context->list.count > 0) {
     iree_vm_context_release_modules(context, 0, context->list.count - 1);
   }
-  if (!context->is_static) {
+  // Note: For non-static module lists, it is only dynamically allocated if
+  // capacity > 0.
+  if (!context->is_static && context->list.capacity > 0) {
     iree_allocator_free(context->allocator, context->list.modules);
     context->list.modules = NULL;
     iree_allocator_free(context->allocator, context->list.module_states);
@@ -221,7 +228,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
   }
 
   // Try growing both our storage lists first, if needed.
-  if (context->list.count + module_count < context->list.capacity) {
+  if (context->list.count + module_count > context->list.capacity) {
     if (context->is_static) {
       return IREE_STATUS_FAILED_PRECONDITION;
     }
@@ -242,17 +249,25 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
            sizeof(iree_vm_module_t*) * context->list.count);
     memcpy(new_module_state_list, context->list.module_states,
            sizeof(iree_vm_module_state_t*) * context->list.count);
+    // The existing memory is only dynamically allocated if it has been grown.
+    if (context->list.capacity > 0) {
+      iree_allocator_free(context->allocator, context->list.modules);
+      iree_allocator_free(context->allocator, context->list.module_states);
+    }
     context->list.modules = new_module_list;
     context->list.module_states = new_module_state_list;
     context->list.capacity = new_capacity;
   }
 
   // Retain all modules and allocate their state.
-  int offset = context->list.count;
+  assert(context->list.capacity >= context->list.count + module_count);
+  int orig_count = context->list.count;
   for (int i = 0; i < module_count; ++i) {
     iree_vm_module_t* module = modules[i];
-    context->list.modules[offset + i] = module;
-    iree_vm_module_retain(context->list.modules[offset + i]);
+    context->list.modules[orig_count + i] = module;
+    context->list.module_states[orig_count + i] = NULL;
+
+    iree_vm_module_retain(module);
 
     // Allocate module state.
     iree_vm_module_state_t* module_state = NULL;
@@ -260,10 +275,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
         module->alloc_state(module->self, context->allocator, &module_state);
     if (alloc_status != IREE_STATUS_OK) {
       // NOTE: we need to clean up initialized modules.
-      iree_vm_context_release_modules(context, offset, offset + i);
+      iree_vm_context_release_modules(context, orig_count, orig_count + i);
+      context->list.count = orig_count;
       return alloc_status;
     }
-    context->list.module_states[offset + i] = module_state;
+    context->list.module_states[orig_count + i] = module_state;
 
     // Resolve imports for the modules.
     // TODO(benvanik): re-resolve imports for previous modules?
@@ -271,7 +287,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_register_modules(
         iree_vm_context_resolve_module_imports(context, module, module_state);
     if (resolve_status != IREE_STATUS_OK) {
       // NOTE: we need to clean up initialized modules.
-      iree_vm_context_release_modules(context, offset, offset + i);
+      iree_vm_context_release_modules(context, orig_count, orig_count + i);
+      context->list.count = orig_count;
       return resolve_status;
     }
 
