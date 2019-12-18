@@ -28,27 +28,6 @@ namespace python {
 
 namespace {
 
-const std::array<const char*, static_cast<unsigned>(
-                                  AbiConstants::ScalarType::kMaxScalarType) +
-                                  1>
-    kScalarTypePyFormat = {
-        "f",      // kIeeeFloat32 = 0,
-        nullptr,  // kIeeeFloat16 = 1,
-        "d",      // kIeeeFloat64 = 2,
-        nullptr,  // kGoogleBfloat16 = 3,
-        "b",      // kSint8 = 4,
-        "h",      // kSint16 = 5,
-        "i",      // kSint32 = 6,
-        "q",      // kSint64 = 7,
-        "c",      // kUint8 = 8,
-        "H",      // kUint16 = 9,
-        "I",      // kUint32 = 10,
-        "Q",      // kUint64 = 11,
-};
-static_assert(kScalarTypePyFormat.size() ==
-                  AbiConstants::kScalarTypeSize.size(),
-              "Mismatch kScalarTypePyFormat");
-
 // Python friendly entry-point for creating an instance from a list
 // of attributes. This is not particularly efficient and is primarily
 // for testing. Typically, this will be created directly from a function
@@ -91,6 +70,20 @@ std::unique_ptr<FunctionArgVariantList> PyAllocateResults(
                         absl::MakeConstSpan(f_args->contents()),
                         absl::MakeSpan(f_results->contents()));
   return f_results;
+}
+
+py::object PyRawUnpackResults(FunctionAbi* self, RtContext& context,
+                              FunctionArgVariantList* f_args) {
+  absl::InlinedVector<py::object, 4> py_results;
+  py_results.resize(f_args->contents().size());
+  self->RawUnpack(context, absl::MakeConstSpan(self->raw_config().results),
+                  absl::MakeSpan(f_args->contents()),
+                  absl::MakeSpan(py_results));
+  py::tuple py_result_tuple(py_results.size());
+  for (size_t i = 0, e = py_results.size(); i < e; ++i) {
+    py_result_tuple[i] = std::move(py_results[i]);
+  }
+  return py_result_tuple;
 }
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
@@ -333,6 +326,55 @@ void FunctionAbi::RawPack(RtContext& context,
   }
 }
 
+void FunctionAbi::RawUnpack(RtContext& context,
+                            absl::Span<const Description> descs,
+                            absl::Span<FunctionArgVariant> f_results,
+                            absl::Span<py::object> py_results) {
+  if (descs.size() != f_results.size() || descs.size() != py_results.size()) {
+    throw RaiseValueError("Mismatched RawUnpack() result arity");
+  }
+  for (size_t i = 0, e = descs.size(); i < e; ++i) {
+    const Description& desc = descs[i];
+    switch (desc.type) {
+      case RawSignatureParser::Type::kBuffer: {
+        auto& bound_arg = absl::get<BoundHalBufferFunctionArg>(f_results[i]);
+        absl::InlinedVector<int, 7> backing_full_dims;
+        absl::Span<const int> dims;
+        if (bound_arg.dynamic_dims.empty()) {
+          // No dynamic dims. Just use the desc dims.
+          dims = absl::MakeSpan(desc.dims);
+        } else {
+          // Splice the dims back together.
+          size_t j = 0;
+          for (auto dim : desc.dims) {
+            if (dim >= 0) {
+              backing_full_dims.push_back(dim);
+            } else if (j < bound_arg.dynamic_dims.size()) {
+              backing_full_dims.push_back(bound_arg.dynamic_dims[j++]);
+            } else {
+              throw RaiseValueError("Mismatched static and dynamic dims");
+            }
+          }
+          dims = absl::MakeConstSpan(backing_full_dims);
+        }
+        py_results[i] = host_type_factory_->CreateImmediateNdarray(
+            desc.buffer.scalar_type, absl::MakeSpan(desc.dims),
+            std::move(bound_arg.buffer));
+        // Already moved the buffer out. Clear the rest.
+        f_results[i] = nullptr;
+        break;
+      }
+      case RawSignatureParser::Type::kRefObject:
+        throw RaisePyError(PyExc_NotImplementedError,
+                           "Ref objects not yet supported");
+        break;
+      default:
+        throw RaisePyError(PyExc_NotImplementedError,
+                           "Unsupported argument type");
+    }
+  }
+}
+
 void FunctionAbi::AllocateResults(RtContext& context,
                                   absl::Span<const Description> descs,
                                   absl::Span<const FunctionArgVariant> f_args,
@@ -400,12 +442,7 @@ void SetupFunctionAbiBindings(pybind11::module m) {
                               py_args, false /* writable */);
            })
       .def("allocate_results", &PyAllocateResults)
-      .def("raw_pack_results",
-           [](FunctionAbi* self, RtContext& context, py::sequence py_args) {
-             return PyRawPack(self, context,
-                              absl::MakeConstSpan(self->raw_config().results),
-                              py_args, true /* writable */);
-           });
+      .def("raw_unpack_results", &PyRawUnpackResults);
 
   // Note that FunctionArgVariantList is meant to be opaque to normal users,
   // but we provide some printing and other introspection to aid testing.

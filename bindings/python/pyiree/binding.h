@@ -125,6 +125,12 @@ class ApiRefCounted {
     return self;
   }
 
+  T* steal_raw_ptr() {
+    T* ret = instance_;
+    instance_ = nullptr;
+    return ret;
+  }
+
   T* raw_ptr() {
     if (!instance_) {
       throw std::invalid_argument("API object is null");

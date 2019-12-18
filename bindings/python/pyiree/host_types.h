@@ -15,6 +15,8 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_HOST_TYPES_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_HOST_TYPES_H_
 
+#include <array>
+
 #include "absl/types/span.h"
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/hal.h"
@@ -23,15 +25,23 @@
 namespace iree {
 namespace python {
 
+extern const std::array<
+    const char*,
+    static_cast<unsigned>(AbiConstants::ScalarType::kMaxScalarType) + 1>
+    kScalarTypePyFormat;
+
 class HostTypeFactory {
  public:
   virtual ~HostTypeFactory() = default;
+
+  // Creates a default implementation which interops with numpy.
+  static std::shared_ptr<HostTypeFactory> CreateNumpyFactory();
 
   // Creates a C-contiguous ndarray of the given element_type/dims and backed
   // by the given buffer. The resulting array has no synchronization and is
   // available for use immediately.
   virtual py::object CreateImmediateNdarray(
-      AbiConstants::ScalarType element_type, absl::Span<int> dims,
+      AbiConstants::ScalarType element_type, absl::Span<const int> dims,
       HalBuffer buffer);
 
   // TODO(laurenzo): Add a CreateDelayedNdarray() which is conditioned on

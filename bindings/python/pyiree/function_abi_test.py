@@ -47,7 +47,7 @@ class FunctionAbiTest(absltest.TestCase):
 
   def setUp(self):
     super().setUp()
-    self.htf = pyiree.binding.host_types.HostTypeFactory()
+    self.htf = pyiree.binding.host_types.HostTypeFactory.create_numpy()
     rt_policy = pyiree.binding.rt.Policy()
     rt_instance = pyiree.binding.rt.Instance()
     self.rt_context = pyiree.binding.rt.Context(rt_instance, rt_policy)
@@ -77,6 +77,11 @@ class FunctionAbiTest(absltest.TestCase):
     print(f_results)
     self.assertEqual("<FunctionArgVariantList(1): [HalBuffer(65536)]>",
                      repr(f_results))
+    py_result, = fabi.raw_unpack_results(self.rt_context, f_results)
+    self.assertEqual(np.int32, py_result.dtype)
+    self.assertEqual((32, 8, 64), py_result.shape)
+    # Unpacking should have consumed the variants.
+    self.assertEqual("<FunctionArgVariantList(1): [None]>", repr(f_results))
 
   def test_dynamic_arg_success(self):
     fabi = pyiree.binding.function_abi.create(
