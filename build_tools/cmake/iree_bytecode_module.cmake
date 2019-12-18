@@ -19,10 +19,10 @@ include(CMakeParseArguments)
 # CMake function to imitate Bazel's iree_bytecode_module rule.
 #
 # Parameters:
-# NAME: Name of target (see Note)
-# SRC: Source file to compile into a bytecode module
-# TRANSLATION: Translation option to pass to the translation tool (string)
-# TRANSLATION_TOOL: Translation tool to invoke (CMake target)
+# NAME: Name of target (see Note).
+# SRC: Source file to compile into a bytecode module.
+# TRANSLATION: Translation option to pass to the translation tool (string).
+# TRANSLATION_TOOL: Translation tool to invoke (CMake target).
 # CC_NAMESPACE: Wraps everything in a C++ namespace.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 # Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC will be
@@ -31,8 +31,8 @@ include(CMakeParseArguments)
 #    -DIREE_BUILD_TESTS=ON to CMake.
 #
 # Note:
-# By default, iree_bytecode_module will always create a library named ${NAME},
-# and alias target iree::${NAME}. The iree:: form should always be used.
+# By default, iree_bytecode_module will create a library named ${NAME}_cc,
+# and alias target iree::${NAME}_cc. The iree:: form should always be used.
 # This is to reduce namespace pollution.
 function(iree_bytecode_module)
   cmake_parse_arguments(

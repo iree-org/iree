@@ -19,9 +19,9 @@ include(CMakeParseArguments)
 # CMake function to imitate Bazel's cc_embed_data rule.
 #
 # Parameters:
-# NAME: Name of target (see Note)
-# SRCS: List of source files to embed
-# GENERATED_SRCS: List of generated source files to embed
+# NAME: Name of target (see Note).
+# SRCS: List of source files to embed.
+# GENERATED_SRCS: List of generated source files to embed.
 # CC_FILE_OUTPUT: The CC implementation file to output.
 # H_FILE_OUTPUT: The H header file to output.
 # CPP_NAMESPACE: Wraps everything in a C++ namespace.
