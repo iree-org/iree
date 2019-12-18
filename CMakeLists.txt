@@ -29,9 +29,9 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 option(IREE_ENABLE_DEBUG "Enables debugging of the VM." ON)
 option(IREE_ENABLE_TRACING "Enables WTF tracing." OFF)
 
-option(IREE_BUILD_COMPILER "Builds the IREE compiler." OFF)
+option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
-option(IREE_BUILD_SAMPLES "Builds IREE sample projects." OFF)
+option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 
 if(${IREE_BUILD_SAMPLES})
