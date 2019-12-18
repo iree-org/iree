@@ -39,6 +39,8 @@ iree_cc_library(
     "IREEIndexComputation.cpp"
     "IREEToSPIRV.cpp"
     "IREEToSPIRVPass.cpp"
+    "PrepareReductionDispatch.cpp"
+    "ReductionFnLowering.cpp"
     "SPIRVExecutableTranslation.cpp"
     "SPIRVLowering.cpp"
     "XLAIndexPropagation.cpp"

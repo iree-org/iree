@@ -28,6 +28,8 @@ cc_library(
         "IndexComputation.cpp",
         "IndexComputationAttribute.cpp",
         "IndexComputationPass.cpp",
+        "PrepareReductionDispatch.cpp",
+        "ReductionFnLowering.cpp",
         "SPIRVExecutableTranslation.cpp",
         "SPIRVLowering.cpp",
         "SPIRVLowering.h",

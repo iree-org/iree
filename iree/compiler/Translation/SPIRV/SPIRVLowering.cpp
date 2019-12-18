@@ -303,6 +303,10 @@ LogicalResult SPIRVCodegenImpl::lowerFunction(
   }
 
   for (auto arg : fn.getArguments()) {
+    if (fn.getArgAttrOfType<UnitAttr>(arg->getArgNumber(),
+                                      "iree.executable.reduction.output")) {
+      continue;
+    }
     // Load values of the argument at all indices needed for computation
     // within the dispatch function.
     if (failed(initArgValues(builder, fn.getLoc(), valueCache, arg))) {

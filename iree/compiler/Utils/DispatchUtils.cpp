@@ -14,6 +14,8 @@
 
 #include "iree/compiler/Utils/DispatchUtils.h"
 
+#include <numeric>
+
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -36,6 +38,28 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+void calculateWorkload(ArrayRef<int64_t> shape,
+                       std::array<int32_t, 3> &workload) {
+  // Drop the trailing ones from the shape.
+  while (shape.size() > 1 && shape.back() == 1) {
+    shape = shape.drop_back();
+  }
+  if (shape.size() <= 3) {
+    // Maps to XYZ (possibly with 1's for unused dimensions).
+    for (auto dim : enumerate(shape)) {
+      workload[shape.size() - 1 - dim.index()] = dim.value();
+    }
+  } else {
+    // Need to flatten the shape to fit XYZ. For now we just squash from
+    // LHS.
+    auto zRange = shape.drop_back(2);
+    workload[2] = std::accumulate(zRange.begin(), zRange.end(), 1,
+                                  std::multiplies<int32_t>());
+    workload[1] = shape[shape.size() - 2];
+    workload[0] = shape.back();
+  }
+}
 
 Value *calculateWorkload(Operation *op, Value *baseOperand) {
   OpBuilder builder(op);
@@ -63,25 +87,7 @@ Value *calculateWorkload(Operation *op, Value *baseOperand) {
         workload[1 - i++] = shape[dim.getSExtValue()];
       }
     } else {
-      // Drop the trailing ones from the shape.
-      while (shape.size() > 1 && shape.back() == 1) {
-        shape = shape.drop_back();
-      }
-      if (shape.size() <= 3) {
-        // Maps to XYZ (possibly with 1's for unused dimensions).
-        for (auto dim : enumerate(shape)) {
-          workload[shape.size() - 1 - dim.index()] = dim.value();
-        }
-      } else {
-        // Need to flatten the shape to fit XYZ. For now we just squash from
-        // LHS.
-        workload[2] = 1;
-        for (int i = 0; i < shape.size() - 2; ++i) {
-          workload[2] *= shape[i];
-        }
-        workload[1] = shape[shape.size() - 2];
-        workload[0] = shape.back();
-      }
+      calculateWorkload(shape, workload);
     }
   }
 

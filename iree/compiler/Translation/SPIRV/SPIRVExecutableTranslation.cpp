@@ -205,10 +205,15 @@ std::vector<uint32_t> SPIRVTranslator::translateAndSerializeShaderModule(
   // Lower module to spirv::ModuleOp.
   auto spirvGenPasses = createPassManager(module.getContext(), options());
   spirvGenPasses->addPass(xla_hlo::createLegalizeToStdPass());
+  spirvGenPasses->addPass(createPrepareReductionDispatchPass());
   spirvGenPasses->addPass(createIndexComputationPass());
   spirvGenPasses->addPass(createIREEToSPIRVPass());
-  spirvGenPasses->addPass(spirv::createLowerABIAttributesPass());
-  spirvGenPasses->addPass(createAdjustIntegerWidthPass());
+
+  OpPassManager &spirvPasses = spirvGenPasses->nest<spirv::ModuleOp>();
+  spirvPasses.addPass(spirv::createLowerABIAttributesPass());
+  spirvPasses.addPass(createInlinerPass());
+  spirvPasses.addPass(createAdjustIntegerWidthPass());
+
   if (failed(runPassPipeline(options(), spirvGenPasses.get(), module))) {
     executableOp.emitError() << "Failed to generate spv.module";
     return {};

@@ -207,4 +207,12 @@ def IREE_StoreOutputOp : IREE_Op<"store_output"> {
   let arguments = (ins AnyType:$src, IREEHL_MemRef:$dst);
 }
 
+def IREE_StoreReduceOp : IREE_Op<"store_reduce"> {
+  let arguments = (ins
+    AnyType:$src,
+    IREEHL_MemRef:$dst,
+    FlatSymbolRefAttr:$reduction_fn
+  );
+}
+
 #endif  // IREE_OPS
