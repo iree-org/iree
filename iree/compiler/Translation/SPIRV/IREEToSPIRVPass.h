@@ -33,8 +33,7 @@ std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass();
 // elements of tensor values needed within a workitem.
 std::unique_ptr<OpPassBase<FuncOp>> createIndexComputationPass();
 
-// Legalizes integer width from i1 and i64 types to i8 and i32 types
-// respectively.
+// Legalizes integer width from i1, i8 and i64 types to i32 type.
 std::unique_ptr<Pass> createAdjustIntegerWidthPass();
 
 }  // namespace iree_compiler
