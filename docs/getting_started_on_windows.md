@@ -134,7 +134,7 @@ environment variable is set when you are building.
 
 ```shell
 # Disable stupid^H^H^H^H^H^H Windows line ending translation
-git config --global core.autocrlf false
+git config --global core.autocrlf true
 # Configure name and email before commiting anything
 git config --global user.name "MY NAME"
 git config --global user.email "MY EMAIL"
