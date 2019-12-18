@@ -37,8 +37,9 @@ if [ -n "$git_status" ]; then
   exit 1
 fi
 
-echo "Pulling latest from remote"
-git pull
+upstream_url="https://github.com/google/iree.git"
+echo "Pulling latest from remote ${upstream_url?}"
+git pull ${upstream_url}
 
 git_status="$(git status -s)"
 
