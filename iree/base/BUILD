@@ -168,6 +168,17 @@ cc_library(
     ],
 )
 
+cc_test(
+    name = "file_path_test",
+    srcs = [
+        "file_path_test.cc",
+    ],
+    deps = [
+        ":file_path",
+        "//iree/testing:gtest_main",
+    ],
+)
+
 cc_library(
     name = "flatbuffer_util",
     srcs = ["flatbuffer_util.cc"],
