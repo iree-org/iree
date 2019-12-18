@@ -83,9 +83,9 @@ git config --global user.name "MY NAME"
 git config --global user.email "MY EMAIL"
 ```
 
-### Clone
+## Clone
 
-This assumes that we are cloning into `/home/user/ireepub`. Update accordingly for
+This assumes that we are cloning into `$HOME/ireepub`. Update accordingly for
 your use.
 
 Note that if you will be cloning frequently, it can be sped up significantly by
@@ -95,8 +95,8 @@ creating a reference repo and setting
 
 ```shell
 IREE_CLONE_ARGS=""
-mkdir -p /home/user/ireepub
-cd /home/user/ireepub
+mkdir -p $HOME/ireepub
+cd $HOME/ireepub
 git clone $IREE_CLONE_ARGS https://github.com/google/iree.git iree
 cd iree
 git submodule init
