@@ -16,7 +16,7 @@
 
 # Build the IREE project with bazel. Designed for CI, but can be run manually.
 
-set -e
+set -e  
 
 set -x
 
