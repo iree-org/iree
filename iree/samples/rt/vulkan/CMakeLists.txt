@@ -17,7 +17,7 @@ add_custom_command(
   COMMAND iree-translate
           --mlir-to-iree-module "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir"
           -o simple_mul_bytecode_module.emod
-  DEPENDS iree::tools::iree_translate
+  DEPENDS iree_tools_iree_translate
 )
 
 add_custom_command(
