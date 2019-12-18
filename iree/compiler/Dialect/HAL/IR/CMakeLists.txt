@@ -52,7 +52,7 @@ iree_cc_library(
   DEPS
     IR
     iree::compiler::Dialect
-    iree_compiler_Dialect_HAL_hal_imports
+    iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::VM::Conversion
     LLVMSupport

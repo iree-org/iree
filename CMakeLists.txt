@@ -53,6 +53,8 @@ include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
+include(iree_cc_embed_data)
+include(iree_bytecode_module)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
