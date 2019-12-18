@@ -17,6 +17,14 @@
 from absl.testing import absltest
 import pyiree
 
+SIMPLE_MUL_ASM = """
+func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
+      attributes { iree.module.export } {
+    %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+    return %0 : tensor<4xf32>
+}
+"""
+
 
 class CompilerTest(absltest.TestCase):
 
@@ -27,16 +35,36 @@ class CompilerTest(absltest.TestCase):
 
   def testParseAndCompileToSequencer(self):
     ctx = pyiree.compiler.Context()
-    input_module = ctx.parse_asm("""
-      func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
-            attributes { iree.module.export } {
-          %0 = "xla_hlo.mul"(%arg0, %arg1) {name = "mul.1"} : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
-          return %0 : tensor<4xf32>
-      }
-      """)
+    input_module = ctx.parse_asm(SIMPLE_MUL_ASM)
     binary = input_module.compile_to_sequencer_blob()
     self.assertTrue(binary)
 
+  def testParseAndCompileToFlatbuffer(self):
+    ctx = pyiree.compiler.Context()
+    input_module = ctx.parse_asm(SIMPLE_MUL_ASM)
+    binary = input_module.compile()
+    b = binary.bytes
+    print("Flatbuffer size =", len(b))
+    self.assertTrue(binary.bytes)
 
-if __name__ == '__main__':
+  def testParseAndCompileToFlatbufferText(self):
+    ctx = pyiree.compiler.Context()
+    input_module = ctx.parse_asm(SIMPLE_MUL_ASM)
+    options = pyiree.compiler.CompileOptions()
+    options.output_format = pyiree.compiler.OutputFormat.FLATBUFFER_TEXT
+    blob = input_module.compile(options=options)
+    text = blob.text
+    self.assertTrue(text)
+
+  def testParseAndCompileToMlirText(self):
+    ctx = pyiree.compiler.Context()
+    input_module = ctx.parse_asm(SIMPLE_MUL_ASM)
+    options = pyiree.compiler.CompileOptions()
+    options.output_format = pyiree.compiler.OutputFormat.MLIR_TEXT
+    blob = input_module.compile(options=options)
+    text = blob.text
+    self.assertTrue(text)
+
+
+if __name__ == "__main__":
   absltest.main()

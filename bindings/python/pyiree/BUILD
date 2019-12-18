@@ -34,9 +34,20 @@ DEFAULT_FEATURES = [
 ]
 
 COMPILER_DEPS = [
+    # TODO(laurenzo): Remove these once migrated to vm2
     "//iree/compiler/Translation/Sequencer",
     "//iree/compiler/Translation/Interpreter",
     "//iree/compiler/Translation/SPIRV",
+    "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+    "//iree/compiler/Translation:IREEVM",
+
+    # New compiler target backends.
+    # NOTE: Including the LegacyInterpreter causes some pretty low level assertion failure.
+    # I think it is non-functional.
+    # "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
+    "//iree/compiler/Dialect/HAL/Target/VMLA",
+    "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
+    "//iree/compiler/Dialect/VM/Target/Bytecode",
 ]
 
 DRIVER_DEPS = PLATFORM_VULKAN_DEPS + [

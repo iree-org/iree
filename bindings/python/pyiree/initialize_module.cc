@@ -109,10 +109,15 @@ PYBIND11_MODULE(binding, m) {
 
   m.doc() = "IREE Binding Backend Helpers";
   py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob")
-      .def_property_readonly("bytes", [](OpaqueBlob* self) -> py::bytes {
-        return py::bytes(static_cast<const char*>(self->data()), self->size());
+      .def_property_readonly("bytes",
+                             [](OpaqueBlob* self) -> py::bytes {
+                               return py::bytes(
+                                   static_cast<const char*>(self->data()),
+                                   self->size());
+                             })
+      .def_property_readonly("text", [](OpaqueBlob* self) -> py::str {
+        return py::str(static_cast<const char*>(self->data()), self->size());
       });
-
   auto compiler_m = m.def_submodule("compiler", "IREE compiler support");
   SetupCompilerBindings(compiler_m);
 

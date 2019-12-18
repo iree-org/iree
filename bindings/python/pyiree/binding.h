@@ -87,6 +87,17 @@ class OpaqueByteVectorBlob : public OpaqueBlob {
   std::vector<uint8_t> v_;
 };
 
+class OpaqueStringBlob : public OpaqueBlob {
+ public:
+  OpaqueStringBlob(std::string s) : OpaqueBlob(), s_(std::move(s)) {
+    data_ = s_.data();
+    size_ = s_.size();
+  }
+
+ private:
+  std::string s_;
+};
+
 template <typename T>
 struct ApiPtrAdapter {};
 
