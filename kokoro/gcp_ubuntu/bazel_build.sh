@@ -21,7 +21,7 @@ set -e
 set -x
 
 # Check these exist and print the versions for later debugging
-bazel --version
+bazel --version     
 python3 -V
 
 export PYTHON_BIN="$(which python3)"
