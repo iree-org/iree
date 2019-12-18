@@ -5,19 +5,22 @@ experimental playground for low-level/tightly integrated machine learning
 libraries that make use of modern hardware acceleration APIs and techniques (see
 [non goals](#non-goals)).
 
-![ci-status](https://github.com/google/iree/workflows/Continuous%20Integration/badge.svg)
-
-To find the last passing commit, choose the latest passing run
-[here](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+is%3Asuccess).
-
 ## Table of Contents
 
+-   [Build Status](#build-status)
 -   [Quickstart](#quickstart)
 -   [Project Goals](#project-goals)
 -   [Milestones](#milestones)
 -   [Status](#status)
 -   [Dependencies](#dependencies)
 -   [License](#license)
+
+## Build Status
+
+CI System      | Build System  | Platform | Status
+-------------- | ------------- | -------- | ------
+GitHub Actions | Bazel & CMake | Linux    | [![ci-status](https://github.com/google/iree/workflows/Continuous%20Integration/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush)
+Kokoro         | Bazel         | Linux    | [![kokoro-status-bazel-linux](https://storage.cloud.google.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.cloud.google.com/iree-oss-build-badges/bazel/build_result_linux.html)
 
 <a name="quickstart"></a>
 
