@@ -20,7 +20,7 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 CI System      | Build System  | Platform | Status
 -------------- | ------------- | -------- | ------
 GitHub Actions | Bazel & CMake | Linux    | [![ci-status](https://github.com/google/iree/workflows/Continuous%20Integration/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush)
-Kokoro         | Bazel         | Linux    | [![kokoro-status-bazel-linux](https://storage.cloud.google.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.cloud.google.com/iree-oss-build-badges/bazel/build_result_linux.html)
+Kokoro         | Bazel         | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
 
 <a name="quickstart"></a>
 
