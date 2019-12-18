@@ -90,7 +90,7 @@ class OpaqueByteVectorBlob : public OpaqueBlob {
 class OpaqueStringBlob : public OpaqueBlob {
  public:
   OpaqueStringBlob(std::string s) : OpaqueBlob(), s_(std::move(s)) {
-    data_ = s_.data();
+    data_ = &s_[0];
     size_ = s_.size();
   }
 
