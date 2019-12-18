@@ -43,6 +43,7 @@ cc_library(
             "@local_config_mlir//:TransformUtils",
             "@local_config_mlir//:IR",
             "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
             "//iree/compiler/Dialect/Flow/IR",
         ],
         "//conditions:default": [
