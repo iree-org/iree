@@ -80,7 +80,7 @@ function(iree_bytecode_module)
           "${_RULE_TESTONLY}"
         IDENTIFIER
           "${_RULE_NAME}"
-        SRCS
+        GENERATED_SRCS
           "${_RULE_NAME}.emod"
         CC_FILE_OUTPUT
           "${_RULE_NAME}.cc"

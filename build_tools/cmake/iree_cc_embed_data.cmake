@@ -21,6 +21,7 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of target (see Note)
 # SRCS: List of source files to embed
+# GENERATED_SRCS: List of generated source files to embed
 # CC_FILE_OUTPUT: The CC implementation file to output.
 # H_FILE_OUTPUT: The H header file to output.
 # CPP_NAMESPACE: Wraps everything in a C++ namespace.
@@ -43,7 +44,7 @@ function(iree_cc_embed_data)
     _RULE
     "PUBLIC;TESTONLY;FLATTEN"
     "NAME;IDENTIFIER;STRIP_PREFIX;CC_FILE_OUTPUT;H_FILE_OUTPUT;CPP_NAMESPACE"
-    "SRCS"
+    "SRCS;GENERATED_SRCS"
     ${ARGN}
   )
 
@@ -67,7 +68,13 @@ function(iree_cc_embed_data)
     if(DEFINED _RULE_FLATTEN})
       list(APPEND _ARGS "--flatten")
     endif()
-    list(APPEND _ARGS "${_RULE_SRCS}")
+
+    foreach(SRC ${_RULE_SRCS})
+      list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
+    endforeach(SRC)
+    foreach(SRC ${_GENERATED_SRCS})
+      list(APPEND _ARGS "${SRC}")
+    endforeach(SRC)
 
     add_custom_command(
       OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_CC_FILE_OUTPUT}"
