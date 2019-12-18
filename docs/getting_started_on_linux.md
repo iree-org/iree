@@ -68,6 +68,41 @@ environment variable is set when you are building. You may find it useful to add
 `source [PATH TO VULKAN SDK]/setup-env.sh` to your `~/.bashrc` file to simplify
 environment variable setup.
 
+## Optional: Configure Git
+
+### Git SSH
+
+*   Generate SSH Key: `ssh-keygen -t rsa -b 4096 -C "EMAIL@email.com"`
+*   Add `~/.ssh.id_rsa.pub` key to GitHub
+*   Try a test connection `ssh git@github.com`
+
+### Other git config options
+
+```shell
+git config --global user.name "MY NAME"
+git config --global user.email "MY EMAIL"
+```
+
+## Clone
+
+This assumes that we are cloning into `$HOME/ireepub`. Update accordingly for
+your use.
+
+Note that if you will be cloning frequently, it can be sped up significantly by
+creating a reference repo and setting
+`IREE_CLONE_ARGS="--reference=/path/to/reference/repo"`. See
+`build_tools/scripts/populate_reference_repo.sh` for further details.
+
+```shell
+IREE_CLONE_ARGS=""
+mkdir -p $HOME/ireepub
+cd $HOME/ireepub
+git clone $IREE_CLONE_ARGS https://github.com/google/iree.git iree
+cd iree
+git submodule init
+git submodule update $IREE_CLONE_ARGS --recursive
+```
+
 ## Building with Bazel
 
 We support both Bazel and CMake, however, the Bazel build covers more parts of

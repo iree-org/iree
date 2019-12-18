@@ -20,17 +20,10 @@ set -e
 
 set -x
 
-# bazel is currently installed in the user bin.
-export PATH="${HOME}/bin:${PATH}"
-
 # Check these exist and print the versions for later debugging
 bazel --version
-clang++-6.0 --version
 python3 -V
 
-echo "Preparing environment variables"
-export CXX=clang++-6.0
-export CC=clang-6.0
 export PYTHON_BIN="$(which python3)"
 
 # Kokoro checks out the repository here.
