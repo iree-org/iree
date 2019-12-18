@@ -56,6 +56,13 @@ string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 # Third-party dependencies
 #-------------------------------------------------------------------------------
 
+if(${IREE_BUILD_COMPILER})
+  # Compiler dependencies require Python.
+  # Find version 3+ first, so CMake doesn't find a lower version like 2.7 first.
+  find_package(PythonInterp 3 REQUIRED)
+  find_package(PythonLibs 3 REQUIRED)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/third_party/flatbuffers/CMake/
 )

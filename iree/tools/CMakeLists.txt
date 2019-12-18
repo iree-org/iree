@@ -14,7 +14,11 @@
 
 if(${IREE_BUILD_COMPILER})
 
-  # TODO(benvanik): fix the ALWAYSLINK property and force MLIR libs.
+  # Additional libraries containing statically registered functions/flags, which
+  # should always be linked in to binaries.
+  #
+  # TODO(scotttodd): Make the ALWAYSLINK property apply transitively and force
+  #                  MLIR libs to generally be ALWAYSLINK wherever used in IREE.
   set(_ALWAYSLINK_LIBS
     MLIRAffineOps
     MLIRAnalysis
@@ -23,6 +27,7 @@ if(${IREE_BUILD_COMPILER})
     MLIRPass
     MLIRSPIRV
     MLIRSPIRVSerialization
+    MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRTransforms
     MLIRTranslation
@@ -34,6 +39,16 @@ if(${IREE_BUILD_COMPILER})
     tensorflow::mlir_xla
   )
 
+  foreach(LIB ${_ALWAYSLINK_LIBS})
+    # Aliased targets are always in-project, so we control them and can set
+    # ALWAYSLINK on them directly.
+    # TODO(scotttodd): add the ALWAYSLINK property to MLIR libraries elsewhere
+    get_target_property(_ALIASED_TARGET ${LIB} ALIASED_TARGET)
+    if(NOT _ALIASED_TARGET)
+      set_property(TARGET ${LIB} PROPERTY ALWAYSLINK 1)
+    endif()
+  endforeach(LIB)
+
   iree_cc_binary(
     NAME
       iree_tblgen
@@ -41,18 +56,11 @@ if(${IREE_BUILD_COMPILER})
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-      "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/Tools/VMOpEncoderGen.cpp"
-      "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/Tools/VMOpTableGen.cpp"
     DEPS
+      iree::compiler::Dialect::VM::Tools
       LLVMMLIRTableGen
       MLIRSupport
       LLVMTableGen
-      LLVMMC
-      LLVMDebugInfoCodeView
-      LLVMBinaryFormat
-      LLVMDebugInfoMSF
-      LLVMSupport
-      LLVMDemangle
     LINKOPTS
       "-lpthread"
   )
@@ -64,7 +72,7 @@ if(${IREE_BUILD_COMPILER})
     OUT
       iree-translate
     SRCS
-      "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-translate/mlir-translate.cpp"
+      "iree_translate_main.cc"
     DEPS
       ${_ALWAYSLINK_LIBS}
       iree::compiler::Translation::Interpreter

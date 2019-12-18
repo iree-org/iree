@@ -27,7 +27,8 @@ include(CMakeParseArguments)
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
 # LINKOPTS: List of link options
-# ALWAYSLINK: Always link the library into any binary with a transitive dep.
+# ALWAYSLINK: Always link the library into any binary with a direct dep.
+#   TODO(scotttodd): Make transitive deps also respect ALWAYSLINK
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
@@ -109,6 +110,7 @@ function(iree_cc_library)
           ${_RULE_COPTS}
           ${IREE_DEFAULT_COPTS}
       )
+
       target_link_libraries(${_NAME}
         PUBLIC
           ${_RULE_DEPS}
@@ -120,6 +122,10 @@ function(iree_cc_library)
         PUBLIC
           ${_RULE_DEFINES}
       )
+
+      if(DEFINED _RULE_ALWAYSLINK)
+        set_property(TARGET ${_NAME} PROPERTY ALWAYSLINK 1)
+      endif()
 
       # Add all IREE targets to a a folder in the IDE for organization.
       if(_RULE_PUBLIC)

@@ -94,12 +94,56 @@ function(iree_cc_binary)
     PRIVATE
       ${_RULE_COPTS}
   )
-  target_link_libraries(${_NAME}
-    PUBLIC
-      ${_RULE_DEPS}
-    PRIVATE
-      ${_RULE_LINKOPTS}
-  )
+
+  # Split DEPS into two lists - one for whole archive (alwayslink) and one for
+  # standard linking (which only links in symbols that are directly used).
+  #
+  # TODO(scotttodd): traverse transitive dependencies also (all direct
+  #                  dependencies of ALWAYSLINK libraries should be linked in)
+  set(_ALWAYS_LINK_DEPS "")
+  set(_STANDARD_DEPS "")
+  foreach(DEP ${_RULE_DEPS})
+    get_target_property(_ALWAYS_LINK_DEP ${DEP} ALWAYSLINK)
+    if(_ALWAYS_LINK_DEP)
+      list(APPEND _ALWAYS_LINK_DEPS ${DEP})
+
+      # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
+      # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
+      # try to link the library in, so we need the flag *and* the dependency.
+      if(MSVC)
+        get_target_property(_ALIASED_TARGET ${DEP} ALIASED_TARGET)
+        if (_ALIASED_TARGET)
+          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_ALIASED_TARGET}")
+        else()
+          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${DEP}")
+        endif()
+      endif()
+    else()
+      list(APPEND _STANDARD_DEPS ${DEP})
+    endif()
+  endforeach(DEP)
+
+  # Call into target_link_libraries with the lists of deps.
+  # TODO(scotttodd): `-Wl,-force_load` version
+  if(MSVC)
+    target_link_libraries(${_NAME}
+      PUBLIC
+        ${_ALWAYS_LINK_DEPS}
+        ${_STANDARD_DEPS}
+      PRIVATE
+        ${_RULE_LINKOPTS}
+    )
+  else()
+    target_link_libraries(${_NAME}
+      PUBLIC
+        "-Wl,--whole-archive"
+        ${_ALWAYS_LINK_DEPS}
+        "-Wl,--no-whole-archive"
+        ${_STANDARD_DEPS}
+      PRIVATE
+        ${_RULE_LINKOPTS}
+    )
+  endif()
 
   # Add all IREE targets to a a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/binaries)
