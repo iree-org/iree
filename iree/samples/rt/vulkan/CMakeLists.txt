@@ -17,7 +17,7 @@ add_custom_command(
   COMMAND iree-translate
           --mlir-to-iree-module "${CMAKE_CURRENT_SOURCE_DIR}/simple_mul.mlir"
           -o simple_mul_bytecode_module.emod
-  DEPENDS iree::tools::iree_translate
+  DEPENDS iree_tools_iree_translate
 )
 
 add_custom_command(
@@ -35,6 +35,13 @@ add_library(
   simple_mul_bytecode_module STATIC
   simple_mul_bytecode_module.cc
 )
+
+# Statically link against Vulkan.
+# Requires installing the Vulkan SDK from https://vulkan.lunarg.com/.
+include(FindVulkan)
+if(NOT Vulkan_FOUND)
+  message(FATAL_ERROR "Vulkan library was not found")
+endif()
 
 iree_cc_binary(
     NAME
@@ -54,5 +61,5 @@ iree_cc_binary(
       iree::vm::api
       SDL2-static
       simple_mul_bytecode_module
-      # TODO(marbre): Add Vulkan dependencies
+      Vulkan::Vulkan
 )

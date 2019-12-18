@@ -80,5 +80,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV
       MLIRTranslateClParser
   )
+  add_executable(iree-translate ALIAS iree_tools_iree_translate)
 
 endif()

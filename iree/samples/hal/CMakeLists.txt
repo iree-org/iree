@@ -17,7 +17,7 @@ add_custom_command(
   COMMAND iree-translate
           --mlir-to-iree-module "${CMAKE_CURRENT_SOURCE_DIR}/simple_compute_test.mlir"
           -o simple_compute_test_module.emod
-  DEPENDS iree::tools::iree_translate
+  DEPENDS iree_tools_iree_translate
 )
 
 add_custom_command(
