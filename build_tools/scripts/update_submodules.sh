@@ -37,8 +37,18 @@ if [ -n "$git_status" ]; then
   exit 1
 fi
 
-echo "Pulling latest from remote"
-git pull
+upstream_url="https://github.com/google/iree.git"
+origin_url="$(git remote get-url origin)"
+if [ ${origin_url} == ${upstream_url} ]
+then
+  echo "Pulling latest from remote"
+  git pull
+else
+  echo "Fetching latest from upstream"
+  git fetch ${upstream_url}
+  echo "Merging into fork master"
+  git merge upstream/master
+fi
 
 git_status="$(git status -s)"
 
