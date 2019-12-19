@@ -16,6 +16,7 @@
 #define IREE_BASE_API_UTIL_H_
 
 #include "absl/base/macros.h"
+#include "absl/container/inlined_vector.h"
 #include "absl/time/time.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
@@ -113,6 +114,29 @@ inline iree_status_t ToApiShape(const Shape& shape, iree_shape_t* out_shape) {
     out_shape->dims[i] = shape[i];
   }
   return IREE_STATUS_OK;
+}
+
+// Returns a vector initialized with the contents of a C-style list query.
+// For functions of the form (..., capacity, out_values, out_count) this will
+// try to fetch the items and resize as needed such that the returned value
+// contains all items available.
+//
+// Returns the empty vector if the query fails for any reason.
+template <typename T, typename... Args>
+absl::InlinedVector<T, 4> QueryListValues(
+    iree_status_t (*fn)(Args..., iree_host_size_t, T*, iree_host_size_t*),
+    Args... args) {
+  absl::InlinedVector<T, 4> values(4);
+  iree_host_size_t count = 0;
+  iree_status_t status = fn(args..., values.size(), values.data(), &count);
+  if (status == IREE_STATUS_OUT_OF_RANGE) {
+    values.resize(count);
+    status = fn(args..., values.size(), values.data(), &count);
+  } else if (status != IREE_STATUS_OK) {
+    return {};
+  }
+  values.resize(count);
+  return values;
 }
 
 }  // namespace iree

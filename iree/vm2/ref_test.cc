@@ -64,7 +64,7 @@ static iree_vm_ref_t MakeRef() {
   }
 
   iree_vm_ref_t ref = {0};
-  CHECK_EQ(IREE_STATUS_OK, iree_vm_ref_wrap(new T(), T::kTypeID, &ref));
+  CHECK_EQ(IREE_STATUS_OK, iree_vm_ref_wrap_assign(new T(), T::kTypeID, &ref));
   return ref;
 }
 
@@ -100,7 +100,7 @@ TEST(VMRefTest, WrappingCStruct) {
   RegisterTypeC();
   iree_vm_ref_t ref = {0};
   EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_wrap(new ref_object_c_t(), kCTypeID, &ref));
+            iree_vm_ref_wrap_assign(new ref_object_c_t(), kCTypeID, &ref));
   EXPECT_EQ(1, ReadCounter(&ref));
   iree_vm_ref_release(&ref);
 }
@@ -128,7 +128,7 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
 
   iree_vm_ref_t ref = {0};
   EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_wrap(new DerivedType(), descriptor.type, &ref));
+            iree_vm_ref_wrap_assign(new DerivedType(), descriptor.type, &ref));
   EXPECT_EQ(1, ReadCounter(&ref));
   EXPECT_EQ(1, allocated_derived_types);
 
@@ -142,16 +142,16 @@ TEST(VMRefTest, WrappingSubclassedRefObject) {
 TEST(VMRefTest, WrappingRequriesTypeRegistration) {
   iree_vm_ref_t ref = {0};
   int dummy = 0;
-  EXPECT_EQ(
-      IREE_STATUS_INVALID_ARGUMENT,
-      iree_vm_ref_wrap(&dummy, static_cast<iree_vm_ref_type_t>(1234), &ref));
+  EXPECT_EQ(IREE_STATUS_INVALID_ARGUMENT,
+            iree_vm_ref_wrap_assign(
+                &dummy, static_cast<iree_vm_ref_type_t>(1234), &ref));
 }
 
 // Tests that wrapping releases any existing ref in out_ref.
 TEST(VMRefTest, WrappingReleasesExisting) {
   RegisterTypeC();
   iree_vm_ref_t ref = {0};
-  iree_vm_ref_wrap(new ref_object_c_t(), kCTypeID, &ref);
+  iree_vm_ref_wrap_assign(new ref_object_c_t(), kCTypeID, &ref);
   EXPECT_EQ(1, ReadCounter(&ref));
   iree_vm_ref_release(&ref);
 }

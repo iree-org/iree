@@ -106,8 +106,8 @@ iree_status_t iree_custom_message_create(iree_string_view_t value,
   message->value.data = (uint8_t*)message + sizeof(iree_custom_message_t);
   message->value.size = value.size;
   memcpy((void*)message->value.data, value.data, message->value.size);
-  return iree_vm_ref_wrap(message, IREE_CUSTOM_MESSAGE_TYPE_ID,
-                          out_message_ref);
+  return iree_vm_ref_wrap_assign(message, IREE_CUSTOM_MESSAGE_TYPE_ID,
+                                 out_message_ref);
 }
 
 iree_status_t iree_custom_message_wrap(iree_string_view_t value,
@@ -119,8 +119,8 @@ iree_status_t iree_custom_message_wrap(iree_string_view_t value,
   message->ref_object.counter = 1;
   message->allocator = allocator;
   message->value = value;  // Unowned.
-  return iree_vm_ref_wrap(message, IREE_CUSTOM_MESSAGE_TYPE_ID,
-                          out_message_ref);
+  return iree_vm_ref_wrap_assign(message, IREE_CUSTOM_MESSAGE_TYPE_ID,
+                                 out_message_ref);
 }
 
 void iree_custom_message_destroy(void* ptr) {

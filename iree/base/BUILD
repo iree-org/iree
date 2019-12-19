@@ -49,6 +49,7 @@ cc_library(
         ":shape",
         ":status",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/time",
     ],
 )

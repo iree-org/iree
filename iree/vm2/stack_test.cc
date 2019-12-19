@@ -247,8 +247,8 @@ TEST(VMStackTest, RefRegisterCleanup) {
   frame_a->registers.ref_register_count = 1;
   memset(&frame_a->registers.ref[0], 0, sizeof(iree_vm_ref_t));
   EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_wrap(new DummyObject(), DummyObject::kTypeID,
-                             &frame_a->registers.ref[0]));
+            iree_vm_ref_wrap_assign(new DummyObject(), DummyObject::kTypeID,
+                                    &frame_a->registers.ref[0]));
   EXPECT_EQ(1, dummy_object_count);
 
   // This should release the ref for us. Heap checker will yell if it doesn't.

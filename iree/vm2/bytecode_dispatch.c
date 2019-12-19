@@ -358,8 +358,9 @@ iree_status_t iree_vm_bytecode_dispatch(
       // ];
       int32_t rodata_ordinal = OP_I32(0);
       // TODO(benvanik): allow decompression callbacks to run now (if needed).
-      iree_vm_ref_wrap(&module_state->rodata_ref_table[rodata_ordinal],
-                       iree_vm_ro_byte_buffer_ref_type_id(), &OP_R_REF(4));
+      iree_vm_ref_wrap_retain(&module_state->rodata_ref_table[rodata_ordinal],
+                              iree_vm_ro_byte_buffer_ref_type_id(),
+                              &OP_R_REF(4));
       offset += 4 + 1;
     });
 
