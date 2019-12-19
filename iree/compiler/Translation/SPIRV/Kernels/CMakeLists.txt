@@ -54,6 +54,6 @@ iree_cc_embed_data(
   H_FILE_OUTPUT
     "Kernels.h"
   CPP_NAMESPACE
-    mlir::iree_compiler::spirv_kernels
+    "mlir::iree_compiler::spirv_kernels"
   FLATTEN
 )
