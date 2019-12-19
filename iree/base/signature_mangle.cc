@@ -142,10 +142,10 @@ bool SignatureParser::SeekTag(char tag) {
 // -----------------------------------------------------------------------------
 
 SignatureBuilder RawSignatureMangler::ToFunctionSignature(
-    RawSignatureMangler& inputs, RawSignatureMangler& results) {
+    const SignatureBuilder& inputs, const SignatureBuilder& results) {
   SignatureBuilder func_builder;
-  inputs.builder_.AppendTo(func_builder, 'I');
-  results.builder_.AppendTo(func_builder, 'R');
+  inputs.AppendTo(func_builder, 'I');
+  results.AppendTo(func_builder, 'R');
   return func_builder;
 }
 
@@ -155,7 +155,7 @@ void RawSignatureMangler::AddAnyReference() {
 }
 
 void RawSignatureMangler::AddShapedNDBuffer(
-    AbiConstants::ScalarType element_type, absl::Span<int> shape) {
+    AbiConstants::ScalarType element_type, absl::Span<const int> shape) {
   SignatureBuilder item_builder;
   // Fields:
   //   't': scalar type code

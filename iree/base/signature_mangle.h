@@ -97,7 +97,7 @@ class SignatureBuilder {
   SignatureBuilder& Span(absl::string_view contents, char tag);
 
   // Appends to another builder as a sub-span with the given tag.
-  SignatureBuilder& AppendTo(SignatureBuilder& other, char tag) {
+  const SignatureBuilder& AppendTo(SignatureBuilder& other, char tag) const {
     other.Span(encoded_, tag);
     return *this;
   }
@@ -159,9 +159,14 @@ class SignatureParser {
 // See function_abi.md.
 class RawSignatureMangler {
  public:
+  static SignatureBuilder ToFunctionSignature(const SignatureBuilder& inputs,
+                                              const SignatureBuilder& results);
+
   // Combines mangled input and result signatures into a function signature.
-  static SignatureBuilder ToFunctionSignature(RawSignatureMangler& inputs,
-                                              RawSignatureMangler& results);
+  static SignatureBuilder ToFunctionSignature(
+      const RawSignatureMangler& inputs, const RawSignatureMangler& results) {
+    return ToFunctionSignature(inputs.builder(), results.builder());
+  }
 
   // Adds an unconstrained reference-type object.
   void AddAnyReference();
@@ -171,7 +176,7 @@ class RawSignatureMangler {
   // This is the common case for external interfacing and requires a fully
   // ranked shape.
   void AddShapedNDBuffer(AbiConstants::ScalarType element_type,
-                         absl::Span<int> shape);
+                         absl::Span<const int> shape);
 
   const SignatureBuilder& builder() const { return builder_; }
 
