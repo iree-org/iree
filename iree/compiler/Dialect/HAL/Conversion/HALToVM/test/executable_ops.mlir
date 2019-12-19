@@ -19,7 +19,7 @@ hal.executable @exe {
 // CHECK-NEXT: ^bb2:
 // CHECK-NEXT:   %c1230128453 = vm.const.i32 1230128453 : i32
 // CHECK-NEXT:   %c1230128454 = vm.const.i32 1230128454 : i32
-// CHECK-NEXT:   %1 = vm.call @hal.ex.match_supported_executable_format(%arg0, %c1230128453, %c1230128454) : (!ireex.ref<!hal.device>, i32, i32) -> i32
+// CHECK-NEXT:   %1 = vm.call.variadic @hal.ex.match_supported_executable_format(%arg0, [%c1230128453, %c1230128454]) : (!ireex.ref<!hal.device>, i32...) -> i32
 // CHECK-NEXT:   vm.br ^bb3(%1 : i32)
 // CHECK-NEXT: ^bb3(%2: i32):
 // CHECK-NEXT:   %c1230128453_0 = vm.const.i32 1230128453 : i32

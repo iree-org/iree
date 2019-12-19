@@ -135,9 +135,16 @@ class ExecutableOpConversion
       queryCallArgs.push_back(funcBuilder.createOrFold<IREE::VM::ConstI32Op>(
           loc, formatRodataOp.getFirst()));
     }
-    auto queryCallOp = funcBuilder.create<IREE::VM::CallOp>(
-        loc, "hal.ex.match_supported_executable_format",
-        ArrayRef<Type>{funcBuilder.getIntegerType(32)}, queryCallArgs);
+    auto queryCallOp = funcBuilder.create<IREE::VM::CallVariadicOp>(
+        loc,
+        funcBuilder.getSymbolRefAttr(
+            "hal.ex.match_supported_executable_format"),
+        ArrayRef<Type>({funcBuilder.getIntegerType(32)}),
+        ArrayRef<int8_t>({-1, static_cast<int8_t>(rodataOps.size())}),
+        ArrayRef<Type>({IREE::RefPtrType::get(
+                            IREE::HAL::DeviceType::get(funcOp.getContext())),
+                        funcBuilder.getIntegerType(32)}),
+        queryCallArgs);
     Value *selectedFormat = queryCallOp.getResult(0);
 
     // Switch on the result to pick the rodata.
