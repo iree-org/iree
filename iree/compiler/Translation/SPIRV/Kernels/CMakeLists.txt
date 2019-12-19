@@ -25,6 +25,12 @@
 # )
 
 add_custom_command(
+  OUTPUT conv2d_nhwc.spv
+  COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/conv2d_nhwc.comp" -o conv2d_nhwc.spv
+  DEPENDS glslangValidator
+)
+
+add_custom_command(
   OUTPUT matmul.spv
   COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/matmul.comp" -o matmul.spv
   DEPENDS glslangValidator
@@ -38,7 +44,7 @@ add_custom_command(
 
 add_custom_command(
   OUTPUT Kernels.h Kernels.cc
-  COMMAND generate_cc_embed_data matmul.spv reduce_untiled.spv
+  COMMAND generate_cc_embed_data conv2d_nhwc.spv matmul.spv reduce_untiled.spv
           --output_header=Kernels.h
           --output_impl=Kernels.cc
           --identifier=Kernels
