@@ -51,6 +51,7 @@ add_custom_command(
           --cpp_namespace=mlir::iree_compiler::spirv_kernels
           --flatten
   DEPENDS generate_cc_embed_data
+          conv2d_nhwc.spv
           matmul.spv
           reduce_untiled.spv
 )
