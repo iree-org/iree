@@ -684,8 +684,65 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncVariadicOperands<"operands">,
       //   VM_EncVariadicResults<"results">,
       // ];
-      // TODO(benvanik): implement variadic calls.
-      return IREE_STATUS_UNIMPLEMENTED;
+
+      // TODO(benvanik): dedupe with above or merge and always have the seg size
+      // list be present (but empty) for non-variadic calls.
+
+      // Get argument and result register lists and flush the caller frame.
+      int32_t function_ordinal = OP_I32(0);
+      offset += 4;
+      const iree_vm_register_list_t* seg_size_list =
+          (const iree_vm_register_list_t*)&bytecode_data[offset];
+      offset += 1 + seg_size_list->size;
+      const iree_vm_register_list_t* src_reg_list =
+          (const iree_vm_register_list_t*)&bytecode_data[offset];
+      offset += 1 + src_reg_list->size;
+      const iree_vm_register_list_t* dst_reg_list =
+          (const iree_vm_register_list_t*)&bytecode_data[offset];
+      current_frame->return_registers = dst_reg_list;
+      offset += 1 + dst_reg_list->size;
+      current_frame->offset = offset;
+
+      // NOTE: we assume validation has ensured these functions exist.
+      // TODO(benvanik): something more clever than just a high bit?
+      iree_vm_function_t target_function;
+      int is_import = (function_ordinal & 0x80000000u) != 0;
+      if (!is_import) {
+        // Variadic calls are currently only supported for import functions.
+        return IREE_STATUS_FAILED_PRECONDITION;
+      }
+
+      // Import that we can fetch from the module state.
+      target_function =
+          module_state->import_table[function_ordinal & 0x7FFFFFFFu];
+
+      // Remap registers from caller to callee.
+      iree_vm_stack_frame_t* callee_frame = NULL;
+      iree_status_t enter_status =
+          iree_vm_stack_function_enter(stack, target_function, &callee_frame);
+      if (enter_status != IREE_STATUS_OK) {
+        // TODO(benvanik): set execution result to stack overflow.
+        return enter_status;
+      }
+      iree_vm_bytecode_dispatch_remap_argument_registers(
+          &current_frame->registers, src_reg_list, &callee_frame->registers);
+
+      // TODO(benvanik): rename return_registers.
+      callee_frame->return_registers = seg_size_list;
+
+      // Call external function.
+      iree_status_t call_status = target_function.module->execute(
+          target_function.module, stack, callee_frame, out_result);
+      if (call_status != IREE_STATUS_OK) {
+        // TODO(benvanik): set execution result to failure/capture stack.
+        return call_status;
+      }
+      if (callee_frame->return_registers) {
+        iree_vm_bytecode_dispatch_remap_registers(
+            &callee_frame->registers, callee_frame->return_registers,
+            &current_frame->registers, current_frame->return_registers);
+      }
+      iree_vm_stack_function_leave(stack);
     });
 
     DISPATCH_OP(Return, {
