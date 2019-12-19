@@ -69,6 +69,22 @@ class OpaqueBlob {
     return {free_fn, holder};
   }
 
+  static iree_allocator_t CreateDeallocator(std::shared_ptr<OpaqueBlob> blob) {
+    // Note that there are more efficient ways to write this which
+    // don't bounce through an extra heap alloc, but this is not
+    // intended to be a high impact code path.
+    struct Holder {
+      std::shared_ptr<OpaqueBlob> blob;
+    };
+    Holder* holder = new Holder{std::move(blob)};
+    auto free_fn = +([](void* self, void*) -> iree_status_t {
+      Holder* self_holder = static_cast<Holder*>(self);
+      delete self_holder;
+      return IREE_STATUS_OK;
+    });
+    return {holder /* self */, nullptr /* alloc */, free_fn /* free */};
+  }
+
  protected:
   void* data_;
   size_t size_;

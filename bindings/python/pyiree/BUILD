@@ -127,6 +127,8 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/types:variant",
         "//iree/compiler/Utils",
+        "//iree/vm2",
+        "//iree/vm2:bytecode_module",
         "@local_config_mlir//:IR",
         "//iree/base:api",
         "//iree/base:status",
@@ -196,6 +198,17 @@ py_test(
 py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
+    python_version = "PY3",
+    deps = NUMPY_DEPS + [
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+        "@absl_py//absl/testing:absltest",
+        "//bindings/python/pyiree",
+    ],
+)
+
+py_test(
+    name = "vm_test",
+    srcs = ["vm_test.py"],
     python_version = "PY3",
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
