@@ -28,6 +28,7 @@
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/schemas/bytecode_module_def_generated.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/PatternMatch.h"
@@ -190,7 +191,8 @@ static Optional<Offset<Vector<T>>> createOptionalVector(
 // Returns a serialized function signature.
 static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
     FunctionType functionType, llvm::DenseMap<Type, int> &typeTable,
-    FlatBufferBuilder &fbb) {
+    DictionaryAttr reflectionAttrs, FlatBufferBuilder &fbb) {
+  // Argument types.
   std::vector<int32_t> argumentTypes(functionType.getNumInputs());
   for (int i = 0; i < argumentTypes.size(); ++i) {
     Type type = functionType.getInput(i);
@@ -201,6 +203,7 @@ static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
   }
   auto argumentTypesOffset = createOptionalVector(argumentTypes, fbb);
 
+  // Result types.
   std::vector<int32_t> resultTypes(functionType.getNumResults());
   for (int i = 0; i < resultTypes.size(); ++i) {
     Type type = functionType.getResult(i);
@@ -211,12 +214,38 @@ static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
   }
   auto resultTypesOffset = createOptionalVector(resultTypes, fbb);
 
+  // Reflection attrs.
+  Optional<Offset<Vector<Offset<iree::vm::ReflectionAttrDef>>>>
+      reflectionAttrsOffset;
+  if (reflectionAttrs) {
+    llvm::SmallVector<Offset<iree::vm::ReflectionAttrDef>, 4>
+        reflectionAttrItems;
+    for (auto reflectionAttr : reflectionAttrs) {
+      auto key = reflectionAttr.first.strref();
+      auto value = reflectionAttr.second.dyn_cast<StringAttr>();
+      if (!value || key.empty()) continue;
+      auto keyOffset =
+          fbb.CreateString(flatbuffers::string_view(key.data(), key.size()));
+      auto valueOffset = fbb.CreateString(flatbuffers::string_view(
+          value.getValue().data(), value.getValue().size()));
+      iree::vm::ReflectionAttrDefBuilder rattr(fbb);
+      rattr.add_key(keyOffset);
+      rattr.add_value(valueOffset);
+      reflectionAttrItems.push_back(rattr.Finish());
+    }
+    reflectionAttrsOffset = fbb.CreateVector(reflectionAttrItems.data(),
+                                             reflectionAttrItems.size());
+  }
+
   iree::vm::FunctionSignatureDefBuilder fsd(fbb);
   if (argumentTypesOffset) {
     fsd.add_argument_types(argumentTypesOffset.getValue());
   }
   if (resultTypesOffset) {
     fsd.add_result_types(resultTypesOffset.getValue());
+  }
+  if (reflectionAttrsOffset) {
+    fsd.add_reflection_attrs(reflectionAttrsOffset.getValue());
   }
   return fsd.Finish();
 }
@@ -336,7 +365,8 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   for (auto importOp : importFuncOps) {
     auto nameOffset = fbb.CreateString(importOp.getName().str());
     auto signatureOffset =
-        makeFunctionSignatureDef(importOp.getType(), typeOrdinalMap, fbb);
+        makeFunctionSignatureDef(importOp.getType(), typeOrdinalMap,
+                                 nullptr /* no reflection for imports */, fbb);
     iree::vm::ImportFunctionDefBuilder ifd(fbb);
     ifd.add_full_name(nameOffset);
     ifd.add_signature(signatureOffset);
@@ -347,8 +377,9 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   for (auto exportOp : exportFuncOps) {
     auto nameOffset = fbb.CreateString(exportOp.export_name().str());
     auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
-    auto signatureOffset =
-        makeFunctionSignatureDef(funcOp.getType(), typeOrdinalMap, fbb);
+    auto signatureOffset = makeFunctionSignatureDef(
+        funcOp.getType(), typeOrdinalMap,
+        funcOp.getAttrOfType<DictionaryAttr>("iree.reflection"), fbb);
     iree::vm::ExportFunctionDefBuilder efd(fbb);
     efd.add_local_name(nameOffset);
     efd.add_signature(signatureOffset);
@@ -360,8 +391,9 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
     internalFuncOffsets.reserve(internalFuncOps.size());
     for (auto funcOp : internalFuncOps) {
       auto nameOffset = fbb.CreateString(funcOp.getName().str());
-      auto signatureOffset =
-          makeFunctionSignatureDef(funcOp.getType(), typeOrdinalMap, fbb);
+      auto signatureOffset = makeFunctionSignatureDef(
+          funcOp.getType(), typeOrdinalMap,
+          nullptr /* no reflection for internal */, fbb);
       iree::vm::InternalFunctionDefBuilder ifd(fbb);
       ifd.add_local_name(nameOffset);
       ifd.add_signature(signatureOffset);
