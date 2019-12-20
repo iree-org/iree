@@ -303,6 +303,45 @@ static iree_status_t iree_vm_bytecode_module_get_function(
   return IREE_STATUS_OK;
 }
 
+static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
+    void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
+    int32_t index, iree_string_view_t* key, iree_string_view_t* value) {
+  iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
+  auto* module_def = IREE_VM_GET_MODULE_DEF(module);
+
+  if (linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+    // Reflection attrs only currently supported on exported functions.
+    return IREE_STATUS_NOT_FOUND;
+  }
+
+  if (ordinal < 0 || ordinal >= module_def->exported_functions()->size()) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto* export_def = module_def->exported_functions()->Get(ordinal);
+  const iree::vm::FunctionSignatureDef* signature = export_def->signature();
+  if (index < 0 || index >= signature->reflection_attrs()->size()) {
+    return IREE_STATUS_NOT_FOUND;
+  }
+  const ::iree::vm::ReflectionAttrDef* attr =
+      signature->reflection_attrs()->Get(index);
+  const ::flatbuffers::String* attr_key = attr->key();
+  const ::flatbuffers::String* attr_value = attr->value();
+  if (!attr_key || !attr_value) {
+    // Because reflection metadata should not impose any overhead for the
+    // non reflection case, we do not eagerly validate in on load -- instead
+    // verify it structurally as needed.
+    return IREE_STATUS_FAILED_PRECONDITION;
+  }
+
+  key->data = attr_key->c_str();
+  key->size = attr_key->size();
+  value->data = attr_value->c_str();
+  value->size = attr_value->size();
+
+  return IREE_STATUS_OK;
+}
+
 static bool iree_vm_bytecode_module_compare_str(const flatbuffers::String* lhs,
                                                 iree_string_view_t rhs) {
   if (!lhs || lhs->size() != rhs.size) return false;
@@ -545,6 +584,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
   module->interface.free_state = iree_vm_bytecode_module_free_state;
   module->interface.resolve_import = iree_vm_bytecode_module_resolve_import;
   module->interface.execute = iree_vm_bytecode_module_execute;
+  module->interface.get_function_reflection_attr =
+      iree_vm_bytecode_module_get_function_reflection_attr;
 
   *out_module = &module->interface;
   return IREE_STATUS_OK;

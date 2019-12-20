@@ -140,6 +140,17 @@ typedef struct iree_vm_module {
   iree_status_t(IREE_API_PTR* execute)(void* self, iree_vm_stack_t* stack,
                                        iree_vm_stack_frame_t* frame,
                                        iree_vm_execution_result_t* out_result);
+
+  // Gets a reflection attribute for a function by index.
+  // The returned key and value strings are guaranteed valid for the life
+  // of the module. Note that not all modules and functions have reflection
+  // attributes.
+  // Returns IREE_STATUS_NOT_FOUND if index >= the number of attributes for
+  // the function.
+  // See: docs/function_abi.md
+  iree_status_t(IREE_API_PTR* get_function_reflection_attr)(
+      void* self, iree_vm_function_linkage_t linkage, int32_t ordinal,
+      int32_t index, iree_string_view_t* key, iree_string_view_t* value);
 } iree_vm_module_t;
 
 #ifndef IREE_API_NO_PROTOTYPES
@@ -170,6 +181,20 @@ iree_vm_module_name(const iree_vm_module_t* module);
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_module_lookup_function(
     const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
     iree_string_view_t name, iree_vm_function_t* out_function);
+
+// Gets a reflection attribute for a function by index.
+// The returned key and value strings are guaranteed valid for the life
+// of the module. Note that not all modules and functions have reflection
+// attributes.
+// Returns IREE_STATUS_NOT_FOUND if index >= the number of attributes for
+// the function.
+// See: docs/function_abi.md
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_get_function_reflection_attr(const iree_vm_module_t* module,
+                                     iree_vm_function_linkage_t linkage,
+                                     int32_t ordinal, int32_t index,
+                                     iree_string_view_t* key,
+                                     iree_string_view_t* value);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
