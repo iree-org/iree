@@ -25,15 +25,12 @@ iree_cc_library(
   SRCS
     "allocator.cc"
   DEPS
-    absl::base
-    absl::fixed_array
     absl::span
-    absl::strings
-    absl::time
-    iree::base::logging
     iree::base::ref_ptr
+    iree::base::source_location
     iree::base::status
-    iree::base::time
+    iree::base::tracing
+    iree::hal::buffer
   PUBLIC
 )
 
@@ -42,20 +39,35 @@ iree_cc_library(
     api
   HDRS
     "api.h"
+    "api_detail.h"
   SRCS
     "api.cc"
   DEPS
+    absl::span
     iree::base::api
     iree::base::api_util
     iree::base::shape
     iree::base::tracing
+    iree::hal::api_hdrs
     iree::hal::buffer
     iree::hal::buffer_view
+    iree::hal::command_buffer
     iree::hal::device
     iree::hal::driver
+    iree::hal::driver_registry
     iree::hal::fence
     iree::hal::heap_buffer
     iree::hal::semaphore
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    api_hdrs
+  HDRS
+    "api.h"
+  DEPS
+    iree::base::api_hdrs
   PUBLIC
 )
 
@@ -73,6 +85,7 @@ iree_cc_library(
     absl::variant
     iree::base::bitfield
     iree::base::logging
+    iree::base::source_location
     iree::base::status
     iree::hal::resource
   PUBLIC
@@ -82,9 +95,9 @@ iree_cc_test(
   NAME
     buffer_test
   SRCS
+    "buffer_mapping_test.cc"
     "buffer_test.cc"
   DEPS
-    absl::base
     absl::span
     gtest_main
     iree::base::status
@@ -104,6 +117,7 @@ iree_cc_library(
     absl::inlined_vector
     absl::strings
     iree::base::shape
+    iree::base::source_location
     iree::base::status
     iree::hal::buffer_view
   PUBLIC
@@ -132,7 +146,9 @@ iree_cc_library(
     "buffer_view_string_util.cc"
   DEPS
     absl::strings
+    absl::optional
     iree::base::buffer_string_util
+    iree::base::source_location
     iree::base::status
     iree::hal::allocator
     iree::hal::buffer_view
@@ -273,6 +289,8 @@ iree_cc_library(
   DEPS
     absl::span
     absl::synchronization
+    absl::time
+    iree::base::source_location
     iree::base::status
     iree::base::time
     iree::base::tracing
@@ -319,6 +337,7 @@ iree_cc_library(
     absl::base
     absl::synchronization
     iree::base::initializer
+    iree::base::ref_ptr
     iree::base::status
     iree::hal::driver
   PUBLIC
@@ -402,6 +421,7 @@ iree_cc_library(
     "heap_buffer.cc"
   DEPS
     absl::base
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator

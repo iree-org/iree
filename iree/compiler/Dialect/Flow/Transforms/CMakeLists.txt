@@ -25,12 +25,16 @@ iree_cc_library(
     "FormStreams.cpp"
     "IdentifyDispatchRegions.cpp"
     "IdentifyReductionRegions.cpp"
+    "LegalizeInputTypes.cpp"
+    "MaterializeExportedReflection.cpp"
+    "MergeExportedReflection.cpp"
     "OutlineDispatchRegions.cpp"
     "OutlineReductionRegions.cpp"
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
     "RematerializeDispatchConstants.cpp"
   DEPS
+    iree::base::signature_mangle
     iree::compiler::Dialect::Flow::Analysis
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
