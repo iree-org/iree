@@ -22,6 +22,22 @@
 namespace iree {
 namespace python {
 
+//------------------------------------------------------------------------------
+// Retain/release bindings
+//------------------------------------------------------------------------------
+
+template <>
+struct ApiPtrAdapter<iree_hal_driver_t> {
+  static void Retain(iree_hal_driver_t* d) { iree_hal_driver_retain(d); }
+  static void Release(iree_hal_driver_t* d) { iree_hal_driver_release(d); }
+};
+
+template <>
+struct ApiPtrAdapter<iree_hal_device_t> {
+  static void Retain(iree_hal_device_t* d) { iree_hal_device_retain(d); }
+  static void Release(iree_hal_device_t* d) { iree_hal_device_release(d); }
+};
+
 template <>
 struct ApiPtrAdapter<iree_hal_buffer_t> {
   static void Retain(iree_hal_buffer_t* b) { iree_hal_buffer_retain(b); }
@@ -36,6 +52,22 @@ struct ApiPtrAdapter<iree_hal_buffer_view_t> {
   static void Release(iree_hal_buffer_view_t* bv) {
     iree_hal_buffer_view_release(bv);
   }
+};
+
+//------------------------------------------------------------------------------
+// ApiRefCounted types
+//------------------------------------------------------------------------------
+
+class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
+ public:
+};
+
+class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
+ public:
+  static std::vector<std::string> Query();
+  static HalDriver Create(const std::string& driver_name);
+
+  HalDevice CreateDefaultDevice();
 };
 
 struct HalShape {

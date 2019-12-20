@@ -17,9 +17,12 @@
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/base/api.h"
+#include "iree/modules/hal/hal_module.h"
 
 namespace iree {
 namespace python {
+
+namespace {
 
 RtModule CreateModuleFromBlob(std::shared_ptr<OpaqueBlob> blob) {
   iree_rt_module_t* module;
@@ -30,6 +33,16 @@ RtModule CreateModuleFromBlob(std::shared_ptr<OpaqueBlob> blob) {
   CheckApiStatus(status, "Error creating vm module from blob");
   return RtModule::CreateRetained(module);
 }
+
+VmModule CreateHalModule(HalDevice* device) {
+  iree_vm_module_t* module;
+  CheckApiStatus(
+      iree_hal_module_create(device->raw_ptr(), IREE_ALLOCATOR_SYSTEM, &module),
+      "Error creating hal module");
+  return VmModule::CreateRetained(module);
+}
+
+}  // namespace
 
 //------------------------------------------------------------------------------
 // VmInstance
@@ -115,8 +128,14 @@ absl::optional<iree_vm_function_t> VmModule::LookupFunction(
 }
 
 void SetupVmBindings(pybind11::module m) {
+  CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
+  CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
+
   // Deprecated: VM1 module.
   m.def("create_module_from_blob", CreateModuleFromBlob);
+
+  // Built-in module creation.
+  m.def("create_hal_module", &CreateHalModule);
 
   py::enum_<iree_vm_function_linkage_t>(m, "Linkage")
       .value("INTERNAL", IREE_VM_FUNCTION_LINKAGE_INTERNAL)

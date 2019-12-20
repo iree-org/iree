@@ -14,7 +14,6 @@
 # limitations under the License.
 
 # pylint: disable=unused-variable
-# pylint: disable=g-unreachable-test-method
 
 from absl.testing import absltest
 import pyiree
@@ -36,6 +35,15 @@ def create_simple_mul_module():
 
 class VmTest(absltest.TestCase):
 
+  @classmethod
+  def setUpClass(cls):
+    super().setUpClass()
+    driver_names = pyiree.binding.hal.HalDriver.query()
+    print("DRIVER_NAMES =", driver_names)
+    cls.driver = pyiree.binding.hal.HalDriver.create("vulkan")
+    cls.device = cls.driver.create_default_device()
+    cls.hal_module = pyiree.binding.vm.create_hal_module(cls.device)
+
   def test_variant_list(self):
     l = pyiree.binding.vm.VmVariantList(5)
     print(l)
@@ -47,25 +55,26 @@ class VmTest(absltest.TestCase):
     context2 = pyiree.binding.vm.VmContext(instance)
     self.assertGreater(context2.context_id, context1.context_id)
 
-  def disabled_test_module_basics(self):
+  def test_module_basics(self):
     m = create_simple_mul_module()
     f = m.lookup_function("simple_mul")
     self.assertGreater(f.ordinal, 0)
     notfound = m.lookup_function("notfound")
     self.assertIs(notfound, None)
 
-  def disabled_test_dynamic_module_context(self):
+  def test_dynamic_module_context(self):
     instance = pyiree.binding.vm.VmInstance()
     context = pyiree.binding.vm.VmContext(instance)
     m = create_simple_mul_module()
-    context.register_modules([m])
+    context.register_modules([self.hal_module, m])
 
-  def disabled_test_static_module_context(self):
+  def test_static_module_context(self):
     m = create_simple_mul_module()
     print(m)
     instance = pyiree.binding.vm.VmInstance()
     print(instance)
-    context = pyiree.binding.vm.VmContext(instance, modules=[m])
+    context = pyiree.binding.vm.VmContext(
+        instance, modules=[self.hal_module, m])
     print(context)
 
 

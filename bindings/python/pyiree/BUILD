@@ -127,6 +127,7 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/types:variant",
         "//iree/compiler/Utils",
+        "//iree/modules/hal",
         "//iree/vm2",
         "//iree/vm2:bytecode_module",
         "@local_config_mlir//:IR",
@@ -210,6 +211,8 @@ py_test(
     name = "vm_test",
     srcs = ["vm_test.py"],
     python_version = "PY3",
+    # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
+    tags = ["notap"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
