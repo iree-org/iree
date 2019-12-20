@@ -76,7 +76,7 @@ Operation *recursivelyCloneOp(Operation *sourceOp, OpBuilder &builder,
   // Note that we dedupe required operands in the case of multiple arguments
   // coming from the same source operation.
   SmallPtrSet<Operation *, 4> operandOps;
-  for (auto *operand : sourceOp->getOperands()) {
+  for (auto operand : sourceOp->getOperands()) {
     operandOps.insert(operand->getDefiningOp());
   }
   for (auto *operandOp : operandOps) {
@@ -89,11 +89,11 @@ Operation *recursivelyCloneOp(Operation *sourceOp, OpBuilder &builder,
 // |mapping| is used to lookup existing values that may be present in the block
 // such as block arguments or already cloned ancestor ops. |mapping| will be
 // updated as the tree is cloned.
-Value *cloneOpTreeIntoBlock(Value *sourceValue, Block *targetBlock,
-                            BlockAndValueMapping *mapping) {
+ValuePtr cloneOpTreeIntoBlock(ValuePtr sourceValue, Block *targetBlock,
+                              BlockAndValueMapping *mapping) {
   // If the op has already been cloned we can just reuse that.
   // This happens if multiple arguments reference the same trees.
-  if (auto *existingValue = mapping->lookupOrNull(sourceValue)) {
+  if (auto existingValue = mapping->lookupOrNull(sourceValue)) {
     return existingValue;
   }
 
@@ -114,7 +114,7 @@ Value *cloneOpTreeIntoBlock(Value *sourceValue, Block *targetBlock,
 // of it and removes the argument. Supports multiple arguments that reference
 // |value| and will clone the entire value tree.
 LogicalResult inlineDispatchRegionOperandsUsingValue(
-    DispatchRegionOp dispatchRegionOp, Value *value) {
+    DispatchRegionOp dispatchRegionOp, ValuePtr value) {
   // Find all args that are using this value.
   SmallVector<unsigned, 4> argIndices;
   for (auto arg : llvm::enumerate(dispatchRegionOp.args())) {
@@ -130,7 +130,7 @@ LogicalResult inlineDispatchRegionOperandsUsingValue(
   // Clone the value (and the ops required to create it) into the entry block.
   auto &entryBlock = dispatchRegionOp.body().getBlocks().front();
   BlockAndValueMapping mapping;
-  auto *clonedValue = cloneOpTreeIntoBlock(value, &entryBlock, &mapping);
+  auto clonedValue = cloneOpTreeIntoBlock(value, &entryBlock, &mapping);
 
   // Replace all uses of the inner operand with the new value.
   for (unsigned argIndex : argIndices) {
@@ -152,7 +152,7 @@ LogicalResult inlineDispatchRegionOperandsUsingValue(
 // Afterward the constant is only removed if there are no other uses within the
 // non-dispatch block (such as by sequencer ops).
 LogicalResult rematerializeConstantInDispatchRegions(ConstantOp constantOp) {
-  Value *constantValue = constantOp.getResult();
+  ValuePtr constantValue = constantOp.getResult();
   SmallVector<DispatchRegionOp, 4> usingRegionOps;
   for (auto *user : constantValue->getUsers()) {
     if (auto dispatchRegionOp = dyn_cast<DispatchRegionOp>(user)) {

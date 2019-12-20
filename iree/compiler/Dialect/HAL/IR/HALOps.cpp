@@ -71,7 +71,7 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
 //===----------------------------------------------------------------------===//
 
 void ExSharedDeviceOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "dev");
 }
 
@@ -98,7 +98,7 @@ static void printExSharedDeviceOp(OpAsmPrinter &p, ExSharedDeviceOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExCacheExecutableOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "exe");
 }
 
@@ -179,7 +179,8 @@ static void printExPushBindingOp(OpAsmPrinter &p, ExPushBindingOp op) {
   p << ", " << op.ordinal() << ", ";
   p.printOperand(op.buffer());
   p << ", shape=[";
-  interleaveComma(op.shape(), p, [&](Value *value) { p.printOperand(value); });
+  interleaveComma(op.shape(), p,
+                  [&](ValuePtr value) { p.printOperand(value); });
   p << "], element_size=" << op.element_size();
   p.printOptionalAttrDictWithKeyword(
       op.getAttrs(),
@@ -191,7 +192,7 @@ static void printExPushBindingOp(OpAsmPrinter &p, ExPushBindingOp op) {
 //===----------------------------------------------------------------------===//
 
 void ExExecutableDescriptorSetLayoutOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "dsl");
 }
 
@@ -296,7 +297,7 @@ void MakeMemoryBarrierOp::build(Builder *builder, OperationState &state,
 }
 
 void MakeMemoryBarrierOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "memory_barrier");
 }
 
@@ -335,7 +336,8 @@ static void printMakeMemoryBarrierOp(OpAsmPrinter &p, MakeMemoryBarrierOp op) {
 void MakeBufferBarrierOp::build(Builder *builder, OperationState &state,
                                 IREE::HAL::AccessScopeBitfield sourceScope,
                                 IREE::HAL::AccessScopeBitfield targetScope,
-                                Value *buffer, Value *offset, Value *length) {
+                                ValuePtr buffer, ValuePtr offset,
+                                ValuePtr length) {
   state.addAttribute("source_scope", builder->getI32IntegerAttr(
                                          static_cast<int32_t>(sourceScope)));
   state.addAttribute("target_scope", builder->getI32IntegerAttr(
@@ -345,7 +347,7 @@ void MakeBufferBarrierOp::build(Builder *builder, OperationState &state,
 }
 
 void MakeBufferBarrierOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "buffer_barrier");
 }
 
@@ -632,7 +634,7 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
 //===----------------------------------------------------------------------===//
 
 void AllocatorComputeSizeOp::build(Builder *builder, OperationState &state,
-                                   Value *allocator,
+                                   ValuePtr allocator,
                                    IREE::HAL::MemoryTypeBitfield memoryTypes,
                                    IREE::HAL::BufferUsageBitfield bufferUsage,
                                    ValueRange shape, int32_t elementSize) {
@@ -647,7 +649,7 @@ void AllocatorComputeSizeOp::build(Builder *builder, OperationState &state,
 }
 
 void AllocatorComputeSizeOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "sz");
 }
 
@@ -704,10 +706,10 @@ static void printAllocatorComputeSizeOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void AllocatorAllocateOp::build(Builder *builder, OperationState &state,
-                                Value *allocator,
+                                ValuePtr allocator,
                                 IREE::HAL::MemoryTypeBitfield memoryTypes,
                                 IREE::HAL::BufferUsageBitfield bufferUsage,
-                                Value *allocationSize) {
+                                ValuePtr allocationSize) {
   state.addOperands({allocator, allocationSize});
   state.addAttribute("memory_types", builder->getI32IntegerAttr(
                                          static_cast<int32_t>(memoryTypes)));
@@ -717,7 +719,7 @@ void AllocatorAllocateOp::build(Builder *builder, OperationState &state,
 }
 
 void AllocatorAllocateOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "buffer");
 }
 
@@ -769,7 +771,7 @@ static void printAllocatorAllocateOp(OpAsmPrinter &p, AllocatorAllocateOp op) {
 //===----------------------------------------------------------------------===//
 
 void AllocatorAllocateConstOp::build(Builder *builder, OperationState &state,
-                                     Value *allocator,
+                                     ValuePtr allocator,
                                      IREE::HAL::MemoryTypeBitfield memoryTypes,
                                      IREE::HAL::BufferUsageBitfield bufferUsage,
                                      ElementsAttr value) {
@@ -783,7 +785,7 @@ void AllocatorAllocateConstOp::build(Builder *builder, OperationState &state,
 }
 
 void AllocatorAllocateConstOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "cbuffer");
 }
 
@@ -834,7 +836,7 @@ static void printAllocatorAllocateConstOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void AllocatorAllocateShapedOp::build(
-    Builder *builder, OperationState &state, Value *allocator,
+    Builder *builder, OperationState &state, ValuePtr allocator,
     IREE::HAL::MemoryTypeBitfield memoryTypes,
     IREE::HAL::BufferUsageBitfield bufferUsage, ValueRange shape,
     int32_t elementSize) {
@@ -849,7 +851,7 @@ void AllocatorAllocateShapedOp::build(
 }
 
 void AllocatorAllocateShapedOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "buffer");
 }
 
@@ -910,7 +912,7 @@ static void printAllocatorAllocateShapedOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void BufferSubspanOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "buffer");
 }
 
@@ -1191,7 +1193,7 @@ static void printBufferStoreOp(OpAsmPrinter &p, BufferStoreOp op) {
 //===----------------------------------------------------------------------===//
 
 void BufferViewComputeOffsetOp::build(Builder *builder, OperationState &state,
-                                      Value *buffer, ValueRange shape,
+                                      ValuePtr buffer, ValueRange shape,
                                       ValueRange indices, int32_t elementSize) {
   state.addOperands({buffer});
   state.addOperands(shape);
@@ -1201,7 +1203,7 @@ void BufferViewComputeOffsetOp::build(Builder *builder, OperationState &state,
 }
 
 void BufferViewComputeOffsetOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(offset(), "off");
 }
 
@@ -1257,7 +1259,7 @@ static void printBufferViewComputeOffsetOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void BufferViewComputeLengthOp::build(Builder *builder, OperationState &state,
-                                      Value *buffer, ValueRange shape,
+                                      ValuePtr buffer, ValueRange shape,
                                       int32_t elementSize) {
   state.addOperands({buffer});
   state.addOperands(shape);
@@ -1266,7 +1268,7 @@ void BufferViewComputeLengthOp::build(Builder *builder, OperationState &state,
 }
 
 void BufferViewComputeLengthOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(length(), "len");
 }
 
@@ -1313,7 +1315,7 @@ static void printBufferViewComputeLengthOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void BufferViewComputeRangeOp::build(Builder *builder, OperationState &state,
-                                     Value *buffer, ValueRange shape,
+                                     ValuePtr buffer, ValueRange shape,
                                      ValueRange indices, ValueRange lengths,
                                      int32_t elementSize) {
   state.addOperands({buffer});
@@ -1325,7 +1327,7 @@ void BufferViewComputeRangeOp::build(Builder *builder, OperationState &state,
 }
 
 void BufferViewComputeRangeOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(offset(), "off");
   setNameFn(length(), "len");
 }
@@ -1391,7 +1393,7 @@ static void printBufferViewComputeRangeOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void BufferViewSliceOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "slice");
 }
 
@@ -1455,7 +1457,7 @@ static void printBufferViewSliceOp(OpAsmPrinter &p, BufferViewSliceOp op) {
 //===----------------------------------------------------------------------===//
 
 void CommandBufferCreateOp::build(
-    Builder *builder, OperationState &state, Value *device,
+    Builder *builder, OperationState &state, ValuePtr device,
     IREE::HAL::CommandBufferModeBitfield modes,
     IREE::HAL::CommandCategoryBitfield commandCategories) {
   state.addOperands({device});
@@ -1469,7 +1471,7 @@ void CommandBufferCreateOp::build(
 }
 
 void CommandBufferCreateOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "cmd");
 }
 
@@ -1567,7 +1569,7 @@ static void printCommandBufferEndOp(OpAsmPrinter &p, CommandBufferEndOp op) {
 //===----------------------------------------------------------------------===//
 
 void CommandBufferExecutionBarrierOp::build(
-    Builder *builder, OperationState &state, Value *commandBuffer,
+    Builder *builder, OperationState &state, ValuePtr commandBuffer,
     IREE::HAL::ExecutionStageBitfield sourceStageMask,
     IREE::HAL::ExecutionStageBitfield targetStageMask,
     ValueRange memoryBarriers, ValueRange bufferBarriers) {
@@ -1742,9 +1744,9 @@ static void printCommandBufferCopyBufferOp(OpAsmPrinter &p,
 
 void CommandBufferBindDescriptorSetOp::build(Builder *builder,
                                              OperationState &state,
-                                             Value *commandBuffer,
-                                             Value *executable, uint32_t set,
-                                             Value *descriptorSet,
+                                             ValuePtr commandBuffer,
+                                             ValuePtr executable, uint32_t set,
+                                             ValuePtr descriptorSet,
                                              ValueRange dynamicOffsets) {
   state.addOperands({commandBuffer, executable, descriptorSet});
   state.addAttribute("set",
@@ -1810,7 +1812,7 @@ static void printCommandBufferBindDescriptorSetOp(
   if (!op.dynamic_offsets().empty()) {
     p << ", offsets=[";
     interleaveComma(op.dynamic_offsets(), p,
-                    [&](Value *value) { p.printOperand(value); });
+                    [&](ValuePtr value) { p.printOperand(value); });
     p << "]";
   }
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
@@ -1823,9 +1825,9 @@ static void printCommandBufferBindDescriptorSetOp(
 //===----------------------------------------------------------------------===//
 
 void CommandBufferDispatchOp::build(
-    Builder *builder, OperationState &state, Value *commandBuffer,
-    Value *executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
-    Value *workgroupX, Value *workgroupY, Value *workgroupZ) {
+    Builder *builder, OperationState &state, ValuePtr commandBuffer,
+    ValuePtr executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
+    ValuePtr workgroupX, ValuePtr workgroupY, ValuePtr workgroupZ) {
   state.addOperands(
       {commandBuffer, executable, workgroupX, workgroupY, workgroupZ});
   state.addAttribute("entry_point",
@@ -1887,7 +1889,7 @@ static void printCommandBufferDispatchOp(OpAsmPrinter &p,
   p << ", entry_point=" << op.entry_point() << ", workgroup_xyz=[";
   interleaveComma(
       ValueRange{op.workgroup_x(), op.workgroup_y(), op.workgroup_z()}, p,
-      [&](Value *value) { p.printOperand(value); });
+      [&](ValuePtr value) { p.printOperand(value); });
   p << "]";
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
                               "entry_point",
@@ -1962,7 +1964,7 @@ static void printCommandBufferDispatchIndirectOp(
 //===----------------------------------------------------------------------===//
 
 void DescriptorSetAllocateOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "descriptor_set");
 }
 
@@ -2004,8 +2006,8 @@ static void printDescriptorSetAllocateOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void DescriptorSetMakeBindingOp::build(Builder *builder, OperationState &state,
-                                       int32_t binding, Value *buffer,
-                                       Value *offset, Value *length,
+                                       int32_t binding, ValuePtr buffer,
+                                       ValuePtr offset, ValuePtr length,
                                        IREE::HAL::MemoryAccessBitfield access) {
   state.addAttribute("binding", builder->getI32IntegerAttr(binding));
   state.addOperands({buffer, offset, length});
@@ -2015,7 +2017,7 @@ void DescriptorSetMakeBindingOp::build(Builder *builder, OperationState &state,
 }
 
 void DescriptorSetMakeBindingOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "binding");
 }
 
@@ -2117,7 +2119,7 @@ static void printDescriptorSetUpdateOp(OpAsmPrinter &p,
 //===----------------------------------------------------------------------===//
 
 void DeviceAllocatorOp::getAsmResultNames(
-    function_ref<void(Value *, StringRef)> setNameFn) {
+    function_ref<void(ValuePtr, StringRef)> setNameFn) {
   setNameFn(result(), "allocator");
 }
 

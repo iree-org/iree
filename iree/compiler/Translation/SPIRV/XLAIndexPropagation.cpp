@@ -104,7 +104,7 @@ LogicalResult XLAConcatenateOpIndexPropagation::propagateIndexMap(
   // For concatenate operation, the operands will be shifted along the given
   // dimension.
   int offset = 0;
-  for (Value *operand : op->getOperands()) {
+  for (ValuePtr operand : op->getOperands()) {
     auto operandType = operand->getType().cast<RankedTensorType>();
     int rank = operandType.getRank();
     SmallVector<AffineExpr, 4> exprs;
@@ -149,12 +149,12 @@ LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
     SmallVectorImpl<AffineMap> &operandIndices) const {
   auto context = op->getContext();
   auto gatherOp = cast<xla_hlo::GatherOp>(op);
-  Value *startIndices = gatherOp.start_indices();
+  ValuePtr startIndices = gatherOp.start_indices();
   int64_t startIndicesRank =
       startIndices->getType().cast<ShapedType>().getRank();
-  Value *operand = gatherOp.operand();
+  ValuePtr operand = gatherOp.operand();
   int64_t operandRank = operand->getType().cast<ShapedType>().getRank();
-  Value *result = gatherOp.getResult();
+  ValuePtr result = gatherOp.getResult();
   int64_t resultRank = result->getType().cast<ShapedType>().getRank();
   ArrayRef<AffineExpr> resultExprs = resultIndex.getResults();
   int64_t indexVectorDim =

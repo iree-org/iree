@@ -39,7 +39,7 @@ class VariableOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::VariableOp variableOp, llvm::ArrayRef<Value *> newOperands,
+      IREE::Flow::VariableOp variableOp, llvm::ArrayRef<ValuePtr> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableOp>(
@@ -61,7 +61,7 @@ class VariableLoadOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::VariableLoadOp loadOp, llvm::ArrayRef<Value *> newOperands,
+      IREE::Flow::VariableLoadOp loadOp, llvm::ArrayRef<ValuePtr> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableLoadOp>(
@@ -81,7 +81,7 @@ class VariableStoreOpConversion
       : OpConversionPattern(ctx) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<Value *> newOperands,
+      IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<ValuePtr> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::VariableStoreOpOperandAdaptor operands(newOperands);
     // TODO(benvanik): multiple converted type results to multiple variables.

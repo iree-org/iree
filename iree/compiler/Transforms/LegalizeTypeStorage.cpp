@@ -34,7 +34,7 @@ bool convertOperation(Operation *oldOp, OpBuilder &builder,
   OperationState state(oldOp->getLoc(), oldOp->getName());
   if (oldOp->getNumSuccessors() == 0) {
     // Non-branching operations can just add all the operands.
-    for (auto *oldOperand : oldOp->getOperands()) {
+    for (auto oldOperand : oldOp->getOperands()) {
       state.operands.push_back(mapping->lookupOrDefault(oldOperand));
     }
   } else {
@@ -53,7 +53,7 @@ bool convertOperation(Operation *oldOp, OpBuilder &builder,
       // Add sentinel to delineate successor operands.
       state.operands.push_back(nullptr);
       // Remap the successors operands.
-      for (auto *operand : oldOp->getSuccessorOperands(succ)) {
+      for (auto operand : oldOp->getSuccessorOperands(succ)) {
         state.operands.push_back(mapping->lookupOrDefault(operand));
       }
     }
@@ -80,8 +80,8 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
   for (auto &oldBlock : oldFunction.getBlocks()) {
     auto *newBlock = builder.createBlock(&newFunction.getBody());
     mapping.map(&oldBlock, newBlock);
-    for (auto *oldArg : oldBlock.getArguments()) {
-      auto *newArg = newBlock->addArgument(legalizeType(oldArg->getType()));
+    for (auto oldArg : oldBlock.getArguments()) {
+      auto newArg = newBlock->addArgument(legalizeType(oldArg->getType()));
       mapping.map(oldArg, newArg);
     }
   }

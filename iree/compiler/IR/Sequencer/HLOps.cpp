@@ -31,7 +31,7 @@ namespace HL {
 
 namespace {
 
-static LogicalResult verifyWorkload(Operation *op, Value *workload) {
+static LogicalResult verifyWorkload(Operation *op, ValuePtr workload) {
   if (auto workloadType = workload->getType().dyn_cast<MemRefType>()) {
     if (workloadType.getNumElements() != 3) {
       return op->emitOpError("workload must be specified as (x,y,z) but has ")
@@ -144,7 +144,7 @@ static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
 
 static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
   Block *dest;
-  SmallVector<Value *, 4> destOperands;
+  SmallVector<ValuePtr, 4> destOperands;
   if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
   result.addSuccessor(dest, destOperands);
   return success();
@@ -171,7 +171,7 @@ void BranchOp::eraseOperand(unsigned index) {
 
 static ParseResult parseCondBranchOp(OpAsmParser &parser,
                                      OperationState &result) {
-  SmallVector<Value *, 4> destOperands;
+  SmallVector<ValuePtr, 4> destOperands;
   Block *dest;
   OpAsmParser::OperandType condInfo;
 
@@ -296,7 +296,7 @@ OpFoldResult RankOp::fold(ArrayRef<Attribute> operands) {
 // iree_hl_seq.shape
 //===----------------------------------------------------------------------===//
 
-void ShapeOp::build(Builder *builder, OperationState &state, Value *operand) {
+void ShapeOp::build(Builder *builder, OperationState &state, ValuePtr operand) {
   state.addOperands(operand);
   int64_t rank = 0;
   if (auto shapedType = operand->getType().dyn_cast<ShapedType>()) {
@@ -340,7 +340,7 @@ struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
                                      PatternRewriter &rewriter) const override {
     auto finalType = concatOp.getResult()->getType().cast<ShapedType>();
     auto loc = concatOp.getLoc();
-    std::vector<Value *> dimPieces;
+    std::vector<ValuePtr> dimPieces;
     auto dst =
         rewriter.create<IREESeq::HL::AllocHeapOp>(loc, finalType, dimPieces);
 
@@ -349,7 +349,7 @@ struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
 
     auto concatDimension = concatOp.dimension().getZExtValue();
     llvm::SmallVector<int64_t, 4> dstIndices(finalType.getRank(), 0);
-    for (auto *src : concatOp.srcs()) {
+    for (auto src : concatOp.srcs()) {
       auto srcShape = src->getType().cast<ShapedType>().getShape();
       auto lengths = createArrayConstant(rewriter, loc, srcShape);
       auto dstIndicesOp = createArrayConstant(rewriter, loc, dstIndices);

@@ -36,7 +36,7 @@ namespace {
 LogicalResult replaceLoadInputOp(IREE::LoadInputOp bindOp) {
   OpBuilder builder(bindOp);
 
-  Value *newValue = nullptr;
+  ValuePtr newValue = nullptr;
   auto dstType = bindOp.getResult()->getType();
   if (dstType.isa<TensorType>()) {
     auto castOp =
@@ -44,7 +44,7 @@ LogicalResult replaceLoadInputOp(IREE::LoadInputOp bindOp) {
     newValue = castOp.getResult();
   } else if (dstType.isIntOrIndexOrFloat()) {
     auto loadOp = builder.create<LoadOp>(bindOp.getLoc(), dstType, bindOp.src(),
-                                         ArrayRef<Value *>{});
+                                         ArrayRef<ValuePtr>{});
     newValue = loadOp.getResult();
   } else {
     return bindOp.emitError()
@@ -83,7 +83,7 @@ LogicalResult replaceStoreOutputOp(IREE::StoreOutputOp bindOp) {
                                            zeros, bindOp.dst(), zeros, lengths);
   } else if (srcType.isIntOrIndexOrFloat()) {
     builder.create<StoreOp>(bindOp.getLoc(), bindOp.src(), bindOp.dst(),
-                            ArrayRef<Value *>{});
+                            ArrayRef<ValuePtr>{});
   } else {
     return bindOp.emitError() << "Unsupported output src type " << srcType;
   }

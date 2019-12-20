@@ -55,7 +55,7 @@ static void makeLegacyExecutableDispatchABI(IREE::Flow::DispatchEntryOp entryOp,
   auto oldArgs = entryBlock.getArguments().vec();
   OpBuilder entryBuilder(&entryBlock);
   entryBuilder.setInsertionPointToStart(&entryBlock);
-  for (auto *arg : entryBlock.getArguments()) {
+  for (auto arg : entryBlock.getArguments()) {
     Type oldType = arg->getType();
     arg->setType(convertTypeToMemRef(legalizeType(oldType)));
     auto loadInputOp =

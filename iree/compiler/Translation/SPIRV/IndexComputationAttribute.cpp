@@ -166,7 +166,7 @@ StringRef getSymbolNumberAttrName() { return "iree.symbol_number_info"; }
 
 /// Gets an attribute associated with a block argument.
 template <typename T>
-T getBlockArgumentAttr(BlockArgument *blockArg, StringRef attrName) {
+T getBlockArgumentAttr(BlockArgumentPtr blockArg, StringRef attrName) {
   auto block = blockArg->getOwner();
   auto funcOp = dyn_cast<FuncOp>(block->getParentOp());
   if (!funcOp) {
@@ -180,7 +180,7 @@ T getBlockArgumentAttr(BlockArgument *blockArg, StringRef attrName) {
 
 /// Updates an attribute associated with a block argument
 template <typename T>
-LogicalResult setBlockArgumentAttr(BlockArgument *blockArg, T updatedAttr,
+LogicalResult setBlockArgumentAttr(BlockArgumentPtr blockArg, T updatedAttr,
                                    StringRef attrName) {
   auto block = blockArg->getOwner();
   auto funcOp = dyn_cast<FuncOp>(block->getParentOp());
@@ -209,7 +209,7 @@ LogicalResult setOpAttr(Operation *op, ArrayAttr updatedAttr,
 
 /// Records the `resultIndexMap` representing an access of an element of the
 /// `blockArg` to the index computation attribute.
-LogicalResult addBlockArgIndexMap(BlockArgument *blockArg,
+LogicalResult addBlockArgIndexMap(BlockArgumentPtr blockArg,
                                   AffineMap resultIndexMap) {
   auto attrName = getIndexComputationAttrName();
   auto currAttr = getBlockArgumentAttr<ArrayAttr>(blockArg, attrName);
@@ -241,16 +241,16 @@ LogicalResult addOpResultIndexMap(Operation *op, AffineMap resultIndexMap) {
 //===----------------------------------------------------------------------===//
 
 /// Records an index map for a tensor value.
-LogicalResult addNewIndexMapForValue(Value *value, AffineMap resultIndexMap) {
+LogicalResult addNewIndexMapForValue(ValuePtr value, AffineMap resultIndexMap) {
   // Check if the Value is a block argument or has a defining operation.
   auto valueKind = value->getKind();
   if (valueKind == Value::Kind::BlockArgument) {
-    return addBlockArgIndexMap(cast<BlockArgument>(value), resultIndexMap);
+    return addBlockArgIndexMap(value->cast<BlockArgument>(), resultIndexMap);
   }
   return addOpResultIndexMap(value->getDefiningOp(), resultIndexMap);
 }
 
-Optional<int64_t> addNewSymbolNumberForTensorIndex(Value *value,
+Optional<int64_t> addNewSymbolNumberForTensorIndex(ValuePtr value,
                                                    AffineMap index) {
   if (value->getKind() == Value::Kind::BlockArgument ||
       !isa<IREE::LoadInputOp>(value->getDefiningOp())) {
@@ -274,7 +274,7 @@ Optional<int64_t> addNewSymbolNumberForTensorIndex(Value *value,
   unsigned symbolNumber = static_cast<unsigned>(updatedNumSymbolsAttr.getInt());
 
   // Record the mapping from element at tensor index to the symbol.
-  auto srcArg = cast<BlockArgument>(loadInputOp.src());
+  auto srcArg = loadInputOp.src()->cast<BlockArgument>();
   auto attrName = getSymbolNumberAttrName();
   auto currAttr = getBlockArgumentAttr<ArrayAttr>(srcArg, attrName);
   auto updatedAttr = updateTensorIndexToSymbolNumberAttr(
@@ -300,12 +300,12 @@ AffineMap getAffineMap(FuncOp funcOp, ArrayRef<AffineExpr> exprs) {
                         (numSymbolsAttr ? numSymbolsAttr.getInt() : 0), exprs);
 }
 
-void getIndexMapsForValue(Value *value, SmallVectorImpl<AffineMap> &indices) {
+void getIndexMapsForValue(ValuePtr value, SmallVectorImpl<AffineMap> &indices) {
   auto valueKind = value->getKind();
   auto attrName = getIndexComputationAttrName();
   ArrayAttr allIndices =
       (valueKind == Value::Kind::BlockArgument
-           ? getBlockArgumentAttr<ArrayAttr>(cast<BlockArgument>(value),
+           ? getBlockArgumentAttr<ArrayAttr>(value->cast<BlockArgument>(),
                                              attrName)
            : value->getDefiningOp()->getAttrOfType<ArrayAttr>(attrName));
   if (!allIndices) {
@@ -342,7 +342,7 @@ void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
 }
 
 void getSymbolNumberForTensorIndex(
-    BlockArgument *arg,
+    BlockArgumentPtr arg,
     SmallVectorImpl<std::pair<AffineMap, unsigned>> &symbolInfo) {
   auto attrName = getSymbolNumberAttrName();
   auto attr = getBlockArgumentAttr<ArrayAttr>(arg, attrName);

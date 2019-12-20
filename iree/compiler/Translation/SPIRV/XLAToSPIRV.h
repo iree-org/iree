@@ -34,7 +34,7 @@ class XLAConcatenateOpSPIRVLowering final
   using SPIRVOpLowering<xla_hlo::ConcatenateOp>::SPIRVOpLowering;
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder, AffineMap index,
-      ArrayRef<Value *> operands,
+      ArrayRef<ValuePtr> operands,
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
@@ -46,7 +46,7 @@ class XLAConvertOpSPIRVLowering final
   using SPIRVOpLowering<xla_hlo::ConvertOp>::SPIRVOpLowering;
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder, AffineMap index,
-      ArrayRef<Value *> operands,
+      ArrayRef<ValuePtr> operands,
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
@@ -57,7 +57,7 @@ class XLAGatherOpSPIRVLowering final
   using SPIRVOpLowering<xla_hlo::GatherOp>::SPIRVOpLowering;
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder, AffineMap index,
-      ArrayRef<Value *> operands,
+      ArrayRef<ValuePtr> operands,
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
@@ -69,7 +69,7 @@ class XLAPadOpSPIRVLowering final : public SPIRVOpLowering<xla_hlo::PadOp> {
   using SPIRVOpLowering<xla_hlo::PadOp>::SPIRVOpLowering;
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder, AffineMap index,
-      ArrayRef<Value *> operands,
+      ArrayRef<ValuePtr> operands,
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
