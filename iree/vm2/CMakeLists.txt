@@ -34,12 +34,12 @@ iree_cc_library(
     "bytecode_module_impl.h"
     "bytecode_op_table.h"
   DEPS
-    bytecode_op_table_gen
-    module
-    ref
-    stack
-    types
-    value
+    iree::vm2::bytecode_op_table_gen
+    iree::vm2::module
+    iree::vm2::ref
+    iree::vm2::stack
+    iree::vm2::types
+    iree::vm2::value
     iree::base::api
     iree::base::flatbuffer_util
     iree::base::target_platform
@@ -83,7 +83,7 @@ iree_cc_test(
   SRCS
     "bytecode_module_test.cc"
   DEPS
-    bytecode_module
+    iree::vm2::bytecode_module
     gtest_main
 )
 
@@ -106,9 +106,9 @@ iree_cc_library(
   SRCS
     "context.c"
   DEPS
-    instance
-    module
-    stack
+    iree::vm2::instance
+    iree::vm2::module
+    iree::vm2::stack
     iree::base::api
 )
 
@@ -120,7 +120,7 @@ iree_cc_library(
   SRCS
     "instance.c"
   DEPS
-    types
+    iree::vm2::types
     iree::base::api
 )
 
@@ -132,9 +132,9 @@ iree_cc_library(
   SRCS
     "invocation.c"
   DEPS
-    context
-    module
-    variant_list
+    iree::vm2::context
+    iree::vm2::module
+    iree::vm2::variant_list
     iree::base::api
 )
 
@@ -166,7 +166,7 @@ iree_cc_test(
   SRCS
     "ref_test.cc"
   DEPS
-    ref
+    iree::vm2::ref
     iree::base::api
     iree::base::ref_ptr
     gtest_main
@@ -180,8 +180,8 @@ iree_cc_library(
   SRCS
     "stack.c"
   DEPS
-    module
-    ref
+    iree::vm2::module
+    iree::vm2::ref
     iree::base::api
 )
 
@@ -191,8 +191,8 @@ iree_cc_test(
   SRCS
     "stack_test.cc"
   DEPS
-    ref
-    stack
+    iree::vm2::ref
+    iree::vm2::stack
     iree::base::api
     iree::base::ref_ptr
     gtest_main
@@ -206,7 +206,7 @@ iree_cc_library(
   SRCS
     "types.c"
   DEPS
-    ref
+    iree::vm2::ref
     iree::base::api
 )
 
@@ -225,8 +225,8 @@ iree_cc_library(
   SRCS
     "variant_list.c"
   DEPS
-    ref
-    value
+    iree::vm2::ref
+    iree::vm2::value
 )
 
 iree_cc_library(
@@ -235,14 +235,14 @@ iree_cc_library(
   HDRS
     "api.h"
   DEPS
-    context
-    instance
-    invocation
-    module
-    ref
-    stack
-    types
-    value
-    variant_list
+    iree::vm2::context
+    iree::vm2::instance
+    iree::vm2::invocation
+    iree::vm2::module
+    iree::vm2::ref
+    iree::vm2::stack
+    iree::vm2::types
+    iree::vm2::value
+    iree::vm2::variant_list
     iree::base::api
 )
