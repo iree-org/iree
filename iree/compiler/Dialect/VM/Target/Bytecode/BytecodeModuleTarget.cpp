@@ -224,10 +224,9 @@ static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
       auto key = reflectionAttr.first.strref();
       auto value = reflectionAttr.second.dyn_cast<StringAttr>();
       if (!value || key.empty()) continue;
-      auto keyOffset =
-          fbb.CreateString(flatbuffers::string_view(key.data(), key.size()));
-      auto valueOffset = fbb.CreateString(flatbuffers::string_view(
-          value.getValue().data(), value.getValue().size()));
+      auto keyOffset = fbb.CreateString(key.data(), key.size());
+      auto valueOffset =
+          fbb.CreateString(value.getValue().data(), value.getValue().size());
       iree::vm::ReflectionAttrDefBuilder rattr(fbb);
       rattr.add_key(keyOffset);
       rattr.add_value(valueOffset);
