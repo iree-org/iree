@@ -50,10 +50,22 @@ iree_vm_module_name(const iree_vm_module_t* module) {
   return module->name(module->self);
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_module_lookup_function(
-    const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
-    iree_string_view_t name, iree_vm_function_t* out_function) {
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
+                                       iree_vm_function_linkage_t linkage,
+                                       iree_string_view_t name,
+                                       iree_vm_function_t* out_function) {
   return module->lookup_function(module->self, linkage, name, out_function);
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
+                                          iree_vm_function_linkage_t linkage,
+                                          int32_t ordinal,
+                                          iree_vm_function_t* out_function) {
+  return module->get_function(module->self, linkage, ordinal, out_function,
+                              /*out_name=*/NULL,
+                              /*out_signature=*/NULL);
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL

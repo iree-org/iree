@@ -178,9 +178,18 @@ iree_vm_module_name(const iree_vm_module_t* module);
 
 // Looks up a function with the given name and linkage in the |module|.
 // This may perform a linear scan and results should be cached.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_module_lookup_function(
-    const iree_vm_module_t* module, iree_vm_function_linkage_t linkage,
-    iree_string_view_t name, iree_vm_function_t* out_function);
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
+                                       iree_vm_function_linkage_t linkage,
+                                       iree_string_view_t name,
+                                       iree_vm_function_t* out_function);
+
+// Looks up a function with the given ordinal and linkage in the |module|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
+                                          iree_vm_function_linkage_t linkage,
+                                          int32_t ordinal,
+                                          iree_vm_function_t* out_function);
 
 // Gets a reflection attribute for a function by index.
 // The returned key and value strings are guaranteed valid for the life

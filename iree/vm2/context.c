@@ -317,7 +317,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
     iree_vm_module_t* module = context->list.modules[i];
     if (iree_string_view_compare(module_name, iree_vm_module_name(module)) ==
         0) {
-      return iree_vm_module_lookup_function(
+      return iree_vm_module_lookup_function_by_name(
           module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, out_function);
     }
   }

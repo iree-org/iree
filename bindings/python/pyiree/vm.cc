@@ -118,8 +118,8 @@ VmModule VmModule::FromFlatbufferBlob(
 absl::optional<iree_vm_function_t> VmModule::LookupFunction(
     const std::string& name, iree_vm_function_linkage_t linkage) {
   iree_vm_function_t f;
-  auto status = iree_vm_module_lookup_function(raw_ptr(), linkage,
-                                               {name.data(), name.size()}, &f);
+  auto status = iree_vm_module_lookup_function_by_name(
+      raw_ptr(), linkage, {name.data(), name.size()}, &f);
   if (status == IREE_STATUS_NOT_FOUND) {
     return absl::nullopt;
   }
