@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "absl/base/macros.h"
+#include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
