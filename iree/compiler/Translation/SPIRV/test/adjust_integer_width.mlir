@@ -38,10 +38,9 @@ module{
       // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
       // CHECK-NEXT: spv.BitwiseAnd
       // CHECK-NEXT: spv.INotEqual {{.*}} : i32
-      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.Select {{.*}} : i1, i32
-      // CHECK: spv.Store "StorageBuffer" {{.*}} : i32
+      // CHECK: spv.AtomicAnd
+      // CHECK: spv.AtomicOr
       %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>

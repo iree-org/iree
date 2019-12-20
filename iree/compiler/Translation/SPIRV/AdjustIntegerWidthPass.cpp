@@ -158,6 +158,18 @@ Value *convertToI32AccessChain(spirv::AccessChainOp op,
   return rewriter.create<spirv::AccessChainOp>(loc, t, op.base_ptr(), indices);
 }
 
+Value *getOffsetOfInt8(spirv::AccessChainOp op, PatternRewriter &rewriter) {
+  const auto loc = op.getLoc();
+  Type i32Type = rewriter.getIntegerType(32);
+  auto four = rewriter.create<spirv::ConstantOp>(loc, i32Type,
+                                                 rewriter.getI32IntegerAttr(4));
+  auto eight = rewriter.create<spirv::ConstantOp>(
+      loc, i32Type, rewriter.getI32IntegerAttr(8));
+  auto lastDim = op.getOperation()->getOperand(op.getNumOperands() - 1);
+  auto m = rewriter.create<spirv::SModOp>(loc, lastDim, four);
+  return rewriter.create<spirv::IMulOp>(loc, i32Type, m, eight);
+}
+
 /// Rewrite loads from !spv.ptr<i64,..> to load from !spv.ptr<i32,...>
 /// Rewrite loads from !spv.ptr<i1,...> to load from !spv.ptr<i32,...> followed
 /// by a truncate to i1 type.
@@ -199,14 +211,7 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
       if (accessChainOp.indices().size() == 1) {
         result = loadOp;
       } else {
-        auto four = rewriter.create<spirv::ConstantOp>(
-            loc, i32Type, rewriter.getI32IntegerAttr(4));
-        auto eight = rewriter.create<spirv::ConstantOp>(
-            loc, i32Type, rewriter.getI32IntegerAttr(8));
-        auto lastDim = accessChainOp.getOperation()->getOperand(
-            accessChainOp.getNumOperands() - 1);
-        auto m = rewriter.create<spirv::SModOp>(loc, lastDim, four);
-        auto offset = rewriter.create<spirv::IMulOp>(loc, i32Type, m, eight);
+        Value *offset = getOffsetOfInt8(accessChainOp, rewriter);
         result = rewriter.create<spirv::ShiftRightArithmeticOp>(loc, i32Type,
                                                                 loadOp, offset);
       }
@@ -237,9 +242,84 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
   }
 };
 
+// Returns the shifted 32-bit value with the given offset.
+Value *shiftStoreValue(spirv::StoreOp op, Value *offset,
+                       PatternRewriter &rewriter) {
+  Type valueType = op.value()->getType();
+  Type i32Type = rewriter.getIntegerType(32);
+  const auto loc = op.getLoc();
+
+  Value *storeVal = op.value();
+  if (hasIntTypeOfWidth(valueType, {1})) {
+    Value *zero =
+        spirv::ConstantOp::getZero(i32Type, loc, &rewriter).getResult();
+    Value *one = spirv::ConstantOp::getOne(i32Type, loc, &rewriter).getResult();
+    storeVal =
+        rewriter.create<spirv::SelectOp>(loc, storeVal, one, zero).getResult();
+  } else {
+    auto i8Mask = rewriter.create<spirv::ConstantOp>(
+        loc, i32Type, rewriter.getI32IntegerAttr(255));
+    storeVal = rewriter.create<spirv::SConvertOp>(loc, i32Type, storeVal);
+    storeVal = rewriter.create<spirv::BitwiseAndOp>(loc, storeVal, i8Mask);
+  }
+  return rewriter.create<spirv::ShiftLeftLogicalOp>(loc, i32Type, storeVal,
+                                                    offset);
+}
+
+// Rewrites store operation that contains i1 and i8 types to i32 type.
+// Since there are multi threads in the processing, atomic operations are
+// required. Rewrite the StoreOp to
+// 1) load a 32-bit integer
+// 2) clear 8 bits in the loading value
+// 3) store 32-bit value back
+// 4) load a 32-bit integer
+// 5) modify 8 bits in the loading value
+// 6) store 32-bit value back
+// The step 1 to step 3 are done by AtomicAnd, and the step 4 to
+// step 6 are done by AtomicOr.
+LogicalResult rewriteInt1AndInt8(spirv::StoreOp op, PatternRewriter &rewriter) {
+  Type i32Type = rewriter.getIntegerType(32);
+  const auto loc = op.getLoc();
+  auto accessChainOp = cast<spirv::AccessChainOp>(op.ptr()->getDefiningOp());
+
+  // Only support for scalar and 1-D tensor. The first element in indices is
+  // index, the remaining elements map to other dimensions.
+  if (accessChainOp.indices().size() > 2) {
+    return failure();
+  }
+
+  auto offset = getOffsetOfInt8(accessChainOp, rewriter);
+  Value *storeVal = shiftStoreValue(op, offset, rewriter);
+
+  // Create a mask (with eight 0 bits) to clear the destination. E.g., if it
+  // is the second i8 in i32, 0xFFFF00FF is created.
+  auto i8Mask = rewriter.create<spirv::ConstantOp>(
+      loc, i32Type, rewriter.getI32IntegerAttr(255));
+  Value *clear8BitMask =
+      rewriter.create<spirv::ShiftLeftLogicalOp>(loc, i32Type, i8Mask, offset);
+  clear8BitMask = rewriter.create<spirv::NotOp>(loc, i32Type, clear8BitMask);
+
+  Value *i32AccessChainOp = convertToI32AccessChain(accessChainOp, rewriter);
+  Value *result = rewriter.create<spirv::AtomicAndOp>(
+      loc, i32Type, i32AccessChainOp, spirv::Scope::Device,
+      spirv::MemorySemantics::AcquireRelease, clear8BitMask);
+  result = rewriter.create<spirv::AtomicOrOp>(
+      loc, i32Type, i32AccessChainOp, spirv::Scope::Device,
+      spirv::MemorySemantics::AcquireRelease, storeVal);
+
+  // The AtomicOrOp has no side effect. Since it is already inserted, we can
+  // just remove the original StoreOp. Note that rewriter.replaceOp()
+  // doesn't work because it only accepts that the numbers of result are the
+  // same.
+  rewriter.eraseOp(op);
+
+  return success();
+}
+
 /// Rewrite store operation that contain i1, i8 and i64 types to i32 type.
 struct AdjustStoreOp : public OpRewritePattern<spirv::StoreOp> {
   using OpRewritePattern<spirv::StoreOp>::OpRewritePattern;
+
   PatternMatchResult matchAndRewrite(spirv::StoreOp op,
                                      PatternRewriter &rewriter) const override {
     Type valueType = op.value()->getType();
@@ -247,29 +327,19 @@ struct AdjustStoreOp : public OpRewritePattern<spirv::StoreOp> {
       return matchFailure();
     }
 
-    Type newType = legalizeIntegerType(valueType);
-    const auto loc = op.getLoc();
-    Value *value = op.value();
-    Value *ptr = op.ptr();
-    if (hasIntTypeOfWidth(valueType, {1})) {
-      Value *zero =
-          spirv::ConstantOp::getZero(newType, loc, &rewriter).getResult();
-      Value *one =
-          spirv::ConstantOp::getOne(newType, loc, &rewriter).getResult();
-      value = rewriter.create<spirv::SelectOp>(loc, op.value(), one, zero)
-                  .getResult();
-    } else if (hasIntTypeOfWidth(valueType, {8})) {
-      llvm_unreachable("StoreOp for 8-bit is not working");
+    if (hasIntTypeOfWidth(valueType, {1, 8})) {
+      if (failed(rewriteInt1AndInt8(op, rewriter))) return matchFailure();
     } else {
-      value = rewriter.create<spirv::SConvertOp>(loc, newType, op.value())
-                  .getResult();
+      const auto loc = op.getLoc();
+      auto i32Type = rewriter.getIntegerType(32);
+      auto value = rewriter.create<spirv::SConvertOp>(loc, i32Type, op.value());
+      rewriter.replaceOpWithNewOp<spirv::StoreOp>(
+          op, op.ptr(), value,
+          op.getAttrOfType<IntegerAttr>(
+              spirv::attributeName<spirv::MemoryAccess>()),
+          op.getAttrOfType<IntegerAttr>("alignment"));
     }
 
-    rewriter.replaceOpWithNewOp<spirv::StoreOp>(
-        op, ptr, value,
-        op.getAttrOfType<IntegerAttr>(
-            spirv::attributeName<spirv::MemoryAccess>()),
-        op.getAttrOfType<IntegerAttr>("alignment"));
     return matchSuccess();
   }
 };
