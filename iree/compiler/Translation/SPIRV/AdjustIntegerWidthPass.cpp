@@ -346,6 +346,8 @@ void AdjustIntegerWidthPass::runOnOperation() {
   patterns.insert<
       // Arithmetic ops:
       AdjustIntegerArithmeticOperations<spirv::GLSLSAbsOp>,
+      AdjustIntegerArithmeticOperations<spirv::GLSLSMaxOp>,
+      AdjustIntegerArithmeticOperations<spirv::GLSLSMinOp>,
       AdjustIntegerArithmeticOperations<spirv::GLSLSSignOp>,
       AdjustIntegerArithmeticOperations<spirv::IAddOp>,
       AdjustIntegerArithmeticOperations<spirv::ISubOp>,

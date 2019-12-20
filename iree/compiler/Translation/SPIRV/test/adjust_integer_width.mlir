@@ -176,6 +176,32 @@ module{
       spv.Return
     }
 
+    func @smax(%arg0: i64, %arg1: i64) -> () {
+      %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      %1 = spv.constant 0 : i32
+      %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      %3 = spv.Load "StorageBuffer" %2 : i64
+      // CHECK: spv.GLSL.SMax {{.*}} : i32
+      %4 = spv.GLSL.SMax %3, %3 : i64
+      %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      spv.Store "StorageBuffer" %6, %4 : i64
+      spv.Return
+    }
+
+    func @smin(%arg0: i64, %arg1: i64) -> () {
+      %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      %1 = spv.constant 0 : i32
+      %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      %3 = spv.Load "StorageBuffer" %2 : i64
+      // CHECK: spv.GLSL.SMin {{.*}} : i32
+      %4 = spv.GLSL.SMin %3, %3 : i64
+      %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+      spv.Store "StorageBuffer" %6, %4 : i64
+      spv.Return
+    }
+
     func @sign(%arg0: i64, %arg1: i64) -> () {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
