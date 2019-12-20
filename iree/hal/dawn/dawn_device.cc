@@ -56,7 +56,7 @@ DawnDevice::DawnDevice(const DeviceInfo& device_info,
   // Log some basic device info.
   std::string backend_type_str;
   auto* adapter =
-      static_cast<dawn_native::Adapter*>(device_info.driver_handle());
+      reinterpret_cast<dawn_native::Adapter*>(device_info.device_id());
   switch (adapter->GetBackendType()) {
     case dawn_native::BackendType::D3D12:
       backend_type_str = "D3D12";

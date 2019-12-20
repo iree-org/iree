@@ -29,8 +29,7 @@ class InterpreterDriver final : public Driver {
 
   StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
-  StatusOr<ref_ptr<Device>> CreateDevice(
-      const DeviceInfo& device_info) override;
+  StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
 };
 
 }  // namespace hal

@@ -40,7 +40,7 @@ StatusOr<DeviceInfo> PopulateDeviceInfo(dawn_native::Adapter* adapter) {
   std::string device_name = absl::StrCat("dawn-", adapter->GetPCIInfo().name);
 
   return DeviceInfo(device_name, supported_features,
-                    reinterpret_cast<void*>(adapter));
+                    reinterpret_cast<DriverDeviceID>(adapter));
 }
 
 }  // namespace
@@ -89,22 +89,22 @@ StatusOr<ref_ptr<Device>> DawnDriver::CreateDefaultDevice() {
 
   // Create the first non-null device, if any.
   for (const auto& device : available_devices) {
-    auto* adapter = static_cast<dawn_native::Adapter*>(device.driver_handle());
+    auto* adapter = reinterpret_cast<dawn_native::Adapter*>(device.device_id());
     if (adapter->GetBackendType() != dawn_native::BackendType::Null) {
-      return CreateDevice(device);
+      return CreateDevice(device.device_id());
     }
   }
 
   // Otherwise create the first null device.
-  return CreateDevice(available_devices.front());
+  return CreateDevice(available_devices.front().device_id());
 }
 
-StatusOr<ref_ptr<Device>> DawnDriver::CreateDevice(
-    const DeviceInfo& device_info) {
+StatusOr<ref_ptr<Device>> DawnDriver::CreateDevice(DriverDeviceID device_id) {
   IREE_TRACE_SCOPE0("DawnDriver::CreateDevice");
 
-  auto* adapter =
-      static_cast<dawn_native::Adapter*>(device_info.driver_handle());
+  auto* adapter = reinterpret_cast<dawn_native::Adapter*>(device_id);
+  ASSIGN_OR_RETURN(auto device_info, PopulateDeviceInfo(adapter));
+
   ::WGPUDevice c_backend_device = adapter->CreateDevice();
   if (!c_backend_device) {
     return InternalErrorBuilder(IREE_LOC) << "Failed to create a Dawn device";

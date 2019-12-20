@@ -34,8 +34,9 @@ TEST(DawnDriverTest, EnumerateDevicesAndCreate) {
                        dawn_driver.EnumerateAvailableDevices());
   ASSERT_GT(available_devices.size(), 0);
 
-  ASSERT_OK_AND_ASSIGN(auto first_device,
-                       dawn_driver.CreateDevice(available_devices[0]));
+  ASSERT_OK_AND_ASSIGN(
+      auto first_device,
+      dawn_driver.CreateDevice(available_devices[0].device_id()));
 }
 
 }  // namespace

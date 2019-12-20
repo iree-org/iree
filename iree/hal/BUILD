@@ -27,10 +27,10 @@ cc_library(
     hdrs = ["allocator.h"],
     deps = [
         ":buffer",
+        "//iree/base:ref_ptr",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
-        "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/types:span",
     ],
 )
@@ -47,8 +47,10 @@ cc_library(
         ":api_hdrs",
         ":buffer",
         ":buffer_view",
+        ":command_buffer",
         ":device",
         ":driver",
+        ":driver_registry",
         ":fence",
         ":heap_buffer",
         ":semaphore",
@@ -56,7 +58,7 @@ cc_library(
         "//iree/base:api_util",
         "//iree/base:shape",
         "//iree/base:tracing",
-        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/types:span",
     ],
 )
 

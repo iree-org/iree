@@ -17,6 +17,7 @@
 #ifndef IREE_HAL_API_H_
 #define IREE_HAL_API_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -29,12 +30,15 @@ extern "C" {
 // Types and Enums
 //===----------------------------------------------------------------------===//
 
+typedef struct iree_hal_allocator iree_hal_allocator_t;
 typedef struct iree_hal_buffer iree_hal_buffer_t;
 typedef struct iree_hal_buffer_view iree_hal_buffer_view_t;
-typedef struct iree_hal_semaphore iree_hal_semaphore_t;
-typedef struct iree_hal_fence iree_hal_fence_t;
+typedef struct iree_hal_command_buffer iree_hal_command_buffer_t;
 typedef struct iree_hal_device iree_hal_device_t;
 typedef struct iree_hal_driver iree_hal_driver_t;
+typedef struct iree_hal_executable iree_hal_executable_t;
+typedef struct iree_hal_fence iree_hal_fence_t;
+typedef struct iree_hal_semaphore iree_hal_semaphore_t;
 
 // Reference to a buffer's mapped memory.
 typedef struct {
@@ -164,6 +168,158 @@ typedef enum {
                               IREE_HAL_BUFFER_USAGE_MAPPING |
                               IREE_HAL_BUFFER_USAGE_DISPATCH,
 } iree_hal_buffer_usage_t;
+
+// An opaque driver-specific handle to identify different devices.
+typedef uintptr_t iree_hal_device_id_t;
+
+// Describes an enumerated HAL device.
+typedef struct {
+  // Opaque handle used by drivers. Not valid across driver instances.
+  iree_hal_device_id_t device_id;
+  // Name of the device as returned by the API.
+  iree_string_view_t name;
+} iree_hal_device_info_t;
+
+// A bitfield specifying the mode of operation for a command buffer.
+typedef enum {
+  // Command buffer will be submitted once and never used again.
+  // This may enable in-place patching of command buffers that reduce overhead
+  // when it's known that command buffers will not be reused.
+  IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT = 1 << 0,
+} iree_hal_command_buffer_mode_t;
+
+// A bitfield specifying the category of commands in a command queue.
+typedef enum {
+  // Command is considered a transfer operation (memcpy, etc).
+  IREE_HAL_COMMAND_CATEGORY_TRANSFER = 1 << 0,
+  // Command is considered a dispatch operation (dispatch/execute).
+  IREE_HAL_COMMAND_CATEGORY_DISPATCH = 1 << 1,
+} iree_hal_command_category_t;
+
+// Bitfield specifying which execution stage a brarrier should start/end at.
+//
+// Maps to VkPipelineStageFlagBits.
+typedef enum {
+  // Top of the pipeline when commands are initially issued by the device.
+  IREE_HAL_EXECUTION_STAGE_COMMAND_ISSUE = 1 << 0,
+  // Stage of the pipeline when dispatch parameter data is consumed.
+  IREE_HAL_EXECUTION_STAGE_COMMAND_PROCESS = 1 << 1,
+  // Stage where dispatch commands execute.
+  IREE_HAL_EXECUTION_STAGE_DISPATCH = 1 << 2,
+  // Stage where transfer (copy/clear/fill/etc) commands execute.
+  IREE_HAL_EXECUTION_STAGE_TRANSFER = 1 << 3,
+  // Final stage in the pipeline when commands are retired on the device.
+  IREE_HAL_EXECUTION_STAGE_COMMAND_RETIRE = 1 << 4,
+  // Pseudo-stage for read/writes by the host. Not executed on device.
+  IREE_HAL_EXECUTION_STAGE_HOST = 1 << 5,
+} iree_hal_execution_stage_t;
+
+// Bitfield specifying which scopes will access memory and how.
+//
+// Maps to VkAccessFlagBits.
+typedef enum {
+  // Read access to indirect command data as part of an indirect dispatch.
+  IREE_HAL_ACCESS_SCOPE_INDIRECT_COMMAND_READ = 1 << 0,
+  // Constant uniform buffer reads by the device.
+  IREE_HAL_ACCESS_SCOPE_CONSTANT_READ = 1 << 1,
+  // Storage buffer reads by dispatch commands.
+  IREE_HAL_ACCESS_SCOPE_DISPATCH_READ = 1 << 2,
+  // Storage buffer writes by dispatch commands.
+  IREE_HAL_ACCESS_SCOPE_DISPATCH_WRITE = 1 << 3,
+  // Source of a transfer operation.
+  IREE_HAL_ACCESS_SCOPE_TRANSFER_READ = 1 << 4,
+  // Target of a transfer operation.
+  IREE_HAL_ACCESS_SCOPE_TRANSFER_WRITE = 1 << 5,
+  // Read operation by the host through mapped memory.
+  IREE_HAL_ACCESS_SCOPE_HOST_READ = 1 << 6,
+  // Write operation by the host through mapped memory.
+  IREE_HAL_ACCESS_SCOPE_HOST_WRITE = 1 << 7,
+  // External/non-specific read.
+  IREE_HAL_ACCESS_SCOPE_MEMORY_READ = 1 << 8,
+  // External/non-specific write.
+  IREE_HAL_ACCESS_SCOPE_MEMORY_WRITE = 1 << 9,
+} iree_hal_access_scope_t;
+
+// Defines a global memory barrier.
+// These are cheaper to encode than buffer-specific barriers but may cause
+// stalls and bubbles in device pipelines if applied too broadly. Prefer them
+// over equivalently large sets of buffer-specific barriers (such as when
+// completely changing execution contexts).
+//
+// Maps to VkMemoryBarrier.
+typedef struct {
+  // All access scopes prior-to the barrier (inclusive).
+  iree_hal_access_scope_t source_scope;
+  // All access scopes following the barrier (inclusive).
+  iree_hal_access_scope_t target_scope;
+} iree_hal_memory_barrier_t;
+
+// Defines a memory barrier that applies to a range of a specific buffer.
+// Use of these (vs. global memory barriers) provides fine-grained execution
+// ordering to device command processors and allows for more aggressive
+// reordering.
+//
+// Maps to VkBufferMemoryBarrier.
+typedef struct {
+  // All access scopes prior-to the barrier (inclusive).
+  iree_hal_access_scope_t source_scope;
+  // All access scopes following the barrier (inclusive).
+  iree_hal_access_scope_t target_scope;
+  // Buffer the barrier is restricted to.
+  // The barrier will apply to the entire physical device allocation.
+  iree_hal_buffer_t* buffer;
+  // Relative offset/length within |buffer| (which may itself be mapped into the
+  // device allocation at an offset).
+  iree_device_size_t offset;
+  iree_device_size_t length;
+} iree_hal_buffer_barrier_t;
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Allocator
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Retains the given |allocator| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
+
+// Releases the given |allocator| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_allocator_release(iree_hal_allocator_t* allocator);
+
+// Allocates a buffer from the allocator.
+// Fails if the memory type requested for the given usage cannot be serviced.
+// Callers can use iree_hal_allocator_can_allocate to decide their memory use
+// strategy.
+//
+// The memory type of the buffer returned may differ from the requested value
+// if the device can provide more functionality; for example, if requesting
+// MemoryType::kHostVisible but the memory is really host cached you may get
+// a buffer back with MemoryType::kHostVisible | MemoryType::kHostCached. The
+// only requirement is that the buffer satisfy the required bits.
+//
+// Fails if it is not possible to allocate and satisfy all placements for the
+// requested |buffer_usage|.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t buffer_usage, iree_host_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer);
+
+// Wraps an existing host allocation in a buffer.
+// Ownership of the allocation remains with the caller and the memory must
+// remain valid for so long as the buffer may be in use.
+//
+// Fails if the allocator cannot access host memory in this way.
+// |out_buffer| must be released by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t buffer_usage, iree_byte_span_t data,
+    iree_hal_buffer_t** out_buffer);
+
+#endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Buffer
@@ -330,18 +486,153 @@ iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view);
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Semaphore
+// iree::hal::CommandBuffer
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_API_NO_PROTOTYPES
 
-// Retains the given |semaphore| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
+// Creates a command buffer ready to begin recording, possibly reusing an
+// existing one from the |device| pool.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories, iree_allocator_t allocator,
+    iree_hal_command_buffer_t** out_command_buffer);
 
-// Releases the given |semaphore| from the caller.
+// Retains the given |command_buffer| for the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore);
+iree_hal_command_buffer_retain(iree_hal_command_buffer_t* command_buffer);
+
+// Releases the given |command_buffer| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_release(iree_hal_command_buffer_t* command_buffer);
+
+// Resets and begins recording into the command buffer, clearing all
+// previously recorded contents.
+// The command buffer must not be in-flight.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer);
+
+// Ends recording into the command buffer.
+// This must be called prior to submitting the command buffer for execution.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer);
+
+// Defines a memory dependency between commands recorded before and after the
+// barrier. One or more memory or buffer barriers can be specified to indicate
+// between which stages or buffers the dependencies exist.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_execution_barrier(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    iree_host_size_t memory_barrier_count,
+    const iree_hal_memory_barrier_t* memory_barriers,
+    iree_host_size_t buffer_barrier_count,
+    const iree_hal_buffer_barrier_t* buffer_barriers);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Device
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Retains the given |device| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_retain(iree_hal_device_t* device);
+
+// Releases the given |device| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_device_release(iree_hal_device_t* device);
+
+// Returns a reference to the allocator of the device that can be used for
+// allocating buffers.
+IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
+iree_hal_device_allocator(iree_hal_device_t* device);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Driver
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Retains the given |driver| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_retain(iree_hal_driver_t* driver);
+
+// Releases the given |driver| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_release(iree_hal_driver_t* driver);
+
+// Queries available devices and returns them as a list.
+// The provided |allocator| will be used to allocate the returned list and after
+// the caller is done with it |out_device_infos| must be freed with that same
+// allocator by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_query_available_devices(
+    iree_hal_driver_t* driver, iree_allocator_t allocator,
+    iree_hal_device_info_t** out_device_infos,
+    iree_host_size_t* out_device_info_count);
+
+// Creates a device as queried with iree_hal_driver_query_available_devices.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_create_device(
+    iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
+    iree_allocator_t allocator, iree_hal_device_t** out_device);
+
+// Creates the driver-defined "default" device. This may simply be the first
+// device enumerated.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
+                                      iree_allocator_t allocator,
+                                      iree_hal_device_t** out_device);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DriverRegistry
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Returns true if the given |driver_name| is registered.
+// If this returns false when unexpected ensure that the driver is linked into
+// the binary.
+IREE_API_EXPORT bool IREE_API_CALL
+iree_hal_driver_registry_has_driver(iree_string_view_t driver_name);
+
+// Queries registered drivers and returns them as a list.
+// The provided |allocator| will be used to allocate the returned list and after
+// the caller is done with it |out_driver_names| must be freed with that same
+// allocator by the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_registry_query_available_drivers(
+    iree_allocator_t allocator, iree_string_view_t** out_driver_names,
+    iree_host_size_t* out_driver_count);
+
+// Creates a driver registered with the driver registry by name.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
+                                       iree_allocator_t allocator,
+                                       iree_hal_driver_t** out_driver);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Executable
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Retains the given |executable| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_executable_retain(iree_hal_executable_t* executable);
+
+// Releases the given |executable| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_executable_release(iree_hal_executable_t* executable);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -362,39 +653,18 @@ iree_hal_fence_release(iree_hal_fence_t* fence);
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Device
+// iree::hal::Semaphore
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_API_NO_PROTOTYPES
 
-// HAL devices are created via HAL drivers.
-
-// Retains the given |device| for the caller.
+// Retains the given |semaphore| for the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_device_retain(iree_hal_device_t* device);
+iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
 
-// Releases the given |device| from the caller.
+// Releases the given |semaphore| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_device_release(iree_hal_device_t* device);
-
-#endif  // IREE_API_NO_PROTOTYPES
-
-//===----------------------------------------------------------------------===//
-// iree::hal::Driver
-//===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
-
-// HAL drivers are created for concrete implementations (e.g. Vulkan with
-// iree_hal_vulkan_driver_create).
-
-// Retains the given |driver| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_retain(iree_hal_driver_t* driver);
-
-// Releases the given |driver| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_release(iree_hal_driver_t* driver);
+iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
