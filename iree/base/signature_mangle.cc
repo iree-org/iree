@@ -149,6 +149,10 @@ SignatureBuilder RawSignatureMangler::ToFunctionSignature(
   return func_builder;
 }
 
+void RawSignatureMangler::AddUnrecognized() {
+  builder_.Span(absl::string_view(), 'U');
+}
+
 void RawSignatureMangler::AddAnyReference() {
   // A more constrained ref object would have a non empty span.
   builder_.Span(absl::string_view(), 'O');

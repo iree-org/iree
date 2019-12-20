@@ -168,6 +168,10 @@ class RawSignatureMangler {
     return ToFunctionSignature(inputs.builder(), results.builder());
   }
 
+  // Adds an unrecognized type. By default, this is an empty span, but in the
+  // future, it may contain some further description.
+  void AddUnrecognized();
+
   // Adds an unconstrained reference-type object.
   void AddAnyReference();
 

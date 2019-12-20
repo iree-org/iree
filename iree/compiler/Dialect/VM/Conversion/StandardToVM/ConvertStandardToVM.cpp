@@ -61,6 +61,11 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
 class FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
+  // Whitelist of function attributes to retain when converting to vm.func.
+  static constexpr std::array<const char *, 1> kRetainedAttributes = {
+      "iree.reflection",
+  };
+
   PatternMatchResult matchAndRewrite(
       FuncOp srcOp, ArrayRef<Value *> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -91,6 +96,15 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
                                 convertedResultTypes, srcOp.getContext());
     auto newFuncOp = rewriter.create<IREE::VM::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), newFuncType);
+
+    // Retain function attributes in the whitelist.
+    for (auto retainAttrName : kRetainedAttributes) {
+      StringRef attrName(retainAttrName);
+      Attribute attr = srcOp.getAttr(attrName);
+      if (attr) {
+        newFuncOp.setAttr(attrName, attr);
+      }
+    }
 
     // Move the body region from src -> new.
     auto &srcRegion = srcOp.getOperation()->getRegion(0);

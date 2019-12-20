@@ -94,8 +94,17 @@ StringAttr mangleType(Builder builder, Type type, char tag) {
     auto mangledTensor = mangleTensorType(tensorType);
     if (!mangledTensor) return nullptr;
     mangledTensor->builder().AppendTo(fBuilder, tag);
+    return builder.getStringAttr(fBuilder.encoded());
   }
 
+  return nullptr;
+}
+
+StringAttr unrecognizedTypeAttr(Builder builder, char tag) {
+  SignatureBuilder fBuilder;
+  RawSignatureMangler mangler;
+  mangler.AddUnrecognized();
+  mangler.builder().AppendTo(fBuilder, tag);
   return builder.getStringAttr(fBuilder.encoded());
 }
 
@@ -114,7 +123,13 @@ class MaterializeExportedReflectionPass
     // Arguments.
     for (int i = 0, e = funcType.getNumInputs(); i < e; ++i) {
       auto mangled = mangleType(builder, funcType.getInput(i), 'I');
-      if (!mangled) continue;
+      if (!mangled) {
+        func.emitWarning()
+            << "Argument #" << i << " of function " << func.getName()
+            << " is not a recognized public ABI type and the function"
+            << " may not be invokable by standard tools";
+        mangled = unrecognizedTypeAttr(builder, 'I');
+      }
       NamedAttributeList l(
           func.getArgAttrOfType<DictionaryAttr>(i, "iree.reflection"));
       l.set(builder.getIdentifier("f_partial"), mangled);
@@ -124,7 +139,13 @@ class MaterializeExportedReflectionPass
     // Results.
     for (int i = 0, e = funcType.getNumResults(); i < e; ++i) {
       auto mangled = mangleType(builder, funcType.getResult(i), 'R');
-      if (!mangled) continue;
+      if (!mangled) {
+        func.emitWarning()
+            << "Result #" << i << " of function " << func.getName()
+            << " is not a recognized public ABI type and the function"
+            << " may not be invokable by standard tools";
+        mangled = unrecognizedTypeAttr(builder, 'R');
+      }
       NamedAttributeList l(
           func.getResultAttrOfType<DictionaryAttr>(i, "iree.reflection"));
       l.set(builder.getIdentifier("f_partial"), mangled);
