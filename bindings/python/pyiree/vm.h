@@ -20,11 +20,8 @@
 #include "bindings/python/pyiree/rt.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
+#include "iree/vm2/api.h"
 #include "iree/vm2/bytecode_module.h"
-#include "iree/vm2/context.h"
-#include "iree/vm2/instance.h"
-#include "iree/vm2/invocation.h"
-#include "iree/vm2/module.h"
 
 namespace iree {
 namespace python {

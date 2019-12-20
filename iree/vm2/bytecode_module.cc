@@ -391,7 +391,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   total_state_struct_size += rwdata_storage_capacity;
   total_state_struct_size += global_ref_count * sizeof(iree_vm_ref_t);
   total_state_struct_size +=
-      rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_ref_t);
+      rodata_ref_count * sizeof(iree_vm_ro_byte_buffer_t);
   total_state_struct_size += import_function_count * sizeof(iree_vm_function_t);
 
   iree_vm_bytecode_module_state_t* state = NULL;
@@ -407,7 +407,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   state->global_ref_table = (iree_vm_ref_t*)p;
   p += global_ref_count * sizeof(state->global_ref_table);
   state->rodata_ref_count = rodata_ref_count;
-  state->rodata_ref_table = (iree_vm_ro_byte_buffer_ref_t*)p;
+  state->rodata_ref_table = (iree_vm_ro_byte_buffer_t*)p;
   p += rodata_ref_count * sizeof(*state->rodata_ref_table);
   state->import_count = import_function_count;
   state->import_table = (iree_vm_function_t*)p;
@@ -416,7 +416,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   for (int i = 0; i < rodata_ref_count; ++i) {
     const iree::vm::RodataSegmentDef* segment =
         module_def->rodata_segments()->Get(i);
-    iree_vm_ro_byte_buffer_ref_t* ref = &state->rodata_ref_table[i];
+    iree_vm_ro_byte_buffer_t* ref = &state->rodata_ref_table[i];
     ref->ref_object.counter = 1;
     ref->data.data = segment->data()->Data();
     ref->data.data_length = segment->data()->size();

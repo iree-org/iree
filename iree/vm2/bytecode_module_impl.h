@@ -21,6 +21,7 @@
 #include "iree/vm2/module.h"
 #include "iree/vm2/ref.h"
 #include "iree/vm2/stack.h"
+#include "iree/vm2/types.h"
 #include "iree/vm2/value.h"
 
 #ifdef __cplusplus
@@ -93,7 +94,7 @@ typedef struct {
   // Right now these don't do much, however we can perform lazy caching and
   // on-the-fly decompression using this information.
   int32_t rodata_ref_count;
-  iree_vm_ro_byte_buffer_ref_t* rodata_ref_table;
+  iree_vm_ro_byte_buffer_t* rodata_ref_table;
 
   // Resolved function imports.
   int32_t import_count;

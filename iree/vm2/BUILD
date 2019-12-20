@@ -14,7 +14,10 @@ cc_test(
     deps = [
         ":bytecode_dispatch_test_module_cc",
         ":bytecode_module",
-        ":vm2",
+        ":context",
+        ":instance",
+        ":invocation",
+        ":module",
         "//iree/base:logging",
         "//iree/testing:gtest_main",
         "@com_google_absl//absl/strings",
@@ -44,6 +47,7 @@ cc_library(
         ":module",
         ":ref",
         ":stack",
+        ":types",
         ":value",
         "//iree/base:api",
         "//iree/base:flatbuffer_util",
@@ -59,7 +63,8 @@ cc_test(
     deps = [
         ":bytecode_module",
         ":bytecode_module_benchmark_module_cc",
-        ":vm2",
+        ":module",
+        ":stack",
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/testing:benchmark_main",
@@ -117,6 +122,7 @@ cc_library(
     srcs = ["instance.c"],
     hdrs = ["instance.h"],
     deps = [
+        ":types",
         "//iree/base:api",
     ],
 )
@@ -179,10 +185,19 @@ cc_test(
     deps = [
         ":ref",
         ":stack",
-        ":vm2",
         "//iree/base:api",
         "//iree/base:ref_ptr",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "types",
+    srcs = ["types.c"],
+    hdrs = ["types.h"],
+    deps = [
+        ":ref",
+        "//iree/base:api",
     ],
 )
 
@@ -204,14 +219,7 @@ cc_library(
 cc_library(
     name = "vm2",
     hdrs = [
-        "context.h",
-        "instance.h",
-        "invocation.h",
-        "module.h",
-        "ref.h",
-        "stack.h",
-        "value.h",
-        "variant_list.h",
+        "api.h",
     ],
     deps = [
         ":context",
@@ -220,6 +228,7 @@ cc_library(
         ":module",
         ":ref",
         ":stack",
+        ":types",
         ":value",
         ":variant_list",
         "//iree/base:api",

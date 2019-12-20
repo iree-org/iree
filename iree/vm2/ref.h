@@ -198,19 +198,6 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
 IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
                                                     iree_vm_ref_t* rhs);
 
-// The built-in constant buffer type.
-// This simply points at a span of memory. The memory could be owned (in which
-// case a destroy function must be provided) or unowned (NULL destroy function).
-typedef struct {
-  iree_vm_ref_object_t ref_object;
-  iree_const_byte_span_t data;
-  iree_vm_ref_destroy_t destroy;
-} iree_vm_ro_byte_buffer_ref_t;
-
-// Returns the type ID of the iree_vm_ro_byte_buffer_ref_t type.
-IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL
-iree_vm_ro_byte_buffer_ref_type_id();
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

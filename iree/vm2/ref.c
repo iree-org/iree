@@ -222,23 +222,3 @@ IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
                                                     iree_vm_ref_t* rhs) {
   return memcmp(lhs, rhs, sizeof(*lhs)) == 0;
 }
-
-static void iree_vm_ro_byte_buffer_ref_destroy(void* ptr) {
-  iree_vm_ro_byte_buffer_ref_t* ref = (iree_vm_ro_byte_buffer_ref_t*)ptr;
-  if (ref->destroy) {
-    ref->destroy(ptr);
-  }
-}
-
-IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL
-iree_vm_ro_byte_buffer_ref_type_id() {
-  static iree_vm_ref_type_descriptor_t descriptor = {0};
-  if (descriptor.type == IREE_VM_REF_TYPE_NULL) {
-    descriptor.destroy = iree_vm_ro_byte_buffer_ref_destroy;
-    descriptor.offsetof_counter =
-        offsetof(iree_vm_ro_byte_buffer_ref_t, ref_object.counter);
-    descriptor.type_name = iree_make_cstring_view("ireex.byte_buffer");
-    iree_vm_ref_register_type(&descriptor);
-  }
-  return descriptor.type;
-}

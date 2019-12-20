@@ -18,8 +18,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "iree/vm2/stack.h"
-
 // These functions match the imports defined in custom.imports.mlir, though the
 // ordinals are only used internally (string lookups are used at runtime). We
 // could have a fancier compile-time generated structure for this, possibly

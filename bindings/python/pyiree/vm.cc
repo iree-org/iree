@@ -17,7 +17,6 @@
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/base/api.h"
-#include "iree/vm2/instance.h"
 
 namespace iree {
 namespace python {
