@@ -17,10 +17,11 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 
 ## Build Status
 
-CI System      | Build System  | Platform | Status
--------------- | ------------- | -------- | ------
-GitHub Actions | Bazel & CMake | Linux    | [![ci-status](https://github.com/google/iree/workflows/Continuous%20Integration/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush)
-Kokoro         | Bazel         | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
+CI System      | Build System | Platform | Status
+-------------- | ------------ | -------- | ------
+GitHub Actions | CMake        | Linux    | [![github-cmake-linux-status](https://github.com/google/iree/workflows/CMake%20Build/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22CMake+Build%22)
+GitHub Actions | Bazel        | Linux    | [![github-bazel-linux-status](https://github.com/google/iree/workflows/Bazel%20Build/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22Bazel+Build%22)
+Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
 
 <a name="quickstart"></a>
 
