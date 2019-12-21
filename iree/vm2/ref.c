@@ -73,8 +73,8 @@ iree_vm_ref_lookup_registered_type(iree_string_view_t full_name) {
   return NULL;
 }
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_ref_wrap(void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_assign(
+    void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
   const iree_vm_ref_type_descriptor_t* type_descriptor =
       iree_vm_ref_get_type_descriptor(type);
   if (!type_descriptor) {
@@ -93,6 +93,16 @@ iree_vm_ref_wrap(void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
   out_ref->offsetof_counter = type_descriptor->offsetof_counter;
   out_ref->type = type;
 
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
+    void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
+  IREE_API_RETURN_IF_API_ERROR(iree_vm_ref_wrap_assign(ptr, type, out_ref));
+  if (out_ref->ptr) {
+    volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
+    atomic_fetch_add(counter, 1);
+  }
   return IREE_STATUS_OK;
 }
 
@@ -211,23 +221,4 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
 IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
                                                     iree_vm_ref_t* rhs) {
   return memcmp(lhs, rhs, sizeof(*lhs)) == 0;
-}
-
-static void iree_vm_ro_byte_buffer_ref_destroy(void* ptr) {
-  iree_vm_ro_byte_buffer_ref_t* ref = (iree_vm_ro_byte_buffer_ref_t*)ptr;
-  if (ref->destroy) {
-    ref->destroy(ptr);
-  }
-}
-
-IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL
-iree_vm_ro_byte_buffer_ref_type_id() {
-  static iree_vm_ref_type_descriptor_t descriptor = {0};
-  if (descriptor.type == IREE_VM_REF_TYPE_NULL) {
-    descriptor.destroy = iree_vm_ro_byte_buffer_ref_destroy;
-    descriptor.offsetof_counter =
-        offsetof(iree_vm_ro_byte_buffer_ref_t, ref_object.counter);
-    descriptor.type_name = iree_make_cstring_view("ireex.byte_buffer");
-  }
-  return descriptor.type;
 }

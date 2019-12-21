@@ -45,9 +45,11 @@ class Driver : public RefObject<Driver> {
   // This may simply be the first device enumerated.
   virtual StatusOr<ref_ptr<Device>> CreateDefaultDevice() = 0;
 
-  // Creates a device as queried with the given |device_info|.
-  virtual StatusOr<ref_ptr<Device>> CreateDevice(
-      const DeviceInfo& device_info) = 0;
+  // Creates a device as queried with the given |driver_handle|.
+  virtual StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) = 0;
+  StatusOr<ref_ptr<Device>> CreateDevice(const DeviceInfo& device_info) {
+    return CreateDevice(device_info.device_id());
+  }
 
  protected:
   explicit Driver(std::string name) : name_(std::move(name)) {}

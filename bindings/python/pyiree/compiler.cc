@@ -19,6 +19,9 @@
 
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/status_utils.h"
+#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
+#include "iree/compiler/Translation/IREEVM.h"
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/compiler/Utils/TranslationUtils.h"
 #include "iree/schemas/module_def_generated.h"
@@ -35,8 +38,14 @@ namespace py = pybind11;
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
+using mlir::iree_compiler::IREE::HAL::ExecutableTargetOptions;
+using mlir::iree_compiler::IREE::VM::BytecodeOutputFormat;
+using mlir::iree_compiler::IREE::VM::BytecodeTargetOptions;
+
 using llvm::MemoryBuffer;
 using llvm::MemoryBufferRef;
+using llvm::raw_ostream;
+using llvm::raw_string_ostream;
 using llvm::StringRef;
 
 namespace iree {
@@ -101,7 +110,7 @@ DiagnosticCapture::DiagnosticCapture(DiagnosticCapture&& other) {
 // is a location pretty printer in the MLIR AsmPrinter. It is private and
 // doesn't do any path shortening, which seems to make long Python stack traces
 // a bit easier to scan.
-void PrintLocation(Location loc, llvm::raw_ostream& out) {
+void PrintLocation(Location loc, raw_ostream& out) {
   switch (loc->getKind()) {
     case StandardAttributes::OpaqueLocation:
       PrintLocation(loc.cast<OpaqueLoc>().getFallbackLocation(), out);
@@ -172,7 +181,7 @@ void PrintLocation(Location loc, llvm::raw_ostream& out) {
 std::string DiagnosticCapture::ConsumeDiagnosticsAsString(
     const char* error_message) {
   std::string s;
-  llvm::raw_string_ostream sout(s);
+  raw_string_ostream sout(s);
   bool first = true;
   if (error_message) {
     sout << error_message;
@@ -236,7 +245,7 @@ std::string CompilerModuleBundle::ToAsm(bool enableDebugInfo, bool prettyForm,
                                         int64_t largeElementLimit) {
   // Print to asm.
   std::string asm_output;
-  llvm::raw_string_ostream sout(asm_output);
+  raw_string_ostream sout(asm_output);
   OpPrintingFlags print_flags;
   if (enableDebugInfo) {
     print_flags.enableDebugInfo(prettyForm);
@@ -270,6 +279,28 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
   return std::make_shared<OpaqueByteVectorBlob>(std::move(module_blob));
 }
 
+std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
+    BytecodeTargetOptions options, std::vector<std::string> target_backends) {
+  // TODO(laurenzo): Plumb pass manager options such as crash reproducer
+  // through to the IREE compiler.
+
+  ExecutableTargetOptions exe_target_options;
+  exe_target_options.targets = std::move(target_backends);
+
+  std::string contents;
+  raw_string_ostream out(contents);
+  auto diag_capture = context_->CaptureDiagnostics();
+  if (failed(mlir::iree_compiler::translateFromMLIRToVMBytecodeModule(
+          module_op_, exe_target_options, options, out))) {
+    throw RaisePyError(
+        PyExc_RuntimeError,
+        diag_capture.ConsumeDiagnosticsAsString("Error compiling IREE module:")
+            .c_str());
+  }
+  out.flush();
+  return std::make_shared<OpaqueStringBlob>(std::move(out.str()));
+}
+
 void CompilerModuleBundle::RunPassPipeline(
     const std::vector<std::string>& pipelines) {
   mlir::PassManager pm(context_->mlir_context());
@@ -280,7 +311,7 @@ void CompilerModuleBundle::RunPassPipeline(
 
   // Parse the pass pipelines.
   std::string error;
-  llvm::raw_string_ostream error_stream(error);
+  raw_string_ostream error_stream(error);
   for (const auto& pipeline : pipelines) {
     if (failed(mlir::parsePassPipeline(pipeline, pm, error_stream))) {
       throw RaiseValueError(error_stream.str().c_str());
@@ -320,6 +351,18 @@ void SetupCompilerBindings(pybind11::module m) {
       .def_property("crash_reproducer_path",
                     &CompilerContextBundle::crash_reproducer_path,
                     &CompilerContextBundle::set_crash_reproducer_path);
+  py::enum_<BytecodeOutputFormat>(m, "OutputFormat")
+      .value("FLATBUFFER_BINARY", BytecodeOutputFormat::kFlatBufferBinary)
+      .value("FLATBUFFER_TEXT", BytecodeOutputFormat::kFlatBufferText)
+      .value("MLIR_TEXT", BytecodeOutputFormat::kMlirText)
+      .export_values();
+  py::class_<BytecodeTargetOptions>(m, "CompileOptions")
+      .def(py::init<>())
+      .def_readwrite("output_format", &BytecodeTargetOptions::outputFormat)
+      .def_readwrite("optimize", &BytecodeTargetOptions::optimize)
+      .def_readwrite("strip_debug_ops", &BytecodeTargetOptions::stripDebugOps)
+      .def_readwrite("strip_source_map", &BytecodeTargetOptions::stripSourceMap)
+      .def_readwrite("strip_symbols", &BytecodeTargetOptions::stripSymbols);
   py::class_<CompilerModuleBundle>(m, "CompilerModule")
       .def("to_asm", &CompilerModuleBundle::ToAsm,
            py::arg("debug_info") = false, py::arg("pretty") = false,
@@ -327,6 +370,9 @@ void SetupCompilerBindings(pybind11::module m) {
       .def("compile_to_sequencer_blob",
            &CompilerModuleBundle::CompileToSequencerBlob,
            py::arg("print_mlir") = false,
+           py::arg("target_backends") = std::vector<std::string>())
+      .def("compile", &CompilerModuleBundle::Compile,
+           py::arg("options") = BytecodeTargetOptions{},
            py::arg("target_backends") = std::vector<std::string>())
       .def("run_pass_pipeline", &CompilerModuleBundle::RunPassPipeline,
            py::arg("pipelines") = std::vector<std::string>());

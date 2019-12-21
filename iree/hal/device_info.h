@@ -24,6 +24,9 @@
 namespace iree {
 namespace hal {
 
+// An opaque driver-specific handle to identify different devices.
+using DriverDeviceID = uintptr_t;
+
 // Describes features supported by the device.
 // These flags indicate the availability of features that may be enabled at the
 // request of the calling application. Note that certain features may disable
@@ -61,10 +64,10 @@ using DeviceFeatureBitfield = DeviceFeature;
 class DeviceInfo {
  public:
   DeviceInfo(std::string name, DeviceFeatureBitfield supported_features,
-             void* driver_handle = nullptr)
+             DriverDeviceID device_id = 0)
       : name_(std::move(name)),
         supported_features_(supported_features),
-        driver_handle_(driver_handle) {}
+        device_id_(device_id) {}
 
   const std::string& name() const { return name_; }
 
@@ -76,12 +79,12 @@ class DeviceInfo {
   // Opaque handle used by drivers to correlate this device with their internal
   // listing. This handle will not be valid across driver instances or outside
   // of the current process.
-  void* driver_handle() const { return driver_handle_; }
+  DriverDeviceID device_id() const { return device_id_; }
 
  private:
   const std::string name_;
   const DeviceFeatureBitfield supported_features_;
-  void* driver_handle_;
+  DriverDeviceID device_id_;
 };
 
 }  // namespace hal

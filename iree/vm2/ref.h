@@ -136,15 +136,20 @@ iree_vm_ref_lookup_registered_type(iree_string_view_t full_name);
 //  my_type_t* my_type = (my_type_t*)malloc(sizeof(my_type_t));
 //  my_type.ref_object.counter = 1;
 //  iree_vm_ref_t my_ref;
-//  iree_vm_ref_wrap(my_type, IREE_VM_REF_TYPE_MY_TYPE, &my_ref);
+//  iree_vm_ref_wrap_assign(my_type, IREE_VM_REF_TYPE_MY_TYPE, &my_ref);
 //  iree_vm_ref_release(&my_ref);
 //
 // Usage (C++):
 //  iree_vm_ref_t my_ref;
-//  iree_vm_ref_wrap(new MyType(), IREE_VM_REF_TYPE_MY_TYPE, &my_ref);
+//  iree_vm_ref_wrap_assign(new MyType(), IREE_VM_REF_TYPE_MY_TYPE, &my_ref);
 //  iree_vm_ref_release(&my_ref);
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_ref_wrap(void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref);
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_assign(
+    void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref);
+
+// Wraps a raw pointer in a iree_vm_ref_t reference and retains it in |out_ref|.
+// |out_ref| will be released if it already contains a reference.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
+    void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref);
 
 // Checks that the given reference-counted pointer |ref| is of |type|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -192,19 +197,6 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
 // Returns 1 if the two references point at the same value (or are both null).
 IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
                                                     iree_vm_ref_t* rhs);
-
-// The built-in constant buffer type.
-// This simply points at a span of memory. The memory could be owned (in which
-// case a destroy function must be provided) or unowned (NULL destroy function).
-typedef struct {
-  iree_vm_ref_object_t ref_object;
-  iree_const_byte_span_t data;
-  iree_vm_ref_destroy_t destroy;
-} iree_vm_ro_byte_buffer_ref_t;
-
-// Returns the type ID of the iree_vm_ro_byte_buffer_ref_t type.
-IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL
-iree_vm_ro_byte_buffer_ref_type_id();
 
 #ifdef __cplusplus
 }  // extern "C"

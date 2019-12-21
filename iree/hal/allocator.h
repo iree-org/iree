@@ -19,6 +19,7 @@
 #include <memory>
 
 #include "absl/types/span.h"
+#include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
 #include "iree/hal/buffer.h"
 
@@ -32,7 +33,7 @@ namespace hal {
 // allocated from must first be checked with CanUseBuffer.
 //
 // Thread-safe.
-class Allocator {
+class Allocator : public RefObject<Allocator> {
  public:
   virtual ~Allocator() = default;
 

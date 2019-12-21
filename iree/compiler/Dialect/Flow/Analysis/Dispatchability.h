@@ -57,7 +57,7 @@ class Dispatchability {
   Optional<bool> computeDispatchability(FuncOp funcOp);
 
   DenseMap<StringRef, bool> funcDispatchability_;
-  ModuleOp funcCloneModuleOp_;
+  OwningModuleRef funcCloneModuleOp_;
   DenseMap<StringRef, FuncOp> funcClones_;
 };
 

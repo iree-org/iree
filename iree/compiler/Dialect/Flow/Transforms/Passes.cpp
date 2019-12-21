@@ -91,6 +91,16 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createFormStreamsPass());
 
   // TODO(benvanik): run symbol DCE pass.
+
+  // Materialize default arg/result reflection metadata.
+  passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
+
+  // Merge arg/result reflection metadata.
+  // NOTE(laurenzo): This will eventually not be the right place for this as
+  // it should happen after the HAL has further annotated the exported
+  // functions (which will be needed for dynamic shapes and synthetic barrier
+  // arguments).
+  passManager.addPass(IREE::Flow::createMergeExportedReflection());
 }
 
 static PassPipelineRegistration<> transformPassPipeline(

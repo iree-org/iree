@@ -1,6 +1,7 @@
 // A simple while loop example.
 
 // RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="f32=[1]\nf32=[3]" --noexport_all --noprint_mlir | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]"
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s --target_backends=vulkan-spirv --input_values="f32=[1]\nf32=[3]" --noexport_all --noprint_mlir | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]")
 
 // CHECK-LABEL: EXEC @main
 func @main(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> attributes { iree.module.export }  {

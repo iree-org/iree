@@ -28,6 +28,8 @@ cc_library(
         "IdentifyDispatchRegions.cpp",
         "IdentifyReductionRegions.cpp",
         "LegalizeInputTypes.cpp",
+        "MaterializeExportedReflection.cpp",
+        "MergeExportedReflection.cpp",
         "OutlineDispatchRegions.cpp",
         "OutlineReductionRegions.cpp",
         "Passes.cpp",
@@ -38,6 +40,7 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        "//iree/base:signature_mangle",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/Conversion",
         "//iree/compiler/Dialect/Flow/Conversion/HLOToFlow",

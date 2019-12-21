@@ -28,7 +28,7 @@ iree_cc_library(
     "ConvertVariableOps.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    iree_compiler_Dialect_HAL_hal_imports
+    iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::HAL::IR::IR
     iree::compiler::Dialect::HAL::IR::HALEnumsGen
     iree::compiler::Dialect::HAL::IR::HALOpInterfaceGen

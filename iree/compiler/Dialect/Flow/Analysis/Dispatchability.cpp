@@ -53,7 +53,7 @@ LogicalResult Dispatchability::recalculate(ModuleOp moduleOp) {
 
   // Run through all functions until we are able to compute their
   // dispatchability. We do this so that we can determine if calls are allowed.
-  OpBuilder cloneBuilder(funcCloneModuleOp_);
+  OpBuilder cloneBuilder(funcCloneModuleOp_.get());
   std::vector<FuncOp> nextWorklist(moduleOp.getOps<FuncOp>().begin(),
                                    moduleOp.getOps<FuncOp>().end());
   std::vector<FuncOp> worklist;
@@ -69,7 +69,7 @@ LogicalResult Dispatchability::recalculate(ModuleOp moduleOp) {
         if (isDispatchable.getValue()) {
           auto clonedFuncOp = cast<FuncOp>(cloneBuilder.clone(*funcOp));
           funcClones_[funcOp.getName()] = clonedFuncOp;
-          funcCloneModuleOp_.push_back(clonedFuncOp);
+          funcCloneModuleOp_->push_back(clonedFuncOp);
         }
         anyChanged = true;
       } else {

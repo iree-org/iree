@@ -24,6 +24,8 @@ from . import binding as _binding
 # Native aliases.
 Context = _binding.compiler.CompilerContext
 Module = _binding.compiler.CompilerModule
+CompileOptions = _binding.compiler.CompileOptions
+OutputFormat = _binding.compiler.OutputFormat
 
 # Conditionally import TensorFlow interop aliases.
 HAS_TENSORFLOW = hasattr(_binding, "tf_interop")

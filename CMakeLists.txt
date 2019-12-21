@@ -29,10 +29,14 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 option(IREE_ENABLE_DEBUG "Enables debugging of the VM." ON)
 option(IREE_ENABLE_TRACING "Enables WTF tracing." OFF)
 
-option(IREE_BUILD_COMPILER "Builds the IREE compiler." OFF)
+option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
+
+if(${IREE_BUILD_SAMPLES})
+  set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
+endif()
 
 #-------------------------------------------------------------------------------
 # IREE-specific CMake configuration
@@ -49,6 +53,8 @@ include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
+include(iree_cc_embed_data)
+include(iree_bytecode_module)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 

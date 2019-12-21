@@ -49,12 +49,12 @@ InterpreterDriver::EnumerateAvailableDevices() {
 }
 
 StatusOr<ref_ptr<Device>> InterpreterDriver::CreateDefaultDevice() {
-  return CreateDevice(GetDefaultDeviceInfo());
+  return CreateDevice(0);
 }
 
 StatusOr<ref_ptr<Device>> InterpreterDriver::CreateDevice(
-    const DeviceInfo& device_info) {
-  auto device = make_ref<InterpreterDevice>(device_info);
+    DriverDeviceID device_id) {
+  auto device = make_ref<InterpreterDevice>(GetDefaultDeviceInfo());
   return device;
 }
 

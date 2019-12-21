@@ -575,7 +575,8 @@ ParseResult parseLoadInputOp(OpAsmParser &parser, OperationState &state) {
   Type argType;
   if (parser.parseLParen() || parser.parseOperand(operand) ||
       parser.parseColonType(argType) || parser.parseRParen() ||
-      parser.resolveOperand(operand, argType, state.operands)) {
+      parser.resolveOperand(operand, argType, state.operands) ||
+      parser.parseOptionalAttrDict(state.attributes)) {
     return failure();
   }
   Type outputType;
@@ -611,7 +612,8 @@ ParseResult parseStoreOutputOp(OpAsmParser &parser, OperationState &state) {
       parser.resolveOperand(op0, argType0, state.operands) ||
       parser.parseOperand(op1) || parser.parseColonType(argType1) ||
       parser.parseRParen() ||
-      parser.resolveOperand(op1, argType1, state.operands)) {
+      parser.resolveOperand(op1, argType1, state.operands) ||
+      parser.parseOptionalAttrDict(state.attributes)) {
     return failure();
   }
   return success();
@@ -630,6 +632,44 @@ void printStoreOutputOp(OpAsmPrinter &printer, Operation *op) {
   printer.printType(outputValue->getType());
   printer << ") ";
   printer.printOptionalAttrDict(op->getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// iree.store_reduce
+//===----------------------------------------------------------------------===//
+
+ParseResult parseStoreReduceOp(OpAsmParser &parser, OperationState &state) {
+  OpAsmParser::OperandType src, dst;
+  Type srcType, dstType;
+  SymbolRefAttr reductionFn;
+  if (parser.parseLParen() || parser.parseOperand(src) ||
+      parser.parseColonType(srcType) ||
+      parser.resolveOperand(src, srcType, state.operands) ||
+      parser.parseComma() || parser.parseOperand(dst) ||
+      parser.parseColonType(dstType) ||
+      parser.resolveOperand(dst, dstType, state.operands) ||
+      parser.parseComma() ||
+      parser.parseAttribute(reductionFn, "reduction_fn", state.attributes) ||
+      parser.parseRParen() || parser.parseOptionalAttrDict(state.attributes)) {
+    return failure();
+  }
+  return success();
+}
+
+void printStoreReduceOp(OpAsmPrinter &printer, Operation *op) {
+  auto storeReduceOp = cast<IREE::StoreReduceOp>(op);
+  printer << op->getName() << '(';
+  printer.printOperand(storeReduceOp.src());
+  printer << " : ";
+  printer.printType(storeReduceOp.src()->getType());
+  printer << ", ";
+  printer.printOperand(storeReduceOp.dst());
+  printer << " : ";
+  printer.printType(storeReduceOp.dst()->getType());
+  printer << ", ";
+  printer.printAttribute(storeReduceOp.reduction_fnAttr());
+  printer << ") ";
+  printer.printOptionalAttrDict(op->getAttrs(), StringRef("reduction_fn"));
 }
 
 #define GET_OP_CLASSES

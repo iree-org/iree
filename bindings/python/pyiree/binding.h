@@ -69,6 +69,22 @@ class OpaqueBlob {
     return {free_fn, holder};
   }
 
+  static iree_allocator_t CreateDeallocator(std::shared_ptr<OpaqueBlob> blob) {
+    // Note that there are more efficient ways to write this which
+    // don't bounce through an extra heap alloc, but this is not
+    // intended to be a high impact code path.
+    struct Holder {
+      std::shared_ptr<OpaqueBlob> blob;
+    };
+    Holder* holder = new Holder{std::move(blob)};
+    auto free_fn = +([](void* self, void*) -> iree_status_t {
+      Holder* self_holder = static_cast<Holder*>(self);
+      delete self_holder;
+      return IREE_STATUS_OK;
+    });
+    return {holder /* self */, nullptr /* alloc */, free_fn /* free */};
+  }
+
  protected:
   void* data_;
   size_t size_;
@@ -85,6 +101,17 @@ class OpaqueByteVectorBlob : public OpaqueBlob {
 
  private:
   std::vector<uint8_t> v_;
+};
+
+class OpaqueStringBlob : public OpaqueBlob {
+ public:
+  OpaqueStringBlob(std::string s) : OpaqueBlob(), s_(std::move(s)) {
+    data_ = &s_[0];
+    size_ = s_.size();
+  }
+
+ private:
+  std::string s_;
 };
 
 template <typename T>
@@ -123,6 +150,12 @@ class ApiRefCounted {
       ApiPtrAdapter<T>::Retain(non_retained_inst);
     }
     return self;
+  }
+
+  T* steal_raw_ptr() {
+    T* ret = instance_;
+    instance_ = nullptr;
+    return ret;
   }
 
   T* raw_ptr() {

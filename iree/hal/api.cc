@@ -14,6 +14,7 @@
 
 #include "iree/hal/api.h"
 
+#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/shape.h"
@@ -21,14 +22,92 @@
 #include "iree/hal/api_detail.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_view.h"
+#include "iree/hal/command_buffer.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
+#include "iree/hal/driver_registry.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/semaphore.h"
 
 namespace iree {
 namespace hal {
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Allocator
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t
+iree_hal_allocator_retain(iree_hal_allocator_t* allocator) {
+  IREE_TRACE_SCOPE0("iree_hal_allocator_retain");
+  auto* handle = reinterpret_cast<Allocator*>(allocator);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->AddReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_allocator_release(iree_hal_allocator_t* allocator) {
+  IREE_TRACE_SCOPE0("iree_hal_allocator_release");
+  auto* handle = reinterpret_cast<Allocator*>(allocator);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_allocate_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_buffer_usage_t buffer_usage, iree_host_size_t allocation_size,
+    iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_allocator_allocate_buffer");
+  if (!out_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_buffer = nullptr;
+  auto* handle = reinterpret_cast<Allocator*>(allocator);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(
+      auto buffer,
+      handle->Allocate(static_cast<MemoryTypeBitfield>(memory_type),
+                       static_cast<BufferUsageBitfield>(buffer_usage),
+                       allocation_size));
+
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
+    iree_hal_allocator_t* allocator, iree_hal_memory_type_t memory_type,
+    iree_hal_memory_access_t allowed_access,
+    iree_hal_buffer_usage_t buffer_usage, iree_byte_span_t data,
+    iree_hal_buffer_t** out_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_allocator_wrap_buffer");
+  if (!out_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_buffer = nullptr;
+  auto* handle = reinterpret_cast<Allocator*>(allocator);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(
+      auto buffer,
+      handle->WrapMutable(static_cast<MemoryTypeBitfield>(memory_type),
+                          static_cast<MemoryAccessBitfield>(allowed_access),
+                          static_cast<BufferUsageBitfield>(buffer_usage),
+                          data.data, data.data_length));
+
+  *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(buffer.release());
+  return IREE_STATUS_OK;
+}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Buffer
@@ -388,13 +467,38 @@ iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view) {
 }
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Semaphore
+// iree::hal::CommandBuffer
 //===----------------------------------------------------------------------===//
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
+    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_command_category_t command_categories, iree_allocator_t allocator,
+    iree_hal_command_buffer_t** out_command_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_create");
+  if (!out_command_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_command_buffer = nullptr;
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(
+      auto command_buffer,
+      handle->CreateCommandBuffer(
+          static_cast<CommandBufferModeBitfield>(mode),
+          static_cast<CommandCategoryBitfield>(command_categories)));
+
+  *out_command_buffer =
+      reinterpret_cast<iree_hal_command_buffer_t*>(command_buffer.release());
+  return IREE_STATUS_OK;
+}
+
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore) {
-  IREE_TRACE_SCOPE0("iree_hal_semaphore_retain");
-  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
+iree_hal_command_buffer_retain(iree_hal_command_buffer_t* command_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_retain");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -403,9 +507,305 @@ iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore) {
 }
 
 IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore) {
-  IREE_TRACE_SCOPE0("iree_hal_semaphore_release");
-  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
+iree_hal_command_buffer_release(iree_hal_command_buffer_t* command_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_release");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_command_buffer_begin(iree_hal_command_buffer_t* command_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_begin");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return ToApiStatus(handle->Begin());
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_command_buffer_end(iree_hal_command_buffer_t* command_buffer) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_end");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return ToApiStatus(handle->End());
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_execution_barrier(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_execution_stage_t source_stage_mask,
+    iree_hal_execution_stage_t target_stage_mask,
+    iree_host_size_t memory_barrier_count,
+    const iree_hal_memory_barrier_t* memory_barriers,
+    iree_host_size_t buffer_barrier_count,
+    const iree_hal_buffer_barrier_t* buffer_barriers) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_execution_barrier");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  // TODO(benvanik): refactor the C++ types to use the C types for storage so
+  // that we can safely map between the two. For now assume size equality
+  // is layout equality (as compilers aren't allowed to reorder structs).
+  static_assert(sizeof(MemoryBarrier) == sizeof(iree_hal_memory_barrier_t),
+                "Expecting identical layout");
+  static_assert(sizeof(BufferBarrier) == sizeof(iree_hal_buffer_barrier_t),
+                "Expecting identical layout");
+  return ToApiStatus(handle->ExecutionBarrier(
+      static_cast<ExecutionStageBitfield>(source_stage_mask),
+      static_cast<ExecutionStageBitfield>(target_stage_mask),
+      absl::MakeConstSpan(
+          reinterpret_cast<const MemoryBarrier*>(memory_barriers),
+          memory_barrier_count),
+      absl::MakeConstSpan(
+          reinterpret_cast<const BufferBarrier*>(buffer_barriers),
+          buffer_barrier_count)));
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Device
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t
+iree_hal_device_retain(iree_hal_device_t* device) {
+  IREE_TRACE_SCOPE0("iree_hal_device_retain");
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->AddReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_device_release(iree_hal_device_t* device) {
+  IREE_TRACE_SCOPE0("iree_hal_device_release");
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
+iree_hal_device_allocator(iree_hal_device_t* device) {
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return nullptr;
+  }
+  return reinterpret_cast<iree_hal_allocator_t*>(handle->allocator());
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Driver
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_retain(iree_hal_driver_t* driver) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_retain");
+  auto* handle = reinterpret_cast<Driver*>(driver);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->AddReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_release(iree_hal_driver_t* driver) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_release");
+  auto* handle = reinterpret_cast<Driver*>(driver);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_query_available_devices(
+    iree_hal_driver_t* driver, iree_allocator_t allocator,
+    iree_hal_device_info_t** out_device_infos,
+    iree_host_size_t* out_device_info_count) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_query_available_devices");
+  if (!out_device_info_count) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_device_info_count = 0;
+  if (!out_device_infos) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  auto* handle = reinterpret_cast<Driver*>(driver);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(auto device_infos,
+                            handle->EnumerateAvailableDevices());
+  size_t total_string_size = 0;
+  for (const auto& device_info : device_infos) {
+    total_string_size += device_info.name().size();
+  }
+
+  *out_device_info_count = device_infos.size();
+  iree_hal_device_info_t* device_info_storage = nullptr;
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator,
+      device_infos.size() * sizeof(*device_info_storage) + total_string_size,
+      (void**)&device_info_storage));
+
+  char* p = reinterpret_cast<char*>(device_info_storage) +
+            device_infos.size() * sizeof(*device_info_storage);
+  for (int i = 0; i < device_infos.size(); ++i) {
+    const auto& device_info = device_infos[i];
+    device_info_storage[i].device_id = device_info.device_id();
+
+    size_t name_size = device_info.name().size();
+    std::memcpy(p, device_info.name().c_str(), name_size);
+    device_info_storage[i].name = iree_string_view_t{p, name_size};
+    p += name_size;
+  }
+
+  *out_device_infos = device_info_storage;
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_driver_create_device(
+    iree_hal_driver_t* driver, iree_hal_device_id_t device_id,
+    iree_allocator_t allocator, iree_hal_device_t** out_device) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_create_device");
+  if (!out_device) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_device = nullptr;
+  auto* handle = reinterpret_cast<Driver*>(driver);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(auto device, handle->CreateDevice(device_id));
+
+  *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_create_default_device(iree_hal_driver_t* driver,
+                                      iree_allocator_t allocator,
+                                      iree_hal_device_t** out_device) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_create_default_device");
+  if (!out_device) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_device = nullptr;
+  auto* handle = reinterpret_cast<Driver*>(driver);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  IREE_API_ASSIGN_OR_RETURN(auto device, handle->CreateDefaultDevice());
+  *out_device = reinterpret_cast<iree_hal_device_t*>(device.release());
+  return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DriverRegistry
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT bool IREE_API_CALL
+iree_hal_driver_registry_has_driver(iree_string_view_t driver_name) {
+  return DriverRegistry::shared_registry()->HasDriver(
+      absl::string_view{driver_name.data, driver_name.size});
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_registry_query_available_drivers(
+    iree_allocator_t allocator, iree_string_view_t** out_driver_names,
+    iree_host_size_t* out_driver_count) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_registry_query_available_drivers");
+  if (!out_driver_count) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_driver_count = 0;
+  if (!out_driver_names) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto* registry = DriverRegistry::shared_registry();
+  auto available_drivers = registry->EnumerateAvailableDrivers();
+  size_t total_string_size = 0;
+  for (const auto& driver_name : available_drivers) {
+    total_string_size += driver_name.size();
+  }
+
+  *out_driver_count = available_drivers.size();
+  iree_string_view_t* driver_name_storage = nullptr;
+  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+      allocator,
+      available_drivers.size() * sizeof(*driver_name_storage) +
+          total_string_size,
+      (void**)&driver_name_storage));
+
+  char* p = reinterpret_cast<char*>(driver_name_storage) +
+            available_drivers.size() * sizeof(*driver_name_storage);
+  for (int i = 0; i < available_drivers.size(); ++i) {
+    const auto& driver_name = available_drivers[i];
+    size_t name_size = driver_name.size();
+    std::memcpy(p, driver_name.c_str(), name_size);
+    driver_name_storage[i] = iree_string_view_t{p, name_size};
+    p += name_size;
+  }
+
+  *out_driver_names = driver_name_storage;
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
+                                       iree_allocator_t allocator,
+                                       iree_hal_driver_t** out_driver) {
+  IREE_TRACE_SCOPE0("iree_hal_driver_registry_create_driver");
+  if (!out_driver) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_driver = nullptr;
+
+  auto* registry = DriverRegistry::shared_registry();
+  IREE_API_ASSIGN_OR_RETURN(
+      auto driver,
+      registry->Create(absl::string_view(driver_name.data, driver_name.size)));
+
+  *out_driver = reinterpret_cast<iree_hal_driver_t*>(driver.release());
+  return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Executable
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t
+iree_hal_executable_retain(iree_hal_executable_t* executable) {
+  IREE_TRACE_SCOPE0("iree_hal_executable_retain");
+  auto* handle = reinterpret_cast<Executable*>(executable);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  handle->AddReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t
+iree_hal_executable_release(iree_hal_executable_t* executable) {
+  IREE_TRACE_SCOPE0("iree_hal_executable_release");
+  auto* handle = reinterpret_cast<Executable*>(executable);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -438,13 +838,13 @@ IREE_API_EXPORT iree_status_t iree_hal_fence_release(iree_hal_fence_t* fence) {
 }
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Device
+// iree::hal::Semaphore
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t
-iree_hal_device_retain(iree_hal_device_t* device) {
-  IREE_TRACE_SCOPE0("iree_hal_device_retain");
-  auto* handle = reinterpret_cast<Device*>(device);
+iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore) {
+  IREE_TRACE_SCOPE0("iree_hal_semaphore_retain");
+  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -453,35 +853,9 @@ iree_hal_device_retain(iree_hal_device_t* device) {
 }
 
 IREE_API_EXPORT iree_status_t
-iree_hal_device_release(iree_hal_device_t* device) {
-  IREE_TRACE_SCOPE0("iree_hal_device_release");
-  auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
-  return IREE_STATUS_OK;
-}
-
-//===----------------------------------------------------------------------===//
-// iree::hal::Driver
-//===----------------------------------------------------------------------===//
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_retain(iree_hal_driver_t* driver) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_retain");
-  auto* handle = reinterpret_cast<Driver*>(driver);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_release(iree_hal_driver_t* driver) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_release");
-  auto* handle = reinterpret_cast<Driver*>(driver);
+iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore) {
+  IREE_TRACE_SCOPE0("iree_hal_semaphore_release");
+  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }

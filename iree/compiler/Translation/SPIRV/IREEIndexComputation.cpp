@@ -24,48 +24,31 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// IREELoadInputOp
+// Utility functions for IREE Index propagation
 //===----------------------------------------------------------------------===//
 
-LogicalResult IREELoadIndexPropagation::propagateIndexMap(
-    Operation *operation, AffineMap resultIndex,
-    SmallVectorImpl<AffineMap> &operandIndices) const {
-  operandIndices.push_back(resultIndex);
-  return success();
-}
-
-//===----------------------------------------------------------------------===//
-// IREEStoreOutputOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
-    Operation *operation) const {
-  auto storeOp = cast<IREE::StoreOutputOp>(operation);
-  auto src = storeOp.src();
-  SmallVector<int64_t, 4> srcShape;
-  int64_t srcNumElements = 0;
-  Type srcType = src->getType();
-  if (auto srcShapedType = srcType.dyn_cast<ShapedType>()) {
-    if (!srcShapedType.hasStaticShape()) {
-      return storeOp.emitError(
-          "can only handle store with src being tensor of static shape");
+// TODO(ravishankarm) : Same logic can be used for ReturnOp. Move it there when
+// IREE::StoreOutputOp and IREE::StoreReduceOp are deprecated.
+static LogicalResult initIndexPropagation(Location loc, FuncOp funcOp,
+                                          Value *value) {
+  SmallVector<int64_t, 4> valueShape;
+  int64_t valueNumElements = 0;
+  Type valueType = value->getType();
+  if (auto valueShapedType = valueType.dyn_cast<ShapedType>()) {
+    if (!valueShapedType.hasStaticShape()) {
+      return emitError(loc, "can only handle tensor of static shape");
     }
-    srcShape.append(srcShapedType.getShape().begin(),
-                    srcShapedType.getShape().end());
-    srcNumElements = srcShapedType.getNumElements();
-  } else if (srcType.isIntOrFloat()) {
-    srcShape.push_back(1);
-    srcNumElements = 1;
+    valueShape.append(valueShapedType.getShape().begin(),
+                      valueShapedType.getShape().end());
+    valueNumElements = valueShapedType.getNumElements();
+  } else if (valueType.isIntOrFloat()) {
+    valueShape.push_back(1);
+    valueNumElements = 1;
   } else {
-    return storeOp.emitError("unhandled src type for iree.store operation");
+    return emitError(loc, "unhandled value type for index propagation");
   }
 
   SmallVector<int64_t, 3> launchSize;
-  auto funcOp = operation->getParentOfType<FuncOp>();
-  if (!funcOp) {
-    return operation->emitError(
-        "expected operation to be in dispatch function to get launch size");
-  }
   if (failed(getLaunchSize(funcOp, launchSize))) {
     return failure();
   }
@@ -75,7 +58,7 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
   // workitem. The choice is fairly arbitrary but is done to enable the common
   // case where consecutive workitems compute "logically" adjacent tensor
   // elements.
-  Builder builder(storeOp.getContext());
+  Builder builder(funcOp.getContext());
   SmallVector<AffineExpr, 4> affineExprs;
   int64_t numElements = 1;
   for (size_t i = launchSize.size(); i > 0; --i) {
@@ -96,16 +79,85 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
   // The stored tensor can be a reshape of the launch dimension. It still
   // retains the requirement that each workitem is computing a single element
   // of the stored tensor.
-  AffineMap srcMap;
+  AffineMap valueMap;
   SmallVector<int64_t, 3> revLaunchSize(reverse(launchSize));
-  if (numElements != srcNumElements ||
+  if (numElements != valueNumElements ||
       failed(getReshapeOperandMap(funcOp, builder, launchMap, revLaunchSize,
-                                  srcShape, srcMap))) {
-    return storeOp.emitError(
+                                  valueShape, valueMap))) {
+    return emitError(
+        loc,
         "unable to map from launch id to element to compute within a "
         "workitem");
   }
-  return index_computation_attribute::addNewIndexMapForValue(src, srcMap);
+  return index_computation_attribute::addNewIndexMapForValue(value, valueMap);
 }
+
+//===----------------------------------------------------------------------===//
+// IREELoadInputOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult IREELoadIndexPropagation::propagateIndexMap(
+    Operation *operation, AffineMap resultIndex,
+    SmallVectorImpl<AffineMap> &operandIndices) const {
+  operandIndices.push_back(resultIndex);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// IREEStoreOutputOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
+    Operation *operation) const {
+  auto storeOp = cast<IREE::StoreOutputOp>(operation);
+  auto funcOp = operation->getParentOfType<FuncOp>();
+  if (!funcOp) {
+    return operation->emitError(
+        "expected operation to be in dispatch function to get launch size");
+  }
+  return initIndexPropagation(storeOp.getLoc(), funcOp, storeOp.src());
+}
+
+//===----------------------------------------------------------------------===//
+// IREEStoreReduceOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult IREEStoreReduceIndexPropagation::propagateIndexMap(
+    Operation *operation) const {
+  auto storeReduceOp = cast<IREE::StoreReduceOp>(operation);
+  auto funcOp = operation->getParentOfType<FuncOp>();
+  if (!funcOp) {
+    return operation->emitError(
+        "expected operation to be in dispatch function to get launch size");
+  }
+  if (failed(initIndexPropagation(storeReduceOp.getLoc(), funcOp,
+                                  storeReduceOp.src()))) {
+    return failure();
+  }
+
+  // Set the index of the output as well based on which dimensions are reduced.
+  SmallVector<AffineMap, 1> inputMap;
+  index_computation_attribute::getIndexMapsForValue(storeReduceOp.src(),
+                                                    inputMap);
+  assert(inputMap.size() == 1);
+  SmallVector<AffineExpr, 2> exprs;
+  auto reductionDim =
+      funcOp.getAttrOfType<IntegerAttr>("iree.executable.reduction.dimension")
+          .getInt();
+  for (auto dim : enumerate(inputMap[0].getResults())) {
+    if (dim.index() == reductionDim) {
+      continue;
+    }
+    exprs.push_back(dim.value());
+  }
+  if (exprs.empty()) {
+    exprs.push_back(getAffineConstantExpr(0, operation->getContext()));
+  }
+  index_computation_attribute::addNewIndexMapForValue(
+      storeReduceOp.dst(),
+      index_computation_attribute::getAffineMap(funcOp, exprs));
+  return success();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

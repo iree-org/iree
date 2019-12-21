@@ -18,6 +18,12 @@ namespace iree.vm;
 file_identifier "BMOD";
 file_extension "bmod";
 
+// Arbitrary key/value reflection attribute.
+table ReflectionAttrDef {
+  key:string;
+  value:string;
+}
+
 // Defines a type within the type table.
 table TypeDef {
   // Fully-qualified name of the type, such as `hal.buffer`.
@@ -33,6 +39,12 @@ table FunctionSignatureDef {
   // Results, in order, as described in the FunctionSignatureDef.
   // Maps to an entry in the module type table.
   result_types:[int32];
+
+  // Function level reflection attributes.
+  // These are typically used to communicate additional ABI metadata needed
+  // for dynamic invocation and host language mapping.
+  // See: docs/function_abi.md
+  reflection_attrs:[ReflectionAttrDef];
 }
 
 // Defines a runtime-resolved import function.

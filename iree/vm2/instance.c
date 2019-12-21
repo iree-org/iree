@@ -16,6 +16,8 @@
 
 #include <stdatomic.h>
 
+#include "iree/vm2/types.h"
+
 struct iree_vm_instance {
   atomic_intptr_t ref_count;
   iree_allocator_t allocator;
@@ -27,6 +29,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
     return IREE_STATUS_INVALID_ARGUMENT;
   }
   *out_instance = NULL;
+
+  IREE_API_RETURN_IF_API_ERROR(iree_vm_register_builtin_types());
 
   iree_vm_instance_t* instance = NULL;
   IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(

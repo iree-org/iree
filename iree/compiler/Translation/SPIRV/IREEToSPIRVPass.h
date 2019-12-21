@@ -22,19 +22,37 @@
 
 #include "mlir/Pass/Pass.h"
 
+// TODO(ravishankarm): Rename this file to something more meaningful.
+
 namespace mlir {
+class FuncOp;
 namespace iree_compiler {
 
-// Generates a spirv::ModuleOp from the module within an IREE Executable with
-// target-config vulkan-spirv.
+/// Generates a spirv::ModuleOp from the module within an IREE Executable with
+/// target-config vulkan-spirv.
 std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass();
 
-// Performs analysis to compute affine maps that represent the index of the
-// elements of tensor values needed within a workitem.
+/// Performs analysis to compute affine maps that represent the index of the
+/// elements of tensor values needed within a workitem.
 std::unique_ptr<OpPassBase<FuncOp>> createIndexComputationPass();
 
 // Legalizes integer width from i1, i8 and i64 types to i32 type.
 std::unique_ptr<Pass> createAdjustIntegerWidthPass();
+
+/// A pass that convertes entry functions for reductions into a form
+/// that is convenient to lower to SPIR-V.
+// TODO(ravishankarm) : This is a placeholder pass. Eventually this pass should
+// not be needed.
+std::unique_ptr<Pass> createPrepareReductionDispatchPass();
+
+/// Method to legalize the apply function within a reduction dispatch. This is
+/// not a pass since lowering of the entry function and the reduction apply
+/// function has to happen simultaneously to avoid dangling symbols.
+// TODO(ravishankarm) : Can probably fix that by adding an empty function and
+// then materializing it. There is no need to do that right now, but maybe in
+// the future.
+LogicalResult lowerReductionApplyFunction(MLIRContext *context,
+                                          ArrayRef<Operation *> fns);
 
 }  // namespace iree_compiler
 }  // namespace mlir

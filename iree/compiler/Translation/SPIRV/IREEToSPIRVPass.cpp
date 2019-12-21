@@ -22,6 +22,7 @@
 #include "iree/compiler/Translation/SPIRV/IREEIndexComputation.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRV.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV.h"
+#include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -44,7 +45,7 @@ void IREEToSPIRVPass::runOnModule() {
       ConstantOpSPIRVLowering,
       // IREE-specific ops:
       IREELoadOpSPIRVLowering, IREEReturnOpSPIRVLowering,
-      IREEStoreOpSPIRVLowering,
+      IREEStoreOpSPIRVLowering, IREEStoreReduceOpSPIRVLowering,
       // Standard dialect unary elementwise ops:
       // Standard dialect binary elementwise ops:
       SPIRVPwOpLowering<AddFOp, spirv::FAddOp>,
@@ -99,7 +100,44 @@ void IREEToSPIRVPass::runOnModule() {
       spirv::MemoryModel::GLSL450, spirv::Capability::Shader,
       spirv::Extension::SPV_KHR_storage_buffer_storage_class);
 
-  for (auto funcOp : module.getOps<FuncOp>()) {
+  auto fns = module.getOps<FuncOp>();
+
+  // Check for functions that are reduction apply functions
+  {
+    OpBuilder::InsertionGuard guard(builder);
+    builder.setInsertionPointToStart(&spvModule.getBlock());
+
+    SymbolTable table(module);
+    llvm::StringSet<> reductionApplyFnSymRefs;
+    SmallVector<Operation *, 1> clonedReductionFns;
+    for (auto funcOp : fns) {
+      if (!funcOp.getAttr("iree.executable.reduction")) {
+        continue;
+      }
+
+      auto applyFnSymRef = funcOp.getAttrOfType<FlatSymbolRefAttr>(
+          "iree.executable.reduction.apply");
+      if (reductionApplyFnSymRefs.count(applyFnSymRef.getValue())) {
+        continue;
+      }
+      auto applyFn = table.lookup<FuncOp>(applyFnSymRef.getValue());
+      if (!applyFn) {
+        emitError(funcOp.getLoc(), "unable to find fn ")
+            << applyFnSymRef << " which is the apply function for "
+            << funcOp.getName();
+        return signalPassFailure();
+      }
+      // Clone the reduction apply fns into the spirv module for legalization.
+      clonedReductionFns.push_back(builder.clone(*applyFn.getOperation()));
+    }
+
+    if (failed(lowerReductionApplyFunction(spvModule.getContext(),
+                                           clonedReductionFns))) {
+      return signalPassFailure();
+    }
+  }
+
+  for (auto funcOp : fns) {
     // TODO(ravishankarm): FuncOps in executable that are not dispatch functions
     // are not lowered to SPIR-V. Fix this limitation.
     if (!funcOp.getAttr("iree.executable.export")) continue;

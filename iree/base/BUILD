@@ -49,6 +49,7 @@ cc_library(
         ":shape",
         ":status",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/time",
     ],
 )
@@ -165,6 +166,17 @@ cc_library(
     hdrs = ["file_path.h"],
     deps = [
         "@com_google_absl//absl/strings",
+    ],
+)
+
+cc_test(
+    name = "file_path_test",
+    srcs = [
+        "file_path_test.cc",
+    ],
+    deps = [
+        ":file_path",
+        "//iree/testing:gtest_main",
     ],
 )
 

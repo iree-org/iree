@@ -19,6 +19,7 @@
 #include <string>
 
 #include "bindings/python/pyiree/binding.h"
+#include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
@@ -44,8 +45,14 @@ class CompilerModuleBundle {
   void RunPassPipeline(const std::vector<std::string>& pipelines);
 
   // Compiles the MLIR module to an IREE sequencer module.
+  // Deprecated (compiles to v1 binary).
   std::shared_ptr<OpaqueBlob> CompileToSequencerBlob(
       bool print_mlir, std::vector<std::string> target_backends);
+
+  // Compile to a VM module.
+  std::shared_ptr<OpaqueBlob> Compile(
+      mlir::iree_compiler::IREE::VM::BytecodeTargetOptions options,
+      std::vector<std::string> target_backends);
 
  private:
   std::shared_ptr<CompilerContextBundle> context_;

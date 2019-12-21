@@ -35,8 +35,7 @@ class DawnDriver final : public Driver {
 
   StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
-  StatusOr<ref_ptr<Device>> CreateDevice(
-      const DeviceInfo& device_info) override;
+  StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
 
  private:
   std::unique_ptr<dawn_native::Instance> dawn_instance_;

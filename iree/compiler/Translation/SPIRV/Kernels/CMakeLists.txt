@@ -25,6 +25,12 @@
 # )
 
 add_custom_command(
+  OUTPUT conv2d_nhwc.spv
+  COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/conv2d_nhwc.comp" -o conv2d_nhwc.spv
+  DEPENDS glslangValidator
+)
+
+add_custom_command(
   OUTPUT matmul.spv
   COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/matmul.comp" -o matmul.spv
   DEPENDS glslangValidator
@@ -36,17 +42,18 @@ add_custom_command(
   DEPENDS glslangValidator
 )
 
-add_custom_command(
-  OUTPUT Kernels.h Kernels.cc
-  COMMAND generate_cc_embed_data matmul.spv reduce_untiled.spv
-          --output_header=Kernels.h
-          --output_impl=Kernels.cc
-          --identifier=Kernels
-          --cpp_namespace=mlir::iree_compiler::spirv_kernels
-          --flatten
-  DEPENDS generate_cc_embed_data
-          matmul.spv
-          reduce_untiled.spv
+iree_cc_embed_data(
+  NAME
+    Kernels
+  GENERATED_SRCS
+    "conv2d_nhwc.spv"
+    "matmul.spv"
+    "reduce_untiled.spv"
+  CC_FILE_OUTPUT
+    "Kernels.cc"
+  H_FILE_OUTPUT
+    "Kernels.h"
+  CPP_NAMESPACE
+    "mlir::iree_compiler::spirv_kernels"
+  FLATTEN
 )
-
-add_library(iree_compiler_Translation_SPIRV_Kernels STATIC Kernels.cc)

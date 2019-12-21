@@ -34,9 +34,20 @@ DEFAULT_FEATURES = [
 ]
 
 COMPILER_DEPS = [
+    # TODO(laurenzo): Remove these once migrated to vm2
     "//iree/compiler/Translation/Sequencer",
     "//iree/compiler/Translation/Interpreter",
     "//iree/compiler/Translation/SPIRV",
+    "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+    "//iree/compiler/Translation:IREEVM",
+
+    # New compiler target backends.
+    # NOTE: Including the LegacyInterpreter causes some pretty low level assertion failure.
+    # I think it is non-functional.
+    # "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
+    "//iree/compiler/Dialect/HAL/Target/VMLA",
+    "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
+    "//iree/compiler/Dialect/VM/Target/Bytecode",
 ]
 
 DRIVER_DEPS = PLATFORM_VULKAN_DEPS + [
@@ -116,6 +127,9 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@com_google_absl//absl/types:variant",
         "//iree/compiler/Utils",
+        "//iree/modules/hal",
+        "//iree/vm2",
+        "//iree/vm2:bytecode_module",
         "@local_config_mlir//:IR",
         "//iree/base:api",
         "//iree/base:status",
@@ -186,6 +200,19 @@ py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
     python_version = "PY3",
+    deps = NUMPY_DEPS + [
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+        "@absl_py//absl/testing:absltest",
+        "//bindings/python/pyiree",
+    ],
+)
+
+py_test(
+    name = "vm_test",
+    srcs = ["vm_test.py"],
+    python_version = "PY3",
+    # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
+    tags = ["notap"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",

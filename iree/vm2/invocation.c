@@ -31,7 +31,7 @@ static iree_status_t iree_vm_marshal_inputs(
     if (IREE_VM_VARIANT_IS_REF(variant)) {
       iree_vm_ref_t* reg_ref = &registers->ref[ref_reg++];
       memset(reg_ref, 0, sizeof(*reg_ref));
-      iree_vm_ref_move(&variant->ref, reg_ref);
+      iree_vm_ref_retain(&variant->ref, reg_ref);
     } else {
       registers->i32[i32_reg++] = variant->i32;
     }

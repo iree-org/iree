@@ -86,6 +86,43 @@ class HalMappedMemory {
 
 }  // namespace
 
+//------------------------------------------------------------------------------
+// HalDriver
+//------------------------------------------------------------------------------
+
+std::vector<std::string> HalDriver::Query() {
+  iree_string_view_t* driver_names;
+  iree_host_size_t driver_count;
+  CheckApiStatus(iree_hal_driver_registry_query_available_drivers(
+                     IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count),
+                 "Error querying drivers");
+
+  std::vector<std::string> drivers;
+  drivers.resize(driver_count);
+  for (iree_host_size_t i = 0; i < driver_count; ++i) {
+    drivers[i] = std::string(driver_names[i].data, driver_names[i].size);
+  }
+  free(driver_names);
+  return drivers;
+}
+
+HalDriver HalDriver::Create(const std::string& driver_name) {
+  iree_hal_driver_t* driver;
+  CheckApiStatus(iree_hal_driver_registry_create_driver(
+                     {driver_name.data(), driver_name.size()},
+                     IREE_ALLOCATOR_SYSTEM, &driver),
+                 "Error creating driver");
+  return HalDriver::CreateRetained(driver);
+}
+
+HalDevice HalDriver::CreateDefaultDevice() {
+  iree_hal_device_t* device;
+  CheckApiStatus(iree_hal_driver_create_default_device(
+                     raw_ptr(), IREE_ALLOCATOR_SYSTEM, &device),
+                 "Error creating default device");
+  return HalDevice::CreateRetained(device);
+}
+
 void SetupHalBindings(pybind11::module m) {
   // Enums.
   py::enum_<iree_hal_memory_type_t>(m, "MemoryType")
@@ -114,6 +151,12 @@ void SetupHalBindings(pybind11::module m) {
       .value("DISCARD_WRITE", IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE)
       .value("ALL", IREE_HAL_MEMORY_ACCESS_ALL)
       .export_values();
+
+  py::class_<HalDevice>(m, "HalDevice");
+  py::class_<HalDriver>(m, "HalDriver")
+      .def_static("query", &HalDriver::Query)
+      .def_static("create", &HalDriver::Create, py::arg("driver_name"))
+      .def("create_default_device", &HalDriver::CreateDefaultDevice);
 
   py::class_<HalShape>(m, "Shape").def(py::init(&HalShape::FromIntVector));
   py::class_<HalBufferView>(m, "BufferView")

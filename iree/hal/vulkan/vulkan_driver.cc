@@ -70,7 +70,8 @@ StatusOr<DeviceInfo> PopulateDeviceInfo(VkPhysicalDevice physical_device,
   // supported_features |= DeviceFeature::kDebugging;
   // supported_features |= DeviceFeature::kCoverage;
   // supported_features |= DeviceFeature::kProfiling;
-  return DeviceInfo(std::move(name), supported_features, physical_device);
+  return DeviceInfo(std::move(name), supported_features,
+                    reinterpret_cast<DriverDeviceID>(physical_device));
 }
 
 }  // namespace
@@ -248,15 +249,15 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
   }
 
   // Just create the first one we find.
-  return CreateDevice(available_devices.front());
+  return CreateDevice(available_devices.front().device_id());
 }
 
-StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(
-    const DeviceInfo& device_info) {
+StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
   IREE_TRACE_SCOPE0("VulkanDriver::CreateDevice");
 
-  auto physical_device =
-      static_cast<VkPhysicalDevice>(device_info.driver_handle());
+  auto physical_device = reinterpret_cast<VkPhysicalDevice>(device_id);
+  ASSIGN_OR_RETURN(auto device_info,
+                   PopulateDeviceInfo(physical_device, syms()));
 
   // Attempt to create the device.
   // This may fail if the device was enumerated but is in exclusive use,

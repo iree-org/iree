@@ -102,15 +102,23 @@ class FunctionAbi {
   int raw_input_arity() const { return raw_config_.inputs.size(); }
   int raw_result_arity() const { return raw_config_.results.size(); }
 
-  // Raw packing and unpacking. These always operate on the linear span
-  // of raw inputs and results. Some ABIs perform a higher level of mapping
-  // on top of this, which can be accessed via the non-prefixed Pack/Unpack
-  // methods.
+  // Raw packing. These always operate on the linear span of raw inputs and
+  // results. Some ABIs perform a higher level of mapping on top of this,
+  // which can be accessed via the non-prefixed Pack/Unpack methods.
   // Given a span of descriptions, packs the given py_args into the span
   // of function args. All spans must be of the same size.
   void RawPack(RtContext& context, absl::Span<const Description> descs,
                absl::Span<py::handle> py_args,
                absl::Span<FunctionArgVariant> f_args, bool writable);
+
+  // Raw unpacks f_results into py_results.
+  // Note that this consumes entries in f_results as needed, leaving them
+  // as nullptr.
+  // Ordinarily, this will be invoked along with AllocateResults() but it
+  // is broken out for testing.
+  void RawUnpack(RtContext& context, absl::Span<const Description> descs,
+                 absl::Span<FunctionArgVariant> f_results,
+                 absl::Span<py::object> py_results);
 
   // Given bound function arguments (from RawPack or equiv) and signature
   // descriptors, allocates results for the function invocation. For fully

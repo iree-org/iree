@@ -18,16 +18,16 @@ add_subdirectory(Target)
 add_subdirectory(Transforms)
 add_subdirectory(Utils)
 
-add_custom_command(
-  PRE_BUILD
-  OUTPUT hal.imports.h hal.imports.cc
-  COMMAND generate_cc_embed_data "${CMAKE_CURRENT_SOURCE_DIR}/hal.imports.mlir"
-          --output_header=hal.imports.h
-          --output_impl=hal.imports.cc
-          --identifier=hal_imports
-          --cpp_namespace=mlir::iree_compiler
-          --flatten
-  DEPENDS generate_cc_embed_data
+iree_cc_embed_data(
+  NAME
+    hal_imports
+  SRCS
+    "hal.imports.mlir"
+  CC_FILE_OUTPUT
+    "hal.imports.cc"
+  H_FILE_OUTPUT
+    "hal.imports.h"
+  CPP_NAMESPACE
+    "mlir::iree_compiler"
+  FLATTEN
 )
-
-add_custom_target(iree_compiler_Dialect_HAL_hal_imports DEPENDS hal.imports.h)

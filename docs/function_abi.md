@@ -52,7 +52,7 @@ signature ::= 'I' length-prefixed(type-sequence)
               'R' length-prefixed(type-sequence)
 
 type-sequence ::= (arg-result-type)*
-arg-result-type ::= buffer-type | ref-object-type
+arg-result-type ::= buffer-type | ref-object-type | unrecognized-type
 buffer-type ::= 'B' length-prefixed(scalar-type? dim*)
 scalar-type ::= 't' (
                     '0'  # IEEE float32 (default if not specified)
@@ -70,7 +70,7 @@ scalar-type ::= 't' (
                   )
 dim :: = 'd' integer  # -1 indicates a dynamic dim
 ref-object-type ::= 'O' length-prefixed()  # Details TBD
-
+unrecognized-type ::= 'U' length-prefixed()
 
 # Lexical primitives
 integer ::= -?[0-9]+

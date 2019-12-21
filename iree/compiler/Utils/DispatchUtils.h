@@ -34,6 +34,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Calculates the workload based on the shape of a tensor.
+void calculateWorkload(ArrayRef<int64_t> shape,
+                       std::array<int32_t, 3> &workload);
+
 // Calculates the workload for |op| based on the op type.
 Value *calculateWorkload(Operation *op, Value *baseOperand);
 
