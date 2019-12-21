@@ -17,11 +17,14 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
-#include "bindings/python/pyiree/rt.h"
+#include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/hal/api.h"
+#include "iree/modules/hal/hal_module.h"
+#include "iree/vm2/ref.h"
+#include "iree/vm2/variant_list.h"
 
 namespace iree {
 namespace python {
@@ -33,7 +36,7 @@ namespace {
 // for testing. Typically, this will be created directly from a function
 // and the attribute introspection will happen internal to C++.
 std::unique_ptr<FunctionAbi> PyCreateAbi(
-    std::shared_ptr<HostTypeFactory> host_type_factory,
+    HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
     std::vector<std::pair<std::string, std::string>> attrs) {
   auto lookup =
       [&attrs](absl::string_view key) -> absl::optional<absl::string_view> {
@@ -42,13 +45,12 @@ std::unique_ptr<FunctionAbi> PyCreateAbi(
     }
     return absl::nullopt;
   };
-  return FunctionAbi::Create(std::move(host_type_factory), lookup);
+  return FunctionAbi::Create(device, std::move(host_type_factory), lookup);
 }
 
 std::unique_ptr<FunctionArgVariantList> PyRawPack(
-    FunctionAbi* self, RtContext& context,
-    absl::Span<const FunctionAbi::Description> descs, py::sequence py_args,
-    bool writable) {
+    FunctionAbi* self, absl::Span<const FunctionAbi::Description> descs,
+    py::sequence py_args, bool writable) {
   if (py_args.size() != descs.size()) {
     throw RaiseValueError("Mismatched pack arity");
   }
@@ -56,27 +58,26 @@ std::unique_ptr<FunctionArgVariantList> PyRawPack(
   f_list->contents().resize(py_args.size());
   absl::InlinedVector<py::handle, 8> local_py_args(py_args.begin(),
                                                    py_args.end());
-  self->RawPack(context, descs, absl::MakeSpan(local_py_args),
+  self->RawPack(descs, absl::MakeSpan(local_py_args),
                 absl::MakeSpan(f_list->contents()), writable);
   return f_list;
 }
 
 std::unique_ptr<FunctionArgVariantList> PyAllocateResults(
-    FunctionAbi* self, RtContext& context, FunctionArgVariantList* f_args) {
+    FunctionAbi* self, FunctionArgVariantList* f_args) {
   auto f_results = absl::make_unique<FunctionArgVariantList>();
   f_results->contents().resize(self->raw_result_arity());
-  self->AllocateResults(context,
-                        absl::MakeConstSpan(self->raw_config().results),
+  self->AllocateResults(absl::MakeConstSpan(self->raw_config().results),
                         absl::MakeConstSpan(f_args->contents()),
                         absl::MakeSpan(f_results->contents()));
   return f_results;
 }
 
-py::object PyRawUnpackResults(FunctionAbi* self, RtContext& context,
+py::object PyRawUnpackResults(FunctionAbi* self,
                               FunctionArgVariantList* f_args) {
   absl::InlinedVector<py::object, 4> py_results;
   py_results.resize(f_args->contents().size());
-  self->RawUnpack(context, absl::MakeConstSpan(self->raw_config().results),
+  self->RawUnpack(absl::MakeConstSpan(self->raw_config().results),
                   absl::MakeSpan(f_args->contents()),
                   absl::MakeSpan(py_results));
   py::tuple py_result_tuple(py_results.size());
@@ -163,52 +164,6 @@ void MapBufferAttrs(Py_buffer& py_view,
   }
 }
 
-void PackBuffer(RtContext& context, const RawSignatureParser::Description& desc,
-                py::handle py_arg, FunctionArgVariant& f_arg, bool writable) {
-  // Request a view of the buffer (use the raw python C API to avoid some
-  // allocation and copying at the pybind level).
-  Py_buffer py_view;
-  // Note that only C-Contiguous ND-arrays are presently supported, so
-  // only request that via PyBUF_ND. Long term, we should consult an
-  // "oracle" in the runtime to determine the precise required format and
-  // set flags accordingly (and fallback/copy on failure).
-  int flags = PyBUF_FORMAT | PyBUF_ND;
-  if (writable) {
-    flags |= PyBUF_WRITABLE;
-  }
-
-  // Acquire the backing buffer and setup RAII release.
-  if (PyObject_GetBuffer(py_arg.ptr(), &py_view, flags) != 0) {
-    // The GetBuffer call is required to set an appropriate error.
-    throw py::error_already_set();
-  }
-  PyBufferReleaser py_view_releaser(py_view);
-
-  auto& bound_arg = f_arg.emplace<BoundHalBufferFunctionArg>();
-  // Whether the py object needs to be retained with the argument.
-  // Should be set to true if directly mapping, false if copied.
-  bool depends_on_pyobject = false;
-
-  // Verify compatibility.
-  MapBufferAttrs(py_view, desc, bound_arg);
-
-  // Allocate a HalBuffer.
-  // This is hard-coded to C-contiguous right now.
-  // TODO(laurenzo): Expand to other layouts as needed.
-  // TODO(laurenzo): Wrap and retain original buffer (depends_on_pyobject=true).
-  bound_arg.buffer =
-      context.AllocateDeviceVisible(py_view.len, IREE_HAL_BUFFER_USAGE_ALL);
-  CheckApiStatus(iree_hal_buffer_write_data(bound_arg.buffer.raw_ptr(), 0,
-                                            py_view.buf, py_view.len),
-                 "Error writing to input buffer");
-
-  // Only capture the reference to the exporting object (incrementing it)
-  // once guaranteed successful.
-  if (depends_on_pyobject) {
-    bound_arg.dependent_pyobject = py::object(py::handle(py_view.obj), false);
-  }
-}
-
 std::string FunctionArgVariantListRepr(FunctionArgVariantList* self) {
   std::string s;
   struct Visitor {
@@ -250,8 +205,40 @@ std::string FunctionArgVariantListRepr(FunctionArgVariantList* self) {
 }  // namespace
 
 //------------------------------------------------------------------------------
+// FunctionArgVariantList
+//------------------------------------------------------------------------------
+
+VmVariantList FunctionArgVariantList::ToVmVariantList() {
+  struct Visitor {
+    VmVariantList list;
+    void operator()(std::nullptr_t) {
+      CheckApiStatus(iree_vm_variant_list_append_null_ref(list.raw_ptr()),
+                     "Error appending to variant list");
+    }
+    void operator()(BoundHalBufferFunctionArg& arg) {
+      if (arg.dependent_pyobject) {
+        throw RaiseValueError("Dependent buffer object not yet supported");
+      }
+      iree_vm_ref_t buffer_ref =
+          iree_hal_buffer_retain_ref(arg.buffer.raw_ptr());
+      CheckApiStatus(
+          iree_vm_variant_list_append_ref_move(list.raw_ptr(), &buffer_ref),
+          "Error moving buffer");
+    }
+  };
+
+  Visitor visitor{VmVariantList::Create(contents_.size())};
+  for (auto& arg_variant : contents_) {
+    absl::visit(visitor, arg_variant);
+  }
+
+  return std::move(visitor.list);
+}
+
+//------------------------------------------------------------------------------
 // FunctionAbi
 //------------------------------------------------------------------------------
+
 std::string FunctionAbi::DebugString() const {
   RawSignatureParser p;
   auto s = p.FunctionSignatureToString(raw_config_.signature);
@@ -262,9 +249,10 @@ std::string FunctionAbi::DebugString() const {
 }
 
 std::unique_ptr<FunctionAbi> FunctionAbi::Create(
-    std::shared_ptr<HostTypeFactory> host_type_factory,
+    HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
     AttributeLookup lookup) {
-  auto abi = absl::make_unique<FunctionAbi>(std::move(host_type_factory));
+  auto abi =
+      absl::make_unique<FunctionAbi>(device, std::move(host_type_factory));
 
   // Fetch key attributes for the raw ABI.
   auto raw_version = lookup("fv");
@@ -291,8 +279,8 @@ std::unique_ptr<FunctionAbi> FunctionAbi::Create(
                           });
   if (raw_parser.GetError()) {
     auto message = absl::StrCat(
-        "Error parsing raw ABI signature: ", *raw_parser.GetError(), " (",
-        *raw_fsig_str, ")");
+        "Error parsing raw ABI signature: ", *raw_parser.GetError(), " ('",
+        *raw_fsig_str, "')");
     throw RaiseValueError(message.c_str());
   }
 
@@ -300,8 +288,7 @@ std::unique_ptr<FunctionAbi> FunctionAbi::Create(
   return abi;
 }
 
-void FunctionAbi::RawPack(RtContext& context,
-                          absl::Span<const Description> descs,
+void FunctionAbi::RawPack(absl::Span<const Description> descs,
                           absl::Span<py::handle> py_args,
                           absl::Span<FunctionArgVariant> f_args,
                           bool writable) {
@@ -313,7 +300,7 @@ void FunctionAbi::RawPack(RtContext& context,
     const Description& desc = descs[i];
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer:
-        PackBuffer(context, desc, py_args[i], f_args[i], writable);
+        PackBuffer(desc, py_args[i], f_args[i], writable);
         break;
       case RawSignatureParser::Type::kRefObject:
         throw RaisePyError(PyExc_NotImplementedError,
@@ -326,8 +313,7 @@ void FunctionAbi::RawPack(RtContext& context,
   }
 }
 
-void FunctionAbi::RawUnpack(RtContext& context,
-                            absl::Span<const Description> descs,
+void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
                             absl::Span<FunctionArgVariant> f_results,
                             absl::Span<py::object> py_results) {
   if (descs.size() != f_results.size() || descs.size() != py_results.size()) {
@@ -375,8 +361,7 @@ void FunctionAbi::RawUnpack(RtContext& context,
   }
 }
 
-void FunctionAbi::AllocateResults(RtContext& context,
-                                  absl::Span<const Description> descs,
+void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
                                   absl::Span<const FunctionArgVariant> f_args,
                                   absl::Span<FunctionArgVariant> f_results) {
   if (descs.size() != f_results.size()) {
@@ -410,11 +395,16 @@ void FunctionAbi::AllocateResults(RtContext& context,
         }
 
         // Static cases are easy.
-        // TODO(laurenzo): This should probably be AllocateDeviceLocal
-        // with a memory type of HOST_VISIBLE, which is not yet plumbed
-        // through.
-        bound_result.buffer = context.AllocateDeviceVisible(
-            alloc_size, IREE_HAL_BUFFER_USAGE_ALL);
+        iree_hal_buffer_t* raw_buffer;
+        CheckApiStatus(iree_hal_allocator_allocate_buffer(
+                           device_.allocator(),
+                           static_cast<iree_hal_memory_type_t>(
+                               IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                               IREE_HAL_MEMORY_TYPE_HOST_VISIBLE),
+                           IREE_HAL_BUFFER_USAGE_ALL, alloc_size, &raw_buffer),
+                       "Error allocating host visible buffer");
+        bound_result.buffer = HalBuffer::CreateRetained(raw_buffer);
+        assert(i < f_results.size());
         f_results[i] = std::move(bound_result);
         break;
       }
@@ -429,6 +419,60 @@ void FunctionAbi::AllocateResults(RtContext& context,
   }
 }
 
+void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
+                             py::handle py_arg, FunctionArgVariant& f_arg,
+                             bool writable) {
+  // Request a view of the buffer (use the raw python C API to avoid some
+  // allocation and copying at the pybind level).
+  Py_buffer py_view;
+  // Note that only C-Contiguous ND-arrays are presently supported, so
+  // only request that via PyBUF_ND. Long term, we should consult an
+  // "oracle" in the runtime to determine the precise required format and
+  // set flags accordingly (and fallback/copy on failure).
+  int flags = PyBUF_FORMAT | PyBUF_ND;
+  if (writable) {
+    flags |= PyBUF_WRITABLE;
+  }
+
+  // Acquire the backing buffer and setup RAII release.
+  if (PyObject_GetBuffer(py_arg.ptr(), &py_view, flags) != 0) {
+    // The GetBuffer call is required to set an appropriate error.
+    throw py::error_already_set();
+  }
+  PyBufferReleaser py_view_releaser(py_view);
+
+  auto& bound_arg = f_arg.emplace<BoundHalBufferFunctionArg>();
+  // Whether the py object needs to be retained with the argument.
+  // Should be set to true if directly mapping, false if copied.
+  bool depends_on_pyobject = false;
+
+  // Verify compatibility.
+  MapBufferAttrs(py_view, desc, bound_arg);
+
+  // Allocate a HalBuffer.
+  // This is hard-coded to C-contiguous right now.
+  // TODO(laurenzo): Expand to other layouts as needed.
+  // TODO(laurenzo): Wrap and retain original buffer (depends_on_pyobject=true).
+  iree_hal_buffer_t* raw_buffer;
+  CheckApiStatus(iree_hal_allocator_allocate_buffer(
+                     device_.allocator(),
+                     static_cast<iree_hal_memory_type_t>(
+                         IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                         IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+                     IREE_HAL_BUFFER_USAGE_ALL, py_view.len, &raw_buffer),
+                 "Failed to allocate device visible buffer");
+  bound_arg.buffer = HalBuffer::CreateRetained(raw_buffer);
+  CheckApiStatus(iree_hal_buffer_write_data(bound_arg.buffer.raw_ptr(), 0,
+                                            py_view.buf, py_view.len),
+                 "Error writing to input buffer");
+
+  // Only capture the reference to the exporting object (incrementing it)
+  // once guaranteed successful.
+  if (depends_on_pyobject) {
+    bound_arg.dependent_pyobject = py::object(py::handle(py_view.obj), false);
+  }
+}
+
 void SetupFunctionAbiBindings(pybind11::module m) {
   m.def("create", &PyCreateAbi);
   py::class_<FunctionAbi, std::unique_ptr<FunctionAbi>>(m, "FunctionAbi")
@@ -436,8 +480,8 @@ void SetupFunctionAbiBindings(pybind11::module m) {
       .def_property_readonly("raw_input_arity", &FunctionAbi::raw_input_arity)
       .def_property_readonly("raw_result_arity", &FunctionAbi::raw_result_arity)
       .def("raw_pack_inputs",
-           [](FunctionAbi* self, RtContext& context, py::sequence py_args) {
-             return PyRawPack(self, context,
+           [](FunctionAbi* self, py::sequence py_args) {
+             return PyRawPack(self,
                               absl::MakeConstSpan(self->raw_config().inputs),
                               py_args, false /* writable */);
            })
@@ -451,6 +495,7 @@ void SetupFunctionAbiBindings(pybind11::module m) {
       .def_property_readonly(
           "size",
           [](FunctionArgVariantList* self) { return self->contents().size(); })
+      .def("to_vm_variant_list", &FunctionArgVariantList::ToVmVariantList)
       .def("__repr__", &FunctionArgVariantListRepr);
 }
 

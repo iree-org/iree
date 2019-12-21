@@ -3,6 +3,7 @@
 // CHECK-LABEL: simple_module
 vm.module @simple_module {
   vm.export @func
+  // CHECK: internal_functions:
   // CHECK: reflection_attrs:
   // CHECK:   key: "f"
   // CHECK:   value: "FOOBAR"

@@ -16,6 +16,7 @@
 # pylint: disable=unused-variable
 
 from absl.testing import absltest
+import numpy as np
 import pyiree
 
 
@@ -43,6 +44,7 @@ class VmTest(absltest.TestCase):
     cls.driver = pyiree.binding.hal.HalDriver.create("vulkan")
     cls.device = cls.driver.create_default_device()
     cls.hal_module = pyiree.binding.vm.create_hal_module(cls.device)
+    cls.htf = pyiree.binding.host_types.HostTypeFactory.get_numpy()
 
   def test_variant_list(self):
     l = pyiree.binding.vm.VmVariantList(5)
@@ -76,6 +78,29 @@ class VmTest(absltest.TestCase):
     context = pyiree.binding.vm.VmContext(
         instance, modules=[self.hal_module, m])
     print(context)
+
+  def test_invoke_function(self):
+    m = create_simple_mul_module()
+    instance = pyiree.binding.vm.VmInstance()
+    context = pyiree.binding.vm.VmContext(
+        instance, modules=[self.hal_module, m])
+    f = m.lookup_function("simple_mul")
+    abi = context.create_function_abi(self.device, self.htf, f)
+    print("INVOKING:", abi)
+    arg0 = np.array([1., 2., 3., 4.], dtype=np.float32)
+    arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
+    inputs = abi.raw_pack_inputs((arg0, arg1))
+    print("INPUTS:", inputs)
+    allocated_results = abi.allocate_results(inputs)
+    print("ALLOCATED RESULTS:", allocated_results)
+    print("--- INVOKE:")
+    context.invoke(f, inputs.to_vm_variant_list(),
+                   allocated_results.to_vm_variant_list())
+    print("--- DONE.")
+    results = abi.raw_unpack_results(allocated_results)
+    print("RESULTS:", results)
+    # TODO(laurenzo): Results are coming back all zero. Diagnose and uncomment.
+    # np.testing.assert_allclose(results[0], [4., 10., 18., 28.])
 
 
 if __name__ == "__main__":

@@ -17,6 +17,7 @@
 
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/binding.h"
+#include "bindings/python/pyiree/host_types.h"
 #include "bindings/python/pyiree/rt.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
@@ -25,6 +26,8 @@
 
 namespace iree {
 namespace python {
+
+class FunctionAbi;
 
 //------------------------------------------------------------------------------
 // Retain/release bindings
@@ -54,6 +57,45 @@ struct ApiPtrAdapter<iree_vm_invocation_t> {
   static void Release(iree_vm_invocation_t* b) {
     iree_vm_invocation_release(b);
   }
+};
+
+//------------------------------------------------------------------------------
+// VmVariantList
+//------------------------------------------------------------------------------
+
+class VmVariantList {
+ public:
+  VmVariantList() : list_(nullptr) {}
+  ~VmVariantList() {
+    if (list_) {
+      CheckApiStatus(iree_vm_variant_list_free(list_), "Error freeing list");
+    }
+  }
+
+  VmVariantList(VmVariantList&& other) {
+    list_ = other.list_;
+    other.list_ = nullptr;
+  }
+
+  VmVariantList& operator=(const VmVariantList&) = delete;
+  VmVariantList(const VmVariantList&) = delete;
+
+  static VmVariantList Create(iree_host_size_t capacity) {
+    iree_vm_variant_list_t* list;
+    CheckApiStatus(
+        iree_vm_variant_list_alloc(capacity, IREE_ALLOCATOR_SYSTEM, &list),
+        "Error allocating variant list");
+    return VmVariantList(list);
+  }
+
+  iree_host_size_t size() const { return iree_vm_variant_list_size(list_); }
+
+  iree_vm_variant_list_t* raw_ptr() { return list_; }
+  const iree_vm_variant_list_t* raw_ptr() const { return list_; }
+
+ private:
+  VmVariantList(iree_vm_variant_list_t* list) : list_(list) {}
+  iree_vm_variant_list_t* list_;
 };
 
 //------------------------------------------------------------------------------
@@ -88,48 +130,21 @@ class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {
 
   // Unique id for this context.
   int context_id() const { return iree_vm_context_id(raw_ptr()); }
+
+  // Synchronously invokes the given function.
+  void Invoke(iree_vm_function_t f, VmVariantList& inputs,
+              VmVariantList& outputs);
+
+  // Creates a function ABI suitable for marshalling function inputs/results.
+  std::unique_ptr<FunctionAbi> CreateFunctionAbi(
+      HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
+      iree_vm_function_t f);
 };
 
 class VmInvocation : public ApiRefCounted<VmInvocation, iree_vm_invocation_t> {
 };
 
 void SetupVmBindings(pybind11::module m);
-
-//------------------------------------------------------------------------------
-// VmVariantList
-//------------------------------------------------------------------------------
-
-class VmVariantList {
- public:
-  VmVariantList() : list_(nullptr) {}
-  ~VmVariantList() {
-    if (list_) {
-      CheckApiStatus(iree_vm_variant_list_free(list_), "Error freeing list");
-    }
-  }
-
-  VmVariantList(VmVariantList&& other) {
-    list_ = other.list_;
-    other.list_ = nullptr;
-  }
-
-  VmVariantList& operator=(const VmVariantList&) = delete;
-  VmVariantList(const VmVariantList&) = delete;
-
-  static VmVariantList Create(iree_host_size_t capacity) {
-    iree_vm_variant_list_t* list;
-    CheckApiStatus(
-        iree_vm_variant_list_alloc(capacity, IREE_ALLOCATOR_SYSTEM, &list),
-        "Error allocating variant list");
-    return VmVariantList(list);
-  }
-
-  iree_host_size_t size() const { return iree_vm_variant_list_size(list_); }
-
- private:
-  VmVariantList(iree_vm_variant_list_t* list) : list_(list) {}
-  iree_vm_variant_list_t* list_;
-};
 
 }  // namespace python
 }  // namespace iree

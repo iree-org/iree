@@ -152,6 +152,9 @@ class ApiRefCounted {
     return self;
   }
 
+  // Whether it is nullptr.
+  operator bool() const { return instance_; }
+
   T* steal_raw_ptr() {
     T* ret = instance_;
     instance_ = nullptr;

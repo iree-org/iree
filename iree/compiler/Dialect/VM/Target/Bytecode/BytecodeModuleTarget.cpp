@@ -376,9 +376,9 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   for (auto exportOp : exportFuncOps) {
     auto nameOffset = fbb.CreateString(exportOp.export_name().str());
     auto funcOp = symbolTable.lookup<IREE::VM::FuncOp>(exportOp.function_ref());
-    auto signatureOffset = makeFunctionSignatureDef(
-        funcOp.getType(), typeOrdinalMap,
-        funcOp.getAttrOfType<DictionaryAttr>("iree.reflection"), fbb);
+    auto signatureOffset =
+        makeFunctionSignatureDef(funcOp.getType(), typeOrdinalMap,
+                                 nullptr /* no reflection for internal */, fbb);
     iree::vm::ExportFunctionDefBuilder efd(fbb);
     efd.add_local_name(nameOffset);
     efd.add_signature(signatureOffset);
@@ -392,7 +392,7 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
       auto nameOffset = fbb.CreateString(funcOp.getName().str());
       auto signatureOffset = makeFunctionSignatureDef(
           funcOp.getType(), typeOrdinalMap,
-          nullptr /* no reflection for internal */, fbb);
+          funcOp.getAttrOfType<DictionaryAttr>("iree.reflection"), fbb);
       iree::vm::InternalFunctionDefBuilder ifd(fbb);
       ifd.add_local_name(nameOffset);
       ifd.add_signature(signatureOffset);

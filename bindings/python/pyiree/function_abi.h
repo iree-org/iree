@@ -26,13 +26,14 @@
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/host_types.h"
+#include "bindings/python/pyiree/vm.h"
 #include "iree/base/signature_mangle.h"
 
 namespace iree {
 namespace python {
 
 // Forward declarations.
-class RtContext;
+class HalDevice;
 
 // A HalBuffer (iree_hal_buffer_t) bound to a function argument.
 // At this point, the buffer has been completely validated, with all shape
@@ -67,6 +68,12 @@ class FunctionArgVariantList {
   VectorType& contents() { return contents_; }
   const VectorType& contents() const { return contents_; }
 
+  // Copies the contents into a iree_vm_variant_list_t.
+  // TODO(laurenzo): It would be best if the iree_vm_variant_list_t backed
+  // this type, but the two were created independently and need to be
+  // retrofitted.
+  VmVariantList ToVmVariantList();
+
  private:
   VectorType contents_;
 };
@@ -76,8 +83,10 @@ class FunctionAbi {
  public:
   using AttributeLookup =
       std::function<absl::optional<absl::string_view>(absl::string_view)>;
-  FunctionAbi(std::shared_ptr<HostTypeFactory> host_type_factory)
-      : host_type_factory_(std::move(host_type_factory)) {}
+  FunctionAbi(HalDevice& device,
+              std::shared_ptr<HostTypeFactory> host_type_factory)
+      : device_(HalDevice::RetainAndCreate(device.raw_ptr())),
+        host_type_factory_(std::move(host_type_factory)) {}
   virtual ~FunctionAbi() = default;
 
   using Description = RawSignatureParser::Description;
@@ -95,7 +104,7 @@ class FunctionAbi {
 
   // Creates an instance based on the function attributes.
   static std::unique_ptr<FunctionAbi> Create(
-      std::shared_ptr<HostTypeFactory> host_type_factory,
+      HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
       AttributeLookup lookup);
 
   RawConfig& raw_config() { return raw_config_; }
@@ -107,7 +116,7 @@ class FunctionAbi {
   // which can be accessed via the non-prefixed Pack/Unpack methods.
   // Given a span of descriptions, packs the given py_args into the span
   // of function args. All spans must be of the same size.
-  void RawPack(RtContext& context, absl::Span<const Description> descs,
+  void RawPack(absl::Span<const Description> descs,
                absl::Span<py::handle> py_args,
                absl::Span<FunctionArgVariant> f_args, bool writable);
 
@@ -116,7 +125,7 @@ class FunctionAbi {
   // as nullptr.
   // Ordinarily, this will be invoked along with AllocateResults() but it
   // is broken out for testing.
-  void RawUnpack(RtContext& context, absl::Span<const Description> descs,
+  void RawUnpack(absl::Span<const Description> descs,
                  absl::Span<FunctionArgVariant> f_results,
                  absl::Span<py::object> py_results);
 
@@ -130,7 +139,7 @@ class FunctionAbi {
   // ahead of time, resulting in a nullptr in f_results. In such cases, the
   // invocation must ensure proper barriers are in place to fully execute the
   // function prior to delivering results to the user layer.
-  void AllocateResults(RtContext& context, absl::Span<const Description> descs,
+  void AllocateResults(absl::Span<const Description> descs,
                        absl::Span<const FunctionArgVariant> f_args,
                        absl::Span<FunctionArgVariant> f_results);
 
@@ -138,6 +147,10 @@ class FunctionAbi {
   std::string DebugString() const;
 
  private:
+  void PackBuffer(const RawSignatureParser::Description& desc,
+                  py::handle py_arg, FunctionArgVariant& f_arg, bool writable);
+
+  HalDevice device_;
   std::shared_ptr<HostTypeFactory> host_type_factory_;
   RawConfig raw_config_;
 };

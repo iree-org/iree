@@ -69,14 +69,13 @@ iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_vm_get_function_reflection_attr(const iree_vm_module_t* module,
-                                     iree_vm_function_linkage_t linkage,
-                                     int32_t ordinal, int32_t index,
+iree_vm_get_function_reflection_attr(iree_vm_function_t function, int32_t index,
                                      iree_string_view_t* key,
                                      iree_string_view_t* value) {
-  if (!module->get_function_reflection_attr) {
+  if (!function.module->get_function_reflection_attr) {
     return IREE_STATUS_NOT_FOUND;
   }
-  return module->get_function_reflection_attr(module->self, linkage, ordinal,
-                                              index, key, value);
+  return function.module->get_function_reflection_attr(
+      function.module->self, function.linkage, function.ordinal, index, key,
+      value);
 }

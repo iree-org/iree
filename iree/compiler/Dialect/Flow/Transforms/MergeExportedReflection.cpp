@@ -36,8 +36,8 @@ class MergeExportedReflectionPass
     if (!func.getAttr("iree.module.export")) return;
 
     // Accumulate input and results into these.
-    SignatureBuilder inputsBuilder;
-    SignatureBuilder resultsBuilder;
+    std::string inputsAccum;
+    std::string resultsAccum;
 
     auto addItem = [&](Attribute partialAttr, llvm::StringRef operandType,
                        int operandIndex) {
@@ -53,10 +53,10 @@ class MergeExportedReflectionPass
                                           partialString.getValue().size()));
       char tag = p.tag();
       if (p.type() == SignatureParser::Type::kSpan && tag == 'I') {
-        inputsBuilder.Span(p.sval(), 'I');
+        inputsAccum.append(p.sval().data(), p.sval().size());
         return success();
       } else if (p.type() == SignatureParser::Type::kSpan && tag == 'R') {
-        resultsBuilder.Span(p.sval(), 'R');
+        resultsAccum.append(p.sval().data(), p.sval().size());
         return success();
       } else {
         llvm::StringRef sval_stringref(p.sval().data(), p.sval().size());
@@ -105,9 +105,9 @@ class MergeExportedReflectionPass
     // And then merge and update the function level attribute.
     auto fIdent = builder.getIdentifier("f");
     auto fVersionIdent = builder.getIdentifier("fv");
-    SignatureBuilder functionSignature =
-        iree::RawSignatureMangler::ToFunctionSignature(inputsBuilder,
-                                                       resultsBuilder);
+    SignatureBuilder functionSignature;
+    functionSignature.Span(inputsAccum, 'I');
+    functionSignature.Span(resultsAccum, 'R');
     NamedAttributeList l(func.getAttrOfType<DictionaryAttr>(reflectionIdent));
     l.set(fIdent, builder.getStringAttr(functionSignature.encoded()));
     l.set(fVersionIdent, builder.getStringAttr("1"));
