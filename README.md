@@ -23,8 +23,6 @@ GitHub Actions | CMake        | Linux    | [![github-cmake-linux-status](https:/
 GitHub Actions | Bazel        | Linux    | [![github-bazel-linux-status](https://github.com/google/iree/workflows/Bazel%20Build/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22Bazel+Build%22)
 Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
 
-<a name="quickstart"></a>
-
 ## Quickstart
 
 More Coming soon! Performing full model translation may require a few steps
@@ -40,8 +38,6 @@ See also:
 
 *   [Using Colab](docs/using_colab.md)
 *   [Vulkan and SPIR-V](docs/vulkan_and_spirv.md)
-
-<a name="project-goals"></a>
 
 ## Project Goals
 
@@ -120,8 +116,6 @@ special access such that any ML workload produced by any tool runs well. We'd
 consider the IREE experiment a success if what resulted was some worked examples
 that help advance the entire ecosystem!
 
-<a name="non-goals"></a>
-
 ## Non-Goals
 
 *   Replace parts of the supported TensorFlow ecosystem of tools: The authors
@@ -135,8 +129,6 @@ that help advance the entire ecosystem!
     gains mind-share or traction, we would revisit that in conjunction with
     finding a more permanent way to align it with the broader constellation of
     ML tooling.
-
-<a name="milestones"></a>
 
 ## Milestones
 
@@ -172,8 +164,6 @@ Things we are interested in but don't yet have in-progress:
     technique)
 *   HAL backends for Metal 2 and Direct3D 12
 *   Profile-guided optimization support for scheduling feedback
-
-<a name="status"></a>
 
 ## Current Status
 
@@ -212,8 +202,6 @@ have broad access to there. This is mainly just to keep our focus tight and does
 not preclude usage of features outside the standard sets or for other hardware
 types (in fact, we have a lot of fun ideas for
 `VK_NVX_device_generated_commands` and Metal 2.1's Indirect Command Buffers!).
-
-<a name="dependencies"></a>
 
 ## Dependencies
 
@@ -255,8 +243,6 @@ targets that will use no dependencies.
 
 [Swiftshader](https://github.com/google/swiftshader) is used to provide fast
 hardware-independent testing of the Vulkan and SPIR-V portions of the toolchain.
-
-<a name="license"></a>
 
 ## License
 
