@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Continuous Integration
+name: Bazel Build
 
 on:
   push:
@@ -21,7 +21,7 @@ on:
       - ci-test # A branch specifically for testing CI
 
 jobs:
-  bazel:
+  linux:
     runs-on: ubuntu-18.04
     env:
       CXX: clang++
@@ -66,27 +66,3 @@ jobs:
           # excluded with "notap".
           # TODO(gcmn) Enable all tests except notap once we can run them on the CI
           bazel query '//... except attr("tags", "notap", //...) except //integrations/tensorflow/e2e:vulkan_conv_test except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test except //iree/samples/simple_embedding:simple_embedding_test' | xargs bazel test --test_env=IREE_VULKAN_DISABLE=1 --define=iree_tensorflow=true --test_output=errors
-
-  cmake:
-    runs-on: ubuntu-18.04
-    env:
-      CXX: clang++
-      CC: clang
-      PYTHON_BIN: /usr/bin/python3
-    steps:
-      - name: Installing dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install clang libsdl2-dev python3 python3-pip
-          sudo pip install numpy
-      - name: Checking out latest version and all submodules
-        run: |
-          git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
-          git clone https://github.com/${GITHUB_REPOSITORY?} ${GITHUB_WORKSPACE?} --no-checkout --no-tags
-          git checkout ${GITHUB_SHA?}
-          git submodule update --init --depth 1000 --jobs 8
-      - name: Building with cmake
-        run: |
-          mkdir build && cd build
-          cmake -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
-          cmake --build .

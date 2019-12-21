@@ -1,0 +1,46 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: CMake Build
+
+on:
+  push:
+    branches:
+      - master
+      - ci-test # A branch specifically for testing CI
+
+jobs:
+  linux:
+    runs-on: ubuntu-18.04
+    env:
+      CXX: clang++
+      CC: clang
+      PYTHON_BIN: /usr/bin/python3
+    steps:
+      - name: Installing dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install clang libsdl2-dev python3 python3-pip
+          sudo pip install numpy
+      - name: Checking out latest version and all submodules
+        run: |
+          git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
+          git clone https://github.com/${GITHUB_REPOSITORY?} ${GITHUB_WORKSPACE?} --no-checkout --no-tags
+          git checkout ${GITHUB_SHA?}
+          git submodule update --init --depth 1000 --jobs 8
+      - name: Building with cmake
+        run: |
+          mkdir build && cd build
+          cmake -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
+          cmake --build .
