@@ -348,21 +348,21 @@ void populateStandardToVMPatterns(MLIRContext *context,
           context);
 
   // Binary arithmetic ops
-  patterns.insert<BinaryArithmeticOpConversion<AddIOp, IREE::VM::AddI32Op>,
-                  BinaryArithmeticOpConversion<DivISOp, IREE::VM::DivI32SOp>,
-                  BinaryArithmeticOpConversion<DivIUOp, IREE::VM::DivI32UOp>,
-                  BinaryArithmeticOpConversion<MulIOp, IREE::VM::MulI32Op>,
-                  BinaryArithmeticOpConversion<RemISOp, IREE::VM::RemI32SOp>,
-                  BinaryArithmeticOpConversion<RemIUOp, IREE::VM::RemI32UOp>,
-                  BinaryArithmeticOpConversion<SubIOp, IREE::VM::SubI32Op>,
-                  BinaryArithmeticOpConversion<AndOp, IREE::VM::AndI32Op>,
-                  BinaryArithmeticOpConversion<OrOp, IREE::VM::OrI32Op>,
-                  BinaryArithmeticOpConversion<XOrOp, IREE::VM::XorI32Op>>(
-      context);
+  patterns
+      .insert<BinaryArithmeticOpConversion<AddIOp, IREE::VM::AddI32Op>,
+              BinaryArithmeticOpConversion<SignedDivIOp, IREE::VM::DivI32SOp>,
+              BinaryArithmeticOpConversion<UnsignedDivIOp, IREE::VM::DivI32UOp>,
+              BinaryArithmeticOpConversion<MulIOp, IREE::VM::MulI32Op>,
+              BinaryArithmeticOpConversion<SignedRemIOp, IREE::VM::RemI32SOp>,
+              BinaryArithmeticOpConversion<UnsignedRemIOp, IREE::VM::RemI32UOp>,
+              BinaryArithmeticOpConversion<SubIOp, IREE::VM::SubI32Op>,
+              BinaryArithmeticOpConversion<AndOp, IREE::VM::AndI32Op>,
+              BinaryArithmeticOpConversion<OrOp, IREE::VM::OrI32Op>,
+              BinaryArithmeticOpConversion<XOrOp, IREE::VM::XorI32Op>>(context);
 
   // Shift ops
   // TODO(laurenzo): The standard dialect is missing shr ops. Add once in place.
-  patterns.insert<ShiftArithmeticOpConversion<ShlISOp, IREE::VM::ShlI32Op>>(
+  patterns.insert<ShiftArithmeticOpConversion<ShiftLeftOp, IREE::VM::ShlI32Op>>(
       context);
 }
 

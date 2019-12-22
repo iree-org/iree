@@ -172,7 +172,7 @@ static std::array<Value *, 3> getDispatchWorkgroupCounts(
         loc, rewriter.getI32IntegerAttr(
                  entryPointOp.workgroup_size().getValue<int32_t>(
                      {static_cast<uint64_t>(i)})));
-    auto *workgroupCountI = rewriter.createOrFold<mlir::DivIUOp>(
+    auto *workgroupCountI = rewriter.createOrFold<mlir::UnsignedDivIOp>(
         loc,
         rewriter.createOrFold<mlir::SubIOp>(
             loc,

@@ -27,7 +27,7 @@ module {
   // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.div.i32.s [[ARG0]], [[ARG1]]
-    %0 = divis %arg0, %arg1 : i32
+    %0 = divi_signed %arg0, %arg1 : i32
     return %0 : i32
   }
 }
@@ -44,7 +44,7 @@ module {
   // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.div.i32.u [[ARG0]], [[ARG1]]
-    %0 = diviu %arg0, %arg1 : i32
+    %0 = divi_unsigned %arg0, %arg1 : i32
     return %0 : i32
   }
 }
@@ -78,7 +78,7 @@ module {
   // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.rem.i32.s [[ARG0]], [[ARG1]]
-    %0 = remis %arg0, %arg1 : i32
+    %0 = remi_signed %arg0, %arg1 : i32
     return %0 : i32
   }
 }
@@ -95,7 +95,7 @@ module {
   // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]+]]
   func @my_fn(%arg0: i32, %arg1: i32) -> (i32) {
     // CHECK: vm.rem.i32.u [[ARG0]], [[ARG1]]
-    %0 = remiu %arg0, %arg1 : i32
+    %0 = remi_unsigned %arg0, %arg1 : i32
     return %0 : i32
   }
 }
@@ -180,7 +180,7 @@ module {
   func @my_fn(%arg0: i32) -> (i32) {
     %cst = constant 3 : i32
     // CHECK: vm.shl.i32 [[ARG0]], 3 : i32
-    %1 = shlis %arg0, %cst : i32
+    %1 = shift_left %arg0, %cst : i32
     return %1 : i32
   }
 }
