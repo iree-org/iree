@@ -60,6 +60,9 @@ class ConstantTensorOpConversion
         constantOp.getLoc(), allocator, memoryTypes, bufferUsage,
         constantOp.getValue().cast<ElementsAttr>());
 
+    // TODO(benvanik): implement resource sets.
+    rewriter.create<IREE::HAL::ExDeferReleaseOp>(constantOp.getLoc(), buffer);
+
     rewriter.replaceOp(constantOp, {buffer});
     return matchSuccess();
   }

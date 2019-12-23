@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=f | IreeFileCheck %s
+// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {
@@ -26,4 +26,4 @@ func @double() -> tensor<f64> {
   %result = "xla_hlo.log"(%input) : (tensor<f64>) -> tensor<f64>
   return %result : tensor<f64>
 }
-// CHECK: f64=1.38629
+// CHECK: f32=1.38629

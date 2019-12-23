@@ -103,6 +103,42 @@ cc_binary(
 )
 
 cc_binary(
+    name = "iree-run-mlir2",
+    srcs = ["run_mlir_main2.cc"],
+    deps = [
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:shaped_buffer",
+        "//iree/base:shaped_buffer_string_util",
+        "//iree/base:signature_mangle",
+        "//iree/base:source_location",
+        "//iree/compiler/Dialect/Flow/Transforms",
+        "//iree/compiler/Dialect/HAL/Transforms",
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Dialect/VM/Transforms",
+        "//iree/hal:api",
+        "//iree/modules/hal",
+        "//iree/vm2",
+        "//iree/vm2:bytecode_module",
+        "@llvm//:support",
+        "@local_config_mlir//:IR",
+        "@local_config_mlir//:Parser",
+        "@local_config_mlir//:Pass",
+        "@local_config_mlir//:Support",
+        "//iree/base:init",
+        "//iree/base:status",
+        "//iree/compiler/Translation:IREEVM",
+    ] + TARGET_COMPILER_BACKENDS + PLATFORM_VULKAN_DEPS + [
+        "//iree/hal/interpreter:interpreter_driver_module",
+        # TODO(b/142004903): enable when Dawn HAL implementation is functional
+        # "//iree/hal/dawn:dawn_driver_module",
+        "//iree/hal/vulkan:vulkan_driver_module",
+    ],
+)
+
+cc_binary(
     name = "iree-tblgen",
     linkopts = [
         "-lpthread",

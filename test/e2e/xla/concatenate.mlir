@@ -1,10 +1,8 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode --input_values="2x2xf32= 1 2 3 4\n2x3xf32= 5 6 7 8 9 10\n2x2xf32= 11 12 13 14" %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv --input_values="2x2xf32= 1 2 3 4\n2x3xf32= 5 6 7 8 9 10\n2x2xf32= 11 12 13 14" %s | IreeFileCheck %s)
-
-// -----
+// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @xla_concatenate
-func @xla_concatenate (%arg0: tensor<2x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<2x2xf32>) -> (tensor<2x5xf32>, tensor<2x5xf32>, tensor<2x7xf32>, tensor<4x2xf32>) {
+func @xla_concatenate(%arg0: tensor<2x2xf32>, %arg1: tensor<2x3xf32>, %arg2: tensor<2x2xf32>) -> (tensor<2x5xf32>, tensor<2x5xf32>, tensor<2x7xf32>, tensor<4x2xf32>) {
   %0 = "xla_hlo.concatenate"(%arg0, %arg1) {dimension = 1} : (tensor<2x2xf32>, tensor<2x3xf32>) -> tensor<2x5xf32>
   %1 = "xla_hlo.concatenate"(%arg1, %arg0) {dimension = 1} : (tensor<2x3xf32>, tensor<2x2xf32>) -> tensor<2x5xf32>
   %2 = "xla_hlo.concatenate"(%arg0, %arg1, %arg2) {dimension = 1} : (tensor<2x2xf32>, tensor<2x3xf32>, tensor<2x2xf32>) -> tensor<2x7xf32>

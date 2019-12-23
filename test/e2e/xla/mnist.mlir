@@ -1,7 +1,7 @@
 // MNIST model with placeholder weights, for translation testing.
 
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="1x28x28x1xf32" | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv %s --input_values="1x28x28x1xf32" | IreeFileCheck %s)
+// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s -input-value="1x28x28x1xf32" | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s -input-value="1x28x28x1xf32" | IreeFileCheck %s)
 
 module {
   // CHECK-LABEL: EXEC @main

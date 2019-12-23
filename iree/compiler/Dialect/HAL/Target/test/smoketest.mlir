@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-translate-executables -iree-hal-target-backends=legacy-interpreter %s | IreeFileCheck %s -check-prefix=INTERP
+// RUN: iree-opt -split-input-file -iree-hal-translate-executables -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s -check-prefix=INTERP
 // RUN: iree-opt -split-input-file -iree-hal-translate-executables -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s -check-prefix=VKSPV
 
 flow.executable @simpleMath_ex_dispatch_0 {

@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir %s --target_backends=interpreter-bytecode --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s --target_backends=vulkan-spirv --input_values="1x5xf32=1,-2,-3,4,-5\n1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
+// RUN: iree-run-mlir2 %s -iree-hal-target-backends=interpreter-bytecode -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 %s -iree-hal-target-backends=vulkan-spirv -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @main
 func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5x1x5xf32>>

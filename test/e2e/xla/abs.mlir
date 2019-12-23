@@ -1,4 +1,5 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=f | IreeFileCheck %s
+// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {
@@ -17,13 +18,3 @@ func @scalar() -> tensor<f32> {
   return %result : tensor<f32>
 }
 // CHECK: f32=4
-
-// -----
-
-// CHECK-LABEL: EXEC @double
-func @double() -> tensor<f64> {
-  %input = constant dense<-4.0> : tensor<f64>
-  %result = "xla_hlo.abs"(%input) : (tensor<f64>) -> tensor<f64>
-  return %result : tensor<f64>
-}
-// CHECK: f64=4

@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --input_values="4xi8=[1 0 200 0]" | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv %s --input_values="4xi8=[1 0 200 0]" | IreeFileCheck %s)
+// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s -input-value="4xi8=[1 0 200 0]" | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s -input-value="4xi8=[1 0 200 0]" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @select
 func @select(%cond : tensor<4xi1>) -> tensor<4xf32> {

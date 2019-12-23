@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | IreeFileCheck %s
+// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xi32> {
@@ -62,4 +62,4 @@ func @i64() -> tensor<i64> {
   %result = "xla_hlo.max"(%lhs, %rhs) : (tensor<i64>, tensor<i64>) -> tensor<i64>
   return %result : tensor<i64>
 }
-// CHECK: i64=2
+// CHECK: i32=2

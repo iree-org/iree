@@ -16,6 +16,7 @@
 
 #include "absl/base/macros.h"
 #include "absl/memory/memory.h"
+#include "absl/strings/str_join.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
@@ -29,11 +30,16 @@ namespace hal {
 namespace {
 
 // TODO(benvanik): remove when we have proper ABI wrapping.
-void ResetStackFrame(iree_vm_stack_frame_t* frame) {
+static void ResetStackFrame(iree_vm_stack_frame_t* frame) {
   frame->return_registers = nullptr;
   for (int i = 0; i < frame->registers.ref_register_count; ++i) {
     iree_vm_ref_release(&frame->registers.ref[i]);
   }
+}
+
+// Pretty prints an array, e.g. [1, 2, 3, 4]
+static std::string PrettyPrint(absl::Span<const int32_t> arr) {
+  return "[" + absl::StrJoin(arr, ",") + "]";
 }
 
 //===----------------------------------------------------------------------===//
@@ -138,7 +144,12 @@ class HALModuleState final {
         shared_device_(std::move(shared_device)),
         executable_cache_(std::move(executable_cache)) {}
 
-  ~HALModuleState() = default;
+  ~HALModuleState() {
+    for (auto& ref : deferred_releases_) {
+      iree_vm_ref_release(&ref);
+    }
+    deferred_releases_.clear();
+  }
 
   // NOTE: Ex* APIs are experimental and likely to be removed soon. Modules
   // using these APIs are not forward compatible.
@@ -213,6 +224,21 @@ class HALModuleState final {
     return allocation_size;
   }
 
+  iree_device_size_t CalculateBufferOffset(absl::Span<const int32_t> shape,
+                                           absl::Span<const int32_t> indices,
+                                           uint8_t element_size) {
+    iree_device_size_t offset = 0;
+    for (int i = 0; i < indices.size(); ++i) {
+      iree_device_size_t axis_offset = indices[i];
+      for (int j = i + 1; j < shape.size(); ++j) {
+        axis_offset *= shape[j];
+      }
+      offset += axis_offset;
+    }
+    offset *= element_size;
+    return offset;
+  }
+
   iree_allocator_t allocator_;
   ref_ptr<Device> shared_device_;
   ref_ptr<ExecutableCache> executable_cache_;
@@ -251,6 +277,10 @@ static const union {
   uint8_t reserved[2];
   iree_vm_register_list_t list;
 } kReturnI32 = {{1, 0}};
+static const union {
+  uint8_t reserved[3];
+  iree_vm_register_list_t list;
+} kReturn2xI32 = {{2, 0, 1}};
 
 //===----------------------------------------------------------------------===//
 // Experimental APIs
@@ -411,7 +441,49 @@ Status HALModuleState::AllocatorAllocate(iree_vm_stack_t* stack,
 
 Status HALModuleState::AllocatorAllocateConst(iree_vm_stack_t* stack,
                                               iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC) << "AllocatorAllocateConst";
+  auto* allocator = iree_hal_allocator_deref(&frame->registers.ref[0]);
+  if (!allocator) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'allocator' invalid";
+  }
+  auto* value_data = iree_vm_ro_byte_buffer_deref(&frame->registers.ref[1]);
+  if (!value_data) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'value' invalid";
+  }
+  int ri32 = 0;
+  iree_hal_memory_type_t memory_types =
+      static_cast<iree_hal_memory_type_t>(frame->registers.i32[ri32++]);
+  iree_hal_buffer_usage_t buffer_usage =
+      static_cast<iree_hal_buffer_usage_t>(frame->registers.i32[ri32++]);
+  int shape_rank = frame->return_registers->registers[3];
+  auto shape = absl::MakeConstSpan(&frame->registers.i32[ri32], shape_rank);
+  ri32 += shape_rank;
+  uint8_t element_size = static_cast<uint8_t>(frame->registers.i32[ri32++]);
+
+  // TODO(benvanik): generic compute size.
+  iree_device_size_t allocation_size = CalculateBufferSize(shape, element_size);
+  if (allocation_size < value_data->data.data_length) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Constant data is too larger for the minimum allocation size";
+  }
+
+  iree_hal_buffer_t* buffer = nullptr;
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_hal_allocator_allocate_buffer(allocator, memory_types, buffer_usage,
+                                         allocation_size, &buffer),
+      IREE_LOC))
+      << "Failed to allocate buffer";
+
+  RETURN_IF_ERROR(
+      FromApiStatus(iree_hal_buffer_write_data(buffer, 0, value_data->data.data,
+                                               value_data->data.data_length),
+                    IREE_LOC))
+      << "Writing constant data";
+
+  ResetStackFrame(frame);
+  frame->return_registers = &kReturnRef.list;
+  frame->registers.ref_register_count = 1;
+  frame->registers.ref[0] = iree_hal_buffer_move_ref(buffer);
+  return OkStatus();
 }
 
 Status HALModuleState::AllocatorAllocateShaped(iree_vm_stack_t* stack,
@@ -478,12 +550,55 @@ Status HALModuleState::BufferCopyData(iree_vm_stack_t* stack,
 
 Status HALModuleState::BufferLoad(iree_vm_stack_t* stack,
                                   iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC) << "BufferLoad";
+  auto* source_buffer = iree_hal_buffer_deref(&frame->registers.ref[0]);
+  if (!source_buffer) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'source_buffer' invalid";
+  }
+  iree_device_size_t source_offset = frame->registers.i32[0];
+  iree_device_size_t length = frame->registers.i32[1];
+
+  uint32_t target_buffer = 0;
+  if (length > sizeof(target_buffer)) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Length " << length << " exceeds max";
+  }
+  RETURN_IF_ERROR(
+      FromApiStatus(iree_hal_buffer_read_data(source_buffer, source_offset,
+                                              &target_buffer, length),
+                    IREE_LOC))
+      << "Read failed";
+
+  ResetStackFrame(frame);
+  frame->return_registers = &kReturnI32.list;
+  frame->registers.i32[0] = target_buffer;
+  return OkStatus();
 }
 
 Status HALModuleState::BufferStore(iree_vm_stack_t* stack,
                                    iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC) << "BufferStore";
+  auto* target_buffer = iree_hal_buffer_deref(&frame->registers.ref[0]);
+  if (!target_buffer) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'target_buffer' invalid";
+  }
+  uint32_t value = frame->registers.i32[0];
+  iree_device_size_t target_offset = frame->registers.i32[1];
+  iree_device_size_t length = frame->registers.i32[2];
+
+  if (target_offset + length > iree_hal_buffer_byte_length(target_buffer)) {
+    return OutOfRangeErrorBuilder(IREE_LOC) << "Out of bounds store";
+  }
+
+  if (length > sizeof(value)) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Length " << length << " exceeds max";
+  }
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_hal_buffer_write_data(target_buffer, target_offset, &value, length),
+      IREE_LOC))
+      << "Write failed";
+
+  ResetStackFrame(frame);
+  return OkStatus();
 }
 
 //===----------------------------------------------------------------------===//
@@ -492,17 +607,106 @@ Status HALModuleState::BufferStore(iree_vm_stack_t* stack,
 
 Status HALModuleState::BufferViewComputeOffset(iree_vm_stack_t* stack,
                                                iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC) << "BufferViewComputeOffset";
+  auto* buffer = iree_hal_buffer_deref(&frame->registers.ref[0]);
+  if (!buffer) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'buffer' invalid";
+  }
+  int ri32 = 0;
+  int shape_rank = frame->return_registers->registers[1];
+  auto shape = absl::MakeConstSpan(&frame->registers.i32[ri32], shape_rank);
+  ri32 += shape_rank;
+  int indices_rank = frame->return_registers->registers[2];
+  auto indices = absl::MakeConstSpan(&frame->registers.i32[ri32], indices_rank);
+  ri32 += indices_rank;
+  uint8_t element_size = static_cast<uint8_t>(frame->registers.i32[ri32++]);
+
+  iree_device_size_t offset =
+      CalculateBufferOffset(shape, indices, element_size);
+
+  ResetStackFrame(frame);
+  frame->return_registers = &kReturnI32.list;
+  frame->registers.i32[0] = offset;
+  return OkStatus();
 }
 
 Status HALModuleState::BufferViewComputeLength(iree_vm_stack_t* stack,
                                                iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC) << "BufferViewComputeLength";
+  auto* buffer = iree_hal_buffer_deref(&frame->registers.ref[0]);
+  if (!buffer) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'buffer' invalid";
+  }
+  int ri32 = 0;
+  int shape_rank = frame->return_registers->registers[1];
+  auto shape = absl::MakeConstSpan(&frame->registers.i32[ri32], shape_rank);
+  ri32 += shape_rank;
+  uint8_t element_size = static_cast<uint8_t>(frame->registers.i32[ri32++]);
+
+  iree_device_size_t length = CalculateBufferSize(shape, element_size);
+
+  ResetStackFrame(frame);
+  frame->return_registers = &kReturnI32.list;
+  frame->registers.i32[0] = length;
+  return OkStatus();
 }
 
 Status HALModuleState::BufferViewComputeRange(iree_vm_stack_t* stack,
                                               iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC) << "BufferViewComputeRange";
+  auto* buffer = iree_hal_buffer_deref(&frame->registers.ref[0]);
+  if (!buffer) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'buffer' invalid";
+  }
+  int ri32 = 0;
+  int shape_rank = frame->return_registers->registers[1];
+  auto shape = absl::MakeConstSpan(&frame->registers.i32[ri32], shape_rank);
+  ri32 += shape_rank;
+  int start_indices_rank = frame->return_registers->registers[2];
+  auto start_indices =
+      absl::MakeConstSpan(&frame->registers.i32[ri32], start_indices_rank);
+  ri32 += start_indices_rank;
+  int lengths_rank = frame->return_registers->registers[3];
+  auto lengths = absl::MakeConstSpan(&frame->registers.i32[ri32], lengths_rank);
+  ri32 += lengths_rank;
+  uint8_t element_size = static_cast<uint8_t>(frame->registers.i32[ri32++]);
+
+  if (start_indices.size() != shape.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Slice start_indices " << PrettyPrint(start_indices)
+           << " do not match rank of shape " << PrettyPrint(shape);
+  }
+  if (start_indices.size() != lengths.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Slice start_indices " << PrettyPrint(start_indices)
+           << " and lengths " << PrettyPrint(lengths)
+           << " are not the same size";
+  }
+
+  absl::InlinedVector<int32_t, 6> end_indices(shape_rank);
+  iree_device_size_t subspan_length = element_size;
+  for (int i = 0; i < lengths.size(); ++i) {
+    subspan_length *= lengths[i];
+    end_indices[i] = start_indices[i] + lengths[i] - 1;
+  }
+
+  iree_device_size_t start_byte_offset =
+      CalculateBufferOffset(shape, start_indices, element_size);
+  iree_device_size_t end_byte_offset =
+      CalculateBufferOffset(shape, end_indices, element_size);
+
+  auto offset_length = end_byte_offset - start_byte_offset + element_size;
+  if (subspan_length != offset_length) {
+    return UnimplementedErrorBuilder(IREE_LOC)
+           << "Slice for non-contiguous region of memory unimplemented. "
+              "start_indices: "
+           << PrettyPrint(start_indices) << " lengths: " << PrettyPrint(lengths)
+           << " " << subspan_length << " " << offset_length << " "
+           << PrettyPrint(end_indices);
+  }
+
+  ResetStackFrame(frame);
+  frame->return_registers = &kReturn2xI32.list;
+  frame->registers.i32[0] = start_byte_offset;
+  frame->registers.i32[1] = end_byte_offset;
+  return OkStatus();
 }
 
 Status HALModuleState::BufferViewSlice(iree_vm_stack_t* stack,

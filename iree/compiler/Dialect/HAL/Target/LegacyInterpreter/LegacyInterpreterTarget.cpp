@@ -14,6 +14,8 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LegacyInterpreter/LegacyInterpreterTarget.h"
 
+#include <utility>
+
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -242,11 +244,11 @@ LogicalResult translateToLegacyInterpreterExecutable(
 }
 
 static ExecutableTargetRegistration targetRegistration(
-    "legacy-interpreter",
+    "interpreter-bytecode",
     +[](IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
         ExecutableTargetOptions executableOptions) {
       return translateToLegacyInterpreterExecutable(
-          sourceOp, targetOp, executableOptions,
+          sourceOp, targetOp, std::move(executableOptions),
           getLegacyInterpreterTargetOptionsFromFlags());
     });
 
