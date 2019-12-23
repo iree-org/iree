@@ -55,6 +55,8 @@ PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(
   if (fn.getNumArguments() != 3) {
     return matchFailure();
   }
+  rewriter.startRootUpdate(fn);
+
   auto src = fn.getArgument(0);
   auto dst = fn.getArgument(2);
   fn.setArgAttr(2, "iree.executable.reduction.output",
@@ -86,7 +88,7 @@ PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(
           workloadAPInt)
           .cast<DenseIntElementsAttr>());
 
-  rewriter.updatedRootInPlace(fn);
+  rewriter.finalizeRootUpdate(fn);
   return matchSuccess();
 }
 
