@@ -992,7 +992,7 @@ static void printBinaryComparisonOp(OpAsmPrinter &p, Operation *op) {
 
 static ParseResult parseBranchOp(OpAsmParser &parser, OperationState *result) {
   Block *dest;
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   if (failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
     return failure();
   }
@@ -1021,7 +1021,7 @@ void BranchOp::eraseOperand(unsigned index) {
 
 static ParseResult parseCondBranchOp(OpAsmParser &parser,
                                      OperationState *result) {
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   Block *dest;
   OpAsmParser::OperandType condInfo;
 
@@ -1211,12 +1211,12 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
       p.printOperand(op.getOperand(operand++));
     } else {
       p << '[';
-      SmallVector<ValuePtr, 4> segmentOperands;
+      SmallVector<Value, 4> segmentOperands;
       for (int i = 0; i < segmentSize.getZExtValue(); ++i) {
         segmentOperands.push_back(op.getOperand(operand++));
       }
       interleaveComma(segmentOperands, p,
-                      [&](ValuePtr operand) { p.printOperand(operand); });
+                      [&](Value operand) { p.printOperand(operand); });
       p << ']';
     }
   });
@@ -1344,7 +1344,7 @@ static void printPrintOp(OpAsmPrinter &p, PrintOp &op) {
 
 static ParseResult parseBreakOp(OpAsmParser &parser, OperationState *result) {
   Block *dest;
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   if (failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
     return failure();
   }
@@ -1379,7 +1379,7 @@ static ParseResult parseCondBreakOp(OpAsmParser &parser,
   }
 
   Block *dest;
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   if (failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
     return failure();
   }

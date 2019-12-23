@@ -51,7 +51,7 @@ class VMFuncEncoder {
                                             StringRef name) = 0;
 
   // Encodes a value type as an integer kind.
-  virtual LogicalResult encodeType(ValuePtr value) = 0;
+  virtual LogicalResult encodeType(Value value) = 0;
 
   // Encodes an integer attribute as a fixed byte length based on bitwidth.
   virtual LogicalResult encodeIntAttr(IntegerAttr value) = 0;
@@ -67,13 +67,13 @@ class VMFuncEncoder {
                                      Operation::operand_range operands) = 0;
 
   // Encodes an operand value (by reference).
-  virtual LogicalResult encodeOperand(ValuePtr value, int ordinal) = 0;
+  virtual LogicalResult encodeOperand(Value value, int ordinal) = 0;
 
   // Encodes a variable list of operands (by reference), including a count.
   virtual LogicalResult encodeOperands(Operation::operand_range values) = 0;
 
   // Encodes a result value (by reference).
-  virtual LogicalResult encodeResult(ValuePtr value) = 0;
+  virtual LogicalResult encodeResult(Value value) = 0;
 
   // Encodes a variable list of results (by reference), including a count.
   virtual LogicalResult encodeResults(Operation::result_range values) = 0;

@@ -50,7 +50,7 @@ struct CallOpLowering : public SequencerConversionPattern<CallOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CallOp callOp, ArrayRef<ValuePtr> operands,
+      CallOp callOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Type, 4> resultTypes(callOp.getResultTypes());
     rewriter.replaceOpWithNewOp<IREESeq::HL::CallOp>(callOp, callOp.getCallee(),
@@ -65,7 +65,7 @@ struct CallIndirectOpLowering
   using SequencerConversionPattern::SequencerConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CallIndirectOp callOp, ArrayRef<ValuePtr> operands,
+      CallIndirectOp callOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREESeq::HL::CallIndirectOp>(
         callOp, callOp.getCallee(), operands);
@@ -77,9 +77,9 @@ struct ReturnOpLowering : public SequencerConversionPattern<ReturnOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      ReturnOp returnOp, ArrayRef<ValuePtr> operands,
+      ReturnOp returnOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<ValuePtr, 4> newOperands;
+    SmallVector<Value, 4> newOperands;
     newOperands.reserve(operands.size());
     for (auto operand : operands) {
       newOperands.push_back(wrapAsMemRef(operand, returnOp, rewriter));
@@ -92,8 +92,8 @@ struct ReturnOpLowering : public SequencerConversionPattern<ReturnOp> {
 struct BranchOpLowering : public SequencerConversionPattern<BranchOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      BranchOp branchOp, ArrayRef<ValuePtr> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
+      BranchOp branchOp, ArrayRef<Value> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREESeq::HL::BranchOp>(
         branchOp, destinations[0], operands[0]);
@@ -104,8 +104,8 @@ struct BranchOpLowering : public SequencerConversionPattern<BranchOp> {
 struct CondBranchOpLowering : public SequencerConversionPattern<CondBranchOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      CondBranchOp condBranchOp, ArrayRef<ValuePtr> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
+      CondBranchOp condBranchOp, ArrayRef<Value> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto condValue =
         loadAccessValue(condBranchOp.getLoc(), properOperands[0], rewriter);
@@ -122,7 +122,7 @@ struct CondBranchOpLowering : public SequencerConversionPattern<CondBranchOp> {
 struct AllocOpLowering : public SequencerConversionPattern<AllocOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      AllocOp allocOp, ArrayRef<ValuePtr> operands,
+      AllocOp allocOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): replace with length computation.
     rewriter.replaceOpWithNewOp<IREESeq::HL::AllocHeapOp>(
@@ -134,7 +134,7 @@ struct AllocOpLowering : public SequencerConversionPattern<AllocOp> {
 struct DeallocOpLowering : public SequencerConversionPattern<DeallocOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      DeallocOp deallocOp, ArrayRef<ValuePtr> operands,
+      DeallocOp deallocOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREESeq::HL::DiscardOp>(deallocOp, operands[0]);
     return matchSuccess();
@@ -144,13 +144,13 @@ struct DeallocOpLowering : public SequencerConversionPattern<DeallocOp> {
 struct LoadOpLowering : public SequencerConversionPattern<LoadOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      LoadOp loadOp, ArrayRef<ValuePtr> operands,
+      LoadOp loadOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (loadOp.getMemRefType().getRank() != 0) {
       loadOp.emitError() << "Cannot lower load of non-scalar";
       return matchFailure();
     }
-    ArrayRef<ValuePtr> dimPieces;
+    ArrayRef<Value> dimPieces;
     auto dst = rewriter.create<AllocOp>(loadOp.getLoc(), loadOp.getMemRefType(),
                                         dimPieces);
     auto emptyArrayMemref = createArrayConstant(rewriter, loadOp.getLoc(), {});
@@ -168,7 +168,7 @@ struct LoadOpLowering : public SequencerConversionPattern<LoadOp> {
 struct StoreOpLowering : public SequencerConversionPattern<StoreOp> {
   using SequencerConversionPattern::SequencerConversionPattern;
   PatternMatchResult matchAndRewrite(
-      StoreOp storeOp, ArrayRef<ValuePtr> operands,
+      StoreOp storeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (storeOp.getMemRefType().getRank() != 0) {
       storeOp.emitError() << "Cannot lower store of non-scalar";

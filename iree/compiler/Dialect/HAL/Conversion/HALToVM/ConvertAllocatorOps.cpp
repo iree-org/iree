@@ -35,7 +35,7 @@ class AllocatorAllocateConstOpConversion
   }
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::AllocatorAllocateConstOp op, llvm::ArrayRef<ValuePtr> operands,
+      IREE::HAL::AllocatorAllocateConstOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Encode constant data into a rodata segment. These will eventually get
     // deduped and combined.
@@ -54,7 +54,7 @@ class AllocatorAllocateConstOpConversion
     IREE::HAL::AllocatorAllocateConstOpOperandAdaptor opAdaptor(operands);
     auto shape = IREE::HAL::getStaticShapeDims(op.getLoc(),
                                                op.value().getType(), rewriter);
-    SmallVector<ValuePtr, 8> callOperands = {
+    SmallVector<Value, 8> callOperands = {
         opAdaptor.allocator(),
         rewriter.create<mlir::ConstantOp>(
             op.getLoc(), rewriter.getI32IntegerAttr(

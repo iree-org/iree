@@ -51,8 +51,8 @@ namespace {
 // as they will all be dispatched with the same workgroup structure. The
 // |invocationRegion| will not be modified.
 LogicalResult buildReductionRegion(Operation *originalOp,
-                                   ArrayRef<ValuePtr> operands,
-                                   ArrayRef<ValuePtr> initialValues,
+                                   ArrayRef<Value> operands,
+                                   ArrayRef<Value> initialValues,
                                    ArrayRef<int32_t> dimensions,
                                    Region &invocationRegion) {
   OpBuilder parentBuilder(originalOp);
@@ -92,7 +92,7 @@ LogicalResult buildReductionRegion(Operation *originalOp,
 // Converts an xla_hlo::ReduceOp to a reduction region and inlines the target
 // computation into the region body.
 LogicalResult buildReductionRegionFromXLAReduceOp(xla_hlo::ReduceOp reduceOp) {
-  SmallVector<ValuePtr, 4> operands(reduceOp.getOperands());
+  SmallVector<Value, 4> operands(reduceOp.getOperands());
   OperandAdaptor<xla_hlo::ReduceOp> adaptor(operands);
 
   SmallVector<int32_t, 4> dimensions;

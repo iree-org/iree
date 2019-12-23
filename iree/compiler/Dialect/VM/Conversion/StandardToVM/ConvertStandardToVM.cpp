@@ -34,7 +34,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      ModuleOp srcOp, ArrayRef<ValuePtr> operands,
+      ModuleOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module.
     // This mechanism can only support rewriting non top-level modules.
@@ -67,7 +67,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
   };
 
   PatternMatchResult matchAndRewrite(
-      FuncOp srcOp, ArrayRef<ValuePtr> operands,
+      FuncOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
     VMTypeConverter typeConverter;
@@ -130,7 +130,7 @@ class ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      ReturnOp srcOp, ArrayRef<ValuePtr> operands,
+      ReturnOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(srcOp, operands);
     return matchSuccess();
@@ -141,7 +141,7 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      ConstantOp srcOp, ArrayRef<ValuePtr> operands,
+      ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
     // Only 32bit integer supported for now.
@@ -169,7 +169,7 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CmpIOp srcOp, ArrayRef<ValuePtr> operands,
+      CmpIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     CmpIOpOperandAdaptor srcAdapter(operands);
     auto returnType = rewriter.getIntegerType(32);
@@ -224,7 +224,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::matchSuccess;
 
   PatternMatchResult matchAndRewrite(
-      SrcOpTy srcOp, ArrayRef<ValuePtr> operands,
+      SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdapter(operands);
 
@@ -241,7 +241,7 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::matchSuccess;
 
   PatternMatchResult matchAndRewrite(
-      SrcOpTy srcOp, ArrayRef<ValuePtr> operands,
+      SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdaptor(operands);
     auto type = srcOp.getType();
@@ -268,7 +268,7 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   static constexpr unsigned kBits = 32;
 
   PatternMatchResult matchAndRewrite(
-      SelectOp srcOp, ArrayRef<ValuePtr> operands,
+      SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     SelectOpOperandAdaptor srcAdaptor(operands);
     IntegerType requiredType = IntegerType::get(kBits, srcOp.getContext());
@@ -286,8 +286,8 @@ class BranchOpConversion : public OpConversionPattern<BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      BranchOp srcOp, ArrayRef<ValuePtr> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
+      BranchOp srcOp, ArrayRef<Value> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
       ConversionPatternRewriter &rewriter) const override {
     assert(destinations.size() == 1 && operands.size() == 1);
     rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(srcOp, destinations[0],
@@ -300,8 +300,8 @@ class CondBranchOpConversion : public OpConversionPattern<CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CondBranchOp srcOp, ArrayRef<ValuePtr> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
+      CondBranchOp srcOp, ArrayRef<Value> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
       ConversionPatternRewriter &rewriter) const override {
     assert(destinations.size() == 2 && operands.size() == 2);
     CondBranchOpOperandAdaptor srcAdaptor(properOperands);
@@ -316,7 +316,7 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CallOp srcOp, ArrayRef<ValuePtr> operands,
+      CallOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     CallOpOperandAdaptor srcAdaptor(operands);
     // Convert function result types. The conversion framework will ensure

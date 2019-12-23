@@ -27,22 +27,21 @@ namespace iree_compiler {
 // Attempts to resolve the use of a value back to the MemRef it was loaded from.
 // Returns either a MemRef view containing the value or nullptr if the value was
 // not loaded from a MemRef (or is possibly unknown).
-ValuePtr resolveValueToSourceMemRef(ValuePtr value, Operation *useOp);
+Value resolveValueToSourceMemRef(Value value, Operation *useOp);
 
 // Wraps a memref with a MemRefToTensorOp, returning the resulting Tensor value.
-ValuePtr wrapAsTensor(ValuePtr value, Operation *srcOp, OpBuilder &builder);
+Value wrapAsTensor(Value value, Operation *srcOp, OpBuilder &builder);
 
 // Wraps a tensor with a TensorToMemrefOp, returning the resulting MemRef value.
-ValuePtr wrapAsMemRef(ValuePtr value, Operation *srcOp, OpBuilder &builder);
+Value wrapAsMemRef(Value value, Operation *srcOp, OpBuilder &builder);
 
 // For non-{Tensor,MemRef} fetches either the associated MemRef if a LoadOp,
 // otherwise append a Alloc and StoreOp.
-ValuePtr loadAccessValue(Location location, ValuePtr operand,
-                         OpBuilder &builder);
+Value loadAccessValue(Location location, Value operand, OpBuilder &builder);
 
 // Adds a LoadOp on a non-{Tensor,MemRef} type that returns the stored value.
-ValuePtr loadResultValue(Location location, const Type &originalType,
-                         ValuePtr result, OpBuilder &builder);
+Value loadResultValue(Location location, const Type &originalType, Value result,
+                      OpBuilder &builder);
 
 }  // namespace iree_compiler
 }  // namespace mlir

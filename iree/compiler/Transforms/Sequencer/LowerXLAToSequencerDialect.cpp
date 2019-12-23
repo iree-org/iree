@@ -61,14 +61,14 @@ UNARY_OP_LOWERING(CopyOp, IREESeq::HL::CloneOp);
 
 template <typename T>
 static Operation *createShapeTargetingOp(ConversionPatternRewriter &rewriter,
-                                         Location loc, ValuePtr input,
+                                         Location loc, Value input,
                                          MemRefType targetType) {
   auto shapeOp = createArrayConstant(rewriter, loc, targetType.getShape());
   return rewriter.create<T>(loc, targetType, input, shapeOp);
 }
 
-static ValuePtr inputAsMemref(ConversionPatternRewriter &rewriter,
-                              Operation *op, ValuePtr tensor) {
+static Value inputAsMemref(ConversionPatternRewriter &rewriter, Operation *op,
+                           Value tensor) {
   return wrapAsMemRef(loadAccessValue(op->getLoc(), tensor, rewriter), op,
                       rewriter);
 }
@@ -79,11 +79,11 @@ class XlaOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<ValuePtr> operands,
+      SrcOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto srcOp = cast<SrcOp>(op);
 
-    SmallVector<ValuePtr, 4> memrefOperands;
+    SmallVector<Value, 4> memrefOperands;
     for (auto operand : operands) {
       memrefOperands.push_back(inputAsMemref(rewriter, op, operand));
     }
@@ -95,7 +95,7 @@ class XlaOpLowering : public OpConversionPattern<SrcOp> {
 
  protected:
   virtual Operation *rewriteInternal(
-      SrcOp *op, ArrayRef<ValuePtr> operands,
+      SrcOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const {
     llvm_unreachable("unimplemented rewrite, did you mean rewriteTerminator?");
   }
@@ -105,7 +105,7 @@ struct ConcatOpLowering : public XlaOpLowering<xla_hlo::ConcatenateOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::ConcatenateOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::ConcatenateOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto finalType = convertTypeToMemRef(*op);
 
@@ -120,18 +120,18 @@ struct DynamicUpdateSliceLowering
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::DynamicUpdateSliceOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::DynamicUpdateSliceOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto operand = operands[0];
     auto update = operands[1];
 
     auto updateType = update->getType().cast<ShapedType>();
-    ValuePtr lengthConstant =
+    Value lengthConstant =
         createArrayConstant(rewriter, op->getLoc(), updateType.getShape());
 
     auto startIndices = makeArrayRef(operands).drop_front(2);
     const int rank = startIndices.size();
-    llvm::SmallVector<ValuePtr, 4> valuesToConcat;
+    llvm::SmallVector<Value, 4> valuesToConcat;
     valuesToConcat.reserve(startIndices.size());
     auto type = getElementTypeOrSelf(startIndices.front());
 
@@ -169,7 +169,7 @@ struct DynamicUpdateSliceLowering
 struct SliceLowering : public XlaOpLowering<xla_hlo::SliceOp> {
   using XlaOpLowering::XlaOpLowering;
   Operation *rewriteInternal(
-      xla_hlo::SliceOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::SliceOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // XLA slice has value semantics, whereas the IREE slice creates a view. We
     // lower it to a copy if all strides are one which may be transformed to a
@@ -183,7 +183,7 @@ struct SliceLowering : public XlaOpLowering<xla_hlo::SliceOp> {
     auto finalType = convertTypeToMemRef(*op);
 
     auto src = operands[0];
-    std::vector<ValuePtr> dim_pieces;
+    std::vector<Value> dim_pieces;
     auto dst = rewriter.create<IREESeq::HL::AllocHeapOp>(op->getLoc(),
                                                          finalType, dim_pieces);
     auto srcIndices =
@@ -205,7 +205,7 @@ struct ReshapeOpLowering : public XlaOpLowering<xla_hlo::ReshapeOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::ReshapeOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::ReshapeOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     return createShapeTargetingOp<IREESeq::HL::ReshapeOp>(
         rewriter, op->getLoc(), operands[0], convertTypeToMemRef(*op));

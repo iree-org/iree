@@ -31,7 +31,7 @@ namespace HL {
 
 namespace {
 
-static LogicalResult verifyWorkload(Operation *op, ValuePtr workload) {
+static LogicalResult verifyWorkload(Operation *op, Value workload) {
   if (auto workloadType = workload->getType().dyn_cast<MemRefType>()) {
     if (workloadType.getNumElements() != 3) {
       return op->emitOpError("workload must be specified as (x,y,z) but has ")
@@ -144,7 +144,7 @@ static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
 
 static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
   Block *dest;
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
   result.addSuccessor(dest, destOperands);
   return success();
@@ -171,7 +171,7 @@ void BranchOp::eraseOperand(unsigned index) {
 
 static ParseResult parseCondBranchOp(OpAsmParser &parser,
                                      OperationState &result) {
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   Block *dest;
   OpAsmParser::OperandType condInfo;
 
@@ -296,7 +296,7 @@ OpFoldResult RankOp::fold(ArrayRef<Attribute> operands) {
 // iree_hl_seq.shape
 //===----------------------------------------------------------------------===//
 
-void ShapeOp::build(Builder *builder, OperationState &state, ValuePtr operand) {
+void ShapeOp::build(Builder *builder, OperationState &state, Value operand) {
   state.addOperands(operand);
   int64_t rank = 0;
   if (auto shapedType = operand->getType().dyn_cast<ShapedType>()) {
@@ -340,7 +340,7 @@ struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
                                      PatternRewriter &rewriter) const override {
     auto finalType = concatOp.getResult()->getType().cast<ShapedType>();
     auto loc = concatOp.getLoc();
-    std::vector<ValuePtr> dimPieces;
+    std::vector<Value> dimPieces;
     auto dst =
         rewriter.create<IREESeq::HL::AllocHeapOp>(loc, finalType, dimPieces);
 

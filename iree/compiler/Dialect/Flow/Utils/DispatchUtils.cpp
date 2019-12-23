@@ -42,8 +42,8 @@ namespace {
 // set of values defined by |ops| that are used outside of the set.
 LogicalResult analyzeOpRangeValues(
     const llvm::SmallDenseSet<Operation *> &opSet,
-    llvm::SetVector<ValuePtr> *capturedValues,
-    llvm::SetVector<ValuePtr> *escapingValues) {
+    llvm::SetVector<Value> *capturedValues,
+    llvm::SetVector<Value> *escapingValues) {
   for (auto *op : opSet) {
     for (auto value : op->getOperands()) {
       if (!llvm::is_contained(opSet, value->getDefiningOp())) {
@@ -66,8 +66,7 @@ LogicalResult analyzeOpRangeValues(
 }  // namespace
 
 LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  ValuePtr workload,
-                                  ArrayRef<Operation *> ops) {
+                                  Value workload, ArrayRef<Operation *> ops) {
   // Fused location with all ops.
   SmallVector<Location, 16> opLocs;
   for (auto *op : ops) {
@@ -80,8 +79,8 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
   llvm::SmallDenseSet<Operation *> opSet;
   opSet.reserve(ops.size());
   opSet.insert(ops.begin(), ops.end());
-  llvm::SetVector<ValuePtr> capturedValues;
-  llvm::SetVector<ValuePtr> escapingValues;
+  llvm::SetVector<Value> capturedValues;
+  llvm::SetVector<Value> escapingValues;
   if (failed(analyzeOpRangeValues(opSet, &capturedValues, &escapingValues))) {
     return failure();
   }
@@ -113,7 +112,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
 
   // Return results (as we need a terminator in our block).
   // These are all of the values that escape our region.
-  SmallVector<ValuePtr, 8> resultValues;
+  SmallVector<Value, 8> resultValues;
   for (auto oldValue : escapingValues) {
     resultValues.push_back(mapping.lookupOrDefault(oldValue));
   }

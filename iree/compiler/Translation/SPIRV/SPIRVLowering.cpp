@@ -28,9 +28,9 @@ namespace iree_compiler {
 // SPIR-V codegen implementation
 //===----------------------------------------------------------------------===//
 
-ValuePtr genPointerOffset(OpBuilder &builder, Location loc,
-                          TensorIndexToScalarValueMap &valueCache,
-                          AffineMap indexMap, ValuePtr buffer) {
+Value genPointerOffset(OpBuilder &builder, Location loc,
+                       TensorIndexToScalarValueMap &valueCache,
+                       AffineMap indexMap, Value buffer) {
   auto varPtrType =
       buffer->getType().cast<spirv::PointerType>().getPointeeType();
   // The variable has to be a struct type with a single element.
@@ -40,7 +40,7 @@ ValuePtr genPointerOffset(OpBuilder &builder, Location loc,
          "element");
   auto varType = varStructType.getElementType(0);
 
-  SmallVector<ValuePtr, 2> accessIndices;
+  SmallVector<Value, 2> accessIndices;
   /// For scalar values, the index-map computed with already map to the 0-th
   /// element. For arrays, they map to the position accessed. So just for arrays
   /// we need to add an extra 0 to index into the struct.
@@ -193,12 +193,12 @@ LogicalResult SPIRVCodegenImpl::createLaunchGuard(OpBuilder &builder,
   auto loc = fn.getLoc();
   auto i1Type = builder.getI1Type();
   auto i32Type = builder.getIntegerType(32);
-  ValuePtr condn = spirv::ConstantOp::getOne(i1Type, loc, &builder);
+  Value condn = spirv::ConstantOp::getOne(i1Type, loc, &builder);
   for (auto launchDim : enumerate(launchSize)) {
     if (launchDim.value() == 1) {
       continue;
     }
-    ValuePtr id = getGlobalInvocationID(launchDim.index());
+    Value id = getGlobalInvocationID(launchDim.index());
     auto extent = builder.create<spirv::ConstantOp>(
         loc, i32Type, builder.getI32IntegerAttr(launchDim.value()));
     auto check = builder.create<spirv::SLessThanOp>(loc, i1Type, id, extent);
@@ -217,8 +217,8 @@ LogicalResult SPIRVCodegenImpl::createLaunchGuard(OpBuilder &builder,
   // Add branch to the header block.
   builder.setInsertionPointToEnd(headerBlock);
   builder.create<spirv::BranchConditionalOp>(
-      loc, condn, thenBlock, ArrayRef<ValuePtr>(), selectionOp.getMergeBlock(),
-      ArrayRef<ValuePtr>());
+      loc, condn, thenBlock, ArrayRef<Value>(), selectionOp.getMergeBlock(),
+      ArrayRef<Value>());
 
   // Add branch to merge block in the then block.
   builder.setInsertionPointToEnd(thenBlock);
@@ -228,7 +228,7 @@ LogicalResult SPIRVCodegenImpl::createLaunchGuard(OpBuilder &builder,
   return success();
 }
 
-ValuePtr SPIRVCodegenImpl::getGlobalInvocationID(unsigned dim) {
+Value SPIRVCodegenImpl::getGlobalInvocationID(unsigned dim) {
   if (dim < globalInvocationIDs.size()) {
     return globalInvocationIDs[dim];
   }
@@ -237,7 +237,7 @@ ValuePtr SPIRVCodegenImpl::getGlobalInvocationID(unsigned dim) {
 
 LogicalResult SPIRVCodegenImpl::initArgValues(
     OpBuilder &builder, Location loc, TensorIndexToScalarValueMap &valueCache,
-    ValuePtr origArg) {
+    Value origArg) {
   SmallVector<AffineMap, 4> indices;
   index_computation_attribute::getIndexMapsForValue(origArg, indices);
   for (auto indexMap : indices) {
@@ -250,7 +250,7 @@ LogicalResult SPIRVCodegenImpl::initArgValues(
 
 LogicalResult SPIRVCodegenImpl::initSymbolValues(
     OpBuilder &builder, Location loc, TensorIndexToScalarValueMap &valueCache,
-    ValuePtr origArg) {
+    Value origArg) {
   // Add values corresponding to the symbol numbers.
   SmallVector<std::pair<AffineMap, unsigned>, 2> symbolInfo;
   index_computation_attribute::getSymbolNumberForTensorIndex(
@@ -267,10 +267,10 @@ LogicalResult SPIRVCodegenImpl::initSymbolValues(
   return success();
 }
 
-ValuePtr SPIRVCodegenImpl::loadArgValueAtIndex(
+Value SPIRVCodegenImpl::loadArgValueAtIndex(
     OpBuilder &builder, Location loc, TensorIndexToScalarValueMap &valueCache,
-    ValuePtr origArg, AffineMap indexMap) {
-  ValuePtr val = valueCache.getValueAtIndex(origArg, indexMap);
+    Value origArg, AffineMap indexMap) {
+  Value val = valueCache.getValueAtIndex(origArg, indexMap);
   if (val) {
     return val;
   }
@@ -332,7 +332,7 @@ LogicalResult SPIRVCodegenImpl::lowerFunction(
 // ConstantOp
 //===----------------------------------------------------------------------===//
 LogicalResult ConstantOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder, AffineMap index, ArrayRef<ValuePtr>,
+    Operation *op, OpBuilder &builder, AffineMap index, ArrayRef<Value>,
     TensorIndexToScalarValueMap &valueCache) const {
   auto constOp = cast<ConstantOp>(op);
   auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
@@ -392,9 +392,9 @@ LogicalResult ConstantOpSPIRVLowering::lowerNonSplatConstant(
       loc, pointerType,
       builder.getI32IntegerAttr(
           static_cast<int32_t>(spirv::StorageClass::Function)),
-      ArrayRef<ValuePtr>(spirvConstOp.getResult()));
+      ArrayRef<Value>(spirvConstOp.getResult()));
 
-  SmallVector<ValuePtr, 2> accessIndices;
+  SmallVector<Value, 2> accessIndices;
   for (auto indexExpr : index.getResults()) {
     accessIndices.push_back(valueCache.getAffineExprValue(
         builder.saveInsertionPoint(), loc, indexExpr));
@@ -413,8 +413,7 @@ LogicalResult ConstantOpSPIRVLowering::lowerNonSplatConstant(
 //===----------------------------------------------------------------------===//
 LogicalResult CmpIOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<ValuePtr> operands,
-    TensorIndexToScalarValueMap &valueCache) const {
+    ArrayRef<Value> operands, TensorIndexToScalarValueMap &valueCache) const {
   if (operands.size() != 2) {
     return op->emitError("expected two operands in spir-v lowering of CmpIOp");
   }
@@ -454,8 +453,7 @@ LogicalResult CmpIOpSPIRVLowering::lowerOperation(
 //===----------------------------------------------------------------------===//
 LogicalResult CmpFOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<ValuePtr> operands,
-    TensorIndexToScalarValueMap &valueCache) const {
+    ArrayRef<Value> operands, TensorIndexToScalarValueMap &valueCache) const {
   if (operands.size() != 2) {
     return op->emitError("expected two operands in spir-v lowering of CmpFOp");
   }

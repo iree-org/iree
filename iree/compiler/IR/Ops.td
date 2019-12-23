@@ -56,7 +56,7 @@ def IREE_TensorToMemRefOp : IREE_PureOp<"tensor_to_memref", [
   let arguments = (ins AnyTensor);
   let results = (outs IREEHL_MemRef);
 
-  let builders = [OpBuilder<"Builder*, OperationState&, ValuePtr ">];
+  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 
   let hasFolder = 1;
 }
@@ -67,7 +67,7 @@ def IREE_MemRefToTensorOp : IREE_PureOp<"memref_to_tensor", [
 ]> {
   let arguments = (ins IREEHL_MemRef);
   let results = (outs AnyTensor);
-  let builders = [OpBuilder<"Builder*, OperationState&, ValuePtr ">];
+  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 
   let hasFolder = 1;
 }
@@ -78,7 +78,7 @@ def IREE_ScalarToMemRefOp : IREE_PureOp<"scalar_to_memref", [
   let arguments = (ins IREEHL_Element);
   let results = (outs IREEHL_AnyScalar);
 
-  let builders = [OpBuilder<"Builder*, OperationState&, ValuePtr ">];
+  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 
   let hasFolder = 1;
 }
@@ -89,7 +89,7 @@ def IREE_MemRefToScalarOp : IREE_PureOp<"memref_to_scalar", [
   let arguments = (ins IREEHL_AnyScalar);
   let results = (outs IREEHL_Element);
 
-  let builders = [OpBuilder<"Builder*, OperationState&, ValuePtr ">];
+  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 
   let hasFolder = 1;
 }
@@ -106,7 +106,7 @@ def IREE_DispatchRegionOp : IREE_PureOp<"dispatch_region"> {
 
   let extraClassDeclaration = [{
     // TODO(b/132296600): make tablegen follow the style guide.
-    ValuePtr getWorkload() { return workload(); }
+    Value getWorkload() { return workload(); }
     Region& getBody() { return body(); }
 
     // TODO(b/133879130): make tablegen support variadic operand accessors.
@@ -116,10 +116,10 @@ def IREE_DispatchRegionOp : IREE_PureOp<"dispatch_region"> {
     }
     unsigned mapArgOperandToOpOperand(unsigned i) { return i + 1; }
     unsigned getNumArgOperands() { return getNumOperands() - 1; }
-    ValuePtr getArgOperand(unsigned i) {
+    Value getArgOperand(unsigned i) {
       return getOperand(mapArgOperandToOpOperand(i));
     }
-    void setArgOperand(unsigned i, ValuePtr arg) {
+    void setArgOperand(unsigned i, Value arg) {
       setOperand(mapArgOperandToOpOperand(i), arg);
     }
 
@@ -132,7 +132,7 @@ def IREE_DispatchRegionOp : IREE_PureOp<"dispatch_region"> {
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<"Builder *builder, OperationState &state,"
-              "ArrayRef<Type> resultTypes, ValuePtr workload,"
+              "ArrayRef<Type> resultTypes, Value workload,"
               "ValueRange args,"
               "ArrayRef<NamedAttribute> attributes = {}">,
   ];
@@ -157,7 +157,7 @@ def IREE_ReductionRegionOp : IREE_PureOp<"reduction_region", [
 
   let extraClassDeclaration = [{
     // TODO(b/132296600): make tablegen follow the style guide.
-    ValuePtr getWorkload() { return workload(); }
+    Value getWorkload() { return workload(); }
     Region& getBody() { return body(); }
 
     bool isWindowed() {
@@ -176,12 +176,12 @@ def IREE_ReductionRegionOp : IREE_PureOp<"reduction_region", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<"Builder *builder, OperationState &state,"
-    "ArrayRef<Type> resultTypes, ValuePtr workload, ValueRange operands,"
+    "ArrayRef<Type> resultTypes, Value workload, ValueRange operands,"
     "ValueRange initialValues,"
     "ArrayRef<int64_t> dimensions,"
     "ArrayRef<NamedAttribute> attributes = {}">,
     OpBuilder<"Builder *builder, OperationState &state,"
-    "ArrayRef<Type> resultTypes, ValuePtr workload, ValueRange operands,"
+    "ArrayRef<Type> resultTypes, Value workload, ValueRange operands,"
     "ValueRange initialValues,"
     "ArrayRef<int64_t> windowDimensions, ArrayRef<int64_t> windowStrides,"
     "ArrayRef<int64_t> baseDilations, ArrayRef<int64_t> windowDilations,"

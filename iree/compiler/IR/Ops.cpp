@@ -126,7 +126,7 @@ OpFoldResult TensorToMemRefOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void TensorToMemRefOp::build(Builder *builder, OperationState &state,
-                             ValuePtr arg) {
+                             Value arg) {
   build(builder, state, convertTypeToMemRef(arg->getType()), arg);
 }
 
@@ -169,7 +169,7 @@ OpFoldResult MemRefToTensorOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void MemRefToTensorOp::build(Builder *builder, OperationState &state,
-                             ValuePtr arg) {
+                             Value arg) {
   // TODO(gcmn) Use getTensorType from MemRefUtils when circular dependency can
   // be avoided.
   auto memRefType = arg->getType().cast<MemRefType>();
@@ -217,7 +217,7 @@ OpFoldResult ScalarToMemRefOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void ScalarToMemRefOp::build(Builder *builder, OperationState &state,
-                             ValuePtr arg) {
+                             Value arg) {
   build(builder, state, convertTypeToMemRef(arg->getType()), arg);
 }
 
@@ -260,7 +260,7 @@ OpFoldResult MemRefToScalarOp::fold(ArrayRef<Attribute> operands) {
 }
 
 void MemRefToScalarOp::build(Builder *builder, OperationState &state,
-                             ValuePtr arg) {
+                             Value arg) {
   build(builder, state, getElementTypeOrSelf(arg), arg);
 }
 
@@ -269,7 +269,7 @@ void MemRefToScalarOp::build(Builder *builder, OperationState &state,
 //===----------------------------------------------------------------------===//
 
 void DispatchRegionOp::build(Builder *builder, OperationState &state,
-                             ArrayRef<Type> resultTypes, ValuePtr workload,
+                             ArrayRef<Type> resultTypes, Value workload,
                              ValueRange operands,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
@@ -350,7 +350,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
   p << "(";
   interleaveComma(
       llvm::zip(op.getBody().front().getArguments(), op.getArgOperands()), p,
-      [&](std::tuple<BlockArgumentPtr, ValuePtr> it) {
+      [&](std::tuple<BlockArgument, Value> it) {
         p << *std::get<0>(it) << " = " << *std::get<1>(it);
         p << " : ";
         p << std::get<1>(it)->getType();
@@ -373,7 +373,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 //===----------------------------------------------------------------------===//
 
 void ReductionRegionOp::build(Builder *builder, OperationState &state,
-                              ArrayRef<Type> resultTypes, ValuePtr workload,
+                              ArrayRef<Type> resultTypes, Value workload,
                               ValueRange operands, ValueRange initialValues,
                               ArrayRef<int64_t> dimensions,
                               ArrayRef<NamedAttribute> attributes) {
@@ -394,7 +394,7 @@ void ReductionRegionOp::build(Builder *builder, OperationState &state,
 
 void ReductionRegionOp::build(
     Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
-    ValuePtr workload, ValueRange operands, ValueRange initialValues,
+    Value workload, ValueRange operands, ValueRange initialValues,
     ArrayRef<int64_t> windowDimensions, ArrayRef<int64_t> windowStrides,
     ArrayRef<int64_t> baseDilations, ArrayRef<int64_t> windowDilations,
     PaddingMode paddingMode, ArrayRef<NamedAttribute> attributes) {
@@ -515,7 +515,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
   if (op.getNumResults() > 0) {
     p << " : (";
     interleaveComma(op.getODSOperands(1), p,
-                    [&](ValuePtr operand) { p.printType(operand->getType()); });
+                    [&](Value operand) { p.printType(operand->getType()); });
     p << ")";
     p << " -> (";
     interleaveComma(op.getResultTypes(), p);
@@ -526,7 +526,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
   p << "      invocation(";
   auto &entryBlock = op.getBody().getBlocks().front();
   int regionArgIndex = 0;
-  interleaveComma(op.getODSOperands(2), p, [&](ValuePtr operand) {
+  interleaveComma(op.getODSOperands(2), p, [&](Value operand) {
     p << "(";
     p.printOperand(entryBlock.getArgument(regionArgIndex++));
     p << ", ";

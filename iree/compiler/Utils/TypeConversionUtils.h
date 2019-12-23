@@ -46,7 +46,7 @@ Type legalizeType(Type type);
 
 // Converts a type (scalar, tensor, etc) to a MemRef-based type.
 MemRefType convertTypeToMemRef(Type type);
-MemRefType convertTypeToMemRef(ValuePtr value);
+MemRefType convertTypeToMemRef(Value value);
 
 }  // namespace iree_compiler
 }  // namespace mlir

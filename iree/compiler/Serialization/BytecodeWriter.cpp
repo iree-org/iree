@@ -189,7 +189,7 @@ LogicalResult BytecodeWriter::WriteAttributeData(Attribute baseAttr) {
          << static_cast<int>(baseAttr.getKind()) << " not implemented";
 }
 
-Optional<int> BytecodeWriter::LookupLocalOrdinal(ValuePtr value) {
+Optional<int> BytecodeWriter::LookupLocalOrdinal(Value value) {
   int ordinal;
   auto it = localMap_.find(value);
   if (it != localMap_.end()) {
@@ -208,12 +208,12 @@ Optional<int> BytecodeWriter::LookupLocalOrdinal(ValuePtr value) {
   return ordinal;
 }
 
-LogicalResult BytecodeWriter::PrepareLocal(ValuePtr value) {
+LogicalResult BytecodeWriter::PrepareLocal(Value value) {
   if (!LookupLocalOrdinal(value).hasValue()) return failure();
   return success();
 }
 
-LogicalResult BytecodeWriter::WriteLocal(ValuePtr value) {
+LogicalResult BytecodeWriter::WriteLocal(Value value) {
   auto ordinal = LookupLocalOrdinal(value);
   if (!ordinal.hasValue()) {
     return failure();
