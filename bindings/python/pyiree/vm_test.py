@@ -79,7 +79,7 @@ class VmTest(absltest.TestCase):
         instance, modules=[self.hal_module, m])
     print(context)
 
-  def test_invoke_function(self):
+  def test_synchronous_invoke_function(self):
     m = create_simple_mul_module()
     instance = pyiree.binding.vm.VmInstance()
     context = pyiree.binding.vm.VmContext(
@@ -91,16 +91,14 @@ class VmTest(absltest.TestCase):
     arg1 = np.array([4., 5., 6., 7.], dtype=np.float32)
     inputs = abi.raw_pack_inputs((arg0, arg1))
     print("INPUTS:", inputs)
-    allocated_results = abi.allocate_results(inputs)
+    allocated_results = abi.allocate_results(inputs, static_alloc=False)
     print("ALLOCATED RESULTS:", allocated_results)
     print("--- INVOKE:")
-    context.invoke(f, inputs.to_vm_variant_list(),
-                   allocated_results.to_vm_variant_list())
+    context.invoke(f, inputs, allocated_results)
     print("--- DONE.")
     results = abi.raw_unpack_results(allocated_results)
     print("RESULTS:", results)
-    # TODO(laurenzo): Results are coming back all zero. Diagnose and uncomment.
-    # np.testing.assert_allclose(results[0], [4., 10., 18., 28.])
+    np.testing.assert_allclose(results[0], [4., 10., 18., 28.])
 
 
 if __name__ == "__main__":

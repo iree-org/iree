@@ -23,6 +23,7 @@
 #include "iree/vm/api.h"
 #include "iree/vm2/api.h"
 #include "iree/vm2/bytecode_module.h"
+#include "iree/vm2/variant_list.h"
 
 namespace iree {
 namespace python {
@@ -92,6 +93,13 @@ class VmVariantList {
 
   iree_vm_variant_list_t* raw_ptr() { return list_; }
   const iree_vm_variant_list_t* raw_ptr() const { return list_; }
+
+  void AppendNullRef() {
+    CheckApiStatus(iree_vm_variant_list_append_null_ref(raw_ptr()),
+                   "Error appending to list");
+  }
+
+  std::string DebugString() const;
 
  private:
   VmVariantList(iree_vm_variant_list_t* list) : list_(list) {}

@@ -35,49 +35,6 @@ namespace python {
 // Forward declarations.
 class HalDevice;
 
-// A HalBuffer (iree_hal_buffer_t) bound to a function argument.
-// At this point, the buffer has been completely validated, with all shape
-// information erased except for any dynamic dims.
-struct BoundHalBufferFunctionArg {
-  // The backing buffer.
-  HalBuffer buffer;
-  // If this function argument is backed by a python object, it is retained
-  // here.
-  py::object dependent_pyobject;
-  // Dynamic dims in the shape (for shaped buffers).
-  absl::InlinedVector<int, 2> dynamic_dims;
-};
-
-// Opaque (to python) native argument.
-using FunctionArgVariant =
-    absl::variant<std::nullptr_t, BoundHalBufferFunctionArg>;
-
-// Opaque list of function arguments.
-// Has sufficient accessors on it to facilitate printing and testing but is
-// otherwise, not visible to python.
-// Typically, native code will interact with the lower level span based API
-// directly (and avoid some overhead). Therefore, this class does not seek to
-// be optimal.
-class FunctionArgVariantList {
- public:
-  using VectorType = absl::InlinedVector<FunctionArgVariant, 4>;
-  FunctionArgVariantList() = default;
-  FunctionArgVariantList(VectorType contents)
-      : contents_(std::move(contents)) {}
-
-  VectorType& contents() { return contents_; }
-  const VectorType& contents() const { return contents_; }
-
-  // Copies the contents into a iree_vm_variant_list_t.
-  // TODO(laurenzo): It would be best if the iree_vm_variant_list_t backed
-  // this type, but the two were created independently and need to be
-  // retrofitted.
-  VmVariantList ToVmVariantList();
-
- private:
-  VectorType contents_;
-};
-
 // Instantiated with function attributes in order to process inputs/outputs.
 class FunctionAbi {
  public:
@@ -117,16 +74,15 @@ class FunctionAbi {
   // Given a span of descriptions, packs the given py_args into the span
   // of function args. All spans must be of the same size.
   void RawPack(absl::Span<const Description> descs,
-               absl::Span<py::handle> py_args,
-               absl::Span<FunctionArgVariant> f_args, bool writable);
+               absl::Span<py::handle> py_args, VmVariantList& args,
+               bool writable);
 
   // Raw unpacks f_results into py_results.
   // Note that this consumes entries in f_results as needed, leaving them
   // as nullptr.
   // Ordinarily, this will be invoked along with AllocateResults() but it
   // is broken out for testing.
-  void RawUnpack(absl::Span<const Description> descs,
-                 absl::Span<FunctionArgVariant> f_results,
+  void RawUnpack(absl::Span<const Description> descs, VmVariantList& f_results,
                  absl::Span<py::object> py_results);
 
   // Given bound function arguments (from RawPack or equiv) and signature
@@ -140,15 +96,14 @@ class FunctionAbi {
   // invocation must ensure proper barriers are in place to fully execute the
   // function prior to delivering results to the user layer.
   void AllocateResults(absl::Span<const Description> descs,
-                       absl::Span<const FunctionArgVariant> f_args,
-                       absl::Span<FunctionArgVariant> f_results);
+                       VmVariantList& f_args, VmVariantList& f_results);
 
   // Gets the string representation.
   std::string DebugString() const;
 
  private:
   void PackBuffer(const RawSignatureParser::Description& desc,
-                  py::handle py_arg, FunctionArgVariant& f_arg, bool writable);
+                  py::handle py_arg, VmVariantList& f_args, bool writable);
 
   HalDevice device_;
   std::shared_ptr<HostTypeFactory> host_type_factory_;

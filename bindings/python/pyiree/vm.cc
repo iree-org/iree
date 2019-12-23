@@ -166,6 +166,42 @@ absl::optional<iree_vm_function_t> VmModule::LookupFunction(
   return f;
 }
 
+//------------------------------------------------------------------------------
+// VmVariantList
+//------------------------------------------------------------------------------
+
+std::string VmVariantList::DebugString() const {
+  // The variant list API requires mutability, so we const cast to it internally
+  // so we can maintain a const DebugString() for callers.
+  auto mutable_this = const_cast<VmVariantList*>(this);
+  std::string s;
+  absl::StrAppend(&s, "<VmVariantList(", size(), "): [");
+
+  for (iree_host_size_t i = 0, e = size(); i < e; ++i) {
+    iree_vm_variant_t* variant =
+        iree_vm_variant_list_get(mutable_this->raw_ptr(), i);
+    if (i > 0) absl::StrAppend(&s, ", ");
+
+    if (IREE_VM_VARIANT_IS_VALUE(variant)) {
+      absl::StrAppend(&s, variant->i32);
+    } else if (IREE_VM_VARIANT_IS_REF(variant)) {
+      // Pretty print a subset of ABI impacting known types.
+      if (iree_hal_buffer_isa(&variant->ref)) {
+        auto* hal_buffer = iree_hal_buffer_deref(&variant->ref);
+        assert(hal_buffer);
+        absl::StrAppend(&s, "HalBuffer(",
+                        iree_hal_buffer_byte_length(hal_buffer), ")");
+      } else {
+        absl::StrAppend(&s, "Unknown(", variant->ref_type, ")");
+      }
+    } else {
+      absl::StrAppend(&s, "None");
+    }
+  }
+  absl::StrAppend(&s, "]>");
+  return s;
+}
+
 void SetupVmBindings(pybind11::module m) {
   CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
   CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
@@ -185,7 +221,8 @@ void SetupVmBindings(pybind11::module m) {
   // Mutation and inspection of the variant list is mostly opaque to python.
   py::class_<VmVariantList>(m, "VmVariantList")
       .def(py::init(&VmVariantList::Create))
-      .def_property_readonly("size", &VmVariantList::size);
+      .def_property_readonly("size", &VmVariantList::size)
+      .def("__repr__", &VmVariantList::DebugString);
 
   py::class_<iree_vm_function_t>(m, "VmFunction")
       .def_readonly("linkage", &iree_vm_function_t::linkage)

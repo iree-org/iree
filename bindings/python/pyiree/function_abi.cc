@@ -19,6 +19,7 @@
 #include "absl/types/span.h"
 #include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/status_utils.h"
+#include "bindings/python/pyiree/vm.h"
 #include "iree/base/api.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/hal/api.h"
@@ -48,37 +49,36 @@ std::unique_ptr<FunctionAbi> PyCreateAbi(
   return FunctionAbi::Create(device, std::move(host_type_factory), lookup);
 }
 
-std::unique_ptr<FunctionArgVariantList> PyRawPack(
-    FunctionAbi* self, absl::Span<const FunctionAbi::Description> descs,
-    py::sequence py_args, bool writable) {
+VmVariantList PyRawPack(FunctionAbi* self,
+                        absl::Span<const FunctionAbi::Description> descs,
+                        py::sequence py_args, bool writable) {
   if (py_args.size() != descs.size()) {
     throw RaiseValueError("Mismatched pack arity");
   }
-  auto f_list = absl::make_unique<FunctionArgVariantList>();
-  f_list->contents().resize(py_args.size());
+
+  VmVariantList f_args = VmVariantList::Create(py_args.size());
   absl::InlinedVector<py::handle, 8> local_py_args(py_args.begin(),
                                                    py_args.end());
-  self->RawPack(descs, absl::MakeSpan(local_py_args),
-                absl::MakeSpan(f_list->contents()), writable);
-  return f_list;
+  self->RawPack(descs, absl::MakeSpan(local_py_args), f_args, writable);
+  return f_args;
 }
 
-std::unique_ptr<FunctionArgVariantList> PyAllocateResults(
-    FunctionAbi* self, FunctionArgVariantList* f_args) {
-  auto f_results = absl::make_unique<FunctionArgVariantList>();
-  f_results->contents().resize(self->raw_result_arity());
-  self->AllocateResults(absl::MakeConstSpan(self->raw_config().results),
-                        absl::MakeConstSpan(f_args->contents()),
-                        absl::MakeSpan(f_results->contents()));
+VmVariantList PyAllocateResults(FunctionAbi* self, VmVariantList& f_args,
+                                bool static_alloc) {
+  auto f_results = VmVariantList::Create(self->raw_result_arity());
+  if (static_alloc) {
+    // For static dispatch, attempt to fully allocate and perform shape
+    // inference.
+    self->AllocateResults(absl::MakeConstSpan(self->raw_config().results),
+                          f_args, f_results);
+  }
   return f_results;
 }
 
-py::object PyRawUnpackResults(FunctionAbi* self,
-                              FunctionArgVariantList* f_args) {
+py::object PyRawUnpackResults(FunctionAbi* self, VmVariantList& f_args) {
   absl::InlinedVector<py::object, 4> py_results;
-  py_results.resize(f_args->contents().size());
-  self->RawUnpack(absl::MakeConstSpan(self->raw_config().results),
-                  absl::MakeSpan(f_args->contents()),
+  py_results.resize(f_args.size());
+  self->RawUnpack(absl::MakeConstSpan(self->raw_config().results), f_args,
                   absl::MakeSpan(py_results));
   py::tuple py_result_tuple(py_results.size());
   for (size_t i = 0, e = py_results.size(); i < e; ++i) {
@@ -115,7 +115,7 @@ pybind11::error_already_set RaiseBufferMismatchError(
 // Returns false if not compatible.
 void MapBufferAttrs(Py_buffer& py_view,
                     const RawSignatureParser::Description& desc,
-                    BoundHalBufferFunctionArg& bound_arg) {
+                    absl::InlinedVector<int, 2>& dynamic_dims) {
   // Verify that rank matches.
   if (py_view.ndim != desc.dims.size()) {
     throw RaiseBufferMismatchError(
@@ -153,7 +153,7 @@ void MapBufferAttrs(Py_buffer& py_view,
     auto f_dim = desc.dims[i];
     if (f_dim < 0) {
       // Dynamic.
-      bound_arg.dynamic_dims.push_back(py_dim);
+      dynamic_dims.push_back(py_dim);
     } else if (py_dim != f_dim) {
       // Mismatch.
       throw RaiseBufferMismatchError(
@@ -164,76 +164,7 @@ void MapBufferAttrs(Py_buffer& py_view,
   }
 }
 
-std::string FunctionArgVariantListRepr(FunctionArgVariantList* self) {
-  std::string s;
-  struct Visitor {
-    Visitor(std::string& s) : s(s) {}
-    void operator()(std::nullptr_t) { s.append("None"); }
-    void operator()(const BoundHalBufferFunctionArg& arg) {
-      absl::StrAppend(&s, "HalBuffer(", arg.buffer.byte_length());
-      if (!arg.dynamic_dims.empty()) {
-        absl::StrAppend(&s, ", dynamic_dims=[");
-        for (size_t i = 0, e = arg.dynamic_dims.size(); i < e; ++i) {
-          if (i > 0) s.append(",");
-          absl::StrAppend(&s, arg.dynamic_dims[i]);
-        }
-        absl::StrAppend(&s, "]");
-      }
-      if (arg.dependent_pyobject) {
-        absl::StrAppend(&s, ", wraps=");
-        std::string wraps_s = py::str(arg.dependent_pyobject);
-        s.append(wraps_s);
-      }
-      absl::StrAppend(&s, ")");
-    }
-    std::string& s;
-  };
-  Visitor v(s);
-
-  absl::StrAppend(&s, "<FunctionArgVariantList(", self->contents().size(),
-                  "): [");
-  for (size_t i = 0, e = self->contents().size(); i < e; ++i) {
-    if (i > 0) s.append(", ");
-    const auto& arg = self->contents()[i];
-    absl::visit(v, arg);
-  }
-  absl::StrAppend(&s, "]>");
-
-  return s;
-}
-
 }  // namespace
-
-//------------------------------------------------------------------------------
-// FunctionArgVariantList
-//------------------------------------------------------------------------------
-
-VmVariantList FunctionArgVariantList::ToVmVariantList() {
-  struct Visitor {
-    VmVariantList list;
-    void operator()(std::nullptr_t) {
-      CheckApiStatus(iree_vm_variant_list_append_null_ref(list.raw_ptr()),
-                     "Error appending to variant list");
-    }
-    void operator()(BoundHalBufferFunctionArg& arg) {
-      if (arg.dependent_pyobject) {
-        throw RaiseValueError("Dependent buffer object not yet supported");
-      }
-      iree_vm_ref_t buffer_ref =
-          iree_hal_buffer_retain_ref(arg.buffer.raw_ptr());
-      CheckApiStatus(
-          iree_vm_variant_list_append_ref_move(list.raw_ptr(), &buffer_ref),
-          "Error moving buffer");
-    }
-  };
-
-  Visitor visitor{VmVariantList::Create(contents_.size())};
-  for (auto& arg_variant : contents_) {
-    absl::visit(visitor, arg_variant);
-  }
-
-  return std::move(visitor.list);
-}
 
 //------------------------------------------------------------------------------
 // FunctionAbi
@@ -289,10 +220,9 @@ std::unique_ptr<FunctionAbi> FunctionAbi::Create(
 }
 
 void FunctionAbi::RawPack(absl::Span<const Description> descs,
-                          absl::Span<py::handle> py_args,
-                          absl::Span<FunctionArgVariant> f_args,
+                          absl::Span<py::handle> py_args, VmVariantList& f_args,
                           bool writable) {
-  if (descs.size() != py_args.size() || descs.size() != f_args.size()) {
+  if (descs.size() != py_args.size()) {
     throw RaiseValueError("Mismatched RawPack() input arity");
   }
 
@@ -300,7 +230,7 @@ void FunctionAbi::RawPack(absl::Span<const Description> descs,
     const Description& desc = descs[i];
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer:
-        PackBuffer(desc, py_args[i], f_args[i], writable);
+        PackBuffer(desc, py_args[i], f_args, writable);
         break;
       case RawSignatureParser::Type::kRefObject:
         throw RaisePyError(PyExc_NotImplementedError,
@@ -314,40 +244,28 @@ void FunctionAbi::RawPack(absl::Span<const Description> descs,
 }
 
 void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
-                            absl::Span<FunctionArgVariant> f_results,
+                            VmVariantList& f_results,
                             absl::Span<py::object> py_results) {
   if (descs.size() != f_results.size() || descs.size() != py_results.size()) {
     throw RaiseValueError("Mismatched RawUnpack() result arity");
   }
   for (size_t i = 0, e = descs.size(); i < e; ++i) {
     const Description& desc = descs[i];
+    iree_vm_variant_t* f_result =
+        iree_vm_variant_list_get(f_results.raw_ptr(), i);
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer: {
-        auto& bound_arg = absl::get<BoundHalBufferFunctionArg>(f_results[i]);
-        absl::InlinedVector<int, 7> backing_full_dims;
-        absl::Span<const int> dims;
-        if (bound_arg.dynamic_dims.empty()) {
-          // No dynamic dims. Just use the desc dims.
-          dims = absl::MakeSpan(desc.dims);
-        } else {
-          // Splice the dims back together.
-          size_t j = 0;
-          for (auto dim : desc.dims) {
-            if (dim >= 0) {
-              backing_full_dims.push_back(dim);
-            } else if (j < bound_arg.dynamic_dims.size()) {
-              backing_full_dims.push_back(bound_arg.dynamic_dims[j++]);
-            } else {
-              throw RaiseValueError("Mismatched static and dynamic dims");
-            }
-          }
-          dims = absl::MakeConstSpan(backing_full_dims);
+        iree_hal_buffer* raw_buffer = iree_hal_buffer_deref(&f_result->ref);
+        if (!raw_buffer) {
+          throw RaiseValueError("Could not deref result buffer (wrong type?)");
         }
+        HalBuffer buffer = HalBuffer::RetainAndCreate(raw_buffer);
+        // TODO(laurenzo): In the case of dynamic dims, the full dims will
+        // need to be splied together based on known static dims and dynamic
+        // dims from a subsequent result.
+        absl::Span<const int> dims = absl::MakeSpan(desc.dims);
         py_results[i] = host_type_factory_->CreateImmediateNdarray(
-            desc.buffer.scalar_type, absl::MakeSpan(desc.dims),
-            std::move(bound_arg.buffer));
-        // Already moved the buffer out. Clear the rest.
-        f_results[i] = nullptr;
+            desc.buffer.scalar_type, dims, std::move(buffer));
         break;
       }
       case RawSignatureParser::Type::kRefObject:
@@ -362,11 +280,8 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
 }
 
 void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
-                                  absl::Span<const FunctionArgVariant> f_args,
-                                  absl::Span<FunctionArgVariant> f_results) {
-  if (descs.size() != f_results.size()) {
-    throw RaiseValueError("Mismatched AllocateResults() result arity");
-  }
+                                  VmVariantList& f_args,
+                                  VmVariantList& f_results) {
   if (f_args.size() != raw_config().inputs.size()) {
     throw RaiseValueError("Mismatched AllocatResults() input arity");
   }
@@ -378,18 +293,14 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
             desc.buffer.scalar_type)];
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer: {
-        BoundHalBufferFunctionArg bound_result;
         for (auto dim : desc.dims) {
           if (dim < 0) {
-            bound_result.dynamic_dims.push_back(dim);
-            // TODO(laurenzo): Should accumulate dynamic dim slices into an
-            // invocation of a result allocator function and then use it to
-            // invoke.
-            // TODO(laurenzo): Should fallback to completely unknown result
-            // thunk.
-            throw RaisePyError(
-                PyExc_NotImplementedError,
-                "AllocateResult() does not yet support dynamic dims");
+            // If there is a dynamic dim, fallback to completely func allocated
+            // result. This is the worst case because it will force a
+            // pipeline stall.
+            // TODO(laurenzo): Invoke shape resolution function if available
+            // to allocate full result.
+            f_results.AppendNullRef();
           }
           alloc_size *= dim;
         }
@@ -403,9 +314,10 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
                                IREE_HAL_MEMORY_TYPE_HOST_VISIBLE),
                            IREE_HAL_BUFFER_USAGE_ALL, alloc_size, &raw_buffer),
                        "Error allocating host visible buffer");
-        bound_result.buffer = HalBuffer::CreateRetained(raw_buffer);
-        assert(i < f_results.size());
-        f_results[i] = std::move(bound_result);
+        iree_vm_ref_t buffer_ref = iree_hal_buffer_move_ref(raw_buffer);
+        CheckApiStatus(iree_vm_variant_list_append_ref_move(f_results.raw_ptr(),
+                                                            &buffer_ref),
+                       "Error moving buffer");
         break;
       }
       case RawSignatureParser::Type::kRefObject:
@@ -420,7 +332,7 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
 }
 
 void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
-                             py::handle py_arg, FunctionArgVariant& f_arg,
+                             py::handle py_arg, VmVariantList& f_args,
                              bool writable) {
   // Request a view of the buffer (use the raw python C API to avoid some
   // allocation and copying at the pybind level).
@@ -441,13 +353,17 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   }
   PyBufferReleaser py_view_releaser(py_view);
 
-  auto& bound_arg = f_arg.emplace<BoundHalBufferFunctionArg>();
   // Whether the py object needs to be retained with the argument.
   // Should be set to true if directly mapping, false if copied.
   bool depends_on_pyobject = false;
 
   // Verify compatibility.
-  MapBufferAttrs(py_view, desc, bound_arg);
+  absl::InlinedVector<int, 2> dynamic_dims;
+  MapBufferAttrs(py_view, desc, dynamic_dims);
+  if (!dynamic_dims.empty()) {
+    throw RaisePyError(PyExc_NotImplementedError,
+                       "Dynamic argument dimensions not implemented");
+  }
 
   // Allocate a HalBuffer.
   // This is hard-coded to C-contiguous right now.
@@ -461,15 +377,23 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
                          IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
                      IREE_HAL_BUFFER_USAGE_ALL, py_view.len, &raw_buffer),
                  "Failed to allocate device visible buffer");
-  bound_arg.buffer = HalBuffer::CreateRetained(raw_buffer);
-  CheckApiStatus(iree_hal_buffer_write_data(bound_arg.buffer.raw_ptr(), 0,
-                                            py_view.buf, py_view.len),
-                 "Error writing to input buffer");
+  CheckApiStatus(
+      iree_hal_buffer_write_data(raw_buffer, 0, py_view.buf, py_view.len),
+      "Error writing to input buffer");
+  iree_vm_ref_t buffer_ref = iree_hal_buffer_move_ref(raw_buffer);
+  CheckApiStatus(
+      iree_vm_variant_list_append_ref_move(f_args.raw_ptr(), &buffer_ref),
+      "Error moving buffer");
 
   // Only capture the reference to the exporting object (incrementing it)
   // once guaranteed successful.
   if (depends_on_pyobject) {
-    bound_arg.dependent_pyobject = py::object(py::handle(py_view.obj), false);
+    // Note for future implementation: there needs to be a place to stash
+    // references to be kept alive which back a buffer. This is likely an
+    // additional bag of refs returned from this function, which can then
+    // be attached to an invocation.
+    throw RaisePyError(PyExc_NotImplementedError,
+                       "Dependent buffer arguments not implemented");
   }
 }
 
@@ -485,18 +409,9 @@ void SetupFunctionAbiBindings(pybind11::module m) {
                               absl::MakeConstSpan(self->raw_config().inputs),
                               py_args, false /* writable */);
            })
-      .def("allocate_results", &PyAllocateResults)
+      .def("allocate_results", &PyAllocateResults, py::arg("f_results"),
+           py::arg("static_alloc") = true)
       .def("raw_unpack_results", &PyRawUnpackResults);
-
-  // Note that FunctionArgVariantList is meant to be opaque to normal users,
-  // but we provide some printing and other introspection to aid testing.
-  py::class_<FunctionArgVariantList, std::unique_ptr<FunctionArgVariantList>>(
-      m, "FunctionArgVariantList")
-      .def_property_readonly(
-          "size",
-          [](FunctionArgVariantList* self) { return self->contents().size(); })
-      .def("to_vm_variant_list", &FunctionArgVariantList::ToVmVariantList)
-      .def("__repr__", &FunctionArgVariantListRepr);
 }
 
 }  // namespace python

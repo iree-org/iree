@@ -15,6 +15,7 @@
 #ifndef IREE_VM_TYPES_H_
 #define IREE_VM_TYPES_H_
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -28,7 +29,12 @@ extern "C" {
 #define IREE_VM_DECLARE_TYPE_ADAPTERS(name, T)                             \
   IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_retain_ref(T* value); \
   IREE_API_EXPORT iree_vm_ref_t IREE_API_CALL name##_move_ref(T* value);   \
-  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref);
+  IREE_API_EXPORT T* IREE_API_CALL name##_deref(iree_vm_ref_t* ref);       \
+  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*                     \
+      name##_get_descriptor();                                             \
+  inline bool name##_isa(iree_vm_ref_t* ref) {                             \
+    return name##_get_descriptor()->type == ref->type;                     \
+  }
 
 // TODO(benvanik): make these macros standard/document them.
 #define IREE_VM_DEFINE_TYPE_ADAPTERS(name, T)                               \
@@ -47,6 +53,10 @@ extern "C" {
       return NULL;                                                          \
     }                                                                       \
     return (T*)ref->ptr;                                                    \
+  }                                                                         \
+  IREE_API_EXPORT const iree_vm_ref_type_descriptor_t*                      \
+      name##_get_descriptor() {                                             \
+    return &name##_descriptor;                                              \
   }
 
 // The built-in constant buffer type.

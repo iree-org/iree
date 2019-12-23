@@ -71,8 +71,7 @@ class FunctionAbiTest(absltest.TestCase):
     arg = np.zeros((10, 128, 64), dtype=np.float32)
     packed = fabi.raw_pack_inputs([arg])
     print(packed)
-    self.assertEqual("<FunctionArgVariantList(1): [HalBuffer(327680)]>",
-                     repr(packed))
+    self.assertEqual("<VmVariantList(1): [HalBuffer(327680)]>", repr(packed))
 
   def test_static_result_success(self):
     fabi = pyiree.binding.function_abi.create(
@@ -82,13 +81,20 @@ class FunctionAbiTest(absltest.TestCase):
     f_args = fabi.raw_pack_inputs([arg])
     f_results = fabi.allocate_results(f_args)
     print(f_results)
-    self.assertEqual("<FunctionArgVariantList(1): [HalBuffer(65536)]>",
-                     repr(f_results))
+    self.assertEqual("<VmVariantList(1): [HalBuffer(65536)]>", repr(f_results))
     py_result, = fabi.raw_unpack_results(f_results)
     self.assertEqual(np.int32, py_result.dtype)
     self.assertEqual((32, 8, 64), py_result.shape)
-    # Unpacking should have consumed the variants.
-    self.assertEqual("<FunctionArgVariantList(1): [None]>", repr(f_results))
+
+  def test_dynamic_alloc_result_success(self):
+    fabi = pyiree.binding.function_abi.create(
+        self.device, self.htf,
+        ATTRS_1ARG_FLOAT32_10X128X64_TO_SINT32_32X8X64_V1)
+    arg = np.zeros((10, 128, 64), dtype=np.float32)
+    f_args = fabi.raw_pack_inputs([arg])
+    f_results = fabi.allocate_results(f_args, static_alloc=False)
+    print(f_results)
+    self.assertEqual("<VmVariantList(0): []>", repr(f_results))
 
   def test_dynamic_arg_success(self):
     fabi = pyiree.binding.function_abi.create(
@@ -102,11 +108,14 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual(1, fabi.raw_result_arity)
 
     arg = np.zeros((10, 128, 64), dtype=np.float32)
-    packed = fabi.raw_pack_inputs([arg])
-    print(packed)
-    self.assertEqual(
-        "<FunctionArgVariantList(1): [HalBuffer(327680, dynamic_dims=[10])]>",
-        repr(packed))
+    with self.assertRaisesRegex(NotImplementedError,
+                                "Dynamic argument dimensions not implemented"):
+      unused_packed = fabi.raw_pack_inputs([arg])
+      # TODO(laurenzo): Re-enable the following once implemented.
+      # print(packed)
+      # self.assertEqual(
+      #     "<VmVariantList(1): [HalBuffer(327680, dynamic_dims=[10])]>",
+      #     repr(packed))
 
   def test_static_arg_rank_mismatch(self):
     fabi = pyiree.binding.function_abi.create(
