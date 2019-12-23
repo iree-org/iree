@@ -94,6 +94,10 @@ if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
   add_subdirectory(build_tools/third_party/dear_imgui EXCLUDE_FROM_ALL)
 endif()
 
+if(${IREE_BUILD_TESTS})
+  add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+endif()
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
@@ -104,6 +108,7 @@ add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/rt)
 add_subdirectory(iree/schemas)
+add_subdirectory(iree/testing)
 add_subdirectory(iree/vm)
 
 if(${IREE_BUILD_COMPILER})
