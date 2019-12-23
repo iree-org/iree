@@ -33,6 +33,8 @@ cc_binary(
     tags = [
         "manual",
         "nobuilder",
+        "noga",
+        "nokokoro",
         "notap",
     ],
     deps = [

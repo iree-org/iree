@@ -114,7 +114,7 @@ package(
 #     }),
 #     tags = [
 #         "manual",
-#         "notap",  # TODO(b/137088911): Build/test on TAP
+#         "notap", "noga", "nokokoro",  # TODO(b/137088911): Build/test on TAP
 #         "wasm",
 #     ],
 #     deps = [

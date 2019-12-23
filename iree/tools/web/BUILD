@@ -63,6 +63,8 @@ cc_binary(
     }),
     tags = [
         "manual",
+        "noga",
+        "nokokoro",
         "notap",  # TODO(b/137088911): Build/test on TAP
         "wasm",
     ],
