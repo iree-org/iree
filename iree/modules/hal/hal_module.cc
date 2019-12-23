@@ -350,13 +350,16 @@ Status HALModuleState::ExPushBinding(iree_vm_stack_t* stack,
 
 Status HALModuleState::ExExecutableDescriptorSetLayout(
     iree_vm_stack_t* stack, iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC)
+         << "ExExecutableDescriptorSetLayout";
 }
 
 Status HALModuleState::ExDeferRelease(iree_vm_stack_t* stack,
                                       iree_vm_stack_frame_t* frame) {
-  deferred_releases_.push_back({0});
-  iree_vm_ref_move(&frame->registers.ref[0], &deferred_releases_.back());
+  if (!iree_vm_ref_is_null(&frame->registers.ref[0])) {
+    deferred_releases_.push_back({0});
+    iree_vm_ref_move(&frame->registers.ref[0], &deferred_releases_.back());
+  }
   ResetStackFrame(frame);
   return OkStatus();
 }
@@ -398,17 +401,17 @@ Status HALModuleState::ExSubmitAndWait(iree_vm_stack_t* stack,
 
 Status HALModuleState::AllocatorComputeSize(iree_vm_stack_t* stack,
                                             iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "AllocatorComputeSize";
 }
 
 Status HALModuleState::AllocatorAllocate(iree_vm_stack_t* stack,
                                          iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "AllocatorAllocate";
 }
 
 Status HALModuleState::AllocatorAllocateConst(iree_vm_stack_t* stack,
                                               iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "AllocatorAllocateConst";
 }
 
 Status HALModuleState::AllocatorAllocateShaped(iree_vm_stack_t* stack,
@@ -450,37 +453,37 @@ Status HALModuleState::AllocatorAllocateShaped(iree_vm_stack_t* stack,
 
 Status HALModuleState::BufferSubspan(iree_vm_stack_t* stack,
                                      iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferSubspan";
 }
 
 Status HALModuleState::BufferFill(iree_vm_stack_t* stack,
                                   iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferFill";
 }
 
 Status HALModuleState::BufferReadData(iree_vm_stack_t* stack,
                                       iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferReadData";
 }
 
 Status HALModuleState::BufferWriteData(iree_vm_stack_t* stack,
                                        iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferWriteData";
 }
 
 Status HALModuleState::BufferCopyData(iree_vm_stack_t* stack,
                                       iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferCopyData";
 }
 
 Status HALModuleState::BufferLoad(iree_vm_stack_t* stack,
                                   iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferLoad";
 }
 
 Status HALModuleState::BufferStore(iree_vm_stack_t* stack,
                                    iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferStore";
 }
 
 //===----------------------------------------------------------------------===//
@@ -489,22 +492,22 @@ Status HALModuleState::BufferStore(iree_vm_stack_t* stack,
 
 Status HALModuleState::BufferViewComputeOffset(iree_vm_stack_t* stack,
                                                iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferViewComputeOffset";
 }
 
 Status HALModuleState::BufferViewComputeLength(iree_vm_stack_t* stack,
                                                iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferViewComputeLength";
 }
 
 Status HALModuleState::BufferViewComputeRange(iree_vm_stack_t* stack,
                                               iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferViewComputeRange";
 }
 
 Status HALModuleState::BufferViewSlice(iree_vm_stack_t* stack,
                                        iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "BufferViewSlice";
 }
 
 //===----------------------------------------------------------------------===//
@@ -599,7 +602,7 @@ Status HALModuleState::CommandBufferFillBuffer(iree_vm_stack_t* stack,
   if (!command_buffer) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "'command_buffer' invalid";
   }
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "CommandBufferFillBuffer";
 }
 
 Status HALModuleState::CommandBufferCopyBuffer(iree_vm_stack_t* stack,
@@ -609,7 +612,7 @@ Status HALModuleState::CommandBufferCopyBuffer(iree_vm_stack_t* stack,
   if (!command_buffer) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "'command_buffer' invalid";
   }
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "CommandBufferCopyBuffer";
 }
 
 Status HALModuleState::CommandBufferBindDescriptorSet(
@@ -619,7 +622,8 @@ Status HALModuleState::CommandBufferBindDescriptorSet(
   if (!command_buffer) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "'command_buffer' invalid";
   }
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC)
+         << "CommandBufferBindDescriptorSet";
 }
 
 Status HALModuleState::CommandBufferDispatch(iree_vm_stack_t* stack,
@@ -660,7 +664,7 @@ Status HALModuleState::CommandBufferDispatchIndirect(
   if (!command_buffer) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "'command_buffer' invalid";
   }
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "CommandBufferDispatchIndirect";
 }
 
 //===----------------------------------------------------------------------===//
@@ -669,12 +673,12 @@ Status HALModuleState::CommandBufferDispatchIndirect(
 
 Status HALModuleState::DescriptorSetAllocate(iree_vm_stack_t* stack,
                                              iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "DescriptorSetAllocate";
 }
 
 Status HALModuleState::DescriptorSetUpdate(iree_vm_stack_t* stack,
                                            iree_vm_stack_frame_t* frame) {
-  return UnimplementedErrorBuilder(IREE_LOC);
+  return UnimplementedErrorBuilder(IREE_LOC) << "DescriptorSetUpdate";
 }
 
 //===----------------------------------------------------------------------===//

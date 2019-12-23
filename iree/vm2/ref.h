@@ -16,6 +16,7 @@
 #define IREE_VM_REF_H_
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "iree/base/api.h"
@@ -194,9 +195,13 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_assign(iree_vm_ref_t* ref,
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
                                                     iree_vm_ref_t* out_ref);
 
-// Returns 1 if the two references point at the same value (or are both null).
-IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
-                                                    iree_vm_ref_t* rhs);
+// Returns true if the given |ref| is NULL.
+IREE_API_EXPORT bool IREE_API_CALL iree_vm_ref_is_null(iree_vm_ref_t* ref);
+
+// Returns true if the two references point at the same value (or are both
+// null).
+IREE_API_EXPORT bool IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
+                                                     iree_vm_ref_t* rhs);
 
 #ifdef __cplusplus
 }  // extern "C"

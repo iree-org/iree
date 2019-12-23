@@ -176,6 +176,10 @@ iree_vm_module_release(iree_vm_module_t* module);
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_vm_module_name(const iree_vm_module_t* module);
 
+// Returns the signature of the module describing the contents.
+IREE_API_EXPORT iree_vm_module_signature_t IREE_API_CALL
+iree_vm_module_signature(const iree_vm_module_t* module);
+
 // Looks up a function with the given name and linkage in the |module|.
 // This may perform a linear scan and results should be cached.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -190,6 +194,19 @@ iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
                                           iree_vm_function_linkage_t linkage,
                                           int32_t ordinal,
                                           iree_vm_function_t* out_function);
+
+// Returns the name of the given function or empty string if not available.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_function_name(const iree_vm_function_t* function);
+
+// Returns a value for the given reflection attribute |key|, if found.
+// Returns the empty string if the reflection data in general or the specific
+// key is not found.
+//
+// See: docs/function_abi.md for documentation on the ABI.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_function_reflection_attr(const iree_vm_function_t* function,
+                                 iree_string_view_t key);
 
 // Gets a reflection attribute for a function by index.
 // The returned key and value strings are guaranteed valid for the life

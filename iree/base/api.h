@@ -206,6 +206,9 @@ typedef struct {
   size_t size;
 } iree_string_view_t;
 
+#define IREE_STRING_VIEW_EMPTY \
+  { 0, 0 }
+
 #define IREE_SHAPE_MAX_RANK 5
 typedef struct {
   int32_t rank;

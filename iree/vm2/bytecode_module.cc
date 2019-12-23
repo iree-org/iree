@@ -310,8 +310,11 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
   auto* module_def = IREE_VM_GET_MODULE_DEF(module);
 
   if (linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
-    // Reflection attrs only on internal functions (referrent of external).
-    return IREE_STATUS_NOT_FOUND;
+    iree_vm_function_t internal_function;
+    iree_vm_bytecode_module_get_function(self, linkage, ordinal,
+                                         &internal_function, NULL, NULL);
+    linkage = internal_function.linkage;
+    ordinal = internal_function.ordinal;
   }
 
   if (ordinal < 0 || ordinal >= module_def->internal_functions()->size()) {
@@ -444,7 +447,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   state->global_i32_table = (int32_t*)state->rwdata_storage.data;
   state->global_ref_count = global_ref_count;
   state->global_ref_table = (iree_vm_ref_t*)p;
-  p += global_ref_count * sizeof(state->global_ref_table);
+  p += global_ref_count * sizeof(*state->global_ref_table);
   state->rodata_ref_count = rodata_ref_count;
   state->rodata_ref_table = (iree_vm_ro_byte_buffer_t*)p;
   p += rodata_ref_count * sizeof(*state->rodata_ref_table);
@@ -505,7 +508,9 @@ static iree_status_t iree_vm_bytecode_module_execute(
   if (frame->function.module != self) {
     return IREE_STATUS_INVALID_ARGUMENT;
   } else if (frame->function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
-    return IREE_STATUS_INVALID_ARGUMENT;
+    IREE_API_RETURN_IF_API_ERROR(iree_vm_bytecode_module_get_function(
+        self, frame->function.linkage, frame->function.ordinal,
+        &frame->function, NULL, NULL));
   }
 
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;

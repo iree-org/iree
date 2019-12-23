@@ -50,6 +50,16 @@ iree_vm_module_name(const iree_vm_module_t* module) {
   return module->name(module->self);
 }
 
+IREE_API_EXPORT iree_vm_module_signature_t IREE_API_CALL
+iree_vm_module_signature(const iree_vm_module_t* module) {
+  if (!module) {
+    iree_vm_module_signature_t empty;
+    memset(&empty, 0, sizeof(empty));
+    return empty;
+  }
+  return module->signature(module->self);
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
                                        iree_vm_function_linkage_t linkage,
@@ -66,6 +76,40 @@ iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
   return module->get_function(module->self, linkage, ordinal, out_function,
                               /*out_name=*/NULL,
                               /*out_signature=*/NULL);
+}
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_function_name(const iree_vm_function_t* function) {
+  iree_string_view_t name;
+  if (function->module->get_function(
+          function->module->self, function->linkage, function->ordinal,
+          /*out_function=*/NULL,
+          /*out_name=*/&name,
+          /*out_signature=*/NULL) != IREE_STATUS_OK) {
+    return iree_make_cstring_view("<error>");
+  }
+  return name;
+}
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_function_reflection_attr(const iree_vm_function_t* function,
+                                 iree_string_view_t key) {
+  iree_string_view_t empty_string = IREE_STRING_VIEW_EMPTY;
+  iree_vm_module_t* module = function->module;
+  if (!module->get_function_reflection_attr) {
+    return empty_string;
+  }
+  for (int index = 0;; ++index) {
+    iree_string_view_t index_key, index_value;
+    iree_status_t status = module->get_function_reflection_attr(
+        module->self, function->linkage, function->ordinal, index, &index_key,
+        &index_value);
+    if (status != IREE_STATUS_OK) break;
+    if (iree_string_view_compare(key, index_key) == 0) {
+      return index_value;
+    }
+  }
+  return empty_string;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL

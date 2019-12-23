@@ -218,7 +218,11 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_move(iree_vm_ref_t* ref,
   memset(ref, 0, sizeof(*ref));
 }
 
-IREE_API_EXPORT int IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
-                                                    iree_vm_ref_t* rhs) {
+IREE_API_EXPORT bool IREE_API_CALL iree_vm_ref_is_null(iree_vm_ref_t* ref) {
+  return ref->type == IREE_VM_REF_TYPE_NULL;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_vm_ref_equal(iree_vm_ref_t* lhs,
+                                                     iree_vm_ref_t* rhs) {
   return memcmp(lhs, rhs, sizeof(*lhs)) == 0;
 }
