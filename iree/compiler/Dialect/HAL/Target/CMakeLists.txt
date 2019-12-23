@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(LegacyInterpreter)
+add_subdirectory(VulkanSPIRV)
+
 iree_cc_library(
   NAME
     ExecutableTarget

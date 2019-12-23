@@ -23,7 +23,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
-    iree::compiler:.Dialect::HAL::Transforms
+    iree::compiler::Dialect::HAL::Transforms
     iree::compiler::IR
     iree::compiler::IR::Interpreter
     iree::compiler::Serialization

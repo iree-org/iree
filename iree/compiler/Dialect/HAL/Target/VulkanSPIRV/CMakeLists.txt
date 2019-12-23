@@ -21,7 +21,7 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL:Target::ExecutableTarget
+    iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::IR
     iree::compiler::Translation::SPIRV
     iree::schemas
