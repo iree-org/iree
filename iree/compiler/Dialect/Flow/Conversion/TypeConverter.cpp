@@ -56,7 +56,7 @@ Type FlowTypeConverter::convertType(Type t) {
 
 Operation *FlowTypeConverter::materializeConversion(PatternRewriter &rewriter,
                                                     Type resultType,
-                                                    ArrayRef<ValuePtr> inputs,
+                                                    ArrayRef<Value> inputs,
                                                     Location loc) {
   // TODO(b/145876978): materialize conversion when this is called.
   llvm_unreachable("unhandled materialization");

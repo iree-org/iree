@@ -179,13 +179,13 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
   return success();
 }
 
-uint8_t RegisterAllocation::mapToRegister(ValuePtr value) {
+uint8_t RegisterAllocation::mapToRegister(Value value) {
   auto it = map_.find(value);
   assert(it != map_.end());
   return it->getSecond();
 }
 
-uint8_t RegisterAllocation::mapUseToRegister(ValuePtr value, Operation *useOp,
+uint8_t RegisterAllocation::mapUseToRegister(Value value, Operation *useOp,
                                              int operandIndex) {
   uint8_t reg = mapToRegister(value);
   if (isRefRegister(reg) &&

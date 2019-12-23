@@ -41,14 +41,13 @@ void untupleTypes(llvm::ArrayRef<Type> types,
   }
 }
 
-ValuePtr processTuple(Type type, Location loc, Block *block,
-                      OpBuilder &builder) {
+Value processTuple(Type type, Location loc, Block *block, OpBuilder &builder) {
   if (!type.isa<TupleType>()) {
     return block->addArgument(type);
   }
 
   auto tupleType = type.dyn_cast<TupleType>();
-  llvm::SmallVector<ValuePtr, 4> values;
+  llvm::SmallVector<Value, 4> values;
   values.reserve(tupleType.size());
   for (auto subtype : tupleType.getTypes()) {
     values.push_back(processTuple(subtype, loc, block, builder));
@@ -63,9 +62,9 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
   }
 }
 
-bool recursiveUntuple(ValuePtr value, Location loc, OpBuilder &builder,
+bool recursiveUntuple(Value value, Location loc, OpBuilder &builder,
                       BlockAndValueMapping *mapping,
-                      llvm::SmallVectorImpl<ValuePtr> *newValues) {
+                      llvm::SmallVectorImpl<Value> *newValues) {
   Type type = value->getType();
   // We can return the value as is.
   if (!type.isa<TupleType>()) {
@@ -85,16 +84,16 @@ bool recursiveUntuple(ValuePtr value, Location loc, OpBuilder &builder,
   return false;
 }
 
-ValuePtr recursiveRetuple(Type oldType, Operation::result_range *values,
-                          OpBuilder &builder, Location loc) {
+Value recursiveRetuple(Type oldType, Operation::result_range *values,
+                       OpBuilder &builder, Location loc) {
   if (!oldType.isa<TupleType>()) {
-    ValuePtr returnValue = *values->begin();
+    Value returnValue = *values->begin();
     *values = values->drop_front();
     return returnValue;
   }
 
   TupleType tupleType = oldType.dyn_cast<TupleType>();
-  llvm::SmallVector<ValuePtr, 10> subValues;
+  llvm::SmallVector<Value, 10> subValues;
   for (auto subtype : tupleType.getTypes()) {
     subValues.push_back(recursiveRetuple(subtype, values, builder, loc));
   }
@@ -104,8 +103,7 @@ ValuePtr recursiveRetuple(Type oldType, Operation::result_range *values,
 }
 
 template <typename T>
-bool untupleAndLookupValues(T values,
-                            llvm::SmallVectorImpl<ValuePtr> *newValues,
+bool untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> *newValues,
                             OpBuilder &builder, Location loc,
                             BlockAndValueMapping *mapping) {
   for (auto operand : values) {
@@ -122,7 +120,7 @@ bool untupleAndLookupValues(T values,
 
 bool convertReturnOp(ReturnOp *op, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 10> newOperands;
+  llvm::SmallVector<Value, 10> newOperands;
   if (untupleAndLookupValues(op->getOperands(), &newOperands, builder,
                              op->getLoc(), mapping)) {
     return true;
@@ -134,7 +132,7 @@ bool convertReturnOp(ReturnOp *op, OpBuilder &builder,
 
 bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
                    BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 4> newArgs;
+  llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
@@ -149,7 +147,7 @@ bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
 
   auto newResults = newOp.getResults();
   for (auto oldResult : oldOp->getResults()) {
-    llvm::SmallVector<ValuePtr, 10> subValues;
+    llvm::SmallVector<Value, 10> subValues;
     auto newResult = recursiveRetuple(oldResult->getType(), &newResults,
                                       builder, oldOp->getLoc());
     mapping->map(oldResult, newResult);
@@ -160,7 +158,7 @@ bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
 
 bool convertIndirectCallOp(CallIndirectOp *oldOp, OpBuilder &builder,
                            BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 4> newArgs;
+  llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
@@ -181,7 +179,7 @@ bool convertIndirectCallOp(CallIndirectOp *oldOp, OpBuilder &builder,
 
 bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 4> newArgs;
+  llvm::SmallVector<Value, 4> newArgs;
   if (untupleAndLookupValues(oldOp->getOperands(), &newArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
@@ -197,13 +195,13 @@ bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
 
 bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder &builder,
                          BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 4> trueArgs;
+  llvm::SmallVector<Value, 4> trueArgs;
   if (untupleAndLookupValues(oldOp->getTrueOperands(), &trueArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
   }
 
-  llvm::SmallVector<ValuePtr, 4> falseArgs;
+  llvm::SmallVector<Value, 4> falseArgs;
   if (untupleAndLookupValues(oldOp->getFalseOperands(), &falseArgs, builder,
                              oldOp->getLoc(), mapping)) {
     return true;
@@ -254,8 +252,8 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
       llvm::SmallVector<Type, 4> newTypes;
       untupleTypes(oldArg->getType(), &newTypes);
 
-      ValuePtr newTuple = processTuple(oldArg->getType(), oldFunction.getLoc(),
-                                       newBlock, builder);
+      Value newTuple = processTuple(oldArg->getType(), oldFunction.getLoc(),
+                                    newBlock, builder);
       if (!newTuple) {
         return true;
       }

@@ -24,7 +24,7 @@ namespace IREE {
 namespace Flow {
 
 // Calculates the workload for |op| based on the op type.
-ValuePtr calculateWorkload(Operation *op, ShapedType baseOperandType);
+Value calculateWorkload(Operation *op, ShapedType baseOperandType);
 
 }  // namespace Flow
 }  // namespace IREE

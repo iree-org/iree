@@ -31,8 +31,7 @@ void removeDeadOperations(llvm::SetVector<Operation *> &deadOperations) {
   }
 }
 
-void replaceSubsequentUses(Operation *userOp, ValuePtr oldValue,
-                           ValuePtr newValue) {
+void replaceSubsequentUses(Operation *userOp, Value oldValue, Value newValue) {
   for (auto &use : oldValue->getUses()) {
     if (userOp->isBeforeInBlock(use.getOwner())) {
       use.set(newValue);

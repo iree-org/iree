@@ -206,8 +206,8 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
     // Find all input operands and results that escape the fragment.
     llvm::SmallSetVector<Operation *, 8> streamOpSet{streamOps.begin(),
                                                      streamOps.end()};
-    SmallVector<ValuePtr, 8> fragmentOperands;
-    SmallVector<ValuePtr, 8> fragmentResults;
+    SmallVector<Value, 8> fragmentOperands;
+    SmallVector<Value, 8> fragmentResults;
     SmallVector<Type, 8> fragmentResultTypes;
     for (auto *op : streamOps) {
       for (auto operand : op->getOperands()) {
@@ -248,11 +248,11 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
     for (auto *op : streamOps) {
       fragmentBuilder.clone(*op, mapping);
     }
-    fragmentBuilder.create<ReturnOp>(UnknownLoc::get(context),
-                                     llvm::to_vector<8>(llvm::map_range(
-                                         fragmentResults, [&](ValuePtr value) {
-                                           return mapping.lookup(value);
-                                         })));
+    fragmentBuilder.create<ReturnOp>(
+        UnknownLoc::get(context),
+        llvm::to_vector<8>(llvm::map_range(fragmentResults, [&](Value value) {
+          return mapping.lookup(value);
+        })));
     for (auto resultOldNew :
          llvm::zip(fragmentResults, fragmentOp.getResults())) {
       auto oldValue = std::get<0>(resultOldNew);

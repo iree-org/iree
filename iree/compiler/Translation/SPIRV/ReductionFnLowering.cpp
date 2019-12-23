@@ -65,7 +65,7 @@ class ReductionApplyFnConversion final
   using SPIRVReductionConversion<FuncOp>::SPIRVReductionConversion;
 
   PatternMatchResult matchAndRewrite(
-      FuncOp funcOp, ArrayRef<ValuePtr> operands,
+      FuncOp funcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -78,7 +78,7 @@ class IREEReturnOpConversion final
   using SPIRVReductionConversion<IREE::ReturnOp>::SPIRVReductionConversion;
 
   PatternMatchResult matchAndRewrite(
-      IREE::ReturnOp op, ArrayRef<ValuePtr> operands,
+      IREE::ReturnOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -90,7 +90,7 @@ class ReductionOpConversion final : public SPIRVReductionConversion<OpTy> {
   using SPIRVReductionConversion<OpTy>::SPIRVReductionConversion;
 
   PatternMatchResult matchAndRewrite(
-      OpTy op, ArrayRef<ValuePtr> operands,
+      OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -117,7 +117,7 @@ Type SPIRVReductionTypeConverter::convertType(Type t) {
 //===----------------------------------------------------------------------===//
 
 PatternMatchResult ReductionApplyFnConversion::matchAndRewrite(
-    FuncOp funcOp, ArrayRef<ValuePtr> operands,
+    FuncOp funcOp, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
   auto fnType = funcOp.getType();
   if (fnType.getNumInputs() != 2 || fnType.getNumResults() != 1) {
@@ -150,7 +150,7 @@ PatternMatchResult ReductionApplyFnConversion::matchAndRewrite(
 //===----------------------------------------------------------------------===//
 
 PatternMatchResult IREEReturnOpConversion::matchAndRewrite(
-    IREE::ReturnOp op, ArrayRef<ValuePtr> operands,
+    IREE::ReturnOp op, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
   rewriter.replaceOpWithNewOp<spirv::ReturnOp>(op);
   return matchSuccess();
@@ -163,15 +163,15 @@ PatternMatchResult IREEReturnOpConversion::matchAndRewrite(
 template <typename OpTy, typename ReplacementOpTy>
 PatternMatchResult
 ReductionOpConversion<OpTy, ReplacementOpTy>::matchAndRewrite(
-    OpTy op, ArrayRef<ValuePtr> operands,
+    OpTy op, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
   if (operands.size() != 2) {
     return this->matchFailure();
   }
   // One of the replacement operands will be a pointer type, and another a value
   // type.
-  ValuePtr ptr = operands[0];
-  ValuePtr value = operands[1];
+  Value ptr = operands[0];
+  Value value = operands[1];
   if (!ptr->getType().isa<spirv::PointerType>()) std::swap(ptr, value);
   if (!ptr->getType().isa<spirv::PointerType>()) return this->matchFailure();
   rewriter.replaceOpWithNewOp<ReplacementOpTy>(

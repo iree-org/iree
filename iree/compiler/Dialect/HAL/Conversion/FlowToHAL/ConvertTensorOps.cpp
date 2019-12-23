@@ -39,7 +39,7 @@ class ConstantTensorOpConversion
       : OpConversionPattern(ctx) {}
 
   PatternMatchResult matchAndRewrite(
-      mlir::ConstantOp constantOp, llvm::ArrayRef<ValuePtr> newOperands,
+      mlir::ConstantOp constantOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     if (!constantOp.getType().isa<TensorType>()) return matchFailure();
 
@@ -72,7 +72,7 @@ class TensorLoadOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<ValuePtr> newOperands,
+      IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorLoadOpOperandAdaptor operands(newOperands);
     auto sourceType = loadOp.source()->getType().cast<ShapedType>();
@@ -98,7 +98,7 @@ class TensorStoreOpConversion
       : OpConversionPattern(ctx) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<ValuePtr> newOperands,
+      IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorStoreOpOperandAdaptor operands(newOperands);
     auto targetType = storeOp.target()->getType().cast<ShapedType>();

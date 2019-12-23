@@ -27,7 +27,7 @@ struct UnaryOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<ValuePtr> operands,
+      SrcOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto value = loadAccessValue(op.getLoc(), operands[0], rewriter);
     value = wrapAsMemRef(value, op, rewriter);
@@ -48,7 +48,7 @@ struct BinaryOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<ValuePtr> operands,
+      SrcOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto lhsValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
     auto rhsValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
@@ -73,7 +73,7 @@ struct TernaryOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<ValuePtr> operands,
+      SrcOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto aValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
     auto bValue = loadAccessValue(op.getLoc(), operands[1], rewriter);

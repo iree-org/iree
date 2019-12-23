@@ -54,7 +54,7 @@ class VMImportOpConversion : public OpConversionPattern<T> {
   }
 
   PatternMatchResult matchAndRewrite(
-      T op, llvm::ArrayRef<ValuePtr> operands,
+      T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (failed(rewriteToCall(op, Adaptor{operands}, rewriter))) {
       return OpConversionPattern<T>::matchFailure();
