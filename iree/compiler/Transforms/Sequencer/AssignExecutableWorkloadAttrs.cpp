@@ -32,7 +32,7 @@ namespace {
 
 struct WorkloadInfo {
   SmallVector<ElementsAttr, 4> staticWorkloads;
-  SmallVector<Value *, 4> dynamicWorkloads;
+  SmallVector<ValuePtr, 4> dynamicWorkloads;
 };
 
 // Finds all dispatches and records their workload attributes mapped by

@@ -189,7 +189,7 @@ LogicalResult BytecodeWriter::WriteAttributeData(Attribute baseAttr) {
          << static_cast<int>(baseAttr.getKind()) << " not implemented";
 }
 
-Optional<int> BytecodeWriter::LookupLocalOrdinal(Value *value) {
+Optional<int> BytecodeWriter::LookupLocalOrdinal(ValuePtr value) {
   int ordinal;
   auto it = localMap_.find(value);
   if (it != localMap_.end()) {
@@ -208,12 +208,12 @@ Optional<int> BytecodeWriter::LookupLocalOrdinal(Value *value) {
   return ordinal;
 }
 
-LogicalResult BytecodeWriter::PrepareLocal(Value *value) {
+LogicalResult BytecodeWriter::PrepareLocal(ValuePtr value) {
   if (!LookupLocalOrdinal(value).hasValue()) return failure();
   return success();
 }
 
-LogicalResult BytecodeWriter::WriteLocal(Value *value) {
+LogicalResult BytecodeWriter::WriteLocal(ValuePtr value) {
   auto ordinal = LookupLocalOrdinal(value);
   if (!ordinal.hasValue()) {
     return failure();
@@ -230,7 +230,7 @@ LogicalResult BytecodeWriter::WriteLocal(Value *value) {
 LogicalResult BytecodeWriter::WriteLocals(Operation::operand_range values) {
   int count = values.size();
   RETURN_IF_FAILURE(WriteCount(count));
-  for (auto *value : values) {
+  for (auto value : values) {
     RETURN_IF_FAILURE(WriteLocal(value));
   }
   return success();
@@ -239,7 +239,7 @@ LogicalResult BytecodeWriter::WriteLocals(Operation::operand_range values) {
 LogicalResult BytecodeWriter::WriteLocals(Operation::result_range values) {
   int count = values.size();
   RETURN_IF_FAILURE(WriteCount(count));
-  for (auto *value : values) {
+  for (auto value : values) {
     RETURN_IF_FAILURE(WriteLocal(value));
   }
   return success();

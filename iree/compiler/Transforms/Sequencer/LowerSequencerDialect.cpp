@@ -56,22 +56,22 @@ class SequencerLoweringPattern : public OpConversionPattern<SrcOp> {
 
 // Returns an integer scalar memref containing the offset specified by |indices|
 // within |type|.
-Value *computeOffset(Location loc, Value *reference, Value *indices,
-                     OpBuilder &builder) {
+ValuePtr computeOffset(Location loc, ValuePtr reference, ValuePtr indices,
+                       OpBuilder &builder) {
   auto referenceType = reference->getType().cast<ShapedType>();
-  auto *shapeMemRef = builder
-                          .create<IREESeq::LL::AllocHeapOp>(
-                              loc,
-                              MemRefType::get({referenceType.getRank()},
-                                              builder.getIntegerType(32)),
-                              ArrayRef<Value *>{})
-                          .getResult();
+  auto shapeMemRef = builder
+                         .create<IREESeq::LL::AllocHeapOp>(
+                             loc,
+                             MemRefType::get({referenceType.getRank()},
+                                             builder.getIntegerType(32)),
+                             ArrayRef<ValuePtr>{})
+                         .getResult();
   builder.create<IREESeq::LL::ShapeOp>(loc, reference, shapeMemRef);
-  auto *resultMemRef =
+  auto resultMemRef =
       builder
           .create<IREESeq::LL::AllocHeapOp>(
               loc, MemRefType::get({}, builder.getIntegerType(32)),
-              ArrayRef<Value *>{})
+              ArrayRef<ValuePtr>{})
           .getResult();
   auto elementSizeAttr = builder.getIntegerAttr(
       builder.getIntegerType(8), referenceType.getElementTypeBitWidth() / 8);
@@ -82,29 +82,29 @@ Value *computeOffset(Location loc, Value *reference, Value *indices,
 
 // Returns a tuple of (offset, length) integer scalar memrefs with the range
 // specified by |indices| and |lengths| within |type|.
-std::pair<Value *, Value *> computeRange(Location loc, Value *reference,
-                                         Value *indices, Value *lengths,
-                                         OpBuilder &builder) {
+std::pair<ValuePtr, ValuePtr> computeRange(Location loc, ValuePtr reference,
+                                           ValuePtr indices, ValuePtr lengths,
+                                           OpBuilder &builder) {
   auto referenceType = reference->getType().cast<ShapedType>();
-  auto *shapeMemRef = builder
-                          .create<IREESeq::LL::AllocHeapOp>(
-                              loc,
-                              MemRefType::get({referenceType.getRank()},
-                                              builder.getIntegerType(32)),
-                              ArrayRef<Value *>{})
-                          .getResult();
+  auto shapeMemRef = builder
+                         .create<IREESeq::LL::AllocHeapOp>(
+                             loc,
+                             MemRefType::get({referenceType.getRank()},
+                                             builder.getIntegerType(32)),
+                             ArrayRef<ValuePtr>{})
+                         .getResult();
   builder.create<IREESeq::LL::ShapeOp>(loc, reference, shapeMemRef);
-  auto *offsetMemRef =
+  auto offsetMemRef =
       builder
           .create<IREESeq::LL::AllocHeapOp>(
               loc, MemRefType::get({}, builder.getIntegerType(32)),
-              ArrayRef<Value *>{})
+              ArrayRef<ValuePtr>{})
           .getResult();
-  auto *lengthMemRef =
+  auto lengthMemRef =
       builder
           .create<IREESeq::LL::AllocHeapOp>(
               loc, MemRefType::get({}, builder.getIntegerType(32)),
-              ArrayRef<Value *>{})
+              ArrayRef<ValuePtr>{})
           .getResult();
   auto elementSizeAttr = builder.getIntegerAttr(
       builder.getIntegerType(8), referenceType.getElementTypeBitWidth() / 8);
@@ -119,7 +119,7 @@ struct LowerSliceOpPattern
   using SequencerLoweringPattern::SequencerLoweringPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREESeq::HL::SliceOp op, ArrayRef<Value *> operands,
+      IREESeq::HL::SliceOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     OperandAdaptor<IREESeq::HL::SliceOp> operandAdaptor(operands);
     auto range = computeRange(op.getLoc(), operandAdaptor.src(),
@@ -127,7 +127,7 @@ struct LowerSliceOpPattern
                               operandAdaptor.lengths(), rewriter);
     rewriter.replaceOpWithNewOp<IREESeq::LL::DynamicSliceOp>(
         op, typeConverter_.convertType(op.getType()),
-        ArrayRef<Value *>{operandAdaptor.src(), range.first, range.second},
+        ArrayRef<ValuePtr>{operandAdaptor.src(), range.first, range.second},
         op.getAttrs());
     return matchSuccess();
   }
@@ -138,15 +138,15 @@ struct LowerShapeOpPattern
   using SequencerLoweringPattern::SequencerLoweringPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREESeq::HL::ShapeOp op, ArrayRef<Value *> operands,
+      IREESeq::HL::ShapeOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *shapeMemRef =
+    auto shapeMemRef =
         rewriter
             .create<IREESeq::LL::AllocHeapOp>(
                 op.getLoc(),
                 MemRefType::get({op.getType().cast<ShapedType>().getRank()},
                                 rewriter.getIntegerType(64)),
-                ArrayRef<Value *>{})
+                ArrayRef<ValuePtr>{})
             .getResult();
     op.replaceAllUsesWith(shapeMemRef);
     rewriter.replaceOpWithNewOp<IREESeq::LL::ShapeOp>(op, operands[0],
@@ -160,12 +160,11 @@ struct LowerCopyOpPattern
   using SequencerLoweringPattern::SequencerLoweringPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREESeq::HL::CopyOp op, ArrayRef<Value *> operands,
+      IREESeq::HL::CopyOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     OperandAdaptor<IREESeq::HL::CopyOp> operandAdaptor(operands);
-    auto *srcOffsetMemRef =
-        computeOffset(op.getLoc(), operandAdaptor.src(),
-                      operandAdaptor.srcIndices(), rewriter);
+    auto srcOffsetMemRef = computeOffset(op.getLoc(), operandAdaptor.src(),
+                                         operandAdaptor.srcIndices(), rewriter);
     auto dstRange = computeRange(op.getLoc(), operandAdaptor.dst(),
                                  operandAdaptor.dstIndices(),
                                  operandAdaptor.lengths(), rewriter);
@@ -181,7 +180,7 @@ struct LowerFillOpPattern
   using SequencerLoweringPattern::SequencerLoweringPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREESeq::HL::FillOp op, ArrayRef<Value *> operands,
+      IREESeq::HL::FillOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     OperandAdaptor<IREESeq::HL::FillOp> operandAdaptor(operands);
     auto dstRange = computeRange(op.getLoc(), operandAdaptor.dst(),
@@ -200,8 +199,8 @@ struct LowerBranchOpPattern
       IREESeq::HL::BranchOp>::SequencerLoweringPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREESeq::HL::BranchOp op, ArrayRef<Value *> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
+      IREESeq::HL::BranchOp op, ArrayRef<ValuePtr> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREESeq::LL::BranchOp>(op, destinations[0],
                                                        operands[0]);
@@ -215,8 +214,8 @@ struct LowerCondCondBranchOpPattern
       IREESeq::HL::CondBranchOp>::SequencerLoweringPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREESeq::HL::CondBranchOp op, ArrayRef<Value *> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value *>> operands,
+      IREESeq::HL::CondBranchOp op, ArrayRef<ValuePtr> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREESeq::LL::CondBranchOp>(
         op, properOperands[0],
@@ -237,7 +236,7 @@ struct LowerIdenticalOpPattern : public SequencerLoweringPattern<SRC> {
   using SequencerLoweringPattern<SRC>::SequencerLoweringPattern;
 
   PatternMatchResult matchAndRewrite(
-      SRC op, ArrayRef<Value *> operands,
+      SRC op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Type, 8> originalResultTypes{
         op.getOperation()->getResultTypes()};

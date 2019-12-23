@@ -35,7 +35,7 @@ class HostTypeFactory {
   virtual ~HostTypeFactory() = default;
 
   // Creates a default implementation which interops with numpy.
-  static std::shared_ptr<HostTypeFactory> CreateNumpyFactory();
+  static std::shared_ptr<HostTypeFactory> GetNumpyFactory();
 
   // Creates a C-contiguous ndarray of the given element_type/dims and backed
   // by the given buffer. The resulting array has no synchronization and is

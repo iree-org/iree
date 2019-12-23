@@ -26,58 +26,24 @@
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/host_types.h"
+#include "bindings/python/pyiree/vm.h"
 #include "iree/base/signature_mangle.h"
 
 namespace iree {
 namespace python {
 
 // Forward declarations.
-class RtContext;
-
-// A HalBuffer (iree_hal_buffer_t) bound to a function argument.
-// At this point, the buffer has been completely validated, with all shape
-// information erased except for any dynamic dims.
-struct BoundHalBufferFunctionArg {
-  // The backing buffer.
-  HalBuffer buffer;
-  // If this function argument is backed by a python object, it is retained
-  // here.
-  py::object dependent_pyobject;
-  // Dynamic dims in the shape (for shaped buffers).
-  absl::InlinedVector<int, 2> dynamic_dims;
-};
-
-// Opaque (to python) native argument.
-using FunctionArgVariant =
-    absl::variant<std::nullptr_t, BoundHalBufferFunctionArg>;
-
-// Opaque list of function arguments.
-// Has sufficient accessors on it to facilitate printing and testing but is
-// otherwise, not visible to python.
-// Typically, native code will interact with the lower level span based API
-// directly (and avoid some overhead). Therefore, this class does not seek to
-// be optimal.
-class FunctionArgVariantList {
- public:
-  using VectorType = absl::InlinedVector<FunctionArgVariant, 4>;
-  FunctionArgVariantList() = default;
-  FunctionArgVariantList(VectorType contents)
-      : contents_(std::move(contents)) {}
-
-  VectorType& contents() { return contents_; }
-  const VectorType& contents() const { return contents_; }
-
- private:
-  VectorType contents_;
-};
+class HalDevice;
 
 // Instantiated with function attributes in order to process inputs/outputs.
 class FunctionAbi {
  public:
   using AttributeLookup =
       std::function<absl::optional<absl::string_view>(absl::string_view)>;
-  FunctionAbi(std::shared_ptr<HostTypeFactory> host_type_factory)
-      : host_type_factory_(std::move(host_type_factory)) {}
+  FunctionAbi(HalDevice& device,
+              std::shared_ptr<HostTypeFactory> host_type_factory)
+      : device_(HalDevice::RetainAndCreate(device.raw_ptr())),
+        host_type_factory_(std::move(host_type_factory)) {}
   virtual ~FunctionAbi() = default;
 
   using Description = RawSignatureParser::Description;
@@ -95,7 +61,7 @@ class FunctionAbi {
 
   // Creates an instance based on the function attributes.
   static std::unique_ptr<FunctionAbi> Create(
-      std::shared_ptr<HostTypeFactory> host_type_factory,
+      HalDevice& device, std::shared_ptr<HostTypeFactory> host_type_factory,
       AttributeLookup lookup);
 
   RawConfig& raw_config() { return raw_config_; }
@@ -107,17 +73,16 @@ class FunctionAbi {
   // which can be accessed via the non-prefixed Pack/Unpack methods.
   // Given a span of descriptions, packs the given py_args into the span
   // of function args. All spans must be of the same size.
-  void RawPack(RtContext& context, absl::Span<const Description> descs,
-               absl::Span<py::handle> py_args,
-               absl::Span<FunctionArgVariant> f_args, bool writable);
+  void RawPack(absl::Span<const Description> descs,
+               absl::Span<py::handle> py_args, VmVariantList& args,
+               bool writable);
 
   // Raw unpacks f_results into py_results.
   // Note that this consumes entries in f_results as needed, leaving them
   // as nullptr.
   // Ordinarily, this will be invoked along with AllocateResults() but it
   // is broken out for testing.
-  void RawUnpack(RtContext& context, absl::Span<const Description> descs,
-                 absl::Span<FunctionArgVariant> f_results,
+  void RawUnpack(absl::Span<const Description> descs, VmVariantList& f_results,
                  absl::Span<py::object> py_results);
 
   // Given bound function arguments (from RawPack or equiv) and signature
@@ -130,14 +95,17 @@ class FunctionAbi {
   // ahead of time, resulting in a nullptr in f_results. In such cases, the
   // invocation must ensure proper barriers are in place to fully execute the
   // function prior to delivering results to the user layer.
-  void AllocateResults(RtContext& context, absl::Span<const Description> descs,
-                       absl::Span<const FunctionArgVariant> f_args,
-                       absl::Span<FunctionArgVariant> f_results);
+  void AllocateResults(absl::Span<const Description> descs,
+                       VmVariantList& f_args, VmVariantList& f_results);
 
   // Gets the string representation.
   std::string DebugString() const;
 
  private:
+  void PackBuffer(const RawSignatureParser::Description& desc,
+                  py::handle py_arg, VmVariantList& f_args, bool writable);
+
+  HalDevice device_;
   std::shared_ptr<HostTypeFactory> host_type_factory_;
   RawConfig raw_config_;
 };

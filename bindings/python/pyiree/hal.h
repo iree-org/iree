@@ -60,6 +60,9 @@ struct ApiPtrAdapter<iree_hal_buffer_view_t> {
 
 class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
  public:
+  iree_hal_allocator_t* allocator() {
+    return iree_hal_device_allocator(raw_ptr());
+  }
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {

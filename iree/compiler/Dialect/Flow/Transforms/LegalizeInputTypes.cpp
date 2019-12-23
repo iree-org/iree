@@ -102,7 +102,7 @@ LogicalResult convertOperation(Operation *oldOp,
 
   if (oldOp->getNumSuccessors() == 0) {
     // Non-branching operations can just add all the operands.
-    for (auto *oldOperand : oldOp->getOperands()) {
+    for (auto oldOperand : oldOp->getOperands()) {
       state.operands.push_back(mapping.lookup(oldOperand));
     }
   } else {
@@ -120,7 +120,7 @@ LogicalResult convertOperation(Operation *oldOp,
       // Add sentinel to delineate successor operands.
       state.operands.push_back(nullptr);
       // Remap the successors operands.
-      for (auto *operand : oldOp->getSuccessorOperands(succ)) {
+      for (auto operand : oldOp->getSuccessorOperands(succ)) {
         state.operands.push_back(mapping.lookup(operand));
       }
     }
@@ -146,8 +146,8 @@ LogicalResult convertOperation(Operation *oldOp,
 
   for (auto oldNewResult :
        llvm::zip(oldOp->getResults(), newOp->getResults())) {
-    auto *oldResult = std::get<0>(oldNewResult);
-    auto *newResult = std::get<1>(oldNewResult);
+    auto oldResult = std::get<0>(oldNewResult);
+    auto newResult = std::get<1>(oldNewResult);
     mapping.map(oldResult, newResult);
   }
 

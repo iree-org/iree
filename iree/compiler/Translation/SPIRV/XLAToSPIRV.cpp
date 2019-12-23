@@ -32,7 +32,8 @@ namespace iree_compiler {
 
 LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+    ArrayRef<ValuePtr> operands,
+    TensorIndexToScalarValueMap &valueCache) const {
   auto concatenateOp = cast<xla_hlo::ConcatenateOp>(op);
   auto loc = concatenateOp.getLoc();
   auto i32Type = builder.getIntegerType(32);
@@ -45,7 +46,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
                    ->getType()
                    .cast<RankedTensorType>()
                    .getShape()[append_dim];
-  Value *resultVal = operands[0];
+  ValuePtr resultVal = operands[0];
   for (auto operandIt : llvm::enumerate(op->getOperands())) {
     // The first operand is already saved in resultVal.
     if (operandIt.index() == 0) continue;
@@ -53,7 +54,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
     // Only select values that offset <= d < offset + operand_shape[append_dim].
     // Since later values will be replaced in the later iterations, only check
     // d >= offset here.
-    Value *cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
+    ValuePtr cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
     auto offsetVar = builder.create<spirv::ConstantOp>(
         loc, i32Type, builder.getI32IntegerAttr(offset));
     auto checkLb = builder.create<spirv::SGreaterThanEqualOp>(
@@ -75,7 +76,8 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
 
 LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+    ArrayRef<ValuePtr> operands,
+    TensorIndexToScalarValueMap &valueCache) const {
   auto convertOp = cast<xla_hlo::ConvertOp>(op);
   auto loc = convertOp.getLoc();
   auto resultElemType =
@@ -99,9 +101,10 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
         // spv.SConvertOp does not support converting a bool to integer, use
         // spv.SelectOp instead.
         if (intOperandType.getWidth() == 1) {
-          Value *zero =
+          ValuePtr zero =
               spirv::ConstantOp::getZero(resultElemType, loc, &builder);
-          Value *one = spirv::ConstantOp::getOne(resultElemType, loc, &builder);
+          ValuePtr one =
+              spirv::ConstantOp::getOne(resultElemType, loc, &builder);
           scalarOp =
               builder.create<spirv::SelectOp>(loc, operands[0], one, zero)
                   .getOperation();
@@ -128,7 +131,8 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
 //===----------------------------------------------------------------------===//
 LogicalResult XLAGatherOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+    ArrayRef<ValuePtr> operands,
+    TensorIndexToScalarValueMap &valueCache) const {
   valueCache.setValueAtIndex(op->getResult(0), index, operands[0]);
   return success();
 }
@@ -139,7 +143,8 @@ LogicalResult XLAGatherOpSPIRVLowering::lowerOperation(
 
 LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<Value *> operands, TensorIndexToScalarValueMap &valueCache) const {
+    ArrayRef<ValuePtr> operands,
+    TensorIndexToScalarValueMap &valueCache) const {
   auto padOp = cast<xla_hlo::PadOp>(op);
   const auto &edgePaddingLow = padOp.edge_padding_low();
   const auto &interiorPadding = padOp.interior_padding();
@@ -156,7 +161,7 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
   auto i32Type = builder.getIntegerType(32);
   auto i1Type = builder.getI1Type();
   auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
-  Value *cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
+  ValuePtr cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
   auto operandType = padOp.operand()->getType().cast<RankedTensorType>();
   if (!operandType.hasStaticShape()) {
     return padOp.emitError("pad op codegen supported only for static shapes");
@@ -210,7 +215,7 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
           builder.create<spirv::LogicalAndOp>(loc, i1Type, cond, checkStride);
     }
   }
-  Value *resultVal =
+  ValuePtr resultVal =
       builder.create<spirv::SelectOp>(loc, cond, operands[0], operands[1]);
   valueCache.setValueAtIndex(op->getResult(0), index, resultVal);
   return success();

@@ -83,11 +83,11 @@ LogicalResult writeOp(IREEInterp::LL::CallIndirectOp op,
 }
 
 LogicalResult WriteConvertOperands(Operation *op, BytecodeWriter *writer) {
-  auto *src = op->getOperand(0);
+  auto src = op->getOperand(0);
   RETURN_IF_FAILURE(
       writer->WriteTypeIndex(getElementTypeOrSelf(src->getType())));
   RETURN_IF_FAILURE(writer->WriteLocal(src));
-  auto *dst = op->getOperand(1);
+  auto dst = op->getOperand(1);
   RETURN_IF_FAILURE(
       writer->WriteTypeIndex(getElementTypeOrSelf(dst->getType())));
   RETURN_IF_FAILURE(writer->WriteLocal(dst));

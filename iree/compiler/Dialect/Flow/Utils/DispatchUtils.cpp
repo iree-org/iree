@@ -42,16 +42,16 @@ namespace {
 // set of values defined by |ops| that are used outside of the set.
 LogicalResult analyzeOpRangeValues(
     const llvm::SmallDenseSet<Operation *> &opSet,
-    llvm::SetVector<Value *> *capturedValues,
-    llvm::SetVector<Value *> *escapingValues) {
+    llvm::SetVector<ValuePtr> *capturedValues,
+    llvm::SetVector<ValuePtr> *escapingValues) {
   for (auto *op : opSet) {
-    for (auto *value : op->getOperands()) {
+    for (auto value : op->getOperands()) {
       if (!llvm::is_contained(opSet, value->getDefiningOp())) {
         // Op is using a value not in the ops set, ensure we capture it.
         capturedValues->insert(value);
       }
     }
-    for (auto *value : op->getResults()) {
+    for (auto value : op->getResults()) {
       for (auto &use : value->getUses()) {
         if (!llvm::is_contained(opSet, use.getOwner())) {
           // An op outside of the ops set is using the value, needs to escape.
@@ -66,7 +66,8 @@ LogicalResult analyzeOpRangeValues(
 }  // namespace
 
 LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  Value *workload, ArrayRef<Operation *> ops) {
+                                  ValuePtr workload,
+                                  ArrayRef<Operation *> ops) {
   // Fused location with all ops.
   SmallVector<Location, 16> opLocs;
   for (auto *op : ops) {
@@ -79,13 +80,13 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
   llvm::SmallDenseSet<Operation *> opSet;
   opSet.reserve(ops.size());
   opSet.insert(ops.begin(), ops.end());
-  llvm::SetVector<Value *> capturedValues;
-  llvm::SetVector<Value *> escapingValues;
+  llvm::SetVector<ValuePtr> capturedValues;
+  llvm::SetVector<ValuePtr> escapingValues;
   if (failed(analyzeOpRangeValues(opSet, &capturedValues, &escapingValues))) {
     return failure();
   }
   SmallVector<Type, 8> escapingTypes;
-  for (auto *value : escapingValues) escapingTypes.push_back(value->getType());
+  for (auto value : escapingValues) escapingTypes.push_back(value->getType());
 
   // Build the region op and add it to the parent block.
   OpBuilder parentBuilder(parentBlock);
@@ -98,8 +99,8 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
   dispatchRegionOp.body().push_back(regionBlock);
   OpBuilder regionBuilder(regionBlock);
   BlockAndValueMapping mapping;
-  for (auto *capturedValue : capturedValues) {
-    auto *blockArg = regionBlock->addArgument(capturedValue->getType());
+  for (auto capturedValue : capturedValues) {
+    auto blockArg = regionBlock->addArgument(capturedValue->getType());
     mapping.map(capturedValue, blockArg);
   }
 
@@ -112,8 +113,8 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
 
   // Return results (as we need a terminator in our block).
   // These are all of the values that escape our region.
-  SmallVector<Value *, 8> resultValues;
-  for (auto *oldValue : escapingValues) {
+  SmallVector<ValuePtr, 8> resultValues;
+  for (auto oldValue : escapingValues) {
     resultValues.push_back(mapping.lookupOrDefault(oldValue));
   }
   regionBuilder.create<IREE::Flow::ReturnOp>(opLocs.back(), resultValues);

@@ -130,6 +130,10 @@ cc_library(
         "//iree/modules/hal",
         "//iree/vm2",
         "//iree/vm2:bytecode_module",
+        "//iree/vm2:invocation",
+        "//iree/vm2:module",
+        "//iree/vm2:ref",
+        "//iree/vm2:variant_list",
         "@local_config_mlir//:IR",
         "//iree/base:api",
         "//iree/base:status",
@@ -178,6 +182,8 @@ py_test(
     name = "function_abi_test",
     srcs = ["function_abi_test.py"],
     python_version = "PY3",
+    # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
+    tags = ["notap"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",

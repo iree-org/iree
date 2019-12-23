@@ -40,12 +40,12 @@ namespace {
 
 // Replaces |returnOp| with a clone including |newOperands| appended.
 LogicalResult appendReturnOperands(ReturnOp returnOp,
-                                   ArrayRef<Value *> newOperands) {
+                                   ArrayRef<ValuePtr> newOperands) {
   // Insert prior to the original return.
   OpBuilder builder(returnOp);
 
   // Clone with new args.
-  SmallVector<Value *, 8> operands;
+  SmallVector<ValuePtr, 8> operands;
   operands.reserve(returnOp.getNumOperands() + newOperands.size());
   operands.append(returnOp.operand_begin(), returnOp.operand_end());
   operands.append(newOperands.begin(), newOperands.end());
@@ -59,8 +59,8 @@ LogicalResult appendReturnOperands(ReturnOp returnOp,
 
 // Replaces |regionOp| with a clone including |newArgs| and |newResults|.
 DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
-                                            ArrayRef<Value *> newArgs,
-                                            ArrayRef<Value *> newResults,
+                                            ArrayRef<ValuePtr> newArgs,
+                                            ArrayRef<ValuePtr> newResults,
                                             Location otherLoc) {
   // Insert prior to the original region.
   OpBuilder builder(regionOp);
@@ -70,12 +70,12 @@ DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
   auto fusedLoc = FusedLoc::get(fusedLocs, regionOp.getContext());
 
   // Clone with new results.
-  SmallVector<Value *, 8> operands;
+  SmallVector<ValuePtr, 8> operands;
   operands.append(regionOp.args().begin(), regionOp.args().end());
   operands.append(newArgs.begin(), newArgs.end());
   SmallVector<Type, 8> resultTypes;
   resultTypes.append(regionOp.result_type_begin(), regionOp.result_type_end());
-  for (auto *newResult : newResults) {
+  for (auto newResult : newResults) {
     resultTypes.push_back(newResult->getType());
   }
   auto newRegionOp = builder.create<DispatchRegionOp>(
@@ -108,10 +108,10 @@ DispatchRegionOp removeUnusedResults(DispatchRegionOp regionOp) {
 
   // Calculate new return values.
   SmallVector<Type, 8> newReturnTypes;
-  SmallVector<Value *, 8> newReturnValues;
-  SmallVector<Value *, 8> newRegionResults;
+  SmallVector<ValuePtr, 8> newReturnValues;
+  SmallVector<ValuePtr, 8> newRegionResults;
   for (int i = 0; i < returnOp.getNumOperands(); ++i) {
-    auto *resultValue = regionOp.getResult(i);
+    auto resultValue = regionOp.getResult(i);
     if (!resultValue->use_empty()) {
       // Still has uses so we will preserve it.
       newReturnTypes.push_back(resultValue->getType());
@@ -153,7 +153,7 @@ bool areDispatchRegionWorkloadsCompatible(DispatchRegionOp &lhs,
 }
 
 // Returns true if |value| depends in any way on |op| through any path.
-bool doesValueDependOnOperation(Value *value, Operation *op) {
+bool doesValueDependOnOperation(ValuePtr value, Operation *op) {
   if (!value->getDefiningOp()) {
     return false;
   } else if (value->getDefiningOp() == op) {
@@ -163,7 +163,7 @@ bool doesValueDependOnOperation(Value *value, Operation *op) {
     // Can't depend on |op| as it is defined prior to it.
     return false;
   }
-  for (auto *operand : value->getDefiningOp()->getOperands()) {
+  for (auto operand : value->getDefiningOp()->getOperands()) {
     if (doesValueDependOnOperation(operand, op)) {
       return true;
     }
@@ -176,7 +176,7 @@ bool doesValueDependOnOperation(Value *value, Operation *op) {
 // parent block will use the results prior to |rhs|.
 bool areDispatchRegionsTransitivelyDependent(DispatchRegionOp &lhs,
                                              DispatchRegionOp &rhs) {
-  for (auto *arg : rhs.args()) {
+  for (auto arg : rhs.args()) {
     if (arg->getDefiningOp() != lhs && doesValueDependOnOperation(arg, lhs)) {
       // Transitively dependent - boo - can't merge yet.
       return true;
@@ -213,7 +213,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   // Find the values used as return values in the lhs.
   // We'll need to replace the uses in rhs with these.
   auto lhsReturnOp = cast<ReturnOp>(lhsBlock.getTerminator());
-  SmallVector<Value *, 8> lhsReturnValues;
+  SmallVector<ValuePtr, 8> lhsReturnValues;
   lhsReturnValues.reserve(lhsReturnOp.getNumOperands());
   lhsReturnValues.append(lhsReturnOp.operand_begin(),
                          lhsReturnOp.operand_end());
@@ -221,14 +221,14 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   // Find the values used as return values in the rhs.
   // We'll add these to the results of the lhs region.
   auto rhsReturnOp = cast<ReturnOp>(rhsBlock.getTerminator());
-  SmallVector<Value *, 8> rhsReturnValues;
+  SmallVector<ValuePtr, 8> rhsReturnValues;
   rhsReturnValues.reserve(rhsReturnOp.getNumOperands());
   rhsReturnValues.append(rhsReturnOp.operand_begin(),
                          rhsReturnOp.operand_end());
 
   // Compute new args.
   BlockAndValueMapping mapping;
-  SmallVector<Value *, 8> newArgs;
+  SmallVector<ValuePtr, 8> newArgs;
   auto lhsArgs = llvm::to_vector<8>(lhs.args());
   auto rhsArgs = llvm::to_vector<8>(rhs.args());
   for (int rhsOpIdx = 0; rhsOpIdx < rhsArgs.size(); ++rhsOpIdx) {
@@ -256,8 +256,8 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
     }
     if (!didElide) {
       // Add to the lhs block.
-      auto *oldArg = rhs.getOperand(rhsOpIdx + 1);
-      auto *newArg = lhsBlock.addArgument(oldArg->getType());
+      auto oldArg = rhs.getOperand(rhsOpIdx + 1);
+      auto newArg = lhsBlock.addArgument(oldArg->getType());
       mapping.map(rhsBlock.getArgument(rhsOpIdx), newArg);
       newArgs.push_back(oldArg);
     }
@@ -279,8 +279,8 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   }
 
   // Compute new results and add to both region and return op.
-  SmallVector<Value *, 8> newResults;
-  for (auto *rhsResult : rhsReturnValues) {
+  SmallVector<ValuePtr, 8> newResults;
+  for (auto rhsResult : rhsReturnValues) {
     newResults.push_back(mapping.lookupOrDefault(rhsResult));
   }
   if (failed(appendReturnOperands(lhsReturnOp, newResults))) {

@@ -27,9 +27,9 @@ struct UnaryOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *value = loadAccessValue(op.getLoc(), operands[0], rewriter);
+    auto value = loadAccessValue(op.getLoc(), operands[0], rewriter);
     value = wrapAsMemRef(value, op, rewriter);
 
     auto dstType = convertTypeToMemRef(op.getResult());
@@ -48,10 +48,10 @@ struct BinaryOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *lhsValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
-    auto *rhsValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
+    auto lhsValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
+    auto rhsValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
     auto dstType = convertTypeToMemRef(op.getResult());
 
     lhsValue = wrapAsMemRef(lhsValue, op, rewriter);
@@ -73,11 +73,11 @@ struct TernaryOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<Value *> operands,
+      SrcOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto *aValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
-    auto *bValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
-    auto *cValue = loadAccessValue(op.getLoc(), operands[2], rewriter);
+    auto aValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
+    auto bValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
+    auto cValue = loadAccessValue(op.getLoc(), operands[2], rewriter);
 
     aValue = wrapAsMemRef(aValue, op, rewriter);
     bValue = wrapAsMemRef(bValue, op, rewriter);

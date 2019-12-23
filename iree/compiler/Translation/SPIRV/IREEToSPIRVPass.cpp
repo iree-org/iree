@@ -53,7 +53,7 @@ void IREEToSPIRVPass::runOnModule() {
       SPIRVPwOpLowering<MulFOp, spirv::FMulOp>,
       SPIRVPwOpLowering<SubFOp, spirv::FSubOp>,
       SPIRVPwOpLowering<AddIOp, spirv::IAddOp>,
-      SPIRVPwOpLowering<DivISOp, spirv::SDivOp>,
+      SPIRVPwOpLowering<SignedDivIOp, spirv::SDivOp>,
       SPIRVPwOpLowering<MulIOp, spirv::IMulOp>,
       SPIRVPwOpLowering<SubIOp, spirv::ISubOp>,
       // XLA unary elementwise ops:

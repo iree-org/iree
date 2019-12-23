@@ -270,7 +270,7 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
 //===----------------------------------------------------------------------===//
 
 void DispatchRegionOp::build(Builder *builder, OperationState &state,
-                             ArrayRef<Type> resultTypes, Value *workload,
+                             ArrayRef<Type> resultTypes, ValuePtr workload,
                              ValueRange operands,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
@@ -350,7 +350,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
   // Print the data argument remapping.
   p << "(";
   interleaveComma(llvm::zip(op.body().front().getArguments(), op.args()), p,
-                  [&](std::tuple<BlockArgument *, Value *> it) {
+                  [&](std::tuple<BlockArgumentPtr, ValuePtr> it) {
                     p << *std::get<0>(it) << " = " << *std::get<1>(it);
                     p << " : ";
                     p << std::get<1>(it)->getType();
@@ -375,7 +375,7 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 //===----------------------------------------------------------------------===//
 
 void ReductionRegionOp::build(Builder *builder, OperationState &state,
-                              ArrayRef<Type> resultTypes, Value *workload,
+                              ArrayRef<Type> resultTypes, ValuePtr workload,
                               ValueRange operands, ValueRange initialValues,
                               ArrayRef<int32_t> dimensions,
                               ArrayRef<NamedAttribute> attributes) {
@@ -478,7 +478,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
   if (op.getNumResults() > 0) {
     p << " : (";
     interleaveComma(op.operands(), p,
-                    [&](Value *operand) { p.printType(operand->getType()); });
+                    [&](ValuePtr operand) { p.printType(operand->getType()); });
     p << ")";
     p << " -> ";
     if (op.getNumResults() > 1) p << "(";
@@ -490,7 +490,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
   p << "      invocation(";
   auto &entryBlock = op.body().getBlocks().front();
   int regionArgIndex = 0;
-  interleaveComma(op.initial_values(), p, [&](Value *operand) {
+  interleaveComma(op.initial_values(), p, [&](ValuePtr operand) {
     p << "(";
     p.printOperand(entryBlock.getArgument(regionArgIndex++));
     p << ", ";
@@ -513,7 +513,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
 
 void WindowedReductionRegionOp::build(
     Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
-    Value *workload, ValueRange operands, ValueRange initialValues,
+    ValuePtr workload, ValueRange operands, ValueRange initialValues,
     ArrayRef<int32_t> windowDimensions, ArrayRef<int32_t> windowStrides,
     ArrayRef<int32_t> baseDilations, ArrayRef<int32_t> windowDilations,
     PaddingMode paddingMode, ArrayRef<NamedAttribute> attributes) {
@@ -574,7 +574,7 @@ void printWindowedReductionRegionOp(OpAsmPrinter &p,
   if (op.getNumResults() > 0) {
     p << " : (";
     interleaveComma(op.operands(), p,
-                    [&](Value *operand) { p.printType(operand->getType()); });
+                    [&](ValuePtr operand) { p.printType(operand->getType()); });
     p << ")";
     p << " -> (";
     interleaveComma(op.getResultTypes(), p);
@@ -585,7 +585,7 @@ void printWindowedReductionRegionOp(OpAsmPrinter &p,
   p << "      invocation(";
   auto &entryBlock = op.body().getBlocks().front();
   int regionArgIndex = 0;
-  interleaveComma(op.initial_values(), p, [&](Value *operand) {
+  interleaveComma(op.initial_values(), p, [&](ValuePtr operand) {
     p << "(";
     p.printOperand(entryBlock.getArgument(regionArgIndex++));
     p << ", ";
@@ -1198,7 +1198,7 @@ void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
   // Print the data argument remapping.
   p << "(";
   interleaveComma(llvm::zip(op.body().front().getArguments(), op.args()), p,
-                  [&](std::tuple<BlockArgument *, Value *> it) {
+                  [&](std::tuple<BlockArgumentPtr, ValuePtr> it) {
                     p << *std::get<0>(it) << " = " << *std::get<1>(it);
                     p << " : ";
                     p << std::get<1>(it)->getType();

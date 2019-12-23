@@ -87,33 +87,32 @@ class PyMappedMemory {
   };
 
   PyMappedMemory(Description desc, iree_hal_mapped_memory_t mapped_memory,
-                 iree_hal_buffer_t* buf)
-      : desc_(std::move(desc)), mapped_memory_(mapped_memory), buf_(buf) {
-    iree_hal_buffer_retain(buf_);
-  }
+                 HalBuffer buffer)
+      : desc_(std::move(desc)),
+        mapped_memory_(mapped_memory),
+        buf_(std::move(buffer)) {}
   ~PyMappedMemory() {
     if (buf_) {
-      CHECK_EQ(iree_hal_buffer_unmap(buf_, &mapped_memory_), IREE_STATUS_OK);
-      iree_hal_buffer_release(buf_);
+      CheckApiStatus(iree_hal_buffer_unmap(buf_.raw_ptr(), &mapped_memory_),
+                     "Error unmapping memory");
     }
   }
   PyMappedMemory(PyMappedMemory&& other)
-      : mapped_memory_(other.mapped_memory_), buf_(other.buf_) {
-    other.buf_ = nullptr;
-  }
+      : mapped_memory_(other.mapped_memory_), buf_(std::move(other.buf_)) {}
 
   const Description& desc() const { return desc_; }
 
   static std::unique_ptr<PyMappedMemory> Read(Description desc,
-                                              iree_hal_buffer_t* buffer) {
-    iree_device_size_t byte_length = iree_hal_buffer_byte_length(buffer);
+                                              HalBuffer buffer) {
+    iree_device_size_t byte_length =
+        iree_hal_buffer_byte_length(buffer.raw_ptr());
     iree_hal_mapped_memory_t mapped_memory;
-    CheckApiStatus(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                       0 /* element_offset */, byte_length,
-                                       &mapped_memory),
+    CheckApiStatus(iree_hal_buffer_map(
+                       buffer.raw_ptr(), IREE_HAL_MEMORY_ACCESS_READ,
+                       0 /* element_offset */, byte_length, &mapped_memory),
                    "Could not map memory");
     return absl::make_unique<PyMappedMemory>(std::move(desc), mapped_memory,
-                                             buffer);
+                                             std::move(buffer));
   }
 
   py::buffer_info ToBufferInfo() {
@@ -129,7 +128,7 @@ class PyMappedMemory {
  private:
   Description desc_;
   iree_hal_mapped_memory_t mapped_memory_;
-  iree_hal_buffer_t* buf_;
+  HalBuffer buf_;
 };
 
 class NumpyHostTypeFactory : public HostTypeFactory {
@@ -138,13 +137,15 @@ class NumpyHostTypeFactory : public HostTypeFactory {
                                     HalBuffer buffer) override {
     auto mapped_memory = PyMappedMemory::Read(
         PyMappedMemory::Description::ForNdarray(element_type, dims),
-        buffer.steal_raw_ptr());
+        std::move(buffer));
     // Since an immediate ndarray was requested, we can just return a native
     // ndarray directly (versus a proxy that needs to lazily map on access).
     auto buffer_info = mapped_memory->ToBufferInfo();
+    auto py_mapped_memory = py::cast(mapped_memory.release(),
+                                     py::return_value_policy::take_ownership);
     return py::array(py::dtype(buffer_info), buffer_info.shape,
                      buffer_info.strides, buffer_info.ptr,
-                     py::cast(mapped_memory.release()) /* base */);
+                     std::move(py_mapped_memory) /* base */);
   }
 };
 
@@ -154,8 +155,9 @@ class NumpyHostTypeFactory : public HostTypeFactory {
 // HostTypeFactory
 //------------------------------------------------------------------------------
 
-std::shared_ptr<HostTypeFactory> HostTypeFactory::CreateNumpyFactory() {
-  return std::make_shared<NumpyHostTypeFactory>();
+std::shared_ptr<HostTypeFactory> HostTypeFactory::GetNumpyFactory() {
+  static auto global_instance = std::make_shared<NumpyHostTypeFactory>();
+  return global_instance;
 }
 
 py::object HostTypeFactory::CreateImmediateNdarray(
@@ -169,7 +171,7 @@ void SetupHostTypesBindings(pybind11::module m) {
   py::class_<HostTypeFactory, std::shared_ptr<HostTypeFactory>>(
       m, "HostTypeFactory")
       .def(py::init<>())
-      .def_static("create_numpy", &HostTypeFactory::CreateNumpyFactory);
+      .def_static("get_numpy", &HostTypeFactory::GetNumpyFactory);
   py::class_<PyMappedMemory, std::unique_ptr<PyMappedMemory>>(
       m, "PyMappedMemory", py::buffer_protocol())
       .def_buffer(&PyMappedMemory::ToBufferInfo);

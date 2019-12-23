@@ -38,7 +38,7 @@ namespace iree_compiler {
 namespace {
 
 // Determines the shapes involved with reducing this dimension.
-SmallVector<int64_t, 4> calculateResultShape(Value *input,
+SmallVector<int64_t, 4> calculateResultShape(ValuePtr input,
                                              int windowDimension) {
   SmallVector<int64_t, 4> resultShape;
   for (auto it :
@@ -56,13 +56,13 @@ SmallVector<int64_t, 4> calculateResultShape(Value *input,
 std::pair<IREE::MultiArchExecutableOp, FuncOp> createReductionExecutable(
     IREE::ReductionRegionOp regionOp, int outlinedRegionOrdinal,
     int separatedReductionIndex, int reductionDimension,
-    SmallVector<Value *, 4> initialValues, SmallVector<Value *, 4> inputs) {
+    SmallVector<ValuePtr, 4> initialValues, SmallVector<ValuePtr, 4> inputs) {
   Builder builder(regionOp.getContext());
 
   // Build function type matching 1:1 with the region signature.
   SmallVector<Type, 8> elementalOperandTypes;
   SmallVector<Type, 8> elementalResultTypes;
-  for (auto *arg : regionOp.getInitialValueOperands()) {
+  for (auto arg : regionOp.getInitialValueOperands()) {
     // (in0, in1) -> out0
     elementalOperandTypes.push_back(arg->getType());
     elementalOperandTypes.push_back(arg->getType());
@@ -83,10 +83,10 @@ std::pair<IREE::MultiArchExecutableOp, FuncOp> createReductionExecutable(
   // dimension.
   SmallVector<Type, 8> allOperandTypes;
   auto inputTypes =
-      llvm::map_range(inputs, [](Value *value) { return value->getType(); });
+      llvm::map_range(inputs, [](ValuePtr value) { return value->getType(); });
   allOperandTypes.append(inputTypes.begin(), inputTypes.end());
   auto initialValueTypes = llvm::map_range(
-      initialValues, [](Value *value) { return value->getType(); });
+      initialValues, [](ValuePtr value) { return value->getType(); });
   allOperandTypes.append(initialValueTypes.begin(), initialValueTypes.end());
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
     auto shapedType = resultType.value().cast<ShapedType>();
@@ -114,17 +114,17 @@ std::pair<IREE::MultiArchExecutableOp, FuncOp> createReductionExecutable(
 // Converts a reduction_region into a dispatch to the outlined region function
 // for a single reduction dimension.
 // Returns the results of the reduction or empty if the construction fails.
-SmallVector<Value *, 4> convertToDispatchOp(
+SmallVector<ValuePtr, 4> convertToDispatchOp(
     IREE::ReductionRegionOp regionOp, IREE::MultiArchExecutableOp executable,
     FuncOp entryFunc, int reductionDimension,
-    SmallVector<Value *, 4> initialValues, SmallVector<Value *, 4> inputs,
+    SmallVector<ValuePtr, 4> initialValues, SmallVector<ValuePtr, 4> inputs,
     OpBuilder &dispatcherBuilder) {
   // Allocate output args and replace the return values with those.
-  SmallVector<Value *, 4> resultValues;
+  SmallVector<ValuePtr, 4> resultValues;
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
     // Allocate output buffer in the dispatcher to pass in to the region.
     auto shapedType = resultType.value().cast<ShapedType>();
-    Value *allocatedValue = allocateDispatchOutputBuffer(
+    ValuePtr allocatedValue = allocateDispatchOutputBuffer(
         regionOp.getLoc(),
         MemRefType::get(calculateResultShape(inputs[resultType.index()],
                                              reductionDimension),
@@ -138,12 +138,12 @@ SmallVector<Value *, 4> convertToDispatchOp(
   }
 
   // Calculate workload from the result shape.
-  auto *workload =
+  auto workload =
       wrapAsMemRef(calculateWorkload(regionOp, resultValues.front()), regionOp,
                    dispatcherBuilder);
 
   // Create the reduce op to the executable function.
-  std::vector<Value *> allOperands;
+  std::vector<ValuePtr> allOperands;
   allOperands.insert(allOperands.end(), inputs.begin(), inputs.end());
   allOperands.insert(allOperands.end(), initialValues.begin(),
                      initialValues.end());
@@ -167,12 +167,12 @@ LogicalResult outlineReductionRegion(IREE::ReductionRegionOp regionOp,
   OpBuilder dispatcherBuilder(regionOp);
 
   // Wrap input operands in memrefs.
-  SmallVector<Value *, 4> initialValues{llvm::map_range(
-      regionOp.getInitialValueOperands(), [&](Value *originalArg) {
+  SmallVector<ValuePtr, 4> initialValues{llvm::map_range(
+      regionOp.getInitialValueOperands(), [&](ValuePtr originalArg) {
         return insertDispatcherStore(regionOp, originalArg, dispatcherBuilder);
       })};
-  SmallVector<Value *, 4> temps{
-      llvm::map_range(regionOp.getReductionOperands(), [&](Value *originalArg) {
+  SmallVector<ValuePtr, 4> temps{llvm::map_range(
+      regionOp.getReductionOperands(), [&](ValuePtr originalArg) {
         return insertDispatcherStore(regionOp, originalArg, dispatcherBuilder);
       })};
 

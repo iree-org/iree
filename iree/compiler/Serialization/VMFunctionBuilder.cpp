@@ -79,7 +79,7 @@ LogicalResult WriteGenericIreeOp(Block *block, Operation *op,
     switch (op_encoding) {
       case iree::OperandEncoding::kInputSlot:
       case iree::OperandEncoding::kOutputSlot: {
-        auto *value = op->getOperand(operandIndex++);
+        auto value = op->getOperand(operandIndex++);
         RETURN_IF_FAILURE(writer->WriteLocal(value));
         break;
       }
@@ -88,13 +88,13 @@ LogicalResult WriteGenericIreeOp(Block *block, Operation *op,
         int count = op->getNumOperands() - operandIndex;
         RETURN_IF_FAILURE(writer->WriteCount(count));
         for (; count; --count) {
-          auto *value = op->getOperand(operandIndex++);
+          auto value = op->getOperand(operandIndex++);
           RETURN_IF_FAILURE(writer->WriteLocal(value));
         }
         break;
       }
       case iree::OperandEncoding::kResultSlot: {
-        auto *value = op->getResult(resultIndex++);
+        auto value = op->getResult(resultIndex++);
         RETURN_IF_FAILURE(writer->WriteLocal(value));
         break;
       }
@@ -102,7 +102,7 @@ LogicalResult WriteGenericIreeOp(Block *block, Operation *op,
         int count = op->getNumResults() - resultIndex;
         RETURN_IF_FAILURE(writer->WriteCount(count));
         for (; count; --count) {
-          auto *value = op->getResult(resultIndex++);
+          auto value = op->getResult(resultIndex++);
           RETURN_IF_FAILURE(writer->WriteLocal(value));
         }
         break;

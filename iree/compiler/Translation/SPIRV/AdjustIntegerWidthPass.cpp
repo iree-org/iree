@@ -140,14 +140,14 @@ struct AdjustGlobalVariableWidth
   }
 };
 
-Value *convertToI32AccessChain(spirv::AccessChainOp op,
-                               PatternRewriter &rewriter) {
+ValuePtr convertToI32AccessChain(spirv::AccessChainOp op,
+                                 PatternRewriter &rewriter) {
   const auto loc = op.getLoc();
   auto i32Type = rewriter.getIntegerType(32);
   auto four = rewriter.create<spirv::ConstantOp>(loc, i32Type,
                                                  rewriter.getI32IntegerAttr(4));
   auto lastDim = op.getOperation()->getOperand(op.getNumOperands() - 1);
-  SmallVector<Value *, 4> indices;
+  SmallVector<ValuePtr, 4> indices;
   for (auto it : op.indices()) {
     indices.push_back(it);
   }
@@ -158,7 +158,7 @@ Value *convertToI32AccessChain(spirv::AccessChainOp op,
   return rewriter.create<spirv::AccessChainOp>(loc, t, op.base_ptr(), indices);
 }
 
-Value *getOffsetOfInt8(spirv::AccessChainOp op, PatternRewriter &rewriter) {
+ValuePtr getOffsetOfInt8(spirv::AccessChainOp op, PatternRewriter &rewriter) {
   const auto loc = op.getLoc();
   Type i32Type = rewriter.getIntegerType(32);
   auto four = rewriter.create<spirv::ConstantOp>(loc, i32Type,
@@ -187,7 +187,7 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
     Type newType = legalizeIntegerType(valueType);
     Type i32Type = rewriter.getIntegerType(32);
     const auto loc = op.getLoc();
-    Value *result;
+    ValuePtr result;
     if (hasIntTypeOfWidth(valueType, {1, 8})) {
       auto accessChainOp =
           cast<spirv::AccessChainOp>(op.ptr()->getDefiningOp());
@@ -197,9 +197,9 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
         return matchFailure();
       }
 
-      Value *i32AccessChainOp =
+      ValuePtr i32AccessChainOp =
           convertToI32AccessChain(accessChainOp, rewriter);
-      Value *loadOp = rewriter.create<spirv::LoadOp>(
+      ValuePtr loadOp = rewriter.create<spirv::LoadOp>(
           loc, i32Type, i32AccessChainOp,
           op.getAttrOfType<IntegerAttr>(
               spirv::attributeName<spirv::MemoryAccess>()),
@@ -211,7 +211,7 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
       if (accessChainOp.indices().size() == 1) {
         result = loadOp;
       } else {
-        Value *offset = getOffsetOfInt8(accessChainOp, rewriter);
+        ValuePtr offset = getOffsetOfInt8(accessChainOp, rewriter);
         result = rewriter.create<spirv::ShiftRightArithmeticOp>(loc, i32Type,
                                                                 loadOp, offset);
       }
@@ -243,17 +243,18 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
 };
 
 // Returns the shifted 32-bit value with the given offset.
-Value *shiftStoreValue(spirv::StoreOp op, Value *offset,
-                       PatternRewriter &rewriter) {
+ValuePtr shiftStoreValue(spirv::StoreOp op, ValuePtr offset,
+                         PatternRewriter &rewriter) {
   Type valueType = op.value()->getType();
   Type i32Type = rewriter.getIntegerType(32);
   const auto loc = op.getLoc();
 
-  Value *storeVal = op.value();
+  ValuePtr storeVal = op.value();
   if (hasIntTypeOfWidth(valueType, {1})) {
-    Value *zero =
+    ValuePtr zero =
         spirv::ConstantOp::getZero(i32Type, loc, &rewriter).getResult();
-    Value *one = spirv::ConstantOp::getOne(i32Type, loc, &rewriter).getResult();
+    ValuePtr one =
+        spirv::ConstantOp::getOne(i32Type, loc, &rewriter).getResult();
     storeVal =
         rewriter.create<spirv::SelectOp>(loc, storeVal, one, zero).getResult();
   } else {
@@ -289,18 +290,18 @@ LogicalResult rewriteInt1AndInt8(spirv::StoreOp op, PatternRewriter &rewriter) {
   }
 
   auto offset = getOffsetOfInt8(accessChainOp, rewriter);
-  Value *storeVal = shiftStoreValue(op, offset, rewriter);
+  ValuePtr storeVal = shiftStoreValue(op, offset, rewriter);
 
   // Create a mask (with eight 0 bits) to clear the destination. E.g., if it
   // is the second i8 in i32, 0xFFFF00FF is created.
   auto i8Mask = rewriter.create<spirv::ConstantOp>(
       loc, i32Type, rewriter.getI32IntegerAttr(255));
-  Value *clear8BitMask =
+  ValuePtr clear8BitMask =
       rewriter.create<spirv::ShiftLeftLogicalOp>(loc, i32Type, i8Mask, offset);
   clear8BitMask = rewriter.create<spirv::NotOp>(loc, i32Type, clear8BitMask);
 
-  Value *i32AccessChainOp = convertToI32AccessChain(accessChainOp, rewriter);
-  Value *result = rewriter.create<spirv::AtomicAndOp>(
+  ValuePtr i32AccessChainOp = convertToI32AccessChain(accessChainOp, rewriter);
+  ValuePtr result = rewriter.create<spirv::AtomicAndOp>(
       loc, i32Type, i32AccessChainOp, spirv::Scope::Device,
       spirv::MemorySemantics::AcquireRelease, clear8BitMask);
   result = rewriter.create<spirv::AtomicOrOp>(

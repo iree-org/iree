@@ -26,7 +26,7 @@ class FlowTypeConverter : public TypeConverter {
   using TypeConverter::convertType;
 
   Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
-                                   ArrayRef<Value *> inputs,
+                                   ArrayRef<ValuePtr> inputs,
                                    Location loc) override;
 };
 

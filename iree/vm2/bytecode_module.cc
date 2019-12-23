@@ -309,16 +309,16 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
   iree_vm_bytecode_module_t* module = (iree_vm_bytecode_module_t*)self;
   auto* module_def = IREE_VM_GET_MODULE_DEF(module);
 
-  if (linkage != IREE_VM_FUNCTION_LINKAGE_EXPORT) {
-    // Reflection attrs only currently supported on exported functions.
+  if (linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
+    // Reflection attrs only on internal functions (referrent of external).
     return IREE_STATUS_NOT_FOUND;
   }
 
-  if (ordinal < 0 || ordinal >= module_def->exported_functions()->size()) {
+  if (ordinal < 0 || ordinal >= module_def->internal_functions()->size()) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* export_def = module_def->exported_functions()->Get(ordinal);
+  auto* export_def = module_def->internal_functions()->Get(ordinal);
   const iree::vm::FunctionSignatureDef* signature = export_def->signature();
   if (index < 0 || index >= signature->reflection_attrs()->size()) {
     return IREE_STATUS_NOT_FOUND;

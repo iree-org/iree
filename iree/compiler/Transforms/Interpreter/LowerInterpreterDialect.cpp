@@ -92,7 +92,7 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
 
   PatternMatchResult matchAndRewrite(SrcOp op,
                                      PatternRewriter &rewriter) const {
-    SmallVector<Value *, 8> operands{op.getOperation()->getOperands()};
+    SmallVector<ValuePtr, 8> operands{op.getOperation()->getOperands()};
 
     // Most ops take results as output operands to populate during execution.
     // Certain ops, like reshape, return references to existing memrefs and
@@ -105,8 +105,8 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
       return this->matchSuccess();
     }
 
-    SmallVector<Value *, 4> replacementValues;
-    for (Value *result : op.getOperation()->getResults()) {
+    SmallVector<ValuePtr, 4> replacementValues;
+    for (ValuePtr result : op.getOperation()->getResults()) {
       auto memRefType = result->getType().cast<MemRefType>();
       if (!memRefType.hasStaticShape()) {
         // TODO(benvanik): real thing here - dynamic shaping required.
@@ -116,7 +116,7 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
         op.emitOpError() << "uses unsupported dynamic shapes";
         return this->matchFailure();
       }
-      ArrayRef<Value *> dim_pieces;
+      ArrayRef<ValuePtr> dim_pieces;
       auto allocOp = rewriter.create<IREEInterp::LL::AllocHeapOp>(
           op.getLoc(), memRefType, dim_pieces);
       operands.push_back(allocOp);

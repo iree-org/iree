@@ -39,7 +39,7 @@ void calculateWorkload(ArrayRef<int64_t> shape,
                        std::array<int32_t, 3> &workload);
 
 // Calculates the workload for |op| based on the op type.
-Value *calculateWorkload(Operation *op, Value *baseOperand);
+ValuePtr calculateWorkload(Operation *op, ValuePtr baseOperand);
 
 // Returns true if the func is trivially dispatchable, meaning that:
 // - it contains a single block
@@ -56,7 +56,7 @@ bool isTriviallyDispatchable(FuncOp func);
 // be dispatched with the same workgroup structure.
 // TODO(benvanik): ensure we want to insert at end. Maybe front?
 LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  Value *workload, ArrayRef<Operation *> ops);
+                                  ValuePtr workload, ArrayRef<Operation *> ops);
 
 // Merges multiple dispatch regions within a block into the same region,
 // if possible. Operations may be reordered if it's possible to merge more while
@@ -67,7 +67,7 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock);
 // of it and removes the argument. Supports multiple arguments that reference
 // |value| and will clone the entire value tree.
 LogicalResult inlineDispatchRegionOperandsUsingValue(
-    IREE::DispatchRegionOp dispatchRegionOp, Value *value);
+    IREE::DispatchRegionOp dispatchRegionOp, ValuePtr value);
 
 // Creates an iree.multi_arch_executable containing an iree.executable with an
 // exported function containing the body region of |op|. Created executables
@@ -78,17 +78,18 @@ std::pair<IREE::MultiArchExecutableOp, FuncOp> createRegionExecutable(
 // Inserts a conversion of an arbitrary |value| to a memref, possibly by way of
 // wrapping in an allocation.
 // Returns a new memref containing the value or an alias to |value|.
-Value *insertDispatcherStore(Operation *op, Value *value, OpBuilder &builder);
+ValuePtr insertDispatcherStore(Operation *op, ValuePtr value,
+                               OpBuilder &builder);
 
 // Inserts a load from a wrapped memref.
 // Returns the value in the original type or an alias to the |value| memref.
-Value *insertDispatcherLoad(Operation *op, Value *originalValue,
-                            Value *allocatedValue, OpBuilder &builder);
+ValuePtr insertDispatcherLoad(Operation *op, ValuePtr originalValue,
+                              ValuePtr allocatedValue, OpBuilder &builder);
 
 // TODO(benvanik): enough information to walk into dispatch region and compute
 // shape when not static.
-Value *allocateDispatchOutputBuffer(Location loc, MemRefType type,
-                                    OpBuilder &builder);
+ValuePtr allocateDispatchOutputBuffer(Location loc, MemRefType type,
+                                      OpBuilder &builder);
 
 }  // namespace iree_compiler
 }  // namespace mlir

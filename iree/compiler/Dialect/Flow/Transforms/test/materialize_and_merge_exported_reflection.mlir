@@ -17,7 +17,7 @@ func @emptyWithVersion() -> () attributes {iree.module.export}
 
 // -----
 // CHECK-LABEL: func @exportedTensor
-// CHECK-SAME: iree.reflection = {f = "I27!I10!B7!t7d4d4I10!B7!t7d5d5R14!R10!B7!t7d5d5", fv = "1"}
+// CHECK-SAME: iree.reflection = {f = "I19!B7!t7d4d4B7!t7d5d5R10!B7!t7d5d5", fv = "1"}
 func @exportedTensor(%arg0 : tensor<4x4xi64>, %arg1 : tensor<5x5xi64>) -> tensor<5x5xi64>
     attributes {iree.module.export}
 {

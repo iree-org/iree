@@ -38,7 +38,7 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
   for (auto &block : funcOp.getBlocks()) {
     SmallVector<Attribute, 8> blockAttrs;
     blockAttrs.reserve(block.getNumArguments());
-    for (auto *blockArg : block.getArguments()) {
+    for (auto blockArg : block.getArguments()) {
       uint8_t reg = registerAllocation.map_[blockArg];
       blockAttrs.push_back(builder.getI32IntegerAttr(reg));
     }
@@ -48,8 +48,8 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
       if (op.getNumResults() == 0) continue;
       SmallVector<Attribute, 8> regAttrs;
       regAttrs.reserve(op.getNumResults());
-      for (auto &result : op.getOpResults()) {
-        uint8_t reg = registerAllocation.map_[&result];
+      for (auto result : op.getResults()) {
+        uint8_t reg = registerAllocation.map_[result];
         regAttrs.push_back(builder.getI32IntegerAttr(reg));
       }
       op.setAttr("result_registers", builder.getArrayAttr(regAttrs));
@@ -141,7 +141,7 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
   // banks as part of the argument passing ABI.
   RegisterUsage registerUsage;
   for (auto &block : funcOp.getBlocks()) {
-    for (auto *blockArg : block.getArguments()) {
+    for (auto blockArg : block.getArguments()) {
       auto reg = registerUsage.allocateRegister(blockArg->getType());
       if (!reg.hasValue()) {
         return funcOp.emitError() << "register allocation failed for block arg "
@@ -160,14 +160,14 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
           registerUsage.releaseRegister(map_[operand.get()]);
         }
       }
-      for (auto &result : op.getOpResults()) {
-        auto reg = registerUsage.allocateRegister(result.getType());
+      for (auto result : op.getResults()) {
+        auto reg = registerUsage.allocateRegister(result->getType());
         if (!reg.hasValue()) {
           return op.emitError() << "register allocation failed for result "
-                                << result.getResultNumber();
+                                << result->cast<OpResult>()->getResultNumber();
         }
-        map_[&result] = reg.getValue();
-        if (result.use_empty()) {
+        map_[result] = reg.getValue();
+        if (result->use_empty()) {
           registerUsage.releaseRegister(reg.getValue());
         }
       }
@@ -179,13 +179,13 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
   return success();
 }
 
-uint8_t RegisterAllocation::mapToRegister(Value *value) {
+uint8_t RegisterAllocation::mapToRegister(ValuePtr value) {
   auto it = map_.find(value);
   assert(it != map_.end());
   return it->getSecond();
 }
 
-uint8_t RegisterAllocation::mapUseToRegister(Value *value, Operation *useOp,
+uint8_t RegisterAllocation::mapUseToRegister(ValuePtr value, Operation *useOp,
                                              int operandIndex) {
   uint8_t reg = mapToRegister(value);
   if (isRefRegister(reg) &&

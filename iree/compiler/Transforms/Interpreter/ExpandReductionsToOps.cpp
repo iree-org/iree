@@ -44,14 +44,14 @@ LogicalResult convertReductionOp(FuncOp entryPoint, FuncOp applyFunc,
   // Ensure that this op is pass-through and does not interact with any other
   // ops within the function.
   // TODO(b/139313439): support fused reductions.
-  for (auto *operand : elementOp->getOperands()) {
+  for (auto operand : elementOp->getOperands()) {
     if (operand->getDefiningOp() != nullptr) {
       return elementOp->emitOpError()
              << "Fused reductions are not supported (operand not sourced from "
                 "block args)";
     }
   }
-  for (auto *result : elementOp->getResults()) {
+  for (auto result : elementOp->getResults()) {
     for (auto *user : result->getUsers()) {
       if (!user->isKnownTerminator()) {
         return elementOp->emitOpError() << "Fused reductions are not supported "
@@ -72,10 +72,10 @@ LogicalResult convertReductionOp(FuncOp entryPoint, FuncOp applyFunc,
 
   // Map to the args from the entry point.
   auto &entryPointEntryBlock = entryPoint.getBlocks().front();
-  Value *srcArg = entryPointEntryBlock.getArgument(setIndex);
-  Value *initArg = entryPointEntryBlock.getArgument(
+  ValuePtr srcArg = entryPointEntryBlock.getArgument(setIndex);
+  ValuePtr initArg = entryPointEntryBlock.getArgument(
       applyFunc.getNumArguments() / 2 + setIndex);
-  Value *dstArg =
+  ValuePtr dstArg =
       entryPointEntryBlock.getArgument(applyFunc.getNumArguments() + setIndex);
   auto dstType = dstArg->getType().cast<ShapedType>();
   Type elementType = dstType.getElementType();

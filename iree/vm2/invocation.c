@@ -49,13 +49,14 @@ static iree_status_t iree_vm_marshal_outputs(
     uint8_t reg = return_registers->registers[i];
     if (reg & IREE_REF_REGISTER_TYPE_BIT) {
       // Always move (as the stack frame will be destroyed soon).
-      iree_vm_variant_list_append_ref_move(
-          outputs, &registers->ref[reg & IREE_REF_REGISTER_MASK]);
+      IREE_API_RETURN_IF_API_ERROR(iree_vm_variant_list_append_ref_move(
+          outputs, &registers->ref[reg & IREE_REF_REGISTER_MASK]));
     } else {
       iree_vm_value_t value;
       value.type = IREE_VM_VALUE_TYPE_I32;
       value.i32 = registers->i32[reg & IREE_I32_REGISTER_MASK];
-      iree_vm_variant_list_append_value(outputs, value);
+      IREE_API_RETURN_IF_API_ERROR(
+          iree_vm_variant_list_append_value(outputs, value));
     }
   }
   return IREE_STATUS_OK;
