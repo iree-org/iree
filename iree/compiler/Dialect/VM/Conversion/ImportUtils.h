@@ -54,7 +54,7 @@ class VMImportOpConversion : public OpConversionPattern<T> {
   }
 
   PatternMatchResult matchAndRewrite(
-      T op, llvm::ArrayRef<Value *> operands,
+      T op, llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (failed(rewriteToCall(op, Adaptor{operands}, rewriter))) {
       return OpConversionPattern<T>::matchFailure();
@@ -90,7 +90,7 @@ class VMImportOpConversion : public OpConversionPattern<T> {
           // conversions can do their job. If we want to remove the dependency
           // from standard ops in the future we could instead go directly to
           // one of the vm constant ops.
-          auto *constOp = rewriter.createOrFold<mlir::ConstantOp>(
+          auto constOp = rewriter.createOrFold<mlir::ConstantOp>(
               op.getLoc(), inputType, intAttr);
           state.operands.push_back(constOp);
         } else {

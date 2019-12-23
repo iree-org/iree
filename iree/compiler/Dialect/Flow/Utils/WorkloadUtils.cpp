@@ -28,7 +28,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-Value *calculateWorkload(Operation *op, ShapedType baseOperandType) {
+ValuePtr calculateWorkload(Operation *op, ShapedType baseOperandType) {
   OpBuilder builder(op);
 
   std::array<int32_t, 3> workload = {1, 1, 1};

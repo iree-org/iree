@@ -37,7 +37,7 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
       : OpConversionPattern(ctx), converter(converter) {}
 
   PatternMatchResult matchAndRewrite(
-      mlir::FuncOp funcOp, llvm::ArrayRef<Value *> operands,
+      mlir::FuncOp funcOp, llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Convert the input signature types.
     // TODO(benvanik): dynamic shapes by passing in tensor dynamic dims.

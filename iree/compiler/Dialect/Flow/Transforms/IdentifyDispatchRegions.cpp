@@ -127,7 +127,7 @@ bool isFusableOp(Operation *op) {
 void gatherFusionOps(Operation *op, Dispatchability &dispatchability,
                      llvm::SetVector<Operation *> *subgraph) {
   // Skip ops that are used outside of the subgraph we are building.
-  for (auto *result : op->getResults()) {
+  for (auto result : op->getResults()) {
     if (result->use_empty() || result->hasOneUse()) continue;
     for (auto *user : result->getUsers()) {
       if (subgraph->count(user) == 0) {
@@ -140,7 +140,7 @@ void gatherFusionOps(Operation *op, Dispatchability &dispatchability,
   }
 
   // Walk backward up to ops providing our input operands.
-  for (auto *operand : op->getOperands()) {
+  for (auto operand : op->getOperands()) {
     auto *sourceOp = operand->getDefiningOp();
     if (!sourceOp) continue;
     if (subgraph->count(sourceOp) == 0) {
@@ -190,7 +190,7 @@ LogicalResult identifyBlockDispatchRegions(FuncOp func, Block *block,
 
       // Compute the workload based on the output shape.
       // When variadic all output shapes match so we can just take the first.
-      auto *workload = calculateWorkload(
+      auto workload = calculateWorkload(
           &rootOp, rootOp.getResult(0)->getType().cast<ShapedType>());
 
       // Try to build a dispatch region from this root.

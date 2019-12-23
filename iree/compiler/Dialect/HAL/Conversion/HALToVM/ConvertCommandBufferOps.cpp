@@ -27,7 +27,7 @@ class RemoveMakeMemoryBarrierOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::MakeMemoryBarrierOp op, ArrayRef<Value *> operands,
+      IREE::HAL::MakeMemoryBarrierOp op, ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return matchSuccess();
@@ -48,11 +48,11 @@ class CommandBufferExecutionBarrierOpConversion
 
   PatternMatchResult matchAndRewrite(
       IREE::HAL::CommandBufferExecutionBarrierOp op,
-      llvm::ArrayRef<Value *> operands,
+      llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getType();
 
-    SmallVector<Value *, 8> callOperands = {
+    SmallVector<ValuePtr, 8> callOperands = {
         operands[0],
         rewriter.create<mlir::ConstantOp>(
             op.getLoc(), rewriter.getI32IntegerAttr(
@@ -77,7 +77,7 @@ class CommandBufferExecutionBarrierOpConversion
           << "tuples not yet fully supported; don't use buffer barriers";
       return matchFailure();
     }
-    for (auto *memoryBarrier : op.memory_barriers()) {
+    for (auto memoryBarrier : op.memory_barriers()) {
       assert(memoryBarrier->getDefiningOp());
       auto makeMemoryBarrierOp =
           cast<IREE::HAL::MakeMemoryBarrierOp>(memoryBarrier->getDefiningOp());

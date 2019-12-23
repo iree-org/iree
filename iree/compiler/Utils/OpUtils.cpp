@@ -21,7 +21,7 @@ void removeDeadOperations(llvm::SetVector<Operation *> &deadOperations) {
   while (!deadOperations.empty()) {
     auto *op = deadOperations.front();
     deadOperations.erase(deadOperations.begin());
-    for (auto *operand : op->getOperands()) {
+    for (auto operand : op->getOperands()) {
       // TODO(benvanik): add check for op side effects.
       if (operand->hasOneUse()) {
         deadOperations.insert(operand->getDefiningOp());
@@ -31,8 +31,8 @@ void removeDeadOperations(llvm::SetVector<Operation *> &deadOperations) {
   }
 }
 
-void replaceSubsequentUses(Operation *userOp, Value *oldValue,
-                           Value *newValue) {
+void replaceSubsequentUses(Operation *userOp, ValuePtr oldValue,
+                           ValuePtr newValue) {
   for (auto &use : oldValue->getUses()) {
     if (userOp->isBeforeInBlock(use.getOwner())) {
       use.set(newValue);

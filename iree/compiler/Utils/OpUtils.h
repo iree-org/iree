@@ -32,7 +32,8 @@ void removeDeadOperations(llvm::SetVector<Operation *> &deadOperations);
 
 // Replaces all uses of |oldValue| with |newValue| that are after |userOp|
 // within the same block.
-void replaceSubsequentUses(Operation *userOp, Value *oldValue, Value *newValue);
+void replaceSubsequentUses(Operation *userOp, ValuePtr oldValue,
+                           ValuePtr newValue);
 
 }  // namespace iree_compiler
 }  // namespace mlir

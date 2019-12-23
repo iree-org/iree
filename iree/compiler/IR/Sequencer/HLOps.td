@@ -90,7 +90,7 @@ def IREESeqHL_CallIndirectOp : IREESeqHL_Op<"call_indirect"> {
   let results = (outs Variadic<IREEHL_MemRef>);
 
   let builders = [OpBuilder<
-    "Builder *, OperationState &result, Value *callee,"
+    "Builder *, OperationState &result, ValuePtr callee,"
     "ValueRange operands = {}", [{
       result.operands.push_back(callee);
       result.addOperands(operands);
@@ -99,7 +99,7 @@ def IREESeqHL_CallIndirectOp : IREESeqHL_Op<"call_indirect"> {
 
   let extraClassDeclaration = [{
     // TODO(b/132296600): make tablegen follow the style guide.
-    Value *getCallee() { return getOperand(0); }
+    ValuePtr getCallee() { return getOperand(0); }
 
     // TODO(b/133879130): make tablegen support variadic operand accessors.
     /// Get the argument operands to the called function.
@@ -155,7 +155,7 @@ def IREESeqHL_CondBranchOp : IREESeqHL_Op<"cond_br", [Terminator]> {
 
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
-    "Builder *, OperationState &result, Value *condition, "
+    "Builder *, OperationState &result, ValuePtr condition, "
     "Block *trueDest, ValueRange trueOperands, "
     "Block *falseDest, ValueRange falseOperands", [{
       result.addOperands(condition);
@@ -168,7 +168,7 @@ def IREESeqHL_CondBranchOp : IREESeqHL_Op<"cond_br", [Terminator]> {
     enum { trueIndex = 0, falseIndex = 1 };
 
     // The condition operand is the first operand in the list.
-    Value *getCondition() { return getOperand(0); }
+    ValuePtr getCondition() { return getOperand(0); }
 
     /// Return the destination if the condition is true.
     Block *getTrueDest() {
@@ -181,12 +181,12 @@ def IREESeqHL_CondBranchOp : IREESeqHL_Op<"cond_br", [Terminator]> {
     }
 
     // Accessors for operands to the 'true' destination.
-    Value *getTrueOperand(unsigned idx) {
+    ValuePtr getTrueOperand(unsigned idx) {
       assert(idx < getNumTrueOperands());
       return getOperand(getTrueDestOperandIndex() + idx);
     }
 
-    void setTrueOperand(unsigned idx, Value *value) {
+    void setTrueOperand(unsigned idx, ValuePtr value) {
       assert(idx < getNumTrueOperands());
       setOperand(getTrueDestOperandIndex() + idx, value);
     }
@@ -211,11 +211,11 @@ def IREESeqHL_CondBranchOp : IREESeqHL_Op<"cond_br", [Terminator]> {
     }
 
     // Accessors for operands to the 'false' destination.
-    Value *getFalseOperand(unsigned idx) {
+    ValuePtr getFalseOperand(unsigned idx) {
       assert(idx < getNumFalseOperands());
       return getOperand(getFalseDestOperandIndex() + idx);
     }
-    void setFalseOperand(unsigned idx, Value *value) {
+    void setFalseOperand(unsigned idx, ValuePtr value) {
       assert(idx < getNumFalseOperands());
       setOperand(getFalseDestOperandIndex() + idx, value);
     }
@@ -263,7 +263,7 @@ def IREESeqHL_DispatchOp : IREESeqHL_Op<"dispatch"> {
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
     "Builder *builder, OperationState &result, StringRef executable,"
-    "StringRef entry_point, Value *workload,"
+    "StringRef entry_point, ValuePtr workload,"
     "ArrayRef<Type> results, ValueRange operands = {}", [{
       result.addOperands({workload});
       result.addOperands(operands);
@@ -278,7 +278,7 @@ def IREESeqHL_DispatchOp : IREESeqHL_Op<"dispatch"> {
     StringRef getEntryPoint() { return entry_point(); }
     FunctionType getEntryPointType();
 
-    Value *getWorkload() { return getOperand(0); }
+    ValuePtr getWorkload() { return getOperand(0); }
 
     // TODO(b/133879130): make tablegen support variadic operand accessors.
     operand_range getArgOperands() {
@@ -333,7 +333,7 @@ def IREESeqHL_ShapeOp : IREESeqHL_PureOp<"shape"> {
 
   let skipDefaultBuilders = 1;
   let builders = [OpBuilder<
-    "Builder *builder, OperationState &result, Value *operand">];
+    "Builder *builder, OperationState &result, ValuePtr operand">];
 
   let hasFolder = 1;
 }

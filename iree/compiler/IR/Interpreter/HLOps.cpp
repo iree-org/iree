@@ -123,7 +123,7 @@ static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
 
 static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
   Block *dest;
-  SmallVector<Value *, 4> destOperands;
+  SmallVector<ValuePtr, 4> destOperands;
   if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
   result.addSuccessor(dest, destOperands);
   return success();
@@ -150,7 +150,7 @@ void BranchOp::eraseOperand(unsigned index) {
 
 static ParseResult parseCondBranchOp(OpAsmParser &parser,
                                      OperationState &result) {
-  SmallVector<Value *, 4> destOperands;
+  SmallVector<ValuePtr, 4> destOperands;
   Block *dest;
   OpAsmParser::OperandType condInfo;
 
@@ -207,7 +207,7 @@ struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
                                      PatternRewriter &rewriter) const override {
     auto finalType = concatOp.getResult()->getType().cast<ShapedType>();
     auto loc = concatOp.getLoc();
-    std::vector<Value *> dimPieces;
+    std::vector<ValuePtr> dimPieces;
     auto dst =
         rewriter.create<IREEInterp::HL::AllocHeapOp>(loc, finalType, dimPieces);
 
@@ -216,7 +216,7 @@ struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
 
     auto concatDimension = concatOp.dimension().getZExtValue();
     llvm::SmallVector<int64_t, 4> dstIndices(finalType.getRank(), 0);
-    for (auto *src : concatOp.srcs()) {
+    for (auto src : concatOp.srcs()) {
       auto srcShape = src->getType().cast<ShapedType>().getShape();
       auto lengths = createArrayConstant(rewriter, loc, srcShape);
       auto dstIndicesOp = createArrayConstant(rewriter, loc, dstIndices);

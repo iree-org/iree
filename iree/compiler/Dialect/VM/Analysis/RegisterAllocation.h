@@ -92,11 +92,11 @@ class RegisterAllocation {
 
   // Maps a |value| to a register with no move bit set.
   // Prefer mapUseToRegister when a move is desired.
-  uint8_t mapToRegister(Value *value);
+  uint8_t mapToRegister(ValuePtr value);
 
   // Maps a |value| to a register as calculated during allocation. The returned
   // register will have the proper type and move bits set.
-  uint8_t mapUseToRegister(Value *value, Operation *useOp, int operandIndex);
+  uint8_t mapUseToRegister(ValuePtr value, Operation *useOp, int operandIndex);
 
  private:
   int8_t maxI32RegisterOrdinal_ = -1;
@@ -106,7 +106,7 @@ class RegisterAllocation {
   ValueLiveness liveness_;
 
   // Mapping from all values within the operation to registers.
-  llvm::DenseMap<Value *, uint8_t> map_;
+  llvm::DenseMap<ValuePtr, uint8_t> map_;
 };
 
 }  // namespace iree_compiler

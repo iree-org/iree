@@ -130,7 +130,7 @@ std::vector<Operation *> sortOpsTopologically(
   using VisitFn = std::function<void(Operation * op)>;
   VisitFn visit = [&](Operation *op) {
     if (markedOps.count(op) > 0) return;
-    for (auto *result : op->getResults()) {
+    for (auto result : op->getResults()) {
       for (auto *user : result->getUsers()) {
         // Don't visit ops not in our set.
         if (unsortedOps.count(user) == 0) continue;
@@ -154,7 +154,7 @@ std::vector<Operation *> sortOpsTopologically(
 // able to fuse and appends them to |subgraph|.
 void gatherFusionOps(Operation *op, llvm::SetVector<Operation *> *subgraph) {
   // Skip ops that are used outside of the subgraph we are building.
-  for (auto *result : op->getResults()) {
+  for (auto result : op->getResults()) {
     if (result->use_empty() || result->hasOneUse()) continue;
     for (auto *user : result->getUsers()) {
       if (subgraph->count(user) == 0) {
@@ -167,7 +167,7 @@ void gatherFusionOps(Operation *op, llvm::SetVector<Operation *> *subgraph) {
   }
 
   // Walk backward up to ops providing our input operands.
-  for (auto *operand : op->getOperands()) {
+  for (auto operand : op->getOperands()) {
     auto *sourceOp = operand->getDefiningOp();
     if (!sourceOp) continue;
     if (subgraph->count(sourceOp) == 0) {
@@ -214,7 +214,7 @@ LogicalResult identifyBlockDispatchRegions(FuncOp func, Block *block) {
 
       // Compute the workload based on the output shape.
       // When variadic all output shapes match so we can just take the first.
-      auto *workload = calculateWorkload(&rootOp, rootOp.getResult(0));
+      auto workload = calculateWorkload(&rootOp, rootOp.getResult(0));
 
       // Try to build a dispatch region from this root.
       if (failed(buildDispatchRegion(func, block, workload, fusedSubgraph))) {

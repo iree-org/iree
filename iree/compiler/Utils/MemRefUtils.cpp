@@ -25,7 +25,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-Value *resolveValueToSourceMemRef(Value *value, Operation *useOp) {
+ValuePtr resolveValueToSourceMemRef(ValuePtr value, Operation *useOp) {
   // TODO(benvanik): implement this for real; this is naive but enough for our
   // simple load patterns.
   auto *defInstr = value->getDefiningOp();
@@ -36,7 +36,7 @@ Value *resolveValueToSourceMemRef(Value *value, Operation *useOp) {
   return nullptr;
 }
 
-Value *wrapAsTensor(Value *value, Operation *srcOp, OpBuilder &builder) {
+ValuePtr wrapAsTensor(ValuePtr value, Operation *srcOp, OpBuilder &builder) {
   if (srcOp->getResult(0)->getType().isa<TensorType>()) {
     if (isa_and_nonnull<IREE::TensorToMemRefOp>(value->getDefiningOp())) {
       return value->getDefiningOp()->getOperand(0);
@@ -47,7 +47,7 @@ Value *wrapAsTensor(Value *value, Operation *srcOp, OpBuilder &builder) {
   return value;
 }
 
-Value *wrapAsMemRef(Value *value, Operation *srcOp, OpBuilder &builder) {
+ValuePtr wrapAsMemRef(ValuePtr value, Operation *srcOp, OpBuilder &builder) {
   if (value->getType().isa<TensorType>()) {
     if (isa_and_nonnull<IREE::MemRefToTensorOp>(value->getDefiningOp())) {
       return value->getDefiningOp()->getOperand(0);
@@ -58,7 +58,8 @@ Value *wrapAsMemRef(Value *value, Operation *srcOp, OpBuilder &builder) {
   return value;
 }
 
-Value *loadAccessValue(Location location, Value *operand, OpBuilder &builder) {
+ValuePtr loadAccessValue(Location location, ValuePtr operand,
+                         OpBuilder &builder) {
   if (operand->getType().isa<MemRefType>() ||
       operand->getType().isa<TensorType>()) {
     return operand;
@@ -74,19 +75,19 @@ Value *loadAccessValue(Location location, Value *operand, OpBuilder &builder) {
 
   auto allocOp = builder.create<AllocOp>(location, memRefType);
   builder.create<StoreOp>(location, operand, allocOp.getResult(),
-                          ArrayRef<Value *>{});
+                          ArrayRef<ValuePtr>{});
   return allocOp.getResult();
 }
 
-Value *loadResultValue(Location location, const Type &originalType,
-                       Value *result, OpBuilder &builder) {
+ValuePtr loadResultValue(Location location, const Type &originalType,
+                         ValuePtr result, OpBuilder &builder) {
   if (originalType.isa<MemRefType>()) {
     return result;
   } else if (auto tensorType = originalType.dyn_cast<TensorType>()) {
     return result;
   }
 
-  auto loadOp = builder.create<LoadOp>(location, result, ArrayRef<Value *>{});
+  auto loadOp = builder.create<LoadOp>(location, result, ArrayRef<ValuePtr>{});
   return loadOp.getResult();
 }
 

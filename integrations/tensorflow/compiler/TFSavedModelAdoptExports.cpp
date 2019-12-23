@@ -92,7 +92,7 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
       args_to_erase.push_back(i);
       auto flow_sym_ref = global_builder.getSymbolRefAttr(
           sym_name_to_flow_sym_name[global_tensor.sym_name()]);
-      Value *arg = func.getArgument(i);
+      ValuePtr arg = func.getArgument(i);
       if (global_tensor.is_mutable()) {
         // The value is a tensor<*x!tf.resource> type, which flows into
         // tf.ReadVariableOp/tf.AssignVariableOp.

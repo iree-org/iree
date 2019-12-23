@@ -33,31 +33,32 @@ namespace {
 
 struct BufferRange {
   BufferRange() = default;
-  explicit BufferRange(Value *buffer) : buffer(buffer) {}
+  explicit BufferRange(ValuePtr buffer) : buffer(buffer) {}
 
-  Value *buffer = nullptr;
+  ValuePtr buffer = nullptr;
 };
 
 // Allocated buffers used within the stream.
 struct BufferSet {
-  explicit BufferSet(Value *allocator) : allocator(allocator) {}
+  explicit BufferSet(ValuePtr allocator) : allocator(allocator) {}
 
   // Allocator instance the buffers come from.
-  Value *allocator = nullptr;
+  ValuePtr allocator = nullptr;
 
   // All output buffers in the same order as the original results.
-  SmallVector<Value *, 4> outputBuffers;
+  SmallVector<ValuePtr, 4> outputBuffers;
 
   // Maps tensor values within the stream to a buffer range that stores them.
-  DenseMap<Value *, BufferRange> rangeMap;
+  DenseMap<ValuePtr, BufferRange> rangeMap;
 };
 
 // Allocates a buffer for the given stream output value.
-// |streamValue| is the Value* used within the stream region and |externalValue|
-// is the returned value from the stream region in the parent block.
-static Value *allocateOutputBuffer(Value *streamValue, Value *externalValue,
-                                   Value *allocator,
-                                   ConversionPatternRewriter &rewriter) {
+// |streamValue| is the ValuePtr  used within the stream region and
+// |externalValue| is the returned value from the stream region in the parent
+// block.
+static ValuePtr allocateOutputBuffer(ValuePtr streamValue,
+                                     ValuePtr externalValue, ValuePtr allocator,
+                                     ConversionPatternRewriter &rewriter) {
   // TODO(benvanik): compute from SSA use-def chain uses.
   IREE::HAL::MemoryTypeBitfield memoryTypes =
       IREE::HAL::MemoryTypeBitfield::DeviceLocal |
@@ -69,17 +70,17 @@ static Value *allocateOutputBuffer(Value *streamValue, Value *externalValue,
   int elementSize = IREE::HAL::getRoundedElementByteWidth(
       streamValue->getType().cast<ShapedType>().getElementType());
   auto shape = IREE::HAL::getShapeDims(streamValue, rewriter);
-  auto *allocationSize = rewriter
-                             .create<IREE::HAL::AllocatorComputeSizeOp>(
-                                 externalValue->getLoc(), allocator,
-                                 memoryTypes, bufferUsage, shape, elementSize)
-                             .getResult();
+  auto allocationSize = rewriter
+                            .create<IREE::HAL::AllocatorComputeSizeOp>(
+                                externalValue->getLoc(), allocator, memoryTypes,
+                                bufferUsage, shape, elementSize)
+                            .getResult();
 
-  auto *buffer = rewriter
-                     .create<IREE::HAL::AllocatorAllocateOp>(
-                         externalValue->getLoc(), allocator, memoryTypes,
-                         bufferUsage, allocationSize)
-                     .getResult();
+  auto buffer = rewriter
+                    .create<IREE::HAL::AllocatorAllocateOp>(
+                        externalValue->getLoc(), allocator, memoryTypes,
+                        bufferUsage, allocationSize)
+                    .getResult();
 
   // TODO(benvanik): implement resource sets.
   rewriter.create<IREE::HAL::ExDeferReleaseOp>(externalValue->getLoc(), buffer);
@@ -95,10 +96,10 @@ static void allocateOutputBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
   // Allocate output buffers and replace the original uses with the buffers.
   auto returnOp = cast<IREE::Flow::ReturnOp>(streamOp.body().front().back());
   for (auto result : llvm::enumerate(streamOp.getResults())) {
-    auto *streamValue = returnOp.getOperand(result.index());
-    auto *externalValue = result.value();
-    auto *buffer = allocateOutputBuffer(streamValue, externalValue,
-                                        bufferSet.allocator, rewriter);
+    auto streamValue = returnOp.getOperand(result.index());
+    auto externalValue = result.value();
+    auto buffer = allocateOutputBuffer(streamValue, externalValue,
+                                       bufferSet.allocator, rewriter);
     auto bufferRange = BufferRange{buffer};
     bufferSet.rangeMap[externalValue] = bufferRange;
     bufferSet.rangeMap[streamValue] = bufferRange;
@@ -107,8 +108,9 @@ static void allocateOutputBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
 }
 
 // Allocates a transient buffer for use entirely within the command buffer.
-static Value *allocateTransientBuffer(Value *streamValue, Value *allocator,
-                                      ConversionPatternRewriter &rewriter) {
+static ValuePtr allocateTransientBuffer(ValuePtr streamValue,
+                                        ValuePtr allocator,
+                                        ConversionPatternRewriter &rewriter) {
   // TODO(benvanik): compute from SSA use-def chain uses.
   IREE::HAL::MemoryTypeBitfield memoryTypes =
       IREE::HAL::MemoryTypeBitfield::DeviceLocal;
@@ -120,17 +122,17 @@ static Value *allocateTransientBuffer(Value *streamValue, Value *allocator,
   int elementSize = IREE::HAL::getRoundedElementByteWidth(
       streamValue->getType().cast<ShapedType>().getElementType());
   auto shape = IREE::HAL::getShapeDims(streamValue, rewriter);
-  auto *allocationSize = rewriter
-                             .create<IREE::HAL::AllocatorComputeSizeOp>(
-                                 streamValue->getLoc(), allocator, memoryTypes,
-                                 bufferUsage, shape, elementSize)
-                             .getResult();
+  auto allocationSize = rewriter
+                            .create<IREE::HAL::AllocatorComputeSizeOp>(
+                                streamValue->getLoc(), allocator, memoryTypes,
+                                bufferUsage, shape, elementSize)
+                            .getResult();
 
-  auto *buffer = rewriter
-                     .create<IREE::HAL::AllocatorAllocateOp>(
-                         streamValue->getLoc(), allocator, memoryTypes,
-                         bufferUsage, allocationSize)
-                     .getResult();
+  auto buffer = rewriter
+                    .create<IREE::HAL::AllocatorAllocateOp>(
+                        streamValue->getLoc(), allocator, memoryTypes,
+                        bufferUsage, allocationSize)
+                    .getResult();
 
   // TODO(benvanik): implement resource sets.
   rewriter.create<IREE::HAL::ExDeferReleaseOp>(streamValue->getLoc(), buffer);
@@ -144,11 +146,11 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
                                      BufferSet &bufferSet,
                                      ConversionPatternRewriter &rewriter) {
   for (auto &op : streamOp.body().front()) {
-    for (auto *result : op.getResults()) {
+    for (auto result : op.getResults()) {
       // If the result is an output buffer we can just use that directly.
       if (bufferSet.rangeMap[result].buffer) continue;
 
-      auto *buffer =
+      auto buffer =
           allocateTransientBuffer(result, bufferSet.allocator, rewriter);
       bufferSet.rangeMap[result] = BufferRange{buffer};
     }
@@ -157,14 +159,14 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
 
 // Returns a the (x, y, z) workgroup counts calculated from the given |workload|
 // and the workgroup size of the dispatch |entryPointOp|.
-static std::array<Value *, 3> getDispatchWorkgroupCounts(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, Value *workload,
+static std::array<ValuePtr, 3> getDispatchWorkgroupCounts(
+    IREE::HAL::ExecutableEntryPointOp entryPointOp, ValuePtr workload,
     ConversionPatternRewriter &rewriter) {
-  std::array<Value *, 3> result;
+  std::array<ValuePtr, 3> result;
   auto loc = entryPointOp.getLoc();
   for (int i = 0; i < 3; ++i) {
     // Round up: (workload + workgroup_size - 1) / workgroup_size;
-    auto *workloadI = rewriter.createOrFold<ExtractElementOp>(
+    auto workloadI = rewriter.createOrFold<ExtractElementOp>(
         loc, workload,
         rewriter.createOrFold<mlir::ConstantOp>(
             loc, IntegerAttr::get(rewriter.getIndexType(), i)));
@@ -172,7 +174,7 @@ static std::array<Value *, 3> getDispatchWorkgroupCounts(
         loc, rewriter.getI32IntegerAttr(
                  entryPointOp.workgroup_size().getValue<int32_t>(
                      {static_cast<uint64_t>(i)})));
-    auto *workgroupCountI = rewriter.createOrFold<mlir::UnsignedDivIOp>(
+    auto workgroupCountI = rewriter.createOrFold<mlir::UnsignedDivIOp>(
         loc,
         rewriter.createOrFold<mlir::SubIOp>(
             loc,
@@ -187,9 +189,9 @@ static std::array<Value *, 3> getDispatchWorkgroupCounts(
 }
 
 // Records a full execution barrier that forces visibility of all buffers.
-static void recordFullExecutionBarrier(Value *commandBuffer, Location loc,
+static void recordFullExecutionBarrier(ValuePtr commandBuffer, Location loc,
                                        ConversionPatternRewriter &rewriter) {
-  auto *memoryBarrier =
+  auto memoryBarrier =
       rewriter
           .create<IREE::HAL::MakeMemoryBarrierOp>(
               loc, IREE::HAL::AccessScopeBitfield::DispatchWrite,
@@ -198,17 +200,17 @@ static void recordFullExecutionBarrier(Value *commandBuffer, Location loc,
   rewriter.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
       loc, commandBuffer, IREE::HAL::ExecutionStageBitfield::CommandRetire,
       IREE::HAL::ExecutionStageBitfield::CommandIssue,
-      ArrayRef<Value *>{memoryBarrier}, ArrayRef<Value *>{});
+      ArrayRef<ValuePtr>{memoryBarrier}, ArrayRef<ValuePtr>{});
 }
 
-static void recordPushBindings(Value *device, Value *commandBuffer,
+static void recordPushBindings(ValuePtr device, ValuePtr commandBuffer,
                                IREE::Flow::DispatchOp &dispatchOp,
                                IREE::HAL::ExecutableOp &executableOp,
                                IREE::HAL::ExecutableEntryPointOp &entryPointOp,
                                BufferSet &bufferSet,
                                ConversionPatternRewriter &rewriter) {
   int bindingOrdinal = 0;
-  auto pushBinding = [&](Value *tensorValue) {
+  auto pushBinding = [&](ValuePtr tensorValue) {
     auto tensorType = tensorValue->getType().cast<ShapedType>();
     auto shape = IREE::HAL::getShapeDims(tensorValue, rewriter);
     int elementSize =
@@ -219,21 +221,21 @@ static void recordPushBindings(Value *device, Value *commandBuffer,
         rewriter.getI32IntegerAttr(bindingOrdinal++), bufferRange.buffer, shape,
         rewriter.getI32IntegerAttr(elementSize));
   };
-  for (auto *tensorValue : dispatchOp.operands()) {
+  for (auto tensorValue : dispatchOp.operands()) {
     pushBinding(tensorValue);
   }
-  for (auto *tensorValue : dispatchOp.results()) {
+  for (auto tensorValue : dispatchOp.results()) {
     pushBinding(tensorValue);
   }
 }
 
 // Records a dispatch operation.
-static void recordDispatch(Value *device, Value *commandBuffer,
+static void recordDispatch(ValuePtr device, ValuePtr commandBuffer,
                            IREE::Flow::DispatchOp &dispatchOp,
                            BufferSet &bufferSet,
                            ConversionPatternRewriter &rewriter) {
   // Get the handle to the executable that is compatible with our device.
-  auto *executable =
+  auto executable =
       rewriter
           .create<IREE::HAL::ExCacheExecutableOp>(dispatchOp.getLoc(), device,
                                                   dispatchOp.executable())
@@ -263,7 +265,7 @@ static void recordDispatch(Value *device, Value *commandBuffer,
   recordFullExecutionBarrier(commandBuffer, dispatchOp.getLoc(), rewriter);
 }
 
-static void recordTensorUpdate(Value *device, Value *commandBuffer,
+static void recordTensorUpdate(ValuePtr device, ValuePtr commandBuffer,
                                IREE::Flow::TensorUpdateOp &updateOp,
                                BufferSet &bufferSet,
                                ConversionPatternRewriter &rewriter) {
@@ -282,14 +284,14 @@ static void recordTensorUpdate(Value *device, Value *commandBuffer,
   auto updateShape = IREE::HAL::getShapeDims(updateOp.update(), rewriter);
   auto startIndices = llvm::to_vector<4>(llvm::map_range(
       updateOp.start_indices(),
-      [&](Value *value) { return rewriter.getRemappedValue(value); }));
+      [&](ValuePtr value) { return rewriter.getRemappedValue(value); }));
   auto targetRange = rewriter.create<IREE::HAL::BufferViewComputeRangeOp>(
       updateOp.getLoc(), targetBuffer.buffer, targetShape, startIndices,
       updateShape, elementSize);
 
-  auto *updateOffset = targetRange.offset();
-  auto *updateLength = targetRange.length();
-  auto *targetLength =
+  auto updateOffset = targetRange.offset();
+  auto updateLength = targetRange.length();
+  auto targetLength =
       rewriter
           .create<IREE::HAL::BufferViewComputeLengthOp>(
               updateOp.getLoc(), targetBuffer.buffer, targetShape, elementSize)
@@ -311,7 +313,8 @@ static void recordTensorUpdate(Value *device, Value *commandBuffer,
   recordFullExecutionBarrier(commandBuffer, updateOp.getLoc(), rewriter);
 }
 
-static LogicalResult recordStreamCommands(Value *device, Value *commandBuffer,
+static LogicalResult recordStreamCommands(ValuePtr device,
+                                          ValuePtr commandBuffer,
                                           Block &streamBlock,
                                           BufferSet &bufferSet,
                                           ConversionPatternRewriter &rewriter) {
@@ -335,7 +338,8 @@ class ExStreamFragmentOpConversion
   using OpConversionPattern<
       IREE::Flow::ExStreamFragmentOp>::OpConversionPattern;
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::ExStreamFragmentOp streamOp, llvm::ArrayRef<Value *> operands,
+      IREE::Flow::ExStreamFragmentOp streamOp,
+      llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): choose buffer mode/category based on stream commands.
     auto mode = IREE::HAL::CommandBufferModeBitfield::OneShot;
@@ -345,9 +349,9 @@ class ExStreamFragmentOpConversion
     // We'll use this buffer set to track the original and converted tensors
     // and buffers during conversion. Ideally we'd run some fancy allocation
     // analysis first to produce it.
-    auto *device =
+    auto device =
         rewriter.createOrFold<IREE::HAL::ExSharedDeviceOp>(streamOp.getLoc());
-    auto *allocator =
+    auto allocator =
         rewriter.create<IREE::HAL::DeviceAllocatorOp>(streamOp.getLoc(), device)
             .getResult();
     BufferSet bufferSet{allocator};
@@ -371,7 +375,7 @@ class ExStreamFragmentOpConversion
     // Allocate and begin the command buffer.
     // In a real version we would want to pick the device based on the placement
     // information attached to the stream.
-    auto *commandBuffer =
+    auto commandBuffer =
         rewriter.createOrFold<IREE::HAL::CommandBufferCreateOp>(
             streamOp.getLoc(), device, mode, category);
     rewriter.create<IREE::HAL::CommandBufferBeginOp>(streamOp.getLoc(),

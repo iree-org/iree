@@ -28,7 +28,7 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::VariableOp op, llvm::ArrayRef<Value *> operands,
+      IREE::HAL::VariableOp op, llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (op.type().isa<IREE::RefPtrType>()) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
@@ -58,7 +58,7 @@ class VariableLoadOpConversion
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::VariableLoadOp op, llvm::ArrayRef<Value *> operands,
+      IREE::HAL::VariableLoadOp op, llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadRefOp>(
         op, typeConverter.convertType(op.getType()), op.variable());
@@ -76,7 +76,7 @@ class VariableStoreOpConversion
       : OpConversionPattern(context) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::VariableStoreOp op, llvm::ArrayRef<Value *> operands,
+      IREE::HAL::VariableStoreOp op, llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreRefOp>(op, op.variable(),
                                                             operands[0]);

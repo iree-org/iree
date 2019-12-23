@@ -46,7 +46,7 @@ bool isOpOfKnownDialect(Operation *op);
 // be dispatched with the same workgroup structure.
 // TODO(benvanik): ensure we want to insert at end. Maybe front?
 LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  Value *workload, ArrayRef<Operation *> ops);
+                                  ValuePtr workload, ArrayRef<Operation *> ops);
 
 // Creates an executable containing exported function containing the body region
 // of |op|. Created executables will be named for their original function

@@ -81,7 +81,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return writeInt32(ordinal);
   }
 
-  LogicalResult encodeType(Value *value) override {
+  LogicalResult encodeType(ValuePtr value) override {
     auto refPtrType = value->getType().dyn_cast<IREE::RefPtrType>();
     if (!refPtrType) {
       return currentOp_->emitOpError()
@@ -148,7 +148,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     for (auto it : llvm::enumerate(operands)) {
       uint8_t srcReg = registerAllocation_->mapUseToRegister(
           it.value(), currentOp_, operandOffset + it.index());
-      BlockArgument *targetArg = targetBlock->getArgument(it.index());
+      BlockArgumentPtr targetArg = targetBlock->getArgument(it.index());
       uint8_t dstReg = registerAllocation_->mapToRegister(targetArg);
       if (!compareRegistersEqual(srcReg, dstReg)) {
         srcDstRegs.push_back({srcReg, dstReg});
@@ -166,7 +166,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return success();
   }
 
-  LogicalResult encodeOperand(Value *value, int ordinal) override {
+  LogicalResult encodeOperand(ValuePtr value, int ordinal) override {
     uint8_t reg =
         registerAllocation_->mapUseToRegister(value, currentOp_, ordinal);
     return writeUint8(reg);
@@ -184,14 +184,14 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return success();
   }
 
-  LogicalResult encodeResult(Value *value) override {
+  LogicalResult encodeResult(ValuePtr value) override {
     uint8_t reg = registerAllocation_->mapUseToRegister(value, currentOp_, 0);
     return writeUint8(reg);
   }
 
   LogicalResult encodeResults(Operation::result_range values) override {
     writeUint8(std::distance(values.begin(), values.end()));
-    for (auto *value : values) {
+    for (auto value : values) {
       uint8_t reg = registerAllocation_->mapToRegister(value);
       if (failed(writeUint8(reg))) {
         return failure();

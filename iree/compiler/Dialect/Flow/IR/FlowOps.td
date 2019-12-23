@@ -139,7 +139,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
-      Value *workload, ValueRange args,
+      ValuePtr workload, ValueRange args,
       ArrayRef<NamedAttribute> attributes = {}
     }]>,
   ];
@@ -185,7 +185,7 @@ def FLOW_ReductionRegionOp : FLOW_PureOp<"reduction.region", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
-      Value *workload, ValueRange operands,
+      ValuePtr workload, ValueRange operands,
       ValueRange initialValues, ArrayRef<int32_t> dimensions,
       ArrayRef<NamedAttribute> attributes = {}
     }]>,
@@ -235,7 +235,7 @@ def FLOW_WindowedReductionRegionOp : FLOW_PureOp<"windowed_reduction.region", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
-      Value *workload, ValueRange operands,
+      ValuePtr workload, ValueRange operands,
       ValueRange initialValues, ArrayRef<int32_t> windowDimensions,
       ArrayRef<int32_t> windowStrides, ArrayRef<int32_t> baseDilations,
       ArrayRef<int32_t> windowDilations, PaddingMode paddingMode,
@@ -417,7 +417,7 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &result, StringRef executable,
-      StringRef entryPoint, Value *workload,
+      StringRef entryPoint, ValuePtr workload,
       ArrayRef<Type> results, ValueRange operands = {}
     }], [{
       result.addOperands({workload});

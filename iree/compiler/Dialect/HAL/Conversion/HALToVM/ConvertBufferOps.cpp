@@ -31,18 +31,18 @@ class BufferLoadOpConversion
   }
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::BufferLoadOp op, llvm::ArrayRef<Value *> operands,
+      IREE::HAL::BufferLoadOp op, llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferLoadOpOperandAdaptor adaptor(operands);
     auto importType = importOp.getType();
-    auto *sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
+    auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
             IREE::HAL::getRoundedElementByteWidth(op.getResult()->getType())));
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
-        ArrayRef<Value *>{adaptor.source_buffer(), adaptor.source_offset(),
-                          sizeConst});
+        ArrayRef<ValuePtr>{adaptor.source_buffer(), adaptor.source_offset(),
+                           sizeConst});
     return matchSuccess();
   }
 
@@ -61,18 +61,18 @@ class BufferStoreOpConversion
   }
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::BufferStoreOp op, llvm::ArrayRef<Value *> operands,
+      IREE::HAL::BufferStoreOp op, llvm::ArrayRef<ValuePtr> operands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferStoreOpOperandAdaptor adaptor(operands);
     auto importType = importOp.getType();
-    auto *sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
+    auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
             IREE::HAL::getRoundedElementByteWidth(op.value()->getType())));
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
-        ArrayRef<Value *>{adaptor.value(), adaptor.target_buffer(),
-                          adaptor.target_offset(), sizeConst});
+        ArrayRef<ValuePtr>{adaptor.value(), adaptor.target_buffer(),
+                           adaptor.target_offset(), sizeConst});
     return matchSuccess();
   }
 

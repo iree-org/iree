@@ -38,8 +38,8 @@ namespace {
 
 // Inserts a load from a wrapped memref (as inserted via insertDispatcherStore).
 // Returns the value in the original type.
-Value *insertDispatcheeLoad(Operation *op, Type originalType, Value *value,
-                            OpBuilder &builder) {
+ValuePtr insertDispatcheeLoad(Operation *op, Type originalType, ValuePtr value,
+                              OpBuilder &builder) {
   // If old value was a memref we don't need to change anything.
   if (originalType.isa<MemRefType>()) {
     return value;
@@ -61,13 +61,13 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
   OpBuilder dispatcheeBuilder(&entryBlock, entryBlock.begin());
 
   // Wrap input operands and unwrap in the entry block.
-  SmallVector<Value *, 8> newArgs;
+  SmallVector<ValuePtr, 8> newArgs;
   for (int i = 0; i < regionOp.getNumArgOperands(); ++i) {
     // Wrap the input outside of the region.
-    auto *blockArg = entryBlock.getArgument(i);
+    auto blockArg = entryBlock.getArgument(i);
     Type originalType = blockArg->getType();
-    auto *originalArg = regionOp.getArgOperand(i);
-    auto *wrappedArg =
+    auto originalArg = regionOp.getArgOperand(i);
+    auto wrappedArg =
         insertDispatcherStore(regionOp, originalArg, dispatcherBuilder);
     newArgs.push_back(wrappedArg);
     blockArg->setType(wrappedArg->getType());
@@ -79,15 +79,15 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
 
   // Allocate output arguments and replace the return values with those.
   SmallVector<Type, 8> newResults;
-  SmallVector<std::pair<int, Value *>, 8> resultIndicesToOutputArgs;
+  SmallVector<std::pair<int, ValuePtr>, 8> resultIndicesToOutputArgs;
   SmallVector<int, 8> deadResultIndices;
-  SmallVector<std::pair<Value *, Value *>, 8> replacedResults;
+  SmallVector<std::pair<ValuePtr, ValuePtr>, 8> replacedResults;
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
-    auto *result = regionOp.getResult(i);
+    auto result = regionOp.getResult(i);
     auto convertedType = convertTypeToMemRef(result->getType());
 
     // Allocate output buffer in the dispatcher to pass in to the region.
-    Value *allocatedValue = allocateDispatchOutputBuffer(
+    ValuePtr allocatedValue = allocateDispatchOutputBuffer(
         regionOp.getLoc(), convertedType, dispatcherBuilder);
     if (!allocatedValue) {
       regionOp.emitError("unable to allocate result value");
@@ -95,7 +95,7 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
     }
     newArgs.push_back(allocatedValue);
 
-    auto *newBlockArg = entryBlock.addArgument(allocatedValue->getType());
+    auto newBlockArg = entryBlock.addArgument(allocatedValue->getType());
     resultIndicesToOutputArgs.push_back({i, newBlockArg});
 
     // NOTE: right now we always replace results. If we want to allow return
@@ -109,13 +109,13 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
     // Replace the results we were returning with stores to output arguments.
     OpBuilder builder(returnOp);
     for (auto resultToArg : resultIndicesToOutputArgs) {
-      auto *value = returnOp.getOperand(resultToArg.first);
-      auto *outputArg = resultToArg.second;
+      auto value = returnOp.getOperand(resultToArg.first);
+      auto outputArg = resultToArg.second;
       builder.create<IREE::StoreOutputOp>(returnOp.getLoc(), value, outputArg);
     }
 
     // Filter out the results that are now dead.
-    SmallVector<Value *, 8> newOperands(returnOp.getOperands());
+    SmallVector<ValuePtr, 8> newOperands(returnOp.getOperands());
     for (int i = deadResultIndices.size() - 1; i >= 0; --i) {
       newOperands.erase(newOperands.begin() + deadResultIndices[i]);
     }
@@ -147,7 +147,7 @@ LogicalResult convertToDispatchOp(IREE::DispatchRegionOp regionOp,
   OpBuilder dispatcherBuilder(regionOp);
 
   // Ensure workload is a memref.
-  auto *workload =
+  auto workload =
       wrapAsMemRef(regionOp.getWorkload(), regionOp, dispatcherBuilder);
 
   // Create the dispatch op to the executable function.
@@ -171,7 +171,7 @@ LogicalResult outlineDispatchRegion(IREE::DispatchRegionOp regionOp,
                                     int outlinedRegionOrdinal) {
   // Build function type matching 1:1 with the region signature.
   SmallVector<Type, 8> operandTypes;
-  for (auto *arg : regionOp.getArgOperands()) {
+  for (auto arg : regionOp.getArgOperands()) {
     operandTypes.push_back(arg->getType());
   }
   SmallVector<Type, 8> resultTypes(regionOp.getResultTypes());
