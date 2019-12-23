@@ -37,5 +37,5 @@ echo "Running with test env args: ${test_env_args[@]}"
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with "notap".
-bazel query '//... except attr("tags", "notap", //...) except //bindings/... except //integrations/... except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test except //iree/samples/simple_embedding:simple_embedding_test' | \
+bazel query '//... except attr("tags", "notap", //...) except attr("tags", "nokokoro", //...) except //bindings/... except //integrations/... except //iree/hal/vulkan:dynamic_symbols_test except //iree/samples/rt:bytecode_module_api_test except //iree/samples/simple_embedding:simple_embedding_test' | \
     xargs bazel test ${test_env_args[@]} --config=rbe --config=rs --keep_going --test_output=errors
