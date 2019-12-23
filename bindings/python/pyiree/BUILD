@@ -75,6 +75,7 @@ py_library(
     deps = [
         ":binding",
         ":compiler",
+        ":system_api",
         "//bindings/python:pathsetup",  # build_cleaner: keep
     ] + select({
         "//iree:enable_tensorflow": [
@@ -89,6 +90,16 @@ py_library(
 py_library(
     name = "compiler",
     srcs = ["compiler.py"],
+    srcs_version = "PY3",
+    deps = [
+        ":binding",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+    ],
+)
+
+py_library(
+    name = "system_api",
+    srcs = ["system_api.py"],
     srcs_version = "PY3",
     deps = [
         ":binding",
@@ -211,6 +222,20 @@ py_test(
     srcs = ["runtime_test.py"],
     python_version = "PY3",
     deps = NUMPY_DEPS + [
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+        "@absl_py//absl/testing:absltest",
+        "//bindings/python/pyiree",
+    ],
+)
+
+py_test(
+    name = "system_api_test",
+    srcs = ["system_api_test.py"],
+    python_version = "PY3",
+    # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
+    tags = ["notap"],
+    deps = NUMPY_DEPS + [
+        ":system_api",
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
         "//bindings/python/pyiree",
