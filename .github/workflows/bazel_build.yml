@@ -47,12 +47,10 @@ jobs:
           # Update pip before using it so it picks up the latest versions of our dependencies.
           sudo python3 -m pip install --upgrade pip
           sudo python3 -m pip install numpy tf-nightly
-      - name: Checking out latest version and all submodules
-        run: |
-          git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
-          git clone https://github.com/${GITHUB_REPOSITORY?} ${GITHUB_WORKSPACE?} --no-checkout --no-tags
-          git checkout ${GITHUB_SHA?}
-          git submodule update --init --depth 1000 --jobs 8
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Updating submodules
+        run: git submodule update --init --depth 1000 --jobs 8
       - name: Building and testing with bazel
         run: |
           # Build and test everything not explicitly marked as excluded from CI

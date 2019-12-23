@@ -33,11 +33,11 @@ jobs:
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -qq -y --no-install-recommends clang-format-9
         wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format
         chmod +x /tmp/git-clang-format
-    - name: Checking out latest version and all submodules
-      run: |
-        git config --global remote.origin.fetch '+refs/pull/*:refs/remotes/origin/pull/*'
-        git clone https://github.com/$GITHUB_REPOSITORY $GITHUB_WORKSPACE --no-checkout --no-tags
-        git checkout $GITHUB_SHA
+    - name: Checking out repository
+      uses: actions/checkout@v2
+      # We have to explicitly fetch master as well
+    - name: Fetching master
+      run: git fetch --no-tags --prune --depth=1 origin master
     - name: Running clang-format on changed source files
       # TODO(benvanik): actually filter to changed files.
       run: |
