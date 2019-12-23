@@ -31,6 +31,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSPIRVDialect
+    MLIRSPIRVLowering
     MLIRSPIRVSerialization
     MLIRSupport
     tensorflow::mlir_xla
