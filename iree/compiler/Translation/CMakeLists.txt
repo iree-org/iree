@@ -40,7 +40,7 @@ iree_cc_library(
     MLIRStandardDialectRegistration
     MLIRSupport
     MLIRTranslation
-    tensorflow_xla
+    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )
