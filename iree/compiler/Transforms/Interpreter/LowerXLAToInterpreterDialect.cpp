@@ -69,14 +69,14 @@ TERNARY_OP_LOWERING(SelectOp, IREEInterp::HL::SelectOp);
 
 template <typename T>
 static Operation *createShapeTargetingOp(ConversionPatternRewriter &rewriter,
-                                         Location loc, ValuePtr input,
+                                         Location loc, Value input,
                                          MemRefType targetType) {
   auto shapeOp = createArrayConstant(rewriter, loc, targetType.getShape());
   return rewriter.create<T>(loc, targetType, input, shapeOp);
 }
 
-static ValuePtr inputAsMemref(ConversionPatternRewriter &rewriter,
-                              Operation *op, ValuePtr tensor) {
+static Value inputAsMemref(ConversionPatternRewriter &rewriter, Operation *op,
+                           Value tensor) {
   return wrapAsMemRef(loadAccessValue(op->getLoc(), tensor, rewriter), op,
                       rewriter);
 }
@@ -86,9 +86,9 @@ class XlaOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp srcOp, ArrayRef<ValuePtr> operands,
+      SrcOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    SmallVector<ValuePtr, 4> memrefOperands;
+    SmallVector<Value, 4> memrefOperands;
     for (auto operand : operands) {
       memrefOperands.push_back(inputAsMemref(rewriter, srcOp, operand));
     }
@@ -103,7 +103,7 @@ class XlaOpLowering : public OpConversionPattern<SrcOp> {
 
  protected:
   virtual Operation *rewriteInternal(
-      SrcOp *op, ArrayRef<ValuePtr> operands,
+      SrcOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const {
     llvm_unreachable("unimplemented rewrite, did you mean rewriteTerminator?");
   }
@@ -114,7 +114,7 @@ struct BroadcastInDimOpLowering
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::BroadcastInDimOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::BroadcastInDimOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto inputValue = operands[0];
     auto inputType = inputValue->getType().cast<MemRefType>();
@@ -150,7 +150,7 @@ struct ConcatOpLowering : public XlaOpLowering<xla_hlo::ConcatenateOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::ConcatenateOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::ConcatenateOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto finalType = convertTypeToMemRef(*op);
 
@@ -164,7 +164,7 @@ struct DotOpLowering : public XlaOpLowering<xla_hlo::DotOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::DotOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::DotOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto lhsValue = operands[0];
     auto rhsValue = operands[1];
@@ -188,18 +188,18 @@ struct DynamicUpdateSliceOpLowering
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::DynamicUpdateSliceOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::DynamicUpdateSliceOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto operand = operands[0];
     auto update = operands[1];
 
     auto updateType = update->getType().cast<ShapedType>();
-    ValuePtr lengthConstant =
+    Value lengthConstant =
         createArrayConstant(rewriter, op->getLoc(), updateType.getShape());
 
     auto startIndices = makeArrayRef(operands).drop_front(2);
     const int rank = startIndices.size();
-    llvm::SmallVector<ValuePtr, 4> valuesToConcat;
+    llvm::SmallVector<Value, 4> valuesToConcat;
     valuesToConcat.reserve(startIndices.size());
     auto type = getElementTypeOrSelf(startIndices.front());
 
@@ -240,7 +240,7 @@ struct UnaryFloatIntOpLowering : public XlaOpLowering<XlaOpType> {
   using XlaOpLowering<XlaOpType>::XlaOpLowering;
 
   Operation *rewriteInternal(
-      XlaOpType *op, ArrayRef<ValuePtr> operands,
+      XlaOpType *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto val = operands[0];
     auto inputType = val->getType().cast<MemRefType>();
@@ -265,7 +265,7 @@ struct BinaryFloatIntOpLowering : public XlaOpLowering<XlaOpType> {
   using XlaOpLowering<XlaOpType>::XlaOpLowering;
 
   Operation *rewriteInternal(
-      XlaOpType *op, ArrayRef<ValuePtr> operands,
+      XlaOpType *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto lhs = operands[0];
     auto rhs = operands[1];
@@ -297,7 +297,7 @@ struct ConvertLowering : public XlaOpLowering<xla_hlo::ConvertOp> {
   using XlaOpLowering<xla_hlo::ConvertOp>::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::ConvertOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::ConvertOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto operand = operands[0];
     auto result = op->getResult();
@@ -331,7 +331,7 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
   // TODO(gcmn): This only handles a minimal number of cases. When XLA
   // redefines gather to be simpler, lower it properly.
   PatternMatchResult matchAndRewrite(
-      xla_hlo::GatherOp gatherOp, ArrayRef<ValuePtr> operands,
+      xla_hlo::GatherOp gatherOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto dimension_numbers = gatherOp.dimension_numbers();
     if (dimension_numbers.index_vector_dim().getValue().getSExtValue() != 0) {
@@ -419,8 +419,7 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
       auto memrefOutputType =
           MemRefType::get({inputType.getRank()}, elementType);
 
-      SmallVector<ValuePtr, 2> valuesToConcat = {startIndices,
-                                                 extraStartIndices};
+      SmallVector<Value, 2> valuesToConcat = {startIndices, extraStartIndices};
       startIndices = rewriter.create<IREEInterp::HL::ConcatOp>(
           gatherOp.getLoc(), memrefOutputType, valuesToConcat,
           rewriter.getI32IntegerAttr(0));
@@ -432,7 +431,7 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
     auto dstType = MemRefType::get(sliceSizes, inputType.getElementType());
 
     auto src = inputAsMemref(rewriter, gatherOp, gatherOp.operand());
-    std::vector<ValuePtr> dim_pieces;
+    std::vector<Value> dim_pieces;
     auto dst = rewriter.create<IREEInterp::HL::AllocHeapOp>(
         gatherOp.getLoc(), dstType, dim_pieces);
     auto lengths = rewriter.create<IREE::ConstantOp>(gatherOp.getLoc(),
@@ -458,7 +457,7 @@ struct SliceOpLowering : public XlaOpLowering<xla_hlo::SliceOp> {
   using XlaOpLowering<xla_hlo::SliceOp>::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::SliceOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::SliceOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // XLA slice has value semantics, whereas the IREE slice creates a view. We
     // lower it to a copy if all strides are one which may be transformed to a
@@ -471,7 +470,7 @@ struct SliceOpLowering : public XlaOpLowering<xla_hlo::SliceOp> {
 
     auto finalType = convertTypeToMemRef(*op);
     auto src = operands[0];
-    std::vector<ValuePtr> dim_pieces;
+    std::vector<Value> dim_pieces;
     auto dst = rewriter.create<IREEInterp::HL::AllocHeapOp>(
         op->getLoc(), finalType, dim_pieces);
     auto srcIndices =
@@ -493,7 +492,7 @@ struct PadOpLowering : public XlaOpLowering<xla_hlo::PadOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::PadOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::PadOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto src = operands[0];
     auto paddingValue = operands[1];
@@ -524,7 +523,7 @@ struct ReshapeOpLowering : public XlaOpLowering<xla_hlo::ReshapeOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::ReshapeOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::ReshapeOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     return createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
         rewriter, op->getLoc(), operands[0], convertTypeToMemRef(*op));
@@ -535,7 +534,7 @@ struct TransposeOpLowering : public XlaOpLowering<xla_hlo::TransposeOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::TransposeOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::TransposeOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto permutationOp =
         rewriter.create<IREE::ConstantOp>(op->getLoc(), op->permutation());
@@ -549,7 +548,7 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
   using XlaOpLowering::XlaOpLowering;
 
   Operation *rewriteInternal(
-      xla_hlo::ReverseOp *op, ArrayRef<ValuePtr> operands,
+      xla_hlo::ReverseOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto reverseOp =
         rewriter.create<IREE::ConstantOp>(op->getLoc(), op->dimensions());

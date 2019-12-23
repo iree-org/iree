@@ -55,12 +55,11 @@ struct ExtractElementOpLowering : public OpRewritePattern<ExtractElementOp> {
 
   PatternMatchResult matchAndRewrite(ExtractElementOp op,
                                      PatternRewriter &rewriter) const override {
-    ValuePtr memRefInput =
+    Value memRefInput =
         wrapAsMemRef(loadAccessValue(op.getLoc(), op.getAggregate(), rewriter),
                      op, rewriter);
 
-    SmallVector<ValuePtr, 4> indices = {op.indices().begin(),
-                                        op.indices().end()};
+    SmallVector<Value, 4> indices = {op.indices().begin(), op.indices().end()};
     rewriter.replaceOpWithNewOp<LoadOp>(op, memRefInput, indices);
     return matchSuccess();
   }

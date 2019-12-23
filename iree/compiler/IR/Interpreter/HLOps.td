@@ -89,7 +89,7 @@ def IREEInterpHL_CallIndirectOp : IREEInterpHL_Op<"call_indirect"> {
   let results = (outs Variadic<IREEHL_MemRef>);
 
   let builders = [OpBuilder<
-    "Builder *, OperationState &result, ValuePtr callee,"
+    "Builder *, OperationState &result, Value callee,"
     "ValueRange operands = {}", [{
       result.operands.push_back(callee);
       result.addOperands(operands);
@@ -98,7 +98,7 @@ def IREEInterpHL_CallIndirectOp : IREEInterpHL_Op<"call_indirect"> {
 
   let extraClassDeclaration = [{
     // TODO(b/132296600): make tablegen follow the style guide.
-    ValuePtr getCallee() { return getOperand(0); }
+    Value getCallee() { return getOperand(0); }
 
     // TODO(b/133879130): make tablegen support variadic operand accessors.
     /// Get the argument operands to the called function.
@@ -152,7 +152,7 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
   );
 
   let builders = [OpBuilder<
-    "Builder *, OperationState &result, ValuePtr condition,"
+    "Builder *, OperationState &result, Value condition,"
     "Block *trueDest, ValueRange trueOperands,"
     "Block *falseDest, ValueRange falseOperands", [{
       result.addOperands(condition);
@@ -165,7 +165,7 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
     enum { trueIndex = 0, falseIndex = 1 };
 
     // The condition operand is the first operand in the list.
-    ValuePtr getCondition() { return getOperand(0); }
+    Value getCondition() { return getOperand(0); }
 
     /// Return the destination if the condition is true.
     Block *getTrueDest() {
@@ -178,12 +178,12 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
     }
 
     // Accessors for operands to the 'true' destination.
-    ValuePtr getTrueOperand(unsigned idx) {
+    Value getTrueOperand(unsigned idx) {
       assert(idx < getNumTrueOperands());
       return getOperand(getTrueDestOperandIndex() + idx);
     }
 
-    void setTrueOperand(unsigned idx, ValuePtr value) {
+    void setTrueOperand(unsigned idx, Value value) {
       assert(idx < getNumTrueOperands());
       setOperand(getTrueDestOperandIndex() + idx, value);
     }
@@ -208,11 +208,11 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
     }
 
     // Accessors for operands to the 'false' destination.
-    ValuePtr getFalseOperand(unsigned idx) {
+    Value getFalseOperand(unsigned idx) {
       assert(idx < getNumFalseOperands());
       return getOperand(getFalseDestOperandIndex() + idx);
     }
-    void setFalseOperand(unsigned idx, ValuePtr value) {
+    void setFalseOperand(unsigned idx, Value value) {
       assert(idx < getNumFalseOperands());
       setOperand(getFalseDestOperandIndex() + idx, value);
     }

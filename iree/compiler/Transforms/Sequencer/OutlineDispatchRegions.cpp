@@ -38,8 +38,8 @@ namespace {
 
 // Inserts a load from a wrapped memref (as inserted via insertDispatcherStore).
 // Returns the value in the original type.
-ValuePtr insertDispatcheeLoad(Operation *op, Type originalType, ValuePtr value,
-                              OpBuilder &builder) {
+Value insertDispatcheeLoad(Operation *op, Type originalType, Value value,
+                           OpBuilder &builder) {
   // If old value was a memref we don't need to change anything.
   if (originalType.isa<MemRefType>()) {
     return value;
@@ -61,7 +61,7 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
   OpBuilder dispatcheeBuilder(&entryBlock, entryBlock.begin());
 
   // Wrap input operands and unwrap in the entry block.
-  SmallVector<ValuePtr, 8> newArgs;
+  SmallVector<Value, 8> newArgs;
   for (int i = 0; i < regionOp.getNumArgOperands(); ++i) {
     // Wrap the input outside of the region.
     auto blockArg = entryBlock.getArgument(i);
@@ -79,15 +79,15 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
 
   // Allocate output arguments and replace the return values with those.
   SmallVector<Type, 8> newResults;
-  SmallVector<std::pair<int, ValuePtr>, 8> resultIndicesToOutputArgs;
+  SmallVector<std::pair<int, Value>, 8> resultIndicesToOutputArgs;
   SmallVector<int, 8> deadResultIndices;
-  SmallVector<std::pair<ValuePtr, ValuePtr>, 8> replacedResults;
+  SmallVector<std::pair<Value, Value>, 8> replacedResults;
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
     auto result = regionOp.getResult(i);
     auto convertedType = convertTypeToMemRef(result->getType());
 
     // Allocate output buffer in the dispatcher to pass in to the region.
-    ValuePtr allocatedValue = allocateDispatchOutputBuffer(
+    Value allocatedValue = allocateDispatchOutputBuffer(
         regionOp.getLoc(), convertedType, dispatcherBuilder);
     if (!allocatedValue) {
       regionOp.emitError("unable to allocate result value");
@@ -115,7 +115,7 @@ LogicalResult marshalDispatchSite(IREE::DispatchRegionOp regionOp) {
     }
 
     // Filter out the results that are now dead.
-    SmallVector<ValuePtr, 8> newOperands(returnOp.getOperands());
+    SmallVector<Value, 8> newOperands(returnOp.getOperands());
     for (int i = deadResultIndices.size() - 1; i >= 0; --i) {
       newOperands.erase(newOperands.begin() + deadResultIndices[i]);
     }

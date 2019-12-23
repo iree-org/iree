@@ -1108,7 +1108,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, ValuePtr condition,
+      Builder *, OperationState &result, Value condition,
       Block *trueDest, ValueRange trueOperands,
       Block *falseDest, ValueRange falseOperands
     }], [{
@@ -1123,7 +1123,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     enum { trueIndex = 0, falseIndex = 1 };
 
     /// The condition operand is the first operand in the list.
-    ValuePtr getCondition() { return getOperand(0); }
+    Value getCondition() { return getOperand(0); }
 
     /// Return the destination if the condition is true.
     Block *getTrueDest() {
@@ -1136,12 +1136,12 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     }
 
     /// Accessors for operands to the 'true' destination.
-    ValuePtr getTrueOperand(unsigned idx) {
+    Value getTrueOperand(unsigned idx) {
       assert(idx < getNumTrueOperands());
       return getOperand(getTrueDestOperandIndex() + idx);
     }
 
-    void setTrueOperand(unsigned idx, ValuePtr value) {
+    void setTrueOperand(unsigned idx, Value value) {
       assert(idx < getNumTrueOperands());
       setOperand(getTrueDestOperandIndex() + idx, value);
     }
@@ -1166,11 +1166,11 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     }
 
     /// Accessors for operands to the 'false' destination.
-    ValuePtr getFalseOperand(unsigned idx) {
+    Value getFalseOperand(unsigned idx) {
       assert(idx < getNumFalseOperands());
       return getOperand(getFalseDestOperandIndex() + idx);
     }
-    void setFalseOperand(unsigned idx, ValuePtr value) {
+    void setFalseOperand(unsigned idx, Value value) {
       assert(idx < getNumFalseOperands());
       setOperand(getFalseDestOperandIndex() + idx, value);
     }
@@ -1516,7 +1516,7 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, ValuePtr condition, Block *dest,
+      Builder *, OperationState &result, Value condition, Block *dest,
       ValueRange operands = {}
     }], [{
       result.addOperands({condition});

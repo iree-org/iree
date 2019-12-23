@@ -45,7 +45,7 @@ struct CallOpLowering : public OpConversionPattern<CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CallOp op, ArrayRef<ValuePtr> operands,
+      CallOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto callOp = cast<CallOp>(op);
     auto calleeType = callOp.getCalleeType();
@@ -59,7 +59,7 @@ struct CallIndirectOpLowering : public OpConversionPattern<CallIndirectOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CallIndirectOp op, ArrayRef<ValuePtr> operands,
+      CallIndirectOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto callOp = cast<CallIndirectOp>(op);
     rewriter.replaceOpWithNewOp<IREEInterp::HL::CallIndirectOp>(
@@ -72,7 +72,7 @@ struct ReturnOpLowering : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      ReturnOp op, ArrayRef<ValuePtr> operands,
+      ReturnOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREEInterp::HL::ReturnOp>(op, operands);
     return matchSuccess();
@@ -83,8 +83,8 @@ struct BranchOpLowering : public OpConversionPattern<BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      BranchOp op, ArrayRef<ValuePtr> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
+      BranchOp op, ArrayRef<Value> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREEInterp::HL::BranchOp>(op, destinations[0],
                                                           operands[0]);
@@ -96,8 +96,8 @@ struct CondBranchOpLowering : public OpConversionPattern<CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CondBranchOp op, ArrayRef<ValuePtr> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<ValuePtr>> operands,
+      CondBranchOp op, ArrayRef<Value> properOperands,
+      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto condValue = loadAccessValue(op.getLoc(), properOperands[0], rewriter);
     rewriter.replaceOpWithNewOp<IREEInterp::HL::CondBranchOp>(
@@ -114,7 +114,7 @@ struct CompareOpLowering : public OpConversionPattern<SrcOp> {
   using OpConversionPattern<SrcOp>::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      SrcOp op, ArrayRef<ValuePtr> operands,
+      SrcOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto lhValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
     auto rhValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
@@ -151,7 +151,7 @@ struct AllocOpLowering : public OpConversionPattern<AllocOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      AllocOp op, ArrayRef<ValuePtr> operands,
+      AllocOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): replace with length computation.
     rewriter.replaceOpWithNewOp<IREEInterp::HL::AllocHeapOp>(op, op.getType(),
@@ -164,7 +164,7 @@ struct DeallocOpLowering : public OpConversionPattern<DeallocOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      DeallocOp op, ArrayRef<ValuePtr> operands,
+      DeallocOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREEInterp::HL::DiscardOp>(op, operands[0]);
     return matchSuccess();
@@ -179,7 +179,7 @@ struct LoadOpLowering : public OpRewritePattern<LoadOp> {
       loadOp.emitError() << "Cannot lower load of non-scalar";
       return matchFailure();
     }
-    ArrayRef<ValuePtr> dimPieces;
+    ArrayRef<Value> dimPieces;
     auto dst =
         rewriter
             .create<AllocOp>(loadOp.getLoc(), loadOp.getMemRefType(), dimPieces)

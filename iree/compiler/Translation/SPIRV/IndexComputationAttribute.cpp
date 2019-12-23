@@ -166,7 +166,7 @@ StringRef getSymbolNumberAttrName() { return "iree.symbol_number_info"; }
 
 /// Gets an attribute associated with a block argument.
 template <typename T>
-T getBlockArgumentAttr(BlockArgumentPtr blockArg, StringRef attrName) {
+T getBlockArgumentAttr(BlockArgument blockArg, StringRef attrName) {
   auto block = blockArg->getOwner();
   auto funcOp = dyn_cast<FuncOp>(block->getParentOp());
   if (!funcOp) {
@@ -180,7 +180,7 @@ T getBlockArgumentAttr(BlockArgumentPtr blockArg, StringRef attrName) {
 
 /// Updates an attribute associated with a block argument
 template <typename T>
-LogicalResult setBlockArgumentAttr(BlockArgumentPtr blockArg, T updatedAttr,
+LogicalResult setBlockArgumentAttr(BlockArgument blockArg, T updatedAttr,
                                    StringRef attrName) {
   auto block = blockArg->getOwner();
   auto funcOp = dyn_cast<FuncOp>(block->getParentOp());
@@ -209,7 +209,7 @@ LogicalResult setOpAttr(Operation *op, ArrayAttr updatedAttr,
 
 /// Records the `resultIndexMap` representing an access of an element of the
 /// `blockArg` to the index computation attribute.
-LogicalResult addBlockArgIndexMap(BlockArgumentPtr blockArg,
+LogicalResult addBlockArgIndexMap(BlockArgument blockArg,
                                   AffineMap resultIndexMap) {
   auto attrName = getIndexComputationAttrName();
   auto currAttr = getBlockArgumentAttr<ArrayAttr>(blockArg, attrName);
@@ -241,7 +241,7 @@ LogicalResult addOpResultIndexMap(Operation *op, AffineMap resultIndexMap) {
 //===----------------------------------------------------------------------===//
 
 /// Records an index map for a tensor value.
-LogicalResult addNewIndexMapForValue(ValuePtr value, AffineMap resultIndexMap) {
+LogicalResult addNewIndexMapForValue(Value value, AffineMap resultIndexMap) {
   // Check if the Value is a block argument or has a defining operation.
   auto valueKind = value->getKind();
   if (valueKind == Value::Kind::BlockArgument) {
@@ -250,7 +250,7 @@ LogicalResult addNewIndexMapForValue(ValuePtr value, AffineMap resultIndexMap) {
   return addOpResultIndexMap(value->getDefiningOp(), resultIndexMap);
 }
 
-Optional<int64_t> addNewSymbolNumberForTensorIndex(ValuePtr value,
+Optional<int64_t> addNewSymbolNumberForTensorIndex(Value value,
                                                    AffineMap index) {
   if (value->getKind() == Value::Kind::BlockArgument ||
       !isa<IREE::LoadInputOp>(value->getDefiningOp())) {
@@ -300,7 +300,7 @@ AffineMap getAffineMap(FuncOp funcOp, ArrayRef<AffineExpr> exprs) {
                         (numSymbolsAttr ? numSymbolsAttr.getInt() : 0), exprs);
 }
 
-void getIndexMapsForValue(ValuePtr value, SmallVectorImpl<AffineMap> &indices) {
+void getIndexMapsForValue(Value value, SmallVectorImpl<AffineMap> &indices) {
   auto valueKind = value->getKind();
   auto attrName = getIndexComputationAttrName();
   ArrayAttr allIndices =
@@ -342,7 +342,7 @@ void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
 }
 
 void getSymbolNumberForTensorIndex(
-    BlockArgumentPtr arg,
+    BlockArgument arg,
     SmallVectorImpl<std::pair<AffineMap, unsigned>> &symbolInfo) {
   auto attrName = getSymbolNumberAttrName();
   auto attr = getBlockArgumentAttr<ArrayAttr>(arg, attrName);

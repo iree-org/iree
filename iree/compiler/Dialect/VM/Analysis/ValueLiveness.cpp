@@ -41,7 +41,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
 
   // Build mapping of Operations to values live during them.
   // This is not needed normally so we calculate it only in this debugging case.
-  DenseMap<Operation *, llvm::SmallSetVector<ValuePtr, 8>> livePerOp;
+  DenseMap<Operation *, llvm::SmallSetVector<Value, 8>> livePerOp;
   for (auto &liveRange : liveness.liveRanges_) {
     auto value = liveRange.getFirst();
     auto &bitVector = liveRange.getSecond();
@@ -63,7 +63,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
   Builder builder(funcOp.getContext());
   DenseMap<Operation *, NamedAttributeList> livenessAttrs(livePerOp.size());
   auto addValuesAttr = [&](Operation &op, StringRef attrName,
-                           const llvm::SmallSetVector<ValuePtr, 8> &values) {
+                           const llvm::SmallSetVector<Value, 8> &values) {
     SmallVector<StringAttr, 8> valueNames;
     for (auto value : values) {
       std::string str;
@@ -238,7 +238,7 @@ LogicalResult ValueLiveness::computeLivenessSets(IREE::VM::FuncOp funcOp) {
 LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
   // Adds a live range for |value| from |start| to |end|.
   // Both |start| and |end| must be within the same Block.
-  auto addLiveRange = [this](ValuePtr value, Operation *start, Operation *end) {
+  auto addLiveRange = [this](Value value, Operation *start, Operation *end) {
     assert(start->getBlock() == end->getBlock());
     auto &bitVector = liveRanges_[value];
     bitVector.resize(opOrdering_.size());
@@ -293,7 +293,7 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
   return success();
 }
 
-bool ValueLiveness::isLastValueUse(ValuePtr value, Operation *useOp,
+bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
                                    int operandIndex) {
   auto &blockSets = blockLiveness_[useOp->getBlock()];
   if (blockSets.liveOut.count(value)) {

@@ -157,7 +157,7 @@ static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
 
 static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
   Block *dest;
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
   result.addSuccessor(dest, destOperands);
   return success();
@@ -184,7 +184,7 @@ void BranchOp::eraseOperand(unsigned index) {
 
 static ParseResult parseCondBranchOp(OpAsmParser &parser,
                                      OperationState &result) {
-  SmallVector<ValuePtr, 4> destOperands;
+  SmallVector<Value, 4> destOperands;
   Block *dest;
   OpAsmParser::OperandType condInfo;
 

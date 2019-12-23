@@ -35,7 +35,7 @@ class IREELoadOpSPIRVLowering final
 
   LogicalResult lowerOperation(
       Operation *op, OpBuilder &builder, AffineMap index,
-      ArrayRef<ValuePtr> operands,
+      ArrayRef<Value> operands,
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
