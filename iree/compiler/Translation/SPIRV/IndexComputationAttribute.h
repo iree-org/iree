@@ -33,8 +33,8 @@ class Operation;
 class Value;
 
 // TODO(riverriddle) Remove this after Value is value-typed.
-using BlockArgumentPtr = BlockArgument *;
-using ValuePtr = Value *;
+using BlockArgumentPtr = BlockArgument;
+using ValuePtr = Value;
 
 namespace iree_compiler {
 namespace index_computation_attribute {
