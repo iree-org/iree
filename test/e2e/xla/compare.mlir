@@ -1,4 +1,5 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | IreeFileCheck %s
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | IreeFileCheck %s --check-prefixes=CHECK,INTERP
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv --output_types=i --skip_tests=compare_f64,compare_i16 %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @compare_tensor
 func @compare_tensor() -> tensor<4xi1> {
@@ -33,14 +34,14 @@ func @compare_i8() -> tensor<i1> {
 
 // -----
 
-// CHECK-LABEL: EXEC @compare_i16
+// INTERP-LABEL: EXEC @compare_i16
 func @compare_i16() -> tensor<i1> {
   %lhs = constant dense<1> : tensor<i16>
   %rhs = constant dense<5> : tensor<i16>
   %result = "xla_hlo.compare"(%lhs, %rhs) {comparison_direction = "EQ"} : (tensor<i16>, tensor<i16>) -> tensor<i1>
   return %result : tensor<i1>
 }
-// CHECK: i8=0
+// INTERP: i8=0
 
 // -----
 
@@ -77,14 +78,14 @@ func @compare_f32() -> tensor<i1> {
 
 // -----
 
-// CHECK-LABEL: EXEC @compare_f64
+// INTERP-LABEL: EXEC @compare_f64
 func @compare_f64() -> tensor<i1> {
   %lhs = constant dense<1.0> : tensor<f64>
   %rhs = constant dense<5.0> : tensor<f64>
   %result = "xla_hlo.compare"(%lhs, %rhs) {comparison_direction = "EQ"} : (tensor<f64>, tensor<f64>) -> tensor<i1>
   return %result : tensor<i1>
 }
-// CHECK: i8=0
+// INTERP: i8=0
 // -----
 
 // CHECK-LABEL: EXEC @compare_tensor_odd_length
@@ -153,11 +154,11 @@ func @compare_gt() -> tensor<4xi1> {
 
 // -----
 
-// CHECK-LABEL: EXEC @compare_ge
+// INTERP-LABEL: EXEC @compare_ge
 func @compare_ge() -> tensor<4xi1> {
   %lhs = constant dense<[1, 2, 7, 4]> : tensor<4xi32>
   %rhs = constant dense<[5, 2, 3, 4]> : tensor<4xi32>
   %result = "xla_hlo.compare"(%lhs, %rhs) {comparison_direction = "GE"} : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi1>
   return %result : tensor<4xi1>
 }
-// CHECK: 4xi8=0 1 1 1
+// INTERP: 4xi8=0 1 1 1

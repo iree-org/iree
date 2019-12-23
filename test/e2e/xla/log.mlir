@@ -1,4 +1,5 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=f | IreeFileCheck %s
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=f | IreeFileCheck %s --check-prefixes=CHECK,INTERP
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv --output_types=f --skip_tests=double %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {
@@ -20,10 +21,10 @@ func @scalar() -> tensor<f32> {
 
 // -----
 
-// CHECK-LABEL: EXEC @double
+// INTERP-LABEL: EXEC @double
 func @double() -> tensor<f64> {
   %input = constant dense<4.0> : tensor<f64>
   %result = "xla_hlo.log"(%input) : (tensor<f64>) -> tensor<f64>
   return %result : tensor<f64>
 }
-// CHECK: f64=1.38629
+// INTERP: f64=1.38629

@@ -88,6 +88,9 @@ ABSL_FLAG(bool, print_bytecode, false,
 ABSL_FLAG(bool, run, true,
           "Option to run the file. Setting it to false just compiles it.");
 
+ABSL_FLAG(std::string, skip_tests, "",
+          "Comma-separated list of tests to skip if --run is true.");
+
 namespace iree {
 namespace {
 
@@ -236,6 +239,8 @@ Status EvaluateFunctions(absl::string_view target_backend,
 
   // Evaluate all exported functions.
   auto policy = make_ref<rt::Policy>();
+  const std::set<std::string> skip_tests =
+      absl::StrSplit(absl::GetFlag(FLAGS_skip_tests), absl::ByChar(','));
   auto run_function = [&](int ordinal) -> Status {
     // Setup a new context for this invocation.
     auto context = make_ref<rt::Context>(add_ref(instance), add_ref(policy));
@@ -245,6 +250,7 @@ Status EvaluateFunctions(absl::string_view target_backend,
     ASSIGN_OR_RETURN(auto function,
                      module->LookupFunctionByOrdinal(
                          rt::Function::Linkage::kExport, ordinal));
+    if (skip_tests.count(std::string(function.name()))) return OkStatus();
     RETURN_IF_ERROR(EvaluateFunction(context, device->allocator(), function));
     return OkStatus();
   };

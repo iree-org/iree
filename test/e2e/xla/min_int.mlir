@@ -1,4 +1,5 @@
-// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | IreeFileCheck %s
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s --output_types=i | IreeFileCheck %s --check-prefixes=CHECK,INTERP
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir --target_backends=vulkan-spirv --output_types=i --skip_tests=i16 %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xi32> {
@@ -44,14 +45,14 @@ func @negative() -> tensor<i32> {
 
 // -----
 
-// CHECK-LABEL: EXEC @i16
+// INTERP-LABEL: EXEC @i16
 func @i16() -> tensor<i16> {
   %lhs = constant dense<1> : tensor<i16>
   %rhs = constant dense<2> : tensor<i16>
   %result = "xla_hlo.min"(%lhs, %rhs) : (tensor<i16>, tensor<i16>) -> tensor<i16>
   return %result : tensor<i16>
 }
-// CHECK: i16=1
+// INTERP: i16=1
 
 // -----
 
