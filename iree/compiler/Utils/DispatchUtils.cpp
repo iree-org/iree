@@ -61,7 +61,7 @@ void calculateWorkload(ArrayRef<int64_t> shape,
   }
 }
 
-ValuePtr calculateWorkload(Operation *op, ValuePtr baseOperand) {
+Value calculateWorkload(Operation *op, Value baseOperand) {
   OpBuilder builder(op);
 
   std::array<int32_t, 3> workload = {1, 1, 1};
@@ -123,8 +123,8 @@ namespace {
 // set of values defined by |ops| that are used outside of the set.
 LogicalResult analyzeOpRangeValues(
     const llvm::SmallDenseSet<Operation *> &opSet,
-    llvm::SetVector<ValuePtr> *capturedValues,
-    llvm::SetVector<ValuePtr> *escapingValues) {
+    llvm::SetVector<Value> *capturedValues,
+    llvm::SetVector<Value> *escapingValues) {
   for (auto *op : opSet) {
     for (auto value : op->getOperands()) {
       if (!llvm::is_contained(opSet, value->getDefiningOp())) {
@@ -147,8 +147,7 @@ LogicalResult analyzeOpRangeValues(
 }  // namespace
 
 LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  ValuePtr workload,
-                                  ArrayRef<Operation *> ops) {
+                                  Value workload, ArrayRef<Operation *> ops) {
   // Fused location with all ops.
   SmallVector<Location, 16> opLocs;
   for (auto *op : ops) {
@@ -161,8 +160,8 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
   llvm::SmallDenseSet<Operation *> opSet;
   opSet.reserve(ops.size());
   opSet.insert(ops.begin(), ops.end());
-  llvm::SetVector<ValuePtr> capturedValues;
-  llvm::SetVector<ValuePtr> escapingValues;
+  llvm::SetVector<Value> capturedValues;
+  llvm::SetVector<Value> escapingValues;
   if (failed(analyzeOpRangeValues(opSet, &capturedValues, &escapingValues))) {
     return failure();
   }
@@ -194,7 +193,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
 
   // Return results (as we need a terminator in our block).
   // These are all of the values that escape our region.
-  SmallVector<ValuePtr, 8> resultValues;
+  SmallVector<Value, 8> resultValues;
   for (auto oldValue : escapingValues) {
     resultValues.push_back(mapping.lookupOrDefault(oldValue));
   }
@@ -217,12 +216,12 @@ namespace {
 
 // Replaces |returnOp| with a clone including |newOperands| appended.
 LogicalResult appendReturnOperands(IREE::ReturnOp returnOp,
-                                   ArrayRef<ValuePtr> newOperands) {
+                                   ArrayRef<Value> newOperands) {
   // Insert prior to the original return.
   OpBuilder builder(returnOp);
 
   // Clone with new args.
-  SmallVector<ValuePtr, 8> operands;
+  SmallVector<Value, 8> operands;
   operands.reserve(returnOp.getNumOperands() + newOperands.size());
   operands.append(returnOp.operand_begin(), returnOp.operand_end());
   operands.append(newOperands.begin(), newOperands.end());
@@ -236,8 +235,8 @@ LogicalResult appendReturnOperands(IREE::ReturnOp returnOp,
 
 // Replaces |regionOp| with a clone including |newArgs| and |newResults|.
 IREE::DispatchRegionOp appendRegionArgsAndResults(
-    IREE::DispatchRegionOp &regionOp, ArrayRef<ValuePtr> newArgs,
-    ArrayRef<ValuePtr> newResults, Location otherLoc) {
+    IREE::DispatchRegionOp &regionOp, ArrayRef<Value> newArgs,
+    ArrayRef<Value> newResults, Location otherLoc) {
   // Insert prior to the original region.
   OpBuilder builder(regionOp);
 
@@ -246,7 +245,7 @@ IREE::DispatchRegionOp appendRegionArgsAndResults(
   auto fusedLoc = FusedLoc::get(fusedLocs, regionOp.getContext());
 
   // Clone with new results.
-  SmallVector<ValuePtr, 8> operands;
+  SmallVector<Value, 8> operands;
   operands.append(regionOp.getArgOperands().begin(),
                   regionOp.getArgOperands().end());
   operands.append(newArgs.begin(), newArgs.end());
@@ -285,8 +284,8 @@ IREE::DispatchRegionOp removeUnusedResults(IREE::DispatchRegionOp regionOp) {
 
   // Calculate new return values.
   SmallVector<Type, 8> newReturnTypes;
-  SmallVector<ValuePtr, 8> newReturnValues;
-  SmallVector<ValuePtr, 8> newRegionResults;
+  SmallVector<Value, 8> newReturnValues;
+  SmallVector<Value, 8> newRegionResults;
   for (int i = 0; i < returnOp.getNumOperands(); ++i) {
     auto resultValue = regionOp.getResult(i);
     if (!resultValue->use_empty()) {
@@ -330,7 +329,7 @@ bool areDispatchRegionWorkloadsCompatible(IREE::DispatchRegionOp &lhs,
 }
 
 // Returns true if |value| depends in any way on |op| through any path.
-bool doesValueDependOnOperation(ValuePtr value, Operation *op) {
+bool doesValueDependOnOperation(Value value, Operation *op) {
   if (!value->getDefiningOp()) {
     return false;
   } else if (value->getDefiningOp() == op) {
@@ -389,7 +388,7 @@ IREE::DispatchRegionOp mergeDispatchRegions(IREE::DispatchRegionOp &lhs,
   // Find the values used as return values in the lhs.
   // We'll need to replace the uses in rhs with these.
   auto lhsReturnOp = cast<IREE::ReturnOp>(lhsBlock.getTerminator());
-  SmallVector<ValuePtr, 8> lhsReturnValues;
+  SmallVector<Value, 8> lhsReturnValues;
   lhsReturnValues.reserve(lhsReturnOp.getNumOperands());
   lhsReturnValues.append(lhsReturnOp.operand_begin(),
                          lhsReturnOp.operand_end());
@@ -397,14 +396,14 @@ IREE::DispatchRegionOp mergeDispatchRegions(IREE::DispatchRegionOp &lhs,
   // Find the values used as return values in the rhs.
   // We'll add these to the results of the lhs region.
   auto rhsReturnOp = cast<IREE::ReturnOp>(rhsBlock.getTerminator());
-  SmallVector<ValuePtr, 8> rhsReturnValues;
+  SmallVector<Value, 8> rhsReturnValues;
   rhsReturnValues.reserve(rhsReturnOp.getNumOperands());
   rhsReturnValues.append(rhsReturnOp.operand_begin(),
                          rhsReturnOp.operand_end());
 
   // Compute new args.
   BlockAndValueMapping mapping;
-  SmallVector<ValuePtr, 8> newArgs;
+  SmallVector<Value, 8> newArgs;
   for (int rhsOpIdx = 0; rhsOpIdx < rhs.getNumArgOperands(); ++rhsOpIdx) {
     bool didElide = false;
     // Find if the rhs arg already exists on the lhs and dedupe.
@@ -453,7 +452,7 @@ IREE::DispatchRegionOp mergeDispatchRegions(IREE::DispatchRegionOp &lhs,
   }
 
   // Compute new results and add to both region and return op.
-  SmallVector<ValuePtr, 8> newResults;
+  SmallVector<Value, 8> newResults;
   for (auto rhsResult : rhsReturnValues) {
     newResults.push_back(mapping.lookupOrDefault(rhsResult));
   }
@@ -544,8 +543,8 @@ Operation *recursivelyCloneOp(Operation *sourceOp, OpBuilder &builder,
 // |mapping| is used to lookup existing values that may be present in the block
 // such as block arguments or already cloned ancestor ops. |mapping| will be
 // updated as the tree is cloned.
-ValuePtr cloneOpTreeIntoBlock(ValuePtr sourceValue, Block *targetBlock,
-                              BlockAndValueMapping *mapping) {
+Value cloneOpTreeIntoBlock(Value sourceValue, Block *targetBlock,
+                           BlockAndValueMapping *mapping) {
   // If the op has already been cloned we can just reuse that.
   // This happens if multiple arguments reference the same trees.
   if (auto existingValue = mapping->lookupOrNull(sourceValue)) {
@@ -568,7 +567,7 @@ ValuePtr cloneOpTreeIntoBlock(ValuePtr sourceValue, Block *targetBlock,
 }  // namespace
 
 LogicalResult inlineDispatchRegionOperandsUsingValue(
-    IREE::DispatchRegionOp dispatchRegionOp, ValuePtr value) {
+    IREE::DispatchRegionOp dispatchRegionOp, Value value) {
   // Find all args that are using this value.
   SmallVector<unsigned, 4> argIndices;
   for (auto arg : llvm::enumerate(dispatchRegionOp.getArgOperands())) {
@@ -685,8 +684,7 @@ std::pair<IREE::MultiArchExecutableOp, FuncOp> createRegionExecutable(
   return std::make_pair(multiArchExecutable, outlinedFunc);
 }
 
-ValuePtr insertDispatcherStore(Operation *op, ValuePtr value,
-                               OpBuilder &builder) {
+Value insertDispatcherStore(Operation *op, Value value, OpBuilder &builder) {
   if (!value) {
     return nullptr;
   }
@@ -706,14 +704,13 @@ ValuePtr insertDispatcherStore(Operation *op, ValuePtr value,
       op->getLoc(), convertTypeToMemRef(value->getType()));
 
   // Insert the store we'll use to box the value.
-  builder.create<StoreOp>(op->getLoc(), value, newStorage,
-                          ArrayRef<ValuePtr>{});
+  builder.create<StoreOp>(op->getLoc(), value, newStorage, ArrayRef<Value>{});
 
   return newStorage;
 }
 
-ValuePtr insertDispatcherLoad(Operation *op, ValuePtr originalValue,
-                              ValuePtr allocatedValue, OpBuilder &builder) {
+Value insertDispatcherLoad(Operation *op, Value originalValue,
+                           Value allocatedValue, OpBuilder &builder) {
   // If old value was a memref we don't need to change anything.
   if (originalValue->getType().isa<MemRefType>()) {
     return allocatedValue;
@@ -725,23 +722,23 @@ ValuePtr insertDispatcherLoad(Operation *op, ValuePtr originalValue,
   }
 
   // Insert the load we'll use to unbox the value.
-  auto loadOp = builder.create<LoadOp>(op->getLoc(), allocatedValue,
-                                       ArrayRef<ValuePtr>{});
+  auto loadOp =
+      builder.create<LoadOp>(op->getLoc(), allocatedValue, ArrayRef<Value>{});
   originalValue->replaceAllUsesWith(loadOp);
   return loadOp;
 }
 
 // TODO(benvanik): enough information to walk into dispatch region and compute
 // shape when not static.
-ValuePtr allocateDispatchOutputBuffer(Location loc, MemRefType type,
-                                      OpBuilder &builder) {
+Value allocateDispatchOutputBuffer(Location loc, MemRefType type,
+                                   OpBuilder &builder) {
   // TODO(benvanik): allocation algorithm:
   // - synthesize shape logic (magic) [[ for now assume fixed shapes ]]
   // - insert shape logic above region
   //   - rely on folding to merge multiple calculations together
   //   - unranked = death, need to be able to alloc shape outputs
   // - insert alloc
-  SmallVector<ValuePtr, 4> dimPieces;
+  SmallVector<Value, 4> dimPieces;
   return builder.create<AllocOp>(loc, type, dimPieces);
 }
 

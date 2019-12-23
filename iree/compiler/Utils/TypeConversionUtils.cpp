@@ -62,7 +62,7 @@ MemRefType convertTypeToMemRef(Type type) {
   }
 }
 
-MemRefType convertTypeToMemRef(ValuePtr value) {
+MemRefType convertTypeToMemRef(Value value) {
   return convertTypeToMemRef(value->getType());
 }
 

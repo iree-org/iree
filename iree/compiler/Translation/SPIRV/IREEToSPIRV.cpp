@@ -26,8 +26,7 @@ namespace iree_compiler {
 /// the value of the operand.
 LogicalResult IREELoadOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder, AffineMap index,
-    ArrayRef<ValuePtr> operands,
-    TensorIndexToScalarValueMap &valueCache) const {
+    ArrayRef<Value> operands, TensorIndexToScalarValueMap &valueCache) const {
   auto loadOp = cast<IREE::LoadInputOp>(op);
   auto result = loadOp.getResult();
   valueCache.setValueAtIndex(result, index, operands[0]);
@@ -76,13 +75,13 @@ LogicalResult IREEStoreReduceOpSPIRVLowering::lowerOperation(
   auto storeReduceOp = cast<IREE::StoreReduceOp>(op);
   auto loc = storeReduceOp.getLoc();
   SmallVector<AffineMap, 1> srcIndices, dstIndices;
-  ValuePtr src = storeReduceOp.src();
+  Value src = storeReduceOp.src();
   index_computation_attribute::getIndexMapsForValue(src, srcIndices);
   if (srcIndices.size() != 1) {
     return storeReduceOp.emitError(
         "expected to compute a single element of the tensor that is reduced");
   }
-  ValuePtr dst = storeReduceOp.dst();
+  Value dst = storeReduceOp.dst();
   index_computation_attribute::getIndexMapsForValue(dst, dstIndices);
   if (dstIndices.size() != 1) {
     return storeReduceOp.emitError(
@@ -94,7 +93,7 @@ LogicalResult IREEStoreReduceOpSPIRVLowering::lowerOperation(
       genPointerOffset(builder, loc, valueCache, dstIndices[0], dstBuffer);
   builder.create<spirv::FunctionCallOp>(loc, ArrayRef<Type>(),
                                         storeReduceOp.reduction_fnAttr(),
-                                        ArrayRef<ValuePtr>{srcValue, ptr});
+                                        ArrayRef<Value>{srcValue, ptr});
   return success();
 }
 

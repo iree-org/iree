@@ -29,9 +29,9 @@ int32_t getRoundedElementByteWidth(Type type) {
   return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
 }
 
-SmallVector<ValuePtr, 4> getStaticShapeDims(
-    Location loc, ShapedType shapedType, ConversionPatternRewriter &rewriter) {
-  SmallVector<ValuePtr, 4> shape;
+SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
+                                         ConversionPatternRewriter &rewriter) {
+  SmallVector<Value, 4> shape;
   if (shapedType.getRank() >= 1) {
     for (auto dim : shapedType.getShape()) {
       shape.push_back(rewriter.createOrFold<mlir::ConstantOp>(
@@ -41,8 +41,8 @@ SmallVector<ValuePtr, 4> getStaticShapeDims(
   return shape;
 }
 
-SmallVector<ValuePtr, 4> getShapeDims(ValuePtr shapedValue,
-                                      ConversionPatternRewriter &rewriter) {
+SmallVector<Value, 4> getShapeDims(Value shapedValue,
+                                   ConversionPatternRewriter &rewriter) {
   // TODO(benvanik): dynamic shape support.
   return getStaticShapeDims(shapedValue->getLoc(),
                             shapedValue->getType().cast<ShapedType>(),

@@ -30,7 +30,7 @@ namespace iree_compiler {
 // TODO(ravishankarm) : Same logic can be used for ReturnOp. Move it there when
 // IREE::StoreOutputOp and IREE::StoreReduceOp are deprecated.
 static LogicalResult initIndexPropagation(Location loc, FuncOp funcOp,
-                                          ValuePtr value) {
+                                          Value value) {
   SmallVector<int64_t, 4> valueShape;
   int64_t valueNumElements = 0;
   Type valueType = value->getType();

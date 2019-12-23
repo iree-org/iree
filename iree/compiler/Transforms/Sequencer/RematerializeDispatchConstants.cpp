@@ -73,7 +73,7 @@ bool canDispatchRegionContainConstants(
 // Afterward the constant is only removed if there are no other uses within the
 // non-dispatch block (such as by sequencer ops).
 LogicalResult rematerializeConstantInDispatchRegions(ConstantOp constantOp) {
-  ValuePtr constantValue = constantOp.getResult();
+  Value constantValue = constantOp.getResult();
   SmallVector<IREE::DispatchRegionOp, 4> usingRegionOps;
   for (auto *user : constantValue->getUsers()) {
     if (auto dispatchRegionOp = dyn_cast<IREE::DispatchRegionOp>(user)) {

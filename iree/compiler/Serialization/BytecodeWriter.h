@@ -55,9 +55,9 @@ class BytecodeWriter {
   LogicalResult WriteConstant(MemRefType memRefType, Attribute baseAttr);
   LogicalResult WriteAttributeData(Attribute baseAttr);
 
-  llvm::Optional<int> LookupLocalOrdinal(ValuePtr value);
-  LogicalResult PrepareLocal(ValuePtr value);
-  LogicalResult WriteLocal(ValuePtr value);
+  llvm::Optional<int> LookupLocalOrdinal(Value value);
+  LogicalResult PrepareLocal(Value value);
+  LogicalResult WriteLocal(Value value);
   LogicalResult WriteLocals(Operation::operand_range values);
   LogicalResult WriteLocals(Operation::result_range values);
 
@@ -82,7 +82,7 @@ class BytecodeWriter {
  private:
   std::vector<uint8_t> bytecode_;
 
-  llvm::DenseMap<ValuePtr, int> localMap_;
+  llvm::DenseMap<Value, int> localMap_;
 
   llvm::DenseMap<Block *, size_t> blockOffsets_;
   std::vector<std::pair<Block *, size_t>> blockOffsetFixups_;

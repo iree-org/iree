@@ -72,10 +72,10 @@ LogicalResult convertReductionOp(FuncOp entryPoint, FuncOp applyFunc,
 
   // Map to the args from the entry point.
   auto &entryPointEntryBlock = entryPoint.getBlocks().front();
-  ValuePtr srcArg = entryPointEntryBlock.getArgument(setIndex);
-  ValuePtr initArg = entryPointEntryBlock.getArgument(
+  Value srcArg = entryPointEntryBlock.getArgument(setIndex);
+  Value initArg = entryPointEntryBlock.getArgument(
       applyFunc.getNumArguments() / 2 + setIndex);
-  ValuePtr dstArg =
+  Value dstArg =
       entryPointEntryBlock.getArgument(applyFunc.getNumArguments() + setIndex);
   auto dstType = dstArg->getType().cast<ShapedType>();
   Type elementType = dstType.getElementType();

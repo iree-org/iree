@@ -184,7 +184,7 @@ std::vector<uint32_t> SPIRVTranslator::translateAndSerializeShaderModule(
         }
       }
     }
-    std::array<BlockArgumentPtr, 3> dynamicWorkloadDimRefs;
+    std::array<BlockArgument, 3> dynamicWorkloadDimRefs;
     if (workloadRefAttr) {
       for (unsigned i = 0; i < 3; ++i) {
         if (staticWorkloadDims[i] == -1) {

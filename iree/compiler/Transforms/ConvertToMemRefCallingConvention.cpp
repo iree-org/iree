@@ -63,8 +63,8 @@ FunctionType getMemRefFunctionType(FunctionType type) {
   return builder.getFunctionType(replacementInputs, replacementResults);
 }
 
-bool insertLoad(BlockArgumentPtr oldArg, BlockArgumentPtr newArg,
-                OpBuilder &builder, BlockAndValueMapping *mapping) {
+bool insertLoad(BlockArgument oldArg, BlockArgument newArg, OpBuilder &builder,
+                BlockAndValueMapping *mapping) {
   auto loc = oldArg->getOwner()->getParent()->getLoc();
 
   // If old arg was a memref we don't need to change anything. We still need
@@ -79,13 +79,13 @@ bool insertLoad(BlockArgumentPtr oldArg, BlockArgumentPtr newArg,
   }
 
   // Insert the load we'll use to unbox the value.
-  auto loadedValue = builder.create<LoadOp>(loc, newArg, ArrayRef<ValuePtr>{});
+  auto loadedValue = builder.create<LoadOp>(loc, newArg, ArrayRef<Value>{});
   mapping->map(oldArg, loadedValue);
 
   return false;
 }
 
-bool insertLoad(Operation *oldOp, ValuePtr oldValue, ValuePtr newValue,
+bool insertLoad(Operation *oldOp, Value oldValue, Value newValue,
                 OpBuilder &builder, BlockAndValueMapping *mapping) {
   // If old value was a memref we don't need to change anything.
   if (oldValue->getType().isa<MemRefType>()) {
@@ -102,14 +102,14 @@ bool insertLoad(Operation *oldOp, ValuePtr oldValue, ValuePtr newValue,
 
   // Insert the load we'll use to unbox the value.
   auto loadedValue =
-      builder.create<LoadOp>(oldOp->getLoc(), newValue, ArrayRef<ValuePtr>{});
+      builder.create<LoadOp>(oldOp->getLoc(), newValue, ArrayRef<Value>{});
   mapping->map(oldValue, loadedValue);
 
   return false;
 }
 
-ValuePtr insertStore(Operation *oldOp, ValuePtr oldValue, OpBuilder &builder,
-                     BlockAndValueMapping *mapping) {
+Value insertStore(Operation *oldOp, Value oldValue, OpBuilder &builder,
+                  BlockAndValueMapping *mapping) {
   auto newValue = mapping->lookupOrNull(oldValue);
   if (!newValue) {
     return nullptr;
@@ -137,14 +137,14 @@ ValuePtr insertStore(Operation *oldOp, ValuePtr oldValue, OpBuilder &builder,
 
   // Insert the store we'll use to box the value.
   builder.create<StoreOp>(oldOp->getLoc(), newValue, newStorage,
-                          ArrayRef<ValuePtr>{});
+                          ArrayRef<Value>{});
 
   return newStorage;
 }
 
 bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
                    BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 4> newArgs;
+  llvm::SmallVector<Value, 4> newArgs;
   for (auto oldArg : oldOp->getOperands()) {
     auto newArg = insertStore(oldOp->getOperation(), oldArg, builder, mapping);
     if (!newArg) {
@@ -179,7 +179,7 @@ bool convertCallIndirectOp(CallIndirectOp *oldOp, OpBuilder &builder,
   oldOp->emitError("CallIndirectOp not yet supported");
   return true;
 #if 0
-  llvm::SmallVector<ValuePtr, 4> newArgs;
+  llvm::SmallVector<Value, 4> newArgs;
   for (auto *oldArg : oldOp->getArgOperands()) {
     auto *newArg = insertStore(oldOp->getOperation(), oldArg, builder, mapping);
     if (!newArg) {
@@ -222,7 +222,7 @@ bool convertReturnOp(Operation *oldOp, OpBuilder &builder,
 
 bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 4> newArgs;
+  llvm::SmallVector<Value, 4> newArgs;
   for (auto oldArg : oldOp->getOperands()) {
     auto newArg = insertStore(oldOp->getOperation(), oldArg, builder, mapping);
     if (!newArg) {
@@ -245,7 +245,7 @@ bool convertBranchOp(BranchOp *oldOp, OpBuilder &builder,
 
 bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder &builder,
                          BlockAndValueMapping *mapping) {
-  llvm::SmallVector<ValuePtr, 4> trueArgs;
+  llvm::SmallVector<Value, 4> trueArgs;
   for (auto oldArg : oldOp->getTrueOperands()) {
     auto newArg = insertStore(oldOp->getOperation(), oldArg, builder, mapping);
     if (!newArg) {
@@ -253,7 +253,7 @@ bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder &builder,
     }
     trueArgs.push_back(newArg);
   }
-  llvm::SmallVector<ValuePtr, 4> falseArgs;
+  llvm::SmallVector<Value, 4> falseArgs;
   for (auto oldArg : oldOp->getFalseOperands()) {
     auto newArg = insertStore(oldOp->getOperation(), oldArg, builder, mapping);
     if (!newArg) {

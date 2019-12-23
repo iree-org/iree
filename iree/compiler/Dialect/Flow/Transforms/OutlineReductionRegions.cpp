@@ -29,8 +29,7 @@ namespace Flow {
 namespace {
 
 // Determines the shapes involved with reducing this dimension.
-SmallVector<int64_t, 4> calculateResultShape(ValuePtr input,
-                                             int windowDimension) {
+SmallVector<int64_t, 4> calculateResultShape(Value input, int windowDimension) {
   SmallVector<int64_t, 4> resultShape;
   for (auto it :
        llvm::enumerate(input->getType().cast<ShapedType>().getShape())) {
@@ -44,10 +43,10 @@ SmallVector<int64_t, 4> calculateResultShape(ValuePtr input,
 // Converts a reduction_region into a dispatch to the outlined region function
 // for a single reduction dimension.
 // Returns the results of the reduction or empty if the construction fails.
-SmallVector<ValuePtr, 4> convertToDispatchOp(
+SmallVector<Value, 4> convertToDispatchOp(
     Operation *regionOp, ExecutableOp executableOp, StringRef entryPointName,
-    int reductionDimension, SmallVector<ValuePtr, 4> initialValues,
-    SmallVector<ValuePtr, 4> inputs, OpBuilder &dispatcherBuilder) {
+    int reductionDimension, SmallVector<Value, 4> initialValues,
+    SmallVector<Value, 4> inputs, OpBuilder &dispatcherBuilder) {
   SmallVector<Type, 4> resultTypes;
   for (auto resultType : llvm::enumerate(regionOp->getResultTypes())) {
     // Allocate output buffer in the dispatcher to pass in to the region.
@@ -63,7 +62,7 @@ SmallVector<ValuePtr, 4> convertToDispatchOp(
       calculateWorkload(regionOp, resultTypes.front().cast<ShapedType>());
 
   // Create the reduce op to the executable function.
-  std::vector<ValuePtr> allOperands;
+  std::vector<Value> allOperands;
   allOperands.insert(allOperands.end(), inputs.begin(), inputs.end());
   allOperands.insert(allOperands.end(), initialValues.begin(),
                      initialValues.end());
@@ -80,7 +79,7 @@ SmallVector<ValuePtr, 4> convertToDispatchOp(
 std::pair<ExecutableOp, ReductionEntryOp> createReductionExecutable(
     ReductionRegionOp regionOp, int outlinedRegionOrdinal,
     int separatedReductionIndex, int reductionDimension,
-    SmallVector<ValuePtr, 4> initialValues, SmallVector<ValuePtr, 4> inputs,
+    SmallVector<Value, 4> initialValues, SmallVector<Value, 4> inputs,
     llvm::StringMap<FuncOp> &dispatchableFuncOps) {
   // Build function type matching 1:1 with the region signature.
   SmallVector<Type, 8> elementalOperandTypes;
@@ -107,10 +106,10 @@ std::pair<ExecutableOp, ReductionEntryOp> createReductionExecutable(
   // dimension.
   SmallVector<Type, 8> allOperandTypes;
   auto inputTypes =
-      llvm::map_range(inputs, [](ValuePtr value) { return value->getType(); });
+      llvm::map_range(inputs, [](Value value) { return value->getType(); });
   allOperandTypes.append(inputTypes.begin(), inputTypes.end());
   auto initialValueTypes = llvm::map_range(
-      initialValues, [](ValuePtr value) { return value->getType(); });
+      initialValues, [](Value value) { return value->getType(); });
   allOperandTypes.append(initialValueTypes.begin(), initialValueTypes.end());
   SmallVector<Type, 4> resultTypes;
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
@@ -150,7 +149,7 @@ LogicalResult outlineReductionRegion(
   // Insert at the same place as the original region.
   OpBuilder dispatcherBuilder(regionOp);
 
-  SmallVector<ValuePtr, 4> temps{regionOp.operands()};
+  SmallVector<Value, 4> temps{regionOp.operands()};
 
   // Create one dispatch per dimension being reduced.
   // We'll do this by chaining the original input through with the temporary
@@ -200,7 +199,7 @@ createWindowedReductionExecutable(
     WindowedReductionRegionOp regionOp, int outlinedRegionOrdinal,
     int separatedReductionIndex, int32_t windowDimension, int32_t windowStride,
     int32_t baseDilation, int32_t windowDilation,
-    SmallVector<ValuePtr, 4> initialValues, SmallVector<ValuePtr, 4> inputs,
+    SmallVector<Value, 4> initialValues, SmallVector<Value, 4> inputs,
     llvm::StringMap<FuncOp> &dispatchableFuncOps) {
   // Build function type matching 1:1 with the region signature.
   SmallVector<Type, 8> elementalOperandTypes;
@@ -227,10 +226,10 @@ createWindowedReductionExecutable(
   // dimension.
   SmallVector<Type, 8> allOperandTypes;
   auto inputTypes =
-      llvm::map_range(inputs, [](ValuePtr value) { return value->getType(); });
+      llvm::map_range(inputs, [](Value value) { return value->getType(); });
   allOperandTypes.append(inputTypes.begin(), inputTypes.end());
   auto initialValueTypes = llvm::map_range(
-      initialValues, [](ValuePtr value) { return value->getType(); });
+      initialValues, [](Value value) { return value->getType(); });
   allOperandTypes.append(initialValueTypes.begin(), initialValueTypes.end());
   SmallVector<Type, 4> resultTypes;
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
@@ -275,8 +274,8 @@ LogicalResult outlineWindowedReductionRegion(
   // Insert at the same place as the original region.
   OpBuilder dispatcherBuilder(regionOp);
 
-  SmallVector<ValuePtr, 4> initialValues{regionOp.initial_values()};
-  SmallVector<ValuePtr, 4> temps{regionOp.operands()};
+  SmallVector<Value, 4> initialValues{regionOp.initial_values()};
+  SmallVector<Value, 4> temps{regionOp.operands()};
 
   // Create one dispatch per dimension being reduced.
   // We'll do this by chaining the original input through with the temporary

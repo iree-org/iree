@@ -139,7 +139,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 
   void handleTerminator(Operation *op,
-                        ArrayRef<ValuePtr> valuesToReplace) const final {
+                        ArrayRef<Value> valuesToReplace) const final {
     // TODO(benvanik): handle other terminators (break/etc).
     auto returnOp = dyn_cast<VM::ReturnOp>(op);
     if (!returnOp) {
@@ -153,7 +153,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
     }
   }
 
-  Operation *materializeCallConversion(OpBuilder &builder, ValuePtr input,
+  Operation *materializeCallConversion(OpBuilder &builder, Value input,
                                        Type resultType,
                                        Location conversionLoc) const override {
     return nullptr;

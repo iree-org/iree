@@ -40,12 +40,12 @@ namespace {
 
 // Replaces |returnOp| with a clone including |newOperands| appended.
 LogicalResult appendReturnOperands(ReturnOp returnOp,
-                                   ArrayRef<ValuePtr> newOperands) {
+                                   ArrayRef<Value> newOperands) {
   // Insert prior to the original return.
   OpBuilder builder(returnOp);
 
   // Clone with new args.
-  SmallVector<ValuePtr, 8> operands;
+  SmallVector<Value, 8> operands;
   operands.reserve(returnOp.getNumOperands() + newOperands.size());
   operands.append(returnOp.operand_begin(), returnOp.operand_end());
   operands.append(newOperands.begin(), newOperands.end());
@@ -59,8 +59,8 @@ LogicalResult appendReturnOperands(ReturnOp returnOp,
 
 // Replaces |regionOp| with a clone including |newArgs| and |newResults|.
 DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
-                                            ArrayRef<ValuePtr> newArgs,
-                                            ArrayRef<ValuePtr> newResults,
+                                            ArrayRef<Value> newArgs,
+                                            ArrayRef<Value> newResults,
                                             Location otherLoc) {
   // Insert prior to the original region.
   OpBuilder builder(regionOp);
@@ -70,7 +70,7 @@ DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
   auto fusedLoc = FusedLoc::get(fusedLocs, regionOp.getContext());
 
   // Clone with new results.
-  SmallVector<ValuePtr, 8> operands;
+  SmallVector<Value, 8> operands;
   operands.append(regionOp.args().begin(), regionOp.args().end());
   operands.append(newArgs.begin(), newArgs.end());
   SmallVector<Type, 8> resultTypes;
@@ -108,8 +108,8 @@ DispatchRegionOp removeUnusedResults(DispatchRegionOp regionOp) {
 
   // Calculate new return values.
   SmallVector<Type, 8> newReturnTypes;
-  SmallVector<ValuePtr, 8> newReturnValues;
-  SmallVector<ValuePtr, 8> newRegionResults;
+  SmallVector<Value, 8> newReturnValues;
+  SmallVector<Value, 8> newRegionResults;
   for (int i = 0; i < returnOp.getNumOperands(); ++i) {
     auto resultValue = regionOp.getResult(i);
     if (!resultValue->use_empty()) {
@@ -153,7 +153,7 @@ bool areDispatchRegionWorkloadsCompatible(DispatchRegionOp &lhs,
 }
 
 // Returns true if |value| depends in any way on |op| through any path.
-bool doesValueDependOnOperation(ValuePtr value, Operation *op) {
+bool doesValueDependOnOperation(Value value, Operation *op) {
   if (!value->getDefiningOp()) {
     return false;
   } else if (value->getDefiningOp() == op) {
@@ -213,7 +213,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   // Find the values used as return values in the lhs.
   // We'll need to replace the uses in rhs with these.
   auto lhsReturnOp = cast<ReturnOp>(lhsBlock.getTerminator());
-  SmallVector<ValuePtr, 8> lhsReturnValues;
+  SmallVector<Value, 8> lhsReturnValues;
   lhsReturnValues.reserve(lhsReturnOp.getNumOperands());
   lhsReturnValues.append(lhsReturnOp.operand_begin(),
                          lhsReturnOp.operand_end());
@@ -221,14 +221,14 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   // Find the values used as return values in the rhs.
   // We'll add these to the results of the lhs region.
   auto rhsReturnOp = cast<ReturnOp>(rhsBlock.getTerminator());
-  SmallVector<ValuePtr, 8> rhsReturnValues;
+  SmallVector<Value, 8> rhsReturnValues;
   rhsReturnValues.reserve(rhsReturnOp.getNumOperands());
   rhsReturnValues.append(rhsReturnOp.operand_begin(),
                          rhsReturnOp.operand_end());
 
   // Compute new args.
   BlockAndValueMapping mapping;
-  SmallVector<ValuePtr, 8> newArgs;
+  SmallVector<Value, 8> newArgs;
   auto lhsArgs = llvm::to_vector<8>(lhs.args());
   auto rhsArgs = llvm::to_vector<8>(rhs.args());
   for (int rhsOpIdx = 0; rhsOpIdx < rhsArgs.size(); ++rhsOpIdx) {
@@ -279,7 +279,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   }
 
   // Compute new results and add to both region and return op.
-  SmallVector<ValuePtr, 8> newResults;
+  SmallVector<Value, 8> newResults;
   for (auto rhsResult : rhsReturnValues) {
     newResults.push_back(mapping.lookupOrDefault(rhsResult));
   }
