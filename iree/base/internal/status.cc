@@ -89,9 +89,11 @@ std::string StatusCodeToString(StatusCode code) {
 Status::Status() {}
 
 Status::Status(StatusCode code, absl::string_view message) {
-  state_ = absl::make_unique<State>();
-  state_->code = code;
-  state_->message = std::string(message);
+  if (code != StatusCode::kOk) {
+    state_ = absl::make_unique<State>();
+    state_->code = code;
+    state_->message = std::string(message);
+  }
 }
 
 Status::Status(const Status& x) {
