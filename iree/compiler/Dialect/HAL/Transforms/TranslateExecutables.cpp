@@ -48,9 +48,19 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
       }
     }
     if (targetBackends.empty()) {
-      getModule().emitError()
+      auto diagnostic = getModule().emitError();
+      diagnostic
           << "no target backends available for executable translation; ensure "
-             "they are linked in and the target options are properly specified";
+          << "they are linked in and the target options are properly "
+          << "specified. requested = [ ";
+      for (const auto& target : executableOptions_.targets) {
+        diagnostic << "'" << target << "' ";
+      }
+      diagnostic << "], available = [ ";
+      for (const auto& target : getExecutableTargetRegistry().keys()) {
+        diagnostic << "'" << target << "' ";
+      }
+      diagnostic << "]";
       return signalPassFailure();
     }
 
@@ -98,7 +108,7 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
     OpBuilder builder(targetOp.getContext());
     builder.setInsertionPointToStart(&targetOp.getBlock());
     int nextOrdinal = 0;
-    for (auto &op : sourceOp.getBlock()) {
+    for (auto& op : sourceOp.getBlock()) {
       if (auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
         builder.create<IREE::HAL::ExecutableEntryPointOp>(
             dispatchEntryOp.getLoc(),
