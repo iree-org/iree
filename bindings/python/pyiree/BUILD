@@ -60,6 +60,8 @@ py_binary(
     srcs = ["dummy.py"],
     main = "dummy.py",
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":pyiree",  # build_cleaner: keep
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -72,6 +74,8 @@ py_library(
         "__init__.py",
     ],
     srcs_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":binding",
         ":compiler",
@@ -91,6 +95,8 @@ py_library(
     name = "compiler",
     srcs = ["compiler.py"],
     srcs_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -101,6 +107,8 @@ py_library(
     name = "system_api",
     srcs = ["system_api.py"],
     srcs_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -130,6 +138,8 @@ cc_library(
     ],
     copts = DEFAULT_COPTS,
     features = DEFAULT_FEATURES,
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
@@ -168,6 +178,8 @@ iree_py_extension(
     copts = DEFAULT_COPTS,
     features = DEFAULT_FEATURES,
     linkstatic = 1,
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     win_def_file = "export.def",
     deps = [
         ":base",
@@ -182,6 +194,8 @@ py_test(
     name = "compiler_test",
     srcs = ["compiler_test.py"],
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "//bindings/python/pyiree",
@@ -204,12 +218,15 @@ py_test(
         "@absl_py//absl/testing:absltest",
         "//bindings/python/pyiree",
     ],
+    # TODO(b/145815906) Get this running in OSS CI.
 )
 
 py_test(
     name = "hal_test",
     srcs = ["hal_test.py"],
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
@@ -221,6 +238,8 @@ py_test(
     name = "runtime_test",
     srcs = ["runtime_test.py"],
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
@@ -232,8 +251,13 @@ py_test(
     name = "system_api_test",
     srcs = ["system_api_test.py"],
     python_version = "PY3",
-    # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
-    tags = ["notap"],
+    tags = [
+        # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
+        "notap",
+        # TODO(b/145815906) Get this running in OSS CI.
+        "noga",
+        "nokokoro",
+    ],
     deps = NUMPY_DEPS + [
         ":system_api",
         "//bindings/python:pathsetup",  # build_cleaner: keep

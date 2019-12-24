@@ -36,6 +36,8 @@ cc_library(
         "//conditions:default": [
         ],
     }),
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = select({
         "//iree:enable_tensorflow": [
             "@llvm//:support",
@@ -57,6 +59,8 @@ cc_library(
 
 cc_binary(
     name = "iree-tf-opt",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":tensorflow",
         "//iree/tools:iree_opt_library",
@@ -66,6 +70,8 @@ cc_binary(
 
 cc_binary(
     name = "iree-tf-translate",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":tensorflow",
         "//iree/tools:iree_translate_library",

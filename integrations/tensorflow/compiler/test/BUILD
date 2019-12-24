@@ -29,9 +29,10 @@ iree_setup_lit_package(
     data = [
         "//integrations/tensorflow/compiler:iree-tf-opt",
     ],
+    tags = ["nokokoro"],
 )
 
-iree_glob_lit_tests()
+iree_glob_lit_tests(tags = ["nokokoro"])
 
 py_test(
     name = "saved_model_adopt_exports",
@@ -45,6 +46,8 @@ py_test(
         INTREE_FILECHECK_TARGET,
     ],
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//bindings/python/pyiree",
     ],

@@ -177,6 +177,11 @@ cc_library(
 cc_test(
     name = "dynamic_symbols_test",
     srcs = ["dynamic_symbols_test.cc"],
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = [
         ":status_util",
         ":dynamic_symbols",

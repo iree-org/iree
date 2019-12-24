@@ -66,6 +66,11 @@ cc_test(
         #   LSAN_OPTIONS=suppressions=third_party/iree/tools/sanitizer_suppressions.txt
         "//iree/tools:sanitizer_suppressions.txt",
     ],
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = [
         ":simple_module_test_bytecode_module_cc",
         "@com_google_absl//absl/strings",
