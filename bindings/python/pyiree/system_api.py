@@ -34,10 +34,40 @@ AnyModule = _binding.vm.VmModule
 
 
 class Config:
+  """System configuration."""
 
+  driver: _binding.hal.HalDriver
+  device: _binding.hal.HalDevice
   vm_instance: _binding.vm.VmInstance
   host_type_factory: _binding.host_types.HostTypeFactory
   default_modules: Tuple[AnyModule]
+
+  def _init_for_hal_driver(self, driver_name):
+    """Initializes the instance for a HAL driver."""
+    self.vm_instance = _binding.vm.VmInstance()
+    driver_names = _binding.hal.HalDriver.query()
+    if driver_name not in driver_names:
+      raise ValueError("Cannot initialize iree for driver '%s': "
+                       "it is not in the known driver list %r" %
+                       (driver_name, driver_names))
+    self.driver = _binding.hal.HalDriver.create(driver_name)
+    self.device = self.driver.create_default_device()
+    hal_module = _binding.vm.create_hal_module(self.device)
+    self.host_type_factory = _binding.host_types.HostTypeFactory.get_numpy()
+    self.default_modules = (hal_module,)
+
+  @classmethod
+  def with_defaults(cls):
+    cfg = cls()
+    # TODO(laurenzo): Have a better heuristic for choosing a default driver.
+    cfg._init_for_hal_driver("vulkan")
+    return cfg
+
+  @classmethod
+  def for_hal_driver(cls, driver_name):
+    cfg = cls()
+    cfg._init_for_hal_driver(driver_name=driver_name)
+    return cfg
 
 
 class _GlobalConfig(Config):
@@ -48,18 +78,9 @@ class _GlobalConfig(Config):
   def __new__(cls, *args, **kwargs):
     if cls._instance is None:
       cls._instance = super().__new__(cls)
-      cls._instance._static_init()
+      # TODO(laurenzo): Have a better heuristic for choosing a default driver.
+      cls._instance._init_for_hal_driver("vulkan")
     return cls._instance
-
-  def _static_init(self):
-    self.vm_instance = _binding.vm.VmInstance()
-    self.driver_names = _binding.hal.HalDriver.query()
-    # TODO(laurenzo): More flexible selection of driver and device.
-    self.driver = _binding.hal.HalDriver.create("vulkan")
-    self.device = self.driver.create_default_device()
-    self.hal_module = _binding.vm.create_hal_module(self.device)
-    self.host_type_factory = _binding.host_types.HostTypeFactory.get_numpy()
-    self.default_modules = (self.hal_module,)
 
 
 class BoundFunction:
