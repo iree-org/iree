@@ -382,13 +382,21 @@ struct AdjustConstantOp : public OpRewritePattern<spirv::ConstantOp> {
   PatternMatchResult matchAndRewrite(spirv::ConstantOp op,
                                      PatternRewriter &rewriter) const {
     Type constantType = op.getType();
-    if (!hasIntTypeOfWidth(constantType, {64})) {
+    if (!hasIntTypeOfWidth(constantType, {8, 64})) {
       return matchFailure();
     }
-    Type newType = legalizeIntegerType(constantType);
-    rewriter.replaceOpWithNewOp<spirv::ConstantOp>(
-        op, newType,
-        IntegerAttr::get(newType, op.value().dyn_cast<IntegerAttr>().getInt()));
+
+    Value i32cst;
+    if (auto attr = op.value().dyn_cast<IntegerAttr>()) {
+      Type i32Type = rewriter.getIntegerType(32);
+      auto i32Attr = IntegerAttr::get(i32Type, attr.getInt());
+      i32cst =
+          rewriter.create<spirv::ConstantOp>(op.getLoc(), i32Type, i32Attr);
+    } else {
+      llvm_unreachable("only support splat constant");
+    }
+
+    rewriter.replaceOpWithNewOp<spirv::SConvertOp>(op, constantType, i32cst);
     return matchSuccess();
   }
 };
