@@ -22,6 +22,4 @@ package(
 iree_py_library(
     name = "pathsetup",
     imports = ["."],
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = ["nokokoro"],
 )
