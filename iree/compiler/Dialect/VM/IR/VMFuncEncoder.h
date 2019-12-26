@@ -64,7 +64,8 @@ class VMFuncEncoder {
 
   // Encodes a branch target and the operand mappings.
   virtual LogicalResult encodeBranch(Block *targetBlock,
-                                     Operation::operand_range operands) = 0;
+                                     Operation::operand_range operands,
+                                     int successorIndex) = 0;
 
   // Encodes an operand value (by reference).
   virtual LogicalResult encodeOperand(Value value, int ordinal) = 0;

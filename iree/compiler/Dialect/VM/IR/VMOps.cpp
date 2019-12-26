@@ -629,11 +629,6 @@ static LogicalResult verifyGlobalResetRefOp(GlobalResetRefOp &op) {
 
 static ParseResult parseConstI32Op(OpAsmParser &parser,
                                    OperationState *result) {
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Failed to parse optional attribute dict";
-  }
-
   Attribute valueAttr;
   SmallVector<NamedAttribute, 1> dummyAttrs;
   if (failed(parser.parseAttribute(valueAttr, "value", dummyAttrs))) {
@@ -646,13 +641,17 @@ static ParseResult parseConstI32Op(OpAsmParser &parser,
   }
   valueAttr = ConstI32Op::convertConstValue(valueAttr);
   result->addAttribute("value", valueAttr);
+  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "Failed to parse optional attribute dict";
+  }
   return parser.addTypeToList(valueAttr.getType(), result->types);
 }
 
 static void printConstI32Op(OpAsmPrinter &p, ConstI32Op &op) {
   p << op.getOperationName() << ' ';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
   p.printAttribute(op.value());
+  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
 }
 
 // static
@@ -716,24 +715,23 @@ void ConstI32Op::build(Builder *builder, OperationState &result,
 
 static ParseResult parseConstI32ZeroOp(OpAsmParser &parser,
                                        OperationState *result) {
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Failed to parse optional attribute dict";
-  }
-
   Type valueType;
   if (failed(parser.parseColonType(valueType))) {
     return parser.emitError(parser.getCurrentLocation())
            << "Invalid integer type";
+  }
+  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "Failed to parse optional attribute dict";
   }
   return parser.addTypeToList(valueType, result->types);
 }
 
 static void printConstI32ZeroOp(OpAsmPrinter &p, ConstI32ZeroOp &op) {
   p << op.getOperationName();
-  p.printOptionalAttrDict(op.getAttrs());
   p << " : ";
   p.printType(op.getResult()->getType());
+  p.printOptionalAttrDict(op.getAttrs());
 }
 
 void ConstI32ZeroOp::build(Builder *builder, OperationState &result) {
@@ -742,24 +740,23 @@ void ConstI32ZeroOp::build(Builder *builder, OperationState &result) {
 
 static ParseResult parseConstRefZeroOp(OpAsmParser &parser,
                                        OperationState *result) {
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Failed to parse optional attribute dict";
-  }
-
   Type objectType;
   if (failed(parser.parseColonType(objectType))) {
     return parser.emitError(parser.getCurrentLocation())
            << "Invalid ref_ptr type";
+  }
+  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
+    return parser.emitError(parser.getCurrentLocation())
+           << "Failed to parse optional attribute dict";
   }
   return parser.addTypeToList(objectType, result->types);
 }
 
 static void printConstRefZeroOp(OpAsmPrinter &p, ConstRefZeroOp &op) {
   p << op.getOperationName();
-  p.printOptionalAttrDict(op.getAttrs());
   p << " : ";
   p.printType(op.getResult()->getType());
+  p.printOptionalAttrDict(op.getAttrs());
 }
 
 void ConstRefZeroOp::build(Builder *builder, OperationState &result,

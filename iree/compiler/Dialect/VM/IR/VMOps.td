@@ -1051,7 +1051,7 @@ def VM_BranchOp : VM_Op<"br", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Branch>,
-    VM_EncBranch<"dest", "operands">,
+    VM_EncBranch<"dest", "operands", 0>,
   ];
 
   let builders = [
@@ -1102,8 +1102,8 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBranch>,
     VM_EncOperand<"condition", 0>,
-    VM_EncBranch<"getTrueDest", "getTrueOperands">,
-    VM_EncBranch<"getFalseDest", "getFalseOperands">,
+    VM_EncBranch<"getTrueDest", "getTrueOperands", 0>,
+    VM_EncBranch<"getFalseDest", "getFalseOperands", 1>,
   ];
 
   let builders = [
@@ -1466,7 +1466,7 @@ def VM_BreakOp : VM_Op<"break", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Break>,
-    VM_EncBranch<"dest", "operands">,
+    VM_EncBranch<"dest", "operands", 0>,
   ];
 
   let builders = [
@@ -1511,7 +1511,7 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBreak>,
-    VM_EncBranch<"dest", "operands">,
+    VM_EncBranch<"dest", "operands", 0>,
   ];
 
   let builders = [

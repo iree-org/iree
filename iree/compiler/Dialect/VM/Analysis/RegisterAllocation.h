@@ -98,6 +98,12 @@ class RegisterAllocation {
   // register will have the proper type and move bits set.
   uint8_t mapUseToRegister(Value value, Operation *useOp, int operandIndex);
 
+  // Remaps branch successor operands to the target block argument registers.
+  // Returns a list of source to target register mappings. Source ref registers
+  // may have their move bit set.
+  SmallVector<std::pair<uint8_t, uint8_t>, 8> remapSuccessorRegisters(
+      Operation *op, int successorIndex);
+
  private:
   int8_t maxI32RegisterOrdinal_ = -1;
   int8_t maxRefRegisterOrdinal_ = -1;

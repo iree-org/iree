@@ -19,12 +19,19 @@
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+static Attribute getStrArrayAttr(Builder &builder,
+                                 ArrayRef<std::string> values) {
+  return builder.getStrArrayAttr(llvm::to_vector<8>(llvm::map_range(
+      values, [](const std::string &value) { return StringRef(value); })));
+}
 
 // static
 LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
@@ -36,23 +43,43 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
 
   Builder builder(funcOp.getContext());
   for (auto &block : funcOp.getBlocks()) {
-    SmallVector<Attribute, 8> blockAttrs;
-    blockAttrs.reserve(block.getNumArguments());
+    SmallVector<std::string, 8> blockRegStrs;
+    blockRegStrs.reserve(block.getNumArguments());
     for (auto blockArg : block.getArguments()) {
       uint8_t reg = registerAllocation.map_[blockArg];
-      blockAttrs.push_back(builder.getI32IntegerAttr(reg));
+      blockRegStrs.push_back(std::to_string(reg));
     }
-    block.front().setAttr("block_registers", builder.getArrayAttr(blockAttrs));
+    block.front().setAttr("block_registers",
+                          getStrArrayAttr(builder, blockRegStrs));
 
     for (auto &op : block.getOperations()) {
       if (op.getNumResults() == 0) continue;
-      SmallVector<Attribute, 8> regAttrs;
-      regAttrs.reserve(op.getNumResults());
+      SmallVector<std::string, 8> regStrs;
+      regStrs.reserve(op.getNumResults());
       for (auto result : op.getResults()) {
         uint8_t reg = registerAllocation.map_[result];
-        regAttrs.push_back(builder.getI32IntegerAttr(reg));
+        regStrs.push_back(std::to_string(reg));
       }
-      op.setAttr("result_registers", builder.getArrayAttr(regAttrs));
+      op.setAttr("result_registers", getStrArrayAttr(builder, regStrs));
+    }
+
+    Operation *terminatorOp = block.getTerminator();
+    if (terminatorOp->getNumSuccessors() > 0) {
+      SmallVector<Attribute, 2> successorAttrs;
+      successorAttrs.reserve(terminatorOp->getNumSuccessors());
+      for (int i = 0; i < terminatorOp->getNumSuccessors(); ++i) {
+        auto srcDstRegs =
+            registerAllocation.remapSuccessorRegisters(terminatorOp, i);
+        SmallVector<std::string, 8> remappingStrs;
+        for (auto &srcDstReg : srcDstRegs) {
+          remappingStrs.push_back(
+              llvm::formatv("{0}->{1}", srcDstReg.first, srcDstReg.second)
+                  .str());
+        }
+        successorAttrs.push_back(getStrArrayAttr(builder, remappingStrs));
+      }
+      terminatorOp->setAttr("remap_registers",
+                            builder.getArrayAttr(successorAttrs));
     }
   }
 
@@ -193,6 +220,24 @@ uint8_t RegisterAllocation::mapUseToRegister(Value value, Operation *useOp,
     reg |= kRefRegisterMoveBit;
   }
   return reg;
+}
+
+SmallVector<std::pair<uint8_t, uint8_t>, 8>
+RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
+  SmallVector<std::pair<uint8_t, uint8_t>, 8> srcDstRegs;
+
+  auto *targetBlock = op->getSuccessor(successorIndex);
+  auto operands = op->getSuccessorOperands(successorIndex);
+  for (auto it : llvm::enumerate(operands)) {
+    uint8_t srcReg = mapUseToRegister(it.value(), op, it.index());
+    BlockArgument targetArg = targetBlock->getArgument(it.index());
+    uint8_t dstReg = mapToRegister(targetArg);
+    if (!compareRegistersEqual(srcReg, dstReg)) {
+      srcDstRegs.push_back({srcReg, dstReg});
+    }
+  }
+
+  return srcDstRegs;
 }
 
 }  // namespace iree_compiler
