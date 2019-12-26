@@ -29,7 +29,6 @@ iree_setup_lit_package(
     data = [
         "//integrations/tensorflow/compiler:iree-tf-opt",
     ],
-    tags = ["nokokoro"],
 )
 
 iree_glob_lit_tests(tags = ["nokokoro"])

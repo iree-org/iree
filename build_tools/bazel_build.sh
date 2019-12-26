@@ -38,4 +38,6 @@ echo "Running with test env args: ${test_env_args[@]}"
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with "nokokoro".
 bazel query '//... except attr("tags", "nokokoro", //...)' | \
-    xargs bazel test ${test_env_args[@]} --config=rbe --config=rs --keep_going --test_output=errors
+  xargs bazel test ${test_env_args[@]} --define=iree_tensorflow=true \
+    --config=rbe --config=rs \
+    --keep_going --test_output=errors
