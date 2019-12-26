@@ -293,8 +293,7 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
   return success();
 }
 
-bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
-                                   int operandIndex) {
+bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
   auto &blockSets = blockLiveness_[useOp->getBlock()];
   if (blockSets.liveOut.count(value)) {
     // Value is escapes the block the useOp is in so it is definitely not the
@@ -305,6 +304,14 @@ bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
   auto &liveRange = liveRanges_[value];
   if (!useOp->isKnownTerminator() && liveRange.test(opOrdinal + 1)) {
     // The value is still live within the block after the useOp.
+    return false;
+  }
+  return true;
+}
+
+bool ValueLiveness::isLastValueUse(Value value, Operation *useOp,
+                                   int operandIndex) {
+  if (!isLastValueUse(value, useOp)) {
     return false;
   }
   for (auto &operand : llvm::reverse(useOp->getOpOperands())) {

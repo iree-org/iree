@@ -134,10 +134,8 @@ struct RegisterUsage {
 
   void releaseRegister(uint8_t reg) {
     if (isRefRegister(reg)) {
-      assert(refRegisters.test(reg & 0x3F));
       refRegisters.reset(reg & 0x3F);
     } else {
-      assert(intRegisters.test(reg & 0x7F));
       intRegisters.reset(reg & 0x7F);
     }
   }
@@ -182,8 +180,7 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
 
     for (auto &op : block.getOperations()) {
       for (auto &operand : op.getOpOperands()) {
-        if (liveness_.isLastValueUse(operand.get(), &op,
-                                     operand.getOperandNumber())) {
+        if (liveness_.isLastValueUse(operand.get(), &op)) {
           registerUsage.releaseRegister(map_[operand.get()]);
         }
       }
