@@ -38,9 +38,8 @@ class ControlFlowModule(tf.Module):
     return i
 
 
-@tf_test_utils.compile_modules(
-    [tf_test_utils.BackendInfo.ALL["iree_interpreter"]],
-    control_flow=ControlFlowModule)
+# TODO(b/146900329): Re-enable once VM2 cond_br issue is fixed
+@tf_test_utils.compile_modules(backends=["tf"], control_flow=ControlFlowModule)
 class ControlFlowTest(tf_test_utils.SavedModelTestCase):
 
   def test_short_sequence(self):

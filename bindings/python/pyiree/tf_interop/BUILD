@@ -123,7 +123,9 @@ py_library(
     # TODO(b/145815906) Get this running in OSS CI.
     tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//bindings/python/pyiree:compiler",
         "//bindings/python/pyiree:binding",
+        "//bindings/python/pyiree:system_api",
     ],
 )
 

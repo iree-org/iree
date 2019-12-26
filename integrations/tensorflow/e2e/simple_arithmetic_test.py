@@ -36,7 +36,10 @@ class SimpleArithmeticModule(tf.Module):
     return tf.matmul(a, b)
 
 
-@tf_test_utils.compile_modules(simple_arithmetic=SimpleArithmeticModule)
+@tf_test_utils.compile_modules(
+    # TODO(b/146900329): Enable for all
+    backends=["tf", "iree_interpreter"],
+    simple_arithmetic=SimpleArithmeticModule)
 class SimpleArithmeticTest(tf_test_utils.SavedModelTestCase):
 
   def test_simple_mul_explicit(self):

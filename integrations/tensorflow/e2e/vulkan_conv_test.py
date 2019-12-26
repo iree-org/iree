@@ -98,17 +98,11 @@ class Conv2dModule(tf.Module):
     return tf.nn.conv2d(img, kernel, [1, 1, 1, 1], "VALID", name="result")
 
 
-tf_test_utils.BackendInfo.add(
-    name="vulkan_spirv",
-    CompiledModule=tf_test_utils.IreeCompiledModule,
-    iree_driver="vulkan",
-    iree_compiler_targets=["vulkan-spirv"])
-
-
 @tf_test_utils.compile_modules(
     backends=[
-        tf_test_utils.BackendInfo.ALL["vulkan_spirv"],
-        tf_test_utils.BackendInfo.ALL["tf"]
+        # TODO(b/146900329): Enable for iree_vulkan
+        # "iree_vulkan",
+        "tf",
     ],
     conv2d=Conv2dModule)
 class ConvTest(tf_test_utils.SavedModelTestCase):

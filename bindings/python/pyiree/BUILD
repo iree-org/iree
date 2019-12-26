@@ -42,9 +42,7 @@ COMPILER_DEPS = [
     "//iree/compiler/Translation:IREEVM",
 
     # New compiler target backends.
-    # NOTE: Including the LegacyInterpreter causes some pretty low level assertion failure.
-    # I think it is non-functional.
-    # "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
+    "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
     "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     "//iree/compiler/Dialect/VM/Target/Bytecode",

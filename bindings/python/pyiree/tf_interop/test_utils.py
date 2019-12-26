@@ -25,6 +25,7 @@ import tempfile
 
 from .. import binding
 from .. import compiler
+from .. import system_api
 from absl import flags
 from absl import logging
 import numpy as np
@@ -58,8 +59,12 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
   """
 
   def compile_from_path(sm_path):
-    return compiler.tf_compile_saved_model(
-        sm_path, exported_names=exported_names, target_backends=target_backends)
+    compiler_context = compiler.Context()
+    compiler_module = compiler.tf_load_saved_model(
+        sm_path,
+        exported_names=exported_names,
+        compiler_context=compiler_context)
+    return compiler_module.compile(target_backends=target_backends)
 
   if hasattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR):
     # Compile directly from the original path.
@@ -94,18 +99,6 @@ def load_tf_module(path):
       (path, ORIGNAL_SAVED_MODEL_PATH_ATTR))
   setattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR, path)
   return tf_module
-
-
-def dump_iree_module(m):
-  print("Loaded module:", m.name)
-  i = 0
-  while True:
-    f = m.lookup_function_by_ordinal(i)
-    if not f:
-      break
-    print("  Export:", f.name, "-> args(", f.signature.argument_count,
-          "), results(", f.signature.result_count, ")")
-    i += 1
 
 
 class CompiledModule(object):
@@ -187,7 +180,7 @@ class IreeCompiledModule(CompiledModule):
         ctor(),
         exported_names=exported_names,
         target_backends=backend.iree_compiler_targets)
-    self._iree_module = binding.vm.create_module_from_blob(
+    self._iree_module = binding.vm.VmModule.from_flatbuffer(
         self._iree_module_blob)
 
   def instantiate(self):
@@ -202,39 +195,29 @@ class _IreeModuleInstance(object):
     self._backend = backend
     self._iree_module_blob = iree_module_blob
     self._iree_module = iree_module
+    self._iree_module_name = self._iree_module.name
 
-    self._policy = binding.rt.Policy()
-    instance = binding.rt.Instance(driver_name=backend.iree_driver)
-    self._context = binding.rt.Context(instance=instance, policy=self._policy)
-    self._context.register_module(self._iree_module)
+    self._system_config = system_api.Config.for_hal_driver(
+        driver_name=backend.iree_driver)
+    self._context = system_api.SystemContext(
+        modules=[self._iree_module], config=self._system_config)
 
   def __getattr__(self, attr):
     # Try to resolve it as a function.
-    # TODO(laurenzo): Do better reflection to match module name and dotted
-    # functions.
-    f = self._context.resolve_function("module." + attr)
-    return _IreeFunctionWrapper(self._policy, self._context, f)
+    m = self._context.modules[self._iree_module_name]
+    f = m[attr]
+    return _IreeFunctionWrapper(self._context, f)
 
 
 class _IreeFunctionWrapper(object):
   """Wraps an IRRE function, making it callable."""
 
-  def __init__(self, policy, context, f):
-    self._policy = policy
+  def __init__(self, context, f):
     self._context = context
     self._f = f
 
   def __call__(self, *args):
-    args = [self._context.wrap_for_input(arg) for arg in args]
-    # Invoke the function and wait for completion.
-    inv = self._context.invoke(self._f, self._policy, args)
-    inv.await_ready()
-    # Get results as a numpy array.
-    results = [np.array(r.map(), copy=False) for r in inv.results]
-    if len(results) == 1:
-      # Unnest to match TF.
-      return results[0]
-    return results
+    return self._f(*args)
 
 
 class _VirtualModuleInstance(object):
@@ -416,7 +399,21 @@ def compile_modules(backends=None, **kwargs):
       exported_names = ()
       if isinstance(ctor, tuple):
         ctor, exported_names = ctor
-      cls._modules_to_compile[name] = (ctor, exported_names, backends)
+
+      # Expand backend names to BackendInfo objects.
+      def _resolve(backend_spec):
+        if isinstance(backend_spec, BackendInfo):
+          return backend_spec
+        # Handle the string form.
+        return BackendInfo.ALL[backend_spec]
+
+      if not backends:
+        # Indicates that no backends are explicitly selected.
+        resolved_backends = None
+      else:
+        resolved_backends = [_resolve(backend) for backend in backends]
+
+      cls._modules_to_compile[name] = (ctor, exported_names, resolved_backends)
 
     return cls
 
@@ -452,11 +449,15 @@ BackendInfo.add(
     name="iree_vulkan",
     CompiledModule=IreeCompiledModule,
     iree_driver="vulkan",
-    iree_compiler_targets=["interpreter-*", "vulkan-*"])
+    iree_compiler_targets=["vulkan-*"])
 
 
 def get_default_test_backends():
-  """Gets the default sequence of BackendInfo instances to test against."""
+  """Gets the default sequence of BackendInfo instances to test against.
+
+  Returns:
+    Sequence of BackendInfo that should be included by default.
+  """
 
   if FLAGS.target_backends is not None:
     backends_env = FLAGS.target_backends
@@ -478,7 +479,7 @@ def get_default_test_backends():
     return backends
   else:
     logging.info("Using default backends")
-    return BackendInfo.ALL["tf"], BackendInfo.ALL["iree_interpreter"]
+    return BackendInfo.ALL.values()
 
 
 class SavedModelTestCase(tf.test.TestCase):
