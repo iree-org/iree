@@ -98,6 +98,12 @@ static llvm::cl::opt<bool> print_mlir_flag{
     llvm::cl::init(false),
 };
 
+static llvm::cl::opt<bool> print_annotated_mlir_flag{
+    "print-annotated-mlir",
+    llvm::cl::desc("Prints MLIR IR with final serialization annotations"),
+    llvm::cl::init(false),
+};
+
 static llvm::cl::opt<bool> print_flatbuffer_flag{
     "print-flatbuffer",
     llvm::cl::desc("Prints Flatbuffer text after serialization"),
@@ -205,10 +211,24 @@ StatusOr<std::string> PrepareModule(
   }
   binary_output.flush();
 
-  // Print the flatbuffer; easiest way right now is to just do it all again.
-  if (print_flatbuffer_flag) {
+  // Print the annotated MLIR and flatbuffer; easiest way right now is to just
+  // do it all again.
+  if (print_annotated_mlir_flag) {
     bytecode_options.outputFormat =
         mlir::iree_compiler::IREE::VM::BytecodeOutputFormat::kMlirText;
+    std::string text_contents;
+    llvm::raw_string_ostream text_output(text_contents);
+    if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
+            mlir_module.get(), bytecode_options, text_output))) {
+      return InternalErrorBuilder(IREE_LOC)
+             << "Serialization to annotated MLIR (text) failed";
+    }
+    text_output.flush();
+    std::cerr << text_contents << std::endl;
+  }
+  if (print_flatbuffer_flag) {
+    bytecode_options.outputFormat =
+        mlir::iree_compiler::IREE::VM::BytecodeOutputFormat::kFlatBufferText;
     std::string text_contents;
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
@@ -217,7 +237,7 @@ StatusOr<std::string> PrepareModule(
              << "Serialization to flatbuffer bytecode (text) failed";
     }
     text_output.flush();
-    std::cout << text_contents << std::endl;
+    std::cerr << text_contents << std::endl;
   }
 
   return binary_contents;
