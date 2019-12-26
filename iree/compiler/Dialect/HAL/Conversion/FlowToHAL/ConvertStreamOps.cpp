@@ -219,6 +219,8 @@ static void recordPushBindings(Value device, Value commandBuffer,
         dispatchOp.getLoc(), commandBuffer,
         rewriter.getI32IntegerAttr(bindingOrdinal++), bufferRange.buffer, shape,
         rewriter.getI32IntegerAttr(elementSize));
+    rewriter.create<IREE::HAL::ExDeferReleaseOp>(dispatchOp.getLoc(),
+                                                 bufferRange.buffer);
   };
   for (auto tensorValue : dispatchOp.operands()) {
     pushBinding(tensorValue);
