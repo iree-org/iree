@@ -14,6 +14,7 @@
 
 #include "bindings/python/pyiree/vm.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/function_abi.h"
 #include "bindings/python/pyiree/status_utils.h"
