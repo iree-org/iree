@@ -530,6 +530,19 @@ iree_hal_command_buffer_execution_barrier(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers);
 
+// Copies a range of one buffer to another.
+// Both buffers must be compatible with the devices owned by this device
+// queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER. Though the source
+// and target buffer may be the same the ranges must not overlap (as with
+// memcpy).
+//
+// This can be used to perform device->host, host->device, and device->device
+// copies.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* source_buffer,
+    iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length);
+
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//

@@ -816,7 +816,26 @@ Status HALModuleState::CommandBufferCopyBuffer(iree_vm_stack_t* stack,
   if (!command_buffer) {
     return InvalidArgumentErrorBuilder(IREE_LOC) << "'command_buffer' invalid";
   }
-  return UnimplementedErrorBuilder(IREE_LOC) << "CommandBufferCopyBuffer";
+  auto* source_buffer = iree_hal_buffer_deref(&frame->registers.ref[1]);
+  if (!source_buffer) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'source_buffer' invalid";
+  }
+  auto* target_buffer = iree_hal_buffer_deref(&frame->registers.ref[2]);
+  if (!target_buffer) {
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "'target_buffer' invalid";
+  }
+  iree_device_size_t source_offset = frame->registers.i32[0];
+  iree_device_size_t target_offset = frame->registers.i32[1];
+  iree_device_size_t length = frame->registers.i32[2];
+
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_hal_command_buffer_copy_buffer(command_buffer, source_buffer,
+                                          source_offset, target_buffer,
+                                          target_offset, length),
+      IREE_LOC));
+
+  ResetStackFrame(frame);
+  return OkStatus();
 }
 
 Status HALModuleState::CommandBufferBindDescriptorSet(

@@ -177,7 +177,7 @@ vm.import @buffer_view.compute_range(
   %buffer : !ireex.ref<!hal.buffer>,
   %shape : i32 ...,
   %indices : i32 ...,
-  %lengths : i32,
+  %lengths : i32 ...,
   %element_size : i32
 ) -> (i32, i32)
 

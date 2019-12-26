@@ -116,7 +116,7 @@ func @buffer_view_compute_range(%arg0 : !ireex.ref<!hal.buffer>) -> (i32, i32) {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   %1:2 = "test_hal.indices"() : () -> (i32, i32)
   %2:2 = "test_hal.lengths"() : () -> (i32, i32)
-  // CHECK: %3:2 = vm.call.variadic @hal.buffer_view.compute_range(%arg0, [%0#0, %0#1], [%1#0, %1#1], %2#0, %2#1) : (!ireex.ref<!hal.buffer>, i32..., i32..., i32, i32) -> (i32, i32)
+  // CHECK: %3:2 = vm.call.variadic @hal.buffer_view.compute_range(%arg0, [%0#0, %0#1], [%1#0, %1#1], [%2#0, %2#1], %c4) : (!ireex.ref<!hal.buffer>, i32..., i32..., i32..., i32) -> (i32, i32)
   %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
   return %off, %len : i32, i32
 }

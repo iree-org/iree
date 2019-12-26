@@ -28,9 +28,11 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 0, %arg0, shape=[
     // CHECK-SAME:   [[C128]]
     // CHECK-SAME: ], element_size=4
+    // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[TMP_BUF]], shape=[
     // CHECK-SAME:   [[C128]]
     // CHECK-SAME: ], element_size=4
+    // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], [[EXE]], entry_point=0, workgroup_xyz=[
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
@@ -39,9 +41,11 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
     // CHECK: hal.ex.push_binding [[CMD]], 0, [[TMP_BUF]], shape=[
     // CHECK-SAME:   [[C128]]
     // CHECK-SAME: ], element_size=4
+    // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[RET_BUF]], shape=[
     // CHECK-SAME:   [[C128]]
     // CHECK-SAME: ], element_size=4
+    // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], {{.+}}, entry_point=0, workgroup_xyz=[
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
