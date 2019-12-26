@@ -201,7 +201,7 @@ memory allocation. Here we attempt to alias/reuse buffers, determine buffers
 that can be entirely elided, and reorder dispatches so that they can more easily
 be grouped based on required barriers. Thanks to MLIR's built-in folding logic
 we can also do some IR optimizations such as converting the generic dispatch to
-a `iree_ll_seq.static_dispatch`, as we know the workkload size at compile-time.
+a `iree_ll_seq.static_dispatch`, as we know the workload size at compile-time.
 
 As part of this we also propagate any static information we can determine, such
 as the workload, into the executables. This is to help aid backends in lowering
