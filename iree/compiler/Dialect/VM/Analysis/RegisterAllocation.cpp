@@ -173,8 +173,15 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
                                   << blockArg->getArgNumber();
       }
       map_[blockArg] = reg.getValue();
+    }
+
+    // Cleanup any block arguments that were unused. We do this after the
+    // initial allocation above so that block arguments can never alias as that
+    // makes things really hard to read. Ideally an optimization pass that
+    // removes unused block arguments would prevent this from happening.
+    for (auto blockArg : block.getArguments()) {
       if (blockArg->use_empty()) {
-        registerUsage.releaseRegister(reg.getValue());
+        registerUsage.releaseRegister(map_[blockArg]);
       }
     }
 

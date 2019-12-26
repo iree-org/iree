@@ -17,7 +17,7 @@ vm.module @module {
   // CHECK-LABEL: @unused_arg
   vm.func @unused_arg(%arg0 : i32, %arg1 : i32) -> i32 {
     // CHECK: vm.const.i32.zero
-    // CHECK-SAME: block_registers = ["0", "0"]
+    // CHECK-SAME: block_registers = ["0", "1"]
     // CHECK-SAME: result_registers = ["0"]
     %zero = vm.const.i32.zero : i32
     vm.return %zero : i32
@@ -76,6 +76,26 @@ vm.module @module {
     // CHECK: vm.return
     // CHECK-SAME: block_registers = ["0"]
     vm.return %1 : i32
+  }
+
+  // CHECK-LABEL: @cond_branch_args_swizzled
+  vm.func @cond_branch_args_swizzled(%arg0 : i32, %arg1 : i32, %arg2 : i32) -> i32 {
+    // CHECK: vm.cond_br
+    // CHECK-SAME: block_registers = ["0", "1", "2"]
+    // CHECK-SAME: remap_registers = [
+    // CHECK-SAME:   ["1->0", "2->1"],
+    // TODO(benvanik): fix register allocation to prevent this hazard.
+    // CHECK-SAME:   ["1->0", "0->1"]
+    // CHECK-SAME: ]
+    vm.cond_br %arg0, ^bb1(%arg1, %arg2 : i32, i32), ^bb2(%arg1, %arg0 : i32, i32)
+  ^bb1(%0 : i32, %1 : i32):
+    // CHECK: vm.return
+    // CHECK-SAME: block_registers = ["0", "1"]
+    vm.return %0 : i32
+  ^bb2(%2 : i32, %3 : i32):
+    // CHECK: vm.return
+    // CHECK-SAME: block_registers = ["0", "1"]
+    vm.return %3 : i32
   }
 
   // CHECK-LABEL: @loop
