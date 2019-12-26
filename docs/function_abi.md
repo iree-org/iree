@@ -27,7 +27,7 @@ for more details.
 ### Raw Function ABI
 
 All exported functions implement the raw function ABI, which defines the
-metadata and calling convention for marshaling inputs and results to their
+metadata and calling convention for marshalling inputs and results to their
 underlying implementations.
 
 *Attributes:*
