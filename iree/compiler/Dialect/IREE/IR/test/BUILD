@@ -12,36 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_cc_library(
-  NAME
-    IR
-  HDRS
-    "IREEDialect.h"
-    "IREEOps.h"
-    "IREEOps.h.inc"
-    "IREETraits.h"
-    "IREETypes.h"
-  SRCS
-    "IREEDialect.cpp"
-    "IREEOps.cpp"
-    "IREEOps.cpp.inc"
-  DEPS
-    IREEOpsGen
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRSupport
-  ALWAYSLINK
-  PUBLIC
+load("//iree:build_defs.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
 )
 
-
-iree_tablegen_library(
-  NAME
-    IREEOpsGen
-  SRCS
-    IREEOps.td
-  OUTS
-    -gen-op-decls IREEOps.h.inc
-    -gen-op-defs IREEOps.cpp.inc
+iree_setup_lit_package(
+    data = [
+        "//iree/tools:iree-opt",
+    ],
 )
+
+iree_glob_lit_tests()

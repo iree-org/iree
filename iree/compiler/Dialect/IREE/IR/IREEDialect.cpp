@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
@@ -30,6 +31,10 @@ IREEXDialect::IREEXDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
   addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType,
            IREE::OpaqueRefObjectType, IREE::RefPtrType>();
+#define GET_OP_LIST
+  addOperations<
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
+      >();
 }
 
 //===----------------------------------------------------------------------===//
