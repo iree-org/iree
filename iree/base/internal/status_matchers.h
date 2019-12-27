@@ -204,6 +204,9 @@ class IsOkMatcherGenerator {
 
 }  // namespace internal
 
+namespace testing {
+namespace status {
+
 // Returns a gMock matcher that expects an iree::StatusOr<T> object to have an
 // OK status and for the contained T object to match |value_matcher|.
 //
@@ -250,10 +253,13 @@ inline internal::IsOkMatcherGenerator IsOk() {
   return internal::IsOkMatcherGenerator();
 }
 
+}  // namespace status
+}  // namespace testing
+
 // Macros for testing the results of functions that return iree::Status or
 // iree::StatusOr<T> (for any type T).
-#define EXPECT_OK(rexpr) EXPECT_THAT(rexpr, ::iree::IsOk())
-#define ASSERT_OK(rexpr) ASSERT_THAT(rexpr, ::iree::IsOk())
+#define EXPECT_OK(rexpr) EXPECT_THAT(rexpr, ::iree::testing::status::IsOk())
+#define ASSERT_OK(rexpr) ASSERT_THAT(rexpr, ::iree::testing::status::IsOk())
 
 // Executes an expression that returns an iree::StatusOr<T>, and assigns the
 // contained variable to lhs if the error code is OK.
