@@ -38,10 +38,15 @@ COMPILER_DEPS = [
     "//iree/compiler/Translation/Sequencer",
     "//iree/compiler/Translation/Interpreter",
     "//iree/compiler/Translation/SPIRV",
-    "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
     "//iree/compiler/Translation:IREEVM",
 
-    # New compiler target backends.
+    # Transforms.
+    "//iree/compiler/Dialect/Flow/Transforms",
+    "//iree/compiler/Dialect/HAL/Transforms",
+    "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+    "//iree/compiler/Dialect/VM/Transforms",
+
+    # Targets.
     "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
     "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",

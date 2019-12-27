@@ -19,8 +19,11 @@
 
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/status_utils.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
 #include "iree/compiler/Utils/TranslationUtils.h"
@@ -281,22 +284,40 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
 
 std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
     BytecodeTargetOptions options, std::vector<std::string> target_backends) {
-  // TODO(laurenzo): Plumb pass manager options such as crash reproducer
-  // through to the IREE compiler.
+  mlir::PassManager pass_manager(context_->mlir_context());
+  auto crash_reproducer_path = context_->crash_reproducer_path();
+  if (crash_reproducer_path) {
+    pass_manager.enableCrashReproducerGeneration(*crash_reproducer_path);
+  }
+  mlir::iree_compiler::IREE::HAL::ExecutableTargetOptions executable_options;
+  executable_options.targets = std::move(target_backends);
 
-  ExecutableTargetOptions exe_target_options;
-  exe_target_options.targets = std::move(target_backends);
+  mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
+  mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
+      pass_manager, executable_options);
+  mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(pass_manager);
 
-  std::string contents;
-  raw_string_ostream out(contents);
+  // Run primary passes.
   auto diag_capture = context_->CaptureDiagnostics();
-  if (failed(mlir::iree_compiler::translateFromMLIRToVMBytecodeModule(
-          module_op_, exe_target_options, options, out))) {
+  if (failed(pass_manager.run(module_op_))) {
     throw RaisePyError(
         PyExc_RuntimeError,
         diag_capture.ConsumeDiagnosticsAsString("Error compiling IREE module:")
             .c_str());
   }
+
+  // Run serialization.
+  std::string contents;
+  raw_string_ostream out(contents);
+  if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(
+          module_op_, options, out))) {
+    throw RaisePyError(
+        PyExc_RuntimeError,
+        diag_capture
+            .ConsumeDiagnosticsAsString("Error serializing to flatbuffer:")
+            .c_str());
+  }
+
   out.flush();
   return std::make_shared<OpaqueStringBlob>(std::move(out.str()));
 }
