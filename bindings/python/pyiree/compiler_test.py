@@ -32,12 +32,6 @@ class CompilerTest(absltest.TestCase):
     with self.assertRaisesRegex(ValueError, "custom op 'FOOBAR' is unknown"):
       ctx.parse_asm("""FOOBAR: I SHOULD NOT PARSE""")
 
-  def testParseAndCompileToSequencer(self):
-    ctx = pyiree.compiler.Context()
-    input_module = ctx.parse_asm(SIMPLE_MUL_ASM)
-    binary = input_module.compile_to_sequencer_blob()
-    self.assertTrue(binary)
-
   def testParseAndCompileToFlatbuffer(self):
     ctx = pyiree.compiler.Context()
     input_module = ctx.parse_asm(SIMPLE_MUL_ASM)

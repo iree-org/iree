@@ -28,16 +28,6 @@ namespace python {
 
 namespace {
 
-RtModule CreateModuleFromBlob(std::shared_ptr<OpaqueBlob> blob) {
-  iree_rt_module_t* module;
-  auto free_fn = OpaqueBlob::CreateFreeFn(blob);
-  auto status = iree_vm_bytecode_module_create_from_buffer(
-      {static_cast<const uint8_t*>(blob->data()), blob->size()}, free_fn.first,
-      free_fn.second, IREE_ALLOCATOR_SYSTEM, &module);
-  CheckApiStatus(status, "Error creating vm module from blob");
-  return RtModule::CreateRetained(module);
-}
-
 VmModule CreateHalModule(HalDevice* device) {
   iree_vm_module_t* module;
   CheckApiStatus(
@@ -206,9 +196,6 @@ std::string VmVariantList::DebugString() const {
 void SetupVmBindings(pybind11::module m) {
   CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
   CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
-
-  // Deprecated: VM1 module.
-  m.def("create_module_from_blob", CreateModuleFromBlob);
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);

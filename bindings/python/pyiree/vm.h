@@ -18,7 +18,6 @@
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/host_types.h"
-#include "bindings/python/pyiree/rt.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 #include "iree/vm2/api.h"

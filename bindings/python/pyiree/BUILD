@@ -34,12 +34,6 @@ DEFAULT_FEATURES = [
 ]
 
 COMPILER_DEPS = [
-    # TODO(laurenzo): Remove these once migrated to vm2
-    "//iree/compiler/Translation/Sequencer",
-    "//iree/compiler/Translation/Interpreter",
-    "//iree/compiler/Translation/SPIRV",
-    "//iree/compiler/Translation:IREEVM",
-
     # Transforms.
     "//iree/compiler/Dialect/Flow/Transforms",
     "//iree/compiler/Dialect/HAL/Transforms",
@@ -125,7 +119,6 @@ cc_library(
         "function_abi.cc",
         "hal.cc",
         "host_types.cc",
-        "rt.cc",
         "status_utils.cc",
         "vm.cc",
     ],
@@ -135,7 +128,6 @@ cc_library(
         "function_abi.h",
         "hal.h",
         "host_types.h",
-        "rt.h",
         "status_utils.h",
         "vm.h",
     ],
@@ -163,8 +155,6 @@ cc_library(
         "//iree/base:status",
         "//iree/base:signature_mangle",
         "//iree/hal:api",
-        "//iree/rt:api",
-        "//iree/schemas",
         "//iree/vm:api",
         "@llvm//:support",
         "@local_config_mlir//:Parser",
@@ -227,19 +217,6 @@ py_test(
 py_test(
     name = "hal_test",
     srcs = ["hal_test.py"],
-    python_version = "PY3",
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = ["nokokoro"],
-    deps = NUMPY_DEPS + [
-        "//bindings/python:pathsetup",  # build_cleaner: keep
-        "@absl_py//absl/testing:absltest",
-        "//bindings/python/pyiree",
-    ],
-)
-
-py_test(
-    name = "runtime_test",
-    srcs = ["runtime_test.py"],
     python_version = "PY3",
     # TODO(b/145815906) Get this running in OSS CI.
     tags = ["nokokoro"],

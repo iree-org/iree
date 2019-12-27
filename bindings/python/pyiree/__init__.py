@@ -30,9 +30,6 @@ from .binding import tracing
 from .binding.compiler import CompilerContext
 from .binding.compiler import CompilerModule
 
-# Alias specific native functions.
-from .binding.vm import create_module_from_blob
-
 # system_api explicitly exports the things that should be in the global
 # scope.
 from .system_api import *

@@ -24,10 +24,6 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
-#include "iree/compiler/Translation/IREEVM.h"
-#include "iree/compiler/Translation/Sequencer/SequencerModuleTranslation.h"
-#include "iree/compiler/Utils/TranslationUtils.h"
-#include "iree/schemas/module_def_generated.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
@@ -260,28 +256,6 @@ std::string CompilerModuleBundle::ToAsm(bool enableDebugInfo, bool prettyForm,
   return sout.str();
 }
 
-std::shared_ptr<OpaqueBlob> CompilerModuleBundle::CompileToSequencerBlob(
-    bool print_mlir, std::vector<std::string> target_backends) {
-  ModuleTranslationOptions options;
-  options.print_mlir = print_mlir;
-  auto crash_reproducer_path = context_->crash_reproducer_path();
-  if (crash_reproducer_path) {
-    options.crash_reproducer = *crash_reproducer_path;
-  }
-  options.target_backends = std::move(target_backends);
-
-  auto diag_capture = context_->CaptureDiagnostics();
-  auto module_blob = mlir::iree_compiler::translateMlirToIreeSequencerModule(
-      module_op(), options);
-  if (module_blob.empty()) {
-    throw RaiseValueError(
-        diag_capture
-            .ConsumeDiagnosticsAsString("Failed to translate MLIR module")
-            .c_str());
-  }
-  return std::make_shared<OpaqueByteVectorBlob>(std::move(module_blob));
-}
-
 std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
     BytecodeTargetOptions options, std::vector<std::string> target_backends) {
   mlir::PassManager pass_manager(context_->mlir_context());
@@ -388,10 +362,6 @@ void SetupCompilerBindings(pybind11::module m) {
       .def("to_asm", &CompilerModuleBundle::ToAsm,
            py::arg("debug_info") = false, py::arg("pretty") = false,
            py::arg("large_element_limit") = -1)
-      .def("compile_to_sequencer_blob",
-           &CompilerModuleBundle::CompileToSequencerBlob,
-           py::arg("print_mlir") = false,
-           py::arg("target_backends") = std::vector<std::string>())
       .def("compile", &CompilerModuleBundle::Compile,
            py::arg("options") = BytecodeTargetOptions{},
            py::arg("target_backends") = std::vector<std::string>())
