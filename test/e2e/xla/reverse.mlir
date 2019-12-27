@@ -1,8 +1,6 @@
 // RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
-// -----
-
 // CHECK-LABEL: EXEC @xla_reverse
 func @xla_reverse () -> (tensor<2x3xf32>, tensor <2x3xf32>, tensor <2x3xf32>) {
   %t1 = xla_hlo.constant dense<[[1.0e0, 2.0e0, 3.0e0], [4.0e0, 5.0e0, 6.0e0]]> : tensor<2x3xf32>
@@ -13,4 +11,4 @@ func @xla_reverse () -> (tensor<2x3xf32>, tensor <2x3xf32>, tensor <2x3xf32>) {
 }
 // CHECK: 2x3xf32=[4 5 6][1 2 3]
 // CHECK-NEXT: 2x3xf32=[3 2 1][6 5 4]
-// CHECK_NEXT: 2x3xf32=[6 5 4][3 2 1]
+// CHECK-NEXT: 2x3xf32=[6 5 4][3 2 1]
