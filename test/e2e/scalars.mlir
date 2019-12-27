@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir %s | IreeFileCheck %s
+// RUN: iree-run-mlir --target_backends=interpreter-bytecode %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @scalars
 func @scalars() -> tensor<f32> {

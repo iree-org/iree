@@ -330,7 +330,8 @@ Status RunFile(std::string mlir_filename) {
                                llvm::Twine(split_line));
     auto sub_failure = EvaluateFile(std::move(sub_buffer));
     if (!sub_failure.ok()) {
-      LOG(ERROR) << sub_failure;
+      LOG(ERROR) << "Failure for split at line #" << split_line << ": "
+                 << sub_failure;
       if (any_failure.ok()) {
         any_failure = std::move(sub_failure);
       }
