@@ -22,7 +22,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Project configuration
 #-------------------------------------------------------------------------------
 
-project(iree CXX)
+project(iree CXX C)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -105,6 +105,7 @@ add_subdirectory(iree/hal)
 add_subdirectory(iree/rt)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/vm)
+add_subdirectory(iree/vm2)
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(third_party/glslang EXCLUDE_FROM_ALL)
