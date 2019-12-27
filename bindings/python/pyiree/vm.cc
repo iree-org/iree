@@ -233,7 +233,7 @@ void SetupVmBindings(pybind11::module m) {
 
   py::class_<VmContext>(m, "VmContext")
       .def(py::init(&VmContext::Create), py::arg("instance"),
-           py::arg("modules") = absl::nullopt)
+           py::arg("modules") = absl::optional<std::vector<VmModule*>>())
       .def("register_modules", &VmContext::RegisterModules)
       .def_property_readonly("context_id", &VmContext::context_id)
       .def("create_function_abi", &VmContext::CreateFunctionAbi,
