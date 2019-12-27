@@ -215,7 +215,7 @@ StatusOr<std::string> PrepareModule(
   // do it all again.
   if (print_annotated_mlir_flag) {
     bytecode_options.outputFormat =
-        mlir::iree_compiler::IREE::VM::BytecodeOutputFormat::kMlirText;
+        mlir::iree_compiler::IREE::VM::BytecodeOutputFormat::kAnnotatedMlirText;
     std::string text_contents;
     llvm::raw_string_ostream text_output(text_contents);
     if (failed(mlir::iree_compiler::IREE::VM::translateModuleToBytecode(

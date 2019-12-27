@@ -450,7 +450,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
            << "failed to canonicalize vm.module to a serializable form";
   }
 
-  if (targetOptions.outputFormat == BytecodeOutputFormat::kMlirText) {
+  if (targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {
     // Run register allocation now and put the info in the IR so it's printed.
     for (auto funcOp : moduleOp.getBlock().getOps<IREE::VM::FuncOp>()) {
       if (!funcOp.empty()) {
@@ -461,7 +461,10 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
         }
       }
     }
+  }
 
+  if (targetOptions.outputFormat == BytecodeOutputFormat::kMlirText ||
+      targetOptions.outputFormat == BytecodeOutputFormat::kAnnotatedMlirText) {
     // Use the standard MLIR text printer.
     moduleOp.getOperation()->print(output);
     output << "\n";
