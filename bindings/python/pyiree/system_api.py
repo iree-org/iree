@@ -25,12 +25,59 @@ and functions.
 
 __all__ = ["load_module", "load_modules", "Config", "SystemContext"]
 
-from typing import Tuple
+import os
+import sys
+
+from typing import Optional, Sequence, Tuple
 
 from . import binding as _binding
 
 # Typing aliases (largely used for documentation).
 AnyModule = _binding.vm.VmModule
+
+# Environment key for a comma-delimitted list of drivers to try to load.
+PREFERRED_DRIVER_ENV_KEY = "IREE_DEFAULT_DRIVER"
+
+# Default value for IREE_DRIVER
+DEFAULT_IREE_DRIVER_VALUE = "vulkan,interpreter"
+
+
+def _create_default_iree_driver(
+    driver_names: Optional[Sequence[str]] = None) -> _binding.hal.HalDriver:
+  """Returns a default driver based on environment settings."""
+  # TODO(laurenzo): Ideally this should take a module and join any explicitly
+  # provided driver list with environmental constraints and what the module
+  # was compiled for.
+  if driver_names is None:
+    # Read from environment.
+    driver_names = os.environ.get(PREFERRED_DRIVER_ENV_KEY)
+    if driver_names is None:
+      driver_names = DEFAULT_IREE_DRIVER_VALUE
+    driver_names = driver_names.split(",")
+  available_driver_names = _binding.hal.HalDriver.query()
+  driver_exceptions = {}
+  for driver_name in driver_names:
+    if driver_name not in available_driver_names:
+      print(
+          "Could not create driver %s (not registered)" % driver_name,
+          file=sys.stderr)
+      continue
+    try:
+      driver = _binding.hal.HalDriver.create(driver_name)
+      # TODO(laurenzo): Remove these prints to stderr (for now, more information
+      # is better and there is no better way to report it yet).
+    except Exception as ex:  # pylint: disable=broad-except
+      print(
+          "Could not create default driver %s: %r" % (driver_name, ex),
+          file=sys.stderr)
+      driver_exceptions[driver_name] = ex
+    print("Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
+    return driver
+
+  # All failed.
+  raise RuntimeError("Could not create any requested driver "
+                     "%r (available=%r) : %r" %
+                     (driver_names, available_driver_names, driver_exceptions))
 
 
 class Config:
@@ -42,45 +89,24 @@ class Config:
   host_type_factory: _binding.host_types.HostTypeFactory
   default_modules: Tuple[AnyModule]
 
-  def _init_for_hal_driver(self, driver_name):
-    """Initializes the instance for a HAL driver."""
+  def __init__(self, driver_name: Optional[str] = None):
     self.vm_instance = _binding.vm.VmInstance()
-    driver_names = _binding.hal.HalDriver.query()
-    if driver_name not in driver_names:
-      raise ValueError("Cannot initialize iree for driver '%s': "
-                       "it is not in the known driver list %r" %
-                       (driver_name, driver_names))
-    self.driver = _binding.hal.HalDriver.create(driver_name)
+    self.driver = _create_default_iree_driver(
+        driver_name.split(",") if driver_name is not None else None)
     self.device = self.driver.create_default_device()
     hal_module = _binding.vm.create_hal_module(self.device)
     self.host_type_factory = _binding.host_types.HostTypeFactory.get_numpy()
     self.default_modules = (hal_module,)
 
-  @classmethod
-  def with_defaults(cls):
-    cfg = cls()
-    # TODO(laurenzo): Have a better heuristic for choosing a default driver.
-    cfg._init_for_hal_driver("vulkan")
-    return cfg
 
-  @classmethod
-  def for_hal_driver(cls, driver_name):
-    cfg = cls()
-    cfg._init_for_hal_driver(driver_name=driver_name)
-    return cfg
+_global_config = None
 
 
-class _GlobalConfig(Config):
-  """Singleton of globally configured instances."""
-
-  _instance = None
-
-  def __new__(cls, *args, **kwargs):
-    if cls._instance is None:
-      cls._instance = super().__new__(cls)
-      # TODO(laurenzo): Have a better heuristic for choosing a default driver.
-      cls._instance._init_for_hal_driver("vulkan")
-    return cls._instance
+def _get_global_config():
+  global _global_config
+  if _global_config is None:
+    _global_config = Config()
+  return _global_config
 
 
 class BoundFunction:
@@ -167,8 +193,9 @@ class Modules(dict):
 class SystemContext:
   """Global system."""
 
-  def __init__(self, modules=None, config: Config = None):
-    self._config = config if config is not None else _GlobalConfig()
+  def __init__(self, modules=None, config: Optional[Config] = None):
+    self._config = config if config is not None else _get_global_config()
+    print("SystemContext driver=%r" % self._config.driver, file=sys.stderr)
     self._is_dynamic = modules is None
     if not self._is_dynamic:
       init_modules = self._config.default_modules + tuple(modules)
@@ -223,14 +250,14 @@ class SystemContext:
     self.add_modules((module,))
 
 
-def load_modules(*modules):
+def load_modules(*modules, config: Optional[Config] = None):
   """Loads modules into a new or shared context and returns them."""
-  context = SystemContext(modules=modules)
+  context = SystemContext(modules=modules, config=config)
   context_modules = context.modules
   bound_modules = [context_modules[m.name] for m in modules]
   return bound_modules
 
 
-def load_module(module):
+def load_module(module, **kwargs):
   """Loads a module into a new or shared context and returns them."""
-  return load_modules(module)[0]
+  return load_modules(module, **kwargs)[0]

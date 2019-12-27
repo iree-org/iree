@@ -40,6 +40,14 @@ def create_simple_mul_module():
 
 class SystemApiTest(absltest.TestCase):
 
+  def test_non_existing_driver(self):
+    with self.assertRaisesRegex(RuntimeError,
+                                "Could not create any requested driver"):
+      config = pyiree.Config("nothere1,nothere2")
+
+  def test_subsequent_driver(self):
+    config = pyiree.Config("nothere1,interpreter")
+
   def test_empty_dynamic(self):
     ctx = pyiree.SystemContext()
     self.assertTrue(ctx.is_dynamic)

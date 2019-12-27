@@ -197,8 +197,7 @@ class _IreeModuleInstance(object):
     self._iree_module = iree_module
     self._iree_module_name = self._iree_module.name
 
-    self._system_config = system_api.Config.for_hal_driver(
-        driver_name=backend.iree_driver)
+    self._system_config = system_api.Config(driver_name=backend.iree_driver)
     self._context = system_api.SystemContext(
         modules=[self._iree_module], config=self._system_config)
 
