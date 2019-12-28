@@ -36,13 +36,26 @@ package(
     )
     for name in [
         "control_flow_test",
-        "exported_names_test",
         "keras_lstm_test",
         "simple_stateful_test",
         "mandelbrot_test",
         "simple_arithmetic_test",
     ]
 ]
+
+py_test(
+    name = "exported_names_test",
+    srcs = ["exported_names_test.py"],
+    python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//bindings/python/pyiree",
+    ],
+)
 
 py_test(
     name = "vulkan_conv_test",
