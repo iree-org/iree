@@ -371,7 +371,30 @@ TEST(IntrusiveListTest, Inserting) {
   EXPECT_THAT(ExtractValues(items), ElementsAre(1, 2, 3, 4));
 }
 
-// TODO(benvanik): test reverse iteration.
+TEST(IntrusiveListTest, Iteration) {
+  Item item1(1);
+  Item item2(2);
+  Item item3(3);
+  Item item4(4);
+
+  IntrusiveList<Item, offsetof(Item, list_a)> items;
+  items.push_back(&item1);
+  items.push_back(&item2);
+  items.push_back(&item3);
+  items.push_back(&item4);
+
+  std::vector<int> regular;
+  for (auto it = items.begin(); it != items.end(); ++it) {
+    regular.push_back((*it)->value);
+  }
+  EXPECT_THAT(regular, ElementsAre(1, 2, 3, 4));
+
+  std::vector<int> reverse;
+  for (auto rit = items.rbegin(); rit != items.rend(); ++rit) {
+    reverse.push_back((*rit)->value);
+  }
+  EXPECT_THAT(reverse, ElementsAre(4, 3, 2, 1));
+}
 
 TEST(IntrusiveListTest, NextPrevious) {
   Item item1(1);
