@@ -14,27 +14,28 @@
 
 iree_cc_library(
   NAME
-    VulkanSPIRV
+    LegacyInterpreter
   HDRS
-    "VulkanSPIRVTarget.h"
+    "LegacyInterpreterTarget.h"
   SRCS
-    "VulkanSPIRVTarget.cpp"
+    "LegacyInterpreterTarget.cpp"
   DEPS
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::HAL::Transforms
     iree::compiler::IR
-    iree::compiler::Translation::SPIRV
-    iree::schemas
-    iree::schemas::spirv_executable_def_cc_fbs
+    iree::compiler::IR::Interpreter
+    iree::compiler::Serialization
+    iree::compiler::Transforms
+    iree::compiler::Transforms::Interpreter
+    iree::compiler::Utils
     flatbuffers
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRSPIRVDialect
-    MLIRSPIRVLowering
-    MLIRSPIRVSerialization
     MLIRSupport
-    tensorflow::mlir_xla
+    MLIRTransforms
   ALWAYSLINK
   PUBLIC
 )
