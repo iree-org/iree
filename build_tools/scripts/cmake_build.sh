@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,22 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the project with bazel using Kokoro.
-
-set -e
+# Build the IREE project with CMake. Designed for CI, but can be run manually.
 
 set -x
+set -e
 
-# Check these exist and print the versions for later debugging
-bazel --version
-python3 -V
+ROOT_DIR=$(git rev-parse --show-toplevel)
 
-export PYTHON_BIN="$(which python3)"
-
-# Kokoro checks out the repository here.
-cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
-echo "Checking out submodules"
-git submodule update --init --depth 1000 --jobs 8
-
-echo "Building and testing with bazel"
-./build_tools/scripts/bazel_build.sh
+cd ${ROOT_DIR?}
+rm -rf build/
+mkdir build && cd build
+cmake -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
+cmake --build .
+rm -rf build/
