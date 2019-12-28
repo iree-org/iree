@@ -71,8 +71,10 @@ def _create_default_iree_driver(
           "Could not create default driver %s: %r" % (driver_name, ex),
           file=sys.stderr)
       driver_exceptions[driver_name] = ex
-    print("Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
-    return driver
+    else:
+      print(
+          "Created IREE driver %s: %r" % (driver_name, driver), file=sys.stderr)
+      return driver
 
   # All failed.
   raise RuntimeError("Could not create any requested driver "
