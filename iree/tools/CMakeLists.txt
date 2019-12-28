@@ -75,24 +75,27 @@ if(${IREE_BUILD_COMPILER})
       iree::hal::interpreter::interpreter_driver_module
       iree::hal::vulkan::vulkan_driver_module
     )
+endif()
 
-  iree_cc_binary(
-    NAME
-      iree_tblgen
-    OUT
-      iree-tblgen
-    SRCS
-      "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-    DEPS
-      iree::compiler::Dialect::VM::Tools
-      LLVMMLIRTableGen
-      MLIRSupport
-      LLVMTableGen
-    LINKOPTS
-      "-lpthread"
-  )
-  add_executable(iree-tblgen ALIAS iree_tools_iree_tblgen)
+iree_cc_binary(
+  NAME
+    iree_tblgen
+  OUT
+    iree-tblgen
+  SRCS
+    "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+  DEPS
+    iree::compiler::Dialect::VM::Tools
+    LLVMMLIRTableGen
+    MLIRSupport
+    LLVMTableGen
+  LINKOPTS
+    "-lpthread"
+)
+add_executable(iree-tblgen ALIAS iree_tools_iree_tblgen)
 
+
+if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree_translate
