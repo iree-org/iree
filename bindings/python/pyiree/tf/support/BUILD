@@ -14,10 +14,7 @@
 
 load(
     "//iree:build_defs.bzl",
-    "INTREE_FILECHECK_TARGET",
     "INTREE_TENSORFLOW_PY_DEPS",
-    "iree_glob_lit_tests",
-    "iree_setup_lit_package",
 )
 
 package(
@@ -25,29 +22,14 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_setup_lit_package(
-    data = [
-        "//integrations/tensorflow/compiler:iree-tf-opt",
-    ],
-)
-
-iree_glob_lit_tests(tags = ["nokokoro"])
-
-py_test(
-    name = "saved_model_adopt_exports",
+py_library(
+    name = "support",
     srcs = [
-        "saved_model_adopt_exports.py",
+        "tf_test_driver.py",
+        "tf_test_utils.py",
     ],
-    args = [
-        "--filecheck_binary=$(rootpath %s)" % INTREE_FILECHECK_TARGET,
-    ],
-    data = [
-        INTREE_FILECHECK_TARGET,
-    ],
-    python_version = "PY3",
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
-        "//third_party/py/pyiree/tf/support",
+        "//third_party/py/pyiree/compiler",
+        "//third_party/py/pyiree/rt",
     ],
 )

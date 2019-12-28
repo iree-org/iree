@@ -1,3 +1,5 @@
+"""Module init for the python bindings."""
+
 # Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(
-    default_visibility = ["//visibility:public"],
-    licenses = ["notice"],  # Apache 2.0
-)
+# pylint: disable=g-multiple-import
+# pylint: disable=g-bad-import-order
+# pylint: disable=g-import-not-at-top
+# pylint: disable=wildcard-import
+
+from . import binding as binding
+
+# Native aliases.
+Context = binding.CompilerContext
+Module = binding.CompilerModule
+CompileOptions = binding.CompileOptions
+OutputFormat = binding.OutputFormat
+
+# Conditionally import TensorFlow interop aliases.
+HAS_TENSORFLOW = hasattr(binding, "tf_interop")
+if HAS_TENSORFLOW:
+  from .conditional_tensorflow import *
