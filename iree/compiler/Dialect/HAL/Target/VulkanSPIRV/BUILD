@@ -40,6 +40,7 @@ cc_library(
         "@local_config_mlir//:SPIRVLowering",
         "@local_config_mlir//:SPIRVSerialization",
         "@local_config_mlir//:Support",
+        "@local_config_mlir//:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
     alwayslink = 1,

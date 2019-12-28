@@ -69,17 +69,20 @@ class ReductionApplyFnConversion final
       ConversionPatternRewriter &rewriter) const override;
 };
 
-/// Return operation conversion. Just converts iree::ReturnOp to
+/// Return operation conversion. Just converts ReturnOp to
 /// spirv::ReturnOp.
 // TODO: This can be moved into DRR.
-class IREEReturnOpConversion final
-    : public SPIRVReductionConversion<IREE::ReturnOp> {
+template <typename ReturnOpTy>
+class ReturnOpConversion final : public SPIRVReductionConversion<ReturnOpTy> {
  public:
-  using SPIRVReductionConversion<IREE::ReturnOp>::SPIRVReductionConversion;
+  using SPIRVReductionConversion<ReturnOpTy>::SPIRVReductionConversion;
 
   PatternMatchResult matchAndRewrite(
-      IREE::ReturnOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override;
+      ReturnOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<spirv::ReturnOp>(op);
+    return this->matchSuccess();
+  }
 };
 
 /// Operations within the apply function need to be converted to a atomic
@@ -146,17 +149,6 @@ PatternMatchResult ReductionApplyFnConversion::matchAndRewrite(
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::ReturnOp
-//===----------------------------------------------------------------------===//
-
-PatternMatchResult IREEReturnOpConversion::matchAndRewrite(
-    IREE::ReturnOp op, ArrayRef<Value> operands,
-    ConversionPatternRewriter &rewriter) const {
-  rewriter.replaceOpWithNewOp<spirv::ReturnOp>(op);
-  return matchSuccess();
-}
-
-//===----------------------------------------------------------------------===//
 // ReductionOp
 //===----------------------------------------------------------------------===//
 
@@ -187,10 +179,12 @@ LogicalResult lowerReductionApplyFunction(MLIRContext *context,
                                           ArrayRef<Operation *> fns) {
   OwningRewritePatternList patterns;
   SPIRVReductionTypeConverter typeConverter;
-  patterns.insert<IREEReturnOpConversion, ReductionApplyFnConversion,
-                  ReductionOpConversion<xla_hlo::MaxOp, spirv::AtomicSMaxOp>,
-                  ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>>(
-      context, typeConverter);
+  patterns
+      .insert<ReductionApplyFnConversion,
+              ReductionOpConversion<xla_hlo::MaxOp, spirv::AtomicSMaxOp>,
+              ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>,
+              ReturnOpConversion<IREE::ReturnOp>, ReturnOpConversion<ReturnOp>>(
+          context, typeConverter);
   ConversionTarget target(*context);
   target.addLegalDialect<spirv::SPIRVDialect>();
   target.addDynamicallyLegalOp<FuncOp>(

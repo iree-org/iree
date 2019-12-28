@@ -73,19 +73,35 @@ PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(
   rewriter.create<IREE::ReturnOp>(fn.getLoc());
 
   // Finally update the workload size to be determined by the size of the input.
+  auto convertFn = [&](std::array<int32_t, 3> value,
+                       SmallVectorImpl<APInt> &vector) {
+    vector.reserve(3);
+    for (auto val : value) {
+      vector.emplace_back(32, static_cast<uint64_t>(val), true);
+    }
+  };
+
   auto shape = src->getType().cast<ShapedType>().getShape();
   std::array<int32_t, 3> workload = {1, 1, 1};
   calculateWorkload(shape, workload);
   SmallVector<APInt, 3> workloadAPInt;
-  workloadAPInt.reserve(3);
-  for (auto workloadVal : workload) {
-    workloadAPInt.emplace_back(32, static_cast<uint64_t>(workloadVal), true);
-  }
+  convertFn(workload, workloadAPInt);
   fn.setAttr(
       "iree.executable.workload",
       DenseElementsAttr::get(
           RankedTensorType::get(3, IntegerType::get(32, rewriter.getContext())),
           workloadAPInt)
+          .cast<DenseIntElementsAttr>());
+
+  // TODO(ravishankarm): The workgroup size should have been set already, but is
+  // not. So setting this here.
+  SmallVector<APInt, 3> workgroupSizeAPInt;
+  convertFn({32, 1, 1}, workgroupSizeAPInt);
+  fn.setAttr(
+      "iree.executable.workgroup_size",
+      DenseElementsAttr::get(
+          RankedTensorType::get(3, IntegerType::get(32, rewriter.getContext())),
+          workgroupSizeAPInt)
           .cast<DenseIntElementsAttr>());
 
   rewriter.finalizeRootUpdate(fn);
