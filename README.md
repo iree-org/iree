@@ -8,6 +8,7 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 ## Table of Contents
 
 -   [Contact](#contact)
+-   [Build Status](#build-status)
 -   [Quickstart](#quickstart)
 -   [Project Goals](#project-goals)
 -   [Milestones](#milestones)
@@ -20,6 +21,14 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 For bugs and issues, prefer filing a GitHub issue. For other topics, feel free
 to join/post/read messages on the
 [iree-discuss mailing list](https://groups.google.com/forum/#!forum/iree-discuss).
+
+## Build Status
+
+CI System      | Build System | Platform | Status
+-------------- | ------------ | -------- | ------
+GitHub Actions | CMake        | Linux    | [![github-cmake-linux-status](https://github.com/google/iree/workflows/CMake%20Build/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22CMake+Build%22)
+GitHub Actions | Bazel        | Linux    | [![github-bazel-linux-status](https://github.com/google/iree/workflows/Bazel%20Build/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22Bazel+Build%22)
+Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
 
 ## Quickstart
 
