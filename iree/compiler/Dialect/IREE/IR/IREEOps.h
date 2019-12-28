@@ -15,10 +15,10 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_IR_IREEOPS_H_
 #define IREE_COMPILER_DIALECT_IREE_IR_IREEOPS_H_
 
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/StandardTypes.h"
+#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Attributes.h"
+#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/Dialect.h"
+#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/OpDefinition.h"
+#include "third_party/llvm/llvm/projects/google_mlir/include/mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
