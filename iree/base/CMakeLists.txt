@@ -38,7 +38,6 @@ iree_cc_library(
   PUBLIC
 )
 
-
 iree_cc_library(
   NAME
     api_util
@@ -544,40 +543,36 @@ iree_cc_library(
     absl::strings
     absl::time
     absl::optional
-      # TODO(marbre): Add dependencies
-      # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
+    # TODO(marbre): Add dependency
+    # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
   ALWAYSLINK
 )
 
 if(${IREE_ENABLE_TRACING})
-
-iree_cc_library(
-  NAME
-    tracing_enabled
-  HDRS
-    "tracing.h"
-  SRCS
-    "tracing_enabled.cc"
-  DEPS
-    absl::core_headers
-    absl::flags
-    absl::strings
-    absl::synchronization
-    absl::time
-    absl::optional
-    iree::base::file_io
-    iree::base::file_path
-    iree::base::initializer
-    iree::base::logging
-    iree::base::status
-      # TODO(marbre): Add dependencies
+  iree_cc_library(
+    NAME
+      tracing_enabled
+    HDRS
+      "tracing.h"
+    SRCS
+      "tracing_enabled.cc"
+    DEPS
+      absl::core_headers
+      absl::flags
+      absl::strings
+      absl::synchronization
+      absl::time
+      absl::optional
+      iree::base::file_io
+      iree::base::file_path
+      iree::base::initializer
+      iree::base::logging
+      iree::base::status
+      # TODO(marbre): Add dependency
       # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
-  ALWAYSLINK
-)
-
+    ALWAYSLINK
+  )
 endif()
-
-
 
 # TODO(benvanik): get wait_handle ported to win32.
 # iree_cc_library(
