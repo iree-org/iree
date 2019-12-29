@@ -511,6 +511,7 @@ if(${IREE_ENABLE_TRACING})
       absl::strings
       absl::optional
       absl::time
+      iree::base::tracing_enabled
       # TODO(marbre): Add dependencies
       # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
       # "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"]
@@ -523,7 +524,10 @@ else()
     HDRS
       "tracing.h"
     DEPS
-      absl::flags
+      absl::strings
+      absl::time
+      absl::optional
+      iree::base::tracing_disabled
     PUBLIC
   )
 endif()
