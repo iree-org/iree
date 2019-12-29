@@ -20,36 +20,24 @@ iree_cc_library(
   SRCS
     "api.cc"
   DEPS
-    absl::time
+    iree::vm::api_hdrs
+    iree::vm::sequencer_module
     iree::base::api
     iree::base::api_util
     iree::base::flatbuffer_util
     iree::base::tracing
     iree::rt::api
-    iree::vm::sequencer_module
   PUBLIC
 )
 
 iree_cc_library(
   NAME
-    bytecode_disassembler
-  SRCS
-    "bytecode_disassembler.cc"
+    api_hdrs
   HDRS
-    "bytecode_disassembler.h"
+    "api.h"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::strings
-    absl::span
-    iree::base::status
-    iree::schemas
-    iree::schemas::bytecode::bytecode_v0
-    iree::rt
-    iree::vm::bytecode_util
-    iree::vm::opcode_info
-    iree::vm::source_map_resolver
-    iree::vm::type
+    iree::base::api_hdrs
+    iree::rt::api_hdrs
   PUBLIC
 )
 
@@ -57,17 +45,28 @@ iree_cc_library(
   NAME
     bytecode_module
   SRCS
+    "bytecode_disassembler.cc"
     "bytecode_module.cc"
   HDRS
+    "bytecode_disassembler.h"
     "bytecode_module.h"
   DEPS
-    absl::memory
+    iree::vm::bytecode_util
+    iree::vm::opcode_info
+    iree::vm::source_map_resolver
+    iree::vm::type
     iree::base::flatbuffer_util
     iree::base::status
+    iree::base::tracing
+    iree::hal::buffer_view
     iree::rt
     iree::schemas
-    iree::vm::bytecode_disassembler
-    iree::vm::source_map_resolver
+    iree::schemas::bytecode::bytecode_v0
+    absl::core_headers
+    absl::inlined_vector
+    absl::memory
+    absl::strings
+    absl::span
   PUBLIC
 )
 
@@ -79,16 +78,16 @@ iree_cc_library(
   HDRS
     "bytecode_reader.h"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
+    iree::vm::bytecode_module
+    iree::vm::type
     iree::base::shape
     iree::base::status
     iree::hal::buffer_view
     iree::hal::heap_buffer
     iree::rt
     iree::schemas::bytecode::bytecode_v0
-    iree::vm::bytecode_module
-    iree::vm::type
+    absl::core_headers
+    absl::inlined_vector
   PUBLIC
 )
 
@@ -100,8 +99,8 @@ iree_cc_library(
   HDRS
     "bytecode_tables_interpreter.h"
   DEPS
-    iree::schemas::bytecode::interpreter_bytecode_v0
     iree::vm::opcode_info
+    iree::schemas::bytecode::interpreter_bytecode_v0
   PUBLIC
 )
 
@@ -113,9 +112,9 @@ iree_cc_library(
   HDRS
     "bytecode_tables_sequencer.h"
   DEPS
-    iree::schemas::bytecode::sequencer_bytecode_v0
     iree::vm::opcode_info
-  PUBLIC
+    iree::schemas::bytecode::sequencer_bytecode_v0
+    PUBLIC
 )
 
 iree_cc_library(
@@ -126,8 +125,8 @@ iree_cc_library(
   HDRS
     "bytecode_util.h"
   DEPS
-    absl::strings
     iree::schemas::bytecode::bytecode_v0
+    absl::strings
   PUBLIC
 )
 
@@ -139,8 +138,8 @@ iree_cc_library(
   HDRS
     "bytecode_validator.h"
   DEPS
+    iree::vm::bytecode_module
     iree::base::status
-    iree::rt
     iree::schemas
   PUBLIC
 )
@@ -151,10 +150,10 @@ iree_cc_library(
   HDRS
     "opcode_info.h"
   DEPS
+    iree::schemas::bytecode::bytecode_v0
     absl::strings
     absl::optional
     absl::span
-    iree::schemas::bytecode::bytecode_v0
   PUBLIC
 )
 
@@ -166,11 +165,11 @@ iree_cc_library(
   HDRS
     "sequencer_dispatch.h"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::strings
-    absl::time
-    absl::span
+    iree::vm::bytecode_module
+    iree::vm::bytecode_reader
+    iree::vm::bytecode_tables_sequencer
+    iree::vm::bytecode_util
+    iree::vm::opcode_info
     iree::base::logging
     iree::base::memory
     iree::base::status
@@ -181,11 +180,11 @@ iree_cc_library(
     iree::hal::heap_buffer
     iree::rt
     iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::bytecode_module
-    iree::vm::bytecode_reader
-    iree::vm::bytecode_tables_sequencer
-    iree::vm::bytecode_util
-    iree::vm::opcode_info
+    absl::core_headers
+    absl::inlined_vector
+    absl::strings
+    absl::time
+    absl::span
   PUBLIC
 )
 
@@ -197,13 +196,14 @@ iree_cc_library(
   HDRS
     "sequencer_module.h"
   DEPS
-    absl::core_headers
+    iree::vm::bytecode_module
+    iree::vm::bytecode_tables_sequencer
+    iree::vm::sequencer_dispatch
     iree::base::status
+    iree::base::tracing
     iree::hal::buffer_view
     iree::rt
-    iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::bytecode_module
-    iree::vm::sequencer_dispatch
+    absl::memory
   PUBLIC
 )
 
@@ -215,12 +215,12 @@ iree_cc_library(
   HDRS
     "source_map_resolver.h"
   DEPS
-    absl::strings
-    absl::optional
     iree::base::flatbuffer_util
     iree::base::status
     iree::rt
     iree::schemas
+    absl::strings
+    absl::optional
   PUBLIC
 )
 
