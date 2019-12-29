@@ -132,43 +132,18 @@ iree_cc_test(
     absl::strings
 )
 
-# TODO(marbre) build within internal
-iree_cc_library(
-  NAME
-    file_handle_win32
-  SRCS
-    "internal/file_handle_win32.cc"
-  HDRS
-    "internal/file_handle_win32.h"
-  DEPS
-    absl::memory
-    absl::strings
-    iree::base::platform_headers
-    iree::base::status
-    iree::base::tracing
-    iree::base::target_platform
-  PUBLIC
-)
-
 iree_cc_library(
   NAME
     file_io
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    "internal/file_io_posix.cc"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    "internal/file_io_win32.cc"
   HDRS
     "file_io.h"
   DEPS
     absl::memory
     absl::strings
     absl::span
-    iree::base::file_handle_win32
-    iree::base::platform_headers
-    iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
+    iree::base::internal::file_io_internal
   PUBLIC
 )
 
@@ -184,11 +159,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     file_mapping
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_mapping") in the Bazel world. . Move to internal.
-    "internal/file_mapping_posix.cc"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    "internal/file_mapping_win32.cc"
   HDRS
     "file_mapping.h"
   DEPS
@@ -197,12 +167,7 @@ iree_cc_library(
     absl::span
     iree::base::ref_ptr
     iree::base::status
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    iree::base::file_mapping_hdrs
-    iree::base::platform_headers
-    iree::base::target_platform
-    iree::base::tracing
-
+    iree::base::internal::file_mapping_internal
   PUBLIC
 )
 
@@ -266,17 +231,8 @@ iree_cc_library(
     init
   HDRS
     "init.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("init") in the Bazel world
-    "internal/init_internal.h"
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("init") in the Bazel world. Move to internal.
-    "internal/init_internal.cc"
   DEPS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("init") in the Bazel world. Move to internal.
-    absl::flags
-    absl::flags_parse
-    iree::base::initializer
-    iree::base::target_platform
+    iree::base::internal::init_internal
   PUBLIC
 )
 
@@ -497,8 +453,8 @@ iree_cc_library(
     source_location
   HDRS
     "source_location.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("source_location") in the Bazel world. Move to internal.
-    "internal/source_location.h"
+  DEPS
+    iree::base::internal::source_location_internal
   PUBLIC
 )
 
@@ -507,33 +463,9 @@ iree_cc_library(
     status
   HDRS
     "status.h"
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status") in the Bazel world. Move to internal.
-    "internal/status.h"
-    "internal/status_builder.h"
-    "internal/status_errno.h"
-    "internal/status_errors.h"
-    "internal/status_macros.h"
-    "internal/status_win32_errors.h"
-    "internal/statusor.h"
-  SRCS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status") in the Bazel world. Move to internal.
-    "internal/status.cc"
-    "internal/status_builder.cc"
-    "internal/status_errno.cc"
-    "internal/status_errors.cc"
-    "internal/status_win32_errors.cc"
-    "internal/statusor.cc"
   DEPS
     iree::base::source_location
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status") in the Bazel world. Move to internal.
-    absl::base
-    absl::debugging
-    absl::flags
-    absl::memory
-    absl::strings
-    iree::base::logging
-    iree::base::platform_headers
-    iree::base::target_platform
+    iree::base::internal::status_internal
   PUBLIC
 )
 
@@ -542,14 +474,8 @@ iree_cc_library(
     status_matchers
   HDRS
     "status_matchers.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("status_matchers") in the Bazel world. Move to internal.
-    "internal/status_matchers.h"
   DEPS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status_matchers") in the Bazel world. Move to internal.
-    absl::strings
-    absl::optional
-    gtest_main
-    iree::base::status
+    iree::base::internal::status_matchers_internal
   TESTONLY
   PUBLIC
 )
