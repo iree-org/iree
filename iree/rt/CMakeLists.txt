@@ -22,16 +22,30 @@ iree_cc_library(
   SRCS
     "api.cc"
   DEPS
-    absl::time
+    iree::rt::api_hdrs
+    iree::rt
     iree::base::api
     iree::base::api_util
     iree::base::tracing
     iree::hal::api
     iree::hal::buffer_view
     iree::hal::driver_registry
-    iree::rt
+    iree::rt::debug::debug_server_interface
+    absl::time
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    api_hdrs
+  HDRS
+    "api.h"
+  DEPS
+    iree::base::api_hdrs
+    iree::hal::api_hdrs
+  PUBLIC
+)
+
 
 iree_cc_library(
   NAME
@@ -63,13 +77,6 @@ iree_cc_library(
     "stack_frame.h"
     "stack_trace.h"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::strings
-    absl::synchronization
-    absl::time
-    absl::optional
-    absl::span
     iree::base::bitfield
     iree::base::intrusive_list
     iree::base::ref_ptr
@@ -78,5 +85,12 @@ iree_cc_library(
     iree::hal::buffer_view
     iree::hal::device_manager
     iree::rt::debug::debug_server_interface
+    absl::core_headers
+    absl::inlined_vector
+    absl::strings
+    absl::synchronization
+    absl::time
+    absl::optional
+    absl::span
   PUBLIC
 )
