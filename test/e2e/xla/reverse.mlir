@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @xla_reverse
 func @xla_reverse () -> (tensor<2x3xf32>, tensor <2x3xf32>, tensor <2x3xf32>) {

@@ -32,6 +32,19 @@ TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
 ]
 
+cc_binary(
+    name = "iree-dump-module",
+    srcs = ["dump_module_main.cc"],
+    deps = [
+        "//iree/base:file_io",  # build-cleaner: keep
+        "//iree/base:flatbuffer_util",
+        "//iree/base:init",
+        "//iree/schemas",
+        "//iree/schemas:bytecode_module_def_cc_fbs",
+        "@com_github_google_flatbuffers//:flatbuffers",
+    ],
+)
+
 cc_library(
     name = "iree_opt_library",
     deps = [
@@ -74,37 +87,6 @@ cc_binary(
 cc_binary(
     name = "iree-run-mlir",
     srcs = ["run_mlir_main.cc"],
-    deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-        "//iree/base:source_location",
-        "//iree/rt",
-        "//iree/vm:sequencer_module",
-        "@llvm-project//llvm:support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Support",
-        "//iree/base:init",
-        "//iree/base:status",
-        "//iree/compiler/Translation/Sequencer",
-        "//iree/compiler/Translation/Interpreter",
-        "//iree/compiler/Translation/SPIRV",
-        "//iree/compiler/Translation:IREEVM",
-        "//iree/hal:buffer_view_string_util",
-        "//iree/hal:driver_registry",
-        "//iree/schemas",
-        "//iree/rt/debug:debug_server_flags",
-    ] + TARGET_COMPILER_BACKENDS + PLATFORM_VULKAN_DEPS + [
-        "//iree/hal/interpreter:interpreter_driver_module",
-        # TODO(b/142004903): enable when Dawn HAL implementation is functional
-        # "//iree/hal/dawn:dawn_driver_module",
-        "//iree/hal/vulkan:vulkan_driver_module",
-    ],
-)
-
-cc_binary(
-    name = "iree-run-mlir2",
-    srcs = ["run_mlir_main2.cc"],
     deps = [
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
@@ -153,7 +135,7 @@ cc_binary(
 
 cc_library(
     name = "iree_translate_library",
-    srcs = ["iree_translate_main.cc"],
+    srcs = ["translate_main.cc"],
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
@@ -181,7 +163,7 @@ cc_binary(
 )
 
 cc_binary(
-    name = "run_module",
+    name = "iree-run-module",
     srcs = ["run_module_main.cc"],
     deps = [
         "//iree/base:file_io",
@@ -198,19 +180,6 @@ cc_binary(
         "//iree/vm:sequencer_module",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_binary(
-    name = "iree_dump_module",
-    srcs = ["dump_module.cc"],
-    deps = [
-        "//iree/base:file_io",  # build-cleaner: keep
-        "//iree/base:flatbuffer_util",
-        "//iree/base:init",
-        "//iree/schemas",
-        "//iree/schemas:reflection_data",
-        "@com_github_google_flatbuffers//:flatbuffers",
     ],
 )
 

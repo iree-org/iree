@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
 
 // Int sum values from [1, 10]
 // CHECK-LABEL: EXEC @reduce_sum_1x10xi32
