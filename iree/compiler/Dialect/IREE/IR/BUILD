@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@local_config_mlir//:tblgen.bzl", "gentbl")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -42,10 +42,10 @@ cc_library(
     ],
     deps = [
         ":IREEOpsGen",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Parser",
-        "@local_config_mlir//:Support",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Support",
     ],
     alwayslink = 1,
 )
@@ -56,10 +56,10 @@ gentbl(
         ("-gen-op-decls", "IREEOps.h.inc"),
         ("-gen-op-defs", "IREEOps.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEOps.td",
     td_srcs = [
         ":td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )

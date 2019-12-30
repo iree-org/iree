@@ -32,9 +32,9 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/IR",
         "//iree/compiler/Utils",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:StandardOps",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
     ],
     alwayslink = 1,
 )

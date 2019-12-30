@@ -27,8 +27,8 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-        "@llvm//:support",
-        "@local_config_mlir//:Support",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:Support",
     ],
     alwayslink = 1,
 )

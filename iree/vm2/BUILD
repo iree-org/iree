@@ -1,7 +1,7 @@
 # Bytecode VM.
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("@local_config_mlir//:tblgen.bzl", "gentbl")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -100,8 +100,8 @@ gentbl(
     td_srcs = [
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "//iree/compiler/Dialect/VM/IR:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
-        "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
     ],
 )
 

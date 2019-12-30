@@ -24,10 +24,10 @@ cc_library(
         "VMOpTableGen.cpp",
     ],
     deps = [
-        "@llvm//:support",
-        "@llvm//:tablegen",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:TableGen",
+        "@llvm-project//llvm:support",
+        "@llvm-project//llvm:tablegen",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TableGen",
     ],
     alwayslink = 1,
 )

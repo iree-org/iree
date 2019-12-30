@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@local_config_mlir//:tblgen.bzl", "gentbl")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -48,11 +48,11 @@ cc_library(
         ":FlowOpInterfaceGen",
         ":FlowOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:StandardOps",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:TransformUtils",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
     ],
     alwayslink = 1,
 )
@@ -63,12 +63,12 @@ gentbl(
         ("-gen-enum-decls", "FlowEnums.h.inc"),
         ("-gen-enum-defs", "FlowEnums.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowBase.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 
@@ -78,12 +78,12 @@ gentbl(
         ("-gen-op-interface-decls", "FlowOpInterface.h.inc"),
         ("-gen-op-interface-defs", "FlowOpInterface.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowBase.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:StdOpsTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
 
@@ -93,11 +93,11 @@ gentbl(
         ("-gen-op-decls", "FlowOps.h.inc"),
         ("-gen-op-defs", "FlowOps.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowOps.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )

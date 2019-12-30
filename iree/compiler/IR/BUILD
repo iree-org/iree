@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-load("@local_config_mlir//:tblgen.bzl", "gentbl")
 
 exports_files(["OpBase.td"])
 
@@ -55,10 +55,10 @@ cc_library(
         ":EnumsGen",
         ":OpsGen",
         ":StructureOpsGen",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:StandardOps",
-        "@local_config_mlir//:Support",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
     ],
     alwayslink = 1,
 )
@@ -69,11 +69,11 @@ gentbl(
         ("-gen-op-decls", "ConfigOps.h.inc"),
         ("-gen-op-defs", "ConfigOps.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ConfigOps.td",
     td_srcs = [
         ":td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 
@@ -83,11 +83,11 @@ gentbl(
         ("-gen-enum-decls", "Enums.h.inc"),
         ("-gen-enum-defs", "Enums.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "OpBase.td",
     td_srcs = [
         ":td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 
@@ -97,11 +97,11 @@ gentbl(
         ("-gen-op-decls", "Ops.h.inc"),
         ("-gen-op-defs", "Ops.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "Ops.td",
     td_srcs = [
         ":td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
 
@@ -111,10 +111,10 @@ gentbl(
         ("-gen-op-decls", "StructureOps.h.inc"),
         ("-gen-op-defs", "StructureOps.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "StructureOps.td",
     td_srcs = [
         ":td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
+        "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )

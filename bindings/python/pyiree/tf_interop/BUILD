@@ -81,8 +81,8 @@ cc_library(
     tags = ["nokokoro"],
     visibility = ["//visibility:private"],
     deps = [
-        "@local_config_mlir//:IR",
-        "@llvm//:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//llvm:support",
         "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",

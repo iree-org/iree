@@ -17,8 +17,8 @@
 #   "@com_google_absl//absl/python"
 #   "@com_google_absl//absl"
 #   "@com_google_benchmark//:benchmark"
-#   "@local_config_mlir//"
-#   "@llvm//"
+#   "@llvm-project//mlir"
+#   "@llvm-project//llvm"
 #   "@com_github_google_flatbuffers//:flatbuffers"
 #   "@org_tensorflow//tensorflow"
 #

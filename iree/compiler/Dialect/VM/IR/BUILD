@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("@local_config_mlir//:tblgen.bzl", "gentbl")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -54,11 +54,11 @@ cc_library(
         ":VMOpInterfaceGen",
         ":VMOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:StandardOps",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:TransformUtils",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
     ],
     alwayslink = 1,
 )
@@ -69,13 +69,13 @@ gentbl(
         ("-gen-enum-decls", "VMEnums.h.inc"),
         ("-gen-enum-defs", "VMEnums.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMBase.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
-        "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
     ],
 )
 
@@ -85,13 +85,13 @@ gentbl(
         ("-gen-op-decls", "VMOps.h.inc"),
         ("-gen-op-defs", "VMOps.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMOps.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
-        "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
     ],
 )
 
@@ -105,8 +105,8 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
-        "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
     ],
 )
 
@@ -116,12 +116,12 @@ gentbl(
         ("-gen-op-interface-decls", "VMOpInterface.h.inc"),
         ("-gen-op-interface-defs", "VMOpInterface.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMBase.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:OpBaseTdFiles",
-        "@local_config_mlir//:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
     ],
 )

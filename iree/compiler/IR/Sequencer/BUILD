@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-load("@local_config_mlir//:tblgen.bzl", "gentbl")
 
 filegroup(
     name = "td_files",
@@ -51,10 +51,10 @@ cc_library(
         "//iree/compiler/Serialization",
         "//iree/compiler/Utils",
         "//iree/schemas/bytecode:sequencer_bytecode_v0",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:StandardOps",
-        "@local_config_mlir//:Support",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
     ],
     alwayslink = 1,
 )
@@ -65,11 +65,11 @@ gentbl(
         ("-gen-op-decls", "HLOps.h.inc"),
         ("-gen-op-defs", "HLOps.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "HLOps.td",
     td_srcs = [
         ":td_files",
-        "@local_config_mlir//:include/mlir/IR/OpBase.td",
+        "@llvm-project//mlir:include/mlir/IR/OpBase.td",
         "//iree/compiler/IR:OpBase.td",
     ],
 )
@@ -80,11 +80,11 @@ gentbl(
         ("-gen-op-decls", "LLOps.h.inc"),
         ("-gen-op-defs", "LLOps.cpp.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LLOps.td",
     td_srcs = [
         ":td_files",
-        "@local_config_mlir//:include/mlir/IR/OpBase.td",
+        "@llvm-project//mlir:include/mlir/IR/OpBase.td",
         "//iree/compiler/IR:OpBase.td",
     ],
 )

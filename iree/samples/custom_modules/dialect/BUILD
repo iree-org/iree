@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
-load("@local_config_mlir//:tblgen.bzl", "gentbl")
+load("@llvm-project//mlir:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -42,12 +42,12 @@ cc_library(
         ":custom_ops_gen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Parser",
-        "@local_config_mlir//:Pass",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:Transforms",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
 )
@@ -58,12 +58,12 @@ gentbl(
         ("-gen-op-decls", "custom_ops.h.inc"),
         ("-gen-op-defs", "custom_ops.cc.inc"),
     ],
-    tblgen = "@local_config_mlir//:mlir-tblgen",
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "custom_ops.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@local_config_mlir//:StdOpsTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
 
@@ -81,7 +81,7 @@ cc_binary(
     deps = [
         ":dialect",
         "//iree/tools:iree_opt_library",
-        "@local_config_mlir//:MlirOptMain",
+        "@llvm-project//mlir:MlirOptMain",
     ],
 )
 
