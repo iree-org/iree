@@ -28,7 +28,7 @@ namespace VM {
 
 void buildVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createConversionPass());
-
+  passManager.addPass(createGlobalInitializationPass());
   passManager.addPass(createCSEPass());
 
   // TODO(benvanik): run symbol DCE pass.

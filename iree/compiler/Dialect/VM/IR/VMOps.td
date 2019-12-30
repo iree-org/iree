@@ -279,6 +279,12 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     }]>,
   ];
 
+  let extraClassDeclaration = [{
+    void makeMutable() { setAttr("is_mutable", UnitAttr::get(getContext())); }
+    void clearInitializer() { removeAttr("initializer"); }
+    void clearInitialValue() { removeAttr("initial_value"); }
+  }];
+
   let parser = [{ return parseGlobalOp(parser, &result); }];
   let printer = [{ return printGlobalOp(p, *this); }];
   let verifier = [{ return verifyGlobalOp(*this); }];
@@ -306,7 +312,7 @@ def VM_GlobalRefOp : VM_GlobalOp<"global.ref", UnitAttr> {
 }
 
 class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
-    VM_PureOp<mnemonic, !listconcat(traits, [
+    VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
   let arguments = (ins

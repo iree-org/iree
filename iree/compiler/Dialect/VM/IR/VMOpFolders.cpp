@@ -111,11 +111,29 @@ struct InlineConstGlobalOpInitializer : public OpRewritePattern<T> {
   }
 };
 
+/// Drops initial_values from globals where the value is 0, as by default all
+/// globals are zero-initialized upon module load.
+struct DropDefaultConstGlobalOpInitializer
+    : public OpRewritePattern<GlobalI32Op> {
+  using OpRewritePattern<GlobalI32Op>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(GlobalI32Op op,
+                                     PatternRewriter &rewriter) const override {
+    if (!op.initial_value().hasValue()) return matchFailure();
+    auto value = op.initial_valueAttr().cast<IntegerAttr>();
+    if (value.getValue() != 0) return matchFailure();
+    rewriter.replaceOpWithNewOp<GlobalI32Op>(
+        op, op.sym_name(), op.is_mutable(), op.type(),
+        llvm::to_vector<4>(op.getDialectAttrs()));
+    return matchSuccess();
+  }
+};
+
 }  // namespace
 
 void GlobalI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
-  results.insert<InlineConstGlobalOpInitializer<GlobalI32Op>>(context);
+  results.insert<InlineConstGlobalOpInitializer<GlobalI32Op>,
+                 DropDefaultConstGlobalOpInitializer>(context);
 }
 
 void GlobalRefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,

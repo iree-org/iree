@@ -19,12 +19,12 @@
 #include "iree/base/api.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/vm2/bytecode_module_impl.h"
+#include "iree/vm2/ref.h"
+#include "iree/vm2/stack.h"
 
 // TODO(benvanik): replace with flatcc version so this file can be pure C.
 #include "flatbuffers/flatbuffers.h"
 #include "iree/schemas/bytecode_module_def_generated.h"
-#include "iree/vm2/ref.h"
-#include "iree/vm2/stack.h"
 
 #define IREE_VM_GET_MODULE_DEF(module)                 \
   ::flatbuffers::GetRoot<iree::vm::BytecodeModuleDef>( \
@@ -323,7 +323,8 @@ static iree_status_t iree_vm_bytecode_module_get_function_reflection_attr(
 
   auto* export_def = module_def->internal_functions()->Get(ordinal);
   const iree::vm::FunctionSignatureDef* signature = export_def->signature();
-  if (index < 0 || index >= signature->reflection_attrs()->size()) {
+  if (!signature->reflection_attrs() || index < 0 ||
+      index >= signature->reflection_attrs()->size()) {
     return IREE_STATUS_NOT_FOUND;
   }
   const ::iree::vm::ReflectionAttrDef* attr =
@@ -474,6 +475,7 @@ static iree_status_t iree_vm_bytecode_module_free_state(
       (iree_vm_bytecode_module_state_t*)module_state;
   if (!state) return IREE_STATUS_INVALID_ARGUMENT;
 
+  // Release remaining global references.
   for (int i = 0; i < state->global_ref_count; ++i) {
     iree_vm_ref_release(&state->global_ref_table[i]);
   }

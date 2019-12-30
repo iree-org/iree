@@ -10,12 +10,24 @@ vm.module @global_i32_folds {
     %c123 = vm.const.i32 123 : i32
     vm.return %c123 : i32
   }
+
+  // CHECK: vm.global.i32 @g1 mutable : i32
+  vm.global.i32 @g1 mutable 0 : i32
+  // CHECK: vm.global.i32 @g2 : i32
+  vm.global.i32 @g2 0 : i32
+
+  // CHECK: vm.global.i32 @g3 mutable : i32
+  vm.global.i32 @g3 mutable init(@g3init) : i32
+  vm.func @g3init() -> i32 {
+    %c0 = vm.const.i32 0 : i32
+    vm.return %c0 : i32
+  }
 }
 
 // -----
 
-// CHECK-LABEL: @global_ref_folds
-vm.module @global_ref_folds {
+// CHECK-LABEL: @global_ref_folds_null
+vm.module @global_ref_folds_null {
   // CHECK: vm.global.ref @g0 mutable : !ireex.opaque_ref
   vm.global.ref @g0 mutable init(@g0init) : !ireex.opaque_ref
   vm.func @g0init() -> !ireex.opaque_ref {

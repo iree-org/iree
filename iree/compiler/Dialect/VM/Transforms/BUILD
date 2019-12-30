@@ -21,7 +21,8 @@ cc_library(
     name = "Transforms",
     srcs = [
         "Conversion.cpp",
-        "OrdinalAllocationPass.cpp",
+        "GlobalInitialization.cpp",
+        "OrdinalAllocation.cpp",
         "Passes.cpp",
     ],
     hdrs = [

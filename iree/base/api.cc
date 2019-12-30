@@ -118,6 +118,16 @@ iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
   return strncmp(lhs.data, rhs.data, rhs.size);
 }
 
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
+    iree_string_view_t value, iree_string_view_t prefix) {
+  if (!value.data || !prefix.data) {
+    return false;
+  } else if (prefix.size > value.size) {
+    return false;
+  }
+  return strncmp(value.data, prefix.data, prefix.size) == 0;
+}
+
 IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
     iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
     iree_string_view_t* out_rhs) {

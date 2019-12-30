@@ -18,7 +18,10 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "OrdinalAllocationPass.cpp"
+    "Conversion.cpp"
+    "GlobalInitialization.cpp"
+    "OrdinalAllocation.cpp"
+    "Passes.cpp"
   DEPS
     iree::compiler::Dialect::VM::IR
     LLVMSupport

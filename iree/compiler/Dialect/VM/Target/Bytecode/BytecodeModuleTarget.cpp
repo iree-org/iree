@@ -162,7 +162,9 @@ static LogicalResult canonicalizeModule(BytecodeTargetOptions targetOptions,
     modulePasses.addPass(mlir::createCanonicalizerPass());
   }
 
-  // TODO(benvanik): analysis instead? useful to have ordinals in MLIR text?
+  // Mark up the module with ordinals for each top-level op (func, etc).
+  // This will make it easier to correlate the MLIR textual output to the
+  // binary output.
   // We don't want any more modifications after this point as they could
   // invalidate the ordinals.
   modulePasses.addPass(IREE::VM::createOrdinalAllocationPass());
