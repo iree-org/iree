@@ -62,10 +62,10 @@ function(iree_bytecode_module)
     set(_ARGS "${_TRANSLATION}")
     list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
     list(APPEND _ARGS "-o")
-    list(APPEND _ARGS "${_RULE_NAME}.emod")
+    list(APPEND _ARGS "${_RULE_NAME}.module")
 
     add_custom_command(
-      OUTPUT "${_RULE_NAME}.emod"
+      OUTPUT "${_RULE_NAME}.module"
       COMMAND ${_TRANSLATION_TOOL_EXECUTABLE} ${_ARGS}
       DEPENDS ${_TRANSLATION_TOOL}
     )
@@ -81,7 +81,7 @@ function(iree_bytecode_module)
         IDENTIFIER
           "${_RULE_NAME}"
         GENERATED_SRCS
-          "${_RULE_NAME}.emod"
+          "${_RULE_NAME}.module"
         CC_FILE_OUTPUT
           "${_RULE_NAME}.cc"
         H_FILE_OUTPUT

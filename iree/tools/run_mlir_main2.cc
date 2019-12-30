@@ -458,19 +458,6 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
-    iree_vm_function_t function;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
-                          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                          ordinal, &function),
-                      IREE_LOC))
-        << "Looking up function export " << ordinal;
-    if (iree_string_view_starts_with(iree_vm_function_name(&function),
-                                     iree_make_cstring_view("__"))) {
-      // Skip internal functions.
-      return OkStatus();
-    }
-
     // Create the context we'll use for this (ensuring that we can't interfere
     // with other running evaluations, such as when in a multithreaded test
     // runner).
@@ -481,6 +468,14 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
                                       IREE_ALLOCATOR_SYSTEM, &context),
                                   IREE_LOC))
         << "Creating context";
+
+    iree_vm_function_t function;
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
+                          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+                          ordinal, &function),
+                      IREE_LOC))
+        << "Looking up function export " << ordinal;
 
     // Invoke the function and print results.
     RETURN_IF_ERROR(

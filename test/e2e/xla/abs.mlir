@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv -input-value="2x2xf32= 1 2 3 4" -input-value="2x3xf32= 5 6 7 8 9 10" -input-value="2x2xf32= 11 12 13 14" %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {

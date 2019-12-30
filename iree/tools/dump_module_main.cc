@@ -14,6 +14,7 @@
 
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
@@ -21,13 +22,12 @@
 #include "flatbuffers/util.h"
 #include "iree/base/flatbuffer_util.h"
 #include "iree/base/init.h"
-#include "iree/schemas/module_def_generated.h"
+#include "iree/schemas/bytecode_module_def_generated.h"
 
 namespace {
 
 using ::flatbuffers::ElementaryType;
 using ::flatbuffers::NumToString;
-using ::flatbuffers::Offset;
 using ::flatbuffers::String;
 using ::flatbuffers::TypeTable;
 
@@ -38,7 +38,8 @@ struct TruncatingToStringVisitor : public ::flatbuffers::IterationVisitor {
   bool is_truncating_vector = false;
   int vector_depth = 0;
 
-  explicit TruncatingToStringVisitor(std::string delimiter) : d(delimiter) {}
+  explicit TruncatingToStringVisitor(std::string delimiter)
+      : d(std::move(delimiter)) {}
 
   void StartSequence() override {
     if (is_truncating_vector) return;
@@ -157,16 +158,16 @@ struct TruncatingToStringVisitor : public ::flatbuffers::IterationVisitor {
 
 }  // namespace
 
-int main(int argc, char** argv) {
+extern "C" int main(int argc, char** argv) {
   iree::InitializeEnvironment(&argc, &argv);
 
   if (argc < 2) {
-    std::cerr << "Syntax: iree_dump_module filename\n";
+    std::cerr << "Syntax: iree-dump-module filename\n";
     return 1;
   }
   std::string module_path = argv[1];
-  auto module_fb = iree::FlatBufferFile<iree::ModuleDef>::LoadFile(
-                       iree::ModuleDefIdentifier(), module_path)
+  auto module_fb = iree::FlatBufferFile<iree::vm::BytecodeModuleDef>::LoadFile(
+                       iree::vm::BytecodeModuleDefIdentifier(), module_path)
                        .ValueOrDie();
   TruncatingToStringVisitor tos_visitor("\n");
   auto object = reinterpret_cast<const uint8_t*>(module_fb->root());

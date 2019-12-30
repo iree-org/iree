@@ -28,13 +28,13 @@ def iree_bytecode_module(
         name = name,
         srcs = [src],
         outs = [
-            "%s.emod" % (name),
+            "%s.module" % (name),
         ],
         cmd = " && ".join([
             " ".join([
                 "$(location %s)" % (translate_tool),
                 translation,
-                "-o $(location %s.emod)" % (name),
+                "-o $(location %s.module)" % (name),
                 "$(location %s)" % (src),
             ]),
         ]),
@@ -49,7 +49,7 @@ def iree_bytecode_module(
         cc_embed_data(
             name = "%s_cc" % (name),
             identifier = name,
-            srcs = ["%s.emod" % (name)],
+            srcs = ["%s.module" % (name)],
             cc_file_output = "%s.cc" % (name),
             h_file_output = "%s.h" % (name),
             cpp_namespace = cc_namespace,
