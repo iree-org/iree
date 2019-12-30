@@ -93,6 +93,28 @@ TEST(FilePathTest, BasenameRelative) {
 
 TEST(FilePathTest, BasenameDoubleSlash) { EXPECT_EQ(Basename("foo//"), ""); }
 
+TEST(FilePathTest, Stem) {
+  EXPECT_EQ(Stem(""), "");
+  EXPECT_EQ(Stem("foo"), "foo");
+  EXPECT_EQ(Stem("foo."), "foo");
+  EXPECT_EQ(Stem("foo.bar"), "foo");
+  EXPECT_EQ(Stem("foo.."), "foo.");
+  EXPECT_EQ(Stem("foo..bar"), "foo.");
+  EXPECT_EQ(Stem(".bar"), "");
+  EXPECT_EQ(Stem("..bar"), ".");
+}
+
+TEST(FilePathTest, Extension) {
+  EXPECT_EQ(Extension(""), "");
+  EXPECT_EQ(Extension("foo"), "");
+  EXPECT_EQ(Extension("foo."), "");
+  EXPECT_EQ(Extension("foo.bar"), "bar");
+  EXPECT_EQ(Extension("foo.."), "");
+  EXPECT_EQ(Extension("foo..bar"), "bar");
+  EXPECT_EQ(Extension(".bar"), "bar");
+  EXPECT_EQ(Extension("..bar"), "bar");
+}
+
 }  // namespace
 }  // namespace file_path
 }  // namespace iree
