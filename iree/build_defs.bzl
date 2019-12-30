@@ -28,7 +28,7 @@ PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 INTREE_TENSORFLOW_PY_DEPS = []
 
 # Target to the FileCheck binary.
-INTREE_FILECHECK_TARGET = "@llvm-project//:FileCheck"
+INTREE_FILECHECK_TARGET = "@llvm-project//llvm:FileCheck"
 
 def iree_setup_lit_package(**kwargs):
     _iree_setup_lit_package(**kwargs)
