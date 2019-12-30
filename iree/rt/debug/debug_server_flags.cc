@@ -19,10 +19,6 @@
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 
-#if defined(IREE_DEBUG_EMBEDDED_APP_PRESENT)
-#include "iree/tools/debugger/debug_app_embedded.h"
-#endif  // IREE_DEBUG_EMBEDDED_APP_PRESENT
-
 ABSL_FLAG(int32_t, iree_debug_service_port, 6000,
           "TCP port to listen for debug service connections.");
 ABSL_FLAG(bool, iree_wait_for_debugger, false,
