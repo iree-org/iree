@@ -22,8 +22,6 @@ if [ -z "${RUNFILES_DIR}" ]; then
   RUNFILES_DIR="$PWD"
 fi
 
-ls -lR ${RUNFILES_DIR}
-
 # Detect whether cygwin/msys2 paths need to be translated.
 set +e  # Ignore errors if not found.
 cygpath="$(which cygpath 2>/dev/null)"
@@ -84,7 +82,6 @@ do
   # Run it.
   export PATH="$SUBPATH"
   echo "RUNNING TEST: $full_command"
-  echo "PATH=$PATH"
   echo "----------------"
   if eval "$full_command"; then
     echo "--- COMPLETE ---"

@@ -88,18 +88,18 @@ $ bazel run //iree/tools:iree-translate -- \
   -o /tmp/module.fb
 ```
 
-### run_module
+### iree-run-module
 
-The `run_module` program takes an already translated IREE module as input and
-executes an exported main function using the provided inputs.
+The `iree-run-module` program takes an already translated IREE module as input
+and executes an exported main function using the provided inputs.
 
 This program can be used in sequence with `iree-translate` to translate a .mlir
 file to an IREE module and then execute it. Here is an example command that runs
 the `simple_mul` function in `simple_compute_test.mlir`.
 
 ```shell
-$ bazel build -c opt //iree/tools:iree-translate //iree/tools:run_module
-$ ./bazel-bin/iree/tools/run_module \
+$ bazel build -c opt //iree/tools:iree-translate //iree/tools:iree-run-module
+$ ./bazel-bin/iree/tools/iree-run-module \
   --main_module=/tmp/module.fb \
   --main_function=simple_mul \
   --input_values="4xf32=1 2 3 4

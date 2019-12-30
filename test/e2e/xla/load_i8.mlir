@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s -input-value="17xi8= 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17" | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s -input-value="17xi8= 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17" | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s -input-value="17xi8= 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17" | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -input-value="17xi8= 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @load_i8
 func @load_i8(%arg : tensor<17xi8>) -> tensor<17xi32> {

@@ -105,7 +105,7 @@ if(${IREE_BUILD_COMPILER})
     OUT
       iree-translate
     SRCS
-      "iree_translate_main.cc"
+      "translate_main.cc"
     DEPS
       ${_ALWAYSLINK_LIBS}
       iree::compiler::Translation::Interpreter

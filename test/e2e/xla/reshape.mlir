@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s -input-value="12xf32=[1 2 3 4 5 6 7 8 9 10 11 12]" | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s -input-value="12xf32=[1 2 3 4 5 6 7 8 9 10 11 12]" | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s -input-value="12xf32=[1 2 3 4 5 6 7 8 9 10 11 12]" | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -input-value="12xf32=[1 2 3 4 5 6 7 8 9 10 11 12]" | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @reshape_1D_2D
 func @reshape_1D_2D(%arg : tensor<12xf32>) -> tensor<3x4xf32> {
