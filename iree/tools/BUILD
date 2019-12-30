@@ -162,27 +162,6 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "iree-run-module",
-    srcs = ["run_module_main.cc"],
-    deps = [
-        "//iree/base:file_io",
-        "//iree/base:file_path",
-        "//iree/base:init",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/hal:buffer_view_string_util",
-        "//iree/hal:driver_registry",
-        "//iree/hal/interpreter:interpreter_driver_module",
-        "//iree/rt",
-        "//iree/rt/debug:debug_server_flags",
-        "//iree/schemas",
-        "//iree/vm:sequencer_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
 sh_binary(
     name = "IreeFileCheck",
     testonly = True,
