@@ -102,9 +102,9 @@ class IsOkAndHoldsGenerator {
 };
 
 // Implements a gMock matcher for checking error-code expectations on
-// iree::Status objects.
-template <typename Enum>
-class StatusMatcher : public ::testing::MatcherInterface<const Status &> {
+// iree::Status and iree::StatusOr objects.
+template <typename Enum, typename Matchee>
+class StatusMatcher : public ::testing::MatcherInterface<Matchee> {
  public:
   StatusMatcher(Enum code, absl::optional<absl::string_view> message)
       : code_(code), message_(message) {}
@@ -121,22 +121,73 @@ class StatusMatcher : public ::testing::MatcherInterface<const Status &> {
 
   // From testing::MatcherInterface.
   //
-  // Tests whether |status| has an error code that meets this matcher's
+  // Tests whether |matchee| has an error code that meets this matcher's
   // expectation. If an error message string is specified in this matcher, it
-  // also tests that |status| has an error message that matches that
+  // also tests that |matchee| has an error message that matches that
   // expectation.
   bool MatchAndExplain(
-      const Status &status,
+      Matchee &matchee,
       ::testing::MatchResultListener *listener) const override {
-    if (status.code() != code_) {
-      *listener << "whose error code is " << StatusCodeToString(status.code());
+    if (GetCode(matchee) != code_) {
+      *listener << "whose error code is "
+                << StatusCodeToString(GetCode(matchee));
       return false;
     }
-    if (message_.has_value() && status.message() != message_.value()) {
-      *listener << "whose error message is '" << status.message() << "'";
+    if (message_.has_value() && GetMessage(matchee) != message_.value()) {
+      *listener << "whose error message is '" << GetMessage(matchee) << "'";
       return false;
     }
     return true;
+  }
+
+ private:
+  template <typename T>
+  StatusCode GetCode(const T &matchee) const {
+    return GetCode(matchee.status());
+  }
+
+  StatusCode GetCode(const Status &status) const { return status.code(); }
+
+  template <typename T>
+  absl::string_view GetMessage(const T &matchee) const {
+    return GetMessage(matchee.status());
+  }
+
+  absl::string_view GetMessage(const Status &status) const {
+    return status.message();
+  }
+
+  // Expected error code.
+  const Enum code_;
+
+  // Expected error message (empty if none expected and verified).
+  const absl::optional<std::string> message_;
+};
+
+// StatusMatcherGenerator is an intermediate object returned by
+// iree::testing::status::StatusIs().
+// It implements implicit type-cast operators to supported matcher types:
+// Matcher<const Status &> and Matcher<const StatusOr<T> &>. These typecast
+// operators create gMock matchers that test OK expectations on a status
+// container.
+template <typename Enum>
+class StatusIsMatcherGenerator {
+ public:
+  StatusIsMatcherGenerator(Enum code, absl::optional<absl::string_view> message)
+      : code_(code), message_(message) {}
+
+  // Type-cast operator for Matcher<const iree::Status &>.
+  operator ::testing::Matcher<const Status &>() const {
+    return ::testing::MakeMatcher(
+        new internal::StatusMatcher<Enum, const Status &>(code_, message_));
+  }
+
+  // Type-cast operator for Matcher<const iree::StatusOr<T> &>.
+  template <class T>
+  operator ::testing::Matcher<const StatusOr<T> &>() const {
+    return ::testing::MakeMatcher(
+        new internal::StatusMatcher<Enum, const StatusOr<T> &>(code_,
+                                                               message_));
   }
 
  private:
@@ -204,6 +255,9 @@ class IsOkMatcherGenerator {
 
 }  // namespace internal
 
+namespace testing {
+namespace status {
+
 // Returns a gMock matcher that expects an iree::StatusOr<T> object to have an
 // OK status and for the contained T object to match |value_matcher|.
 //
@@ -229,18 +283,16 @@ internal::IsOkAndHoldsGenerator<ValueMatcherT> IsOkAndHolds(
 // Returns a gMock matcher that expects an iree::Status object to have the
 // given |code|.
 template <typename Enum>
-::testing::Matcher<const Status &> StatusIs(Enum code) {
-  return ::testing::MakeMatcher(
-      new internal::StatusMatcher<Enum>(code, absl::nullopt));
+internal::StatusIsMatcherGenerator<Enum> StatusIs(Enum code) {
+  return internal::StatusIsMatcherGenerator<Enum>(code, absl::nullopt);
 }
 
 // Returns a gMock matcher that expects an iree::Status object to have the
 // given |code| and |message|.
 template <typename Enum>
-::testing::Matcher<const Status &> StatusIs(Enum code,
-                                            absl::string_view message) {
-  return ::testing::MakeMatcher(
-      new internal::StatusMatcher<Enum>(code, message));
+internal::StatusIsMatcherGenerator<Enum> StatusIs(Enum code,
+                                                  absl::string_view message) {
+  return internal::StatusIsMatcherGenerator<Enum>(code, message);
 }
 
 // Returns an internal::IsOkMatcherGenerator, which may be typecast to a
@@ -250,10 +302,13 @@ inline internal::IsOkMatcherGenerator IsOk() {
   return internal::IsOkMatcherGenerator();
 }
 
+}  // namespace status
+}  // namespace testing
+
 // Macros for testing the results of functions that return iree::Status or
 // iree::StatusOr<T> (for any type T).
-#define EXPECT_OK(rexpr) EXPECT_THAT(rexpr, ::iree::IsOk())
-#define ASSERT_OK(rexpr) ASSERT_THAT(rexpr, ::iree::IsOk())
+#define EXPECT_OK(rexpr) EXPECT_THAT(rexpr, ::iree::testing::status::IsOk())
+#define ASSERT_OK(rexpr) ASSERT_THAT(rexpr, ::iree::testing::status::IsOk())
 
 // Executes an expression that returns an iree::StatusOr<T>, and assigns the
 // contained variable to lhs if the error code is OK.

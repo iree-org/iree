@@ -26,6 +26,7 @@ namespace iree {
 namespace {
 
 using ::testing::ElementsAre;
+using testing::status::StatusIs;
 
 template <typename T>
 absl::Span<const T> ReadAs(absl::Span<const uint8_t> data) {
@@ -86,10 +87,14 @@ TEST(ShapedBufferStringUtilTest, ParseShapedBufferFromStringBinary) {
   EXPECT_THAT(ReadAs<uint8_t>(m1.contents()), ElementsAre(0, 1, 2, 3));
 
   // Should fail on malformed hex bytes.
-  EXPECT_FALSE(ParseShapedBufferFromString("4x1=1").ok());
-  EXPECT_FALSE(ParseShapedBufferFromString("4x1=00003").ok());
-  EXPECT_FALSE(ParseShapedBufferFromString("4x1=%0123%\1").ok());
-  EXPECT_FALSE(ParseShapedBufferFromString("4x1=00010203040506").ok());
+  EXPECT_THAT(ParseShapedBufferFromString("4x1=1"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapedBufferFromString("4x1=00003"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapedBufferFromString("4x1=%0123%\1"),
+              StatusIs(StatusCode::kInvalidArgument));
+  EXPECT_THAT(ParseShapedBufferFromString("4x1=00010203040506"),
+              StatusIs(StatusCode::kInvalidArgument));
 }
 
 TEST(ShapedBufferStringUtilTest, ParseShapedBufferFromStringAllowBrackets) {
