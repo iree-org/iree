@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s -input-value=1xi32=42 | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s -input-value=1xi32=42 | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s -input-value=1xi32=42 | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -input-value=1xi32=42 | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @narrow_int
 func @narrow_int(%arg : tensor<1xi32>) -> tensor<1xi8> {

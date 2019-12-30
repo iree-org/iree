@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode -input-value="2xf32=0.3, 0.5" %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv -input-value="2xf32=0.3, 0.5" %s | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode -input-value="2xf32=0.3, 0.5" %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv -input-value="2xf32=0.3, 0.5" %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @dot_passthrough
 func @dot_passthrough(%arg0: tensor<2xf32>) -> tensor<1x3xf32> {

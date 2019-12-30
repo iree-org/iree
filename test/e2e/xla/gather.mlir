@@ -1,5 +1,5 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode %s -input-value="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]" -input-value="i64=2" | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s -input-value="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]" -input-value="i64=2" | IreeFileCheck %s)
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s -input-value="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]" -input-value="i64=2" | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -input-value="5x1x5xi32=[1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25]" -input-value="i64=2" | IreeFileCheck %s)
 
 module {
   // CHECK-LABEL: EXEC @foo

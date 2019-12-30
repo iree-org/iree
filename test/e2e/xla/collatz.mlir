@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir2 -iree-hal-target-backends=interpreter-bytecode -input-value="f32=178" %s | IreeFileCheck %s
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode -input-value="f32=178" %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @collatz
 func @collatz(%arg0: tensor<f32>) -> tensor<f32> {
