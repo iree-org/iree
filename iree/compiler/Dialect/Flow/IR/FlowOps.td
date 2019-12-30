@@ -330,8 +330,7 @@ def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
     StrAttr:$sym_name,
     // TODO(benvanik): ref into child module.
     FlatSymbolRefAttr:$function_ref,
-    OptionalAttr<FLOW_WorkloadAttr>:$workload,
-    OptionalAttr<FLOW_WorkloadAttr>:$workgroup_size
+    OptionalAttr<FLOW_WorkloadAttr>:$workload
   );
 }
 

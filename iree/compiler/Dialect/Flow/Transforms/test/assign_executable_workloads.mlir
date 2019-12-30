@@ -2,7 +2,6 @@
 
 flow.executable @singleStaticWorkload_ex_dispatch_0 {
   // CHECK-LABEL: flow.dispatch.entry @singleStaticWorkload_rgn_dispatch_0
-  // CHECK-SAME: workgroup_size = dense<[32, 1, 1]> : vector<3xi32>
   // CHECK-SAME: workload = dense<[4, 1, 1]> : vector<3xi32>
   flow.dispatch.entry @singleStaticWorkload_rgn_dispatch_0
   module {
@@ -24,7 +23,6 @@ func @singleStaticWorkload(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 flow.executable @reduction_ex_reduce_0_dim_0 {
   // CHECK-LABEL: flow.reduction.entry @reduction_rgn_reduce_0_dim_0_entry
-  // CHECK-SAME: workgroup_size = dense<[32, 1, 1]> : vector<3xi32>
   // CHECK-SAME: workload = dense<[4, 1, 1]> : vector<3xi32>
   flow.reduction.entry @reduction_rgn_reduce_0_dim_0_entry apply(@reduction_rgn_reduce_0_dim_0) attributes {dimension = 1 : i32}
   module {

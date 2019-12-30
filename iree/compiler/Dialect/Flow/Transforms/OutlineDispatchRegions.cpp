@@ -75,8 +75,7 @@ LogicalResult outlineDispatchRegion(
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<DispatchEntryOp>(
       regionOp.getLoc(), builder.getStringAttr(outlinedFuncOp.getName()),
-      builder.getSymbolRefAttr(outlinedFuncOp), DenseIntElementsAttr{},
-      DenseIntElementsAttr{});
+      builder.getSymbolRefAttr(outlinedFuncOp), DenseIntElementsAttr{});
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
   return convertToDispatchOp(regionOp, executableOp, entryPointOp,

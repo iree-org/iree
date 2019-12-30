@@ -22,11 +22,27 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+// TODO(GH-67): move workgroup size determination to backends.
+// Returns an (x,y,z) workgroup size for the given |targetFuncOp|.
+// This is pure heuristics until we support dynamic/varying workgroup sizes.
+static std::array<int32_t, 3> guessWorkGroupSize(
+    IREE::Flow::DispatchEntryOp entryOp, FuncOp targetFuncOp) {
+  for (auto& block : targetFuncOp.getBlocks()) {
+    if (!block.getOps<xla_hlo::DotOp>().empty()) {
+      // A special dot kernel. This has a fixed workgroup size based on the
+      // hand-written shader.
+      return {16, 16, 1};
+    }
+  }
+  return {32, 1, 1};
+}
 
 class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
  public:
@@ -110,15 +126,18 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
     int nextOrdinal = 0;
     for (auto& op : sourceOp.getBlock()) {
       if (auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
+        // Hardwire workgroup size based on the contents.
+        // TODO(GH-67): move workgroup size determination to backends.
+        auto targetFuncOp = sourceOp.getInnerModule().lookupSymbol<FuncOp>(
+            dispatchEntryOp.function_ref());
+        auto workGroupSize = guessWorkGroupSize(dispatchEntryOp, targetFuncOp);
+        auto workGroupSizeAttr = DenseIntElementsAttr::get(
+            VectorType::get(3, builder.getIntegerType(32)), workGroupSize);
+
         builder.create<IREE::HAL::ExecutableEntryPointOp>(
             dispatchEntryOp.getLoc(),
             builder.getStringAttr(dispatchEntryOp.sym_name()),
-            builder.getI32IntegerAttr(nextOrdinal++),
-            DenseIntElementsAttr::get(
-                VectorType::get({3}, builder.getIntegerType(32)),
-                llvm::to_vector<3>(dispatchEntryOp.workgroup_size()
-                                       .getValue()
-                                       .getIntValues())));
+            builder.getI32IntegerAttr(nextOrdinal++), workGroupSizeAttr);
       } else if (auto reductionEntryOp =
                      dyn_cast<IREE::Flow::ReductionEntryOp>(op)) {
         builder.create<IREE::HAL::ExecutableEntryPointOp>(

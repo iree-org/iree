@@ -27,15 +27,17 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static void makeLegacyExecutableDispatchABI(IREE::Flow::DispatchEntryOp entryOp,
-                                            ModuleOp moduleOp) {
+static void makeLegacyExecutableDispatchABI(
+    IREE::Flow::DispatchEntryOp dispatchEntryOp, ModuleOp moduleOp,
+    IREE::HAL::ExecutableEntryPointOp targetEntryOp) {
   // Add export attr so that the function is not DCE'd.
-  auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
+  auto funcOp = moduleOp.lookupSymbol<FuncOp>(dispatchEntryOp.function_ref());
   funcOp.setAttr("iree.executable.export",
                  UnitAttr::get(moduleOp.getContext()));
-  funcOp.setAttr("iree.executable.workload", entryOp.workload().getValue());
+  funcOp.setAttr("iree.executable.workload",
+                 dispatchEntryOp.workload().getValue());
   funcOp.setAttr("iree.executable.workgroup_size",
-                 entryOp.workgroup_size().getValue());
+                 targetEntryOp.workgroup_size());
 
   // Reset function type to memrefs with output args.
   SmallVector<Type, 4> inputTypes;
@@ -58,8 +60,8 @@ static void makeLegacyExecutableDispatchABI(IREE::Flow::DispatchEntryOp entryOp,
   for (auto arg : entryBlock.getArguments()) {
     Type oldType = arg->getType();
     arg->setType(convertTypeToMemRef(legalizeType(oldType)));
-    auto loadInputOp =
-        entryBuilder.create<IREE::LoadInputOp>(entryOp.getLoc(), oldType, arg);
+    auto loadInputOp = entryBuilder.create<IREE::LoadInputOp>(
+        dispatchEntryOp.getLoc(), oldType, arg);
     arg->replaceAllUsesWith(loadInputOp.getResult());
     loadInputOp.setOperand(arg);
   }
@@ -80,19 +82,20 @@ static void makeLegacyExecutableDispatchABI(IREE::Flow::DispatchEntryOp entryOp,
 }
 
 static void makeLegacyExecutableReductionABI(
-    IREE::Flow::ReductionEntryOp entryOp, ModuleOp moduleOp) {
+    IREE::Flow::ReductionEntryOp reductionEntryOp, ModuleOp moduleOp,
+    IREE::HAL::ExecutableEntryPointOp targetEntryOp) {
   // Add export attr so that the function is not DCE'd.
-  auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
+  auto funcOp = moduleOp.lookupSymbol<FuncOp>(reductionEntryOp.function_ref());
   funcOp.setAttr("iree.executable.export",
                  UnitAttr::get(moduleOp.getContext()));
   funcOp.setAttr("iree.executable.reduction",
                  UnitAttr::get(moduleOp.getContext()));
-  funcOp.setAttr(
-      "iree.executable.reduction.apply",
-      FlatSymbolRefAttr::get(entryOp.apply_ref(), moduleOp.getContext()));
+  funcOp.setAttr("iree.executable.reduction.apply",
+                 FlatSymbolRefAttr::get(reductionEntryOp.apply_ref(),
+                                        moduleOp.getContext()));
   funcOp.setAttr("iree.executable.reduction.dimension",
                  IntegerAttr::get(IntegerType::get(32, moduleOp.getContext()),
-                                  entryOp.dimension()));
+                                  reductionEntryOp.dimension()));
 
   // Reset function type to memrefs with output args.
   SmallVector<Type, 4> inputTypes;
@@ -107,12 +110,19 @@ static void makeLegacyExecutableReductionABI(
 }
 
 void makeLegacyExecutableABI(IREE::Flow::ExecutableOp executableOp,
-                             ModuleOp moduleOp) {
+                             ModuleOp moduleOp,
+                             IREE::HAL::ExecutableOp targetExecutableOp) {
   for (auto &op : executableOp.getBlock()) {
     if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
-      makeLegacyExecutableDispatchABI(entryOp, moduleOp);
+      auto targetEntryOp =
+          targetExecutableOp.lookupSymbol<IREE::HAL::ExecutableEntryPointOp>(
+              entryOp.sym_name());
+      makeLegacyExecutableDispatchABI(entryOp, moduleOp, targetEntryOp);
     } else if (auto entryOp = dyn_cast<IREE::Flow::ReductionEntryOp>(&op)) {
-      makeLegacyExecutableReductionABI(entryOp, moduleOp);
+      auto targetEntryOp =
+          targetExecutableOp.lookupSymbol<IREE::HAL::ExecutableEntryPointOp>(
+              entryOp.sym_name());
+      makeLegacyExecutableReductionABI(entryOp, moduleOp, targetEntryOp);
     }
   }
 }

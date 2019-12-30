@@ -190,7 +190,7 @@ LogicalResult translateToLegacyInterpreterExecutable(
   // Clone the module containing the things we want to translate. We do this so
   // that multiple targets can pull from the same source without conflicting.
   auto moduleOp = sourceOp.getInnerModule().clone();
-  makeLegacyExecutableABI(sourceOp, moduleOp);
+  makeLegacyExecutableABI(sourceOp, moduleOp, targetOp);
 
   // Run all passes to go from input to the iree_ll_interp dialect.
   PassManager conversionPassManager(moduleOp.getContext());

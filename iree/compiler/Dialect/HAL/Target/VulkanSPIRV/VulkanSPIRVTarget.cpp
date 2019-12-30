@@ -123,7 +123,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
   // Clone the module containing the things we want to translate. We do this so
   // that multiple targets can pull from the same source without conflicting.
   auto moduleOp = sourceOp.getInnerModule().clone();
-  makeLegacyExecutableABI(sourceOp, moduleOp);
+  makeLegacyExecutableABI(sourceOp, moduleOp, targetOp);
 
   // Try first to match against an embedded kernel (such as matmul) and
   // otherwise fall back to generating the kernel.

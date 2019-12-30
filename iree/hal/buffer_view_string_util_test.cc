@@ -134,9 +134,15 @@ TEST(BufferViewUtilTest, ParseBufferViewFromStringFloat) {
   EXPECT_THAT(ReadBuffer<double>(m1.buffer).ValueOrDie(),
               ElementsAre(0.0, 1.0, 123456789012345.0, -2.0e-5));
 
+  // Splat (repeating single element value).
+  ASSERT_OK_AND_ASSIGN(auto m2, ParseBufferViewFromString("4xf32=2.2"));
+  EXPECT_EQ(Shape({4}), m2.shape);
+  EXPECT_EQ(4, m2.element_size);
+  EXPECT_THAT(ReadBuffer<float>(m2.buffer).ValueOrDie(),
+              ElementsAre(2.2f, 2.2f, 2.2f, 2.2f));
+
   // Should fail on malformed floats and out of bounds values.
   EXPECT_FALSE(ParseBufferViewFromString("4xf32=asodfj").ok());
-  EXPECT_FALSE(ParseBufferViewFromString("4xf32=0").ok());
   EXPECT_FALSE(ParseBufferViewFromString("4xf32=0 1 2 3 4").ok());
 }
 

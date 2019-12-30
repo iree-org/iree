@@ -70,8 +70,6 @@ class PipelineExecutable final : public Executable {
     return descriptor_sets_;
   }
 
-  bool is_matmul() const { return tag_ == "__matmul__"; }
-
   StatusOr<VkPipeline> GetPipelineForEntryPoint(int entry_ordinal) const;
 
  private:

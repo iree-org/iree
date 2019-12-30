@@ -2,7 +2,6 @@
 
 flow.executable @outerOps_ex_dispatch_0 {
   flow.dispatch.entry @outerOps_rgn_dispatch_0 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   module {
@@ -33,7 +32,6 @@ func @outerOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 flow.executable @nondependentOuterOps_ex_dispatch_0 {
   flow.dispatch.entry @nondependentOuterOps_rgn_dispatch_0 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   module {
@@ -66,7 +64,6 @@ func @nondependentOuterOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 flow.executable @interleavedOuterOps_ex_dispatch_0 {
   flow.dispatch.entry @interleavedOuterOps_rgn_dispatch_0 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   module {
@@ -100,11 +97,9 @@ func @interleavedOuterOps(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 
 flow.executable @independentOps_ex_dispatch_0 {
   flow.dispatch.entry @independentOps_rgn_dispatch_0 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   flow.dispatch.entry @independentOps_rgn_dispatch_1 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
 }
@@ -127,7 +122,6 @@ func @independentOps(%arg0: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
 
 flow.executable @interleavedDot_ex_dispatch_0 {
   flow.dispatch.entry @interleavedDot_rgn_dispatch_0 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 4, 1]> : vector<3xi32>
   }
   module {
@@ -139,7 +133,6 @@ flow.executable @interleavedDot_ex_dispatch_0 {
 }
 flow.executable @interleavedDot_ex_dispatch_1 {
   flow.dispatch.entry @interleavedDot_rgn_dispatch_1 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 4, 1]> : vector<3xi32>
   }
   module {
@@ -151,7 +144,6 @@ flow.executable @interleavedDot_ex_dispatch_1 {
 }
 flow.executable @interleavedDot_ex_dispatch_2 {
   flow.dispatch.entry @interleavedDot_rgn_dispatch_2 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 4, 1]> : vector<3xi32>
   }
   module {
@@ -182,7 +174,6 @@ func @interleavedDot(%arg0: tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 flow.executable @caller_ex_dispatch_0 {
   flow.dispatch.entry @caller_rgn_dispatch_0 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   module {
@@ -194,7 +185,6 @@ flow.executable @caller_ex_dispatch_0 {
 }
 flow.executable @caller_ex_dispatch_1 {
   flow.dispatch.entry @caller_rgn_dispatch_1 attributes {
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
     workload = dense<[4, 1, 1]> : vector<3xi32>
   }
   module {

@@ -34,9 +34,9 @@ cc_library(
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
     alwayslink = 1,
 )

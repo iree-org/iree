@@ -385,13 +385,6 @@ Status DirectCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
   uint32_t group_count_y = dispatch_request.workload[1];
   uint32_t group_count_z = dispatch_request.workload[2];
 
-  // TODO(GH-67): pre-divide workload by tile size.
-  if (executable->is_matmul()) {
-    group_count_x = (group_count_x + 16 - 1) / 16;
-    group_count_y = (group_count_y + 16 - 1) / 16;
-    group_count_z = 1;
-  }
-
   syms()->vkCmdDispatch(command_buffer_, group_count_x, group_count_y,
                         group_count_z);
 
