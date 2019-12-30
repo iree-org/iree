@@ -24,7 +24,6 @@ package(
 iree_setup_lit_package(
     data = [
         "//iree/tools:iree-opt",
-        "//iree/tools:iree-run-mlir",
     ],
 )
 
