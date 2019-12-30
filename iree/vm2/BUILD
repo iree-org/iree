@@ -1,7 +1,7 @@
 # Bytecode VM.
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("@llvm-project//mlir:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],

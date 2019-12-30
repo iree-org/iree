@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
-load("@llvm-project//mlir:tblgen.bzl", "gentbl")
+load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
