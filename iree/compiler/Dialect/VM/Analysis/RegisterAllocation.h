@@ -52,15 +52,22 @@ constexpr bool isRefMove(uint8_t reg) {
   return (reg & kRefRegisterMoveBit) == kRefRegisterMoveBit;
 }
 
+// Returns the register 0-based ordinal within its set.
+constexpr uint8_t getRegisterOrdinal(uint8_t reg) {
+  return isRefRegister(reg)
+             ? (reg & ~(kRefRegisterTypeBit | kRefRegisterMoveBit))
+             : reg;
+}
+
+// Returns the register ID without the move bit.
+constexpr uint8_t getBaseRegister(uint8_t reg) {
+  return isRefRegister(reg) ? (reg & ~kRefRegisterMoveBit) : reg;
+}
+
 // Compares whether two register bytes are equal to each other, ignoring any
 // move semantics on ref_ptr registers.
 constexpr bool compareRegistersEqual(uint8_t a, uint8_t b) {
-  if (isRefRegister(a) != isRefRegister(b)) return false;
-  if (isRefRegister(a)) {
-    return (a & ~kRefRegisterMoveBit) == (b & ~kRefRegisterMoveBit);
-  } else {
-    return a == b;
-  }
+  return getBaseRegister(a) == getBaseRegister(b);
 }
 
 // Analysis that performs VM register allocation on the given function op and
@@ -105,8 +112,8 @@ class RegisterAllocation {
       Operation *op, int successorIndex);
 
  private:
-  int8_t maxI32RegisterOrdinal_ = -1;
-  int8_t maxRefRegisterOrdinal_ = -1;
+  int maxI32RegisterOrdinal_ = -1;
+  int maxRefRegisterOrdinal_ = -1;
 
   // Cached liveness information.
   ValueLiveness liveness_;

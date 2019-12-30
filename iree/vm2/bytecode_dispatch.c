@@ -19,6 +19,18 @@
 #include "iree/vm2/bytecode_module_impl.h"
 #include "iree/vm2/bytecode_op_table.h"
 
+// Enable to get some verbose logging; better than nothing until we have some
+// better tooling.
+#define IREE_DISPATCH_LOGGING 0
+
+#if IREE_DISPATCH_LOGGING
+#include <stdio.h>
+#define IREE_DISPATCH_LOG_OPCODE(op_name) \
+  fprintf(stderr, "DISPATCH %d %s\n", (int)offset, op_name)
+#else
+#define IREE_DISPATCH_LOG_OPCODE(...)
+#endif  // IREE_DISPATCH_LOGGING
+
 #if defined(IREE_COMPILER_MSVC) && !defined(IREE_COMPILER_CLANG)
 #define IREE_DISPATCH_MODE_SWITCH 1
 #else
@@ -130,19 +142,6 @@ static void iree_vm_bytecode_dispatch_remap_branch_registers(
   }
 }
 
-// Discards source ref registers in the remapping list if they are marked move.
-static void iree_vm_bytecode_dispatch_discard_branch_registers(
-    iree_vm_registers_t* regs,
-    const iree_vm_register_remap_list_t* remap_list) {
-  for (int i = 0; i < remap_list->size; ++i) {
-    uint8_t src_reg = remap_list->pairs[i].src_reg;
-    if ((src_reg & (IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT)) ==
-        (IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT)) {
-      iree_vm_ref_release(&regs->ref[src_reg & IREE_REF_REGISTER_MASK]);
-    }
-  }
-}
-
 iree_status_t iree_vm_bytecode_dispatch(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, iree_vm_stack_t* stack,
@@ -179,8 +178,9 @@ iree_status_t iree_vm_bytecode_dispatch(
   VMCHECK(0);                \
   return IREE_STATUS_UNIMPLEMENTED;
 
-#define DISPATCH_OP(op_name, body) \
-  _dispatch_##op_name : body;      \
+#define DISPATCH_OP(op_name, body)                          \
+  _dispatch_##op_name : IREE_DISPATCH_LOG_OPCODE(#op_name); \
+  body;                                                     \
   goto* kDispatchTable[bytecode_data[offset++]];
 
 #else
@@ -199,9 +199,10 @@ iree_status_t iree_vm_bytecode_dispatch(
     VMCHECK(0);              \
     return IREE_STATUS_UNIMPLEMENTED;
 
-#define DISPATCH_OP(op_name, body) \
-  case IREE_VM_OP_##op_name:       \
-    body;                          \
+#define DISPATCH_OP(op_name, body)      \
+  case IREE_VM_OP_##op_name:            \
+    IREE_DISPATCH_LOG_OPCODE(#op_name); \
+    body;                               \
     break;
 
 #endif  // IREE_DISPATCH_MODE_COMPUTED_GOTO
@@ -586,14 +587,10 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (cond_value) {
         offset = true_block_offset;
         iree_vm_bytecode_dispatch_remap_branch_registers(regs, true_remap_list);
-        iree_vm_bytecode_dispatch_discard_branch_registers(regs,
-                                                           false_remap_list);
       } else {
         offset = false_block_offset;
         iree_vm_bytecode_dispatch_remap_branch_registers(regs,
                                                          false_remap_list);
-        iree_vm_bytecode_dispatch_discard_branch_registers(regs,
-                                                           true_remap_list);
       }
     });
 
@@ -630,6 +627,11 @@ iree_status_t iree_vm_bytecode_dispatch(
         target_function.linkage = IREE_VM_FUNCTION_LINKAGE_INTERNAL;
         target_function.ordinal = function_ordinal;
       }
+
+#if IREE_DISPATCH_LOGGING
+      iree_string_view_t target_name = iree_vm_function_name(&target_function);
+      fprintf(stderr, "CALL -> %s\n", target_name.data);
+#endif  // IREE_DISPATCH_LOGGING
 
       // Remap registers from caller to callee.
       iree_vm_stack_frame_t* callee_frame = NULL;
@@ -714,6 +716,11 @@ iree_status_t iree_vm_bytecode_dispatch(
       // Import that we can fetch from the module state.
       target_function =
           module_state->import_table[function_ordinal & 0x7FFFFFFFu];
+
+#if IREE_DISPATCH_LOGGING
+      iree_string_view_t target_name = iree_vm_function_name(&target_function);
+      fprintf(stderr, "VCALL -> %s\n", target_name.data);
+#endif  // IREE_DISPATCH_LOGGING
 
       // Remap registers from caller to callee.
       iree_vm_stack_frame_t* callee_frame = NULL;

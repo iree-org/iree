@@ -308,6 +308,14 @@ static void recordTensorUpdate(Value device, Value commandBuffer,
       updateOp.getLoc(), commandBuffer, updateBuffer.buffer, zeroOffset,
       resultBuffer.buffer, updateOffset, updateLength);
 
+  // TODO(benvanik): implement resource sets.
+  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
+                                               targetBuffer.buffer);
+  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
+                                               updateBuffer.buffer);
+  rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),
+                                               resultBuffer.buffer);
+
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could
   // also do a canonicalization step that removed trailing barriers).

@@ -705,7 +705,7 @@ Status HALModuleState::BufferViewComputeRange(iree_vm_stack_t* stack,
   ResetStackFrame(frame);
   frame->return_registers = &kReturn2xI32.list;
   frame->registers.i32[0] = start_byte_offset;
-  frame->registers.i32[1] = end_byte_offset;
+  frame->registers.i32[1] = subspan_length;
   return OkStatus();
 }
 

@@ -19,6 +19,7 @@ cc_library(
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",

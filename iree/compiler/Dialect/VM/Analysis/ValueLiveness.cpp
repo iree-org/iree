@@ -293,6 +293,11 @@ LogicalResult ValueLiveness::computeLiveIntervals(IREE::VM::FuncOp funcOp) {
   return success();
 }
 
+ArrayRef<Value> ValueLiveness::getBlockLiveIns(Block *block) {
+  auto &blockSets = blockLiveness_[block];
+  return blockSets.liveIn.getArrayRef();
+}
+
 bool ValueLiveness::isLastValueUse(Value value, Operation *useOp) {
   auto &blockSets = blockLiveness_[useOp->getBlock()];
   if (blockSets.liveOut.count(value)) {

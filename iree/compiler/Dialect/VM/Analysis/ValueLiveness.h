@@ -50,6 +50,9 @@ class ValueLiveness {
   // Recalculates the liveness information for the given function.
   LogicalResult recalculate(IREE::VM::FuncOp funcOp);
 
+  // Returns an unordered list of values live on block entry.
+  ArrayRef<Value> getBlockLiveIns(Block *block);
+
   // Returns true if |useOp| has the last use of |value|.
   bool isLastValueUse(Value value, Operation *useOp);
   // Returns true if |useOp|'s operand at |operandIndex| is the last use of the
