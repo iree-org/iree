@@ -13,13 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from pyiree import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(b/145831067): Get this test working on IREE.
-# Needs `flow` dialect variable lowering.
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 
 class Stateful(tf.Module):
