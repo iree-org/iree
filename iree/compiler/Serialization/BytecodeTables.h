@@ -16,7 +16,6 @@
 #define IREE_COMPILER_SERIALIZATION_BYTECODE_TABLES_H_
 
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
-#include "iree/schemas/bytecode/sequencer_bytecode_v0.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/Support/LLVM.h"
@@ -39,12 +38,6 @@ llvm::Optional<iree::InterpreterOpcode> GetInterpreterOpcodeByName(
 
 // Returns the info for the given interpreter opcode.
 const OpcodeInfo& GetInterpreterOpcodeInfo(iree::InterpreterOpcode opcode);
-
-// Returns an opcode - if found - for the given sequencer op.
-llvm::Optional<iree::SequencerOpcode> GetSequencerOpcodeByName(StringRef name);
-
-// Returns the info for the given sequencer opcode.
-const OpcodeInfo& GetSequencerOpcodeInfo(iree::SequencerOpcode opcode);
 
 }  // namespace iree_compiler
 }  // namespace mlir

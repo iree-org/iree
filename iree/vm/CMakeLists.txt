@@ -14,24 +14,6 @@
 
 iree_cc_library(
   NAME
-    api
-  HDRS
-    "api.h"
-  SRCS
-    "api.cc"
-  DEPS
-    absl::time
-    iree::base::api
-    iree::base::api_util
-    iree::base::flatbuffer_util
-    iree::base::tracing
-    iree::rt::api
-    iree::vm::sequencer_module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     bytecode_disassembler
   SRCS
     "bytecode_disassembler.cc"
@@ -107,19 +89,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    bytecode_tables_sequencer
-  SRCS
-    "bytecode_tables_sequencer.cc"
-  HDRS
-    "bytecode_tables_sequencer.h"
-  DEPS
-    iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::opcode_info
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     bytecode_util
   SRCS
     "bytecode_util.cc"
@@ -155,55 +124,6 @@ iree_cc_library(
     absl::optional
     absl::span
     iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_dispatch
-  SRCS
-    "sequencer_dispatch.cc"
-  HDRS
-    "sequencer_dispatch.h"
-  DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::strings
-    absl::time
-    absl::span
-    iree::base::logging
-    iree::base::memory
-    iree::base::status
-    iree::hal::buffer_view
-    iree::hal::command_queue
-    iree::hal::device
-    iree::hal::device_placement
-    iree::hal::heap_buffer
-    iree::rt
-    iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::bytecode_module
-    iree::vm::bytecode_reader
-    iree::vm::bytecode_tables_sequencer
-    iree::vm::bytecode_util
-    iree::vm::opcode_info
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_module
-  SRCS
-    "sequencer_module.cc"
-  HDRS
-    "sequencer_module.h"
-  DEPS
-    absl::core_headers
-    iree::base::status
-    iree::hal::buffer_view
-    iree::rt
-    iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::bytecode_module
-    iree::vm::sequencer_dispatch
   PUBLIC
 )
 

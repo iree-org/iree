@@ -54,10 +54,6 @@ createDropUnreachableModuleFunctionsPass();
 std::unique_ptr<OpPassBase<ModuleOp>>
 createDropUnreachableExecutableFunctionsPass();
 
-// Drops all executables in a module that are not reachable by any dispatch
-// sequencer op.
-std::unique_ptr<OpPassBase<ModuleOp>> createDropUnusedExecutablesPass();
-
 //===----------------------------------------------------------------------===//
 // Module Analysis and Assignment
 //===----------------------------------------------------------------------===//

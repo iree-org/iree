@@ -46,18 +46,9 @@ LogicalResult WriteGenericIreeOp(Block *block, Operation *op,
   auto dialectNamespace = dialect->getNamespace();
   std::unique_ptr<OpcodeInfo> operandInfo;
   auto strippedOpName = opName.substr(opName.find('.') + 1).str();
-  if (dialectNamespace == "iree_ll_seq") {
-    auto opcode = GetSequencerOpcodeByName(strippedOpName);
-    if (!opcode.hasValue()) {
-      return op->emitOpError()
-             << "No sequencer opcode found for op; is it a pseudo op?";
-    }
-    RETURN_IF_FAILURE(writer->WriteOpcode(opcode.getValue()));
-    operandInfo =
-        std::make_unique<OpcodeInfo>(GetSequencerOpcodeInfo(opcode.getValue()));
-  } else if (dialectNamespace == "iree_ll_interp" ||
-             // TODO(gcmn) remove special case for IREE dialect?
-             dialectNamespace == IREEDialect::getDialectNamespace()) {
+  if (dialectNamespace == "iree_ll_interp" ||
+      // TODO(gcmn) remove special case for IREE dialect?
+      dialectNamespace == IREEDialect::getDialectNamespace()) {
     auto opcode = GetInterpreterOpcodeByName(strippedOpName);
     if (!opcode.hasValue()) {
       return op->emitOpError()

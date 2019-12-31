@@ -13,7 +13,6 @@
 # limitations under the License.
 
 add_subdirectory(Interpreter)
-add_subdirectory(Sequencer)
 
 iree_cc_library(
   NAME

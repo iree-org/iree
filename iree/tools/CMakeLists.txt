@@ -34,7 +34,6 @@ if(${IREE_BUILD_COMPILER})
     MLIRSupport
     MLIRVectorOps
     iree::compiler::IR
-    iree::compiler::IR::Sequencer
     iree::compiler::IR::Interpreter
     tensorflow::mlir_xla
   )
@@ -60,14 +59,12 @@ if(${IREE_BUILD_COMPILER})
       # TODO(marbre): Fix problems with property "ALWAYSLINK".
       #iree::base::source_location
       iree::rt
-      iree::vm::sequencer_module
       LLVMSupport
       MLIRIR
       MLIRParser
       MLIRSupport
       iree::base::init
       iree::base::status
-      iree::compiler::Translation::Sequencer
       iree::compiler::Translation::Interpreter
       iree::compiler::Translation::SPIRV
       iree::compiler::Translation::IREEVM
@@ -109,7 +106,6 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ${_ALWAYSLINK_LIBS}
       iree::compiler::Translation::Interpreter
-      iree::compiler::Translation::Sequencer
       iree::compiler::Translation::SPIRV
       MLIRTranslateClParser
   )

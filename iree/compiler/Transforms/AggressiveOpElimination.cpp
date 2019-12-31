@@ -17,8 +17,6 @@
 
 #include "iree/compiler/IR/Interpreter/HLOps.h"
 #include "iree/compiler/IR/Interpreter/LLOps.h"
-#include "iree/compiler/IR/Sequencer/HLOps.h"
-#include "iree/compiler/IR/Sequencer/LLOps.h"
 #include "iree/compiler/IR/StructureOps.h"
 #include "mlir/Analysis/Dominance.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -49,8 +47,6 @@ struct EraseUnused : public OpRewritePattern<T> {
 void populateAggressiveOpEliminationPatterns(OwningRewritePatternList &patterns,
                                              MLIRContext *ctx) {
   patterns.insert<EraseUnused<LoadOp>, EraseUnused<AllocOp>,
-                  EraseUnused<IREESeq::HL::AllocHeapOp>,
-                  EraseUnused<IREESeq::LL::AllocHeapOp>,
                   EraseUnused<IREEInterp::HL::AllocHeapOp>,
                   EraseUnused<IREEInterp::LL::AllocHeapOp>>(ctx);
 }

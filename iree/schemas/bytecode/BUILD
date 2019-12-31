@@ -33,11 +33,3 @@ cc_library(
         ":bytecode_v0",
     ],
 )
-
-cc_library(
-    name = "sequencer_bytecode_v0",
-    hdrs = ["sequencer_bytecode_v0.h"],
-    deps = [
-        ":bytecode_v0",
-    ],
-)

@@ -13,7 +13,6 @@
 # limitations under the License.
 
 add_subdirectory(Interpreter)
-add_subdirectory(Sequencer)
 
 iree_cc_library(
   NAME
@@ -28,7 +27,6 @@ iree_cc_library(
     "ConvertFromTupleCallingConvention.cpp"
     "ConvertToMemRefCallingConvention.cpp"
     "DropUnreachableFunctions.cpp"
-    "DropUnusedExecutables.cpp"
     "LegalizeTypeStorage.cpp"
     "LowerStdToIreeDialect.cpp"
     "LowerXLAToIreeDialect.cpp"

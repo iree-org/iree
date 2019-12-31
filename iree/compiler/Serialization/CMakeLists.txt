@@ -36,10 +36,8 @@ iree_cc_library(
   DEPS
     iree::compiler::IR
     iree::compiler::IR::Interpreter
-    iree::compiler::IR::Sequencer
     iree::schemas
     iree::schemas::bytecode::interpreter_bytecode_v0
-    iree::schemas::bytecode::sequencer_bytecode_v0
     LLVMSupport
     MLIRIR
   PUBLIC

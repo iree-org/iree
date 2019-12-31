@@ -47,7 +47,6 @@ cc_library(
         "//iree/schemas",
         "//iree/schemas/bytecode:bytecode_v0",
         "//iree/schemas/bytecode:interpreter_bytecode_v0",
-        "//iree/schemas/bytecode:sequencer_bytecode_v0",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",

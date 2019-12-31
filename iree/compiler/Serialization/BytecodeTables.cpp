@@ -35,9 +35,6 @@ namespace {
 static const OpcodeInfo kInterpreterInfoTable[256] = {
     IREE_INTERPRETER_OPCODE_LIST(DECLARE_INFO, DECLARE_INFO)};
 
-static const OpcodeInfo kSequencerInfoTable[256] = {
-    IREE_SEQUENCER_OPCODE_LIST(DECLARE_INFO, DECLARE_INFO)};
-
 #undef DECLARE_INFO
 
 }  // namespace
@@ -54,19 +51,6 @@ llvm::Optional<iree::InterpreterOpcode> GetInterpreterOpcodeByName(
 
 const OpcodeInfo& GetInterpreterOpcodeInfo(iree::InterpreterOpcode opcode) {
   return kInterpreterInfoTable[static_cast<uint8_t>(opcode)];
-}
-
-llvm::Optional<iree::SequencerOpcode> GetSequencerOpcodeByName(StringRef name) {
-  for (int i = 0; i < llvm::array_lengthof(kSequencerInfoTable); ++i) {
-    if (name == kSequencerInfoTable[i].mnemonic) {
-      return static_cast<iree::SequencerOpcode>(i);
-    }
-  }
-  return llvm::None;
-}
-
-const OpcodeInfo& GetSequencerOpcodeInfo(iree::SequencerOpcode opcode) {
-  return kSequencerInfoTable[static_cast<uint8_t>(opcode)];
 }
 
 }  // namespace iree_compiler

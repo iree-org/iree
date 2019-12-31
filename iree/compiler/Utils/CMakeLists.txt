@@ -34,7 +34,6 @@ iree_cc_library(
     "TypeConversionUtils.cpp"
   DEPS
     iree::compiler::IR
-    iree::compiler::IR::Sequencer
     iree::schemas::executable_def_cc_fbs
     tensorflow::mlir_xla
     LLVMSupport

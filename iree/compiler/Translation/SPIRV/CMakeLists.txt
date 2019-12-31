@@ -51,7 +51,6 @@ iree_cc_library(
     iree::compiler::IR::Interpreter
     iree::compiler::Serialization
     iree::compiler::Transforms
-    iree::compiler::Transforms::Sequencer
     iree::compiler::Translation::SPIRV::Kernels
     iree::compiler::Utils
     iree::schemas

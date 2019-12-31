@@ -25,7 +25,6 @@ cc_library(
         "ConvertFromTupleCallingConvention.cpp",
         "ConvertToMemRefCallingConvention.cpp",
         "DropUnreachableFunctions.cpp",
-        "DropUnusedExecutables.cpp",
         "LegalizeTypeStorage.cpp",
         "LowerStdToIreeDialect.cpp",
         "LowerXLAToIreeDialect.cpp",
@@ -38,7 +37,6 @@ cc_library(
     deps = [
         "//iree/compiler/IR",
         "//iree/compiler/IR/Interpreter",
-        "//iree/compiler/IR/Sequencer",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:Analysis",

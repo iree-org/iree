@@ -155,7 +155,6 @@ cc_library(
         "//iree/base:status",
         "//iree/base:signature_mangle",
         "//iree/hal:api",
-        "//iree/vm:api",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
