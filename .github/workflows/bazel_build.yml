@@ -54,7 +54,7 @@ jobs:
       - name: Building and testing with bazel
         run: |
           # Build and test everything not explicitly marked as excluded from CI
-          # (using the tag "noga"=No GitHub Actions").
+          # (using the tag "noga"="No GitHub Actions").
           # Note that somewhat contrary to its name `bazel test` will also build
           # any non-test targets specified.
           # We use `bazel query //...` piped to `bazel test` rather than the
