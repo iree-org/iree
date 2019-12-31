@@ -15,8 +15,8 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_IREE_TRANSFORMS_PASSES_H_
 
-#include "third_party/llvm/llvm-project/mlir//include/mlir/IR/Module.h"
-#include "third_party/llvm/llvm-project/mlir//include/mlir/Pass/Pass.h"
+#include "mlir/IR/Module.h"
+#include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
