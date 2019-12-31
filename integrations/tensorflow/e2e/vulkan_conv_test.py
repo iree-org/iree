@@ -100,11 +100,9 @@ class Conv2dModule(tf.Module):
 
 @tf_test_utils.compile_modules(
     backends=[
-        # TODO(b/146900329): Enable for iree_vulkan
-        # "iree_vulkan",
+        "iree_vulkan",
         "tf",
-    ],
-    conv2d=Conv2dModule)
+    ], conv2d=Conv2dModule)
 class ConvTest(tf_test_utils.SavedModelTestCase):
 
   def test_id_batch_size_1(self):

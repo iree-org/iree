@@ -39,6 +39,10 @@ static std::array<int32_t, 3> guessWorkGroupSize(
       // A special dot kernel. This has a fixed workgroup size based on the
       // hand-written shader.
       return {16, 16, 1};
+    } else if (!block.getOps<xla_hlo::ConvOp>().empty()) {
+      // Matches hard-coded assumptions in the conv2d_nhwc hand-written
+      // shader.
+      return {1, 1, 1};
     }
   }
   return {32, 1, 1};
