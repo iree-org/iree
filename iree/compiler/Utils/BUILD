@@ -24,16 +24,11 @@ cc_library(
     srcs = [
         "DispatchUtils.cpp",
         "GraphUtils.cpp",
-        "MemRefUtils.cpp",
-        "OpCreationUtils.cpp",
         "TypeConversionUtils.cpp",
     ],
     hdrs = [
         "DispatchUtils.h",
         "GraphUtils.h",
-        "Macros.h",
-        "MemRefUtils.h",
-        "OpCreationUtils.h",
         "TypeConversionUtils.h",
     ],
     deps = [

@@ -12,21 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_cc_library(
-  NAME
-    Utils
-  HDRS
-    "DispatchUtils.h"
-    "GraphUtils.h"
-    "TypeConversionUtils.h"
-  SRCS
-    "DispatchUtils.cpp"
-    "GraphUtils.cpp"
-    "TypeConversionUtils.cpp"
-  DEPS
-    iree::compiler::IR
-    tensorflow::mlir_xla
-    LLVMSupport
-    MLIRIR
-  PUBLIC
-)
+add_subdirectory(IR)
+add_subdirectory(Serialization)
+add_subdirectory(Transforms)
+add_subdirectory(Utils)

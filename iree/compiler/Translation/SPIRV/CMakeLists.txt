@@ -46,9 +46,6 @@ iree_cc_library(
   DEPS
     flatbuffers
     iree::compiler::IR
-    iree::compiler::IR::Interpreter
-    iree::compiler::Serialization
-    iree::compiler::Transforms
     iree::compiler::Translation::SPIRV::Kernels
     iree::compiler::Utils
     iree::schemas::spirv_executable_def_cc_fbs

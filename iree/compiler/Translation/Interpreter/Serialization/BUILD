@@ -12,35 +12,38 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Serialization for the VM bytecode.
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
 cc_library(
-    name = "LegacyInterpreter",
+    name = "Serialization",
     srcs = [
-        "LegacyInterpreterTarget.cpp",
+        "BytecodeTables.cpp",
+        "BytecodeWriter.cpp",
+        "VMFunctionBuilder.cpp",
+        "VMFunctionTableBuilder.cpp",
+        "VMModuleBuilder.cpp",
     ],
     hdrs = [
-        "LegacyInterpreterTarget.h",
+        "BytecodeTables.h",
+        "BytecodeWriter.h",
+        "VMFunctionBuilder.h",
+        "VMFunctionTableBuilder.h",
+        "VMModuleBuilder.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-        "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/IR",
-        "//iree/compiler/Translation/Interpreter/IR",
-        "//iree/compiler/Translation/Interpreter/Serialization",
-        "//iree/compiler/Translation/Interpreter/Transforms",
-        "//iree/compiler/Utils",
+        "//iree/compiler/Translation/Interpreter/Utils",
+        "//iree/schemas:interpreter_module_def_cc_fbs",
+        "//iree/schemas/bytecode:interpreter_bytecode_v0",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )

@@ -12,35 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Utilities for working with IREE MLIR types.
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
 cc_library(
-    name = "LegacyInterpreter",
+    name = "Utils",
     srcs = [
-        "LegacyInterpreterTarget.cpp",
+        "MemRefUtils.cpp",
+        "OpCreationUtils.cpp",
     ],
     hdrs = [
-        "LegacyInterpreterTarget.h",
+        "Macros.h",
+        "MemRefUtils.h",
+        "OpCreationUtils.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-        "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/IR",
-        "//iree/compiler/Translation/Interpreter/IR",
-        "//iree/compiler/Translation/Interpreter/Serialization",
-        "//iree/compiler/Translation/Interpreter/Transforms",
-        "//iree/compiler/Utils",
-        "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
-    alwayslink = 1,
 )

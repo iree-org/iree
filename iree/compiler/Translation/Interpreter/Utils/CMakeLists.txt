@@ -14,27 +14,18 @@
 
 iree_cc_library(
   NAME
-    LegacyInterpreter
+    Utils
   HDRS
-    "LegacyInterpreterTarget.h"
+    "Macros.h"
+    "MemRefUtils.h"
+    "OpCreationUtils.h"
   SRCS
-    "LegacyInterpreterTarget.cpp"
+    "MemRefUtils.cpp"
+    "OpCreationUtils.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
-    iree::compiler::Dialect::HAL::Transforms
     iree::compiler::IR
-    iree::compiler::Translation::Interpreter::IR
-    iree::compiler::Translation::Interpreter::Serialization
-    iree::compiler::Translation::Interpreter::Transforms
-    iree::compiler::Utils
-    flatbuffers
+    tensorflow::mlir_xla
     LLVMSupport
     MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransforms
-  ALWAYSLINK
   PUBLIC
 )

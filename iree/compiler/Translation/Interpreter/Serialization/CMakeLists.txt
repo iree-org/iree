@@ -14,27 +14,25 @@
 
 iree_cc_library(
   NAME
-    LegacyInterpreter
+    Serialization
   HDRS
-    "LegacyInterpreterTarget.h"
+    "BytecodeTables.h"
+    "BytecodeWriter.h"
+    "VMFunctionBuilder.h"
+    "VMFunctionTableBuilder.h"
+    "VMModuleBuilder.h"
   SRCS
-    "LegacyInterpreterTarget.cpp"
+    "BytecodeTables.cpp"
+    "BytecodeWriter.cpp"
+    "VMFunctionBuilder.cpp"
+    "VMFunctionTableBuilder.cpp"
+    "VMModuleBuilder.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
-    iree::compiler::Dialect::HAL::Transforms
     iree::compiler::IR
     iree::compiler::Translation::Interpreter::IR
-    iree::compiler::Translation::Interpreter::Serialization
-    iree::compiler::Translation::Interpreter::Transforms
-    iree::compiler::Utils
-    flatbuffers
+    iree::schemas::interpreter_module_def_cc_fbs
+    iree::schemas::bytecode::interpreter_bytecode_v0
     LLVMSupport
     MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransforms
-  ALWAYSLINK
   PUBLIC
 )

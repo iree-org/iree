@@ -14,27 +14,51 @@
 
 iree_cc_library(
   NAME
-    LegacyInterpreter
+    IR
   HDRS
-    "LegacyInterpreterTarget.h"
+    "HLDialect.h"
+    "HLOps.h"
+    "HLOps.h.inc"
+    "LLDialect.h"
+    "LLOps.h"
+    "LLOps.h.inc"
+    "OpWriters.h"
   SRCS
-    "LegacyInterpreterTarget.cpp"
+    "HLDialect.cpp"
+    "HLOps.cpp"
+    "HLOps.cpp.inc"
+    "LLDialect.cpp"
+    "LLOps.cpp"
+    "LLOps.cpp.inc"
+    "OpWriters.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
-    iree::compiler::Dialect::HAL::Transforms
     iree::compiler::IR
-    iree::compiler::Translation::Interpreter::IR
+    iree::compiler::Translation::Interpreter::IR::HLOpsGen
+    iree::compiler::Translation::Interpreter::IR::LLOpsGen
     iree::compiler::Translation::Interpreter::Serialization
-    iree::compiler::Translation::Interpreter::Transforms
     iree::compiler::Utils
-    flatbuffers
     LLVMSupport
     MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransforms
   ALWAYSLINK
   PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    HLOpsGen
+  SRCS
+    HLOps.td
+  OUTS
+    -gen-op-decls HLOps.h.inc
+    -gen-op-defs HLOps.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    LLOpsGen
+  SRCS
+    LLOps.td
+  OUTS
+    -gen-op-decls LLOps.h.inc
+    -gen-op-defs LLOps.cpp.inc
 )
