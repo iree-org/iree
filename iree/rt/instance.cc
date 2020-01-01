@@ -15,15 +15,11 @@
 #include "iree/rt/instance.h"
 
 #include "iree/base/tracing.h"
-#include "iree/rt/debug/debug_server.h"
 
 namespace iree {
 namespace rt {
 
-Instance::Instance(std::unique_ptr<debug::DebugServer> debug_server)
-    : debug_server_(std::move(debug_server)) {
-  IREE_TRACE_SCOPE0("Instance::ctor");
-}
+Instance::Instance() { IREE_TRACE_SCOPE0("Instance::ctor"); }
 
 Instance::~Instance() { IREE_TRACE_SCOPE0("Instance::dtor"); }
 
@@ -32,15 +28,9 @@ void Instance::RegisterContext(Context* context) {
     absl::MutexLock lock(&contexts_mutex_);
     contexts_.push_back(context);
   }
-  if (debug_server_) {
-    CHECK_OK(debug_server_->RegisterContext(context));
-  }
 }
 
 void Instance::UnregisterContext(Context* context) {
-  if (debug_server_) {
-    CHECK_OK(debug_server_->UnregisterContext(context));
-  }
   {
     absl::MutexLock lock(&contexts_mutex_);
     contexts_.erase(context);

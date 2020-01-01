@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(debug)
-
 iree_cc_library(
   NAME
     rt
@@ -58,6 +56,5 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::buffer_view
     iree::hal::device_manager
-    iree::rt::debug::debug_server_interface
   PUBLIC
 )

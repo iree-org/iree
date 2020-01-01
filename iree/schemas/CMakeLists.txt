@@ -21,7 +21,6 @@ iree_cc_library(
     "archive_def_generated.h"
     "buffer_data_def_generated.h"
     "bytecode_def_generated.h"
-    "debug_service_generated.h"
     "device_def_generated.h"
     "device_group_def_generated.h"
     "device_table_def_generated.h"
@@ -36,7 +35,6 @@ iree_cc_library(
     iree::schemas::archive_def_cc_fbs
     iree::schemas::buffer_data_def_cc_fbs
     iree::schemas::bytecode_def_cc_fbs
-    iree::schemas::debug_service_cc_fbs
     iree::schemas::device_def_cc_fbs
     iree::schemas::device_group_def_cc_fbs
     iree::schemas::device_table_def_cc_fbs
@@ -93,26 +91,6 @@ flatbuffer_cc_library(
     bytecode_module_def_cc_fbs
   SRCS
     "bytecode_module_def.fbs"
-  PUBLIC
-)
-
-flatbuffer_cc_library(
-  NAME
-    debug_service_cc_fbs
-  SRCS
-    "debug_service.fbs"
-  DEPS
-    iree::schemas::bytecode_def_cc_fbs
-    iree::schemas::device_def_cc_fbs
-    iree::schemas::device_group_def_cc_fbs
-    iree::schemas::device_table_def_cc_fbs
-    iree::schemas::executable_def_cc_fbs
-    iree::schemas::executable_table_def_cc_fbs
-    iree::schemas::function_def_cc_fbs
-    iree::schemas::function_table_def_cc_fbs
-    iree::schemas::module_def_cc_fbs
-    iree::schemas::source_map_def_cc_fbs
-    iree::schemas::type_def_cc_fbs
   PUBLIC
 )
 

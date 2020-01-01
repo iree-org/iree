@@ -21,7 +21,6 @@
 #include "iree/base/ref_ptr.h"
 #include "iree/hal/device_manager.h"
 #include "iree/rt/context.h"
-#include "iree/rt/debug/debug_server.h"
 
 namespace iree {
 namespace rt {
@@ -38,15 +37,10 @@ namespace rt {
 // Thread-safe.
 class Instance final : public RefObject<Instance> {
  public:
-  // Creates an instance with an optional attached |debug_server|.
-  Instance() : Instance(nullptr) {}
-  explicit Instance(std::unique_ptr<debug::DebugServer> debug_server);
+  Instance();
   ~Instance();
   Instance(const Instance&) = delete;
   Instance& operator=(const Instance&) = delete;
-
-  // Optional debug server that has access to contexts in this instance.
-  debug::DebugServer* debug_server() const { return debug_server_.get(); }
 
   // Device manager used to enumerate available devices.
   hal::DeviceManager* device_manager() const { return &device_manager_; }
@@ -56,7 +50,6 @@ class Instance final : public RefObject<Instance> {
   void RegisterContext(Context* context);
   void UnregisterContext(Context* context);
 
-  std::unique_ptr<debug::DebugServer> debug_server_;
   mutable hal::DeviceManager device_manager_;
 
   absl::Mutex contexts_mutex_;

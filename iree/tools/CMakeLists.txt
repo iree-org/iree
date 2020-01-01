@@ -72,7 +72,6 @@ if(${IREE_BUILD_COMPILER})
       iree::hal::driver_registry
       # TODO(marbre): Fix problems with property "ALWAYSLINK".
       #iree::schemas
-      iree::rt::debug::debug_server_flags
       # TODO(marbre)_ Add deps
       # PLATFORM_VULKAN_DEPS
       iree::hal::interpreter::interpreter_driver_module

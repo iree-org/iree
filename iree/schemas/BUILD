@@ -66,25 +66,6 @@ iree_flatbuffer_cc_library(
 )
 
 iree_flatbuffer_cc_library(
-    name = "debug_service_cc_fbs",
-    srcs = ["debug_service.fbs"],
-    flatc_args = FLATC_ARGS,
-    includes = [
-        ":bytecode_def_cc_fbs_includes",
-        ":device_def_cc_fbs_includes",
-        ":device_group_def_cc_fbs_includes",
-        ":device_table_def_cc_fbs_includes",
-        ":executable_def_cc_fbs_includes",
-        ":executable_table_def_cc_fbs_includes",
-        ":function_def_cc_fbs_includes",
-        ":function_table_def_cc_fbs_includes",
-        ":module_def_cc_fbs_includes",
-        ":source_map_def_cc_fbs_includes",
-        ":type_def_cc_fbs_includes",
-    ],
-)
-
-iree_flatbuffer_cc_library(
     name = "device_def_cc_fbs",
     srcs = ["device_def.fbs"],
     flatc_args = FLATC_ARGS,
@@ -195,7 +176,6 @@ iree_build_test(
     targets = [
         ":archive_def_cc_fbs",
         ":bytecode_def_cc_fbs",
-        ":debug_service_cc_fbs",
         ":device_def_cc_fbs",
         ":device_group_def_cc_fbs",
         ":device_table_def_cc_fbs",
@@ -216,7 +196,6 @@ cc_library(
         ":archive_def_generated.h",
         ":buffer_data_def_generated.h",
         ":bytecode_def_generated.h",
-        ":debug_service_generated.h",
         ":device_def_generated.h",
         ":device_group_def_generated.h",
         ":device_table_def_generated.h",
@@ -232,7 +211,6 @@ cc_library(
         ":archive_def_cc_fbs",
         ":buffer_data_def_cc_fbs",
         ":bytecode_def_cc_fbs",
-        ":debug_service_cc_fbs",
         ":device_def_cc_fbs",
         ":device_group_def_cc_fbs",
         ":device_table_def_cc_fbs",
@@ -252,7 +230,6 @@ REFLECTION_SRCS = [] if not FLATBUFFER_SUPPORTS_REFLECTIONS else [
     "archive_def.bfbs",
     "buffer_data_def.bfbs",
     "bytecode_def.bfbs",
-    "debug_service.bfbs",
     "executable_def.bfbs",
     "executable_table_def.bfbs",
     "function_def.bfbs",

@@ -57,7 +57,6 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:buffer_view",
         "//iree/hal:device_manager",
-        "//iree/rt/debug:debug_server_interface",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",

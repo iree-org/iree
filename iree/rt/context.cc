@@ -19,7 +19,6 @@
 #include "absl/strings/str_cat.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
-#include "iree/rt/debug/debug_server.h"
 #include "iree/rt/instance.h"
 #include "iree/rt/invocation.h"
 
@@ -67,11 +66,6 @@ Status Context::RegisterModule(ref_ptr<Module> module) {
   // Try resolving prior to actually registering; if we can't resolve an import
   // then we want to fail the entire registration.
   ASSIGN_OR_RETURN(auto import_table, ResolveImports(module.get()));
-
-  auto* debug_server = instance_->debug_server();
-  if (debug_server) {
-    CHECK_OK(debug_server->RegisterContextModule(this, module.get()));
-  }
 
   modules_.push_back(std::move(module));
   module_import_tables_.push_back(std::move(import_table));
@@ -146,17 +140,9 @@ void Context::RegisterInvocation(Invocation* invocation) {
     absl::MutexLock lock(&invocations_mutex_);
     invocations_.push_back(invocation);
   }
-  auto* debug_server = instance_->debug_server();
-  if (debug_server) {
-    CHECK_OK(debug_server->RegisterInvocation(invocation));
-  }
 }
 
 void Context::UnregisterInvocation(Invocation* invocation) {
-  auto* debug_server = instance_->debug_server();
-  if (debug_server) {
-    CHECK_OK(debug_server->UnregisterInvocation(invocation));
-  }
   {
     absl::MutexLock lock(&invocations_mutex_);
     invocations_.erase(invocation);
