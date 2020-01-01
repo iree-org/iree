@@ -158,7 +158,7 @@ static LogicalResult declareInterpreterFunction(
     if (functionOffset.IsNull()) {
       return funcOp.emitError() << "failed to create import function bytecode";
     }
-    if (failed(functionTable->DefineFunction(funcOp, functionOffset, {}))) {
+    if (failed(functionTable->DefineFunction(funcOp, functionOffset))) {
       return failure();
     }
   }
@@ -179,8 +179,8 @@ static LogicalResult defineInterpreterFunction(
   if (functionOffset.IsNull()) {
     return funcOp.emitError() << "failed to serialize function";
   }
-  return moduleBuilder->function_table()->DefineFunction(
-      funcOp, functionOffset, functionBuilder.source_map());
+  return moduleBuilder->function_table()->DefineFunction(funcOp,
+                                                         functionOffset);
 }
 
 LogicalResult translateToLegacyInterpreterExecutable(

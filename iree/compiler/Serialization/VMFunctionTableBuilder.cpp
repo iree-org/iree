@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Serialization/VMFunctionTableBuilder.h"
 
-#include "iree/compiler/Serialization/VMSourceMapBuilder.h"
 #include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
@@ -40,8 +39,6 @@ LogicalResult VMFunctionTableBuilder::DeclareFunction(FuncOp funcOp,
   int ordinal = functionOrdinal.getInt();
   functionDefs_.resize(
       std::max(functionDefs_.size(), static_cast<size_t>(ordinal) + 1u));
-  functionSourceMaps_.resize(
-      std::max(functionDefs_.size(), static_cast<size_t>(ordinal) + 1u));
   functionSet_.insert({funcOp.getName()});
   switch (linkageType) {
     case LinkageType::kInternal:
@@ -57,8 +54,7 @@ LogicalResult VMFunctionTableBuilder::DeclareFunction(FuncOp funcOp,
 }
 
 LogicalResult VMFunctionTableBuilder::DefineFunction(
-    FuncOp funcOp, ::flatbuffers::Offset<iree::FunctionDef> functionDef,
-    VMFunctionSourceMap functionSourceMap) {
+    FuncOp funcOp, ::flatbuffers::Offset<iree::FunctionDef> functionDef) {
   auto functionOrdinal = funcOp.getAttrOfType<IntegerAttr>("iree.ordinal");
   if (!functionOrdinal) {
     return funcOp.emitError() << "Ordinal not assigned to function";
@@ -68,7 +64,6 @@ LogicalResult VMFunctionTableBuilder::DefineFunction(
     return funcOp.emitOpError() << "Function has already been defined";
   }
   functionDefs_[ordinal] = functionDef;
-  functionSourceMaps_[ordinal] = std::move(functionSourceMap);
   return success();
 }
 

@@ -17,20 +17,18 @@
 #include <iostream>
 
 #include "iree/hal/interpreter/interpreter_module.h"
-#include "iree/rt/policy.h"
 
 namespace iree {
 namespace hal {
 
 // static
 StatusOr<ref_ptr<BytecodeExecutable>> BytecodeExecutable::Load(
-    ref_ptr<rt::Instance> instance, hal::Allocator* allocator,
-    ExecutableSpec spec, bool allow_aliasing_data) {
+    hal::Allocator* allocator, ExecutableSpec spec, bool allow_aliasing_data) {
   // Allocate the executable now.
   // We do this here so that if we need to clone the data we are passing that
   // to the VM loader instead of the data we may not have access to later.
-  auto executable = make_ref<BytecodeExecutable>(std::move(instance), allocator,
-                                                 spec, allow_aliasing_data);
+  auto executable =
+      make_ref<BytecodeExecutable>(allocator, spec, allow_aliasing_data);
 
   // Create the executable module.
   auto module_def =
@@ -38,18 +36,14 @@ StatusOr<ref_ptr<BytecodeExecutable>> BytecodeExecutable::Load(
   ASSIGN_OR_RETURN(auto module,
                    InterpreterModule::FromDef(allocator, *module_def));
   executable->module_ = add_ref(module);
-  RETURN_IF_ERROR(executable->context()->RegisterModule(std::move(module)));
 
   return executable;
 }
 
-BytecodeExecutable::BytecodeExecutable(ref_ptr<rt::Instance> instance,
-                                       hal::Allocator* allocator,
+BytecodeExecutable::BytecodeExecutable(hal::Allocator* allocator,
                                        ExecutableSpec spec,
                                        bool allow_aliasing_data)
-    : spec_(spec),
-      context_(
-          make_ref<rt::Context>(std::move(instance), make_ref<rt::Policy>())) {
+    : spec_(spec) {
   if (!allow_aliasing_data) {
     // Clone data.
     cloned_executable_data_ = {spec.executable_data.begin(),

@@ -33,24 +33,12 @@
 #include "iree/hal/interpreter/bytecode_dispatch_conversion.h"
 #include "iree/hal/interpreter/bytecode_dispatch_util.h"
 #include "iree/hal/interpreter/bytecode_kernels.h"
-#include "iree/rt/function.h"
+#include "iree/hal/interpreter/bytecode_reader.h"
+#include "iree/hal/interpreter/bytecode_tables_interpreter.h"
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
-#include "iree/vm/bytecode_module.h"
-#include "iree/vm/bytecode_reader.h"
-#include "iree/vm/bytecode_tables_interpreter.h"
-#include "iree/vm/bytecode_util.h"
-#include "iree/vm/opcode_info.h"
 
 namespace iree {
 namespace hal {
-
-namespace {
-
-using ::iree::rt::Stack;
-using ::iree::rt::StackFrame;
-using ::iree::vm::BytecodeReader;
-
-}  // namespace
 
 Status Dispatch(hal::Allocator* allocator,
                 kernels::RuntimeState* kernel_runtime_state, Stack* stack,
@@ -78,16 +66,15 @@ Status Dispatch(hal::Allocator* allocator,
   // We hope that LLVM decides to keep these in registers (as they are touched
   // for every instruction executed). The stack_frame will change as we call
   // into different functions.
-  BytecodeReader reader(stack);
+  BytecodeReader reader;
   RETURN_IF_ERROR(reader.SwitchStackFrame(entry_stack_frame));
 
-#define DISPATCH_NEXT()                                                    \
-  {                                                                        \
-    uint8_t opcode = *reader.AdvanceOffset().ValueOrDie();                 \
-    DVLOG(1)                                                               \
-        << "Interpreter dispatching op code: "                             \
-        << GetOpcodeInfo(vm::interpreter_opcode_table(), opcode).mnemonic; \
-    goto* kDispatchTable[opcode];                                          \
+#define DISPATCH_NEXT()                                                     \
+  {                                                                         \
+    uint8_t opcode = *reader.AdvanceOffset().ValueOrDie();                  \
+    DVLOG(1) << "Interpreter dispatching op code: "                         \
+             << GetOpcodeInfo(interpreter_opcode_table(), opcode).mnemonic; \
+    goto* kDispatchTable[opcode];                                           \
   }
 
 #define DISPATCH_CORE_OPCODE(opcode, body) \
@@ -111,17 +98,14 @@ Status Dispatch(hal::Allocator* allocator,
     auto* old_stack_frame = stack->current_frame();
     ASSIGN_OR_RETURN(const auto& target_function, reader.ReadFunction());
     // TODO(benvanik): rework register storage interface.
-    ASSIGN_OR_RETURN(
-        const auto* function_def,
-        static_cast<const vm::BytecodeModule*>(target_function.module())
-            ->GetFunctionDef(target_function.linkage(),
-                             target_function.ordinal()));
+    ASSIGN_OR_RETURN(const auto* function_def,
+                     target_function.module()->GetFunctionDef(
+                         target_function.linkage(), target_function.ordinal()));
     ASSIGN_OR_RETURN(auto* new_stack_frame, stack->PushFrame(target_function));
     new_stack_frame->mutable_registers()->buffer_views.resize(
         function_def->bytecode()->local_count());
     RETURN_IF_ERROR(
         reader.CopyInputsAndSwitchStackFrame(old_stack_frame, new_stack_frame));
-    DVLOG(1) << "Call; stack now: " << stack->DebugString();
   });
 
   DISPATCH_CORE_OPCODE(kReturn, {
@@ -144,7 +128,6 @@ Status Dispatch(hal::Allocator* allocator,
     RETURN_IF_ERROR(reader.CopyResultsAndSwitchStackFrame(old_stack_frame,
                                                           new_stack_frame));
     RETURN_IF_ERROR(stack->PopFrame());
-    DVLOG(1) << "Return; stack now: " << stack->DebugString();
   });
 
   DISPATCH_CORE_OPCODE(kBranch, {
@@ -265,9 +248,7 @@ Status Dispatch(hal::Allocator* allocator,
       case CmpFPredicate::kTrue:
         // TODO(b/132183250) support these if we ever need them.
         return UnimplementedErrorBuilder(IREE_LOC)
-               << "Unsupported comparison predicate value "
-               << static_cast<int>(p) << " ("
-               << vm::PredicateToString(predicate) << ")";
+               << "Unsupported comparison predicate value";
     }
   });
 

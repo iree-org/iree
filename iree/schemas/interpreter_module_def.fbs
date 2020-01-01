@@ -14,6 +14,10 @@
 
 namespace iree;
 
+// 'Executable MODule'.
+file_identifier "EMOD";
+file_extension "emod";
+
 table FloatTypeDef {
   width:int;
 }
@@ -66,3 +70,35 @@ table FunctionTypeDef {
   inputs:[TypeDef];
   results:[TypeDef];
 }
+
+table BytecodeDef {
+  local_count:int;
+  contents:[byte];
+}
+
+table FunctionAttributeDef {
+  key:string;
+  value:string;
+}
+
+table FunctionDef {
+  name:string;
+  type:FunctionTypeDef;
+
+  attrs:[FunctionAttributeDef];
+
+  bytecode:BytecodeDef;
+}
+
+table FunctionTableDef {
+  functions:[FunctionDef];
+  imports:[int];
+  exports:[int];
+}
+
+table ModuleDef {
+  name:string;
+  function_table:FunctionTableDef;
+}
+
+root_type ModuleDef;

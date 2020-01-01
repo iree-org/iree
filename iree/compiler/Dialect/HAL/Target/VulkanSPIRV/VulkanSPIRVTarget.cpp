@@ -21,7 +21,6 @@
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRVPass.h"
-#include "iree/schemas/executable_def_generated.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"

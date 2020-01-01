@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/bytecode_tables_interpreter.h"
+#include "iree/hal/interpreter/bytecode_tables_interpreter.h"
 
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
 
 namespace iree {
-namespace vm {
+namespace hal {
 
 namespace {
 
@@ -40,5 +40,5 @@ static const OpcodeInfo kInfoTable[256] = {
 
 OpcodeTable interpreter_opcode_table() { return kInfoTable; }
 
-}  // namespace vm
+}  // namespace hal
 }  // namespace iree

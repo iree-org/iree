@@ -19,7 +19,7 @@
 #include <utility>
 #include <vector>
 
-#include "iree/schemas/bytecode/bytecode_v0.h"
+#include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
 #include "llvm/ADT/Optional.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Block.h"

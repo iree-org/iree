@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_OPCODE_INFO_H_
-#define IREE_VM_OPCODE_INFO_H_
+#ifndef IREE_HAL_INTERPRETER_BYTECODE_TABLES_INTERPRETER_H_
+#define IREE_HAL_INTERPRETER_BYTECODE_TABLES_INTERPRETER_H_
 
 #include "absl/strings/string_view.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
-#include "iree/schemas/bytecode/bytecode_v0.h"
+#include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
 
 namespace iree {
-namespace vm {
+namespace hal {
 
 struct OpcodeInfo {
   const char* mnemonic;
@@ -39,7 +39,9 @@ inline const OpcodeInfo& GetOpcodeInfo(OpcodeTable opcode_table, T opcode) {
   return opcode_table[static_cast<uint8_t>(opcode)];
 }
 
-}  // namespace vm
+OpcodeTable interpreter_opcode_table();
+
+}  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_VM_OPCODE_INFO_H_
+#endif  // IREE_HAL_INTERPRETER_BYTECODE_TABLES_INTERPRETER_H_

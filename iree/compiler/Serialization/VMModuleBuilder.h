@@ -18,11 +18,8 @@
 #include <vector>
 
 #include "flatbuffers/flatbuffers.h"
-#include "iree/compiler/Serialization/VMDeviceTableBuilder.h"
-#include "iree/compiler/Serialization/VMExecutableTableBuilder.h"
 #include "iree/compiler/Serialization/VMFunctionTableBuilder.h"
-#include "iree/compiler/Serialization/VMSourceMapBuilder.h"
-#include "iree/schemas/module_def_generated.h"
+#include "iree/schemas/interpreter_module_def_generated.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -32,10 +29,7 @@ class VMModuleBuilder {
   explicit VMModuleBuilder(::flatbuffers::FlatBufferBuilder *fbb);
 
   ::flatbuffers::FlatBufferBuilder *fbb() const { return fbb_; }
-  VMDeviceTableBuilder *device_table() { return &deviceTable_; }
   VMFunctionTableBuilder *function_table() { return &functionTable_; }
-  VMExecutableTableBuilder *executable_table() { return &executableTable_; }
-  VMSourceMapBuilder *source_map() { return &sourceMap_; }
 
   ::flatbuffers::Offset<iree::ModuleDef> Finish();
 
@@ -45,10 +39,7 @@ class VMModuleBuilder {
  private:
   ::flatbuffers::FlatBufferBuilder *fbb_;
 
-  VMDeviceTableBuilder deviceTable_;
   VMFunctionTableBuilder functionTable_;
-  VMExecutableTableBuilder executableTable_;
-  VMSourceMapBuilder sourceMap_;
 };
 
 }  // namespace iree_compiler

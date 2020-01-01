@@ -18,25 +18,19 @@ iree_cc_library(
   HDRS
     "BytecodeTables.h"
     "BytecodeWriter.h"
-    "VMDeviceTableBuilder.h"
-    "VMExecutableTableBuilder.h"
     "VMFunctionBuilder.h"
     "VMFunctionTableBuilder.h"
     "VMModuleBuilder.h"
-    "VMSourceMapBuilder.h"
   SRCS
     "BytecodeTables.cpp"
     "BytecodeWriter.cpp"
-    "VMDeviceTableBuilder.cpp"
-    "VMExecutableTableBuilder.cpp"
     "VMFunctionBuilder.cpp"
     "VMFunctionTableBuilder.cpp"
     "VMModuleBuilder.cpp"
-    "VMSourceMapBuilder.cpp"
   DEPS
     iree::compiler::IR
     iree::compiler::IR::Interpreter
-    iree::schemas
+    iree::schemas::interpreter_module_def_cc_fbs
     iree::schemas::bytecode::interpreter_bytecode_v0
     LLVMSupport
     MLIRIR

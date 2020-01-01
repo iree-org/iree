@@ -14,46 +14,20 @@
 
 #include "iree/compiler/Serialization/VMModuleBuilder.h"
 
-#include "iree/schemas/executable_table_def_generated.h"
-
 namespace mlir {
 namespace iree_compiler {
 
 VMModuleBuilder::VMModuleBuilder(::flatbuffers::FlatBufferBuilder *fbb)
-    : fbb_(fbb),
-      deviceTable_(fbb),
-      functionTable_(fbb),
-      executableTable_(fbb),
-      sourceMap_(fbb) {}
+    : fbb_(fbb), functionTable_(fbb) {}
 
 ::flatbuffers::Offset<iree::ModuleDef> VMModuleBuilder::Finish() {
   auto nameOffset = fbb_->CreateString("module");
-  auto deviceTableOffset = deviceTable_.Finish();
-  if (deviceTableOffset.IsNull()) return {};
   auto functionTableOffset = functionTable_.Finish();
   if (functionTableOffset.IsNull()) return {};
-  auto executableTableOffset = executableTable_.Finish();
-  if (executableTableOffset.IsNull()) return {};
-
-  for (int function_ordinal = 0;
-       function_ordinal < functionTable_.function_source_maps().size();
-       ++function_ordinal) {
-    if (failed(sourceMap_.AddFunction(
-            function_ordinal,
-            functionTable_.function_source_maps()[function_ordinal]))) {
-      return {};
-    }
-  }
-  auto sourceMapOffset =
-      sourceMap_.Finish(functionTable_.max_function_ordinal());
-  if (sourceMapOffset.IsNull()) return {};
 
   iree::ModuleDefBuilder mdb(*fbb_);
   mdb.add_name(nameOffset);
-  mdb.add_device_table(deviceTableOffset);
   mdb.add_function_table(functionTableOffset);
-  mdb.add_executable_table(executableTableOffset);
-  mdb.add_source_map(sourceMapOffset);
   return mdb.Finish();
 }
 

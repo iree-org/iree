@@ -39,7 +39,6 @@ cc_binary(
         "//iree/base:file_io",  # build-cleaner: keep
         "//iree/base:flatbuffer_util",
         "//iree/base:init",
-        "//iree/schemas",
         "//iree/schemas:bytecode_module_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
     ],

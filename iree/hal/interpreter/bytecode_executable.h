@@ -22,21 +22,19 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_spec.h"
-#include "iree/rt/context.h"
-#include "iree/rt/instance.h"
-#include "iree/rt/module.h"
+#include "iree/hal/interpreter/interpreter_module.h"
 
 namespace iree {
 namespace hal {
 
 class BytecodeExecutable final : public Executable {
  public:
-  static StatusOr<ref_ptr<BytecodeExecutable>> Load(
-      ref_ptr<rt::Instance> instance, hal::Allocator* allocator,
-      ExecutableSpec spec, bool allow_aliasing_data);
+  static StatusOr<ref_ptr<BytecodeExecutable>> Load(hal::Allocator* allocator,
+                                                    ExecutableSpec spec,
+                                                    bool allow_aliasing_data);
 
-  BytecodeExecutable(ref_ptr<rt::Instance> instance, hal::Allocator* allocator,
-                     ExecutableSpec spec, bool allow_aliasing_data);
+  BytecodeExecutable(hal::Allocator* allocator, ExecutableSpec spec,
+                     bool allow_aliasing_data);
   ~BytecodeExecutable() override;
 
   bool supports_debugging() const override { return false; }
@@ -46,20 +44,16 @@ class BytecodeExecutable final : public Executable {
     return spec_.executable_data;
   }
 
-  // VM context with the executable registered.
-  const ref_ptr<rt::Context>& context() const { return context_; }
-
   // VM module representing the executable.
   // Note that there may be more than one module in the Context and only this
   // module can be used to lookup executable exports.
-  const ref_ptr<rt::Module>& module() const { return module_; }
+  const ref_ptr<InterpreterModule>& module() const { return module_; }
 
  private:
   ExecutableSpec spec_;
   std::vector<uint8_t> cloned_executable_data_;
 
-  ref_ptr<rt::Context> context_;
-  ref_ptr<rt::Module> module_;
+  ref_ptr<InterpreterModule> module_;
 };
 
 }  // namespace hal

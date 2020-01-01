@@ -12,28 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/bytecode_reader.h"
+#include "iree/hal/interpreter/bytecode_reader.h"
 
 #include "iree/base/shape.h"
 #include "iree/base/status.h"
 #include "iree/hal/heap_buffer.h"
-#include "iree/vm/bytecode_module.h"
 
 namespace iree {
-namespace vm {
-
-namespace {
-
-using ::iree::hal::BufferView;
-using ::iree::rt::StackFrame;
-
-}  // namespace
+namespace hal {
 
 StatusOr<const uint8_t*> BytecodeReader::AdvanceOffset() {
   *stack_frame_->mutable_offset() = offset();
   // TODO(benvanik): make a flag and/or remove.
-  DVLOG(1) << "dispatch(" << stack_frame_->function().name() << "@" << offset()
-           << "): " << int(*bytecode_pc_);
+  DVLOG(1) << "dispatch(" << offset() << "): " << int(*bytecode_pc_);
   for (int i = 0; i < registers_->buffer_views.size(); ++i) {
     DVLOG(1) << "local[" << i << "] "
              << registers_->buffer_views[i].DebugStringShort();
@@ -124,10 +115,9 @@ Status BytecodeReader::SwitchStackFrame(StackFrame* new_stack_frame) {
 
   // Setup state pointers for faster dereferencing.
   const auto& function = new_stack_frame->function();
-  ASSIGN_OR_RETURN(
-      const auto* function_def,
-      static_cast<const BytecodeModule*>(function.module())
-          ->GetFunctionDef(function.linkage(), function.ordinal()));
+  ASSIGN_OR_RETURN(const auto* function_def,
+                   function.module()->GetFunctionDef(function.linkage(),
+                                                     function.ordinal()));
   const auto& bytecode = *function_def->bytecode();
   bytecode_base_ = bytecode.contents()->Data();
   bytecode_limit_ = bytecode_base_ + bytecode.contents()->size();
@@ -285,5 +275,5 @@ StatusOr<BufferView> BytecodeReader::ReadConstant() {
   return buffer_view;
 }
 
-}  // namespace vm
+}  // namespace hal
 }  // namespace iree

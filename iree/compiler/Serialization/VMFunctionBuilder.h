@@ -17,9 +17,7 @@
 
 #include "iree/compiler/Serialization/BytecodeWriter.h"
 #include "iree/compiler/Serialization/VMFunctionTableBuilder.h"
-#include "iree/compiler/Serialization/VMSourceMapBuilder.h"
-#include "iree/schemas/bytecode_def_generated.h"
-#include "iree/schemas/function_def_generated.h"
+#include "iree/schemas/interpreter_module_def_generated.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
@@ -38,8 +36,6 @@ class VMFunctionBuilder {
   ~VMFunctionBuilder() = default;
 
   void RegisterCustomWriter(StringRef operationName, CustomWriterFn writerFn);
-
-  const VMFunctionSourceMap &source_map() const { return sourceMap_; }
 
   LogicalResult ConvertBytecode();
 
@@ -68,7 +64,6 @@ class VMFunctionBuilder {
   VMFunctionTableBuilder *functionTable_;
   ::flatbuffers::FlatBufferBuilder *fbb_;
   ::flatbuffers::Offset<iree::BytecodeDef> bytecodeDef_;
-  VMFunctionSourceMap sourceMap_;
 };
 
 }  // namespace iree_compiler

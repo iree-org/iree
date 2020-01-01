@@ -70,8 +70,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::hal::buffer_view_string_util
       iree::hal::driver_registry
-      # TODO(marbre): Fix problems with property "ALWAYSLINK".
-      #iree::schemas
       # TODO(marbre)_ Add deps
       # PLATFORM_VULKAN_DEPS
       iree::hal::interpreter::interpreter_driver_module

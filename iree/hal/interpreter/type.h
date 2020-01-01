@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_TYPE_H_
-#define IREE_VM_TYPE_H_
+#ifndef IREE_HAL_INTERPRETER_TYPE_H_
+#define IREE_HAL_INTERPRETER_TYPE_H_
 
 #include "iree/base/status.h"
-#include "iree/schemas/bytecode/bytecode_v0.h"
-#include "iree/schemas/type_def_generated.h"
+#include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
+#include "iree/schemas/interpreter_module_def_generated.h"
 
 namespace iree {
-namespace vm {
+namespace hal {
 
 class Type {
  public:
@@ -59,7 +59,7 @@ inline std::ostream& operator<<(std::ostream& stream, const Type& type) {
   return stream;
 }
 
-}  // namespace vm
+}  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_VM_TYPE_H_
+#endif  // IREE_HAL_INTERPRETER_TYPE_H_

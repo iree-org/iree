@@ -12,37 +12,33 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM_BYTECODE_READER_H_
-#define IREE_VM_BYTECODE_READER_H_
+#ifndef IREE_HAL_INTERPRETER_BYTECODE_READER_H_
+#define IREE_HAL_INTERPRETER_BYTECODE_READER_H_
 
 #include "absl/base/attributes.h"
 #include "absl/container/inlined_vector.h"
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view.h"
-#include "iree/rt/context.h"
-#include "iree/rt/stack.h"
-#include "iree/rt/stack_frame.h"
-#include "iree/schemas/bytecode/bytecode_v0.h"
-#include "iree/vm/type.h"
+#include "iree/hal/interpreter/stack.h"
+#include "iree/hal/interpreter/type.h"
+#include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
 
 namespace iree {
-namespace vm {
+namespace hal {
 
 class BytecodeReader {
  public:
-  explicit BytecodeReader(rt::Stack* stack) : stack_(stack) {}
-
   int offset() const { return static_cast<int>(bytecode_pc_ - bytecode_base_); }
 
   StatusOr<const uint8_t*> AdvanceOffset();
 
-  Status SwitchStackFrame(rt::StackFrame* new_stack_frame);
+  Status SwitchStackFrame(StackFrame* new_stack_frame);
   Status BranchToOffset(int32_t offset);
 
-  Status CopyInputsAndSwitchStackFrame(rt::StackFrame* src_stack_frame,
-                                       rt::StackFrame* dst_stack_frame);
-  Status CopyResultsAndSwitchStackFrame(rt::StackFrame* src_stack_frame,
-                                        rt::StackFrame* dst_stack_frame);
+  Status CopyInputsAndSwitchStackFrame(StackFrame* src_stack_frame,
+                                       StackFrame* dst_stack_frame);
+  Status CopyResultsAndSwitchStackFrame(StackFrame* src_stack_frame,
+                                        StackFrame* dst_stack_frame);
   Status CopySlots();
 
   StatusOr<hal::BufferView> ReadConstant();
@@ -56,22 +52,14 @@ class BytecodeReader {
     return Type::FromTypeIndex(type_index);
   }
 
-  ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<const rt::Function> ReadFunction() {
+  ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<const Function> ReadFunction() {
     ASSIGN_OR_RETURN(auto value, ReadValue<uint32_t>());
     const auto& module = stack_frame_->module();
-    return module.LookupFunctionByOrdinal(rt::Function::Linkage::kInternal,
-                                          value);
-  }
-
-  ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<const rt::Function>
-  ReadImportFunction() {
-    ASSIGN_OR_RETURN(auto value, ReadValue<uint32_t>());
-    const auto& module = stack_frame_->module();
-    return stack_->context()->ResolveImport(&module, value);
+    return module.LookupFunctionByOrdinal(Function::Linkage::kInternal, value);
   }
 
   ABSL_ATTRIBUTE_ALWAYS_INLINE StatusOr<hal::BufferView*> ReadLocal(
-      rt::Registers* registers) {
+      Registers* registers) {
     ASSIGN_OR_RETURN(auto value, ReadValue<uint16_t>());
     if (value > registers->buffer_views.size()) {
       return OutOfRangeErrorBuilder(IREE_LOC)
@@ -155,15 +143,14 @@ class BytecodeReader {
     return value;
   }
 
-  rt::Stack* stack_ = nullptr;
-  rt::StackFrame* stack_frame_ = nullptr;
+  StackFrame* stack_frame_ = nullptr;
   const uint8_t* bytecode_base_ = nullptr;
   const uint8_t* bytecode_limit_ = nullptr;
   const uint8_t* bytecode_pc_ = nullptr;
-  rt::Registers* registers_ = nullptr;
+  Registers* registers_ = nullptr;
 };
 
-}  // namespace vm
+}  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_VM_BYTECODE_READER_H_
+#endif  // IREE_HAL_INTERPRETER_BYTECODE_READER_H_

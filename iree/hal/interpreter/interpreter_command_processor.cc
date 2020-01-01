@@ -21,7 +21,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/interpreter/bytecode_executable.h"
-#include "iree/rt/stack.h"
+#include "iree/hal/interpreter/stack.h"
 
 namespace iree {
 namespace hal {
@@ -42,10 +42,10 @@ Status InterpreterCommandProcessor::Dispatch(
       static_cast<BytecodeExecutable*>(dispatch_request.executable);
   const auto& module = executable->module();
   ASSIGN_OR_RETURN(auto entry_function, module->LookupFunctionByOrdinal(
-                                            rt::Function::Linkage::kExport,
+                                            Function::Linkage::kExport,
                                             dispatch_request.entry_point));
 
-  rt::Stack stack(executable->context().get());
+  Stack stack;
 
   // TODO(benvanik): avoid this by directly referencing the bindings.
   absl::InlinedVector<BufferView, 8> arguments;

@@ -12,19 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/rt/stack.h"
+#include "iree/hal/interpreter/stack.h"
 
 #include <iterator>
 
-#include "absl/strings/str_join.h"
 #include "iree/base/status.h"
 
 namespace iree {
-namespace rt {
+namespace hal {
 
 constexpr int Stack::kMaxStackDepth;
 
-Stack::Stack(Context* context) : context_(context) {}
+Stack::Stack() = default;
 
 Stack::~Stack() = default;
 
@@ -52,9 +51,5 @@ Status Stack::PopFrame() {
   return OkStatus();
 }
 
-std::string Stack::DebugString() const {
-  return absl::StrJoin(frames(), "\n", StackFrameFormatter());
-}
-
-}  // namespace rt
+}  // namespace hal
 }  // namespace iree

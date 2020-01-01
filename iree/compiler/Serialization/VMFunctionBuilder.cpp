@@ -18,8 +18,8 @@
 #include "iree/compiler/IR/Dialect.h"
 #include "iree/compiler/Serialization/BytecodeTables.h"
 #include "iree/compiler/Utils/Macros.h"
-#include "iree/schemas/bytecode/bytecode_v0.h"
-#include "iree/schemas/type_def_generated.h"
+#include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
+#include "iree/schemas/interpreter_module_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
@@ -136,7 +136,6 @@ void VMFunctionBuilder::RegisterCustomWriter(StringRef operationName,
 
 LogicalResult VMFunctionBuilder::ConvertBytecode() {
   BytecodeWriter writer;
-  sourceMap_ = {};
 
   RETURN_IF_FAILURE(BeginFunction(function_, &writer));
   for (auto &block : function_.getBlocks()) {
@@ -233,10 +232,6 @@ LogicalResult VMFunctionBuilder::EndBlock(Block *block, Operation *op,
 
 LogicalResult VMFunctionBuilder::WriteOperation(Block *block, Operation *baseOp,
                                                 BytecodeWriter *writer) {
-  if (!baseOp->getLoc().isa<UnknownLoc>()) {
-    sourceMap_.locations.push_back({writer->offset(), baseOp->getLoc()});
-  }
-
   // Check registered writers first to allow overrides.
   auto writerIt = customWriters_.find(baseOp->getName().getStringRef());
   if (writerIt != customWriters_.end()) {

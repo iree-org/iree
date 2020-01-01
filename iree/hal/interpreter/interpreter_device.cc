@@ -97,7 +97,7 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
 }  // namespace
 
 InterpreterDevice::InterpreterDevice(DeviceInfo device_info)
-    : Device(std::move(device_info)), instance_(make_ref<rt::Instance>()) {
+    : Device(std::move(device_info)) {
   // We currently only expose a single command queue.
   auto command_queue = absl::make_unique<UnsynchronizedCommandQueue>(
       &allocator_, "cpu0",
@@ -113,7 +113,7 @@ InterpreterDevice::InterpreterDevice(DeviceInfo device_info)
 InterpreterDevice::~InterpreterDevice() = default;
 
 ref_ptr<ExecutableCache> InterpreterDevice::CreateExecutableCache() {
-  return make_ref<BytecodeCache>(add_ref(instance_), &allocator_);
+  return make_ref<BytecodeCache>(&allocator_);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> InterpreterDevice::CreateCommandBuffer(

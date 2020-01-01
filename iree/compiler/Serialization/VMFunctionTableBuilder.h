@@ -19,9 +19,7 @@
 #include <vector>
 
 #include "flatbuffers/flatbuffers.h"
-#include "iree/compiler/Serialization/VMSourceMapBuilder.h"
-#include "iree/schemas/function_def_generated.h"
-#include "iree/schemas/function_table_def_generated.h"
+#include "iree/schemas/interpreter_module_def_generated.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
@@ -42,10 +40,6 @@ class VMFunctionTableBuilder {
 
   int max_function_ordinal() const { return functionDefs_.size(); }
 
-  ArrayRef<VMFunctionSourceMap> function_source_maps() {
-    return llvm::makeArrayRef(functionSourceMaps_);
-  }
-
   // Returns true if |funcOp| has already been declared in the table.
   bool IsFunctionDeclared(FuncOp funcOp);
 
@@ -55,8 +49,7 @@ class VMFunctionTableBuilder {
 
   // Defines |funcOp| using the given |functionDef|.
   LogicalResult DefineFunction(
-      FuncOp funcOp, ::flatbuffers::Offset<iree::FunctionDef> functionDef,
-      VMFunctionSourceMap functionSourceMap);
+      FuncOp funcOp, ::flatbuffers::Offset<iree::FunctionDef> functionDef);
 
   ::flatbuffers::Offset<iree::FunctionTableDef> Finish();
 
@@ -64,7 +57,6 @@ class VMFunctionTableBuilder {
   ::flatbuffers::FlatBufferBuilder *fbb_;
   llvm::StringSet<> functionSet_;
   std::vector<::flatbuffers::Offset<iree::FunctionDef>> functionDefs_;
-  std::vector<VMFunctionSourceMap> functionSourceMaps_;
   std::vector<int> importIndices_;
   std::vector<int> exportIndices_;
 };

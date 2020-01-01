@@ -30,7 +30,6 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
         "//iree/compiler/IR",
         "//iree/compiler/Translation/SPIRV",
-        "//iree/schemas",
         "//iree/schemas:spirv_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm-project//llvm:support",

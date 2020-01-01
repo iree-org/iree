@@ -18,18 +18,10 @@ package(
 )
 
 cc_library(
-    name = "bytecode_v0",
-    hdrs = ["bytecode_v0.h"],
-    deps = [
-        "//iree/base:bitfield",
-        "@com_google_absl//absl/base:core_headers",
-    ],
-)
-
-cc_library(
     name = "interpreter_bytecode_v0",
     hdrs = ["interpreter_bytecode_v0.h"],
     deps = [
-        ":bytecode_v0",
+        "//iree/base:bitfield",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )

@@ -24,11 +24,10 @@
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/heap_buffer.h"
 #include "iree/hal/interpreter/bytecode_kernels.h"
-#include "iree/rt/function.h"
-#include "iree/rt/stack.h"
+#include "iree/hal/interpreter/bytecode_reader.h"
+#include "iree/hal/interpreter/stack.h"
+#include "iree/hal/interpreter/type.h"
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
-#include "iree/vm/bytecode_reader.h"
-#include "iree/vm/type.h"
 
 // TODO(benvanik): move to dedicated config file/build flags.
 #define IREE_SUPPORT_F32 1
@@ -420,7 +419,7 @@ Status ApplyMatMulOpF(kernels::MatMul::RuntimeState* runtime_state,
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseUnaryOpIS(vm::BytecodeReader* reader) {
+Status DispatchElementwiseUnaryOpIS(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* src_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* dst_local, reader->ReadLocal());
   RETURN_IF_ERROR(ValidateElementwiseUnaryOp(src_local, dst_local));
@@ -428,7 +427,7 @@ Status DispatchElementwiseUnaryOpIS(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseUnaryOpIU(vm::BytecodeReader* reader) {
+Status DispatchElementwiseUnaryOpIU(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* src_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* dst_local, reader->ReadLocal());
   RETURN_IF_ERROR(ValidateElementwiseUnaryOp(src_local, dst_local));
@@ -436,7 +435,7 @@ Status DispatchElementwiseUnaryOpIU(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseUnaryOpF(vm::BytecodeReader* reader) {
+Status DispatchElementwiseUnaryOpF(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* src_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* dst_local, reader->ReadLocal());
   RETURN_IF_ERROR(ValidateElementwiseUnaryOp(src_local, dst_local));
@@ -444,7 +443,7 @@ Status DispatchElementwiseUnaryOpF(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseBinaryOpIS(vm::BytecodeReader* reader) {
+Status DispatchElementwiseBinaryOpIS(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* lhs_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* rhs_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* dst_local, reader->ReadLocal());
@@ -453,7 +452,7 @@ Status DispatchElementwiseBinaryOpIS(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseBinaryOpIU(vm::BytecodeReader* reader) {
+Status DispatchElementwiseBinaryOpIU(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* lhs_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* rhs_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* dst_local, reader->ReadLocal());
@@ -462,7 +461,7 @@ Status DispatchElementwiseBinaryOpIU(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseBinaryOpF(vm::BytecodeReader* reader) {
+Status DispatchElementwiseBinaryOpF(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* lhs_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* rhs_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* dst_local, reader->ReadLocal());
@@ -471,7 +470,7 @@ Status DispatchElementwiseBinaryOpF(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseTernaryOpIS(vm::BytecodeReader* reader) {
+Status DispatchElementwiseTernaryOpIS(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* a_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* b_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* c_local, reader->ReadLocal());
@@ -482,7 +481,7 @@ Status DispatchElementwiseTernaryOpIS(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseTernaryOpIU(vm::BytecodeReader* reader) {
+Status DispatchElementwiseTernaryOpIU(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* a_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* b_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* c_local, reader->ReadLocal());
@@ -493,7 +492,7 @@ Status DispatchElementwiseTernaryOpIU(vm::BytecodeReader* reader) {
 }
 
 template <typename KERNEL>
-Status DispatchElementwiseTernaryOpF(vm::BytecodeReader* reader) {
+Status DispatchElementwiseTernaryOpF(BytecodeReader* reader) {
   ASSIGN_OR_RETURN(auto* a_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* b_local, reader->ReadLocal());
   ASSIGN_OR_RETURN(auto* c_local, reader->ReadLocal());

@@ -51,7 +51,6 @@ iree_cc_library(
     iree::compiler::Transforms
     iree::compiler::Translation::SPIRV::Kernels
     iree::compiler::Utils
-    iree::schemas
     iree::schemas::spirv_executable_def_cc_fbs
     tensorflow::mlir_xla
     LLVMSupport

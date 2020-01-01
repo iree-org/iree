@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm/type.h"
+#include "iree/hal/interpreter/type.h"
 
 #include "iree/base/status.h"
 
 namespace iree {
-namespace vm {
+namespace hal {
 
 // static
 StatusOr<const Type> Type::FromTypeIndex(uint8_t type_index) {
@@ -60,5 +60,5 @@ size_t Type::element_size() const {
   }
 }
 
-}  // namespace vm
+}  // namespace hal
 }  // namespace iree

@@ -32,52 +32,43 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    bytecode_dispatch
+    bytecode_executable
   HDRS
     "bytecode_dispatch.h"
     "bytecode_dispatch_conversion.h"
     "bytecode_dispatch_util.h"
+    "bytecode_executable.h"
+    "bytecode_reader.h"
+    "bytecode_tables_interpreter.h"
+    "interpreter_module.h"
+    "stack.h"
+    "type.h"
   SRCS
     "bytecode_cache.cc"
     "bytecode_dispatch_util.cc"
+    "bytecode_executable.cc"
+    "bytecode_reader.cc"
+    "bytecode_tables_interpreter.cc"
+    "interpreter_module.cc"
+    "stack.cc"
+    "type.cc"
   DEPS
     absl::base
+    absl::core_headers
     absl::inlined_vector
     absl::span
+    iree::base::flatbuffer_util
     iree::base::logging
     iree::base::memory
+    iree::base::shape
     iree::base::status
     iree::hal::allocator
     iree::hal::buffer_view
-    iree::hal::heap_buffer
-    iree::hal::interpreter::bytecode_kernels
-    iree::rt
-    iree::schemas::bytecode::interpreter_bytecode_v0
-    iree::vm::bytecode_reader
-    iree::vm::bytecode_tables_interpreter
-    iree::vm::bytecode_util
-    iree::vm::opcode_info
-    iree::vm::type
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    bytecode_executable
-  HDRS
-    "bytecode_executable.h"
-  SRCS
-    "bytecode_executable.cc"
-  DEPS
-    absl::span
-    iree::base::status
-    iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_spec
-    iree::hal::interpreter::interpreter_module
-    iree::rt
-    iree::vm::bytecode_tables_interpreter
-    iree::vm::bytecode_validator
+    iree::hal::interpreter::bytecode_kernels
+    iree::hal::heap_buffer
+    iree::schemas::bytecode::interpreter_bytecode_v0
   PUBLIC
 )
 
@@ -187,24 +178,5 @@ iree_cc_library(
     iree::base::status
     iree::hal::driver_registry
     iree::hal::interpreter::interpreter_driver
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    interpreter_module
-  HDRS
-    "interpreter_module.h"
-  SRCS
-    "interpreter_module.cc"
-  DEPS
-    absl::span
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::hal::allocator
-    iree::hal::buffer_view
-    iree::hal::interpreter::bytecode_dispatch
-    iree::hal::interpreter::bytecode_kernels
-    iree::rt
   PUBLIC
 )
