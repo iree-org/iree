@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_IREE_VM2_INSTANCE_H_
-#define IREE_IREE_VM2_INSTANCE_H_
+#ifndef IREE_VM_INSTANCE_H_
+#define IREE_VM_INSTANCE_H_
 
 #include "iree/base/api.h"
 
@@ -57,4 +57,4 @@ iree_vm_instance_release(iree_vm_instance_t* instance);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_IREE_VM2_INSTANCE_H_
+#endif  // IREE_VM_INSTANCE_H_

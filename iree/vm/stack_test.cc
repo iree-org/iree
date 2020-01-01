@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/stack.h"
+#include "iree/vm/stack.h"
 
 #include <cstring>
 
 #include "iree/base/api.h"
 #include "iree/base/ref_ptr.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm2/ref.h"
+#include "iree/vm/ref.h"
 
 namespace {
 

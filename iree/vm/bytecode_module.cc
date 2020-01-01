@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/bytecode_module.h"
+#include "iree/vm/bytecode_module.h"
 
 #include <string.h>
 
 #include "iree/base/api.h"
 #include "iree/base/flatbuffer_util.h"
-#include "iree/vm2/bytecode_module_impl.h"
-#include "iree/vm2/ref.h"
-#include "iree/vm2/stack.h"
+#include "iree/vm/bytecode_module_impl.h"
+#include "iree/vm/ref.h"
+#include "iree/vm/stack.h"
 
 // TODO(benvanik): replace with flatcc version so this file can be pure C.
 #include "flatbuffers/flatbuffers.h"

@@ -19,9 +19,9 @@
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/host_types.h"
 #include "iree/base/api.h"
-#include "iree/vm2/api.h"
-#include "iree/vm2/bytecode_module.h"
-#include "iree/vm2/variant_list.h"
+#include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
+#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace python {

@@ -175,7 +175,7 @@ class TFSavedModelAdoptExportsPass
       auto exported_names = mlir::tf_saved_model::GetExportedNames(func);
       if (exported_names.empty()) continue;
 
-      // TODO(laurenzo): After VM2 rework, we should just keep the
+      // TODO(laurenzo): After VM rework, we should just keep the
       // function name as-is and create explicit export ops for each exported
       // function.
       if (exported_names.size() > 1) {

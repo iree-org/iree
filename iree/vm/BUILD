@@ -217,7 +217,7 @@ cc_library(
 )
 
 cc_library(
-    name = "vm2",
+    name = "vm",
     hdrs = [
         "api.h",
     ],

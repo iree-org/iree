@@ -21,12 +21,12 @@
 #include "absl/strings/match.h"
 #include "iree/base/logging.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm2/bytecode_dispatch_test_module.h"
-#include "iree/vm2/bytecode_module.h"
-#include "iree/vm2/context.h"
-#include "iree/vm2/instance.h"
-#include "iree/vm2/invocation.h"
-#include "iree/vm2/module.h"
+#include "iree/vm/bytecode_dispatch_test_module.h"
+#include "iree/vm/bytecode_module.h"
+#include "iree/vm/context.h"
+#include "iree/vm/instance.h"
+#include "iree/vm/invocation.h"
+#include "iree/vm/module.h"
 
 namespace {
 

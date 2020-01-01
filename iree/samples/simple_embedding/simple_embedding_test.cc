@@ -21,8 +21,8 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm2/api.h"
-#include "iree/vm2/bytecode_module.h"
+#include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
 
 // Compiled module embedded here to avoid file IO:
 #include "iree/samples/simple_embedding/simple_embedding_test_bytecode_module.h"

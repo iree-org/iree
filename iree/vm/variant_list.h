@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM2_VARIANT_LIST_H_
-#define IREE_VM2_VARIANT_LIST_H_
+#ifndef IREE_VM_VARIANT_LIST_H_
+#define IREE_VM_VARIANT_LIST_H_
 
 #include <stdint.h>
 
-#include "iree/vm2/ref.h"
-#include "iree/vm2/value.h"
+#include "iree/vm/ref.h"
+#include "iree/vm/value.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,4 +104,4 @@ iree_vm_variant_list_get(iree_vm_variant_list_t* list, iree_host_size_t i);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_VM2_VARIANT_LIST_H_
+#endif  // IREE_VM_VARIANT_LIST_H_

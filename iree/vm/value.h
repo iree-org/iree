@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM2_VALUE_H_
-#define IREE_VM2_VALUE_H_
+#ifndef IREE_VM_VALUE_H_
+#define IREE_VM_VALUE_H_
 
 #include <stdint.h>
 
@@ -46,4 +46,4 @@ typedef struct iree_vm_value {
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_VM2_VALUE_H_
+#endif  // IREE_VM_VALUE_H_

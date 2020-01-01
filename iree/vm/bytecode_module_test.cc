@@ -12,18 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM2_API_H_
-#define IREE_VM2_API_H_
+// Tests for bytecode_module.cc implementations.
+// This means mostly just flatbuffer verification, module interface functions,
+// etc. bytecode_dispatch_test.cc covers actual dispatch.
 
-#include "iree/base/api.h"
-#include "iree/vm2/context.h"
-#include "iree/vm2/instance.h"
-#include "iree/vm2/invocation.h"
-#include "iree/vm2/module.h"
-#include "iree/vm2/ref.h"
-#include "iree/vm2/stack.h"
-#include "iree/vm2/types.h"
-#include "iree/vm2/value.h"
-#include "iree/vm2/variant_list.h"
+#include "iree/vm/bytecode_module.h"
 
-#endif  // IREE_VM2_API_H_
+#include "iree/testing/gtest.h"
+
+namespace {
+
+// TODO(benvanik): bytecode_module_test.cc for flatbuffer/module implementation.
+
+}  // namespace

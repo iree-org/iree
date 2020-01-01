@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/module.h"
+#include "iree/vm/module.h"
 
 #include <stdatomic.h>
 #include <string.h>

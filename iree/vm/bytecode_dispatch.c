@@ -16,8 +16,8 @@
 #include <string.h>
 
 #include "iree/base/target_platform.h"
-#include "iree/vm2/bytecode_module_impl.h"
-#include "iree/vm2/bytecode_op_table.h"
+#include "iree/vm/bytecode_module_impl.h"
+#include "iree/vm/bytecode_op_table.h"
 
 // Enable to get some verbose logging; better than nothing until we have some
 // better tooling.

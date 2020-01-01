@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/context.h"
+#include "iree/vm/context.h"
 
 #include <assert.h>
 #include <stdatomic.h>

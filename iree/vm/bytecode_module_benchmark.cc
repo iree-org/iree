@@ -17,10 +17,10 @@
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
-#include "iree/vm2/bytecode_module.h"
-#include "iree/vm2/bytecode_module_benchmark_module.h"
-#include "iree/vm2/module.h"
-#include "iree/vm2/stack.h"
+#include "iree/vm/bytecode_module.h"
+#include "iree/vm/bytecode_module_benchmark_module.h"
+#include "iree/vm/module.h"
+#include "iree/vm/stack.h"
 
 namespace {
 

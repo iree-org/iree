@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/instance.h"
+#include "iree/vm/instance.h"
 
 #include <stdatomic.h>
 
-#include "iree/vm2/types.h"
+#include "iree/vm/types.h"
 
 struct iree_vm_instance {
   atomic_intptr_t ref_count;

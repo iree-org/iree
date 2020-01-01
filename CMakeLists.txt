@@ -106,7 +106,6 @@ add_subdirectory(build_tools/embed_data/)
 
 add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
-add_subdirectory(iree/rt)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/testing)
 add_subdirectory(iree/vm)

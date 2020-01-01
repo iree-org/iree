@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_VM2_CONTEXT_H_
-#define IREE_VM2_CONTEXT_H_
+#ifndef IREE_VM_CONTEXT_H_
+#define IREE_VM_CONTEXT_H_
 
 #include "iree/base/api.h"
-#include "iree/vm2/instance.h"
-#include "iree/vm2/module.h"
-#include "iree/vm2/stack.h"
+#include "iree/vm/instance.h"
+#include "iree/vm/module.h"
+#include "iree/vm/stack.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -92,4 +92,4 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_resolve_function(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_VM2_CONTEXT_H_
+#endif  // IREE_VM_CONTEXT_H_

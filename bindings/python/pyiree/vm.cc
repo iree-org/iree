@@ -20,8 +20,8 @@
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm2/invocation.h"
-#include "iree/vm2/module.h"
+#include "iree/vm/invocation.h"
+#include "iree/vm/module.h"
 
 namespace iree {
 namespace python {

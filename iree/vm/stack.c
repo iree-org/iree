@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/stack.h"
+#include "iree/vm/stack.h"
 
 #include <string.h>
 
-#include "iree/vm2/module.h"
+#include "iree/vm/module.h"
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_init(
     iree_vm_state_resolver_t state_resolver, iree_vm_stack_t* out_stack) {

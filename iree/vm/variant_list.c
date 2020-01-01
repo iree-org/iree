@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/variant_list.h"
+#include "iree/vm/variant_list.h"
 
 struct iree_vm_variant_list {
   iree_allocator_t allocator;

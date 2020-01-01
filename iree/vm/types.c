@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/types.h"
+#include "iree/vm/types.h"
 
 static iree_vm_ref_type_descriptor_t iree_vm_ro_byte_buffer_descriptor = {0};
 

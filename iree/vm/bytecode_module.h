@@ -18,7 +18,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/vm2/module.h"
+#include "iree/vm/module.h"
 
 #ifdef __cplusplus
 extern "C" {

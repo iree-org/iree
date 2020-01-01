@@ -26,7 +26,7 @@ iree_cc_library(
     iree::hal::api
     iree::hal::command_queue
     iree::hal::device
-    iree::vm2
+    iree::vm
     absl::core_headers
     absl::memory
     absl::strings

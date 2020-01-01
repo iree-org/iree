@@ -14,13 +14,13 @@
 
 // See iree/base/api.h for documentation on the API conventions used.
 
-#ifndef IREE_VM2_INVOCATION_H_
-#define IREE_VM2_INVOCATION_H_
+#ifndef IREE_VM_INVOCATION_H_
+#define IREE_VM_INVOCATION_H_
 
 #include "iree/base/api.h"
-#include "iree/vm2/context.h"
-#include "iree/vm2/module.h"
-#include "iree/vm2/variant_list.h"
+#include "iree/vm/context.h"
+#include "iree/vm/module.h"
+#include "iree/vm/variant_list.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -101,4 +101,4 @@ iree_vm_invocation_abort(iree_vm_invocation_t* invocation);
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_VM2_INVOCATION_H_
+#endif  // IREE_VM_INVOCATION_H_

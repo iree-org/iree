@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/vm2/invocation.h"
+#include "iree/vm/invocation.h"
 
 static iree_status_t iree_vm_validate_function_inputs(
     iree_vm_function_t function, iree_vm_variant_list_t* inputs) {

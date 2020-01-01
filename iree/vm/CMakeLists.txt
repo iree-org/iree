@@ -34,12 +34,12 @@ iree_cc_library(
     "bytecode_module_impl.h"
     "bytecode_op_table.h"
   DEPS
-    iree::vm2::bytecode_op_table_gen
-    iree::vm2::module
-    iree::vm2::ref
-    iree::vm2::stack
-    iree::vm2::types
-    iree::vm2::value
+    iree::vm::bytecode_op_table_gen
+    iree::vm::module
+    iree::vm::ref
+    iree::vm::stack
+    iree::vm::types
+    iree::vm::value
     iree::base::api
     iree::base::flatbuffer_util
     iree::base::target_platform
@@ -56,10 +56,10 @@ iree_cc_library(
 #  SRCS
 #    "bytecode_module_benchmark.cc"
 #  DEPS
-#    iree::vm2::bytecode_module
-#    iree::vm2::bytecode_module_benchmark_module_cc
-#    iree::vm2::module
-#    iree::vm2::stack
+#    iree::vm::bytecode_module
+#    iree::vm::bytecode_module_benchmark_module_cc
+#    iree::vm::module
+#    iree::vm::stack
 #    iree::base::api
 #    iree::base::logging
 #    #TODO(marbre): Add dep iree::testing::benchmark_main
@@ -85,7 +85,7 @@ iree_cc_test(
   SRCS
     "bytecode_module_test.cc"
   DEPS
-    iree::vm2::bytecode_module
+    iree::vm::bytecode_module
     gtest_main
 )
 
@@ -108,9 +108,9 @@ iree_cc_library(
   SRCS
     "context.c"
   DEPS
-    iree::vm2::instance
-    iree::vm2::module
-    iree::vm2::stack
+    iree::vm::instance
+    iree::vm::module
+    iree::vm::stack
     iree::base::api
 )
 
@@ -122,7 +122,7 @@ iree_cc_library(
   SRCS
     "instance.c"
   DEPS
-    iree::vm2::types
+    iree::vm::types
     iree::base::api
 )
 
@@ -134,9 +134,9 @@ iree_cc_library(
   SRCS
     "invocation.c"
   DEPS
-    iree::vm2::context
-    iree::vm2::module
-    iree::vm2::variant_list
+    iree::vm::context
+    iree::vm::module
+    iree::vm::variant_list
     iree::base::api
 )
 
@@ -168,7 +168,7 @@ iree_cc_test(
   SRCS
     "ref_test.cc"
   DEPS
-    iree::vm2::ref
+    iree::vm::ref
     iree::base::api
     iree::base::ref_ptr
     gtest_main
@@ -182,8 +182,8 @@ iree_cc_library(
   SRCS
     "stack.c"
   DEPS
-    iree::vm2::module
-    iree::vm2::ref
+    iree::vm::module
+    iree::vm::ref
     iree::base::api
 )
 
@@ -193,8 +193,8 @@ iree_cc_test(
   SRCS
     "stack_test.cc"
   DEPS
-    iree::vm2::ref
-    iree::vm2::stack
+    iree::vm::ref
+    iree::vm::stack
     iree::base::api
     iree::base::ref_ptr
     gtest_main
@@ -208,7 +208,7 @@ iree_cc_library(
   SRCS
     "types.c"
   DEPS
-    iree::vm2::ref
+    iree::vm::ref
     iree::base::api
 )
 
@@ -227,24 +227,24 @@ iree_cc_library(
   SRCS
     "variant_list.c"
   DEPS
-    iree::vm2::ref
-    iree::vm2::value
+    iree::vm::ref
+    iree::vm::value
 )
 
 iree_cc_library(
   NAME
-    vm2
+    vm
   HDRS
     "api.h"
   DEPS
-    iree::vm2::context
-    iree::vm2::instance
-    iree::vm2::invocation
-    iree::vm2::module
-    iree::vm2::ref
-    iree::vm2::stack
-    iree::vm2::types
-    iree::vm2::value
-    iree::vm2::variant_list
+    iree::vm::context
+    iree::vm::instance
+    iree::vm::invocation
+    iree::vm::module
+    iree::vm::ref
+    iree::vm::stack
+    iree::vm::types
+    iree::vm::value
+    iree::vm::variant_list
     iree::base::api
 )

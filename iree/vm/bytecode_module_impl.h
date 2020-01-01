@@ -18,11 +18,11 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
-#include "iree/vm2/module.h"
-#include "iree/vm2/ref.h"
-#include "iree/vm2/stack.h"
-#include "iree/vm2/types.h"
-#include "iree/vm2/value.h"
+#include "iree/vm/module.h"
+#include "iree/vm/ref.h"
+#include "iree/vm/stack.h"
+#include "iree/vm/types.h"
+#include "iree/vm/value.h"
 
 #ifdef __cplusplus
 extern "C" {
