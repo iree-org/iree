@@ -14,6 +14,7 @@
 
 #include "iree/compiler/IR/Dialect.h"
 #include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/LLDialect.h"
@@ -135,7 +136,7 @@ void populateInterpreterLoweringPatterns(OwningRewritePatternList &patterns,
                                          MLIRContext *ctx) {
   patterns.insert<LowerBranchOpPattern, LowerCondCondBranchOpPattern>(ctx);
   patterns.insert<
-      SimpleOpLowering<IREE::ConstantOp, IREEInterp::LL::ConstantOp>,
+      SimpleOpLowering<IREEInterp::ConstantOp, IREEInterp::LL::ConstantOp>,
       SimpleOpLowering<IREEInterp::HL::CopyOp, IREEInterp::LL::DynamicCopyOp>,
       SimpleOpLowering<IREEInterp::HL::SliceOp,
                        IREEInterp::LL::DynamicSliceOp>>(ctx);

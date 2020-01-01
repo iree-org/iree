@@ -178,7 +178,7 @@ module {
   }
   func @simple_mul(%arg0: memref<4xf32>, %arg1: memref<4xf32>) -> memref<4xf32>
   attributes  {iree.module.export} {
-    %0 = iree.constant dense<[4, 1, 1]> : tensor<3xi32>
+    %0 = iree_interp.constant dense<[4, 1, 1]> : tensor<3xi32>
     %1 = "iree_hl_seq.alloc_heap"() : () -> memref<4xf32>
     iree_hl_seq.dispatch simple_mul_ex_dispatch_0::simple_mul_rgn_dispatch_0[%0 : memref<3xi32>](%arg0, %arg1, %1) : (memref<4xf32>, memref<4xf32>, memref<4xf32>) -> ()
     iree_hl_seq.return %1 : memref<4xf32>

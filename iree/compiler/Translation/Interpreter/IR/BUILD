@@ -25,6 +25,45 @@ filegroup(
 )
 
 cc_library(
+    name = "Common",
+    srcs = [
+        "CommonDialect.cpp",
+        "CommonOps.cpp",
+        "CommonOps.cpp.inc",
+    ],
+    hdrs = [
+        "CommonDialect.h",
+        "CommonOps.h",
+        "CommonOps.h.inc",
+    ],
+    deps = [
+        ":CommonOpsGen",
+        "//iree/compiler/IR",
+        "//iree/compiler/IR:OpsGen",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+    ],
+    alwayslink = 1,
+)
+
+gentbl(
+    name = "CommonOpsGen",
+    tbl_outs = [
+        ("-gen-op-decls", "CommonOps.h.inc"),
+        ("-gen-op-defs", "CommonOps.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "CommonOps.td",
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "//iree/compiler/IR:OpBase.td",
+    ],
+)
+
+cc_library(
     name = "IR",
     srcs = [
         "HLDialect.cpp",
@@ -45,9 +84,11 @@ cc_library(
         "OpWriters.h",
     ],
     deps = [
+        ":Common",
         ":HLOpsGen",
         ":LLOpsGen",
         "//iree/compiler/IR",
+        "//iree/compiler/IR:OpsGen",
         "//iree/compiler/Translation/Interpreter/Serialization",
         "//iree/compiler/Translation/Interpreter/Utils",
         "//iree/compiler/Utils",
@@ -55,6 +96,7 @@ cc_library(
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
     ],
     alwayslink = 1,
 )

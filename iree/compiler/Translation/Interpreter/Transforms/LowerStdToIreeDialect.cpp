@@ -14,6 +14,7 @@
 
 #include "iree/compiler/IR/Dialect.h"
 #include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "iree/compiler/Translation/Interpreter/Utils/MemRefUtils.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/PatternMatch.h"
@@ -30,7 +31,7 @@ struct ConstantOpLowering : public OpRewritePattern<ConstantOp> {
                                      PatternRewriter &rewriter) const override {
     if (auto elementsValue = op.getValue().dyn_cast<ElementsAttr>()) {
       auto ireeConst =
-          rewriter.create<IREE::ConstantOp>(op.getLoc(), elementsValue);
+          rewriter.create<IREEInterp::ConstantOp>(op.getLoc(), elementsValue);
 
       auto result = wrapAsTensor(ireeConst.getResult(), op, rewriter);
       rewriter.replaceOp(op, result);
@@ -44,8 +45,8 @@ struct ConstantOpLowering : public OpRewritePattern<ConstantOp> {
     auto elementsValue =
         DenseElementsAttr::get(RankedTensorType::get({}, type), op.getValue());
     auto ireeConst =
-        rewriter.create<IREE::ConstantOp>(op.getLoc(), elementsValue);
-    rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(op, ireeConst);
+        rewriter.create<IREEInterp::ConstantOp>(op.getLoc(), elementsValue);
+    rewriter.replaceOpWithNewOp<IREEInterp::MemRefToScalarOp>(op, ireeConst);
     return matchSuccess();
   }
 };

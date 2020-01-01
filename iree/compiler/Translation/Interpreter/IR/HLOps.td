@@ -27,7 +27,7 @@
 #ifndef IREE_INTERPRETER_HL_OPS
 #define IREE_INTERPRETER_HL_OPS
 
-include "iree/compiler/IR/OpBase.td"
+include "iree/compiler/Translation/Interpreter/IR/CommonBase.td"
 
 def IREEInterpHL_Dialect : Dialect {
   let name = "iree_hl_interp";

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "iree/compiler/Translation/Interpreter/Utils/MemRefUtils.h"
 #include "mlir/IR/PatternMatch.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
@@ -27,7 +28,8 @@ struct ConstOpLowering : public OpRewritePattern<xla_hlo::ConstOp> {
 
   PatternMatchResult matchAndRewrite(xla_hlo::ConstOp op,
                                      PatternRewriter &rewriter) const override {
-    auto ireeConst = rewriter.create<IREE::ConstantOp>(op.getLoc(), op.value());
+    auto ireeConst =
+        rewriter.create<IREEInterp::ConstantOp>(op.getLoc(), op.value());
     rewriter.replaceOp(op, wrapAsTensor(ireeConst, op, rewriter));
     return matchSuccess();
   }

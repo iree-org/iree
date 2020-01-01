@@ -177,7 +177,7 @@ struct LoadOpLowering : public OpRewritePattern<LoadOp> {
         /*srcIndices=*/emptyArrayMemref, dst,
         /*dstIndices=*/emptyArrayMemref, /*lengths=*/emptyArrayMemref);
 
-    rewriter.replaceOpWithNewOp<IREE::MemRefToScalarOp>(loadOp, dst);
+    rewriter.replaceOpWithNewOp<IREEInterp::MemRefToScalarOp>(loadOp, dst);
 
     return matchSuccess();
   }
@@ -192,7 +192,7 @@ struct StoreOpLowering : public OpRewritePattern<StoreOp> {
       return matchFailure();
     }
 
-    auto src = rewriter.create<IREE::ScalarToMemRefOp>(
+    auto src = rewriter.create<IREEInterp::ScalarToMemRefOp>(
         storeOp.getLoc(), storeOp.getValueToStore());
 
     auto emptyArrayMemref = createArrayConstant(rewriter, storeOp.getLoc(), {});

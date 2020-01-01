@@ -12,29 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Utility functions related to the creation of new operations. Where possible,
-// use custom builders. These helpers are for situations where a custom builder
-// is not appropriate.
+#include "iree/compiler/Translation/Interpreter/IR/CommonDialect.h"
 
-#ifndef IREE_COMPILER_UTILS_OPCREATIONUTILS_H_
-#define IREE_COMPILER_UTILS_OPCREATIONUTILS_H_
-
-#include <cstdint>
-
-#include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
-#include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Location.h"
-#include "mlir/Support/LLVM.h"
+#include "llvm/Support/SourceMgr.h"
+#include "mlir/IR/DialectImplementation.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-IREEInterp::ConstantOp createArrayConstant(OpBuilder &builder, Location loc,
-                                           llvm::ArrayRef<int64_t> elements);
+static DialectRegistration<IREEInterpreterDialect> iree_interp_dialect;
+
+IREEInterpreterDialect::IREEInterpreterDialect(MLIRContext *context)
+    : Dialect(getDialectNamespace(), context) {
+#define GET_OP_LIST
+  addOperations<
+#include "iree/compiler/Translation/Interpreter/IR/CommonOps.cpp.inc"
+      >();
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_UTILS_OPCREATIONUTILS_H_

@@ -14,6 +14,7 @@
 
 #include "iree/compiler/IR/Dialect.h"
 #include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Translation/Interpreter/IR/CommonDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLOps.h"
 #include "iree/compiler/Translation/Interpreter/Transforms/ConversionUtils.h"
@@ -413,8 +414,8 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
             llvm::makeArrayRef(zeroes));
       }
 
-      auto extraStartIndices =
-          rewriter.create<IREE::ConstantOp>(gatherOp.getLoc(), elementsAttr);
+      auto extraStartIndices = rewriter.create<IREEInterp::ConstantOp>(
+          gatherOp.getLoc(), elementsAttr);
 
       auto memrefOutputType =
           MemRefType::get({inputType.getRank()}, elementType);
@@ -434,8 +435,8 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
     std::vector<Value> dim_pieces;
     auto dst = rewriter.create<IREEInterp::HL::AllocHeapOp>(
         gatherOp.getLoc(), dstType, dim_pieces);
-    auto lengths = rewriter.create<IREE::ConstantOp>(gatherOp.getLoc(),
-                                                     gatherOp.slice_sizes());
+    auto lengths = rewriter.create<IREEInterp::ConstantOp>(
+        gatherOp.getLoc(), gatherOp.slice_sizes());
     llvm::SmallVector<int64_t, 4> zero_offset;
     zero_offset.resize(dstType.getRank(), 0);
     auto dstIndices =
@@ -473,8 +474,8 @@ struct SliceOpLowering : public XlaOpLowering<xla_hlo::SliceOp> {
     std::vector<Value> dim_pieces;
     auto dst = rewriter.create<IREEInterp::HL::AllocHeapOp>(
         op->getLoc(), finalType, dim_pieces);
-    auto srcIndices =
-        rewriter.create<IREE::ConstantOp>(op->getLoc(), op->start_indices());
+    auto srcIndices = rewriter.create<IREEInterp::ConstantOp>(
+        op->getLoc(), op->start_indices());
     auto lengths =
         createArrayConstant(rewriter, op->getLoc(), finalType.getShape());
 
@@ -506,12 +507,12 @@ struct PadOpLowering : public XlaOpLowering<xla_hlo::PadOp> {
       }
     }
 
-    auto edgePaddingLowOp =
-        rewriter.create<IREE::ConstantOp>(op->getLoc(), op->edge_padding_low());
-    auto edgePaddingHighOp = rewriter.create<IREE::ConstantOp>(
+    auto edgePaddingLowOp = rewriter.create<IREEInterp::ConstantOp>(
+        op->getLoc(), op->edge_padding_low());
+    auto edgePaddingHighOp = rewriter.create<IREEInterp::ConstantOp>(
         op->getLoc(), op->edge_padding_high());
-    auto interiorPaddingOp =
-        rewriter.create<IREE::ConstantOp>(op->getLoc(), op->interior_padding());
+    auto interiorPaddingOp = rewriter.create<IREEInterp::ConstantOp>(
+        op->getLoc(), op->interior_padding());
 
     return rewriter.create<IREEInterp::HL::PadOp>(
         op->getLoc(), convertTypeToMemRef(*op), src, paddingValue,
@@ -536,8 +537,8 @@ struct TransposeOpLowering : public XlaOpLowering<xla_hlo::TransposeOp> {
   Operation *rewriteInternal(
       xla_hlo::TransposeOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto permutationOp =
-        rewriter.create<IREE::ConstantOp>(op->getLoc(), op->permutation());
+    auto permutationOp = rewriter.create<IREEInterp::ConstantOp>(
+        op->getLoc(), op->permutation());
 
     return rewriter.create<IREEInterp::HL::TransposeOp>(
         op->getLoc(), convertTypeToMemRef(*op), operands[0], permutationOp);
@@ -551,7 +552,7 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
       xla_hlo::ReverseOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto reverseOp =
-        rewriter.create<IREE::ConstantOp>(op->getLoc(), op->dimensions());
+        rewriter.create<IREEInterp::ConstantOp>(op->getLoc(), op->dimensions());
 
     return rewriter.create<IREEInterp::HL::ReverseOp>(
         op->getLoc(), convertTypeToMemRef(*op), operands[0], reverseOp);
@@ -582,7 +583,8 @@ class LowerXLAToInterpreterDialectPass
     populateLowerXlaToInterpreterPatterns(patterns, &getContext());
 
     ConversionTarget target(getContext());
-    target.addLegalDialect<IREEHLInterpreterDialect, IREEDialect>();
+    target.addLegalDialect<IREEHLInterpreterDialect, IREEInterpreterDialect,
+                           IREEDialect>();
     if (failed(applyPartialConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }

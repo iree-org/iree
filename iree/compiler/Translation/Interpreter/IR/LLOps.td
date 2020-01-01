@@ -22,9 +22,7 @@
 #ifndef IREE_INTERPRETER_LL_OPS
 #define IREE_INTERPRETER_LL_OPS
 
-#ifndef IREE_OP_BASE
-include "iree/compiler/IR/OpBase.td"
-#endif  // IREE_OP_BASE
+include "iree/compiler/Translation/Interpreter/IR/CommonBase.td"
 
 def IREEInterpLL_Dialect : Dialect {
   let name = "iree_ll_interp";

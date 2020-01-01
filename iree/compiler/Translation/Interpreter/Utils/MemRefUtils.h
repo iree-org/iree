@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_UTILS_MEMREFUTILS_H_
 #define IREE_COMPILER_UTILS_MEMREFUTILS_H_
 
+#include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Operation.h"

@@ -30,70 +30,6 @@ class IREE_Op<string mnemonic, list<OpTrait> traits = []> :
 class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
     IREE_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
-// TODO(b/134575149): determine if we want multiple constant op types.
-def IREE_ConstantOp : IREE_PureOp<"constant", [
-    AllShapesMatch<["value", "result"]>,
-    AllElementTypesMatch<["value", "result"]>
-]> {
-  let arguments = (ins ElementsAttr:$value);
-  let results = (outs IREEHL_MemRef:$result);
-
-  // TODO(b/132296600): make tablegen follow the style guide.
-  let extraClassDeclaration = [{
-    Attribute getValue() { return value(); }
-  }];
-
-  let builders = [OpBuilder<"Builder*, OperationState&, ElementsAttr">];
-
-  // TODO(b/134575149): enable folder when we store the correct type.
-  // let hasFolder = 1;
-}
-
-// TODO(b/134671482): remove/move tensor_to_memref/memref_to_tensor.
-def IREE_TensorToMemRefOp : IREE_PureOp<"tensor_to_memref", [
-  SameOperandsAndResultShape, SameOperandsAndResultElementType
-]> {
-  let arguments = (ins AnyTensor);
-  let results = (outs IREEHL_MemRef);
-
-  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
-
-  let hasFolder = 1;
-}
-
-// TODO(b/134671482): remove/move tensor_to_memref/memref_to_tensor.
-def IREE_MemRefToTensorOp : IREE_PureOp<"memref_to_tensor", [
-  SameOperandsAndResultShape, SameOperandsAndResultElementType
-]> {
-  let arguments = (ins IREEHL_MemRef);
-  let results = (outs AnyTensor);
-  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
-
-  let hasFolder = 1;
-}
-
-def IREE_ScalarToMemRefOp : IREE_PureOp<"scalar_to_memref", [
-  SameOperandsAndResultElementType
-]> {
-  let arguments = (ins IREEHL_Element);
-  let results = (outs IREEHL_AnyScalar);
-
-  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
-
-  let hasFolder = 1;
-}
-
-def IREE_MemRefToScalarOp : IREE_PureOp<"memref_to_scalar", [
-  SameOperandsAndResultElementType
-]> {
-  let arguments = (ins IREEHL_AnyScalar);
-  let results = (outs IREEHL_Element);
-
-  let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
-
-  let hasFolder = 1;
-}
-
 def IREE_ReturnOp : IREE_Op<"return", [Terminator]> {
   let arguments = (ins Variadic<AnyType>:$operands);
 
@@ -103,18 +39,18 @@ def IREE_ReturnOp : IREE_Op<"return", [Terminator]> {
 }
 
 def IREE_LoadInputOp : IREE_PureOp<"load_input"> {
-  let arguments = (ins IREEHL_MemRef:$src);
+  let arguments = (ins IREE_MemRef:$src);
   let results = (outs AnyType);
 }
 
 def IREE_StoreOutputOp : IREE_Op<"store_output"> {
-  let arguments = (ins AnyType:$src, IREEHL_MemRef:$dst);
+  let arguments = (ins AnyType:$src, IREE_MemRef:$dst);
 }
 
 def IREE_StoreReduceOp : IREE_Op<"store_reduce"> {
   let arguments = (ins
     AnyType:$src,
-    IREEHL_MemRef:$dst,
+    IREE_MemRef:$dst,
     FlatSymbolRefAttr:$reduction_fn
   );
 }

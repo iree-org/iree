@@ -16,7 +16,6 @@
 
 #include <cassert>
 
-#include "iree/compiler/IR/Ops.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -28,10 +27,11 @@ namespace iree_compiler {
 
 Value wrapAsTensor(Value value, Operation *srcOp, OpBuilder &builder) {
   if (srcOp->getResult(0)->getType().isa<TensorType>()) {
-    if (isa_and_nonnull<IREE::TensorToMemRefOp>(value->getDefiningOp())) {
+    if (isa_and_nonnull<IREEInterp::TensorToMemRefOp>(value->getDefiningOp())) {
       return value->getDefiningOp()->getOperand(0);
     }
-    auto newOp = builder.create<IREE::MemRefToTensorOp>(srcOp->getLoc(), value);
+    auto newOp =
+        builder.create<IREEInterp::MemRefToTensorOp>(srcOp->getLoc(), value);
     value = newOp.getResult();
   }
   return value;
@@ -39,10 +39,11 @@ Value wrapAsTensor(Value value, Operation *srcOp, OpBuilder &builder) {
 
 Value wrapAsMemRef(Value value, Operation *srcOp, OpBuilder &builder) {
   if (value->getType().isa<TensorType>()) {
-    if (isa_and_nonnull<IREE::MemRefToTensorOp>(value->getDefiningOp())) {
+    if (isa_and_nonnull<IREEInterp::MemRefToTensorOp>(value->getDefiningOp())) {
       return value->getDefiningOp()->getOperand(0);
     }
-    auto newOp = builder.create<IREE::TensorToMemRefOp>(srcOp->getLoc(), value);
+    auto newOp =
+        builder.create<IREEInterp::TensorToMemRefOp>(srcOp->getLoc(), value);
     value = newOp.getResult();
   }
   return value;

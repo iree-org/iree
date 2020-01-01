@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/IR/Dialect.h"
+#include "iree/compiler/Translation/Interpreter/IR/CommonDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/LLDialect.h"
 #include "iree/compiler/Translation/Interpreter/Transforms/Rewrites.h"
@@ -40,7 +41,8 @@ class LowerToInterpreterDialectPass
     populateLowerXlaToInterpreterPatterns(patterns, ctx);
 
     ConversionTarget target(getContext());
-    target.addLegalDialect<IREEHLInterpreterDialect, IREEDialect>();
+    target.addLegalDialect<IREEHLInterpreterDialect, IREEInterpreterDialect,
+                           IREEDialect>();
     target.addLegalOp<FuncOp, ReturnOp>();
     if (failed(applyFullConversion(getFunction(), target, patterns))) {
       return signalPassFailure();

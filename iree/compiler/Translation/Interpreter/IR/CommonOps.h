@@ -12,29 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Utility functions related to the creation of new operations. Where possible,
-// use custom builders. These helpers are for situations where a custom builder
-// is not appropriate.
+#ifndef IREE_COMPILER_TRANSLATION_INTERPRETER_IR_COMMON_OPS_H_
+#define IREE_COMPILER_TRANSLATION_INTERPRETER_IR_COMMON_OPS_H_
 
-#ifndef IREE_COMPILER_UTILS_OPCREATIONUTILS_H_
-#define IREE_COMPILER_UTILS_OPCREATIONUTILS_H_
-
-#include <cstdint>
-
-#include "iree/compiler/IR/Ops.h"
-#include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
-#include "mlir/IR/Builders.h"
-#include "mlir/IR/Location.h"
-#include "mlir/Support/LLVM.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREEInterp {
 
-IREEInterp::ConstantOp createArrayConstant(OpBuilder &builder, Location loc,
-                                           llvm::ArrayRef<int64_t> elements);
+#define GET_OP_CLASSES
+#include "iree/compiler/Translation/Interpreter/IR/CommonOps.h.inc"
 
+}  // namespace IREEInterp
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_OPCREATIONUTILS_H_
+#endif  // IREE_COMPILER_TRANSLATION_INTERPRETER_IR_COMMON_OPS_H_

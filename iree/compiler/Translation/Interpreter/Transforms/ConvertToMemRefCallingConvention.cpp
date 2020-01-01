@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "iree/compiler/Translation/Interpreter/Utils/MemRefUtils.h"
 #include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -86,7 +87,7 @@ bool insertLoad(BlockArgument oldArg, BlockArgument newArg, OpBuilder &builder,
     mapping->map(oldArg, newArg);
     return false;
   } else if (oldArg->getType().isa<TensorType>()) {
-    auto castOp = builder.create<IREE::MemRefToTensorOp>(loc, newArg);
+    auto castOp = builder.create<IREEInterp::MemRefToTensorOp>(loc, newArg);
     mapping->map(oldArg, castOp.getResult());
     return false;
   }
@@ -106,7 +107,7 @@ bool insertLoad(Operation *oldOp, Value oldValue, Value newValue,
     return false;
   } else if (oldValue->getType().isa<TensorType>()) {
     auto castOp =
-        builder.create<IREE::MemRefToTensorOp>(oldOp->getLoc(), newValue);
+        builder.create<IREEInterp::MemRefToTensorOp>(oldOp->getLoc(), newValue);
     mapping->map(oldValue, castOp.getResult());
     return false;
   }
@@ -135,7 +136,7 @@ Value insertStore(Operation *oldOp, Value oldValue, OpBuilder &builder,
     return newValue;
   } else if (oldValue->getType().isa<TensorType>()) {
     auto castOp =
-        builder.create<IREE::TensorToMemRefOp>(oldOp->getLoc(), newValue);
+        builder.create<IREEInterp::TensorToMemRefOp>(oldOp->getLoc(), newValue);
     return castOp.getResult();
   }
 

@@ -32,6 +32,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/IR",
+        "//iree/compiler/Translation/Interpreter/IR:Common",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

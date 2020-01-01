@@ -45,6 +45,7 @@ cc_library(
     deps = [
         "//iree/compiler/IR",
         "//iree/compiler/Translation/Interpreter/IR",
+        "//iree/compiler/Translation/Interpreter/IR:Common",
         "//iree/compiler/Translation/Interpreter/Serialization",
         "//iree/compiler/Translation/Interpreter/Utils",
         "//iree/compiler/Utils",

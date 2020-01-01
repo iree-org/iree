@@ -35,10 +35,10 @@ ElementsAttr elementsAttrFromArray(OpBuilder &builder,
 
 }  // namespace
 
-IREE::ConstantOp createArrayConstant(OpBuilder &builder, Location loc,
-                                     llvm::ArrayRef<int64_t> elements) {
+IREEInterp::ConstantOp createArrayConstant(OpBuilder &builder, Location loc,
+                                           llvm::ArrayRef<int64_t> elements) {
   auto elementsAttr = elementsAttrFromArray(builder, elements);
-  return builder.create<IREE::ConstantOp>(loc, elementsAttr);
+  return builder.create<IREEInterp::ConstantOp>(loc, elementsAttr);
 }
 
 }  // namespace iree_compiler

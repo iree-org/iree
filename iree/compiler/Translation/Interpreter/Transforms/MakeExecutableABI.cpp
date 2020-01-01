@@ -38,8 +38,8 @@ LogicalResult replaceLoadInputOp(IREE::LoadInputOp bindOp) {
   Value newValue = nullptr;
   auto dstType = bindOp.getResult()->getType();
   if (dstType.isa<TensorType>()) {
-    auto castOp =
-        builder.create<IREE::MemRefToTensorOp>(bindOp.getLoc(), bindOp.src());
+    auto castOp = builder.create<IREEInterp::MemRefToTensorOp>(bindOp.getLoc(),
+                                                               bindOp.src());
     newValue = castOp.getResult();
   } else if (dstType.isIntOrIndexOrFloat()) {
     auto loadOp = builder.create<LoadOp>(bindOp.getLoc(), dstType, bindOp.src(),
@@ -64,8 +64,8 @@ LogicalResult replaceStoreOutputOp(IREE::StoreOutputOp bindOp) {
   if (srcType.isa<MemRefType>()) {
     // Already stored into the output.
   } else if (srcType.isa<TensorType>()) {
-    auto castOp =
-        builder.create<IREE::TensorToMemRefOp>(bindOp.getLoc(), bindOp.src());
+    auto castOp = builder.create<IREEInterp::TensorToMemRefOp>(bindOp.getLoc(),
+                                                               bindOp.src());
 
     // Insert a copy to our output parameter.
     auto dst = bindOp.dst()->getType().cast<ShapedType>();
