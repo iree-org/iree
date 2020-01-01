@@ -84,35 +84,6 @@ def IREEInterpHL_CallOp : IREEInterpHL_Op<"call"> {
   let printer = [{ return print$cppClass(p, *this); }];
 }
 
-def IREEInterpHL_CallIndirectOp : IREEInterpHL_Op<"call_indirect"> {
-  let arguments = (ins FunctionType:$callee, Variadic<IREEHL_MemRef>:$operands);
-  let results = (outs Variadic<IREEHL_MemRef>);
-
-  let builders = [OpBuilder<
-    "Builder *, OperationState &result, Value callee,"
-    "ValueRange operands = {}", [{
-      result.operands.push_back(callee);
-      result.addOperands(operands);
-      result.addTypes(callee->getType().cast<FunctionType>().getResults());
-  }]>];
-
-  let extraClassDeclaration = [{
-    // TODO(b/132296600): make tablegen follow the style guide.
-    Value getCallee() { return getOperand(0); }
-
-    // TODO(b/133879130): make tablegen support variadic operand accessors.
-    /// Get the argument operands to the called function.
-    operand_range getArgOperands() {
-      return {arg_operand_begin(), arg_operand_end()};
-    }
-    operand_iterator arg_operand_begin() { return ++operand_begin(); }
-    operand_iterator arg_operand_end() { return operand_end(); }
-  }];
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
-}
-
 def IREEInterpHL_ReturnOp : IREEInterpHL_Op<"return", [Terminator]> {
   let arguments = (ins Variadic<IREEHL_MemRef>:$operands);
 
@@ -358,13 +329,6 @@ def IREEInterpHL_ConcatOp : IREEInterpHL_PureOp<"concat"> {
   let results = (outs IREEHL_MemRef);
 
   let hasCanonicalizer = 1;
-}
-
-// TODO(benvanik): add split dim/size/etc. Maybe make multiple ops?
-def IREEInterpHL_SplitOp :
-    IREEInterpHL_PureOp<"split", [SameOperandsAndResultElementType]> {
-  let arguments = (ins IREEHL_MemRef:$src);
-  let results = (outs Variadic<IREEHL_MemRef>);
 }
 
 def IREEInterpHL_AssignOp :
@@ -658,15 +622,5 @@ def IREEInterpHL_ReduceMaxFOp :
   );
   let results = (outs IREEHL_FloatMemRef:$result);
 }
-
-def IREEInterpHL_TraceOp : IREEInterpHL_Op<"trace"> {
-  let arguments = (ins Variadic<IREEHL_MemRef>:$srcs);
-}
-
-def IREEInterpHL_CondBreakOp : IREEInterpHL_Op<"cond_break"> {
-  let arguments = (ins IREEHL_BoolScalar:$cond);
-}
-
-def IREEInterpHL_BreakOp : IREEInterpHL_Op<"break">;
 
 #endif  // IREE_INTERPRETER_HL_OPS

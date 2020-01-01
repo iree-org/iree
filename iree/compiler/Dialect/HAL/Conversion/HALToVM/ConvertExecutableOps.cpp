@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <string>
+
 #include "iree/compiler/Dialect/HAL/Conversion/HALToVM/ConvertHALToVM.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -80,13 +82,12 @@ class ExecutableOpConversion
     llvm::SmallDenseMap<uint32_t, IREE::VM::RodataOp> rodataOps;
     for (auto binaryOp :
          executableOp.getBlock().getOps<IREE::HAL::ExecutableBinaryOp>()) {
-      rodataOps[binaryOp.format().getZExtValue()] =
-          rewriter.create<IREE::VM::RodataOp>(
-              binaryOp.getLoc(),
-              (executableOp.getName() + "_data_" +
-               binaryOp.format().toString(8, false))
-                  .str(),
-              binaryOp.data());
+      rodataOps[binaryOp.format()] = rewriter.create<IREE::VM::RodataOp>(
+          binaryOp.getLoc(),
+          (executableOp.getName() + "_data_" +
+           std::to_string(binaryOp.format()))
+              .str(),
+          binaryOp.data());
     }
 
     // One global for now that represents the cached executable. We could add a

@@ -46,37 +46,8 @@ LogicalResult writeOp(IREEInterp::LL::ConstantOp op, BytecodeWriter *writer) {
 LogicalResult writeOp(IREEInterp::LL::CallOp op, BytecodeWriter *writer) {
   auto module = op.getOperation()->getParentOfType<ModuleOp>();
   auto callee = module.lookupSymbol<FuncOp>(op.getCallee());
-  // TODO(benvanik): transforms to convert Call->CallImport.
-  // TODO(benvanik): switch with kCallTail if attr exists.
-  if (callee.isExternal()) {
-    RETURN_IF_FAILURE(
-        writer->WriteOpcode(iree::InterpreterOpcode::kCallImport));
-  } else {
-    RETURN_IF_FAILURE(writer->WriteOpcode(iree::InterpreterOpcode::kCall));
-  }
+  RETURN_IF_FAILURE(writer->WriteOpcode(iree::InterpreterOpcode::kCall));
   RETURN_IF_FAILURE(writer->WriteFunctionOrdinal(callee));
-  RETURN_IF_FAILURE(writer->WriteLocals(op.getArgOperands()));
-  RETURN_IF_FAILURE(writer->WriteLocals(op.getResults()));
-  return success();
-}
-
-LogicalResult writeOp(IREEInterp::LL::CallImportOp op, BytecodeWriter *writer) {
-  auto module = op.getOperation()->getParentOfType<ModuleOp>();
-  auto callee = module.lookupSymbol<FuncOp>(op.getCallee());
-  // TODO(benvanik): switch with kCallTail if attr exists.
-  RETURN_IF_FAILURE(writer->WriteOpcode(iree::InterpreterOpcode::kCallImport));
-  RETURN_IF_FAILURE(writer->WriteImportOrdinal(callee));
-  RETURN_IF_FAILURE(writer->WriteLocals(op.getArgOperands()));
-  RETURN_IF_FAILURE(writer->WriteLocals(op.getResults()));
-  return success();
-}
-
-LogicalResult writeOp(IREEInterp::LL::CallIndirectOp op,
-                      BytecodeWriter *writer) {
-  RETURN_IF_FAILURE(
-      writer->WriteOpcode(iree::InterpreterOpcode::kCallIndirect));
-  RETURN_IF_FAILURE(writer->WriteTypeIndex(op.getCallee()->getType()));
-  RETURN_IF_FAILURE(writer->WriteLocal(op.getCallee()));
   RETURN_IF_FAILURE(writer->WriteLocals(op.getArgOperands()));
   RETURN_IF_FAILURE(writer->WriteLocals(op.getResults()));
   return success();
@@ -237,8 +208,6 @@ void registerInterpreterCustomWriters(VMFunctionBuilder *builder) {
       });
   REGISTER_CUSTOM_WRITER_IMPL(IREEInterp::LL::ConstantOp);
   REGISTER_CUSTOM_WRITER_IMPL(IREEInterp::LL::CallOp);
-  REGISTER_CUSTOM_WRITER_IMPL(IREEInterp::LL::CallImportOp);
-  REGISTER_CUSTOM_WRITER_IMPL(IREEInterp::LL::CallIndirectOp);
   REGISTER_CUSTOM_WRITER_IMPL(IREEInterp::LL::BranchOp);
   REGISTER_CUSTOM_WRITER_IMPL(IREEInterp::LL::CondBranchOp);
   REGISTER_CUSTOM_WRITER_IMPL(IREEInterp::LL::ConvertSSOp);

@@ -236,7 +236,7 @@ LogicalResult translateToLegacyInterpreterExecutable(
   targetBuilder.setInsertionPoint(&targetOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
       targetOp.getLoc(),
-      static_cast<uint32_t>(IREE::ExecutableFormat::IreeBytecode),
+      static_cast<uint32_t>(IREE::HAL::ExecutableFormat::IreeBytecode),
       std::move(bytes));
   binaryOp.getBlock().getOperations().insert(
       Block::iterator(binaryOp.getBlock().back()), moduleOp);

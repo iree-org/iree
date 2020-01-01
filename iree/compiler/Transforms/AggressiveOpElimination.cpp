@@ -17,7 +17,6 @@
 
 #include "iree/compiler/IR/Interpreter/HLOps.h"
 #include "iree/compiler/IR/Interpreter/LLOps.h"
-#include "iree/compiler/IR/StructureOps.h"
 #include "mlir/Analysis/Dominance.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Block.h"

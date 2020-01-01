@@ -103,72 +103,6 @@ def IREEInterpLL_CallOp : IREEInterpLL_Op<"call"> {
   let printer = [{ return print$cppClass(p, *this); }];
 }
 
-// TODO(benvanik): add verifier that target isExternal.
-def IREEInterpLL_CallImportOp : IREEInterpLL_Op<"call_import"> {
-  let arguments = (ins FlatSymbolRefAttr:$callee, Variadic<IREELL_MemRef>);
-  let results = (outs Variadic<IREELL_MemRef>);
-
-  let builders = [OpBuilder<
-    "Builder *builder, OperationState &result, FuncOp callee,"
-    "ValueRange operands = {}", [{
-      result.addOperands(operands);
-      result.addAttribute("callee", builder->getSymbolRefAttr(callee));
-      result.addTypes(callee.getType().getResults());
-  }]>, OpBuilder<
-    "Builder *builder, OperationState &result, StringRef callee,"
-    "ArrayRef<Type> results, ValueRange operands = {}", [{
-      result.addOperands(operands);
-      result.addAttribute("callee", builder->getSymbolRefAttr(callee));
-      result.addTypes(results);
-  }]>];
-
-  let extraClassDeclaration = [{
-    // TODO(b/132296600): make tablegen follow the style guide.
-    StringRef getCallee() { return callee(); }
-    FunctionType getCalleeType();
-
-    // TODO(b/133879130): make tablegen support variadic operand accessors.
-    /// Get the argument operands to the called function.
-    operand_range getArgOperands() {
-      return {arg_operand_begin(), arg_operand_end()};
-    }
-
-    operand_iterator arg_operand_begin() { return operand_begin(); }
-    operand_iterator arg_operand_end() { return operand_end(); }
-  }];
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
-}
-
-def IREEInterpLL_CallIndirectOp : IREEInterpLL_Op<"call_indirect"> {
-  let arguments = (ins FunctionType:$callee, Variadic<IREELL_MemRef>:$operands);
-  let results = (outs Variadic<IREELL_MemRef>);
-
-  let builders = [OpBuilder<
-    "Builder *, OperationState &result, Value callee,"
-    "ValueRange operands = {}", [{
-      result.operands.push_back(callee);
-      result.addOperands(operands);
-      result.addTypes(callee->getType().cast<FunctionType>().getResults());
-  }]>];
-
-  let extraClassDeclaration = [{
-    Value getCallee() { return getOperand(0); }
-
-    /// Get the argument operands to the called function.
-    operand_range getArgOperands() {
-      return {arg_operand_begin(), arg_operand_end()};
-    }
-
-    operand_iterator arg_operand_begin() { return ++operand_begin(); }
-    operand_iterator arg_operand_end() { return operand_end(); }
-  }];
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
-}
-
 def IREEInterpLL_ReturnOp : IREEInterpLL_Op<"return", [Terminator]> {
   let arguments = (ins Variadic<IREELL_MemRef>:$operands);
 
@@ -322,31 +256,6 @@ def IREEInterpLL_CmpFOp : IREEInterpLL_Op<"cmp_f"> {
   );
 }
 
-def IREEInterpLL_AllocStaticOp : IREEInterpLL_PureOp<"alloc_static"> {
-  // TODO(benvanik): attributes and args.
-  let results = (outs IREELL_MemRef);
-}
-
-def IREEInterpLL_AllocStackOp : IREEInterpLL_PureOp<"alloc_stack"> {
-  // TODO(benvanik): atributes and args.
-  let arguments = (ins
-      Variadic<IREELL_MemRef>:$dim_pieces
-  );
-  let results = (outs
-      IREELL_MemRef
-  );
-}
-
-def IREEInterpLL_AllocStackInitOp : IREEInterpLL_PureOp<"alloc_stack_init"> {
-  // TODO(benvanik): attributes and args.
-  let arguments = (ins
-      Variadic<IREELL_MemRef>:$dim_pieces
-  );
-  let results = (outs
-      IREELL_MemRef
-  );
-}
-
 // TODO(b/142012496): Add trait that enables DCE but not CSE.
 def IREEInterpLL_AllocHeapOp : IREEInterpLL_Op<"alloc_heap"> {
   // TODO(benvanik): attributes and args.
@@ -438,16 +347,6 @@ def IREEInterpLL_CloneOp :
     IREEInterpLL_PureOp<"clone", [SameOperandsAndResultType]> {
   let arguments = (ins IREELL_MemRef:$src);
   let results = (outs IREELL_MemRef);
-}
-
-// TODO(benvanik): add split dim/size/etc. Maybe make multiple ops?
-def IREEInterpLL_SplitOp : IREEInterpLL_PureOp<"split"> {
-  let arguments = (ins
-      IREELL_MemRef:$src
-  );
-  let results = (outs
-      Variadic<IREELL_MemRef>
-  );
 }
 
 def IREEInterpLL_AssignOp :
@@ -631,19 +530,5 @@ def IREEInterpLL_ReduceMaxFOp : IREEInterpLL_Op<"reduce_max_f"> {
       IREELL_FloatMemRef:$dst
   );
 }
-
-def IREEInterpLL_TraceOp : IREEInterpLL_Op<"trace"> {
-  let arguments = (ins
-      Variadic<IREELL_MemRef>:$srcs
-  );
-}
-
-def IREEInterpLL_CondBreakOp : IREEInterpLL_Op<"cond_break"> {
-  let arguments = (ins
-      IREELL_BoolScalar:$cond
-  );
-}
-
-def IREEInterpLL_BreakOp : IREEInterpLL_Op<"break">;
 
 #endif  // IREE_INTERPRETER_LL_OPS

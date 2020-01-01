@@ -19,22 +19,17 @@ iree_cc_library(
     "DispatchUtils.h"
     "Macros.h"
     "MemRefUtils.h"
-    "ModuleUtils.h"
     "OpCreationUtils.h"
-    "OpUtils.h"
     "TranslationUtils.h"
     "TypeConversionUtils.h"
   SRCS
     "DispatchUtils.cpp"
     "MemRefUtils.cpp"
-    "ModuleUtils.cpp"
     "OpCreationUtils.cpp"
-    "OpUtils.cpp"
     "TranslationUtils.cpp"
     "TypeConversionUtils.cpp"
   DEPS
     iree::compiler::IR
-    iree::schemas::executable_def_cc_fbs
     tensorflow::mlir_xla
     LLVMSupport
     MLIRIR

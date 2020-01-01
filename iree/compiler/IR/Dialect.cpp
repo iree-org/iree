@@ -14,10 +14,7 @@
 
 #include "iree/compiler/IR/Dialect.h"
 
-#include "iree/compiler/IR/ConfigOps.h"
 #include "iree/compiler/IR/Ops.h"
-#include "iree/compiler/IR/StructureOps.h"
-#include "iree/compiler/IR/Types.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/DialectImplementation.h"
 
@@ -31,14 +28,6 @@ IREEDialect::IREEDialect(MLIRContext *context)
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/IR/Ops.cpp.inc"
-      >();
-#define GET_OP_LIST
-  addOperations<
-#include "iree/compiler/IR/ConfigOps.cpp.inc"
-      >();
-#define GET_OP_LIST
-  addOperations<
-#include "iree/compiler/IR/StructureOps.cpp.inc"
       >();
 }
 

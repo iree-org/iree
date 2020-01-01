@@ -44,11 +44,6 @@ std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeTypeStoragePass();
 // if their results are unused: e.g. alloc and load.
 std::unique_ptr<OpPassBase<FuncOp>> createAggressiveOpEliminationPass();
 
-// Drops functions from the module that are unreachable from any exported
-// functions (iree.module.export).
-std::unique_ptr<OpPassBase<ModuleOp>>
-createDropUnreachableModuleFunctionsPass();
-
 // Drops functions from the executable module that are unreachable from any
 // exported functions (iree.executable.export).
 std::unique_ptr<OpPassBase<ModuleOp>>

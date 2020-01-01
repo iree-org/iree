@@ -209,7 +209,7 @@ LogicalResult identifyBlockDispatchRegions(FuncOp func, Block *block,
 
 }  // namespace
 
-// Identifies dispatchable ops and moves them into iree.dispatch_regions.
+// Identifies dispatchable ops and moves them into dispatch regions.
 // Some ops, such as call, will be deferred until following passes.
 class IdentifyDispatchRegionsPass
     : public FunctionPass<IdentifyDispatchRegionsPass> {

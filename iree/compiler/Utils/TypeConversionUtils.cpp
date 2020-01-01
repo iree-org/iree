@@ -48,8 +48,6 @@ Type legalizeType(Type type) {
   return type;
 }
 
-Type LLTypeConverter::convertType(Type type) { return legalizeType(type); }
-
 MemRefType convertTypeToMemRef(Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
@@ -64,10 +62,6 @@ MemRefType convertTypeToMemRef(Type type) {
 
 MemRefType convertTypeToMemRef(Value value) {
   return convertTypeToMemRef(value->getType());
-}
-
-Type MemRefTypeConverter::convertType(Type type) {
-  return convertTypeToMemRef(type);
 }
 
 }  // namespace iree_compiler

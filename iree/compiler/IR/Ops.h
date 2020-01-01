@@ -15,7 +15,6 @@
 #ifndef IREE_COMPILER_IR_OPS_H_
 #define IREE_COMPILER_IR_OPS_H_
 
-#include "iree/compiler/IR/Types.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Dialect.h"

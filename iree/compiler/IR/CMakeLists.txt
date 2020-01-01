@@ -12,60 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Interpreter)
-
 iree_cc_library(
   NAME
     IR
   HDRS
-    "ConfigOps.h"
     "Dialect.h"
     "Ops.h"
-    "StructureOps.h"
-    "Types.h"
   SRCS
-    "ConfigOps.cpp"
-    "ConfigOps.cpp.inc"
-    "ConfigOps.h.inc"
     "Dialect.cpp"
     "Ops.cpp"
     "Ops.cpp.inc"
     "Ops.h.inc"
-    "StructureOps.cpp"
-    "StructureOps.cpp.inc"
-    "StructureOps.h.inc"
-    "Types.cpp"
   DEPS
-    iree::compiler::IR::ConfigOpsGen
-    iree::compiler::IR::EnumsGen
     iree::compiler::IR::OpsGen
-    iree::compiler::IR::StructureOpsGen
-    iree::schemas::executable_def_cc_fbs
     LLVMSupport
     MLIRIR
     MLIRStandardOps
   ALWAYSLINK
   PUBLIC
-)
-
-iree_tablegen_library(
-  NAME
-    ConfigOpsGen
-  SRCS
-    ConfigOps.td
-  OUTS
-    -gen-op-decls ConfigOps.h.inc
-    -gen-op-defs ConfigOps.cpp.inc
-)
-
-iree_tablegen_library(
-  NAME
-    EnumsGen
-  SRCS
-    OpBase.td
-  OUTS
-    -gen-enum-decls Enums.h.inc
-    -gen-enum-defs Enums.cpp.inc
 )
 
 iree_tablegen_library(
@@ -76,14 +40,4 @@ iree_tablegen_library(
   OUTS
     -gen-op-decls Ops.h.inc
     -gen-op-defs Ops.cpp.inc
-)
-
-iree_tablegen_library(
-  NAME
-    StructureOpsGen
-  SRCS
-    StructureOps.td
-  OUTS
-    -gen-op-decls StructureOps.h.inc
-    -gen-op-defs StructureOps.cpp.inc
 )

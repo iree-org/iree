@@ -19,7 +19,6 @@
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
-#include "iree/compiler/IR/Types.h"
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRVPass.h"
 #include "iree/schemas/executable_def_generated.h"
@@ -201,7 +200,8 @@ LogicalResult translateToVulkanSPIRVExecutable(
   OpBuilder targetBuilder(&targetOp.getBlock());
   targetBuilder.setInsertionPoint(&targetOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-      targetOp.getLoc(), static_cast<uint32_t>(IREE::ExecutableFormat::SpirV),
+      targetOp.getLoc(),
+      static_cast<uint32_t>(IREE::HAL::ExecutableFormat::SpirV),
       std::move(bytes));
   binaryOp.getBlock().getOperations().insert(
       Block::iterator(binaryOp.getBlock().back()), moduleOp);

@@ -14,8 +14,7 @@
 
 // Utilities for dispatch region and function manipulation.
 // These are shared between all dispatchable types such as the standard
-// iree.dispatch_region as well as dispatch-related types like
-// iree.reduction_region.
+// dispatch region as well as dispatch-related types like reduction region.
 
 #ifndef IREE_COMPILER_DIALECT_FLOW_UTILS_DISPATCHUTILS_H_
 #define IREE_COMPILER_DIALECT_FLOW_UTILS_DISPATCHUTILS_H_

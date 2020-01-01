@@ -323,9 +323,29 @@ def HAL_Semaphore : DialectType<
 
 def HAL_OrdinalAttr : IntegerAttrBase<I32, "32-bit integer ordinal attribute">;
 
-// A four character code (FourCC) matching the executable format in
-// `iree/hal/executable_format.h`.
-def HAL_ExecutableFormatAttr : IntegerAttrBase<I32, "uint32_t">;
+// Values are FourCC codes.
+// See https://github.com/google/iree/tree/master/iree/iree/hal/executable_format.h for more info.
+// https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
+// integer values for inclusion here.
+//
+// LINT.IfChange(executable_format)
+def HAL_EF_Unspecified : I32EnumAttrCase<"Unspecified", 538976288>;
+def HAL_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
+def HAL_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
+def HAL_EF_SpirV : I32EnumAttrCase<"SpirV", 1397773893>;
+def HAL_ExecutableFormatAttr :
+    I32EnumAttr<"ExecutableFormat", "IREE HAL Executable format", [
+      HAL_EF_Unspecified,
+      HAL_EF_MlirText,
+      HAL_EF_IreeBytecode,
+      HAL_EF_SpirV,
+    ]> {
+  let returnType = "uint32_t";
+  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+// LINT.ThenChange(//iree/iree/hal/executable_format.h:fourcc)
+
 def HAL_ExecutableDataAttr : IntElementsAttr<8>;
 
 def HAL_DeviceSize : TypeAlias<I32>;

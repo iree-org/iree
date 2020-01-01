@@ -139,7 +139,6 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
-        "//iree/compiler/Translation/Interpreter",
         "//iree/compiler/Translation/SPIRV",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineDialectRegistration",

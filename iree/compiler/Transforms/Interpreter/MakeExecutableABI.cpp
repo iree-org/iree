@@ -15,7 +15,6 @@
 #include "iree/compiler/IR/Interpreter/HLOps.h"
 #include "iree/compiler/IR/Ops.h"
 #include "iree/compiler/Utils/OpCreationUtils.h"
-#include "iree/compiler/Utils/OpUtils.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"

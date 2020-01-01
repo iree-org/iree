@@ -44,7 +44,7 @@ namespace Flow {
 
 namespace {
 
-// Builds a new iree.reduction_region with the given |invocationRegion|.
+// Builds a new reduction region with the given |invocationRegion|.
 // The new region will be inserted after |originalOp|.
 //
 // All |invocationRegion| ops must be compatible with the |workload| specified
@@ -100,7 +100,7 @@ LogicalResult buildReductionRegionFromXLAReduceOp(xla_hlo::ReduceOp reduceOp) {
     dimensions.push_back(dim.getSExtValue());
   }
 
-  // Create the iree.reduction_region.
+  // Create the reduction region op with the reduction computation.
   if (failed(buildReductionRegion(reduceOp, adaptor.operands(),
                                   adaptor.init_values(), dimensions,
                                   reduceOp.body()))) {
@@ -138,7 +138,7 @@ LogicalResult identifyBlockReductionRegions(FuncOp funcOp, Block *block) {
 
 }  // namespace
 
-// Identifies reduction ops and moves their targets into iree.reduction_regions.
+// Identifies reduction ops and moves their targets into reduction regions.
 class IdentifyReductionRegionsPass
     : public ModulePass<IdentifyReductionRegionsPass> {
  public:

@@ -55,19 +55,6 @@ struct CallOpLowering : public OpConversionPattern<CallOp> {
   }
 };
 
-struct CallIndirectOpLowering : public OpConversionPattern<CallIndirectOp> {
-  using OpConversionPattern::OpConversionPattern;
-
-  PatternMatchResult matchAndRewrite(
-      CallIndirectOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const override {
-    auto callOp = cast<CallIndirectOp>(op);
-    rewriter.replaceOpWithNewOp<IREEInterp::HL::CallIndirectOp>(
-        op, callOp.getCallee(), operands);
-    return matchSuccess();
-  }
-};
-
 struct ReturnOpLowering : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
@@ -289,8 +276,8 @@ void populateLowerStdToInterpreterPatterns(OwningRewritePatternList &patterns,
                                            MLIRContext *ctx) {
   patterns.insert<
       // Control flow.
-      CallOpLowering, CallIndirectOpLowering, ReturnOpLowering,
-      BranchOpLowering, CondBranchOpLowering, CmpIOpLowering, CmpFOpLowering,
+      CallOpLowering, ReturnOpLowering, BranchOpLowering, CondBranchOpLowering,
+      CmpIOpLowering, CmpFOpLowering,
       // Memory management.
       AllocOpLowering, DeallocOpLowering, LoadOpLowering, StoreOpLowering,
       // Shape operations.

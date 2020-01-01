@@ -16,7 +16,6 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/IR/Dialect.h"
-#include "iree/compiler/IR/Types.h"
 #include "iree/compiler/Serialization/BytecodeTables.h"
 #include "iree/compiler/Utils/Macros.h"
 #include "iree/schemas/bytecode/bytecode_v0.h"

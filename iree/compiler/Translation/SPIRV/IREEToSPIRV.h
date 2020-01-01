@@ -21,7 +21,6 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_IREETOSPIRV_H
 
 #include "iree/compiler/IR/Ops.h"
-#include "iree/compiler/IR/StructureOps.h"
 #include "iree/compiler/Translation/SPIRV/SPIRVLowering.h"
 
 namespace mlir {

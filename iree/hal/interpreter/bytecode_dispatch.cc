@@ -124,15 +124,6 @@ Status Dispatch(hal::Allocator* allocator,
     DVLOG(1) << "Call; stack now: " << stack->DebugString();
   });
 
-  DISPATCH_CORE_OPCODE(kCallImport, {
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Non-module imports not supported";
-  });
-
-  DISPATCH_CORE_OPCODE(kCallIndirect, {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented call_indirect";
-  });
-
   DISPATCH_CORE_OPCODE(kReturn, {
     auto* old_stack_frame = stack->current_frame();
     auto* new_stack_frame = stack->caller_frame();
@@ -280,19 +271,6 @@ Status Dispatch(hal::Allocator* allocator,
     }
   });
 
-  DISPATCH_CORE_OPCODE(kAllocStatic, {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented alloc_static";
-  });
-
-  DISPATCH_CORE_OPCODE(kAllocStack, {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented alloc_stack";
-  });
-
-  DISPATCH_CORE_OPCODE(kAllocStackInit, {
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Unimplemented alloc_stack_init";
-  });
-
   DISPATCH_CORE_OPCODE(kAllocHeap, {
     ASSIGN_OR_RETURN(auto heap_type, reader.ReadInt32());
     ASSIGN_OR_RETURN(auto type, reader.ReadType());
@@ -395,10 +373,6 @@ Status Dispatch(hal::Allocator* allocator,
     dst_local->buffer = HeapBuffer::Allocate(src_local->buffer->usage(),
                                              src_local->buffer->byte_length());
     RETURN_IF_ERROR(dst_local->buffer->CopyData(0, src_local->buffer.get()));
-  });
-
-  DISPATCH_CORE_OPCODE(kSplit, {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented split";
   });
 
   DISPATCH_CORE_OPCODE(kAssign, {
@@ -840,18 +814,6 @@ Status Dispatch(hal::Allocator* allocator,
     RETURN_IF_ERROR(ApplyBinaryOpF<kernels::ReduceMax>(
         src_local, init_local, dst_local, dimension, src_local->shape,
         dst_local->shape));
-  });
-
-  DISPATCH_CORE_OPCODE(kTrace, {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented trace";
-  });
-
-  DISPATCH_CORE_OPCODE(kBreak, {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented break";
-  });
-
-  DISPATCH_CORE_OPCODE(kCondBreak, {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unimplemented cond_break";
   });
 
 _dispatch_unhandled:
