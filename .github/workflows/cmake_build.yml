@@ -40,7 +40,4 @@ jobs:
       - name: Updating submodules
         run: git submodule update --init --depth 1000 --jobs 8
       - name: Building with cmake
-        run: |
-          mkdir build && cd build
-          cmake -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
-          cmake --build .
+        run: ./build_tools/scripts/cmake_build.sh
