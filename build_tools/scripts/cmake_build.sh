@@ -19,6 +19,8 @@ set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
+cmake --version
+
 cd ${ROOT_DIR?}
 rm -rf build/
 mkdir build && cd build
