@@ -37,12 +37,20 @@ iree_cc_library(
   DEPS
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::IR
+    iree::compiler::Translation::Interpreter::IR::Common
+    iree::compiler::Translation::Interpreter::Serialization
     iree::compiler::Translation::Interpreter::Utils
     iree::compiler::Utils
-    tensorflow::mlir_xla
+    iree::schemas::bytecode::interpreter_bytecode_v0
     LLVMSupport
+    MLIRAnalysis
     MLIRIR
     MLIRPass
+    MLIRStandardOps
+    MLIRSupport
     MLIRTransformUtils
+    MLIRTransforms
+    tensorflow::mlir_xla
+  ALWAYSLINK
   PUBLIC
 )
