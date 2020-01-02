@@ -33,6 +33,7 @@ iree_cc_library(
     MLIRSPIRVLowering
     MLIRSPIRVSerialization
     MLIRSupport
+    MLIRTransforms
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
