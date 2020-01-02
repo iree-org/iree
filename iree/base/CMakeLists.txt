@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(internal)
+
 iree_cc_library(
   NAME
     api
@@ -35,7 +37,6 @@ iree_cc_library(
     "api.h"
   PUBLIC
 )
-
 
 iree_cc_library(
   NAME
@@ -130,43 +131,18 @@ iree_cc_test(
     absl::strings
 )
 
-# TODO(marbre) build within internal
-iree_cc_library(
-  NAME
-    file_handle_win32
-  SRCS
-    "internal/file_handle_win32.cc"
-  HDRS
-    "internal/file_handle_win32.h"
-  DEPS
-    absl::memory
-    absl::strings
-    iree::base::platform_headers
-    iree::base::status
-    iree::base::tracing
-    iree::base::target_platform
-  PUBLIC
-)
-
 iree_cc_library(
   NAME
     file_io
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    "internal/file_io_posix.cc"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    "internal/file_io_win32.cc"
   HDRS
     "file_io.h"
   DEPS
     absl::memory
     absl::strings
     absl::span
-    iree::base::file_handle_win32
-    iree::base::platform_headers
-    iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
+    iree::base::internal::file_io_internal
   PUBLIC
 )
 
@@ -182,11 +158,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     file_mapping
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_mapping") in the Bazel world. . Move to internal.
-    "internal/file_mapping_posix.cc"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    "internal/file_mapping_win32.cc"
   HDRS
     "file_mapping.h"
   DEPS
@@ -195,12 +166,7 @@ iree_cc_library(
     absl::span
     iree::base::ref_ptr
     iree::base::status
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("file_io") in the Bazel world. Move to internal.
-    iree::base::file_mapping_hdrs
-    iree::base::platform_headers
-    iree::base::target_platform
-    iree::base::tracing
-
+    iree::base::internal::file_mapping_internal
   PUBLIC
 )
 
@@ -264,17 +230,8 @@ iree_cc_library(
     init
   HDRS
     "init.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("init") in the Bazel world
-    "internal/init_internal.h"
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("init") in the Bazel world. Move to internal.
-    "internal/init_internal.cc"
   DEPS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("init") in the Bazel world. Move to internal.
-    absl::flags
-    absl::flags_parse
-    iree::base::initializer
-    iree::base::target_platform
+    iree::base::internal::init_internal
   PUBLIC
 )
 
@@ -316,6 +273,9 @@ iree_cc_test(
     iree::base::intrusive_list
 )
 
+# TODO(marbre): Moving to internal breaks iree::samples::rt::vulkan::vk_graphics_integration
+#  INTERFACE_LIBRARY targets may only have whitelisted properties.  The
+#  property "ALWAYSLINK" is not allowed.
 iree_cc_library(
   NAME
     logging
@@ -495,8 +455,8 @@ iree_cc_library(
     source_location
   HDRS
     "source_location.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("source_location") in the Bazel world. Move to internal.
-    "internal/source_location.h"
+  DEPS
+    iree::base::internal::source_location_internal
   PUBLIC
 )
 
@@ -505,33 +465,9 @@ iree_cc_library(
     status
   HDRS
     "status.h"
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status") in the Bazel world. Move to internal.
-    "internal/status.h"
-    "internal/status_builder.h"
-    "internal/status_errno.h"
-    "internal/status_errors.h"
-    "internal/status_macros.h"
-    "internal/status_win32_errors.h"
-    "internal/statusor.h"
-  SRCS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status") in the Bazel world. Move to internal.
-    "internal/status.cc"
-    "internal/status_builder.cc"
-    "internal/status_errno.cc"
-    "internal/status_errors.cc"
-    "internal/status_win32_errors.cc"
-    "internal/statusor.cc"
   DEPS
     iree::base::source_location
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status") in the Bazel world. Move to internal.
-    absl::base
-    absl::debugging
-    absl::flags
-    absl::memory
-    absl::strings
-    iree::base::logging
-    iree::base::platform_headers
-    iree::base::target_platform
+    iree::base::internal::status_internal
   PUBLIC
 )
 
@@ -540,14 +476,8 @@ iree_cc_library(
     status_matchers
   HDRS
     "status_matchers.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("status_matchers") in the Bazel world. Move to internal.
-    "internal/status_matchers.h"
   DEPS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("status_matchers") in the Bazel world. Move to internal.
-    absl::strings
-    absl::optional
-    gtest_main
-    iree::base::status
+    iree::base::internal::status_matchers_internal
   TESTONLY
   PUBLIC
 )
@@ -580,6 +510,7 @@ if(${IREE_ENABLE_TRACING})
       absl::strings
       absl::optional
       absl::time
+      iree::base::tracing_enabled
       # TODO(marbre): Add dependencies
       # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
       # "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"]
@@ -592,7 +523,10 @@ else()
     HDRS
       "tracing.h"
     DEPS
-      absl::flags
+      absl::strings
+      absl::time
+      absl::optional
+      iree::base::tracing_disabled
     PUBLIC
   )
 endif()
@@ -609,40 +543,36 @@ iree_cc_library(
     absl::strings
     absl::time
     absl::optional
-      # TODO(marbre): Add dependencies
-      # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
+    # TODO(marbre): Add dependency
+    # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
   ALWAYSLINK
 )
 
 if(${IREE_ENABLE_TRACING})
-
-iree_cc_library(
-  NAME
-    tracing_enabled
-  HDRS
-    "tracing.h"
-  SRCS
-    "tracing_enabled.cc"
-  DEPS
-    absl::core_headers
-    absl::flags
-    absl::strings
-    absl::synchronization
-    absl::time
-    absl::optional
-    iree::base::file_io
-    iree::base::file_path
-    iree::base::initializer
-    iree::base::logging
-    iree::base::status
-      # TODO(marbre): Add dependencies
+  iree_cc_library(
+    NAME
+      tracing_enabled
+    HDRS
+      "tracing.h"
+    SRCS
+      "tracing_enabled.cc"
+    DEPS
+      absl::core_headers
+      absl::flags
+      absl::strings
+      absl::synchronization
+      absl::time
+      absl::optional
+      iree::base::file_io
+      iree::base::file_path
+      iree::base::initializer
+      iree::base::logging
+      iree::base::status
+      # TODO(marbre): Add dependency
       # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
-  ALWAYSLINK
-)
-
+    ALWAYSLINK
+  )
 endif()
-
-
 
 # TODO(benvanik): get wait_handle ported to win32.
 # iree_cc_library(

@@ -54,7 +54,7 @@ iree_cc_library(
     iree::base::file_mapping_hdrs
     iree::base::platform_headers
     iree::base::target_platform
-    iree::base::traching
+    iree::base::tracing
     absl::memory
     absl::strings
 )
@@ -83,7 +83,7 @@ iree_cc_library(
   DEPS
     iree::base::platform_headers
     absl::core_headers
-    absl::flags_flag
+    absl::flags
 )
 
 iree_cc_library(
@@ -118,21 +118,20 @@ iree_cc_library(
     iree::base::target_platform
     absl::core_headers
     absl::stacktrace
-    absl::flags_flag
+    absl::flags
     absl::memory
     absl::strings
 )
 
-if(IREE_BUILD_TESTS)
-  iree_cc_library(
-    NAME
-      status_matchers_internal
-    HDRS
-      "status_matchers.h"
-    DEPS
-      iree::base::status
-      absl::strings
-      absl::optional
-      gtest
-  )
-endif()
+iree_cc_library(
+  NAME
+    status_matchers_internal
+  HDRS
+    "status_matchers.h"
+  DEPS
+    iree::base::status
+    absl::strings
+    absl::optional
+    gtest
+  TESTONLY
+)
