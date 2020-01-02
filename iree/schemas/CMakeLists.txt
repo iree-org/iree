@@ -32,9 +32,9 @@ flatbuffer_cc_library(
 
 flatbuffer_cc_library(
   NAME
-    module_def_cc_fbs
+    interpreter_module_def_cc_fbs
   SRCS
-    "module_def.fbs"
+    "interpreter_module_def.fbs"
   PUBLIC
 )
 
