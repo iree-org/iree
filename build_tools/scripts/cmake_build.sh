@@ -22,6 +22,6 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 cd ${ROOT_DIR?}
 rm -rf build/
 mkdir build && cd build
-cmake -DIREE_BUILD_COMPILER=OFF -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
+cmake -DIREE_BUILD_COMPILER=ON -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
 cmake --build .
 rm -rf build/
