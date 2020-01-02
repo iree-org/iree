@@ -33,6 +33,9 @@ if(${IREE_BUILD_COMPILER})
     MLIRTranslation
     MLIRSupport
     MLIRVectorOps
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::IR
     tensorflow::mlir_xla
@@ -102,7 +105,7 @@ if(${IREE_BUILD_COMPILER})
       "translate_main.cc"
     DEPS
       ${_ALWAYSLINK_LIBS}
-      iree::compiler::Translation::Interpreter
+      iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Translation::SPIRV
       MLIRTranslateClParser
   )
