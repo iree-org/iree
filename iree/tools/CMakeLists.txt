@@ -51,33 +51,34 @@ if(${IREE_BUILD_COMPILER})
     endif()
   endforeach(LIB)
 
-  iree_cc_binary(
-    NAME
-      iree-run-mlir
-    SRCS
-      "run_mlir_main.cc"
-    DEPS
-      absl::flags
-      absl::strings
-      # TODO(marbre): Fix problems with property "ALWAYSLINK".
-      #iree::base::source_location
-      iree::rt
-      LLVMSupport
-      MLIRIR
-      MLIRParser
-      MLIRSupport
-      iree::base::init
-      iree::base::status
-      iree::compiler::Translation::Interpreter
-      iree::compiler::Translation::SPIRV
-      iree::compiler::Translation::IREEVM
-      iree::hal::buffer_view_string_util
-      iree::hal::driver_registry
-      # TODO(marbre)_ Add deps
-      # PLATFORM_VULKAN_DEPS
-      iree::hal::interpreter::interpreter_driver_module
-      iree::hal::vulkan::vulkan_driver_module
-    )
+# TODO(mabre): Get this working
+#  iree_cc_binary(
+#    NAME
+#      iree-run-mlir
+#    SRCS
+#      "run_mlir_main.cc"
+#    DEPS
+#      absl::flags
+#      absl::strings
+#      # TODO(marbre): Fix problems with property "ALWAYSLINK".
+#      #iree::base::source_location
+#      iree::rt
+#      LLVMSupport
+#      MLIRIR
+#      MLIRParser
+#      MLIRSupport
+#      iree::base::init
+#      iree::base::status
+#      iree::compiler::Translation::Interpreter
+#      iree::compiler::Translation::SPIRV
+#      iree::compiler::Translation::IREEVM
+#      iree::hal::buffer_view_string_util
+#      iree::hal::driver_registry
+#      # TODO(marbre)_ Add deps
+#      # PLATFORM_VULKAN_DEPS
+#      iree::hal::interpreter::interpreter_driver_module
+#      iree::hal::vulkan::vulkan_driver_module
+#    )
 
   iree_cc_binary(
     NAME
