@@ -1,4 +1,4 @@
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir2 -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // TODO(b/146030213) : This test fails cause the initialization isn't
 // done correctly within the vulkan backend. Enable this test once that

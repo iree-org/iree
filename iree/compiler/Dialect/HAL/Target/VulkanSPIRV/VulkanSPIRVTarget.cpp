@@ -31,6 +31,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
@@ -140,10 +141,14 @@ LogicalResult translateToVulkanSPIRVExecutable(
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
     conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());
+    conversionPassManager.addPass(createPrepareReductionDispatchPass());
     conversionPassManager.addPass(createIndexComputationPass());
     conversionPassManager.addPass(createIREEToSPIRVPass());
-    conversionPassManager.addPass(spirv::createLowerABIAttributesPass());
-    conversionPassManager.addPass(createAdjustIntegerWidthPass());
+
+    OpPassManager &spirvPasses = conversionPassManager.nest<spirv::ModuleOp>();
+    spirvPasses.addPass(spirv::createLowerABIAttributesPass());
+    spirvPasses.addPass(createInlinerPass());
+    spirvPasses.addPass(createAdjustIntegerWidthPass());
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";
     }
