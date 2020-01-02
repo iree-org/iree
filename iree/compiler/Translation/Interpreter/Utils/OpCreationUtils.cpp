@@ -16,7 +16,7 @@
 
 #include <cstdint>
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Location.h"

@@ -17,13 +17,57 @@
 
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
-class IREEX_Op<string mnemonic, list<OpTrait> traits = []> :
-    Op<IREEX_Dialect, mnemonic, traits> {
+//===----------------------------------------------------------------------===//
+// Op types
+//===----------------------------------------------------------------------===//
+
+class IREE_Op<string mnemonic, list<OpTrait> traits = []> :
+    Op<IREE_Dialect, mnemonic, traits> {
   let parser = [{ return parse$cppClass(parser, result); }];
   let printer = [{ print$cppClass(p, *this); }];
 }
 
-def IREE_DoNotOptimizeOp : IREEX_Op<"do_not_optimize"> {
+class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    IREE_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+def IREE_ReturnOp : IREE_Op<"return", [Terminator]> {
+  let arguments = (ins Variadic<AnyType>:$operands);
+
+  let builders = [OpBuilder<
+    "Builder *b, OperationState &result", [{ build(b, result, llvm::None); }]
+  >];
+}
+
+//===----------------------------------------------------------------------===//
+// Executable ABI
+//===----------------------------------------------------------------------===//
+
+def IREE_LoadInputOp : IREE_PureOp<"load_input"> {
+  let arguments = (ins IREE_MemRef:$src);
+  let results = (outs AnyType);
+}
+
+def IREE_StoreOutputOp : IREE_Op<"store_output"> {
+  let arguments = (ins AnyType:$src, IREE_MemRef:$dst);
+}
+
+def IREE_StoreReduceOp : IREE_Op<"store_reduce"> {
+  let arguments = (ins
+    AnyType:$src,
+    IREE_MemRef:$dst,
+    FlatSymbolRefAttr:$reduction_fn
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// Compiler hints
+//===----------------------------------------------------------------------===//
+
+def IREE_DoNotOptimizeOp : IREE_Op<"do_not_optimize"> {
   let summary = "Prevents compiler optimizations of a value.";
   let description = [{
     Wraps any operands in an unoptimizable identity. This operation is declared

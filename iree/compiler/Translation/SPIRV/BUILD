@@ -48,7 +48,7 @@ cc_library(
         "XLAToSPIRV.h",
     ],
     deps = [
-        "//iree/compiler/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/SPIRV/Kernels",
         "//iree/compiler/Utils",
         "//iree/schemas:spirv_executable_def_cc_fbs",

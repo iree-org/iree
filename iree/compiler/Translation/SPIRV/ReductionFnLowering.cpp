@@ -18,7 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"

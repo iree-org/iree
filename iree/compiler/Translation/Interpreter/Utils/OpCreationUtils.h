@@ -21,7 +21,7 @@
 
 #include <cstdint>
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"

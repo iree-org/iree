@@ -19,27 +19,27 @@
 // RUN: custom-opt -split-input-file %s | custom-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @printOp
-func @printOp(%arg0 : !ireex.ref<!custom.message>) {
+func @printOp(%arg0 : !iree.ref<!custom.message>) {
   %c1_i32 = constant 1 : i32
-  // CHECK: "custom.print"(%arg0, %c1_i32) : (!ireex.ref<!custom.message>, i32) -> ()
-  "custom.print"(%arg0, %c1_i32) : (!ireex.ref<!custom.message>, i32) -> ()
+  // CHECK: "custom.print"(%arg0, %c1_i32) : (!iree.ref<!custom.message>, i32) -> ()
+  "custom.print"(%arg0, %c1_i32) : (!iree.ref<!custom.message>, i32) -> ()
   return
 }
 
 // -----
 
 // CHECK-LABEL: @reverseOp
-func @reverseOp(%arg0 : !ireex.ref<!custom.message>) -> !ireex.ref<!custom.message> {
-  // CHECK: %0 = "custom.reverse"(%arg0) : (!ireex.ref<!custom.message>) -> !ireex.ref<!custom.message>
-  %0 = "custom.reverse"(%arg0) : (!ireex.ref<!custom.message>) -> !ireex.ref<!custom.message>
-  return %0 : !ireex.ref<!custom.message>
+func @reverseOp(%arg0 : !iree.ref<!custom.message>) -> !iree.ref<!custom.message> {
+  // CHECK: %0 = "custom.reverse"(%arg0) : (!iree.ref<!custom.message>) -> !iree.ref<!custom.message>
+  %0 = "custom.reverse"(%arg0) : (!iree.ref<!custom.message>) -> !iree.ref<!custom.message>
+  return %0 : !iree.ref<!custom.message>
 }
 
 // -----
 
 // CHECK-LABEL: @getUniqueMessageOp
-func @getUniqueMessageOp() -> !ireex.ref<!custom.message> {
-  // CHECK: %0 = "custom.get_unique_message"() : () -> !ireex.ref<!custom.message>
-  %0 = "custom.get_unique_message"() : () -> !ireex.ref<!custom.message>
-  return %0 : !ireex.ref<!custom.message>
+func @getUniqueMessageOp() -> !iree.ref<!custom.message> {
+  // CHECK: %0 = "custom.get_unique_message"() : () -> !iree.ref<!custom.message>
+  %0 = "custom.get_unique_message"() : () -> !iree.ref<!custom.message>
+  return %0 : !iree.ref<!custom.message>
 }

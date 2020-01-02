@@ -27,7 +27,7 @@ iree_cc_library(
   DEPS
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Utils
     LLVMSupport
     MLIRIR

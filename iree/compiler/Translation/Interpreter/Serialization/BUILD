@@ -36,7 +36,7 @@ cc_library(
         "VMModuleBuilder.h",
     ],
     deps = [
-        "//iree/compiler/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/Interpreter/Utils",
         "//iree/schemas:interpreter_module_def_cc_fbs",
         "//iree/schemas/bytecode:interpreter_bytecode_v0",

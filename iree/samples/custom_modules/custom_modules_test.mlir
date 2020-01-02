@@ -17,18 +17,18 @@
 //
 // See custom_modules/dialect/custom_ops.td for the op definitions and
 // custom_modules/dialect/custom.imports.mlir for the import definitions.
-func @reverseAndPrint(%message : !ireex.ref<!custom.message>, %count : i32) -> !ireex.ref<!custom.message>
+func @reverseAndPrint(%message : !iree.ref<!custom.message>, %count : i32) -> !iree.ref<!custom.message>
     attributes { iree.module.export } {
   %c1 = constant 1 : i32
-  %0 = "custom.get_unique_message"() : () -> !ireex.ref<!custom.message>
-  "custom.print"(%0, %c1) : (!ireex.ref<!custom.message>, i32) -> ()
-  %1 = call @reverse(%message) : (!ireex.ref<!custom.message>) -> !ireex.ref<!custom.message>
-  "custom.print"(%1, %count) : (!ireex.ref<!custom.message>, i32) -> ()
-  return %1 : !ireex.ref<!custom.message>
+  %0 = "custom.get_unique_message"() : () -> !iree.ref<!custom.message>
+  "custom.print"(%0, %c1) : (!iree.ref<!custom.message>, i32) -> ()
+  %1 = call @reverse(%message) : (!iree.ref<!custom.message>) -> !iree.ref<!custom.message>
+  "custom.print"(%1, %count) : (!iree.ref<!custom.message>, i32) -> ()
+  return %1 : !iree.ref<!custom.message>
 }
 
 // Reverses a message. Just an example to show intra-module calls.
-func @reverse(%message : !ireex.ref<!custom.message>) -> !ireex.ref<!custom.message> {
-  %0 = "custom.reverse"(%message) : (!ireex.ref<!custom.message>) -> !ireex.ref<!custom.message>
-  return %0 : !ireex.ref<!custom.message>
+func @reverse(%message : !iree.ref<!custom.message>) -> !iree.ref<!custom.message> {
+  %0 = "custom.reverse"(%message) : (!iree.ref<!custom.message>) -> !iree.ref<!custom.message>
+  return %0 : !iree.ref<!custom.message>
 }

@@ -31,6 +31,135 @@ namespace iree_compiler {
 namespace IREE {
 
 //===----------------------------------------------------------------------===//
+// iree.return
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &state) {
+  SmallVector<OpAsmParser::OperandType, 2> opInfo;
+  SmallVector<Type, 2> types;
+  llvm::SMLoc loc = parser.getCurrentLocation();
+  return failure(parser.parseOperandList(opInfo) ||
+                 (!opInfo.empty() && parser.parseColonTypeList(types)) ||
+                 parser.resolveOperands(opInfo, types, loc, state.operands));
+}
+
+static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
+  p << "iree.return";
+  if (op.getNumOperands() > 0) {
+    p << ' ';
+    p.printOperands(op.operand_begin(), op.operand_end());
+    p << " : ";
+    interleaveComma(op.getOperandTypes(), p);
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// iree.load_input
+//===----------------------------------------------------------------------===//
+
+ParseResult parseLoadInputOp(OpAsmParser &parser, OperationState &state) {
+  OpAsmParser::OperandType operand;
+  Type argType;
+  if (parser.parseLParen() || parser.parseOperand(operand) ||
+      parser.parseColonType(argType) || parser.parseRParen() ||
+      parser.resolveOperand(operand, argType, state.operands) ||
+      parser.parseOptionalAttrDict(state.attributes)) {
+    return failure();
+  }
+  Type outputType;
+  if (parser.parseColonType(outputType) ||
+      parser.addTypeToList(outputType, state.types)) {
+    return failure();
+  }
+  return success();
+}
+
+void printLoadInputOp(OpAsmPrinter &printer, Operation *op) {
+  auto inputValue = op->getOperand(0);
+  auto outputValue = op->getResult(0);
+  printer << op->getName() << '(';
+  printer.printOperand(inputValue);
+  printer << " : ";
+  printer.printType(inputValue->getType());
+  printer << ") ";
+  printer.printOptionalAttrDict(op->getAttrs());
+  printer << " : ";
+  printer.printType(outputValue->getType());
+}
+
+//===----------------------------------------------------------------------===//
+// iree.store_output
+//===----------------------------------------------------------------------===//
+
+ParseResult parseStoreOutputOp(OpAsmParser &parser, OperationState &state) {
+  OpAsmParser::OperandType op0, op1;
+  Type argType0, argType1;
+  if (parser.parseLParen() || parser.parseOperand(op0) ||
+      parser.parseColonType(argType0) || parser.parseComma() ||
+      parser.resolveOperand(op0, argType0, state.operands) ||
+      parser.parseOperand(op1) || parser.parseColonType(argType1) ||
+      parser.parseRParen() ||
+      parser.resolveOperand(op1, argType1, state.operands) ||
+      parser.parseOptionalAttrDict(state.attributes)) {
+    return failure();
+  }
+  return success();
+}
+
+void printStoreOutputOp(OpAsmPrinter &printer, Operation *op) {
+  auto inputValue = op->getOperand(0);
+  auto outputValue = op->getOperand(1);
+  printer << op->getName() << '(';
+  printer.printOperand(inputValue);
+  printer << " : ";
+  printer.printType(inputValue->getType());
+  printer << ", ";
+  printer.printOperand(outputValue);
+  printer << " : ";
+  printer.printType(outputValue->getType());
+  printer << ") ";
+  printer.printOptionalAttrDict(op->getAttrs());
+}
+
+//===----------------------------------------------------------------------===//
+// iree.store_reduce
+//===----------------------------------------------------------------------===//
+
+ParseResult parseStoreReduceOp(OpAsmParser &parser, OperationState &state) {
+  OpAsmParser::OperandType src, dst;
+  Type srcType, dstType;
+  SymbolRefAttr reductionFn;
+  if (parser.parseLParen() || parser.parseOperand(src) ||
+      parser.parseColonType(srcType) ||
+      parser.resolveOperand(src, srcType, state.operands) ||
+      parser.parseComma() || parser.parseOperand(dst) ||
+      parser.parseColonType(dstType) ||
+      parser.resolveOperand(dst, dstType, state.operands) ||
+      parser.parseComma() ||
+      parser.parseAttribute(reductionFn, "reduction_fn", state.attributes) ||
+      parser.parseRParen() || parser.parseOptionalAttrDict(state.attributes)) {
+    return failure();
+  }
+  return success();
+}
+
+void printStoreReduceOp(OpAsmPrinter &printer, Operation *op) {
+  auto storeReduceOp = cast<IREE::StoreReduceOp>(op);
+  printer << op->getName() << '(';
+  printer.printOperand(storeReduceOp.src());
+  printer << " : ";
+  printer.printType(storeReduceOp.src()->getType());
+  printer << ", ";
+  printer.printOperand(storeReduceOp.dst());
+  printer << " : ";
+  printer.printType(storeReduceOp.dst()->getType());
+  printer << ", ";
+  printer.printAttribute(storeReduceOp.reduction_fnAttr());
+  printer << ") ";
+  printer.printOptionalAttrDict(op->getAttrs(), StringRef("reduction_fn"));
+}
+
+//===----------------------------------------------------------------------===//
 // iree.do_not_optimize
 //===----------------------------------------------------------------------===//
 
@@ -53,7 +182,7 @@ ParseResult parseDoNotOptimizeOp(OpAsmParser &parser, OperationState &state) {
 }
 
 void printDoNotOptimizeOp(OpAsmPrinter &p, Operation *op) {
-  p << "ireex.do_not_optimize";
+  p << "iree.do_not_optimize";
   p << "(";
   p.printOperands(op->getOperands());
   p << ")";

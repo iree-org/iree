@@ -28,11 +28,11 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_load_ref
 vm.module @my_module {
-  vm.global.ref @g0 : !ireex.opaque_ref
-  vm.func @global_load_ref() -> !ireex.opaque_ref {
-    // CHECK: %g0 = vm.global.load.ref @g0 : !ireex.opaque_ref
-    %g0 = vm.global.load.ref @g0 : !ireex.opaque_ref
-    vm.return %g0 : !ireex.opaque_ref
+  vm.global.ref @g0 : !iree.opaque_ref
+  vm.func @global_load_ref() -> !iree.opaque_ref {
+    // CHECK: %g0 = vm.global.load.ref @g0 : !iree.opaque_ref
+    %g0 = vm.global.load.ref @g0 : !iree.opaque_ref
+    vm.return %g0 : !iree.opaque_ref
   }
 }
 
@@ -40,10 +40,10 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_store_ref
 vm.module @my_module {
-  vm.global.ref @g0 mutable : !ireex.opaque_ref
-  vm.func @global_store_ref(%arg0 : !ireex.opaque_ref) {
-    // CHECK: vm.global.store.ref @g0, %arg0 : !ireex.opaque_ref
-    vm.global.store.ref @g0, %arg0 : !ireex.opaque_ref
+  vm.global.ref @g0 mutable : !iree.opaque_ref
+  vm.func @global_store_ref(%arg0 : !iree.opaque_ref) {
+    // CHECK: vm.global.store.ref @g0, %arg0 : !iree.opaque_ref
+    vm.global.store.ref @g0, %arg0 : !iree.opaque_ref
     vm.return
   }
 }
@@ -52,7 +52,7 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_reset_ref
 vm.module @my_module {
-  vm.global.ref @g0 mutable : !ireex.opaque_ref
+  vm.global.ref @g0 mutable : !iree.opaque_ref
   vm.func @global_reset_ref() {
     // CHECK: vm.global.reset.ref @g0
     vm.global.reset.ref @g0

@@ -15,7 +15,7 @@
 #include "iree/compiler/Translation/Interpreter/Serialization/VMFunctionBuilder.h"
 
 #include "flatbuffers/flatbuffers.h"
-#include "iree/compiler/IR/Dialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Translation/Interpreter/Serialization/BytecodeTables.h"
 #include "iree/compiler/Translation/Interpreter/Utils/Macros.h"
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"

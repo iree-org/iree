@@ -32,7 +32,7 @@ iree_cc_library(
     "LLOps.cpp.inc"
     "OpWriters.cpp"
   DEPS
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::IR::HLOpsGen
     iree::compiler::Translation::Interpreter::IR::LLOpsGen
     iree::compiler::Translation::Interpreter::Serialization

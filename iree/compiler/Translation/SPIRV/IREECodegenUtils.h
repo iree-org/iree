@@ -20,7 +20,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_IREECODEGENUTILS_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_IREECODEGENUTILS_H
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/IR/Function.h"
 #include "mlir/Support/LogicalResult.h"
 

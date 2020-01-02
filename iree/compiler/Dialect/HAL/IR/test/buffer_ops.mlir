@@ -3,19 +3,19 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @buffer_subspan
-func @buffer_subspan() -> !ireex.ref<!hal.buffer> {
-  %0 = "test_hal.buffer"() : () -> !ireex.ref<!hal.buffer>
+func @buffer_subspan() -> !iree.ref<!hal.buffer> {
+  %0 = "test_hal.buffer"() : () -> !iree.ref<!hal.buffer>
   %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.device_size"() : () -> i32
-  // CHECK: %buffer = hal.buffer.subspan %0, %1, %2 : !ireex.ref<!hal.buffer>
-  %buffer = hal.buffer.subspan %0, %1, %2 : !ireex.ref<!hal.buffer>
-  return %buffer : !ireex.ref<!hal.buffer>
+  // CHECK: %buffer = hal.buffer.subspan %0, %1, %2 : !iree.ref<!hal.buffer>
+  %buffer = hal.buffer.subspan %0, %1, %2 : !iree.ref<!hal.buffer>
+  return %buffer : !iree.ref<!hal.buffer>
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_fill
-func @buffer_fill(%arg0 : !ireex.ref<!hal.buffer>) {
+func @buffer_fill(%arg0 : !iree.ref<!hal.buffer>) {
   %0 = "test_hal.device_size"() : () -> i32
   %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.pattern"() : () -> i32
@@ -27,33 +27,33 @@ func @buffer_fill(%arg0 : !ireex.ref<!hal.buffer>) {
 // -----
 
 // CHECK-LABEL: @buffer_read_data
-func @buffer_read_data(%arg0 : !ireex.ref<!hal.buffer>) {
+func @buffer_read_data(%arg0 : !iree.ref<!hal.buffer>) {
   %0 = "test_hal.device_size"() : () -> i32
-  %1 = "test_hal.mutable_data"() : () -> !ireex.mutable_byte_buffer_ref
+  %1 = "test_hal.mutable_data"() : () -> !iree.mutable_byte_buffer_ref
   %2 = "test_hal.device_size"() : () -> i32
   %3 = "test_hal.device_size"() : () -> i32
-  // CHECK: hal.buffer.read_data %arg0, %0, %1, %2, %3 : !ireex.mutable_byte_buffer_ref
-  hal.buffer.read_data %arg0, %0, %1, %2, %3 : !ireex.mutable_byte_buffer_ref
+  // CHECK: hal.buffer.read_data %arg0, %0, %1, %2, %3 : !iree.mutable_byte_buffer_ref
+  hal.buffer.read_data %arg0, %0, %1, %2, %3 : !iree.mutable_byte_buffer_ref
   return
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_write_data
-func @buffer_write_data(%arg0 : !ireex.ref<!hal.buffer>) {
-  %0 = "test_hal.mutable_data"() : () -> !ireex.mutable_byte_buffer_ref
+func @buffer_write_data(%arg0 : !iree.ref<!hal.buffer>) {
+  %0 = "test_hal.mutable_data"() : () -> !iree.mutable_byte_buffer_ref
   %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.device_size"() : () -> i32
   %3 = "test_hal.device_size"() : () -> i32
-  // CHECK: hal.buffer.write_data %0, %1, %arg0, %2, %3 : !ireex.mutable_byte_buffer_ref
-  hal.buffer.write_data %0, %1, %arg0, %2, %3 : !ireex.mutable_byte_buffer_ref
+  // CHECK: hal.buffer.write_data %0, %1, %arg0, %2, %3 : !iree.mutable_byte_buffer_ref
+  hal.buffer.write_data %0, %1, %arg0, %2, %3 : !iree.mutable_byte_buffer_ref
   return
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_copy_data
-func @buffer_copy_data(%arg0 : !ireex.ref<!hal.buffer>, %arg1 : !ireex.ref<!hal.buffer>) {
+func @buffer_copy_data(%arg0 : !iree.ref<!hal.buffer>, %arg1 : !iree.ref<!hal.buffer>) {
   %0 = "test_hal.device_size"() : () -> i32
   %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.device_size"() : () -> i32
@@ -65,7 +65,7 @@ func @buffer_copy_data(%arg0 : !ireex.ref<!hal.buffer>, %arg1 : !ireex.ref<!hal.
 // -----
 
 // CHECK-LABEL: @buffer_load
-func @buffer_load(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
+func @buffer_load(%arg0 : !iree.ref<!hal.buffer>) -> i32 {
   %0 = "test_hal.device_size"() : () -> i32
   // CHECK: [[VAL:%.+]] = hal.buffer.load %arg0[%0] : i32
   %1 = hal.buffer.load %arg0[%0] : i32
@@ -76,7 +76,7 @@ func @buffer_load(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
 // -----
 
 // CHECK-LABEL: @buffer_store
-func @buffer_store(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>) {
+func @buffer_store(%arg0 : i32, %arg1 : !iree.ref<!hal.buffer>) {
   %0 = "test_hal.device_size"() : () -> i32
   // CHECK: hal.buffer.store %arg0, %arg1[%0] : i32
   hal.buffer.store %arg0, %arg1[%0] : i32
@@ -86,7 +86,7 @@ func @buffer_store(%arg0 : i32, %arg1 : !ireex.ref<!hal.buffer>) {
 // -----
 
 // CHECK-LABEL: @buffer_view_compute_offset
-func @buffer_view_compute_offset(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
+func @buffer_view_compute_offset(%arg0 : !iree.ref<!hal.buffer>) -> i32 {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   %1:2 = "test_hal.indices"() : () -> (i32, i32)
   // CHECK: %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], element_size=4
@@ -97,7 +97,7 @@ func @buffer_view_compute_offset(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
 // -----
 
 // CHECK-LABEL: @buffer_view_compute_length
-func @buffer_view_compute_length(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
+func @buffer_view_compute_length(%arg0 : !iree.ref<!hal.buffer>) -> i32 {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   // CHECK: %len = hal.buffer_view.compute_length %arg0, shape=[%0#0, %0#1], element_size=4
   %len = hal.buffer_view.compute_length %arg0, shape=[%0#0, %0#1], element_size=4
@@ -107,7 +107,7 @@ func @buffer_view_compute_length(%arg0 : !ireex.ref<!hal.buffer>) -> i32 {
 // -----
 
 // CHECK-LABEL: @buffer_view_compute_range
-func @buffer_view_compute_range(%arg0 : !ireex.ref<!hal.buffer>) -> (i32, i32) {
+func @buffer_view_compute_range(%arg0 : !iree.ref<!hal.buffer>) -> (i32, i32) {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   %1:2 = "test_hal.indices"() : () -> (i32, i32)
   %2:2 = "test_hal.lengths"() : () -> (i32, i32)
@@ -119,11 +119,11 @@ func @buffer_view_compute_range(%arg0 : !ireex.ref<!hal.buffer>) -> (i32, i32) {
 // -----
 
 // CHECK-LABEL: @buffer_view_slice
-func @buffer_view_slice(%arg0 : !ireex.ref<!hal.buffer>) -> !ireex.ref<!hal.buffer> {
+func @buffer_view_slice(%arg0 : !iree.ref<!hal.buffer>) -> !iree.ref<!hal.buffer> {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
   %1:2 = "test_hal.indices"() : () -> (i32, i32)
   %2:2 = "test_hal.lengths"() : () -> (i32, i32)
   // CHECK: %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
   %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
-  return %slice : !ireex.ref<!hal.buffer>
+  return %slice : !iree.ref<!hal.buffer>
 }

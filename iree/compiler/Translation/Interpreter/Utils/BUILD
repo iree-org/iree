@@ -31,7 +31,7 @@ cc_library(
         "OpCreationUtils.h",
     ],
     deps = [
-        "//iree/compiler/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/Interpreter/IR:Common",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",

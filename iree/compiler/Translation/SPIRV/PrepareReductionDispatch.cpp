@@ -17,7 +17,7 @@
 // Prepare dispatch regions that implement reductions before SPIR-V lowering.
 //
 //===----------------------------------------------------------------------===//
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Utils/DispatchUtils.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"

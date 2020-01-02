@@ -20,7 +20,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/SPIRV/IndexComputationAttribute.h"
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"

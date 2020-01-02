@@ -25,6 +25,7 @@
 #include "iree/compiler/Translation/SPIRV/TensorIndexToScalarValueMap.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/Support/StringExtras.h"
 
 namespace mlir {

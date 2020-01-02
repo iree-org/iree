@@ -32,7 +32,7 @@ cc_library(
         "TypeConversionUtils.h",
     ],
     deps = [
-        "//iree/compiler/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

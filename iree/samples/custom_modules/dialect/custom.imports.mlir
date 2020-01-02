@@ -25,20 +25,20 @@ vm.module @custom {
 // Prints the %message provided %count times.
 // Maps to the IREE::Custom::PrintOp.
 vm.import @print(
-  %message : !ireex.ref<!custom.message>,
+  %message : !iree.ref<!custom.message>,
   %count : i32
 )
 
 // Returns the message with its characters reversed.
 // Maps to the IREE::Custom::ReverseOp.
 vm.import @reverse(
-  %message : !ireex.ref<!custom.message>
-) -> !ireex.ref<!custom.message>
+  %message : !iree.ref<!custom.message>
+) -> !iree.ref<!custom.message>
 attributes {nosideeffects}
 
 // Returns a per-context unique message.
 // Maps to the IREE::Custom::GetUniqueMessageOp.
-vm.import @get_unique_message() -> !ireex.ref<!custom.message>
+vm.import @get_unique_message() -> !iree.ref<!custom.message>
 attributes {nosideeffects}
 
 }  // vm.module

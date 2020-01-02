@@ -16,7 +16,7 @@
 
 #include <cassert>
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/StandardOps/Ops.h"

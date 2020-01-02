@@ -17,7 +17,7 @@
 #ifndef IREE_INTERPRETER_BASE
 #define IREE_INTERPRETER_BASE
 
-include "iree/compiler/IR/OpBase.td"
+include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//

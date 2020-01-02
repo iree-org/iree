@@ -28,7 +28,7 @@ iree_cc_library(
     "VMFunctionTableBuilder.cpp"
     "VMModuleBuilder.cpp"
   DEPS
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::IR
     iree::schemas::interpreter_module_def_cc_fbs
     iree::schemas::bytecode::interpreter_bytecode_v0

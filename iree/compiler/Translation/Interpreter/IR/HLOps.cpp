@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Translation/Interpreter/IR/HLOps.h"
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/Interpreter/Utils/OpCreationUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"

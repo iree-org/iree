@@ -38,8 +38,7 @@ cc_library(
     ],
     deps = [
         ":CommonOpsGen",
-        "//iree/compiler/IR",
-        "//iree/compiler/IR:OpsGen",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",
@@ -59,7 +58,7 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "//iree/compiler/IR:OpBase.td",
+        "//iree/compiler/Dialect/IREE/IR:IREEBase.td",
     ],
 )
 
@@ -87,8 +86,7 @@ cc_library(
         ":Common",
         ":HLOpsGen",
         ":LLOpsGen",
-        "//iree/compiler/IR",
-        "//iree/compiler/IR:OpsGen",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/Interpreter/Serialization",
         "//iree/compiler/Translation/Interpreter/Utils",
         "//iree/compiler/Utils",
@@ -112,7 +110,7 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:include/mlir/IR/OpBase.td",
-        "//iree/compiler/IR:OpBase.td",
+        "//iree/compiler/Dialect/IREE/IR:IREEBase.td",
     ],
 )
 
@@ -127,6 +125,6 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:include/mlir/IR/OpBase.td",
-        "//iree/compiler/IR:OpBase.td",
+        "//iree/compiler/Dialect/IREE/IR:IREEBase.td",
     ],
 )

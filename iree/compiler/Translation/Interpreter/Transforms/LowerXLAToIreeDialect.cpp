@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "iree/compiler/Translation/Interpreter/Utils/MemRefUtils.h"
 #include "mlir/IR/PatternMatch.h"

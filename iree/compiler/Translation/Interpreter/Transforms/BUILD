@@ -43,7 +43,7 @@ cc_library(
         "Rewrites.h",
     ],
     deps = [
-        "//iree/compiler/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/Interpreter/IR",
         "//iree/compiler/Translation/Interpreter/IR:Common",
         "//iree/compiler/Translation/Interpreter/Serialization",

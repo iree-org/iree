@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/IR/Dialect.h"
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/CommonDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLOps.h"

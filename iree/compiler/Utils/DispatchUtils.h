@@ -17,7 +17,7 @@
 
 #include <utility>
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"

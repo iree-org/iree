@@ -13,8 +13,5 @@
 # limitations under the License.
 
 add_subdirectory(Dialect)
-add_subdirectory(IR)
-add_subdirectory(Serialization)
-add_subdirectory(Transforms)
 add_subdirectory(Translation)
 add_subdirectory(Utils)

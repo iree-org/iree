@@ -25,9 +25,9 @@
 namespace mlir {
 namespace iree_compiler {
 
-static DialectRegistration<IREEXDialect> base_dialect;
+static DialectRegistration<IREEDialect> base_dialect;
 
-IREEXDialect::IREEXDialect(MLIRContext* context)
+IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
   addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType,
            IREE::OpaqueRefObjectType, IREE::RefPtrType>();
@@ -41,7 +41,7 @@ IREEXDialect::IREEXDialect(MLIRContext* context)
 // Type parsing and printing
 //===----------------------------------------------------------------------===//
 
-Type IREEXDialect::parseType(DialectAsmParser& parser) const {
+Type IREEDialect::parseType(DialectAsmParser& parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
   if (spec.consume_front("ref")) {
@@ -78,7 +78,7 @@ Type IREEXDialect::parseType(DialectAsmParser& parser) const {
   return Type();
 }
 
-void IREEXDialect::printType(Type type, DialectAsmPrinter& os) const {
+void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
   switch (type.getKind()) {
     case IREE::TypeKind::RefPtr: {
       auto objectType = type.cast<IREE::RefPtrType>().getObjectType();

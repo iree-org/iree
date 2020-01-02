@@ -20,7 +20,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_IREETOSPIRV_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_IREETOSPIRV_H
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/SPIRV/SPIRVLowering.h"
 
 namespace mlir {

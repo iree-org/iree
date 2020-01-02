@@ -23,7 +23,7 @@ iree_cc_library(
     "MemRefUtils.cpp"
     "OpCreationUtils.cpp"
   DEPS
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_xla
     LLVMSupport
     MLIRIR

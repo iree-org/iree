@@ -22,7 +22,7 @@ iree_cc_library(
   DEPS
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::SPIRV
     iree::schemas::spirv_executable_def_cc_fbs
     flatbuffers

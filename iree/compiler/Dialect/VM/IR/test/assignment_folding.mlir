@@ -33,28 +33,28 @@ vm.module @select_i32_folds {
 // CHECK-LABEL: @select_ref_folds
 vm.module @select_ref_folds {
   // CHECK-LABEL: @select_ref_zero
-  vm.func @select_ref_zero(%arg0 : !ireex.opaque_ref,
-                           %arg1 : !ireex.opaque_ref) -> !ireex.opaque_ref {
-    // CHECK: vm.return %arg1 : !ireex.opaque_ref
+  vm.func @select_ref_zero(%arg0 : !iree.opaque_ref,
+                           %arg1 : !iree.opaque_ref) -> !iree.opaque_ref {
+    // CHECK: vm.return %arg1 : !iree.opaque_ref
     %zero = vm.const.i32.zero : i32
-    %0 = vm.select.ref %zero, %arg0, %arg1 : !ireex.opaque_ref
-    vm.return %0 : !ireex.opaque_ref
+    %0 = vm.select.ref %zero, %arg0, %arg1 : !iree.opaque_ref
+    vm.return %0 : !iree.opaque_ref
   }
 
   // CHECK-LABEL: @select_ref_one
-  vm.func @select_ref_one(%arg0 : !ireex.opaque_ref,
-                          %arg1 : !ireex.opaque_ref) -> !ireex.opaque_ref {
-    // CHECK: vm.return %arg0 : !ireex.opaque_ref
+  vm.func @select_ref_one(%arg0 : !iree.opaque_ref,
+                          %arg1 : !iree.opaque_ref) -> !iree.opaque_ref {
+    // CHECK: vm.return %arg0 : !iree.opaque_ref
     %c123 = vm.const.i32 123 : i32
-    %0 = vm.select.ref %c123, %arg0, %arg1 : !ireex.opaque_ref
-    vm.return %0 : !ireex.opaque_ref
+    %0 = vm.select.ref %c123, %arg0, %arg1 : !iree.opaque_ref
+    vm.return %0 : !iree.opaque_ref
   }
 
   // CHECK-LABEL: @select_ref_eq
   vm.func @select_ref_eq(%arg0 : i32,
-                         %arg1 : !ireex.opaque_ref) -> !ireex.opaque_ref {
-    // CHECK: vm.return %arg1 : !ireex.opaque_ref
-    %0 = vm.select.ref %arg0, %arg1, %arg1 : !ireex.opaque_ref
-    vm.return %0 : !ireex.opaque_ref
+                         %arg1 : !iree.opaque_ref) -> !iree.opaque_ref {
+    // CHECK: vm.return %arg1 : !iree.opaque_ref
+    %0 = vm.select.ref %arg0, %arg1, %arg1 : !iree.opaque_ref
+    vm.return %0 : !iree.opaque_ref
   }
 }

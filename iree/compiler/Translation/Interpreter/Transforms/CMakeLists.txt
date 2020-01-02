@@ -35,7 +35,7 @@ iree_cc_library(
     "LowerXLAToIreeDialect.cpp"
     "MakeExecutableABI.cpp"
   DEPS
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::IR
     iree::compiler::Translation::Interpreter::Utils
     iree::compiler::Utils

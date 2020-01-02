@@ -33,7 +33,7 @@ if(${IREE_BUILD_COMPILER})
     MLIRTranslation
     MLIRSupport
     MLIRVectorOps
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::IR
     tensorflow::mlir_xla
   )
