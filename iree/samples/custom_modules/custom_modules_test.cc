@@ -23,6 +23,7 @@
 #include "iree/testing/gtest.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/ref.h"
 
 namespace {
 
@@ -77,7 +78,7 @@ class CustomModulesTest : public ::testing::Test {
 
 TEST_F(CustomModulesTest, Run) {
   // Allocate one of our custom message types to pass in.
-  iree_vm_ref_t input_message = {0};
+  iree_custom_message_t* input_message = nullptr;
   IREE_ASSERT_OK(
       iree_custom_message_wrap(iree_make_cstring_view("hello world!"),
                                IREE_ALLOCATOR_SYSTEM, &input_message));
@@ -87,7 +88,9 @@ TEST_F(CustomModulesTest, Run) {
   // TODO(benvanik): make a macro/magic.
   iree_vm_variant_list_t* inputs = nullptr;
   IREE_ASSERT_OK(iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &inputs));
-  IREE_ASSERT_OK(iree_vm_variant_list_append_ref_move(inputs, &input_message));
+  iree_vm_ref_t input_message_ref = iree_custom_message_move_ref(input_message);
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_append_ref_move(inputs, &input_message_ref));
   IREE_ASSERT_OK(iree_vm_variant_list_append_value(inputs, count));
 
   // Prepare outputs list to accept the results from the invocation.
@@ -102,7 +105,9 @@ TEST_F(CustomModulesTest, Run) {
   iree_vm_variant_list_free(inputs);
 
   // Read back the message that we reversed inside of the module.
-  iree_vm_ref_t* reversed_message = &iree_vm_variant_list_get(outputs, 0)->ref;
+  iree_custom_message_t* reversed_message =
+      iree_custom_message_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+  ASSERT_NE(nullptr, reversed_message);
   char result_buffer[256];
   IREE_ASSERT_OK(iree_custom_message_read_value(reversed_message, result_buffer,
                                                 ABSL_ARRAYSIZE(result_buffer)));

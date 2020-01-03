@@ -111,6 +111,22 @@ typedef struct {
   iree_string_view_t type_name;
 } iree_vm_ref_type_descriptor_t;
 
+// Directly retains the object with base |ptr| with the given |type_descriptor|.
+//
+// Note that this avoids any kind of type checking; for untrusted inputs use
+// the iree_vm_ref_t-based methods.
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_retain(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor);
+
+// Directly release the object with base |ptr| with the given |type_descriptor|,
+// possibly destroying it if it is the last reference. Assume that |ptr| is
+// invalid after this function returns.
+//
+// Note that this avoids any kind of type checking; for untrusted inputs use
+// the iree_vm_ref_t-based methods.
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor);
+
 // Registers a user-defined type with the IREE C ref system.
 // The provided destroy function will be used to destroy objects when their
 // reference count goes to 0. NULL can be used to no-op the destruction if the

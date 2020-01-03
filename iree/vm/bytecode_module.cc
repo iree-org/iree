@@ -507,9 +507,7 @@ static iree_status_t iree_vm_bytecode_module_execute(
   if (!out_result) return IREE_STATUS_INVALID_ARGUMENT;
   memset(out_result, 0, sizeof(iree_vm_execution_result_t));
   if (!stack || !frame) return IREE_STATUS_INVALID_ARGUMENT;
-  if (frame->function.module != self) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  } else if (frame->function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
+  if (frame->function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
     IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
         self, frame->function.linkage, frame->function.ordinal,
         &frame->function, NULL, NULL));

@@ -38,6 +38,7 @@ cc_test(
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
+        "//iree/vm:ref",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
     ],
@@ -45,10 +46,12 @@ cc_test(
 
 cc_library(
     name = "native_module",
-    srcs = ["native_module.c"],
+    srcs = ["native_module.cc"],
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
+        "//iree/base:api_util",
         "//iree/vm",
+        "//iree/vm:module_abi_cc",
     ],
 )

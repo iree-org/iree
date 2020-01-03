@@ -22,11 +22,36 @@
 #error "Your compiler does not ensure lock-free atomic ops"
 #endif  // ATOMIC_POINTER_LOCK_FREE
 
+#define IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor) \
+  ((volatile atomic_intptr_t*)(((uintptr_t)ptr) +      \
+                               type_descriptor->offsetof_counter))
+
 #define IREE_GET_REF_COUNTER_PTR(ref) \
   ((volatile atomic_intptr_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter))
 
 // TODO(benvanik): dynamic, if we care - otherwise keep small.
 #define IREE_VM_MAX_TYPE_ID 64
+
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_retain(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
+  if (!ptr) return;
+  volatile atomic_intptr_t* counter =
+      IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor);
+  atomic_fetch_add(counter, 1);
+}
+
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
+  if (!ptr) return;
+  volatile atomic_intptr_t* counter =
+      IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor);
+  if (atomic_fetch_sub(counter, 1) == 1) {
+    if (type_descriptor->destroy) {
+      // NOTE: this makes us not re-entrant, but I think that's OK.
+      type_descriptor->destroy(ptr);
+    }
+  }
+}
 
 // A table of type descriptors registered at startup.
 // These provide quick dereferencing of destruction functions and type names for

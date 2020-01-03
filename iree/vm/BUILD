@@ -149,6 +149,24 @@ cc_library(
 )
 
 cc_library(
+    name = "module_abi_cc",
+    hdrs = [
+        "module_abi_cc.h",
+        "module_abi_packing.h",
+    ],
+    deps = [
+        ":module",
+        ":ref",
+        ":stack",
+        "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
     name = "ref",
     srcs = ["ref.c"],
     hdrs = ["ref.h"],

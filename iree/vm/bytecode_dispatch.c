@@ -647,7 +647,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       if (is_import) {
         // Call external function.
         iree_status_t call_status = target_function.module->execute(
-            target_function.module, stack, callee_frame, out_result);
+            target_function.module->self, stack, callee_frame, out_result);
         if (!iree_status_is_ok(call_status)) {
           // TODO(benvanik): set execution result to failure/capture stack.
           return call_status;
@@ -738,7 +738,7 @@ iree_status_t iree_vm_bytecode_dispatch(
 
       // Call external function.
       iree_status_t call_status = target_function.module->execute(
-          target_function.module, stack, callee_frame, out_result);
+          target_function.module->self, stack, callee_frame, out_result);
       if (!iree_status_is_ok(call_status)) {
         // TODO(benvanik): set execution result to failure/capture stack.
         return call_status;

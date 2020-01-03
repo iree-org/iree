@@ -1086,9 +1086,6 @@ static iree_status_t iree_hal_module_execute(
   if (!out_result) return IREE_STATUS_INVALID_ARGUMENT;
   std::memset(out_result, 0, sizeof(*out_result));
   if (!stack || !frame) return IREE_STATUS_INVALID_ARGUMENT;
-  if (frame->function.module != self) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
   int32_t ordinal = frame->function.ordinal;
   if (ordinal < 0 || ordinal > ABSL_ARRAYSIZE(kHALExportFunctionInfos)) {
     return IREE_STATUS_INVALID_ARGUMENT;
