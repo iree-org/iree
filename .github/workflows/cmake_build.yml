@@ -32,7 +32,8 @@ jobs:
     steps:
       - name: Installing cmake 3.13
         run: |
-          sudo apt remove --purge --auto-remove cmake
+          which cmake
+          sudo apt-get remove --purge --auto-remove cmake
           which cmake
           cmake --version
           exit 1
