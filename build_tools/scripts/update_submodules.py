@@ -20,22 +20,6 @@ import os
 import subprocess
 import sys
 
-BUILD_COPYRIGHT = r"""# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""
-
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
@@ -201,21 +185,12 @@ def update_build_files_from_tensorflow(repo_path, tensorflow_path):
                                      "test.BUILD")
   overlay_path = os.path.join(repo_path, "build_tools", "bazel",
                               "third_party_import", "llvm-project", "overlay")
-  # Both TensorFlow and IREE are copyright Google with the same license,
-  # but TensorFlow doesn't consistently have copyrights (which are
-  # enforced by IREE), so add them.
-  copy_text_file(
-      src_llvm_build,
-      os.path.join(overlay_path, "llvm", "BUILD.bazel"),
-      prepend_text=BUILD_COPYRIGHT)
-  copy_text_file(
-      src_mlir_build,
-      os.path.join(overlay_path, "mlir", "BUILD.bazel"),
-      prepend_text=BUILD_COPYRIGHT)
-  copy_text_file(
-      src_mlir_test_build,
-      os.path.join(overlay_path, "mlir", "test", "BUILD.bazel"),
-      prepend_text=BUILD_COPYRIGHT)
+  copy_text_file(src_llvm_build,
+                 os.path.join(overlay_path, "llvm", "BUILD.bazel"))
+  copy_text_file(src_mlir_build,
+                 os.path.join(overlay_path, "mlir", "BUILD.bazel"))
+  copy_text_file(src_mlir_test_build,
+                 os.path.join(overlay_path, "mlir", "test", "BUILD.bazel"))
 
 
 def copy_text_file(src_file, dst_file, prepend_text=None):
