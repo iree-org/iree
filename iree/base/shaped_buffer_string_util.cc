@@ -92,8 +92,9 @@ Status PrintShapedBufferToStream(const ShapedBuffer& shaped_buffer,
     return OkStatus();
   }
 
-  std::string type_str =
-      MakeBufferTypeString(shaped_buffer.element_size(), print_mode);
+  ASSIGN_OR_RETURN(
+      std::string type_str,
+      MakeBufferTypeString(shaped_buffer.element_size(), print_mode));
 
   PrintShapedTypeToStream(shaped_buffer.shape(), type_str, stream);
   *stream << "=";

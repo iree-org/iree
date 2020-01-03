@@ -19,6 +19,7 @@
 #include <string>
 #include <type_traits>
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_join.h"
@@ -328,59 +329,61 @@ StatusOr<BufferDataPrintMode> ParseBufferDataPrintMode(absl::string_view str) {
 }
 
 StatusOr<int> ParseBufferTypeElementSize(absl::string_view type_str) {
-  if (type_str.empty()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC) << "Type is empty";
-  } else if (IsBinaryType(type_str)) {
-    // If the first character is a digit then we are dealign with binary data.
-    // The type is just the number of bytes per element.
-    int element_size = 0;
-    if (!absl::SimpleAtoi(type_str, &element_size)) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "Unable to parse element size type '" << type_str << "'";
-    }
-    return element_size;
-  }
-  // We know that our types are single characters followed by bit counts.
-  // If we start to support other types we may need to do something more clever.
-  int bit_count = 0;
-  if (!absl::SimpleAtoi(type_str.substr(1), &bit_count)) {
+  static const auto* const type_sizes =
+      new absl::flat_hash_map<absl::string_view, int>{
+          {"1", 1},   {"2", 2},   {"4", 4},   {"8", 8},   {"i8", 1},
+          {"u8", 1},  {"i16", 2}, {"u16", 2}, {"i32", 4}, {"u32", 4},
+          {"i64", 8}, {"u64", 8}, {"f32", 4}, {"f64", 8},
+      };
+  auto type_size = type_sizes->find(type_str);
+  if (type_size != type_sizes->end()) {
+    return type_size->second;
+  } else {
     return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Unable to parse type bit count from '" << type_str
-           << "'; expecting something like 'i32'";
+           << "Unsupported type '" << type_str << "'";
   }
-  return bit_count / 8;
 }
 
-std::string MakeBufferTypeString(int element_size,
-                                 BufferDataPrintMode print_mode) {
-  std::string type_str;
+StatusOr<std::string> MakeBufferTypeString(int element_size,
+                                           BufferDataPrintMode print_mode) {
+  if (element_size <= 0) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid element size '" << element_size << "'";
+  }
   switch (print_mode) {
     case BufferDataPrintMode::kBinary:
-      type_str = std::to_string(element_size);
-      break;
+      return absl::StrCat(element_size);
     case BufferDataPrintMode::kSignedInteger:
-      absl::StrAppend(&type_str, "i", element_size * 8);
-      break;
+      return absl::StrCat("i", element_size * 8);
     case BufferDataPrintMode::kUnsignedInteger:
-      absl::StrAppend(&type_str, "u", element_size * 8);
-      break;
+      return absl::StrCat("u", element_size * 8);
     case BufferDataPrintMode::kFloatingPoint:
-      absl::StrAppend(&type_str, "f", element_size * 8);
-      break;
+      return absl::StrCat("f", element_size * 8);
   }
-  return type_str;
 }
 
 StatusOr<Shape> ParseShape(absl::string_view shape_str) {
+  if (shape_str.empty()) {
+    return Shape{};
+  }
   std::vector<int> dims;
-  for (auto dim_str : absl::StrSplit(shape_str, 'x', absl::SkipWhitespace())) {
+  for (auto dim_str : absl::StrSplit(shape_str, 'x')) {
     int dim_value = 0;
     if (!absl::SimpleAtoi(dim_str, &dim_value)) {
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Invalid shape dimension '" << dim_str
              << "' while parsing shape '" << shape_str << "'";
     }
+    if (dim_value < 0) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Unsupported shape dimension '" << dim_str << "'";
+    }
     dims.push_back(dim_value);
+  }
+  if (dims.size() > kMaxRank) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Shape rank '" << dims.size() << "' exceeds maximum rank '"
+           << kMaxRank << "'";
   }
   return Shape{dims};
 }
@@ -432,7 +435,17 @@ Status PrintBinaryDataToStream(int element_size,
   max_entries *= element_size;  // Counting bytes, but treat them as elements.
   constexpr size_t hex_chars_per_byte = 2;
   constexpr size_t max_bytes = sizeof(int64_t);
-  CHECK_LE(element_size, max_bytes);
+  if (element_size != 1 && element_size != 2 && element_size != 4 &&
+      element_size != 8) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid element size '" << element_size
+           << "'; only '1', '2', '4' and '8' are supported";
+  }
+  if (contents.size() % element_size != 0) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Element size '" << element_size
+           << "' doesn't divide contents size " << contents.size();
+  }
   // Plus one char for the null terminator.
   char hex_buffer[hex_chars_per_byte * max_bytes + 1] = {0};
   for (size_t i = 0; i < std::min(max_entries, contents.size());

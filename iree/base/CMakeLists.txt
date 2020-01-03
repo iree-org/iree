@@ -107,6 +107,7 @@ iree_cc_library(
   HDRS
     "buffer_string_util.h"
   DEPS
+    absl::flat_hash_map
     absl::strings
     absl::optional
     absl::span
