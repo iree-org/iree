@@ -438,8 +438,8 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   total_state_struct_size += import_function_count * sizeof(iree_vm_function_t);
 
   iree_vm_bytecode_module_state_t* state = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
-      allocator, total_state_struct_size, (void**)&state));
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, total_state_struct_size,
+                                             (void**)&state));
   state->allocator = allocator;
 
   uint8_t* p = ((uint8_t*)state) + sizeof(iree_vm_bytecode_module_state_t);
@@ -510,7 +510,7 @@ static iree_status_t iree_vm_bytecode_module_execute(
   if (frame->function.module != self) {
     return IREE_STATUS_INVALID_ARGUMENT;
   } else if (frame->function.linkage != IREE_VM_FUNCTION_LINKAGE_INTERNAL) {
-    IREE_API_RETURN_IF_API_ERROR(iree_vm_bytecode_module_get_function(
+    IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_get_function(
         self, frame->function.linkage, frame->function.ordinal,
         &frame->function, NULL, NULL));
   }
@@ -553,14 +553,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
   if (!module_def) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  IREE_API_RETURN_IF_API_ERROR(
-      iree_vm_bytecode_module_flatbuffer_verify(module_def));
+  IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_flatbuffer_verify(module_def));
 
   size_t type_table_size =
       module_def->types()->size() * sizeof(iree_vm_type_def_t);
 
   iree_vm_bytecode_module_t* module = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_vm_bytecode_module_t) + type_table_size,
       (void**)&module));
   module->allocator = allocator;

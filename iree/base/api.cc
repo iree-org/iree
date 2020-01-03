@@ -26,7 +26,53 @@
 namespace iree {
 
 //===----------------------------------------------------------------------===//
-// iree Core API
+// iree_status_t
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT const char* IREE_API_CALL
+iree_status_code_string(iree_status_code_t code) {
+  switch (code) {
+    case IREE_STATUS_OK:
+      return "OK";
+    case IREE_STATUS_CANCELLED:
+      return "CANCELLED";
+    case IREE_STATUS_UNKNOWN:
+      return "UNKNOWN";
+    case IREE_STATUS_INVALID_ARGUMENT:
+      return "INVALID_ARGUMENT";
+    case IREE_STATUS_DEADLINE_EXCEEDED:
+      return "DEADLINE_EXCEEDED";
+    case IREE_STATUS_NOT_FOUND:
+      return "NOT_FOUND";
+    case IREE_STATUS_ALREADY_EXISTS:
+      return "ALREADY_EXISTS";
+    case IREE_STATUS_PERMISSION_DENIED:
+      return "PERMISSION_DENIED";
+    case IREE_STATUS_UNAUTHENTICATED:
+      return "UNAUTHENTICATED";
+    case IREE_STATUS_RESOURCE_EXHAUSTED:
+      return "RESOURCE_EXHAUSTED";
+    case IREE_STATUS_FAILED_PRECONDITION:
+      return "FAILED_PRECONDITION";
+    case IREE_STATUS_ABORTED:
+      return "ABORTED";
+    case IREE_STATUS_OUT_OF_RANGE:
+      return "OUT_OF_RANGE";
+    case IREE_STATUS_UNIMPLEMENTED:
+      return "UNIMPLEMENTED";
+    case IREE_STATUS_INTERNAL:
+      return "INTERNAL";
+    case IREE_STATUS_UNAVAILABLE:
+      return "UNAVAILABLE";
+    case IREE_STATUS_DATA_LOSS:
+      return "DATA_LOSS";
+    default:
+      return "";
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// IREE Core API
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -43,6 +89,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_api_init(int* argc,
   InitializeEnvironment(argc, argv);
   return IREE_STATUS_OK;
 }
+
+//===----------------------------------------------------------------------===//
+// iree_allocator_t
+//===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_allocator_malloc(
     iree_allocator_t allocator, iree_host_size_t byte_length, void** out_ptr) {
@@ -97,7 +147,7 @@ iree_allocator_system_free(void* self, void* ptr) {
 }
 
 //===----------------------------------------------------------------------===//
-// Utilities for working with API types
+// iree_string_view_t
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL

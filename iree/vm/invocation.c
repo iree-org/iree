@@ -49,14 +49,13 @@ static iree_status_t iree_vm_marshal_outputs(
     uint8_t reg = return_registers->registers[i];
     if (reg & IREE_REF_REGISTER_TYPE_BIT) {
       // Always move (as the stack frame will be destroyed soon).
-      IREE_API_RETURN_IF_API_ERROR(iree_vm_variant_list_append_ref_move(
+      IREE_RETURN_IF_ERROR(iree_vm_variant_list_append_ref_move(
           outputs, &registers->ref[reg & IREE_REF_REGISTER_MASK]));
     } else {
       iree_vm_value_t value;
       value.type = IREE_VM_VALUE_TYPE_I32;
       value.i32 = registers->i32[reg & IREE_I32_REGISTER_MASK];
-      IREE_API_RETURN_IF_API_ERROR(
-          iree_vm_variant_list_append_value(outputs, value));
+      IREE_RETURN_IF_ERROR(iree_vm_variant_list_append_value(outputs, value));
     }
   }
   return IREE_STATUS_OK;
@@ -70,18 +69,17 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(
   // NOTE: it is ok to have no inputs or outputs. If we do have them, though,
   // they must be valid.
   // TODO(benvanik): validate outputs capacity.
-  IREE_API_RETURN_IF_API_ERROR(
-      iree_vm_validate_function_inputs(function, inputs));
+  IREE_RETURN_IF_ERROR(iree_vm_validate_function_inputs(function, inputs));
 
   // Allocate a stack on the heap and initialize it.
   // If we shrunk the stack (or made it so that it could dynamically grow)
   // then we could stack-allocate it here and not need the allocator at all.
   iree_vm_stack_t* stack = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
-      allocator, sizeof(iree_vm_stack_t), (void**)&stack));
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(allocator, sizeof(iree_vm_stack_t),
+                                             (void**)&stack));
   iree_status_t status =
       iree_vm_stack_init(iree_vm_context_state_resolver(context), stack);
-  if (status != IREE_STATUS_OK) {
+  if (!iree_status_is_ok(status)) {
     iree_allocator_free(allocator, stack);
     return status;
   }
@@ -90,20 +88,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(
   status = iree_vm_stack_function_enter(stack, function, &callee_frame);
 
   // Marhsal inputs.
-  if (status == IREE_STATUS_OK && inputs) {
+  if (iree_status_is_ok(status) && inputs) {
     status = iree_vm_marshal_inputs(inputs, callee_frame);
   }
 
   // Perform execution. Note that for synchronous execution we expect this to
   // complete without yielding.
-  if (status == IREE_STATUS_OK) {
+  if (iree_status_is_ok(status)) {
     iree_vm_execution_result_t result;
     status = function.module->execute(function.module->self, stack,
                                       callee_frame, &result);
   }
 
   // Marshal outputs.
-  if (status == IREE_STATUS_OK && outputs) {
+  if (iree_status_is_ok(status) && outputs) {
     status = iree_vm_marshal_outputs(callee_frame, outputs);
   }
 

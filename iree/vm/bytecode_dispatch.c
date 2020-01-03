@@ -637,7 +637,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_stack_frame_t* callee_frame = NULL;
       iree_status_t enter_status =
           iree_vm_stack_function_enter(stack, target_function, &callee_frame);
-      if (enter_status != IREE_STATUS_OK) {
+      if (!iree_status_is_ok(enter_status)) {
         // TODO(benvanik): set execution result to stack overflow.
         return enter_status;
       }
@@ -648,7 +648,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         // Call external function.
         iree_status_t call_status = target_function.module->execute(
             target_function.module, stack, callee_frame, out_result);
-        if (call_status != IREE_STATUS_OK) {
+        if (!iree_status_is_ok(call_status)) {
           // TODO(benvanik): set execution result to failure/capture stack.
           return call_status;
         }
@@ -726,7 +726,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       iree_vm_stack_frame_t* callee_frame = NULL;
       iree_status_t enter_status =
           iree_vm_stack_function_enter(stack, target_function, &callee_frame);
-      if (enter_status != IREE_STATUS_OK) {
+      if (!iree_status_is_ok(enter_status)) {
         // TODO(benvanik): set execution result to stack overflow.
         return enter_status;
       }
@@ -739,7 +739,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       // Call external function.
       iree_status_t call_status = target_function.module->execute(
           target_function.module, stack, callee_frame, out_result);
-      if (call_status != IREE_STATUS_OK) {
+      if (!iree_status_is_ok(call_status)) {
         // TODO(benvanik): set execution result to failure/capture stack.
         return call_status;
       }

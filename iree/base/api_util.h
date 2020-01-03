@@ -29,7 +29,7 @@ inline iree_status_t ToApiStatus(const Status& status) {
   if (!status.ok()) {
     LOG(ERROR) << status;
   }
-  return static_cast<iree_status_t>(status.code());
+  return iree_make_status(status.code());
 }
 
 inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
@@ -131,10 +131,10 @@ absl::InlinedVector<T, 4> QueryListValues(
   absl::InlinedVector<T, 4> values(4);
   iree_host_size_t count = 0;
   iree_status_t status = fn(args..., values.size(), values.data(), &count);
-  if (status == IREE_STATUS_OUT_OF_RANGE) {
+  if (iree_status_is_out_of_range(status)) {
     values.resize(count);
     status = fn(args..., values.size(), values.data(), &count);
-  } else if (status != IREE_STATUS_OK) {
+  } else if (!iree_status_is_ok(status)) {
     return {};
   }
   values.resize(count);

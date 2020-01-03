@@ -157,7 +157,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_ref_check(iree_vm_ref_t* ref, iree_vm_ref_type_t type);
 
 #define IREE_VM_DEREF_OR_RETURN(value_type, value, ref, type) \
-  IREE_API_RETURN_IF_API_ERROR(iree_vm_ref_check(ref, type)); \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, type));         \
   value_type* value = (value_type*)(ref)->ptr;
 
 // Retains the reference-counted pointer |ref|.

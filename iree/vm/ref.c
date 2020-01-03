@@ -98,7 +98,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_assign(
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
     void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
-  IREE_API_RETURN_IF_API_ERROR(iree_vm_ref_wrap_assign(ptr, type, out_ref));
+  IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(ptr, type, out_ref));
   if (out_ref->ptr) {
     volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
     atomic_fetch_add(counter, 1);

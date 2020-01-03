@@ -31,7 +31,7 @@ namespace iree {
 namespace samples {
 namespace {
 
-#define ASSERT_API_OK(expr) ASSERT_EQ(IREE_STATUS_OK, (expr))
+#define ASSERT_API_OK(expr) IREE_ASSERT_OK((expr))
 
 struct TestParams {
   // HAL driver to use for the test.
@@ -47,9 +47,8 @@ std::vector<TestParams> GetAvailableDriverTestParams() {
   std::vector<TestParams> all_test_params;
   iree_string_view_t* driver_names = nullptr;
   iree_host_size_t driver_count = 0;
-  CHECK_EQ(IREE_STATUS_OK,
-           iree_hal_driver_registry_query_available_drivers(
-               IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count));
+  IREE_CHECK_OK(iree_hal_driver_registry_query_available_drivers(
+      IREE_ALLOCATOR_SYSTEM, &driver_names, &driver_count));
   for (int i = 0; i < driver_count; ++i) {
     TestParams test_params;
     test_params.driver_name =
@@ -67,11 +66,10 @@ class SimpleEmbeddingTest : public ::testing::Test,
 
 TEST_P(SimpleEmbeddingTest, RunOnce) {
   // TODO(benvanik): move to instance-based registration.
-  ASSERT_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
+  IREE_ASSERT_OK(iree_hal_module_register_types());
 
   iree_vm_instance_t* instance = nullptr;
-  ASSERT_EQ(IREE_STATUS_OK,
-            iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance));
+  IREE_ASSERT_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance));
 
   // Create the driver/device as defined by the test and setup the HAL module.
   const auto& driver_name = GetParam().driver_name;
@@ -101,9 +99,9 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // Allocate a context that will hold the module state across invocations.
   iree_vm_context_t* context = nullptr;
   std::vector<iree_vm_module_t*> modules = {hal_module, bytecode_module};
-  ASSERT_EQ(IREE_STATUS_OK, iree_vm_context_create_with_modules(
-                                instance, modules.data(), modules.size(),
-                                IREE_ALLOCATOR_SYSTEM, &context));
+  IREE_ASSERT_OK(iree_vm_context_create_with_modules(
+      instance, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+      &context));
   LOG(INFO) << "Module loaded and context is ready for use";
   iree_vm_module_release(hal_module);
   iree_vm_module_release(bytecode_module);
@@ -145,25 +143,24 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   // Setup call inputs with our buffers.
   // TODO(benvanik): make a macro/magic.
   iree_vm_variant_list_t* inputs = nullptr;
-  ASSERT_EQ(IREE_STATUS_OK,
-            iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &inputs));
+  IREE_ASSERT_OK(iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &inputs));
   auto arg0_buffer_ref = iree_hal_buffer_move_ref(arg0_buffer);
   auto arg1_buffer_ref = iree_hal_buffer_move_ref(arg1_buffer);
-  ASSERT_EQ(IREE_STATUS_OK,
-            iree_vm_variant_list_append_ref_move(inputs, &arg0_buffer_ref));
-  ASSERT_EQ(IREE_STATUS_OK,
-            iree_vm_variant_list_append_ref_move(inputs, &arg1_buffer_ref));
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_append_ref_move(inputs, &arg0_buffer_ref));
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_append_ref_move(inputs, &arg1_buffer_ref));
 
   // Prepare outputs list to accept the results from the invocation.
   iree_vm_variant_list_t* outputs = nullptr;
-  ASSERT_EQ(IREE_STATUS_OK,
-            iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
 
   // Synchronously invoke the function.
   LOG(INFO) << "Calling " << kMainFunctionName << "...";
-  ASSERT_EQ(IREE_STATUS_OK, iree_vm_invoke(context, main_function,
-                                           /*policy=*/nullptr, inputs, outputs,
-                                           IREE_ALLOCATOR_SYSTEM));
+  IREE_ASSERT_OK(iree_vm_invoke(context, main_function,
+                                /*policy=*/nullptr, inputs, outputs,
+                                IREE_ALLOCATOR_SYSTEM));
   iree_vm_variant_list_free(inputs);
 
   // Get the result buffers from the invocation.

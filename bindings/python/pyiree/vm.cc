@@ -99,7 +99,7 @@ std::unique_ptr<FunctionAbi> VmContext::CreateFunctionAbi(
     attrs.push_back({});
     auto status = iree_vm_get_function_reflection_attr(
         f, i, &attrs.back().first, &attrs.back().second);
-    if (status == IREE_STATUS_NOT_FOUND) {
+    if (iree_status_is_not_found(status)) {
       attrs.pop_back();
       break;
     }
@@ -137,7 +137,7 @@ VmModule VmModule::FromFlatbufferBlob(
       {static_cast<const uint8_t*>(flatbuffer_blob->data()),
        flatbuffer_blob->size()},
       deallocator, IREE_ALLOCATOR_SYSTEM, &module);
-  if (status != IREE_STATUS_OK) {
+  if (!iree_status_is_ok(status)) {
     deallocator.free(deallocator.self, nullptr);
   }
 
@@ -150,7 +150,7 @@ absl::optional<iree_vm_function_t> VmModule::LookupFunction(
   iree_vm_function_t f;
   auto status = iree_vm_module_lookup_function_by_name(
       raw_ptr(), linkage, {name.data(), name.size()}, &f);
-  if (status == IREE_STATUS_NOT_FOUND) {
+  if (iree_status_is_not_found(status)) {
     return absl::nullopt;
   }
   CheckApiStatus(status, "Error looking up function");
@@ -194,8 +194,8 @@ std::string VmVariantList::DebugString() const {
 }
 
 void SetupVmBindings(pybind11::module m) {
-  CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
-  CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
+  IREE_CHECK_OK(iree_vm_register_builtin_types());
+  IREE_CHECK_OK(iree_hal_module_register_types());
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);

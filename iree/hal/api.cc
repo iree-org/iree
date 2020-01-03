@@ -371,7 +371,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
 
   // Allocate and initialize the iree_hal_buffer_view struct.
   iree_hal_buffer_view* handle = nullptr;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(*handle), reinterpret_cast<void**>(&handle)));
   new (handle) iree_hal_buffer_view();
   handle->allocator = allocator;
@@ -671,7 +671,7 @@ iree_hal_driver_query_available_devices(
 
   *out_device_info_count = device_infos.size();
   iree_hal_device_info_t* device_info_storage = nullptr;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator,
       device_infos.size() * sizeof(*device_info_storage) + total_string_size,
       (void**)&device_info_storage));
@@ -762,7 +762,7 @@ iree_hal_driver_registry_query_available_drivers(
 
   *out_driver_count = available_drivers.size();
   iree_string_view_t* driver_name_storage = nullptr;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator,
       available_drivers.size() * sizeof(*driver_name_storage) +
           total_string_size,

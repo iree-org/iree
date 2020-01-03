@@ -60,7 +60,7 @@ static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
   descriptor.type_name = iree_make_cstring_view(name);    \
   descriptor.offsetof_counter = type::offsetof_counter(); \
   descriptor.destroy = type::DirectDestroy;               \
-  IREE_API_RETURN_IF_API_ERROR(iree_vm_ref_register_type(&descriptor));
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types() {
   static bool has_registered = false;

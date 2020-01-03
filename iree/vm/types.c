@@ -40,7 +40,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types() {
       offsetof(iree_vm_ro_byte_buffer_t, ref_object.counter);
   iree_vm_ro_byte_buffer_descriptor.type_name =
       iree_make_cstring_view("iree.byte_buffer");
-  IREE_API_RETURN_IF_API_ERROR(
+  IREE_RETURN_IF_ERROR(
       iree_vm_ref_register_type(&iree_vm_ro_byte_buffer_descriptor));
 
   return IREE_STATUS_OK;

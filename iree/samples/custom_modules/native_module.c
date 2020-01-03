@@ -97,7 +97,7 @@ iree_status_t iree_custom_message_create(iree_string_view_t value,
                                          iree_vm_ref_t* out_message_ref) {
   // Note that we allocate the message and the string value together.
   iree_custom_message_t* message = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_message_t) + value.size, (void**)&message));
   message->ref_object.counter = 1;
   message->allocator = allocator;
@@ -112,7 +112,7 @@ iree_status_t iree_custom_message_wrap(iree_string_view_t value,
                                        iree_allocator_t allocator,
                                        iree_vm_ref_t* out_message_ref) {
   iree_custom_message_t* message = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_message_t), (void**)&message));
   message->ref_object.counter = 1;
   message->allocator = allocator;
@@ -183,7 +183,7 @@ static iree_status_t iree_custom_native_reverse_thunk(
   IREE_VM_DEREF_OR_RETURN(iree_custom_message_t, src_message,
                           &frame->registers.ref[0],
                           IREE_CUSTOM_MESSAGE_TYPE_ID);
-  IREE_API_RETURN_IF_API_ERROR(iree_custom_message_create(
+  IREE_RETURN_IF_ERROR(iree_custom_message_create(
       src_message->value, src_message->allocator, &frame->registers.ref[0]));
   IREE_VM_DEREF_OR_RETURN(iree_custom_message_t, dst_message,
                           &frame->registers.ref[0],
@@ -334,7 +334,7 @@ static iree_status_t iree_custom_native_module_alloc_state(
   iree_custom_native_module_t* module = (iree_custom_native_module_t*)self;
 
   iree_custom_native_module_state_t* state = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_native_module_state_t), (void**)&state));
   state->allocator = allocator;
 
@@ -342,7 +342,7 @@ static iree_status_t iree_custom_native_module_alloc_state(
   int unique_id = atomic_fetch_add(&module->next_unique_id, 1);
   char buffer[16];
   snprintf(buffer, 16, "ctx_%d", unique_id);
-  IREE_API_RETURN_IF_API_ERROR(iree_custom_message_create(
+  IREE_RETURN_IF_ERROR(iree_custom_message_create(
       iree_make_cstring_view(buffer), allocator, &state->unique_message));
 
   *out_module_state = (iree_vm_module_state_t*)state;
@@ -403,7 +403,7 @@ iree_status_t iree_custom_native_module_create(iree_allocator_t allocator,
   *out_module = NULL;
 
   iree_custom_native_module_t* module = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_native_module_t), (void**)&module));
   module->allocator = allocator;
   module->next_unique_id = 0;
