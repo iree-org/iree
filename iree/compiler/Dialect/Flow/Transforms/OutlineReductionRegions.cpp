@@ -70,7 +70,7 @@ SmallVector<Value, 4> convertToDispatchOp(
       regionOp->getLoc(), executableOp.getName(), entryPointName, workload,
       resultTypes, allOperands);
 
-  return llvm::to_vector<4>(dispatchOp.getResults());
+  return dispatchOp.getResults();
 }
 
 // Creates an executable that holds the given elemental reduction region.
