@@ -124,7 +124,7 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
   ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR/include
+  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
 )
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
