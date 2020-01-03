@@ -29,9 +29,6 @@ iree_cc_library(
     "HALOps.cpp.inc"
     "HALTypes.cpp"
   DEPS
-    iree::compiler::Dialect::HAL::IR::HALEnumsGen
-    iree::compiler::Dialect::HAL::IR::HALOpInterfaceGen
-    iree::compiler::Dialect::HAL::IR::HALOpsGen
     iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR

@@ -34,10 +34,6 @@ iree_cc_library(
     "VMOps.cpp.inc"
     "VMTypes.cpp"
   DEPS
-    VMEnumsGen
-    VMOpEncoderGen
-    VMOpInterfaceGen
-    VMOpsGen
     iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
