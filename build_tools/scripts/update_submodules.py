@@ -23,11 +23,6 @@ import sys
 
 def parse_arguments():
   parser = argparse.ArgumentParser()
-  parser.add_argument(
-      "--let_me_through",
-      help="This tool is not ready yet. Please use update_submodules.sh "
-      "for now",
-      type=str2bool)
   parser.add_argument("--repo", help="Repository root directory")
   parser.add_argument(
       "--tensorflow",
@@ -85,11 +80,6 @@ def str2bool(v):
 
 
 def main(args):
-  if not args.let_me_through:
-    print("This tool is not ready yet. Please use update_submodules.sh",
-          "(or pass --let_me_through=1)")
-    sys.exit(1)
-
   print("IREE handy-dandy-LLVM-submodule-updater at your service...")
   print("  IREE Path :", args.repo)
   print("  LLVM Path :", args.llvm)
