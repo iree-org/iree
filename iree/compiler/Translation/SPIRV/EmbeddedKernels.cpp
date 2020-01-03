@@ -150,8 +150,8 @@ LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
 LogicalResult buildConvExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
                                   xla_hlo::ConvOp convOp,
                                   iree::SpirVExecutableDefT *outDef) {
-  auto lhs = convOp.lhs()->getType().cast<ShapedType>();
-  auto rhs = convOp.rhs()->getType().cast<ShapedType>();
+  auto lhs = convOp.lhs().getType().cast<ShapedType>();
+  auto rhs = convOp.rhs().getType().cast<ShapedType>();
   if (convOp.feature_group_count() != 1) {
     return entryFuncOp.emitOpError()
            << "only feature group counts of 1 supported";
@@ -261,8 +261,8 @@ LogicalResult buildConvExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
 LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
                                     xla_hlo::DotOp dotOp,
                                     iree::SpirVExecutableDefT *outDef) {
-  auto arg0 = dotOp.getOperand(0)->getType().cast<ShapedType>();
-  auto arg1 = dotOp.getOperand(1)->getType().cast<ShapedType>();
+  auto arg0 = dotOp.getOperand(0).getType().cast<ShapedType>();
+  auto arg1 = dotOp.getOperand(1).getType().cast<ShapedType>();
 
   outDef->tag = "__matmul__";
   outDef->entry_points = {"main"};

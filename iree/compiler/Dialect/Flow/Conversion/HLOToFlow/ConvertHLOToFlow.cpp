@@ -51,7 +51,7 @@ struct DynamicUpdateSliceOpLowering
                                                          tensorValue);
         }));
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(
-        op, op.getResult()->getType(), op.update(), op.operand(), startIndices);
+        op, op.getResult().getType(), op.update(), op.operand(), startIndices);
     return matchSuccess();
   }
 };

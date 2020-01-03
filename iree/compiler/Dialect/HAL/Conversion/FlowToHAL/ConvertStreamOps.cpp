@@ -68,22 +68,22 @@ static Value allocateOutputBuffer(Value streamValue, Value externalValue,
 
   // Compute the allocation size for the value.
   int elementSize = IREE::HAL::getRoundedElementByteWidth(
-      streamValue->getType().cast<ShapedType>().getElementType());
+      streamValue.getType().cast<ShapedType>().getElementType());
   auto shape = IREE::HAL::getShapeDims(streamValue, rewriter);
   auto allocationSize = rewriter
                             .create<IREE::HAL::AllocatorComputeSizeOp>(
-                                externalValue->getLoc(), allocator, memoryTypes,
+                                externalValue.getLoc(), allocator, memoryTypes,
                                 bufferUsage, shape, elementSize)
                             .getResult();
 
   auto buffer = rewriter
                     .create<IREE::HAL::AllocatorAllocateOp>(
-                        externalValue->getLoc(), allocator, memoryTypes,
+                        externalValue.getLoc(), allocator, memoryTypes,
                         bufferUsage, allocationSize)
                     .getResult();
 
   // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(externalValue->getLoc(), buffer);
+  rewriter.create<IREE::HAL::ExDeferReleaseOp>(externalValue.getLoc(), buffer);
 
   return buffer;
 }
@@ -119,22 +119,22 @@ static Value allocateTransientBuffer(Value streamValue, Value allocator,
 
   // Compute the allocation size for the value.
   int elementSize = IREE::HAL::getRoundedElementByteWidth(
-      streamValue->getType().cast<ShapedType>().getElementType());
+      streamValue.getType().cast<ShapedType>().getElementType());
   auto shape = IREE::HAL::getShapeDims(streamValue, rewriter);
   auto allocationSize = rewriter
                             .create<IREE::HAL::AllocatorComputeSizeOp>(
-                                streamValue->getLoc(), allocator, memoryTypes,
+                                streamValue.getLoc(), allocator, memoryTypes,
                                 bufferUsage, shape, elementSize)
                             .getResult();
 
   auto buffer = rewriter
                     .create<IREE::HAL::AllocatorAllocateOp>(
-                        streamValue->getLoc(), allocator, memoryTypes,
+                        streamValue.getLoc(), allocator, memoryTypes,
                         bufferUsage, allocationSize)
                     .getResult();
 
   // TODO(benvanik): implement resource sets.
-  rewriter.create<IREE::HAL::ExDeferReleaseOp>(streamValue->getLoc(), buffer);
+  rewriter.create<IREE::HAL::ExDeferReleaseOp>(streamValue.getLoc(), buffer);
 
   return buffer;
 }
@@ -210,7 +210,7 @@ static void recordPushBindings(Value device, Value commandBuffer,
                                ConversionPatternRewriter &rewriter) {
   int bindingOrdinal = 0;
   auto pushBinding = [&](Value tensorValue) {
-    auto tensorType = tensorValue->getType().cast<ShapedType>();
+    auto tensorType = tensorValue.getType().cast<ShapedType>();
     auto shape = IREE::HAL::getShapeDims(tensorValue, rewriter);
     int elementSize =
         IREE::HAL::getRoundedElementByteWidth(tensorType.getElementType());
@@ -278,7 +278,7 @@ static void recordTensorUpdate(Value device, Value commandBuffer,
       updateOp.getLoc(), rewriter.getI32IntegerAttr(0));
 
   // Compute the size of the update range.
-  auto updateType = updateOp.update()->getType().cast<ShapedType>();
+  auto updateType = updateOp.update().getType().cast<ShapedType>();
   int elementSize =
       IREE::HAL::getRoundedElementByteWidth(updateType.getElementType());
   auto targetShape = IREE::HAL::getShapeDims(updateOp.target(), rewriter);
@@ -366,7 +366,7 @@ class ExStreamFragmentOpConversion
     // Remap non-tensor operands (such as workloads).
     auto &entryBlock = streamOp.body().front();
     for (int i = 0; i < operands.size(); ++i) {
-      if (operands[i]->getType().isa<IREE::RefPtrType>()) {
+      if (operands[i].getType().isa<IREE::RefPtrType>()) {
         bufferSet.rangeMap[entryBlock.getArgument(i)] =
             BufferRange{operands[i]};
       } else {
@@ -406,7 +406,7 @@ class ExStreamFragmentOpConversion
     // otherwise we lose access to the original values (which we need for
     // shape information).
     for (int i = 0; i < operands.size(); ++i) {
-      if (operands[i]->getType().isa<IREE::RefPtrType>()) {
+      if (operands[i].getType().isa<IREE::RefPtrType>()) {
         rewriter.replaceUsesOfBlockArgument(entryBlock.getArgument(i),
                                             operands[i]);
       }

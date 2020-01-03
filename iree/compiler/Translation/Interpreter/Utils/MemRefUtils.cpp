@@ -26,9 +26,9 @@ namespace mlir {
 namespace iree_compiler {
 
 Value wrapAsTensor(Value value, Operation *srcOp, OpBuilder &builder) {
-  if (srcOp->getResult(0)->getType().isa<TensorType>()) {
-    if (isa_and_nonnull<IREEInterp::TensorToMemRefOp>(value->getDefiningOp())) {
-      return value->getDefiningOp()->getOperand(0);
+  if (srcOp->getResult(0).getType().isa<TensorType>()) {
+    if (isa_and_nonnull<IREEInterp::TensorToMemRefOp>(value.getDefiningOp())) {
+      return value.getDefiningOp()->getOperand(0);
     }
     auto newOp =
         builder.create<IREEInterp::MemRefToTensorOp>(srcOp->getLoc(), value);
@@ -38,9 +38,9 @@ Value wrapAsTensor(Value value, Operation *srcOp, OpBuilder &builder) {
 }
 
 Value wrapAsMemRef(Value value, Operation *srcOp, OpBuilder &builder) {
-  if (value->getType().isa<TensorType>()) {
-    if (isa_and_nonnull<IREEInterp::MemRefToTensorOp>(value->getDefiningOp())) {
-      return value->getDefiningOp()->getOperand(0);
+  if (value.getType().isa<TensorType>()) {
+    if (isa_and_nonnull<IREEInterp::MemRefToTensorOp>(value.getDefiningOp())) {
+      return value.getDefiningOp()->getOperand(0);
     }
     auto newOp =
         builder.create<IREEInterp::TensorToMemRefOp>(srcOp->getLoc(), value);
@@ -50,13 +50,13 @@ Value wrapAsMemRef(Value value, Operation *srcOp, OpBuilder &builder) {
 }
 
 Value loadAccessValue(Location location, Value operand, OpBuilder &builder) {
-  if (operand->getType().isa<MemRefType>() ||
-      operand->getType().isa<TensorType>()) {
+  if (operand.getType().isa<MemRefType>() ||
+      operand.getType().isa<TensorType>()) {
     return operand;
   }
 
-  auto memRefType = MemRefType::get({}, operand->getType());
-  if (auto loadOp = dyn_cast_or_null<LoadOp>(operand->getDefiningOp())) {
+  auto memRefType = MemRefType::get({}, operand.getType());
+  if (auto loadOp = dyn_cast_or_null<LoadOp>(operand.getDefiningOp())) {
     // TODO(benvanik): handle creating views.
     if (loadOp.getMemRefType() == memRefType) {
       return loadOp.getMemRef();

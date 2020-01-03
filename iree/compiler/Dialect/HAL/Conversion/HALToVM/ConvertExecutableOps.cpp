@@ -226,7 +226,7 @@ class ExCacheExecutableOpConversion
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         cacheExecutableOp,
         rewriter.getSymbolRefAttr(cacheExecutableOp.executable()),
-        ArrayRef<Type>{cacheExecutableOp.getResult()->getType()},
+        ArrayRef<Type>{cacheExecutableOp.getResult().getType()},
         ArrayRef<Value>{operands[0]});
     return matchSuccess();
   }

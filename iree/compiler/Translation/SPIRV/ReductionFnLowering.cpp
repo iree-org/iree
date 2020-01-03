@@ -164,10 +164,10 @@ ReductionOpConversion<OpTy, ReplacementOpTy>::matchAndRewrite(
   // type.
   Value ptr = operands[0];
   Value value = operands[1];
-  if (!ptr->getType().isa<spirv::PointerType>()) std::swap(ptr, value);
-  if (!ptr->getType().isa<spirv::PointerType>()) return this->matchFailure();
+  if (!ptr.getType().isa<spirv::PointerType>()) std::swap(ptr, value);
+  if (!ptr.getType().isa<spirv::PointerType>()) return this->matchFailure();
   rewriter.replaceOpWithNewOp<ReplacementOpTy>(
-      op, ptr->getType().cast<spirv::PointerType>().getPointeeType(), ptr,
+      op, ptr.getType().cast<spirv::PointerType>().getPointeeType(), ptr,
       spirv::Scope::Device, spirv::MemorySemantics::AcquireRelease, value);
   return this->matchSuccess();
 }

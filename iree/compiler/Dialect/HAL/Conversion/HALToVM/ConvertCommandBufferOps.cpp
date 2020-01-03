@@ -78,9 +78,9 @@ class CommandBufferExecutionBarrierOpConversion
       return matchFailure();
     }
     for (auto memoryBarrier : op.memory_barriers()) {
-      assert(memoryBarrier->getDefiningOp());
+      assert(memoryBarrier.getDefiningOp());
       auto makeMemoryBarrierOp =
-          cast<IREE::HAL::MakeMemoryBarrierOp>(memoryBarrier->getDefiningOp());
+          cast<IREE::HAL::MakeMemoryBarrierOp>(memoryBarrier.getDefiningOp());
       callOperands.push_back(rewriter.create<mlir::ConstantOp>(
           op.getLoc(), rewriter.getI32IntegerAttr(static_cast<int32_t>(
                            makeMemoryBarrierOp.source_scope()))));

@@ -80,11 +80,11 @@ void printLoadInputOp(OpAsmPrinter &printer, Operation *op) {
   printer << op->getName() << '(';
   printer.printOperand(inputValue);
   printer << " : ";
-  printer.printType(inputValue->getType());
+  printer.printType(inputValue.getType());
   printer << ") ";
   printer.printOptionalAttrDict(op->getAttrs());
   printer << " : ";
-  printer.printType(outputValue->getType());
+  printer.printType(outputValue.getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -112,11 +112,11 @@ void printStoreOutputOp(OpAsmPrinter &printer, Operation *op) {
   printer << op->getName() << '(';
   printer.printOperand(inputValue);
   printer << " : ";
-  printer.printType(inputValue->getType());
+  printer.printType(inputValue.getType());
   printer << ", ";
   printer.printOperand(outputValue);
   printer << " : ";
-  printer.printType(outputValue->getType());
+  printer.printType(outputValue.getType());
   printer << ") ";
   printer.printOptionalAttrDict(op->getAttrs());
 }
@@ -148,11 +148,11 @@ void printStoreReduceOp(OpAsmPrinter &printer, Operation *op) {
   printer << op->getName() << '(';
   printer.printOperand(storeReduceOp.src());
   printer << " : ";
-  printer.printType(storeReduceOp.src()->getType());
+  printer.printType(storeReduceOp.src().getType());
   printer << ", ";
   printer.printOperand(storeReduceOp.dst());
   printer << " : ";
-  printer.printType(storeReduceOp.dst()->getType());
+  printer.printType(storeReduceOp.dst().getType());
   printer << ", ";
   printer.printAttribute(storeReduceOp.reduction_fnAttr());
   printer << ") ";

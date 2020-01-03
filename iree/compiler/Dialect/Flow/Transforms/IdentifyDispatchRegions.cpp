@@ -72,7 +72,7 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
     // as we do here.
     return false;
   } else if (op->getNumResults() &&
-             !op->getResult(0)->getType().isa<ShapedType>()) {
+             !op->getResult(0).getType().isa<ShapedType>()) {
     // We don't put scalar manipulation into dispatch regions.
     return false;
   } else if (!isOpOfKnownDialect(op)) {
@@ -128,8 +128,8 @@ void gatherFusionOps(Operation *op, Dispatchability &dispatchability,
                      llvm::SetVector<Operation *> *subgraph) {
   // Skip ops that are used outside of the subgraph we are building.
   for (auto result : op->getResults()) {
-    if (result->use_empty() || result->hasOneUse()) continue;
-    for (auto *user : result->getUsers()) {
+    if (result.use_empty() || result.hasOneUse()) continue;
+    for (auto *user : result.getUsers()) {
       if (subgraph->count(user) == 0) {
         // Op that consumes the result is not (yet) in the subgraph.
         // For now we'll ignore these as it may represent a fork that we don't
@@ -141,7 +141,7 @@ void gatherFusionOps(Operation *op, Dispatchability &dispatchability,
 
   // Walk backward up to ops providing our input operands.
   for (auto operand : op->getOperands()) {
-    auto *sourceOp = operand->getDefiningOp();
+    auto *sourceOp = operand.getDefiningOp();
     if (!sourceOp) continue;
     if (subgraph->count(sourceOp) == 0) {
       if (isDispatchableOp(sourceOp, dispatchability) &&
@@ -191,7 +191,7 @@ LogicalResult identifyBlockDispatchRegions(FuncOp func, Block *block,
       // Compute the workload based on the output shape.
       // When variadic all output shapes match so we can just take the first.
       auto workload = calculateWorkload(
-          &rootOp, rootOp.getResult(0)->getType().cast<ShapedType>());
+          &rootOp, rootOp.getResult(0).getType().cast<ShapedType>());
 
       // Try to build a dispatch region from this root.
       if (failed(buildDispatchRegion(func, block, workload, fusedSubgraph))) {

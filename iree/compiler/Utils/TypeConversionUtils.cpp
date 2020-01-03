@@ -61,7 +61,7 @@ MemRefType convertTypeToMemRef(Type type) {
 }
 
 MemRefType convertTypeToMemRef(Value value) {
-  return convertTypeToMemRef(value->getType());
+  return convertTypeToMemRef(value.getType());
 }
 
 }  // namespace iree_compiler

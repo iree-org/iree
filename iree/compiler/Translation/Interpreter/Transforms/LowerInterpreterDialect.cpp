@@ -108,7 +108,7 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
 
     SmallVector<Value, 4> replacementValues;
     for (Value result : op.getOperation()->getResults()) {
-      auto memRefType = result->getType().cast<MemRefType>();
+      auto memRefType = result.getType().cast<MemRefType>();
       if (!memRefType.hasStaticShape()) {
         // TODO(benvanik): real thing here - dynamic shaping required.
         // This should emit a shape calculation based on the operation. Most

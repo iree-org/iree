@@ -60,7 +60,7 @@ LogicalResult buildReductionRegion(Operation *originalOp,
   // Compute the workload based on the output shape.
   // When variadic all output shapes match so we can just take the first.
   auto workload = calculateWorkload(
-      originalOp, originalOp->getResult(0)->getType().cast<ShapedType>());
+      originalOp, originalOp->getResult(0).getType().cast<ShapedType>());
 
   // Build the region op and add it to the parent block.
   SmallVector<Type, 4> resultTypes{originalOp->getResultTypes()};
@@ -82,8 +82,7 @@ LogicalResult buildReductionRegion(Operation *originalOp,
 
   // Replace usage of values with the results of the region.
   for (int i = 0; i < originalOp->getNumResults(); ++i) {
-    originalOp->getResult(i)->replaceAllUsesWith(
-        reductionRegionOp.getResult(i));
+    originalOp->getResult(i).replaceAllUsesWith(reductionRegionOp.getResult(i));
   }
 
   return success();

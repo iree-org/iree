@@ -38,7 +38,7 @@ class BufferLoadOpConversion
     auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
-            IREE::HAL::getRoundedElementByteWidth(op.getResult()->getType())));
+            IREE::HAL::getRoundedElementByteWidth(op.getResult().getType())));
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
@@ -68,7 +68,7 @@ class BufferStoreOpConversion
     auto sizeConst = rewriter.createOrFold<mlir::ConstantOp>(
         op.getLoc(),
         rewriter.getI32IntegerAttr(
-            IREE::HAL::getRoundedElementByteWidth(op.value()->getType())));
+            IREE::HAL::getRoundedElementByteWidth(op.value().getType())));
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.value(), adaptor.target_buffer(),

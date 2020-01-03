@@ -100,7 +100,7 @@ class VariableLoadOpConversion
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableLoadOp>(
-        loadOp, converter.convertType(loadOp.result()->getType()),
+        loadOp, converter.convertType(loadOp.result().getType()),
         rewriter.getSymbolRefAttr(loadOp.variable()));
     return matchSuccess();
   }

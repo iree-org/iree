@@ -44,9 +44,8 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
 SmallVector<Value, 4> getShapeDims(Value shapedValue,
                                    ConversionPatternRewriter &rewriter) {
   // TODO(benvanik): dynamic shape support.
-  return getStaticShapeDims(shapedValue->getLoc(),
-                            shapedValue->getType().cast<ShapedType>(),
-                            rewriter);
+  return getStaticShapeDims(shapedValue.getLoc(),
+                            shapedValue.getType().cast<ShapedType>(), rewriter);
 }
 
 }  // namespace HAL

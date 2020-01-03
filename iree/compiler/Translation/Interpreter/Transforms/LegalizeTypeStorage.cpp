@@ -81,7 +81,7 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
     auto *newBlock = builder.createBlock(&newFunction.getBody());
     mapping.map(&oldBlock, newBlock);
     for (auto oldArg : oldBlock.getArguments()) {
-      auto newArg = newBlock->addArgument(legalizeType(oldArg->getType()));
+      auto newArg = newBlock->addArgument(legalizeType(oldArg.getType()));
       mapping.map(oldArg, newArg);
     }
   }

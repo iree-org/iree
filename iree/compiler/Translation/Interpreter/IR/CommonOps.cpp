@@ -111,14 +111,14 @@ static void printTensorToMemRefOp(OpAsmPrinter &p, TensorToMemRefOp &op) {
   p << "iree_interp.tensor_to_memref(";
   p.printOperand(op.getOperand());
   p << " : ";
-  p.printType(op.getOperand()->getType());
+  p.printType(op.getOperand().getType());
   p << ") : ";
   p.printType(op.getType());
 }
 
 OpFoldResult TensorToMemRefOp::fold(ArrayRef<Attribute> operands) {
   if (auto memrefToTensorOp = dyn_cast_or_null<IREEInterp::MemRefToTensorOp>(
-          getOperand()->getDefiningOp())) {
+          getOperand().getDefiningOp())) {
     return memrefToTensorOp.getOperand();
   }
 
@@ -127,7 +127,7 @@ OpFoldResult TensorToMemRefOp::fold(ArrayRef<Attribute> operands) {
 
 void TensorToMemRefOp::build(Builder *builder, OperationState &state,
                              Value arg) {
-  build(builder, state, convertTypeToMemRef(arg->getType()), arg);
+  build(builder, state, convertTypeToMemRef(arg.getType()), arg);
 }
 
 //===----------------------------------------------------------------------===//
@@ -154,14 +154,14 @@ static void printMemRefToTensorOp(OpAsmPrinter &p, MemRefToTensorOp &op) {
   p << "iree_interp.memref_to_tensor(";
   p.printOperand(op.getOperand());
   p << " : ";
-  p.printType(op.getOperand()->getType());
+  p.printType(op.getOperand().getType());
   p << ") : ";
   p.printType(op.getType());
 }
 
 OpFoldResult MemRefToTensorOp::fold(ArrayRef<Attribute> operands) {
   if (auto tensorToMemRefOp = dyn_cast_or_null<IREEInterp::TensorToMemRefOp>(
-          getOperand()->getDefiningOp())) {
+          getOperand().getDefiningOp())) {
     return tensorToMemRefOp.getOperand();
   }
 
@@ -172,7 +172,7 @@ void MemRefToTensorOp::build(Builder *builder, OperationState &state,
                              Value arg) {
   // TODO(gcmn) Use getTensorType from MemRefUtils when circular dependency can
   // be avoided.
-  auto memRefType = arg->getType().cast<MemRefType>();
+  auto memRefType = arg.getType().cast<MemRefType>();
   auto tensorType =
       RankedTensorType::get(memRefType.getShape(), memRefType.getElementType());
   build(builder, state, tensorType, arg);
@@ -202,14 +202,14 @@ static void printScalarToMemRefOp(OpAsmPrinter &p, ScalarToMemRefOp &op) {
   p << "iree_interp.scalar_to_memref(";
   p.printOperand(op.getOperand());
   p << " : ";
-  p.printType(op.getOperand()->getType());
+  p.printType(op.getOperand().getType());
   p << ") : ";
   p.printType(op.getType());
 }
 
 OpFoldResult ScalarToMemRefOp::fold(ArrayRef<Attribute> operands) {
   if (auto memrefToScalarOp = dyn_cast_or_null<IREEInterp::MemRefToScalarOp>(
-          getOperand()->getDefiningOp())) {
+          getOperand().getDefiningOp())) {
     return memrefToScalarOp.getOperand();
   }
 
@@ -218,7 +218,7 @@ OpFoldResult ScalarToMemRefOp::fold(ArrayRef<Attribute> operands) {
 
 void ScalarToMemRefOp::build(Builder *builder, OperationState &state,
                              Value arg) {
-  build(builder, state, convertTypeToMemRef(arg->getType()), arg);
+  build(builder, state, convertTypeToMemRef(arg.getType()), arg);
 }
 
 //===----------------------------------------------------------------------===//
@@ -245,14 +245,14 @@ static void printMemRefToScalarOp(OpAsmPrinter &p, MemRefToScalarOp &op) {
   p << "iree_interp.memref_to_scalar(";
   p.printOperand(op.getOperand());
   p << " : ";
-  p.printType(op.getOperand()->getType());
+  p.printType(op.getOperand().getType());
   p << ") : ";
   p.printType(op.getType());
 }
 
 OpFoldResult MemRefToScalarOp::fold(ArrayRef<Attribute> operands) {
   if (auto scalarToMemRefOp = dyn_cast_or_null<IREEInterp::ScalarToMemRefOp>(
-          getOperand()->getDefiningOp())) {
+          getOperand().getDefiningOp())) {
     return scalarToMemRefOp.getOperand();
   }
 

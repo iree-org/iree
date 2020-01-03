@@ -82,10 +82,10 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeType(Value value) override {
-    auto refPtrType = value->getType().dyn_cast<IREE::RefPtrType>();
+    auto refPtrType = value.getType().dyn_cast<IREE::RefPtrType>();
     if (!refPtrType) {
       return currentOp_->emitOpError()
-             << "type " << value->getType()
+             << "type " << value.getType()
              << " is not supported as a serialized type kind";
     }
     int typeOrdinal = typeTable_->lookup(refPtrType.getObjectType());

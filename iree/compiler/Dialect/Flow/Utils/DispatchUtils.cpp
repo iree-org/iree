@@ -46,13 +46,13 @@ LogicalResult analyzeOpRangeValues(
     llvm::SetVector<Value> *escapingValues) {
   for (auto *op : opSet) {
     for (auto value : op->getOperands()) {
-      if (!llvm::is_contained(opSet, value->getDefiningOp())) {
+      if (!llvm::is_contained(opSet, value.getDefiningOp())) {
         // Op is using a value not in the ops set, ensure we capture it.
         capturedValues->insert(value);
       }
     }
     for (auto value : op->getResults()) {
-      for (auto &use : value->getUses()) {
+      for (auto &use : value.getUses()) {
         if (!llvm::is_contained(opSet, use.getOwner())) {
           // An op outside of the ops set is using the value, needs to escape.
           escapingValues->insert(value);
@@ -85,7 +85,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
     return failure();
   }
   SmallVector<Type, 8> escapingTypes;
-  for (auto value : escapingValues) escapingTypes.push_back(value->getType());
+  for (auto value : escapingValues) escapingTypes.push_back(value.getType());
 
   // Build the region op and add it to the parent block.
   OpBuilder parentBuilder(parentBlock);
@@ -99,7 +99,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
   OpBuilder regionBuilder(regionBlock);
   BlockAndValueMapping mapping;
   for (auto capturedValue : capturedValues) {
-    auto blockArg = regionBlock->addArgument(capturedValue->getType());
+    auto blockArg = regionBlock->addArgument(capturedValue.getType());
     mapping.map(capturedValue, blockArg);
   }
 
@@ -120,7 +120,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
 
   // Replace usage of values with the results of the region.
   for (int i = 0; i < escapingValues.size(); ++i) {
-    escapingValues[i]->replaceAllUsesWith(dispatchRegionOp.getResult(i));
+    escapingValues[i].replaceAllUsesWith(dispatchRegionOp.getResult(i));
   }
 
   // Remove original ops from the parent region.

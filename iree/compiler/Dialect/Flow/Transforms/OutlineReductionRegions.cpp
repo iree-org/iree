@@ -32,7 +32,7 @@ namespace {
 SmallVector<int64_t, 4> calculateResultShape(Value input, int windowDimension) {
   SmallVector<int64_t, 4> resultShape;
   for (auto it :
-       llvm::enumerate(input->getType().cast<ShapedType>().getShape())) {
+       llvm::enumerate(input.getType().cast<ShapedType>().getShape())) {
     if (it.index() != windowDimension) {
       resultShape.push_back(it.value());
     }
@@ -86,9 +86,9 @@ std::pair<ExecutableOp, ReductionEntryOp> createReductionExecutable(
   SmallVector<Type, 8> elementalResultTypes;
   for (auto arg : regionOp.initial_values()) {
     // (in0, in1) -> out0
-    elementalOperandTypes.push_back(arg->getType());
-    elementalOperandTypes.push_back(arg->getType());
-    elementalResultTypes.push_back(arg->getType());
+    elementalOperandTypes.push_back(arg.getType());
+    elementalOperandTypes.push_back(arg.getType());
+    elementalResultTypes.push_back(arg.getType());
   }
   auto elementalFunctionType = FunctionType::get(
       elementalOperandTypes, elementalResultTypes, regionOp.getContext());
@@ -106,10 +106,10 @@ std::pair<ExecutableOp, ReductionEntryOp> createReductionExecutable(
   // dimension.
   SmallVector<Type, 8> allOperandTypes;
   auto inputTypes =
-      llvm::map_range(inputs, [](Value value) { return value->getType(); });
+      llvm::map_range(inputs, [](Value value) { return value.getType(); });
   allOperandTypes.append(inputTypes.begin(), inputTypes.end());
   auto initialValueTypes = llvm::map_range(
-      initialValues, [](Value value) { return value->getType(); });
+      initialValues, [](Value value) { return value.getType(); });
   allOperandTypes.append(initialValueTypes.begin(), initialValueTypes.end());
   SmallVector<Type, 4> resultTypes;
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
@@ -182,7 +182,7 @@ LogicalResult outlineReductionRegion(
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
-    regionOp.getResult(i)->replaceAllUsesWith(temps[i]);
+    regionOp.getResult(i).replaceAllUsesWith(temps[i]);
   }
 
   // Erase original region.
@@ -206,9 +206,9 @@ createWindowedReductionExecutable(
   SmallVector<Type, 8> elementalResultTypes;
   for (auto arg : regionOp.initial_values()) {
     // (in0, in1) -> out0
-    elementalOperandTypes.push_back(arg->getType());
-    elementalOperandTypes.push_back(arg->getType());
-    elementalResultTypes.push_back(arg->getType());
+    elementalOperandTypes.push_back(arg.getType());
+    elementalOperandTypes.push_back(arg.getType());
+    elementalResultTypes.push_back(arg.getType());
   }
   auto elementalFunctionType = FunctionType::get(
       elementalOperandTypes, elementalResultTypes, regionOp.getContext());
@@ -226,10 +226,10 @@ createWindowedReductionExecutable(
   // dimension.
   SmallVector<Type, 8> allOperandTypes;
   auto inputTypes =
-      llvm::map_range(inputs, [](Value value) { return value->getType(); });
+      llvm::map_range(inputs, [](Value value) { return value.getType(); });
   allOperandTypes.append(inputTypes.begin(), inputTypes.end());
   auto initialValueTypes = llvm::map_range(
-      initialValues, [](Value value) { return value->getType(); });
+      initialValues, [](Value value) { return value.getType(); });
   allOperandTypes.append(initialValueTypes.begin(), initialValueTypes.end());
   SmallVector<Type, 4> resultTypes;
   for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
@@ -324,7 +324,7 @@ LogicalResult outlineWindowedReductionRegion(
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
-    regionOp.getResult(i)->replaceAllUsesWith(temps[i]);
+    regionOp.getResult(i).replaceAllUsesWith(temps[i]);
   }
 
   // Erase original region.

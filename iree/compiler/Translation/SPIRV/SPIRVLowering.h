@@ -127,7 +127,7 @@ class CmpSelectOpSPIRVLowering final : public SPIRVOpLowering<OpTy> {
            "instruction");
     auto cmpSelectOp = cast<OpTy>(op);
     auto result = cmpSelectOp.getResult();
-    auto resultTy = result->getType().template dyn_cast<ShapedType>();
+    auto resultTy = result.getType().template dyn_cast<ShapedType>();
     if (!resultTy) {
       return op->emitError(
           "unhandled lowering of operations that don't return a "
@@ -144,7 +144,7 @@ class CmpSelectOpSPIRVLowering final : public SPIRVOpLowering<OpTy> {
                                       ArrayRef<NamedAttribute>());
     }
     auto selectOp = builder.create<spirv::SelectOp>(
-        op->getLoc(), operands[0]->getType(), cmpOp->getResult(0), operands[0],
+        op->getLoc(), operands[0].getType(), cmpOp->getResult(0), operands[0],
         operands[1]);
     valueCache.setValueAtIndex(op->getResult(0), index, selectOp.getResult());
     return success();
@@ -175,7 +175,7 @@ class SPIRVPwOpLowering final : public SPIRVOpLowering<OpTy> {
     }
     auto pwOp = cast<OpTy>(op);
     auto result = pwOp.getResult();
-    auto resultType = result->getType().template dyn_cast<ShapedType>();
+    auto resultType = result.getType().template dyn_cast<ShapedType>();
     if (!resultType) {
       return op->emitError(
           "unhandled lowering of operations that don't return a "

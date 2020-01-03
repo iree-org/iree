@@ -200,7 +200,7 @@ Optional<int> BytecodeWriter::LookupLocalOrdinal(Value value) {
   }
   if (ordinal > UINT16_MAX) {
     // TODO(benvanik): varints?
-    emitError(UnknownLoc::get(value->getContext()))
+    emitError(UnknownLoc::get(value.getContext()))
         << "Too many ordinals: " << ordinal
         << "; only 0-UINT16_MAX are supported";
     return llvm::None;
@@ -220,7 +220,7 @@ LogicalResult BytecodeWriter::WriteLocal(Value value) {
   }
   if (ordinal.getValue() > UINT16_MAX) {
     // TODO(benvanik): varints?
-    return emitError(UnknownLoc::get(value->getContext()))
+    return emitError(UnknownLoc::get(value.getContext()))
            << "Too many locals: " << ordinal.getValue()
            << "; only 0-UINT16_MAX are supported";
   }

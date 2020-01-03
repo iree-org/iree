@@ -524,7 +524,7 @@ static void printGlobalLoadOp(OpAsmPrinter &p, Operation *op) {
   p.printSymbolName(op->getAttrOfType<FlatSymbolRefAttr>("global").getValue());
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"global"});
   p << " : ";
-  p.printType(op->getResult(0)->getType());
+  p.printType(op->getResult(0).getType());
 }
 
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
@@ -535,7 +535,7 @@ static LogicalResult verifyGlobalLoadOp(Operation *op) {
     return op->emitOpError() << "Undefined global: " << globalAttr;
   }
   auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
-  auto loadType = op->getResult(0)->getType();
+  auto loadType = op->getResult(0).getType();
   if (globalType.getValue() != loadType) {
     return op->emitOpError()
            << "Global type mismatch; global " << globalAttr << " is "
@@ -566,7 +566,7 @@ static void printGlobalStoreOp(OpAsmPrinter &p, Operation *op) {
   p.printOperand(op->getOperand(0));
   p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"global"});
   p << " : ";
-  p.printType(op->getOperand(0)->getType());
+  p.printType(op->getOperand(0).getType());
 }
 
 static LogicalResult verifyGlobalStoreOp(Operation *op) {
@@ -577,7 +577,7 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
     return op->emitOpError() << "Undefined global: " << globalAttr;
   }
   auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
-  auto storeType = op->getOperand(0)->getType();
+  auto storeType = op->getOperand(0).getType();
   if (globalType.getValue() != storeType) {
     return op->emitOpError()
            << "Global type mismatch; global " << globalAttr << " is "
@@ -730,7 +730,7 @@ static ParseResult parseConstI32ZeroOp(OpAsmParser &parser,
 static void printConstI32ZeroOp(OpAsmPrinter &p, ConstI32ZeroOp &op) {
   p << op.getOperationName();
   p << " : ";
-  p.printType(op.getResult()->getType());
+  p.printType(op.getResult().getType());
   p.printOptionalAttrDict(op.getAttrs());
 }
 
@@ -755,7 +755,7 @@ static ParseResult parseConstRefZeroOp(OpAsmParser &parser,
 static void printConstRefZeroOp(OpAsmPrinter &p, ConstRefZeroOp &op) {
   p << op.getOperationName();
   p << " : ";
-  p.printType(op.getResult()->getType());
+  p.printType(op.getResult().getType());
   p.printOptionalAttrDict(op.getAttrs());
 }
 
@@ -808,7 +808,7 @@ static void printConstRefRodataOp(OpAsmPrinter &p, ConstRefRodataOp &op) {
   p.printSymbolName(op.rodata());
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"rodata"});
   p << " : ";
-  p.printType(op.value()->getType());
+  p.printType(op.value().getType());
 }
 
 static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
@@ -860,10 +860,10 @@ static ParseResult parseSelectOp(OpAsmParser &parser, OperationState *result) {
 }
 
 static void printSelectOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << *op->getOperand(0) << ", " << *op->getOperand(1)
-    << ", " << *op->getOperand(2);
+  p << op->getName() << ' ' << op->getOperand(0) << ", " << op->getOperand(1)
+    << ", " << op->getOperand(2);
   p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getResult(0)->getType();
+  p << " : " << op->getResult(0).getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -883,9 +883,9 @@ static ParseResult parseUnaryArithmeticOp(OpAsmParser &parser,
 }
 
 static void printUnaryArithmeticOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << *op->getOperand(0);
+  p << op->getName() << ' ' << op->getOperand(0);
   p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getOperand(0)->getType();
+  p << " : " << op->getOperand(0).getType();
 }
 
 static ParseResult parseBinaryArithmeticOp(OpAsmParser &parser,
@@ -901,9 +901,9 @@ static ParseResult parseBinaryArithmeticOp(OpAsmParser &parser,
 }
 
 static void printBinaryArithmeticOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << *op->getOperand(0) << ", " << *op->getOperand(1);
+  p << op->getName() << ' ' << op->getOperand(0) << ", " << op->getOperand(1);
   p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getResult(0)->getType();
+  p << " : " << op->getResult(0).getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -928,10 +928,10 @@ static ParseResult parseShiftArithmeticOp(OpAsmParser &parser,
 }
 
 static void printShiftArithmeticOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << *op->getOperand(0) << ", "
+  p << op->getName() << ' ' << op->getOperand(0) << ", "
     << op->getAttrOfType<IntegerAttr>("amount").getInt();
   p.printOptionalAttrDict(op->getAttrs(), {"amount"});
-  p << " : " << op->getResult(0)->getType();
+  p << " : " << op->getResult(0).getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -959,9 +959,9 @@ static ParseResult parseUnaryComparisonOp(OpAsmParser &parser,
 }
 
 static void printUnaryComparisonOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << *op->getOperand(0);
+  p << op->getName() << ' ' << op->getOperand(0);
   p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getOperand(0)->getType();
+  p << " : " << op->getOperand(0).getType();
 }
 
 static ParseResult parseBinaryComparisonOp(OpAsmParser &parser,
@@ -978,9 +978,9 @@ static ParseResult parseBinaryComparisonOp(OpAsmParser &parser,
 }
 
 static void printBinaryComparisonOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << *op->getOperand(0) << ", " << *op->getOperand(1);
+  p << op->getName() << ' ' << op->getOperand(0) << ", " << op->getOperand(1);
   p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getOperand(0)->getType();
+  p << " : " << op->getOperand(0).getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -1240,7 +1240,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
   p << ")";
   if (op.getNumResults() == 1) {
     p << " -> ";
-    p.printType(op.getResult(0)->getType());
+    p.printType(op.getResult(0).getType());
   } else if (op.getNumResults() > 1) {
     p << " -> (";
     interleaveComma(op.getResultTypes(), p);

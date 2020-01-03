@@ -44,7 +44,7 @@ llvm::StringMap<llvm::StringMap<WorkloadInfo>> gatherExecutableWorkloadInfos(
     funcOp.walk([&](DispatchOp op) {
       auto &workloadInfo = workloadInfos[op.executable()][op.entry_point()];
       if (auto constantOp =
-              dyn_cast<ConstantOp>(op.workload()->getDefiningOp())) {
+              dyn_cast<ConstantOp>(op.workload().getDefiningOp())) {
         for (auto existingWorkloadAttr : workloadInfo.staticWorkloads) {
           if (existingWorkloadAttr == constantOp.value()) {
             return;  // Already present, ignore.

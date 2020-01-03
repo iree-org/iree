@@ -66,7 +66,7 @@ Value calculateWorkload(Operation *op, Value baseOperand) {
   std::array<int32_t, 3> workload = {1, 1, 1};
 
   // TODO(b/139353314): lookup/calculate based on type/etc.
-  auto resultType = baseOperand->getType();
+  auto resultType = baseOperand.getType();
   if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
     if (!shapedType.hasStaticShape()) {
       op->emitOpError() << "Dynamic shapes not yet supported";

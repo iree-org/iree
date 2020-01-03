@@ -90,7 +90,7 @@ static void printExSharedDeviceOp(OpAsmPrinter &p, ExSharedDeviceOp op) {
   p << op.getOperationName();
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -129,7 +129,7 @@ static void printExCacheExecutableOp(OpAsmPrinter &p, ExCacheExecutableOp op) {
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{"executable"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -224,7 +224,7 @@ static void printExExecutableDescriptorSetLayoutOp(
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{"executable"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -248,7 +248,7 @@ static void printExDeferReleaseOp(OpAsmPrinter &p, ExDeferReleaseOp op) {
   p << op.getOperationName() << ' ';
   p.printOperand(op.operand());
   p << " : ";
-  p.printType(op.operand()->getType());
+  p.printType(op.operand().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -325,7 +325,7 @@ static void printMakeMemoryBarrierOp(OpAsmPrinter &p, MakeMemoryBarrierOp op) {
       op.getAttrs(),
       /*elidedAttrs=*/{"source_scope", "target_scope"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -389,7 +389,7 @@ static void printMakeBufferBarrierOp(OpAsmPrinter &p, MakeBufferBarrierOp op) {
       op.getAttrs(),
       /*elidedAttrs=*/{"source_scope", "target_scope"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -560,7 +560,7 @@ static void printVariableLoadOp(OpAsmPrinter &p, VariableLoadOp &op) {
   p.printSymbolName(op.variable());
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
@@ -569,7 +569,7 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
     return op.emitOpError() << "undefined variable: " << op.variable();
   }
   auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto loadType = op.result()->getType();
+  auto loadType = op.result().getType();
   if (!isVariableTypeCompatible(variableOp.type(), loadType)) {
     return op.emitOpError()
            << "variable type mismatch; variable " << op.variable() << " is "
@@ -605,7 +605,7 @@ static void printVariableStoreOp(OpAsmPrinter &p, VariableStoreOp &op) {
   p.printSymbolName(op.variable());
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
   p << " : ";
-  p.printType(op.value()->getType());
+  p.printType(op.value().getType());
 }
 
 static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
@@ -614,7 +614,7 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
     return op.emitOpError() << "undefined variable: " << op.variable();
   }
   auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto storeType = op.value()->getType();
+  auto storeType = op.value().getType();
   if (!isVariableTypeCompatible(variableOp.type(), storeType)) {
     return op.emitOpError()
            << "variable type mismatch; variable " << op.variable() << " is "
@@ -761,7 +761,7 @@ static void printAllocatorAllocateOp(OpAsmPrinter &p, AllocatorAllocateOp op) {
       op.getAttrs(),
       /*elidedAttrs=*/{"memory_types", "buffer_usage"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -824,7 +824,7 @@ static void printAllocatorAllocateConstOp(OpAsmPrinter &p,
       op.getAttrs(),
       /*elidedAttrs=*/{"memory_types", "buffer_usage", "value"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
   p << " = ";
   p.printAttribute(op.value());
 }
@@ -902,7 +902,7 @@ static void printAllocatorAllocateShapedOp(OpAsmPrinter &p,
       op.getAttrs(),
       /*elidedAttrs=*/{"memory_types", "buffer_usage", "element_size"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -945,7 +945,7 @@ static void printBufferSubspanOp(OpAsmPrinter &p, BufferSubspanOp op) {
   p.printOperand(op.length());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1024,7 +1024,7 @@ static void printBufferReadDataOp(OpAsmPrinter &p, BufferReadDataOp op) {
   p.printOperand(op.length());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
   p << " : ";
-  p.printType(op.target_buffer()->getType());
+  p.printType(op.target_buffer().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1067,7 +1067,7 @@ static void printBufferWriteDataOp(OpAsmPrinter &p, BufferWriteDataOp op) {
   p.printOperand(op.length());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
   p << " : ";
-  p.printType(op.source_buffer()->getType());
+  p.printType(op.source_buffer().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1141,7 +1141,7 @@ static void printBufferLoadOp(OpAsmPrinter &p, BufferLoadOp op) {
   p << "[";
   p.printOperand(op.source_offset());
   p << "] : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -1181,7 +1181,7 @@ static void printBufferStoreOp(OpAsmPrinter &p, BufferStoreOp op) {
   p << "[";
   p.printOperand(op.target_offset());
   p << "] : ";
-  p.printType(op.value()->getType());
+  p.printType(op.value().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{"element_size"});
 }
@@ -1510,7 +1510,7 @@ static void printCommandBufferCreateOp(OpAsmPrinter &p,
       op.getAttrs(),
       /*elidedAttrs=*/{"modes", "command_categories"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1996,7 +1996,7 @@ static void printDescriptorSetAllocateOp(OpAsmPrinter &p,
   p.printOperand(op.set_layout());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2067,7 +2067,7 @@ static void printDescriptorSetMakeBindingOp(OpAsmPrinter &p,
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
                                      /*elidedAttrs=*/{"binding", "access"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2142,7 +2142,7 @@ static void printDeviceAllocatorOp(OpAsmPrinter &p, DeviceAllocatorOp op) {
   p.printOperand(op.device());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//

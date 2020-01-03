@@ -77,7 +77,7 @@ Operation *recursivelyCloneOp(Operation *sourceOp, OpBuilder &builder,
   // coming from the same source operation.
   SmallPtrSet<Operation *, 4> operandOps;
   for (auto operand : sourceOp->getOperands()) {
-    operandOps.insert(operand->getDefiningOp());
+    operandOps.insert(operand.getDefiningOp());
   }
   for (auto *operandOp : operandOps) {
     recursivelyCloneOp(operandOp, builder, mapping);
@@ -99,7 +99,7 @@ Value cloneOpTreeIntoBlock(Value sourceValue, Block *targetBlock,
 
   OpBuilder builder(targetBlock);
   builder.setInsertionPointToStart(targetBlock);
-  auto *sourceOp = sourceValue->getDefiningOp();
+  auto *sourceOp = sourceValue.getDefiningOp();
   auto *clonedOp = recursivelyCloneOp(sourceOp, builder, mapping);
 
   // Return only the result matching our source value (in the case of multiple
@@ -134,7 +134,7 @@ LogicalResult inlineDispatchRegionOperandsUsingValue(
 
   // Replace all uses of the inner operand with the new value.
   for (unsigned argIndex : argIndices) {
-    entryBlock.getArgument(argIndex)->replaceAllUsesWith(clonedValue);
+    entryBlock.getArgument(argIndex).replaceAllUsesWith(clonedValue);
   }
 
   // Remove the dispatch region args and the block args that have been
@@ -154,7 +154,7 @@ LogicalResult inlineDispatchRegionOperandsUsingValue(
 LogicalResult rematerializeConstantInDispatchRegions(ConstantOp constantOp) {
   Value constantValue = constantOp.getResult();
   SmallVector<DispatchRegionOp, 4> usingRegionOps;
-  for (auto *user : constantValue->getUsers()) {
+  for (auto *user : constantValue.getUsers()) {
     if (auto dispatchRegionOp = dyn_cast<DispatchRegionOp>(user)) {
       // Ensure this isn't just the workload and is used as an arg.
       if (std::find(dispatchRegionOp.args().begin(),

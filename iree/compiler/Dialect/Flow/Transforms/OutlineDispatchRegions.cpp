@@ -43,7 +43,7 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
-    regionOp.getResult(i)->replaceAllUsesWith(dispatchOp.getResult(i));
+    regionOp.getResult(i).replaceAllUsesWith(dispatchOp.getResult(i));
   }
 
   // Erase original region.

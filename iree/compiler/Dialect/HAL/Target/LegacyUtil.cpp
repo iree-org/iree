@@ -58,11 +58,11 @@ static void makeLegacyExecutableDispatchABI(
   OpBuilder entryBuilder(&entryBlock);
   entryBuilder.setInsertionPointToStart(&entryBlock);
   for (auto arg : entryBlock.getArguments()) {
-    Type oldType = arg->getType();
-    arg->setType(convertTypeToMemRef(legalizeType(oldType)));
+    Type oldType = arg.getType();
+    arg.setType(convertTypeToMemRef(legalizeType(oldType)));
     auto loadInputOp = entryBuilder.create<IREE::LoadInputOp>(
         dispatchEntryOp.getLoc(), oldType, arg);
-    arg->replaceAllUsesWith(loadInputOp.getResult());
+    arg.replaceAllUsesWith(loadInputOp.getResult());
     loadInputOp.setOperand(arg);
   }
 

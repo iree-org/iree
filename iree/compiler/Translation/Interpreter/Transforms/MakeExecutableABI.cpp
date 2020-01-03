@@ -36,7 +36,7 @@ LogicalResult replaceLoadInputOp(IREE::LoadInputOp bindOp) {
   OpBuilder builder(bindOp);
 
   Value newValue = nullptr;
-  auto dstType = bindOp.getResult()->getType();
+  auto dstType = bindOp.getResult().getType();
   if (dstType.isa<TensorType>()) {
     auto castOp = builder.create<IREEInterp::MemRefToTensorOp>(bindOp.getLoc(),
                                                                bindOp.src());
@@ -60,7 +60,7 @@ LogicalResult replaceLoadInputOp(IREE::LoadInputOp bindOp) {
 LogicalResult replaceStoreOutputOp(IREE::StoreOutputOp bindOp) {
   OpBuilder builder(bindOp);
 
-  auto srcType = bindOp.src()->getType();
+  auto srcType = bindOp.src().getType();
   if (srcType.isa<MemRefType>()) {
     // Already stored into the output.
   } else if (srcType.isa<TensorType>()) {
@@ -68,7 +68,7 @@ LogicalResult replaceStoreOutputOp(IREE::StoreOutputOp bindOp) {
                                                                bindOp.src());
 
     // Insert a copy to our output parameter.
-    auto dst = bindOp.dst()->getType().cast<ShapedType>();
+    auto dst = bindOp.dst().getType().cast<ShapedType>();
     if (!dst.hasStaticShape()) {
       return bindOp.emitError()
              << "Dynamic output args are not yet implemented";

@@ -203,7 +203,7 @@ void GlobalLoadRefOp::getCanonicalizationPatterns(
 OpFoldResult ConstI32Op::fold(ArrayRef<Attribute> operands) { return value(); }
 
 OpFoldResult ConstI32ZeroOp::fold(ArrayRef<Attribute> operands) {
-  return IntegerAttr::get(getResult()->getType(), 0);
+  return IntegerAttr::get(getResult().getType(), 0);
 }
 
 OpFoldResult ConstRefZeroOp::fold(ArrayRef<Attribute> operands) {
@@ -744,10 +744,10 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
   using OpRewritePattern<CondBranchOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(CondBranchOp op,
                                      PatternRewriter &rewriter) const override {
-    if (!op.getCondition()->getDefiningOp()) {
+    if (!op.getCondition().getDefiningOp()) {
       return matchFailure();
     }
-    if (auto notOp = dyn_cast<NotI32Op>(op.getCondition()->getDefiningOp())) {
+    if (auto notOp = dyn_cast<NotI32Op>(op.getCondition().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<CondBranchOp>(
           op, notOp.getOperand(), op.getFalseDest(), op.getFalseOperands(),
           op.getTrueDest(), op.getTrueOperands());
@@ -779,7 +779,7 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
     // First check if the call is unused - this ensures we only do the symbol
     // lookup if we are actually going to use it.
     for (auto result : op.getResults()) {
-      if (!result->use_empty()) {
+      if (!result.use_empty()) {
         return matchFailure();
       }
     }

@@ -96,11 +96,11 @@ struct AdjustAccessChainOp : public OpRewritePattern<spirv::AccessChainOp> {
   using OpRewritePattern<spirv::AccessChainOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::AccessChainOp op,
                                      PatternRewriter &rewriter) const override {
-    if (!hasIntTypeOfWidth(op.component_ptr()->getType(), {1, 8, 64})) {
+    if (!hasIntTypeOfWidth(op.component_ptr().getType(), {1, 8, 64})) {
       return matchFailure();
     }
     ValueRange indices(op.indices());
-    Type newType = legalizeIntegerType(op.component_ptr()->getType());
+    Type newType = legalizeIntegerType(op.component_ptr().getType());
     rewriter.replaceOpWithNewOp<spirv::AccessChainOp>(op, newType,
                                                       op.base_ptr(), indices);
     return matchSuccess();
@@ -113,11 +113,11 @@ struct AdjustAddressOfOp : public OpRewritePattern<spirv::AddressOfOp> {
   using OpRewritePattern<spirv::AddressOfOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::AddressOfOp op,
                                      PatternRewriter &rewriter) const override {
-    if (!hasIntTypeOfWidth(op.pointer()->getType(), {1, 8, 64})) {
+    if (!hasIntTypeOfWidth(op.pointer().getType(), {1, 8, 64})) {
       return matchFailure();
     }
     rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(
-        op, legalizeIntegerType(op.pointer()->getType()),
+        op, legalizeIntegerType(op.pointer().getType()),
         SymbolRefAttr::get(op.variable(), rewriter.getContext()));
     return matchSuccess();
   }
@@ -154,7 +154,7 @@ Value convertToI32AccessChain(spirv::AccessChainOp op,
   if (indices.size() > 1) {
     indices.back() = rewriter.create<spirv::SDivOp>(loc, lastDim, four);
   }
-  Type t = legalizeIntegerType(op.component_ptr()->getType());
+  Type t = legalizeIntegerType(op.component_ptr().getType());
   return rewriter.create<spirv::AccessChainOp>(loc, t, op.base_ptr(), indices);
 }
 
@@ -179,7 +179,7 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
   using OpRewritePattern<spirv::LoadOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::LoadOp op,
                                      PatternRewriter &rewriter) const override {
-    Type valueType = op.value()->getType();
+    Type valueType = op.value().getType();
     if (!hasIntTypeOfWidth(valueType, {1, 8, 64})) {
       return matchFailure();
     }
@@ -189,8 +189,7 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
     const auto loc = op.getLoc();
     Value result;
     if (hasIntTypeOfWidth(valueType, {1, 8})) {
-      auto accessChainOp =
-          cast<spirv::AccessChainOp>(op.ptr()->getDefiningOp());
+      auto accessChainOp = cast<spirv::AccessChainOp>(op.ptr().getDefiningOp());
       // Only support for scalar and 1-D tensor. The first element in indices is
       // index, the remaining elements map to other dimensions.
       if (accessChainOp.indices().size() > 2) {
@@ -244,7 +243,7 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
 // Returns the shifted 32-bit value with the given offset.
 Value shiftStoreValue(spirv::StoreOp op, Value offset,
                       PatternRewriter &rewriter) {
-  Type valueType = op.value()->getType();
+  Type valueType = op.value().getType();
   Type i32Type = rewriter.getIntegerType(32);
   const auto loc = op.getLoc();
 
@@ -279,7 +278,7 @@ Value shiftStoreValue(spirv::StoreOp op, Value offset,
 LogicalResult rewriteInt1AndInt8(spirv::StoreOp op, PatternRewriter &rewriter) {
   Type i32Type = rewriter.getIntegerType(32);
   const auto loc = op.getLoc();
-  auto accessChainOp = cast<spirv::AccessChainOp>(op.ptr()->getDefiningOp());
+  auto accessChainOp = cast<spirv::AccessChainOp>(op.ptr().getDefiningOp());
 
   // Only support for scalar and 1-D tensor. The first element in indices is
   // index, the remaining elements map to other dimensions.
@@ -321,7 +320,7 @@ struct AdjustStoreOp : public OpRewritePattern<spirv::StoreOp> {
 
   PatternMatchResult matchAndRewrite(spirv::StoreOp op,
                                      PatternRewriter &rewriter) const override {
-    Type valueType = op.value()->getType();
+    Type valueType = op.value().getType();
     if (!hasIntTypeOfWidth(valueType, {1, 8, 64})) {
       return matchFailure();
     }
@@ -352,8 +351,8 @@ struct RemoveNopSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
   using OpRewritePattern<spirv::SConvertOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::SConvertOp op,
                                      PatternRewriter &rewriter) const override {
-    Type t1 = op.operand()->getType();
-    Type t2 = op.result()->getType();
+    Type t1 = op.operand().getType();
+    Type t2 = op.result().getType();
     if (t1 != t2) return matchFailure();
     auto zero = spirv::ConstantOp::getZero(t1, op.getLoc(), &rewriter);
     rewriter.replaceOpWithNewOp<spirv::IAddOp>(op, op.operand(), zero);
@@ -366,7 +365,7 @@ struct AdjustSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
   using OpRewritePattern<spirv::SConvertOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::SConvertOp op,
                                      PatternRewriter &rewriter) const override {
-    Type t = op.result()->getType();
+    Type t = op.result().getType();
     if (!hasIntTypeOfWidth(t, {8, 64})) {
       return matchFailure();
     }
@@ -407,11 +406,11 @@ template <typename OpTy>
 struct AdjustIntegerArithmeticOperations : public OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(OpTy op, PatternRewriter &rewriter) const {
-    Type resultType = op.result()->getType();
+    Type resultType = op.result().getType();
     if (!hasIntTypeOfWidth(resultType, {64})) {
       return Pattern::matchFailure();
     }
-    Type newType = legalizeIntegerType(op.getResult()->getType());
+    Type newType = legalizeIntegerType(op.getResult().getType());
     ValueRange operands(op.getOperation()->getOperands());
     rewriter.replaceOpWithNewOp<OpTy>(op, newType, operands, op.getAttrs());
     return Pattern::matchSuccess();

@@ -33,7 +33,7 @@ static LogicalResult initIndexPropagation(Location loc, FuncOp funcOp,
                                           Value value) {
   SmallVector<int64_t, 4> valueShape;
   int64_t valueNumElements = 0;
-  Type valueType = value->getType();
+  Type valueType = value.getType();
   if (auto valueShapedType = valueType.dyn_cast<ShapedType>()) {
     if (!valueShapedType.hasStaticShape()) {
       return emitError(loc, "can only handle tensor of static shape");

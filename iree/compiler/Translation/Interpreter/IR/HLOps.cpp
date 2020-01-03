@@ -91,7 +91,7 @@ static void printCallIndirectOp(OpAsmPrinter &p, CallIndirectOp op) {
   p.printOperands(++operandRange.begin(), operandRange.end());
   p << ')';
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
-  p << " : " << op.getCallee()->getType();
+  p << " : " << op.getCallee().getType();
 }
 
 //===----------------------------------------------------------------------===//
@@ -192,7 +192,7 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp op) {
 OpFoldResult CloneOp::fold(ArrayRef<Attribute> operands) {
   // If this is the only usage, we know the clone is unnecessary.
   // TODO(b/135053584) More sophisticated analysis.
-  if (src()->hasOneUse()) return src();
+  if (src().hasOneUse()) return src();
   return {};
 }
 
@@ -205,7 +205,7 @@ struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
   using OpRewritePattern::OpRewritePattern;
   PatternMatchResult matchAndRewrite(ConcatOp concatOp,
                                      PatternRewriter &rewriter) const override {
-    auto finalType = concatOp.getResult()->getType().cast<ShapedType>();
+    auto finalType = concatOp.getResult().getType().cast<ShapedType>();
     auto loc = concatOp.getLoc();
     std::vector<Value> dimPieces;
     auto dst =
@@ -217,7 +217,7 @@ struct ConcatToCopies : public OpRewritePattern<ConcatOp> {
     auto concatDimension = concatOp.dimension().getZExtValue();
     llvm::SmallVector<int64_t, 4> dstIndices(finalType.getRank(), 0);
     for (auto src : concatOp.srcs()) {
-      auto srcShape = src->getType().cast<ShapedType>().getShape();
+      auto srcShape = src.getType().cast<ShapedType>().getShape();
       auto lengths = createArrayConstant(rewriter, loc, srcShape);
       auto dstIndicesOp = createArrayConstant(rewriter, loc, dstIndices);
       rewriter.create<IREEInterp::HL::CopyOp>(loc, src, srcIndices, dst,

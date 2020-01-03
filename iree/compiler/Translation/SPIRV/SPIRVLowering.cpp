@@ -32,7 +32,7 @@ Value genPointerOffset(OpBuilder &builder, Location loc,
                        TensorIndexToScalarValueMap &valueCache,
                        AffineMap indexMap, Value buffer) {
   auto varPtrType =
-      buffer->getType().cast<spirv::PointerType>().getPointeeType();
+      buffer.getType().cast<spirv::PointerType>().getPointeeType();
   // The variable has to be a struct type with a single element.
   auto varStructType = varPtrType.cast<spirv::StructType>();
   assert(varStructType.getNumElements() == 1 &&
@@ -254,7 +254,7 @@ LogicalResult SPIRVCodegenImpl::initSymbolValues(
   // Add values corresponding to the symbol numbers.
   SmallVector<std::pair<AffineMap, unsigned>, 2> symbolInfo;
   index_computation_attribute::getSymbolNumberForTensorIndex(
-      origArg->cast<BlockArgument>(), symbolInfo);
+      origArg.cast<BlockArgument>(), symbolInfo);
   for (auto element : symbolInfo) {
     // Load the value at the index.
     auto val =
@@ -303,7 +303,7 @@ LogicalResult SPIRVCodegenImpl::lowerFunction(
   }
 
   for (auto arg : fn.getArguments()) {
-    if (fn.getArgAttrOfType<UnitAttr>(arg->getArgNumber(),
+    if (fn.getArgAttrOfType<UnitAttr>(arg.getArgNumber(),
                                       "iree.executable.reduction.output")) {
       continue;
     }
@@ -347,7 +347,7 @@ LogicalResult ConstantOpSPIRVLowering::lowerSplatConstant(
     TensorIndexToScalarValueMap &valueCache) const {
   auto constOp = cast<ConstantOp>(op);
   auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
-  auto resultType = constOp.getResult()->getType();
+  auto resultType = constOp.getResult().getType();
   Type resultElemType;
   if (resultType.isIntOrFloat()) {
     resultElemType = resultType;

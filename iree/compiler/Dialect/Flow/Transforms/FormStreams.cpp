@@ -95,8 +95,8 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
         auto *nextOp = markList.pop_back_val();
         if (!currentOutsideOps.insert(nextOp)) continue;
         for (auto operand : nextOp->getOperands()) {
-          if (operand->getDefiningOp()) {
-            markList.insert(operand->getDefiningOp());
+          if (operand.getDefiningOp()) {
+            markList.insert(operand.getDefiningOp());
           }
         }
       }
@@ -130,7 +130,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
       // Recursively work through the inputs of the op to pull in any
       // dependencies that we are able to (are flow ops, have no side-effects).
       for (auto operand : op->getOperands()) {
-        auto *depOp = operand->getDefiningOp();
+        auto *depOp = operand.getDefiningOp();
         if (!depOp) {
           // Op is a block arg.
           continue;
@@ -213,15 +213,15 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
       for (auto operand : op->getOperands()) {
         if (std::find(fragmentOperands.begin(), fragmentOperands.end(),
                       operand) == fragmentOperands.end()) {
-          if (!operand->getDefiningOp() ||
-              !streamOpSet.count(operand->getDefiningOp())) {
+          if (!operand.getDefiningOp() ||
+              !streamOpSet.count(operand.getDefiningOp())) {
             fragmentOperands.push_back(operand);
           }
         }
       }
       for (auto result : op->getResults()) {
         bool onlyStreamUses = true;
-        for (auto &use : result->getUses()) {
+        for (auto &use : result.getUses()) {
           if (!streamOpSet.count(use.getOwner())) {
             onlyStreamUses = false;
             break;
@@ -229,7 +229,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
         }
         if (!onlyStreamUses) {
           fragmentResults.push_back(result);
-          fragmentResultTypes.push_back(result->getType());
+          fragmentResultTypes.push_back(result.getType());
         }
       }
     }
@@ -242,7 +242,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
     entryBlock->addArguments(llvm::to_vector<8>(fragmentOp.getOperandTypes()));
     BlockAndValueMapping mapping;
     for (auto arg : entryBlock->getArguments()) {
-      mapping.map(fragmentOperands[arg->getArgNumber()], arg);
+      mapping.map(fragmentOperands[arg.getArgNumber()], arg);
     }
     OpBuilder fragmentBuilder(entryBlock);
     for (auto *op : streamOps) {
@@ -257,7 +257,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
          llvm::zip(fragmentResults, fragmentOp.getResults())) {
       auto oldValue = std::get<0>(resultOldNew);
       auto newValue = std::get<1>(resultOldNew);
-      oldValue->replaceAllUsesWith(newValue);
+      oldValue.replaceAllUsesWith(newValue);
     }
 
     // Erase the ops from the block now that we've cloned them.

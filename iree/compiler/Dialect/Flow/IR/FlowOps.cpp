@@ -198,7 +198,7 @@ static void printVariableLoadOp(OpAsmPrinter &p, VariableLoadOp &op) {
   p.printSymbolName(op.variable());
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
 }
 
 static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
@@ -207,7 +207,7 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
     return op.emitOpError() << "undefined variable: " << op.variable();
   }
   auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto loadType = op.result()->getType();
+  auto loadType = op.result().getType();
   if (!isVariableTypeCompatible(variableOp.type(), loadType)) {
     return op.emitOpError()
            << "variable type mismatch; variable " << op.variable() << " is "
@@ -243,7 +243,7 @@ static void printVariableStoreOp(OpAsmPrinter &p, VariableStoreOp &op) {
   p.printSymbolName(op.variable());
   p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
   p << " : ";
-  p.printType(op.value()->getType());
+  p.printType(op.value().getType());
 }
 
 static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
@@ -252,7 +252,7 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
     return op.emitOpError() << "undefined variable: " << op.variable();
   }
   auto variableOp = dyn_cast<VariableOp>(symbolOp);
-  auto storeType = op.value()->getType();
+  auto storeType = op.value().getType();
   if (!isVariableTypeCompatible(variableOp.type(), storeType)) {
     return op.emitOpError()
            << "variable type mismatch; variable " << op.variable() << " is "
@@ -344,16 +344,16 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
   p << "[";
   p.printOperand(op.workload());
   p << " : ";
-  p.printType(op.workload()->getType());
+  p.printType(op.workload().getType());
   p << "]";
 
   // Print the data argument remapping.
   p << "(";
   interleaveComma(llvm::zip(op.body().front().getArguments(), op.args()), p,
                   [&](std::tuple<BlockArgument, Value> it) {
-                    p << *std::get<0>(it) << " = " << *std::get<1>(it);
+                    p << std::get<0>(it) << " = " << std::get<1>(it);
                     p << " : ";
-                    p << std::get<1>(it)->getType();
+                    p << std::get<1>(it).getType();
                   });
   p << ")";
 
@@ -469,7 +469,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
   p << "[";
   p.printOperand(op.workload());
   p << " : ";
-  p.printType(op.workload()->getType());
+  p.printType(op.workload().getType());
   p << "]";
 
   p << "(";
@@ -478,7 +478,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
   if (op.getNumResults() > 0) {
     p << " : (";
     interleaveComma(op.operands(), p,
-                    [&](Value operand) { p.printType(operand->getType()); });
+                    [&](Value operand) { p.printType(operand.getType()); });
     p << ")";
     p << " -> ";
     if (op.getNumResults() > 1) p << "(";
@@ -498,7 +498,7 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
     p << ") = ";
     p.printOperand(operand);
     p << " : ";
-    p.printType(operand->getType());
+    p.printType(operand.getType());
   });
   p << ") ";
 
@@ -565,7 +565,7 @@ void printWindowedReductionRegionOp(OpAsmPrinter &p,
   p << "[";
   p.printOperand(op.workload());
   p << " : ";
-  p.printType(op.workload()->getType());
+  p.printType(op.workload().getType());
   p << "]";
 
   p << "(";
@@ -574,7 +574,7 @@ void printWindowedReductionRegionOp(OpAsmPrinter &p,
   if (op.getNumResults() > 0) {
     p << " : (";
     interleaveComma(op.operands(), p,
-                    [&](Value operand) { p.printType(operand->getType()); });
+                    [&](Value operand) { p.printType(operand.getType()); });
     p << ")";
     p << " -> (";
     interleaveComma(op.getResultTypes(), p);
@@ -593,7 +593,7 @@ void printWindowedReductionRegionOp(OpAsmPrinter &p,
     p << ") = ";
     p.printOperand(operand);
     p << " : ";
-    p.printType(operand->getType());
+    p.printType(operand.getType());
   });
   p << ") ";
 
@@ -851,7 +851,7 @@ static void printDispatchOp(OpAsmPrinter &p, DispatchOp op) {
   p << "[";
   p.printOperand(op.workload());
   p << " : ";
-  p.printType(op.workload()->getType());
+  p.printType(op.workload().getType());
   p << "](";
   p.printOperands(op.operands());
   p << ')';
@@ -896,9 +896,9 @@ static void printTensorReshapeOp(OpAsmPrinter &p, TensorReshapeOp &op) {
   p << op.getOperationName() << ' ';
   p.printOperand(op.source());
   p << " : ";
-  p.printType(op.source()->getType());
+  p.printType(op.source().getType());
   p << " -> ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -936,7 +936,7 @@ static void printTensorLoadOp(OpAsmPrinter &p, TensorLoadOp &op) {
     p << ']';
   }
   p << " : ";
-  p.printType(op.source()->getType());
+  p.printType(op.source().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -981,7 +981,7 @@ static void printTensorStoreOp(OpAsmPrinter &p, TensorStoreOp &op) {
     p << ']';
   }
   p << " : ";
-  p.printType(op.target()->getType());
+  p.printType(op.target().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -1008,7 +1008,7 @@ static void printTensorSplatOp(OpAsmPrinter &p, TensorSplatOp &op) {
   p << op.getOperationName() << ' ';
   p.printOperand(op.value());
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -1034,7 +1034,7 @@ static void printTensorCloneOp(OpAsmPrinter &p, TensorCloneOp &op) {
   p << op.getOperationName() << ' ';
   p.printOperand(op.operand());
   p << " : ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -1082,9 +1082,9 @@ static void printTensorSliceOp(OpAsmPrinter &p, TensorSliceOp &op) {
   p << " for ";
   p.printOperands(op.lengths());
   p << "] : ";
-  p.printType(op.source()->getType());
+  p.printType(op.source().getType());
   p << " -> ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -1128,9 +1128,9 @@ static void printTensorUpdateOp(OpAsmPrinter &p, TensorUpdateOp &op) {
   p << '[';
   p.printOperands(op.start_indices());
   p << "] : ";
-  p.printType(op.update()->getType());
+  p.printType(op.update().getType());
   p << " -> ";
-  p.printType(op.result()->getType());
+  p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
@@ -1199,9 +1199,9 @@ void printExStreamFragmentOp(OpAsmPrinter &p, ExStreamFragmentOp op) {
   p << "(";
   interleaveComma(llvm::zip(op.body().front().getArguments(), op.args()), p,
                   [&](std::tuple<BlockArgument, Value> it) {
-                    p << *std::get<0>(it) << " = " << *std::get<1>(it);
+                    p << std::get<0>(it) << " = " << std::get<1>(it);
                     p << " : ";
-                    p << std::get<1>(it)->getType();
+                    p << std::get<1>(it).getType();
                   });
   p << ")";
 

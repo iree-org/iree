@@ -118,7 +118,7 @@ struct BroadcastInDimOpLowering
       xla_hlo::BroadcastInDimOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto inputValue = operands[0];
-    auto inputType = inputValue->getType().cast<MemRefType>();
+    auto inputType = inputValue.getType().cast<MemRefType>();
     auto finalType = convertTypeToMemRef(*op);
 
     // Reshape to scalar and broadcast.
@@ -194,7 +194,7 @@ struct DynamicUpdateSliceOpLowering
     auto operand = operands[0];
     auto update = operands[1];
 
-    auto updateType = update->getType().cast<ShapedType>();
+    auto updateType = update.getType().cast<ShapedType>();
     Value lengthConstant =
         createArrayConstant(rewriter, op->getLoc(), updateType.getShape());
 
@@ -224,7 +224,7 @@ struct DynamicUpdateSliceOpLowering
     auto srcOffset = createArrayConstant(rewriter, op->getLoc(), zero_offset);
 
     auto copiedOperand = rewriter.create<IREEInterp::HL::CloneOp>(
-        op->getLoc(), operand->getType(), operand);
+        op->getLoc(), operand.getType(), operand);
 
     rewriter
         .create<IREEInterp::HL::CopyOp>(op->getLoc(), update, srcOffset,
@@ -244,7 +244,7 @@ struct UnaryFloatIntOpLowering : public XlaOpLowering<XlaOpType> {
       XlaOpType *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto val = operands[0];
-    auto inputType = val->getType().cast<MemRefType>();
+    auto inputType = val.getType().cast<MemRefType>();
     auto elementType = inputType.getElementType();
 
     if (elementType.isa<FloatType>()) {
@@ -270,7 +270,7 @@ struct BinaryFloatIntOpLowering : public XlaOpLowering<XlaOpType> {
       ConversionPatternRewriter &rewriter) const override {
     auto lhs = operands[0];
     auto rhs = operands[1];
-    auto inputType = lhs->getType().cast<MemRefType>();
+    auto inputType = lhs.getType().cast<MemRefType>();
     auto elementType = inputType.getElementType();
 
     if (elementType.isa<FloatType>()) {
@@ -303,8 +303,8 @@ struct ConvertLowering : public XlaOpLowering<xla_hlo::ConvertOp> {
     auto operand = operands[0];
     auto result = op->getResult();
 
-    auto operandType = operand->getType().cast<MemRefType>().getElementType();
-    auto resultType = result->getType().cast<ShapedType>().getElementType();
+    auto operandType = operand.getType().cast<MemRefType>().getElementType();
+    auto resultType = result.getType().cast<ShapedType>().getElementType();
 
     auto newResultType = convertTypeToMemRef(result);
 
@@ -359,7 +359,7 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
       return matchFailure();
     }
 
-    auto resultType = gatherOp.getResult()->getType().cast<RankedTensorType>();
+    auto resultType = gatherOp.getResult().getType().cast<RankedTensorType>();
     if (dimension_numbers.offset_dims().getType().getNumElements() !=
         resultType.getRank()) {
       gatherOp.emitRemark() << "Couldn't lower gather with offset_dims != "
@@ -385,11 +385,11 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
       }
     }
 
-    auto inputType = gatherOp.operand()->getType().cast<RankedTensorType>();
+    auto inputType = gatherOp.operand().getType().cast<RankedTensorType>();
 
     auto startIndices =
         inputAsMemref(rewriter, gatherOp, gatherOp.start_indices());
-    auto startIndicesType = startIndices->getType().cast<MemRefType>();
+    auto startIndicesType = startIndices.getType().cast<MemRefType>();
     if (startIndicesType.getNumElements() != inputType.getRank()) {
       auto extraDims = inputType.getRank() - startIndicesType.getNumElements();
       auto elementType = startIndicesType.getElementType();

@@ -83,7 +83,7 @@ struct EraseUnusedVariableLoadOp : public OpRewritePattern<VariableLoadOp> {
 
   PatternMatchResult matchAndRewrite(VariableLoadOp op,
                                      PatternRewriter &rewriter) const override {
-    if (op.result()->use_empty()) {
+    if (op.result().use_empty()) {
       rewriter.eraseOp(op);
       return matchSuccess();
     }
@@ -110,7 +110,7 @@ struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
   PatternMatchResult matchAndRewrite(VariableStoreOp op,
                                      PatternRewriter &rewriter) const override {
     if (auto loadOp =
-            dyn_cast_or_null<VariableLoadOp>(op.value()->getDefiningOp())) {
+            dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
       if (loadOp.variable() == op.variable()) {
         rewriter.eraseOp(op);
         return matchSuccess();
@@ -148,8 +148,8 @@ static uint64_t getFlattenedIndex(ShapedType type, ArrayRef<uint64_t> index) {
 }
 
 OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
-  auto sourceType = source()->getType().cast<ShapedType>();
-  auto resultType = result()->getType().cast<ShapedType>();
+  auto sourceType = source().getType().cast<ShapedType>();
+  auto resultType = result().getType().cast<ShapedType>();
   if (sourceType.hasStaticShape() && sourceType == resultType) {
     // No-op.
     return source();
@@ -157,7 +157,7 @@ OpFoldResult TensorReshapeOp::fold(ArrayRef<Attribute> operands) {
 
   // Skip intermediate reshapes.
   if (auto definingOp =
-          dyn_cast_or_null<TensorReshapeOp>(source()->getDefiningOp())) {
+          dyn_cast_or_null<TensorReshapeOp>(source().getDefiningOp())) {
     setOperand(definingOp.getOperand());
     return result();
   }
@@ -206,7 +206,7 @@ OpFoldResult TensorSplatOp::fold(ArrayRef<Attribute> operands) {
   // TODO(benvanik): only fold when shape is constant.
   if (operands[0]) {
     // Splat value is constant and we can fold the operation.
-    return SplatElementsAttr::get(result()->getType().cast<ShapedType>(),
+    return SplatElementsAttr::get(result().getType().cast<ShapedType>(),
                                   operands[0]);
   }
   return {};
@@ -244,8 +244,8 @@ OpFoldResult TensorUpdateOp::fold(ArrayRef<Attribute> operands) {
                         operands[1].cast<ElementsAttr>(), indices);
   } else {
     // Replace the entire tensor when the sizes match.
-    auto updateType = update()->getType().cast<ShapedType>();
-    auto targetType = target()->getType().cast<ShapedType>();
+    auto updateType = update().getType().cast<ShapedType>();
+    auto targetType = target().getType().cast<ShapedType>();
     if (updateType.hasStaticShape() && targetType.hasStaticShape() &&
         updateType == targetType) {
       return update();

@@ -42,7 +42,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
       builder.saveInsertionPoint(), loc, index.getResult(append_dim));
 
   int offset = op->getOperand(0)
-                   ->getType()
+                   .getType()
                    .cast<RankedTensorType>()
                    .getShape()[append_dim];
   Value resultVal = operands[0];
@@ -62,7 +62,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
     resultVal = builder.create<spirv::SelectOp>(
         loc, cond, operands[operandIt.index()], resultVal);
     auto operandShape =
-        operandIt.value()->getType().cast<RankedTensorType>().getShape();
+        operandIt.value().getType().cast<RankedTensorType>().getShape();
     offset += operandShape[append_dim];
   }
   valueCache.setValueAtIndex(op->getResult(0), index, resultVal);
@@ -79,9 +79,9 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
   auto convertOp = cast<xla_hlo::ConvertOp>(op);
   auto loc = convertOp.getLoc();
   auto resultElemType =
-      convertOp.getResult()->getType().dyn_cast<ShapedType>().getElementType();
+      convertOp.getResult().getType().dyn_cast<ShapedType>().getElementType();
   auto operandElemType =
-      convertOp.getOperand()->getType().dyn_cast<ShapedType>().getElementType();
+      convertOp.getOperand().getType().dyn_cast<ShapedType>().getElementType();
 
   if (resultElemType == operandElemType) {
     valueCache.setValueAtIndex(op->getResult(0), index, operands[0]);
@@ -157,7 +157,7 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
   auto i1Type = builder.getI1Type();
   auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
   Value cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
-  auto operandType = padOp.operand()->getType().cast<RankedTensorType>();
+  auto operandType = padOp.operand().getType().cast<RankedTensorType>();
   if (!operandType.hasStaticShape()) {
     return padOp.emitError("pad op codegen supported only for static shapes");
   }
@@ -201,10 +201,10 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
 
     if (paddingStride != 1) {
       // ((d_i - edge_padding_low[i]) % (interior_padding[i]+1) == 0)
-      auto t1 = builder.create<spirv::ISubOp>(loc, dimIndex->getType(),
-                                              dimIndex, edgePadding);
-      auto t2 = builder.create<spirv::SModOp>(loc, t1.getResult()->getType(),
-                                              t1, stride);
+      auto t1 = builder.create<spirv::ISubOp>(loc, dimIndex.getType(), dimIndex,
+                                              edgePadding);
+      auto t2 = builder.create<spirv::SModOp>(loc, t1.getResult().getType(), t1,
+                                              stride);
       auto checkStride = builder.create<spirv::IEqualOp>(loc, i1Type, t2, zero);
       cond =
           builder.create<spirv::LogicalAndOp>(loc, i1Type, cond, checkStride);

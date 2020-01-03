@@ -260,8 +260,7 @@ LogicalResult ExtractElementOpIndexPropagation::propagateIndexMap(
   // clearer picture as to what index types become at the time of SPIR-V
   // lowering since they do not have an equivalent XLA-HLO representation.
   auto extractElementOp = cast<ExtractElementOp>(operation);
-  if (extractElementOp.aggregate()->getType().cast<ShapedType>().getRank() >
-      0) {
+  if (extractElementOp.aggregate().getType().cast<ShapedType>().getRank() > 0) {
     return extractElementOp.emitError(
         "unhandled index propagation for non-zero ranked tensor types");
   }

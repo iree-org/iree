@@ -30,7 +30,7 @@ std::vector<Operation *> sortOpsTopologically(
   VisitFn visit = [&](Operation *op) {
     if (markedOps.count(op) > 0) return;
     for (auto result : op->getResults()) {
-      for (auto *user : result->getUsers()) {
+      for (auto *user : result.getUsers()) {
         // Don't visit ops not in our set.
         if (unsortedOps.count(user) == 0) continue;
         visit(user);

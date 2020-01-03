@@ -272,7 +272,7 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
       ConversionPatternRewriter &rewriter) const override {
     SelectOpOperandAdaptor srcAdaptor(operands);
     IntegerType requiredType = IntegerType::get(kBits, srcOp.getContext());
-    if (srcAdaptor.true_value()->getType() != requiredType)
+    if (srcAdaptor.true_value().getType() != requiredType)
       return matchFailure();
 
     rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(

@@ -67,7 +67,7 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
 bool recursiveUntuple(Value value, Location loc, OpBuilder &builder,
                       BlockAndValueMapping *mapping,
                       llvm::SmallVectorImpl<Value> *newValues) {
-  Type type = value->getType();
+  Type type = value.getType();
   // We can return the value as is.
   if (!type.isa<TupleType>()) {
     newValues->push_back(value);
@@ -150,8 +150,8 @@ bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
   auto newResults = newOp.getResults();
   for (auto oldResult : oldOp->getResults()) {
     llvm::SmallVector<Value, 10> subValues;
-    auto newResult = recursiveRetuple(oldResult->getType(), &newResults,
-                                      builder, oldOp->getLoc());
+    auto newResult = recursiveRetuple(oldResult.getType(), &newResults, builder,
+                                      oldOp->getLoc());
     mapping->map(oldResult, newResult);
   }
 
@@ -252,9 +252,9 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
     auto *newBlock = builder.createBlock(&newFunction.getBody());
     for (auto oldArg : oldBlock.getArguments()) {
       llvm::SmallVector<Type, 4> newTypes;
-      untupleTypes(oldArg->getType(), &newTypes);
+      untupleTypes(oldArg.getType(), &newTypes);
 
-      Value newTuple = processTuple(oldArg->getType(), oldFunction.getLoc(),
+      Value newTuple = processTuple(oldArg.getType(), oldFunction.getLoc(),
                                     newBlock, builder);
       if (!newTuple) {
         return true;

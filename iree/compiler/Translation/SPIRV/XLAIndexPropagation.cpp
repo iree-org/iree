@@ -75,7 +75,7 @@ LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
   SmallVector<AffineExpr, 4> exprs;
   for (auto i : llvm::seq<size_t>(
            broadcastDim.getType().getShape()[0],
-           operation->getResult(0)->getType().cast<ShapedType>().getRank())) {
+           operation->getResult(0).getType().cast<ShapedType>().getRank())) {
     exprs.push_back(resultIndex.getResult(i));
   }
 
@@ -105,7 +105,7 @@ LogicalResult XLAConcatenateOpIndexPropagation::propagateIndexMap(
   // dimension.
   int offset = 0;
   for (Value operand : op->getOperands()) {
-    auto operandType = operand->getType().cast<RankedTensorType>();
+    auto operandType = operand.getType().cast<RankedTensorType>();
     int rank = operandType.getRank();
     SmallVector<AffineExpr, 4> exprs;
     for (int i = 0; i < rank; ++i) {
@@ -151,11 +151,11 @@ LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
   auto gatherOp = cast<xla_hlo::GatherOp>(op);
   Value startIndices = gatherOp.start_indices();
   int64_t startIndicesRank =
-      startIndices->getType().cast<ShapedType>().getRank();
+      startIndices.getType().cast<ShapedType>().getRank();
   Value operand = gatherOp.operand();
-  int64_t operandRank = operand->getType().cast<ShapedType>().getRank();
+  int64_t operandRank = operand.getType().cast<ShapedType>().getRank();
   Value result = gatherOp.getResult();
-  int64_t resultRank = result->getType().cast<ShapedType>().getRank();
+  int64_t resultRank = result.getType().cast<ShapedType>().getRank();
   ArrayRef<AffineExpr> resultExprs = resultIndex.getResults();
   int64_t indexVectorDim =
       gatherOp.dimension_numbers().index_vector_dim().getValue().getSExtValue();
@@ -266,7 +266,7 @@ LogicalResult XLAPadOpIndexPropagation::propagateIndexMap(
 
   // Index for the tensor operand.
   SmallVector<AffineExpr, 4> exprs(
-      padOp.operand()->getType().cast<RankedTensorType>().getRank());
+      padOp.operand().getType().cast<RankedTensorType>().getRank());
   for (auto resultExpr : enumerate(resultIndex.getResults())) {
     auto i = resultExpr.index();
     int64_t padding_low = edge_padding_low.getValue<IntegerAttr>(i).getInt();

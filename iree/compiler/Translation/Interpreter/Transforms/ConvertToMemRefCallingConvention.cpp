@@ -42,7 +42,7 @@ namespace {
 Value resolveValueToSourceMemRef(Value value, Operation *useOp) {
   // TODO(benvanik): implement this for real; this is naive but enough for our
   // simple load patterns.
-  auto *defInstr = value->getDefiningOp();
+  auto *defInstr = value.getDefiningOp();
   if (auto loadOp = dyn_cast_or_null<LoadOp>(defInstr)) {
     // TODO(benvanik): support views.
     return loadOp.getMemRef();
@@ -79,14 +79,14 @@ FunctionType getMemRefFunctionType(FunctionType type) {
 
 bool insertLoad(BlockArgument oldArg, BlockArgument newArg, OpBuilder &builder,
                 BlockAndValueMapping *mapping) {
-  auto loc = oldArg->getOwner()->getParent()->getLoc();
+  auto loc = oldArg.getOwner()->getParent()->getLoc();
 
   // If old arg was a memref we don't need to change anything. We still need
   // to remap so that the use lists match through conversion, though.
-  if (oldArg->getType().isa<MemRefType>()) {
+  if (oldArg.getType().isa<MemRefType>()) {
     mapping->map(oldArg, newArg);
     return false;
-  } else if (oldArg->getType().isa<TensorType>()) {
+  } else if (oldArg.getType().isa<TensorType>()) {
     auto castOp = builder.create<IREEInterp::MemRefToTensorOp>(loc, newArg);
     mapping->map(oldArg, castOp.getResult());
     return false;
@@ -102,17 +102,17 @@ bool insertLoad(BlockArgument oldArg, BlockArgument newArg, OpBuilder &builder,
 bool insertLoad(Operation *oldOp, Value oldValue, Value newValue,
                 OpBuilder &builder, BlockAndValueMapping *mapping) {
   // If old value was a memref we don't need to change anything.
-  if (oldValue->getType().isa<MemRefType>()) {
+  if (oldValue.getType().isa<MemRefType>()) {
     mapping->map(oldValue, newValue);
     return false;
-  } else if (oldValue->getType().isa<TensorType>()) {
+  } else if (oldValue.getType().isa<TensorType>()) {
     auto castOp =
         builder.create<IREEInterp::MemRefToTensorOp>(oldOp->getLoc(), newValue);
     mapping->map(oldValue, castOp.getResult());
     return false;
   }
 
-  assert(newValue->getType().isa<MemRefType>());
+  assert(newValue.getType().isa<MemRefType>());
 
   // Insert the load we'll use to unbox the value.
   auto loadedValue =
@@ -132,9 +132,9 @@ Value insertStore(Operation *oldOp, Value oldValue, OpBuilder &builder,
   // If the previous value was already a memref we don't need to change
   // anything.
   // TODO(benvanik): ensure indices make sense.
-  if (oldValue->getType().isa<MemRefType>()) {
+  if (oldValue.getType().isa<MemRefType>()) {
     return newValue;
-  } else if (oldValue->getType().isa<TensorType>()) {
+  } else if (oldValue.getType().isa<TensorType>()) {
     auto castOp =
         builder.create<IREEInterp::TensorToMemRefOp>(oldOp->getLoc(), newValue);
     return castOp.getResult();
@@ -147,7 +147,7 @@ Value insertStore(Operation *oldOp, Value oldValue, OpBuilder &builder,
 
   // Allocate the memref to store the value.
   auto newStorage = builder.create<AllocOp>(
-      oldOp->getLoc(), convertTypeToMemRef(oldValue->getType()));
+      oldOp->getLoc(), convertTypeToMemRef(oldValue.getType()));
 
   // Insert the store we'll use to box the value.
   builder.create<StoreOp>(oldOp->getLoc(), newValue, newStorage,
@@ -334,7 +334,7 @@ bool convertFunction(FuncOp oldFunc, FuncOp newFunc) {
     auto *newBlock = builder.createBlock(&newFunc.getBody());
     for (auto oldArg : oldBlock.getArguments()) {
       // Replace the block args with memrefs.
-      auto memRefType = convertTypeToMemRef(oldArg->getType());
+      auto memRefType = convertTypeToMemRef(oldArg.getType());
       if (!memRefType) return true;
       auto newArg = newBlock->addArgument(memRefType);
 

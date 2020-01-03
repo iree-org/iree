@@ -106,12 +106,12 @@ class NoBroadcastPwOpIndexPropagation : public IndexPropagationOp<OpTy> {
       SmallVectorImpl<AffineMap> &operandIndices) const override {
     // All operands must have the same type.
     auto argRefType =
-        operation->getOperand(0)->getType().dyn_cast<RankedTensorType>();
+        operation->getOperand(0).getType().dyn_cast<RankedTensorType>();
     if (!argRefType) {
       return operation->emitError("expected operands to be of tensortype");
     }
     for (auto arg : operation->getOperands()) {
-      auto argType = arg->getType().dyn_cast<RankedTensorType>();
+      auto argType = arg.getType().dyn_cast<RankedTensorType>();
       if (!argType || argType.getShape() != argRefType.getShape()) {
         return operation->emitError("expected operands to have same shape");
       }
@@ -144,9 +144,9 @@ class ReshapeOpIndexPropagation final : public IndexPropagationOp<OpTy> {
       SmallVectorImpl<AffineMap> &operandIndices) const override {
     Builder builder(op->getContext());
     auto resultType =
-        op->getResult(0)->getType().template dyn_cast<ShapedType>();
+        op->getResult(0).getType().template dyn_cast<ShapedType>();
     auto operandType =
-        op->getOperand(0)->getType().template dyn_cast<ShapedType>();
+        op->getOperand(0).getType().template dyn_cast<ShapedType>();
     if (!resultType || !operandType) {
       return op->emitError("expected result and operand to be shaped types");
     }
@@ -189,7 +189,7 @@ class ReverseOpIndexPropagation : public IndexPropagationOp<OpTy> {
   LogicalResult propagateIndexMapImpl(
       Operation *op, DenseSet<unsigned> dimensions, AffineMap resultIndex,
       SmallVectorImpl<AffineMap> &operandIndices) const {
-    auto shaped_type = op->getOperand(0)->getType().cast<ShapedType>();
+    auto shaped_type = op->getOperand(0).getType().cast<ShapedType>();
     Builder builder(op->getContext());
     SmallVector<AffineExpr, 4> dimensionsExprs;
     for (unsigned index = 0; index < shaped_type.getRank(); ++index) {
@@ -232,7 +232,7 @@ class SliceOpIndexPropagation : public IndexPropagationOp<OpTy> {
       SmallVectorImpl<AffineMap> &operandIndices) const {
     Builder builder(op->getContext());
     SmallVector<AffineExpr, 4> exprs;
-    auto shaped_type = op->getOperand(0)->getType().cast<ShapedType>();
+    auto shaped_type = op->getOperand(0).getType().cast<ShapedType>();
     int rank = shaped_type.getRank();
     for (int i = 0; i < rank; ++i) {
       exprs.push_back(builder.getAffineDimExpr(i) * strides[i] +

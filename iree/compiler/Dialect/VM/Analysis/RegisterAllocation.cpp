@@ -217,10 +217,10 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
 
     // Allocate arguments first from left-to-right.
     for (auto blockArg : block->getArguments()) {
-      auto reg = registerUsage.allocateRegister(blockArg->getType());
+      auto reg = registerUsage.allocateRegister(blockArg.getType());
       if (!reg.hasValue()) {
         return funcOp.emitError() << "register allocation failed for block arg "
-                                  << blockArg->getArgNumber();
+                                  << blockArg.getArgNumber();
       }
       map_[blockArg] = reg.getValue();
     }
@@ -230,7 +230,7 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
     // makes things really hard to read. Ideally an optimization pass that
     // removes unused block arguments would prevent this from happening.
     for (auto blockArg : block->getArguments()) {
-      if (blockArg->use_empty()) {
+      if (blockArg.use_empty()) {
         registerUsage.releaseRegister(map_[blockArg]);
       }
     }
@@ -242,13 +242,13 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
         }
       }
       for (auto result : op.getResults()) {
-        auto reg = registerUsage.allocateRegister(result->getType());
+        auto reg = registerUsage.allocateRegister(result.getType());
         if (!reg.hasValue()) {
           return op.emitError() << "register allocation failed for result "
-                                << result->cast<OpResult>()->getResultNumber();
+                                << result.cast<OpResult>().getResultNumber();
         }
         map_[result] = reg.getValue();
-        if (result->use_empty()) {
+        if (result.use_empty()) {
           registerUsage.releaseRegister(reg.getValue());
         }
       }

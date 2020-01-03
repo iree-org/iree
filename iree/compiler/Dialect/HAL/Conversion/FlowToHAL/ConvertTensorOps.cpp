@@ -78,14 +78,14 @@ class TensorLoadOpConversion
       IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorLoadOpOperandAdaptor operands(newOperands);
-    auto sourceType = loadOp.source()->getType().cast<ShapedType>();
+    auto sourceType = loadOp.source().getType().cast<ShapedType>();
     auto sourceShape = IREE::HAL::getShapeDims(loadOp.source(), rewriter);
     auto sourceOffset =
         rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
             loadOp.getLoc(), operands.source(), sourceShape, operands.indices(),
             IREE::HAL::getRoundedElementByteWidth(sourceType.getElementType()));
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
-        loadOp, converter.convertType(loadOp.result()->getType()),
+        loadOp, converter.convertType(loadOp.result().getType()),
         operands.source(), sourceOffset);
     return matchSuccess();
   }
@@ -104,7 +104,7 @@ class TensorStoreOpConversion
       IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorStoreOpOperandAdaptor operands(newOperands);
-    auto targetType = storeOp.target()->getType().cast<ShapedType>();
+    auto targetType = storeOp.target().getType().cast<ShapedType>();
     auto targetShape = IREE::HAL::getShapeDims(storeOp.target(), rewriter);
     auto targetOffset =
         rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(

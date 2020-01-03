@@ -56,11 +56,11 @@ LogicalResult writeOp(IREEInterp::LL::CallOp op, BytecodeWriter *writer) {
 LogicalResult WriteConvertOperands(Operation *op, BytecodeWriter *writer) {
   auto src = op->getOperand(0);
   RETURN_IF_FAILURE(
-      writer->WriteTypeIndex(getElementTypeOrSelf(src->getType())));
+      writer->WriteTypeIndex(getElementTypeOrSelf(src.getType())));
   RETURN_IF_FAILURE(writer->WriteLocal(src));
   auto dst = op->getOperand(1);
   RETURN_IF_FAILURE(
-      writer->WriteTypeIndex(getElementTypeOrSelf(dst->getType())));
+      writer->WriteTypeIndex(getElementTypeOrSelf(dst.getType())));
   RETURN_IF_FAILURE(writer->WriteLocal(dst));
   return success();
 }

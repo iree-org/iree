@@ -99,14 +99,14 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
         // XLA resource functionalization should have canonicalized everything
         // to uses of those two ops in the body of the tf_saved_model exported
         // function.
-        for (OpOperand &operand : llvm::make_early_inc_range(arg->getUses())) {
+        for (OpOperand &operand : llvm::make_early_inc_range(arg.getUses())) {
           if (auto read_variable =
                   dyn_cast<TF::ReadVariableOp>(operand.getOwner())) {
             auto load = OpBuilder(read_variable)
                             .create<IREE::Flow::VariableLoadOp>(
                                 read_variable.getLoc(),
-                                read_variable.value()->getType(), flow_sym_ref);
-            read_variable.value()->replaceAllUsesWith(load.result());
+                                read_variable.value().getType(), flow_sym_ref);
+            read_variable.value().replaceAllUsesWith(load.result());
             read_variable.erase();
             continue;
           }
@@ -128,8 +128,8 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
         auto load =
             OpBuilder(func.getBody())
                 .create<IREE::Flow::VariableLoadOp>(
-                    global_tensor.getLoc(), arg->getType(), flow_sym_ref);
-        arg->replaceAllUsesWith(load.result());
+                    global_tensor.getLoc(), arg.getType(), flow_sym_ref);
+        arg.replaceAllUsesWith(load.result());
       }
     }
     func.eraseArguments(args_to_erase);
