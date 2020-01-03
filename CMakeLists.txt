@@ -27,6 +27,7 @@ set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 option(IREE_ENABLE_DEBUG "Enables debugging of the VM." ON)
+option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
 option(IREE_ENABLE_TRACING "Enables WTF tracing." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
@@ -36,6 +37,10 @@ option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 
 if(${IREE_BUILD_SAMPLES})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
+endif()
+
+if(${IREE_BUILD_COMPILER})
+  set(IREE_ENABLE_LLVM ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
 endif()
 
 #-------------------------------------------------------------------------------
@@ -83,9 +88,12 @@ add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
-if(${IREE_BUILD_COMPILER})
+if(${IREE_ENABLE_LLVM})
   add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
   include(external_tablegen_library)
+endif()
+
+if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)
 endif()
 
@@ -108,11 +116,19 @@ add_subdirectory(iree/base)
 add_subdirectory(iree/hal)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/testing)
-add_subdirectory(iree/vm)
+
+if(${IREE_ENABLE_LLVM})
+  # The VM requires LLVM to build its op definitions.
+  add_subdirectory(iree/vm)
+endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(third_party/glslang EXCLUDE_FROM_ALL)
   add_subdirectory(iree/compiler)
+elseif(${IREE_ENABLE_LLVM})
+  # If not building the compiler, tablegen is still needed
+  # to generate vm ops so deep include it only.
+  add_subdirectory(iree/compiler/Dialect/VM/Tools)
 endif()
 
 add_subdirectory(iree/tools)

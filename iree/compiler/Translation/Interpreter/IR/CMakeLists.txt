@@ -25,8 +25,7 @@ iree_cc_library(
     "CommonOps.cpp.inc"
   DEPS
     iree::compiler::Translation::Interpreter::IR::CommonOpsGen
-    iree::compiler::IR
-    iree::compiler::IR::OpsGen
+    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRStandardOps

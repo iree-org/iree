@@ -108,32 +108,26 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 # Third party: llvm/mlir
 #-------------------------------------------------------------------------------
 
-set(LLVM_INCLUDE_EXAMPLES OFF)
-set(LLVM_INCLUDE_TESTS OFF)
-set(LLVM_INCLUDE_BENCHMARKS OFF)
-set(LLVM_APPEND_VC_REV OFF)
-set(LLVM_ENABLE_IDE ON)
-set(LLVM_ENABLE_RTTI ON)
+set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "" FORCE)
+set(LLVM_APPEND_VC_REV OFF CACHE BOOL "" FORCE)
+set(LLVM_ENABLE_IDE ON CACHE BOOL "" FORCE)
+set(LLVM_ENABLE_RTTI ON CACHE BOOL "" FORCE)
 
-set(LLVM_TARGETS_TO_BUILD "WebAssembly")
+set(LLVM_TARGETS_TO_BUILD "WebAssembly" CACHE STRING "" FORCE)
 
-set(LLVM_ENABLE_PROJECTS "")
-set(LLVM_EXTERNAL_PROJECTS "MLIR")
-set(LLVM_EXTERNAL_MLIR_SOURCE_DIR "${IREE_ROOT_DIR}/third_party/mlir/")
-set(LLVM_ENABLE_BINDINGS OFF)
+set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)
+set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
   ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
 )
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
-set(MLIR_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir/include)
-set(MLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir)
-set(MLIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR)
-
 set(IREE_TABLEGEN_EXE iree-tblgen)
 
 #-------------------------------------------------------------------------------
