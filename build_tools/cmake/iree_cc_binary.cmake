@@ -145,7 +145,7 @@ function(iree_cc_binary)
     )
   endif()
 
-  # Add all IREE targets to a a folder in the IDE for organization.
+  # Add all IREE targets to a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/binaries)
 
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
