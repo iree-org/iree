@@ -92,21 +92,21 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
       args_to_erase.push_back(i);
       auto flow_sym_ref = global_builder.getSymbolRefAttr(
           sym_name_to_flow_sym_name[global_tensor.sym_name()]);
-      ValuePtr arg = func.getArgument(i);
+      Value arg = func.getArgument(i);
       if (global_tensor.is_mutable()) {
         // The value is a tensor<*x!tf.resource> type, which flows into
         // tf.ReadVariableOp/tf.AssignVariableOp.
         // XLA resource functionalization should have canonicalized everything
         // to uses of those two ops in the body of the tf_saved_model exported
         // function.
-        for (OpOperand &operand : llvm::make_early_inc_range(arg->getUses())) {
+        for (OpOperand &operand : llvm::make_early_inc_range(arg.getUses())) {
           if (auto read_variable =
                   dyn_cast<TF::ReadVariableOp>(operand.getOwner())) {
             auto load = OpBuilder(read_variable)
                             .create<IREE::Flow::VariableLoadOp>(
                                 read_variable.getLoc(),
-                                read_variable.value()->getType(), flow_sym_ref);
-            read_variable.value()->replaceAllUsesWith(load.result());
+                                read_variable.value().getType(), flow_sym_ref);
+            read_variable.value().replaceAllUsesWith(load.result());
             read_variable.erase();
             continue;
           }
@@ -128,8 +128,8 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
         auto load =
             OpBuilder(func.getBody())
                 .create<IREE::Flow::VariableLoadOp>(
-                    global_tensor.getLoc(), arg->getType(), flow_sym_ref);
-        arg->replaceAllUsesWith(load.result());
+                    global_tensor.getLoc(), arg.getType(), flow_sym_ref);
+        arg.replaceAllUsesWith(load.result());
       }
     }
     func.eraseArguments(args_to_erase);
@@ -175,7 +175,7 @@ class TFSavedModelAdoptExportsPass
       auto exported_names = mlir::tf_saved_model::GetExportedNames(func);
       if (exported_names.empty()) continue;
 
-      // TODO(laurenzo): After VM2 rework, we should just keep the
+      // TODO(laurenzo): After VM rework, we should just keep the
       // function name as-is and create explicit export ops for each exported
       // function.
       if (exported_names.size() > 1) {

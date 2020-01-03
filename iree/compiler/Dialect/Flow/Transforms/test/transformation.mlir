@@ -15,7 +15,6 @@ func @simpleMath(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-NEXT:   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
 // CHECK-SAME:     workload = dense<[4, 1, 1]> : vector<3xi32>
 // CHECK-SAME:   }
 // CHECK-NEXT:   module {
@@ -45,7 +44,6 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: flow.executable @stdElementwiseOps_ex_dispatch_0 {
 // CHECK-NEXT:   flow.dispatch.entry @stdElementwiseOps_rgn_dispatch_0 attributes {
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
 // CHECK-SAME:     workload = dense<[4, 1, 1]> : vector<3xi32>
 // CHECK-SAME:   }
 // CHECK-NEXT:   module {
@@ -77,7 +75,6 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 // CHECK-LABEL: flow.executable @hloElementwiseOps_ex_dispatch_0 {
 // CHECK-NEXT:   flow.dispatch.entry @hloElementwiseOps_rgn_dispatch_0 attributes {
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
 // CHECK-SAME:     workload = dense<[4, 1, 1]> : vector<3xi32>
 // CHECK-SAME:   }
 // CHECK-NEXT:   module {
@@ -109,7 +106,6 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // CHECK-LABEL: flow.executable @interleavedDot_ex_dispatch_0 {
 // CHECK-NEXT:   flow.dispatch.entry @interleavedDot_rgn_dispatch_0 attributes {
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
 // CHECK-SAME:     workload = dense<[4, 4, 1]> : vector<3xi32>
 // CHECK-SAME:   }
 // CHECK-NEXT:   module {
@@ -121,7 +117,6 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT: }
 // CHECK-NEXT: flow.executable @interleavedDot_ex_dispatch_1 {
 // CHECK-NEXT:   flow.dispatch.entry @interleavedDot_rgn_dispatch_1 attributes {
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
 // CHECK-SAME:     workload = dense<[4, 4, 1]> : vector<3xi32>
 // CHECK-SAME:   }
 // CHECK-NEXT:   module {
@@ -133,7 +128,6 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT: }
 // CHECK-NEXT: flow.executable @interleavedDot_ex_dispatch_2 {
 // CHECK-NEXT:   flow.dispatch.entry @interleavedDot_rgn_dispatch_2 attributes {
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
 // CHECK-SAME:     workload = dense<[4, 4, 1]> : vector<3xi32>
 // CHECK-SAME:   }
 // CHECK-NEXT:   module {
@@ -169,7 +163,6 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
 // CHECK-LABEL: flow.executable @reduction_ex_reduce_0_dim_0 {
 // CHECK-NEXT:   flow.reduction.entry @reduction_rgn_reduce_0_dim_0_entry apply(@reduction_rgn_reduce_0_dim_0) attributes {
 // CHECK-SAME:     dimension = 1 : i32,
-// CHECK-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>,
 // CHECK-SAME:     workload = dense<[4, 1, 1]> : vector<3xi32>
 // CHECK-SAME:   }
 // CHECK-NEXT:   module {
@@ -199,7 +192,7 @@ func @dynamicUpdateSlice(%operand : tensor<2x4xi32>, %update : tensor<1x1xi32>, 
 }
 
 // CHECK-LABEL: flow.executable @dynamicUpdateSlice_ex_dispatch_0 {
-// CHECK-NEXT: flow.dispatch.entry @dynamicUpdateSlice_rgn_dispatch_0 attributes {workgroup_size = dense<[32, 1, 1]> : vector<3xi32>, workload = dense<[4, 2, 1]> : vector<3xi32>}
+// CHECK-NEXT: flow.dispatch.entry @dynamicUpdateSlice_rgn_dispatch_0 attributes {workload = dense<[4, 2, 1]> : vector<3xi32>}
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @dynamicUpdateSlice_rgn_dispatch_0(%arg0: tensor<2x4xi32>, %arg1: tensor<2x4xi32>) -> tensor<2x4xi32> {
 // CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg1 : tensor<2x4xi32>

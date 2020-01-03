@@ -55,7 +55,7 @@ constexpr ExecutableFormat kExecutableFormatIreeBytecode =
 constexpr ExecutableFormat kExecutableFormatSpirV =
     MakeExecutableFormatID("SPVE");
 
-// LINT.ThenChange(//iree/iree/compiler/IR/OpBase.td:executable_format)
+// LINT.ThenChange(//iree/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
 
 }  // namespace hal
 }  // namespace iree

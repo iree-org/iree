@@ -7,6 +7,7 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 
 ## Table of Contents
 
+-   [Contact](#contact)
 -   [Build Status](#build-status)
 -   [Quickstart](#quickstart)
 -   [Project Goals](#project-goals)
@@ -14,6 +15,12 @@ libraries that make use of modern hardware acceleration APIs and techniques (see
 -   [Status](#status)
 -   [Dependencies](#dependencies)
 -   [License](#license)
+
+## Contact
+
+For bugs and issues, prefer filing a GitHub issue. For other topics, feel free
+to join/post/read messages on the
+[iree-discuss mailing list](https://groups.google.com/forum/#!forum/iree-discuss).
 
 ## Build Status
 

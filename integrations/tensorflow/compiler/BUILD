@@ -38,10 +38,10 @@ cc_library(
     }),
     deps = select({
         "//iree:enable_tensorflow": [
-            "@llvm//:support",
-            "@local_config_mlir//:Support",
-            "@local_config_mlir//:TransformUtils",
-            "@local_config_mlir//:IR",
+            "@llvm-project//llvm:support",
+            "@llvm-project//mlir:Support",
+            "@llvm-project//mlir:TransformUtils",
+            "@llvm-project//mlir:IR",
             "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
             "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
             "//iree/compiler/Dialect/Flow/IR",
@@ -50,7 +50,7 @@ cc_library(
         ],
     }) + [
         "//iree/base:signature_mangle",
-        "@local_config_mlir//:Pass",
+        "@llvm-project//mlir:Pass",
     ],
     alwayslink = 1,
 )
@@ -60,7 +60,7 @@ cc_binary(
     deps = [
         ":tensorflow",
         "//iree/tools:iree_opt_library",
-        "@local_config_mlir//:MlirOptMain",
+        "@llvm-project//mlir:MlirOptMain",
     ],
 )
 

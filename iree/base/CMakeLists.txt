@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(internal)
+
 iree_cc_library(
   NAME
     api
@@ -20,10 +22,19 @@ iree_cc_library(
   SRCS
     "api.cc"
   DEPS
+    iree::base::api_hdrs
     iree::base::api_util
     iree::base::file_mapping
     iree::base::init
     iree::base::tracing
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    api_hdrs
+  HDRS
+    "api.h"
   PUBLIC
 )
 
@@ -34,6 +45,8 @@ iree_cc_library(
     "api.h"
     "api_util.h"
   DEPS
+    absl::base
+    absl::container
     absl::time
     iree::base::logging
     iree::base::shape
@@ -49,6 +62,7 @@ iree_cc_library(
   SRCS
     "arena.cc"
   DEPS
+    absl::base
     absl::span
     iree::base::logging
   PUBLIC
@@ -71,7 +85,6 @@ iree_cc_library(
     "bitfield.h"
   DEPS
     absl::span
-    iree::base::bitfield
   PUBLIC
 )
 
@@ -95,6 +108,7 @@ iree_cc_library(
     "buffer_string_util.h"
   DEPS
     absl::strings
+    absl::optional
     absl::span
     iree::base::memory
     iree::base::shape
@@ -113,65 +127,58 @@ iree_cc_test(
     iree::base::memory
     iree::base::status
     iree::base::status_matchers
+    absl::optional
     absl::strings
-)
-
-iree_cc_library(
-  NAME
-    file_handle
-  SRCS
-    "internal/file_handle_win32.cc"
-  HDRS
-    "internal/file_handle_win32.h"
-  DEPS
-    absl::memory
-    absl::strings
-    iree::base::platform_headers
-    iree::base::status
-    iree::base::tracing
-    iree::base::target_platform
-  PUBLIC
 )
 
 iree_cc_library(
   NAME
     file_io
-  SRCS
-    "internal/file_io_posix.cc"
-    "internal/file_io_win32.cc"
   HDRS
     "file_io.h"
   DEPS
     absl::memory
     absl::strings
     absl::span
-    iree::base::file_handle
-    iree::base::platform_headers
-    iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
+    iree::base::internal::file_io_internal
   PUBLIC
 )
 
 iree_cc_library(
   NAME
+    file_io_hdrs
+  HDRS
+    "file_io.h"
+  DEPS
+    iree::base::status
+)
+
+iree_cc_library(
+  NAME
     file_mapping
-  SRCS
-    "internal/file_mapping_posix.cc"
-    "internal/file_mapping_win32.cc"
   HDRS
     "file_mapping.h"
   DEPS
     absl::memory
     absl::strings
     absl::span
-    iree::base::file_handle
-    iree::base::platform_headers
     iree::base::ref_ptr
     iree::base::status
-    iree::base::tracing
-    iree::base::target_platform
+    iree::base::internal::file_mapping_internal
   PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    file_mapping_hdrs
+  HDRS
+    "file_mapping.h"
+  DEPS
+    absl::span
+    iree::base::ref_ptr
+    iree::base::status
 )
 
 iree_cc_library(
@@ -184,6 +191,16 @@ iree_cc_library(
   DEPS
     absl::strings
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    file_path_test
+  SRCS
+    "file_path_test.cc"
+  DEPS
+    iree::base::file_path
+    gtest_main
 )
 
 iree_cc_library(
@@ -202,6 +219,7 @@ iree_cc_library(
     iree::base::file_mapping
     iree::base::memory
     iree::base::ref_ptr
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
   PUBLIC
@@ -212,14 +230,8 @@ iree_cc_library(
     init
   HDRS
     "init.h"
-    "internal/init_internal.h"
-  SRCS
-    "internal/init_internal.cc"
   DEPS
-    absl::flags
-    absl::flags_parse
-    iree::base::initializer
-    iree::base::target_platform
+    iree::base::internal::init_internal
   PUBLIC
 )
 
@@ -252,21 +264,30 @@ iree_cc_test(
   NAME
     intrusive_list_test
   SRCS
+    "intrusive_list_ref_ptr_test.cc"
     "intrusive_list_test.cc"
+    "intrusive_list_unique_ptr_test.cc"
   DEPS
+    absl::memory
     gtest_main
     iree::base::intrusive_list
 )
 
+# TODO(marbre): Moving to internal breaks iree::samples::rt::vulkan::vk_graphics_integration
+#  INTERFACE_LIBRARY targets may only have whitelisted properties.  The
+#  property "ALWAYSLINK" is not allowed.
 iree_cc_library(
   NAME
     logging
   HDRS
     "logging.h"
+    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
     "internal/logging.h"
   SRCS
+    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
     "internal/logging.cc"
   DEPS
+    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
     absl::base
     absl::flags
     iree::base::platform_headers
@@ -332,13 +353,74 @@ iree_cc_library(
   SRCS
     "shape.cc"
   DEPS
-    absl::base
     absl::span
     absl::strings
     absl::type_traits
     iree::base::logging
+    iree::base::source_location
     iree::base::status
   PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    shape_test
+  SRCS
+    "shape_test.cc"
+  DEPS
+    iree::base::shape
+    iree::base::status
+    iree::base::status_matchers
+    gtest_main
+)
+
+iree_cc_library(
+  NAME
+    shaped_buffer
+  HDRS
+    "shaped_buffer.h"
+  DEPS
+    absl::fixed_array
+    absl::span
+    iree::base::logging
+    iree::base::memory
+    iree::base::shape
+)
+
+iree_cc_library(
+  NAME
+    shaped_buffer_string_util
+  SRCS
+    "shaped_buffer_string_util.cc"
+  HDRS
+    "shaped_buffer_string_util.h"
+  DEPS
+    absl::fixed_array
+    absl::strings
+    absl::optional
+    absl::span
+    iree::base::buffer_string_util
+    iree::base::memory
+    iree::base::shape
+    iree::base::shaped_buffer
+    iree::base::source_location
+    iree::base::status
+)
+
+iree_cc_test(
+  NAME
+    shaped_buffer_string_util_test
+  SRCS
+    "shaped_buffer_string_util_test.cc"
+  DEPS
+    absl::strings
+    iree::base::buffer_string_util
+    iree::base::memory
+    iree::base::shaped_buffer
+    iree::base::shaped_buffer_string_util
+    iree::base::status
+    iree::base::status_matchers
+    gtest_main
 )
 
 iree_cc_library(
@@ -354,6 +436,7 @@ iree_cc_library(
     absl::optional
     absl::span
     absl::strings
+    iree::base::status
   PUBLIC
 )
 
@@ -364,23 +447,7 @@ iree_cc_test(
     "signature_mangle_test.cc"
   DEPS
     gtest_main
-    iree::base::logging
     iree::base::signature_mangle
-)
-
-iree_cc_test(
-  NAME
-    shape_test
-  SRCS
-    "shape_test.cc"
-  DEPS
-    absl::span
-    absl::strings
-    gtest_main
-    iree::base::logging
-    iree::base::shape
-    iree::base::status
-    iree::base::status_matchers
 )
 
 iree_cc_library(
@@ -388,7 +455,8 @@ iree_cc_library(
     source_location
   HDRS
     "source_location.h"
-    "internal/source_location.h"
+  DEPS
+    iree::base::internal::source_location_internal
   PUBLIC
 )
 
@@ -397,29 +465,9 @@ iree_cc_library(
     status
   HDRS
     "status.h"
-    "internal/status.h"
-    "internal/status_builder.h"
-    "internal/status_errno.h"
-    "internal/status_errors.h"
-    "internal/status_macros.h"
-    "internal/status_win32_errors.h"
-    "internal/statusor.h"
-  SRCS
-    "internal/status.cc"
-    "internal/status_builder.cc"
-    "internal/status_errno.cc"
-    "internal/status_errors.cc"
-    "internal/status_win32_errors.cc"
-    "internal/statusor.cc"
   DEPS
-    absl::base
-    absl::debugging
-    absl::flags
-    absl::memory
-    absl::strings
-    iree::base::logging
-    iree::base::platform_headers
     iree::base::source_location
+    iree::base::internal::status_internal
   PUBLIC
 )
 
@@ -428,12 +476,8 @@ iree_cc_library(
     status_matchers
   HDRS
     "status_matchers.h"
-    "internal/status_matchers.h"
   DEPS
-    absl::strings
-    absl::optional
-    gmock
-    iree::base::status
+    iree::base::internal::status_matchers_internal
   TESTONLY
   PUBLIC
 )
@@ -462,18 +506,14 @@ if(${IREE_ENABLE_TRACING})
       tracing
     HDRS
       "tracing.h"
-    SRCS
-      "tracing.cc"
     DEPS
-      absl::core_headers
-      absl::flags
       absl::strings
-      absl::synchronization
+      absl::optional
       absl::time
-      iree::base::file_io
-      iree::base::inititializer
-      iree::base::logging
-      iree::base::status
+      iree::base::tracing_enabled
+      # TODO(marbre): Add dependencies
+      # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
+      # "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"]
     PUBLIC
   )
 else()
@@ -482,11 +522,55 @@ else()
       tracing
     HDRS
       "tracing.h"
-    SRCS
-      "tracing_disabled.cc"
     DEPS
-      absl::flags
+      absl::strings
+      absl::time
+      absl::optional
+      iree::base::tracing_disabled
     PUBLIC
+  )
+endif()
+
+iree_cc_library(
+  NAME
+    tracing_disabled
+  HDRS
+    "tracing.h"
+  SRCS
+    "tracing_disabled.cc"
+  DEPS
+    absl::flags
+    absl::strings
+    absl::time
+    absl::optional
+    # TODO(marbre): Add dependency
+    # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
+  ALWAYSLINK
+)
+
+if(${IREE_ENABLE_TRACING})
+  iree_cc_library(
+    NAME
+      tracing_enabled
+    HDRS
+      "tracing.h"
+    SRCS
+      "tracing_enabled.cc"
+    DEPS
+      absl::core_headers
+      absl::flags
+      absl::strings
+      absl::synchronization
+      absl::time
+      absl::optional
+      iree::base::file_io
+      iree::base::file_path
+      iree::base::initializer
+      iree::base::logging
+      iree::base::status
+      # TODO(marbre): Add dependency
+      # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp"
+    ALWAYSLINK
   )
 endif()
 

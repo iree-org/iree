@@ -31,10 +31,12 @@ enum class BytecodeOutputFormat {
   kFlatBufferBinary,
   // FlatBuffer text using reflection. Not designed to be deserialized.
   kFlatBufferText,
+  // MLIR text of the VM module.
+  kMlirText,
   // MLIR text with annotations approximating what is in the FlatBuffer binary.
   // Useful for debugging and testing without needing to do filechecks against
   // the FlatBuffer text format (which can be non-deterministic).
-  kMlirText,
+  kAnnotatedMlirText,
 };
 
 // Options that can be provided to bytecode translation.

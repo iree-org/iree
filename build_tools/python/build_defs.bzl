@@ -26,8 +26,8 @@ def py_extension(
         linkstatic = 0,
         deps = [],
         features = [],
-        visibility = [],
-        win_def_file = None):
+        win_def_file = None,
+        **kwargs):
     """Builds a platform specific native python extension shared library.
 
     Note that you typically need to add some dependency on the python headers,
@@ -39,9 +39,11 @@ def py_extension(
         data: cc_library data.
         copts: cc_library copts.
         linkopts: cc_library linkopts.
+        linkstatic: cc_libarary linkstatic.
         deps: cc_library deps.
         features: cc_library features.
-        visibility: visibility for all artifacts.
+        win_def_file: The Windows DEF file to be passed to the linker.
+        **kwargs: Any additional arguments to pass into all generated rules.
     """
     dll_file = name + ".dll"
     pyd_file = name + ".pyd"
@@ -58,8 +60,8 @@ def py_extension(
             linkshared = True,
             linkstatic = linkstatic,
             features = features,
-            visibility = visibility,
             win_def_file = actual_def_file,
+            **kwargs
         )
 
     # TODO(laurenzo): Bug the bazel team about letting a cc_binary output
@@ -70,7 +72,7 @@ def py_extension(
         outs = [":" + pyd_file],
         cmd = "cp $< $@",
         output_to_bindir = True,
-        visibility = visibility,
+        **kwargs
     )
 
     # Making the rule output be a filegroup lets us give the shared
@@ -87,9 +89,10 @@ def py_extension(
                 ":%s" % so_file,
             ],
         }),
-        visibility = visibility,
+        **kwargs
     )
     py_library(
         name = name,
         data = [filegroup_name],
+        **kwargs
     )

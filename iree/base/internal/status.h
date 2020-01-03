@@ -70,6 +70,7 @@ class Status final {
   Status();
 
   // Creates a status with the specified code and error message.
+  // If `code` is kOk, `message` is ignored.
   Status(StatusCode code, absl::string_view message);
 
   Status(const Status&);

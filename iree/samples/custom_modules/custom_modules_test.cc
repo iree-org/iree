@@ -21,8 +21,8 @@
 #include "iree/samples/custom_modules/custom_modules_test_module.h"
 #include "iree/samples/custom_modules/native_module.h"
 #include "iree/testing/gtest.h"
-#include "iree/vm2/api.h"
-#include "iree/vm2/bytecode_module.h"
+#include "iree/vm/api.h"
+#include "iree/vm/bytecode_module.h"
 
 namespace {
 

@@ -15,6 +15,8 @@
 #ifndef IREE_COMPILER_DIALECT_VM_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_VM_TRANSFORMS_PASSES_H_
 
+#include <memory>
+
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/Pass.h"
@@ -50,6 +52,11 @@ std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass();
 //===----------------------------------------------------------------------===//
 // Module Analysis and Assignment
 //===----------------------------------------------------------------------===//
+
+// Gathers all module-level global init/deinit functions into single locations
+// such that the runtime can init/deinit everything at once.
+std::unique_ptr<OpPassBase<IREE::VM::ModuleOp>>
+createGlobalInitializationPass();
 
 // Assigns module-unique ordinals to function/global/etc symbols within the
 // module.

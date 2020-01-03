@@ -14,8 +14,7 @@
 
 // Utilities for dispatch region and function manipulation.
 // These are shared between all dispatchable types such as the standard
-// iree.dispatch_region as well as dispatch-related types like
-// iree.reduction_region.
+// dispatch region as well as dispatch-related types like reduction region.
 
 #ifndef IREE_COMPILER_DIALECT_FLOW_UTILS_DISPATCHUTILS_H_
 #define IREE_COMPILER_DIALECT_FLOW_UTILS_DISPATCHUTILS_H_
@@ -46,7 +45,7 @@ bool isOpOfKnownDialect(Operation *op);
 // be dispatched with the same workgroup structure.
 // TODO(benvanik): ensure we want to insert at end. Maybe front?
 LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  ValuePtr workload, ArrayRef<Operation *> ops);
+                                  Value workload, ArrayRef<Operation *> ops);
 
 // Creates an executable containing exported function containing the body region
 // of |op|. Created executables will be named for their original function

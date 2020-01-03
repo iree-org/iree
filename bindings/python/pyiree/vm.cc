@@ -14,28 +14,19 @@
 
 #include "bindings/python/pyiree/vm.h"
 
+#include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/function_abi.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "iree/base/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm2/invocation.h"
-#include "iree/vm2/module.h"
+#include "iree/vm/invocation.h"
+#include "iree/vm/module.h"
 
 namespace iree {
 namespace python {
 
 namespace {
-
-RtModule CreateModuleFromBlob(std::shared_ptr<OpaqueBlob> blob) {
-  iree_rt_module_t* module;
-  auto free_fn = OpaqueBlob::CreateFreeFn(blob);
-  auto status = iree_vm_bytecode_module_create_from_buffer(
-      {static_cast<const uint8_t*>(blob->data()), blob->size()}, free_fn.first,
-      free_fn.second, IREE_ALLOCATOR_SYSTEM, &module);
-  CheckApiStatus(status, "Error creating vm module from blob");
-  return RtModule::CreateRetained(module);
-}
 
 VmModule CreateHalModule(HalDevice* device) {
   iree_vm_module_t* module;
@@ -206,9 +197,6 @@ void SetupVmBindings(pybind11::module m) {
   CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
   CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
 
-  // Deprecated: VM1 module.
-  m.def("create_module_from_blob", CreateModuleFromBlob);
-
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);
 
@@ -232,7 +220,7 @@ void SetupVmBindings(pybind11::module m) {
 
   py::class_<VmContext>(m, "VmContext")
       .def(py::init(&VmContext::Create), py::arg("instance"),
-           py::arg("modules") = absl::nullopt)
+           py::arg("modules") = absl::optional<std::vector<VmModule*>>())
       .def("register_modules", &VmContext::RegisterModules)
       .def_property_readonly("context_id", &VmContext::context_id)
       .def("create_function_abi", &VmContext::CreateFunctionAbi,
@@ -241,6 +229,7 @@ void SetupVmBindings(pybind11::module m) {
 
   py::class_<VmModule>(m, "VmModule")
       .def_static("from_flatbuffer", &VmModule::FromFlatbufferBlob)
+      .def_property_readonly("name", &VmModule::name)
       .def("lookup_function", &VmModule::LookupFunction, py::arg("name"),
            py::arg("linkage") = IREE_VM_FUNCTION_LINKAGE_EXPORT);
 }

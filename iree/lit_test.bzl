@@ -14,11 +14,12 @@
 
 """Bazel macros for running lit tests."""
 
-def iree_setup_lit_package(data):
+def iree_setup_lit_package(data, **kwargs):
     """Should be called once per test package that contains globbed lit tests.
 
     Args:
       data: Additional, project specific data deps to add.
+      **kwargs: Any additional arguments to the underlying filegroup.
     """
 
     # Bundle together all of the test utilities that are used by tests.
@@ -28,12 +29,14 @@ def iree_setup_lit_package(data):
         data = data + [
             "//iree/tools:IreeFileCheck",
         ],
+        **kwargs
     )
 
 def iree_glob_lit_tests(
         data = [":lit_test_utilities"],
         driver = "//iree/tools:run_lit.sh",
-        test_file_exts = ["mlir"]):
+        test_file_exts = ["mlir"],
+        **kwargs):
     """Globs lit test files into tests for a package.
 
     For most packages, the defaults suffice. Packages that include this must
@@ -43,6 +46,7 @@ def iree_glob_lit_tests(
       data: Data files to include/build.
       driver: Test driver.
       test_file_exts: File extensions to glob.
+      **kwargs: Any additional arguments to the underlying sh_test.
     """
     for test_file_ext in test_file_exts:
         test_files = native.glob([
@@ -57,4 +61,5 @@ def iree_glob_lit_tests(
                 srcs = [driver],
                 data = data + [test_file],
                 args = [test_file_location],
+                **kwargs
             )

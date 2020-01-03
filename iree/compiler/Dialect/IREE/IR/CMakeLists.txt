@@ -17,10 +17,14 @@ iree_cc_library(
     IR
   HDRS
     "IREEDialect.h"
+    "IREEOps.h"
+    "IREEOps.h.inc"
     "IREETraits.h"
     "IREETypes.h"
   SRCS
     "IREEDialect.cpp"
+    "IREEOps.cpp"
+    "IREEOps.cpp.inc"
   DEPS
     LLVMSupport
     MLIRIR
@@ -28,4 +32,15 @@ iree_cc_library(
     MLIRSupport
   ALWAYSLINK
   PUBLIC
+)
+
+
+iree_tablegen_library(
+  NAME
+    IREEOpsGen
+  SRCS
+    IREEOps.td
+  OUTS
+    -gen-op-decls IREEOps.h.inc
+    -gen-op-defs IREEOps.cpp.inc
 )

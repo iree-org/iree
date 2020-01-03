@@ -32,4 +32,4 @@ echo "Checking out submodules"
 git submodule update --init --depth 1000 --jobs 8
 
 echo "Building and testing with bazel"
-./build_tools/bazel_build.sh
+./build_tools/scripts/bazel_build.sh

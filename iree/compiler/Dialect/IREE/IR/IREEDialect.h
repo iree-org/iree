@@ -22,11 +22,11 @@ namespace mlir {
 namespace iree_compiler {
 
 // TODO(b/143787186): rename to IREEDialect.
-class IREEXDialect : public Dialect {
+class IREEDialect : public Dialect {
  public:
-  explicit IREEXDialect(MLIRContext* context);
+  explicit IREEDialect(MLIRContext* context);
   // TODO(b/143787186): rename to iree.
-  static StringRef getDialectNamespace() { return "ireex"; }
+  static StringRef getDialectNamespace() { return "iree"; }
 
   /// Parses a type registered to this dialect.
   Type parseType(DialectAsmParser& parser) const override;

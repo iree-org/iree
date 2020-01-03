@@ -34,17 +34,14 @@ DEFAULT_FEATURES = [
 ]
 
 COMPILER_DEPS = [
-    # TODO(laurenzo): Remove these once migrated to vm2
-    "//iree/compiler/Translation/Sequencer",
-    "//iree/compiler/Translation/Interpreter",
-    "//iree/compiler/Translation/SPIRV",
+    # Transforms.
+    "//iree/compiler/Dialect/Flow/Transforms",
+    "//iree/compiler/Dialect/HAL/Transforms",
     "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-    "//iree/compiler/Translation:IREEVM",
+    "//iree/compiler/Dialect/VM/Transforms",
 
-    # New compiler target backends.
-    # NOTE: Including the LegacyInterpreter causes some pretty low level assertion failure.
-    # I think it is non-functional.
-    # "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
+    # Targets.
+    "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
     "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     "//iree/compiler/Dialect/VM/Target/Bytecode",
@@ -60,6 +57,8 @@ py_binary(
     srcs = ["dummy.py"],
     main = "dummy.py",
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":pyiree",  # build_cleaner: keep
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -72,9 +71,12 @@ py_library(
         "__init__.py",
     ],
     srcs_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":binding",
         ":compiler",
+        ":system_api",
         "//bindings/python:pathsetup",  # build_cleaner: keep
     ] + select({
         "//iree:enable_tensorflow": [
@@ -90,6 +92,20 @@ py_library(
     name = "compiler",
     srcs = ["compiler.py"],
     srcs_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
+    deps = [
+        ":binding",
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+    ],
+)
+
+py_library(
+    name = "system_api",
+    srcs = ["system_api.py"],
+    srcs_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -103,7 +119,6 @@ cc_library(
         "function_abi.cc",
         "hal.cc",
         "host_types.cc",
-        "rt.cc",
         "status_utils.cc",
         "vm.cc",
     ],
@@ -113,12 +128,13 @@ cc_library(
         "function_abi.h",
         "hal.h",
         "host_types.h",
-        "rt.h",
         "status_utils.h",
         "vm.h",
     ],
     copts = DEFAULT_COPTS,
     features = DEFAULT_FEATURES,
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
@@ -128,23 +144,20 @@ cc_library(
         "@com_google_absl//absl/types:variant",
         "//iree/compiler/Utils",
         "//iree/modules/hal",
-        "//iree/vm2",
-        "//iree/vm2:bytecode_module",
-        "//iree/vm2:invocation",
-        "//iree/vm2:module",
-        "//iree/vm2:ref",
-        "//iree/vm2:variant_list",
-        "@local_config_mlir//:IR",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:invocation",
+        "//iree/vm:module",
+        "//iree/vm:ref",
+        "//iree/vm:variant_list",
+        "@llvm-project//mlir:IR",
         "//iree/base:api",
         "//iree/base:status",
         "//iree/base:signature_mangle",
         "//iree/hal:api",
-        "//iree/rt:api",
-        "//iree/schemas",
-        "//iree/vm:api",
-        "@llvm//:support",
-        "@local_config_mlir//:Parser",
-        "@local_config_mlir//:Pass",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
         "@iree_pybind11//:pybind11",
     ] + COMPILER_DEPS + DRIVER_DEPS + PYTHON_HEADERS_DEPS,
 )
@@ -157,6 +170,8 @@ iree_py_extension(
     copts = DEFAULT_COPTS,
     features = DEFAULT_FEATURES,
     linkstatic = 1,
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     win_def_file = "export.def",
     deps = [
         ":base",
@@ -171,6 +186,8 @@ py_test(
     name = "compiler_test",
     srcs = ["compiler_test.py"],
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "//bindings/python/pyiree",
@@ -183,18 +200,25 @@ py_test(
     srcs = ["function_abi_test.py"],
     python_version = "PY3",
     # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
-    tags = ["notap"],
+    tags = [
+        "noga",
+        "nokokoro",
+        "notap",
+    ],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
         "//bindings/python/pyiree",
     ],
+    # TODO(b/145815906) Get this running in OSS CI.
 )
 
 py_test(
     name = "hal_test",
     srcs = ["hal_test.py"],
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
@@ -203,10 +227,18 @@ py_test(
 )
 
 py_test(
-    name = "runtime_test",
-    srcs = ["runtime_test.py"],
+    name = "system_api_test",
+    srcs = ["system_api_test.py"],
     python_version = "PY3",
+    tags = [
+        # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
+        "notap",
+        # TODO(b/145815906) Get this running in OSS CI.
+        "noga",
+        "nokokoro",
+    ],
     deps = NUMPY_DEPS + [
+        ":system_api",
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
         "//bindings/python/pyiree",
@@ -218,7 +250,11 @@ py_test(
     srcs = ["vm_test.py"],
     python_version = "PY3",
     # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
-    tags = ["notap"],
+    tags = [
+        "noga",
+        "nokokoro",
+        "notap",
+    ],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",

@@ -21,18 +21,19 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL:Target::ExecutableTarget
-    iree::compiler::IR
+    iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::SPIRV
-    iree::schemas
     iree::schemas::spirv_executable_def_cc_fbs
     flatbuffers
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRSPIRVDialect
+    MLIRSPIRVLowering
     MLIRSPIRVSerialization
     MLIRSupport
+    MLIRTransforms
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

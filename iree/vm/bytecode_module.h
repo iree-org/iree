@@ -15,88 +15,26 @@
 #ifndef IREE_VM_BYTECODE_MODULE_H_
 #define IREE_VM_BYTECODE_MODULE_H_
 
-#include <memory>
+#include <stdint.h>
 
-#include "iree/base/flatbuffer_util.h"
-#include "iree/rt/function.h"
-#include "iree/rt/module.h"
-#include "iree/schemas/executable_table_def_generated.h"
-#include "iree/schemas/function_table_def_generated.h"
-#include "iree/schemas/module_def_generated.h"
-#include "iree/vm/opcode_info.h"
-#include "iree/vm/source_map_resolver.h"
+#include "iree/base/api.h"
+#include "iree/vm/module.h"
 
-namespace iree {
-namespace vm {
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
-using ModuleFile = FlatBufferFile<ModuleDef>;
+// Creates a VM module from an in-memory ModuleDef FlatBuffer.
+// If a |flatbuffer_allocator| is provided then it will be used to free the
+// |flatbuffer_data| when the module is destroyed and otherwise the ownership of
+// the flatbuffer_data remains with the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
+    iree_const_byte_span_t flatbuffer_data,
+    iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
+    iree_vm_module_t** out_module);
 
-// A loaded bytecode module backed by a FlatBuffer.
-class BytecodeModule : public rt::Module {
- public:
-  static Status ValidateStructure(const ModuleDef& module_def);
-
-  ~BytecodeModule() override;
-
-  const ModuleDef& def() const { return module_def_; }
-  const FunctionTableDef& function_table_def() const {
-    return *module_def_.function_table();
-  }
-  const ExecutableTableDef& executable_table_def() const {
-    return *module_def_.executable_table();
-  }
-
-  absl::string_view name() const override {
-    return WrapString(module_def_.name());
-  }
-
-  const rt::ModuleSignature signature() const override;
-
-  rt::SourceResolver* source_resolver() const override {
-    return &source_resolver_;
-  }
-
-  rt::Disassembler* disassembler() const override {
-    return disassembler_.get();
-  }
-
-  std::string DebugStringShort() const override;
-
-  StatusOr<const rt::Function> LookupFunctionByOrdinal(
-      rt::Function::Linkage linkage, int32_t ordinal) const override;
-
-  StatusOr<const rt::Function> LookupFunctionByName(
-      rt::Function::Linkage linkage, absl::string_view name) const override;
-
-  StatusOr<absl::string_view> GetFunctionName(rt::Function::Linkage linkage,
-                                              int32_t ordinal) const override;
-
-  StatusOr<const rt::FunctionSignature> GetFunctionSignature(
-      rt::Function::Linkage linkage, int32_t ordinal) const override;
-
-  StatusOr<const FunctionDef*> GetFunctionDef(rt::Function::Linkage linkage,
-                                              int32_t ordinal) const;
-
-  StatusOr<const MultiArchExecutableDef*> LookupMultiArchExecutable(
-      int executable_ordinal) const;
-
- protected:
-  BytecodeModule(ref_ptr<ModuleFile> module_file, OpcodeTable opcode_table);
-
-  static Status ValidateArgType(const hal::BufferView& arg,
-                                const MemRefTypeDef& expected_type);
-
- private:
-  StatusOr<int32_t> MapFunctionOrdinal(rt::Function::Linkage linkage,
-                                       int32_t ordinal) const;
-
-  ref_ptr<ModuleFile> module_file_;
-  const ModuleDef& module_def_;
-  mutable SourceMapResolver source_resolver_;
-  mutable std::unique_ptr<rt::Disassembler> disassembler_;
-};
-
-}  // namespace vm
-}  // namespace iree
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_VM_BYTECODE_MODULE_H_

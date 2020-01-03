@@ -4,7 +4,7 @@
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    https://www.apache.org/licenses/LICENSE-2.0
+#      https://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -12,228 +12,239 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_cc_library(
+iree_bytecode_module(
   NAME
-    api
-  HDRS
-    "api.h"
-  SRCS
-    "api.cc"
-  DEPS
-    absl::time
-    iree::base::api
-    iree::base::api_util
-    iree::base::flatbuffer_util
-    iree::base::tracing
-    iree::rt::api
-    iree::vm::sequencer_module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    bytecode_disassembler
-  SRCS
-    "bytecode_disassembler.cc"
-  HDRS
-    "bytecode_disassembler.h"
-  DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::strings
-    absl::span
-    iree::base::status
-    iree::schemas
-    iree::schemas::bytecode::bytecode_v0
-    iree::rt
-    iree::vm::bytecode_util
-    iree::vm::opcode_info
-    iree::vm::source_map_resolver
-    iree::vm::type
-  PUBLIC
+    bytecode_dispatch_test_module
+  SRC
+    "bytecode_dispatch_test.mlir"
+  CC_NAMESPACE
+    "iree::vm"
+  TRANSLATION
+    "-iree-vm-ir-to-bytecode-module"
 )
 
 iree_cc_library(
   NAME
     bytecode_module
-  SRCS
-    "bytecode_module.cc"
   HDRS
     "bytecode_module.h"
+  SRCS
+    "bytecode_dispatch.c"
+    "bytecode_module.cc"
+    "bytecode_module_impl.h"
+    "bytecode_op_table.h"
   DEPS
-    absl::memory
+    iree::vm::bytecode_op_table_gen
+    iree::vm::module
+    iree::vm::ref
+    iree::vm::stack
+    iree::vm::types
+    iree::vm::value
+    iree::base::api
     iree::base::flatbuffer_util
-    iree::base::status
-    iree::rt
-    iree::schemas
-    iree::vm::bytecode_disassembler
-    iree::vm::source_map_resolver
+    iree::base::target_platform
+    iree::schemas::bytecode_module_def_cc_fbs
+    flatbuffers
   PUBLIC
 )
 
-iree_cc_library(
+#TODO(marbre): 'benchmark/benchmark.h' file not found by bytecode_module_benchmark.cc
+#
+#iree_cc_test(
+#  NAME
+#    bytecode_module_benchmark
+#  SRCS
+#    "bytecode_module_benchmark.cc"
+#  DEPS
+#    iree::vm::bytecode_module
+#    iree::vm::bytecode_module_benchmark_module_cc
+#    iree::vm::module
+#    iree::vm::stack
+#    iree::base::api
+#    iree::base::logging
+#    #TODO(marbre): Add dep iree::testing::benchmark_main
+#    absl::container
+#    absl::strings
+#    #TODO(marbre): Add depp "@com_google_benchmark//:benchmark"
+#)
+
+iree_bytecode_module(
   NAME
-    bytecode_reader
+    bytecode_module_benchmark_module
+  SRC
+    "bytecode_module_benchmark_module.mlir"
+  CC_NAMESPACE
+    "iree::vm"
+  TRANSLATION
+    "-iree-vm-ir-to-bytecode-module"
+)
+
+iree_cc_test(
+  NAME
+    bytecode_module_test
   SRCS
-    "bytecode_reader.cc"
-  HDRS
-    "bytecode_reader.h"
+    "bytecode_module_test.cc"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    iree::base::shape
-    iree::base::status
-    iree::hal::buffer_view
-    iree::hal::heap_buffer
-    iree::rt
-    iree::schemas::bytecode::bytecode_v0
     iree::vm::bytecode_module
-    iree::vm::type
-  PUBLIC
+    gtest_main
 )
 
-iree_cc_library(
+iree_tablegen_library(
   NAME
-    bytecode_tables_interpreter
+    bytecode_op_table_gen
   SRCS
-    "bytecode_tables_interpreter.cc"
-  HDRS
-    "bytecode_tables_interpreter.h"
-  DEPS
-    iree::schemas::bytecode::interpreter_bytecode_v0
-    iree::vm::opcode_info
-  PUBLIC
-)
+    "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/IR/VMOps.td"
+  OUTS
+    -gen-iree-vm-op-table-defs bytecode_op_table.h
+  TBLGEN
+    IREE
+ )
 
 iree_cc_library(
   NAME
-    bytecode_tables_sequencer
+    context
+  HDRS
+    "context.h"
   SRCS
-    "bytecode_tables_sequencer.cc"
-  HDRS
-    "bytecode_tables_sequencer.h"
+    "context.c"
   DEPS
-    iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::opcode_info
-  PUBLIC
+    iree::vm::instance
+    iree::vm::module
+    iree::vm::stack
+    iree::base::api
 )
 
 iree_cc_library(
   NAME
-    bytecode_util
+    instance
+  HDRS
+    "instance.h"
   SRCS
-    "bytecode_util.cc"
-  HDRS
-    "bytecode_util.h"
+    "instance.c"
   DEPS
-    absl::strings
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
+    iree::vm::types
+    iree::base::api
 )
 
 iree_cc_library(
   NAME
-    bytecode_validator
+    invocation
+  HDRS
+    "invocation.h"
   SRCS
-    "bytecode_validator.cc"
-  HDRS
-    "bytecode_validator.h"
+    "invocation.c"
   DEPS
-    iree::base::status
-    iree::rt
-    iree::schemas
-  PUBLIC
+    iree::vm::context
+    iree::vm::module
+    iree::vm::variant_list
+    iree::base::api
 )
 
 iree_cc_library(
   NAME
-    opcode_info
+    module
   HDRS
-    "opcode_info.h"
-  DEPS
-    absl::strings
-    absl::optional
-    absl::span
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_dispatch
+    "module.h"
   SRCS
-    "sequencer_dispatch.cc"
-  HDRS
-    "sequencer_dispatch.h"
+    "module.c"
   DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::strings
-    absl::time
-    absl::span
-    iree::base::logging
-    iree::base::memory
-    iree::base::status
-    iree::hal::buffer_view
-    iree::hal::command_queue
-    iree::hal::device
-    iree::hal::device_placement
-    iree::hal::heap_buffer
-    iree::rt
-    iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::bytecode_module
-    iree::vm::bytecode_reader
-    iree::vm::bytecode_tables_sequencer
-    iree::vm::bytecode_util
-    iree::vm::opcode_info
-  PUBLIC
+    iree::base::api
 )
 
 iree_cc_library(
   NAME
-    sequencer_module
-  SRCS
-    "sequencer_module.cc"
+    ref
   HDRS
-    "sequencer_module.h"
+    "ref.h"
+  SRCS
+    "ref.c"
   DEPS
-    absl::core_headers
-    iree::base::status
-    iree::hal::buffer_view
-    iree::rt
-    iree::schemas::bytecode::sequencer_bytecode_v0
-    iree::vm::bytecode_module
-    iree::vm::sequencer_dispatch
-  PUBLIC
+    iree::base::api
+)
+
+iree_cc_test(
+  NAME
+    ref_test
+  SRCS
+    "ref_test.cc"
+  DEPS
+    iree::vm::ref
+    iree::base::api
+    iree::base::ref_ptr
+    gtest_main
 )
 
 iree_cc_library(
   NAME
-    source_map_resolver
-  SRCS
-    "source_map_resolver.cc"
+    stack
   HDRS
-    "source_map_resolver.h"
+    "stack.h"
+  SRCS
+    "stack.c"
   DEPS
-    absl::strings
-    absl::optional
-    iree::base::flatbuffer_util
-    iree::base::status
-    iree::rt
-    iree::schemas
-  PUBLIC
+    iree::vm::module
+    iree::vm::ref
+    iree::base::api
+)
+
+iree_cc_test(
+  NAME
+    stack_test
+  SRCS
+    "stack_test.cc"
+  DEPS
+    iree::vm::ref
+    iree::vm::stack
+    iree::base::api
+    iree::base::ref_ptr
+    gtest_main
 )
 
 iree_cc_library(
   NAME
-    type
-  SRCS
-    "type.cc"
+    types
   HDRS
-    "type.h"
+    "types.h"
+  SRCS
+    "types.c"
   DEPS
-    iree::base::status
-    iree::schemas
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
+    iree::vm::ref
+    iree::base::api
+)
+
+iree_cc_library(
+  NAME
+    value
+  HDRS
+    "value.h"
+)
+
+iree_cc_library(
+  NAME
+    variant_list
+  HDRS
+    "variant_list.h"
+  SRCS
+    "variant_list.c"
+  DEPS
+    iree::vm::ref
+    iree::vm::value
+)
+
+iree_cc_library(
+  NAME
+    vm
+  HDRS
+    "api.h"
+  DEPS
+    iree::vm::context
+    iree::vm::instance
+    iree::vm::invocation
+    iree::vm::module
+    iree::vm::ref
+    iree::vm::stack
+    iree::vm::types
+    iree::vm::value
+    iree::vm::variant_list
+    iree::base::api
 )

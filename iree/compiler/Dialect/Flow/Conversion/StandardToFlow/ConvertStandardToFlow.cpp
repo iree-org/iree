@@ -31,7 +31,7 @@ struct ExtractElementOpLowering : public OpRewritePattern<ExtractElementOp> {
   using OpRewritePattern::OpRewritePattern;
   PatternMatchResult matchAndRewrite(ExtractElementOp op,
                                      PatternRewriter &rewriter) const override {
-    auto aggregateType = op.getAggregate()->getType().dyn_cast<TensorType>();
+    auto aggregateType = op.getAggregate().getType().dyn_cast<TensorType>();
     if (!aggregateType) {
       // We currently are only looking for tensor types.
       return matchFailure();
@@ -49,7 +49,7 @@ void setupDirectStandardToFlowLegality(MLIRContext *context,
                                        ConversionTarget &conversionTarget) {
   conversionTarget.addDynamicallyLegalOp<ExtractElementOp>(
       [](ExtractElementOp op) {
-        return !op.getAggregate()->getType().isa<TensorType>();
+        return !op.getAggregate().getType().isa<TensorType>();
       });
 }
 

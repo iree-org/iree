@@ -24,8 +24,8 @@
 #include "iree/base/signature_mangle.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
-#include "iree/vm2/ref.h"
-#include "iree/vm2/variant_list.h"
+#include "iree/vm/ref.h"
+#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace python {

@@ -25,7 +25,6 @@ iree_cc_library(
     "IREEIndexComputation.h"
     "IREEToSPIRV.h"
     "IREEToSPIRVPass.h"
-    "SPIRVExecutableTranslation.h"
     "SPIRVLowering.h"
     "TensorIndexToScalarValueMap.h"
     "XLAIndexPropagation.h"
@@ -41,20 +40,14 @@ iree_cc_library(
     "IREEToSPIRVPass.cpp"
     "PrepareReductionDispatch.cpp"
     "ReductionFnLowering.cpp"
-    "SPIRVExecutableTranslation.cpp"
     "SPIRVLowering.cpp"
     "XLAIndexPropagation.cpp"
     "XLAToSPIRV.cpp"
   DEPS
     flatbuffers
-    iree::compiler::IR
-    iree::compiler::IR::Interpreter
-    iree::compiler::Serialization
-    iree::compiler::Transforms
-    iree::compiler::Transforms::Sequencer
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::SPIRV::Kernels
     iree::compiler::Utils
-    iree::schemas
     iree::schemas::spirv_executable_def_cc_fbs
     tensorflow::mlir_xla
     LLVMSupport

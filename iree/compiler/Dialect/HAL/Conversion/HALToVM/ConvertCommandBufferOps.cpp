@@ -27,7 +27,7 @@ class RemoveMakeMemoryBarrierOpConversion
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      IREE::HAL::MakeMemoryBarrierOp op, ArrayRef<ValuePtr> operands,
+      IREE::HAL::MakeMemoryBarrierOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return matchSuccess();
@@ -48,11 +48,11 @@ class CommandBufferExecutionBarrierOpConversion
 
   PatternMatchResult matchAndRewrite(
       IREE::HAL::CommandBufferExecutionBarrierOp op,
-      llvm::ArrayRef<ValuePtr> operands,
+      llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto importType = importOp.getType();
 
-    SmallVector<ValuePtr, 8> callOperands = {
+    SmallVector<Value, 8> callOperands = {
         operands[0],
         rewriter.create<mlir::ConstantOp>(
             op.getLoc(), rewriter.getI32IntegerAttr(
@@ -78,9 +78,9 @@ class CommandBufferExecutionBarrierOpConversion
       return matchFailure();
     }
     for (auto memoryBarrier : op.memory_barriers()) {
-      assert(memoryBarrier->getDefiningOp());
+      assert(memoryBarrier.getDefiningOp());
       auto makeMemoryBarrierOp =
-          cast<IREE::HAL::MakeMemoryBarrierOp>(memoryBarrier->getDefiningOp());
+          cast<IREE::HAL::MakeMemoryBarrierOp>(memoryBarrier.getDefiningOp());
       callOperands.push_back(rewriter.create<mlir::ConstantOp>(
           op.getLoc(), rewriter.getI32IntegerAttr(static_cast<int32_t>(
                            makeMemoryBarrierOp.source_scope()))));

@@ -25,7 +25,7 @@ class VMTypeConverter : public TypeConverter {
   Type convertType(Type t) override;
 
   Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
-                                   ArrayRef<ValuePtr> inputs,
+                                   ArrayRef<Value> inputs,
                                    Location loc) override;
 };
 

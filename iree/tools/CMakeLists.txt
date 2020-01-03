@@ -12,6 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+if (${IREE_ENABLE_LLVM})
+  iree_cc_binary(
+    NAME
+      iree_tblgen
+    OUT
+      iree-tblgen
+    SRCS
+      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+    DEPS
+      iree::compiler::Dialect::VM::Tools
+      LLVMMLIRTableGen
+      MLIRSupport
+      LLVMTableGen
+    LINKOPTS
+      "-lpthread"
+  )
+  add_executable(iree-tblgen ALIAS iree_tools_iree_tblgen)
+endif()
+
 if(${IREE_BUILD_COMPILER})
 
   # Additional libraries containing statically registered functions/flags, which
@@ -33,9 +52,11 @@ if(${IREE_BUILD_COMPILER})
     MLIRTranslation
     MLIRSupport
     MLIRVectorOps
-    iree::compiler::IR
-    iree::compiler::IR::Sequencer
-    iree::compiler::IR::Interpreter
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::Interpreter::IR
     tensorflow::mlir_xla
   )
 
@@ -49,22 +70,34 @@ if(${IREE_BUILD_COMPILER})
     endif()
   endforeach(LIB)
 
-  iree_cc_binary(
-    NAME
-      iree_tblgen
-    OUT
-      iree-tblgen
-    SRCS
-      "${IREE_ROOT_DIR}/third_party/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-    DEPS
-      iree::compiler::Dialect::VM::Tools
-      LLVMMLIRTableGen
-      MLIRSupport
-      LLVMTableGen
-    LINKOPTS
-      "-lpthread"
-  )
-  add_executable(iree-tblgen ALIAS iree_tools_iree_tblgen)
+# TODO(mabre): Get this working
+#  iree_cc_binary(
+#    NAME
+#      iree-run-mlir
+#    SRCS
+#      "run_mlir_main.cc"
+#    DEPS
+#      absl::flags
+#      absl::strings
+#      # TODO(marbre): Fix problems with property "ALWAYSLINK".
+#      #iree::base::source_location
+#      iree::rt
+#      LLVMSupport
+#      MLIRIR
+#      MLIRParser
+#      MLIRSupport
+#      iree::base::init
+#      iree::base::status
+#      iree::compiler::Translation::Interpreter
+#      iree::compiler::Translation::SPIRV
+#      iree::compiler::Translation::IREEVM
+#      iree::hal::buffer_view_string_util
+#      iree::hal::driver_registry
+#      # TODO(marbre)_ Add deps
+#      # PLATFORM_VULKAN_DEPS
+#      iree::hal::interpreter::interpreter_driver_module
+#      iree::hal::vulkan::vulkan_driver_module
+#    )
 
   iree_cc_binary(
     NAME
@@ -72,11 +105,10 @@ if(${IREE_BUILD_COMPILER})
     OUT
       iree-translate
     SRCS
-      "iree_translate_main.cc"
+      "translate_main.cc"
     DEPS
       ${_ALWAYSLINK_LIBS}
-      iree::compiler::Translation::Interpreter
-      iree::compiler::Translation::Sequencer
+      iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Translation::SPIRV
       MLIRTranslateClParser
   )

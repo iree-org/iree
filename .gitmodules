@@ -7,9 +7,6 @@
 [submodule "third_party/llvm-project"]
 	path = third_party/llvm-project
 	url = https://github.com/llvm/llvm-project.git
-[submodule "third_party/mlir"]
-	path = third_party/mlir
-	url = https://github.com/tensorflow/mlir.git
 [submodule "third_party/tensorflow"]
 	path = third_party/tensorflow
 	url = https://github.com/tensorflow/tensorflow.git

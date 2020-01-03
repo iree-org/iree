@@ -11,22 +11,22 @@ func @initializer() -> i32 {
 
 // -----
 
-hal.variable @v_unused : !ireex.ref<!hal.buffer>
+hal.variable @v_unused : !iree.ref<!hal.buffer>
 // CHECK-LABEL: @unused_load
 func @unused_load() {
   // CHECK-NEXT: return
-  %0 = hal.variable.load @v_unused : !ireex.ref<!hal.buffer>
+  %0 = hal.variable.load @v_unused : !iree.ref<!hal.buffer>
   return
 }
 
 // -----
 
-hal.variable @v_nop mutable : !ireex.ref<!hal.buffer>
+hal.variable @v_nop mutable : !iree.ref<!hal.buffer>
 // CHECK-LABEL: @nop_load_store
 func @nop_load_store() {
   // CHECK-NEXT: return
-  %0 = hal.variable.load @v_nop : !ireex.ref<!hal.buffer>
-  hal.variable.store %0, @v_nop : !ireex.ref<!hal.buffer>
+  %0 = hal.variable.load @v_nop : !iree.ref<!hal.buffer>
+  hal.variable.store %0, @v_nop : !iree.ref<!hal.buffer>
   return
 }
 

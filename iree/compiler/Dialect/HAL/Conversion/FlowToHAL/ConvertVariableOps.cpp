@@ -32,6 +32,27 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+static FuncOp createInitializerFromImmediate(
+    IREE::Flow::VariableOp variableOp, ElementsAttr immediateElements,
+    ConversionPatternRewriter &rewriter) {
+  auto loc = variableOp.getLoc();
+  auto initializerType = FunctionType::get({}, {immediateElements.getType()},
+                                           rewriter.getContext());
+  // TODO(b/145839814): It is presently possible to collide with user
+  // provided symbols and it seems like it shouldn't be.
+  auto uniqueName = (Twine("__") + variableOp.getName() + "_initializer").str();
+  auto initializerFuncOp =
+      rewriter.create<FuncOp>(variableOp.getLoc(), uniqueName, initializerType,
+                              ArrayRef<NamedAttribute>{});
+  auto *entryBlock = initializerFuncOp.addEntryBlock();
+  rewriter.setInsertionPointToEnd(entryBlock);
+
+  // Create const and return ops.
+  auto constValue = rewriter.create<ConstantOp>(loc, immediateElements);
+  rewriter.create<ReturnOp>(loc, constValue.getResult());
+  return initializerFuncOp;
+}
+
 class VariableOpConversion
     : public OpConversionPattern<IREE::Flow::VariableOp> {
  public:
@@ -39,13 +60,27 @@ class VariableOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::VariableOp variableOp, llvm::ArrayRef<ValuePtr> newOperands,
+      IREE::Flow::VariableOp variableOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple variables.
+    Optional<StringRef> initializer = variableOp.initializer();
+    Optional<Attribute> initialValue = variableOp.initial_value();
+
+    // Hoist any immediate initial_value elements to an initializer function
+    // that returns it. This will then be converted by the framework to
+    // an appropriate HAL Buffer-based initializer.
+    if (auto initialValueElements =
+            variableOp.initial_valueAttr().dyn_cast_or_null<ElementsAttr>()) {
+      auto initializerFunc = createInitializerFromImmediate(
+          variableOp, initialValueElements, rewriter);
+      initializer = initializerFunc.getName();
+      initialValue = llvm::None;
+    }
+
+    rewriter.setInsertionPoint(variableOp);
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableOp>(
         variableOp, variableOp.sym_name(), variableOp.is_mutable(),
-        converter.convertType(variableOp.type()), variableOp.initializer(),
-        variableOp.initial_value(),
+        converter.convertType(variableOp.type()), initializer, initialValue,
         llvm::to_vector<4>(variableOp.getDialectAttrs()));
     return matchSuccess();
   }
@@ -61,11 +96,11 @@ class VariableLoadOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::VariableLoadOp loadOp, llvm::ArrayRef<ValuePtr> newOperands,
+      IREE::Flow::VariableLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableLoadOp>(
-        loadOp, converter.convertType(loadOp.result()->getType()),
+        loadOp, converter.convertType(loadOp.result().getType()),
         rewriter.getSymbolRefAttr(loadOp.variable()));
     return matchSuccess();
   }
@@ -81,7 +116,7 @@ class VariableStoreOpConversion
       : OpConversionPattern(ctx) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<ValuePtr> newOperands,
+      IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::VariableStoreOpOperandAdaptor operands(newOperands);
     // TODO(benvanik): multiple converted type results to multiple variables.

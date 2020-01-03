@@ -38,9 +38,9 @@ class ControlFlowModule(tf.Module):
     return i
 
 
+# TODO(b/146900329): Triage op coverage for vulkan backend.
 @tf_test_utils.compile_modules(
-    [tf_test_utils.BackendInfo.ALL["iree_interpreter"]],
-    control_flow=ControlFlowModule)
+    backends=["tf", "iree_interpreter"], control_flow=ControlFlowModule)
 class ControlFlowTest(tf_test_utils.SavedModelTestCase):
 
   def test_short_sequence(self):

@@ -70,6 +70,7 @@
 #define IREE_BASE_API_H_
 
 #include <memory.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -206,6 +207,9 @@ typedef struct {
   size_t size;
 } iree_string_view_t;
 
+#define IREE_STRING_VIEW_EMPTY \
+  { 0, 0 }
+
 #define IREE_SHAPE_MAX_RANK 5
 typedef struct {
   int32_t rank;
@@ -315,6 +319,10 @@ iree_make_cstring_view(const char* str);
 // Like strncmp but with iree_string_view_t values.
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
+
+// Returns true if the string starts with the given prefix.
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(
+    iree_string_view_t value, iree_string_view_t prefix);
 
 // Splits |value| into two parts based on the first occurrence of |split_char|.
 // Returns the index of the |split_char| in the original |value| or -1 if not

@@ -16,7 +16,7 @@
 
 #include <cassert>
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -48,8 +48,6 @@ Type legalizeType(Type type) {
   return type;
 }
 
-Type LLTypeConverter::convertType(Type type) { return legalizeType(type); }
-
 MemRefType convertTypeToMemRef(Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
@@ -62,12 +60,8 @@ MemRefType convertTypeToMemRef(Type type) {
   }
 }
 
-MemRefType convertTypeToMemRef(ValuePtr value) {
-  return convertTypeToMemRef(value->getType());
-}
-
-Type MemRefTypeConverter::convertType(Type type) {
-  return convertTypeToMemRef(type);
+MemRefType convertTypeToMemRef(Value value) {
+  return convertTypeToMemRef(value.getType());
 }
 
 }  // namespace iree_compiler

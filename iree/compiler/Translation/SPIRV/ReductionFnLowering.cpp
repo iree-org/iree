@@ -18,7 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/IR/Ops.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -65,21 +65,24 @@ class ReductionApplyFnConversion final
   using SPIRVReductionConversion<FuncOp>::SPIRVReductionConversion;
 
   PatternMatchResult matchAndRewrite(
-      FuncOp funcOp, ArrayRef<ValuePtr> operands,
+      FuncOp funcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override;
 };
 
-/// Return operation conversion. Just converts iree::ReturnOp to
+/// Return operation conversion. Just converts ReturnOp to
 /// spirv::ReturnOp.
 // TODO: This can be moved into DRR.
-class IREEReturnOpConversion final
-    : public SPIRVReductionConversion<IREE::ReturnOp> {
+template <typename ReturnOpTy>
+class ReturnOpConversion final : public SPIRVReductionConversion<ReturnOpTy> {
  public:
-  using SPIRVReductionConversion<IREE::ReturnOp>::SPIRVReductionConversion;
+  using SPIRVReductionConversion<ReturnOpTy>::SPIRVReductionConversion;
 
   PatternMatchResult matchAndRewrite(
-      IREE::ReturnOp op, ArrayRef<ValuePtr> operands,
-      ConversionPatternRewriter &rewriter) const override;
+      ReturnOpTy op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<spirv::ReturnOp>(op);
+    return this->matchSuccess();
+  }
 };
 
 /// Operations within the apply function need to be converted to a atomic
@@ -90,7 +93,7 @@ class ReductionOpConversion final : public SPIRVReductionConversion<OpTy> {
   using SPIRVReductionConversion<OpTy>::SPIRVReductionConversion;
 
   PatternMatchResult matchAndRewrite(
-      OpTy op, ArrayRef<ValuePtr> operands,
+      OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override;
 };
 
@@ -117,7 +120,7 @@ Type SPIRVReductionTypeConverter::convertType(Type t) {
 //===----------------------------------------------------------------------===//
 
 PatternMatchResult ReductionApplyFnConversion::matchAndRewrite(
-    FuncOp funcOp, ArrayRef<ValuePtr> operands,
+    FuncOp funcOp, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
   auto fnType = funcOp.getType();
   if (fnType.getNumInputs() != 2 || fnType.getNumResults() != 1) {
@@ -146,36 +149,25 @@ PatternMatchResult ReductionApplyFnConversion::matchAndRewrite(
 }
 
 //===----------------------------------------------------------------------===//
-// IREE::ReturnOp
-//===----------------------------------------------------------------------===//
-
-PatternMatchResult IREEReturnOpConversion::matchAndRewrite(
-    IREE::ReturnOp op, ArrayRef<ValuePtr> operands,
-    ConversionPatternRewriter &rewriter) const {
-  rewriter.replaceOpWithNewOp<spirv::ReturnOp>(op);
-  return matchSuccess();
-}
-
-//===----------------------------------------------------------------------===//
 // ReductionOp
 //===----------------------------------------------------------------------===//
 
 template <typename OpTy, typename ReplacementOpTy>
 PatternMatchResult
 ReductionOpConversion<OpTy, ReplacementOpTy>::matchAndRewrite(
-    OpTy op, ArrayRef<ValuePtr> operands,
+    OpTy op, ArrayRef<Value> operands,
     ConversionPatternRewriter &rewriter) const {
   if (operands.size() != 2) {
     return this->matchFailure();
   }
   // One of the replacement operands will be a pointer type, and another a value
   // type.
-  ValuePtr ptr = operands[0];
-  ValuePtr value = operands[1];
-  if (!ptr->getType().isa<spirv::PointerType>()) std::swap(ptr, value);
-  if (!ptr->getType().isa<spirv::PointerType>()) return this->matchFailure();
+  Value ptr = operands[0];
+  Value value = operands[1];
+  if (!ptr.getType().isa<spirv::PointerType>()) std::swap(ptr, value);
+  if (!ptr.getType().isa<spirv::PointerType>()) return this->matchFailure();
   rewriter.replaceOpWithNewOp<ReplacementOpTy>(
-      op, ptr->getType().cast<spirv::PointerType>().getPointeeType(), ptr,
+      op, ptr.getType().cast<spirv::PointerType>().getPointeeType(), ptr,
       spirv::Scope::Device, spirv::MemorySemantics::AcquireRelease, value);
   return this->matchSuccess();
 }
@@ -187,10 +179,12 @@ LogicalResult lowerReductionApplyFunction(MLIRContext *context,
                                           ArrayRef<Operation *> fns) {
   OwningRewritePatternList patterns;
   SPIRVReductionTypeConverter typeConverter;
-  patterns.insert<IREEReturnOpConversion, ReductionApplyFnConversion,
-                  ReductionOpConversion<xla_hlo::MaxOp, spirv::AtomicSMaxOp>,
-                  ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>>(
-      context, typeConverter);
+  patterns
+      .insert<ReductionApplyFnConversion,
+              ReductionOpConversion<xla_hlo::MaxOp, spirv::AtomicSMaxOp>,
+              ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>,
+              ReturnOpConversion<IREE::ReturnOp>, ReturnOpConversion<ReturnOp>>(
+          context, typeConverter);
   ConversionTarget target(*context);
   target.addLegalDialect<spirv::SPIRVDialect>();
   target.addDynamicallyLegalOp<FuncOp>(

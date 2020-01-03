@@ -14,17 +14,18 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LegacyInterpreter/LegacyInterpreterTarget.h"
 
+#include <utility>
+
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/minireflect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
-#include "iree/compiler/IR/Interpreter/OpWriters.h"
-#include "iree/compiler/Serialization/VMFunctionBuilder.h"
-#include "iree/compiler/Serialization/VMModuleBuilder.h"
-#include "iree/compiler/Transforms/Interpreter/Passes.h"
-#include "iree/compiler/Transforms/Passes.h"
+#include "iree/compiler/Translation/Interpreter/IR/OpWriters.h"
+#include "iree/compiler/Translation/Interpreter/Serialization/VMFunctionBuilder.h"
+#include "iree/compiler/Translation/Interpreter/Serialization/VMModuleBuilder.h"
+#include "iree/compiler/Translation/Interpreter/Transforms/Passes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/IR/Builders.h"
@@ -156,7 +157,7 @@ static LogicalResult declareInterpreterFunction(
     if (functionOffset.IsNull()) {
       return funcOp.emitError() << "failed to create import function bytecode";
     }
-    if (failed(functionTable->DefineFunction(funcOp, functionOffset, {}))) {
+    if (failed(functionTable->DefineFunction(funcOp, functionOffset))) {
       return failure();
     }
   }
@@ -177,8 +178,8 @@ static LogicalResult defineInterpreterFunction(
   if (functionOffset.IsNull()) {
     return funcOp.emitError() << "failed to serialize function";
   }
-  return moduleBuilder->function_table()->DefineFunction(
-      funcOp, functionOffset, functionBuilder.source_map());
+  return moduleBuilder->function_table()->DefineFunction(funcOp,
+                                                         functionOffset);
 }
 
 LogicalResult translateToLegacyInterpreterExecutable(
@@ -188,7 +189,7 @@ LogicalResult translateToLegacyInterpreterExecutable(
   // Clone the module containing the things we want to translate. We do this so
   // that multiple targets can pull from the same source without conflicting.
   auto moduleOp = sourceOp.getInnerModule().clone();
-  makeLegacyExecutableABI(sourceOp, moduleOp);
+  makeLegacyExecutableABI(sourceOp, moduleOp, targetOp);
 
   // Run all passes to go from input to the iree_ll_interp dialect.
   PassManager conversionPassManager(moduleOp.getContext());
@@ -234,7 +235,7 @@ LogicalResult translateToLegacyInterpreterExecutable(
   targetBuilder.setInsertionPoint(&targetOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
       targetOp.getLoc(),
-      static_cast<uint32_t>(IREE::ExecutableFormat::IreeBytecode),
+      static_cast<uint32_t>(IREE::HAL::ExecutableFormat::IreeBytecode),
       std::move(bytes));
   binaryOp.getBlock().getOperations().insert(
       Block::iterator(binaryOp.getBlock().back()), moduleOp);
@@ -242,11 +243,11 @@ LogicalResult translateToLegacyInterpreterExecutable(
 }
 
 static ExecutableTargetRegistration targetRegistration(
-    "legacy-interpreter",
+    "interpreter-bytecode",
     +[](IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
         ExecutableTargetOptions executableOptions) {
       return translateToLegacyInterpreterExecutable(
-          sourceOp, targetOp, executableOptions,
+          sourceOp, targetOp, std::move(executableOptions),
           getLegacyInterpreterTargetOptionsFromFlags());
     });
 

@@ -28,6 +28,8 @@ package(
         name = name,
         srcs = [name + ".py"],
         python_version = "PY3",
+        # TODO(b/145815906) Get this running in OSS CI.
+        tags = ["nokokoro"],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//bindings/python/pyiree",
         ],
@@ -39,6 +41,19 @@ package(
         "simple_stateful_test",
         "mandelbrot_test",
         "simple_arithmetic_test",
-        "vulkan_conv_test",
     ]
 ]
+
+py_test(
+    name = "vulkan_conv_test",
+    srcs = ["vulkan_conv_test.py"],
+    python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//bindings/python/pyiree",
+    ],
+)

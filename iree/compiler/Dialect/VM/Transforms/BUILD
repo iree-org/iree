@@ -21,7 +21,8 @@ cc_library(
     name = "Transforms",
     srcs = [
         "Conversion.cpp",
-        "OrdinalAllocationPass.cpp",
+        "GlobalInitialization.cpp",
+        "OrdinalAllocation.cpp",
         "Passes.cpp",
     ],
     hdrs = [
@@ -31,12 +32,12 @@ cc_library(
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Pass",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:TransformUtils",
-        "@local_config_mlir//:Transforms",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
 )

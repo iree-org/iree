@@ -19,3 +19,4 @@ iree/tools/web
 # Ignore third_party directories which contain BUILD files so that recursive
 # from root works.
 third_party
+build_tools/bazel/third_party_import/llvm-project/overlay

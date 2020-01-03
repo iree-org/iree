@@ -32,10 +32,23 @@ TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
 ]
 
+cc_binary(
+    name = "iree-dump-module",
+    srcs = ["dump_module_main.cc"],
+    deps = [
+        "//iree/base:file_io",  # build-cleaner: keep
+        "//iree/base:flatbuffer_util",
+        "//iree/base:init",
+        "//iree/schemas:bytecode_module_def_cc_fbs",
+        "@com_github_google_flatbuffers//:flatbuffers",
+    ],
+)
+
 cc_library(
     name = "iree_opt_library",
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Flow/Analysis",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
@@ -47,15 +60,13 @@ cc_library(
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Transforms",
-        "//iree/compiler/Transforms",
-        "//iree/compiler/Transforms/Interpreter",
-        "//iree/compiler/Transforms/Sequencer",
+        "//iree/compiler/Translation/Interpreter/Transforms",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV",
-        "@llvm//:support",
-        "@local_config_mlir//:AffineDialectRegistration",
-        "@local_config_mlir//:MlirOptLib",
-        "@local_config_mlir//:StandardDialectRegistration",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AffineDialectRegistration",
+        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:StandardDialectRegistration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
@@ -67,7 +78,7 @@ cc_binary(
     name = "iree-opt",
     deps = [
         ":iree_opt_library",
-        "@local_config_mlir//:MlirOptMain",
+        "@llvm-project//mlir:MlirOptMain",
     ],
 )
 
@@ -77,23 +88,28 @@ cc_binary(
     deps = [
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
+        "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:shaped_buffer",
+        "//iree/base:shaped_buffer_string_util",
+        "//iree/base:signature_mangle",
         "//iree/base:source_location",
-        "//iree/rt",
-        "//iree/vm:sequencer_module",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Parser",
-        "@local_config_mlir//:Support",
+        "//iree/compiler/Dialect/Flow/Transforms",
+        "//iree/compiler/Dialect/HAL/Transforms",
+        "//iree/compiler/Dialect/VM/Target/Bytecode",
+        "//iree/compiler/Dialect/VM/Transforms",
+        "//iree/hal:api",
+        "//iree/modules/hal",
+        "//iree/vm",
+        "//iree/vm:bytecode_module",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
         "//iree/base:init",
         "//iree/base:status",
-        "//iree/compiler/Translation/Sequencer",
-        "//iree/compiler/Translation/Interpreter",
-        "//iree/compiler/Translation/SPIRV",
         "//iree/compiler/Translation:IREEVM",
-        "//iree/hal:buffer_view_string_util",
-        "//iree/hal:driver_registry",
-        "//iree/schemas",
-        "//iree/rt/debug:debug_server_flags",
     ] + TARGET_COMPILER_BACKENDS + PLATFORM_VULKAN_DEPS + [
         "//iree/hal/interpreter:interpreter_driver_module",
         # TODO(b/142004903): enable when Dawn HAL implementation is functional
@@ -109,29 +125,27 @@ cc_binary(
     ],
     deps = [
         "//iree/compiler/Dialect/VM/Tools",
-        "@local_config_mlir//:MlirTableGenMain",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:TableGen",
+        "@llvm-project//mlir:MlirTableGenMain",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TableGen",
     ],
 )
 
 cc_library(
     name = "iree_translate_library",
-    srcs = ["iree_translate_main.cc"],
+    srcs = ["translate_main.cc"],
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
-        "//iree/compiler/Translation/Interpreter",
         "//iree/compiler/Translation/SPIRV",
-        "//iree/compiler/Translation/Sequencer",
-        "@llvm//:support",
-        "@local_config_mlir//:AffineDialectRegistration",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Pass",
-        "@local_config_mlir//:StandardDialectRegistration",
-        "@local_config_mlir//:Support",
-        "@local_config_mlir//:TranslateClParser",
-        "@local_config_mlir//:Translation",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AffineDialectRegistration",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardDialectRegistration",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TranslateClParser",
+        "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ] + TARGET_COMPILER_BACKENDS,
     alwayslink = 1,
@@ -144,43 +158,9 @@ cc_binary(
     ],
 )
 
-cc_binary(
-    name = "run_module",
-    srcs = ["run_module_main.cc"],
-    deps = [
-        "//iree/base:file_io",
-        "//iree/base:file_path",
-        "//iree/base:init",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/hal:buffer_view_string_util",
-        "//iree/hal:driver_registry",
-        "//iree/hal/interpreter:interpreter_driver_module",
-        "//iree/rt",
-        "//iree/rt/debug:debug_server_flags",
-        "//iree/schemas",
-        "//iree/vm:sequencer_module",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_binary(
-    name = "iree_dump_module",
-    srcs = ["dump_module.cc"],
-    deps = [
-        "//iree/base:file_io",  # build-cleaner: keep
-        "//iree/base:flatbuffer_util",
-        "//iree/base:init",
-        "//iree/schemas",
-        "//iree/schemas:reflection_data",
-        "@com_github_google_flatbuffers//:flatbuffers",
-    ],
-)
-
 sh_binary(
     name = "IreeFileCheck",
     testonly = True,
     srcs = ["IreeFileCheck.sh"],
-    data = ["@llvm//:FileCheck"],
+    data = ["@llvm-project//llvm:FileCheck"],
 )

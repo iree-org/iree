@@ -127,7 +127,7 @@ function(iree_cc_library)
         set_property(TARGET ${_NAME} PROPERTY ALWAYSLINK 1)
       endif()
 
-      # Add all IREE targets to a a folder in the IDE for organization.
+      # Add all IREE targets to a folder in the IDE for organization.
       if(_RULE_PUBLIC)
         set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER})
       elseif(_RULE_TESTONLY)

@@ -261,8 +261,8 @@ class VM_EncIntArrayAttr<string name, int thisBitwidth> : VM_EncEncodeExpr<
 }
 class VM_EncStrAttr<string name> : VM_EncEncodeExpr<
     "e.encodeStrAttr(getAttrOfType<StringAttr>(\"" # name # "\"))">;
-class VM_EncBranch<string blockName, string operandsName> : VM_EncEncodeExpr<
-    "e.encodeBranch(" # blockName # "(), " # operandsName # "())">;
+class VM_EncBranch<string blockName, string operandsName, int successorIndex> : VM_EncEncodeExpr<
+    "e.encodeBranch(" # blockName # "(), " # operandsName # "(), " # successorIndex # ")">;
 class VM_EncOperand<string name, int ordinal> : VM_EncEncodeExpr<
     "e.encodeOperand(" # name # "(), " # ordinal # ")">;
 class VM_EncVariadicOperands<string name> : VM_EncEncodeExpr<

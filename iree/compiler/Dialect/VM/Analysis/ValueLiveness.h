@@ -50,9 +50,14 @@ class ValueLiveness {
   // Recalculates the liveness information for the given function.
   LogicalResult recalculate(IREE::VM::FuncOp funcOp);
 
+  // Returns an unordered list of values live on block entry.
+  ArrayRef<Value> getBlockLiveIns(Block *block);
+
+  // Returns true if |useOp| has the last use of |value|.
+  bool isLastValueUse(Value value, Operation *useOp);
   // Returns true if |useOp|'s operand at |operandIndex| is the last use of the
   // value.
-  bool isLastValueUse(ValuePtr value, Operation *useOp, int operandIndex);
+  bool isLastValueUse(Value value, Operation *useOp, int operandIndex);
 
  private:
   // Produces an op ordering for the entire function.
@@ -84,20 +89,20 @@ class ValueLiveness {
   // For a Block defines the values that are defined or live within/across.
   struct BlockSets {
     // All values defined within the block (either by ops or block args).
-    llvm::SmallSetVector<ValuePtr, 8> defined;
+    llvm::SmallSetVector<Value, 8> defined;
     // All values used within the block that are not defined there.
-    llvm::SmallSetVector<ValuePtr, 8> live;
+    llvm::SmallSetVector<Value, 8> live;
     // Values live on block entry (used in the block or successors).
-    llvm::SmallSetVector<ValuePtr, 8> liveIn;
+    llvm::SmallSetVector<Value, 8> liveIn;
     // Values live on block exit (used in successors).
-    llvm::SmallSetVector<ValuePtr, 8> liveOut;
+    llvm::SmallSetVector<Value, 8> liveOut;
   };
   DenseMap<Block *, BlockSets> blockLiveness_;
 
   // Liveness ranges indicating for which operations the value is live.
   // Each bit in the BitVector corresponds to an operation with the matching
   // ordinal in opOrdering_.
-  DenseMap<ValuePtr, llvm::BitVector> liveRanges_;
+  DenseMap<Value, llvm::BitVector> liveRanges_;
 };
 
 }  // namespace iree_compiler

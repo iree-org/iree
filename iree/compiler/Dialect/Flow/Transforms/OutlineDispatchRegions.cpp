@@ -43,7 +43,7 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
-    regionOp.getResult(i)->replaceAllUsesWith(dispatchOp.getResult(i));
+    regionOp.getResult(i).replaceAllUsesWith(dispatchOp.getResult(i));
   }
 
   // Erase original region.
@@ -75,8 +75,7 @@ LogicalResult outlineDispatchRegion(
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<DispatchEntryOp>(
       regionOp.getLoc(), builder.getStringAttr(outlinedFuncOp.getName()),
-      builder.getSymbolRefAttr(outlinedFuncOp), DenseIntElementsAttr{},
-      DenseIntElementsAttr{});
+      builder.getSymbolRefAttr(outlinedFuncOp), DenseIntElementsAttr{});
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
   return convertToDispatchOp(regionOp, executableOp, entryPointOp,

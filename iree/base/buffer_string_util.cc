@@ -221,7 +221,12 @@ Status ParseNumericalDataAsType(absl::string_view data_str,
     RETURN_IF_ERROR(ParseNumericalDataElement<T>(
         data_str, token_start, data_str.size() - 1, cast_output, dst_i++));
   }
-  if (dst_i < cast_output.size()) {
+  if (dst_i == 1 && cast_output.size() > 1) {
+    // Splat the single value we got to the entire tensor.
+    for (int i = 1; i < cast_output.size(); ++i) {
+      cast_output[i] = cast_output[0];
+    }
+  } else if (dst_i < cast_output.size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Input data string contains fewer elements than the underlying "
               "buffer (expected "

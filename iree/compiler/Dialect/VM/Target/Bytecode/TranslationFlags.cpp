@@ -35,7 +35,10 @@ static llvm::cl::opt<BytecodeOutputFormat> outputFormatFlag{
         clEnumValN(BytecodeOutputFormat::kFlatBufferText, "flatbuffer-text",
                    "Text FlatBuffer file, debug-only"),
         clEnumValN(BytecodeOutputFormat::kMlirText, "mlir-text",
-                   "MLIR module file with annotations")),
+                   "MLIR module file in the VM dialect"),
+        clEnumValN(BytecodeOutputFormat::kAnnotatedMlirText,
+                   "annotated-mlir-text",
+                   "MLIR module file in the VM dialect with annotations")),
 };
 
 static llvm::cl::opt<bool> optimizeFlag{

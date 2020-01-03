@@ -32,7 +32,7 @@ namespace {
 
 struct WorkloadInfo {
   SmallVector<ElementsAttr, 4> staticWorkloads;
-  SmallVector<ValuePtr, 4> dynamicWorkloads;
+  SmallVector<Value, 4> dynamicWorkloads;
 };
 
 // Finds all dispatches and records their workload attributes mapped by
@@ -44,7 +44,7 @@ llvm::StringMap<llvm::StringMap<WorkloadInfo>> gatherExecutableWorkloadInfos(
     funcOp.walk([&](DispatchOp op) {
       auto &workloadInfo = workloadInfos[op.executable()][op.entry_point()];
       if (auto constantOp =
-              dyn_cast<ConstantOp>(op.workload()->getDefiningOp())) {
+              dyn_cast<ConstantOp>(op.workload().getDefiningOp())) {
         for (auto existingWorkloadAttr : workloadInfo.staticWorkloads) {
           if (existingWorkloadAttr == constantOp.value()) {
             return;  // Already present, ignore.
@@ -77,12 +77,6 @@ LogicalResult attributeExecutableEntryPointWorkload(
   // have the dynamic values to reference.
   entryPointOp->setAttr("workload", workloadInfo.staticWorkloads.front());
 
-  // Hardwire workgroup size to {32, 1, 1}
-  SmallVector<int32_t, 3> workGroupInfo = {32, 1, 1};
-  auto workGroupAttr = DenseIntElementsAttr::get(
-      VectorType::get(3, IntegerType::get(32, entryPointOp->getContext())),
-      workGroupInfo);
-  entryPointOp->setAttr("workgroup_size", workGroupAttr);
   return success();
 }
 

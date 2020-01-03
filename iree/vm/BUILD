@@ -1,214 +1,236 @@
-# Copyright 2019 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# Bytecode VM.
 
-# Bytecode VM used by the IREE sequencer and interpreter.
+load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-cc_library(
-    name = "api",
-    srcs = ["api.cc"],
-    hdrs = ["api.h"],
-    visibility = ["//visibility:public"],
+cc_test(
+    name = "bytecode_dispatch_test",
+    srcs = ["bytecode_dispatch_test.cc"],
     deps = [
-        ":api_hdrs",
-        ":sequencer_module",
-        "//iree/base:api",
-        "//iree/base:api_util",
-        "//iree/base:flatbuffer_util",
-        "//iree/base:tracing",
-        "//iree/rt:api",
+        ":bytecode_dispatch_test_module_cc",
+        ":bytecode_module",
+        ":context",
+        ":instance",
+        ":invocation",
+        ":module",
+        "//iree/base:logging",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/strings",
     ],
 )
 
-cc_library(
-    name = "api_hdrs",
-    hdrs = ["api.h"],
-    deps = [
-        "//iree/base:api_hdrs",
-        "//iree/rt:api_hdrs",
-    ],
+iree_bytecode_module(
+    name = "bytecode_dispatch_test_module",
+    src = "bytecode_dispatch_test.mlir",
+    cc_namespace = "iree::vm",
+    translation = "-iree-vm-ir-to-bytecode-module",
 )
 
 cc_library(
     name = "bytecode_module",
     srcs = [
-        "bytecode_disassembler.cc",
+        "bytecode_dispatch.c",
         "bytecode_module.cc",
+        "bytecode_module_impl.h",
+        "bytecode_op_table.h",
     ],
     hdrs = [
-        "bytecode_disassembler.h",
         "bytecode_module.h",
     ],
     deps = [
-        ":bytecode_util",
-        ":opcode_info",
-        ":source_map_resolver",
-        ":type",
+        ":bytecode_op_table_gen",
+        ":module",
+        ":ref",
+        ":stack",
+        ":types",
+        ":value",
+        "//iree/base:api",
         "//iree/base:flatbuffer_util",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:buffer_view",
-        "//iree/rt",
-        "//iree/schemas",
-        "//iree/schemas/bytecode:bytecode_v0",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:span",
+        "//iree/base:target_platform",
+        "//iree/schemas:bytecode_module_def_cc_fbs",
+        "@com_github_google_flatbuffers//:flatbuffers",
     ],
 )
 
-cc_library(
-    name = "bytecode_reader",
-    srcs = ["bytecode_reader.cc"],
-    hdrs = ["bytecode_reader.h"],
+cc_test(
+    name = "bytecode_module_benchmark",
+    srcs = ["bytecode_module_benchmark.cc"],
     deps = [
         ":bytecode_module",
-        ":type",
-        "//iree/base:shape",
-        "//iree/base:status",
-        "//iree/hal:buffer_view",
-        "//iree/hal:heap_buffer",
-        "//iree/rt",
-        "//iree/schemas/bytecode:bytecode_v0",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-    ],
-)
-
-cc_library(
-    name = "bytecode_tables_interpreter",
-    srcs = ["bytecode_tables_interpreter.cc"],
-    hdrs = ["bytecode_tables_interpreter.h"],
-    deps = [
-        ":opcode_info",
-        "//iree/schemas/bytecode:interpreter_bytecode_v0",
-    ],
-)
-
-cc_library(
-    name = "bytecode_tables_sequencer",
-    srcs = ["bytecode_tables_sequencer.cc"],
-    hdrs = ["bytecode_tables_sequencer.h"],
-    deps = [
-        ":opcode_info",
-        "//iree/schemas/bytecode:sequencer_bytecode_v0",
-    ],
-)
-
-cc_library(
-    name = "bytecode_util",
-    srcs = ["bytecode_util.cc"],
-    hdrs = ["bytecode_util.h"],
-    deps = [
-        "//iree/schemas/bytecode:bytecode_v0",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_library(
-    name = "bytecode_validator",
-    srcs = ["bytecode_validator.cc"],
-    hdrs = ["bytecode_validator.h"],
-    deps = [
-        ":bytecode_module",
-        "//iree/base:status",
-        "//iree/schemas",
-    ],
-)
-
-cc_library(
-    name = "opcode_info",
-    hdrs = ["opcode_info.h"],
-    deps = [
-        "//iree/schemas/bytecode:bytecode_v0",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_absl//absl/types:span",
-    ],
-)
-
-cc_library(
-    name = "sequencer_dispatch",
-    srcs = ["sequencer_dispatch.cc"],
-    hdrs = ["sequencer_dispatch.h"],
-    deps = [
-        ":bytecode_module",
-        ":bytecode_reader",
-        ":bytecode_tables_sequencer",
-        ":bytecode_util",
-        ":opcode_info",
+        ":bytecode_module_benchmark_module_cc",
+        ":module",
+        ":stack",
+        "//iree/base:api",
         "//iree/base:logging",
-        "//iree/base:memory",
-        "//iree/base:status",
-        "//iree/hal:buffer_view",
-        "//iree/hal:command_queue",
-        "//iree/hal:device",
-        "//iree/hal:device_placement",
-        "//iree/hal:heap_buffer",
-        "//iree/rt",
-        "//iree/schemas/bytecode:sequencer_bytecode_v0",
-        "@com_google_absl//absl/base:core_headers",
+        "//iree/testing:benchmark_main",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:span",
+        "@com_google_benchmark//:benchmark",
     ],
 )
 
-cc_library(
-    name = "sequencer_module",
-    srcs = ["sequencer_module.cc"],
-    hdrs = ["sequencer_module.h"],
+iree_bytecode_module(
+    name = "bytecode_module_benchmark_module",
+    src = "bytecode_module_benchmark.mlir",
+    cc_namespace = "iree::vm",
+    translation = "-iree-vm-ir-to-bytecode-module",
+)
+
+cc_test(
+    name = "bytecode_module_test",
+    srcs = ["bytecode_module_test.cc"],
     deps = [
         ":bytecode_module",
-        ":bytecode_tables_sequencer",
-        ":sequencer_dispatch",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:buffer_view",
-        "//iree/rt",
-        "@com_google_absl//absl/memory",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+gentbl(
+    name = "bytecode_op_table_gen",
+    tbl_outs = [
+        ("-gen-iree-vm-op-table-defs", "bytecode_op_table.h"),
+    ],
+    tblgen = "//iree/tools:iree-tblgen",
+    td_file = "//iree/compiler/Dialect/VM/IR:VMOps.td",
+    td_srcs = [
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/VM/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
     ],
 )
 
 cc_library(
-    name = "source_map_resolver",
-    srcs = ["source_map_resolver.cc"],
-    hdrs = ["source_map_resolver.h"],
+    name = "context",
+    srcs = ["context.c"],
+    hdrs = ["context.h"],
     deps = [
-        "//iree/base:flatbuffer_util",
-        "//iree/base:status",
-        "//iree/rt",
-        "//iree/schemas",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
+        ":instance",
+        ":module",
+        ":stack",
+        "//iree/base:api",
     ],
 )
 
 cc_library(
-    name = "type",
-    srcs = ["type.cc"],
-    hdrs = ["type.h"],
+    name = "instance",
+    srcs = ["instance.c"],
+    hdrs = ["instance.h"],
     deps = [
-        "//iree/base:status",
-        "//iree/schemas",
-        "//iree/schemas/bytecode:bytecode_v0",
+        ":types",
+        "//iree/base:api",
+    ],
+)
+
+cc_library(
+    name = "invocation",
+    srcs = ["invocation.c"],
+    hdrs = ["invocation.h"],
+    deps = [
+        ":context",
+        ":module",
+        ":variant_list",
+        "//iree/base:api",
+    ],
+)
+
+cc_library(
+    name = "module",
+    srcs = ["module.c"],
+    hdrs = ["module.h"],
+    deps = [
+        "//iree/base:api",
+    ],
+)
+
+cc_library(
+    name = "ref",
+    srcs = ["ref.c"],
+    hdrs = ["ref.h"],
+    deps = [
+        "//iree/base:api",
+    ],
+)
+
+cc_test(
+    name = "ref_test",
+    srcs = ["ref_test.cc"],
+    deps = [
+        ":ref",
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "stack",
+    srcs = ["stack.c"],
+    hdrs = ["stack.h"],
+    deps = [
+        ":module",
+        ":ref",
+        "//iree/base:api",
+    ],
+)
+
+cc_test(
+    name = "stack_test",
+    srcs = ["stack_test.cc"],
+    deps = [
+        ":ref",
+        ":stack",
+        "//iree/base:api",
+        "//iree/base:ref_ptr",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "types",
+    srcs = ["types.c"],
+    hdrs = ["types.h"],
+    deps = [
+        ":ref",
+        "//iree/base:api",
+    ],
+)
+
+cc_library(
+    name = "value",
+    hdrs = ["value.h"],
+)
+
+cc_library(
+    name = "variant_list",
+    srcs = ["variant_list.c"],
+    hdrs = ["variant_list.h"],
+    deps = [
+        ":ref",
+        ":value",
+    ],
+)
+
+cc_library(
+    name = "vm",
+    hdrs = [
+        "api.h",
+    ],
+    deps = [
+        ":context",
+        ":instance",
+        ":invocation",
+        ":module",
+        ":ref",
+        ":stack",
+        ":types",
+        ":value",
+        ":variant_list",
+        "//iree/base:api",
     ],
 )

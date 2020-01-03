@@ -18,12 +18,10 @@
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/binding.h"
 #include "bindings/python/pyiree/host_types.h"
-#include "bindings/python/pyiree/rt.h"
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
-#include "iree/vm2/api.h"
-#include "iree/vm2/bytecode_module.h"
-#include "iree/vm2/variant_list.h"
+#include "iree/vm/bytecode_module.h"
+#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace python {
@@ -122,6 +120,11 @@ class VmModule : public ApiRefCounted<VmModule, iree_vm_module_t> {
 
   absl::optional<iree_vm_function_t> LookupFunction(
       const std::string& name, iree_vm_function_linkage_t linkage);
+
+  std::string name() const {
+    auto name_sv = iree_vm_module_name(raw_ptr());
+    return std::string(name_sv.data, name_sv.size);
+  }
 };
 
 class VmContext : public ApiRefCounted<VmContext, iree_vm_context_t> {

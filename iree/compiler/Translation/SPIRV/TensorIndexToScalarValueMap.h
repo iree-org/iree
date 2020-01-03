@@ -37,13 +37,11 @@ class TensorIndexToScalarValueMap {
       : affineExprCodegen(context) {}
 
   /// Returns the buffer associated with an argument in the dispatch function.
-  ValuePtr getBufferForArgument(ValuePtr arg) {
-    return argToBufferMap.lookup(arg);
-  }
+  Value getBufferForArgument(Value arg) { return argToBufferMap.lookup(arg); }
 
   /// Returns the value in the lowered function that represents the scalar value
   /// of the `tensor` in the original function at a given `index`
-  ValuePtr getValueAtIndex(ValuePtr tensor, AffineMap index) {
+  Value getValueAtIndex(Value tensor, AffineMap index) {
     auto tensorIt = tensorIndexToScalarValueMap.find(tensor);
     if (tensorIt == tensorIndexToScalarValueMap.end()) {
       return nullptr;
@@ -58,45 +56,44 @@ class TensorIndexToScalarValueMap {
   /// Returns the value in the lowered function (or generates it if it hasn't
   /// been generated already), the scalar value that stores the value
   /// corresponding to `expr`
-  ValuePtr getAffineExprValue(OpBuilder::InsertPoint ip, Location loc,
-                              AffineExpr expr) {
+  Value getAffineExprValue(OpBuilder::InsertPoint ip, Location loc,
+                           AffineExpr expr) {
     return affineExprCodegen.getExprValue(ip, loc, expr);
   }
 
   /// Records the `buffer` to use for an `argument` in the dispatch function.
-  void setBufferForArgument(ValuePtr argument, ValuePtr buffer) {
+  void setBufferForArgument(Value argument, Value buffer) {
     argToBufferMap[argument] = buffer;
   }
 
   /// Records the `scalar` value in the lowered function that represents the
   /// value of the `tensor` in the original function at a given `index`
-  void setValueAtIndex(ValuePtr tensor, AffineMap index, ValuePtr scalar) {
+  void setValueAtIndex(Value tensor, AffineMap index, Value scalar) {
     tensorIndexToScalarValueMap[tensor][index] = scalar;
   }
 
   /// Records the `value` to use for an AffineDimExpr while generating code for
   /// AffineExpr trees.
-  void setDimValue(unsigned dim, ValuePtr value) {
+  void setDimValue(unsigned dim, Value value) {
     return affineExprCodegen.setDimValue(dim, value);
   }
 
   /// Records the `value` to use for an AffineSymbolExpr while generating code
   /// for AffineExpr trees.
-  void setSymbolValue(unsigned pos, ValuePtr value) {
+  void setSymbolValue(unsigned pos, Value value) {
     return affineExprCodegen.setSymbolValue(pos, value);
   }
 
  private:
   /// Class to walk AffineExpr trees and generate scalar code that evaluates the
   /// tree.
-  class AffineExprCodegen
-      : public AffineExprVisitor<AffineExprCodegen, ValuePtr> {
+  class AffineExprCodegen : public AffineExprVisitor<AffineExprCodegen, Value> {
    public:
     explicit AffineExprCodegen(MLIRContext *context)
         : builder(context), location(UnknownLoc::get(context)) {}
-    ValuePtr getExprValue(OpBuilder::InsertPoint ip, Location loc,
-                          AffineExpr expr) {
-      ValuePtr &val = affineExprToValueMap[expr];
+    Value getExprValue(OpBuilder::InsertPoint ip, Location loc,
+                       AffineExpr expr) {
+      Value &val = affineExprToValueMap[expr];
       if (!val) {
         builder.restoreInsertionPoint(ip);
         location = loc;
@@ -104,53 +101,53 @@ class TensorIndexToScalarValueMap {
       }
       return val;
     }
-    ValuePtr visitAddExpr(AffineBinaryOpExpr expr) {
+    Value visitAddExpr(AffineBinaryOpExpr expr) {
       auto operand1 = getValue(expr.getLHS());
       auto operand2 = getValue(expr.getRHS());
       return builder.create<spirv::IAddOp>(location, operand1, operand2);
     }
-    ValuePtr visitCeilDivExpr(AffineBinaryOpExpr expr) {
+    Value visitCeilDivExpr(AffineBinaryOpExpr expr) {
       // TODO(ravishankarm): Implement ceil div expr codegen.
       llvm_unreachable("Unimplemented affine AffineCeilDivExpr codegen");
       return nullptr;
     }
-    ValuePtr visitConstantExpr(AffineConstantExpr expr) {
+    Value visitConstantExpr(AffineConstantExpr expr) {
       return builder.create<spirv::ConstantOp>(
           location, builder.getIntegerType(32),
           builder.getI32IntegerAttr(expr.getValue()));
     }
-    ValuePtr visitDimExpr(AffineDimExpr expr) {
+    Value visitDimExpr(AffineDimExpr expr) {
       return threadDimToValue.lookup(expr.getPosition());
     }
-    ValuePtr visitFloorDivExpr(AffineBinaryOpExpr expr) {
+    Value visitFloorDivExpr(AffineBinaryOpExpr expr) {
       auto operand1 = getValue(expr.getLHS());
       auto operand2 = getValue(expr.getRHS());
       return builder.create<spirv::SDivOp>(location, operand1, operand2);
     }
-    ValuePtr visitModExpr(AffineBinaryOpExpr expr) {
+    Value visitModExpr(AffineBinaryOpExpr expr) {
       auto operand1 = getValue(expr.getLHS());
       auto operand2 = getValue(expr.getRHS());
       return builder.create<spirv::SModOp>(location, operand1, operand2);
     }
-    ValuePtr visitMulExpr(AffineBinaryOpExpr expr) {
+    Value visitMulExpr(AffineBinaryOpExpr expr) {
       auto operand1 = getValue(expr.getLHS());
       auto operand2 = getValue(expr.getRHS());
       return builder.create<spirv::IMulOp>(location, operand1, operand2);
     }
-    ValuePtr visitSymbolExpr(AffineSymbolExpr expr) {
+    Value visitSymbolExpr(AffineSymbolExpr expr) {
       return symbolPosToValue.lookup(expr.getPosition());
     }
-    void setDimValue(unsigned dim, ValuePtr value) {
+    void setDimValue(unsigned dim, Value value) {
       threadDimToValue[dim] = value;
     }
-    void setSymbolValue(unsigned pos, ValuePtr value) {
+    void setSymbolValue(unsigned pos, Value value) {
       assert(!symbolPosToValue.count(pos));
       symbolPosToValue[pos] = value;
     }
 
    private:
-    ValuePtr getValue(AffineExpr expr) {
-      ValuePtr &val = affineExprToValueMap[expr];
+    Value getValue(AffineExpr expr) {
+      Value &val = affineExprToValueMap[expr];
       if (!val) {
         val = visit(expr);
       }
@@ -158,23 +155,23 @@ class TensorIndexToScalarValueMap {
     }
 
     /// Cache of AffineExpr to scalar Value to avoid regeneration.
-    DenseMap<AffineExpr, ValuePtr> affineExprToValueMap;
+    DenseMap<AffineExpr, Value> affineExprToValueMap;
 
     /// Mapping from AffineDimExpr to Value to use in generating scalar code to
     /// compute an AffineExpr tree.
-    DenseMap<unsigned, ValuePtr> threadDimToValue;
+    DenseMap<unsigned, Value> threadDimToValue;
 
     /// Mapping from AffineSymbolExpr to Value to use in generating scalar code
     /// to compute an AffineExpr tree.
-    DenseMap<unsigned, ValuePtr> symbolPosToValue;
+    DenseMap<unsigned, Value> symbolPosToValue;
 
     OpBuilder builder;
     Location location;
   };
 
   AffineExprCodegen affineExprCodegen;
-  DenseMap<ValuePtr, DenseMap<AffineMap, ValuePtr>> tensorIndexToScalarValueMap;
-  DenseMap<ValuePtr, ValuePtr> argToBufferMap;
+  DenseMap<Value, DenseMap<AffineMap, Value>> tensorIndexToScalarValueMap;
+  DenseMap<Value, Value> argToBufferMap;
 };
 
 }  // namespace iree_compiler

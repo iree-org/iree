@@ -31,12 +31,12 @@ namespace HAL {
 int32_t getRoundedElementByteWidth(Type type);
 
 // Returns an array of i32 values representing the shape of the |shapedType|.
-SmallVector<ValuePtr, 4> getStaticShapeDims(
-    Location loc, ShapedType shapedType, ConversionPatternRewriter &rewriter);
+SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
+                                         ConversionPatternRewriter &rewriter);
 
 // Returns an array of i32 values representing the shape of the |shapedValue|.
-SmallVector<ValuePtr, 4> getShapeDims(ValuePtr shapedValue,
-                                      ConversionPatternRewriter &rewriter);
+SmallVector<Value, 4> getShapeDims(Value shapedValue,
+                                   ConversionPatternRewriter &rewriter);
 
 }  // namespace HAL
 }  // namespace IREE

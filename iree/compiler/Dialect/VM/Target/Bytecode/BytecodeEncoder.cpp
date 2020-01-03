@@ -81,11 +81,11 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return writeInt32(ordinal);
   }
 
-  LogicalResult encodeType(ValuePtr value) override {
-    auto refPtrType = value->getType().dyn_cast<IREE::RefPtrType>();
+  LogicalResult encodeType(Value value) override {
+    auto refPtrType = value.getType().dyn_cast<IREE::RefPtrType>();
     if (!refPtrType) {
       return currentOp_->emitOpError()
-             << "type " << value->getType()
+             << "type " << value.getType()
              << " is not supported as a serialized type kind";
     }
     int typeOrdinal = typeTable_->lookup(refPtrType.getObjectType());
@@ -134,7 +134,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeBranch(Block *targetBlock,
-                             Operation::operand_range operands) override {
+                             Operation::operand_range operands,
+                             int successorIndex) override {
     // Reserve space for the block offset. It will get fixed up when we are all
     // done and know all of the block offsets.
     blockOffsetFixups_.push_back({targetBlock, bytecode_.size()});
@@ -143,18 +144,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     // Compute required remappings - we only need to emit them when the source
     // and dest registers differ. Hopefully the allocator did a good job and
     // this list is small :)
-    int operandOffset = 0;
-    SmallVector<std::pair<uint8_t, uint8_t>, 8> srcDstRegs;
-    for (auto it : llvm::enumerate(operands)) {
-      uint8_t srcReg = registerAllocation_->mapUseToRegister(
-          it.value(), currentOp_, operandOffset + it.index());
-      BlockArgumentPtr targetArg = targetBlock->getArgument(it.index());
-      uint8_t dstReg = registerAllocation_->mapToRegister(targetArg);
-      if (!compareRegistersEqual(srcReg, dstReg)) {
-        srcDstRegs.push_back({srcReg, dstReg});
-      }
-    }
-
+    auto srcDstRegs = registerAllocation_->remapSuccessorRegisters(
+        currentOp_, successorIndex);
     writeUint8(srcDstRegs.size());
     for (auto srcDstReg : srcDstRegs) {
       if (failed(writeUint8(srcDstReg.first)) ||
@@ -166,7 +157,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return success();
   }
 
-  LogicalResult encodeOperand(ValuePtr value, int ordinal) override {
+  LogicalResult encodeOperand(Value value, int ordinal) override {
     uint8_t reg =
         registerAllocation_->mapUseToRegister(value, currentOp_, ordinal);
     return writeUint8(reg);
@@ -184,7 +175,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     return success();
   }
 
-  LogicalResult encodeResult(ValuePtr value) override {
+  LogicalResult encodeResult(Value value) override {
     uint8_t reg = registerAllocation_->mapUseToRegister(value, currentOp_, 0);
     return writeUint8(reg);
   }

@@ -25,7 +25,7 @@ func @exportedTensor(%arg0 : tensor<4x4xi64>, %arg1 : tensor<5x5xi64>) -> tensor
 }
 
 // -----
-// expected-error @+1 {{Illegal partial reflection attribute: '' on argument 0}}
+// expected-warning @+1 {{Argument #0 of function unsupportedType is not a recognized public ABI type and the function may not be invokable by standard tools}}
 func @unsupportedType(%arg0 : i1) -> ()
     attributes {iree.module.export}
 {

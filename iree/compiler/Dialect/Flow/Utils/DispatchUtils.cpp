@@ -42,17 +42,17 @@ namespace {
 // set of values defined by |ops| that are used outside of the set.
 LogicalResult analyzeOpRangeValues(
     const llvm::SmallDenseSet<Operation *> &opSet,
-    llvm::SetVector<ValuePtr> *capturedValues,
-    llvm::SetVector<ValuePtr> *escapingValues) {
+    llvm::SetVector<Value> *capturedValues,
+    llvm::SetVector<Value> *escapingValues) {
   for (auto *op : opSet) {
     for (auto value : op->getOperands()) {
-      if (!llvm::is_contained(opSet, value->getDefiningOp())) {
+      if (!llvm::is_contained(opSet, value.getDefiningOp())) {
         // Op is using a value not in the ops set, ensure we capture it.
         capturedValues->insert(value);
       }
     }
     for (auto value : op->getResults()) {
-      for (auto &use : value->getUses()) {
+      for (auto &use : value.getUses()) {
         if (!llvm::is_contained(opSet, use.getOwner())) {
           // An op outside of the ops set is using the value, needs to escape.
           escapingValues->insert(value);
@@ -66,8 +66,7 @@ LogicalResult analyzeOpRangeValues(
 }  // namespace
 
 LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  ValuePtr workload,
-                                  ArrayRef<Operation *> ops) {
+                                  Value workload, ArrayRef<Operation *> ops) {
   // Fused location with all ops.
   SmallVector<Location, 16> opLocs;
   for (auto *op : ops) {
@@ -80,13 +79,13 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
   llvm::SmallDenseSet<Operation *> opSet;
   opSet.reserve(ops.size());
   opSet.insert(ops.begin(), ops.end());
-  llvm::SetVector<ValuePtr> capturedValues;
-  llvm::SetVector<ValuePtr> escapingValues;
+  llvm::SetVector<Value> capturedValues;
+  llvm::SetVector<Value> escapingValues;
   if (failed(analyzeOpRangeValues(opSet, &capturedValues, &escapingValues))) {
     return failure();
   }
   SmallVector<Type, 8> escapingTypes;
-  for (auto value : escapingValues) escapingTypes.push_back(value->getType());
+  for (auto value : escapingValues) escapingTypes.push_back(value.getType());
 
   // Build the region op and add it to the parent block.
   OpBuilder parentBuilder(parentBlock);
@@ -100,7 +99,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
   OpBuilder regionBuilder(regionBlock);
   BlockAndValueMapping mapping;
   for (auto capturedValue : capturedValues) {
-    auto blockArg = regionBlock->addArgument(capturedValue->getType());
+    auto blockArg = regionBlock->addArgument(capturedValue.getType());
     mapping.map(capturedValue, blockArg);
   }
 
@@ -113,7 +112,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
 
   // Return results (as we need a terminator in our block).
   // These are all of the values that escape our region.
-  SmallVector<ValuePtr, 8> resultValues;
+  SmallVector<Value, 8> resultValues;
   for (auto oldValue : escapingValues) {
     resultValues.push_back(mapping.lookupOrDefault(oldValue));
   }
@@ -121,7 +120,7 @@ LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
 
   // Replace usage of values with the results of the region.
   for (int i = 0; i < escapingValues.size(); ++i) {
-    escapingValues[i]->replaceAllUsesWith(dispatchRegionOp.getResult(i));
+    escapingValues[i].replaceAllUsesWith(dispatchRegionOp.getResult(i));
   }
 
   // Remove original ops from the parent region.

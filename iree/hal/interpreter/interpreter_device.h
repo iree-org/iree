@@ -21,7 +21,6 @@
 #include "iree/hal/device.h"
 #include "iree/hal/host/host_local_allocator.h"
 #include "iree/hal/interpreter/bytecode_kernels.h"
-#include "iree/rt/instance.h"
 
 namespace iree {
 namespace hal {
@@ -67,7 +66,6 @@ class InterpreterDevice final : public Device {
   Status WaitIdle(absl::Time deadline) override;
 
  private:
-  ref_ptr<rt::Instance> instance_;
   kernels::RuntimeState kernel_runtime_state_;
   mutable HostLocalAllocator allocator_;
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;

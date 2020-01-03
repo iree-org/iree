@@ -20,16 +20,16 @@
 #include "iree/base/status.h"
 #include "iree/hal/buffer_view.h"
 #include "iree/hal/interpreter/bytecode_dispatch_util.h"
+#include "iree/hal/interpreter/type.h"
 #include "iree/schemas/bytecode/interpreter_bytecode_v0.h"
-#include "iree/vm/type.h"
 
 namespace iree {
 namespace hal {
 
 template <typename KERNEL, bool src_signed, bool dst_signed, typename... ARGS>
 struct ApplyConversionOp {
-  static Status Apply(const vm::Type& src_type, BufferView* src_local,
-                      const vm::Type& dst_type, BufferView* dst_local,
+  static Status Apply(const Type& src_type, BufferView* src_local,
+                      const Type& dst_type, BufferView* dst_local,
                       ARGS... args) {
     // Validate ranges so that we cannot go out of bounds on thunk table.
     int src_type_index = src_type.type_index();

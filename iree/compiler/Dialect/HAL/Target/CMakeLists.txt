@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(LegacyInterpreter)
+add_subdirectory(VulkanSPIRV)
+
 iree_cc_library(
   NAME
     ExecutableTarget
@@ -24,7 +27,7 @@ iree_cc_library(
   DEPS
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Utils
     LLVMSupport
     MLIRIR

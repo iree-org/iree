@@ -16,8 +16,8 @@
 #define IREE_COMPILER_TRANSLATION_SPIRV_EMBEDDEDKERNELS_H_
 
 #include "flatbuffers/flatbuffers.h"
-#include "iree/compiler/IR/StructureOps.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
+#include "mlir/IR/Module.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {

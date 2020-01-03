@@ -344,10 +344,10 @@ vm.module @cmp_ugte_i32_folds {
 // CHECK-LABEL: @cmp_eq_ref_folds
 vm.module @cmp_eq_ref_folds {
   // CHECK-LABEL: @always_eq
-  vm.func @always_eq(%arg0 : !ireex.opaque_ref) -> i32 {
+  vm.func @always_eq(%arg0 : !iree.opaque_ref) -> i32 {
     // CHECK: %c1 = vm.const.i32 1 : i32
     // CHECK-NEXT: vm.return %c1 : i32
-    %eq = vm.cmp.eq.ref %arg0, %arg0 : !ireex.opaque_ref
+    %eq = vm.cmp.eq.ref %arg0, %arg0 : !iree.opaque_ref
     vm.return %eq : i32
   }
 
@@ -355,19 +355,19 @@ vm.module @cmp_eq_ref_folds {
   vm.func @const_eq() -> i32 {
     // CHECK: %c1 = vm.const.i32 1 : i32
     // CHECK-NEXT: vm.return %c1 : i32
-    %null = vm.const.ref.zero : !ireex.opaque_ref
-    %null0 = vm.const.ref.zero : !ireex.opaque_ref
-    %eq = vm.cmp.eq.ref %null, %null0 : !ireex.opaque_ref
+    %null = vm.const.ref.zero : !iree.opaque_ref
+    %null0 = vm.const.ref.zero : !iree.opaque_ref
+    %eq = vm.cmp.eq.ref %null, %null0 : !iree.opaque_ref
     vm.return %eq : i32
   }
 
   // CHECK-LABEL: @cmp_null
-  vm.func @cmp_null(%arg0 : !ireex.opaque_ref) -> i32 {
-    // CHECK: %rnz = vm.cmp.nz.ref %arg0 : !ireex.opaque_ref
+  vm.func @cmp_null(%arg0 : !iree.opaque_ref) -> i32 {
+    // CHECK: %rnz = vm.cmp.nz.ref %arg0 : !iree.opaque_ref
     // CHECK-NEXT: %0 = vm.not.i32 %rnz : i32
     // CHECK-NEXT: vm.return %0 : i32
-    %null = vm.const.ref.zero : !ireex.opaque_ref
-    %eq = vm.cmp.eq.ref %arg0, %null : !ireex.opaque_ref
+    %null = vm.const.ref.zero : !iree.opaque_ref
+    %eq = vm.cmp.eq.ref %arg0, %null : !iree.opaque_ref
     vm.return %eq : i32
   }
 }
@@ -377,10 +377,10 @@ vm.module @cmp_eq_ref_folds {
 // CHECK-LABEL: @cmp_ne_ref_folds
 vm.module @cmp_ne_ref_folds {
   // CHECK-LABEL: @always_eq
-  vm.func @always_eq(%arg0 :  !ireex.opaque_ref) -> i32 {
+  vm.func @always_eq(%arg0 :  !iree.opaque_ref) -> i32 {
     // CHECK: %zero = vm.const.i32.zero : i32
     // CHECK-NEXT: vm.return %zero : i32
-    %ne = vm.cmp.ne.ref %arg0, %arg0 :  !ireex.opaque_ref
+    %ne = vm.cmp.ne.ref %arg0, %arg0 :  !iree.opaque_ref
     vm.return %ne : i32
   }
 
@@ -388,18 +388,18 @@ vm.module @cmp_ne_ref_folds {
   vm.func @const_eq() -> i32 {
     // CHECK: %zero = vm.const.i32.zero : i32
     // CHECK-NEXT: vm.return %zero : i32
-    %null = vm.const.ref.zero : !ireex.opaque_ref
-    %null0 = vm.const.ref.zero : !ireex.opaque_ref
-    %ne = vm.cmp.ne.ref %null, %null0 : !ireex.opaque_ref
+    %null = vm.const.ref.zero : !iree.opaque_ref
+    %null0 = vm.const.ref.zero : !iree.opaque_ref
+    %ne = vm.cmp.ne.ref %null, %null0 : !iree.opaque_ref
     vm.return %ne : i32
   }
 
   // CHECK-LABEL: @cmp_null
-  vm.func @cmp_null(%arg0 : !ireex.opaque_ref) -> i32 {
-    // CHECK: %rnz = vm.cmp.nz.ref %arg0 : !ireex.opaque_ref
+  vm.func @cmp_null(%arg0 : !iree.opaque_ref) -> i32 {
+    // CHECK: %rnz = vm.cmp.nz.ref %arg0 : !iree.opaque_ref
     // CHECK-NEXT: vm.return %rnz : i32
-    %null = vm.const.ref.zero : !ireex.opaque_ref
-    %ne = vm.cmp.ne.ref %arg0, %null : !ireex.opaque_ref
+    %null = vm.const.ref.zero : !iree.opaque_ref
+    %ne = vm.cmp.ne.ref %arg0, %null : !iree.opaque_ref
     vm.return %ne : i32
   }
 }
@@ -412,8 +412,8 @@ vm.module @cmp_nz_ref_folds {
   vm.func @const_null() -> i32 {
     // CHECK: %zero = vm.const.i32.zero : i32
     // CHECK-NEXT: vm.return %zero : i32
-    %null = vm.const.ref.zero : !ireex.opaque_ref
-    %ne = vm.cmp.nz.ref %null : !ireex.opaque_ref
+    %null = vm.const.ref.zero : !iree.opaque_ref
+    %ne = vm.cmp.nz.ref %null : !iree.opaque_ref
     vm.return %ne : i32
   }
 }

@@ -19,7 +19,6 @@
 #include "bindings/python/pyiree/function_abi.h"
 #include "bindings/python/pyiree/hal.h"
 #include "bindings/python/pyiree/host_types.h"
-#include "bindings/python/pyiree/rt.h"
 #include "bindings/python/pyiree/status_utils.h"
 #include "bindings/python/pyiree/tf_interop/register_tensorflow.h"
 #include "bindings/python/pyiree/vm.h"
@@ -130,9 +129,6 @@ PYBIND11_MODULE(binding, m) {
 
   auto hal_m = m.def_submodule("hal", "IREE HAL support");
   SetupHalBindings(hal_m);
-
-  auto rt_m = m.def_submodule("rt", "IREE RT api");
-  SetupRtBindings(rt_m);
 
   auto vm_m = m.def_submodule("vm", "IREE VM api");
   SetupVmBindings(vm_m);

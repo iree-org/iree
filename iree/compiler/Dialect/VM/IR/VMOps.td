@@ -279,6 +279,12 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
     }]>,
   ];
 
+  let extraClassDeclaration = [{
+    void makeMutable() { setAttr("is_mutable", UnitAttr::get(getContext())); }
+    void clearInitializer() { removeAttr("initializer"); }
+    void clearInitialValue() { removeAttr("initial_value"); }
+  }];
+
   let parser = [{ return parseGlobalOp(parser, &result); }];
   let printer = [{ return printGlobalOp(p, *this); }];
   let verifier = [{ return verifyGlobalOp(*this); }];
@@ -306,7 +312,7 @@ def VM_GlobalRefOp : VM_GlobalOp<"global.ref", UnitAttr> {
 }
 
 class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
-    VM_PureOp<mnemonic, !listconcat(traits, [
+    VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
   let arguments = (ins
@@ -1051,7 +1057,7 @@ def VM_BranchOp : VM_Op<"br", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Branch>,
-    VM_EncBranch<"dest", "operands">,
+    VM_EncBranch<"dest", "operands", 0>,
   ];
 
   let builders = [
@@ -1102,13 +1108,13 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBranch>,
     VM_EncOperand<"condition", 0>,
-    VM_EncBranch<"getTrueDest", "getTrueOperands">,
-    VM_EncBranch<"getFalseDest", "getFalseOperands">,
+    VM_EncBranch<"getTrueDest", "getTrueOperands", 0>,
+    VM_EncBranch<"getFalseDest", "getFalseOperands", 1>,
   ];
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, ValuePtr condition,
+      Builder *, OperationState &result, Value condition,
       Block *trueDest, ValueRange trueOperands,
       Block *falseDest, ValueRange falseOperands
     }], [{
@@ -1123,7 +1129,7 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     enum { trueIndex = 0, falseIndex = 1 };
 
     /// The condition operand is the first operand in the list.
-    ValuePtr getCondition() { return getOperand(0); }
+    Value getCondition() { return getOperand(0); }
 
     /// Return the destination if the condition is true.
     Block *getTrueDest() {
@@ -1136,12 +1142,12 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     }
 
     /// Accessors for operands to the 'true' destination.
-    ValuePtr getTrueOperand(unsigned idx) {
+    Value getTrueOperand(unsigned idx) {
       assert(idx < getNumTrueOperands());
       return getOperand(getTrueDestOperandIndex() + idx);
     }
 
-    void setTrueOperand(unsigned idx, ValuePtr value) {
+    void setTrueOperand(unsigned idx, Value value) {
       assert(idx < getNumTrueOperands());
       setOperand(getTrueDestOperandIndex() + idx, value);
     }
@@ -1166,11 +1172,11 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     }
 
     /// Accessors for operands to the 'false' destination.
-    ValuePtr getFalseOperand(unsigned idx) {
+    Value getFalseOperand(unsigned idx) {
       assert(idx < getNumFalseOperands());
       return getOperand(getFalseDestOperandIndex() + idx);
     }
-    void setFalseOperand(unsigned idx, ValuePtr value) {
+    void setFalseOperand(unsigned idx, Value value) {
       assert(idx < getNumFalseOperands());
       setOperand(getFalseDestOperandIndex() + idx, value);
     }
@@ -1466,7 +1472,7 @@ def VM_BreakOp : VM_Op<"break", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Break>,
-    VM_EncBranch<"dest", "operands">,
+    VM_EncBranch<"dest", "operands", 0>,
   ];
 
   let builders = [
@@ -1511,12 +1517,12 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBreak>,
-    VM_EncBranch<"dest", "operands">,
+    VM_EncBranch<"dest", "operands", 0>,
   ];
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, ValuePtr condition, Block *dest,
+      Builder *, OperationState &result, Value condition, Block *dest,
       ValueRange operands = {}
     }], [{
       result.addOperands({condition});

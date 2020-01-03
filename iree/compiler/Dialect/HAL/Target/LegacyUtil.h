@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LEGACYUTIL_H_
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/IR/Module.h"
 
 namespace mlir {
@@ -25,7 +26,8 @@ namespace HAL {
 
 // Inserts the iree.load_input/iree.store_output ops to match the legacy ABI.
 void makeLegacyExecutableABI(IREE::Flow::ExecutableOp executableOp,
-                             ModuleOp moduleOp);
+                             ModuleOp moduleOp,
+                             IREE::HAL::ExecutableOp targetExecutableOp);
 
 }  // namespace HAL
 }  // namespace IREE

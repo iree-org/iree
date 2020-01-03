@@ -30,11 +30,11 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Utils",
-        "@llvm//:support",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:StandardOps",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
     ],
     alwayslink = 1,
 )

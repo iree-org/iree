@@ -18,15 +18,14 @@
 #include "iree/base/status.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/interpreter/bytecode_kernels.h"
-#include "iree/rt/stack.h"
-#include "iree/rt/stack_frame.h"
+#include "iree/hal/interpreter/stack.h"
 
 namespace iree {
 namespace hal {
 
 Status Dispatch(hal::Allocator* allocator,
-                kernels::RuntimeState* kernel_runtime_state, rt::Stack* stack,
-                rt::StackFrame* entry_stack_frame,
+                kernels::RuntimeState* kernel_runtime_state, Stack* stack,
+                StackFrame* entry_stack_frame,
                 absl::Span<BufferView> entry_results);
 
 }  // namespace hal

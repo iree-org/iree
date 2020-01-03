@@ -14,31 +14,11 @@
 
 iree_cc_library(
   NAME
-    bytecode_v0
-  HDRS
-    "bytecode_v0.h"
-  DEPS
-    absl::core_headers
-    iree::base::bitfield
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     interpreter_bytecode_v0
   HDRS
     "interpreter_bytecode_v0.h"
   DEPS
-    iree::schemas::bytecode::bytecode_v0
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    sequencer_bytecode_v0
-  HDRS
-    "sequencer_bytecode_v0.h"
-  DEPS
-    iree::schemas::bytecode::bytecode_v0
+    absl::core_headers
+    iree::base::bitfield
   PUBLIC
 )

@@ -46,12 +46,12 @@ struct DynamicUpdateSliceOpLowering
   PatternMatchResult matchAndRewrite(xla_hlo::DynamicUpdateSliceOp op,
                                      PatternRewriter &rewriter) const override {
     auto startIndices = llvm::to_vector<4>(
-        llvm::map_range(op.start_indices(), [&](ValuePtr tensorValue) {
+        llvm::map_range(op.start_indices(), [&](Value tensorValue) {
           return rewriter.createOrFold<ExtractElementOp>(op.getLoc(),
                                                          tensorValue);
         }));
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(
-        op, op.getResult()->getType(), op.update(), op.operand(), startIndices);
+        op, op.getResult().getType(), op.update(), op.operand(), startIndices);
     return matchSuccess();
   }
 };

@@ -14,14 +14,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 set -e
+set -o pipefail
 
 if [ -z "${RUNFILES_DIR}" ]; then
   # Some versions of bazel do not set RUNFILES_DIR. Instead they just cd
   # into the directory.
   RUNFILES_DIR="$PWD"
 fi
-
-ls -lR ${RUNFILES_DIR}
 
 # Detect whether cygwin/msys2 paths need to be translated.
 set +e  # Ignore errors if not found.
@@ -83,7 +82,6 @@ do
   # Run it.
   export PATH="$SUBPATH"
   echo "RUNNING TEST: $full_command"
-  echo "PATH=$PATH"
   echo "----------------"
   if eval "$full_command"; then
     echo "--- COMPLETE ---"

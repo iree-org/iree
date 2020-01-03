@@ -79,7 +79,7 @@ struct EraseUnusedVariableLoadOp : public OpRewritePattern<VariableLoadOp> {
 
   PatternMatchResult matchAndRewrite(VariableLoadOp op,
                                      PatternRewriter &rewriter) const override {
-    if (op.result()->use_empty()) {
+    if (op.result().use_empty()) {
       rewriter.eraseOp(op);
       return matchSuccess();
     }
@@ -106,7 +106,7 @@ struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
   PatternMatchResult matchAndRewrite(VariableStoreOp op,
                                      PatternRewriter &rewriter) const override {
     if (auto loadOp =
-            dyn_cast_or_null<VariableLoadOp>(op.value()->getDefiningOp())) {
+            dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
       if (loadOp.variable() == op.variable()) {
         rewriter.eraseOp(op);
         return matchSuccess();
@@ -139,7 +139,7 @@ struct SimplifyAllocatorAllocateShapedOp
   PatternMatchResult matchAndRewrite(AllocatorAllocateOp op,
                                      PatternRewriter &rewriter) const override {
     if (auto computeSizeOp = dyn_cast_or_null<AllocatorComputeSizeOp>(
-            op.allocation_size()->getDefiningOp())) {
+            op.allocation_size().getDefiningOp())) {
       if (op.memory_types() == computeSizeOp.memory_types() &&
           op.buffer_usage() == computeSizeOp.buffer_usage()) {
         rewriter.replaceOpWithNewOp<AllocatorAllocateShapedOp>(

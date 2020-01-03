@@ -36,6 +36,11 @@ cc_test(
         #   LSAN_OPTIONS=suppressions=third_party/iree/tools/sanitizer_suppressions.txt
         "//iree/tools:sanitizer_suppressions.txt",
     ],
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = [
+        "noga",
+        "nokokoro",
+    ],
     deps = [
         ":simple_embedding_test_bytecode_module_cc",
         "@com_google_absl//absl/base:core_headers",
@@ -45,8 +50,8 @@ cc_test(
         "//iree/base:logging",
         "//iree/hal:api",
         "//iree/modules/hal",
-        "//iree/vm2:bytecode_module",
-        "//iree/vm2",
+        "//iree/vm:bytecode_module",
+        "//iree/vm",
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.

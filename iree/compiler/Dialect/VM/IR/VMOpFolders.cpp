@@ -111,11 +111,29 @@ struct InlineConstGlobalOpInitializer : public OpRewritePattern<T> {
   }
 };
 
+/// Drops initial_values from globals where the value is 0, as by default all
+/// globals are zero-initialized upon module load.
+struct DropDefaultConstGlobalOpInitializer
+    : public OpRewritePattern<GlobalI32Op> {
+  using OpRewritePattern<GlobalI32Op>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(GlobalI32Op op,
+                                     PatternRewriter &rewriter) const override {
+    if (!op.initial_value().hasValue()) return matchFailure();
+    auto value = op.initial_valueAttr().cast<IntegerAttr>();
+    if (value.getValue() != 0) return matchFailure();
+    rewriter.replaceOpWithNewOp<GlobalI32Op>(
+        op, op.sym_name(), op.is_mutable(), op.type(),
+        llvm::to_vector<4>(op.getDialectAttrs()));
+    return matchSuccess();
+  }
+};
+
 }  // namespace
 
 void GlobalI32Op::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                               MLIRContext *context) {
-  results.insert<InlineConstGlobalOpInitializer<GlobalI32Op>>(context);
+  results.insert<InlineConstGlobalOpInitializer<GlobalI32Op>,
+                 DropDefaultConstGlobalOpInitializer>(context);
 }
 
 void GlobalRefOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
@@ -185,7 +203,7 @@ void GlobalLoadRefOp::getCanonicalizationPatterns(
 OpFoldResult ConstI32Op::fold(ArrayRef<Attribute> operands) { return value(); }
 
 OpFoldResult ConstI32ZeroOp::fold(ArrayRef<Attribute> operands) {
-  return IntegerAttr::get(getResult()->getType(), 0);
+  return IntegerAttr::get(getResult().getType(), 0);
 }
 
 OpFoldResult ConstRefZeroOp::fold(ArrayRef<Attribute> operands) {
@@ -726,10 +744,10 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
   using OpRewritePattern<CondBranchOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(CondBranchOp op,
                                      PatternRewriter &rewriter) const override {
-    if (!op.getCondition()->getDefiningOp()) {
+    if (!op.getCondition().getDefiningOp()) {
       return matchFailure();
     }
-    if (auto notOp = dyn_cast<NotI32Op>(op.getCondition()->getDefiningOp())) {
+    if (auto notOp = dyn_cast<NotI32Op>(op.getCondition().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<CondBranchOp>(
           op, notOp.getOperand(), op.getFalseDest(), op.getFalseOperands(),
           op.getTrueDest(), op.getTrueOperands());
@@ -761,7 +779,7 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
     // First check if the call is unused - this ensures we only do the symbol
     // lookup if we are actually going to use it.
     for (auto result : op.getResults()) {
-      if (!result->use_empty()) {
+      if (!result.use_empty()) {
         return matchFailure();
       }
     }

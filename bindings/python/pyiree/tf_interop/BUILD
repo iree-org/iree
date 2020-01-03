@@ -43,6 +43,8 @@ cc_library(
         "//conditions:default": [],
     }),
     features = DEFAULT_FEATURES,
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = select({
         "//iree:enable_tensorflow": [
             ":tensorflow_impl",
@@ -75,10 +77,12 @@ cc_library(
     ],
     copts = DEFAULT_COPTS,
     features = DEFAULT_FEATURES,
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     visibility = ["//visibility:private"],
     deps = [
-        "@local_config_mlir//:IR",
-        "@llvm//:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//llvm:support",
         "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
@@ -96,6 +100,8 @@ cc_library(
     ],
     copts = DEFAULT_COPTS,
     features = DEFAULT_FEATURES,
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         "//bindings/python/pyiree:base",
     ],
@@ -104,6 +110,8 @@ cc_library(
 py_library(
     name = "tf_test_driver",
     srcs = ["tf_test_driver.py"],
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//bindings/python/pyiree:binding",
     ],
@@ -112,8 +120,12 @@ py_library(
 py_library(
     name = "test_utils",
     srcs = ["test_utils.py"],
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//bindings/python/pyiree:compiler",
         "//bindings/python/pyiree:binding",
+        "//bindings/python/pyiree:system_api",
     ],
 )
 
@@ -121,6 +133,8 @@ py_test(
     name = "saved_model_test",
     srcs = ["saved_model_test.py"],
     python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
     deps = [
         "//bindings/python/pyiree",
         "//bindings/python:pathsetup",  # build_cleaner: keep

@@ -39,7 +39,7 @@ class ConstantTensorOpConversion
       : OpConversionPattern(ctx) {}
 
   PatternMatchResult matchAndRewrite(
-      mlir::ConstantOp constantOp, llvm::ArrayRef<ValuePtr> newOperands,
+      mlir::ConstantOp constantOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     if (!constantOp.getType().isa<TensorType>()) return matchFailure();
 
@@ -60,6 +60,9 @@ class ConstantTensorOpConversion
         constantOp.getLoc(), allocator, memoryTypes, bufferUsage,
         constantOp.getValue().cast<ElementsAttr>());
 
+    // TODO(benvanik): implement resource sets.
+    rewriter.create<IREE::HAL::ExDeferReleaseOp>(constantOp.getLoc(), buffer);
+
     rewriter.replaceOp(constantOp, {buffer});
     return matchSuccess();
   }
@@ -72,17 +75,17 @@ class TensorLoadOpConversion
       : OpConversionPattern(ctx), converter(converter) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<ValuePtr> newOperands,
+      IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorLoadOpOperandAdaptor operands(newOperands);
-    auto sourceType = loadOp.source()->getType().cast<ShapedType>();
+    auto sourceType = loadOp.source().getType().cast<ShapedType>();
     auto sourceShape = IREE::HAL::getShapeDims(loadOp.source(), rewriter);
     auto sourceOffset =
         rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
             loadOp.getLoc(), operands.source(), sourceShape, operands.indices(),
             IREE::HAL::getRoundedElementByteWidth(sourceType.getElementType()));
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
-        loadOp, converter.convertType(loadOp.result()->getType()),
+        loadOp, converter.convertType(loadOp.result().getType()),
         operands.source(), sourceOffset);
     return matchSuccess();
   }
@@ -98,10 +101,10 @@ class TensorStoreOpConversion
       : OpConversionPattern(ctx) {}
 
   PatternMatchResult matchAndRewrite(
-      IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<ValuePtr> newOperands,
+      IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorStoreOpOperandAdaptor operands(newOperands);
-    auto targetType = storeOp.target()->getType().cast<ShapedType>();
+    auto targetType = storeOp.target().getType().cast<ShapedType>();
     auto targetShape = IREE::HAL::getShapeDims(storeOp.target(), rewriter);
     auto targetOffset =
         rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(

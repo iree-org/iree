@@ -24,6 +24,7 @@
 #include "absl/container/fixed_array.h"
 #include "absl/strings/ascii.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 #include "absl/types/optional.h"
 #include "absl/types/span.h"
 #include "iree/base/buffer_string_util.h"
@@ -39,6 +40,8 @@ StatusOr<ShapedBuffer> ParseShapedBufferFromString(
     absl::string_view shaped_buf_str) {
   // Strip whitespace that may come along (linefeeds/etc).
   shaped_buf_str = absl::StripAsciiWhitespace(shaped_buf_str);
+  shaped_buf_str = absl::StripPrefix(shaped_buf_str, "\"");
+  shaped_buf_str = absl::StripSuffix(shaped_buf_str, "\"");
   if (shaped_buf_str.empty()) {
     // Empty lines denote empty shaped_buffers.
     return ShapedBuffer{};

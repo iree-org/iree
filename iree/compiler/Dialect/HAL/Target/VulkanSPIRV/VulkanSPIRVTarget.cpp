@@ -19,10 +19,8 @@
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
-#include "iree/compiler/IR/Types.h"
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels.h"
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRVPass.h"
-#include "iree/schemas/executable_def_generated.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -33,6 +31,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
@@ -123,7 +122,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
   // Clone the module containing the things we want to translate. We do this so
   // that multiple targets can pull from the same source without conflicting.
   auto moduleOp = sourceOp.getInnerModule().clone();
-  makeLegacyExecutableABI(sourceOp, moduleOp);
+  makeLegacyExecutableABI(sourceOp, moduleOp, targetOp);
 
   // Try first to match against an embedded kernel (such as matmul) and
   // otherwise fall back to generating the kernel.
@@ -142,10 +141,14 @@ LogicalResult translateToVulkanSPIRVExecutable(
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
     conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());
+    conversionPassManager.addPass(createPrepareReductionDispatchPass());
     conversionPassManager.addPass(createIndexComputationPass());
     conversionPassManager.addPass(createIREEToSPIRVPass());
-    conversionPassManager.addPass(spirv::createLowerABIAttributesPass());
-    conversionPassManager.addPass(createAdjustIntegerWidthPass());
+
+    OpPassManager &spirvPasses = conversionPassManager.nest<spirv::ModuleOp>();
+    spirvPasses.addPass(spirv::createLowerABIAttributesPass());
+    spirvPasses.addPass(createInlinerPass());
+    spirvPasses.addPass(createAdjustIntegerWidthPass());
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";
     }
@@ -201,7 +204,8 @@ LogicalResult translateToVulkanSPIRVExecutable(
   OpBuilder targetBuilder(&targetOp.getBlock());
   targetBuilder.setInsertionPoint(&targetOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-      targetOp.getLoc(), static_cast<uint32_t>(IREE::ExecutableFormat::SpirV),
+      targetOp.getLoc(),
+      static_cast<uint32_t>(IREE::HAL::ExecutableFormat::SpirV),
       std::move(bytes));
   binaryOp.getBlock().getOperations().insert(
       Block::iterator(binaryOp.getBlock().back()), moduleOp);

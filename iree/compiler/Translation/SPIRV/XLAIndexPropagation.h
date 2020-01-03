@@ -65,7 +65,7 @@ class ReturnOpIndexPropagation : public IndexPropagationOp<OpTy> {
       return operation->emitError("unhandled multiple return values");
     }
     auto returnValue = operation->getOperand(0);
-    auto returnType = returnValue->getType().cast<RankedTensorType>();
+    auto returnType = returnValue.getType().cast<RankedTensorType>();
     auto returnRank = returnType.getRank();
     if (returnRank > 3) {
       return operation->emitError("unhandled return tensor of dimension ")

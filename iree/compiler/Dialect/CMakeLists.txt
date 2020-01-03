@@ -15,5 +15,4 @@
 add_subdirectory(Flow)
 add_subdirectory(HAL)
 add_subdirectory(IREE)
-#add_subdirectory(Interpreter)
 add_subdirectory(VM)

@@ -33,9 +33,9 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/IR",
-        "@local_config_mlir//:IR",
-        "@local_config_mlir//:Parser",
-        "@local_config_mlir//:StandardOps",
-        "@local_config_mlir//:Transforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Transforms",
     ],
 )

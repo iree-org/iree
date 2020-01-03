@@ -12,28 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_cc_library(
-  NAME
-    Interpreter
-  HDRS
-    "InterpreterExecutableTranslation.h"
-  SRCS
-    "InterpreterExecutableTranslation.cpp"
-  DEPS
-    flatbuffers
-    iree::base::status
-    iree::compiler::IR
-    iree::compiler::IR::Interpreter
-    iree::compiler::Serialization
-    iree::compiler::Transforms
-    iree::compiler::Transforms::Interpreter
-    iree::compiler::Utils
-    iree::schemas
-    tensorflow::mlir_xla
-    LLVMSupport
-    MLIRIR
-    MLIRTransforms
-    MLIRTranslation
-  ALWAYSLINK
-  PUBLIC
-)
+add_subdirectory(IR)
+add_subdirectory(Serialization)
+add_subdirectory(Transforms)
+add_subdirectory(Utils)

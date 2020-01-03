@@ -19,7 +19,7 @@
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
-#include "iree/vm2/api.h"
+#include "iree/vm/api.h"
 
 #ifdef __cplusplus
 extern "C" {

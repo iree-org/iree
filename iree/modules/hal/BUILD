@@ -28,9 +28,10 @@ cc_library(
         "//iree/hal:api",
         "//iree/hal:command_queue",
         "//iree/hal:device",
-        "//iree/vm2",
+        "//iree/vm",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )

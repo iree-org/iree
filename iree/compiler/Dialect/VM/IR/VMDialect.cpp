@@ -43,7 +43,7 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
     llvm::raw_svector_ostream os(osBuffer);
 
     // TODO(b/143187291): tablegen this by adding a value name prefix field.
-    if (op->getResult(0)->getType().isa<VectorType>()) {
+    if (op->getResult(0).getType().isa<VectorType>()) {
       os << "v";
     }
     if (auto globalLoadOp = dyn_cast<GlobalLoadI32Op>(op)) {
@@ -66,7 +66,7 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       }
     } else if (auto rodataOp = dyn_cast<ConstRefRodataOp>(op)) {
       os << rodataOp.rodata();
-    } else if (op->getResult(0)->getType().isa<RefPtrType>()) {
+    } else if (op->getResult(0).getType().isa<RefPtrType>()) {
       os << "ref";
     } else if (isa<CmpEQI32Op>(op)) {
       os << "eq";
@@ -139,7 +139,7 @@ struct VMInlinerInterface : public DialectInlinerInterface {
   }
 
   void handleTerminator(Operation *op,
-                        ArrayRef<ValuePtr> valuesToReplace) const final {
+                        ArrayRef<Value> valuesToReplace) const final {
     // TODO(benvanik): handle other terminators (break/etc).
     auto returnOp = dyn_cast<VM::ReturnOp>(op);
     if (!returnOp) {
@@ -149,11 +149,11 @@ struct VMInlinerInterface : public DialectInlinerInterface {
     // Replace the values directly with the return operands.
     assert(returnOp.getNumOperands() == valuesToReplace.size());
     for (const auto &it : llvm::enumerate(returnOp.getOperands())) {
-      valuesToReplace[it.index()]->replaceAllUsesWith(it.value());
+      valuesToReplace[it.index()].replaceAllUsesWith(it.value());
     }
   }
 
-  Operation *materializeCallConversion(OpBuilder &builder, ValuePtr input,
+  Operation *materializeCallConversion(OpBuilder &builder, Value input,
                                        Type resultType,
                                        Location conversionLoc) const override {
     return nullptr;

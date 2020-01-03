@@ -52,15 +52,22 @@ constexpr bool isRefMove(uint8_t reg) {
   return (reg & kRefRegisterMoveBit) == kRefRegisterMoveBit;
 }
 
+// Returns the register 0-based ordinal within its set.
+constexpr uint8_t getRegisterOrdinal(uint8_t reg) {
+  return isRefRegister(reg)
+             ? (reg & ~(kRefRegisterTypeBit | kRefRegisterMoveBit))
+             : reg;
+}
+
+// Returns the register ID without the move bit.
+constexpr uint8_t getBaseRegister(uint8_t reg) {
+  return isRefRegister(reg) ? (reg & ~kRefRegisterMoveBit) : reg;
+}
+
 // Compares whether two register bytes are equal to each other, ignoring any
 // move semantics on ref_ptr registers.
 constexpr bool compareRegistersEqual(uint8_t a, uint8_t b) {
-  if (isRefRegister(a) != isRefRegister(b)) return false;
-  if (isRefRegister(a)) {
-    return (a & ~kRefRegisterMoveBit) == (b & ~kRefRegisterMoveBit);
-  } else {
-    return a == b;
-  }
+  return getBaseRegister(a) == getBaseRegister(b);
 }
 
 // Analysis that performs VM register allocation on the given function op and
@@ -92,21 +99,27 @@ class RegisterAllocation {
 
   // Maps a |value| to a register with no move bit set.
   // Prefer mapUseToRegister when a move is desired.
-  uint8_t mapToRegister(ValuePtr value);
+  uint8_t mapToRegister(Value value);
 
   // Maps a |value| to a register as calculated during allocation. The returned
   // register will have the proper type and move bits set.
-  uint8_t mapUseToRegister(ValuePtr value, Operation *useOp, int operandIndex);
+  uint8_t mapUseToRegister(Value value, Operation *useOp, int operandIndex);
+
+  // Remaps branch successor operands to the target block argument registers.
+  // Returns a list of source to target register mappings. Source ref registers
+  // may have their move bit set.
+  SmallVector<std::pair<uint8_t, uint8_t>, 8> remapSuccessorRegisters(
+      Operation *op, int successorIndex);
 
  private:
-  int8_t maxI32RegisterOrdinal_ = -1;
-  int8_t maxRefRegisterOrdinal_ = -1;
+  int maxI32RegisterOrdinal_ = -1;
+  int maxRefRegisterOrdinal_ = -1;
 
   // Cached liveness information.
   ValueLiveness liveness_;
 
   // Mapping from all values within the operation to registers.
-  llvm::DenseMap<ValuePtr, uint8_t> map_;
+  llvm::DenseMap<Value, uint8_t> map_;
 };
 
 }  // namespace iree_compiler

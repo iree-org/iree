@@ -40,12 +40,12 @@ namespace {
 
 // Replaces |returnOp| with a clone including |newOperands| appended.
 LogicalResult appendReturnOperands(ReturnOp returnOp,
-                                   ArrayRef<ValuePtr> newOperands) {
+                                   ArrayRef<Value> newOperands) {
   // Insert prior to the original return.
   OpBuilder builder(returnOp);
 
   // Clone with new args.
-  SmallVector<ValuePtr, 8> operands;
+  SmallVector<Value, 8> operands;
   operands.reserve(returnOp.getNumOperands() + newOperands.size());
   operands.append(returnOp.operand_begin(), returnOp.operand_end());
   operands.append(newOperands.begin(), newOperands.end());
@@ -59,8 +59,8 @@ LogicalResult appendReturnOperands(ReturnOp returnOp,
 
 // Replaces |regionOp| with a clone including |newArgs| and |newResults|.
 DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
-                                            ArrayRef<ValuePtr> newArgs,
-                                            ArrayRef<ValuePtr> newResults,
+                                            ArrayRef<Value> newArgs,
+                                            ArrayRef<Value> newResults,
                                             Location otherLoc) {
   // Insert prior to the original region.
   OpBuilder builder(regionOp);
@@ -70,13 +70,13 @@ DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
   auto fusedLoc = FusedLoc::get(fusedLocs, regionOp.getContext());
 
   // Clone with new results.
-  SmallVector<ValuePtr, 8> operands;
+  SmallVector<Value, 8> operands;
   operands.append(regionOp.args().begin(), regionOp.args().end());
   operands.append(newArgs.begin(), newArgs.end());
   SmallVector<Type, 8> resultTypes;
   resultTypes.append(regionOp.result_type_begin(), regionOp.result_type_end());
   for (auto newResult : newResults) {
-    resultTypes.push_back(newResult->getType());
+    resultTypes.push_back(newResult.getType());
   }
   auto newRegionOp = builder.create<DispatchRegionOp>(
       fusedLoc, resultTypes, regionOp.workload(), operands,
@@ -85,7 +85,7 @@ DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
 
   // Replace uses of original values with the new values.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
-    regionOp.getResult(i)->replaceAllUsesWith(newRegionOp.getResult(i));
+    regionOp.getResult(i).replaceAllUsesWith(newRegionOp.getResult(i));
   }
 
   // Erase the original region.
@@ -108,13 +108,13 @@ DispatchRegionOp removeUnusedResults(DispatchRegionOp regionOp) {
 
   // Calculate new return values.
   SmallVector<Type, 8> newReturnTypes;
-  SmallVector<ValuePtr, 8> newReturnValues;
-  SmallVector<ValuePtr, 8> newRegionResults;
+  SmallVector<Value, 8> newReturnValues;
+  SmallVector<Value, 8> newRegionResults;
   for (int i = 0; i < returnOp.getNumOperands(); ++i) {
     auto resultValue = regionOp.getResult(i);
-    if (!resultValue->use_empty()) {
+    if (!resultValue.use_empty()) {
       // Still has uses so we will preserve it.
-      newReturnTypes.push_back(resultValue->getType());
+      newReturnTypes.push_back(resultValue.getType());
       newReturnValues.push_back(returnOp.getOperand(i));
       newRegionResults.push_back(resultValue);
     }
@@ -135,7 +135,7 @@ DispatchRegionOp removeUnusedResults(DispatchRegionOp regionOp) {
 
   // Replace uses of original values with the new values.
   for (int i = 0; i < newRegionResults.size(); ++i) {
-    newRegionResults[i]->replaceAllUsesWith(newRegionOp.getResult(i));
+    newRegionResults[i].replaceAllUsesWith(newRegionOp.getResult(i));
   }
 
   // Erase the original region.
@@ -153,17 +153,17 @@ bool areDispatchRegionWorkloadsCompatible(DispatchRegionOp &lhs,
 }
 
 // Returns true if |value| depends in any way on |op| through any path.
-bool doesValueDependOnOperation(ValuePtr value, Operation *op) {
-  if (!value->getDefiningOp()) {
+bool doesValueDependOnOperation(Value value, Operation *op) {
+  if (!value.getDefiningOp()) {
     return false;
-  } else if (value->getDefiningOp() == op) {
+  } else if (value.getDefiningOp() == op) {
     return true;
-  } else if (value->getDefiningOp()->getBlock() == op->getBlock() &&
-             value->getDefiningOp()->isBeforeInBlock(op)) {
+  } else if (value.getDefiningOp()->getBlock() == op->getBlock() &&
+             value.getDefiningOp()->isBeforeInBlock(op)) {
     // Can't depend on |op| as it is defined prior to it.
     return false;
   }
-  for (auto operand : value->getDefiningOp()->getOperands()) {
+  for (auto operand : value.getDefiningOp()->getOperands()) {
     if (doesValueDependOnOperation(operand, op)) {
       return true;
     }
@@ -177,7 +177,7 @@ bool doesValueDependOnOperation(ValuePtr value, Operation *op) {
 bool areDispatchRegionsTransitivelyDependent(DispatchRegionOp &lhs,
                                              DispatchRegionOp &rhs) {
   for (auto arg : rhs.args()) {
-    if (arg->getDefiningOp() != lhs && doesValueDependOnOperation(arg, lhs)) {
+    if (arg.getDefiningOp() != lhs && doesValueDependOnOperation(arg, lhs)) {
       // Transitively dependent - boo - can't merge yet.
       return true;
     }
@@ -213,7 +213,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   // Find the values used as return values in the lhs.
   // We'll need to replace the uses in rhs with these.
   auto lhsReturnOp = cast<ReturnOp>(lhsBlock.getTerminator());
-  SmallVector<ValuePtr, 8> lhsReturnValues;
+  SmallVector<Value, 8> lhsReturnValues;
   lhsReturnValues.reserve(lhsReturnOp.getNumOperands());
   lhsReturnValues.append(lhsReturnOp.operand_begin(),
                          lhsReturnOp.operand_end());
@@ -221,14 +221,14 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   // Find the values used as return values in the rhs.
   // We'll add these to the results of the lhs region.
   auto rhsReturnOp = cast<ReturnOp>(rhsBlock.getTerminator());
-  SmallVector<ValuePtr, 8> rhsReturnValues;
+  SmallVector<Value, 8> rhsReturnValues;
   rhsReturnValues.reserve(rhsReturnOp.getNumOperands());
   rhsReturnValues.append(rhsReturnOp.operand_begin(),
                          rhsReturnOp.operand_end());
 
   // Compute new args.
   BlockAndValueMapping mapping;
-  SmallVector<ValuePtr, 8> newArgs;
+  SmallVector<Value, 8> newArgs;
   auto lhsArgs = llvm::to_vector<8>(lhs.args());
   auto rhsArgs = llvm::to_vector<8>(rhs.args());
   for (int rhsOpIdx = 0; rhsOpIdx < rhsArgs.size(); ++rhsOpIdx) {
@@ -257,7 +257,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
     if (!didElide) {
       // Add to the lhs block.
       auto oldArg = rhs.getOperand(rhsOpIdx + 1);
-      auto newArg = lhsBlock.addArgument(oldArg->getType());
+      auto newArg = lhsBlock.addArgument(oldArg.getType());
       mapping.map(rhsBlock.getArgument(rhsOpIdx), newArg);
       newArgs.push_back(oldArg);
     }
@@ -279,7 +279,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
   }
 
   // Compute new results and add to both region and return op.
-  SmallVector<ValuePtr, 8> newResults;
+  SmallVector<Value, 8> newResults;
   for (auto rhsResult : rhsReturnValues) {
     newResults.push_back(mapping.lookupOrDefault(rhsResult));
   }
@@ -291,7 +291,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
 
   // Replace uses of original values with the new values.
   for (int i = 0; i < rhs.getNumResults(); ++i) {
-    rhs.getResult(i)->replaceAllUsesWith(
+    rhs.getResult(i).replaceAllUsesWith(
         newRegionOp.getResult(lhsReturnValues.size() + i));
   }
 

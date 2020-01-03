@@ -6,7 +6,7 @@ performed in as similar way as possible in various target languages. In general,
 this requires additional metadata on top of the raw characteristics of a
 function. Where possible, this is done by attaching attributes to a function.
 
-*   `abi` : string indiciating the abi/calling convention in use
+*   `abi` : string indicating the abi/calling convention in use
 *   `abiv` : numeric version of the `abi`
 
 Each abi can require additional attributes as needed.
@@ -132,7 +132,7 @@ to buffer layout. For the moment, the responsibility to convert the buffer to a
 compatible memory layout is on the host-language binding. However, often it is
 the most efficient to schedule this for execution on a device. In the future, it
 is anticipated that there will be a built-in pathway for scheduling such a
-conversion (which would allow pipelinining and offload of buffer conversions).
+conversion (which would allow pipelining and offload of buffer conversions).
 
 ##### Deferred result allocation
 

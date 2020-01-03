@@ -44,15 +44,15 @@ namespace Flow {
 
 namespace {
 
-// Builds a new iree.reduction_region with the given |invocationRegion|.
+// Builds a new reduction region with the given |invocationRegion|.
 // The new region will be inserted after |originalOp|.
 //
 // All |invocationRegion| ops must be compatible with the |workload| specified
 // as they will all be dispatched with the same workgroup structure. The
 // |invocationRegion| will not be modified.
 LogicalResult buildReductionRegion(Operation *originalOp,
-                                   ArrayRef<ValuePtr> operands,
-                                   ArrayRef<ValuePtr> initialValues,
+                                   ArrayRef<Value> operands,
+                                   ArrayRef<Value> initialValues,
                                    ArrayRef<int32_t> dimensions,
                                    Region &invocationRegion) {
   OpBuilder parentBuilder(originalOp);
@@ -60,7 +60,7 @@ LogicalResult buildReductionRegion(Operation *originalOp,
   // Compute the workload based on the output shape.
   // When variadic all output shapes match so we can just take the first.
   auto workload = calculateWorkload(
-      originalOp, originalOp->getResult(0)->getType().cast<ShapedType>());
+      originalOp, originalOp->getResult(0).getType().cast<ShapedType>());
 
   // Build the region op and add it to the parent block.
   SmallVector<Type, 4> resultTypes{originalOp->getResultTypes()};
@@ -82,8 +82,7 @@ LogicalResult buildReductionRegion(Operation *originalOp,
 
   // Replace usage of values with the results of the region.
   for (int i = 0; i < originalOp->getNumResults(); ++i) {
-    originalOp->getResult(i)->replaceAllUsesWith(
-        reductionRegionOp.getResult(i));
+    originalOp->getResult(i).replaceAllUsesWith(reductionRegionOp.getResult(i));
   }
 
   return success();
@@ -92,7 +91,7 @@ LogicalResult buildReductionRegion(Operation *originalOp,
 // Converts an xla_hlo::ReduceOp to a reduction region and inlines the target
 // computation into the region body.
 LogicalResult buildReductionRegionFromXLAReduceOp(xla_hlo::ReduceOp reduceOp) {
-  SmallVector<ValuePtr, 4> operands(reduceOp.getOperands());
+  SmallVector<Value, 4> operands(reduceOp.getOperands());
   OperandAdaptor<xla_hlo::ReduceOp> adaptor(operands);
 
   SmallVector<int32_t, 4> dimensions;
@@ -100,7 +99,7 @@ LogicalResult buildReductionRegionFromXLAReduceOp(xla_hlo::ReduceOp reduceOp) {
     dimensions.push_back(dim.getSExtValue());
   }
 
-  // Create the iree.reduction_region.
+  // Create the reduction region op with the reduction computation.
   if (failed(buildReductionRegion(reduceOp, adaptor.operands(),
                                   adaptor.init_values(), dimensions,
                                   reduceOp.body()))) {
@@ -138,7 +137,7 @@ LogicalResult identifyBlockReductionRegions(FuncOp funcOp, Block *block) {
 
 }  // namespace
 
-// Identifies reduction ops and moves their targets into iree.reduction_regions.
+// Identifies reduction ops and moves their targets into reduction regions.
 class IdentifyReductionRegionsPass
     : public ModulePass<IdentifyReductionRegionsPass> {
  public:

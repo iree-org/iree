@@ -22,14 +22,23 @@ include "mlir/IR/OpBase.td"
 //===----------------------------------------------------------------------===//
 
 // TODO(b/143787186): rename when old dialects are removed.
-def IREEX_Dialect : Dialect {
-  let name = "ireex";
+def IREE_Dialect : Dialect {
+  let name = "iree";
   let cppNamespace = "IREE";
 
   let summary = [{
     A dialect used for types common across IREE subdialects.
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// General types and helpers
+//===----------------------------------------------------------------------===//
+
+def IREE_Bool :
+    AnyTypeOf<[I1, I8], "boolean-storing type (1 or 8 -bit integer)">;
+def IREE_Element : AnyTypeOf<[AnyInteger, AnyFloat]>;
+def IREE_MemRef : MemRefOf<[IREE_Element]>;
 
 //===----------------------------------------------------------------------===//
 // Attribute constraints
@@ -77,7 +86,7 @@ class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
 //===----------------------------------------------------------------------===//
 
 def AnyRefObject : DialectType<
-    IREEX_Dialect,
+    IREE_Dialect,
     CPred<"$_self.isa<IREE::RefObjectType>()">,
     "ref_object"> {
   let typeDescription = [{
@@ -86,7 +95,7 @@ def AnyRefObject : DialectType<
 }
 
 def AnyRefPtr : DialectType<
-    IREEX_Dialect,
+    IREE_Dialect,
     CPred<"$_self.isa<IREE::RefPtrType>()">,
     "ref"> {
   let typeDescription = [{
@@ -102,7 +111,7 @@ class RefPtrOf<Type type> :
     ]>, "ref<" # type.description # ">">;
 
 def ByteBufferType : DialectType<
-    IREEX_Dialect,
+    IREE_Dialect,
     CPred<"$_self.isa<IREE::ByteBufferType>()">,
     "byte_buffer"> {
   let typeDescription = [{
@@ -113,7 +122,7 @@ def ByteBufferRef : RefPtrOf<ByteBufferType>;
 def ByteBufferRefAttr : AliasedSymbolRefAttr;
 
 def MutableByteBufferType : DialectType<
-    IREEX_Dialect,
+    IREE_Dialect,
     CPred<"$_self.isa<IREE::MutableByteBufferType>()">,
     "mutable_byte_buffer"> {
   let typeDescription = [{
