@@ -23,7 +23,7 @@
 namespace iree {
 namespace {
 
-using testing::ElementsAre;
+using ::testing::ElementsAre;
 
 TEST(BufferStringUtilTest, ParseBufferDataPrintMode) {
   EXPECT_EQ(BufferDataPrintMode::kBinary,
