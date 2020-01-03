@@ -39,6 +39,10 @@ if(${IREE_BUILD_SAMPLES})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
 
+if(${IREE_BUILD_COMPILER})
+  set(IREE_ENABLE_LLVM ON CACHE BOOL "Enable LLVM dependencies if the IREE compiler is build." FORCE)
+endif()
+
 #-------------------------------------------------------------------------------
 # IREE-specific CMake configuration
 #-------------------------------------------------------------------------------
