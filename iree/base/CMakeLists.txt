@@ -74,7 +74,7 @@ iree_cc_test(
   SRCS
     "arena_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::arena
 )
 
@@ -95,7 +95,7 @@ iree_cc_test(
     "bitfield_test.cc"
   DEPS
     absl::base
-    gtest_main
+    iree::testing::gtest_main
     iree::base::bitfield
 )
 
@@ -123,7 +123,7 @@ iree_cc_test(
   SRCS
     "buffer_string_util_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::buffer_string_util
     iree::base::memory
     iree::base::status
@@ -201,7 +201,7 @@ iree_cc_test(
     "file_path_test.cc"
   DEPS
     iree::base::file_path
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -270,7 +270,7 @@ iree_cc_test(
     "intrusive_list_unique_ptr_test.cc"
   DEPS
     absl::memory
-    gtest_main
+    iree::testing::gtest_main
     iree::base::intrusive_list
 )
 
@@ -342,7 +342,7 @@ iree_cc_test(
   SRCS
     "ref_ptr_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::ref_ptr
 )
 
@@ -372,7 +372,7 @@ iree_cc_test(
     iree::base::shape
     iree::base::status
     iree::base::status_matchers
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -421,7 +421,7 @@ iree_cc_test(
     iree::base::shaped_buffer_string_util
     iree::base::status
     iree::base::status_matchers
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -447,7 +447,7 @@ iree_cc_test(
   SRCS
     "signature_mangle_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::signature_mangle
 )
 
@@ -603,7 +603,7 @@ endif()
 #     "wait_handle_test.cc"
 #   DEPS
 #     absl::time
-#     gtest_main
+#     iree::testing::gtest_main
 #     iree::base::status
 #     iree::base::status_matchers
 #     iree::base::wait_handle
