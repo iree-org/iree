@@ -30,6 +30,12 @@ jobs:
       CC: clang
       PYTHON_BIN: /usr/bin/python3
     steps:
+      - name: Installing cmake 3.13
+        run: |
+          sudo apt remove --purge --auto-remove cmake
+          which cmake
+          cmake --version
+          exit 1
       - name: Installing dependencies
         run: |
           sudo apt-get update
