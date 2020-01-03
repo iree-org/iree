@@ -117,21 +117,19 @@ set(LLVM_ENABLE_RTTI ON)
 
 set(LLVM_TARGETS_TO_BUILD "WebAssembly")
 
-set(LLVM_ENABLE_PROJECTS "")
-set(LLVM_EXTERNAL_PROJECTS "MLIR")
-set(LLVM_EXTERNAL_MLIR_SOURCE_DIR "${IREE_ROOT_DIR}/third_party/mlir/")
+set(LLVM_ENABLE_PROJECTS "mlir")
 set(LLVM_ENABLE_BINDINGS OFF)
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
   ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
   ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR/include
 )
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
-set(MLIR_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir/include)
-set(MLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/mlir)
+set(MLIR_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include)
+set(MLIR_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir)
 set(MLIR_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/MLIR)
 
 set(IREE_TABLEGEN_EXE iree-tblgen)
