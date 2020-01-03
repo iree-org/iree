@@ -68,6 +68,7 @@ iree_cc_library(
     iree::hal::executable_spec
     iree::hal::interpreter::bytecode_kernels
     iree::hal::heap_buffer
+    iree::schemas::interpreter_module_def_cc_fbs
     iree::schemas::bytecode::interpreter_bytecode_v0
   PUBLIC
 )
