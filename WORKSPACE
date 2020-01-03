@@ -98,6 +98,16 @@ bazel_skylib_workspace()
 ###############################################################################
 
 ###############################################################################
+# llvm-project
+load("@iree_core//build_tools/bazel/third_party_import/llvm-project:configure.bzl", "llvm_configure")
+maybe(llvm_configure,
+    name = "llvm-project",
+    workspace = "@iree_core//:WORKSPACE",
+    path = "third_party/llvm-project",
+)
+###############################################################################
+
+###############################################################################
 # Bootstrap TensorFlow.
 # Note that we ultimately would like to avoid doing this at the top level like
 # this but need to unbundle some of the deps fromt the tensorflow repo first.
@@ -112,8 +122,6 @@ maybe(local_repository,
 
 # Import all of the tensorflow dependencies.
 load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
-
-tf_repositories()
 ###############################################################################
 
 ###############################################################################
@@ -218,3 +226,6 @@ maybe(new_local_repository,
     path = "third_party/dear_imgui",
     build_file = "build_tools/third_party/dear_imgui/BUILD.overlay",
 )
+
+# Bootstrap TensorFlow deps last so that ours can take precedence.
+tf_repositories()
