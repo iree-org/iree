@@ -126,7 +126,7 @@ class VMImportOpConversion : public OpConversionPattern<T> {
     }
 
     auto *callOp = rewriter.createOperation(state);
-    rewriter.replaceOp(op, llvm::to_vector<4>(callOp->getResults()));
+    rewriter.replaceOp(op, callOp->getResults());
     return success();
   }
 

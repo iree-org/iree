@@ -90,7 +90,7 @@ Value recursiveRetuple(Type oldType, Operation::result_range *values,
                        OpBuilder &builder, Location loc) {
   if (!oldType.isa<TupleType>()) {
     Value returnValue = *values->begin();
-    *values = values->drop_front();
+    *values = {values->begin() + 1, values->end()};
     return returnValue;
   }
 
