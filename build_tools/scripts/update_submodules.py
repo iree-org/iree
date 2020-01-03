@@ -38,18 +38,23 @@ BUILD_COPYRIGHT = r"""# Copyright 2019 Google LLC
 
 
 def parse_arguments():
-  default_repo_path = os.path.dirname(
-      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
   parser = argparse.ArgumentParser()
   parser.add_argument(
-      "--let_met_through",
-      help="This tool is not ready yet. Please use update_submodules.sh for now"
-  )
+      "--let_me_through",
+      help="This tool is not ready yet. Please use update_submodules.sh "
+      "for now",
+      type=str2bool)
+  parser.add_argument("--repo", help="Repository root directory")
   parser.add_argument(
-      "--repo", help="Repository root directory", default=default_repo_path)
+      "--tensorflow",
+      help="Path to the tensorflow sources "
+      "(default to third_party/tensorflow)",
+      default=None)
   parser.add_argument(
-      "--tensorflow", help="Path to the tensorflow sources", default=None)
-  parser.add_argument("--llvm", help="Path to the LLVM sources", default=None)
+      "--llvm",
+      help="Path to the LLVM sources "
+      "(defaults to third_party/llvm-project)",
+      default=None)
   parser.add_argument(
       "--tensorflow_commit",
       help="Update TensorFlow to this commit (or 'KEEP', 'REMOTE')",
@@ -66,6 +71,13 @@ def parse_arguments():
       nargs="?",
       default=None)
   args = parser.parse_args()
+
+  # Default repo path.
+  if args.repo is None:
+    args.repo = execute(["git", "rev-parse", "--show-toplevel"],
+                        cwd=os.path.dirname(__file__),
+                        capture_output=True,
+                        silent=True).strip().decode("UTF-8")
 
   # Set some defaults.
   if not args.tensorflow:
@@ -89,9 +101,9 @@ def str2bool(v):
 
 
 def main(args):
-  if not args.let_met_through:
+  if not args.let_me_through:
     print("This tool is not ready yet. Please use update_submodules.sh",
-          "(or pass --let_me_through)")
+          "(or pass --let_me_through=1)")
     sys.exit(1)
 
   print("IREE handy-dandy-LLVM-submodule-updater at your service...")
