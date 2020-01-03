@@ -145,7 +145,7 @@ def update_submodule(path, commit, tracking="origin/master"):
     print("Resolved remote commit:", commit)
 
   # Rebase to commit (will fail if not fast-forward).
-  execute(["git", "rebase", commit], cwd=path)
+  execute(["git", "checkout", commit], cwd=path)
 
 
 def find_tensorflow_llvm_commit(tensorflow_path):
