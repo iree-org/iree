@@ -24,8 +24,14 @@ iree_cc_library(
     "OpCreationUtils.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_xla
+    iree::compiler::Translation::Interpreter::IR::Common
     LLVMSupport
     MLIRIR
+    MLIRPass
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransformUtils
+    MLIRTransforms
+    tensorflow::mlir_xla
   PUBLIC
 )

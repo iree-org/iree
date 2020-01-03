@@ -14,6 +14,39 @@
 
 iree_cc_library(
   NAME
+    Common
+  HDRS
+    "CommonDialect.h"
+    "CommonOps.h"
+    "CommonOps.h.inc"
+  SRCS
+    "CommonDialect.cpp"
+    "CommonOps.cpp"
+    "CommonOps.cpp.inc"
+  DEPS
+    iree::compiler::Translation::Interpreter::IR::CommonOpsGen
+    iree::compiler::IR
+    iree::compiler::IR::OpsGen
+    LLVMSupport
+    MLIRIR
+    MLIRStandardOps
+    MLIRSupport
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    CommonOpsGen
+  SRCS
+    CommonOps.td
+  OUTS
+    -gen-op-decls CommonOps.h.inc
+    -gen-op-defs CommonOps.cpp.inc
+)
+
+iree_cc_library(
+  NAME
     IR
   HDRS
     "HLDialect.h"

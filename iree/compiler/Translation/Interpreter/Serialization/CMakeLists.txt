@@ -29,10 +29,13 @@ iree_cc_library(
     "VMModuleBuilder.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::Interpreter::IR
+    iree::compiler::Translation::Interpreter::Utils
     iree::schemas::interpreter_module_def_cc_fbs
     iree::schemas::bytecode::interpreter_bytecode_v0
+    flatbuffers
     LLVMSupport
     MLIRIR
+    MLIRStandardOps
+    MLIRSupport
   PUBLIC
 )
