@@ -18,26 +18,16 @@ package(
 )
 
 cc_library(
-    name = "Transforms",
+    name = "PreserveCompilerHints",
     srcs = [
-        "Conversion.cpp",
-        "GlobalInitialization.cpp",
-        "OrdinalAllocation.cpp",
-        "Passes.cpp",
+        "PreserveCompilerHints.cpp",
     ],
     hdrs = [
-        "Passes.h",
+        "PreserveCompilerHints.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints",
-        "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
-        "//iree/compiler/Dialect/VM/IR",
-        "@llvm-project//llvm:support",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,

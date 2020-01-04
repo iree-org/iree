@@ -21,3 +21,19 @@ func @func(%arg0 : i32) -> i32 attributes { iree.module.export } {
 
 }
 }
+
+// -----
+
+// CHECK-LABEL: name: "do_not_optimize_module"
+module {
+module @do_not_optimize_module {
+// CHECK: exported_functions:
+// CHECK: local_name: "add"
+func @add() -> i32 attributes { iree.module.export } {
+  %input = constant 1 : i32
+  %unf = iree.do_not_optimize(%input) : i32
+  %result = addi %unf, %unf : i32
+  return %result : i32
+}
+}
+}

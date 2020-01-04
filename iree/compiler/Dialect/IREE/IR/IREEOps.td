@@ -78,6 +78,9 @@ def IREE_DoNotOptimizeOp : IREE_Op<"do_not_optimize"> {
   let arguments = (ins Variadic<AnyType>:$arguments);
   let results = (outs Variadic<AnyType>:$results);
   let verifier = [{ return verify$cppClass(*this); }];
+  let builders = [
+    OpBuilder<"Builder *builder, OperationState &state, ValueRange operands, ArrayRef<NamedAttribute> attributes = {}">
+  ];
 }
 
 #endif  // IREE_DIALECT_IREE_OPS

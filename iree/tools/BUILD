@@ -96,6 +96,7 @@ cc_binary(
         "//iree/base:source_location",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/Transforms",
+        "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/hal:api",

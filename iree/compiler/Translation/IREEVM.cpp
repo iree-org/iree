@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "mlir/IR/Module.h"
@@ -65,6 +66,7 @@ static PassPipelineRegistration<> transformPassPipeline(
       IREE::HAL::buildHALTransformPassPipeline(
           passManager, IREE::HAL::getExecutableTargetOptionsFromFlags());
       IREE::VM::buildVMTransformPassPipeline(passManager);
+      passManager.addPass(IREE::createDropCompilerHintsPass());
     });
 
 LogicalResult translateFromMLIRToVMBytecodeModule(
@@ -78,6 +80,7 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager);
+  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
   }

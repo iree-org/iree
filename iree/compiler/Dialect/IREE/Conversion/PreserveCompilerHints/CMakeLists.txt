@@ -12,20 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tests for common transforms.
-
-load("//iree:build_defs.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
-
-package(
-    default_visibility = ["//visibility:public"],
-    licenses = ["notice"],  # Apache 2.0
+iree_cc_library(
+  NAME
+    PreserveCompilerHints
+  HDRS
+    "PreserveCompilerHints.h"
+  SRCS
+    "PreserveCompilerHints.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    MLIRIR
+    MLIRTransforms
+  ALWAYSLINK
+  PUBLIC
 )
-
-iree_setup_lit_package(
-    data = [
-        "//iree/tools:iree-opt",
-        "//iree/tools:iree-translate",
-    ],
-)
-
-iree_glob_lit_tests()

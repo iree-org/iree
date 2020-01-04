@@ -30,6 +30,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
     LLVMSupport
     MLIRIR
     MLIRPass

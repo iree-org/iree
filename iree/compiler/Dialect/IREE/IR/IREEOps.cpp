@@ -23,6 +23,7 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/STLExtras.h"
 
@@ -162,6 +163,14 @@ void printStoreReduceOp(OpAsmPrinter &printer, Operation *op) {
 //===----------------------------------------------------------------------===//
 // iree.do_not_optimize
 //===----------------------------------------------------------------------===//
+
+void DoNotOptimizeOp::build(Builder *builder, OperationState &state,
+                            ValueRange operands,
+                            ArrayRef<NamedAttribute> attributes) {
+  state.addOperands(operands);
+  state.addTypes(llvm::to_vector<2>(operands.getTypes()));
+  state.addAttributes(attributes);
+}
 
 ParseResult parseDoNotOptimizeOp(OpAsmParser &parser, OperationState &state) {
   SmallVector<OpAsmParser::OperandType, 2> args;

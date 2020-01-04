@@ -23,6 +23,7 @@ iree_cc_library(
     "OrdinalAllocation.cpp"
     "Passes.cpp"
   DEPS
+    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
     iree::compiler::Dialect::VM::IR
     LLVMSupport
     MLIRIR

@@ -54,6 +54,7 @@
 #include "iree/base/status.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -191,6 +192,8 @@ StatusOr<std::string> PrepareModule(
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
       pass_manager, executable_options);
   mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(pass_manager);
+  pass_manager.addPass(
+      mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(pass_manager.run(mlir_module.get()))) {
     return InternalErrorBuilder(IREE_LOC)
            << "Conversion from source -> vm failed";
