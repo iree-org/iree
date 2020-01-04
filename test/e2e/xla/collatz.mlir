@@ -1,11 +1,12 @@
-// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode -input-value="f32=178" %s | IreeFileCheck %s
+// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @collatz
-func @collatz(%arg0: tensor<f32>) -> tensor<f32> {
-  %0 = xla_hlo.constant dense<1.000000e+00> : tensor<f32>
-  %1 = xla_hlo.constant dense<3.000000e+00> : tensor<f32>
-  %2 = xla_hlo.constant dense<2.000000e+00> : tensor<f32>
-  %3 = xla_hlo.constant dense<0.000000e+00> : tensor<f32>
+func @collatz() -> tensor<f32> {
+  %arg0 = iree.unfoldable_constant dense<178.0> : tensor<f32>
+  %0 = xla_hlo.constant dense<1.0> : tensor<f32>
+  %1 = xla_hlo.constant dense<3.0> : tensor<f32>
+  %2 = xla_hlo.constant dense<2.0> : tensor<f32>
+  %3 = xla_hlo.constant dense<0.0> : tensor<f32>
   br ^bb1(%3, %arg0 : tensor<f32>, tensor<f32>)
 ^bb1(%4: tensor<f32>, %5: tensor<f32>):
   %6 = "xla_hlo.compare"(%5, %0) {comparison_direction = "GT"} : (tensor<f32>, tensor<f32>) -> tensor<i1>
