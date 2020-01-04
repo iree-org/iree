@@ -7,8 +7,8 @@
 // Int sum values from [1, 10]
 // CHECK-LABEL: EXEC @reduce_sum_1x10xi32
 func @reduce_sum_1x10xi32() -> tensor<1xi32> {
-  %0 = constant dense<[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]> : tensor<1x10xi32>
-  %1 = constant dense<30> : tensor<i32>
+  %0 = iree.unfoldable_constant dense<[[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]> : tensor<1x10xi32>
+  %1 = iree.unfoldable_constant dense<30> : tensor<i32>
   %2 = "xla_hlo.reduce"(%0, %1) ( {
   ^bb0(%arg0: tensor<i32>, %arg1: tensor<i32>):   // no predecessors
     %3 = "xla_hlo.max"(%arg0, %arg1) : (tensor<i32>, tensor<i32>) -> tensor<i32>
