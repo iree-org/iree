@@ -83,4 +83,22 @@ def IREE_DoNotOptimizeOp : IREE_Op<"do_not_optimize"> {
   ];
 }
 
+def IREE_UnfoldableConstantOp : IREE_Op<"unfoldable_constant"> {
+  let summary = "A constant that cannot be folded by the compiler.";
+  let description = [{
+    Similar to a std.constant, but is declared as having a side effect and has
+    no folder. This is really just syntactic sugar as it is canonicalized to a
+    std.constant wrapped in an iree.do_not_optimize.
+  }];
+
+  let arguments = (ins AnyAttr:$value);
+  let results = (outs AnyType);
+
+  let builders = [OpBuilder<
+    "Builder *builder, OperationState &result, Attribute value",
+    [{ build(builder, result, value.getType(), value); }]>];
+
+  let hasCanonicalizer = 1;
+}
+
 #endif  // IREE_DIALECT_IREE_OPS

@@ -32,3 +32,13 @@ func @chained_add() -> i32 {
   %result = addi %int, %int : i32
   return %result : i32
 }
+
+// -----
+
+// CHECK-LABEL: @unfoldable_constant
+func @unfoldable_constant() -> i32 {
+  %input = iree.unfoldable_constant 1 : i32
+  // CHECK: vm.add.i32
+  %result = addi %input, %input : i32
+  return %result : i32
+}

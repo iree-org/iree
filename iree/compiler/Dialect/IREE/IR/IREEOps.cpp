@@ -16,11 +16,13 @@
 
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/OperationSupport.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
@@ -220,6 +222,62 @@ static LogicalResult verifyDoNotOptimizeOp(DoNotOptimizeOp op) {
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// iree.unfoldable_constant
+//===----------------------------------------------------------------------===//
+
+// Parsing/printing copied from std.constant
+
+ParseResult parseUnfoldableConstantOp(OpAsmParser &parser,
+                                      OperationState &state) {
+  Attribute valueAttr;
+  if (parser.parseOptionalAttrDict(state.attributes) ||
+      parser.parseAttribute(valueAttr, "value", state.attributes))
+    return failure();
+
+  // If the attribute is a symbol reference, then we expect a trailing type.
+  Type type;
+  if (!valueAttr.isa<SymbolRefAttr>())
+    type = valueAttr.getType();
+  else if (parser.parseColonType(type))
+    return failure();
+
+  // Add the attribute type to the list.
+  return parser.addTypeToList(type, state.types);
+}
+
+void printUnfoldableConstantOp(OpAsmPrinter &p, Operation *op) {
+  auto constOp = cast<IREE::UnfoldableConstantOp>(op);
+  p << "iree.unfoldable_constant ";
+  p.printOptionalAttrDict(constOp.getAttrs(), /*elidedAttrs=*/{"value"});
+
+  if (constOp.getAttrs().size() > 1) p << ' ';
+  p << constOp.value();
+
+  // If the value is a symbol reference, print a trailing type.
+  if (constOp.value().isa<SymbolRefAttr>()) p << " : " << constOp.getType();
+}
+
+namespace {
+
+struct ExpandUnfoldableConstantOp
+    : public OpRewritePattern<UnfoldableConstantOp> {
+  using OpRewritePattern<IREE::UnfoldableConstantOp>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(UnfoldableConstantOp op,
+                                     PatternRewriter &rewriter) const override {
+    auto stdConst = rewriter.create<ConstantOp>(op.getLoc(), op.value());
+    rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
+    return matchSuccess();
+  }
+};
+
+}  // namespace
+
+void UnfoldableConstantOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandUnfoldableConstantOp>(context);
 }
 
 #define GET_OP_CLASSES

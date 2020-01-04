@@ -29,6 +29,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRParser
+    MLIRStandardOps
     MLIRSupport
   ALWAYSLINK
   PUBLIC
