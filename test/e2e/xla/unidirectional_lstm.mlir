@@ -6,7 +6,8 @@
 // The resulting MLIR was modified by hand by changing all large constants to be
 // splats of 0.42, removing the leading "module" wrapper, removing "name"
 // attributes, removing extraneous 0s from float constants, and cleaning up
-// extra whitespace.
+// extra whitespace. On top of that, the result was further trimmed by removing
+// some calls from @main and the call graphs of the removed callees.
 
 func @Min_reduction.47(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
   %0 = xla_hlo.min %arg0, %arg1 : tensor<f32>
