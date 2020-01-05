@@ -1,3 +1,4 @@
+# Remove me.
 load("@org_tensorflow//third_party/mlir:tblgen.bzl", "gentbl")
 
 licenses(["notice"])
