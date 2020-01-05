@@ -13,6 +13,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""submodule_versions.py
+
+Synchronizes the tracked SUBMODULE_VERSIONS file with the submodule state
+in git.
+
+Typical usage:
+--------------
+Exporting current git submodule state to SUBMODULE_VERSIONS:
+  Syntax: ./git_scripts/submodule_versions.py export
+
+Importing versions in SUBMODULE_VERSIONS to git submodule state:
+  Syntax: ./git_scripts/submodule_versions.py import
+
+Checking whether SUBMODULE_VERSIONS and git state are in sync:
+  Syntax: ./git_scripts/submodule_versions.py check
+"""
 
 import argparse
 import os
@@ -20,12 +36,16 @@ import re
 import subprocess
 import sys
 
+import utils
 
-VERSIONS_FILE = ".gitmoduleversions"
+VERSIONS_FILE = "SUBMODULE_VERSIONS"
 
 
 def get_submodule_versions(repo_dir):
-  raw_status = subprocess.check_output(["git", "submodule", "status"], cwd=repo_dir).decode("UTF-8")
+  raw_status = utils.execute(["git", "submodule", "status"],
+                             cwd=repo_dir,
+                             silent=True,
+                             capture_output=True).decode("UTF-8")
   status_lines = []
   for line in raw_status.splitlines():
     # Format is a status char followed by revision, space and path.
@@ -36,17 +56,21 @@ def get_submodule_versions(repo_dir):
   return "\n".join(status_lines) + "\n"
 
 
-def write_submodule_versions(repo_dir):
+def export_versions(repo_dir):
   current_versions = get_submodule_versions(repo_dir)
-  with open(os.path.join(repo_dir, VERSIONS_FILE), "w", encoding="UTF-8") as f:
+  versions_file_path = os.path.join(repo_dir, VERSIONS_FILE)
+  print("*** Exporting current submodule versions to:", versions_file_path)
+  with open(versions_file_path, "w", encoding="UTF-8") as f:
     f.write(current_versions)
+  utils.execute(["git", "add", VERSIONS_FILE], cwd=repo_dir)
 
 
 def parse_versions(versions_text):
   versions = dict()
   for line in versions_text.splitlines():
     comps = line.split(" ", maxsplit=2)
-    if len(comps) != 2: continue
+    if len(comps) != 2:
+      continue
     versions[comps[1]] = comps[0]
   return versions
 
@@ -57,14 +81,22 @@ def get_diff_versions(repo_dir):
     written_versions = parse_versions(f.read())
   diff_versions = current_versions.items() ^ written_versions.items()
   return {
-    k:(current_versions.get(k), written_versions.get(k)) for k, _ in diff_versions
+      k: (current_versions.get(k), written_versions.get(k))
+      for k, _ in diff_versions
   }
 
 
-def update_versions(repo_dir):
+def sync_and_update_submodules(repo_dir):
+  print("*** Synchronizing/updating submodules")
+  utils.execute(["git", "submodule", "sync"], cwd=repo_dir)
+  utils.execute(["git", "submodule", "update"], cwd=repo_dir)
+
+
+def import_versions(repo_dir):
+  print("*** Importing versions to git submodule state")
   diff_versions = get_diff_versions(repo_dir)
   if not diff_versions:
-    print("No submodule updates required")
+    print("*** No submodule updates required")
     return
   for path, (current, written) in diff_versions.items():
     if current is None:
@@ -76,16 +108,15 @@ def update_versions(repo_dir):
       continue
     command = ["git", "update-index", "--cacheinfo", "160000", written, path]
     print("Updating", path, "to", written)
-    print("+", " ".join(command))
-    subprocess.check_call(command, cwd=repo_dir)
-    subprocess.check_call(["git", "submodule", "update", path], cwd=repo_dir)
+    utils.execute(command, cwd=repo_dir)
+    utils.execute(["git", "add", path], cwd=repo_dir)
 
 
 def check_submodule_versions(repo_dir):
-  diff_versions = get_diff_versions(repo_dir) 
+  diff_versions = get_diff_versions(repo_dir)
   if diff_versions:
-    print("Submodule versions need to be written. Run (and update commit):")
-    print("  ./build_tools/scripts/submodule_util write")
+    print("Submodule versions need to be exported. Run (and commit):")
+    print("  ./build_tools/scripts/submodule_util write export")
     for k, (current, written) in diff_versions.items():
       print("%s : actual=%s written=%s" % (k, current, written))
       return False
@@ -95,26 +126,28 @@ def check_submodule_versions(repo_dir):
 def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
-  parser.add_argument("command", help="Command to run (show|write|check)")
+  parser.add_argument(
+      "command", help="Command to run (show|import|export|check)")
   args = parser.parse_args()
 
   # Default repo path.
   if args.repo is None:
-    args.repo = subprocess.check_output(["git", "rev-parse", "--show-toplevel"],
-                        cwd=os.path.dirname(__file__)).strip().decode("UTF-8")
+    args.repo = utils.find_git_toplevel()
   return args
 
 
 def main(args):
   if args.command == "show":
     print(get_submodule_versions(args.repo))
-  elif args.command == "write":
-    write_submodule_versions(args.repo)
+  elif args.command == "export":
+    sync_and_update_submodules(args.repo)
+    export_versions(args.repo)
   elif args.command == "check":
     if not check_submodule_versions(args.repo):
       sys.exit(1)
-  elif args.command == "update":
-    update_versions(args.repo)
+  elif args.command == "import":
+    import_versions(args.repo)
+    sync_and_update_submodules(args.repo)
   else:
     print("Unrecognized command:", args.command)
     sys.exit(1)
