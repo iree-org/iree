@@ -16,6 +16,8 @@ if (${IREE_ENABLE_LLVM})
   iree_cc_binary(
     NAME
       iree-tblgen
+    OUT
+      iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
     DEPS
