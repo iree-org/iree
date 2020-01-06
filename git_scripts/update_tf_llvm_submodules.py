@@ -14,11 +14,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=missing-docstring
+"""update_tf_llvm_submodules.
+
+Updates the third_party/tensorflow and third_party/llvm-project submodules
+to new commits. We have special conditions around these submodules since
+upstream will only accept an llvm-project version that is sync'd with the
+corresponding version that tensorflow depends on. In addition, some BUILD
+files must be sync'd for the new version.
+
+Typical usage:
+  Syntax: ./git_scripts/update_tf_llvm_modules.py
+
+  By default, this will update the tensorflow submodule to remote HEAD and
+  update the llvm-project submodule to the corresponding version. It will
+  also sync BUILD file changes as needed and export the version metadata.
+"""
+
 import argparse
 import re
 import os
-import subprocess
 import sys
+
+import submodule_versions
+import utils
 
 
 def parse_arguments():
@@ -46,17 +65,14 @@ def parse_arguments():
       "--update_build_files",
       help="Updates the IREE LLVM build files from TensorFlow"
       " (Defaults to True if --llvm_commit=TENSORFLOW)",
-      type=str2bool,
+      type=utils.str2bool,
       nargs="?",
       default=None)
   args = parser.parse_args()
 
   # Default repo path.
   if args.repo is None:
-    args.repo = execute(["git", "rev-parse", "--show-toplevel"],
-                        cwd=os.path.dirname(__file__),
-                        capture_output=True,
-                        silent=True).strip().decode("UTF-8")
+    args.repo = utils.find_git_toplevel()
 
   # Set some defaults.
   if not args.tensorflow:
@@ -64,19 +80,6 @@ def parse_arguments():
   if not args.llvm:
     args.llvm = os.path.join(args.repo, "third_party", "llvm-project")
   return args
-
-
-def str2bool(v):
-  if v is None:
-    return None
-  if isinstance(v, bool):
-    return v
-  if v.lower() in ("yes", "true", "t", "y", "1"):
-    return True
-  elif v.lower() in ("no", "false", "f", "n", "0"):
-    return False
-  else:
-    raise argparse.ArgumentTypeError("Boolean value expected.")
 
 
 def main(args):
@@ -97,6 +100,7 @@ def main(args):
   else:
     print("\n*** Updating TensorFlow to", args.tensorflow_commit, "***")
     update_submodule(args.tensorflow, args.tensorflow_commit)
+    stage_path(args.repo, "third_party/tensorflow")
 
   # Update LLVM.
   if args.llvm_commit == "TENSORFLOW":
@@ -111,6 +115,7 @@ def main(args):
   else:
     print("\n*** Updating LLVM to", args.llvm_commit, "***")
     update_submodule(args.llvm, args.llvm_commit)
+    stage_path(args.repo, "third_party/llvm-project")
 
   # Update build files.
   if not args.update_build_files:
@@ -119,33 +124,28 @@ def main(args):
     print("\n*** Updating BUILD.bazel files ***")
     update_build_files_from_tensorflow(args.repo, args.tensorflow)
 
-
-def execute(args, cwd, capture_output=False, silent=False, **kwargs):
-  if not silent:
-    print("+", " ".join(args), "  [from %s]" % cwd)
-  if capture_output:
-    return subprocess.check_output(args, cwd=cwd, **kwargs)
-  else:
-    return subprocess.check_call(args, cwd=cwd, **kwargs)
+  # Export SUBMODULE_VERSIONS.
+  print()  # Add line break.
+  submodule_versions.export_versions(args.repo)
 
 
 def get_commit(path, rev="HEAD"):
-  return execute(["git", "rev-parse", rev],
-                 cwd=path,
-                 silent=True,
-                 capture_output=True).decode("ISO-8859-1").strip()
+  return utils.execute(["git", "rev-parse", rev],
+                       cwd=path,
+                       silent=True,
+                       capture_output=True).decode("ISO-8859-1").strip()
 
 
 def update_submodule(path, commit, tracking="origin/master"):
   # Fetch.
-  execute(["git", "fetch"], cwd=path)
+  utils.execute(["git", "fetch"], cwd=path)
   # Determine commit.
   if commit == "REMOTE":
     commit = get_commit(path, rev=tracking)
     print("Resolved remote commit:", commit)
 
   # Rebase to commit (will fail if not fast-forward).
-  execute(["git", "checkout", commit], cwd=path)
+  utils.execute(["git", "checkout", commit], cwd=path)
 
 
 def find_tensorflow_llvm_commit(tensorflow_path):
@@ -175,26 +175,29 @@ def update_build_files_from_tensorflow(repo_path, tensorflow_path):
                                      "test.BUILD")
   overlay_path = os.path.join(repo_path, "build_tools", "bazel",
                               "third_party_import", "llvm-project", "overlay")
-  copy_text_file(src_llvm_build,
+  copy_text_file(repo_path, src_llvm_build,
                  os.path.join(overlay_path, "llvm", "BUILD.bazel"))
-  copy_text_file(src_mlir_build,
+  copy_text_file(repo_path, src_mlir_build,
                  os.path.join(overlay_path, "mlir", "BUILD.bazel"))
-  copy_text_file(src_mlir_test_build,
+  copy_text_file(repo_path, src_mlir_test_build,
                  os.path.join(overlay_path, "mlir", "test", "BUILD.bazel"))
 
 
-def copy_text_file(src_file, dst_file, prepend_text=None):
-  print("+ cp %s %s" % (src_file, dst_file),
-        "  [with prepended text]" if prepend_text else "")
+def copy_text_file(repo_path, src_file, dst_file):
+  print("+ cp %s %s" % (src_file, dst_file))
   with open(src_file, "r", encoding="UTF-8") as f:
     src_contents = f.read()
 
-  if prepend_text:
-    src_contents = prepend_text + src_contents
   if not os.path.exists(dst_file):
     print("WARNING: Destination file does not exist:", dst_file)
   with open(dst_file, "w", encoding="UTF-8") as f:
     f.write(src_contents)
+  stage_path(repo_path, dst_file)
+
+
+def stage_path(repo_path, to_stage):
+  # TODO(laurenzo): Move to utils.py.
+  utils.execute(["git", "add", to_stage], cwd=repo_path)
 
 
 if __name__ == "__main__":
