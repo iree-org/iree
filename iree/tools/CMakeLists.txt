@@ -15,8 +15,6 @@
 if (${IREE_ENABLE_LLVM})
   iree_cc_binary(
     NAME
-      iree_tblgen
-    OUT
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
@@ -28,7 +26,7 @@ if (${IREE_ENABLE_LLVM})
     LINKOPTS
       "-lpthread"
   )
-  add_executable(iree-tblgen ALIAS iree_tools_iree_tblgen)
+  add_executable(iree-tblgen ALIAS iree_tools_iree-tblgen)
 endif()
 
 if(${IREE_BUILD_COMPILER})
