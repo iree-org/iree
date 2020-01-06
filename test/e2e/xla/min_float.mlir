@@ -1,4 +1,5 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {
