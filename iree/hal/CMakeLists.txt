@@ -99,7 +99,7 @@ iree_cc_test(
     "buffer_test.cc"
   DEPS
     absl::span
-    gtest_main
+    iree::testing::gtest_main
     iree::base::status
     iree::base::status_matchers
     iree::hal::buffer
@@ -129,7 +129,7 @@ iree_cc_test(
   SRCS
     "buffer_view_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::status
     iree::base::status_matchers
     iree::hal::buffer
@@ -162,7 +162,7 @@ iree_cc_test(
   SRCS
     "buffer_view_string_util_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::status
     iree::base::status_matchers
     iree::hal::buffer_view_string_util
@@ -241,7 +241,7 @@ iree_cc_test(
     "deferred_buffer_test.cc"
   DEPS
     absl::memory
-    gtest_main
+    iree::testing::gtest_main
     iree::base::status_matchers
     iree::hal::deferred_buffer
     iree::hal::heap_buffer

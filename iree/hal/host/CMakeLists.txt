@@ -33,7 +33,7 @@ iree_cc_test(
   DEPS
     absl::memory
     absl::time
-    gtest_main
+    iree::testing::gtest_main
     iree::base::status
     iree::base::status_matchers
     iree::base::time
@@ -96,7 +96,7 @@ iree_cc_test(
     "host_fence_test.cc"
   DEPS
     absl::time
-    gtest_main
+    iree::testing::gtest_main
     iree::base::status
     iree::base::status_matchers
     iree::hal::host::host_fence
@@ -161,7 +161,7 @@ iree_cc_test(
   SRCS
     "host_submission_queue_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::hal::host::host_submission_queue
 )
 

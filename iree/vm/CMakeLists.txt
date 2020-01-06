@@ -62,10 +62,10 @@ iree_cc_library(
 #    iree::vm::stack
 #    iree::base::api
 #    iree::base::logging
-#    #TODO(marbre): Add dep iree::testing::benchmark_main
+#    iree::testing::benchmark_main
 #    absl::container
 #    absl::strings
-#    #TODO(marbre): Add depp "@com_google_benchmark//:benchmark"
+#    benchmark
 #)
 
 iree_bytecode_module(
@@ -86,7 +86,7 @@ iree_cc_test(
     "bytecode_module_test.cc"
   DEPS
     iree::vm::bytecode_module
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_tablegen_library(
@@ -171,7 +171,7 @@ iree_cc_test(
     iree::vm::ref
     iree::base::api
     iree::base::ref_ptr
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -197,7 +197,7 @@ iree_cc_test(
     iree::vm::stack
     iree::base::api
     iree::base::ref_ptr
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
