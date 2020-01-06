@@ -77,13 +77,13 @@ endif()
 # Third party: benchmark
 #-------------------------------------------------------------------------------
 
-set(BENCHMARK_ENABLE_TESTING OFF)
+set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 
 #-------------------------------------------------------------------------------
 # Third party: flatbuffers
 #-------------------------------------------------------------------------------
 
-set(FLATBUFFERS_BUILD_TESTS OFF)
+set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_INSTALL OFF)
 set(FLATBUFFERS_BUILD_FLATC ON)
 set(FLATBUFFERS_BUILD_FLATHASH OFF)
@@ -103,7 +103,7 @@ list(APPEND IREE_DEFAULT_COPTS ${FLATBUFFERS_COPTS})
 # Third party: glslang
 #-------------------------------------------------------------------------------
 
-set(ENABLE_CTEST OFF)
+set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 
 #-------------------------------------------------------------------------------
 # Third party: gtest
