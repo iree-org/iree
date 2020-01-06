@@ -12,7 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load(
+    "//bindings/python/pyiree:build_defs.bzl",
+    "pybind_cc_library",
+)
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+pybind_cc_library(
+    name = "common",
+    srcs = [
+        "status_utils.cc",
+    ],
+    hdrs = [
+        "binding.h",
+        "status_utils.h",
+    ],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+    ],
 )

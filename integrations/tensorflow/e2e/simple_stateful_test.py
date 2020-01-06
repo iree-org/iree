@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pyiree import tf_test_utils
+from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 

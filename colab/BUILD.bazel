@@ -12,7 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-package(
-    default_visibility = ["//visibility:public"],
-    licenses = ["notice"],  # Apache 2.0
+py_binary(
+    name = "everything_for_colab",
+    srcs = ["dummy.py"],
+    main = "dummy.py",
+    python_version = "PY3",
+    # TODO(b/145815906) Get this running in OSS CI.
+    tags = ["nokokoro"],
+    deps = [
+        "//bindings/python:pathsetup",  # build_cleaner: keep
+        "//bindings/python/pyiree/compiler",  # build_cleaner: keep
+        "//bindings/python/pyiree/rt",  # build_cleaner: keep
+        "//bindings/python/pyiree/tf/support",  # build_cleaner: keep
+    ],
 )

@@ -12,7 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load(
+    "//iree:build_defs.bzl",
+    "INTREE_TENSORFLOW_PY_DEPS",
+)
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+py_library(
+    name = "support",
+    srcs = [
+        "tf_test_driver.py",
+        "tf_test_utils.py",
+    ],
+    deps = INTREE_TENSORFLOW_PY_DEPS + [
+        "//bindings/python/pyiree/compiler",
+        "//bindings/python/pyiree/rt",
+    ],
 )

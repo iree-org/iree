@@ -48,6 +48,6 @@ py_test(
     # TODO(b/145815906) Get this running in OSS CI.
     tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
-        "//bindings/python/pyiree",
+        "//bindings/python/pyiree/tf/support",
     ],
 )
