@@ -18,7 +18,6 @@ on:
   push:
     branches:
       - master
-      - ci-test # A branch specifically for testing CI
 
 jobs:
   linux:
