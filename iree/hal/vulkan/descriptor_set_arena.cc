@@ -69,6 +69,19 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
   return write_infos;
 }
 
+VkDescriptorSetAllocateInfo PopulateDescriptorSetsAllocateInfo(
+    const DescriptorPool& descriptor_pool,
+    const PipelineDescriptorSets& pipeline_descriptor_sets) {
+  VkDescriptorSetAllocateInfo allocate_info;
+  allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocate_info.pNext = nullptr;
+  allocate_info.descriptorPool = descriptor_pool.handle;
+  allocate_info.descriptorSetCount = 1;
+  allocate_info.pSetLayouts =
+      &pipeline_descriptor_sets.buffer_binding_set_layout;
+  return allocate_info;
+}
+
 }  // namespace
 
 DescriptorSetArena::DescriptorSetArena(
@@ -118,17 +131,12 @@ Status DescriptorSetArena::BindDescriptorSet(
   auto& descriptor_pool = descriptor_pool_buckets_[bucket];
 
   const auto& pipeline_descriptor_sets = executable->descriptor_sets();
-
-  VkDescriptorSetAllocateInfo allocate_info;
-  allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocate_info.pNext = nullptr;
-  allocate_info.descriptorPool = descriptor_pool.handle;
-  allocate_info.descriptorSetCount = 1;
-  allocate_info.pSetLayouts =
-      &pipeline_descriptor_sets.buffer_binding_set_layout;
+  auto allocate_info = PopulateDescriptorSetsAllocateInfo(
+      descriptor_pool, pipeline_descriptor_sets);
   VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
   VkResult result = syms().vkAllocateDescriptorSets(
       *logical_device_, &allocate_info, &descriptor_set);
+
   if (result == VK_ERROR_OUT_OF_POOL_MEMORY) {
     // Allocation failed because the pool is either out of descriptors or too
     // fragmented. We'll just allocate another pool.
@@ -137,6 +145,13 @@ Status DescriptorSetArena::BindDescriptorSet(
         descriptor_pool_cache_->AcquireDescriptorPool(
             VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, max_descriptor_count));
     used_descriptor_pools_.push_back(descriptor_pool_buckets_[bucket]);
+
+    // Allocate descriptor sets.
+    auto allocate_info = PopulateDescriptorSetsAllocateInfo(
+        descriptor_pool_buckets_[bucket], pipeline_descriptor_sets);
+    descriptor_set = VK_NULL_HANDLE;
+    VK_RETURN_IF_ERROR(syms().vkAllocateDescriptorSets(
+        *logical_device_, &allocate_info, &descriptor_set));
   }
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
