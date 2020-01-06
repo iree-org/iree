@@ -48,6 +48,7 @@ py_library(
         "conditional_tensorflow.py",
     ],
     srcs_version = "PY3",
+    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -62,6 +63,7 @@ iree_py_extension(
     copts = PYBIND_COPTS + PYBIND_EXTENSION_COPTS,
     features = PYBIND_FEATURES,
     linkstatic = 1,
+    tags = ["nokokoro"],
     win_def_file = "export.def",
     deps = [
         ":compiler_library",
@@ -78,6 +80,7 @@ pybind_cc_library(
     hdrs = [
         "compiler.h",
     ],
+    tags = ["nokokoro"],
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",
         "@llvm-project//llvm:support",
@@ -91,6 +94,7 @@ py_test(
     name = "compiler_test",
     srcs = ["compiler_test.py"],
     python_version = "PY3",
+    tags = ["nokokoro"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
