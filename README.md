@@ -26,11 +26,9 @@ to join/post/read messages on the
 
 CI System      | Build System | Platform | Status
 -------------- | ------------ | -------- | ------
-GitHub Actions | CMake        | Linux    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22CMake+Build%22)*
-GitHub Actions | Bazel        | Linux    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build%22)*
+GitHub Actions | CMake        | Linux    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22CMake+Build%22)
+GitHub Actions | Bazel        | Linux    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build%22)
 Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
-
-\* Due to a [bug in GitHub actions](https://github.community/t5/GitHub-Actions/Actions-Reporting-Wrong-Branch-on-Merges/td-p/36966) runs will frequently be tagged with the branch that was pushed from instead of the master branch. This also breaks the status badge.
 
 ## Quickstart
 
