@@ -63,11 +63,10 @@ def parse_arguments():
       default="TENSORFLOW")
   parser.add_argument(
       "--update_build_files",
-      help="Updates the IREE LLVM build files from TensorFlow"
-      " (Defaults to True if --llvm_commit=TENSORFLOW)",
+      help="Updates the IREE LLVM build files from TensorFlow",
       type=utils.str2bool,
       nargs="?",
-      default=None)
+      default=False)
   args = parser.parse_args()
 
   # Default repo path.
