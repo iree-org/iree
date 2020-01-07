@@ -21,6 +21,7 @@ iree_bytecode_module(
     "iree::vm"
   TRANSLATION
     "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
 )
 
 iree_cc_library(
@@ -77,6 +78,7 @@ iree_bytecode_module(
     "iree::vm"
   TRANSLATION
     "-iree-vm-ir-to-bytecode-module"
+  PUBLIC
 )
 
 iree_cc_test(
@@ -112,6 +114,7 @@ iree_cc_library(
     iree::vm::module
     iree::vm::stack
     iree::base::api
+  PUBLIC
 )
 
 iree_cc_library(
@@ -124,6 +127,7 @@ iree_cc_library(
   DEPS
     iree::vm::types
     iree::base::api
+  PUBLIC
 )
 
 iree_cc_library(
@@ -138,6 +142,7 @@ iree_cc_library(
     iree::vm::module
     iree::vm::variant_list
     iree::base::api
+  PUBLIC
 )
 
 iree_cc_library(
@@ -149,6 +154,7 @@ iree_cc_library(
     "module.c"
   DEPS
     iree::base::api
+  PUBLIC
 )
 
 iree_cc_library(
@@ -160,6 +166,7 @@ iree_cc_library(
     "ref.c"
   DEPS
     iree::base::api
+  PUBLIC
 )
 
 iree_cc_test(
@@ -185,6 +192,7 @@ iree_cc_library(
     iree::vm::module
     iree::vm::ref
     iree::base::api
+  PUBLIC
 )
 
 iree_cc_test(
@@ -210,6 +218,7 @@ iree_cc_library(
   DEPS
     iree::vm::ref
     iree::base::api
+  PUBLIC
 )
 
 iree_cc_library(
@@ -217,6 +226,7 @@ iree_cc_library(
     value
   HDRS
     "value.h"
+  PUBLIC
 )
 
 iree_cc_library(
@@ -229,6 +239,7 @@ iree_cc_library(
   DEPS
     iree::vm::ref
     iree::vm::value
+  PUBLIC
 )
 
 iree_cc_library(
@@ -247,4 +258,5 @@ iree_cc_library(
     iree::vm::value
     iree::vm::variant_list
     iree::base::api
+  PUBLIC
 )
