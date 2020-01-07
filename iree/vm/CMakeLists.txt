@@ -159,6 +159,24 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    module_abi_cc
+  HDRS
+    "module_abi_cc.h"
+    "module_abi_packing.h"
+  DEPS
+    iree::vm::module
+    iree::vm::ref
+    iree::vm::stack
+    iree::base::api
+    iree::base::api_util
+    iree::base::ref_ptr
+    iree::base::status
+    absl::span
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     ref
   HDRS
     "ref.h"
