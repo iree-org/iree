@@ -49,25 +49,23 @@ iree_cc_library(
   PUBLIC
 )
 
-#TODO(marbre): 'benchmark/benchmark.h' file not found by bytecode_module_benchmark.cc
-#
-#iree_cc_test(
-#  NAME
-#    bytecode_module_benchmark
-#  SRCS
-#    "bytecode_module_benchmark.cc"
-#  DEPS
-#    iree::vm::bytecode_module
-#    iree::vm::bytecode_module_benchmark_module_cc
-#    iree::vm::module
-#    iree::vm::stack
-#    iree::base::api
-#    iree::base::logging
-#    iree::testing::benchmark_main
-#    absl::container
-#    absl::strings
-#    benchmark
-#)
+iree_cc_test(
+  NAME
+    bytecode_module_benchmark
+  SRCS
+    "bytecode_module_benchmark.cc"
+  DEPS
+    iree::vm::bytecode_module
+    iree::vm::bytecode_module_benchmark_module_cc
+    iree::vm::module
+    iree::vm::stack
+    iree::base::api
+    iree::base::logging
+    iree::testing::benchmark_main
+    absl::container
+    absl::strings
+    benchmark
+)
 
 iree_bytecode_module(
   NAME
