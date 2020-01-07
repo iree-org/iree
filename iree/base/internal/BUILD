@@ -131,8 +131,8 @@ cc_library(
     hdrs = ["status_matchers.h"],
     deps = [
         "//iree/base:status",
+        "//iree/testing:gtest",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-        "@com_google_googletest//:gtest",
     ],
 )
