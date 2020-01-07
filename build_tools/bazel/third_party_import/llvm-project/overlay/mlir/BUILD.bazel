@@ -1013,7 +1013,7 @@ gentbl(
             "-gen-spirv-avail-impls",
             "include/mlir/Dialect/SPIRV/SPIRVOpAvailabilityImpl.inc",
         ),
-    ],   
+    ],
     tblgen = ":mlir-tblgen",
     td_file = "include/mlir/Dialect/SPIRV/SPIRVOps.td",
     td_srcs = [
@@ -1049,7 +1049,7 @@ gentbl(
             "-gen-spirv-enum-avail-defs",
             "include/mlir/Dialect/SPIRV/SPIRVEnumAvailability.cpp.inc",
         ),
-    ],   
+    ],
     tblgen = ":mlir-tblgen",
     td_file = "include/mlir/Dialect/SPIRV/SPIRVBase.td",
     td_srcs = [
@@ -1645,8 +1645,8 @@ cc_library(
         ":Translation",
         "@llvm-project//llvm:bit_reader",
         "@llvm-project//llvm:bit_writer",
-        "@llvm-project//llvm:execution_engine",
         "@llvm-project//llvm:core",
+        "@llvm-project//llvm:execution_engine",
         "@llvm-project//llvm:machine_code",
         "@llvm-project//llvm:orcjit",
         "@llvm-project//llvm:support",
@@ -1669,8 +1669,8 @@ cc_library(
     deps = [
         "@llvm-project//llvm:analysis",
         "@llvm-project//llvm:common_transforms",
-        "@llvm-project//llvm:ipo_transforms",
         "@llvm-project//llvm:core",
+        "@llvm-project//llvm:ipo_transforms",
         "@llvm-project//llvm:support",
         "@llvm-project//llvm:target_base",
     ],
