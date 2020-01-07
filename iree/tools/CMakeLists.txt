@@ -101,7 +101,7 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_binary(
     NAME
-      iree_translate
+      iree-translate
     OUT
       iree-translate
     SRCS
@@ -112,6 +112,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV
       MLIRTranslateClParser
   )
-  add_executable(iree-translate ALIAS iree_tools_iree_translate)
+  add_executable(iree-translate ALIAS iree_tools_iree-translate)
 
 endif()
