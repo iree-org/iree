@@ -45,6 +45,9 @@ See also:
 
 *   [Using Colab](docs/using_colab.md)
 *   [Vulkan and SPIR-V](docs/vulkan_and_spirv.md)
+*   [Function ABI](docs/function_abi.md)
+*   [MNIST example on IREE](docs/mnist_example.md)
+*   [Details of IREE Repository Management](docs/repository_management.md)
 
 ## Project Goals
 
