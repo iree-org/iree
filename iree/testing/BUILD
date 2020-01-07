@@ -23,7 +23,7 @@ package(
 
 cc_library(
     name = "benchmark_main",
-    testonly = 1,
+    testonly = True,
     srcs = ["benchmark_main.cc"],
     deps = [
         "//iree/base:init",
@@ -34,14 +34,14 @@ cc_library(
 
 cc_library(
     name = "gtest",
-    testonly = 1,
+    testonly = True,
     hdrs = ["gtest.h"],
     deps = platform_trampoline_deps("gtest", "testing"),
 )
 
 cc_library(
     name = "gtest_main",
-    testonly = 1,
+    testonly = True,
     hdrs = ["gtest.h"],
     tags = ["keep_dep"],
     deps = platform_trampoline_deps("gtest_main", "testing"),

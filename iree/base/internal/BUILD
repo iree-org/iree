@@ -127,7 +127,7 @@ cc_library(
 
 cc_library(
     name = "status_matchers_internal",
-    testonly = 1,
+    testonly = True,
     hdrs = ["status_matchers.h"],
     deps = [
         "//iree/base:status",

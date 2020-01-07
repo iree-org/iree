@@ -400,7 +400,7 @@ cc_library(
 
 cc_library(
     name = "status_matchers",
-    testonly = 1,
+    testonly = True,
     hdrs = ["status_matchers.h"],
     deps = platform_trampoline_deps("status_matchers"),
 )

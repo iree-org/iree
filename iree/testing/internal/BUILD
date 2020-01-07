@@ -21,7 +21,7 @@ package(
 
 cc_library(
     name = "gtest_internal",
-    testonly = 1,
+    testonly = True,
     hdrs = ["gtest_internal.h"],
     deps = [
         "@com_google_googletest//:gtest",
@@ -30,7 +30,7 @@ cc_library(
 
 cc_library(
     name = "gtest_main_internal",
-    testonly = 1,
+    testonly = True,
     srcs = ["gtest_main_internal.cc"],
     hdrs = ["gtest_internal.h"],
     deps = [
