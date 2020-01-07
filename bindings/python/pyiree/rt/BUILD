@@ -40,6 +40,7 @@ py_library(
         "system_api.py",
     ],
     srcs_version = "PY3",
+    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -80,6 +81,7 @@ pybind_cc_library(
         "host_types.h",
         "vm.h",
     ],
+    tags = ["nokokoro"],
     deps = [
         "//bindings/python/pyiree/common",
         "//iree/base:api",
