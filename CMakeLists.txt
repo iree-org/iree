@@ -104,6 +104,7 @@ endif()
 
 if(${IREE_BUILD_TESTS})
   add_subdirectory(third_party/benchmark EXCLUDE_FROM_ALL)
+  enable_testing(iree)
 endif()
 
 #-------------------------------------------------------------------------------
