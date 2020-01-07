@@ -55,6 +55,7 @@ external_cc_library(
     ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/
   DEPS
     absl::core_headers
+    absl::flat_hash_set
     tensorflow_mlir_xla_canonicalize_gen
     tensorflow_mlir_xla_hlo_ops_gen
     tensorflow_mlir_xla_hlo_ops_base_gen
