@@ -1,8 +1,8 @@
 // RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | IreeFileCheck %s
 
-// CHECK: [[MAP0:\#.*]] = ([[DIM00:d.*]], [[DIM01:d.*]], [[DIM02:d.*]]) -> (s0, 0, [[DIM00]])
-// CHECK: [[MAP1:\#.*]] = ([[DIM10:d.*]], [[DIM11:d.*]], [[DIM12:d.*]]) -> (0)
-// CHECK: [[MAP2:\#.*]] = ([[DIM20:d.*]], [[DIM21:d.*]], [[DIM22:d.*]]) -> (0, [[DIM20]])
+// CHECK: [[MAP0:\#.*]] = (d0, d1, d2)[s0] -> (s0, 0, d0)
+// CHECK: [[MAP1:\#.*]] = (d0, d1, d2) -> (0)
+// CHECK: [[MAP2:\#.*]] = (d0, d1, d2) -> (0, d0)
 
 module {
   // CHECK: func @foo

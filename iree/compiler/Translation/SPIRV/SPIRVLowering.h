@@ -77,14 +77,6 @@ class ConstantOpSPIRVLowering final : public SPIRVOpLowering<ConstantOp> {
       Operation *op, OpBuilder &builder, AffineMap index,
       ArrayRef<Value> operands,
       TensorIndexToScalarValueMap &valueCache) const override;
-
- private:
-  LogicalResult lowerSplatConstant(
-      Operation *op, OpBuilder &builder, AffineMap index,
-      TensorIndexToScalarValueMap &valueCache) const;
-  LogicalResult lowerNonSplatConstant(
-      Operation *op, OpBuilder &builder, AffineMap index,
-      TensorIndexToScalarValueMap &valueCache) const;
 };
 
 /// SPIR-V lowering for CmpIOp.
@@ -231,7 +223,8 @@ class SPIRVIndexOpLowering final : public SPIRVOpLowering<OpTy> {
 /// location of a spv.globalVariable.
 Value genPointerOffset(OpBuilder &builder, Location loc,
                        TensorIndexToScalarValueMap &valueCache,
-                       AffineMap indexMap, Value buffer);
+                       AffineMap indexMap, ArrayRef<int64_t> shape,
+                       Value buffer);
 
 namespace detail {
 /// Implementation class for generating SPIR-V kernel.
@@ -309,8 +302,7 @@ class SPIRVCodegen : public detail::SPIRVCodegenImpl {
  public:
   explicit SPIRVCodegen() { insert(); }
 
-  LogicalResult codegen(spirv::ModuleOp &spirvModule, FuncOp &fn,
-                        TensorIndexToScalarValueMap &valueCache) {
+  LogicalResult codegen(spirv::ModuleOp &spirvModule, FuncOp &fn) {
     if (fn.getBlocks().size() != 1) {
       return emitError(
           fn.getLoc(),
@@ -320,6 +312,7 @@ class SPIRVCodegen : public detail::SPIRVCodegenImpl {
     OpBuilder builder(spirvModule.body());
     // Create the entry function and generate global invocation ID. Creates a
     // global variable for all inputs and output tensors.
+    TensorIndexToScalarValueMap valueCache;
     return createEntryFn(builder, fn, valueCache);
   }
 

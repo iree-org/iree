@@ -37,14 +37,21 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
   auto loc = concatenateOp.getLoc();
   auto i32Type = builder.getIntegerType(32);
   auto i1Type = builder.getI1Type();
-  int append_dim = concatenateOp.dimension().getZExtValue();
-  auto dimIndex = valueCache.getAffineExprValue(
-      builder.saveInsertionPoint(), loc, index.getResult(append_dim));
+  int appendDim = concatenateOp.dimension().getZExtValue();
+  SmallVector<Value, 2> accessIndices;
+  // Compute the index of the concat dimension.
+  AffineMap appendDimMap = AffineMap::get(
+      index.getNumDims(), index.getNumSymbols(), index.getResult(appendDim));
+  Value dimIndex =
+      valueCache.getAccessIndicesForIndexMap(builder, loc, appendDimMap);
+  if (!dimIndex) {
+    return failure();
+  }
 
   int offset = op->getOperand(0)
                    .getType()
                    .cast<RankedTensorType>()
-                   .getShape()[append_dim];
+                   .getShape()[appendDim];
   Value resultVal = operands[0];
   for (auto operandIt : llvm::enumerate(op->getOperands())) {
     // The first operand is already saved in resultVal.
@@ -63,7 +70,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
         loc, cond, operands[operandIt.index()], resultVal);
     auto operandShape =
         operandIt.value().getType().cast<RankedTensorType>().getShape();
-    offset += operandShape[append_dim];
+    offset += operandShape[appendDim];
   }
   valueCache.setValueAtIndex(op->getResult(0), index, resultVal);
   return success();
@@ -153,17 +160,31 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
   // If true, then use the value of the operand, or use the
   // padding value.
   auto loc = padOp.getLoc();
-  auto i32Type = builder.getIntegerType(32);
-  auto i1Type = builder.getI1Type();
-  auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
-  Value cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
+  auto indexType = builder.getIndexType();
+  auto zero = builder.create<ConstantOp>(loc, indexType,
+                                         builder.getIntegerAttr(indexType, 0));
+  Value cond = builder.create<ConstantOp>(loc, builder.getBoolAttr(true));
   auto operandType = padOp.operand().getType().cast<RankedTensorType>();
   if (!operandType.hasStaticShape()) {
     return padOp.emitError("pad op codegen supported only for static shapes");
   }
   auto operandShape = operandType.getShape();
-  for (auto resultIndex : enumerate(index.getResults())) {
-    auto i = resultIndex.index();
+  SmallVector<Value, 2> dimIndices;
+  for (auto resultExpr : index.getResults()) {
+    auto dimMap =
+        AffineMap::get(index.getNumDims(), index.getNumSymbols(), resultExpr);
+    auto dimIndex =
+        valueCache.getAccessIndicesForIndexMap(builder, loc, dimMap);
+    if (!dimIndex) {
+      return failure();
+    }
+    dimIndices.push_back(dimIndex);
+  }
+  // If the pad is a no-op then the input value can directly be used for the
+  // output.
+  bool noop = true;
+  for (auto dimIndex : enumerate(dimIndices)) {
+    auto i = dimIndex.index();
 
     // (edge_padding_low[i] + (interior_padding[i]+1) * operand_shape[i])
     int64_t paddingLow = edgePaddingLow.getValue<IntegerAttr>(i).getInt();
@@ -173,45 +194,43 @@ LogicalResult XLAPadOpSPIRVLowering::lowerOperation(
     if (paddingLow == 0 && paddingStride == 1 && paddingHigh == 0) {
       continue;
     }
-    auto edgePadding = builder.create<spirv::ConstantOp>(
-        loc, i32Type, builder.getI32IntegerAttr(paddingLow));
-    auto stride = builder.create<spirv::ConstantOp>(
-        loc, i32Type, builder.getI32IntegerAttr(paddingStride));
-    auto operandExtent = builder.create<spirv::ConstantOp>(
-        loc, i32Type, builder.getI32IntegerAttr(operandShape[i]));
-    auto t1 =
-        builder.create<spirv::IMulOp>(loc, i32Type, stride, operandExtent);
-    auto bound = builder.create<spirv::IAddOp>(loc, i32Type, edgePadding, t1);
+    noop = false;
+    auto edgePadding = builder.create<ConstantOp>(
+        loc, indexType, builder.getIntegerAttr(indexType, paddingLow));
+    auto stride = builder.create<ConstantOp>(
+        loc, indexType, builder.getIntegerAttr(indexType, paddingStride));
+    auto operandExtent = builder.create<ConstantOp>(
+        loc, indexType, builder.getIntegerAttr(indexType, operandShape[i]));
+    auto t1 = builder.create<MulIOp>(loc, stride, operandExtent);
+    auto bound = builder.create<AddIOp>(loc, edgePadding, t1);
 
     // d_i
-    auto dimIndex = valueCache.getAffineExprValue(builder.saveInsertionPoint(),
-                                                  loc, resultIndex.value());
+    auto dimIndexVal = dimIndex.value();
 
     // d_i < (edge_padding_low[i] + stride * operand_shape[i])
     auto checkUb =
-        builder.create<spirv::SLessThanOp>(loc, i1Type, dimIndex, bound);
-    cond = builder.create<spirv::LogicalAndOp>(loc, i1Type, cond, checkUb);
+        builder.create<CmpIOp>(loc, CmpIPredicate::slt, dimIndexVal, bound);
+    cond = builder.create<AndOp>(loc, cond, checkUb);
 
     if (paddingLow != 0) {
       // d_i >= edge_padding_low[i]
-      auto checkLb = builder.create<spirv::SGreaterThanEqualOp>(
-          loc, i1Type, dimIndex, edgePadding);
-      cond = builder.create<spirv::LogicalAndOp>(loc, i1Type, cond, checkLb);
+      auto checkLb = builder.create<CmpIOp>(loc, CmpIPredicate::sge,
+                                            dimIndexVal, edgePadding);
+      cond = builder.create<AndOp>(loc, cond, checkLb);
     }
 
     if (paddingStride != 1) {
       // ((d_i - edge_padding_low[i]) % (interior_padding[i]+1) == 0)
-      auto t1 = builder.create<spirv::ISubOp>(loc, dimIndex.getType(), dimIndex,
-                                              edgePadding);
-      auto t2 = builder.create<spirv::SModOp>(loc, t1.getResult().getType(), t1,
-                                              stride);
-      auto checkStride = builder.create<spirv::IEqualOp>(loc, i1Type, t2, zero);
-      cond =
-          builder.create<spirv::LogicalAndOp>(loc, i1Type, cond, checkStride);
+      auto t1 = builder.create<SubIOp>(loc, dimIndexVal, edgePadding);
+      auto t2 = builder.create<SignedRemIOp>(loc, t1, stride);
+      auto checkStride =
+          builder.create<CmpIOp>(loc, CmpIPredicate::eq, t2, zero);
+      cond = builder.create<AndOp>(loc, cond, checkStride);
     }
   }
   Value resultVal =
-      builder.create<spirv::SelectOp>(loc, cond, operands[0], operands[1]);
+      noop ? operands[0]
+           : builder.create<SelectOp>(loc, cond, operands[0], operands[1]);
   valueCache.setValueAtIndex(op->getResult(0), index, resultVal);
   return success();
 }

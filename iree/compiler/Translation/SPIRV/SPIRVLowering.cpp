@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/SPIRV/SPIRVLowering.h"
 
+#include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 
 namespace mlir {
@@ -30,7 +31,8 @@ namespace iree_compiler {
 
 Value genPointerOffset(OpBuilder &builder, Location loc,
                        TensorIndexToScalarValueMap &valueCache,
-                       AffineMap indexMap, Value buffer) {
+                       AffineMap indexMap, ArrayRef<int64_t> shape,
+                       Value buffer) {
   auto varPtrType =
       buffer.getType().cast<spirv::PointerType>().getPointeeType();
   // The variable has to be a struct type with a single element.
@@ -41,17 +43,16 @@ Value genPointerOffset(OpBuilder &builder, Location loc,
   auto varType = varStructType.getElementType(0);
 
   SmallVector<Value, 2> accessIndices;
-  /// For scalar values, the index-map computed with already map to the 0-th
-  /// element. For arrays, they map to the position accessed. So just for arrays
-  /// we need to add an extra 0 to index into the struct.
   auto i32Type = builder.getIntegerType(32);
+  auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
+  accessIndices.push_back(zero);
   if (varType.isa<spirv::ArrayType>()) {
-    auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
-    accessIndices.push_back(zero);
-  }
-  for (auto indexExpr : indexMap.getResults()) {
-    accessIndices.push_back(valueCache.getAffineExprValue(
-        builder.saveInsertionPoint(), loc, indexExpr));
+    Value linearizedIndex =
+        valueCache.getAccessIndicesForIndexMap(builder, loc, indexMap, shape);
+    if (!linearizedIndex) {
+      return nullptr;
+    }
+    accessIndices.push_back(linearizedIndex);
   }
   return builder.create<spirv::AccessChainOp>(loc, buffer, accessIndices);
 }
@@ -59,7 +60,12 @@ Value genPointerOffset(OpBuilder &builder, Location loc,
 /// Returns the type of the global variable to use for an argument of the
 /// dispatch function.
 static spirv::PointerType convertArgTypeToVariableType(Location loc,
-                                                       MemRefType argType) {
+                                                       ShapedType argType) {
+  if (!argType.isa<MemRefType>()) {
+    emitError(loc, "unhandled arg type ")
+        << argType << " while lowering to SPIR-V";
+    return nullptr;
+  }
   auto elementType = argType.getElementType();
   if (!elementType.isIntOrFloat()) {
     emitError(loc, "unhandled element type ")
@@ -72,14 +78,10 @@ static spirv::PointerType convertArgTypeToVariableType(Location loc,
     return nullptr;
   }
   int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
-  for (auto dim : reverse(argType.getShape())) {
-    if (dim <= 0) {
-      emitError(loc, "expected tensor dimensions to be non-zero");
-      return nullptr;
-    }
+  if (argType.getRank()) {
     elementType = spirv::ArrayType::get(
-        elementType, dim, static_cast<spirv::ArrayType::LayoutInfo>(stride));
-    stride *= dim;
+        elementType, argType.getNumElements(),
+        static_cast<spirv::ArrayType::LayoutInfo>(stride));
   }
   return spirv::PointerType::get(
       spirv::StructType::get(elementType,
@@ -262,6 +264,16 @@ LogicalResult SPIRVCodegenImpl::initSymbolValues(
     if (!val) {
       return failure();
     }
+    // Convert to i32.
+    auto valIntType = val.getType().dyn_cast<IntegerType>();
+    if (!valIntType) {
+      return emitError(loc, "expected symbol value to be integer type, got ")
+             << valIntType;
+    }
+    if (valIntType.getWidth() != 32) {
+      auto i32Type = builder.getIntegerType(32);
+      val = builder.create<spirv::SConvertOp>(loc, i32Type, val);
+    }
     valueCache.setSymbolValue(element.second, val);
   }
   return success();
@@ -279,7 +291,9 @@ Value SPIRVCodegenImpl::loadArgValueAtIndex(
     emitError(loc, "unable to find buffer for tensor argument");
     return nullptr;
   }
-  auto ptr = genPointerOffset(builder, loc, valueCache, indexMap, var);
+  auto ptr =
+      genPointerOffset(builder, loc, valueCache, indexMap,
+                       origArg->getType().cast<ShapedType>().getShape(), var);
   val = builder.create<spirv::LoadOp>(loc, ptr,
                                       /*memory_access =*/nullptr,
                                       /*alignment = */ nullptr);
@@ -331,20 +345,10 @@ LogicalResult SPIRVCodegenImpl::lowerFunction(
 //===----------------------------------------------------------------------===//
 // ConstantOp
 //===----------------------------------------------------------------------===//
-LogicalResult ConstantOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder, AffineMap index, ArrayRef<Value>,
-    TensorIndexToScalarValueMap &valueCache) const {
-  auto constOp = cast<ConstantOp>(op);
-  auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
-  if (!attr || !attr.isSplat()) {
-    return lowerNonSplatConstant(op, builder, index, valueCache);
-  }
-  return lowerSplatConstant(op, builder, index, valueCache);
-}
 
-LogicalResult ConstantOpSPIRVLowering::lowerSplatConstant(
+static LogicalResult lowerSplatConstant(
     Operation *op, OpBuilder &builder, AffineMap index,
-    TensorIndexToScalarValueMap &valueCache) const {
+    TensorIndexToScalarValueMap &valueCache) {
   auto constOp = cast<ConstantOp>(op);
   auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
   auto resultType = constOp.getResult().getType();
@@ -364,9 +368,9 @@ LogicalResult ConstantOpSPIRVLowering::lowerSplatConstant(
   return success();
 }
 
-LogicalResult ConstantOpSPIRVLowering::lowerNonSplatConstant(
+static LogicalResult lowerNonSplatConstant(
     Operation *op, OpBuilder &builder, AffineMap index,
-    TensorIndexToScalarValueMap &valueCache) const {
+    TensorIndexToScalarValueMap &valueCache) {
   auto constOp = cast<ConstantOp>(op);
   auto loc = constOp.getLoc();
   auto argType = constOp.getType().dyn_cast<ShapedType>();
@@ -375,37 +379,71 @@ LogicalResult ConstantOpSPIRVLowering::lowerNonSplatConstant(
   if (!argType.hasStaticShape()) {
     return constOp.emitError("expected static shaped tensor");
   }
+  if (!elementType.isIntOrFloat()) {
+    return op->emitError("unhandled element type of the result :")
+           << elementType;
+  }
 
   // Build the array type.
   int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
-  for (auto dim : reverse(argType.getShape())) {
+  Attribute spirvConstAttr;
+  if (argType.getRank()) {
+    // Create a DenseElementsAttr that is a linearized version of a the
+    // attribute in the original operation.
+    // TODO: This is copying the values temporarily (the old one will be
+    // deleted), but potentially can "move" the data here.
+    auto tensorType =
+        RankedTensorType::get(argType.getNumElements(), elementType);
+    if (elementType.isa<IntegerType>()) {
+      auto values =
+          constOp.value().cast<DenseElementsAttr>().getValues<APInt>();
+      SmallVector<APInt, 4> valuesVec(values.begin(), values.end());
+      spirvConstAttr = DenseElementsAttr::get(tensorType, valuesVec);
+    } else {
+      auto values =
+          constOp.value().cast<DenseElementsAttr>().getValues<APFloat>();
+      SmallVector<APFloat, 4> valuesVec(values.begin(), values.end());
+      spirvConstAttr = DenseElementsAttr::get(tensorType, valuesVec);
+    }
     elementType = spirv::ArrayType::get(
-        elementType, dim, static_cast<spirv::ArrayType::LayoutInfo>(stride));
-    stride *= dim;
+        elementType, argType.getNumElements(),
+        static_cast<spirv::ArrayType::LayoutInfo>(stride));
+  } else {
+    spirvConstAttr = constOp.value();
   }
-
   auto pointerType =
       spirv::PointerType::get(elementType, spirv::StorageClass::Function);
   auto spirvConstOp =
-      builder.create<spirv::ConstantOp>(loc, elementType, constOp.value());
+      builder.create<spirv::ConstantOp>(loc, elementType, spirvConstAttr);
   auto spirvVarOp = builder.create<spirv::VariableOp>(
       loc, pointerType,
       builder.getI32IntegerAttr(
           static_cast<int32_t>(spirv::StorageClass::Function)),
       ArrayRef<Value>(spirvConstOp.getResult()));
 
-  SmallVector<Value, 2> accessIndices;
-  for (auto indexExpr : index.getResults()) {
-    accessIndices.push_back(valueCache.getAffineExprValue(
-        builder.saveInsertionPoint(), loc, indexExpr));
+  Value accessIndex = valueCache.getAccessIndicesForIndexMap(
+      builder, loc, index, argType.getShape());
+  if (!accessIndex) {
+    return failure();
   }
   auto valPtr =
-      builder.create<spirv::AccessChainOp>(loc, spirvVarOp, accessIndices);
+      builder.create<spirv::AccessChainOp>(loc, spirvVarOp, accessIndex);
   auto val =
       builder.create<spirv::LoadOp>(loc, valPtr, /*memory_access=*/nullptr,
                                     /*alignment=*/nullptr);
   valueCache.setValueAtIndex(op->getResult(0), index, val.getResult());
   return success();
+}
+
+LogicalResult ConstantOpSPIRVLowering::lowerOperation(
+    Operation *op, OpBuilder &builder, AffineMap index, ArrayRef<Value>,
+    TensorIndexToScalarValueMap &valueCache) const {
+  auto constOp = cast<ConstantOp>(op);
+  auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
+  if (!attr || !attr.isSplat()) {
+    return lowerNonSplatConstant(op, builder, index, valueCache);
+  }
+  return lowerSplatConstant(op, builder, index, valueCache);
 }
 
 //===----------------------------------------------------------------------===//

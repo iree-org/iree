@@ -23,6 +23,9 @@
 #include "iree/compiler/Translation/SPIRV/IREEToSPIRV.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV.h"
 #include "llvm/ADT/StringSet.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
+#include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
+#include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -36,10 +39,46 @@ class IREEToSPIRVPass : public ModulePass<IREEToSPIRVPass> {
 };
 }  // namespace
 
-void IREEToSPIRVPass::runOnModule() {
-  auto module = getModule();
-  OpBuilder builder(module.getBodyRegion());
+/// Generates the reduction apply function within the SPIR-V module.
+template <typename operation_range>
+static LogicalResult generateReductionApplyFns(spirv::ModuleOp spvModule,
+                                               ModuleOp module,
+                                               OpBuilder &builder,
+                                               operation_range fns) {
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(&spvModule.getBlock());
 
+  SymbolTable table(module);
+  llvm::StringSet<> reductionApplyFnSymRefs;
+  SmallVector<Operation *, 1> clonedReductionFns;
+  for (auto funcOp : fns) {
+    if (!funcOp.getAttr("iree.executable.reduction")) {
+      continue;
+    }
+
+    auto applyFnSymRef = funcOp.template getAttrOfType<FlatSymbolRefAttr>(
+        "iree.executable.reduction.apply");
+    if (reductionApplyFnSymRefs.count(applyFnSymRef.getValue())) {
+      continue;
+    }
+    auto applyFn = table.lookup<FuncOp>(applyFnSymRef.getValue());
+    if (!applyFn) {
+      return emitError(funcOp.getLoc(), "unable to find fn ")
+             << applyFnSymRef << " which is the apply function for "
+             << funcOp.getName();
+    }
+    // Clone the reduction apply fns into the spirv module for legalization.
+    clonedReductionFns.push_back(builder.clone(*applyFn.getOperation()));
+  }
+
+  return lowerReductionApplyFunction(spvModule.getContext(),
+                                     clonedReductionFns);
+}
+
+/// Generates the entry function within the SPIR-V module for dispatch function.
+template <typename operation_range>
+static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
+                                           operation_range fns) {
   // Initialize the spir-v codegenerator.
   SPIRVCodegen<
       ConstantOpSPIRVLowering,
@@ -97,6 +136,38 @@ void IREEToSPIRVPass::runOnModule() {
       XLAGatherOpSPIRVLowering, XLAPadOpSPIRVLowering>
       spirvCodegen;
 
+  for (auto funcOp : fns) {
+    // TODO(ravishankarm): FuncOps in executable that are not dispatch functions
+    // are not lowered to SPIR-V. Fix this limitation.
+    if (!funcOp.getAttr("iree.executable.export")) continue;
+
+    if (failed(spirvCodegen.codegen(spvModule, funcOp))) {
+      return failure();
+    }
+  }
+  return success();
+}
+
+/// Converts the affine-apply ops to SPIR-V ops by adding the patterns for
+/// lowering from affine to StandardOps and StandardOps To SPIRV.
+static LogicalResult convertAffineApplyOps(MLIRContext *context,
+                                           spirv::ModuleOp spvModule) {
+  OwningRewritePatternList patterns;
+  populateAffineToStdConversionPatterns(patterns, context);
+  SPIRVTypeConverter typeConverter;
+  populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+  ConversionTarget target(*context);
+  target.addLegalDialect<spirv::SPIRVDialect>();
+  target.addDynamicallyLegalOp<FuncOp>(
+      [&](FuncOp op) { return typeConverter.isSignatureLegal(op.getType()); });
+  return applyFullConversion(spvModule, target, patterns);
+}
+
+void IREEToSPIRVPass::runOnModule() {
+  auto module = getModule();
+  OpBuilder builder(module.getBodyRegion());
+  auto *context = &getContext();
+
   // Create a spirv.module Op.
   auto spvModule = builder.create<spirv::ModuleOp>(
       module.getLoc(), spirv::AddressingModel::Logical,
@@ -105,50 +176,19 @@ void IREEToSPIRVPass::runOnModule() {
 
   auto fns = module.getOps<FuncOp>();
 
-  // Check for functions that are reduction apply functions
-  {
-    OpBuilder::InsertionGuard guard(builder);
-    builder.setInsertionPointToStart(&spvModule.getBlock());
-
-    SymbolTable table(module);
-    llvm::StringSet<> reductionApplyFnSymRefs;
-    SmallVector<Operation *, 1> clonedReductionFns;
-    for (auto funcOp : fns) {
-      if (!funcOp.getAttr("iree.executable.reduction")) {
-        continue;
-      }
-
-      auto applyFnSymRef = funcOp.getAttrOfType<FlatSymbolRefAttr>(
-          "iree.executable.reduction.apply");
-      if (reductionApplyFnSymRefs.count(applyFnSymRef.getValue())) {
-        continue;
-      }
-      auto applyFn = table.lookup<FuncOp>(applyFnSymRef.getValue());
-      if (!applyFn) {
-        emitError(funcOp.getLoc(), "unable to find fn ")
-            << applyFnSymRef << " which is the apply function for "
-            << funcOp.getName();
-        return signalPassFailure();
-      }
-      // Clone the reduction apply fns into the spirv module for legalization.
-      clonedReductionFns.push_back(builder.clone(*applyFn.getOperation()));
-    }
-
-    if (failed(lowerReductionApplyFunction(spvModule.getContext(),
-                                           clonedReductionFns))) {
-      return signalPassFailure();
-    }
+  // Generate the SPIR-V functions for any reduction apply functions.
+  if (failed(generateReductionApplyFns(spvModule, module, builder, fns))) {
+    return signalPassFailure();
   }
 
-  for (auto funcOp : fns) {
-    // TODO(ravishankarm): FuncOps in executable that are not dispatch functions
-    // are not lowered to SPIR-V. Fix this limitation.
-    if (!funcOp.getAttr("iree.executable.export")) continue;
+  // Generate the SPIR-V entry function for the dispatch function
+  if (failed(generateEntryFunction(spvModule, fns))) {
+    return signalPassFailure();
+  }
 
-    TensorIndexToScalarValueMap valueCache(spvModule.getContext());
-    if (failed(spirvCodegen.codegen(spvModule, funcOp, valueCache))) {
-      return signalPassFailure();
-    }
+  // Legalize AffineApplyOp generated during spir-v codegen.
+  if (failed(convertAffineApplyOps(context, spvModule))) {
+    return signalPassFailure();
   }
 }
 

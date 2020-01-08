@@ -52,8 +52,12 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
     return storeOp.emitError(
         "unable to find buffer that corresponds to the dst memref");
   }
-  auto ptr =
-      genPointerOffset(builder, storeOp.getLoc(), valueCache, indices[0], var);
+  ArrayRef<int64_t> shape = {0};
+  if (auto shapedType = src->getType().dyn_cast<ShapedType>()) {
+    shape = shapedType.getShape();
+  }
+  auto ptr = genPointerOffset(builder, storeOp.getLoc(), valueCache, indices[0],
+                              shape, var);
   auto scalarValue = valueCache.getValueAtIndex(src, indices[0]);
   builder.create<spirv::StoreOp>(storeOp.getLoc(), ptr, scalarValue,
                                  /*memory_access = */ nullptr,
@@ -90,7 +94,8 @@ LogicalResult IREEStoreReduceOpSPIRVLowering::lowerOperation(
   auto srcValue = valueCache.getValueAtIndex(src, srcIndices[0]);
   auto dstBuffer = valueCache.getBufferForArgument(storeReduceOp.dst());
   auto ptr =
-      genPointerOffset(builder, loc, valueCache, dstIndices[0], dstBuffer);
+      genPointerOffset(builder, loc, valueCache, dstIndices[0],
+                       dst->getType().cast<ShapedType>().getShape(), dstBuffer);
   builder.create<spirv::FunctionCallOp>(loc, ArrayRef<Type>(),
                                         storeReduceOp.reduction_fnAttr(),
                                         ArrayRef<Value>{srcValue, ptr});

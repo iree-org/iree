@@ -51,9 +51,12 @@ iree_cc_library(
     iree::schemas::spirv_executable_def_cc_fbs
     tensorflow::mlir_xla
     LLVMSupport
+    MLIRAffineOps
+    MLIRAffineToStandard
     MLIRIR
     MLIRSPIRV
     MLIRSPIRVSerialization
+    MLIRStandardToSPIRVTransforms
     MLIRTransforms
     MLIRTranslation
   ALWAYSLINK

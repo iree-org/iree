@@ -114,8 +114,8 @@ ArrayAttr updateIndexComputationAttrWithOperandIndices(
 IntegerAttr updateMaxSymbolNumberAttr(MLIRContext *context,
                                       IntegerAttr currAttr) {
   if (currAttr) {
-    auto numSymbols = currAttr.getInt();
-    return IntegerAttr::get(currAttr.getType(), numSymbols + 1);
+    auto maxSymbolNum = currAttr.getInt();
+    return IntegerAttr::get(currAttr.getType(), maxSymbolNum + 1);
   }
   return IntegerAttr::get(IntegerType::get(32, context), 0);
 }
@@ -154,7 +154,7 @@ StringRef getNumDimsAttrName() { return "iree.num_dims"; }
 
 /// Returns the name of the attribute that tracks the total number of symbols
 /// for the dispatch function.
-StringRef getNumSymbolsAttrName() { return "iree.max_symbol_num"; }
+StringRef getMaxSymbolNumAttrName() { return "iree.max_symbol_num"; }
 
 /// Returns the name of the attribute that tracks symbol numbers associated with
 /// the scalar values produced by these ops.
@@ -264,12 +264,12 @@ Optional<int64_t> addNewSymbolNumberForTensorIndex(Value value,
 
   // Find the symbol number to use. It is recorded as an attribute on the
   // dispatch function.
-  auto numSymbolsAttrName = getNumSymbolsAttrName();
+  auto maxSymbolNumAttrName = getMaxSymbolNumAttrName();
   auto currNumSymbolsAttr =
-      funcOp.getAttrOfType<IntegerAttr>(numSymbolsAttrName);
+      funcOp.getAttrOfType<IntegerAttr>(maxSymbolNumAttrName);
   auto updatedNumSymbolsAttr =
       updateMaxSymbolNumberAttr(context, currNumSymbolsAttr);
-  funcOp.setAttr(numSymbolsAttrName, updatedNumSymbolsAttr);
+  funcOp.setAttr(maxSymbolNumAttrName, updatedNumSymbolsAttr);
   unsigned symbolNumber = static_cast<unsigned>(updatedNumSymbolsAttr.getInt());
 
   // Record the mapping from element at tensor index to the symbol.
@@ -293,10 +293,11 @@ LogicalResult addOperandsIndexMap(Operation *op, AffineMap resultIndexMap,
 
 AffineMap getAffineMap(FuncOp funcOp, ArrayRef<AffineExpr> exprs) {
   auto numDimsAttr = funcOp.getAttrOfType<IntegerAttr>(getNumDimsAttrName());
-  auto numSymbolsAttr =
-      funcOp.getAttrOfType<IntegerAttr>(getNumSymbolsAttrName());
+  auto maxSymbolNumAttr =
+      funcOp.getAttrOfType<IntegerAttr>(getMaxSymbolNumAttrName());
   return AffineMap::get(numDimsAttr.getInt(),
-                        (numSymbolsAttr ? numSymbolsAttr.getInt() : 0), exprs);
+                        (maxSymbolNumAttr ? maxSymbolNumAttr.getInt() + 1 : 0),
+                        exprs);
 }
 
 void getIndexMapsForValue(Value value, SmallVectorImpl<AffineMap> &indices) {

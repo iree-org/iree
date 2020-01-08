@@ -21,6 +21,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_TENSORINDEXTOSCALARVALUEMAP_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_TENSORINDEXTOSCALARVALUEMAP_H
 
+#include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineExprVisitor.h"
@@ -33,8 +34,7 @@ namespace iree_compiler {
 
 class TensorIndexToScalarValueMap {
  public:
-  explicit TensorIndexToScalarValueMap(MLIRContext *context)
-      : affineExprCodegen(context) {}
+  explicit TensorIndexToScalarValueMap() {}
 
   /// Returns the buffer associated with an argument in the dispatch function.
   Value getBufferForArgument(Value arg) { return argToBufferMap.lookup(arg); }
@@ -53,12 +53,47 @@ class TensorIndexToScalarValueMap {
     return scalarValIt->second;
   }
 
-  /// Returns the value in the lowered function (or generates it if it hasn't
-  /// been generated already), the scalar value that stores the value
-  /// corresponding to `expr`
-  Value getAffineExprValue(OpBuilder::InsertPoint ip, Location loc,
-                           AffineExpr expr) {
-    return affineExprCodegen.getExprValue(ip, loc, expr);
+  Value getAccessIndicesForIndexMap(OpBuilder &builder, Location loc,
+                                    AffineMap indexMap,
+                                    ArrayRef<int64_t> shape = {1}) {
+    assert(indexMap.getNumSymbols() <= symbolPosToValue.size() ||
+           (symbolPosToValue.empty() && indexMap.getNumSymbols() == 0));
+    // Linearize the shape using row major layout.
+    // TODO(ravishankarm): Handle dynamic shapes here.
+    SmallVector<int64_t, 2> strides(shape.size(), 1);
+    AffineMap linearizedIndexMap;
+    if (shape.size() > 1) {
+      for (size_t dim = shape.size() - 1; dim > 0; --dim) {
+        assert(shape[dim] != ShapedType::kDynamicSize);
+        strides[dim - 1] = strides[dim] * shape[dim];
+      }
+      AffineMap linearizedMap = makeStridedLinearLayoutMap(
+          strides, /*offset=*/0, builder.getContext());
+      linearizedIndexMap = linearizedMap.compose(indexMap);
+    } else {
+      linearizedIndexMap = indexMap;
+    }
+
+    SmallVector<Value, 2> applyOperands;
+    applyOperands.reserve(indexMap.getNumDims() + indexMap.getNumSymbols());
+    for (auto i : llvm::seq<unsigned>(0, indexMap.getNumDims())) {
+      auto dimValue = threadDimToValue.lookup(i);
+      if (!dimValue) {
+        emitError(loc, "unset value for dim d") << i;
+        return nullptr;
+      }
+      applyOperands.push_back(dimValue);
+    }
+    for (auto i : llvm::seq<unsigned>(0, indexMap.getNumSymbols())) {
+      auto symbolVal = symbolPosToValue.lookup(i);
+      if (!symbolVal) {
+        emitError(loc, "unset value for symbol s") << i;
+        return nullptr;
+      }
+      applyOperands.push_back(symbolVal);
+    }
+    return builder.create<AffineApplyOp>(loc, linearizedIndexMap,
+                                         applyOperands);
   }
 
   /// Records the `buffer` to use for an `argument` in the dispatch function.
@@ -74,104 +109,26 @@ class TensorIndexToScalarValueMap {
 
   /// Records the `value` to use for an AffineDimExpr while generating code for
   /// AffineExpr trees.
-  void setDimValue(unsigned dim, Value value) {
-    return affineExprCodegen.setDimValue(dim, value);
-  }
+  void setDimValue(unsigned dim, Value value) { threadDimToValue[dim] = value; }
 
   /// Records the `value` to use for an AffineSymbolExpr while generating code
   /// for AffineExpr trees.
   void setSymbolValue(unsigned pos, Value value) {
-    return affineExprCodegen.setSymbolValue(pos, value);
+    assert(!symbolPosToValue.count(pos));
+    symbolPosToValue[pos] = value;
   }
 
  private:
-  /// Class to walk AffineExpr trees and generate scalar code that evaluates the
-  /// tree.
-  class AffineExprCodegen : public AffineExprVisitor<AffineExprCodegen, Value> {
-   public:
-    explicit AffineExprCodegen(MLIRContext *context)
-        : builder(context), location(UnknownLoc::get(context)) {}
-    Value getExprValue(OpBuilder::InsertPoint ip, Location loc,
-                       AffineExpr expr) {
-      Value &val = affineExprToValueMap[expr];
-      if (!val) {
-        builder.restoreInsertionPoint(ip);
-        location = loc;
-        val = visit(expr);
-      }
-      return val;
-    }
-    Value visitAddExpr(AffineBinaryOpExpr expr) {
-      auto operand1 = getValue(expr.getLHS());
-      auto operand2 = getValue(expr.getRHS());
-      return builder.create<spirv::IAddOp>(location, operand1, operand2);
-    }
-    Value visitCeilDivExpr(AffineBinaryOpExpr expr) {
-      // TODO(ravishankarm): Implement ceil div expr codegen.
-      llvm_unreachable("Unimplemented affine AffineCeilDivExpr codegen");
-      return nullptr;
-    }
-    Value visitConstantExpr(AffineConstantExpr expr) {
-      return builder.create<spirv::ConstantOp>(
-          location, builder.getIntegerType(32),
-          builder.getI32IntegerAttr(expr.getValue()));
-    }
-    Value visitDimExpr(AffineDimExpr expr) {
-      return threadDimToValue.lookup(expr.getPosition());
-    }
-    Value visitFloorDivExpr(AffineBinaryOpExpr expr) {
-      auto operand1 = getValue(expr.getLHS());
-      auto operand2 = getValue(expr.getRHS());
-      return builder.create<spirv::SDivOp>(location, operand1, operand2);
-    }
-    Value visitModExpr(AffineBinaryOpExpr expr) {
-      auto operand1 = getValue(expr.getLHS());
-      auto operand2 = getValue(expr.getRHS());
-      return builder.create<spirv::SModOp>(location, operand1, operand2);
-    }
-    Value visitMulExpr(AffineBinaryOpExpr expr) {
-      auto operand1 = getValue(expr.getLHS());
-      auto operand2 = getValue(expr.getRHS());
-      return builder.create<spirv::IMulOp>(location, operand1, operand2);
-    }
-    Value visitSymbolExpr(AffineSymbolExpr expr) {
-      return symbolPosToValue.lookup(expr.getPosition());
-    }
-    void setDimValue(unsigned dim, Value value) {
-      threadDimToValue[dim] = value;
-    }
-    void setSymbolValue(unsigned pos, Value value) {
-      assert(!symbolPosToValue.count(pos));
-      symbolPosToValue[pos] = value;
-    }
-
-   private:
-    Value getValue(AffineExpr expr) {
-      Value &val = affineExprToValueMap[expr];
-      if (!val) {
-        val = visit(expr);
-      }
-      return val;
-    }
-
-    /// Cache of AffineExpr to scalar Value to avoid regeneration.
-    DenseMap<AffineExpr, Value> affineExprToValueMap;
-
-    /// Mapping from AffineDimExpr to Value to use in generating scalar code to
-    /// compute an AffineExpr tree.
-    DenseMap<unsigned, Value> threadDimToValue;
-
-    /// Mapping from AffineSymbolExpr to Value to use in generating scalar code
-    /// to compute an AffineExpr tree.
-    DenseMap<unsigned, Value> symbolPosToValue;
-
-    OpBuilder builder;
-    Location location;
-  };
-
-  AffineExprCodegen affineExprCodegen;
   DenseMap<Value, DenseMap<AffineMap, Value>> tensorIndexToScalarValueMap;
   DenseMap<Value, Value> argToBufferMap;
+
+  /// Mapping from AffineDimExpr to Value to use in generating scalar code to
+  /// compute an AffineExpr tree.
+  DenseMap<unsigned, Value> threadDimToValue;
+
+  /// Mapping from AffineSymbolExpr to Value to use in generating scalar code
+  /// to compute an AffineExpr tree.
+  DenseMap<unsigned, Value> symbolPosToValue;
 };
 
 }  // namespace iree_compiler
