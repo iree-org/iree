@@ -12,6 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_cc_test(
+  NAME
+    bytecode_dispatch_test
+  SRCS
+    "bytecode_dispatch_test.cc"
+  DEPS
+    iree::vm::bytecode_dispatch_test_module_cc
+    iree::vm::bytecode_module
+    iree::vm::context
+    iree::vm::instance
+    iree::vm::invocation
+    iree::vm::module
+    iree::base::logging
+    iree::testing::gtest_main
+    absl::strings
+  )
+
 iree_bytecode_module(
   NAME
     bytecode_dispatch_test_module
