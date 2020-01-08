@@ -1,9 +1,10 @@
 # IREE: An Experimental MLIR Execution Environment
 
-**DISCLAIMER**: This is not an officially supported Google product. It's an
-experimental playground for low-level/tightly integrated machine learning
-libraries that make use of modern hardware acceleration APIs and techniques (see
-[non goals](#non-goals)).
+**DISCLAIMER**: This is an early phase project that we hope will graduate into a
+supported form someday, but it is far from ready for everyday use and is made
+available without any support. With that said, feel free to browse the issues
+and reach out on the
+[iree-discuss mailing list](https://groups.google.com/forum/#!forum/iree-discuss).
 
 ## Table of Contents
 
@@ -125,20 +126,6 @@ to make ML efficient on their hardware without the need for bespoke runtimes and
 special access such that any ML workload produced by any tool runs well. We'd
 consider the IREE experiment a success if what resulted was some worked examples
 that help advance the entire ecosystem!
-
-## Non-Goals
-
-*   Replace parts of the supported TensorFlow ecosystem of tools: The authors
-    within Google work closely with TensorFlow and contribute to it regularly.
-    However, IREE is exploring some different angles of the problem and is
-    experimental. We will seek to leverage anything of value that we learn in an
-    appropriate way to make TensorFlow better over time, but the two should not
-    be conflated.
-*   Providing an [SLA](https://en.wikipedia.org/wiki/Service-level_agreement) of
-    any kind: IREE is infrastructure research, not a supported product. If it
-    gains mind-share or traction, we would revisit that in conjunction with
-    finding a more permanent way to align it with the broader constellation of
-    ML tooling.
 
 ## Milestones
 
