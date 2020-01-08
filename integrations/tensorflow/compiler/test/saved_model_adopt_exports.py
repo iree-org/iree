@@ -115,10 +115,10 @@ class T0002c_SimpleConst(tf.Module):
 # CHECK: attributes
 # CHECK-SAME: iree.module.export
 # CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I1!R1!"}
-# CHECK:   [[CONST_2xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>} : () -> tensor<2xf32>
-# CHECK:   [[CONST_3xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00, 2.000000e+00]> : tensor<3xf32>} : () -> tensor<3xf32>
-# CHECK:   flow.variable.store [[CONST_2xf32]], @v : tensor<2xf32>
-# CHECK:   flow.variable.store [[CONST_3xf32]], @v : tensor<3xf32>
+# CHECK-DAG:   [[CONST_2xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00]> : tensor<2xf32>} : () -> tensor<2xf32>
+# CHECK-DAG:   [[CONST_3xf32:%.+]] = "tf.Const"() {value = dense<[0.000000e+00, 1.000000e+00, 2.000000e+00]> : tensor<3xf32>} : () -> tensor<3xf32>
+# CHECK-DAG:   flow.variable.store [[CONST_2xf32]], @v : tensor<2xf32>
+# CHECK-DAG:   flow.variable.store [[CONST_3xf32]], @v : tensor<3xf32>
 # CHECK: FINISH_TEST
 class T0002d_VarCompatibleShapeChange(tf.Module):
 
