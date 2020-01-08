@@ -130,8 +130,8 @@ iree_cc_library(
     "status_matchers.h"
   DEPS
     iree::base::status
+    iree::testing::gtest
     absl::strings
     absl::optional
-    gtest
   TESTONLY
 )
