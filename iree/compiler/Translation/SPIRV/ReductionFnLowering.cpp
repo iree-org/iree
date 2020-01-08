@@ -181,6 +181,7 @@ LogicalResult lowerReductionApplyFunction(MLIRContext *context,
   SPIRVReductionTypeConverter typeConverter;
   patterns
       .insert<ReductionApplyFnConversion,
+              ReductionOpConversion<xla_hlo::MinOp, spirv::AtomicSMinOp>,
               ReductionOpConversion<xla_hlo::MaxOp, spirv::AtomicSMaxOp>,
               ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>,
               ReturnOpConversion<IREE::ReturnOp>, ReturnOpConversion<ReturnOp>>(
