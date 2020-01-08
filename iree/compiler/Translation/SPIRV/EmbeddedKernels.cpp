@@ -76,12 +76,6 @@ LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
                                        iree::SpirVExecutableDefT *outDef) {
   auto funcType = entryFuncOp.getType();
   auto arg0 = funcType.getInput(0).cast<ShapedType>();
-  if (!arg0.getElementType().isF32()) {
-    // When we do other types we'll need other shaders.
-    return entryFuncOp.emitOpError()
-           << "only floating point reduction is implemented";
-  }
-
   auto applyFuncAttr = entryFuncOp.getAttrOfType<FlatSymbolRefAttr>(
       "iree.executable.reduction.apply");
   auto applyFuncOp = moduleOp.lookupSymbol(applyFuncAttr.getValue());
@@ -304,6 +298,12 @@ bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
                               iree::SpirVExecutableDefT *outDef) {
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     if (funcOp.getAttr("iree.executable.reduction")) {
+      // Integer reduction is supported through other passes.
+      auto arg0 = funcOp.getType().getInput(0).cast<ShapedType>();
+      if (arg0.getElementType().dyn_cast<IntegerType>()) {
+        return false;
+      }
+
       if (failed(buildReductionExecutable(moduleOp, funcOp, outDef))) {
         moduleOp.emitOpError() << "failed to splat in the reduction kernel";
         return false;
