@@ -89,6 +89,7 @@ if(${IREE_BUILD_COMPILER})
 #      iree::base::init
 #      iree::base::status
 #      iree::compiler::Translation::Interpreter
+#      iree::compiler::Translation::SPIRV::LinalgToSPIRV
 #      iree::compiler::Translation::SPIRV::XLAToSPIRV
 #      iree::compiler::Translation::IREEVM
 #      iree::hal::buffer_view_string_util
@@ -109,6 +110,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ${_ALWAYSLINK_LIBS}
       iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Translation::SPIRV::LinalgToSPIRV
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       MLIRTranslateClParser
   )
