@@ -12,8 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(EmbeddedKernels)
-add_subdirectory(IndexComputation)
-add_subdirectory(Passes)
-add_subdirectory(ReductionCodegen)
-add_subdirectory(XLAToSPIRV)
+iree_cc_library(
+  NAME
+    IndexComputation
+  HDRS
+    "IREEIndexComputation.h"
+    "IndexComputation.h"
+    "IndexComputationAttribute.h"
+    "IndexComputationPass.h"
+    "XLAIndexPropagation.h"
+  SRCS
+    "IREEIndexComputation.cpp"
+    "IndexComputation.cpp"
+    "IndexComputationAttribute.cpp"
+    "IndexComputationPass.cpp"
+    "XLAIndexPropagation.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Utils
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSPIRV
+    MLIRStandardOps
+   tensorflow::mlir_xla
+  ALWAYSLINK
+  PUBLIC
+)

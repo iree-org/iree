@@ -12,8 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(EmbeddedKernels)
-add_subdirectory(IndexComputation)
-add_subdirectory(Passes)
-add_subdirectory(ReductionCodegen)
-add_subdirectory(XLAToSPIRV)
+iree_cc_library(
+  NAME
+    ReductionCodegen
+  HDRS
+    "ReductionCodegenPasses.h"
+  SRCS
+    "PrepareReductionDispatch.cpp"
+    "ReductionFnLowering.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Utils
+    MLIRIR
+    MLIRPass
+    MLIRSPIRV
+    MLIRStandardOps
+    MLIRTransforms
+    tensorflow::mlir_xla
+  ALWAYSLINK
+  PUBLIC
+)

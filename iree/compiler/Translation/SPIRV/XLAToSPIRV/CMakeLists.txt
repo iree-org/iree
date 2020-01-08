@@ -14,24 +14,32 @@
 
 iree_cc_library(
   NAME
-    VulkanSPIRV
+    XLAToSPIRV
   HDRS
-    "VulkanSPIRVTarget.h"
+    "IREEToSPIRV.h"
+    "IREEToSPIRVPass.h"
+    "SPIRVLowering.h"
+    "TensorIndexToScalarValueMap.h"
+    "XLAToSPIRV.h"
   SRCS
-    "VulkanSPIRVTarget.cpp"
+    "IREEToSPIRV.cpp"
+    "IREEToSPIRVPass.cpp"
+    "SPIRVLowering.cpp"
+    "XLAToSPIRV.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::SPIRV::EmbeddedKernels
-    iree::compiler::Translation::SPIRV::XLAToSPIRV
-    iree::schemas::spirv_executable_def_cc_fbs
-    flatbuffers
+    iree::compiler::Translation::SPIRV::IndexComputation
+    iree::compiler::Translation::SPIRV::Passes
+    iree::compiler::Translation::SPIRV::ReductionCodegen
+    iree::compiler::Utils
     LLVMSupport
+    MLIRAffineOps
+    MLIRAffineToStandard
     MLIRIR
     MLIRPass
     MLIRSPIRV
-    MLIRSPIRVSerialization
+    MLIRStandardOps
+    MLIRStandardToSPIRVTransforms
     MLIRSupport
     MLIRTransforms
     tensorflow::mlir_xla

@@ -19,8 +19,8 @@
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
-#include "iree/compiler/Translation/SPIRV/EmbeddedKernels.h"
-#include "iree/compiler/Translation/SPIRV/IREEToSPIRVPass.h"
+#include "iree/compiler/Translation/SPIRV/EmbeddedKernels/EmbeddedKernels.h"
+#include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -140,15 +140,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
 
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
-    conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());
-    conversionPassManager.addPass(createPrepareReductionDispatchPass());
-    conversionPassManager.addPass(createIndexComputationPass());
-    conversionPassManager.addPass(createIREEToSPIRVPass());
-
-    OpPassManager &spirvPasses = conversionPassManager.nest<spirv::ModuleOp>();
-    spirvPasses.addPass(spirv::createLowerABIAttributesPass());
-    spirvPasses.addPass(createInlinerPass());
-    spirvPasses.addPass(createAdjustIntegerWidthPass());
+    addIREEToSPIRVPasses(conversionPassManager);
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";
     }

@@ -12,8 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(EmbeddedKernels)
-add_subdirectory(IndexComputation)
-add_subdirectory(Passes)
-add_subdirectory(ReductionCodegen)
-add_subdirectory(XLAToSPIRV)
+iree_cc_library(
+  NAME
+    Passes
+  HDRS
+    "Passes.h"
+  SRCS
+    "AdjustIntegerWidthPass.cpp"
+  DEPS
+    MLIRIR
+    MLIRPass
+    MLIRSPIRV
+    MLIRStandardOps
+    MLIRTransforms
+  ALWAYSLINK
+  PUBLIC
+)

@@ -12,8 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(EmbeddedKernels)
-add_subdirectory(IndexComputation)
-add_subdirectory(Passes)
-add_subdirectory(ReductionCodegen)
-add_subdirectory(XLAToSPIRV)
+add_subdirectory(Kernels)
+
+iree_cc_library(
+  NAME
+    EmbeddedKernels
+  HDRS
+    "EmbeddedKernels.h"
+  SRCS
+    "EmbeddedKernels.cpp"
+  DEPS
+    flatbuffers
+    iree::compiler::Translation::SPIRV::EmbeddedKernels::Kernels
+    iree::schemas::spirv_executable_def_cc_fbs
+    MLIRIR
+    MLIRSupport
+    tensorflow::mlir_xla
+  ALWAYSLINK
+  PUBLIC
+)

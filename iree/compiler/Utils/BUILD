@@ -24,18 +24,19 @@ cc_library(
     srcs = [
         "DispatchUtils.cpp",
         "GraphUtils.cpp",
+        "IREECodegenUtils.cpp",
         "TypeConversionUtils.cpp",
     ],
     hdrs = [
         "DispatchUtils.h",
         "GraphUtils.h",
+        "IREECodegenUtils.h",
         "TypeConversionUtils.h",
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",

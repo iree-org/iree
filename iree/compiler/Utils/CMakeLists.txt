@@ -18,10 +18,12 @@ iree_cc_library(
   HDRS
     "DispatchUtils.h"
     "GraphUtils.h"
+    "IREECodegenUtils.h"
     "TypeConversionUtils.h"
   SRCS
     "DispatchUtils.cpp"
     "GraphUtils.cpp"
+    "IREECodegenUtils.cpp"
     "TypeConversionUtils.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
