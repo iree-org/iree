@@ -60,6 +60,12 @@ class PrePartitioningConversionPass
     conversionTarget.addIllegalOp<xla_hlo::DotGeneralOp>();
     xla_hlo::PopulateGeneralDotOpLoweringPatterns(&conversionPatterns, context);
 
+    // We don't support broadcast_dimensions as part of ops, so materialize
+    // any such attributes to dedicated xla_hlo.broadcast_in_dim ops.
+    xla_hlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);
+    xla_hlo::PopulateMaterializeBroadcastsPatterns(context,
+                                                   &conversionPatterns);
+
     // Early conversion of ops that have matches we want to route through.
     // For example, DynamicUpdateSlice should end up as a stream operation.
     setupDirectHLOToFlowLegality(context, conversionTarget);

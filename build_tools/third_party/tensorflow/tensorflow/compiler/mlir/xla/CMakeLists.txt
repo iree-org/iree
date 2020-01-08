@@ -41,6 +41,7 @@ external_cc_library(
     "transforms/legalize_control_flow.cc"
     "transforms/legalize_to_standard.cc"
     "transforms/lower_general_dot.cc"
+    "transforms/materialize_broadcasts.cc"
   HDRS
     "convert_op_folder.h"
     "ir/hlo_ops.h"
@@ -55,6 +56,7 @@ external_cc_library(
     ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/
   DEPS
     absl::core_headers
+    absl::flat_hash_set
     tensorflow_mlir_xla_canonicalize_gen
     tensorflow_mlir_xla_hlo_ops_gen
     tensorflow_mlir_xla_hlo_ops_base_gen
