@@ -274,24 +274,13 @@ iree_cc_test(
     iree::base::intrusive_list
 )
 
-# TODO(marbre): Moving to internal breaks iree::samples::rt::vulkan::vk_graphics_integration
-#  INTERFACE_LIBRARY targets may only have whitelisted properties.  The
-#  property "ALWAYSLINK" is not allowed.
 iree_cc_library(
   NAME
     logging
   HDRS
     "logging.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
-    "internal/logging.h"
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
-    "internal/logging.cc"
   DEPS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
-    absl::base
-    absl::flags
-    iree::base::platform_headers
+    iree::base::internal::logging_internal
   PUBLIC
 )
 
