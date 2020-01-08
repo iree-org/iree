@@ -30,6 +30,54 @@ module{
     spv.globalVariable @globalInvocationID built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     // CHECK: spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
     // CHECK: spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+    spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
+    spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
+    func @foo_i16(%arg0 : i16, %arg1 : i16) -> () {
+      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
+      // CHECK: spv.AtomicAnd
+      // CHECK: spv.AtomicOr
+      %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
+      %1 = spv.constant 0 : i32
+      %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
+      %3 = spv.Load "StorageBuffer" %2 : i16
+      %4 = spv._address_of @constant_arg_1 : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
+      %5 = spv.constant 0 : i32
+      %6 = spv.AccessChain %4[%5] : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
+      spv.Store "StorageBuffer" %6, %3 : i16
+      spv.Return
+    }
+  }
+
+  spv.module "Logical" "GLSL450" {
+    spv.globalVariable @globalInvocationID built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+    // CHECK: spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+    // CHECK: spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+    spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+    spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+    func @foo_i8(%arg0 : i8, %arg1 : i8) -> () {
+      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
+      // CHECK: spv.AtomicAnd
+      // CHECK: spv.AtomicOr
+      %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+      %1 = spv.constant 0 : i32
+      %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+      %3 = spv.Load "StorageBuffer" %2 : i8
+      %4 = spv._address_of @constant_arg_1 : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+      %5 = spv.constant 0 : i32
+      %6 = spv.AccessChain %4[%5] : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+      spv.Store "StorageBuffer" %6, %3 : i8
+      spv.Return
+    }
+  }
+
+  spv.module "Logical" "GLSL450" {
+    spv.globalVariable @globalInvocationID built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+    // CHECK: spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+    // CHECK: spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
     func @foo_i1(%arg0 : i1, %arg1 : i1) -> () {

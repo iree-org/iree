@@ -1,4 +1,5 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xi32> {
@@ -41,6 +42,17 @@ func @negative() -> tensor<i32> {
   return %result : tensor<i32>
 }
 // CHECK: i32=1
+
+// -----
+
+// CHECK-LABEL: EXEC @i8
+func @i8() -> tensor<i8> {
+  %lhs = iree.unfoldable_constant dense<1> : tensor<i8>
+  %rhs = iree.unfoldable_constant dense<2> : tensor<i8>
+  %result = "xla_hlo.max"(%lhs, %rhs) : (tensor<i8>, tensor<i8>) -> tensor<i8>
+  return %result : tensor<i8>
+}
+// CHECK: i8=2
 
 // -----
 

@@ -58,16 +58,15 @@ bool hasIntTypeOfWidth(Type type, ArrayRef<int64_t> widths) {
   return false;
 }
 
-// Legalizes the integer types in struct.
-// 1) i1/i8 -> i32,
-// 2) i64 -> i32.
+// Returns true if the type contains i1, i8, i16, or i64.
+bool hasSupportedIntegerType(Type type) {
+  return hasIntTypeOfWidth(type, {1, 8, 16, 64});
+}
+
+// Legalizes all the integer types in struct to i32.
 Type legalizeIntegerType(Type type) {
   if (auto intType = type.dyn_cast<IntegerType>()) {
-    if (intType.getWidth() == 1 || intType.getWidth() == 8) {
-      return IntegerType::get(32, intType.getContext());
-    } else if (intType.getWidth() == 64) {
-      return IntegerType::get(32, intType.getContext());
-    }
+    return IntegerType::get(32, intType.getContext());
   } else if (auto structType = type.dyn_cast<spirv::StructType>()) {
     SmallVector<Type, 1> elementTypes;
     for (auto i : llvm::seq<unsigned>(0, structType.getNumElements())) {
@@ -96,7 +95,7 @@ struct AdjustAccessChainOp : public OpRewritePattern<spirv::AccessChainOp> {
   using OpRewritePattern<spirv::AccessChainOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::AccessChainOp op,
                                      PatternRewriter &rewriter) const override {
-    if (!hasIntTypeOfWidth(op.component_ptr().getType(), {1, 8, 64})) {
+    if (!hasSupportedIntegerType(op.component_ptr().getType())) {
       return matchFailure();
     }
     ValueRange indices(op.indices());
@@ -113,7 +112,7 @@ struct AdjustAddressOfOp : public OpRewritePattern<spirv::AddressOfOp> {
   using OpRewritePattern<spirv::AddressOfOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::AddressOfOp op,
                                      PatternRewriter &rewriter) const override {
-    if (!hasIntTypeOfWidth(op.pointer().getType(), {1, 8, 64})) {
+    if (!hasSupportedIntegerType(op.pointer().getType())) {
       return matchFailure();
     }
     rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(
@@ -123,13 +122,14 @@ struct AdjustAddressOfOp : public OpRewritePattern<spirv::AddressOfOp> {
   }
 };
 
-/// Rewrite global variable ops that contains i1, i8 and i64 types to i32 type.
+/// Rewrite global variable ops that contains i1, i8, i16 and i64 types to i32
+/// type.
 struct AdjustGlobalVariableWidth
     : public OpRewritePattern<spirv::GlobalVariableOp> {
   using OpRewritePattern<spirv::GlobalVariableOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::GlobalVariableOp op,
                                      PatternRewriter &rewriter) const override {
-    if (!hasIntTypeOfWidth(op.type(), {1, 8, 64})) {
+    if (!hasSupportedIntegerType(op.type())) {
       return matchFailure();
     }
     rewriter.replaceOpWithNewOp<spirv::GlobalVariableOp>(
@@ -140,34 +140,92 @@ struct AdjustGlobalVariableWidth
   }
 };
 
-Value convertToI32AccessChain(spirv::AccessChainOp op,
+// Returns an adjusted spirv::AccessChainOp to access corresponding i32
+// elements. One element was a `bits`-bit integer. The method adjust the last
+// index to make it access the corresponding i32 element. Note that this only
+// works for a scalar or 1-D tensor.
+Value convertToI32AccessChain(spirv::AccessChainOp op, int bits,
                               PatternRewriter &rewriter) {
+  assert(32 % bits == 0);
   const auto loc = op.getLoc();
   auto i32Type = rewriter.getIntegerType(32);
-  auto four = rewriter.create<spirv::ConstantOp>(loc, i32Type,
-                                                 rewriter.getI32IntegerAttr(4));
+  auto idx = rewriter.create<spirv::ConstantOp>(
+      loc, i32Type, rewriter.getI32IntegerAttr(32 / bits));
   auto lastDim = op.getOperation()->getOperand(op.getNumOperands() - 1);
   SmallVector<Value, 4> indices;
   for (auto it : op.indices()) {
     indices.push_back(it);
   }
   if (indices.size() > 1) {
-    indices.back() = rewriter.create<spirv::SDivOp>(loc, lastDim, four);
+    indices.back() = rewriter.create<spirv::SDivOp>(loc, lastDim, idx);
   }
   Type t = legalizeIntegerType(op.component_ptr().getType());
   return rewriter.create<spirv::AccessChainOp>(loc, t, op.base_ptr(), indices);
 }
 
-Value getOffsetOfInt8(spirv::AccessChainOp op, PatternRewriter &rewriter) {
+// Returns the offset of input value in i32 representation. For example, if
+// `bits` equals to 8, the x-th element is located at (x % 4) * 8. Because there
+// are four elements in one i32, and one element has 8 bits.
+Value getOffsetOfInt(spirv::AccessChainOp op, int bits,
+                     PatternRewriter &rewriter) {
+  assert(32 % bits == 0);
   const auto loc = op.getLoc();
   Type i32Type = rewriter.getIntegerType(32);
-  auto four = rewriter.create<spirv::ConstantOp>(loc, i32Type,
-                                                 rewriter.getI32IntegerAttr(4));
-  auto eight = rewriter.create<spirv::ConstantOp>(
-      loc, i32Type, rewriter.getI32IntegerAttr(8));
+  auto idx = rewriter.create<spirv::ConstantOp>(
+      loc, i32Type, rewriter.getI32IntegerAttr(32 / bits));
+  auto num = rewriter.create<spirv::ConstantOp>(
+      loc, i32Type, rewriter.getI32IntegerAttr(bits));
   auto lastDim = op.getOperation()->getOperand(op.getNumOperands() - 1);
-  auto m = rewriter.create<spirv::SModOp>(loc, lastDim, four);
-  return rewriter.create<spirv::IMulOp>(loc, i32Type, m, eight);
+  auto m = rewriter.create<spirv::SModOp>(loc, lastDim, idx);
+  return rewriter.create<spirv::IMulOp>(loc, i32Type, m, num);
+}
+
+Value rewriteIntForLoadOp(spirv::LoadOp op, PatternRewriter &rewriter) {
+  const auto loc = op.getLoc();
+  Type valueType = op.value().getType();
+  Type i32Type = rewriter.getIntegerType(32);
+  Value result;
+  auto accessChainOp = cast<spirv::AccessChainOp>(op.ptr().getDefiningOp());
+  // Only support for scalar and 1-D tensor. The first element in indices is
+  // index, the remaining elements map to other dimensions.
+  if (accessChainOp.indices().size() > 2) {
+    return nullptr;
+  }
+
+  int bits = hasIntTypeOfWidth(valueType, {1, 8}) ? 8 : 16;
+  Value i32AccessChainOp =
+      convertToI32AccessChain(accessChainOp, bits, rewriter);
+  Value loadOp = rewriter.create<spirv::LoadOp>(
+      loc, i32Type, i32AccessChainOp,
+      op.getAttrOfType<IntegerAttr>(
+          spirv::attributeName<spirv::MemoryAccess>()),
+      op.getAttrOfType<IntegerAttr>("alignment"));
+
+  // If it is a scalar, use the loading value directly. Otherwise, extract
+  // corresponding bits out. If it is a scalar, the indices only contains one
+  // element (which is index).
+  if (accessChainOp.indices().size() == 1) {
+    result = loadOp;
+  } else {
+    Value offset = getOffsetOfInt(accessChainOp, bits, rewriter);
+    result = rewriter.create<spirv::ShiftRightArithmeticOp>(loc, i32Type,
+                                                            loadOp, offset);
+  }
+
+  auto intMax = rewriter.create<spirv::ConstantOp>(
+      loc, i32Type, rewriter.getI32IntegerAttr((1 << bits) - 1));
+  result = rewriter.create<spirv::BitwiseAndOp>(loc, i32Type, result, intMax);
+
+  // If this is a load of a i1, replace it with a load of i8, and truncate the
+  // result. Use INotEqualOp because SConvert doesn't work for i1.
+  if (hasIntTypeOfWidth(valueType, {1})) {
+    Type newType = legalizeIntegerType(valueType);
+    auto zero = spirv::ConstantOp::getZero(newType, loc, &rewriter);
+    result = rewriter.create<spirv::INotEqualOp>(loc, valueType, result, zero)
+                 .getResult();
+  }
+
+  return result;
 }
 
 /// Rewrite loads from !spv.ptr<i64,..> to load from !spv.ptr<i32,...>
@@ -175,49 +233,22 @@ Value getOffsetOfInt8(spirv::AccessChainOp op, PatternRewriter &rewriter) {
 /// by a truncate to i1 type.
 /// Rewrite loads from !spv.ptr<i8,...> to load from !spv.ptr<i32,...> followed
 /// by an extraction.
+/// Rewrite loads from !spv.ptr<i16,...> to load from !spv.ptr<i32,...> followed
+/// by an extraction.
 struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
   using OpRewritePattern<spirv::LoadOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::LoadOp op,
                                      PatternRewriter &rewriter) const override {
     Type valueType = op.value().getType();
-    if (!hasIntTypeOfWidth(valueType, {1, 8, 64})) {
+    if (!hasSupportedIntegerType(valueType)) {
       return matchFailure();
     }
 
     Type newType = legalizeIntegerType(valueType);
-    Type i32Type = rewriter.getIntegerType(32);
     const auto loc = op.getLoc();
     Value result;
-    if (hasIntTypeOfWidth(valueType, {1, 8})) {
-      auto accessChainOp = cast<spirv::AccessChainOp>(op.ptr().getDefiningOp());
-      // Only support for scalar and 1-D tensor. The first element in indices is
-      // index, the remaining elements map to other dimensions.
-      if (accessChainOp.indices().size() > 2) {
-        return matchFailure();
-      }
-
-      Value i32AccessChainOp = convertToI32AccessChain(accessChainOp, rewriter);
-      Value loadOp = rewriter.create<spirv::LoadOp>(
-          loc, i32Type, i32AccessChainOp,
-          op.getAttrOfType<IntegerAttr>(
-              spirv::attributeName<spirv::MemoryAccess>()),
-          op.getAttrOfType<IntegerAttr>("alignment"));
-
-      // If it is a scalar, use the loading value directly. Otherwise, extract
-      // corresponding 8-bit integer out. If it is a scalar, the indices only
-      // contains one element (which is index).
-      if (accessChainOp.indices().size() == 1) {
-        result = loadOp;
-      } else {
-        Value offset = getOffsetOfInt8(accessChainOp, rewriter);
-        result = rewriter.create<spirv::ShiftRightArithmeticOp>(loc, i32Type,
-                                                                loadOp, offset);
-      }
-
-      auto i8Max = rewriter.create<spirv::ConstantOp>(
-          loc, i32Type, rewriter.getI32IntegerAttr(255));
-      result =
-          rewriter.create<spirv::BitwiseAndOp>(loc, i32Type, result, i8Max);
+    if (hasIntTypeOfWidth(valueType, {1, 8, 16})) {
+      result = rewriteIntForLoadOp(op, rewriter);
     } else {
       auto loadOp = rewriter.create<spirv::LoadOp>(
           loc, newType, op.ptr(),
@@ -227,21 +258,13 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
       result = loadOp.getResult();
     }
 
-    // If this is a load of a i1, replace it with a load of i8, and truncate the
-    // result. Use INotEqualOp because SConvert doesn't work for i1.
-    if (hasIntTypeOfWidth(valueType, {1})) {
-      auto zero = spirv::ConstantOp::getZero(newType, loc, &rewriter);
-      result = rewriter.create<spirv::INotEqualOp>(loc, valueType, result, zero)
-                   .getResult();
-    }
-
     rewriter.replaceOp(op, result);
     return matchSuccess();
   }
 };
 
 // Returns the shifted 32-bit value with the given offset.
-Value shiftStoreValue(spirv::StoreOp op, Value offset,
+Value shiftStoreValue(spirv::StoreOp op, const Value &offset, const Value &mask,
                       PatternRewriter &rewriter) {
   Type valueType = op.value().getType();
   Type i32Type = rewriter.getIntegerType(32);
@@ -255,18 +278,16 @@ Value shiftStoreValue(spirv::StoreOp op, Value offset,
     storeVal =
         rewriter.create<spirv::SelectOp>(loc, storeVal, one, zero).getResult();
   } else {
-    auto i8Mask = rewriter.create<spirv::ConstantOp>(
-        loc, i32Type, rewriter.getI32IntegerAttr(255));
     storeVal = rewriter.create<spirv::SConvertOp>(loc, i32Type, storeVal);
-    storeVal = rewriter.create<spirv::BitwiseAndOp>(loc, storeVal, i8Mask);
+    storeVal = rewriter.create<spirv::BitwiseAndOp>(loc, storeVal, mask);
   }
   return rewriter.create<spirv::ShiftLeftLogicalOp>(loc, i32Type, storeVal,
                                                     offset);
 }
 
-// Rewrites store operation that contains i1 and i8 types to i32 type.
+// Rewrites store operation that contains i1, i8 and i16 types to i32 type.
 // Since there are multi threads in the processing, atomic operations are
-// required. Rewrite the StoreOp to
+// required. E.g., if the loading value is i8, rewrite the StoreOp to
 // 1) load a 32-bit integer
 // 2) clear 8 bits in the loading value
 // 3) store 32-bit value back
@@ -275,7 +296,9 @@ Value shiftStoreValue(spirv::StoreOp op, Value offset,
 // 6) store 32-bit value back
 // The step 1 to step 3 are done by AtomicAnd, and the step 4 to
 // step 6 are done by AtomicOr.
-LogicalResult rewriteInt1AndInt8(spirv::StoreOp op, PatternRewriter &rewriter) {
+LogicalResult rewriteIntForStoreOp(spirv::StoreOp op,
+                                   PatternRewriter &rewriter) {
+  Type valueType = op.value().getType();
   Type i32Type = rewriter.getIntegerType(32);
   const auto loc = op.getLoc();
   auto accessChainOp = cast<spirv::AccessChainOp>(op.ptr().getDefiningOp());
@@ -286,18 +309,20 @@ LogicalResult rewriteInt1AndInt8(spirv::StoreOp op, PatternRewriter &rewriter) {
     return failure();
   }
 
-  auto offset = getOffsetOfInt8(accessChainOp, rewriter);
-  Value storeVal = shiftStoreValue(op, offset, rewriter);
+  int bits = hasIntTypeOfWidth(valueType, {1, 8}) ? 8 : 16;
+  auto offset = getOffsetOfInt(accessChainOp, bits, rewriter);
 
-  // Create a mask (with eight 0 bits) to clear the destination. E.g., if it
-  // is the second i8 in i32, 0xFFFF00FF is created.
-  auto i8Mask = rewriter.create<spirv::ConstantOp>(
-      loc, i32Type, rewriter.getI32IntegerAttr(255));
+  // Create a mask to clear the destination. E.g., if it is the second i8 in
+  // i32, 0xFFFF00FF is created.
+  auto mask = rewriter.create<spirv::ConstantOp>(
+      loc, i32Type, rewriter.getI32IntegerAttr((1 << bits) - 1));
   Value clear8BitMask =
-      rewriter.create<spirv::ShiftLeftLogicalOp>(loc, i32Type, i8Mask, offset);
+      rewriter.create<spirv::ShiftLeftLogicalOp>(loc, i32Type, mask, offset);
   clear8BitMask = rewriter.create<spirv::NotOp>(loc, i32Type, clear8BitMask);
 
-  Value i32AccessChainOp = convertToI32AccessChain(accessChainOp, rewriter);
+  Value storeVal = shiftStoreValue(op, offset, mask, rewriter);
+  Value i32AccessChainOp =
+      convertToI32AccessChain(accessChainOp, bits, rewriter);
   Value result = rewriter.create<spirv::AtomicAndOp>(
       loc, i32Type, i32AccessChainOp, spirv::Scope::Device,
       spirv::MemorySemantics::AcquireRelease, clear8BitMask);
@@ -321,12 +346,12 @@ struct AdjustStoreOp : public OpRewritePattern<spirv::StoreOp> {
   PatternMatchResult matchAndRewrite(spirv::StoreOp op,
                                      PatternRewriter &rewriter) const override {
     Type valueType = op.value().getType();
-    if (!hasIntTypeOfWidth(valueType, {1, 8, 64})) {
+    if (!hasSupportedIntegerType(valueType)) {
       return matchFailure();
     }
 
-    if (hasIntTypeOfWidth(valueType, {1, 8})) {
-      if (failed(rewriteInt1AndInt8(op, rewriter))) return matchFailure();
+    if (hasIntTypeOfWidth(valueType, {1, 8, 16})) {
+      if (failed(rewriteIntForStoreOp(op, rewriter))) return matchFailure();
     } else {
       const auto loc = op.getLoc();
       auto i32Type = rewriter.getIntegerType(32);
@@ -360,13 +385,13 @@ struct RemoveNopSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
   }
 };
 
-/// Rewrite SConvert operation that the target type is i8 or i64.
+/// Rewrite SConvert operation that the target type is i8, i16 or i64.
 struct AdjustSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
   using OpRewritePattern<spirv::SConvertOp>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(spirv::SConvertOp op,
                                      PatternRewriter &rewriter) const override {
     Type t = op.result().getType();
-    if (!hasIntTypeOfWidth(t, {8, 64})) {
+    if (!hasIntTypeOfWidth(t, {8, 16, 64})) {
       return matchFailure();
     }
     Type i32Type = rewriter.getIntegerType(32);
@@ -381,7 +406,7 @@ struct AdjustConstantOp : public OpRewritePattern<spirv::ConstantOp> {
   PatternMatchResult matchAndRewrite(spirv::ConstantOp op,
                                      PatternRewriter &rewriter) const {
     Type constantType = op.getType();
-    if (!hasIntTypeOfWidth(constantType, {8, 64})) {
+    if (!hasIntTypeOfWidth(constantType, {8, 16, 64})) {
       return matchFailure();
     }
 
@@ -407,7 +432,7 @@ struct AdjustIntegerArithmeticOperations : public OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
   PatternMatchResult matchAndRewrite(OpTy op, PatternRewriter &rewriter) const {
     Type resultType = op.result().getType();
-    if (!hasIntTypeOfWidth(resultType, {64})) {
+    if (!hasIntTypeOfWidth(resultType, {8, 16, 64})) {
       return Pattern::matchFailure();
     }
     Type newType = legalizeIntegerType(op.getResult().getType());
@@ -445,8 +470,7 @@ void AdjustIntegerWidthPass::runOnOperation() {
 
 static PassRegistration<AdjustIntegerWidthPass> pass(
     "iree-spirv-adjust-integer-width",
-    "Adjust integer width from i1 and i64 types to i8 and i32 types "
-    "respectively");
+    "Adjust integer width from all integer types to i32 type");
 
 }  // namespace
 
