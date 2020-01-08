@@ -78,16 +78,17 @@ endif()
 #-------------------------------------------------------------------------------
 
 set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
 
 #-------------------------------------------------------------------------------
 # Third party: flatbuffers
 #-------------------------------------------------------------------------------
 
 set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INSTALL OFF)
-set(FLATBUFFERS_BUILD_FLATC ON)
-set(FLATBUFFERS_BUILD_FLATHASH OFF)
-set(FLATBUFFERS_BUILD_GRPCTEST OFF)
+set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
+set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
+set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatbuffers/include/"
 )
@@ -109,7 +110,7 @@ set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 # Third party: gtest
 #-------------------------------------------------------------------------------
 
-set(INSTALL_GTEST OFF)
+set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(GTEST_INCLUDE_DIRS
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest/include/"
   "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googlemock/include/"
