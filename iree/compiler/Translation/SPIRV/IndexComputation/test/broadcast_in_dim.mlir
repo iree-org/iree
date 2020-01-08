@@ -92,3 +92,20 @@ module {
     iree.return
   }
 }
+
+// -----
+
+// CHECK-DAG: [[MAP0:#.*]] = (d0, d1, d2) -> (0)
+// CHECK-DAG: [[MAP1:#.*]] = (d0, d1, d2) -> (d0)
+
+module {
+  func @zero_element_1dtensor(%arg0 : memref<f32>, %arg1 : memref<4xf32>)
+    attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    %0 = iree.load_input(%arg0 : memref<f32>) : tensor<f32>
+    // CHECK: xla_hlo.broadcast_in_dim
+    // CHECK-SAME: iree.index_computation_info = {{\[\[}}[[MAP1]], [[MAP0]]{{\]\]}}
+    %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<4xf32>
+    iree.store_output(%1 : tensor<4xf32>, %arg1 : memref<4xf32>)
+    iree.return
+  }
+}

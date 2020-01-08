@@ -36,7 +36,7 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
   auto broadcastDim = broadcastOp.broadcast_dimensions();
 
   Builder builder(operation->getContext());
-  if (!broadcastDim) {
+  if (!broadcastDim || broadcastDim->getNumElements() == 0) {
     // This is a scalar. So all indices map to the same element.
     AffineMap scalarMap = index_computation_attribute::getAffineMap(
         operation->getParentOfType<FuncOp>(), builder.getAffineConstantExpr(0));
