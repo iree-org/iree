@@ -112,21 +112,23 @@ def import_versions(repo_dir):
     command = ["git", "update-index", "--cacheinfo", "160000", written, path]
     print("Updating", path, "to", written)
     utils.execute(command, cwd=repo_dir)
-    # It should not be technically necessary to also do an add here. However
-    # it seemed that this kept a subsequent submodule update from overwriting
-    # the change.
-    # TODO(laurenzo): Triage this further with actual updates.
-    utils.execute(["git", "add", path], cwd=repo_dir)
 
 
 def check_submodule_versions(repo_dir):
   diff_versions = get_diff_versions(repo_dir)
   if diff_versions:
-    print("Submodule versions need to be exported. Run (and commit):")
-    print("  ./build_tools/scripts/submodule_util write export")
+    print(
+        "Submodule state differs from SUBMODULE_VERSIONS file. Run (and commit) one of:"
+    )
+    print(
+        "  ./git_scripts/submodule_versions.py import # Use version in SUBMODULE_VERSIONS"
+    )
+    print(
+        "  ./git_scripts/submodule_versions.py export # Use version in git state"
+    )
     for k, (current, written) in diff_versions.items():
       print("%s : actual=%s written=%s" % (k, current, written))
-      return False
+    return False
   return True
 
 
