@@ -182,6 +182,7 @@ iree_cc_library(
     iree::vm::module
     iree::vm::ref
     iree::vm::stack
+    iree::vm::types
     iree::base::api
     iree::base::api_util
     iree::base::ref_ptr
