@@ -54,9 +54,8 @@ See also:
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
 pronounced as "eerie") is an experimental compiler backend for
-[MLIR](https://github.com/tensorflow/mlir) that lowers ML models to an IR that
-is optimized for real-time mobile/edge inference against heterogeneous hardware
-accelerators.
+[MLIR](https://mlir.llvm.org/) that lowers ML models to an IR that is optimized
+for real-time mobile/edge inference against heterogeneous hardware accelerators.
 
 The IR produced contains the sequencing information required to communicate
 pipelined data dependencies and parallelism to low-level hardware APIs like
@@ -210,9 +209,9 @@ particular use case please file an issue so we can make sure to fix it.
 
 The compiler has several layers that allow scaling the dependencies required
 based on the source and target formats. In all cases
-[MLIR](https://github.com/tensorflow/mlir) is required and for models not
-originating from TensorFlow (or already in XLA HLO format) it is the only
-dependency. When targeting the IREE Runtime VM and HAL
+[MLIR](https://mlir.llvm.org/) is required and for models not originating from
+TensorFlow (or already in XLA HLO format) it is the only dependency. When
+targeting the IREE Runtime VM and HAL
 [FlatBuffers](https://google.github.io/flatbuffers/) is required for
 serialization. Converting from TensorFlow models requires a dependency on
 TensorFlow (however only those parts required for conversion).
