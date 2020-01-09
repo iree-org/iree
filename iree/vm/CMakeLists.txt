@@ -88,7 +88,7 @@ iree_bytecode_module(
   NAME
     bytecode_module_benchmark_module
   SRC
-    "bytecode_module_benchmark_module.mlir"
+    "bytecode_module_benchmark.mlir"
   CC_NAMESPACE
     "iree::vm"
   TRANSLATION
