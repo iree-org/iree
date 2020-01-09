@@ -33,6 +33,8 @@ Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https:/
 
 ## Quickstart
 
+A test
+
 More Coming soon! Performing full model translation may require a few steps
 (such as ensuring you have a working TensorFlow build), however we'll have
 pre-translated example models that allow independent testing of the runtime
