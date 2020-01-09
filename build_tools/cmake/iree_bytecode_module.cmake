@@ -53,7 +53,7 @@ function(iree_bytecode_module)
     if(DEFINED _RULE_TRANSLATION_TOOL)
       set(_TRANSLATION_TOOL ${_RULE_TRANSLATION_TOOL})
     else()
-      set(_TRANSLATION_TOOL "iree_tools_iree_translate")
+      set(_TRANSLATION_TOOL "iree_tools_iree-translate")
     endif()
 
     # Resolve the executable binary path from the target name.

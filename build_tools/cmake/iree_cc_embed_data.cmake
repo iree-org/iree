@@ -72,14 +72,14 @@ function(iree_cc_embed_data)
     foreach(SRC ${_RULE_SRCS})
       list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
     endforeach(SRC)
-    foreach(SRC ${_GENERATED_SRCS})
+    foreach(SRC ${_RULE_GENERATED_SRCS})
       list(APPEND _ARGS "${SRC}")
     endforeach(SRC)
 
     add_custom_command(
       OUTPUT "${_RULE_H_FILE_OUTPUT}" "${_RULE_CC_FILE_OUTPUT}"
       COMMAND generate_cc_embed_data ${_ARGS}
-      DEPENDS generate_cc_embed_data ${_RULE_SRCS}
+      DEPENDS generate_cc_embed_data ${_RULE_SRCS} ${_RULE_GENERATED_SRCS}
     )
 
     iree_cc_library(
