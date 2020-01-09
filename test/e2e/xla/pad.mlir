@@ -1,7 +1,7 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
-// CHECK-LABEL: EXEC @pad
+// CHECK-LABEL: EXEC @pad_test
 func @pad_test() -> tensor<4x13xi32> {
   %input = iree.unfoldable_constant dense<[[1, 2, 3], [4, 5, 6]]> : tensor<2x3xi32>
   %c0 = iree.unfoldable_constant dense<0> : tensor<i32>
