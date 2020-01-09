@@ -37,6 +37,6 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Updating submodules
-        run: git submodule update --init --depth 1000 --jobs 8
+        run: git submodule update --init --depth 1 --jobs 8
       - name: Building with cmake
         run: ./build_tools/scripts/cmake_build.sh
