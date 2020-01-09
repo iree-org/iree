@@ -72,7 +72,7 @@ function(iree_cc_embed_data)
     foreach(SRC ${_RULE_SRCS})
       list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${SRC}")
     endforeach(SRC)
-    foreach(SRC ${_GENERATED_SRCS})
+    foreach(SRC ${_RULE_GENERATED_SRCS})
       list(APPEND _ARGS "${SRC}")
     endforeach(SRC)
 
