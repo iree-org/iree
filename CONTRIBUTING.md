@@ -34,10 +34,12 @@ use GitHub pull requests (PRs) for this purpose. Consult
 [GitHub Help](https://help.github.com/articles/about-pull-requests/) for more
 information on using pull requests.
 
-Each PR will be merged into the master branch as a single commit by our
-automation workflow with a description matching the initial PR
-comment/description. Please keep PRs small (focused on a single issue) to
-streamline review and ease later culprit-finding.
+We use a GitHub integration to import PRs into our upstream (Google internal)
+source code management. Once it is approved internally, each PR will be merged
+into the master branch as a single commit by the same tooling. The description
+will match the PR title followed by the PR description. Accordingly, please
+write these as you would a helpful commit message. Please also keep PRs small
+(focused on a single issue) to streamline review and ease later culprit-finding.
 
 ## Community Guidelines
 
