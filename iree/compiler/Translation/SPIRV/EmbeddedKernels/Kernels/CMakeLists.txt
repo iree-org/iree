@@ -12,48 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(benvanik): iree_glsl_cc_library.
-# iree_glsl_cc_library(
-#   NAME
-#     Kernels
-#  TARGET
-#    spirv
-#  SRCS
-#    "matmul.comp"
-#    "reduce_untiled.comp"
-#   PUBLIC
-# )
-
-add_custom_command(
-  OUTPUT conv2d_nhwc.spv
-  COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/conv2d_nhwc.comp" -o conv2d_nhwc.spv
-  DEPENDS glslangValidator
-)
-
-add_custom_command(
-  OUTPUT matmul.spv
-  COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/matmul.comp" -o matmul.spv
-  DEPENDS glslangValidator
-)
-
-add_custom_command(
-  OUTPUT reduce_untiled.spv
-  COMMAND glslangValidator -V "${CMAKE_CURRENT_SOURCE_DIR}/reduce_untiled.comp" -o reduce_untiled.spv
-  DEPENDS glslangValidator
-)
-
-iree_cc_embed_data(
+iree_spirv_kernel_cc_library(
   NAME
     Kernels
-  GENERATED_SRCS
-    "conv2d_nhwc.spv"
-    "matmul.spv"
-    "reduce_untiled.spv"
-  CC_FILE_OUTPUT
-    "Kernels.cc"
-  H_FILE_OUTPUT
-    "Kernels.h"
-  CPP_NAMESPACE
-    "mlir::iree_compiler::spirv_kernels"
-  FLATTEN
+  SRCS
+    "conv2d_nhwc.comp"
+    "matmul.comp"
+    "reduce_untiled.comp"
 )
