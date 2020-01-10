@@ -41,7 +41,10 @@ TF_IMPORT_PASS_PIPELINE = (
     # Clean up control flow
     "tf-functional-control-flow-to-cfg",
     "inline",
+
+    # Some further cleanups now that control flow is in better shape.
     "tf-saved-model-delete-unused-funcs",
+    "tf-shape-inference",
     "canonicalize",
 
     # Legalize to XLA
