@@ -66,6 +66,8 @@ include(iree_spirv_kernel_cc_library)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+
 #-------------------------------------------------------------------------------
 # Third-party dependencies
 #-------------------------------------------------------------------------------
