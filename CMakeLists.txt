@@ -60,6 +60,9 @@ include(iree_cc_test)
 include(iree_tablegen_library)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
+include(iree_glslang)
+include(iree_glsl_vulkan)
+include(iree_spirv_kernel_cc_library)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 

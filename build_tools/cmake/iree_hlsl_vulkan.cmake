@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,11 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_spirv_kernel_cc_library(
-  NAME
-    Kernels
-  SRCS
-    "conv2d_nhwc.comp"
-    "matmul.comp"
-    "reduce_untiled.comp"
-)
+include(CMakeParseArguments)
+
+# iree_hlsl_vulkan()
+#
+# CMake function to imitate Bazel's iree_hlsl_vulkan rule and hlsl_vulkan rule
+#
+# Parameters:
+# NAME: Name of spv file to create (without file name extension).
+# SRC: GLSL source file to translate into a SPIR-V binary.
+
+function(iree_hlsl_vulkan)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;SRC"
+    ""
+    ${ARGN}
+  )
+
+  iree_glslang(
+    NAME
+      ${_RULE_NAME}
+    SRC
+      ${_RULE_SRC}
+    MODE
+      "hlsl"
+    TARGET
+      "vulkan"
+  )
+
+endfunction()
