@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ include(CMakeParseArguments)
 # CMake function to imitate Bazel's iree_hlsl_vulkan rule and hlsl_vulkan rule
 #
 # Parameters:
-# NAME: Name of spv file to create, whichout file name extension.
+# NAME: Name of spv file to create (without file name extension).
 # SRC: GLSL source file to translate into a SPIR-V binary.
 
 function(iree_hlsl_vulkan)

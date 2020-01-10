@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,10 +19,10 @@ include(CMakeParseArguments)
 # CMake function to imitate Bazel's _glslang rule.
 #
 # Parameters:
-# NAME: Name of spv file to create, whichout file name extension.
+# NAME: Name of spv file to create (without file name extension).
 # SRC: Source file.
-# MODE: Defines the typ of input, either "hlsl" or "glsl".
-# TARGET: Target to create the SPIR-V binary for, either "vulkan" or "opengl".
+# MODE: Defines the type of input: either "hlsl" or "glsl".
+# TARGET: Target to create the SPIR-V binary for: either "vulkan" or "opengl".
 
 function(iree_glslang)
   cmake_parse_arguments(
