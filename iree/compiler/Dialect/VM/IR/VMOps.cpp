@@ -678,7 +678,6 @@ Attribute ConstI32Op::convertConstValue(Attribute value) {
   assert(isBuildableWith(value, value.getType()));
   Builder builder(value.getContext());
   int32_t dims = 1;
-  Attribute newValue;
   if (value.isa<UnitAttr>()) {
     return builder.getI32IntegerAttr(1);
   } else if (auto v = value.dyn_cast<BoolAttr>()) {
@@ -1093,7 +1092,6 @@ static void printCallOp(OpAsmPrinter &p, CallOp &op) {
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,
                                        OperationState *result) {
   FlatSymbolRefAttr calleeAttr;
-  FunctionType calleeType;
   auto calleeLoc = parser.getNameLoc();
   if (failed(parser.parseAttribute(calleeAttr, "callee", result->attributes)) ||
       failed(parser.parseLParen())) {
