@@ -63,6 +63,8 @@ include(iree_bytecode_module)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
+set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
+
 #-------------------------------------------------------------------------------
 # Third-party dependencies
 #-------------------------------------------------------------------------------
