@@ -20,13 +20,14 @@ iree_cc_library(
   SRCS
     "bytecode_cache.cc"
   DEPS
+    iree::hal::interpreter::bytecode_executable
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_cache
     iree::hal::executable_format
-    iree::hal::interpreter::bytecode_executable
   PUBLIC
 )
 
@@ -53,10 +54,6 @@ iree_cc_library(
     "stack.cc"
     "type.cc"
   DEPS
-    absl::base
-    absl::core_headers
-    absl::inlined_vector
-    absl::span
     iree::base::flatbuffer_util
     iree::base::logging
     iree::base::memory
@@ -70,6 +67,12 @@ iree_cc_library(
     iree::hal::heap_buffer
     iree::schemas::interpreter_module_def_cc_fbs
     iree::schemas::bytecode::interpreter_bytecode_v0
+    absl::base
+    absl::core_headers
+    absl::inlined_vector
+    absl::strings
+    absl::optional
+    absl::span
   PUBLIC
 )
 
@@ -101,10 +104,10 @@ iree_cc_test(
   SRCS
     "bytecode_kernels_test.cc"
   DEPS
-    iree::testing::gtest_main
+    iree::hal::interpreter::bytecode_kernels
     iree::base::memory
     iree::base::status_matchers
-    iree::hal::interpreter::bytecode_kernels
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -115,14 +118,14 @@ iree_cc_library(
   SRCS
     "interpreter_command_processor.cc"
   DEPS
-    absl::inlined_vector
-    absl::span
-    flatbuffers
+    iree::hal::interpreter::bytecode_executable
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::buffer_view
     iree::hal::host::host_local_command_processor
-    ruy
+    absl::inlined_vector
+    absl::span
   PUBLIC
 )
 
@@ -134,9 +137,9 @@ iree_cc_library(
   SRCS
     "interpreter_device.cc"
   DEPS
-    absl::inlined_vector
-    absl::memory
-    absl::span
+    iree::hal::interpreter::bytecode_cache
+    iree::hal::interpreter::bytecode_kernels
+    iree::hal::interpreter::interpreter_command_processor
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -149,9 +152,9 @@ iree_cc_library(
     iree::hal::host::host_local_allocator
     iree::hal::host::host_submission_queue
     iree::hal::host::inproc_command_buffer
-    iree::hal::interpreter::bytecode_cache
-    iree::hal::interpreter::bytecode_kernels
-    iree::hal::interpreter::interpreter_command_processor
+    absl::inlined_vector
+    absl::memory
+    absl::span
   PUBLIC
 )
 
@@ -163,9 +166,9 @@ iree_cc_library(
   SRCS
     "interpreter_driver.cc"
   DEPS
+    iree::hal::interpreter::interpreter_device
     iree::hal::device_info
     iree::hal::driver
-    iree::hal::interpreter::interpreter_device
   PUBLIC
 )
 
@@ -175,9 +178,10 @@ iree_cc_library(
   SRCS
     "interpreter_driver_module.cc"
   DEPS
+    iree::hal::interpreter::interpreter_driver
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
-    iree::hal::interpreter::interpreter_driver
+  ALWAYSLINK
   PUBLIC
 )
