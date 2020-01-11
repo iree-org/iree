@@ -170,7 +170,7 @@ std::vector<Operation *> findFusionSubgraphFromRoot(
 }
 
 // Identifies ranges of dispatchable ops and moves them into dispatch regions.
-LogicalResult identifyBlockDispatchRegions(FuncOp func, Block *block,
+LogicalResult identifyBlockDispatchRegions(Block *block,
                                            Dispatchability &dispatchability) {
   // Fixed point iteration until we can no longer fuse anything.
   bool didFindAnyNewRegions;
@@ -194,7 +194,7 @@ LogicalResult identifyBlockDispatchRegions(FuncOp func, Block *block,
           &rootOp, rootOp.getResult(0).getType().cast<ShapedType>());
 
       // Try to build a dispatch region from this root.
-      if (failed(buildDispatchRegion(func, block, workload, fusedSubgraph))) {
+      if (failed(buildDispatchRegion(block, workload, fusedSubgraph))) {
         return failure();
       }
 
@@ -225,7 +225,7 @@ class IdentifyDispatchRegionsPass
     }
 
     for (auto &block : getFunction()) {
-      if (failed(identifyBlockDispatchRegions(getFunction(), &block,
+      if (failed(identifyBlockDispatchRegions(&block,
                                               dispatchability.getValue()))) {
         return signalPassFailure();
       }
