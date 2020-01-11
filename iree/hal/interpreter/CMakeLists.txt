@@ -104,10 +104,10 @@ iree_cc_test(
   SRCS
     "bytecode_kernels_test.cc"
   DEPS
-    iree::testing::gtest_main
+    iree::hal::interpreter::bytecode_kernels
     iree::base::memory
     iree::base::status_matchers
-    iree::hal::interpreter::bytecode_kernels
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
