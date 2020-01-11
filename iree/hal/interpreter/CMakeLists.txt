@@ -20,13 +20,14 @@ iree_cc_library(
   SRCS
     "bytecode_cache.cc"
   DEPS
+    iree::hal::interpreter::bytecode_executable
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_cache
     iree::hal::executable_format
-    iree::hal::interpreter::bytecode_executable
   PUBLIC
 )
 
