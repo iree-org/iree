@@ -293,7 +293,7 @@ Value SPIRVCodegenImpl::loadArgValueAtIndex(
   }
   auto ptr =
       genPointerOffset(builder, loc, valueCache, indexMap,
-                       origArg->getType().cast<ShapedType>().getShape(), var);
+                       origArg.getType().cast<ShapedType>().getShape(), var);
   val = builder.create<spirv::LoadOp>(loc, ptr,
                                       /*memory_access =*/nullptr,
                                       /*alignment = */ nullptr);
