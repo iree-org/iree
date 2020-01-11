@@ -56,6 +56,7 @@ LogicalResult analyzeOpRangeValues(
         if (!llvm::is_contained(opSet, use.getOwner())) {
           // An op outside of the ops set is using the value, needs to escape.
           escapingValues->insert(value);
+          continue;
         }
       }
     }
