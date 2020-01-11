@@ -118,14 +118,14 @@ iree_cc_library(
   SRCS
     "interpreter_command_processor.cc"
   DEPS
-    absl::inlined_vector
-    absl::span
-    flatbuffers
+    iree::hal::interpreter::bytecode_executable
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::buffer_view
     iree::hal::host::host_local_command_processor
-    ruy
+    absl::inlined_vector
+    absl::span
   PUBLIC
 )
 
