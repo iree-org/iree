@@ -178,9 +178,10 @@ iree_cc_library(
   SRCS
     "interpreter_driver_module.cc"
   DEPS
+    iree::hal::interpreter::interpreter_driver
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
-    iree::hal::interpreter::interpreter_driver
+  ALWAYSLINK
   PUBLIC
 )
