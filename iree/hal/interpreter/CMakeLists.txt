@@ -54,10 +54,6 @@ iree_cc_library(
     "stack.cc"
     "type.cc"
   DEPS
-    absl::base
-    absl::core_headers
-    absl::inlined_vector
-    absl::span
     iree::base::flatbuffer_util
     iree::base::logging
     iree::base::memory
@@ -71,6 +67,12 @@ iree_cc_library(
     iree::hal::heap_buffer
     iree::schemas::interpreter_module_def_cc_fbs
     iree::schemas::bytecode::interpreter_bytecode_v0
+    absl::base
+    absl::core_headers
+    absl::inlined_vector
+    absl::strings
+    absl::optional
+    absl::span
   PUBLIC
 )
 
