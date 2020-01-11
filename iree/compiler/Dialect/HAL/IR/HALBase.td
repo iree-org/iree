@@ -69,8 +69,6 @@ def HAL_MemoryTypeBitfieldAttr :
       HAL_MemoryType_DeviceVisible,
       HAL_MemoryType_DeviceLocal
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::MemoryTypeBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::MemoryTypeBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -89,8 +87,6 @@ def HAL_MemoryAccessBitfieldAttr :
       HAL_MemoryAccess_DiscardWrite,
       HAL_MemoryAccess_All
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::MemoryAccessBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::MemoryAccessBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -109,8 +105,6 @@ def HAL_BufferUsageBitfieldAttr :
       HAL_BufferUsage_Dispatch,
       HAL_BufferUsage_All
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::BufferUsageBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::BufferUsageBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -121,8 +115,6 @@ def HAL_CommandBufferModeBitfieldAttr :
       HAL_CommandBufferMode_None,
       HAL_CommandBufferMode_OneShot
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::CommandBufferModeBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::CommandBufferModeBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -135,8 +127,6 @@ def HAL_CommandCategoryBitfieldAttr :
       HAL_CommandCategory_Transfer,
       HAL_CommandCategory_Dispatch
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::CommandCategoryBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::CommandCategoryBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -157,8 +147,6 @@ def HAL_ExecutionStageBitfieldAttr :
       HAL_ExecutionStage_CommandRetire,
       HAL_ExecutionStage_Host
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::ExecutionStageBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::ExecutionStageBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -187,8 +175,6 @@ def HAL_AccessScopeBitfieldAttr :
       HAL_AccessScope_MemoryRead,
       HAL_AccessScope_MemoryWrite
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::AccessScopeBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::AccessScopeBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
