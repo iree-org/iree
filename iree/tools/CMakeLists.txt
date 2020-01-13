@@ -12,6 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_cc_binary(
+  NAME
+    iree-dump-module
+  OUT
+    iree-dump-module
+  SRCS
+    "dump_module_main.cc"
+  DEPS
+    iree::base::file_io
+    iree::base::flatbuffer_util
+    iree::base::init
+    iree::schemas::bytecode_module_def_cc_fbs
+    flatbuffers
+)
+add_executable(iree-dump-module ALIAS iree_tools_iree-dump-module)
+
 if (${IREE_ENABLE_LLVM})
   iree_cc_binary(
     NAME
