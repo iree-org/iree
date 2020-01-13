@@ -21,7 +21,6 @@
 load(
     "//iree:build_defs.bzl",
     "cc_library",
-    _NUMPY_DEPS = "NUMPY_DEPS",
     _PLATFORM_VULKAN_DEPS = "PLATFORM_VULKAN_DEPS",
     _PYTHON_HEADER_DEPS = "PYTHON_HEADERS_DEPS",
 )
@@ -35,7 +34,7 @@ def iree_py_extension(**kwargs):
     """Delegates to the real py_extension."""
     py_extension(**kwargs)
 
-NUMPY_DEPS = _NUMPY_DEPS
+NUMPY_DEPS = []
 PLATFORM_VULKAN_DEPS = _PLATFORM_VULKAN_DEPS
 PYTHON_HEADER_DEPS = _PYTHON_HEADER_DEPS
 
