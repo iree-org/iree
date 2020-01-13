@@ -17,10 +17,10 @@
 # Build the project with bazel using Kokoro.
 
 set -e
-
-# Print the UTC time and the command for each shell command.
-PS4='[$(date -u "+%T %Z")] '
 set -x
+
+# Print the UTC time when set -x is on
+export PS4='[$(date -u "+%T %Z")] '
 
 # Check these exist and print the versions for later debugging
 bazel --version
