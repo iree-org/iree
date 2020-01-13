@@ -24,13 +24,20 @@ load(
     _NUMPY_DEPS = "NUMPY_DEPS",
     _PLATFORM_VULKAN_DEPS = "PLATFORM_VULKAN_DEPS",
     _PYTHON_HEADER_DEPS = "PYTHON_HEADERS_DEPS",
-    _iree_py_extension = "iree_py_extension",
 )
+
+load(
+    "@iree_native_python//:build_defs.bzl",
+    "py_extension",
+)
+
+def iree_py_extension(**kwargs):
+    """Delegates to the real py_extension."""
+    py_extension(**kwargs)
 
 NUMPY_DEPS = _NUMPY_DEPS
 PLATFORM_VULKAN_DEPS = _PLATFORM_VULKAN_DEPS
 PYTHON_HEADER_DEPS = _PYTHON_HEADER_DEPS
-iree_py_extension = _iree_py_extension
 
 PYBIND_COPTS = [
     "-fexceptions",
