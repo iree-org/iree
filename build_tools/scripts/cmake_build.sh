@@ -14,8 +14,11 @@
 
 # Build the IREE project with CMake. Designed for CI, but can be run manually.
 
-set -x
 set -e
+
+# Print the UTC time and the command for each shell command.
+PS4='[$(date -u "+%T %Z")] '
+set -x
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 

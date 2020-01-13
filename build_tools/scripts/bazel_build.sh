@@ -18,6 +18,8 @@
 
 set -e
 
+# Print the UTC time and the command for each shell command.
+PS4='[$(date -u "+%T %Z")] '
 set -x
 
 # CI-friendly defaults that control availability of certain platform tests.
