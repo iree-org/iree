@@ -22,7 +22,6 @@ load(
     "//iree:build_defs.bzl",
     "cc_library",
     _PLATFORM_VULKAN_DEPS = "PLATFORM_VULKAN_DEPS",
-    _PYTHON_HEADER_DEPS = "PYTHON_HEADERS_DEPS",
 )
 
 load(
@@ -36,7 +35,7 @@ def iree_py_extension(**kwargs):
 
 NUMPY_DEPS = []
 PLATFORM_VULKAN_DEPS = _PLATFORM_VULKAN_DEPS
-PYTHON_HEADER_DEPS = _PYTHON_HEADER_DEPS
+PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 
 PYBIND_COPTS = [
     "-fexceptions",
