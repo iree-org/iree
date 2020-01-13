@@ -126,7 +126,7 @@ load("@org_tensorflow//tensorflow:workspace.bzl", "tf_repositories")
 
 ###############################################################################
 # Autoconfigure native build repo for python.
-load("//build_tools/python:configure.bzl", "python_configure")
+load("//bindings/python/build_tools/python:configure.bzl", "python_configure")
 
 # TODO(laurenzo): Scoping to "iree" to avoid conflicts with other things that
 # take an opinion until we can isolate.
