@@ -27,6 +27,7 @@
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
 #include "iree/vm/stack.h"
+#include "iree/vm/types.h"
 
 namespace iree {
 namespace vm {
@@ -40,19 +41,16 @@ namespace vm {
 // types. We may still need the iree_vm_ref_type_t exposed but that's relatively
 // simple compared to getting the typed retain/release functions.
 
-// Users must override this with their custom types to allow the packing code to
+// Users may override this with their custom types to allow the packing code to
 // access their registered type ID at runtime.
 template <typename T>
-inline const iree_vm_ref_type_descriptor_t* ref_type_descriptor();
-
-template <typename T>
 ABSL_ATTRIBUTE_ALWAYS_INLINE void ref_type_retain(T* p) {
-  iree_vm_ref_object_retain(p, ref_type_descriptor<T>());
+  iree_vm_ref_object_retain(p, ref_type_descriptor<T>::get());
 }
 
 template <typename T>
 ABSL_ATTRIBUTE_ALWAYS_INLINE void ref_type_release(T* p) {
-  iree_vm_ref_object_release(p, ref_type_descriptor<T>());
+  iree_vm_ref_object_release(p, ref_type_descriptor<T>::get());
 }
 
 // TODO(benvanik): reconcile RefObject, iree_vm_ref_t, and this.
@@ -64,7 +62,7 @@ class ref {
 
  public:
   ABSL_ATTRIBUTE_ALWAYS_INLINE iree_vm_ref_type_t type() const noexcept {
-    return ref_type_descriptor<T>()->type;
+    return ref_type_descriptor<T>::get()->type;
   }
 
   ABSL_ATTRIBUTE_ALWAYS_INLINE ref() noexcept = default;
@@ -160,6 +158,32 @@ inline ref<T> retain_ref(ref<T>& value) {
   return ref<T>(value.get());
 }
 
+template <typename T>
+inline ref<T> retain_ref(T* value) {
+  if (value) ref_type_retain<T>(value);
+  return ref<T>(value);
+}
+
+template <typename T>
+inline ref<T> assign_ref(T* value) {
+  return ref<T>(value);
+}
+
+struct opaque_ref {
+  iree_vm_ref_t value = {0};
+  opaque_ref() = default;
+  opaque_ref(const opaque_ref&) = delete;
+  opaque_ref& operator=(const opaque_ref&) = delete;
+  opaque_ref(opaque_ref&& rhs) noexcept {
+    iree_vm_ref_move(&rhs.value, &value);
+  }
+  opaque_ref& operator=(opaque_ref&& rhs) noexcept {
+    iree_vm_ref_move(&rhs.value, &value);
+    return *this;
+  }
+  ~opaque_ref() { iree_vm_ref_release(&value); }
+};
+
 namespace packing {
 
 //===----------------------------------------------------------------------===//
@@ -169,41 +193,50 @@ namespace packing {
 struct ParamUnpackState {
   int i32_ordinal = 0;
   int ref_ordinal = 0;
+  int varargs_ordinal = 0;
   Status status;
 };
 
 template <typename T>
-struct ParamUnpack;
-
-template <typename T, size_t... I>
-inline std::array<T, sizeof...(I)> UnpackArray(ParamUnpackState* param_state,
-                                               iree_vm_stack_frame_t* frame,
-                                               std::index_sequence<I...>) {
-  return {((void)I, ParamUnpack<T>(param_state, frame))...};
-}
+struct ParamUnpack {
+  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+    ++param_state->varargs_ordinal;
+    reg = static_cast<T>(frame->registers.i32[param_state->i32_ordinal++]);
+  }
+  operator T() const { return reg; }
+  T reg;
+};
 
 template <>
-struct ParamUnpack<int32_t> {
+struct ParamUnpack<opaque_ref> {
   ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
-    reg = frame->registers.i32[param_state->i32_ordinal++];
+    ++param_state->varargs_ordinal;
+    iree_vm_ref_move(&frame->registers.ref[param_state->ref_ordinal++],
+                     &reg.value);
   }
-  operator int32_t() const { return reg; }
-  int32_t reg;
+  operator opaque_ref&() { return reg; }
+  operator const opaque_ref&() const { return reg; }
+  opaque_ref reg;
 };
 
 template <typename T>
 struct ParamUnpack<ref<T>> {
   ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+    ++param_state->varargs_ordinal;
     auto& ref_storage = frame->registers.ref[param_state->ref_ordinal++];
-    if (ref_storage.type == ref_type_descriptor<T>()->type) {
+    if (ref_storage.type == ref_type_descriptor<T>::get()->type) {
       // Move semantics.
       reg = ref<T>{reinterpret_cast<T*>(ref_storage.ptr)};
       std::memset(&ref_storage, 0, sizeof(ref_storage));
     } else if (ref_storage.type != IREE_VM_REF_TYPE_NULL) {
       param_state->status =
           InvalidArgumentErrorBuilder(IREE_LOC)
-          << "Parameter contains a reference to the wrong type";
+          << "Parameter contains a reference to the wrong type; have "
+          << iree_vm_ref_type_name(ref_storage.type).data << " but expected "
+          << ref_type_descriptor<T>::get()->type_name.data << " ("
+          << typeid(reg).name() << ")";
     }
+    // NOTE: null is allowed here!
   }
   operator ref<T>&() { return reg; }
   operator const ref<T>&() const { return reg; }
@@ -211,9 +244,23 @@ struct ParamUnpack<ref<T>> {
 };
 
 template <typename U, size_t S>
+struct ParamUnpack<std::array<U, S>>;
+template <typename... Ts>
+struct ParamUnpack<std::tuple<Ts...>>;
+template <typename U>
+struct ParamUnpack<absl::Span<U>>;
+
+template <typename U, size_t S>
 struct ParamUnpack<std::array<U, S>> {
   ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+    ++param_state->varargs_ordinal;
     regs = UnpackArray<U>(param_state, frame, std::make_index_sequence<S>());
+  }
+  template <typename T, size_t... I>
+  inline std::array<T, sizeof...(I)> UnpackArray(ParamUnpackState* param_state,
+                                                 iree_vm_stack_frame_t* frame,
+                                                 std::index_sequence<I...>) {
+    return {((void)I, ParamUnpack<T>(param_state, frame))...};
   }
   operator std::array<U, S>&() { return regs; }
   operator std::array<U, S>() const { return regs; }
@@ -223,6 +270,7 @@ struct ParamUnpack<std::array<U, S>> {
 template <typename... Ts>
 struct ParamUnpack<std::tuple<Ts...>> {
   ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+    ++param_state->varargs_ordinal;
     regs = std::make_tuple(ParamUnpack<Ts>(param_state, frame)...);
   }
   operator std::tuple<Ts...>&() { return regs; }
@@ -232,16 +280,19 @@ struct ParamUnpack<std::tuple<Ts...>> {
 
 template <typename U>
 struct ParamUnpack<absl::Span<U>> {
-  ParamUnpack(ParamUnpackState* param_state,
-              iree_vm_stack_frame_t* frame) noexcept {
-    ParamUnpack<int32_t> count(param_state, frame);
+  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+    uint8_t count =
+        frame->return_registers->registers[param_state->varargs_ordinal++];
+    int32_t original_varargs_ordinal = param_state->varargs_ordinal;
     regs.reserve(count);
-    for (int i = 0; i < regs.size(); ++i) {
-      regs.push_back(ParamUnpack<U>(param_state, frame));
+    for (int i = 0; i < count; ++i) {
+      regs.push_back(
+          ParamUnpack<typename std::decay<U>::type>(param_state, frame));
     }
+    param_state->varargs_ordinal = original_varargs_ordinal;
   }
   operator absl::Span<U>() const { return absl::MakeSpan(regs); }
-  mutable std::vector<U> regs;
+  mutable std::vector<typename std::decay<U>::type> regs;
 };
 
 //===----------------------------------------------------------------------===//
@@ -255,13 +306,7 @@ struct ResultPackState {
 };
 
 template <typename T>
-struct ResultCount;
-template <>
-struct ResultCount<int32_t> {
-  constexpr static int value = 1;
-};
-template <typename T>
-struct ResultCount<ref<T>> {
+struct ResultCount {
   constexpr static int value = 1;
 };
 template <typename... Ts>
@@ -281,9 +326,7 @@ struct ResultCount<std::tuple<Ts...>> {
 };
 
 template <typename T>
-struct ResultRegister;
-template <>
-struct ResultRegister<int32_t> {
+struct ResultRegister {
   constexpr static auto value = std::make_tuple<uint8_t>(0);
 };
 template <typename T>
@@ -297,25 +340,13 @@ struct ResultRegister<std::tuple<Ts...>> {
 };
 
 template <typename T>
-struct ResultPack;
-
-template <typename... T, size_t... I>
-inline std::tuple<ResultPack<T>...> PackTuple(ResultPackState* result_state,
-                                              iree_vm_stack_frame_t* frame,
-                                              std::tuple<T...>& value,
-                                              std::index_sequence<I...>) {
-  return {ResultPack<typename std::tuple_element<I, std::tuple<T...>>::type>(
-      result_state, frame, std::move(std::get<I>(value)))...};
-}
-
-template <>
-struct ResultPack<int32_t> {
+struct ResultPack {
   ResultPack(ResultPackState* result_state, iree_vm_stack_frame_t* frame,
-             int32_t value) {
-    frame->registers.i32[result_state->i32_ordinal++] = value;
+             T value) {
+    frame->registers.i32[result_state->i32_ordinal++] =
+        static_cast<int32_t>(value);
   }
 };
-
 template <typename T>
 struct ResultPack<ref<T>> {
   ResultPack(ResultPackState* result_state, iree_vm_stack_frame_t* frame,
@@ -334,6 +365,16 @@ struct ResultPack<std::tuple<Ts...>> {
              std::tuple<Ts...> results) {
     PackTuple(result_state, frame, results,
               std::make_index_sequence<sizeof...(Ts)>());
+  }
+
+  template <typename... T, size_t... I>
+  inline std::tuple<ResultPack<T>...> PackTuple(ResultPackState* result_state,
+                                                iree_vm_stack_frame_t* frame,
+                                                std::tuple<T...>& value,
+                                                std::index_sequence<I...>) {
+    return std::make_tuple<ResultPack<T>...>(
+        ResultPack<typename std::tuple_element<I, std::tuple<T...>>::type>(
+            result_state, frame, std::move(std::get<I>(value)))...);
   }
 };
 
@@ -370,6 +411,9 @@ struct DispatchFunctor {
     auto results_or =
         ApplyFn(reinterpret_cast<FnPtr>(ptr), self, std::move(params),
                 std::make_index_sequence<sizeof...(Params)>());
+    if (!results_or.ok()) {
+      return std::move(results_or).status();
+    }
 
     static const int kResultCount = ResultCount<Results>::value;
     static const auto kResultList = TupleToArray(
@@ -383,7 +427,7 @@ struct DispatchFunctor {
 
     ResultPackState result_state;
     auto results = std::move(results_or).ValueOrDie();
-    auto r = ResultPack<Results>(&result_state, frame, std::move(results));
+    ResultPack<Results>(&result_state, frame, std::move(results));
     return result_state.status;
   }
 

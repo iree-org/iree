@@ -86,6 +86,14 @@ iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor) {
   return IREE_STATUS_RESOURCE_EXHAUSTED;
 }
 
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_ref_type_name(iree_vm_ref_type_t type) {
+  if (type == 0 || type >= IREE_VM_MAX_TYPE_ID) {
+    return iree_make_cstring_view("");
+  }
+  return iree_vm_ref_type_descriptors[type]->type_name;
+}
+
 IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL
 iree_vm_ref_lookup_registered_type(iree_string_view_t full_name) {
   for (int i = 1; i <= IREE_VM_MAX_TYPE_ID; ++i) {

@@ -29,6 +29,10 @@ IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_allocator, iree_hal_allocator_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_buffer, iree_hal_buffer_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_command_buffer,
                               iree_hal_command_buffer_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_descriptor_set,
+                              iree_hal_descriptor_set_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_descriptor_set_layout,
+                              iree_hal_descriptor_set_layout_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
 

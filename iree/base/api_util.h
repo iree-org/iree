@@ -36,6 +36,11 @@ inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
   return StatusBuilder(static_cast<StatusCode>(status_code), loc);
 }
 
+#define IREE_RETURN_IF_NULL(value)                       \
+  if (!(value))                                          \
+    return ::iree::InvalidArgumentErrorBuilder(IREE_LOC) \
+           << #value << " is null/empty";
+
 // Internal helper for concatenating macro values.
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y) x##y
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_(x, y) \

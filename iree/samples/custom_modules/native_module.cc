@@ -108,18 +108,6 @@ iree_status_t iree_custom_native_module_register_types() {
 // VM module interface implementation
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): wrap up in a useful macro.
-// Allow mapping of iree_custom_message_t to a type we can pack/unpack.
-namespace iree {
-namespace vm {
-template <>
-inline const iree_vm_ref_type_descriptor_t*
-ref_type_descriptor<iree_custom_message_t>() {
-  return &iree_custom_message_descriptor;
-}
-}  // namespace vm
-}  // namespace iree
-
 namespace iree {
 namespace samples {
 namespace {

@@ -34,6 +34,8 @@ typedef struct iree_hal_allocator iree_hal_allocator_t;
 typedef struct iree_hal_buffer iree_hal_buffer_t;
 typedef struct iree_hal_buffer_view iree_hal_buffer_view_t;
 typedef struct iree_hal_command_buffer iree_hal_command_buffer_t;
+typedef struct iree_hal_descriptor_set iree_hal_descriptor_set_t;
+typedef struct iree_hal_descriptor_set_layout iree_hal_descriptor_set_layout_t;
 typedef struct iree_hal_device iree_hal_device_t;
 typedef struct iree_hal_driver iree_hal_driver_t;
 typedef struct iree_hal_executable iree_hal_executable_t;

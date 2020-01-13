@@ -141,6 +141,10 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor);
 
+// Returns the type name for the given type, if found.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_ref_type_name(iree_vm_ref_type_t type);
+
 // Returns the registered type descriptor for the given type, if found.
 IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL
 iree_vm_ref_lookup_registered_type(iree_string_view_t full_name);

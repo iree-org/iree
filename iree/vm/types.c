@@ -15,8 +15,10 @@
 #include "iree/vm/types.h"
 
 static iree_vm_ref_type_descriptor_t iree_vm_ro_byte_buffer_descriptor = {0};
+static iree_vm_ref_type_descriptor_t iree_vm_rw_byte_buffer_descriptor = {0};
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_ro_byte_buffer, iree_vm_ro_byte_buffer_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vm_rw_byte_buffer, iree_vm_rw_byte_buffer_t);
 
 static void iree_vm_ro_byte_buffer_destroy(void* ptr) {
   iree_vm_ro_byte_buffer_t* ref = (iree_vm_ro_byte_buffer_t*)ptr;
@@ -25,9 +27,11 @@ static void iree_vm_ro_byte_buffer_destroy(void* ptr) {
   }
 }
 
-IREE_API_EXPORT iree_vm_ref_type_t IREE_API_CALL
-iree_vm_ro_byte_buffer_type_id() {
-  return iree_vm_ro_byte_buffer_descriptor.type;
+static void iree_vm_rw_byte_buffer_destroy(void* ptr) {
+  iree_vm_rw_byte_buffer_t* ref = (iree_vm_rw_byte_buffer_t*)ptr;
+  if (ref->destroy) {
+    ref->destroy(ptr);
+  }
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types() {
@@ -42,6 +46,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types() {
       iree_make_cstring_view("iree.byte_buffer");
   IREE_RETURN_IF_ERROR(
       iree_vm_ref_register_type(&iree_vm_ro_byte_buffer_descriptor));
+
+  iree_vm_rw_byte_buffer_descriptor.destroy = iree_vm_rw_byte_buffer_destroy;
+  iree_vm_rw_byte_buffer_descriptor.offsetof_counter =
+      offsetof(iree_vm_rw_byte_buffer_t, ref_object.counter);
+  iree_vm_rw_byte_buffer_descriptor.type_name =
+      iree_make_cstring_view("iree.mutable_byte_buffer");
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ref_register_type(&iree_vm_rw_byte_buffer_descriptor));
 
   return IREE_STATUS_OK;
 }

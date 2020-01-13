@@ -18,6 +18,7 @@
 #include <cstring>
 #include <memory>
 
+#include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
@@ -227,6 +228,9 @@ class NativeModule {
     auto* state = FromStatePointer(frame->module_state);
     auto status = info.call(info.ptr, state, stack, frame, out_result);
     if (!status.ok()) {
+      status = iree::Annotate(
+          status,
+          absl::StrCat("while executing ", module->name_, ".", info.name));
       return ToApiStatus(status);
     }
     return IREE_STATUS_OK;

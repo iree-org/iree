@@ -158,10 +158,12 @@ cc_library(
         ":module",
         ":ref",
         ":stack",
+        ":types",
         "//iree/base:api",
         "//iree/base:api_util",
         "//iree/base:ref_ptr",
         "//iree/base:status",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )
