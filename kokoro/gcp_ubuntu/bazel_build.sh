@@ -30,8 +30,8 @@ export PYTHON_BIN="$(which python3)"
 
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
-echo "Checking out submodules"
-git submodule update --init --depth 1000 --jobs 8
+echo "Initializing submodules"
+./git_scripts/submodule_versions.py init
 
 echo "Building and testing with bazel"
 ./build_tools/scripts/bazel_build.sh
