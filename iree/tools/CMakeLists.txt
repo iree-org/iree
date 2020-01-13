@@ -52,8 +52,7 @@ if(${IREE_BUILD_COMPILER})
   # Additional libraries containing statically registered functions/flags, which
   # should always be linked in to binaries.
   #
-  # TODO(scotttodd): Make the ALWAYSLINK property apply transitively and force
-  #                  MLIR libs to generally be ALWAYSLINK wherever used in IREE.
+  # TODO(scotttodd): Set MLIR libs to generally be ALWAYSLINK in IREE?
   set(_ALWAYSLINK_LIBS
     MLIRAffineOps
     MLIRAnalysis
