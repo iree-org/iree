@@ -19,7 +19,6 @@ load("@rules_cc//cc:defs.bzl", _cc_binary = "cc_binary", _cc_library = "cc_libra
 load("@iree_native_python//:build_defs.bzl", "py_extension")
 load("@iree_core//build_tools/third_party/glslang:build_defs.bzl", "glsl_vulkan")
 load("@iree_core//iree:lit_test.bzl", _iree_glob_lit_tests = "iree_glob_lit_tests", _iree_setup_lit_package = "iree_setup_lit_package")
-load("@rules_python//python:defs.bzl", "py_library")
 
 NUMPY_DEPS = []
 PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
@@ -79,14 +78,6 @@ PLATFORM_VULKAN_TEST_DEPS = [
 # Aliases to the Starlark cc rules.
 cc_library = _cc_library
 cc_binary = _cc_binary
-
-def iree_py_library(**kwargs):
-    """Compatibility py_library which has bazel compatible args."""
-
-    # This is used when args are needed that are incompatible with upstream.
-    # Presently, this includes:
-    #   imports
-    py_library(**kwargs)
 
 def iree_py_extension(**kwargs):
     """Delegates to the real py_extension."""

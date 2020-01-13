@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load(":build_defs.bzl", "iree_py_library")
+"""Macros for building IREE python extensions."""
 
-package(
-    default_visibility = ["//visibility:public"],
-    licenses = ["notice"],  # Apache 2.0
-)
+load("@rules_python//python:defs.bzl", "py_library")
 
-iree_py_library(
-    name = "pathsetup",
-    imports = ["."],
-)
+def iree_py_library(**kwargs):
+    """Compatibility py_library which has bazel compatible args."""
+
+    # This is used when args are needed that are incompatible with upstream.
+    # Presently, this includes:
+    #   imports
+    py_library(**kwargs)
