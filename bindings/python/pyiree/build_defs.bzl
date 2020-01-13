@@ -63,6 +63,6 @@ def pybind_cc_library(
         features = PYBIND_FEATURES,
         deps = [
             "@iree_pybind11//:pybind11",
-        ] + deps + PYTHON_HEADER_DEPS,
+        ] + deps + PYTHON_HEADERS_DEPS,
         **kwargs
     )
