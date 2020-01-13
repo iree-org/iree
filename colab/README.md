@@ -3,6 +3,8 @@
 To run these notebooks with a local runtime, refer to the
 [Using Colab docs](../docs/using_colab.md).
 
+Hosted/remote runtimes are not yet supported.
+
 ## Notebooks
 
 ### [edge_detection\.ipynb](edge_detection.ipynb)
