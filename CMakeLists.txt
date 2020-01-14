@@ -111,7 +111,18 @@ add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 if(${IREE_ENABLE_LLVM})
+  # If CMAKE_BUILD_TYPE is FastBuild, set to Release for llvm
+  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
+  if(NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
+    set(CMAKE_BUILD_TYPE "Release")
+  endif()
+
   add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
+
+  # Reset CMAKE_BUILD_TYPE to its previous setting
+  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+
   include(external_tablegen_library)
 endif()
 
