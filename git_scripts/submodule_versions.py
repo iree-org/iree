@@ -114,6 +114,23 @@ def import_versions(repo_dir):
     utils.execute(command, cwd=repo_dir)
 
 
+def init_submodules(repo_dir):
+  print("*** Initializing submodules")
+  utils.execute(["git", "submodule", "init"], cwd=repo_dir)
+
+
+def parallel_shallow_update_submodules(repo_dir):
+  print("*** Making shallow clone of submodules")
+  # TODO(gcmn) Figure out a way to quickly fetch submodules without relying on
+  # target SHA being within 1000 commits of HEAD.
+  magic_depth = 1000
+  utils.execute([
+      "git", "submodule", "update", "--jobs", "8", "--depth",
+      str(magic_depth)
+  ],
+                cwd=repo_dir)
+
+
 def check_submodule_versions(repo_dir):
   diff_versions = get_diff_versions(repo_dir)
   if diff_versions:
@@ -136,7 +153,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser()
   parser.add_argument("--repo", help="Repository root directory")
   parser.add_argument(
-      "command", help="Command to run (show|import|export|check)")
+      "command", help="Command to run (show|import|export|check|init)")
   args = parser.parse_args()
 
   # Default repo path.
@@ -157,6 +174,16 @@ def main(args):
   elif args.command == "import":
     import_versions(args.repo)
     sync_and_update_submodules(args.repo)
+  elif args.command == "init":
+    init_submodules(args.repo)
+    # Redundant, since import_versions will only update if they differ,
+    # but good to only print output about the import if it's actually
+    # needed.
+    if not check_submodule_versions(args.repo):
+      print("Warning: git submodule state does not match SUBMODULE_VERSIONS. "
+            "Using state in SUBMODULE_VERSIONS")
+      import_versions(args.repo)
+    parallel_shallow_update_submodules(args.repo)
   else:
     print("Unrecognized command:", args.command)
     sys.exit(1)
