@@ -111,11 +111,11 @@ add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 if(${IREE_ENABLE_LLVM})
-  # If CMAKE_BUILD_TYPE is FastBuild, set to Release for llvm
+  # If CMAKE_BUILD_TYPE is FastBuild, set to Debug for llvm
   set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
   string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
   if(NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
-    set(CMAKE_BUILD_TYPE "Release")
+    set(CMAKE_BUILD_TYPE "Debug")
   endif()
 
   add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
