@@ -36,7 +36,7 @@ jobs:
           sudo pip install numpy
       - name: Checking out repository
         uses: actions/checkout@v2
-      - name: Updating submodules
-        run: git submodule update --init --depth 1000 --jobs 8
+      - name: Initializing submodules
+        run: ./git_scripts/submodule_versions.py init
       - name: Building with cmake
         run: ./build_tools/scripts/cmake_build.sh

@@ -27,10 +27,8 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
-      - name: Updating submodules
-        run: git submodule update --init --depth 1000 --jobs 8
-      - name: Synchronizing submodules
-        run: ./git_scripts/submodule_versions.py import
+      - name: Initializing submodules
+        run: ./git_scripts/submodule_versions.py init
       - name: Committing updates
         run: |
           # Only commit if there's a diff.
