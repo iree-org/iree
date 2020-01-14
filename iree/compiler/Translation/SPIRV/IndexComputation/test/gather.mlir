@@ -1,8 +1,8 @@
 // RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | IreeFileCheck %s
 
-// CHECK: [[MAP0:\#.*]] = (d0, d1, d2)[s0] -> (s0, 0, d0)
-// CHECK: [[MAP1:\#.*]] = (d0, d1, d2) -> (0)
-// CHECK: [[MAP2:\#.*]] = (d0, d1, d2) -> (0, d0)
+// CHECK: [[MAP0:\#.*]] = affine_map<(d0, d1, d2)[s0] -> (s0, 0, d0)>
+// CHECK: [[MAP1:\#.*]] = affine_map<(d0, d1, d2) -> (0)>
+// CHECK: [[MAP2:\#.*]] = affine_map<(d0, d1, d2) -> (0, d0)>
 
 module {
   // CHECK: func @foo

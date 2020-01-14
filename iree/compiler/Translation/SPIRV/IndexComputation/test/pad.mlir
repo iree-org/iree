@@ -1,8 +1,8 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -verify-diagnostics -o - %s | IreeFileCheck %s
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1) -> (0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1) -> (d1 - 4, d0 - 5)
-// CHECK-DAG: [[MAP2:#.*]] = (d0, d1) -> (d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1) -> (0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1) -> (d1 - 4, d0 - 5)>
+// CHECK-DAG: [[MAP2:#.*]] = affine_map<(d0, d1) -> (d1, d0)>
 
 module {
   // CHECK: func @pad_zero_interior
@@ -21,8 +21,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1) -> (0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1) -> (d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1) -> (0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1) -> (d1, d0)>
 
 module {
   // CHECK: func @pad_no_op
@@ -41,9 +41,9 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1) -> (0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1) -> (d1 floordiv 2 - 2, (d0 - 5) floordiv 3)
-// CHECK-DAG: [[MAP2:#.*]] = (d0, d1) -> (d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1) -> (0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1) -> (d1 floordiv 2 - 2, (d0 - 5) floordiv 3)>
+// CHECK-DAG: [[MAP2:#.*]] = affine_map<(d0, d1) -> (d1, d0)>
 
 module {
   // CHECK: func @pad_zero_interior

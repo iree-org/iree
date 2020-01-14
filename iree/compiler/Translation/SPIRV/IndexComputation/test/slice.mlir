@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -verify-diagnostics -o - %s | IreeFileCheck %s
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1) -> (d0 floordiv 3 + 2, d0 mod 3 + 1)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1) -> (d0 floordiv 3, d0 mod 3)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d0 floordiv 3 + 2, d0 mod 3 + 1)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1) -> (d0 floordiv 3, d0 mod 3)>
 
 module {
   // CHECK: func @slice_unit_stride
@@ -19,8 +19,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1) -> (d0 floordiv 3 + 2, (d0 mod 3) * 2 + 1)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1) -> (d0 floordiv 3, d0 mod 3)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d0 floordiv 3 + 2, (d0 mod 3) * 2 + 1)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1) -> (d0 floordiv 3, d0 mod 3)>
 
 module {
   // CHECK: func @slice_non_unit_stride

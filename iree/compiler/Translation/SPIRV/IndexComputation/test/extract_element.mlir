@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | IreeFileCheck %s
 
-// CHECK: [[MAP0:\#.*]] = ({{d.*}}, {{d.*}}, {{d.*}}) -> (0)
+// CHECK: [[MAP0:\#.*]] = affine_map<({{d.*}}, {{d.*}}, {{d.*}}) -> (0)>
 
 module {
   // CHECK: func @extract_element

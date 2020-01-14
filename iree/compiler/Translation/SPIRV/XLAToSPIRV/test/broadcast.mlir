@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
-#map0 = (d0, d1, d2) -> (d1, d0)
-#map1 = (d0, d1, d2) -> (d2, d1, d0)
+#map0 = affine_map<(d0, d1, d2) -> (d1, d0)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK:spv.module "Logical" "GLSL450"
@@ -23,8 +23,8 @@ module {
 
 // -----
 
-#map0 = (d0, d1, d2) -> (0)
-#map1 = (d0, d1, d2) -> (d2, d1, d0)
+#map0 = affine_map<(d0, d1, d2) -> (0)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK:spv.module "Logical" "GLSL450"

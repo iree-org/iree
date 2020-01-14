@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
-#map0 = (d0, d1) -> (0, d1)
-#map1 = (d0, d1) -> (0, d1 - 64)
+#map0 = affine_map<(d0, d1) -> (0, d1)>
+#map1 = affine_map<(d0, d1) -> (0, d1 - 64)>
 
 module {
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>

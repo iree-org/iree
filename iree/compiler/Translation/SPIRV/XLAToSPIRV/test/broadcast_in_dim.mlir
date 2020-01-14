@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
-#map0 = (d0, d1, d2) -> (d1, d0)
-#map1 = (d0, d1, d2) -> (d2, d1, d0)
+#map0 = affine_map<(d0, d1, d2) -> (d1, d0)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK:spv.module "Logical" "GLSL450"
@@ -19,8 +19,8 @@ module {
 
 // -----
 
-#map0 = (d0, d1, d2) -> (0)
-#map1 = (d0, d1, d2) -> (d2, d1, d0)
+#map0 = affine_map<(d0, d1, d2) -> (0)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK:spv.module "Logical" "GLSL450"
@@ -41,8 +41,8 @@ module {
 }
 
 // -----
-#map0 = (d0, d1) -> (d1)
-#map1 = (d0, d1) -> (d1, d0)
+#map0 = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
 
 
 module {
@@ -57,8 +57,8 @@ module {
 
 // -----
 
-#map0 = (d0, d1) -> (d1)
-#map1 = (d0, d1) -> (d1, d0)
+#map0 = affine_map<(d0, d1) -> (d1)>
+#map1 = affine_map<(d0, d1) -> (d1, d0)>
 
 module {
   func @const_int_splat(%arg0: memref<12x42xi32>) attributes {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.executable.workload = dense<[42, 12, 1]> : tensor<3xi32>, iree.num_dims = 2 : i32, iree.ordinal = 0 : i32} {
@@ -72,8 +72,8 @@ module {
 
 // -----
 
-#map0 = (d0, d1, d2) -> (d2)
-#map1 = (d0, d1, d2) -> (d2, d1, d0)
+#map0 = affine_map<(d0, d1, d2) -> (d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 
 module {

@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -verify-diagnostics -o - %s | IreeFileCheck %s
 
-// CHECK: [[MAP0:#.*]] = (d0, d1) -> (0, d1)
-// CHECK: [[MAP1:#.*]] = (d0, d1) -> (0, d1 - 64)
+// CHECK: [[MAP0:#.*]] = affine_map<(d0, d1) -> (0, d1)>
+// CHECK: [[MAP1:#.*]] = affine_map<(d0, d1) -> (0, d1 - 64)>
 
 module {
   // CHECK: func @concatenate

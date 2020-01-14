@@ -1,6 +1,6 @@
 // RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | IreeFileCheck %s
 
-// CHECK: [[MAP0:\#.*]] = ([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM1]], [[DIM0]])
+// CHECK: [[MAP0:\#.*]] = affine_map<([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM1]], [[DIM0]])>
 
 module {
    // CHECK: func {{@.*}}({{%.*}}: memref<12x42xi32> {iree.index_computation_info = {{\[\[}}[[MAP0]]{{\]\]}}}

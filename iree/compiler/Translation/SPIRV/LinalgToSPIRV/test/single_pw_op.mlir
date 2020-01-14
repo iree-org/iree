@@ -1,6 +1,6 @@
 // RUN: iree-opt -pass-pipeline='iree-linalg-to-spirv{workgroup-size=2,2 num-workgroups=2,2}' %s
 
-#map0 = (d0, d1) -> (d0, d1)
+#map0 = affine_map<(d0, d1) -> (d0, d1)>
 
 module {
   func @fmul(%arg0: memref<12x4xf32>, %arg1: memref<12x4xf32>, %arg2: memref<12x4xf32>) {

@@ -1,7 +1,7 @@
 // RUN: iree-opt -iree-index-computation -simplify-spirv-affine-exprs=false %s | IreeFileCheck %s
 
-// CHECK-DAG: [[MAP0:\#.*]] = ([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM1]], [[DIM0]])
-// CHECK-DAG: [[MAP1:\#.*]] = ([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM0]], [[DIM1]])
+// CHECK-DAG: [[MAP0:\#.*]] = affine_map<([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM1]], [[DIM0]])>
+// CHECK-DAG: [[MAP1:\#.*]] = affine_map<([[DIM0:d.*]], [[DIM1:d.*]]) -> ([[DIM0]], [[DIM1]])>
 module {
  // CHECK: func {{@.*}}({{%.*}}: memref<12x12xf32> {iree.index_computation_info = {{\[\[}}[[MAP0]]{{\]}}, {{\[}}[[MAP1]]{{\]\]}}}
  func @transpose_add(%arg0: memref<12x12xf32>, %arg1: memref<12x12xf32>)

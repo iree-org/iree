@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -o - %s | IreeFileCheck %s
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1, d2) -> (d1, d0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1, d2) -> (d2, d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1, d2) -> (d1, d0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK: func @broadcast_2D_3D
@@ -19,8 +19,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1, d2) -> (0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1, d2) -> (d2, d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1, d2) -> (0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK: func @broadcast_scalar_3D

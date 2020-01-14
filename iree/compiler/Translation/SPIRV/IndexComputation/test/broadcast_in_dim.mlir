@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -o - %s | IreeFileCheck %s
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1, d2) -> (d1, d0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1, d2) -> (d2, d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1, d2) -> (d1, d0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK: func @broadcast_in_dim_2D_3D
@@ -19,8 +19,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1, d2) -> (0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1, d2) -> (d2, d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1, d2) -> (0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   // CHECK: func @broadcast_in_dim_scalar_3D
@@ -38,8 +38,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1) -> (d1)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1) -> (d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1) -> (d1, d0)>
 
 module {
   func @const_float_splat(%arg0: memref<12x42xf32>)
@@ -57,8 +57,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1) -> (d1)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1) -> (d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d1)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1) -> (d1, d0)>
 
 module {
   func @const_int_splat(%arg0: memref<12x42xi32>)
@@ -76,8 +76,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1, d2) -> (d2)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1, d2) -> (d2, d1, d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1, d2) -> (d2)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1, d2) -> (d2, d1, d0)>
 
 module {
   func @const_int_nonsplat(%arg0: memref<2x12x42xi32>)
@@ -95,8 +95,8 @@ module {
 
 // -----
 
-// CHECK-DAG: [[MAP0:#.*]] = (d0, d1, d2) -> (0)
-// CHECK-DAG: [[MAP1:#.*]] = (d0, d1, d2) -> (d0)
+// CHECK-DAG: [[MAP0:#.*]] = affine_map<(d0, d1, d2) -> (0)>
+// CHECK-DAG: [[MAP1:#.*]] = affine_map<(d0, d1, d2) -> (d0)>
 
 module {
   func @zero_element_1dtensor(%arg0 : memref<f32>, %arg1 : memref<4xf32>)
