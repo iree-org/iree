@@ -66,6 +66,16 @@ include(iree_spirv_kernel_cc_library)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
+set(CMAKE_CXX_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C++ compiler during fast builds." FORCE)
+set(CMAKE_C_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C compiler during fast builds." FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used for linking binaries during fast builds." FORCE)
+set(CMAKE_SHARED_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used by the shared libraries linker binaries during fast builds." FORCE)
+mark_as_advanced(
+  CMAKE_CXX_FLAGS_FASTBUILD
+  CMAKE_C_FLAGS_FASTBUILD
+  CMAKE_EXE_LINKER_FLAGS_FASTBUILD
+  CMAKE_SHARED_LINKER_FLAGS_FASTBUILD
+)
 set(DEFAULT_CMAKE_BUILD_TYPE "Release")
 
 if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
