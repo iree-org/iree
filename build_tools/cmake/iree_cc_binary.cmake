@@ -102,26 +102,36 @@ function(iree_cc_binary)
   #                  dependencies of ALWAYSLINK libraries should be linked in)
   set(_ALWAYS_LINK_DEPS "")
   set(_STANDARD_DEPS "")
-  foreach(DEP ${_RULE_DEPS})
-    get_target_property(_ALWAYS_LINK_DEP ${DEP} ALWAYSLINK)
-    if(_ALWAYS_LINK_DEP)
-      list(APPEND _ALWAYS_LINK_DEPS ${DEP})
+  foreach(_DEP ${_RULE_DEPS})
+    # Check if _DEP is a library with the ALWAYSLINK property set.
+    get_target_property(_DEP_TYPE ${_DEP} TYPE)
+    if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
+      # Can't be ALWAYSLINK since it's an INTERFACE library.
+      # We also can't even query for the property, since it isn't whitelisted.
+      set(_DEP_IS_ALWAYSLINK OFF)
+    else()
+      get_target_property(_DEP_IS_ALWAYSLINK ${_DEP} ALWAYSLINK)
+    endif()
+
+    # Append to the corresponding list of deps.
+    if(_DEP_IS_ALWAYSLINK)
+      list(APPEND _ALWAYS_LINK_DEPS ${_DEP})
 
       # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
       # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
       # try to link the library in, so we need the flag *and* the dependency.
       if(MSVC)
-        get_target_property(_ALIASED_TARGET ${DEP} ALIASED_TARGET)
+        get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
         if (_ALIASED_TARGET)
           list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_ALIASED_TARGET}")
         else()
-          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${DEP}")
+          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_DEP}")
         endif()
       endif()
     else()
-      list(APPEND _STANDARD_DEPS ${DEP})
+      list(APPEND _STANDARD_DEPS ${_DEP})
     endif()
-  endforeach(DEP)
+  endforeach(_DEP)
 
   # Call into target_link_libraries with the lists of deps.
   # TODO(scotttodd): `-Wl,-force_load` version
