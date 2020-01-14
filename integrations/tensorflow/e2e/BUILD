@@ -41,6 +41,7 @@ package(
         "simple_stateful_test",
         "mandelbrot_test",
         "simple_arithmetic_test",
+        "batch_norm_test",
     ]
 ]
 

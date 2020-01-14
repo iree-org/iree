@@ -50,6 +50,7 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_unfuse_batch_norm",
     ],
     alwayslink = 1,
 )

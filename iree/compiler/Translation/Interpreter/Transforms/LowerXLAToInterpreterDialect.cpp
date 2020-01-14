@@ -36,6 +36,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+#include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -563,6 +564,7 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
 
 void populateLowerXlaToInterpreterPatterns(OwningRewritePatternList &patterns,
                                            MLIRContext *ctx) {
+  xla_hlo::PopulateUnfuseBatchNormPatterns(ctx, &patterns);
   patterns.insert<AbsOpLowering, BroadcastInDimOpLowering, ConcatOpLowering,
                   ConvertLowering, CopyOpLowering, DotOpLowering,
                   DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
@@ -585,6 +587,10 @@ class LowerXLAToInterpreterDialectPass
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLInterpreterDialect, IREEInterpreterDialect,
                            IREEDialect>();
+
+    // Unfuse batch norm into primitive ops.
+    target.addIllegalOp<xla_hlo::BatchNormInferenceOp>();
+
     if (failed(applyPartialConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }

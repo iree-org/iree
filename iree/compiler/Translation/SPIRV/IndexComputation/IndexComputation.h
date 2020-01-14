@@ -310,7 +310,7 @@ class IndexPropagationList {
         auto &op = *jt;
         auto opName = op.getName().getStringRef();
         if (!indexPropagationList.count(opName)) {
-          return op.emitError("unhandled index propagation");
+          return op.emitError() << "unhandled index propagation for " << opName;
         }
         auto propagate = indexPropagationList.find(opName);
         if (failed(propagate->getValue()->propagateIndexMap(&op))) {

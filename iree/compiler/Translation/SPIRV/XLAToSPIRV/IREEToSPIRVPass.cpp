@@ -32,13 +32,20 @@
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/Passes.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
+#include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
 
 namespace {
+class PrepareHLOOpConversionPass
+    : public FunctionPass<PrepareHLOOpConversionPass> {
+  void runOnFunction() override;
+};
 class IREEToSPIRVPass : public ModulePass<IREEToSPIRVPass> {
   void runOnModule() override;
 };
@@ -168,6 +175,22 @@ static LogicalResult convertAffineApplyOps(MLIRContext *context,
   return applyFullConversion(spvModule, target, patterns);
 }
 
+/// Performs initial conversion on input HLO ops, applying default lowerings
+/// to forms that the SPIR-V code generator knows how to handle.
+void PrepareHLOOpConversionPass::runOnFunction() {
+  ConversionTarget target(getContext());
+  OwningRewritePatternList patterns;
+  target.addLegalDialect<xla_hlo::XlaHloDialect>();
+
+  // Unfuse batch norm into primitive ops.
+  xla_hlo::PopulateUnfuseBatchNormPatterns(&getContext(), &patterns);
+  target.addIllegalOp<xla_hlo::BatchNormInferenceOp>();
+
+  if (failed(applyPartialConversion(getFunction(), target, patterns))) {
+    return signalPassFailure();
+  }
+}
+
 void IREEToSPIRVPass::runOnModule() {
   auto module = getModule();
   OpBuilder builder(module.getBodyRegion());
@@ -200,11 +223,15 @@ void IREEToSPIRVPass::runOnModule() {
 std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass() {
   return std::make_unique<IREEToSPIRVPass>();
 }
-static PassRegistration<IREEToSPIRVPass> pass(
+
+static PassRegistration<IREEToSPIRVPass> ireeToSPIRVPassReg(
     "convert-iree-to-spirv",
     "Convert IREE dispatch functions to SPIR-V dialect");
 
 void addIREEToSPIRVPasses(PassManager &conversionPassManager) {
+  conversionPassManager.addPass(std::make_unique<PrepareHLOOpConversionPass>());
+  // TODO(laurenzo): createLegalizeToStdPass should probably be refactored
+  // in terms of conversion patterns and added to above.
   conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());
   conversionPassManager.addPass(createPrepareReductionDispatchPass());
   conversionPassManager.addPass(createIndexComputationPass());

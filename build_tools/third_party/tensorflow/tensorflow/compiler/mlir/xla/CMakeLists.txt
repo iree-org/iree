@@ -42,6 +42,7 @@ external_cc_library(
     "transforms/legalize_to_standard.cc"
     "transforms/lower_general_dot.cc"
     "transforms/materialize_broadcasts.cc"
+    "transforms/unfuse_batch_norm.cc"
   HDRS
     "convert_op_folder.h"
     "ir/hlo_ops.h"
