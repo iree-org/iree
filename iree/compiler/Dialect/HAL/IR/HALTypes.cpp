@@ -24,6 +24,20 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+llvm::Optional<int32_t> getElementTypeValue(Type type) {
+  // TODO(benvanik): replace this with the signature mangling stuff for
+  // consistency? For now we are just using it for demos, so this is ok:
+  static const uint32_t kSignedIntType = 0;
+  static const uint32_t kFloatType = 2;
+  if (auto intType = type.dyn_cast_or_null<IntegerType>()) {
+    return (kSignedIntType << 16) | intType.getWidth();
+  } else if (auto floatType = type.dyn_cast_or_null<FloatType>()) {
+    // TODO(benvanik): fltSemantics.
+    return (kFloatType << 16) | floatType.getWidth();
+  }
+  return llvm::None;
+}
+
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"
 
 }  // namespace HAL

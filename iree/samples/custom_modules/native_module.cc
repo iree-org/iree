@@ -17,7 +17,11 @@
 #include <cstdio>
 #include <cstring>
 
+#include "iree/base/api.h"
 #include "iree/base/api_util.h"
+#include "iree/base/buffer_string_util.h"
+#include "iree/hal/api.h"
+#include "iree/modules/hal/hal_module.h"
 #include "iree/vm/module_abi_cc.h"
 
 //===----------------------------------------------------------------------===//
@@ -133,6 +137,40 @@ class CustomModuleState final {
         IREE_LOC);
   }
 
+  // custom.buffer_to_message(%buffer, %type, %shape) -> %result
+  StatusOr<vm::ref<iree_custom_message_t>> BufferToMessage(
+      vm::ref<iree_hal_buffer_t>& buffer, int32_t type,
+      absl::Span<const int32_t> shape) {
+    // Map the buffer memory so we can read it back.
+    iree_hal_mapped_memory_t mapped_memory;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_map(buffer.get(), IREE_HAL_MEMORY_ACCESS_READ, 0,
+                            IREE_WHOLE_BUFFER, &mapped_memory),
+        IREE_LOC));
+
+    // Print the buffer contents using our helpers.
+    std::string string_value;
+    RETURN_IF_ERROR(PrintNumericalDataToString(
+        Shape{shape},
+        // TODO(benvanik): proper type handling - this is just a sample :)
+        "f32",
+        {mapped_memory.contents.data, mapped_memory.contents.data_length},
+        /*max_entries=*/1024, &string_value));
+
+    // Unmap the buffer when we are done with it.
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_unmap(buffer.get(), &mapped_memory), IREE_LOC));
+
+    // Pack the string contents into a message.
+    vm::ref<iree_custom_message_t> message;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_custom_message_create(
+            iree_string_view_t{string_value.data(), string_value.size()},
+            IREE_ALLOCATOR_SYSTEM, &message),
+        IREE_LOC));
+    return std::move(message);
+  }
+
   // custom.print(%message, %count)
   Status Print(vm::ref<iree_custom_message_t>& message, int32_t count) {
     for (int i = 0; i < count; ++i) {
@@ -180,6 +218,8 @@ class CustomModuleState final {
 // The signature of the target function is expected to match that in the
 // custom.imports.mlir file.
 static const vm::NativeFunction<CustomModuleState> kCustomModuleFunctions[] = {
+    vm::MakeNativeFunction("buffer_to_message",
+                           &CustomModuleState::BufferToMessage),
     vm::MakeNativeFunction("print", &CustomModuleState::Print),
     vm::MakeNativeFunction("reverse", &CustomModuleState::Reverse),
     vm::MakeNativeFunction("get_unique_message",

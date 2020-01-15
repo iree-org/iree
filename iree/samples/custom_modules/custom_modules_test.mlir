@@ -32,3 +32,12 @@ func @reverse(%message : !iree.ref<!custom.message>) -> !iree.ref<!custom.messag
   %0 = "custom.reverse"(%message) : (!iree.ref<!custom.message>) -> !iree.ref<!custom.message>
   return %0 : !iree.ref<!custom.message>
 }
+
+// Prints the provided tensor to by first converting it to a message.
+func @printTensor(%tensor : tensor<2x4xf32>) -> !iree.ref<!custom.message>
+    attributes { iree.module.export } {
+  %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !iree.ref<!custom.message>
+  %c1 = constant 1 : i32
+  "custom.print"(%0, %c1) : (!iree.ref<!custom.message>, i32) -> ()
+  return %0 : !iree.ref<!custom.message>
+}

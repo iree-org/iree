@@ -35,6 +35,8 @@ cc_test(
         ":native_module",
         "//iree/base:api",
         "//iree/base:logging",
+        "//iree/hal:api",
+        "//iree/modules/hal",
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
@@ -51,6 +53,9 @@ cc_library(
     deps = [
         "//iree/base:api",
         "//iree/base:api_util",
+        "//iree/base:buffer_string_util",
+        "//iree/hal:api",
+        "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:module_abi_cc",
     ],

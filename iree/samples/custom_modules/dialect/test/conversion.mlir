@@ -16,7 +16,24 @@
 // Depending on whether any manual conversion is performed this may get complex,
 // such as when versioning imports or performing optimizations.
 
-// RUN: custom-opt %s -iree-vm-conversion -split-input-file | IreeFileCheck %s
+// RUN: custom-opt %s -iree-convert-flow-to-hal -iree-vm-conversion -split-input-file | IreeFileCheck %s
+
+// CHECK-LABEL: @tensorToMessage
+func @tensorToMessage(%tensor : tensor<2x4xf32>) {
+  // CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 131104 : i32
+  // CHECK-DAG: [[DIM0:%.+]] = vm.const.i32 2 : i32
+  // CHECK-DAG: [[DIM1:%.+]] = vm.const.i32 4 : i32
+  // CHECK-NEXT: [[MSG:%.+]] = vm.call.variadic @custom.buffer_to_message(%arg0, [[TYPE]], [
+  // CHECK-SAME:     [[DIM0]], [[DIM1]]
+  // CHECK-SAME: ]) : (!iree.ref<!hal.buffer>, i32, i32...) -> !iree.ref<!custom.message>
+  %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !iree.ref<!custom.message>
+  %c1 = constant 1 : i32
+  // CHECK: vm.call @custom.print([[MSG]]
+  "custom.print"(%0, %c1) : (!iree.ref<!custom.message>, i32) -> ()
+  return
+}
+
+// -----
 
 // CHECK-LABEL: @printOp
 func @printOp(%arg0 : !iree.ref<!custom.message>) {

@@ -18,32 +18,23 @@ package(
 )
 
 cc_library(
-    name = "FlowToHAL",
+    name = "Conversion",
     srcs = [
-        "ConvertFlowToHAL.cpp",
-        "ConvertStreamOps.cpp",
-        "ConvertStructuralOps.cpp",
-        "ConvertTensorOps.cpp",
-        "ConvertVariableOps.cpp",
+        "ConversionTarget.cpp",
+        "TypeConverter.cpp",
     ],
     hdrs = [
-        "ConvertFlowToHAL.h",
+        "ConversionDialectInterface.h",
+        "ConversionTarget.h",
+        "TypeConverter.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/HAL/Conversion",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
-        "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-        "//iree/compiler/Dialect/HAL/Utils",
-        "//iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints",
         "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Dialect/VM/IR",
-        "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )

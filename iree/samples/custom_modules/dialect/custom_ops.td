@@ -15,6 +15,7 @@
 #ifndef IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_OPS
 #define IREE_SAMPLES_CUSTOM_MODULES_DIALECT_CUSTOM_OPS
 
+include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/IR/OpBase.td"
 
@@ -41,6 +42,44 @@ def CUSTOM_Message : DialectType<
     at runtime and must derive from iree_vm_ref_t but otherwise can be whatever
     the dialect wants.
   }];
+}
+
+def CUSTOM_TensorToMessageOp : Op<CUSTOM_Dialect, "tensor_to_message"> {
+  let summary = [{formats tensor contents as a message}];
+  let description = [{
+    Formats the tensor using the IREE buffer printer to have a shape/type and
+    the contents as a string.
+
+    This demonstrates handling tensor->buffer conversion through the HAL layer.
+    This op (tensor_to_message) is only used prior to translation and instances
+    of it will be converted to the lower-level HAL-based buffer_to_message op.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$operand
+  );
+  let results = (outs
+    // TODO(benvanik): remove the use of RefPtrOf here.
+    RefPtrOf<CUSTOM_Message>:$result
+  );
+}
+
+def CUSTOM_BufferToMessageOp : Op<CUSTOM_Dialect, "buffer_to_message"> {
+  let summary = [{formats buffer contents as a message}];
+  let description = [{
+    Formats the tensor using the IREE buffer printer to have a shape/type and
+    the contents as a string.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Buffer>:$buffer,
+    I32:$type,
+    Variadic<I32>:$shape
+  );
+  let results = (outs
+    // TODO(benvanik): remove the use of RefPtrOf here.
+    RefPtrOf<CUSTOM_Message>:$result
+  );
 }
 
 def CUSTOM_PrintOp : Op<CUSTOM_Dialect, "print"> {

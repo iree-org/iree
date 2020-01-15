@@ -40,6 +40,14 @@ namespace HAL {
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterface.h.inc"
 
 //===----------------------------------------------------------------------===//
+// Enum utilities
+//===----------------------------------------------------------------------===//
+
+// Returns a stable identifier for the MLIR element type or nullopt if the type
+// is unsupported in the ABI.
+llvm::Optional<int32_t> getElementTypeValue(Type type);
+
+//===----------------------------------------------------------------------===//
 // RefObject types
 //===----------------------------------------------------------------------===//
 

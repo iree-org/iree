@@ -22,6 +22,15 @@
 // versioning and overrides to cause M:N mappings.
 vm.module @custom {
 
+// Formats the tensor using the IREE buffer printer to have a shape/type and
+// the contents as a string.
+vm.import @buffer_to_message(
+  %buffer : !iree.ref<!hal.buffer>,
+  %type : i32,
+  %shape : i32 ...
+) -> !iree.ref<!custom.message>
+attributes {nosideeffects}
+
 // Prints the %message provided %count times.
 // Maps to the IREE::Custom::PrintOp.
 vm.import @print(

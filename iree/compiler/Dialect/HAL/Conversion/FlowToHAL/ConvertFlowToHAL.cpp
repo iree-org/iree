@@ -15,6 +15,9 @@
 #include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -55,38 +58,15 @@ void populateFlowVariableToHALPatterns(MLIRContext *context,
 
 namespace {
 
-// Converts types to Flow tensors and shapes to HAL types.
-class FlowTensorTypeConverter : public TypeConverter {
- public:
-  explicit FlowTensorTypeConverter(MLIRContext *context) {}
-
-  Type convertType(Type type) override {
-    if (type.isa<TensorType>()) {
-      return IREE::RefPtrType::get(
-          IREE::HAL::BufferType::get(type.getContext()));
-    }
-    return type;
-  }
-
-  // TODO(benvanik): signature conversion for output buffers.
-};
-
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
 class ConvertFlowToHALPass : public ModulePass<ConvertFlowToHALPass> {
  public:
   void runOnModule() override {
     auto *context = &getContext();
 
-    ConversionTarget target(getContext());
-    target.addLegalDialect<StandardOpsDialect>();
-    target.addLegalOp<FuncOp, ModuleOp, ModuleTerminatorOp>();
-    target.addLegalDialect<IREE::HAL::HALDialect>();
+    HALTypeConverter typeConverter;
+    HALConversionTarget target(context, typeConverter);
     target.addIllegalDialect<IREE::Flow::FlowDialect>();
-
-    target.addLegalOp<IREE::HAL::ExecutableOp>();
-    target.markOpRecursivelyLegal<IREE::HAL::ExecutableOp>();
-
-    FlowTensorTypeConverter typeConverter(context);
 
     OwningRewritePatternList patterns;
     populateFlowStreamToHALPatterns(context, patterns, typeConverter);
@@ -96,15 +76,20 @@ class ConvertFlowToHALPass : public ModulePass<ConvertFlowToHALPass> {
     populatePreserveCompilerHintsPatterns(context, patterns);
     setupCompilerHintsLegality(context, target, typeConverter);
 
-    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
-      return typeConverter.isSignatureLegal(op.getType());
-    });
-    target.addDynamicallyLegalOp<ConstantOp>(
-        [&](ConstantOp op) { return !op.getType().isa<TensorType>(); });
+    // Gather all HAL dialect conversion patterns from custom dialects.
+    // These will perform the tensor->buffer mapping for their ops.
+    for (auto *dialect : context->getRegisteredDialects()) {
+      if (auto *conversionInterface =
+              dialect
+                  ->getRegisteredInterface<HALConversionDialectInterface>()) {
+        conversionInterface->setupConversionTarget(target, patterns,
+                                                   typeConverter);
+      }
+    }
 
-    // NOTE: we allow other dialects besides just VM during this pass as we are
-    // only trying to eliminate the std ops. When used as part of a larger set
-    // of rewrites a full conversion should be used instead.
+    // NOTE: we allow ops that we don't know about to allow custom dialects
+    // that don't need anything HAL-specific to pass through. This is handled by
+    // the fallback type legality support of the
     if (failed(applyPartialConversion(getModule(), target, patterns,
                                       &typeConverter))) {
       return signalPassFailure();

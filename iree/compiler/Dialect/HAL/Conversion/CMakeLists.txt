@@ -14,3 +14,25 @@
 
 add_subdirectory(FlowToHAL)
 add_subdirectory(HALToVM)
+
+iree_cc_library(
+  NAME
+    Conversion
+  HDRS
+    "ConversionDialectInterface.h"
+    "ConversionTarget.h"
+    "TypeConverter.h"
+  SRCS
+    "ConversionTarget.cpp"
+    "TypeConverter.cpp"
+  DEPS
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::IREE::IR
+    MLIRIR
+    MLIRParser
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransforms
+  PUBLIC
+)

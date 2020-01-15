@@ -18,6 +18,8 @@
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
+#include "iree/hal/api.h"
+#include "iree/modules/hal/hal_module.h"
 #include "iree/samples/custom_modules/custom_modules_test_module.h"
 #include "iree/samples/custom_modules/native_module.h"
 #include "iree/testing/gtest.h"
@@ -30,6 +32,10 @@ namespace {
 class CustomModulesTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
+    // NOTE: we only use the HAL types here, we don't need the full module.
+    // TODO(benvanik): move to instance-based registration.
+    IREE_ASSERT_OK(iree_hal_module_register_types());
+
     IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
 
     IREE_CHECK_OK(iree_custom_native_module_register_types());
@@ -76,7 +82,7 @@ class CustomModulesTest : public ::testing::Test {
   iree_vm_module_t* native_module_ = nullptr;
 };
 
-TEST_F(CustomModulesTest, Run) {
+TEST_F(CustomModulesTest, ReverseAndPrint) {
   // Allocate one of our custom message types to pass in.
   iree_custom_message_t* input_message = nullptr;
   IREE_ASSERT_OK(
@@ -112,6 +118,48 @@ TEST_F(CustomModulesTest, Run) {
   IREE_ASSERT_OK(iree_custom_message_read_value(reversed_message, result_buffer,
                                                 ABSL_ARRAYSIZE(result_buffer)));
   EXPECT_STREQ("!dlrow olleh", result_buffer);
+
+  iree_vm_variant_list_free(outputs);
+}
+
+TEST_F(CustomModulesTest, PrintTensor) {
+  // Allocate the buffer we'll be printing.
+  static float kBufferContents[2 * 4] = {0.0f, 1.0f, 2.0f, 3.0f,
+                                         4.0f, 5.0f, 6.0f, 7.0f};
+  iree_hal_buffer_t* buffer = nullptr;
+  IREE_ASSERT_OK(iree_hal_heap_buffer_allocate_copy(
+      IREE_HAL_MEMORY_TYPE_HOST_LOCAL, IREE_HAL_BUFFER_USAGE_ALL,
+      IREE_HAL_MEMORY_ACCESS_ALL,
+      iree_byte_span_t{reinterpret_cast<uint8_t*>(kBufferContents),
+                       sizeof(kBufferContents)},
+      IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM, &buffer));
+
+  // Pass in the tensor as an expanded HAL buffer.
+  iree_vm_variant_list_t* inputs = nullptr;
+  IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
+  iree_vm_ref_t input_buffer_ref = iree_hal_buffer_move_ref(buffer);
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_append_ref_move(inputs, &input_buffer_ref));
+
+  // Prepare outputs list to accept the results from the invocation.
+  iree_vm_variant_list_t* outputs = nullptr;
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+
+  // Synchronously invoke the function.
+  IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("printTensor"),
+                                /*policy=*/nullptr, inputs, outputs,
+                                IREE_ALLOCATOR_SYSTEM));
+  iree_vm_variant_list_free(inputs);
+
+  // Read back the message that we printed inside of the module.
+  iree_custom_message_t* printed_message =
+      iree_custom_message_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+  ASSERT_NE(nullptr, printed_message);
+  char result_buffer[256];
+  IREE_ASSERT_OK(iree_custom_message_read_value(printed_message, result_buffer,
+                                                ABSL_ARRAYSIZE(result_buffer)));
+  EXPECT_STREQ("[0 1 2 3][4 5 6 7]", result_buffer);
 
   iree_vm_variant_list_free(outputs);
 }
