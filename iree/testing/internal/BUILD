@@ -14,6 +14,8 @@
 
 # Implementations for iree/testing/
 
+load("//iree:build_defs.oss.bzl", "iree_build_test")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
@@ -36,5 +38,13 @@ cc_library(
     deps = [
         "//iree/base:init",
         "@com_google_googletest//:gtest",
+    ],
+)
+
+iree_build_test(
+    name = "internal_build_test",
+    targets = [
+        ":gtest_internal",
+        ":gtest_main_internal",
     ],
 )

@@ -19,9 +19,8 @@
 
 #include "absl/strings/str_cat.h"
 #include "absl/types/optional.h"
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 #include "iree/base/status.h"
+#include "iree/testing/gtest.h"
 
 #undef EXPECT_OK
 #undef ASSERT_OK
