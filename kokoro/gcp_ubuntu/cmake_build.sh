@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Build the project with bazel using Kokoro.
+# Build the project with cmake using Kokoro.
 
 set -e
 set -x
@@ -36,5 +36,5 @@ cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 echo "Initializing submodules"
 ./git_scripts/submodule_versions.py init
 
-echo "Building and testing with bazel"
+echo "Building and testing with cmake"
 ./build_tools/scripts/cmake_build.sh
