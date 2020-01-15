@@ -36,7 +36,6 @@ iree_cc_library(
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils
-  ALWAYSLINK
   PUBLIC
 )
 
@@ -48,7 +47,7 @@ iree_cc_library(
   SRCS
     "HALDialect.h"
   DEPS
-    IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::VM::Conversion

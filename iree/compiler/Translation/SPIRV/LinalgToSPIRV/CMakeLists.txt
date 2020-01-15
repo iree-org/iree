@@ -35,4 +35,5 @@ iree_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRSupport
     MLIRTransforms
+  ALWAYSLINK
 )
