@@ -66,6 +66,23 @@ include(iree_spirv_kernel_cc_library)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
+set(CMAKE_CXX_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C++ compiler during fast builds." FORCE)
+set(CMAKE_C_FLAGS_FASTBUILD "-gmlt" CACHE STRING "Flags used by the C compiler during fast builds." FORCE)
+set(CMAKE_EXE_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used for linking binaries during fast builds." FORCE)
+set(CMAKE_SHARED_LINKER_FLAGS_FASTBUILD "-Wl,-S" CACHE STRING "Flags used by the shared libraries linker binaries during fast builds." FORCE)
+mark_as_advanced(
+  CMAKE_CXX_FLAGS_FASTBUILD
+  CMAKE_C_FLAGS_FASTBUILD
+  CMAKE_EXE_LINKER_FLAGS_FASTBUILD
+  CMAKE_SHARED_LINKER_FLAGS_FASTBUILD
+)
+
+set(DEFAULT_CMAKE_BUILD_TYPE "Release")
+if (NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "No build type selected, default to ${DEFAULT_CMAKE_BUILD_TYPE}")
+  set(CMAKE_BUILD_TYPE "${DEFAULT_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+endif()
+
 set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
@@ -94,7 +111,18 @@ add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
 
 if(${IREE_ENABLE_LLVM})
+  # If CMAKE_BUILD_TYPE is FastBuild, set to Debug for llvm
+  set(_CMAKE_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+  string(TOUPPER "${CMAKE_BUILD_TYPE}" uppercase_CMAKE_BUILD_TYPE)
+  if(NOT uppercase_CMAKE_BUILD_TYPE MATCHES "^(DEBUG|RELEASE|RELWITHDEBINFO|MINSIZEREL)$")
+    set(CMAKE_BUILD_TYPE "Debug")
+  endif()
+
   add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
+
+  # Reset CMAKE_BUILD_TYPE to its previous setting
+  set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
+
   include(external_tablegen_library)
 endif()
 
