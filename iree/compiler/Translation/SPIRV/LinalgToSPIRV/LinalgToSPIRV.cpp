@@ -68,8 +68,8 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm,
   workGroupSize.resize(2, 1);
 
   // Linalg to loops.
-  pm.addPass(linalg::createLinalgTilingPass(workGroupSize));
-  pm.addPass(linalg::createConvertLinalgToLoopsPass());
+  pm.addPass(createLinalgTilingPass(workGroupSize));
+  pm.addPass(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
