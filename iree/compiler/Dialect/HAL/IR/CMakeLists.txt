@@ -49,7 +49,6 @@ iree_cc_library(
     "HALDialect.h"
   DEPS
     IR
-    iree::compiler::Dialect
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::HAL::Conversion::HALToVM
     iree::compiler::Dialect::VM::Conversion
