@@ -12,8 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Compress)
-add_subdirectory(Flow)
-add_subdirectory(HAL)
-add_subdirectory(IREE)
-add_subdirectory(VM)
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "XlaPasses",
+    srcs = ["XlaOutlineQuantizable.cpp"],
+    hdrs = ["XlaPasses.h"],
+    deps = [
+        "//iree/compiler/Dialect/Compress/IR",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+    ],
+    alwayslink = 1,
+)

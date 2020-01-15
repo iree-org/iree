@@ -47,6 +47,8 @@ cc_binary(
 cc_library(
     name = "iree_opt_library",
     deps = [
+        "//iree/compiler/Dialect/Compress/IR",
+        "//iree/compiler/Dialect/Compress/Transforms:XlaPasses",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Flow/Analysis",
@@ -68,6 +70,7 @@ cc_library(
         "@llvm-project//mlir:AffineDialectRegistration",
         "@llvm-project//mlir:LinalgDialectRegistration",
         "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:QuantOps",
         "@llvm-project//mlir:StandardDialectRegistration",
         "@llvm-project//mlir:SPIRVDialectRegistration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
@@ -151,7 +154,6 @@ cc_library(
         "@llvm-project//mlir:SPIRVDialectRegistration",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TranslateClParser",
-        "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ] + TARGET_COMPILER_BACKENDS,
     alwayslink = 1,

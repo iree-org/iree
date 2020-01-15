@@ -12,8 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Compress)
-add_subdirectory(Flow)
-add_subdirectory(HAL)
-add_subdirectory(IREE)
-add_subdirectory(VM)
+iree_cc_library(
+  NAME
+    IR
+  HDRS
+    "CompressDialect.h",
+    "CompressOps.h",
+  SRCS
+    "CompressDialect.cpp",
+    "CompressOps.cpp",
+  DEPS
+    iree::compiler::Dialect::Compress::CompressOpsGen
+    iree::compiler::Dialect::IREE::IR
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
+    MLIRTransformUtils
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_tablegen_library(
+  NAME
+    CompressOpsGen
+  SRCS
+    CompressOps.td
+  OUTS
+    -gen-op-decls CompressOps.h.inc
+    -gen-op-defs CompressOps.cpp.inc
+)
