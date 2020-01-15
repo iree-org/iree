@@ -157,6 +157,7 @@ cc_library(
     deps = [
         ":module",
         ":ref",
+        ":ref_cc",
         ":stack",
         ":types",
         "//iree/base:api",
@@ -185,6 +186,17 @@ cc_test(
         "//iree/base:api",
         "//iree/base:ref_ptr",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "ref_cc",
+    hdrs = ["ref_cc.h"],
+    deps = [
+        ":ref",
+        ":types",
+        "//iree/base:api",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 

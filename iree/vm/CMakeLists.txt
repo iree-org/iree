@@ -181,6 +181,7 @@ iree_cc_library(
   DEPS
     iree::vm::module
     iree::vm::ref
+    iree::vm::ref_cc
     iree::vm::stack
     iree::vm::types
     iree::base::api
@@ -213,6 +214,19 @@ iree_cc_test(
     iree::base::api
     iree::base::ref_ptr
     iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    ref_cc
+  HDRS
+    "ref_cc.h"
+  DEPS
+    absl::base
+    iree::base::api
+    iree::vm::ref
+    iree::vm::types
+  PUBLIC
 )
 
 iree_cc_library(
