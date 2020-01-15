@@ -15,7 +15,7 @@
 # Misc tools used to optimize, translate, and evaluate IREE.
 # Most of these are not designed to run on-device.
 
-load("//iree:build_defs.bzl", "PLATFORM_VULKAN_DEPS")
+load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],

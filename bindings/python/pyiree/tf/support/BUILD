@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load(
-    "//iree:build_defs.bzl",
+    "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
 )
 

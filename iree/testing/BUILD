@@ -14,7 +14,7 @@
 
 # Testing utilities for IREE.
 
-load("//iree:build_defs.bzl", "platform_trampoline_deps")
+load("//iree:build_defs.oss.bzl", "platform_trampoline_deps")
 
 package(
     default_visibility = ["//visibility:public"],

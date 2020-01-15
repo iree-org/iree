@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,23 +14,14 @@
 
 """Macros for building IREE python extensions."""
 
-# Re-export various top-level things.
-# We do this to keep the python bindings fairly self-contained and
-# able to move to a dedicated repo more easily.
+load("@iree_native_python//:build_defs.bzl", "py_extension")
+load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_python//python:defs.bzl", "py_library")
+load("//iree:build_defs.oss.bzl", _PLATFORM_VULKAN_DEPS = "PLATFORM_VULKAN_DEPS")
 
-load(
-    "//iree:build_defs.bzl",
-    "cc_library",
-    _NUMPY_DEPS = "NUMPY_DEPS",
-    _PLATFORM_VULKAN_DEPS = "PLATFORM_VULKAN_DEPS",
-    _PYTHON_HEADER_DEPS = "PYTHON_HEADERS_DEPS",
-    _iree_py_extension = "iree_py_extension",
-)
-
-NUMPY_DEPS = _NUMPY_DEPS
+NUMPY_DEPS = []
 PLATFORM_VULKAN_DEPS = _PLATFORM_VULKAN_DEPS
-PYTHON_HEADER_DEPS = _PYTHON_HEADER_DEPS
-iree_py_extension = _iree_py_extension
+PYTHON_HEADERS_DEPS = ["@iree_native_python//:python_headers"]
 
 PYBIND_COPTS = [
     "-fexceptions",
@@ -43,6 +34,10 @@ PYBIND_FEATURES = [
 PYBIND_EXTENSION_COPTS = [
     "-fvisibility=hidden",
 ]
+
+# Optional deps to enable an intree TensorFlow python. This build configuration
+# defaults to getting TensorFlow from the python environment (empty).
+INTREE_TENSORFLOW_PY_DEPS = []
 
 def pybind_cc_library(
         name,
@@ -58,6 +53,18 @@ def pybind_cc_library(
         features = PYBIND_FEATURES,
         deps = [
             "@iree_pybind11//:pybind11",
-        ] + deps + PYTHON_HEADER_DEPS,
+        ] + deps + PYTHON_HEADERS_DEPS,
         **kwargs
     )
+
+def iree_py_library(**kwargs):
+    """Compatibility py_library which has bazel compatible args."""
+
+    # This is used when args are needed that are incompatible with upstream.
+    # Presently, this includes:
+    #   imports
+    py_library(**kwargs)
+
+def iree_py_extension(**kwargs):
+    """Delegates to the real py_extension."""
+    py_extension(**kwargs)

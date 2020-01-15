@@ -14,7 +14,7 @@
 
 # Tests for lowering MLIR in various dialects to IREE interpreter bytecode.
 
-load("//iree:build_defs.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
+load("//iree:build_defs.oss.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
 
 package(
     default_visibility = ["//visibility:public"],

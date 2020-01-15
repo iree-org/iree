@@ -13,11 +13,14 @@
 # limitations under the License.
 
 load(
-    "//iree:build_defs.bzl",
+    "//iree:build_defs.oss.bzl",
     "INTREE_FILECHECK_TARGET",
-    "INTREE_TENSORFLOW_PY_DEPS",
     "iree_glob_lit_tests",
     "iree_setup_lit_package",
+)
+load(
+    "//bindings/python:build_defs.oss.bzl",
+    "INTREE_TENSORFLOW_PY_DEPS",
 )
 
 package(

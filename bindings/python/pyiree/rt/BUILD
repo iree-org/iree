@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load(
-    "//bindings/python/pyiree:build_defs.bzl",
+    "//bindings/python:build_defs.oss.bzl",
     "NUMPY_DEPS",
     "PLATFORM_VULKAN_DEPS",
     "PYBIND_COPTS",

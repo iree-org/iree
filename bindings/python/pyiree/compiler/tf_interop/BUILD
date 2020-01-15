@@ -13,12 +13,9 @@
 # limitations under the License.
 
 load(
-    "//bindings/python/pyiree:build_defs.bzl",
-    "pybind_cc_library",
-)
-load(
-    "//iree:build_defs.bzl",
+    "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
+    "pybind_cc_library",
 )
 
 package(

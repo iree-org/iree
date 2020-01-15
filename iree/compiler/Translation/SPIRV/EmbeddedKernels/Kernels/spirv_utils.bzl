@@ -14,7 +14,7 @@
 
 """Utilities for handling hand-written SPIR-V files."""
 
-load("//iree:build_defs.bzl", "iree_glsl_vulkan")
+load("//iree:build_defs.oss.bzl", "iree_glsl_vulkan")
 load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 def spirv_kernel_cc_library(name, srcs):
