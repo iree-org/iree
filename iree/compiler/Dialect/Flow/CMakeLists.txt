@@ -13,8 +13,7 @@
 # limitations under the License.
 
 add_subdirectory(Analysis)
-add_subdirectory(Conversion/HLOToFlow)
-add_subdirectory(Conversion/StandardToFlow)
+add_subdirectory(Conversion)
 add_subdirectory(IR)
 add_subdirectory(Transforms)
 add_subdirectory(Utils)

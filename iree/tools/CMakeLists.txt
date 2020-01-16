@@ -51,9 +51,6 @@ if(${IREE_BUILD_COMPILER})
 
   # Additional libraries containing statically registered functions/flags, which
   # should always be linked in to binaries.
-  #
-  # TODO(scotttodd): Make the ALWAYSLINK property apply transitively and force
-  #                  MLIR libs to generally be ALWAYSLINK wherever used in IREE.
   set(_ALWAYSLINK_LIBS
     MLIRAffineOps
     MLIRAnalysis
@@ -68,11 +65,6 @@ if(${IREE_BUILD_COMPILER})
     MLIRTranslation
     MLIRSupport
     MLIRVectorOps
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::Interpreter::IR
     tensorflow::mlir_xla
   )
 
@@ -116,19 +108,32 @@ if(${IREE_BUILD_COMPILER})
 #      iree::hal::vulkan::vulkan_driver_module
 #    )
 
+  iree_cc_library(
+    NAME
+      iree_translate_library
+    SRCS
+      "translate_main.cc"
+    DEPS
+      ${_ALWAYSLINK_LIBS}
+      iree::compiler::Dialect::Flow::Conversion
+      iree::compiler::Dialect::HAL::Conversion
+      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
+      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+      iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Translation::IREEVM
+      iree::compiler::Translation::SPIRV::XLAToSPIRV
+      LLVMSupport
+      MLIRTranslateClParser
+    ALWAYSLINK
+  )
+
   iree_cc_binary(
     NAME
       iree-translate
     OUT
       iree-translate
-    SRCS
-      "translate_main.cc"
     DEPS
-      ${_ALWAYSLINK_LIBS}
-      iree::compiler::Dialect::VM::Target::Bytecode
-      iree::compiler::Translation::SPIRV::LinalgToSPIRV
-      iree::compiler::Translation::SPIRV::XLAToSPIRV
-      MLIRTranslateClParser
+      iree::tools::iree_translate_library
   )
   add_executable(iree-translate ALIAS iree_tools_iree-translate)
 

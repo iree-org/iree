@@ -35,7 +35,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRStandardDialectRegistration
+    MLIRStandardOps
     MLIRSupport
     MLIRTranslation
     tensorflow::mlir_xla
