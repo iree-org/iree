@@ -34,6 +34,7 @@ option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 
 if(${IREE_BUILD_SAMPLES})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
