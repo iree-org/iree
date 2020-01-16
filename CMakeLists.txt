@@ -49,6 +49,7 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
+  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
 
@@ -63,6 +64,7 @@ include(iree_bytecode_module)
 include(iree_glslang)
 include(iree_glsl_vulkan)
 include(iree_spirv_kernel_cc_library)
+include(iree_pybind_cc_library)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
