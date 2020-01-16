@@ -22,7 +22,7 @@ iree_bytecode_module(
   CC_NAMESPACE
     "iree::samples::custom_modules"
   TRANSLATION_TOOL
-    iree::samples::custom_modules::dialect::custom-translate
+    iree_samples_custom_modules_dialect_custom-translate
   TRANSLATION
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
