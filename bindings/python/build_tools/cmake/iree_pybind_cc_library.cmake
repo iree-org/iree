@@ -27,7 +27,7 @@ include(CMakeParseArguments)
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
 # LINKOPTS: List of link options
-# TYPE: Type of library to be crated: either "MODULE" or "SHARED" (default).
+# TYPE: Type of library to be crated: either "MODULE", "SHARED" or "STATIC" (default).
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 
 function(iree_pybind_cc_library)
@@ -46,11 +46,11 @@ function(iree_pybind_cc_library)
     set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
     if(NOT _RULE_TYPE)
-      set(_RULE_TYPE "SHARED")
+      set(_RULE_TYPE "STATIC")
     endif()
 
     string(TOUPPER "${_RULE_TYPE}" _uppercase_RULE_TYPE)
-    if(NOT _uppercase_RULE_TYPE MATCHES "^(SHARED|MODULE)")
+    if(NOT _uppercase_RULE_TYPE MATCHES "^(STATIC|SHARED|MODULE)")
       message(FATAL_ERROR "Unsported library TYPE for iree_pybind_cc_library: ${_RULE_TYPE}")
     endif()
 
@@ -103,9 +103,10 @@ function(iree_pybind_cc_library)
     set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
     set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-    set_property(TARGET ${_NAME} PROPERTY PREFIX "${PYTHON_MODULE_PREFIX}")
-    set_property(TARGET ${_NAME} PROPERTY SUFFIX "${PYTHON_MODULE_EXTENSION}")
-
+    if(NOT _uppercase_RULE_TYPE MATCHES "STATIC")
+      set_property(TARGET ${_NAME} PROPERTY PREFIX "${PYTHON_MODULE_PREFIX}")
+      set_property(TARGET ${_NAME} PROPERTY SUFFIX "${PYTHON_MODULE_EXTENSION}")
+    endif()
 
     # Alias the iree_package_name library to iree::package::name.
     # This lets us more clearly map to Bazel and makes it possible to
