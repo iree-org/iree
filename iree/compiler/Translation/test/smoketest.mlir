@@ -1,7 +1,6 @@
 // RUN: iree-translate -split-input-file -iree-mlir-to-vm-bytecode-module -iree-vm-bytecode-module-output-format=flatbuffer-text %s | IreeFileCheck %s
 
 // CHECK-LABEL: name: "simple_module"
-module {
 module @simple_module {
 // CHECK: exported_functions:
 // CHECK: local_name: "func"
@@ -18,14 +17,11 @@ func @func(%arg0 : i32) -> i32 attributes { iree.module.export } {
 // CHECK-NEXT: i32_register_count: 1
 // CHECK-NEXT: ref_register_count: 0
 // CHECK: bytecode_data: [ 84, 1, 0 ]
-
-}
 }
 
 // -----
 
 // CHECK-LABEL: name: "do_not_optimize_module"
-module {
 module @do_not_optimize_module {
 // CHECK: exported_functions:
 // CHECK: local_name: "add"
@@ -36,5 +32,20 @@ func @add() -> i32 attributes { iree.module.export } {
   %result = addi %unf_c1, %unf_c2 : i32
   return %result : i32
 }
+}
+
+// -----
+
+// CHECK-LABEL: name: "hal_usage"
+module @hal_usage {
+// CHECK: imported_functions:
+// CHECK: full_name: "hal.command_buffer.dispatch"
+// CHECK: exported_functions:
+// CHECK: local_name: "hloElementwiseOps"
+func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> attributes {iree.module.export} {
+  %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
+  %1 = xla_hlo.sub %0, %arg0 : tensor<4xf32>
+  %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
+  return %2 : tensor<4xf32>
 }
 }
