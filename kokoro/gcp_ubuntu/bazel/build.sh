@@ -1,6 +1,6 @@
-# Format: //devtools/kokoro/config/proto/build.proto
+#!/bin/bash
 
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Configuration for Kokoro build that runs cmake on pushes to master.
+# Build the project with bazel using Kokoro.
 
-build_file: "iree/kokoro/gcp_ubuntu/cmake_build.sh"
+set -e
+set -x
+
+# Print the UTC time when set -x is on
+export PS4='[$(date -u "+%T %Z")] '
+
+# Check these exist and print the versions for later debugging
+bazel --version
+python3 -V
+
+export PYTHON_BIN="$(which python3)"
+
+# Kokoro checks out the repository here.
+cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
+echo "Initializing submodules"
+./git_scripts/submodule_versions.py init
+
+echo "Building and testing with bazel"
+./build_tools/scripts/bazel_build.sh
