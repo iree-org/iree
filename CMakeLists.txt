@@ -143,6 +143,10 @@ if(${IREE_BUILD_TESTS})
   enable_testing(iree)
 endif()
 
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+endif()
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
@@ -167,6 +171,10 @@ elseif(${IREE_ENABLE_LLVM})
   # If not building the compiler, tablegen is still needed
   # to generate vm ops so deep include it only.
   add_subdirectory(iree/compiler/Dialect/VM/Tools)
+endif()
+
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(bindings/python)
 endif()
 
 add_subdirectory(iree/tools)
