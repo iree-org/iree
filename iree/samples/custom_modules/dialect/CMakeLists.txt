@@ -75,6 +75,8 @@ iree_cc_binary(
 iree_cc_binary(
   NAME
     custom-translate
+  OUT
+    custom-translate
   DEPS
     iree::samples::custom_modules::dialect
     iree::tools::iree_translate_library
