@@ -29,17 +29,18 @@ jobs:
         uses: actions/checkout@v2
       - name: Initializing submodules
         run: ./git_scripts/submodule_versions.py init
-      - name: Committing updates
+      - name: Checking submodule state
         run: |
-          # Only commit if there's a diff.
-          if ! git diff --cached --exit-code; then
-            git config --local user.email "noreply+action@github.com"
-            git config --local user.name "Submodule Synchronize Action"
-            git commit -am "Synchronize submodules"
-          else
-            echo "Submodules already up to date"
-          fi
+          echo "::set-env name=has_diff::false"
+          git diff --cached --exit-code || echo "::set-env name=has_diff::true"
+      - name: Committing updates
+        if: env.has_diff == 'true'
+        run: |
+          git config --local user.email "noreply+action@github.com"
+          git config --local user.name "Submodule Synchronize Action"
+          git commit -am "Synchronize submodules"
       - name: Pushing changes
+        if: env.has_diff == 'true'
         # Will push regardless, but exit successfully if already up to date with master
         uses: ad-m/github-push-action@v0.5.0
         with:
