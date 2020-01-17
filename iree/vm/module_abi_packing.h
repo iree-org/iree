@@ -62,7 +62,7 @@ struct ParamUnpack<opaque_ref> {
                      &reg.value);
   }
   operator opaque_ref&() { return reg; }
-  operator const opaque_ref&() const { return reg; }
+  operator const opaque_ref &() const { return reg; }
   opaque_ref reg;
 };
 
@@ -85,8 +85,8 @@ struct ParamUnpack<ref<T>> {
     }
     // NOTE: null is allowed here!
   }
-  operator ref<T>&() { return reg; }
-  operator const ref<T>&() const { return reg; }
+  operator ref<T> &() { return reg; }
+  operator const ref<T> &() const { return reg; }
   ref<T> reg;
 };
 
@@ -109,7 +109,7 @@ struct ParamUnpack<std::array<U, S>> {
                                                  std::index_sequence<I...>) {
     return {((void)I, ParamUnpack<T>(param_state, frame))...};
   }
-  operator std::array<U, S>&() { return regs; }
+  operator std::array<U, S> &() { return regs; }
   operator std::array<U, S>() const { return regs; }
   std::array<U, S> regs;
 };
@@ -120,7 +120,7 @@ struct ParamUnpack<std::tuple<Ts...>> {
     ++param_state->varargs_ordinal;
     regs = std::make_tuple(ParamUnpack<Ts>(param_state, frame)...);
   }
-  operator std::tuple<Ts...>&() { return regs; }
+  operator std::tuple<Ts...> &() { return regs; }
   operator std::tuple<Ts...>() const { return regs; }
   std::tuple<Ts...> regs;
 };
