@@ -42,12 +42,12 @@ iree_cc_library(
   NAME
     api_util
   HDRS
-    "api.h"
     "api_util.h"
   DEPS
     absl::base
     absl::container
     absl::time
+    iree::base::api_hdrs
     iree::base::logging
     iree::base::shape
     iree::base::status
@@ -94,7 +94,7 @@ iree_cc_test(
   SRCS
     "bitfield_test.cc"
   DEPS
-    absl::base
+    absl::core_headers
     iree::testing::gtest_main
     iree::base::bitfield
 )
@@ -128,7 +128,6 @@ iree_cc_test(
     iree::base::memory
     iree::base::status
     iree::base::status_matchers
-    absl::optional
     absl::strings
 )
 

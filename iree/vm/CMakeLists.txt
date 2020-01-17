@@ -188,6 +188,7 @@ iree_cc_library(
     iree::base::api_util
     iree::base::ref_ptr
     iree::base::status
+    absl::strings
     absl::span
   PUBLIC
 )
