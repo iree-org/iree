@@ -46,6 +46,13 @@ MLIR_TARGET_MAPPING = {
     "@llvm-project//mlir:Transforms": "MLIRTransforms",
 }
 
+VULKAN_HEADERS_MAPPING = {
+    # TODO(scotttodd): Set -DVK_NO_PROTOTYPES to COPTS for _no_prototypes.
+    #   Maybe add a wrapper CMake lib within build_tools/third_party/?
+    "@vulkan_headers//:vulkan_headers": "Vulkan::Headers",
+    "@vulkan_headers//:vulkan_headers_no_prototypes": "Vulkan::Headers",
+}
+
 
 def convert_external_target(target):
   """Converts an external (doesn't start with //iree) Bazel target to Cmake.
@@ -75,5 +82,7 @@ def convert_external_target(target):
   if target.startswith("@org_tensorflow//tensorflow/lite/experimental/ruy"):
     # All Bazel targets map to a single CMake target.
     return "ruy"
+  if target.startswith("@vulkan_headers"):
+    return VULKAN_HEADERS_MAPPING[target]
 
   raise KeyError("No conversion found for target '%s'" % target)
