@@ -21,16 +21,29 @@
 #
 # Generated CMake files will be similar in structure to their source BUILD
 # files by using the functions in build_tools/cmake/ that imitate corresponding
-# Bazel rules (i.e. cc_library -> iree_cc_library.cmake).
+# Bazel rules (e.g. cc_library -> iree_cc_library.cmake).
 #
 # Usage:
 #   python3 build_tools/scripts/bazel_to_cmake.py
 
+import bazel_to_cmake_deps
 import os
 import textwrap
 
 BUILD_FILE_NAME = "BUILD"
 CMAKELISTS_FILE_NAME = "CMakeLists.txt"
+
+repo_root = None
+
+
+def setup_environment():
+  """Sets up some environment globals."""
+  global repo_root
+
+  # Determine the repository root (two dir-levels up).
+  repo_root = os.path.dirname(
+      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  print("Repository root: %s" % (repo_root,))
 
 
 class BuildFileFunctions(object):
@@ -80,14 +93,21 @@ class BuildFileFunctions(object):
     return self._convert_filelist_block("SRCS", kwargs.get("srcs"))
 
   def _convert_dep(self, dep):
-    # TODO(scotttodd): special cases where pattern isn't found
-    #   could import from a separate file to keep this file more generic
-
-    # Bazel `//iree/base`     -> CMake `iree::base`
-    # Bazel `//iree/base:api` -> CMake `iree::base::api`
-    dep = dep.replace("//", "")  # iree/base:api
-    dep = dep.replace(":", "::")  # iree/base::api
-    dep = dep.replace("/", "::")  # iree::base::api
+    if dep.startswith(":"):
+      # Bazel package-relative `:logging` -> CMake absolute `iree::base::logging`
+      package = os.path.dirname(self.converter.rel_build_file_path)
+      package = package.replace(os.path.sep, "::")
+      dep.replace("::", "")
+      dep = package + dep
+    if not dep.startswith("//iree"):
+      # External dependency, call helper method for special case handling.
+      dep = bazel_to_cmake_deps.convert_external_dep(dep)
+    else:
+      # Bazel `//iree/base`     -> CMake `iree::base`
+      # Bazel `//iree/base:api` -> CMake `iree::base::api`
+      dep = dep.replace("//", "")  # iree/base:api
+      dep = dep.replace(":", "::")  # iree/base::api
+      dep = dep.replace("/", "::")  # iree::base::api
     return dep
 
   def _convert_deps_block(self, **kwargs):
@@ -98,8 +118,10 @@ class BuildFileFunctions(object):
     #    dep1::target1
     #    dep2::target2
     deps = kwargs.get("deps")
-    deps_list = "\n".join(["    %s" % (self._convert_dep(dep)) for dep in deps])
-    return "  DEPS\n%s\n" % (deps_list)
+    deps_list = [self._convert_dep(dep) for dep in deps]
+    deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
+    deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
+    return "  DEPS\n%s\n" % (deps_list,)
 
   # ------------------------------------------------------------------------- #
   # Function handlers that convert BUILD definitions to CMake definitions.    #
@@ -134,11 +156,27 @@ class BuildFileFunctions(object):
     "testonly_block": testonly_block,
     }
 
+  def cc_test(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    hdrs_block = self._convert_hdrs_block(**kwargs)
+    srcs_block = self._convert_srcs_block(**kwargs)
+    deps_block = self._convert_deps_block(**kwargs)
+
+    self.converter.body += """iree_cc_test(
+%(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s
+)\n\n""" % {
+    "name_block": name_block,
+    "hdrs_block": hdrs_block,
+    "srcs_block": srcs_block,
+    "deps_block": deps_block,
+    }
+
 
 class Converter(object):
 
-  def __init__(self):
+  def __init__(self, rel_build_file_path):
     self.body = ""
+    self.rel_build_file_path = rel_build_file_path
 
   def convert(self):
     return self.template % {"body": self.body}
@@ -159,13 +197,13 @@ def GetDict(obj):
 
 
 def convert_directory_tree(root_directory_path):
-  print("convert_directory_tree: %s" % (root_directory_path))
+  print("convert_directory_tree: %s" % (root_directory_path,))
   for root, directory_names, file_names in os.walk(root_directory_path):
     convert_directory(root)
 
 
 def convert_directory(directory_path):
-  print("convert_directory: %s" % (directory_path))
+  global repo_root
 
   build_file_path = os.path.join(directory_path, BUILD_FILE_NAME)
   cmakelists_file_path = os.path.join(directory_path, CMAKELISTS_FILE_NAME)
@@ -174,29 +212,41 @@ def convert_directory(directory_path):
     # No Bazel BUILD file in this directory to convert, skip.
     return
 
+  rel_build_file_path = os.path.relpath(build_file_path, repo_root)
+  rel_cmakelists_file_path = os.path.relpath(cmakelists_file_path, repo_root)
+  print("Converting %s to %s" % (rel_build_file_path, rel_cmakelists_file_path))
+
   # TODO(scotttodd): Attempt to merge instead of overwrite?
   #   Existing CMakeLists.txt may have special logic that should be preserved
   if os.path.isfile(cmakelists_file_path):
-    print("  Already has CMakeLists.txt")
+    print("  %s already exists, overwritting..." % (rel_cmakelists_file_path,))
   else:
-    print("  Does not have CMakeLists.txt")
+    print("  %s does not exist yet, creating..." % (rel_cmakelists_file_path,))
 
   with open(build_file_path) as build_file:
     build_file_code = compile(build_file.read(), build_file_path, "exec")
-    converter = Converter()
-    exec(build_file_code, GetDict(BuildFileFunctions(converter)))
-    converted_text = converter.convert()
-    print(converted_text)
-    # TODO(scotttodd): write to file
+    converter = Converter(rel_build_file_path)
+    try:
+      exec(build_file_code, GetDict(BuildFileFunctions(converter)))
+      converted_text = converter.convert()
+
+      # TODO(scotttodd): write to file
+      print(converted_text)
+    except NameError as e:
+      print(
+          "Failed to convert %s. Missing a rule handler in bazel_to_cmake.py?" %
+          (rel_build_file_path))
+      print("  Reason: `%s`" % (e,))
+    except KeyError as e:
+      print(
+          "Failed to convert %s. Missing a dep conversion in bazel_to_cmake_deps.py?"
+          % (rel_build_file_path))
+      print("  Reason: `%s`" % (e,))
 
 
 def run():
   """Runs Bazel to CMake conversion."""
-
-  # Determine the repository root (two dir-levels up).
-  repo_root = os.path.dirname(
-      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-  print("Repository root: %s" % (repo_root))
+  global repo_root
 
   # TODO(scotttodd): Flags:
   #   debug: print to console, do not write files
@@ -204,8 +254,13 @@ def run():
   #   path: individual build file or directory to run on
 
   # convert_directory_tree(os.path.join(repo_root, "iree"))
-  convert_directory(os.path.join(repo_root, "iree/hal/testing"))
+  # convert_directory(os.path.join(repo_root, "iree/hal/testing"))
+  # convert_directory(os.path.join(repo_root, "iree/hal/host"))
+  convert_directory(os.path.join(repo_root, "iree/compiler/Utils"))
+  convert_directory(
+      os.path.join(repo_root, "iree/compiler/Dialect/Flow/Transforms"))
 
 
 if __name__ == "__main__":
+  setup_environment()
   run()
