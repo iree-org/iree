@@ -184,6 +184,10 @@ class BuildFileFunctions(object):
     # Not supported during conversion (yet?).
     pass
 
+  def config_setting(self, **kwargs):
+    # No mapping to CMake, ignore.
+    pass
+
   def cc_library(self, **kwargs):
     name_block = self._convert_name_block(**kwargs)
     hdrs_block = self._convert_hdrs_block(**kwargs)
