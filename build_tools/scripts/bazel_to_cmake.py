@@ -23,18 +23,51 @@
 # files by using the functions in build_tools/cmake/ that imitate corresponding
 # Bazel rules (e.g. cc_library -> iree_cc_library.cmake).
 #
-# Usage:
-#   python3 build_tools/scripts/bazel_to_cmake.py
+# For usage, see:
+#   python3 build_tools/scripts/bazel_to_cmake.py --help
 
+import argparse
 import bazel_to_cmake_targets
 import datetime
 import os
 import textwrap
 
-BUILD_FILE_NAME = "BUILD"
-CMAKELISTS_FILE_NAME = "CMakeLists.txt"
-
 repo_root = None
+
+
+def parse_arguments():
+  global repo_root
+
+  parser = argparse.ArgumentParser(
+      description="Bazel to CMake conversion helper.")
+  parser.add_argument(
+      "--debug",
+      help="Prints results instead of writing files",
+      action="store_true",
+      default=False)
+
+  # Specify only one of these (defaults to --root_dir=iree).
+  group = parser.add_mutually_exclusive_group()
+  group.add_argument(
+      "--dir",
+      help="Converts the BUILD file in the given directory",
+      default=None)
+  group.add_argument(
+      "--root_dir",
+      help="Converts all BUILD files under a root directory (defaults to iree/)",
+      default="iree")
+
+  # TODO(scotttodd): --check option that returns success/failure depending on
+  #   if files match the converted versions
+
+  args = parser.parse_args()
+
+  # --dir takes precedence over --root_dir.
+  # They are mutually exclusive, but the default value is still set.
+  if args.dir:
+    args.root_dir = None
+
+  return args
 
 
 def setup_environment():
@@ -44,10 +77,10 @@ def setup_environment():
   # Determine the repository root (two dir-levels up).
   repo_root = os.path.dirname(
       os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-  print("Repository root: %s" % (repo_root,))
 
 
 class BuildFileFunctions(object):
+  """Object passed to `exec` that has handlers for BUILD file functions."""
 
   def __init__(self, converter):
     self.converter = converter
@@ -206,6 +239,7 @@ class BuildFileFunctions(object):
 
 
 class Converter(object):
+  """Conversion state tracking and full file template substitution."""
 
   def __init__(self, directory_path, rel_build_file_path):
     self.body = ""
@@ -266,18 +300,18 @@ def GetDict(obj):
   return ret
 
 
-def convert_directory_tree(root_directory_path):
+def convert_directory_tree(root_directory_path, write_files):
   print("convert_directory_tree: %s" % (root_directory_path,))
   for root, dirs, file_names in os.walk(root_directory_path):
-    convert_directory(root)
+    convert_directory(root, write_files)
 
 
-def convert_directory(directory_path):
+def convert_directory(directory_path, write_files):
   if not os.path.isdir(directory_path):
     raise FileNotFoundError("Cannot find directory '%s'" % (directory_path,))
 
-  build_file_path = os.path.join(directory_path, BUILD_FILE_NAME)
-  cmakelists_file_path = os.path.join(directory_path, CMAKELISTS_FILE_NAME)
+  build_file_path = os.path.join(directory_path, "BUILD")
+  cmakelists_file_path = os.path.join(directory_path, "CMakeLists.txt")
 
   if not os.path.isfile(build_file_path):
     # No Bazel BUILD file in this directory to convert, skip.
@@ -294,16 +328,20 @@ def convert_directory(directory_path):
     print("  %s already exists, overwritting..." % (rel_cmakelists_file_path,))
   else:
     print("  %s does not exist yet, creating..." % (rel_cmakelists_file_path,))
+  print("")
 
-  with open(build_file_path) as build_file:
+  with open(build_file_path, "rt") as build_file:
     build_file_code = compile(build_file.read(), build_file_path, "exec")
     converter = Converter(directory_path, rel_build_file_path)
     try:
       exec(build_file_code, GetDict(BuildFileFunctions(converter)))
       converted_text = converter.convert()
 
-      # TODO(scotttodd): write to file
-      print(converted_text)
+      if write_files:
+        with open(cmakelists_file_path, "wt") as cmakelists_file:
+          cmakelists_file.write(converted_text)
+      else:
+        print(converted_text)
     except NameError as e:
       print(
           "Failed to convert %s. Missing a rule handler in bazel_to_cmake.py?" %
@@ -316,23 +354,18 @@ def convert_directory(directory_path):
       print("  Reason: `%s: %s`" % (type(e).__name__, e))
 
 
-def run():
+def main(args):
   """Runs Bazel to CMake conversion."""
   global repo_root
 
-  # TODO(scotttodd): Flags:
-  #   debug: print to console, do not write files
-  #   check: return success code if files match, failure with diff otherwise
-  #   path: individual build file or directory to run on
+  write_files = not args.debug
 
-  # convert_directory_tree(os.path.join(repo_root, "iree"))
-  # convert_directory(os.path.join(repo_root, "iree/hal/testing"))
-  # convert_directory(os.path.join(repo_root, "iree/hal/host"))
-  convert_directory(os.path.join(repo_root, "iree/compiler/Utils"))
-  convert_directory(
-      os.path.join(repo_root, "iree/compiler/Dialect/Flow/Transforms"))
+  if args.root_dir:
+    convert_directory_tree(os.path.join(repo_root, args.root_dir), write_files)
+  elif args.dir:
+    convert_directory(os.path.join(repo_root, args.dir), write_files)
 
 
 if __name__ == "__main__":
   setup_environment()
-  run()
+  main(parse_arguments())
