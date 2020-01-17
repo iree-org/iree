@@ -41,7 +41,7 @@ def parse_arguments():
   parser = argparse.ArgumentParser(
       description="Bazel to CMake conversion helper.")
   parser.add_argument(
-      "--debug",
+      "--preview",
       help="Prints results instead of writing files",
       action="store_true",
       default=False)
@@ -322,12 +322,13 @@ def convert_directory(directory_path, write_files):
   rel_cmakelists_file_path = os.path.relpath(cmakelists_file_path, repo_root)
   print("Converting %s to %s" % (rel_build_file_path, rel_cmakelists_file_path))
 
-  # TODO(scotttodd): Attempt to merge instead of overwrite?
-  #   Existing CMakeLists.txt may have special logic that should be preserved
-  if os.path.isfile(cmakelists_file_path):
-    print("  %s already exists, overwritting..." % (rel_cmakelists_file_path,))
-  else:
-    print("  %s does not exist yet, creating..." % (rel_cmakelists_file_path,))
+  if write_files:
+    # TODO(scotttodd): Attempt to merge instead of overwrite?
+    #   Existing CMakeLists.txt may have special logic that should be preserved
+    if os.path.isfile(cmakelists_file_path):
+      print("  %s already exists, overwritting" % (rel_cmakelists_file_path,))
+    else:
+      print("  %s does not exist yet, creating" % (rel_cmakelists_file_path,))
   print("")
 
   with open(build_file_path, "rt") as build_file:
@@ -358,7 +359,7 @@ def main(args):
   """Runs Bazel to CMake conversion."""
   global repo_root
 
-  write_files = not args.debug
+  write_files = not args.preview
 
   if args.root_dir:
     convert_directory_tree(os.path.join(repo_root, args.root_dir), write_files)
