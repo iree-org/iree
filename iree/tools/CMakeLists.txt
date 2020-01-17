@@ -51,7 +51,7 @@ if(${IREE_BUILD_COMPILER})
 
   # Additional libraries containing statically registered functions/flags, which
   # should always be linked in to binaries.
-  set(_ALWAYSLINK_LIBS
+  set(_ALWAYSLINK_LIBS_IREE_TRANSLATE
     MLIRAffineOps
     MLIRAnalysis
     MLIREDSC
@@ -68,7 +68,19 @@ if(${IREE_BUILD_COMPILER})
     tensorflow::mlir_xla
   )
 
-  foreach(LIB ${_ALWAYSLINK_LIBS})
+  set(_ALWAYSLINK_LIBS_IREE_OPT
+    MLIRAffineOps
+    MLIRLinalgOps
+    MLIRStandardOps
+    MLIRSPIRV
+    MLIRSPIRVSerialization
+    MLIRSPIRVTransforms
+    MLIRTranslation
+    MLIROptMain
+    tensorflow::mlir_xla
+  )
+
+  foreach(LIB IN LISTS _ALWAYSLINK_LIBS_IREE_TRANSLATE _ALWAYSLINK_LIBS_IREE_OPT)
     # Aliased targets are always in-project, so we control them and can set
     # ALWAYSLINK on them directly.
     # TODO(scotttodd): add the ALWAYSLINK property to MLIR libraries elsewhere
@@ -77,6 +89,49 @@ if(${IREE_BUILD_COMPILER})
       set_property(TARGET ${LIB} PROPERTY ALWAYSLINK 1)
     endif()
   endforeach(LIB)
+
+  iree_cc_library(
+    NAME
+      iree_opt_library
+    SRCS
+      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-opt/mlir-opt.cpp"
+    DEPS
+      ${_ALWAYSLINK_LIBS_IREE_OPT}
+      iree::compiler::Dialect::IREE::IR
+      iree::compiler::Dialect::IREE::Transforms
+      iree::compiler::Dialect::Flow::Analysis
+      iree::compiler::Dialect::Flow::Conversion
+      iree::compiler::Dialect::Flow::IR
+      iree::compiler::Dialect::Flow::Transforms
+      iree::compiler::Dialect::HAL::Conversion
+      iree::compiler::Dialect::HAL::Conversion::FlowToHAL
+      iree::compiler::Dialect::HAL::Conversion::HALToVM
+      iree::compiler::Dialect::HAL::IR
+      iree::compiler::Dialect::HAL::Transforms
+      iree::compiler::Dialect::VM::Analysis
+      iree::compiler::Dialect::VM::Conversion
+      iree::compiler::Dialect::VM::Conversion::StandardToVM
+      iree::compiler::Dialect::VM::IR
+      iree::compiler::Dialect::VM::Transforms
+      iree::compiler::Translation::Interpreter::Transforms
+      iree::compiler::Translation::IREEVM
+      iree::compiler::Translation::SPIRV::XLAToSPIRV
+      iree::compiler::Translation::SPIRV::LinalgToSPIRV
+      LLVMSupport
+    ALWAYSLINK
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-opt
+    OUT
+      iree-opt
+    DEPS
+      iree::tools::iree_opt_library
+    LINKOPTS
+      "-lpthread"
+  )
+  add_executable(iree-opt ALIAS iree_tools_iree-opt)
 
 # TODO(mabre): Get this working
 #  iree_cc_binary(
@@ -114,7 +169,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "translate_main.cc"
     DEPS
-      ${_ALWAYSLINK_LIBS}
+      ${_ALWAYSLINK_LIBS_IREE_TRANSLATE}
       iree::compiler::Dialect::Flow::Conversion
       iree::compiler::Dialect::HAL::Conversion
       iree::compiler::Dialect::HAL::Target::LegacyInterpreter
