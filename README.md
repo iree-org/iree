@@ -38,6 +38,8 @@ More Coming soon! Performing full model translation may require a few steps
 pre-translated example models that allow independent testing of the runtime
 portions.
 
+Test kokoro build
+
 *   [Getting Started on Windows](docs/getting_started_on_windows.md)
 *   [Getting Started on Linux](docs/getting_started_on_linux.md)
 *   [Getting Started](docs/getting_started.md)
