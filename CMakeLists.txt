@@ -34,6 +34,7 @@ option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
+option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 
 if(${IREE_BUILD_SAMPLES})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
@@ -49,6 +50,7 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_LIST_DIR}/build_tools/cmake/
+  ${CMAKE_CURRENT_LIST_DIR}/bindings/python/build_tools/cmake/
   ${CMAKE_CURRENT_LIST_DIR}/third_party/abseil-cpp/absl/copts/
 )
 
@@ -63,6 +65,7 @@ include(iree_bytecode_module)
 include(iree_glslang)
 include(iree_glsl_vulkan)
 include(iree_spirv_kernel_cc_library)
+include(iree_pybind_cc_library)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
@@ -140,6 +143,10 @@ if(${IREE_BUILD_TESTS})
   enable_testing(iree)
 endif()
 
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+endif()
+
 #-------------------------------------------------------------------------------
 # IREE top-level libraries
 #-------------------------------------------------------------------------------
@@ -164,6 +171,10 @@ elseif(${IREE_ENABLE_LLVM})
   # If not building the compiler, tablegen is still needed
   # to generate vm ops so deep include it only.
   add_subdirectory(iree/compiler/Dialect/VM/Tools)
+endif()
+
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  add_subdirectory(bindings/python)
 endif()
 
 add_subdirectory(iree/tools)
