@@ -48,13 +48,19 @@ class BuildFileFunctions(object):
     #    rule_name
     return "  NAME\n    %s\n" % (kwargs["name"])
 
-  def _convert_testonly_block(self, **kwargs):
-    if kwargs.get("testonly"):
+  def _convert_option_block(self, option, option_value):
+    if option_value:
       # Note: this is a truthiness check as well as an existence check, i.e.
       # Bazel `testonly = False` will be handled correctly by this condition.
-      return "  TESTONLY\n"
+      return "  %s\n" % option
     else:
       return ""
+
+  def _convert_alwayslink_block(self, **kwargs):
+    return self._convert_option_block("ALWAYSLINK", kwargs.get("alwayslink"))
+
+  def _convert_testonly_block(self, **kwargs):
+    return self._convert_option_block("TESTONLY", kwargs.get("testonly"))
 
   def _convert_filelist_block(self, list_name, files):
     if not files:
@@ -114,15 +120,17 @@ class BuildFileFunctions(object):
     hdrs_block = self._convert_hdrs_block(**kwargs)
     srcs_block = self._convert_srcs_block(**kwargs)
     deps_block = self._convert_deps_block(**kwargs)
+    alwayslink_block = self._convert_alwayslink_block(**kwargs)
     testonly_block = self._convert_testonly_block(**kwargs)
 
     self.converter.body += """iree_cc_library(
-%(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s%(testonly_block)s  PUBLIC
+%(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s%(alwayslink_block)s%(testonly_block)s  PUBLIC
 )\n\n""" % {
     "name_block": name_block,
     "hdrs_block": hdrs_block,
     "srcs_block": srcs_block,
     "deps_block": deps_block,
+    "alwayslink_block": alwayslink_block,
     "testonly_block": testonly_block,
     }
 
