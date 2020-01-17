@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Bazel to CMake dependency conversions used by bazel_to_cmake.py.
+# Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
-ABSL_DEP_MAPPING = {
+ABSL_TARGET_MAPPING = {
     "@com_google_absl//absl/base:core_headers": "absl::base",
     "@com_google_absl//absl/container:inlined_vector": "absl::inlined_vector",
     "@com_google_absl//absl/memory": "absl::memory",
@@ -24,11 +24,11 @@ ABSL_DEP_MAPPING = {
     "@com_google_absl//absl/types:span": "absl::span",
 }
 
-LLVM_DEP_MAPPING = {
+LLVM_TARGET_MAPPING = {
     "@llvm-project//llvm:support": "LLVMSupport",
 }
 
-MLIR_DEP_MAPPING = {
+MLIR_TARGET_MAPPING = {
     "@llvm-project//mlir:IR": "MLIRIR",
     "@llvm-project//mlir:Pass": "MLIRPass",
     "@llvm-project//mlir:StandardOps": "MLIRStandardOps",
@@ -38,30 +38,30 @@ MLIR_DEP_MAPPING = {
 }
 
 
-def convert_external_dep(dep):
-  """Converts an external (doesn't start with //iree) Bazel dep to Cmake.
+def convert_external_target(target):
+  """Converts an external (doesn't start with //iree) Bazel target to Cmake.
 
-  IREE deps are expected to follow a standard form between Bazel and CMake that
-  facilitates conversion. External dependencies *may* have their own patterns,
+  IREE targets are expected to follow a standard form between Bazel and CMake
+  that facilitates conversion. External targets *may* have their own patterns,
   or they may be purely special cases.
 
-  Multiple dependencies in Bazel may map to a single dependency in CMake.
-  A Bazel dependency may *not* map to multiple CMake dependencies.
+  Multiple target in Bazel may map to a single target in CMake.
+  A Bazel target may *not* map to multiple CMake targets.
 
   Returns:
-    The converted dep if it was successfully converted.
+    The converted target if it was successfully converted.
 
   Raises:
-    KeyError: No conversion was found for the dependency.
+    KeyError: No conversion was found for the target.
   """
-  if dep.startswith("@com_google_absl"):
-    return ABSL_DEP_MAPPING[dep]
-  if dep.startswith("@llvm-project//llvm"):
-    return LLVM_DEP_MAPPING[dep]
-  if dep.startswith("@llvm-project//mlir"):
-    return MLIR_DEP_MAPPING[dep]
-  if dep.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
-    # All Bazel dependencies map to a single CMake dependency.
+  if target.startswith("@com_google_absl"):
+    return ABSL_TARGET_MAPPING[target]
+  if target.startswith("@llvm-project//llvm"):
+    return LLVM_TARGET_MAPPING[target]
+  if target.startswith("@llvm-project//mlir"):
+    return MLIR_TARGET_MAPPING[target]
+  if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
+    # All Bazel targets map to a single CMake target.
     return "tensorflow::mlir_xla"
 
-  raise KeyError("No conversion found for dep '%s'" % dep)
+  raise KeyError("No conversion found for target '%s'" % target)

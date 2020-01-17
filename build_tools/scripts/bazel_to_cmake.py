@@ -26,7 +26,7 @@
 # Usage:
 #   python3 build_tools/scripts/bazel_to_cmake.py
 
-import bazel_to_cmake_deps
+import bazel_to_cmake_targets
 import os
 import textwrap
 
@@ -92,33 +92,34 @@ class BuildFileFunctions(object):
   def _convert_srcs_block(self, **kwargs):
     return self._convert_filelist_block("SRCS", kwargs.get("srcs"))
 
-  def _convert_dep(self, dep):
-    if dep.startswith(":"):
+  def _convert_target(self, target):
+    if target.startswith(":"):
       # Bazel package-relative `:logging` -> CMake absolute `iree::base::logging`
       package = os.path.dirname(self.converter.rel_build_file_path)
       package = package.replace(os.path.sep, "::")
-      dep.replace("::", "")
-      dep = package + dep
-    if not dep.startswith("//iree"):
-      # External dependency, call helper method for special case handling.
-      dep = bazel_to_cmake_deps.convert_external_dep(dep)
+      target.replace("::", "")
+      target = package + target
+    if not target.startswith("//iree"):
+      # External target, call helper method for special case handling.
+      target = bazel_to_cmake_targets.convert_external_target(target)
     else:
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
-      dep = dep.replace("//", "")  # iree/base:api
-      dep = dep.replace(":", "::")  # iree/base::api
-      dep = dep.replace("/", "::")  # iree::base::api
-    return dep
+      target = target.replace("//", "")  # iree/base:api
+      target = target.replace(":", "::")  # iree/base::api
+      target = target.replace("/", "::")  # iree::base::api
+    return target
 
   def _convert_deps_block(self, **kwargs):
     if not kwargs.get("deps"):
       return ""
 
     #  DEPS
-    #    dep1::target1
-    #    dep2::target2
+    #    package1::target1
+    #    package1::target2
+    #    package2::target
     deps = kwargs.get("deps")
-    deps_list = [self._convert_dep(dep) for dep in deps]
+    deps_list = [self._convert_target(dep) for dep in deps]
     deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
@@ -239,7 +240,7 @@ def convert_directory(directory_path):
       print("  Reason: `%s`" % (e,))
     except KeyError as e:
       print(
-          "Failed to convert %s. Missing a dep conversion in bazel_to_cmake_deps.py?"
+          "Failed to convert %s. Missing a conversion in bazel_to_cmake_targets.py?"
           % (rel_build_file_path))
       print("  Reason: `%s`" % (e,))
 
