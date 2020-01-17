@@ -15,13 +15,17 @@
 
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
+# TODO(scotttodd): Trim using a pattern absl::[name], with special cases
 ABSL_TARGET_MAPPING = {
     "@com_google_absl//absl/base:core_headers": "absl::base",
     "@com_google_absl//absl/container:inlined_vector": "absl::inlined_vector",
     "@com_google_absl//absl/memory": "absl::memory",
+    "@com_google_absl//absl/strings": "absl::strings",
     "@com_google_absl//absl/synchronization": "absl::synchronization",
     "@com_google_absl//absl/time": "absl::time",
+    "@com_google_absl//absl/types:optional": "absl::optional",
     "@com_google_absl//absl/types:span": "absl::span",
+    "@com_google_absl//absl/types:variant": "absl::variant",
 }
 
 LLVM_TARGET_MAPPING = {
