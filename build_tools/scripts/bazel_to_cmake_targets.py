@@ -28,8 +28,11 @@ LLVM_TARGET_MAPPING = {
     "@llvm-project//llvm:support": "LLVMSupport",
 }
 
+# TODO(scotttodd): Trim using a pattern MLIR[Name], as long as all match
 MLIR_TARGET_MAPPING = {
     "@llvm-project//mlir:IR": "MLIRIR",
+    "@llvm-project//mlir:MlirOptMain": "MLIROptMain",
+    "@llvm-project//mlir:Parser": "MLIRParser",
     "@llvm-project//mlir:Pass": "MLIRPass",
     "@llvm-project//mlir:StandardOps": "MLIRStandardOps",
     "@llvm-project//mlir:Support": "MLIRSupport",

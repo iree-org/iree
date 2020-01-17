@@ -97,9 +97,11 @@ class BuildFileFunctions(object):
       # Bazel package-relative `:logging` -> CMake absolute `iree::base::logging`
       package = os.path.dirname(self.converter.rel_build_file_path)
       package = package.replace(os.path.sep, "::")
-      target.replace("::", "")
-      target = package + target
-    if not target.startswith("//iree"):
+      if package.endswith(target):
+        target = package  # Omit target if it matches the package name
+      else:
+        target = package + ":" + target
+    elif not target.startswith("//iree"):
       # External target, call helper method for special case handling.
       target = bazel_to_cmake_targets.convert_external_target(target)
     else:
@@ -138,6 +140,16 @@ class BuildFileFunctions(object):
     # No mapping to CMake, ignore.
     pass
 
+  def filegroup(self, **kwargs):
+    # Not implemented yet. Might be a no-op, or may want to evaluate the srcs
+    # attribute and pass them along to any targets that depend on the filegroup.
+    # Cross-package dependencies and complicated globs could be hard to handle.
+    pass
+
+  def glob(self, *args):
+    # Not supported during conversion (yet?).
+    pass
+
   def cc_library(self, **kwargs):
     name_block = self._convert_name_block(**kwargs)
     hdrs_block = self._convert_hdrs_block(**kwargs)
@@ -171,6 +183,26 @@ class BuildFileFunctions(object):
     "srcs_block": srcs_block,
     "deps_block": deps_block,
     }
+
+  def cc_binary(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_srcs_block(**kwargs)
+    deps_block = self._convert_deps_block(**kwargs)
+
+    self.converter.body += """iree_cc_binary(
+%(name_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    "deps_block": deps_block,
+    }
+
+  def gentbl(self, **kwargs):
+    # Not implemented yet.
+    pass
+
+  def cc_embed_data(self, **kwargs):
+    # Not implemented yet.
+    pass
 
 
 class Converter(object):
@@ -237,12 +269,12 @@ def convert_directory(directory_path):
       print(
           "Failed to convert %s. Missing a rule handler in bazel_to_cmake.py?" %
           (rel_build_file_path))
-      print("  Reason: `%s`" % (e,))
+      print("  Reason: `%s: %s`" % (type(e).__name__, e))
     except KeyError as e:
       print(
           "Failed to convert %s. Missing a conversion in bazel_to_cmake_targets.py?"
           % (rel_build_file_path))
-      print("  Reason: `%s`" % (e,))
+      print("  Reason: `%s: %s`" % (type(e).__name__, e))
 
 
 def run():
