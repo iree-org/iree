@@ -17,7 +17,9 @@
 
 # TODO(scotttodd): Trim using a pattern absl::[name], with special cases
 ABSL_TARGET_MAPPING = {
+    "@com_google_absl//absl/algorithm": "absl::algorithm",
     "@com_google_absl//absl/base:core_headers": "absl::base",
+    "@com_google_absl//absl/container:flat_hash_set": "absl::flat_hash_set",
     "@com_google_absl//absl/container:inlined_vector": "absl::inlined_vector",
     "@com_google_absl//absl/memory": "absl::memory",
     "@com_google_absl//absl/strings": "absl::strings",
@@ -70,5 +72,8 @@ def convert_external_target(target):
   if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
     # All Bazel targets map to a single CMake target.
     return "tensorflow::mlir_xla"
+  if target.startswith("@org_tensorflow//tensorflow/lite/experimental/ruy"):
+    # All Bazel targets map to a single CMake target.
+    return "ruy"
 
   raise KeyError("No conversion found for target '%s'" % target)

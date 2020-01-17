@@ -177,8 +177,7 @@ class BuildFileFunctions(object):
     deps_block = self._convert_deps_block(**kwargs)
 
     self.converter.body += """iree_cc_test(
-%(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s
-)\n\n""" % {
+%(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
     "name_block": name_block,
     "hdrs_block": hdrs_block,
     "srcs_block": srcs_block,
@@ -274,7 +273,8 @@ def convert_directory_tree(root_directory_path):
 
 
 def convert_directory(directory_path):
-  global repo_root
+  if not os.path.isdir(directory_path):
+    raise FileNotFoundError("Cannot find directory '%s'" % (directory_path,))
 
   build_file_path = os.path.join(directory_path, BUILD_FILE_NAME)
   cmakelists_file_path = os.path.join(directory_path, CMAKELISTS_FILE_NAME)
@@ -283,6 +283,7 @@ def convert_directory(directory_path):
     # No Bazel BUILD file in this directory to convert, skip.
     return
 
+  global repo_root
   rel_build_file_path = os.path.relpath(build_file_path, repo_root)
   rel_cmakelists_file_path = os.path.relpath(cmakelists_file_path, repo_root)
   print("Converting %s to %s" % (rel_build_file_path, rel_cmakelists_file_path))
