@@ -14,7 +14,7 @@
 
 #include <tuple>
 
-#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"

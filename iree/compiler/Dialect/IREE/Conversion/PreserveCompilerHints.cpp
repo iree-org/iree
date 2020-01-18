@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/IR/MLIRContext.h"
