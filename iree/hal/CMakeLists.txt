@@ -46,7 +46,6 @@ iree_cc_library(
     ::device
     ::driver
     ::driver_registry
-    ::fence
     ::heap_buffer
     ::semaphore
     absl::span
@@ -148,7 +147,6 @@ iree_cc_library(
     "command_queue.h"
   DEPS
     ::command_buffer
-    ::fence
     ::semaphore
     absl::span
     absl::time
@@ -269,8 +267,8 @@ iree_cc_library(
     ::device
     ::device_placement
     ::executable_format
-    ::fence
     ::heap_buffer
+    ::semaphore
     absl::span
     absl::synchronization
     absl::time
@@ -392,17 +390,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    fence
-  HDRS
-    "fence.h"
-  DEPS
-    ::resource
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     heap_buffer
   HDRS
     "heap_buffer.h"
@@ -431,12 +418,40 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    resource_set
+  HDRS
+    "resource_set.h"
+  SRCS
+    "resource_set.cc"
+  DEPS
+    iree::base::ref_ptr
+    iree::hal::resource
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    resource_timeline
+  HDRS
+    "resource_timeline.h"
+  DEPS
+    iree::base::ref_ptr
+    iree::hal::resource
+    iree::hal::resource_set
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     semaphore
   HDRS
     "semaphore.h"
   DEPS
     ::resource
-    absl::variant
+    ::resource_set
+    absl::time
+    iree::base::status
+    iree::base::time
   PUBLIC
 )
 

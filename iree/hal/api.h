@@ -41,7 +41,6 @@ typedef struct iree_hal_driver iree_hal_driver_t;
 typedef struct iree_hal_executable iree_hal_executable_t;
 typedef struct iree_hal_executable_cache iree_hal_executable_cache_t;
 typedef struct iree_hal_executable_layout iree_hal_executable_layout_t;
-typedef struct iree_hal_fence iree_hal_fence_t;
 typedef struct iree_hal_semaphore iree_hal_semaphore_t;
 
 // Reference to a buffer's mapped memory.
@@ -1124,26 +1123,17 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_release(
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Fence
-//===----------------------------------------------------------------------===//
-
-#ifndef IREE_API_NO_PROTOTYPES
-
-// Retains the given |fence| for the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_fence_retain(iree_hal_fence_t* fence);
-
-// Releases the given |fence| from the caller.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_fence_release(iree_hal_fence_t* fence);
-
-#endif  // IREE_API_NO_PROTOTYPES
-
-//===----------------------------------------------------------------------===//
 // iree::hal::Semaphore
 //===----------------------------------------------------------------------===//
 
 #ifndef IREE_API_NO_PROTOTYPES
+
+// Creates a semaphore that can be used with command queues owned by this
+// device. To use the semaphores with other devices or instances they must
+// first be exported.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_create(
+    iree_hal_device_t* device, uint64_t initial_value,
+    iree_allocator_t allocator, iree_hal_semaphore_t** out_semaphore);
 
 // Retains the given |semaphore| for the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -1152,6 +1142,57 @@ iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore);
 // Releases the given |semaphore| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore);
+
+// Returns a permanent failure status if the |semaphore| is indicating an
+// asynchronous failure.
+//
+// Returns the status at the time the method is called without blocking and as
+// such is only valid after a semaphore has been signaled. The same failure
+// status will be returned regardless of when in the timeline the error
+// occurred.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_status(iree_hal_semaphore_t* semaphore);
+
+// Queries the current payload of the semaphore and stores the result in
+// |out_value|. As the payload is monotonically increasing it is guaranteed that
+// the value is at least equal to the previous result of a
+// iree_hal_semaphore_query call and coherent with any waits for a
+// specified value via iree_device_wait_all_semaphores.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_query(
+    iree_hal_semaphore_t* semaphore, uint64_t* out_value);
+
+// Signals the |semaphore| to the given payload value.
+// The call is ignored if the current payload value exceeds |new_value|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_signal(iree_hal_semaphore_t* semaphore, uint64_t new_value);
+
+// Signals the |semaphore| with a failure. The |status| will be returned from
+// iree_hal_semaphore_query and iree_hal_semaphore_signal for the lifetime
+// of the semaphore.
+IREE_API_EXPORT void IREE_API_CALL
+iree_hal_semaphore_fail(iree_hal_semaphore_t* semaphore, iree_status_t status);
+
+// Blocks the caller until the semaphore reaches or exceedes the specified
+// payload value or the |deadline_ns| elapses.
+//
+// Returns success if the wait is successful and the semaphore has at met or
+// exceeded the required payload value.
+//
+// Returns DEADLINE_EXCEEDED if the |deadline_ns| elapses without the semaphore
+// reaching the required value. If an asynchronous failure occured this will
+// return the failure status that was set immediately.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_wait_with_deadline(iree_hal_semaphore_t* semaphore,
+                                      uint64_t value, iree_time_t deadline_ns);
+
+// Blocks the caller until the semaphore reaches or exceedes the specified
+// payload value or the |timeout_ns| elapses.
+// A relative-time version of iree_hal_semaphore_wait_with_deadline using the
+// relative nanoseconds from the time the call is made.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_semaphore_wait_with_timeout(iree_hal_semaphore_t* semaphore,
+                                     uint64_t value,
+                                     iree_duration_t timeout_ns);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

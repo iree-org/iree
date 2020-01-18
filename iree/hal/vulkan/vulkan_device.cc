@@ -26,15 +26,14 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/fence.h"
+#include "iree/hal/semaphore.h"
 #include "iree/hal/vulkan/direct_command_buffer.h"
 #include "iree/hal/vulkan/direct_command_queue.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
-#include "iree/hal/vulkan/legacy_fence.h"
-#include "iree/hal/vulkan/native_binary_semaphore.h"
 #include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/native_event.h"
+#include "iree/hal/vulkan/native_timeline_semaphore.h"
 #include "iree/hal/vulkan/pipeline_cache.h"
 #include "iree/hal/vulkan/pipeline_executable_layout.h"
 #include "iree/hal/vulkan/status_util.h"
@@ -55,10 +54,10 @@ struct QueueFamilyInfo {
   uint32_t transfer_queue_count = 0;
 };
 
-// Finds the first queue in the listing (which is usually the driver-preferred)
-// that has all of the |required_queue_flags| and none of the
-// |excluded_queue_flags|.
-// Returns kInvalidQueueFamilyIndex if no matching queue is found.
+// Finds the first queue in the listing (which is usually the
+// driver-preferred) that has all of the |required_queue_flags| and none of
+// the |excluded_queue_flags|. Returns kInvalidQueueFamilyIndex if no matching
+// queue is found.
 uint32_t FindFirstQueueFamilyWithFlags(
     absl::Span<const VkQueueFamilyProperties> queue_family_properties,
     uint32_t required_queue_flags, uint32_t excluded_queue_flags) {
@@ -92,8 +91,8 @@ StatusOr<QueueFamilyInfo> SelectQueueFamilies(
   QueueFamilyInfo queue_family_info;
 
   // Try to find a dedicated compute queue (no graphics caps).
-  // Some may support both transfer and compute. If that fails then fallback to
-  // any queue that supports compute.
+  // Some may support both transfer and compute. If that fails then fallback
+  // to any queue that supports compute.
   queue_family_info.dispatch_index = FindFirstQueueFamilyWithFlags(
       queue_family_properties, VK_QUEUE_COMPUTE_BIT, VK_QUEUE_GRAPHICS_BIT);
   if (queue_family_info.dispatch_index == kInvalidQueueFamilyIndex) {
@@ -108,11 +107,11 @@ StatusOr<QueueFamilyInfo> SelectQueueFamilies(
       queue_family_properties[queue_family_info.dispatch_index].queueCount;
 
   // Try to find a dedicated transfer queue (no compute or graphics caps).
-  // Not all devices have one, and some have only a queue family for everything
-  // and possibly a queue family just for compute/etc. If that fails then
-  // fallback to any queue that supports transfer. Finally, if /that/ fails then
-  // we just won't create a transfer queue and instead use the compute queue for
-  // all operations.
+  // Not all devices have one, and some have only a queue family for
+  // everything and possibly a queue family just for compute/etc. If that
+  // fails then fallback to any queue that supports transfer. Finally, if
+  // /that/ fails then we just won't create a transfer queue and instead use
+  // the compute queue for all operations.
   queue_family_info.transfer_index = FindFirstQueueFamilyWithFlags(
       queue_family_properties, VK_QUEUE_TRANSFER_BIT,
       VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT);
@@ -129,8 +128,8 @@ StatusOr<QueueFamilyInfo> SelectQueueFamilies(
         queue_family_properties[queue_family_info.transfer_index].queueCount;
   }
 
-  // Ensure that we don't share the dispatch queues with transfer queues if that
-  // would put us over the queue count.
+  // Ensure that we don't share the dispatch queues with transfer queues if
+  // that would put us over the queue count.
   if (queue_family_info.dispatch_index == queue_family_info.transfer_index) {
     queue_family_info.transfer_queue_count = std::min(
         queue_family_properties[queue_family_info.dispatch_index].queueCount -
@@ -225,8 +224,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
                    SelectQueueFamilies(physical_device, syms));
 
   // Limit the number of queues we create (for now).
-  // We may want to allow this to grow, but each queue adds overhead and we need
-  // to measure to make sure we can effectively use them all.
+  // We may want to allow this to grow, but each queue adds overhead and we
+  // need to measure to make sure we can effectively use them all.
   queue_family_info.dispatch_queue_count =
       std::min(2u, queue_family_info.dispatch_queue_count);
   queue_family_info.transfer_queue_count =
@@ -237,9 +236,9 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   // Setup the queue info we'll be using.
   // Each queue here (created from within a family) will map to a HAL queue.
   //
-  // Note that we need to handle the case where we have transfer queues that are
-  // of the same queue family as the dispatch queues: Vulkan requires that all
-  // queues created from the same family are done in the same
+  // Note that we need to handle the case where we have transfer queues that
+  // are of the same queue family as the dispatch queues: Vulkan requires that
+  // all queues created from the same family are done in the same
   // VkDeviceQueueCreateInfo struct.
   DVLOG(1) << "Creating " << queue_family_info.dispatch_queue_count
            << " dispatch queue(s) in queue family "
@@ -310,8 +309,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
   // If we wanted to expose the pools through the HAL to allow the VM to more
-  // effectively manage them (pool per fiber, etc) we could, however I doubt the
-  // overhead of locking the pool will be even a blip.
+  // effectively manage them (pool per fiber, etc) we could, however I doubt
+  // the overhead of locking the pool will be even a blip.
   ASSIGN_OR_RETURN(auto dispatch_command_pool,
                    CreateTransientCommandPool(
                        logical_device, queue_family_info.dispatch_index));
@@ -341,16 +340,11 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   auto command_queues = CreateCommandQueues(
       device_info, logical_device, compute_queue_set, transfer_queue_set, syms);
 
-  // TODO(b/140141417): implement timeline semaphore fences and switch here.
-  ASSIGN_OR_RETURN(auto legacy_fence_pool,
-                   LegacyFencePool::Create(add_ref(logical_device)));
-
   return assign_ref(new VulkanDevice(
       std::move(driver), device_info, physical_device,
       std::move(logical_device), std::move(allocator),
       std::move(command_queues), std::move(dispatch_command_pool),
-      std::move(transfer_command_pool), std::move(legacy_fence_pool),
-      debug_capture_manager));
+      std::move(transfer_command_pool), debug_capture_manager));
 }
 
 // static
@@ -398,8 +392,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   // Create command pools for each queue family. If we don't have a transfer
   // queue then we'll ignore that one and just use the dispatch pool.
   // If we wanted to expose the pools through the HAL to allow the VM to more
-  // effectively manage them (pool per fiber, etc) we could, however I doubt the
-  // overhead of locking the pool will be even a blip.
+  // effectively manage them (pool per fiber, etc) we could, however I doubt
+  // the overhead of locking the pool will be even a blip.
   ASSIGN_OR_RETURN(auto dispatch_command_pool,
                    CreateTransientCommandPool(
                        device_handle, compute_queue_set.queue_family_index));
@@ -413,15 +407,11 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
   auto command_queues = CreateCommandQueues(
       device_info, device_handle, compute_queue_set, transfer_queue_set, syms);
 
-  // TODO(b/140141417): implement timeline semaphore fences and switch here.
-  ASSIGN_OR_RETURN(auto legacy_fence_pool,
-                   LegacyFencePool::Create(add_ref(device_handle)));
-
   return assign_ref(new VulkanDevice(
       std::move(driver), device_info, physical_device, std::move(device_handle),
       std::move(allocator), std::move(command_queues),
       std::move(dispatch_command_pool), std::move(transfer_command_pool),
-      std::move(legacy_fence_pool), /*debug_capture_manager=*/nullptr));
+      /*debug_capture_manager=*/nullptr));
 }
 
 VulkanDevice::VulkanDevice(
@@ -431,7 +421,6 @@ VulkanDevice::VulkanDevice(
     absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
     ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
     ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-    ref_ptr<LegacyFencePool> legacy_fence_pool,
     DebugCaptureManager* debug_capture_manager)
     : Device(device_info),
       driver_(std::move(driver)),
@@ -443,7 +432,6 @@ VulkanDevice::VulkanDevice(
           make_ref<DescriptorPoolCache>(add_ref(logical_device_))),
       dispatch_command_pool_(std::move(dispatch_command_pool)),
       transfer_command_pool_(std::move(transfer_command_pool)),
-      legacy_fence_pool_(std::move(legacy_fence_pool)),
       debug_capture_manager_(debug_capture_manager) {
   // Populate the queue lists based on queue capabilities.
   for (auto& command_queue : command_queues_) {
@@ -595,8 +583,8 @@ StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(
   IREE_TRACE_SCOPE0("VulkanDevice::CreateCommandBuffer");
 
   // Select the command pool to used based on the types of commands used.
-  // Note that we may not have a dedicated transfer command pool if there are no
-  // dedicated transfer queues.
+  // Note that we may not have a dedicated transfer command pool if there are
+  // no dedicated transfer queues.
   ref_ptr<VkCommandPoolHandle> command_pool;
   if (transfer_command_pool_ &&
       !AllBitsSet(command_categories, CommandCategory::kDispatch)) {
@@ -642,60 +630,98 @@ StatusOr<ref_ptr<Event>> VulkanDevice::CreateEvent() {
   return make_ref<NativeEvent>(add_ref(logical_device_), event_handle);
 }
 
-StatusOr<ref_ptr<BinarySemaphore>> VulkanDevice::CreateBinarySemaphore(
-    bool initial_value) {
-  IREE_TRACE_SCOPE0("VulkanDevice::CreateBinarySemaphore");
+StatusOr<ref_ptr<Semaphore>> VulkanDevice::CreateSemaphore(
+    uint64_t initial_value) {
+  IREE_TRACE_SCOPE0("VulkanDevice::CreateSemaphore");
+
+  VkSemaphoreTypeCreateInfo timeline_create_info;
+  timeline_create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+  timeline_create_info.pNext = nullptr;
+  timeline_create_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+  timeline_create_info.initialValue = initial_value;
 
   VkSemaphoreCreateInfo create_info;
   create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  create_info.pNext = nullptr;
-  create_info.flags = initial_value ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
+  create_info.pNext = &timeline_create_info;
+  create_info.flags = 0;
   VkSemaphore semaphore_handle = VK_NULL_HANDLE;
   VK_RETURN_IF_ERROR(syms()->vkCreateSemaphore(*logical_device_, &create_info,
                                                logical_device_->allocator(),
                                                &semaphore_handle));
 
-  return make_ref<NativeBinarySemaphore>(add_ref(logical_device_),
-                                         semaphore_handle);
+  return make_ref<NativeTimelineSemaphore>(add_ref(logical_device_),
+                                           semaphore_handle, initial_value);
 }
 
-StatusOr<ref_ptr<TimelineSemaphore>> VulkanDevice::CreateTimelineSemaphore(
-    uint64_t initial_value) {
-  IREE_TRACE_SCOPE0("VulkanDevice::CreateTimelineSemaphore");
-
-  // TODO(b/140141417): implement timeline semaphores.
-  return UnimplementedErrorBuilder(IREE_LOC)
-         << "Timeline semaphores not yet implemented";
+Status VulkanDevice::WaitAllSemaphores(
+    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+  IREE_TRACE_SCOPE0("VulkanDevice::WaitAllSemaphores");
+  return WaitSemaphores(semaphores, deadline, /*wait_flags=*/0);
 }
 
-StatusOr<ref_ptr<Fence>> VulkanDevice::CreateFence(uint64_t initial_value) {
-  IREE_TRACE_SCOPE0("VulkanDevice::CreateFence");
-
-  // TODO(b/140141417): implement timeline semaphore fences and switch here.
-  // NOTE: we'll want some magic factory so that we can cleanly compile out the
-  // legacy implementation and pool.
-
-  return make_ref<LegacyFence>(add_ref(legacy_fence_pool_), initial_value);
+StatusOr<int> VulkanDevice::WaitAnySemaphore(
+    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+  IREE_TRACE_SCOPE0("VulkanDevice::WaitAnySemaphore");
+  return WaitSemaphores(semaphores, deadline,
+                        /*wait_flags=*/VK_SEMAPHORE_WAIT_ANY_BIT);
 }
 
-Status VulkanDevice::WaitAllFences(absl::Span<const FenceValue> fences,
-                                   absl::Time deadline) {
-  IREE_TRACE_SCOPE0("VulkanDevice::WaitAllFences");
+Status VulkanDevice::WaitSemaphores(absl::Span<const SemaphoreValue> semaphores,
+                                    absl::Time deadline,
+                                    VkSemaphoreWaitFlags wait_flags) {
+  IREE_TRACE_SCOPE0("VulkanDevice::WaitSemaphores");
 
-  // TODO(b/140141417): implement timeline semaphore fences and switch here.
+  absl::InlinedVector<VkSemaphore, 4> semaphores(semaphores.size());
+  absl::InlinedVector<uint64_t, 4> values(semaphores.size());
+  for (int i = 0; i < semaphores.size(); ++i) {
+    semaphores[i] =
+        static_cast<NativeTimelineSemaphore*>(semaphores[i].semaphore)
+            ->handle();
+    values[i] = semaphores[i].value;
+  }
 
-  return LegacyFence::WaitForFences(logical_device_.get(), fences,
-                                    /*wait_all=*/true, deadline);
-}
+  VkSemaphoreWaitInfo wait_info;
+  wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+  wait_info.pNext = nullptr;
+  wait_info.flags = wait_flags;
+  wait_info.semaphoreCount = semaphores.size();
+  wait_info.pSemaphores = semaphores.data();
+  wait_info.pValues = values.data();
 
-StatusOr<int> VulkanDevice::WaitAnyFence(absl::Span<const FenceValue> fences,
-                                         absl::Time deadline) {
-  IREE_TRACE_SCOPE0("VulkanDevice::WaitAnyFence");
+  uint64_t timeout_nanos;
+  if (deadline == absl::InfiniteFuture()) {
+    timeout_nanos = UINT64_MAX;
+  } else if (deadline == absl::InfinitePast()) {
+    timeout_nanos = 0;
+  } else {
+    auto relative_nanos = absl::ToInt64Nanoseconds(deadline - absl::Now());
+    timeout_nanos = relative_nanos < 0 ? 0 : relative_nanos;
+  }
 
-  // TODO(b/140141417): implement timeline semaphore fences and switch here.
+  // NOTE: this may fail with a timeout (VK_TIMEOUT) or in the case of a
+  // device loss event may return either VK_SUCCESS *or* VK_ERROR_DEVICE_LOST.
+  // We may want to explicitly query for device loss after a successful wait
+  // to ensure we consistently return errors.
+  VkResult result =
+      syms()->vkWaitSemaphores(*logical_device_, &wait_info, timeout_nanos);
+  if (result == VK_ERROR_DEVICE_LOST) {
+    // Nothing we do now matters.
+    return VkResultToStatus(result);
+  }
 
-  return LegacyFence::WaitForFences(logical_device_.get(), fences,
-                                    /*wait_all=*/false, deadline);
+  // Regardless of the result we want to check if any of the semaphores
+  // completed. This ensures we clean up any resources we can as early as
+  // possible.
+  for (int i = 0; i < semaphores.size(); ++i) {
+    uint64_t current_value = 0;
+    VK_RETURN_IF_ERROR(syms()->vkGetSemaphoreCounterValue(
+        *logical_device_, semaphores[i], &current_value));
+    RETURN_IF_ERROR(
+        static_cast<NativeTimelineSemaphore*>(semaphores[i].semaphore)
+            ->AdvanceValue(current_value));
+  }
+
+  return OkStatus();
 }
 
 Status VulkanDevice::WaitIdle(absl::Time deadline) {
@@ -707,7 +733,7 @@ Status VulkanDevice::WaitIdle(absl::Time deadline) {
     return OkStatus();
   }
 
-  IREE_TRACE_SCOPE0("VulkanDevice::WaitIdle#Fences");
+  IREE_TRACE_SCOPE0("VulkanDevice::WaitIdle#Semaphores");
   for (auto& command_queue : command_queues_) {
     RETURN_IF_ERROR(command_queue->WaitIdle(deadline));
   }

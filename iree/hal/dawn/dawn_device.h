@@ -65,16 +65,12 @@ class DawnDevice final : public Device {
 
   StatusOr<ref_ptr<Event>> CreateEvent() override;
 
-  StatusOr<ref_ptr<BinarySemaphore>> CreateBinarySemaphore(
-      bool initial_value) override;
-  StatusOr<ref_ptr<TimelineSemaphore>> CreateTimelineSemaphore(
-      uint64_t initial_value) override;
+  StatusOr<ref_ptr<Semaphore>> CreateSemaphore(uint64_t initial_value) override;
 
-  StatusOr<ref_ptr<Fence>> CreateFence(uint64_t initial_value) override;
-  Status WaitAllFences(absl::Span<const FenceValue> fences,
-                       absl::Time deadline) override;
-  StatusOr<int> WaitAnyFence(absl::Span<const FenceValue> fences,
-                             absl::Time deadline) override;
+  Status WaitAllSemaphores(absl::Span<const SemaphoreValue> semaphores,
+                           absl::Time deadline) override;
+  StatusOr<int> WaitAnySemaphore(absl::Span<const SemaphoreValue> semaphores,
+                                 absl::Time deadline) override;
 
   Status WaitIdle(absl::Time deadline) override;
 

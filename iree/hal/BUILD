@@ -50,8 +50,9 @@ cc_library(
         ":device",
         ":driver",
         ":driver_registry",
-        ":fence",
+        ":executable_layout",
         ":heap_buffer",
+        ":resource_set",
         ":semaphore",
         "//iree/base:api",
         "//iree/base:api_util",
@@ -140,7 +141,6 @@ cc_library(
     hdrs = ["command_queue.h"],
     deps = [
         ":command_buffer",
-        ":fence",
         ":semaphore",
         "//iree/base:bitfield",
         "//iree/base:status",
@@ -214,8 +214,7 @@ cc_library(
         ":device_info",
         ":event",
         ":executable_cache",
-        ":executable_layout",
-        ":semaphore",
+
         "//iree/base:ref_ptr",
         "//iree/base:status",
         "//iree/base:time",
@@ -244,8 +243,8 @@ cc_library(
         ":device",
         ":device_placement",
         ":executable_format",
-        ":fence",
         ":heap_buffer",
+        ":semaphore",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:time",
@@ -343,15 +342,6 @@ cc_library(
 )
 
 cc_library(
-    name = "fence",
-    hdrs = ["fence.h"],
-    deps = [
-        ":resource",
-        "//iree/base:status",
-    ],
-)
-
-cc_library(
     name = "heap_buffer",
     srcs = ["heap_buffer.cc"],
     hdrs = ["heap_buffer.h"],
@@ -375,11 +365,34 @@ cc_library(
 )
 
 cc_library(
+    name = "resource_set",
+    srcs = ["resource_set.cc"],
+    hdrs = ["resource_set.h"],
+    deps = [
+        ":resource",
+        "//iree/base:ref_ptr",
+    ],
+)
+
+cc_library(
+    name = "resource_timeline",
+    hdrs = ["resource_timeline.h"],
+    deps = [
+        ":resource",
+        ":resource_set",
+        "//iree/base:ref_ptr",
+    ],
+)
+
+cc_library(
     name = "semaphore",
     hdrs = ["semaphore.h"],
     deps = [
         ":resource",
-        "@com_google_absl//absl/types:variant",
+        ":resource_set",
+        "//iree/base:status",
+        "//iree/base:time",
+        "@com_google_absl//absl/time",
     ],
 )
 

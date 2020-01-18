@@ -150,8 +150,7 @@ iree_cc_library(
     iree::hal::vulkan::direct_command_buffer
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::handle_util
-    iree::hal::vulkan::legacy_fence
-    iree::hal::vulkan::native_binary_semaphore
+    iree::hal::vulkan::native_timeline_semaphore
     iree::hal::vulkan::status_util
     Vulkan::Headers
   PUBLIC
@@ -237,47 +236,6 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    legacy_fence
-  HDRS
-    "legacy_fence.h"
-  SRCS
-    "legacy_fence.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
-  DEPS
-    absl::core_headers
-    absl::inlined_vector
-    absl::synchronization
-    absl::time
-    iree::base::intrusive_list
-    iree::base::ref_ptr
-    iree::base::status
-    iree::base::tracing
-    iree::hal::fence
-    iree::hal::vulkan::handle_util
-    iree::hal::vulkan::status_util
-    Vulkan::Headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    native_binary_semaphore
-  HDRS
-    "native_binary_semaphore.h"
-  SRCS
-    "native_binary_semaphore.cc"
-  COPTS
-    "-DVK_NO_PROTOTYPES"
-  DEPS
-    iree::hal::semaphore
-    iree::hal::vulkan::handle_util
-    Vulkan::Headers
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     native_event
   HDRS
     "native_event.h"
@@ -288,6 +246,22 @@ iree_cc_library(
   DEPS
     iree::hal::vulkan::handle_util
     iree::hal::event
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    native_timeline_semaphore
+  HDRS
+    "native_timeline_semaphore.h"
+  SRCS
+    "native_timeline_semaphore.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
+  DEPS
+    iree::hal::semaphore
+    iree::hal::vulkan::handle_util
     Vulkan::Headers
   PUBLIC
 )
@@ -456,16 +430,15 @@ iree_cc_library(
     iree::hal::debug_capture_manager
     iree::hal::device
     iree::hal::driver
-    iree::hal::fence
+    iree::hal::semaphore
     iree::hal::vulkan::descriptor_pool_cache
     iree::hal::vulkan::direct_command_buffer
     iree::hal::vulkan::direct_command_queue
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::extensibility_util
     iree::hal::vulkan::handle_util
-    iree::hal::vulkan::legacy_fence
-    iree::hal::vulkan::native_binary_semaphore
     iree::hal::vulkan::native_event
+    iree::hal::vulkan::native_timeline_semaphore
     iree::hal::vulkan::pipeline_cache
     iree::hal::vulkan::pipeline_executable_layout
     iree::hal::vulkan::status_util

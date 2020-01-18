@@ -81,7 +81,7 @@ cc_library(
         "//iree/hal:command_buffer_validation",
         "//iree/hal:command_queue",
         "//iree/hal:device",
-        "//iree/hal:fence",
+        "//iree/hal:semaphore",
         "//iree/hal/host:async_command_queue",
         "//iree/hal/host:host_descriptor_set",
         "//iree/hal/host:host_event",

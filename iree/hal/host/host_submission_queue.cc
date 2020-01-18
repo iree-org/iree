@@ -21,6 +21,7 @@
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 
+
 namespace iree {
 namespace hal {
 
@@ -94,22 +95,15 @@ HostSubmissionQueue::~HostSubmissionQueue() = default;
 
 bool HostSubmissionQueue::IsBatchReady(const PendingBatch& batch) const {
   for (auto& wait_point : batch.wait_semaphores) {
-    if (wait_point.index() == 0) {
-      auto* binary_semaphore =
-          reinterpret_cast<HostBinarySemaphore*>(absl::get<0>(wait_point));
-      if (!binary_semaphore->is_signaled()) {
-        return false;
-      }
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
+    auto* semaphore = reinterpret_cast<HostSemaphore*>(wait_point.first);
+    if (!semaphore->HasReached(wait_point.second)) {
       return false;
     }
   }
   return true;
 }
 
-Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches,
-                                    FenceValue fence) {
+Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches) {
   IREE_TRACE_SCOPE0("HostSubmissionQueue::Enqueue");
 
   if (has_shutdown_) {
@@ -124,30 +118,19 @@ Status HostSubmissionQueue::Enqueue(absl::Span<const SubmissionBatch> batches,
   // and are consistent across HAL implementations.
   for (auto& batch : batches) {
     for (auto& semaphore_value : batch.wait_semaphores) {
-      if (semaphore_value.index() == 0) {
-        auto* binary_semaphore = reinterpret_cast<HostBinarySemaphore*>(
-            absl::get<0>(semaphore_value));
-        RETURN_IF_ERROR(binary_semaphore->BeginWaiting());
-      } else {
-        // TODO(b/140141417): implement timeline semaphores.
-        return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-      }
+      auto* semaphore = reinterpret_cast<HostSemaphore*>(semaphore_value.first);
+      // DO NOT SUBMIT
+      RETURN_IF_ERROR(binary_semaphore->BeginWaiting());
     }
     for (auto& semaphore_value : batch.signal_semaphores) {
-      if (semaphore_value.index() == 0) {
-        auto* binary_semaphore = reinterpret_cast<HostBinarySemaphore*>(
-            absl::get<0>(semaphore_value));
-        RETURN_IF_ERROR(binary_semaphore->BeginSignaling());
-      } else {
-        // TODO(b/140141417): implement timeline semaphores.
-        return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-      }
+      auto* semaphore = reinterpret_cast<HostSemaphore*>(semaphore_value.first);
+      // DO NOT SUBMIT
+      RETURN_IF_ERROR(binary_semaphore->BeginSignaling());
     }
   }
 
   // Add to list - order does not matter as Process evaluates semaphores.
   auto submission = absl::make_unique<Submission>();
-  submission->fence = std::move(fence);
   submission->pending_batches.resize(batches.size());
   for (int i = 0; i < batches.size(); ++i) {
     submission->pending_batches[i] = PendingBatch{
@@ -196,7 +179,7 @@ Status HostSubmissionQueue::ProcessBatches(ExecuteFn execute_fn) {
           // break out of the loop and try from the first submission again.
           if (submission->pending_batches.empty()) {
             // All work for this submission completed successfully. Signal the
-            // fence and remove the submission from the list.
+            // semaphore and remove the submission from the list.
             RETURN_IF_ERROR(CompleteSubmission(submission, OkStatus()));
             list_.take(submission).reset();
           }
@@ -230,14 +213,9 @@ Status HostSubmissionQueue::ProcessBatch(const PendingBatch& batch,
 
   // Complete the waits on all semaphores and reset them.
   for (auto& semaphore_value : batch.wait_semaphores) {
-    if (semaphore_value.index() == 0) {
-      auto* binary_semaphore =
-          reinterpret_cast<HostBinarySemaphore*>(absl::get<0>(semaphore_value));
-      RETURN_IF_ERROR(binary_semaphore->EndWaiting());
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-    }
+    auto* semaphore = reinterpret_cast<HostSemaphore*>(semaphore_value.first);
+    // DO NOT SUBMIT
+    RETURN_IF_ERROR(binary_semaphore->EndWaiting());
   }
 
   // Let the caller handle execution of the command buffers.
@@ -245,14 +223,9 @@ Status HostSubmissionQueue::ProcessBatch(const PendingBatch& batch,
 
   // Signal all semaphores to allow them to unblock waiters.
   for (auto& semaphore_value : batch.signal_semaphores) {
-    if (semaphore_value.index() == 0) {
-      auto* binary_semaphore =
-          reinterpret_cast<HostBinarySemaphore*>(absl::get<0>(semaphore_value));
-      RETURN_IF_ERROR(binary_semaphore->EndSignaling());
-    } else {
-      // TODO(b/140141417): implement timeline semaphores.
-      return UnimplementedErrorBuilder(IREE_LOC) << "Timeline semaphores NYI";
-    }
+    auto* semaphore = reinterpret_cast<HostSemaphore*>(semaphore_value.first);
+    // DO NOT SUBMIT
+    RETURN_IF_ERROR(binary_semaphore->EndSignaling());
   }
 
   return OkStatus();
@@ -265,14 +238,6 @@ Status HostSubmissionQueue::CompleteSubmission(Submission* submission,
   // It's safe to drop any remaining batches - their semaphores will never be
   // signaled but that's fine as we should be the only thing relying on them.
   submission->pending_batches.clear();
-
-  // Signal the fence.
-  auto* fence = static_cast<HostFence*>(submission->fence.first);
-  if (status.ok()) {
-    RETURN_IF_ERROR(fence->Signal(submission->fence.second));
-  } else {
-    RETURN_IF_ERROR(fence->Fail(std::move(status)));
-  }
 
   return OkStatus();
 }

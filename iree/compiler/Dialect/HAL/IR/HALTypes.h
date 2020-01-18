@@ -163,15 +163,6 @@ class ExecutableLayoutType : public Type::TypeBase<ExecutableLayoutType, Type> {
   }
 };
 
-class FenceType : public Type::TypeBase<FenceType, Type> {
- public:
-  using Base::Base;
-  static FenceType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::Fence);
-  }
-  static bool kindof(unsigned kind) { return kind == TypeKind::Fence; }
-};
-
 class RingBufferType : public Type::TypeBase<RingBufferType, Type> {
  public:
   using Base::Base;

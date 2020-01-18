@@ -122,7 +122,7 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
   ASSERT_OK(command_queue->WaitIdle());
 
   // Should have already expired.
-  ASSERT_OK_AND_ASSIGN(uint64_t value, fence.QueryValue());
+  ASSERT_OK_AND_ASSIGN(uint64_t value, fence.Query());
   ASSERT_EQ(1u, value);
 }
 
@@ -154,9 +154,9 @@ TEST_F(AsyncCommandQueueTest, WaitIdleAndProgress) {
   ASSERT_OK(command_queue->WaitIdle());
 
   // Both should have already expired.
-  ASSERT_OK_AND_ASSIGN(uint64_t value_0, fence_0.QueryValue());
+  ASSERT_OK_AND_ASSIGN(uint64_t value_0, fence_0.Query());
   ASSERT_EQ(1u, value_0);
-  ASSERT_OK_AND_ASSIGN(uint64_t value_1, fence_1.QueryValue());
+  ASSERT_OK_AND_ASSIGN(uint64_t value_1, fence_1.Query());
   ASSERT_EQ(1u, value_1);
 }
 

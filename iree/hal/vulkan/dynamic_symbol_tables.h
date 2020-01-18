@@ -286,6 +286,13 @@ namespace vulkan {
   DEV_PFN(REQUIRED, vkUpdateDescriptorSets)                             \
   DEV_PFN(REQUIRED, vkWaitForFences)                                    \
                                                                         \
+  DEV_PFN(OPTIONAL, vkGetSemaphoreCounterValue)                         \
+  DEV_PFN(OPTIONAL, vkGetSemaphoreCounterValueKHR)                      \
+  DEV_PFN(OPTIONAL, vkWaitSemaphores)                                   \
+  DEV_PFN(OPTIONAL, vkWaitSemaphoresKHR)                                \
+  DEV_PFN(OPTIONAL, vkSignalSemaphore)                                  \
+  DEV_PFN(OPTIONAL, vkSignalSemaphoreKHR)                               \
+                                                                        \
   INS_PFN(OPTIONAL, vkCreateDebugReportCallbackEXT)                     \
   INS_PFN(OPTIONAL, vkCreateDebugUtilsMessengerEXT)                     \
   INS_PFN(EXCLUDED, vkCreateDisplayPlaneSurfaceKHR)                     \

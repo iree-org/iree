@@ -12,21 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/hal/vulkan/native_binary_semaphore.h"
+#ifndef IREE_HAL_RESOURCE_SET_H_
+#define IREE_HAL_RESOURCE_SET_H_
+
+#include "iree/base/ref_ptr.h"
+#include "iree/base/status.h"
+#include "iree/hal/resource.h"
 
 namespace iree {
 namespace hal {
-namespace vulkan {
 
-NativeBinarySemaphore::NativeBinarySemaphore(
-    ref_ptr<VkDeviceHandle> logical_device, VkSemaphore handle)
-    : logical_device_(std::move(logical_device)), handle_(handle) {}
+// A set of resources that are treated as a single reference within a timeline.
+// All resources inserted into the set will be retained by the set.
+class ResourceSet : public RefObject<ResourceSet> {
+ public:
+  ResourceSet();
+  ~ResourceSet();
 
-NativeBinarySemaphore::~NativeBinarySemaphore() {
-  logical_device_->syms()->vkDestroySemaphore(*logical_device_, handle_,
-                                              logical_device_->allocator());
-}
+  // Inserts resources into the set.
+  Status Insert(ref_ptr<Resource> resource);
 
-}  // namespace vulkan
+  // Unions this set with another resource set. The |other_set| will not be
+  // modified.
+  Status Union(const ResourceSet& other_set);
+};
+
 }  // namespace hal
 }  // namespace iree
+
+#endif  // IREE_HAL_RESOURCE_SET_H_

@@ -129,36 +129,6 @@ class HALModuleState final {
         reinterpret_cast<iree_hal_device_t*>(shared_device_.get()));
   }
 
-  Status ExDeferRelease(absl::optional<vm::opaque_ref> operand) {
-    if (operand.has_value()) {
-      deferred_releases_.push_back({0});
-      iree_vm_ref_move(&operand.value(), &deferred_releases_.back());
-    }
-    return OkStatus();
-  }
-
-  Status ExSubmitAndWait(vm::ref<iree_hal_device_t> device,
-                         vm::ref<iree_hal_command_buffer_t> command_buffer) {
-    IREE_TRACE_SCOPE0("HALModuleState::ExSubmitAndWait");
-
-    auto* device_ptr = reinterpret_cast<Device*>(device.get());
-    auto* queue = device_ptr->dispatch_queues().front();
-    ASSIGN_OR_RETURN(auto fence, device_ptr->CreateFence(0u));
-    SubmissionBatch batch;
-    CommandBuffer* command_buffers[1] = {
-        reinterpret_cast<CommandBuffer*>(command_buffer.get())};
-    batch.command_buffers = absl::MakeConstSpan(command_buffers);
-    RETURN_IF_ERROR(queue->Submit(batch, {fence.get(), 1u}));
-    RETURN_IF_ERROR(queue->WaitIdle());
-
-    for (auto& ref : deferred_releases_) {
-      iree_vm_ref_release(&ref);
-    }
-    deferred_releases_.clear();
-
-    return OkStatus();
-  }
-
   //===--------------------------------------------------------------------===//
   // iree::hal::Allocator
   //===--------------------------------------------------------------------===//
@@ -765,9 +735,6 @@ class HALModuleState final {
 
 static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
     vm::MakeNativeFunction("ex.shared_device", &HALModuleState::ExSharedDevice),
-    vm::MakeNativeFunction("ex.defer_release", &HALModuleState::ExDeferRelease),
-    vm::MakeNativeFunction("ex.submit_and_wait",
-                           &HALModuleState::ExSubmitAndWait),
 
     vm::MakeNativeFunction("allocator.compute_size",
                            &HALModuleState::AllocatorComputeSize),
