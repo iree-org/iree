@@ -15,35 +15,30 @@
 
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
-# TODO(scotttodd): Trim using a pattern absl::[name], with special cases
-ABSL_TARGET_MAPPING = {
-    "@com_google_absl//absl/algorithm": "absl::algorithm",
-    "@com_google_absl//absl/base:core_headers": "absl::base",
-    "@com_google_absl//absl/container:flat_hash_set": "absl::flat_hash_set",
-    "@com_google_absl//absl/container:inlined_vector": "absl::inlined_vector",
-    "@com_google_absl//absl/memory": "absl::memory",
-    "@com_google_absl//absl/strings": "absl::strings",
-    "@com_google_absl//absl/synchronization": "absl::synchronization",
-    "@com_google_absl//absl/time": "absl::time",
-    "@com_google_absl//absl/types:optional": "absl::optional",
-    "@com_google_absl//absl/types:span": "absl::span",
-    "@com_google_absl//absl/types:variant": "absl::variant",
+ABSL_EXPLICIT_TARGET_MAPPING = {
+    "@com_google_absl//absl/flags:flag": "absl::flags",
+    "@com_google_absl//absl/flags:parse": "absl::flags_parse",
 }
+
+
+def _convert_absl_target(target):
+  if target in ABSL_EXPLICIT_TARGET_MAPPING:
+    return ABSL_EXPLICIT_TARGET_MAPPING[target]
+
+  # Default to a pattern substitution approach.
+  # Take "absl::" and append the name part of the full target identifier, e.g.
+  #   "@com_google_absl//absl/memory"         -> "absl::memory"
+  #   "@com_google_absl//absl/types:optional" -> "absl::optional"
+  #   "@com_google_absl//absl/types:span"     -> "absl::span"
+  if ":" in target:
+    target_name = target.rsplit(":")[-1]
+  else:
+    target_name = target.rsplit("/")[-1]
+  return "absl::" + target_name
+
 
 LLVM_TARGET_MAPPING = {
     "@llvm-project//llvm:support": "LLVMSupport",
-}
-
-# TODO(scotttodd): Trim using a pattern MLIR[Name], as long as all match
-MLIR_TARGET_MAPPING = {
-    "@llvm-project//mlir:IR": "MLIRIR",
-    "@llvm-project//mlir:MlirOptMain": "MLIROptMain",
-    "@llvm-project//mlir:Parser": "MLIRParser",
-    "@llvm-project//mlir:Pass": "MLIRPass",
-    "@llvm-project//mlir:StandardOps": "MLIRStandardOps",
-    "@llvm-project//mlir:Support": "MLIRSupport",
-    "@llvm-project//mlir:TransformUtils": "MLIRTransformUtils",
-    "@llvm-project//mlir:Transforms": "MLIRTransforms",
 }
 
 VULKAN_HEADERS_MAPPING = {
@@ -52,6 +47,22 @@ VULKAN_HEADERS_MAPPING = {
     "@vulkan_headers//:vulkan_headers": "Vulkan::Headers",
     "@vulkan_headers//:vulkan_headers_no_prototypes": "Vulkan::Headers",
 }
+
+MLIR_EXPLICIT_TARGET_MAPPING = {
+    "@llvm-project//mlir:StandardDialectRegistration": "MLIRStandardOps",
+    "@llvm-project//mlir:MlirOptMain": "MLIROptMain",
+}
+
+
+def _convert_mlir_target(target):
+  if target in MLIR_EXPLICIT_TARGET_MAPPING:
+    return MLIR_EXPLICIT_TARGET_MAPPING[target]
+
+  # Default to a pattern substitution approach.
+  # Take "MLIR" and append the name part of the full target identifier, e.g.
+  #   "@llvm-project//mlir:IR"   -> "MLIRIR"
+  #   "@llvm-project//mlir:Pass" -> "MLIRPass"
+  return "MLIR" + target.rsplit(":")[-1]
 
 
 def convert_external_target(target):
@@ -71,11 +82,11 @@ def convert_external_target(target):
     KeyError: No conversion was found for the target.
   """
   if target.startswith("@com_google_absl"):
-    return ABSL_TARGET_MAPPING[target]
+    return _convert_absl_target(target)
   if target.startswith("@llvm-project//llvm"):
     return LLVM_TARGET_MAPPING[target]
   if target.startswith("@llvm-project//mlir"):
-    return MLIR_TARGET_MAPPING[target]
+    return _convert_mlir_target(target)
   if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
     # All Bazel targets map to a single CMake target.
     return "tensorflow::mlir_xla"
