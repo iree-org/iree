@@ -103,6 +103,8 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-run-mlir
+    OUT
+      iree-run-mlir
     SRCS
       "run_mlir_main.cc"
     DEPS
@@ -143,7 +145,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Target::LegacyInterpreter
       iree::compiler::Dialect::HAL::Target::VulkanSPIRV
       iree::hal::vulkan::vulkan_driver_module
-    )
+  )
+  add_executable(iree-run-mlir ALIAS iree_tools_iree-run-mlir)
 
   iree_cc_library(
     NAME
