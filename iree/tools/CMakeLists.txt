@@ -95,8 +95,6 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       iree::tools::iree_opt_library
       MLIROptMain
-    LINKOPTS
-      "-lpthread"
   )
   add_executable(iree-opt ALIAS iree_tools_iree-opt)
 
