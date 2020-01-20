@@ -100,35 +100,50 @@ if(${IREE_BUILD_COMPILER})
   )
   add_executable(iree-opt ALIAS iree_tools_iree-opt)
 
-# TODO(mabre): Get this working
-#  iree_cc_binary(
-#    NAME
-#      iree-run-mlir
-#    SRCS
-#      "run_mlir_main.cc"
-#    DEPS
-#      absl::flags
-#      absl::strings
-#      # TODO(marbre): Fix problems with property "ALWAYSLINK".
-#      #iree::base::source_location
-#      iree::rt
-#      LLVMSupport
-#      MLIRIR
-#      MLIRParser
-#      MLIRSupport
-#      iree::base::init
-#      iree::base::status
-#      iree::compiler::Translation::Interpreter
-#      iree::compiler::Translation::SPIRV::LinalgToSPIRV
-#      iree::compiler::Translation::SPIRV::XLAToSPIRV
-#      iree::compiler::Translation::IREEVM
-#      iree::hal::buffer_view_string_util
-#      iree::hal::driver_registry
-#      # TODO(marbre)_ Add deps
-#      # PLATFORM_VULKAN_DEPS
-#      iree::hal::interpreter::interpreter_driver_module
-#      iree::hal::vulkan::vulkan_driver_module
-#    )
+  iree_cc_binary(
+    NAME
+      iree-run-mlir
+    SRCS
+      "run_mlir_main.cc"
+    DEPS
+      absl::flags
+      absl::strings
+      iree::base::api
+      iree::base::api_util
+      iree::base::shaped_buffer
+      iree::base::shaped_buffer_string_util
+      iree::base::signature_mangle
+      iree::base::source_location
+      iree::compiler::Dialect::Flow::Conversion
+      iree::compiler::Dialect::Flow::Transforms
+      iree::compiler::Dialect::HAL::Conversion
+      iree::compiler::Dialect::HAL::Transforms
+      iree::compiler::Dialect::IREE::Transforms
+      iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Dialect::VM::Transforms
+      iree::hal::api
+      iree::modules::hal
+      iree::vm
+      iree::vm::bytecode_module
+      LLVMSupport
+      MLIRIR
+      MLIRParser
+      MLIRPass
+      MLIRSPIRV
+      MLIRSPIRVSerialization
+      MLIRSPIRVTransforms
+      MLIRSupport
+      iree::base::init
+      iree::base::status
+      iree::compiler::Translation::IREEVM
+      iree::hal::buffer_view_string_util
+      iree::hal::driver_registry
+      # TODO(marbre): Add PLATFORM_VULKAN_DEPS
+      # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
+      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
+      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+      iree::hal::vulkan::vulkan_driver_module
+    )
 
   iree_cc_library(
     NAME
