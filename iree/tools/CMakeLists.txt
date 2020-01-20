@@ -152,11 +152,11 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRV
       MLIRSPIRVSerialization
       MLIRSPIRVTransforms
+      MLIRSupport
       MLIRStandardOps
       MLIRTransforms
       MLIRTranslateClParser
       MLIRTranslation
-      MLIRSupport
       MLIRVectorOps
       tensorflow::mlir_xla
     ALWAYSLINK
