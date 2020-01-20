@@ -49,54 +49,12 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
 
-  # Additional libraries containing statically registered functions/flags, which
-  # should always be linked in to binaries.
-  set(_ALWAYSLINK_LIBS_IREE_TRANSLATE
-    MLIRAffineOps
-    MLIRAnalysis
-    MLIREDSC
-    MLIRParser
-    MLIRPass
-    MLIRSPIRV
-    MLIRSPIRVSerialization
-    MLIRSPIRVTransforms
-    MLIRStandardOps
-    MLIRTransforms
-    MLIRTranslation
-    MLIRSupport
-    MLIRVectorOps
-    tensorflow::mlir_xla
-  )
-
-  set(_ALWAYSLINK_LIBS_IREE_OPT
-    MLIRAffineOps
-    MLIRLinalgOps
-    MLIRStandardOps
-    MLIRSPIRV
-    MLIRSPIRVSerialization
-    MLIRSPIRVTransforms
-    MLIRTranslation
-    MLIROptMain
-    tensorflow::mlir_xla
-  )
-
-  foreach(LIB IN LISTS _ALWAYSLINK_LIBS_IREE_TRANSLATE _ALWAYSLINK_LIBS_IREE_OPT)
-    # Aliased targets are always in-project, so we control them and can set
-    # ALWAYSLINK on them directly.
-    # TODO(scotttodd): add the ALWAYSLINK property to MLIR libraries elsewhere
-    get_target_property(_ALIASED_TARGET ${LIB} ALIASED_TARGET)
-    if(NOT _ALIASED_TARGET)
-      set_property(TARGET ${LIB} PROPERTY ALWAYSLINK 1)
-    endif()
-  endforeach(LIB)
-
   iree_cc_library(
     NAME
       iree_opt_library
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-opt/mlir-opt.cpp"
     DEPS
-      ${_ALWAYSLINK_LIBS_IREE_OPT}
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::Flow::Analysis
@@ -118,6 +76,15 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::SPIRV::LinalgToSPIRV
       LLVMSupport
+      MLIRAffineOps
+      MLIRLinalgOps
+      MLIRStandardOps
+      MLIRSPIRV
+      MLIRSPIRVSerialization
+      MLIRSPIRVTransforms
+      MLIRTranslation
+      MLIROptMain
+      tensorflow::mlir_xla
     ALWAYSLINK
   )
 
@@ -169,7 +136,6 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "translate_main.cc"
     DEPS
-      ${_ALWAYSLINK_LIBS_IREE_TRANSLATE}
       iree::compiler::Dialect::Flow::Conversion
       iree::compiler::Dialect::HAL::Conversion
       iree::compiler::Dialect::HAL::Target::LegacyInterpreter
@@ -178,7 +144,21 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       LLVMSupport
+      MLIRAffineOps
+      MLIRAnalysis
+      MLIREDSC
+      MLIRParser
+      MLIRPass
+      MLIRSPIRV
+      MLIRSPIRVSerialization
+      MLIRSPIRVTransforms
+      MLIRStandardOps
+      MLIRTransforms
       MLIRTranslateClParser
+      MLIRTranslation
+      MLIRSupport
+      MLIRVectorOps
+      tensorflow::mlir_xla
     ALWAYSLINK
   )
 
