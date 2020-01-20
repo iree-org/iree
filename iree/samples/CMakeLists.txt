@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(marbre): Add once custom-translate runs without errors
-#add_subdirectory(custom_mdules)
-
+# TODO(marbre): Add once iree-translate and custom-translate run without errors
+#add_subdirectory(custom_modules)
 #add_subdirectory(simple_embedding)
