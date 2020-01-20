@@ -19,6 +19,7 @@ set(_ALWAYSLINK_LIBS
   MLIRAffineOps
   MLIRAnalysis
   MLIREDSC
+  MLIRIR
   MLIRParser
   MLIRPass
   MLIRSPIRV

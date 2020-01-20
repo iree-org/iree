@@ -164,6 +164,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRAnalysis
       MLIREDSC
       MLIRParser
+      MLIRIR
       MLIRPass
       MLIRSPIRV
       MLIRSPIRVSerialization
