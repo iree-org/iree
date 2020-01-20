@@ -30,7 +30,6 @@ set(_ALWAYSLINK_LIBS
   MLIRSupport
   MLIRVectorOps
   MLIRLinalgOps
-  MLIROptMain
   tensorflow::mlir_xla
 )
 

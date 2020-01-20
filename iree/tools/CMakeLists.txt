@@ -83,7 +83,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVSerialization
       MLIRSPIRVTransforms
       MLIRTranslation
-      MLIROptMain
       tensorflow::mlir_xla
     ALWAYSLINK
   )
@@ -95,6 +94,7 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       iree::tools::iree_opt_library
+      MLIROptMain
     LINKOPTS
       "-lpthread"
   )
