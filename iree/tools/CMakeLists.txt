@@ -155,6 +155,7 @@ if(${IREE_BUILD_COMPILER})
 #      iree::compiler::Translation::SPIRV::LinalgToSPIRV
 #      iree::compiler::Translation::SPIRV::XLAToSPIRV
 #      iree::compiler::Translation::IREEVM
+#      iree::compiler::Translation::XLAToLinalg
 #      iree::hal::buffer_view_string_util
 #      iree::hal::driver_registry
 #      # TODO(marbre)_ Add deps

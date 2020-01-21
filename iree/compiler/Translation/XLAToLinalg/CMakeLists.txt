@@ -12,33 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Interpreter)
-add_subdirectory(SPIRV)
-add_subdirectory(XLAToLinalg)
-
 iree_cc_library(
   NAME
-    IREEVM
+    XLAToLinalg
   HDRS
-    "IREEVM.h"
+    "MapHloToScalarOp.h"
   SRCS
-    "IREEVM.cpp"
+    "XLAToLinalg.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::IREE::Transforms
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Transforms
     LLVMSupport
     MLIRIR
+    MLIRLinalgOps
     MLIRPass
-    MLIRStandardOps
+    MLIRStandarOps
     MLIRSupport
-    MLIRTranslation
+    MLIRTransforms
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
