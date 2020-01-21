@@ -24,7 +24,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgOps
     MLIRPass
-    MLIRStandarOps
+    MLIRStandardOps
     MLIRSupport
     MLIRTransforms
     tensorflow::mlir_xla

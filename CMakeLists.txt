@@ -182,3 +182,6 @@ add_subdirectory(iree/tools)
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
 endif()
+
+# Set ALWAYSLINK property after all targets have been created
+include(iree_alwayslink)

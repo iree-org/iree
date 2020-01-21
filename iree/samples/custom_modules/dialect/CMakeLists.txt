@@ -66,6 +66,8 @@ iree_cc_embed_data(
 iree_cc_binary(
   NAME
     custom-opt
+  OUT
+    custom-opt
   DEPS
     iree::samples::custom_modules::dialect
     iree::tools::iree_opt_library
