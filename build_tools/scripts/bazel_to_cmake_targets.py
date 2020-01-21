@@ -49,6 +49,9 @@ VULKAN_HEADERS_MAPPING = {
 }
 
 MLIR_EXPLICIT_TARGET_MAPPING = {
+    "@llvm-project//mlir:AffineDialectRegistration": "MLIRAffineOps",
+    "@llvm-project//mlir:LinalgDialectRegistration": "MLIRLinalgOps",
+    "@llvm-project//mlir:SPIRVDialectRegistration": "MLIRSPIRV",
     "@llvm-project//mlir:StandardDialectRegistration": "MLIRStandardOps",
     "@llvm-project//mlir:MlirOptMain": "MLIROptMain",
 }
