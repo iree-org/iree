@@ -35,12 +35,7 @@ set(_ALWAYSLINK_LIBS
 )
 
 foreach(LIB ${_ALWAYSLINK_LIBS})
-# Aliased targets are always in-project, so we control them and can set
-# ALWAYSLINK on them directly.
-if(TARGET LIB)
-  get_target_property(_ALIASED_TARGET ${LIB} ALIASED_TARGET)
-  if(NOT _ALIASED_TARGET)
+  if(TARGET LIB)
     set_property(TARGET ${LIB} PROPERTY ALWAYSLINK 1)
   endif()
-endif()
 endforeach(LIB)
