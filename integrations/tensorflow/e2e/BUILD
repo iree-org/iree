@@ -36,6 +36,7 @@ package(
     )
     for name in [
         "control_flow_test",
+        "dynamic_mlp_test",
         "exported_names_test",
         "keras_lstm_test",
         "simple_stateful_test",
