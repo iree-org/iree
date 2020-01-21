@@ -86,6 +86,10 @@ def convert_external_target(target):
   """
   if target.startswith("@com_google_absl"):
     return _convert_absl_target(target)
+  if target == "@com_google_benchmark//:benchmark":
+    return "benchmark"
+  if target == "@com_google_googletest//:gtest":
+    return "gtest"
   if target.startswith("@llvm-project//llvm"):
     return LLVM_TARGET_MAPPING[target]
   if target.startswith("@llvm-project//mlir"):
