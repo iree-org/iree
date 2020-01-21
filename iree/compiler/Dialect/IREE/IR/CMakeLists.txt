@@ -25,6 +25,7 @@ iree_cc_library(
     "IREEDialect.cpp"
     "IREEOps.cpp"
     "IREEOps.cpp.inc"
+    "IREETypes.cpp"
   DEPS
     LLVMSupport
     MLIRIR

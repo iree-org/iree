@@ -16,9 +16,11 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
 
@@ -30,7 +32,8 @@ static DialectRegistration<IREEDialect> base_dialect;
 IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
   addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType,
-           IREE::OpaqueRefObjectType, IREE::RefPtrType>();
+           IREE::OpaqueRefObjectType, IREE::RefPtrType,
+           IREE::RankedShapeType>();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
@@ -41,7 +44,54 @@ IREEDialect::IREEDialect(MLIRContext* context)
 // Type parsing and printing
 //===----------------------------------------------------------------------===//
 
+static Type parseRankedShape(DialectAsmParser& parser) {
+  llvm::SmallVector<int64_t, 7> dims;
+  Type dimType;
+  if (parser.parseLess()) return nullptr;
+  if (failed(parser.parseDimensionList(dims))) {
+    return nullptr;
+  }
+  if (failed(parser.parseType(dimType))) {
+    return nullptr;
+  }
+  if (failed(parser.parseGreater())) {
+    parser.emitError(parser.getNameLoc(), "expected terminating '>'");
+    return nullptr;
+  }
+
+  return IREE::RankedShapeType::getChecked(
+      dims, dimType, parser.getEncodedSourceLoc(parser.getNameLoc()));
+}
+
+static void printRankedShape(IREE::RankedShapeType type,
+                             DialectAsmPrinter& printer) {
+  llvm::SmallVector<int64_t, 7> dims;
+  type.getAllDims(dims);
+  printer << "ranked_shape<";
+  bool first = true;
+  for (auto dim : dims) {
+    if (first) {
+      first = false;
+    } else {
+      printer << "x";
+    }
+
+    if (dim < 0)
+      printer << "?";
+    else
+      printer << dim;
+  }
+
+  if (!first) printer << "x";
+  printer.printType(type.getDimType());
+  printer << ">";
+}
+
 Type IREEDialect::parseType(DialectAsmParser& parser) const {
+  if (succeeded(parser.parseOptionalKeyword("ranked_shape"))) {
+    return parseRankedShape(parser);
+  }
+
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
   if (spec.consume_front("ref")) {
@@ -101,6 +151,9 @@ void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
       break;
     case IREE::TypeKind::MutableByteBuffer:
       os << "mutable_byte_buffer";
+      break;
+    case IREE::TypeKind::RankedShape:
+      printRankedShape(type.cast<IREE::RankedShapeType>(), os);
       break;
     default:
       llvm_unreachable("unhandled IREE type");

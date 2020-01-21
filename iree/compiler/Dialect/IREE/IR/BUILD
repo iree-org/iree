@@ -32,6 +32,7 @@ cc_library(
         "IREEDialect.cpp",
         "IREEOps.cpp",
         "IREEOps.cpp.inc",
+        "IREETypes.cpp",
     ],
     hdrs = [
         "IREEDialect.h",
