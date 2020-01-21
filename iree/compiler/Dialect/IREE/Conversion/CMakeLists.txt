@@ -12,4 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(PreserveCompilerHints)
+iree_cc_library(
+  NAME
+    PreserveCompilerHints
+  HDRS
+    "PreserveCompilerHints.h"
+  SRCS
+    "PreserveCompilerHints.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    MLIRIR
+    MLIRTransforms
+  ALWAYSLINK
+  PUBLIC
+)

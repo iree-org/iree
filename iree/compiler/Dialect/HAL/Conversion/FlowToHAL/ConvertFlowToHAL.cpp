@@ -21,7 +21,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
