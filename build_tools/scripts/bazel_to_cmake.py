@@ -160,6 +160,10 @@ class BuildFileFunctions(object):
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
 
+  def _convert_unimplemented_function(self, rule, *args, **kwargs):
+    name = kwargs.get("name", "unnamed")
+    self.converter.body += "# Unimplemented %(rule)s %(name)s\n" % {"rule": rule, "name": name}
+
   # ------------------------------------------------------------------------- #
   # Function handlers that convert BUILD definitions to CMake definitions.    #
   #                                                                           #
@@ -174,15 +178,21 @@ class BuildFileFunctions(object):
     # No mapping to CMake, ignore.
     pass
 
+  def iree_build_test(self, **kwargs):
+    pass
+
   def filegroup(self, **kwargs):
     # Not implemented yet. Might be a no-op, or may want to evaluate the srcs
     # attribute and pass them along to any targets that depend on the filegroup.
     # Cross-package dependencies and complicated globs could be hard to handle.
+    self._convert_unimplemented_function("filegroup", **kwargs)
+
+  def exports_files(self, *args, **kwargs):
     pass
 
   def glob(self, *args):
     # Not supported during conversion (yet?).
-    pass
+    self._convert_unimplemented_function("glob", *args)
 
   def config_setting(self, **kwargs):
     # No mapping to CMake, ignore.
@@ -234,12 +244,22 @@ class BuildFileFunctions(object):
     }
 
   def gentbl(self, **kwargs):
-    # Not implemented yet.
-    pass
+    self._convert_unimplemented_function("gentbl", **kwargs)
 
   def cc_embed_data(self, **kwargs):
-    # Not implemented yet.
-    pass
+    self._convert_unimplemented_function("cc_embed_data", **kwargs)
+
+  def iree_bytecode_module(self, **kwargs):
+    self._convert_unimplemented_function("iree_bytecode_module", **kwargs)
+
+  def iree_setup_lit_package(self, **kwargs):
+    self._convert_unimplemented_function("iree_setup_lit_package", **kwargs)
+
+  def iree_glob_lit_tests(self, **kwargs):
+    self._convert_unimplemented_function("iree_glob_lit_tests", **kwargs)
+
+  def spirv_kernel_cc_library(self, **kwargs):
+    self._convert_unimplemented_function("spirv_kernel_cc_library", **kwargs)
 
 
 class Converter(object):
