@@ -80,51 +80,53 @@ static iree_status_t iree_vm_bytecode_module_resolve_types(
 static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     const iree::vm::BytecodeModuleDef* module_def) {
   if (!module_def->name() || module_def->name()->size() == 0) {
-    // All modules must have a name.
+    LOG(ERROR) << "All modules must have a name.";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   if (!module_def->types()) {
-    // Type table is mandatory, though it could be empty (in empty modules).
+    LOG(ERROR) << "Type table is mandatory, though it could be empty (in empty "
+                  "modules).";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   if (!module_def->exported_functions() ||
       module_def->exported_functions()->size() == 0) {
-    // At least one exported function is required.
+    LOG(ERROR) << "At least one exported function is required.";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   if (!module_def->internal_functions() ||
       module_def->internal_functions()->size() == 0) {
-    // At least one internal function is required.
+    LOG(ERROR) << "At least one internal function is required.";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   if (!module_def->function_descriptors() ||
       module_def->function_descriptors()->size() !=
           module_def->internal_functions()->size()) {
-    // All internal functions need a mapping into the bytecode data.
+    LOG(ERROR)
+        << "All internal functions need a mapping into the bytecode data.";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   if (!module_def->bytecode_data()) {
-    // Bytecode data is required if we have any functions.
+    LOG(ERROR) << "Bytecode data is required if we have any functions.";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   for (int i = 0; i < module_def->types()->size(); ++i) {
     const auto* type_def = module_def->types()->Get(i);
     if (!type_def) {
-      // All types must be valid.
+      LOG(ERROR) << "All types must be valid.";
       return IREE_STATUS_INVALID_ARGUMENT;
     } else if (!type_def->full_name() || type_def->full_name()->size() == 0) {
-      // All types require a name.
+      LOG(ERROR) << "All types require a name.";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
     if (!iree_vm_type_def_is_valid(
             iree_vm_bytecode_module_resolve_type(type_def))) {
-      // No type registered.
+      LOG(ERROR) << "No type registered.";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
   }
@@ -133,14 +135,14 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     for (int i = 0; i < module_def->imported_functions()->size(); ++i) {
       auto* import_def = module_def->imported_functions()->Get(i);
       if (!import_def) {
-        // All imports must be valid.
+        LOG(ERROR) << "All imports must be valid.";
         return IREE_STATUS_INVALID_ARGUMENT;
       } else if (!import_def->full_name() ||
                  import_def->full_name()->size() == 0) {
-        // All imports require a name.
+        LOG(ERROR) << "All imports require a name.";
         return IREE_STATUS_INVALID_ARGUMENT;
       } else if (!import_def->signature()) {
-        // All imports require a signature.
+        LOG(ERROR) << "All imports require a signature.";
         return IREE_STATUS_INVALID_ARGUMENT;
       }
     }
@@ -149,19 +151,20 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
   for (int i = 0; i < module_def->exported_functions()->size(); ++i) {
     auto* export_def = module_def->exported_functions()->Get(i);
     if (!export_def) {
-      // All exports must be valid.
+      LOG(ERROR) << "All exports must be valid.";
       return IREE_STATUS_INVALID_ARGUMENT;
     } else if (!export_def->local_name() ||
                export_def->local_name()->size() == 0) {
-      // All exports require a name.
+      LOG(ERROR) << "All exports require a name.";
       return IREE_STATUS_INVALID_ARGUMENT;
     } else if (!export_def->signature()) {
-      // All exports require a signature.
+      LOG(ERROR) << "All exports require a signature.";
       return IREE_STATUS_INVALID_ARGUMENT;
     } else if (export_def->internal_ordinal() < 0 ||
                export_def->internal_ordinal() >=
                    module_def->internal_functions()->size()) {
-      // Out-of-bounds reference to a function in the internal table.
+      LOG(ERROR)
+          << "Out-of-bounds reference to a function in the internal table.";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
   }
@@ -169,10 +172,10 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
   for (int i = 0; i < module_def->internal_functions()->size(); ++i) {
     auto* function_def = module_def->internal_functions()->Get(i);
     if (!function_def) {
-      // All functions must be valid.
+      LOG(ERROR) << "All functions must be valid.";
       return IREE_STATUS_INVALID_ARGUMENT;
     } else if (!function_def->signature()) {
-      // All functions require a signature.
+      LOG(ERROR) << "All functions require a signature.";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
 
@@ -183,12 +186,12 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
         function_descriptor->bytecode_offset() +
                 function_descriptor->bytecode_length() >
             module_def->bytecode_data()->size()) {
-      // Bytecode span must be a valid range.
+      LOG(ERROR) << "Bytecode span must be a valid range.";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
     if (function_descriptor->i32_register_count() > IREE_I32_REGISTER_COUNT ||
         function_descriptor->ref_register_count() > IREE_REF_REGISTER_COUNT) {
-      // Register counts out of range.
+      LOG(ERROR) << "Register counts out of range.";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
 
