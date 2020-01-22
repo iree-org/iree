@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
@@ -278,6 +279,68 @@ struct ExpandUnfoldableConstantOp
 void UnfoldableConstantOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ExpandUnfoldableConstantOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// iree.static_ranked_shape
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseStaticRankedShapeOp(OpAsmParser &parser,
+                                            OperationState &state) {
+  return parser.parseOptionalArrowTypeList(state.types);
+}
+
+static void printStaticRankedShapeOp(OpAsmPrinter &p, StaticRankedShapeOp op) {
+  p << "iree.static_ranked_shape";
+  p << " -> ";
+  p.printType(op.shape().getType());
+}
+
+static LogicalResult verifyStaticRankedShapeOp(StaticRankedShapeOp op) {
+  auto type = op.shape().getType().cast<RankedShapeType>();
+  if (!type.isFullyStatic()) {
+    return op.emitOpError()
+           << "must return a fully static ranked_shape (got " << type << ")";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// iree.get_ranked_shape
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseGetRankedShapeOp(OpAsmParser &parser,
+                                         OperationState &state) {
+  OpAsmParser::OperandType operandType;
+  Type resultType;
+  return failure(
+      parser.parseOperand(operandType) || parser.parseColonType(resultType) ||
+      parser.parseOptionalArrowTypeList(state.types) ||
+      parser.resolveOperand(operandType, resultType, state.operands));
+}
+
+static void printGetRankedShapeOp(OpAsmPrinter &p, GetRankedShapeOp op) {
+  p << "iree.get_ranked_shape ";
+  p.printOperand(op.operand());
+  p << " : ";
+  p.printType(op.operand().getType());
+  p << " -> ";
+  p.printType(op.shape().getType());
+}
+
+static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
+  auto tensorType = op.operand().getType().cast<TensorType>();
+  auto rsType = op.shape().getType().cast<RankedShapeType>();
+  if (tensorType.getRank() != rsType.getRank()) {
+    return op.emitOpError("operand and result must be of same rank");
+  }
+  SmallVector<int64_t, 4> rsDims;
+  rsType.getAllDims(rsDims);
+  if (!std::equal(rsDims.begin(), rsDims.end(),
+                  tensorType.getShape().begin())) {
+    return op.emitOpError("operand tensor and result shape must be equal");
+  }
+  return success();
 }
 
 #define GET_OP_CLASSES

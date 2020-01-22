@@ -163,7 +163,7 @@ class RefPtrType
 
 // A shape with a fixed ranked and a mixture of static and dynamic dimensions
 // which can express partially shaped values in the tensor domain and be
-// easily lowered to the vector domain (only retaining the dynamic dims upon
+// easily lowered to the memref domain (only retaining the dynamic dims upon
 // conversion).
 class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
                                               detail::RankedShapeTypeStorage> {
@@ -194,8 +194,11 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
   // Will be null if no dynamic dims.
   VectorType getDynamicDimsType() const;
 
-  // Gets the rank that this shape represents.
-  int64_t getValueRank() const;
+  // Gets the rank (counting all dims, static and dynamic).
+  int64_t getRank() const;
+
+  // Whether the shape is fully static.
+  bool isFullyStatic() const;
 
   // Gets all dims of this shape, where dynamic dims are represented by -1.
   // The size of the dims vector will be the same as reported by getValueRank().

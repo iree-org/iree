@@ -101,4 +101,37 @@ def IREE_UnfoldableConstantOp : IREE_Op<"unfoldable_constant"> {
   let hasCanonicalizer = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// Dynamic shape support
+//===----------------------------------------------------------------------===//
+
+def IREE_StaticRankedShapeOp : IREE_PureOp<"static_ranked_shape"> {
+  let summary = "Creates a fully static ranked shape.";
+  let description = [{
+    Creates fully specified (static) RankedShape.
+  }];
+
+  let results = (outs IREE_RankedShape:$shape);
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
+def IREE_GetRankedShapeOp : IREE_PureOp<"get_ranked_shape"> {
+  let summary = "Gets the RankedShape associated with the given Tensor.";
+  let description = [{
+    Early in compilation, this op is used to resolve the RankedShape from an
+    arbitrary tensor value. It will typically be converted later to a
+    RankedShape loaded from an arbitrary input vector or other shape related
+    computation, based on the topagraphy of the computation.
+
+    Getting the RankedShape of a statically shaped tensor will canonicalize
+    to a static_ranked_shape op and will never cause a further SSA dependency.
+  }];
+
+  let arguments = (ins AnyTensor:$operand);
+  let results = (outs IREE_RankedShape:$shape);
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
 #endif  // IREE_DIALECT_IREE_OPS

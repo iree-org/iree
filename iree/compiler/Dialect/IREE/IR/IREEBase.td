@@ -39,6 +39,9 @@ def IREE_Bool :
     AnyTypeOf<[I1, I8], "boolean-storing type (1 or 8 -bit integer)">;
 def IREE_Element : AnyTypeOf<[AnyInteger, AnyFloat]>;
 def IREE_MemRef : MemRefOf<[IREE_Element]>;
+def IREE_RankedShape :
+    Type<CPred<"$_self.isa<::mlir::iree_compiler::IREE::RankedShapeType>()">,
+         "Ranked shape type">;
 
 //===----------------------------------------------------------------------===//
 // Attribute constraints

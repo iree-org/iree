@@ -167,8 +167,15 @@ VectorType RankedShapeType::getDynamicDimsType() const {
   return getImpl()->key.dynamicDimsType;
 }
 
-int64_t RankedShapeType::getValueRank() const {
-  return getImpl()->key.dynamicDimsType.getNumElements();
+int64_t RankedShapeType::getRank() const {
+  return getImpl()->key.offsetDims.size();
+}
+
+bool RankedShapeType::isFullyStatic() const {
+  for (auto dim : getImpl()->key.offsetDims) {
+    if (dim < 0) return false;
+  }
+  return true;
 }
 
 void RankedShapeType::getAllDims(SmallVectorImpl<int64_t> &dims) {

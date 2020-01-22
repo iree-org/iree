@@ -20,7 +20,6 @@ func @parse_print_do_not_optimize(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
 }
 
 // -----
-
 // CHECK-LABEL: @parse_print_unfoldable_constant
 func @parse_print_unfoldable_constant(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
   // CHECK-NEXT: iree.unfoldable_constant 42
@@ -32,5 +31,21 @@ func @parse_print_unfoldable_constant(%arg0 : tensor<i32>, %arg1 : tensor<i32>) 
   // CHECK: iree.unfoldable_constant @func_with_args : (f32) -> ()
   %csymref = iree.unfoldable_constant @func_with_args : (f32) -> ()
 
+  return
+}
+
+// -----
+// CHECK-LABEL: @parse_print_static_ranked_shape
+func @parse_print_static_ranked_shape() {
+  // CHECK: iree.static_ranked_shape -> !iree.ranked_shape<2x2xi32>
+  %0 = iree.static_ranked_shape -> !iree.ranked_shape<2x2xi32>
+  return
+}
+
+// -----
+// CHECK-LABEL: @parse_print_get_ranked_shape
+func @parse_print_get_ranked_shape(%arg0 : tensor<2x?x4xi32>) {
+  // CHECK: iree.get_ranked_shape %arg0 : tensor<2x?x4xi32> -> !iree.ranked_shape<2x?x4xi32>
+  %0 = iree.get_ranked_shape %arg0 : tensor<2x?x4xi32> -> !iree.ranked_shape<2x?x4xi32>
   return
 }
