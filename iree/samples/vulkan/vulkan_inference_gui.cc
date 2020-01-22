@@ -48,7 +48,7 @@
 #include "third_party/dear_imgui/examples/imgui_impl_vulkan.h"
 
 // Compiled module embedded here to avoid file IO:
-#include "iree/samples/vulkan_graphics/simple_mul_bytecode_module.h"
+#include "iree/samples/vulkan/simple_mul_bytecode_module.h"
 
 static VkAllocationCallbacks* g_Allocator = NULL;
 static VkInstance g_Instance = VK_NULL_HANDLE;
@@ -386,7 +386,7 @@ extern "C" int main(int argc, char** argv) {
   SDL_WindowFlags window_flags = (SDL_WindowFlags)(
       SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
   SDL_Window* window = SDL_CreateWindow(
-      "IREE Samples - Vulkan Graphics Integration", SDL_WINDOWPOS_CENTERED,
+      "IREE Samples - Vulkan Inference GUI", SDL_WINDOWPOS_CENTERED,
       SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
 
   // Setup Vulkan

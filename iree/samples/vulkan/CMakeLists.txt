@@ -30,9 +30,9 @@ endif()
 
 iree_cc_binary(
     NAME
-      vulkan_graphics
+      vulkan_inference_gui
     SRCS
-      "vulkan_graphics.cc"
+      "vulkan_inference_gui.cc"
     DEPS
       absl::base
       dear_imgui::dear_imgui
@@ -43,7 +43,7 @@ iree_cc_binary(
       iree::hal::api
       iree::hal::vulkan::api
       iree::modules::hal
-      iree::samples::vulkan_graphics::simple_mul_bytecode_module_cc
+      iree::samples::vulkan::simple_mul_bytecode_module_cc
       iree::vm
       iree::vm::bytecode_module
       SDL2-static

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Samples demonstrating use of the RT API with Vulkan.
+# Samples demonstrating use of the VM and HAL APIs with Vulkan.
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
@@ -28,8 +28,8 @@ iree_bytecode_module(
 )
 
 cc_binary(
-    name = "vulkan_graphics",
-    srcs = ["vulkan_graphics.cc"],
+    name = "vulkan_inference_gui",
+    srcs = ["vulkan_inference_gui.cc"],
     tags = [
         "manual",
         "nobuilder",
