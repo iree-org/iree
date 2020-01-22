@@ -50,9 +50,14 @@ VULKAN_HEADERS_MAPPING = {
 
 MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AffineDialectRegistration": "MLIRAffineOps",
+    "@llvm-project//mlir:AffineToStandardTransforms": "MLIRAffineToStandard",
+    "@llvm-project//mlir:GPUToSPIRVTransforms": "MLIRGPUtoSPIRVTransforms",
+    "@llvm-project//mlir:GPUTransforms": "MLIRGPU",
     "@llvm-project//mlir:LinalgDialectRegistration": "MLIRLinalgOps",
+    "@llvm-project//mlir:LoopsToGPUPass": "MLIRLoopsToGPU",
     "@llvm-project//mlir:SPIRVDialectRegistration": "MLIRSPIRV",
     "@llvm-project//mlir:StandardDialectRegistration": "MLIRStandardOps",
+    "@llvm-project//mlir:StandardToSPIRVConversions": "MLIRStandardToSPIRVTransforms",
     "@llvm-project//mlir:MlirOptMain": "MLIROptMain",
 }
 
