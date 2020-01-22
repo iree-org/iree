@@ -27,8 +27,9 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::IR
     LLVMSupport
+    MLIRAnalysis
     MLIRIR
-    MLIRParser
+    MLIRPass
     MLIRSupport
   ALWAYSLINK
   PUBLIC

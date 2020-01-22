@@ -28,9 +28,9 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRStandardOps
     MLIRSupport
     MLIRTransforms
+    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )

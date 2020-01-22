@@ -34,8 +34,9 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSPIRV
+    # TODO(marbre): Bazel dep to MLIRSPIRVDialect, find appropriavte CMake dep
     MLIRStandardOps
-   tensorflow::mlir_xla
+    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )

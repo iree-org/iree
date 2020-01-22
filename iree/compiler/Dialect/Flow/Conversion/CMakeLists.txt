@@ -24,10 +24,8 @@ iree_cc_library(
     "TypeConverter.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    LLVMSupport
     MLIRIR
     MLIRParser
     MLIRTransforms
   PUBLIC
 )
-
