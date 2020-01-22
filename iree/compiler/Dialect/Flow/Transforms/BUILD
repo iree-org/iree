@@ -57,6 +57,7 @@ cc_library(
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_lower",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_materialize_broadcasts",
     ],
     alwayslink = 1,
