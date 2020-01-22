@@ -87,7 +87,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_invoke(
   iree_vm_stack_frame_t* callee_frame = NULL;
   status = iree_vm_stack_function_enter(stack, function, &callee_frame);
 
-  // Marhsal inputs.
+  // Marshal inputs.
   if (iree_status_is_ok(status) && inputs) {
     status = iree_vm_marshal_inputs(inputs, callee_frame);
   }
