@@ -14,6 +14,7 @@
 
 add_subdirectory(LegacyInterpreter)
 add_subdirectory(VulkanSPIRV)
+add_subdirectory(VMLA)
 
 iree_cc_library(
   NAME

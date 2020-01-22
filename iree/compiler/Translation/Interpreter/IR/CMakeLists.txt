@@ -65,12 +65,17 @@ iree_cc_library(
     "OpWriters.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::Interpreter::IR::Common
     iree::compiler::Translation::Interpreter::IR::HLOpsGen
     iree::compiler::Translation::Interpreter::IR::LLOpsGen
     iree::compiler::Translation::Interpreter::Serialization
+    iree::compiler::Translation::Interpreter::Utils
     iree::compiler::Utils
+    iree::schemas::bytecode::interpreter_bytecode_v0
     LLVMSupport
     MLIRIR
+    MLIRStandardOps
+    MLIRSupport
   ALWAYSLINK
   PUBLIC
 )

@@ -27,8 +27,12 @@ iree_cc_library(
     "TypeConversionUtils.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_xla
     LLVMSupport
     MLIRIR
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransformUtils
+    MLIRTransforms
+    tensorflow::mlir_xla
   PUBLIC
 )
