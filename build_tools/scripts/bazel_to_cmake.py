@@ -243,6 +243,16 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
+  def spirv_kernel_cc_library(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_srcs_block(**kwargs)
+
+    self.converter.body += """iree_spirv_kernel_cc_library(
+%(name_block)s%(srcs_block)s)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    }
+
   def gentbl(self, **kwargs):
     self._convert_unimplemented_function("gentbl", **kwargs)
 
@@ -257,9 +267,6 @@ class BuildFileFunctions(object):
 
   def iree_glob_lit_tests(self, **kwargs):
     self._convert_unimplemented_function("iree_glob_lit_tests", **kwargs)
-
-  def spirv_kernel_cc_library(self, **kwargs):
-    self._convert_unimplemented_function("spirv_kernel_cc_library", **kwargs)
 
 
 class Converter(object):
