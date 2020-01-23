@@ -55,7 +55,10 @@ MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:GPUTransforms": "MLIRGPU",
     "@llvm-project//mlir:LinalgDialectRegistration": "MLIRLinalgOps",
     "@llvm-project//mlir:LoopsToGPUPass": "MLIRLoopsToGPU",
+    "@llvm-project//mlir:SPIRVDialect": "MLIRSPIRV",
     "@llvm-project//mlir:SPIRVDialectRegistration": "MLIRSPIRV",
+    "@llvm-project//mlir:SPIRVLowering": "MLIRSPIRV",
+    "@llvm-project//mlir:SPIRVTranslateRegistration": "MLIRSPIRVSerialization",
     "@llvm-project//mlir:StandardDialectRegistration": "MLIRStandardOps",
     "@llvm-project//mlir:StandardToSPIRVConversions": "MLIRStandardToSPIRVTransforms",
     "@llvm-project//mlir:MlirOptMain": "MLIROptMain",
@@ -93,6 +96,8 @@ def convert_external_target(target):
     return _convert_absl_target(target)
   if target == "@com_google_benchmark//:benchmark":
     return "benchmark"
+  if target == "@com_github_google_flatbuffers//:flatbuffers":
+    return "flatbuffers"
   if target == "@com_google_googletest//:gtest":
     return "gtest"
   if target.startswith("@llvm-project//llvm"):

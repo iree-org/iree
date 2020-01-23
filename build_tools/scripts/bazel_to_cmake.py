@@ -95,6 +95,14 @@ class BuildFileFunctions(object):
     #    rule_name
     return "  NAME\n    %s\n" % (kwargs["name"])
 
+  def _convert_namespace_block(self, **kwargs):
+    #  CC_NAMESPACE
+    #    "cc_namespace"
+    return "  CC_NAMESPACE\n    \"%s\"\n" % (kwargs["cc_namespace"])
+
+  def _convert_translation_block(self, **kwargs):
+    return "  TRANSLATION\n    \"%s\"\n" % (kwargs["translation"])
+
   def _convert_option_block(self, option, option_value):
     if option_value:
       # Note: this is a truthiness check as well as an existence check, i.e.
@@ -125,6 +133,9 @@ class BuildFileFunctions(object):
 
   def _convert_srcs_block(self, **kwargs):
     return self._convert_filelist_block("SRCS", kwargs.get("srcs"))
+
+  def _convert_src_block(self, **kwargs):
+    return "  SRC\n    \"%s\"\n" % kwargs.get("src")
 
   def _convert_target(self, target):
     if target.startswith(":"):
@@ -243,23 +254,41 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
+  def spirv_kernel_cc_library(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_srcs_block(**kwargs)
+
+    self.converter.body += """iree_spirv_kernel_cc_library(
+%(name_block)s%(srcs_block)s)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    }
+
+  def iree_bytecode_module(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    src_block = self._convert_src_block(**kwargs)
+    namespace_block = self._convert_namespace_block(**kwargs)
+    translation_block = self._convert_translation_block(**kwargs)
+
+    self.converter.body += """iree_bytecode_module(
+%(name_block)s%(src_block)s%(namespace_block)s%(translation_block)s  PUBLIC\n)\n\n""" % {
+    "name_block": name_block,
+    "src_block": src_block,
+    "namespace_block": namespace_block,
+    "translation_block":translation_block,
+    }
+
   def gentbl(self, **kwargs):
     self._convert_unimplemented_function("gentbl", **kwargs)
 
   def cc_embed_data(self, **kwargs):
     self._convert_unimplemented_function("cc_embed_data", **kwargs)
 
-  def iree_bytecode_module(self, **kwargs):
-    self._convert_unimplemented_function("iree_bytecode_module", **kwargs)
-
   def iree_setup_lit_package(self, **kwargs):
     self._convert_unimplemented_function("iree_setup_lit_package", **kwargs)
 
   def iree_glob_lit_tests(self, **kwargs):
     self._convert_unimplemented_function("iree_glob_lit_tests", **kwargs)
-
-  def spirv_kernel_cc_library(self, **kwargs):
-    self._convert_unimplemented_function("spirv_kernel_cc_library", **kwargs)
 
 
 class Converter(object):
