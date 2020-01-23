@@ -20,7 +20,7 @@ load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 def iree_bytecode_module(
         name,
         src,
-        translation = "-mlir-to-iree-module",
+        translation = "-iree-mlir-to-vm-bytecode-module",
         translate_tool = "//iree/tools:iree-translate",
         cc_namespace = None,
         visibility = None):

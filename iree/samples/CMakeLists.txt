@@ -15,3 +15,4 @@
 # TODO(marbre): Add once iree-translate and custom-translate run without errors
 #add_subdirectory(custom_modules)
 #add_subdirectory(simple_embedding)
+#add_subdirectory(vulkan)

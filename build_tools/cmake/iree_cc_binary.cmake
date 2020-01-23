@@ -103,13 +103,15 @@ function(iree_cc_binary)
   set(_STANDARD_DEPS "")
   foreach(_DEP ${_TRANSITIVE_DEPS})
     # Check if _DEP is a library with the ALWAYSLINK property set.
-    get_target_property(_DEP_TYPE ${_DEP} TYPE)
-    if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
-      # Can't be ALWAYSLINK since it's an INTERFACE library.
-      # We also can't even query for the property, since it isn't whitelisted.
-      set(_DEP_IS_ALWAYSLINK OFF)
-    else()
-      get_target_property(_DEP_IS_ALWAYSLINK ${_DEP} ALWAYSLINK)
+    set(_DEP_IS_ALWAYSLINK OFF)
+    if (TARGET ${_DEP})
+      get_target_property(_DEP_TYPE ${_DEP} TYPE)
+      if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
+        # Can't be ALWAYSLINK since it's an INTERFACE library.
+        # We also can't even query for the property, since it isn't whitelisted.
+      else()
+        get_target_property(_DEP_IS_ALWAYSLINK ${_DEP} ALWAYSLINK)
+      endif()
     endif()
 
     # Append to the corresponding list of deps.
@@ -199,6 +201,11 @@ function(_iree_transitive_dependencies_helper TARGET TRANSITIVE_DEPS)
   # Append this target to the list. Dependencies of this target will be added
   # (if valid and not already visited) in recursive function calls.
   list(APPEND _RESULT ${_TARGET_NAME})
+
+  # Check for non-target identifiers again after resolving the alias.
+  if (NOT TARGET ${_TARGET_NAME})
+    return()
+  endif()
 
   # Get the list of direct dependencies for this target.
   get_target_property(_TARGET_TYPE ${_TARGET_NAME} TYPE)
