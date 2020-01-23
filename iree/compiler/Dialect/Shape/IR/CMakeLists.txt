@@ -12,8 +12,37 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Flow)
-add_subdirectory(HAL)
-add_subdirectory(IREE)
-add_subdirectory(Shape)
-add_subdirectory(VM)
+iree_cc_library(
+  NAME
+    IR
+  HDRS
+    "ShapeDialect.h"
+    "ShapeOps.h"
+    "ShapeOps.h.inc"
+    "ShapeTypes.h"
+  SRCS
+    "ShapeDialect.cpp"
+    "ShapeOps.cpp"
+    "ShapeOps.cpp.inc"
+    "ShapeTypes.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRStandardOps
+    MLIRSupport
+  ALWAYSLINK
+  PUBLIC
+)
+
+
+iree_tablegen_library(
+  NAME
+    ShapeOpsGen
+  SRCS
+    ShapeOps.td
+  OUTS
+    -gen-op-decls ShapeOps.h.inc
+    -gen-op-defs ShapeOps.cpp.inc
+)

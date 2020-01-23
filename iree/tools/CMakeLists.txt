@@ -66,6 +66,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Conversion::HALToVM
       iree::compiler::Dialect::HAL::IR
       iree::compiler::Dialect::HAL::Transforms
+      iree::compiler::Dialect::Shape::IR
       iree::compiler::Dialect::VM::Analysis
       iree::compiler::Dialect::VM::Conversion
       iree::compiler::Dialect::VM::Conversion::StandardToVM

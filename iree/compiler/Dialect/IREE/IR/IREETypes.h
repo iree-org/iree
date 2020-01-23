@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 #define IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/StandardTypes.h"
@@ -36,10 +37,10 @@ enum Kind {
   OpaqueRefObject,
   ByteBuffer,
   MutableByteBuffer,
-  RankedShape,
 
   FIRST_HAL_TYPE = Type::FIRST_IREE_TYPE + 20,
   FIRST_SEQ_TYPE = Type::FIRST_IREE_TYPE + 40,
+  FIRST_SHAPE_TYPE = Type::FIRST_IREE_TYPE + 60,
 };
 }  // namespace TypeKind
 
@@ -73,6 +74,14 @@ enum Kind {
 };
 }  // namespace TypeKind
 }  // namespace SEQ
+
+namespace Shape {
+namespace TypeKind {
+enum Kind {
+  RankedShape = IREE::TypeKind::FIRST_SHAPE_TYPE,
+};
+}  // namespace TypeKind
+}  // namespace Shape
 
 /// Base type for RefObject-derived types.
 /// These can be wrapped in RefPtrType.
@@ -159,60 +168,6 @@ class RefPtrType
   RefObjectType getObjectType();
 
   static bool kindof(unsigned kind) { return kind == TypeKind::RefPtr; }
-};
-
-// A shape with a fixed ranked and a mixture of static and dynamic dimensions
-// which can express partially shaped values in the tensor domain and be
-// easily lowered to the vector domain (only retaining the dynamic dims upon
-// conversion).
-class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
-                                              detail::RankedShapeTypeStorage> {
- public:
-  using Base::Base;
-
-  /// Support method to enable LLVM-style type casting.
-  static bool kindof(unsigned kind) { return kind == TypeKind::RankedShape; }
-
-  // Gets an instance of a RankedShapeType given an array of dimensions and
-  // the integral dimension type to use at runtime. Any dynamic dim should be
-  // -1.
-  static RankedShapeType get(ArrayRef<int64_t> dims, Type dimType);
-  static RankedShapeType getChecked(ArrayRef<int64_t> dims, Type dimType,
-                                    Location loc);
-
-  // Verifies construction invariants and issues errors/warnings.
-  static LogicalResult verifyConstructionInvariants(Optional<Location> loc,
-                                                    MLIRContext *context,
-                                                    ArrayRef<int64_t> dims,
-                                                    Type dimType,
-                                                    VectorType dynamicDimsType);
-
-  // Gets an integral type suitable for holding dimensions of this shape.
-  IntegerType getDimType() const;
-
-  // Gets a vector type suitable for holding all dynamic dims at runtime.
-  // Will be null if no dynamic dims.
-  VectorType getDynamicDimsType() const;
-
-  // Gets the rank that this shape represents.
-  int64_t getValueRank() const;
-
-  // Gets all dims of this shape, where dynamic dims are represented by -1.
-  // The size of the dims vector will be the same as reported by getValueRank().
-  void getAllDims(SmallVectorImpl<int64_t> &dims);
-
-  // Returns whether the indexed dimension is dynamic.
-  bool isDimDynamic(int allDimsIndex);
-
-  // Returns the static dimension at the overall shape index.
-  // It is an error to request a static index for which isDimDynamic() is
-  // true.
-  int64_t getStaticDim(int allDimsIndex);
-
-  // Given an index into the overall shape for a dynamic dimension, returns
-  // a corresponding dimension into the runtime getDynamicDimsType().
-  // It is an error to request an index for which isDimDynamic() is false.
-  unsigned getDynamicDimIndex(int allDimsIndex);
 };
 
 }  // namespace IREE
