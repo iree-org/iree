@@ -176,18 +176,17 @@ void DoNotOptimizeOp::build(Builder *builder, OperationState &state,
 
 ParseResult parseDoNotOptimizeOp(OpAsmParser &parser, OperationState &state) {
   SmallVector<OpAsmParser::OperandType, 2> args;
+  // Operands and results have the same types.
+  auto &operandTypes = state.types;
 
   if (failed(parser.parseLParen()) || failed(parser.parseOperandList(args)) ||
       failed(parser.parseRParen()) ||
       failed(parser.parseOptionalAttrDict(state.attributes)) ||
-      failed(parser.parseOptionalColonTypeList(state.types))) {
+      failed(parser.parseOptionalColonTypeList(state.types)) ||
+      failed(parser.resolveOperands(
+          args, operandTypes, parser.getCurrentLocation(), state.operands))) {
     return failure();
   }
-
-  // Operands and results have the same types.
-  auto &operandTypes = state.types;
-  parser.resolveOperands(args, operandTypes, parser.getCurrentLocation(),
-                         state.operands);
 
   return success();
 }
