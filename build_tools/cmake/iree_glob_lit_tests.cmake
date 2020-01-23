@@ -25,6 +25,7 @@ function(iree_glob_lit_tests)
 
   iree_package_name(_PACKAGE_NAME)
   file(GLOB_RECURSE _TEST_FILES *.mlir)
+  set(_TOOL_DEPS iree_tool_iree-opt IreeFileCheck)
 
   foreach(_TEST_FILE ${_TEST_FILES})
     get_filename_component(_TEST_FILE_LOCATION ${_TEST_FILE} DIRECTORY)
@@ -32,6 +33,6 @@ function(iree_glob_lit_tests)
     set(_NAME "${_PACKAGE_NAME}_${_TEST_NAME}")
 
     add_test(NAME ${_NAME} COMMAND ${CMAKE_SOURCE_DIR}/iree/tools/run_lit.sh ${_TEST_FILE} ${CMAKE_SOURCE_DIR}/iree/tools/IreeFileCheck.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/iree/tools)
-    set_tests_properties(${_NAME} PROPERTIES DEPENDS iree_tools_iree-opt IreeFileCheck)
+    set_tests_properties(${_NAME} PROPERTIES DEPENDS _TOOL_DEPS)
   endforeach()
 endfunction()
