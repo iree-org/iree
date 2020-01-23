@@ -39,6 +39,7 @@ package(
         "dynamic_mlp_test",
         "exported_names_test",
         "keras_lstm_test",
+        "linspace_test",
         "simple_stateful_test",
         "mandelbrot_test",
         "simple_arithmetic_test",
