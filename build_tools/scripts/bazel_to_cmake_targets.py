@@ -93,6 +93,8 @@ def convert_external_target(target):
     return _convert_absl_target(target)
   if target == "@com_google_benchmark//:benchmark":
     return "benchmark"
+  if target == "@com_github_google_flatbuffers//:flatbuffers":
+    return "flatbuffers"
   if target == "@com_google_googletest//:gtest":
     return "gtest"
   if target.startswith("@llvm-project//llvm"):
