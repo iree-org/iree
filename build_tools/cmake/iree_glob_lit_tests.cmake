@@ -32,6 +32,6 @@ function(iree_glob_lit_tests)
     set(_NAME "${_PACKAGE_NAME}_${_TEST_NAME}")
 
     add_test(NAME ${_NAME} COMMAND ${CMAKE_SOURCE_DIR}/iree/tools/run_lit.sh ${_TEST_FILE} ${CMAKE_SOURCE_DIR}/iree/tools/IreeFileCheck.sh WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/iree/tools)
-    set_tests_properties(${_NAME} PROPERTIES DEPENDS iree_tools_iree-opt LLVMFileCheck IreeFileCheck)
+    set_tests_properties(${_NAME} PROPERTIES DEPENDS iree_tools_iree-opt IreeFileCheck)
   endforeach()
 endfunction()
