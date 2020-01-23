@@ -191,4 +191,14 @@ if(${IREE_BUILD_COMPILER})
   )
   add_executable(iree-translate ALIAS iree_tools_iree-translate)
 
+  if(${IREE_BUILD_TESTS})
+    add_custom_target(IreeFileCheck ALL
+      COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
+    )
+    add_custom_target(LLVMFileCheck ALL
+      COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
+      DEPENDS FileCheck
+    )
+  endif()
+
 endif()

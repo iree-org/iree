@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,39 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
-
-iree_cc_library(
-  NAME
-    IR
-  HDRS
-    "IREEDialect.h"
-    "IREEOps.h"
-    "IREEOps.h.inc"
-    "IREETraits.h"
-    "IREETypes.h"
-  SRCS
-    "IREEDialect.cpp"
-    "IREEOps.cpp"
-    "IREEOps.cpp.inc"
-    "IREETypes.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRStandardOps
-    MLIRSupport
-  ALWAYSLINK
-  PUBLIC
-)
-
-
-iree_tablegen_library(
-  NAME
-    IREEOpsGen
-  SRCS
-    IREEOps.td
-  OUTS
-    -gen-op-decls IREEOps.h.inc
-    -gen-op-defs IREEOps.cpp.inc
-)
+iree_glob_lit_tests()
