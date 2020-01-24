@@ -62,7 +62,7 @@ class CheckTest : public ::testing::Test {
     iree_vm_context_release(context_);
     iree_vm_instance_release(instance_);
     if (inputs_) iree_vm_variant_list_free(inputs_);
-    if (outputs_) iree_vm_variant_list_free(inputs_);
+    if (outputs_) iree_vm_variant_list_free(outputs_);
   }
 
   iree_vm_function_t LookupFunction(absl::string_view function_name) {
