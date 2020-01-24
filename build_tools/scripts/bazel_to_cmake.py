@@ -97,7 +97,7 @@ class BuildFileFunctions(object):
     #    rule_name
     return "  NAME\n    %s\n" % (kwargs["name"])
 
-  def _convert_namespace_block(self, **kwargs):
+  def _convert_cc_namespace_block(self, **kwargs):
     #  CC_NAMESPACE
     #    "cc_namespace"
     return "  CC_NAMESPACE\n    \"%s\"\n" % (kwargs["cc_namespace"])
@@ -293,7 +293,7 @@ class BuildFileFunctions(object):
   def iree_bytecode_module(self, **kwargs):
     name_block = self._convert_name_block(**kwargs)
     src_block = self._convert_src_block(**kwargs)
-    namespace_block = self._convert_namespace_block(**kwargs)
+    namespace_block = self._convert_cc_namespace_block(**kwargs)
     translate_tool_block = self._convert_translate_tool_block(**kwargs)
     translation_block = self._convert_translation_block(**kwargs)
 
