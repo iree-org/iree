@@ -102,6 +102,11 @@ class BuildFileFunctions(object):
     #    "cc_namespace"
     return "  CC_NAMESPACE\n    \"%s\"\n" % (kwargs["cc_namespace"])
 
+  def _convert_cpp_namespace_block(self, **kwargs):
+    #  CPP_NAMESPACE
+    #    "cpp_namespace"
+    return "  CPP_NAMESPACE\n    \"%s\"\n" % (kwargs["cpp_namespace"])
+
   def _convert_translation_block(self, **kwargs):
     return "  TRANSLATION\n    \"%s\"\n" % (kwargs["translation"])
 
