@@ -31,6 +31,8 @@ import bazel_to_cmake_targets
 import datetime
 import os
 import textwrap
+from collections import OrderedDict
+from itertools import repeat
 
 repo_root = None
 
@@ -167,7 +169,8 @@ class BuildFileFunctions(object):
     #    package2::target
     deps = kwargs.get("deps")
     deps_list = [self._convert_target(dep) for dep in deps]
-    deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
+    #deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
+    deps_list = list(OrderedDict(zip(deps_list, repeat(None))))  # Remove duplicates, but preserve order of deps.
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
 
