@@ -70,7 +70,6 @@ iree_cc_library(
     iree::base::initializer
     iree::base::target_platform
     absl::flags_parse
-    absl::strings
 )
 
 iree_cc_library(

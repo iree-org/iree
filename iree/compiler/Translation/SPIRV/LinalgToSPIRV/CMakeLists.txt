@@ -17,7 +17,6 @@ add_subdirectory(test)
 iree_cc_library(
   NAME
     LinalgToSPIRV
-  HDRS
   SRCS
     "LinalgToSPIRV.cpp"
   DEPS
@@ -29,11 +28,13 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgOps
     MLIRLinalgTransforms
+    # TODO: Drop dependency on MLIRLinalgUtils
+    #       Fixed in MLIR within https://reviews.llvm.org/D72821
+    #       HEAD of llvm-project submodule points to an older revision.
     MLIRLinalgUtils
     MLIRLoopsToGPU
     MLIRPass
     MLIRSPIRV
-    MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRSupport
