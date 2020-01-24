@@ -12,5 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(IR)
-add_subdirectory(Transforms)
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "Transforms",
+    srcs = [
+        "ExpandFunctionDynamicDims.cpp",
+    ],
+    hdrs = [
+        "Passes.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/Shape/IR",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
+    ],
+    alwayslink = 1,
+)

@@ -34,6 +34,23 @@ class Shape_PureOp<string mnemonic, list<OpTrait> traits = []> :
 // Dynamic shape support
 //===----------------------------------------------------------------------===//
 
+def Shape_TieShapeOp : Shape_PureOp<"tie_shape"> {
+  let summary = "Ties a tensor and a shape together.";
+  let description = [{
+    Ties a specific tensor and its shape together in the IR, allowing further
+    conversions to re-associate the two. This has no runtime implication and
+    will be removed late in conversion.
+
+    Usage:
+      %0 = shape.tie_shape %1, %2 : tensor<...>, shape.ranked_shape<...>
+  }];
+
+  let arguments = (ins AnyTensor:$operand, Shape_RankedShape:$shape);
+  let results = (outs AnyTensor:$result);
+
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
 def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
   let summary = "Gets the RankedShape associated with the given Tensor.";
   let description = [{
@@ -43,12 +60,23 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
     Getting the RankedShape of a statically shaped tensor will canonicalize
     to a static_ranked_shape op and will never cause a further SSA dependency.
+
+    Usage:
+      %0 = shape.get_ranked_shape %arg0 : tensor<2x?xf32> ->
+          !shape.ranked_shape<2x?xf32>
+
+    Canonicalization: This op includes a canonicalization pattern such that
+    if its operand is supplied by a tie_shape op, then it will replace itself
+    with the tie_shape's shape() operand. In this way, a function with all
+    shapes materialized and tied to intermediate tensors should canonicalize
+    to contain no get_ranked_shape ops.
   }];
 
   let arguments = (ins AnyTensor:$operand);
   let results = (outs Shape_RankedShape:$shape);
 
   let verifier = [{ return verify$cppClass(*this); }];
+  let hasCanonicalizer = 1;
 }
 
 #endif  // IREE_DIALECT_SHAPE_OPS

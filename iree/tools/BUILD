@@ -57,6 +57,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/VM/Analysis",
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
