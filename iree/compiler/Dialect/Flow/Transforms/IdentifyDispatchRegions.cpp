@@ -190,8 +190,7 @@ LogicalResult identifyBlockDispatchRegions(Block *block,
 
       // Compute the workload based on the output shape.
       // When variadic all output shapes match so we can just take the first.
-      auto workload = calculateWorkload(
-          &rootOp, rootOp.getResult(0).getType().cast<ShapedType>());
+      auto workload = calculateWorkload(&rootOp, rootOp.getResult(0));
 
       // Try to build a dispatch region from this root.
       if (failed(buildDispatchRegion(block, workload, fusedSubgraph))) {

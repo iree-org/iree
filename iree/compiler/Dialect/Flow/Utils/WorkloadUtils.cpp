@@ -28,12 +28,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-Value calculateWorkload(Operation *op, ShapedType baseOperandType) {
+Value calculateWorkload(Operation *op, Value baseOperand) {
   OpBuilder builder(op);
 
   std::array<int32_t, 3> workload = {1, 1, 1};
 
   // TODO(b/139353314): lookup/calculate based on type/etc.
+  auto baseOperandType = baseOperand.getType().cast<ShapedType>();
   if (!baseOperandType.hasStaticShape()) {
     op->emitOpError() << "Dynamic shapes not yet supported";
     return nullptr;

@@ -23,8 +23,15 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-// Calculates the workload for |op| based on the op type.
-Value calculateWorkload(Operation *op, ShapedType baseOperandType);
+// Calculates the workload for |op| based on the given operation operand.
+// Returns a vector<3xi32> containing the X, Y, Z workload parameters.
+//
+// The |baseOperand| is usually one of the results of a dispatch that signifies
+// how many invocations are ideal for writing the result. Later on in the
+// lowering process, once workgroup sizes are determined by target backends,
+// the workload will be divided up. The returned value here represents the
+// entirety of the computation.
+Value calculateWorkload(Operation *op, Value baseOperand);
 
 }  // namespace Flow
 }  // namespace IREE
