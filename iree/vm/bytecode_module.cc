@@ -539,19 +539,25 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_bytecode_module_create(
     iree_const_byte_span_t flatbuffer_data,
     iree_allocator_t flatbuffer_allocator, iree_allocator_t allocator,
     iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+  if (!out_module) {
+    LOG(ERROR) << "Output module argument not set";
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
   *out_module = NULL;
 
   if (!flatbuffer_data.data || flatbuffer_data.data_length < 16) {
+    LOG(ERROR) << "Flatbuffer data is not present or less than 16 bytes";
     return IREE_STATUS_INVALID_ARGUMENT;
   } else if (!iree::vm::BytecodeModuleDefBufferHasIdentifier(
                  flatbuffer_data.data)) {
+    LOG(ERROR) << "Flatbuffer data does not have bytecode module identifier";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
-  auto* module_def =
+  const iree::vm::BytecodeModuleDef* module_def =
       ::flatbuffers::GetRoot<iree::vm::BytecodeModuleDef>(flatbuffer_data.data);
   if (!module_def) {
+    LOG(ERROR) << "Failed getting root from flatbuffer data";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
   IREE_RETURN_IF_ERROR(iree_vm_bytecode_module_flatbuffer_verify(module_def));

@@ -38,6 +38,7 @@ static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context);
 static iree_status_t iree_vm_context_query_module_state(
     void* state_resolver, iree_vm_module_t* module,
     iree_vm_module_state_t** out_module_state) {
+  if (!state_resolver) return IREE_STATUS_INVALID_ARGUMENT;
   iree_vm_context_t* context = (iree_vm_context_t*)state_resolver;
   // NOTE: this is a linear scan, but given that the list of modules should be
   // N<4 this is faster than just about anything else we could do.
