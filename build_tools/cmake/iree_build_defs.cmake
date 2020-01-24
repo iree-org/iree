@@ -28,3 +28,8 @@ set(TARGET_COMPILER_BACKENDS
   iree::compiler::Dialect::HAL::Target::LegacyInterpreter
   iree::compiler::Dialect::HAL::Target::VulkanSPIRV
 )
+
+# Bazel's variable PLATFORM_VULKAN_TEST_DEPS set in iree/build_defs.oss.bzl
+set(PLATFORM_VULKAN_TEST_DEPS
+  iree::testing::gtest_main
+)

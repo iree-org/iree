@@ -44,6 +44,5 @@ iree_cc_test(
     # executables for from the source MLIR.
     iree::hal::interpreter::interpreter_driver_module
     iree::hal::vulkan::vulkan_driver_module
-    # TODO(marbre): Set PLATFORM_VULKAN_TEST_DEPS somewhere instead of adding dependencies directly
-    iree::testing::gtest_main
+    ${PLATFORM_VULKAN_TEST_DEPS}
 )
