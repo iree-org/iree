@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Bazel's variable IREE_ENABLE_TRACING set in iree/base/build_defs.oss.bzl
 if(${IREE_ENABLE_TRACING})
   set(IREE_BASE_TRACING_DEPS
     iree::base::tracing_enabled
@@ -24,6 +25,7 @@ else()
   )
 endif()
 
+# Bazel's variable TARGET_COMPILER_BACKENDS set in iree/tools/build_defs.oss.bzl
 set(TARGET_COMPILER_BACKENDS
   iree::compiler::Dialect::HAL::Target::LegacyInterpreter
   iree::compiler::Dialect::HAL::Target::VulkanSPIRV
