@@ -130,6 +130,9 @@ class BuildFileFunctions(object):
   def _convert_testonly_block(self, **kwargs):
     return self._convert_option_block("TESTONLY", kwargs.get("testonly"))
 
+  def _convert_flatten_block(self, **kwargs):
+    return self._convert_option_block("FLATTEN", kwargs.get("flatten"))
+
   def _convert_filelist_block(self, list_name, files):
     if not files:
       return ""
