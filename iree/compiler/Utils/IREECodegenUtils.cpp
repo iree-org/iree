@@ -11,14 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 #include "iree/compiler/Utils/IREECodegenUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
 
 /// Gets the launch size associated with the dispatch function.
-LogicalResult getLaunchSize(FuncOp funcOp,
-                            SmallVectorImpl<int64_t> &launchSize) {
+LogicalResult getLegacyLaunchSize(FuncOp funcOp,
+                                  SmallVectorImpl<int64_t> &launchSize) {
   if (!funcOp.getAttr("iree.executable.export")) {
     return funcOp.emitError(
         "expected operation to be in dispatch function to get launch size");
@@ -47,8 +48,8 @@ LogicalResult getLaunchSize(FuncOp funcOp,
 }
 
 /// Gets the workgroup size.
-LogicalResult getWorkGroupSize(FuncOp funcOp,
-                               SmallVectorImpl<int32_t> &workGroupSize) {
+LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
+                                     SmallVectorImpl<int32_t> &workGroupSize) {
   if (!funcOp.getAttr("iree.executable.export")) {
     return funcOp.emitError(
         "expected operation to be in dispatch function to get launch size");

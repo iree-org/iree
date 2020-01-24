@@ -298,7 +298,7 @@ class IndexPropagationList {
     // Set the attribute for the number of launch dims.
     auto funcOp = region.getParentOfType<FuncOp>();
     SmallVector<int64_t, 3> launchSize;
-    if (failed(getLaunchSize(funcOp, launchSize))) {
+    if (failed(getLegacyLaunchSize(funcOp, launchSize))) {
       return emitError(region.getLoc(),
                        "expected region of index propagation to be in dispatch "
                        "function to get launch size");

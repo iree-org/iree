@@ -49,7 +49,7 @@ static LogicalResult initIndexPropagation(Location loc, FuncOp funcOp,
   }
 
   SmallVector<int64_t, 3> launchSize;
-  if (failed(getLaunchSize(funcOp, launchSize))) {
+  if (failed(getLegacyLaunchSize(funcOp, launchSize))) {
     return failure();
   }
 

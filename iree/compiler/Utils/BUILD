@@ -22,13 +22,11 @@ package(
 cc_library(
     name = "Utils",
     srcs = [
-        "DispatchUtils.cpp",
         "GraphUtils.cpp",
         "IREECodegenUtils.cpp",
         "TypeConversionUtils.cpp",
     ],
     hdrs = [
-        "DispatchUtils.h",
         "GraphUtils.h",
         "IREECodegenUtils.h",
         "TypeConversionUtils.h",

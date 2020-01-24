@@ -17,8 +17,9 @@
 // Prepare dispatch regions that implement reductions before SPIR-V lowering.
 //
 //===----------------------------------------------------------------------===//
+#include <numeric>
+
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "iree/compiler/Utils/DispatchUtils.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -27,6 +28,31 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
+
+// TODO(ravishankarm): remove the entire need for this, as it does not support
+// dynamic shapes (where we do not know the workload, or know only partial
+// dimensions of the workload, at compile-time).
+void calculateWorkload(ArrayRef<int64_t> shape,
+                       std::array<int32_t, 3> &workload) {
+  // Drop the trailing ones from the shape.
+  while (shape.size() > 1 && shape.back() == 1) {
+    shape = shape.drop_back();
+  }
+  if (shape.size() <= 3) {
+    // Maps to XYZ (possibly with 1's for unused dimensions).
+    for (auto dim : enumerate(shape)) {
+      workload[shape.size() - 1 - dim.index()] = dim.value();
+    }
+  } else {
+    // Need to flatten the shape to fit XYZ. For now we just squash from
+    // LHS.
+    auto zRange = shape.drop_back(2);
+    workload[2] = std::accumulate(zRange.begin(), zRange.end(), 1,
+                                  std::multiplies<int32_t>());
+    workload[1] = shape[shape.size() - 2];
+    workload[0] = shape.back();
+  }
+}
 
 /// The entry function of the reduction dispatches is empty. This pattern fills
 /// the body with an iree.load_input of the reduction input followed by an
@@ -43,6 +69,7 @@ struct PrepareReductionDispatchPass
     : public OperationPass<PrepareReductionDispatchPass> {
   void runOnOperation() override;
 };
+
 }  // namespace
 
 PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(

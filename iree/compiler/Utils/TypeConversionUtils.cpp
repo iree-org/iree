@@ -26,29 +26,29 @@
 namespace mlir {
 namespace iree_compiler {
 
-Type legalizeType(Type type) {
+Type legalizeLegacyType(Type type) {
   if (type.isIndex()) {
     return IntegerType::get(kIndexBitWidth, type.getContext());
   } else if (type.isInteger(1)) {
     return IntegerType::get(kBoolBitWidth, type.getContext());
   } else if (auto memRefType = type.dyn_cast<MemRefType>()) {
     return MemRefType::get(memRefType.getShape(),
-                           legalizeType(memRefType.getElementType()));
+                           legalizeLegacyType(memRefType.getElementType()));
   } else if (auto functionType = type.dyn_cast<FunctionType>()) {
     llvm::SmallVector<Type, 4> inputs;
     for (const auto &oldType : functionType.getInputs()) {
-      inputs.push_back(legalizeType(oldType));
+      inputs.push_back(legalizeLegacyType(oldType));
     }
     llvm::SmallVector<Type, 4> results;
     for (const auto &oldType : functionType.getResults()) {
-      results.push_back(legalizeType(oldType));
+      results.push_back(legalizeLegacyType(oldType));
     }
     return FunctionType::get(inputs, results, type.getContext());
   }
   return type;
 }
 
-MemRefType convertTypeToMemRef(Type type) {
+MemRefType convertLegacyTypeToMemRef(Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
   } else if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
@@ -58,10 +58,6 @@ MemRefType convertTypeToMemRef(Type type) {
   } else {
     llvm_unreachable("Unconvertable type");
   }
-}
-
-MemRefType convertTypeToMemRef(Value value) {
-  return convertTypeToMemRef(value.getType());
 }
 
 }  // namespace iree_compiler

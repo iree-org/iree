@@ -28,7 +28,6 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Utils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVDialect",

@@ -26,14 +26,18 @@
 namespace mlir {
 namespace iree_compiler {
 
+// WARNING: this file is deprecated and will be removed soon. Do not use.
+
 static const int kBoolBitWidth = 8;
 static const int kIndexBitWidth = 32;
 
-Type legalizeType(Type type);
+Type legalizeLegacyType(Type type);
 
 // Converts a type (scalar, tensor, etc) to a MemRef-based type.
-MemRefType convertTypeToMemRef(Type type);
-MemRefType convertTypeToMemRef(Value value);
+MemRefType convertLegacyTypeToMemRef(Type type);
+inline MemRefType convertLegacyTypeToMemRef(Value value) {
+  return convertLegacyTypeToMemRef(value.getType());
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir

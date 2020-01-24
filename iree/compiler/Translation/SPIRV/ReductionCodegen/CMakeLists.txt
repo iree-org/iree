@@ -24,7 +24,6 @@ iree_cc_library(
     "ReductionFnLowering.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Utils
     MLIRIR
     MLIRPass
     MLIRSPIRV

@@ -12,11 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- IREECodegenUtils.h --------------------------------------*- C++//-*-===//
-//
-// Utility functions used during code-generation (for SPIR-V)
-//
-//===----------------------------------------------------------------------===//
 #ifndef IREE_COMPILER_UTILS_IREECODEGENUTILS_H
 #define IREE_COMPILER_UTILS_IREECODEGENUTILS_H
 
@@ -27,13 +22,17 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Gets the launch size associated with the dispatch function.
-LogicalResult getLaunchSize(FuncOp funcOp,
-                            SmallVectorImpl<int64_t> &launchSize);
+// WARNING: this file is deprecated and will be removed soon. Do not use.
 
+// TODO(ravishankarm): remove this; it does not work with dynamic shapes.
+/// Gets the launch size associated with the dispatch function.
+LogicalResult getLegacyLaunchSize(FuncOp funcOp,
+                                  SmallVectorImpl<int64_t> &launchSize);
+
+// TODO(ravishankarm): remove this; it is not safe for variable sizes.
 /// Gets the workgroup size.
-LogicalResult getWorkGroupSize(FuncOp funcOp,
-                               SmallVectorImpl<int32_t> &workGroupSize);
+LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
+                                     SmallVectorImpl<int32_t> &workGroupSize);
 
 }  // namespace iree_compiler
 }  // namespace mlir
