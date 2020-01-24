@@ -291,6 +291,24 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
+  def cc_embed_data(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_srcs_block(**kwargs)
+    cc_file_output_block = self._convert_cc_file_output_block(**kwargs)
+    h_file_output_block = self._convert_h_file_output_block(**kwargs)
+    namespace_block = self._convert_cpp_namespace_block(**kwargs)
+    flatten_block = self._convert_flatten_block(**kwargs)
+
+    self.converter.body += """iree_cc_embed_data(
+%(name_block)s%(srcs_block)s%(cc_file_output_block)s%(h_file_output_block)s%(namespace_block)s%(flatten_block)s  PUBLIC\n)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    "cc_file_output_block": cc_file_output_block,
+    "h_file_output_block": h_file_output_block,
+    "namespace_block": namespace_block,
+    "flatten_block": flatten_block,
+    }
+
   def spirv_kernel_cc_library(self, **kwargs):
     name_block = self._convert_name_block(**kwargs)
     srcs_block = self._convert_srcs_block(**kwargs)
@@ -319,9 +337,6 @@ class BuildFileFunctions(object):
 
   def gentbl(self, **kwargs):
     self._convert_unimplemented_function("gentbl", **kwargs)
-
-  def cc_embed_data(self, **kwargs):
-    self._convert_unimplemented_function("cc_embed_data", **kwargs)
 
   def iree_setup_lit_package(self, **kwargs):
     self._convert_unimplemented_function("iree_setup_lit_package", **kwargs)
