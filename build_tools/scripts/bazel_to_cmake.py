@@ -158,6 +158,12 @@ class BuildFileFunctions(object):
   def _convert_src_block(self, **kwargs):
     return "  SRC\n    \"%s\"\n" % kwargs.get("src")
 
+  def _convert_cc_file_output_block(self, **kwargs):
+    return "  CC_FILE_OUTPUT\n    \"%s\"\n" % kwargs.get("cc_file_output")
+
+  def _convert_h_file_output_block(self, **kwargs):
+    return "  H_FILE_OUTPUT\n    \"%s\"\n" % kwargs.get("h_file_output")
+
   def _convert_target(self, target):
     if target.startswith(":"):
       # Bazel package-relative `:logging` -> CMake absolute `iree::base::logging`
