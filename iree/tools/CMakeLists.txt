@@ -80,6 +80,7 @@ if(${IREE_BUILD_COMPILER})
       LLVMSupport
       MLIRAffineOps
       MLIRLinalgOps
+      MLIRLinalgUtils
       MLIRStandardOps
       MLIRSPIRV
       MLIRSPIRVSerialization
