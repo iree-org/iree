@@ -16,6 +16,7 @@
 # Most of these are not designed to run on-device.
 
 load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_DEPS")
+load(":build_defs.oss.bzl", "TARGET_COMPILER_BACKENDS")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -26,11 +27,6 @@ exports_files([
     "run_lit.sh",
     "sanitizer_suppressions.txt",
 ])
-
-TARGET_COMPILER_BACKENDS = [
-    "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
-    "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-]
 
 cc_binary(
     name = "iree-dump-module",
