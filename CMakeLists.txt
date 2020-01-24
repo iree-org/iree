@@ -67,7 +67,7 @@ include(iree_glsl_vulkan)
 include(iree_spirv_kernel_cc_library)
 include(iree_pybind_cc_library)
 include(iree_glob_lit_tests)
-include(iree_dependencies)
+include(iree_build_defs)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
