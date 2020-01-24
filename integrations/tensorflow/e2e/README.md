@@ -42,6 +42,15 @@ bazel test ... --test_env=IREE_TEST_BACKENDS=tf,iree_interpreter,iree_vulkan \
     --test_output=errors
 ```
 
+## Debugging tests
+
+If the compiler fails to compile the program, then it will create a crash
+reproducer (see documentation [here](https://mlir.llvm.org/docs/WritingAPass/)),
+which then allows reproducing the bug with an appropriate "opt" tool. Further
+debugging iteration can happen in opt.
+
+TODO(silvasean): debugging miscompiles
+
 ## Test harnesses
 
 ### Simple function tests
