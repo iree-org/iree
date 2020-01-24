@@ -33,6 +33,7 @@ cc_library(
         "HALOpFolders.cpp",
         "HALOpInterface.cpp.inc",
         "HALOps.cpp",
+        "HALOps.cpp.inc",
         "HALTypes.cpp",
     ],
     hdrs = [
