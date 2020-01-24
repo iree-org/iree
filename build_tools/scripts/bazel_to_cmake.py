@@ -159,6 +159,12 @@ class BuildFileFunctions(object):
         target = package  # Omit target if it matches the package name
       else:
         target = package + ":" + target
+      if target.endswith("_gen"):
+        # Files created by gentbl have to be included as source and header files
+        # and not as a dependency. Adding these targets to the dependencies list,
+        # results in linkage failures if the library including the gentbl dep is
+        # marked as ALWAYSLINK.
+        return
     elif not target.startswith("//iree"):
       # External target, call helper method for special case handling.
       target = bazel_to_cmake_targets.convert_external_target(target)
@@ -181,7 +187,7 @@ class BuildFileFunctions(object):
     deps = kwargs.get("deps")
     deps_list = [self._convert_target(dep) for dep in deps]
     #deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
-    deps_list = list(OrderedDict(zip(deps_list, repeat(None))))  # Remove duplicates, but preserve order of deps.
+    deps_list = list(filter(None,OrderedDict(zip(deps_list, repeat(None)))))  # Remove duplicates, but preserve order of deps.
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
 
