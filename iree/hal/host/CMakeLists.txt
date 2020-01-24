@@ -20,8 +20,13 @@ iree_cc_library(
   SRCS
     "async_command_queue.cc"
   DEPS
-    absl::base
-    iree::base::bitfield
+    iree::hal::host::host_submission_queue
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_queue
+    iree::hal::fence
+    absl::core_headers
+    absl::synchronization
   PUBLIC
 )
 
@@ -31,17 +36,17 @@ iree_cc_test(
   SRCS
     "async_command_queue_test.cc"
   DEPS
-    absl::memory
-    absl::time
-    iree::testing::gtest_main
+    iree::hal::host::async_command_queue
+    iree::hal::host::host_submission_queue
     iree::base::status
     iree::base::status_matchers
     iree::base::time
     iree::hal::command_queue
-    iree::hal::host::async_command_queue
-    iree::hal::host::host_submission_queue
     iree::hal::testing::mock_command_buffer
     iree::hal::testing::mock_command_queue
+    iree::testing::gtest_main
+    absl::memory
+    absl::time
 )
 
 iree_cc_library(
@@ -52,10 +57,11 @@ iree_cc_library(
   SRCS
     "host_buffer.cc"
   DEPS
-    absl::base
     iree::base::logging
+    iree::base::source_location
     iree::base::status
     iree::hal::buffer
+    absl::core_headers
   PUBLIC
 )
 
@@ -79,13 +85,13 @@ iree_cc_library(
   SRCS
     "host_fence.cc"
   DEPS
-    absl::base
-    absl::inlined_vector
-    absl::span
-    absl::synchronization
     iree::base::status
     iree::base::tracing
     iree::hal::fence
+    absl::core_headers
+    absl::inlined_vector
+    absl::synchronization
+    absl::span
   PUBLIC
 )
 
@@ -95,11 +101,11 @@ iree_cc_test(
   SRCS
     "host_fence_test.cc"
   DEPS
-    absl::time
-    iree::testing::gtest_main
+    iree::hal::host::host_fence
     iree::base::status
     iree::base::status_matchers
-    iree::hal::host::host_fence
+    iree::testing::gtest_main
+    absl::time
 )
 
 iree_cc_library(
@@ -110,13 +116,12 @@ iree_cc_library(
   SRCS
     "host_local_allocator.cc"
   DEPS
-    absl::base
-    absl::synchronization
+    iree::hal::host::host_buffer
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator
     iree::hal::buffer
-    iree::hal::host::host_buffer
   PUBLIC
 )
 
@@ -128,6 +133,7 @@ iree_cc_library(
   SRCS
     "host_local_command_processor.cc"
   DEPS
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::command_buffer
@@ -142,16 +148,16 @@ iree_cc_library(
   SRCS
     "host_submission_queue.cc"
   DEPS
-    absl::base
-    absl::inlined_vector
-    absl::synchronization
+    iree::hal::host::host_fence
     iree::base::intrusive_list
     iree::base::status
     iree::base::tracing
     iree::hal::command_queue
     iree::hal::fence
-    iree::hal::host::host_fence
     iree::hal::semaphore
+    absl::core_headers
+    absl::inlined_vector
+    absl::synchronization
   PUBLIC
 )
 
@@ -161,8 +167,8 @@ iree_cc_test(
   SRCS
     "host_submission_queue_test.cc"
   DEPS
-    iree::testing::gtest_main
     iree::hal::host::host_submission_queue
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

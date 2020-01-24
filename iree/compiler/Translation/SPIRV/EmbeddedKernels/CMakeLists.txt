@@ -22,9 +22,9 @@ iree_cc_library(
   SRCS
     "EmbeddedKernels.cpp"
   DEPS
-    flatbuffers
     iree::compiler::Translation::SPIRV::EmbeddedKernels::Kernels
     iree::schemas::spirv_executable_def_cc_fbs
+    flatbuffers
     MLIRIR
     MLIRSupport
     tensorflow::mlir_xla

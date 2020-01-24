@@ -45,13 +45,14 @@ iree_cc_library(
   NAME
     HALDialect
   HDRS
-    "HALDialect.cpp"
-  SRCS
     "HALDialect.h"
+  SRCS
+    "HALDialect.cpp"
   DEPS
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::HAL::Conversion::HALToVM
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
     LLVMSupport
     MLIRIR

@@ -17,7 +17,6 @@ add_subdirectory(test)
 iree_cc_library(
   NAME
     LinalgToSPIRV
-  HDRS
   SRCS
     "LinalgToSPIRV.cpp"
   DEPS
@@ -29,11 +28,9 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgOps
     MLIRLinalgTransforms
-    MLIRLinalgUtils
     MLIRLoopsToGPU
     MLIRPass
     MLIRSPIRV
-    MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRSupport
