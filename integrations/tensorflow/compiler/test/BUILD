@@ -15,26 +15,27 @@
 load(
     "//iree:build_defs.oss.bzl",
     "INTREE_FILECHECK_TARGET",
-    "iree_glob_lit_tests",
-    "iree_setup_lit_package",
 )
 load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
 )
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_setup_lit_package(
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
     data = [
         "//integrations/tensorflow/compiler:iree-tf-opt",
+        "//iree/tools:IreeFileCheck",
     ],
+    tags = ["nokokoro"],
 )
-
-iree_glob_lit_tests(tags = ["nokokoro"])
 
 py_test(
     name = "saved_model_adopt_exports",

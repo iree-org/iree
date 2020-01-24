@@ -14,18 +14,19 @@
 
 # Tests for common transforms.
 
-load("//iree:build_defs.oss.bzl", "iree_glob_lit_tests", "iree_setup_lit_package")
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_setup_lit_package(
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
     data = [
+        "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-opt",
         "//iree/tools:iree-translate",
     ],
 )
-
-iree_glob_lit_tests()
