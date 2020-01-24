@@ -110,7 +110,7 @@ maybe(llvm_configure,
 ###############################################################################
 # Bootstrap TensorFlow.
 # Note that we ultimately would like to avoid doing this at the top level like
-# this but need to unbundle some of the deps fromt the tensorflow repo first.
+# this but need to unbundle some of the deps from the tensorflow repo first.
 # In the mean-time: we're sorry.
 # TODO(laurenzo): Come up with a way to make this optional. Also, see if we can
 # get the TensorFlow tf_repositories() rule to use maybe() so we can provide
