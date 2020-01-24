@@ -27,7 +27,7 @@ iree_cc_test(
     iree::base::logging
     iree::testing::gtest_main
     absl::strings
-  )
+)
 
 iree_bytecode_module(
   NAME
@@ -79,7 +79,7 @@ iree_cc_test(
     iree::base::api
     iree::base::logging
     iree::testing::benchmark_main
-    absl::container
+    absl::inlined_vector
     absl::strings
     benchmark
 )
@@ -223,10 +223,10 @@ iree_cc_library(
   HDRS
     "ref_cc.h"
   DEPS
-    absl::base
-    iree::base::api
     iree::vm::ref
     iree::vm::types
+    iree::base::api
+    absl::core_headers
   PUBLIC
 )
 

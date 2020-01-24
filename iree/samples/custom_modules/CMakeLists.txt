@@ -38,6 +38,7 @@ iree_cc_test(
     iree::samples::custom_modules::native_module
     iree::base::api
     iree::base::logging
+    iree::hal::api
     iree::modules::hal
     iree::testing::gtest_main
     iree::vm

@@ -34,18 +34,18 @@ iree_cc_test(
   SRCS
     "check_test.cc"
   DEPS
-    absl::core_headers
-    absl::strings
+    iree::modules::check::check_test_module_cc
+    iree::modules::check::native_module
     iree::base::api
     iree::base::logging
     iree::hal::api
     iree::modules::hal
-    iree::modules::check::check_test_module_cc
-    iree::modules::check::native_module
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode_module
     iree::vm::ref
+    absl::core_headers
+    absl::strings
 )
 
 iree_cc_library(
@@ -56,7 +56,6 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
-    absl::strings
     iree::base::api
     iree::base::api_util
     iree::base::buffer_string_util
@@ -64,5 +63,6 @@ iree_cc_library(
     iree::modules::hal
     iree::vm
     iree::vm::module_abi_cc
+    absl::strings
   PUBLIC
 )

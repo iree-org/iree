@@ -18,7 +18,7 @@ iree_cc_library(
   HDRS
     "interpreter_bytecode_v0.h"
   DEPS
-    absl::core_headers
     iree::base::bitfield
+    absl::core_headers
   PUBLIC
 )

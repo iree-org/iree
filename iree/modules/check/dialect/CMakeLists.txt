@@ -18,25 +18,26 @@ iree_cc_library(
   NAME
     dialect
   HDRS
-    "conversion_patterns.h"
     "check_dialect.h"
     "check_ops.h"
     "check_ops.h.inc"
+    "conversion_patterns.h"
   SRCS
-    "conversion_patterns.cc"
     "check_dialect.cc"
     "check_ops.cc"
     "check_ops.cc.inc"
+    "conversion_patterns.cc"
   DEPS
+    iree::modules::check::dialect::check_imports
+    iree::modules::check::dialect::check_ops_gen
+    iree::compiler::Dialect::VM::Conversion
+    iree::samples::custom_modules::dialect::custom_imports
     LLVMSupport
     MLIRIR
     MLIRParser
     MLIRPass
     MLIRSupport
     MLIRTransforms
-    iree::compiler::Dialect::VM::Conversion
-    iree::modules::Check::dialect::Check_imports
-    iree::samples::custom_modules::dialect::custom_imports
   ALWAYSLINK
   PUBLIC
 )
@@ -69,15 +70,15 @@ iree_cc_binary(
   NAME
     check-opt
   DEPS
-    MLIROptMain
-    iree::modules::Check::dialect
+    iree::modules::check::dialect
     iree::tools::iree_opt_library
+    MLIROptMain
 )
 
 iree_cc_binary(
   NAME
     check-translate
   DEPS
-    iree::modules::Check::dialect
+    iree::modules::check::dialect
     iree::tools::iree_translate_library
 )
