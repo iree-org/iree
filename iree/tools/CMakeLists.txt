@@ -86,6 +86,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVTransforms
       MLIRTranslation
       tensorflow::mlir_xla
+      ${TARGET_COMPILER_BACKENDS}
     ALWAYSLINK
   )
 
