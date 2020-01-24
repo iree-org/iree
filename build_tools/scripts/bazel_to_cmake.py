@@ -105,6 +105,17 @@ class BuildFileFunctions(object):
   def _convert_translation_block(self, **kwargs):
     return "  TRANSLATION\n    \"%s\"\n" % (kwargs["translation"])
 
+  def _convert_translate_tool_block(self, **kwargs):
+    translate_tool = kwargs.get("translate_tool")
+    print(translate_tool)
+    if translate_tool:
+      translate_tool = translate_tool.replace("//", "")  # iree/base:api
+      translate_tool = translate_tool.replace(":", "_")  # iree/base::api
+      translate_tool = translate_tool.replace("/", "_")  # iree::base::api
+      return "  TRANSLATION_TOOL\n    %s\n" % (translate_tool)
+    else:
+      return ""
+
   def _convert_option_block(self, option, option_value):
     if option_value:
       # Note: this is a truthiness check as well as an existence check, i.e.
@@ -274,13 +285,15 @@ class BuildFileFunctions(object):
     name_block = self._convert_name_block(**kwargs)
     src_block = self._convert_src_block(**kwargs)
     namespace_block = self._convert_namespace_block(**kwargs)
+    translate_tool_block = self._convert_translate_tool_block(**kwargs)
     translation_block = self._convert_translation_block(**kwargs)
 
     self.converter.body += """iree_bytecode_module(
-%(name_block)s%(src_block)s%(namespace_block)s%(translation_block)s  PUBLIC\n)\n\n""" % {
+%(name_block)s%(src_block)s%(namespace_block)s%(translate_tool_block)s%(translation_block)s  PUBLIC\n)\n\n""" % {
     "name_block": name_block,
     "src_block": src_block,
     "namespace_block": namespace_block,
+    "translate_tool_block": translate_tool_block,
     "translation_block": translation_block,
     }
 
