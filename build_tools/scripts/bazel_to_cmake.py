@@ -112,7 +112,6 @@ class BuildFileFunctions(object):
 
   def _convert_translate_tool_block(self, **kwargs):
     translate_tool = kwargs.get("translate_tool")
-    print(translate_tool)
     if translate_tool:
       translate_tool = translate_tool.replace("//", "")  # iree/base:api
       translate_tool = translate_tool.replace(":", "_")  # iree/base::api
