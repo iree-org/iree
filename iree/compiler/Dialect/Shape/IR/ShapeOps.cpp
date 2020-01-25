@@ -25,6 +25,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
@@ -57,8 +58,23 @@ class ElideTiedGetRankedShapePattern
   }
 };
 
+class ElideStaticGetRankedShape : public OpRewritePattern<GetRankedShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    auto operandType = op.operand().getType().dyn_cast<RankedTensorType>();
+    auto shapeType = op.shape().getType().dyn_cast<RankedShapeType>();
+    if (!operandType || !shapeType || !operandType.hasStaticShape()) {
+      return matchFailure();
+    }
+
+    rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, shapeType);
+    return matchSuccess();
+  }
+};
+
 //===----------------------------------------------------------------------===//
-// iree.tie_shape
+// shape.tie_shape
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseTieShapeOp(OpAsmParser &parser, OperationState &state) {
@@ -107,7 +123,7 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// iree.get_ranked_shape
+// shape.get_ranked_shape
 //===----------------------------------------------------------------------===//
 
 static ParseResult parseGetRankedShapeOp(OpAsmParser &parser,
@@ -146,7 +162,98 @@ static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
 
 void GetRankedShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  patterns.insert<ElideTiedGetRankedShapePattern>(context);
+  patterns.insert<ElideTiedGetRankedShapePattern, ElideStaticGetRankedShape>(
+      context);
+}
+
+//===----------------------------------------------------------------------===//
+// shape.const_ranked_shape
+//===----------------------------------------------------------------------===//
+
+void ConstRankedShapeOp::build(Builder *builder, OperationState &result,
+                               Type type) {
+  result.addAttribute("value", UnitAttr::get(builder->getContext()));
+  result.types.push_back(type);
+}
+
+static ParseResult parseConstRankedShapeOp(OpAsmParser &parser,
+                                           OperationState &state) {
+  Type resultType;
+  if (parser.parseColonType(resultType)) {
+    return failure();
+  }
+  state.types.push_back(resultType);
+  return success();
+}
+
+static void printConstRankedShapeOp(OpAsmPrinter &p, ConstRankedShapeOp op) {
+  p << op.getOperationName() << " : ";
+  p.printType(op.result().getType());
+}
+
+static LogicalResult verifyConstRankedShapeOp(ConstRankedShapeOp op) {
+  auto rsType = op.result().getType().dyn_cast<RankedShapeType>();
+  if (!rsType || !rsType.isFullyStatic()) {
+    return op.emitOpError("must be a fully static ranked_shape");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// shape.ranked_dim
+//===----------------------------------------------------------------------===//
+
+ParseResult parseRankedDimOp(OpAsmParser &parser, OperationState &state) {
+  OpAsmParser::OperandType operand;
+  Type operandType;
+  IntegerAttr indexAttr;
+  Type indexType = parser.getBuilder().getIndexType();
+  if (parser.parseOperand(operand) || parser.parseLSquare() ||
+      parser.parseAttribute(indexAttr, indexType, "index", state.attributes) ||
+      parser.parseRSquare() || parser.parseColonType(operandType) ||
+      parser.resolveOperand(operand, operandType, state.operands)) {
+    return failure();
+  }
+
+  auto rsType = operandType.dyn_cast<RankedShapeType>();
+  if (!rsType) {
+    return parser.emitError(parser.getNameLoc());
+  }
+  state.types.push_back(rsType.getDimType());
+  return success();
+}
+
+static void printRankedDimOp(OpAsmPrinter &p, RankedDimOp op) {
+  p << op.getOperationName() << " ";
+  p.printOperand(op.shape());
+  p << "[" << op.getIndex() << "]";
+  p << " : ";
+  p.printType(op.shape().getType());
+}
+
+static LogicalResult verifyRankedDimOp(RankedDimOp op) {
+  auto resultType = op.result().getType();
+  auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
+  if (resultType != rsType.getDimType()) {
+    return op.emitOpError()
+           << "expected result of type " << rsType.getDimType();
+  }
+  auto index = static_cast<int64_t>(op.getIndex());
+  if (index < 0 || index >= rsType.getRank()) {
+    return op.emitOpError() << "index out of bounds of shape";
+  }
+  return success();
+}
+
+OpFoldResult RankedDimOp::fold(ArrayRef<Attribute> operand) {
+  auto rsType = shape().getType().cast<RankedShapeType>();
+  int index = getIndex();
+  if (!rsType.isDimDynamic(index)) {
+    auto dimSize = rsType.getStaticDim(index);
+    return IntegerAttr::get(rsType.getDimType(), dimSize);
+  }
+
+  return {};
 }
 
 #define GET_OP_CLASSES

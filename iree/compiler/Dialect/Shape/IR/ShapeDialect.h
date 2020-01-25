@@ -27,10 +27,7 @@ class ShapeDialect : public Dialect {
   // TODO(b/143787186): rename to iree.
   static StringRef getDialectNamespace() { return "shape"; }
 
-  /// Parses a type registered to this dialect.
   Type parseType(DialectAsmParser& parser) const override;
-
-  /// Prints a type registered to this dialect.
   void printType(Type type, DialectAsmPrinter& os) const override;
 };
 

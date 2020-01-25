@@ -70,6 +70,10 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
     with the tie_shape's shape() operand. In this way, a function with all
     shapes materialized and tied to intermediate tensors should canonicalize
     to contain no get_ranked_shape ops.
+
+    Any get_ranked_shape on a fully static shape will canonicalize to a const
+    with unit value:
+      %0 = constant
   }];
 
   let arguments = (ins AnyTensor:$operand);
@@ -77,6 +81,51 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
   let verifier = [{ return verify$cppClass(*this); }];
   let hasCanonicalizer = 1;
+}
+
+def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape"> {
+  let summary = "A constant ranked_shape.";
+  let description = [{
+    Holds a RankedShape value. Note that it is only legal to store a constant
+    RankedShape that is fully static, as anything more specific should be
+    in the type, not have dims represented as const SSA values.
+
+    Usage:
+      %0 = shape.const ranked_shape : !shape.ranked_shape<1x2xi32>
+  }];
+
+  let arguments = (ins);
+  let results = (outs Shape_RankedShape:$result);
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Type type
+      }]>,
+  ];
+  let verifier = [{ return verify$cppClass(*this); }];
+}
+
+def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
+  let summary = "Gets a dimension value from a ranked_shape.";
+  let description = [{
+    Static dimensions will fold to constants.
+
+    Usage:
+      %0 = shape.const ranked_shape : !shape.ranked_shape<1x2xi32>
+      %1 = shape.ranked_dim %0[0] : !shape.ranked_shape<1x2xi32>
+  }];
+
+  let arguments = (ins Shape_RankedShape:$shape,
+                   APIntAttr:$index);
+  let results = (outs AnyInteger:$result);
+  let verifier = [{ return verify$cppClass(*this); }];
+
+  let extraClassDeclaration = [{
+    unsigned getIndex() {
+      return getAttrOfType<IntegerAttr>("index").getValue().getZExtValue();
+    }
+  }];
+  let hasFolder = 1;
 }
 
 #endif  // IREE_DIALECT_SHAPE_OPS

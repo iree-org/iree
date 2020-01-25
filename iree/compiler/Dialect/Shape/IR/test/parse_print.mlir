@@ -15,3 +15,19 @@ func @parse_print_get_ranked_shape(%arg0 : tensor<2x?x4xi32>) {
   %0 = shape.get_ranked_shape %arg0 : tensor<2x?x4xi32> -> !shape.ranked_shape<2x?x4xi32>
   return
 }
+
+// -----
+// CHECK-LABEL: @const_ranked_shape
+func @const_ranked_shape() -> !shape.ranked_shape<2x4xi32> {
+  // CHECK: shape.const_ranked_shape : !shape.ranked_shape<2x4xi32>
+  %0 = shape.const_ranked_shape : !shape.ranked_shape<2x4xi32>
+  return %0 : !shape.ranked_shape<2x4xi32>
+}
+
+// -----
+// CHECK-LABEL: @ranked_dim
+func @ranked_dim(%arg0 : !shape.ranked_shape<2x4xi32>)  {
+  // CHECK: shape.ranked_dim %arg0[1] : !shape.ranked_shape<2x4xi32>
+  %0 = shape.ranked_dim %arg0[1] : !shape.ranked_shape<2x4xi32>
+  return
+}
