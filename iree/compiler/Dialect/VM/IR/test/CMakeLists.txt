@@ -12,15 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# TODO(gcmn): should we generate the glob at bazel->cmake time instead?
-file(GLOB _TEST_FILES CONFIGURE_DEPENDS *.mlir)
-
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_TEST_FILES}"
+    "arithmetic_folding.mlir"
+    "arithmetic_ops.mlir"
+    "assignment_folding.mlir"
+    "assignment_ops.mlir"
+    "comparison_folding.mlir"
+    "comparison_ops.mlir"
+    "const_folding.mlir"
+    "const_ops.mlir"
+    "control_flow_folding.mlir"
+    "control_flow_ops.mlir"
+    "conversion_folding.mlir"
+    "conversion_ops.mlir"
+    "debug_folding.mlir"
+    "debug_ops.mlir"
+    "global_folding.mlir"
+    "global_ops.mlir"
+    "structural_ops.mlir"
   DATA
-    iree_tools_iree-opt
-    IreeFileCheck
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )

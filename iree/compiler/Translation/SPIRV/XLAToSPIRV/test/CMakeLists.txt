@@ -12,4 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_glob_lit_tests()
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "adjust_integer_width.mlir"
+    "arithmetic_ops.mlir"
+    "broadcast.mlir"
+    "broadcast_in_dim.mlir"
+    "concatenate.mlir"
+    "constant.mlir"
+    "convert.mlir"
+    "copy.mlir"
+    "exp_test.mlir"
+    "extract_element.mlir"
+    "gather.mlir"
+    "max.mlir"
+    "pad.mlir"
+    "reshape.mlir"
+    "reshape_dropdims.mlir"
+    "reverse.mlir"
+    "select.mlir"
+    "slice.mlir"
+    "store_reduce.mlir"
+    "transpose_add.mlir"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
+)

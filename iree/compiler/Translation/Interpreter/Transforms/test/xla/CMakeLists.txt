@@ -16,17 +16,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "broadcast.mlir"
-    "broadcast_in_dim.mlir"
-    "concatenate.mlir"
-    "copy.mlir"
-    "extract_element.mlir"
+    "concat.mlir"
+    "dynamic_update_slice.mlir"
     "gather.mlir"
-    "pad.mlir"
-    "reverse.mlir"
     "slice.mlir"
-    "store_reduce.mlir"
-    "transpose_add.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

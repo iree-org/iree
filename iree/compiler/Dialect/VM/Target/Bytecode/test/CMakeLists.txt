@@ -12,4 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_glob_lit_tests()
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "module_encoding_smoke.mlir"
+    "reflection_attrs.mlir"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-translate
+)
