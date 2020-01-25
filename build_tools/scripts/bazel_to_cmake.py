@@ -165,6 +165,29 @@ class BuildFileFunctions(object):
   def _convert_h_file_output_block(self, **kwargs):
     return "  H_FILE_OUTPUT\n    \"%s\"\n" % kwargs.get("h_file_output")
 
+  def _convert_td_file_block(self, **kwargs):
+    td_file = kwargs.get("td_file")
+    if td_file.startswith("//iree"):
+      # Bazel `//iree/dir/td_file.td`
+      # -> CMake `${IREE_ROOT_DIR}/iree/dir/td_file.td
+      # Bazel `//iree/dir/IR:td_file.td`
+      # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
+      td_file = td_file.replace("//", "${IREE_ROOT_DIR}/")
+      td_file = td_file.replace(":", "/")
+    return "  SRCS\n    \"%s\"\n" % (td_file)
+
+  def _convert_tbl_outs_block(self, **kwargs):
+    tbl_outs = kwargs.get("tbl_outs")
+    outs_list = "\n".join(["    %s %s" % tbl_out for tbl_out in tbl_outs])
+    return "  OUTS\n%s\n" % (outs_list)
+
+  def _convert_tblgen_block(self, **kwargs):
+    tblgen = kwargs.get("tblgen")
+    if tblgen.endswith("iree-tblgen"):
+      return "  TBLGEN\n    IREE\n"
+    else:
+      return ""
+
   def _convert_target(self, target):
     if target.startswith(":"):
       # Bazel package-relative `:logging` -> CMake absolute `iree::base::logging`
@@ -338,7 +361,18 @@ class BuildFileFunctions(object):
     }
 
   def gentbl(self, **kwargs):
-    self._convert_unimplemented_function("gentbl", **kwargs)
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_td_file_block(**kwargs)
+    outs_block = self._convert_tbl_outs_block(**kwargs)
+    tblgen_block = self._convert_tblgen_block(**kwargs)
+
+    self.converter.body += """iree_tablegen_library(
+%(name_block)s%(srcs_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    "outs_block": outs_block,
+    "tblgen_block": tblgen_block,
+    }
 
   def iree_setup_lit_package(self, **kwargs):
     self._convert_unimplemented_function("iree_setup_lit_package", **kwargs)
