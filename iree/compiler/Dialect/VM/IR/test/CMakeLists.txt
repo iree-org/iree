@@ -12,4 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_glob_lit_tests()
+# TODO(gcmn): should we generate the glob at bazel->cmake time instead?
+file(GLOB _TEST_FILES CONFIGURE_DEPENDS *.mlir)
+
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "${_TEST_FILES}"
+  DATA
+    iree_tools_iree-opt
+    IreeFileCheck
+)
