@@ -113,6 +113,8 @@ class BuildFileFunctions(object):
   def _convert_translate_tool_block(self, **kwargs):
     translate_tool = kwargs.get("translate_tool")
     if translate_tool:
+      # Bazel `//iree/base`     -> CMake `iree::base`
+      # Bazel `//iree/base:api` -> CMake `iree::base::api`
       translate_tool = translate_tool.replace("//", "")  # iree/base:api
       translate_tool = translate_tool.replace(":", "_")  # iree/base::api
       translate_tool = translate_tool.replace("/", "_")  # iree::base::api
@@ -177,7 +179,7 @@ class BuildFileFunctions(object):
         # and not as a dependency. Adding these targets to the dependencies list,
         # results in linkage failures if the library including the gentbl dep is
         # marked as ALWAYSLINK.
-        return
+        return ""
     elif not target.startswith("//iree"):
       # External target, call helper method for special case handling.
       target = bazel_to_cmake_targets.convert_external_target(target)
@@ -200,7 +202,8 @@ class BuildFileFunctions(object):
     deps = kwargs.get("deps")
     deps_list = [self._convert_target(dep) for dep in deps]
     #deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
-    deps_list = list(filter(None,OrderedDict(zip(deps_list, repeat(None)))))  # Remove duplicates, but preserve order of deps.
+    # Remove `None` values and duplicates, preserving the original ordering.
+    deps_list = list(filter(None,OrderedDict(zip(deps_list, repeat(None)))))
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
 
