@@ -226,8 +226,7 @@ class BuildFileFunctions(object):
     #    package2::target
     deps = kwargs.get("deps")
     deps_list = [self._convert_target(dep) for dep in deps]
-    #deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
-    # Remove `None` values and duplicates, preserving the original ordering.
+    # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
     deps_list = list(filter(None,OrderedDict(zip(deps_list, repeat(None)))))
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
