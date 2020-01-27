@@ -310,7 +310,7 @@ def HAL_Semaphore : DialectType<
 def HAL_OrdinalAttr : IntegerAttrBase<I32, "32-bit integer ordinal attribute">;
 
 // Values are FourCC codes.
-// See https://github.com/google/iree/tree/master/iree/iree/hal/executable_format.h for more info.
+// See https://github.com/google/iree/tree/master/iree/hal/executable_format.h for more info.
 // https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
 // integer values for inclusion here.
 //

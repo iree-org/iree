@@ -50,7 +50,7 @@ constexpr ExecutableFormat kExecutableFormatIreeBytecode =
     MakeExecutableFormatID("IREE");
 
 // SPIR-V executable in FlatBuffer format using the
-// https://github.com/google/iree/tree/master/iree/iree/schemas/spirv_executable_def.fbs
+// https://github.com/google/iree/tree/master/iree/schemas/spirv_executable_def.fbs
 // schema.
 constexpr ExecutableFormat kExecutableFormatSpirV =
     MakeExecutableFormatID("SPVE");
