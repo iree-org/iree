@@ -72,13 +72,41 @@ def CUSTOM_BufferToMessageOp : Op<CUSTOM_Dialect, "buffer_to_message"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$buffer,
-    I32:$type,
-    Variadic<I32>:$shape
+    RefPtrOf<HAL_BufferView>:$buffer_view
   );
   let results = (outs
     // TODO(benvanik): remove the use of RefPtrOf here.
     RefPtrOf<CUSTOM_Message>:$result
+  );
+}
+
+def CUSTOM_MessageToTensorOp : Op<CUSTOM_Dialect, "message_to_tensor"> {
+  let summary = [{parses message contents as a tensor}];
+  let description = [{
+    Parses the message containing a IREE buffer parser-formatted tensor.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<CUSTOM_Message>:$message
+  );
+  let results = (outs
+    // TODO(benvanik): remove the use of RefPtrOf here.
+    AnyRankedTensor:$result
+  );
+}
+
+def CUSTOM_MessageToBufferOp : Op<CUSTOM_Dialect, "message_to_buffer"> {
+  let summary = [{parses message contents as a buffer}];
+  let description = [{
+    Parses the message containing a IREE buffer parser-formatted tensor.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<CUSTOM_Message>:$message
+  );
+  let results = (outs
+    // TODO(benvanik): remove the use of RefPtrOf here.
+    RefPtrOf<HAL_BufferView>:$result
   );
 }
 

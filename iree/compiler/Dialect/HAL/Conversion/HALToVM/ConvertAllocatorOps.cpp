@@ -66,15 +66,14 @@ class AllocatorAllocateConstOpConversion
     callOperands.append(shape.begin(), shape.end());
     callOperands.push_back(rewriter.create<mlir::ConstantOp>(
         op.getLoc(),
-        rewriter.getI32IntegerAttr(IREE::HAL::getRoundedElementByteWidth(
-            op.value().getType().getElementType()))));
+        IREE::HAL::getElementTypeAttr(op.value().getType().getElementType())));
     callOperands.push_back(loadRodataOp.getResult());
     SmallVector<int8_t, 6> segmentSizes = {
         /*allocator=*/-1,
         /*memory_types=*/-1,
         /*buffer_usage=*/-1,
         /*shape=*/static_cast<int8_t>(shape.size()),
-        /*element_size=*/-1,
+        /*element_type=*/-1,
         /*value=*/-1,
     };
 
@@ -109,12 +108,14 @@ void populateHALAllocatorToVMPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorComputeSizeOp>>(
       context, importSymbols, typeConverter, "hal.allocator.compute_size");
+  patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorComputeOffsetOp>>(
+      context, importSymbols, typeConverter, "hal.allocator.compute_offset");
+  patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorComputeRangeOp>>(
+      context, importSymbols, typeConverter, "hal.allocator.compute_range");
   patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorAllocateOp>>(
       context, importSymbols, typeConverter, "hal.allocator.allocate");
   patterns.insert<AllocatorAllocateConstOpConversion>(
       context, importSymbols, typeConverter, "hal.allocator.allocate.const");
-  patterns.insert<VMImportOpConversion<IREE::HAL::AllocatorAllocateShapedOp>>(
-      context, importSymbols, typeConverter, "hal.allocator.allocate.shaped");
 }
 
 }  // namespace iree_compiler

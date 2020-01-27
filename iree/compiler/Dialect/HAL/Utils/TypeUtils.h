@@ -38,6 +38,58 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
 SmallVector<Value, 4> getShapeDims(Value shapedValue,
                                    ConversionPatternRewriter &rewriter);
 
+// An adaptor used for tensor->buffer rewrites.
+// This abstracts the source and destination types to allow for implicit
+// conversion between buffers and buffer views. Always prefer using this when
+// mapping between the types to ensure that the conversion framework can
+// flexibly choose which type to use based on target ops.
+struct TensorRewriteAdaptor {
+  TensorRewriteAdaptor(Location loc, Value oldValue, Value newValue,
+                       ConversionPatternRewriter &rewriter)
+      : loc(loc), oldValue(oldValue), newValue(newValue), rewriter(rewriter) {}
+
+  Location loc;
+  Value oldValue;
+  Value newValue;
+  ConversionPatternRewriter &rewriter;
+
+  // Gets the allocator this buffer was allocated with.
+  Value getAllocator();
+
+  // Returns true if the new value is a buffer view type.
+  bool isBufferView();
+
+  // Returns a hal.buffer type for the value.
+  Value getBuffer();
+
+  // Returns a hal.buffer_view type for the value.
+  Value getBufferView();
+
+  // Returns the original tensor type of the value.
+  TensorType getTensorType();
+
+  // Returns the element type of the tensor as the int32 packed value.
+  int32_t getElementType();
+  IntegerAttr getElementTypeAttr();
+
+  // Returns the I32 shape dimensions of the tensor.
+  SmallVector<Value, 4> getShapeDims();
+
+  // Performs the equivalent of a hal.buffer_view.byte_length.
+  Value getByteLength();
+
+  // Performs the equivalent of a hal.buffer_view.compute_offset.
+  Value computeOffset(ValueRange indices);
+
+  struct Range {
+    Value offset;
+    Value length;
+  };
+
+  // Performs the equivalent of a hal.buffer_view.compute_range.
+  Range computeRange(ValueRange indices, ValueRange lengths);
+};
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

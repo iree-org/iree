@@ -78,15 +78,13 @@ class TensorLoadOpConversion
       IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorLoadOpOperandAdaptor operands(newOperands);
-    auto sourceType = loadOp.source().getType().cast<ShapedType>();
-    auto sourceShape = IREE::HAL::getShapeDims(loadOp.source(), rewriter);
-    auto sourceOffset =
-        rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
-            loadOp.getLoc(), operands.source(), sourceShape, operands.indices(),
-            IREE::HAL::getRoundedElementByteWidth(sourceType.getElementType()));
+    IREE::HAL::TensorRewriteAdaptor source(loadOp.getLoc(), loadOp.source(),
+                                           operands.source(), rewriter);
+
+    auto sourceOffset = source.computeOffset(operands.indices());
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
-        operands.source(), sourceOffset);
+        source.getBuffer(), sourceOffset);
     return matchSuccess();
   }
 
@@ -104,15 +102,12 @@ class TensorStoreOpConversion
       IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorStoreOpOperandAdaptor operands(newOperands);
-    auto targetType = storeOp.target().getType().cast<ShapedType>();
-    auto targetShape = IREE::HAL::getShapeDims(storeOp.target(), rewriter);
-    auto targetOffset =
-        rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
-            storeOp.getLoc(), operands.target(), targetShape,
-            operands.indices(),
-            IREE::HAL::getRoundedElementByteWidth(targetType.getElementType()));
+    IREE::HAL::TensorRewriteAdaptor target(storeOp.getLoc(), storeOp.target(),
+                                           operands.target(), rewriter);
+
+    auto targetOffset = target.computeOffset(operands.indices());
     rewriter.create<IREE::HAL::BufferStoreOp>(
-        storeOp.getLoc(), operands.value(), operands.target(), targetOffset);
+        storeOp.getLoc(), operands.value(), target.getBuffer(), targetOffset);
     rewriter.replaceOp(storeOp, {operands.value()});
     return matchSuccess();
   }

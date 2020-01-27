@@ -111,18 +111,6 @@ inline absl::Time ToAbslTime(iree_time_t time) {
   }
 }
 
-// Converts a Shape to an iree_shape_t.
-inline iree_status_t ToApiShape(const Shape& shape, iree_shape_t* out_shape) {
-  out_shape->rank = shape.size();
-  if (shape.size() > ABSL_ARRAYSIZE(out_shape->dims)) {
-    return IREE_STATUS_OUT_OF_RANGE;
-  }
-  for (int i = 0; i < out_shape->rank; ++i) {
-    out_shape->dims[i] = shape[i];
-  }
-  return IREE_STATUS_OK;
-}
-
 // Returns a vector initialized with the contents of a C-style list query.
 // For functions of the form (..., capacity, out_values, out_count) this will
 // try to fetch the items and resize as needed such that the returned value

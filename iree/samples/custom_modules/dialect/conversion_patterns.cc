@@ -32,6 +32,8 @@ void populateCustomToHALPatterns(MLIRContext *context,
   // buffer is required and the shape is not) we could add our own.
   patterns.insert<HALOpConversion<TensorToMessageOp, BufferToMessageOp>>(
       context, typeConverter);
+  patterns.insert<HALOpConversion<MessageToTensorOp, MessageToBufferOp>>(
+      context, typeConverter);
 }
 
 void populateCustomToVMPatterns(MLIRContext *context,
@@ -43,6 +45,8 @@ void populateCustomToVMPatterns(MLIRContext *context,
   // (such as the HAL dialect does).
   patterns.insert<VMImportOpConversion<IREE::Custom::BufferToMessageOp>>(
       context, importSymbols, typeConverter, "custom.buffer_to_message");
+  patterns.insert<VMImportOpConversion<IREE::Custom::MessageToBufferOp>>(
+      context, importSymbols, typeConverter, "custom.message_to_buffer");
   patterns.insert<VMImportOpConversion<IREE::Custom::PrintOp>>(
       context, importSymbols, typeConverter, "custom.print");
   patterns.insert<VMImportOpConversion<IREE::Custom::ReverseOp>>(

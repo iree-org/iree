@@ -41,3 +41,14 @@ func @printTensor(%tensor : tensor<2x4xf32>) -> !iree.ref<!custom.message>
   "custom.print"(%0, %c1) : (!iree.ref<!custom.message>, i32) -> ()
   return %0 : !iree.ref<!custom.message>
 }
+
+// Round-trips a tensor through a message.
+func @roundTripTensor(%tensor : tensor<2x4xf32>) -> !iree.ref<!custom.message>
+    attributes { iree.module.export } {
+  %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !iree.ref<!custom.message>
+  %1 = "custom.message_to_tensor"(%0) : (!iree.ref<!custom.message>) -> tensor<2x4xf32>
+  %2 = "custom.tensor_to_message"(%1) : (tensor<2x4xf32>) -> !iree.ref<!custom.message>
+  %c1 = constant 1 : i32
+  "custom.print"(%2, %c1) : (!iree.ref<!custom.message>, i32) -> ()
+  return %0 : !iree.ref<!custom.message>
+}

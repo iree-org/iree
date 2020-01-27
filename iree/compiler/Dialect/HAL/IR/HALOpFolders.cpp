@@ -124,29 +124,26 @@ void VariableStoreOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
-// iree::hal::Allocator
+// iree::hal::Buffer
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-/// Simplifies a hal.allocator.compute_size + hal.allocator.allocate pair into
-/// a single hal.allocator.allocate.shaped when there are no other paired
-/// allocations.
-struct SimplifyAllocatorAllocateShapedOp
-    : public OpRewritePattern<AllocatorAllocateOp> {
-  using OpRewritePattern<AllocatorAllocateOp>::OpRewritePattern;
+/// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
+/// the same scope and we know the origin buffer.
+struct SkipBufferAllocatorOp : public OpRewritePattern<BufferAllocatorOp> {
+  using OpRewritePattern<BufferAllocatorOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(AllocatorAllocateOp op,
+  PatternMatchResult matchAndRewrite(BufferAllocatorOp op,
                                      PatternRewriter &rewriter) const override {
-    if (auto computeSizeOp = dyn_cast_or_null<AllocatorComputeSizeOp>(
-            op.allocation_size().getDefiningOp())) {
-      if (op.memory_types() == computeSizeOp.memory_types() &&
-          op.buffer_usage() == computeSizeOp.buffer_usage()) {
-        rewriter.replaceOpWithNewOp<AllocatorAllocateShapedOp>(
-            op, op.allocator(), op.memory_types(), op.buffer_usage(),
-            computeSizeOp.shape(), computeSizeOp.element_size().getZExtValue());
-        return matchSuccess();
-      }
+    if (auto allocateOp = dyn_cast_or_null<AllocatorAllocateOp>(
+            op.buffer().getDefiningOp())) {
+      rewriter.replaceOp(op, allocateOp.allocator());
+      return matchSuccess();
+    } else if (auto allocateOp = dyn_cast_or_null<AllocatorAllocateConstOp>(
+                   op.buffer().getDefiningOp())) {
+      rewriter.replaceOp(op, allocateOp.allocator());
+      return matchSuccess();
     }
     return matchFailure();
   }
@@ -154,9 +151,38 @@ struct SimplifyAllocatorAllocateShapedOp
 
 }  // namespace
 
-void AllocatorAllocateOp::getCanonicalizationPatterns(
+void BufferAllocatorOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<SimplifyAllocatorAllocateShapedOp>(context);
+  results.insert<SkipBufferAllocatorOp>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::BufferView
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
+/// the same scope and we know the origin buffer.
+struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
+  using OpRewritePattern<BufferViewBufferOp>::OpRewritePattern;
+
+  PatternMatchResult matchAndRewrite(BufferViewBufferOp op,
+                                     PatternRewriter &rewriter) const override {
+    if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
+            op.buffer_view().getDefiningOp())) {
+      rewriter.replaceOp(op, createOp.buffer());
+      return matchSuccess();
+    }
+    return matchFailure();
+  }
+};
+
+}  // namespace
+
+void BufferViewBufferOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<SkipBufferViewBufferOp>(context);
 }
 
 }  // namespace HAL

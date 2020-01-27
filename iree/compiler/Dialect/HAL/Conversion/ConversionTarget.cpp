@@ -15,8 +15,11 @@
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -76,67 +79,45 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
     auto dstOperand = std::get<1>(srcDstOperand);
     if (auto tensorType =
             srcOperand.getType().template dyn_cast<TensorType>()) {
-      if (!tensorType.hasStaticShape()) {
-        // Dynamic shapes not yet implemented.
-        return srcOp->emitOpError(
-            "has a dynamically shaped tensor operand that is not yet "
-            "supported");
-      }
-
-      // New operand as hal.buffer.
-      state.addOperands({dstOperand});
-
-      // Type encoded to a matching primitive data type.
-      auto elementType =
-          IREE::HAL::getElementTypeValue(tensorType.getElementType());
-      if (!elementType) {
-        // Unsupported element type.
-        return srcOp->emitOpError(
-            "requires the element type be mappable to "
-            "IREE::HAL::ElementType");
-      }
-      auto typeOp = rewriter.createOrFold<mlir::ConstantOp>(
-          srcOp->getLoc(), rewriter.getIntegerType(32),
-          rewriter.getI32IntegerAttr(elementType.getValue()));
-      state.addOperands({typeOp});
-
-      // Shape encoded as a variadic list of dimensions.
-      // TODO(benvanik): segment_sizes for multiple operands.
-      for (int64_t dim : tensorType.getShape()) {
-        auto dimOp = rewriter.createOrFold<mlir::ConstantOp>(
-            srcOp->getLoc(), rewriter.getIntegerType(32),
-            rewriter.getI32IntegerAttr(static_cast<int32_t>(dim)));
-        state.addOperands({dimOp});
-      }
+      // Create the buffer view that we'll pass to the function.
+      // Note that we expect this to be CSE'd if there are multiple calls using
+      // the same buffer.
+      IREE::HAL::TensorRewriteAdaptor operand(srcOp->getLoc(), srcOperand,
+                                              dstOperand, rewriter);
+      state.addOperands({operand.getBufferView()});
     } else {
+      // Normal pass-through operand.
       state.addOperands({dstOperand});
     }
   }
   for (auto resultType : srcOp->getResultTypes()) {
     if (auto tensorType = resultType.template dyn_cast<TensorType>()) {
-      if (!tensorType.hasStaticShape()) {
-        // Dynamic shapes not yet implemented.
-        return srcOp->emitOpError(
-            "has a dynamically shaped tensor result that is not yet supported");
-      }
-
-      // TODO(benvanik): use type converter multi-type expansion.
-      // Tensor -> buffer.
-      state.addTypes(typeConverter.convertType(tensorType));
-      // Element type.
-      state.addTypes(rewriter.getIntegerType(32));
-      // Shape encoded as a variadic list of dimensions.
-      // TODO(benvanik): segment_sizes for multiple results.
-      for (int i = 0; i < tensorType.getShape().size(); ++i) {
-        state.addTypes(rewriter.getIntegerType(32));
-      }
+      state.addTypes(IREE::RefPtrType::get(
+          IREE::HAL::BufferViewType::get(rewriter.getContext())));
     } else {
+      // Normal pass-through result.
       state.addTypes({resultType});
     }
   }
 
   auto *dstOp = rewriter.createOperation(state);
-  rewriter.replaceOp(srcOp, dstOp->getResults());
+
+  // Now unpack any of the buffer views we may have returned.
+  SmallVector<Value, 4> results;
+  for (auto resultTypeValue :
+       llvm::zip(srcOp->getResultTypes(), dstOp->getResults())) {
+    Type resultType;
+    Value resultValue;
+    std::tie(resultType, resultValue) = resultTypeValue;
+    if (auto tensorType = resultType.template dyn_cast<TensorType>()) {
+      results.push_back(rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(
+          srcOp->getLoc(), resultValue));
+    } else {
+      results.push_back(resultValue);
+    }
+  }
+
+  rewriter.replaceOp(srcOp, results);
   return success();
 }
 

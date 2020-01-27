@@ -53,21 +53,22 @@ class HalMappedMemory {
   }
 
   py::buffer_info ToBufferInfo() {
-    iree_shape_t shape;
-    CheckApiStatus(iree_hal_buffer_view_shape(bv_, &shape),
-                   "Error getting buffer view shape");
-    int8_t element_size = iree_hal_buffer_view_element_size(bv_);
-    absl::InlinedVector<py::ssize_t, IREE_SHAPE_MAX_RANK> dims;
-    dims.resize(shape.rank);
-    for (int i = 0; i < shape.rank; ++i) {
-      dims[i] = shape.dims[i];
+    absl::InlinedVector<int32_t, 6> shape(iree_hal_buffer_view_shape_rank(bv_));
+    CheckApiStatus(
+        iree_hal_buffer_view_shape(bv_, shape.size(), shape.data(), nullptr),
+        "Error getting buffer view shape");
+    iree_hal_element_type_t element_type =
+        iree_hal_buffer_view_element_type(bv_);
+    int32_t element_size = iree_hal_element_byte_count(element_type);
+    absl::InlinedVector<py::ssize_t, 6> dims(shape.size());
+    for (int i = 0; i < shape.size(); ++i) {
+      dims[i] = shape[i];
     }
-    absl::InlinedVector<py::ssize_t, IREE_SHAPE_MAX_RANK> strides;
-    strides.resize(shape.rank);
+    absl::InlinedVector<py::ssize_t, 8> strides(shape.size());
     if (!strides.empty()) {
-      strides[shape.rank - 1] = element_size;
-      for (int i = shape.rank - 2; i >= 0; --i) {
-        strides[i] = strides[i + 1] * shape.dims[i + 1];
+      strides[shape.size() - 1] = element_size;
+      for (int i = shape.size() - 2; i >= 0; --i) {
+        strides[i] = strides[i + 1] * shape[i + 1];
       }
     }
 
@@ -76,7 +77,7 @@ class HalMappedMemory {
     return py::buffer_info(
         mapped_memory_.contents.data, element_size,
         py::format_descriptor<float>::format(),  // TODO(laurenzo): DTYPE!
-        shape.rank, dims, strides);
+        shape.size(), dims, strides);
   }
 
  private:

@@ -142,13 +142,6 @@ typedef struct {
   iree_host_size_t data_length;
 } iree_const_byte_span_t;
 
-// TODO(benvanik): remove when HAL dispatch API is simplified.
-#define IREE_SHAPE_MAX_RANK 5
-typedef struct {
-  int32_t rank;
-  int32_t dims[IREE_SHAPE_MAX_RANK];
-} iree_shape_t;
-
 //===----------------------------------------------------------------------===//
 // iree_status_t and error reporting
 //===----------------------------------------------------------------------===//

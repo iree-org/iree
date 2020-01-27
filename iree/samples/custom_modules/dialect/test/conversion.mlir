@@ -20,17 +20,29 @@
 
 // CHECK-LABEL: @tensorToMessage
 func @tensorToMessage(%tensor : tensor<2x4xf32>) {
-  // CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 131104 : i32
+  // CHECK-DAG: [[TYPE:%.+]] = vm.const.i32 50331680 : i32
   // CHECK-DAG: [[DIM0:%.+]] = vm.const.i32 2 : i32
   // CHECK-DAG: [[DIM1:%.+]] = vm.const.i32 4 : i32
-  // CHECK-NEXT: [[MSG:%.+]] = vm.call.variadic @custom.buffer_to_message(%arg0, [[TYPE]], [
+  // CHECK-NEXT: [[VIEW:%.+]] = vm.call.variadic @hal.buffer_view.create(%arg0, [
   // CHECK-SAME:     [[DIM0]], [[DIM1]]
-  // CHECK-SAME: ]) : (!iree.ref<!hal.buffer>, i32, i32...) -> !iree.ref<!custom.message>
+  // CHECK-SAME: ], [[TYPE]])
+  // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!iree.ref<!hal.buffer_view>) -> !iree.ref<!custom.message>
   %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !iree.ref<!custom.message>
   %c1 = constant 1 : i32
   // CHECK: vm.call @custom.print([[MSG]]
   "custom.print"(%0, %c1) : (!iree.ref<!custom.message>, i32) -> ()
   return
+}
+
+// -----
+
+// CHECK-LABEL: @messageToTensor
+func @messageToTensor(%arg0 : !iree.ref<!custom.message>) -> tensor<2x4xf32> {
+  // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!iree.ref<!custom.message>) -> !iree.ref<!hal.buffer_view>
+  %0 = "custom.message_to_tensor"(%arg0) : (!iree.ref<!custom.message>) -> tensor<2x4xf32>
+  // CHECK-NEXT: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!iree.ref<!hal.buffer_view>) -> !iree.ref<!hal.buffer>
+  // CHECK-NEXT: vm.return [[BUFFER]]
+  return %0 : tensor<2x4xf32>
 }
 
 // -----

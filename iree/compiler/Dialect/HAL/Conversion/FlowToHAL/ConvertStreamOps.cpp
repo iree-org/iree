@@ -53,7 +53,7 @@ struct BufferSet {
 };
 
 // Allocates a buffer for the given stream output value.
-// |streamValue| is the Value  used within the stream region and
+// |streamValue| is the Value used within the stream region and
 // |externalValue| is the returned value from the stream region in the parent
 // block.
 static Value allocateOutputBuffer(Value streamValue, Value externalValue,
@@ -67,14 +67,17 @@ static Value allocateOutputBuffer(Value streamValue, Value externalValue,
       IREE::HAL::BufferUsageBitfield::All;
 
   // Compute the allocation size for the value.
-  int elementSize = IREE::HAL::getRoundedElementByteWidth(
+  auto elementType = IREE::HAL::getElementTypeValue(
       streamValue.getType().cast<ShapedType>().getElementType());
+  if (!elementType) {
+    return {};
+  }
   auto shape = IREE::HAL::getShapeDims(streamValue, rewriter);
-  auto allocationSize = rewriter
-                            .create<IREE::HAL::AllocatorComputeSizeOp>(
-                                externalValue.getLoc(), allocator, memoryTypes,
-                                bufferUsage, shape, elementSize)
-                            .getResult();
+  auto allocationSize =
+      rewriter
+          .create<IREE::HAL::AllocatorComputeSizeOp>(
+              externalValue.getLoc(), allocator, shape, elementType.getValue())
+          .getResult();
 
   auto buffer = rewriter
                     .create<IREE::HAL::AllocatorAllocateOp>(
@@ -118,14 +121,17 @@ static Value allocateTransientBuffer(Value streamValue, Value allocator,
       IREE::HAL::BufferUsageBitfield::Transfer;
 
   // Compute the allocation size for the value.
-  int elementSize = IREE::HAL::getRoundedElementByteWidth(
+  auto elementType = IREE::HAL::getElementTypeValue(
       streamValue.getType().cast<ShapedType>().getElementType());
+  if (!elementType) {
+    return {};
+  }
   auto shape = IREE::HAL::getShapeDims(streamValue, rewriter);
-  auto allocationSize = rewriter
-                            .create<IREE::HAL::AllocatorComputeSizeOp>(
-                                streamValue.getLoc(), allocator, memoryTypes,
-                                bufferUsage, shape, elementSize)
-                            .getResult();
+  auto allocationSize =
+      rewriter
+          .create<IREE::HAL::AllocatorComputeSizeOp>(
+              streamValue.getLoc(), allocator, shape, elementType.getValue())
+          .getResult();
 
   auto buffer = rewriter
                     .create<IREE::HAL::AllocatorAllocateOp>(
@@ -210,15 +216,13 @@ static void recordPushBindings(Value device, Value commandBuffer,
                                ConversionPatternRewriter &rewriter) {
   int bindingOrdinal = 0;
   auto pushBinding = [&](Value tensorValue) {
-    auto tensorType = tensorValue.getType().cast<ShapedType>();
-    auto shape = IREE::HAL::getShapeDims(tensorValue, rewriter);
-    int elementSize =
-        IREE::HAL::getRoundedElementByteWidth(tensorType.getElementType());
     auto &bufferRange = bufferSet.rangeMap[tensorValue];
+    IREE::HAL::TensorRewriteAdaptor value(dispatchOp.getLoc(), tensorValue,
+                                          bufferRange.buffer, rewriter);
     rewriter.create<IREE::HAL::ExPushBindingOp>(
         dispatchOp.getLoc(), commandBuffer,
-        rewriter.getI32IntegerAttr(bindingOrdinal++), bufferRange.buffer, shape,
-        rewriter.getI32IntegerAttr(elementSize));
+        rewriter.getI32IntegerAttr(bindingOrdinal++), value.getBuffer(),
+        value.getShapeDims(), value.getElementTypeAttr());
     rewriter.create<IREE::HAL::ExDeferReleaseOp>(dispatchOp.getLoc(),
                                                  bufferRange.buffer);
   };
@@ -274,39 +278,33 @@ static void recordTensorUpdate(Value device, Value commandBuffer,
   auto &targetBuffer = bufferSet.rangeMap[updateOp.target()];
   auto &resultBuffer = bufferSet.rangeMap[updateOp.result()];
 
+  // TODO(benvanik): use something other than the BufferRange::buffer?
+  // This may require us to subview the buffer first.
+  IREE::HAL::TensorRewriteAdaptor update(updateOp.getLoc(), updateOp.update(),
+                                         updateBuffer.buffer, rewriter);
+  IREE::HAL::TensorRewriteAdaptor target(updateOp.getLoc(), updateOp.target(),
+                                         targetBuffer.buffer, rewriter);
+  IREE::HAL::TensorRewriteAdaptor result(updateOp.getLoc(), updateOp.result(),
+                                         resultBuffer.buffer, rewriter);
+
   auto zeroOffset = rewriter.createOrFold<mlir::ConstantOp>(
       updateOp.getLoc(), rewriter.getI32IntegerAttr(0));
 
   // Compute the size of the update range.
-  auto updateType = updateOp.update().getType().cast<ShapedType>();
-  int elementSize =
-      IREE::HAL::getRoundedElementByteWidth(updateType.getElementType());
-  auto targetShape = IREE::HAL::getShapeDims(updateOp.target(), rewriter);
-  auto updateShape = IREE::HAL::getShapeDims(updateOp.update(), rewriter);
   auto startIndices = llvm::to_vector<4>(llvm::map_range(
       updateOp.start_indices(),
       [&](Value value) { return rewriter.getRemappedValue(value); }));
-  auto targetRange = rewriter.create<IREE::HAL::BufferViewComputeRangeOp>(
-      updateOp.getLoc(), targetBuffer.buffer, targetShape, startIndices,
-      updateShape, elementSize);
-
-  auto updateOffset = targetRange.offset();
-  auto updateLength = targetRange.length();
-  auto targetLength =
-      rewriter
-          .create<IREE::HAL::BufferViewComputeLengthOp>(
-              updateOp.getLoc(), targetBuffer.buffer, targetShape, elementSize)
-          .getResult();
+  auto targetRange = target.computeRange(startIndices, update.getShapeDims());
 
   // TODO(benvanik): actual buffer allocation so we aren't doing this copy.
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
-      updateOp.getLoc(), commandBuffer, targetBuffer.buffer, zeroOffset,
-      resultBuffer.buffer, zeroOffset, targetLength);
+      updateOp.getLoc(), commandBuffer, target.getBuffer(), zeroOffset,
+      result.getBuffer(), zeroOffset, target.getByteLength());
   // TODO(benvanik): slice left/mid/right, but really just don't do this.
   recordFullExecutionBarrier(commandBuffer, updateOp.getLoc(), rewriter);
   rewriter.create<IREE::HAL::CommandBufferCopyBufferOp>(
-      updateOp.getLoc(), commandBuffer, updateBuffer.buffer, zeroOffset,
-      resultBuffer.buffer, updateOffset, updateLength);
+      updateOp.getLoc(), commandBuffer, update.getBuffer(), zeroOffset,
+      result.getBuffer(), targetRange.offset, targetRange.length);
 
   // TODO(benvanik): implement resource sets.
   rewriter.create<IREE::HAL::ExDeferReleaseOp>(updateOp.getLoc(),

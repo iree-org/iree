@@ -56,8 +56,10 @@ cc_library(
         ":semaphore",
         "//iree/base:api",
         "//iree/base:api_util",
+        "//iree/base:ref_ptr",
         "//iree/base:shape",
         "//iree/base:tracing",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )

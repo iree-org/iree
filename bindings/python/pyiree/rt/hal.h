@@ -15,6 +15,7 @@
 #ifndef IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
 #define IREE_BINDINGS_PYTHON_PYIREE_RT_HAL_H_
 
+#include "absl/container/inlined_vector.h"
 #include "bindings/python/pyiree/common/binding.h"
 #include "bindings/python/pyiree/common/status_utils.h"
 #include "iree/hal/api.h"
@@ -76,18 +77,12 @@ class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
 struct HalShape {
  public:
   static HalShape FromIntVector(std::vector<int32_t> indices) {
-    if (indices.size() > IREE_SHAPE_MAX_RANK) {
-      throw RaiseValueError("Shape exceeded maximum rank");
-    }
     HalShape s;
-    s.s.rank = indices.size();
-    for (size_t i = 0, e = indices.size(); i < e; ++i) {
-      s.s.dims[i] = indices[i];
-    }
+    s.s = {indices.begin(), indices.end()};
     return s;
   }
 
-  iree_shape_t s;
+  absl::InlinedVector<int32_t, 6> s;
 };
 
 class HalBufferView
@@ -119,11 +114,15 @@ class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
                    "Error zero filling buffer");
   }
 
+  // TODO(laurenzo): make this take element_type instead.
   HalBufferView CreateView(HalShape& shape, size_t element_size) {
     iree_hal_buffer_view_t* bv;
-    CheckApiStatus(iree_hal_buffer_view_create(raw_ptr(), shape.s, element_size,
-                                               IREE_ALLOCATOR_SYSTEM, &bv),
-                   "Error creating buffer view");
+    iree_hal_element_type_t element_type = iree_hal_make_element_type(
+        IREE_HAL_ELEMENT_TYPE_NONE, element_size * 8);
+    CheckApiStatus(
+        iree_hal_buffer_view_create(raw_ptr(), shape.s.data(), shape.s.size(),
+                                    element_type, IREE_ALLOCATOR_SYSTEM, &bv),
+        "Error creating buffer view");
     return HalBufferView::CreateRetained(bv);
   }
 };

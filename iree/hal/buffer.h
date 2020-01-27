@@ -651,6 +651,9 @@ class MappedMemory {
   T* mutable_data() noexcept;
   absl::Span<T> mutable_contents() noexcept { return {mutable_data(), size()}; }
 
+  // Returns a raw pointer to the mapped data without any access checks.
+  T* unsafe_data() const noexcept { return data_; }
+
   // Equivalent to absl::Span::subspan().
   // May return a 0-length span.
   // Fails if the buffer is not mapped or not mapped for the requested access.

@@ -67,14 +67,8 @@ class HALConversionTarget : public ConversionTarget {
 // Source:
 //   my.tensor_op(%arg0 : tensor<2x4xf32>)
 // Target:
-//   my.buffer_op(
-//       %arg0_buffer : !iree.ref<!hal.buffer>,
-//       %arg0_type : i32,
-//       [%arg0_shape_dim0 : i32, %arg0_shape_dim1 : i32]
-//   )
-//
-// TODO(benvanik): variants that elide unused information or store it as attrs.
-// TODO(benvanik): type specification.
+//   %arg0_view = hal.buffer_view.create %arg0, ...
+//   my.buffer_op(%arg0_view : !iree.ref<!hal.buffer_view>)
 template <typename SRC, typename DST>
 class HALOpConversion : public OpConversionPattern<SRC> {
  public:

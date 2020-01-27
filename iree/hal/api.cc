@@ -14,6 +14,11 @@
 
 #include "iree/hal/api.h"
 
+#include <cctype>
+#include <cstdio>
+
+#include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
@@ -32,6 +37,78 @@
 
 namespace iree {
 namespace hal {
+
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
+    iree_string_view_t value, iree_hal_element_type_t* out_element_type) {
+  if (!out_element_type) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+
+  auto str_value = absl::string_view(value.data, value.size);
+
+  iree_hal_numerical_type_t numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
+  if (absl::StartsWith(str_value, "i")) {
+    numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED;
+    str_value.remove_prefix(1);
+  } else if (absl::StartsWith(str_value, "u")) {
+    numerical_type = IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED;
+    str_value.remove_prefix(1);
+  } else if (absl::StartsWith(str_value, "f")) {
+    numerical_type = IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE;
+    str_value.remove_prefix(1);
+  } else if (absl::StartsWith(str_value, "x")) {
+    numerical_type = IREE_HAL_NUMERICAL_TYPE_UNKNOWN;
+    str_value.remove_prefix(1);
+  } else {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  int32_t bit_count = 0;
+  if (!absl::SimpleAtoi(str_value, &bit_count)) {
+    return IREE_STATUS_OUT_OF_RANGE;
+  }
+
+  *out_element_type = iree_hal_make_element_type(numerical_type, bit_count);
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
+    iree_hal_element_type_t element_type, size_t capacity, char* buffer,
+    size_t* out_length) {
+  if (out_length) {
+    *out_length = 0;
+  }
+  const char* prefix;
+  switch (iree_hal_element_numerical_type(element_type)) {
+    case IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED:
+      prefix = "i";
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED:
+      prefix = "u";
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE:
+      prefix = "f";
+      break;
+    default:
+      prefix = "x";
+      break;
+  }
+  int n = std::snprintf(
+      buffer, capacity, "%s%d", prefix,
+      static_cast<int32_t>(iree_hal_element_bit_count(element_type)));
+  if (n < 0) {
+    return IREE_STATUS_FAILED_PRECONDITION;
+  }
+  if (out_length) {
+    *out_length = n;
+  }
+  return n >= capacity ? IREE_STATUS_OUT_OF_RANGE : IREE_STATUS_OK;
+}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Allocator
@@ -56,6 +133,109 @@ iree_hal_allocator_release(iree_hal_allocator_t* allocator) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
   handle->ReleaseReference();
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_device_size_t* out_allocation_size) {
+  if (!out_allocation_size) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_allocation_size = 0;
+  if (!allocator) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // TODO(benvanik): layout/padding.
+  iree_device_size_t byte_length = iree_hal_element_byte_count(element_type);
+  for (int i = 0; i < shape_rank; ++i) {
+    byte_length *= shape[i];
+  }
+  *out_allocation_size = byte_length;
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    const int32_t* indices, size_t indices_count,
+    iree_device_size_t* out_offset) {
+  if (!out_offset) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_offset = 0;
+  if (!allocator) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (shape_rank != indices_count) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // TODO(benvanik): layout/padding.
+  iree_device_size_t offset = 0;
+  for (int i = 0; i < indices_count; ++i) {
+    if (indices[i] >= shape[i]) {
+      return IREE_STATUS_OUT_OF_RANGE;
+    }
+    iree_device_size_t axis_offset = indices[i];
+    for (int j = i + 1; j < shape_rank; ++j) {
+      axis_offset *= shape[j];
+    }
+    offset += axis_offset;
+  }
+  offset *= iree_hal_element_byte_count(element_type);
+
+  *out_offset = offset;
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    const int32_t* start_indices, size_t indices_count, const int32_t* lengths,
+    size_t lengths_count, iree_device_size_t* out_start_offset,
+    iree_device_size_t* out_length) {
+  if (!out_start_offset || !out_length) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_start_offset = 0;
+  *out_length = 0;
+  if (!allocator) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (indices_count != lengths_count || indices_count != shape_rank) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // TODO(benvanik): layout/padding.
+  absl::InlinedVector<int32_t, 6> end_indices(shape_rank);
+  iree_device_size_t element_size = iree_hal_element_byte_count(element_type);
+  iree_device_size_t subspan_length = element_size;
+  for (int i = 0; i < lengths_count; ++i) {
+    subspan_length *= lengths[i];
+    end_indices[i] = start_indices[i] + lengths[i] - 1;
+  }
+
+  iree_device_size_t start_byte_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_compute_offset(
+      allocator, shape, shape_rank, element_type, start_indices, indices_count,
+      &start_byte_offset));
+  iree_device_size_t end_byte_offset = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_allocator_compute_offset(
+      allocator, shape, shape_rank, element_type, end_indices.data(),
+      end_indices.size(), &end_byte_offset));
+
+  // Non-contiguous regions not yet implemented. Will be easier to detect when
+  // we have strides.
+  auto offset_length = end_byte_offset - start_byte_offset + element_size;
+  if (subspan_length != offset_length) {
+    return IREE_STATUS_UNIMPLEMENTED;
+  }
+
+  *out_start_offset = start_byte_offset;
+  *out_length = subspan_length;
   return IREE_STATUS_OK;
 }
 
@@ -159,9 +339,15 @@ iree_hal_buffer_release(iree_hal_buffer_t* buffer) {
   return IREE_STATUS_OK;
 }
 
+IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
+iree_hal_buffer_allocator(const iree_hal_buffer_t* buffer) {
+  const auto* handle = reinterpret_cast<const Buffer*>(buffer);
+  CHECK(handle) << "NULL buffer handle";
+  return reinterpret_cast<iree_hal_allocator_t*>(handle->allocator());
+}
+
 IREE_API_EXPORT iree_device_size_t
 iree_hal_buffer_byte_length(const iree_hal_buffer_t* buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_byte_length");
   const auto* handle = reinterpret_cast<const Buffer*>(buffer);
   CHECK(handle) << "NULL buffer handle";
   return handle->byte_length();
@@ -248,7 +434,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
       reinterpret_cast<MappedMemory<uint8_t>*>(out_mapped_memory->reserved);
   *mapping_storage = std::move(mapping);
 
-  out_mapped_memory->contents = {const_cast<uint8_t*>(mapping_storage->data()),
+  out_mapped_memory->contents = {mapping_storage->unsafe_data(),
                                  mapping_storage->size()};
 
   return IREE_STATUS_OK;
@@ -354,8 +540,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 //===----------------------------------------------------------------------===//
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, iree_shape_t shape, int8_t element_size,
-    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
+    iree_hal_buffer_t* buffer, const int32_t* shape, size_t shape_rank,
+    iree_hal_element_type_t element_type, iree_allocator_t allocator,
+    iree_hal_buffer_view_t** out_buffer_view) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_view_create");
 
   if (!out_buffer_view) {
@@ -365,105 +552,153 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
 
   if (!buffer) {
     return IREE_STATUS_INVALID_ARGUMENT;
-  } else if (shape.rank > kMaxRank || element_size <= 0) {
-    return IREE_STATUS_OUT_OF_RANGE;
   }
 
   // Allocate and initialize the iree_hal_buffer_view struct.
-  iree_hal_buffer_view* handle = nullptr;
+  // Note that we have the dynamically-sized shape dimensions on the end.
+  iree_hal_buffer_view* buffer_view = nullptr;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(*handle), reinterpret_cast<void**>(&handle)));
-  new (handle) iree_hal_buffer_view();
-  handle->allocator = allocator;
+      allocator, sizeof(*buffer_view) + sizeof(int32_t) * shape_rank,
+      reinterpret_cast<void**>(&buffer_view)));
+  new (buffer_view) iree_hal_buffer_view();
+  buffer_view->allocator = allocator;
+  buffer_view->buffer = buffer;
+  iree_hal_buffer_retain(buffer_view->buffer);
+  buffer_view->element_type = element_type;
+  buffer_view->byte_length =
+      iree_hal_element_byte_count(buffer_view->element_type);
+  buffer_view->shape_rank = shape_rank;
+  for (int i = 0; i < shape_rank; ++i) {
+    buffer_view->shape[i] = shape[i];
+    buffer_view->byte_length *= shape[i];
+  }
 
-  handle->impl.buffer = add_ref(reinterpret_cast<Buffer*>(buffer));
-  handle->impl.shape = {shape.dims, shape.rank};
-  handle->impl.element_size = element_size;
-
-  *out_buffer_view = reinterpret_cast<iree_hal_buffer_view_t*>(handle);
+  *out_buffer_view = buffer_view;
   return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
+    size_t indices_count, const int32_t* lengths, size_t lengths_count,
+    iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view) {
+  if (!out_buffer_view) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // NOTE: we rely on the compute range call to do parameter validation.
+  iree_device_size_t start_offset = 0;
+  iree_device_size_t subview_length = 0;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_view_compute_range(
+      buffer_view, start_indices, indices_count, lengths, lengths_count,
+      &start_offset, &subview_length));
+
+  iree_hal_buffer_t* subview_buffer = nullptr;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_subspan(buffer_view->buffer,
+                                               start_offset, subview_length,
+                                               allocator, &subview_buffer));
+
+  iree_status_t result = iree_hal_buffer_view_create(
+      subview_buffer, lengths, lengths_count, buffer_view->element_type,
+      allocator, out_buffer_view);
+  iree_hal_buffer_release(subview_buffer);
+  return result;
 }
 
 IREE_API_EXPORT iree_status_t
 iree_hal_buffer_view_retain(iree_hal_buffer_view_t* buffer_view) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_view_retain");
-  auto* handle = reinterpret_cast<iree_hal_buffer_view*>(buffer_view);
-  if (!handle) {
+  if (!buffer_view) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  handle->AddReference();
+  buffer_view->AddReference();
   return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t
 iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_view_release");
-  auto* handle = reinterpret_cast<iree_hal_buffer_view*>(buffer_view);
-  if (!handle) {
+  if (!buffer_view) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  handle->ReleaseReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_assign(
-    iree_hal_buffer_view_t* buffer_view, iree_hal_buffer_t* buffer,
-    iree_shape_t shape, int8_t element_size) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_view_assign");
-  auto* handle = reinterpret_cast<iree_hal_buffer_view*>(buffer_view);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->impl.buffer.reset();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_view_reset(iree_hal_buffer_view_t* buffer_view) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_view_reset");
-  auto* handle = reinterpret_cast<iree_hal_buffer_view*>(buffer_view);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->impl.buffer.reset();
+  buffer_view->ReleaseReference();
   return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(
     const iree_hal_buffer_view_t* buffer_view) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_view_buffer");
-  const auto* handle =
-      reinterpret_cast<const iree_hal_buffer_view*>(buffer_view);
-  CHECK(handle) << "NULL buffer_view handle";
-  return reinterpret_cast<iree_hal_buffer_t*>(handle->impl.buffer.get());
+  CHECK(buffer_view) << "NULL buffer_view handle";
+  return buffer_view->buffer;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_buffer_view_shape(
-    const iree_hal_buffer_view_t* buffer_view, iree_shape_t* out_shape) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_view_shape");
-
-  if (!out_shape) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  out_shape->rank = 0;
-
-  const auto* handle =
-      reinterpret_cast<const iree_hal_buffer_view*>(buffer_view);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  const auto& shape = handle->impl.shape;
-  return ToApiShape(shape, out_shape);
+IREE_API_EXPORT size_t IREE_API_CALL
+iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view) {
+  CHECK(buffer_view) << "NULL buffer_view handle";
+  return buffer_view->shape_rank;
 }
 
-IREE_API_EXPORT int8_t
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
+    const iree_hal_buffer_view_t* buffer_view, size_t rank_capacity,
+    int32_t* out_shape, size_t* out_shape_rank) {
+  if (out_shape_rank) {
+    *out_shape_rank = 0;
+  }
+  if (!buffer_view || !out_shape) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  if (out_shape_rank) {
+    *out_shape_rank = buffer_view->shape_rank;
+  }
+  if (rank_capacity < buffer_view->shape_rank) {
+    return IREE_STATUS_OUT_OF_RANGE;
+  }
+
+  for (int i = 0; i < buffer_view->shape_rank; ++i) {
+    out_shape[i] = buffer_view->shape[i];
+  }
+
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_hal_element_type_t IREE_API_CALL
+iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view) {
+  CHECK(buffer_view) << "NULL buffer_view handle";
+  return buffer_view->element_type;
+}
+
+IREE_API_EXPORT size_t
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_view_element_size");
-  const auto* handle =
-      reinterpret_cast<const iree_hal_buffer_view*>(buffer_view);
-  CHECK(handle) << "NULL buffer_view handle";
-  return handle->impl.element_size;
+  CHECK(buffer_view) << "NULL buffer_view handle";
+  return iree_hal_element_byte_count(buffer_view->element_type);
+}
+
+IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view) {
+  CHECK(buffer_view) << "NULL buffer_view handle";
+  return buffer_view->byte_length;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* indices,
+    size_t indices_count, iree_device_size_t* out_offset) {
+  if (!buffer_view) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return iree_hal_allocator_compute_offset(
+      iree_hal_buffer_allocator(buffer_view->buffer), buffer_view->shape,
+      buffer_view->shape_rank, buffer_view->element_type, indices,
+      indices_count, out_offset);
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
+    size_t indices_count, const int32_t* lengths, size_t lengths_count,
+    iree_device_size_t* out_start_offset, iree_device_size_t* out_length) {
+  if (!buffer_view) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return iree_hal_allocator_compute_range(
+      iree_hal_buffer_allocator(buffer_view->buffer), buffer_view->shape,
+      buffer_view->shape_rank, buffer_view->element_type, start_indices,
+      indices_count, lengths, lengths_count, out_start_offset, out_length);
 }
 
 //===----------------------------------------------------------------------===//

@@ -20,6 +20,8 @@
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/buffer_string_util.h"
+#include "iree/base/shape.h"
+#include "iree/base/shaped_buffer_string_util.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/module_abi_cc.h"
@@ -137,29 +139,51 @@ class CustomModuleState final {
         IREE_LOC);
   }
 
-  // custom.buffer_to_message(%buffer, %type, %shape) -> %result
+  // custom.buffer_to_message(%buffer_view) -> %result
   StatusOr<vm::ref<iree_custom_message_t>> BufferToMessage(
-      vm::ref<iree_hal_buffer_t>& buffer, int32_t type,
-      absl::Span<const int32_t> shape) {
+      vm::ref<iree_hal_buffer_view_t>& buffer_view) {
+    IREE_RETURN_IF_NULL(buffer_view);
+    iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view.get());
+
     // Map the buffer memory so we can read it back.
     iree_hal_mapped_memory_t mapped_memory;
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                                          0, IREE_WHOLE_BUFFER, &mapped_memory),
+                      IREE_LOC));
+
+    // NOTE: these string methods take the old Shape type and as such have a
+    // rank limit. That limit is just an artifact of those APIs, not the
+    // buffer view shape type.
+    absl::InlinedVector<int32_t, kMaxRank> shape(kMaxRank);
+    size_t rank = 0;
     RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_map(buffer.get(), IREE_HAL_MEMORY_ACCESS_READ, 0,
-                            IREE_WHOLE_BUFFER, &mapped_memory),
+        iree_hal_buffer_view_shape(buffer_view.get(), shape.capacity(),
+                                   shape.data(), &rank),
         IREE_LOC));
+    shape.resize(rank);
+    char element_type_str[16];
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_format_element_type(
+                          iree_hal_buffer_view_element_type(buffer_view.get()),
+                          sizeof(element_type_str), element_type_str, nullptr),
+                      IREE_LOC));
 
     // Print the buffer contents using our helpers.
     std::string string_value;
     RETURN_IF_ERROR(PrintNumericalDataToString(
-        Shape{shape},
-        // TODO(benvanik): proper type handling - this is just a sample :)
-        "f32",
+        Shape{shape}, element_type_str,
         {mapped_memory.contents.data, mapped_memory.contents.data_length},
         /*max_entries=*/1024, &string_value));
 
+    // Prefix shape/type.
+    string_value =
+        absl::StrCat(PrintShapedTypeToString(Shape{shape}, element_type_str),
+                     "=", string_value);
+
     // Unmap the buffer when we are done with it.
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_unmap(buffer.get(), &mapped_memory), IREE_LOC));
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_buffer_unmap(buffer, &mapped_memory), IREE_LOC));
 
     // Pack the string contents into a message.
     vm::ref<iree_custom_message_t> message;
@@ -169,6 +193,65 @@ class CustomModuleState final {
             IREE_ALLOCATOR_SYSTEM, &message),
         IREE_LOC));
     return std::move(message);
+  }
+
+  // custom.message_to_buffer(%message) -> %buffer_view
+  StatusOr<vm::ref<iree_hal_buffer_view_t>> MessageToBuffer(
+      vm::ref<iree_custom_message_t>& message) {
+    IREE_RETURN_IF_NULL(message);
+
+    // NOTE: these old-style parsing routines need to be updated for the new
+    // type system. They use different types, different shapes, etc.
+    auto str_parts = BufferStringParts::ExtractFrom(
+        absl::string_view(message->value.data, message->value.size));
+    iree_hal_element_type_t element_type = IREE_HAL_ELEMENT_TYPE_NONE;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_parse_element_type(
+            {str_parts.type_str.data(), str_parts.type_str.size()},
+            &element_type),
+        IREE_LOC));
+    ASSIGN_OR_RETURN(auto shape, ParseShape(str_parts.shape_str));
+
+    // TODO(benvanik): plumb through an allocator we can use.
+    size_t allocation_size =
+        shape.element_count() * iree_hal_element_byte_count(element_type);
+    vm::ref<iree_hal_buffer_t> buffer;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_heap_buffer_allocate(
+            IREE_HAL_MEMORY_TYPE_HOST_LOCAL,
+            static_cast<iree_hal_buffer_usage_t>(
+                IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT),
+            allocation_size, IREE_ALLOCATOR_SYSTEM, IREE_ALLOCATOR_SYSTEM,
+            &buffer),
+        IREE_LOC));
+    if (!str_parts.data_str.empty()) {
+      // Map the buffer memory so we can write it with the data contents.
+      iree_hal_mapped_memory_t mapped_memory;
+      RETURN_IF_ERROR(FromApiStatus(
+          iree_hal_buffer_map(buffer.get(),
+                              IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE, 0,
+                              IREE_WHOLE_BUFFER, &mapped_memory),
+          IREE_LOC));
+
+      // Parse the data from the string right into the buffer.
+      RETURN_IF_ERROR(ParseBufferDataAsType(
+          str_parts.data_str, str_parts.type_str,
+          absl::MakeSpan(mapped_memory.contents.data,
+                         mapped_memory.contents.data_length)));
+
+      // Unmap the buffer when we are done with it.
+      RETURN_IF_ERROR(FromApiStatus(
+          iree_hal_buffer_unmap(buffer.get(), &mapped_memory), IREE_LOC));
+    }
+
+    // Wrap in a buffer view to pass back into the VM.
+    vm::ref<iree_hal_buffer_view_t> buffer_view;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_view_create(buffer.get(), shape.data().data(),
+                                    shape.size(), element_type,
+                                    IREE_ALLOCATOR_SYSTEM, &buffer_view),
+        IREE_LOC));
+    return std::move(buffer_view);
   }
 
   // custom.print(%message, %count)
@@ -220,6 +303,8 @@ class CustomModuleState final {
 static const vm::NativeFunction<CustomModuleState> kCustomModuleFunctions[] = {
     vm::MakeNativeFunction("buffer_to_message",
                            &CustomModuleState::BufferToMessage),
+    vm::MakeNativeFunction("message_to_buffer",
+                           &CustomModuleState::MessageToBuffer),
     vm::MakeNativeFunction("print", &CustomModuleState::Print),
     vm::MakeNativeFunction("reverse", &CustomModuleState::Reverse),
     vm::MakeNativeFunction("get_unique_message",

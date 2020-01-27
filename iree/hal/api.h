@@ -276,6 +276,81 @@ typedef struct {
   iree_device_size_t length;
 } iree_hal_buffer_barrier_t;
 
+// LINT.IfChange(element_type)
+
+typedef enum {
+  IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00,
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED = 0x01,
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED = 0x02,
+  // TODO(benvanik): specialize with semantics from APFloat.
+  IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE = 0x03,
+} iree_hal_numerical_type_t;
+
+#define IREE_HAL_ELEMENT_TYPE_VALUE(numerical_type, bit_count) \
+  (((uint32_t)(numerical_type) << 24) | (uint32_t)(bit_count))
+
+#define iree_hal_make_element_type(numerical_type, bit_count) \
+  (iree_hal_element_type_t)(                                  \
+      IREE_HAL_ELEMENT_TYPE_VALUE(numerical_type, bit_count))
+#define iree_hal_element_numerical_type(element_type) \
+  (iree_hal_numerical_type_t)((uint32_t)(element_type) >> 24)
+#define iree_hal_element_bit_count(element_type) (size_t)((element_type)&0xFF)
+#define iree_hal_element_byte_count(element_type) \
+  ((iree_hal_element_bit_count(element_type) + 8 - 1) / 8)
+
+// Defines the element type of a buffer in a standard format.
+//
+// Composed as a 32-bit bitfield to allow for opaque data types. Use
+// iree_hal_make_element_type to make a bitfield with the appropriate ordering.
+//
+//   MSB --------------------------------- LSB
+//   [numerical type] [x] [x] [number of bits]
+//
+// clang-format off
+typedef enum {
+  IREE_HAL_ELEMENT_TYPE_NONE             = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             0),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_8         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             8),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_32        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_64        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_8           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,      8),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_8           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,    8),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_16          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_16          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_32          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_32          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_64          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_64          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_FLOAT_16         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_FLOAT_32         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_FLOAT_64         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         64),  // NOLINT
+} iree_hal_element_type_t;
+// clang-format on
+
+// LINT.ThenChange(//iree/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
+
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Parses a serialized iree_hal_element_type_t and sets |out_element_type| if
+// it is valid. The format is the same as produced by
+// iree_hal_format_element_type.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
+    iree_string_view_t value, iree_hal_element_type_t* out_element_type);
+
+// Converts an iree_hal_element_type_t enum value to a canonical string
+// representation, like `IREE_HAL_ELEMENT_TYPE_FLOAT_16` to `f16`.
+// |capacity| defines the size of |buffer| in bytes and |out_length| will return
+// the string length in characters.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_format_element_type(iree_hal_element_type_t element_type,
+                             size_t capacity, char* buffer, size_t* out_length);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Allocator
 //===----------------------------------------------------------------------===//
@@ -289,6 +364,27 @@ iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
 // Releases the given |allocator| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_allocator_release(iree_hal_allocator_t* allocator);
+
+// Calculates the allocation size of a buffer.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_device_size_t* out_allocation_size);
+
+// Calculates a byte offset into a buffer at the given indices.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    const int32_t* indices, size_t indices_count,
+    iree_device_size_t* out_offset);
+
+// Calculates a byte range into a buffer of the given contiguous range.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    const int32_t* start_indices, size_t indices_count, const int32_t* lengths,
+    size_t lengths_count, iree_device_size_t* out_start_offset,
+    iree_device_size_t* out_length);
 
 // Allocates a buffer from the allocator.
 // Fails if the memory type requested for the given usage cannot be serviced.
@@ -351,6 +447,10 @@ iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
 // Releases the given |buffer| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_buffer_release(iree_hal_buffer_t* buffer);
+
+// Returns the allocator this buffer was allocated from.
+IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
+iree_hal_buffer_allocator(const iree_hal_buffer_t* buffer);
 
 // Returns the size in bytes of the buffer.
 IREE_API_EXPORT iree_device_size_t IREE_API_CALL
@@ -449,7 +549,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 // Creates a buffer view with the given |buffer|, which may be nullptr.
 // |out_buffer_view| must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, iree_shape_t shape, int8_t element_size,
+    iree_hal_buffer_t* buffer, const int32_t* shape, size_t shape_rank,
+    iree_hal_element_type_t element_type, iree_allocator_t allocator,
+    iree_hal_buffer_view_t** out_buffer_view);
+
+// Creates a buffer view referencing a subview of the given |buffer_view|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
+    size_t indices_count, const int32_t* lengths, size_t lengths_count,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
@@ -460,30 +567,48 @@ iree_hal_buffer_view_retain(iree_hal_buffer_view_t* buffer_view);
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view);
 
-// Sets the buffer view to point at the new |buffer| with the given metadata.
-// To clear a buffer_view to empty use iree_hal_buffer_view_reset.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_assign(
-    iree_hal_buffer_view_t* buffer_view, iree_hal_buffer_t* buffer,
-    iree_shape_t shape, int8_t element_size);
-
-// Resets the buffer view to have an empty buffer and shape.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_buffer_view_reset(iree_hal_buffer_view_t* buffer_view);
-
 // Returns the buffer underlying the buffer view.
 // The caller must retain the returned buffer if they want to continue using it.
 IREE_API_EXPORT iree_hal_buffer_t* IREE_API_CALL
 iree_hal_buffer_view_buffer(const iree_hal_buffer_view_t* buffer_view);
 
-// Returns the shape of the buffer view in |out_shape|.
-// If there is not enough space in |out_shape| to store all dimensions then
-// IREE_STATUS_OUT_OF_RANGE is returned and |out_shape|.rank is set to the rank.
+// Returns the rank of the shape associated with the buffer view.
+IREE_API_EXPORT size_t IREE_API_CALL
+iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view);
+
+// Returns the dimensions of the shape in |out_shape| and its rank in
+// |out_shape_rank|. |rank_capacity| indicates the number of dimensions
+// available in the |out_shape| buffer. If there is not enough capacity to store
+// all of the dimensions IREE_STATUS_OUT_OF_RANGE is returned.
+// |out_shape_rank| can be omitted if the rank is already known.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
-    const iree_hal_buffer_view_t* buffer_view, iree_shape_t* out_shape);
+    const iree_hal_buffer_view_t* buffer_view, size_t rank_capacity,
+    int32_t* out_shape, size_t* out_shape_rank);
+
+// Returns the element type of the buffer.
+IREE_API_EXPORT iree_hal_element_type_t IREE_API_CALL
+iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the size of each element in the buffer view in bytes.
-IREE_API_EXPORT int8_t IREE_API_CALL
+// Note that not all buffers are contiguous or densely packed.
+IREE_API_EXPORT size_t IREE_API_CALL
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view);
+
+// Returns the total size of the specified view in bytes.
+// Note that not all buffers are contiguous or densely packed.
+IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view);
+
+// Calculates a byte offset into the |buffer_view| at the given indices.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* indices,
+    size_t indices_count, iree_device_size_t* out_offset);
+
+// Calculates a byte range into the |buffer_view| of the given contiguous range.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
+    size_t indices_count, const int32_t* lengths, size_t lengths_count,
+    iree_device_size_t* out_start_offset, iree_device_size_t* out_length);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

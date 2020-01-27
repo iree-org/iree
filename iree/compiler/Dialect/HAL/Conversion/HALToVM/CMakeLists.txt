@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "ConvertAllocatorOps.cpp"
     "ConvertBufferOps.cpp"
+    "ConvertBufferViewOps.cpp"
     "ConvertCommandBufferOps.cpp"
     "ConvertDeviceOps.cpp"
     "ConvertExecutableOps.cpp"

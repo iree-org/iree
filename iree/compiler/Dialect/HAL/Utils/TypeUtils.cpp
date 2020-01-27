@@ -14,6 +14,9 @@
 
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -46,6 +49,84 @@ SmallVector<Value, 4> getShapeDims(Value shapedValue,
   // TODO(benvanik): dynamic shape support.
   return getStaticShapeDims(shapedValue.getLoc(),
                             shapedValue.getType().cast<ShapedType>(), rewriter);
+}
+
+Value TensorRewriteAdaptor::getAllocator() {
+  return rewriter.createOrFold<IREE::HAL::BufferAllocatorOp>(loc, getBuffer());
+}
+
+bool TensorRewriteAdaptor::isBufferView() {
+  auto refPtrType = newValue.getType().cast<IREE::RefPtrType>();
+  return refPtrType.getObjectType().isa<IREE::HAL::BufferViewType>();
+}
+
+Value TensorRewriteAdaptor::getBuffer() {
+  if (isBufferView()) {
+    return rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(loc, newValue);
+  } else {
+    return newValue;
+  }
+}
+
+Value TensorRewriteAdaptor::getBufferView() {
+  if (isBufferView()) {
+    return newValue;
+  } else {
+    return rewriter.createOrFold<IREE::HAL::BufferViewCreateOp>(
+        loc, newValue, getShapeDims(), getElementType());
+  }
+}
+
+TensorType TensorRewriteAdaptor::getTensorType() {
+  return oldValue.getType().cast<TensorType>();
+}
+
+int32_t TensorRewriteAdaptor::getElementType() {
+  return IREE::HAL::getElementTypeValue(getTensorType().getElementType())
+      .getValueOr(0);
+}
+
+IntegerAttr TensorRewriteAdaptor::getElementTypeAttr() {
+  return IREE::HAL::getElementTypeAttr(getTensorType().getElementType());
+}
+
+SmallVector<Value, 4> TensorRewriteAdaptor::getShapeDims() {
+  // TODO(benvanik): replace with actual ranked shape tracking to newValue.
+  return IREE::HAL::getShapeDims(oldValue, rewriter);
+}
+
+Value TensorRewriteAdaptor::getByteLength() {
+  if (isBufferView()) {
+    return rewriter.createOrFold<IREE::HAL::BufferViewByteLengthOp>(
+        loc, getBufferView());
+  } else {
+    return rewriter.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
+        loc, getAllocator(), getShapeDims(), getElementType());
+  }
+}
+
+Value TensorRewriteAdaptor::computeOffset(ValueRange indices) {
+  if (isBufferView()) {
+    return rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
+        loc, getBufferView(), indices);
+  } else {
+    return rewriter.createOrFold<IREE::HAL::AllocatorComputeOffsetOp>(
+        loc, getAllocator(), getShapeDims(), getElementType(), indices);
+  }
+}
+
+TensorRewriteAdaptor::Range TensorRewriteAdaptor::computeRange(
+    ValueRange indices, ValueRange lengths) {
+  if (isBufferView()) {
+    auto range = rewriter.create<IREE::HAL::BufferViewComputeRangeOp>(
+        loc, getBufferView(), indices, lengths);
+    return Range{range.offset(), range.length()};
+  } else {
+    auto range = rewriter.create<IREE::HAL::AllocatorComputeRangeOp>(
+        loc, getAllocator(), getShapeDims(), getElementType(), indices,
+        lengths);
+    return Range{range.offset(), range.length()};
+  }
 }
 
 }  // namespace HAL

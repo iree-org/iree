@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "ConvertAllocatorOps.cpp",
         "ConvertBufferOps.cpp",
+        "ConvertBufferViewOps.cpp",
         "ConvertCommandBufferOps.cpp",
         "ConvertDeviceOps.cpp",
         "ConvertExecutableOps.cpp",

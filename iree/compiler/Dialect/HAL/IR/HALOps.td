@@ -71,7 +71,7 @@ def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
     I32Attr:$ordinal,
     RefPtrOf<HAL_Buffer>:$buffer,
     HAL_Shape:$shape,
-    I32Attr:$element_size
+    HAL_ElementTypeAttr:$element_type
   );
 }
 
@@ -259,14 +259,13 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   let summary = [{buffer allocation size computation operation}];
   let description = [{
     Computes the byte size required for a buffer of the given shape and type.
+    This returns the same value as `hal.buffer_view.byte_length`.
   }];
 
   let arguments = (ins
     RefPtrOf<HAL_Allocator>:$allocator,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
     HAL_Shape:$shape,
-    I32Attr:$element_size
+    HAL_ElementTypeAttr:$element_type
   );
   let results = (outs
     HAL_DeviceSize:$result
@@ -276,9 +275,70 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, Value allocator,
-      IREE::HAL::MemoryTypeBitfield memoryTypes,
-      IREE::HAL::BufferUsageBitfield bufferUsage,
       ValueRange shape, int32_t elementSize
+    }]>,
+  ];
+}
+
+def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{buffer view indices to byte offset computation operation}];
+  let description = [{
+    Computes an element byte offset within a buffer produced by the allocator.
+    This returns the same value as `hal.buffer_view.compute_offset`.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Shape:$shape,
+    HAL_ElementTypeAttr:$element_type,
+    HAL_Dims:$indices
+  );
+
+  let results = (outs
+    HAL_DeviceSize:$offset
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value allocator,
+      ValueRange shape, int32_t elementType, ValueRange indices
+    }]>,
+  ];
+}
+
+def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{buffer view byte range computation operation}];
+  let description = [{
+    Computes a byte range within a buffer for one or more elements.
+    This returns the same value as `hal.buffer_view.compute_range`.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Shape:$shape,
+    HAL_ElementTypeAttr:$element_type,
+    HAL_Dims:$indices,
+    HAL_Dims:$lengths
+  );
+  let results = (outs
+    // TODO(benvanik): return a strides tuple instead, or one per dim.
+    HAL_DeviceSize:$offset,
+    HAL_DeviceSize:$length
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value allocator,
+      ValueRange shape, int32_t elementType, ValueRange indices,
+      ValueRange lengths
     }]>,
   ];
 }
@@ -288,7 +348,9 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   ]> {
   let summary = [{empty buffer allocation operation}];
   let description = [{
-    Allocates a buffer from the allocator.
+    Allocates a buffer of the given size from the allocator.
+    The size of the buffer returned may be larger than the requested size if the
+    allocator has specific alignment requirements or minimum allocation sizes.
   }];
 
   let arguments = (ins
@@ -310,8 +372,6 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
       Value allocationSize
     }]>,
   ];
-
-  let hasCanonicalizer = 1;
 }
 
 def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
@@ -320,6 +380,9 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
   let summary = [{constant buffer allocation operation}];
   let description = [{
     Allocates a buffer from the allocator with the given constant contents.
+    The buffer contents cannot change after the the point of allocation and in
+    most cases should be cached so that the buffer is not reallocated
+    repeatedly.
   }];
 
   let arguments = (ins
@@ -343,41 +406,34 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
   ];
 }
 
-def HAL_AllocatorAllocateShapedOp : HAL_Op<"allocator.allocate.shaped", [
+//===----------------------------------------------------------------------===//
+// iree::hal::Buffer
+//===----------------------------------------------------------------------===//
+
+def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
-  let summary = [{empty buffer allocation operation}];
+  let summary = [{buffer allocator accessor operation}];
   let description = [{
-    Allocates a buffer from the allocator.
-    Acts as a fusion of hal.allocator.compute_size and hal.allocator.allocate
-    for when only a single buffer is being allocated.
+    Returns the allocator this buffer was allocated from.
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Allocator>:$allocator,
-    HAL_MemoryTypeBitfieldAttr:$memory_types,
-    HAL_BufferUsageBitfieldAttr:$buffer_usage,
-    HAL_Shape:$shape,
-    I32Attr:$element_size
+    RefPtrOf<HAL_Buffer>:$buffer
   );
   let results = (outs
-    RefPtrOf<HAL_Buffer>:$result
+    RefPtrOf<HAL_Allocator>:$result
   );
 
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value allocator,
-      IREE::HAL::MemoryTypeBitfield memoryTypes,
-      IREE::HAL::BufferUsageBitfield bufferUsage,
-      ValueRange shape, int32_t elementSize
+      Builder *builder, OperationState &state, Value buffer
     }]>,
   ];
-}
 
-//===----------------------------------------------------------------------===//
-// iree::hal::Buffer
-//===----------------------------------------------------------------------===//
+  let hasCanonicalizer = 1;
+}
 
 // TODO(benvanik): clone buffer op.
 
@@ -490,20 +546,114 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
 
-def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
+def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    SameVariadicOperandSize,
   ]> {
-  let summary = [{buffer view indices to byte offset computation operation}];
+  let summary = [{buffer view reference initializer}];
   let description = [{
-    Computes an element byte offset within a buffer.
+    Creates a reference to a buffer with a particular shape and element type.
+    The buffer is not copied and both the original and view references must be
+    synchronized. This makes it easier to associate commonly-carried metadata
+    along with the contents.
   }];
 
   let arguments = (ins
     RefPtrOf<HAL_Buffer>:$buffer,
     HAL_Shape:$shape,
+    HAL_ElementTypeAttr:$element_type
+  );
+  let results = (outs
+    RefPtrOf<HAL_BufferView>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value buffer,
+      ValueRange shape, int32_t elementType
+    }]>,
+  ];
+}
+
+def HAL_BufferViewSubviewOp : HAL_PureOp<"buffer_view.subview", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
+  ]> {
+  let summary = [{buffer view subview initializer}];
+  let description = [{
+    Returns a view into a another buffer view. The buffer is not copied and both
+    the original and sliced references must be synchronized.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_BufferView>:$buffer_view,
     HAL_Dims:$indices,
-    I32Attr:$element_size
+    HAL_Dims:$lengths
+  );
+  let results = (outs
+    RefPtrOf<HAL_BufferView>:$result
+  );
+}
+
+def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer view buffer accessor}];
+  let description = [{
+    Returns the buffer backing this view's contents.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_BufferView>:$buffer_view
+  );
+  let results = (outs
+    RefPtrOf<HAL_Buffer>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value bufferView
+    }]>,
+  ];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer view buffer byte length accessor}];
+  let description = [{
+    Returns the allocated size of a shaped buffer view in bytes.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_BufferView>:$buffer_view
+  );
+  let results = (outs
+    HAL_DeviceSize:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value bufferView
+    }]>,
+  ];
+}
+
+def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer view indices to byte offset computation operation}];
+  let description = [{
+    Computes an element byte offset within a buffer view.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_BufferView>:$buffer_view,
+    HAL_Dims:$indices
   );
 
   let results = (outs
@@ -513,36 +663,8 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value buffer,
-      ValueRange shape, ValueRange indices, int32_t elementSize
-    }]>,
-  ];
-}
-
-def HAL_BufferViewComputeLengthOp : HAL_PureOp<"buffer_view.compute_length", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{buffer view shape to byte size computation operation}];
-  let description = [{
-    Computes a shaped buffer view length in bytes.
-  }];
-
-  let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$buffer,
-    HAL_Shape:$shape,
-    I32Attr:$element_size
-  );
-
-  let results = (outs
-    HAL_DeviceSize:$length
-  );
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state, Value buffer,
-      ValueRange shape, int32_t elementSize
+      Builder *builder, OperationState &state, Value bufferView,
+      ValueRange indices
     }]>,
   ];
 }
@@ -557,11 +679,9 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$buffer,
-    HAL_Shape:$shape,
+    RefPtrOf<HAL_BufferView>:$buffer_view,
     HAL_Dims:$indices,
-    HAL_Dims:$lengths,
-    I32Attr:$element_size
+    HAL_Dims:$lengths
   );
   let results = (outs
     // TODO(benvanik): return a strides tuple instead, or one per dim.
@@ -572,33 +692,10 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value buffer,
-      ValueRange shape, ValueRange indices,
-      ValueRange lengths, int32_t elementSize
+      Builder *builder, OperationState &state, Value bufferView,
+      ValueRange indices, ValueRange lengths
     }]>,
   ];
-}
-
-def HAL_BufferViewSliceOp : HAL_PureOp<"buffer_view.slice", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-    SameVariadicOperandSize,
-  ]> {
-  let summary = [{buffer view slice operation}];
-  let description = [{
-    Returns a view into a buffer. The buffer is not copied and both the original
-    and sliced references must be synchronized.
-  }];
-
-  let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$buffer,
-    HAL_Shape:$shape,
-    HAL_Dims:$indices,
-    HAL_Dims:$lengths,
-    I32Attr:$element_size
-  );
-  let results = (outs
-    RefPtrOf<HAL_Buffer>:$result
-  );
 }
 
 //===----------------------------------------------------------------------===//
