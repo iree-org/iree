@@ -82,7 +82,7 @@ cc_binary(
     deps = [
         ":dialect",
         "//iree/tools:iree_opt_library",
-        "@llvm-project//mlir:MlirOptMain",
+        "@llvm-project//mlir:MlirOptLib",
     ],
 )
 

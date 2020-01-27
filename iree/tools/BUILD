@@ -70,7 +70,7 @@ cc_library(
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineDialectRegistration",
         "@llvm-project//mlir:LinalgDialectRegistration",
-        "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:MlirOptMain",
         "@llvm-project//mlir:StandardDialectRegistration",
         "@llvm-project//mlir:SPIRVDialectRegistration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
@@ -84,7 +84,7 @@ cc_binary(
     name = "iree-opt",
     deps = [
         ":iree_opt_library",
-        "@llvm-project//mlir:MlirOptMain",
+        "@llvm-project//mlir:MlirOptLib",
     ],
 )
 
