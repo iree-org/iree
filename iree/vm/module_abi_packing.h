@@ -62,7 +62,7 @@ struct ParamUnpack<opaque_ref> {
                      &reg.value);
   }
   operator opaque_ref&() { return reg; }
-  operator const opaque_ref &() const { return reg; }
+  operator const opaque_ref&() const { return reg; }
   opaque_ref reg;
 };
 
