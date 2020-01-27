@@ -74,6 +74,8 @@ MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:StandardToSPIRVConversions":
         "MLIRStandardToSPIRVTransforms",
     "@llvm-project//mlir:MlirOptMain":
+        "MLIRMlirOptLib",
+    "@llvm-project//mlir:MlirOptLib":
         "MLIROptMain",
 }
 
