@@ -31,6 +31,8 @@ import bazel_to_cmake_targets
 import datetime
 import os
 import textwrap
+from collections import OrderedDict
+from itertools import repeat
 
 repo_root = None
 
@@ -95,13 +97,30 @@ class BuildFileFunctions(object):
     #    rule_name
     return "  NAME\n    %s\n" % (kwargs["name"])
 
-  def _convert_namespace_block(self, **kwargs):
+  def _convert_cc_namespace_block(self, **kwargs):
     #  CC_NAMESPACE
     #    "cc_namespace"
     return "  CC_NAMESPACE\n    \"%s\"\n" % (kwargs["cc_namespace"])
 
+  def _convert_cpp_namespace_block(self, **kwargs):
+    #  CPP_NAMESPACE
+    #    "cpp_namespace"
+    return "  CPP_NAMESPACE\n    \"%s\"\n" % (kwargs["cpp_namespace"])
+
   def _convert_translation_block(self, **kwargs):
     return "  TRANSLATION\n    \"%s\"\n" % (kwargs["translation"])
+
+  def _convert_translate_tool_block(self, **kwargs):
+    translate_tool = kwargs.get("translate_tool")
+    if translate_tool:
+      # Bazel `//iree/base`     -> CMake `iree::base`
+      # Bazel `//iree/base:api` -> CMake `iree::base::api`
+      translate_tool = translate_tool.replace("//", "")  # iree/base:api
+      translate_tool = translate_tool.replace(":", "_")  # iree/base::api
+      translate_tool = translate_tool.replace("/", "_")  # iree::base::api
+      return "  TRANSLATION_TOOL\n    %s\n" % (translate_tool)
+    else:
+      return ""
 
   def _convert_option_block(self, option, option_value):
     if option_value:
@@ -116,6 +135,9 @@ class BuildFileFunctions(object):
 
   def _convert_testonly_block(self, **kwargs):
     return self._convert_option_block("TESTONLY", kwargs.get("testonly"))
+
+  def _convert_flatten_block(self, **kwargs):
+    return self._convert_option_block("FLATTEN", kwargs.get("flatten"))
 
   def _convert_filelist_block(self, list_name, files):
     if not files:
@@ -137,6 +159,35 @@ class BuildFileFunctions(object):
   def _convert_src_block(self, **kwargs):
     return "  SRC\n    \"%s\"\n" % kwargs.get("src")
 
+  def _convert_cc_file_output_block(self, **kwargs):
+    return "  CC_FILE_OUTPUT\n    \"%s\"\n" % kwargs.get("cc_file_output")
+
+  def _convert_h_file_output_block(self, **kwargs):
+    return "  H_FILE_OUTPUT\n    \"%s\"\n" % kwargs.get("h_file_output")
+
+  def _convert_td_file_block(self, **kwargs):
+    td_file = kwargs.get("td_file")
+    if td_file.startswith("//iree"):
+      # Bazel `//iree/dir/td_file.td`
+      # -> CMake `${IREE_ROOT_DIR}/iree/dir/td_file.td
+      # Bazel `//iree/dir/IR:td_file.td`
+      # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
+      td_file = td_file.replace("//", "${IREE_ROOT_DIR}/")
+      td_file = td_file.replace(":", "/")
+    return "  SRCS\n    \"%s\"\n" % (td_file)
+
+  def _convert_tbl_outs_block(self, **kwargs):
+    tbl_outs = kwargs.get("tbl_outs")
+    outs_list = "\n".join(["    %s %s" % tbl_out for tbl_out in tbl_outs])
+    return "  OUTS\n%s\n" % (outs_list)
+
+  def _convert_tblgen_block(self, **kwargs):
+    tblgen = kwargs.get("tblgen")
+    if tblgen.endswith("iree-tblgen"):
+      return "  TBLGEN\n    IREE\n"
+    else:
+      return ""
+
   def _convert_target(self, target):
     if target.startswith(":"):
       # Bazel package-relative `:logging` -> CMake absolute `iree::base::logging`
@@ -146,6 +197,14 @@ class BuildFileFunctions(object):
         target = package  # Omit target if it matches the package name
       else:
         target = package + ":" + target
+      if target.endswith("_gen"):
+        # Files created by gentbl have to be included as source and header files
+        # and not as a dependency. Adding these targets to the dependencies list,
+        # results in linkage failures if the library including the gentbl dep is
+        # marked as ALWAYSLINK.
+        # TODO: Some targets not to be included end to "Gen", but others like
+        #       LLVMTableGen still need to be included.
+        return ""
     elif not target.startswith("//iree"):
       # External target, call helper method for special case handling.
       target = bazel_to_cmake_targets.convert_external_target(target)
@@ -167,7 +226,8 @@ class BuildFileFunctions(object):
     #    package2::target
     deps = kwargs.get("deps")
     deps_list = [self._convert_target(dep) for dep in deps]
-    deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
+    # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
+    deps_list = list(filter(None, OrderedDict(zip(deps_list, repeat(None)))))
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
 
@@ -257,6 +317,24 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
+  def cc_embed_data(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_srcs_block(**kwargs)
+    cc_file_output_block = self._convert_cc_file_output_block(**kwargs)
+    h_file_output_block = self._convert_h_file_output_block(**kwargs)
+    namespace_block = self._convert_cpp_namespace_block(**kwargs)
+    flatten_block = self._convert_flatten_block(**kwargs)
+
+    self.converter.body += """iree_cc_embed_data(
+%(name_block)s%(srcs_block)s%(cc_file_output_block)s%(h_file_output_block)s%(namespace_block)s%(flatten_block)s  PUBLIC\n)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    "cc_file_output_block": cc_file_output_block,
+    "h_file_output_block": h_file_output_block,
+    "namespace_block": namespace_block,
+    "flatten_block": flatten_block,
+    }
+
   def spirv_kernel_cc_library(self, **kwargs):
     name_block = self._convert_name_block(**kwargs)
     srcs_block = self._convert_srcs_block(**kwargs)
@@ -270,22 +348,32 @@ class BuildFileFunctions(object):
   def iree_bytecode_module(self, **kwargs):
     name_block = self._convert_name_block(**kwargs)
     src_block = self._convert_src_block(**kwargs)
-    namespace_block = self._convert_namespace_block(**kwargs)
+    namespace_block = self._convert_cc_namespace_block(**kwargs)
+    translate_tool_block = self._convert_translate_tool_block(**kwargs)
     translation_block = self._convert_translation_block(**kwargs)
 
     self.converter.body += """iree_bytecode_module(
-%(name_block)s%(src_block)s%(namespace_block)s%(translation_block)s  PUBLIC\n)\n\n""" % {
+%(name_block)s%(src_block)s%(namespace_block)s%(translate_tool_block)s%(translation_block)s  PUBLIC\n)\n\n""" % {
     "name_block": name_block,
     "src_block": src_block,
     "namespace_block": namespace_block,
+    "translate_tool_block": translate_tool_block,
     "translation_block": translation_block,
     }
 
   def gentbl(self, **kwargs):
-    self._convert_unimplemented_function("gentbl", **kwargs)
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_td_file_block(**kwargs)
+    outs_block = self._convert_tbl_outs_block(**kwargs)
+    tblgen_block = self._convert_tblgen_block(**kwargs)
 
-  def cc_embed_data(self, **kwargs):
-    self._convert_unimplemented_function("cc_embed_data", **kwargs)
+    self.converter.body += """iree_tablegen_library(
+%(name_block)s%(srcs_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    "outs_block": outs_block,
+    "tblgen_block": tblgen_block,
+    }
 
   def iree_setup_lit_package(self, **kwargs):
     self._convert_unimplemented_function("iree_setup_lit_package", **kwargs)
