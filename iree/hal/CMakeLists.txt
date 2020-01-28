@@ -15,6 +15,7 @@
 add_subdirectory(host)
 add_subdirectory(interpreter)
 add_subdirectory(testing)
+add_subdirectory(vmla)
 add_subdirectory(vulkan)
 
 iree_cc_library(

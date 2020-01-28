@@ -49,6 +49,12 @@ constexpr ExecutableFormat kExecutableFormatMlir =
 constexpr ExecutableFormat kExecutableFormatIreeBytecode =
     MakeExecutableFormatID("IREE");
 
+// IREE VMLA executable in FlatBuffer format using the
+// https://github.com/google/iree/tree/master/iree/schemas/vmla_executable_def.fbs
+// schema.
+constexpr ExecutableFormat kExecutableFormatVMLA =
+    MakeExecutableFormatID("VMLA");
+
 // SPIR-V executable in FlatBuffer format using the
 // https://github.com/google/iree/tree/master/iree/schemas/spirv_executable_def.fbs
 // schema.
