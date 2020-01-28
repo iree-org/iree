@@ -310,6 +310,11 @@ Status OutputFunctionResults(iree_vm_function_t function,
                           [&](const RawSignatureParser::Description& desc) {
                             output_descs.push_back(desc);
                           });
+  if (sig_parser.GetError()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Parsing function signature '" << sig_f.data
+           << "' failed getting results";
+  }
   if (output_descs.size() != iree_vm_variant_list_size(outputs)) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Result signature mismatch; expected " << output_descs.size()
