@@ -596,7 +596,7 @@ Status RunFile(const std::string& mlir_filename) {
 
   // Split the buffer into separate modules and evaluate independently.
   // This matches the -split-input-file arg to mlir-opt.
-  const char kSplitMarker[] = "// -----\n";
+  const char kSplitMarker[] = "// -----";
   auto* full_buffer = file.get();
   llvm::SmallVector<llvm::StringRef, 8> source_buffers;
   full_buffer->getBuffer().split(source_buffers, kSplitMarker);
