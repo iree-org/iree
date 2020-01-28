@@ -21,12 +21,25 @@ namespace mlir {
 namespace iree_compiler {
 
 //===----------------------------------------------------------------------===//
-// TensorFlow Import
+// IREE-specific Passes For TensorFlow Import
 //===----------------------------------------------------------------------===//
 
-// In a module tagged with `tf_saved_model.semantics`, adopts any exported
-// SavedModel functions to be used as IREE exported functions.
-std::unique_ptr<OpPassBase<ModuleOp>> createTFSavedModelAdoptExportsPass();
+// In a module tagged with `tf_saved_model.semantics`, lowers
+// `tf_saved_model.global_variable`'s to `flow.variable`'s.
+//
+// This pass should be run before adopting the exports, which transitions to
+// a module that does not have `tf_saved_model.semantics`.
+std::unique_ptr<OpPassBase<ModuleOp>> createTFSavedModelLowerGlobalTensors();
+
+// In a module tagged with `tf_saved_model.semantics`, lowers any tf_saved_model
+// exported functions to IREE exported functions with appropriate reflection
+// metadata.
+std::unique_ptr<OpPassBase<ModuleOp>>
+createTFSavedModelLowerExportedFunctions();
+
+// Create a single pipeline that will run all the needed IREE-specific TF import
+// passes in the right order.
+void createIreeTfImportPipeline(OpPassManager &pm);
 
 }  // namespace iree_compiler
 }  // namespace mlir

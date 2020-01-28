@@ -54,8 +54,9 @@ TF_IMPORT_PASS_PIPELINE = (
     # Now that the IR is starting to look nice, optimize global tensors.
     "tf-saved-model-optimize-global-tensors",
 
-    # Adopt saved_model exports into IREE.
-    "iree-tf-saved-model-adopt-exports",
+    # IREE-specific passes to prepare TF code for IREE compilation.
+    # In particular, this eliminates tf_saved_model.
+    "iree-tf-import-pipeline",
 )
 
 

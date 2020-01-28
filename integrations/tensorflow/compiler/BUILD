@@ -21,7 +21,9 @@ cc_library(
     name = "tensorflow",
     srcs = select({
         "//iree:enable_tensorflow": [
-            "TFSavedModelAdoptExports.cpp",
+            "TFSavedModelLowerExportedFunctions.cpp",
+            "TFSavedModelLowerGlobalTensors.cpp",
+            "Passes.cpp",
         ],
         "//conditions:default": [
         ],
