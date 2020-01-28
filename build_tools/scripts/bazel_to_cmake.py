@@ -225,11 +225,12 @@ class BuildFileFunctions(object):
     #    package1::target1
     #    package1::target2
     #    package2::target
-    deps = kwargs.get("data")
-    deps_list = [self._convert_target(dep) for dep in deps]
-    deps_list = sorted(list(set(deps_list)))  # Remove duplicates and sort.
-    deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
-    return "  DATA\n%s\n" % (deps_list,)
+    data = kwargs.get("data")
+    data_list = [self._convert_target(dep) for dep in data]
+    # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
+    data_list = list(filter(None, OrderedDict(zip(data_list, repeat(None)))))
+    data_list = "\n".join(["    %s" % (data,) for data in data_list])
+    return "  DATA\n%s\n" % (data_list,)
 
   def _convert_deps_block(self, **kwargs):
     if not kwargs.get("deps"):
