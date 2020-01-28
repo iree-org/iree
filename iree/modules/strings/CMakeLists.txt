@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,5 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(hal)
-add_subdirectory(strings)
+iree_cc_library(
+  NAME
+    strings
+  HDRS
+    "strings_module.h"
+  SRCS
+    "strings_module.cc"
+  DEPS
+    iree::base::api
+    iree::base::api_util
+    iree::base::tracing
+    iree::hal::api
+    iree::hal::command_queue
+    iree::hal::device
+    iree::vm
+    iree::vm::module_abi_cc
+    absl::core_headers
+    absl::memory
+    absl::strings
+    absl::span
+  PUBLIC
+)

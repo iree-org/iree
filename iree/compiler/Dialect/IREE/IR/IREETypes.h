@@ -41,6 +41,7 @@ enum Kind {
   FIRST_HAL_TYPE = Type::FIRST_IREE_TYPE + 20,
   FIRST_SEQ_TYPE = Type::FIRST_IREE_TYPE + 40,
   FIRST_SHAPE_TYPE = Type::FIRST_IREE_TYPE + 60,
+  FIRST_STRING_TYPE = Type::FIRST_IREE_TYPE + 80,
 };
 }  // namespace TypeKind
 
@@ -83,6 +84,14 @@ enum Kind {
 };
 }  // namespace TypeKind
 }  // namespace Shape
+
+namespace Strings {
+namespace TypeKind {
+enum Kind {
+  String = IREE::TypeKind::FIRST_STRING_TYPE,
+};
+}  // namespace TypeKind
+}  // namespace Strings
 
 /// Base type for RefObject-derived types.
 /// These can be wrapped in RefPtrType.
