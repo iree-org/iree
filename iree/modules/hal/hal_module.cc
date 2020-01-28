@@ -215,7 +215,7 @@ class HALModuleState final {
   Status CommandBufferFillBuffer(
       vm::ref<iree_hal_command_buffer_t>& command_buffer,
       vm::ref<iree_hal_buffer_t>& target_buffer, int32_t target_offset,
-      int32_t length, int32_t pattern);
+      int32_t length, uint32_t pattern);
   Status CommandBufferCopyBuffer(
       vm::ref<iree_hal_command_buffer_t>& command_buffer,
       vm::ref<iree_hal_buffer_t>& source_buffer, int32_t source_offset,
@@ -687,11 +687,16 @@ Status HALModuleState::CommandBufferExecutionBarrier(
 Status HALModuleState::CommandBufferFillBuffer(
     vm::ref<iree_hal_command_buffer_t>& command_buffer,
     vm::ref<iree_hal_buffer_t>& target_buffer, int32_t target_offset,
-    int32_t length, int32_t pattern) {
+    int32_t length, uint32_t pattern) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferFillBuffer");
   IREE_RETURN_IF_NULL(command_buffer);
   IREE_RETURN_IF_NULL(target_buffer);
-  return UnimplementedErrorBuilder(IREE_LOC) << "CommandBufferFillBuffer";
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_hal_command_buffer_fill_buffer(command_buffer.get(),
+                                          target_buffer.get(), target_offset,
+                                          length, &pattern, sizeof(pattern)),
+      IREE_LOC));
+  return OkStatus();
 }
 
 Status HALModuleState::CommandBufferCopyBuffer(

@@ -745,6 +745,37 @@ iree_hal_command_buffer_execution_barrier(
           buffer_barrier_count)));
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    const void* pattern, iree_host_size_t pattern_length) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_fill_buffer");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return ToApiStatus(
+      handle->FillBuffer(reinterpret_cast<Buffer*>(target_buffer),
+                         target_offset, length, pattern, pattern_length));
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
+                                      const void* source_buffer,
+                                      iree_host_size_t source_offset,
+                                      iree_hal_buffer_t* target_buffer,
+                                      iree_device_size_t target_offset,
+                                      iree_device_size_t length) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_update_buffer");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return ToApiStatus(handle->UpdateBuffer(
+      source_buffer, source_offset, reinterpret_cast<Buffer*>(target_buffer),
+      target_offset, length));
+}
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
