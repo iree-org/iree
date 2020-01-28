@@ -410,7 +410,7 @@ class ExStreamFragmentOpConversion
       }
     }
 
-    rewriter.replaceOp(streamOp, bufferSet.outputBuffers, operands);
+    rewriter.replaceOp(streamOp, bufferSet.outputBuffers);
     return matchSuccess();
   }
 };
