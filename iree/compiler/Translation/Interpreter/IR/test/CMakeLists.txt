@@ -12,4 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_glob_lit_tests()
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "concat.mlir"
+    "constant.mlir"
+    "invalid_types_hl.mlir"
+    "invalid_types_ll.mlir"
+    "scalar_memref.mlir"
+    "tensor_memref.mlir"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
+)

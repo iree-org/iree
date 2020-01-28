@@ -12,4 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_glob_lit_tests()
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "allocator_ops.mlir"
+    "buffer_folding.mlir"
+    "buffer_ops.mlir"
+    "buffer_view_folding.mlir"
+    "buffer_view_ops.mlir"
+    "command_buffer_ops.mlir"
+    "descriptor_set_ops.mlir"
+    "device_ops.mlir"
+    "executable_ops.mlir"
+    "experimental_ops.mlir"
+    "variable_folding.mlir"
+    "variable_ops.mlir"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
+)

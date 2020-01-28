@@ -33,6 +33,7 @@ import os
 import textwrap
 from collections import OrderedDict
 from itertools import repeat
+import glob
 
 repo_root = None
 
@@ -216,6 +217,21 @@ class BuildFileFunctions(object):
       target = target.replace("/", "::")  # iree::base::api
     return target
 
+  def _convert_data_block(self, **kwargs):
+    if not kwargs.get("data"):
+      return ""
+
+    #  DATA
+    #    package1::target1
+    #    package1::target2
+    #    package2::target
+    data = kwargs.get("data")
+    data_list = [self._convert_target(dep) for dep in data]
+    # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
+    data_list = list(filter(None, OrderedDict(zip(data_list, repeat(None)))))
+    data_list = "\n".join(["    %s" % (data,) for data in data_list])
+    return "  DATA\n%s\n" % (data_list,)
+
   def _convert_deps_block(self, **kwargs):
     if not kwargs.get("deps"):
       return ""
@@ -264,9 +280,39 @@ class BuildFileFunctions(object):
   def exports_files(self, *args, **kwargs):
     pass
 
-  def glob(self, *args):
-    # Not supported during conversion (yet?).
-    self._convert_unimplemented_function("glob", *args)
+  def glob(self, include, exclude=[], exclude_directories=1):
+    # Rather than converting bazel globs into CMake globs, we evaluate the glob at
+    # conversion time. This avoids issues with different glob semantics and dire
+    # warnings about not knowing when to reevaluate the glob.
+    # See https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
+    if exclude_directories != 1:
+      raise ValueError("Non-default exclude_directories not supported")
+
+    filepaths = []
+    for pattern in include:
+      if "**" in pattern:
+        # bazel's glob has some specific restrictions about crossing package boundaries.
+        # We have no uses of recursive globs. Rather than try to emulate them or
+        # silently give different behavior, just error out.
+        # See https://docs.bazel.build/versions/master/be/functions.html#glob
+        raise ValueError("Recursive globs not supported")
+
+      filepaths += glob.glob(self.converter.directory_path + "/" + pattern)
+
+    exclude_filepaths = set([])
+    for pattern in exclude:
+      if "**" in pattern:
+        # See comment above
+        raise ValueError("Recursive globs not supported")
+      exclude_filepaths.update(
+          glob.glob(self.converter.directory_path + "/" + pattern))
+
+    basenames = sorted([
+        os.path.basename(path)
+        for path in filepaths
+        if path not in exclude_filepaths
+    ])
+    return basenames
 
   def config_setting(self, **kwargs):
     # No mapping to CMake, ignore.
@@ -380,6 +426,20 @@ class BuildFileFunctions(object):
 
   def iree_glob_lit_tests(self, **kwargs):
     self._convert_unimplemented_function("iree_glob_lit_tests", **kwargs)
+
+  def iree_lit_test_suite(self, **kwargs):
+    name_block = self._convert_name_block(**kwargs)
+    srcs_block = self._convert_srcs_block(**kwargs)
+    data_block = self._convert_data_block(**kwargs)
+
+    self.converter.body += ("iree_lit_test_suite(\n"
+                            "%(name_block)s"
+                            "%(srcs_block)s"
+                            "%(data_block)s)\n\n" % {
+                                "name_block": name_block,
+                                "srcs_block": srcs_block,
+                                "data_block": data_block,
+                            })
 
 
 class Converter(object):

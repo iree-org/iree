@@ -12,4 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_glob_lit_tests()
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "dispatch_ops.mlir"
+    "dispatch_regions.mlir"
+    "executable_ops.mlir"
+    "reduction_regions.mlir"
+    "stream_ops.mlir"
+    "tensor_folding.mlir"
+    "tensor_ops.mlir"
+    "variable_folding.mlir"
+    "variable_ops.mlir"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
+)
