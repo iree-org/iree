@@ -25,6 +25,7 @@ iree_cc_library(
     iree::base::target_platform
     absl::memory
     absl::strings
+  PUBLIC
 )
 
 iree_cc_library(
@@ -41,6 +42,7 @@ iree_cc_library(
     iree::base::target_platform
     absl::memory
     absl::strings
+  PUBLIC
 )
 
 iree_cc_library(
@@ -57,6 +59,7 @@ iree_cc_library(
     iree::base::tracing
     absl::memory
     absl::strings
+  PUBLIC
 )
 
 iree_cc_library(
@@ -70,6 +73,7 @@ iree_cc_library(
     iree::base::initializer
     iree::base::target_platform
     absl::flags_parse
+  PUBLIC
 )
 
 iree_cc_library(
@@ -83,6 +87,7 @@ iree_cc_library(
     iree::base::platform_headers
     absl::core_headers
     absl::flags
+  PUBLIC
 )
 
 iree_cc_library(
@@ -90,6 +95,7 @@ iree_cc_library(
     source_location_internal
   HDRS
     "source_location.h"
+  PUBLIC
 )
 
 iree_cc_library(
@@ -120,6 +126,7 @@ iree_cc_library(
     absl::flags
     absl::memory
     absl::strings
+  PUBLIC
 )
 
 iree_cc_library(
@@ -133,4 +140,5 @@ iree_cc_library(
     absl::strings
     absl::optional
   TESTONLY
+  PUBLIC
 )

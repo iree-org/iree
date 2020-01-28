@@ -15,6 +15,7 @@
 add_subdirectory(Interpreter)
 add_subdirectory(SPIRV)
 add_subdirectory(XLAToLinalg)
+add_subdirectory(test)
 
 iree_cc_library(
   NAME

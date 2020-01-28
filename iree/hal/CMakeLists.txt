@@ -48,16 +48,21 @@ iree_cc_library(
     iree::hal::buffer
     iree::hal::buffer_view
     iree::hal::command_buffer
+    iree::hal::descriptor_set
+    iree::hal::descriptor_set_layout
     iree::hal::device
     iree::hal::driver
     iree::hal::driver_registry
+    iree::hal::executable_layout
     iree::hal::fence
     iree::hal::heap_buffer
     iree::hal::semaphore
     iree::base::api
     iree::base::api_util
+    iree::base::ref_ptr
     iree::base::shape
     iree::base::tracing
+    absl::strings
     absl::span
   PUBLIC
 )
@@ -286,8 +291,8 @@ iree_cc_library(
     iree::hal::descriptor_set_layout
     iree::hal::device_info
     iree::hal::event
-    iree::hal::executable_layout
     iree::hal::executable_cache
+    iree::hal::executable_layout
     iree::hal::semaphore
     iree::base::ref_ptr
     iree::base::status
