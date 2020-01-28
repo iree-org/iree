@@ -42,7 +42,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     IREEOpsGen
-  SRCS
+  TD_FILE
     IREEOps.td
   OUTS
     -gen-op-decls IREEOps.h.inc

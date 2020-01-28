@@ -109,7 +109,7 @@ iree_cc_test(
 iree_tablegen_library(
   NAME
     bytecode_op_table_gen
-  SRCS
+  TD_FILE
     "${IREE_ROOT_DIR}/iree/compiler/Dialect/VM/IR/VMOps.td"
   OUTS
     -gen-iree-vm-op-table-defs bytecode_op_table.h

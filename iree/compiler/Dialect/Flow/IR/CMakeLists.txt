@@ -46,7 +46,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     FlowEnumsGen
-  SRCS
+  TD_FILE
     FlowBase.td
   OUTS
     -gen-enum-decls FlowEnums.h.inc
@@ -56,7 +56,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     FlowOpInterfaceGen
-  SRCS
+  TD_FILE
     FlowBase.td
   OUTS
     -gen-op-interface-decls FlowOpInterface.h.inc
@@ -66,7 +66,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     FlowOpsGen
-  SRCS
+  TD_FILE
     FlowOps.td
   OUTS
     -gen-op-decls FlowOps.h.inc

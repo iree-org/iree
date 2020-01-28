@@ -39,7 +39,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     CommonOpsGen
-  SRCS
+  TD_FILE
     CommonOps.td
   OUTS
     -gen-op-decls CommonOps.h.inc
@@ -85,7 +85,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     HLOpsGen
-  SRCS
+  TD_FILE
     HLOps.td
   OUTS
     -gen-op-decls HLOps.h.inc
@@ -95,7 +95,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     LLOpsGen
-  SRCS
+  TD_FILE
     LLOps.td
   OUTS
     -gen-op-decls LLOps.h.inc
