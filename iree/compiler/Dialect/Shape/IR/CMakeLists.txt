@@ -40,7 +40,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     ShapeOpsGen
-  SRCS
+  TD_FILE
     ShapeOps.td
   OUTS
     -gen-op-decls ShapeOps.h.inc

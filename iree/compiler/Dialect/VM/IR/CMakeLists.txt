@@ -49,7 +49,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     VMEnumsGen
-  SRCS
+  TD_FILE
     VMBase.td
   OUTS
     -gen-enum-decls VMEnums.h.inc
@@ -59,7 +59,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     VMOpsGen
-  SRCS
+  TD_FILE
     VMOps.td
   OUTS
     -gen-op-decls VMOps.h.inc
@@ -69,7 +69,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     VMOpEncoderGen
-  SRCS
+  TD_FILE
     VMOps.td
   OUTS
     -gen-iree-vm-op-encoder-defs VMOpEncoder.cpp.inc
@@ -80,7 +80,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     VMOpInterfaceGen
-  SRCS
+  TD_FILE
     VMBase.td
   OUTS
     -gen-op-interface-decls VMOpInterface.h.inc

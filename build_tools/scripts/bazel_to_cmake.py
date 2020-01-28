@@ -175,7 +175,7 @@ class BuildFileFunctions(object):
       # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
       td_file = td_file.replace("//", "${IREE_ROOT_DIR}/")
       td_file = td_file.replace(":", "/")
-    return "  SRCS\n    \"%s\"\n" % (td_file)
+    return "  TD_FILE\n    \"%s\"\n" % (td_file)
 
   def _convert_tbl_outs_block(self, **kwargs):
     tbl_outs = kwargs.get("tbl_outs")
@@ -409,14 +409,14 @@ class BuildFileFunctions(object):
 
   def gentbl(self, **kwargs):
     name_block = self._convert_name_block(**kwargs)
-    srcs_block = self._convert_td_file_block(**kwargs)
+    td_file_block = self._convert_td_file_block(**kwargs)
     outs_block = self._convert_tbl_outs_block(**kwargs)
     tblgen_block = self._convert_tblgen_block(**kwargs)
 
     self.converter.body += """iree_tablegen_library(
-%(name_block)s%(srcs_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
+%(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
     "name_block": name_block,
-    "srcs_block": srcs_block,
+    "td_file_block": td_file_block,
     "outs_block": outs_block,
     "tblgen_block": tblgen_block,
     }

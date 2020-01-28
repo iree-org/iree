@@ -45,7 +45,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     check_ops_gen
-  SRCS
+  TD_FILE
     check_ops.td
   OUTS
     -gen-op-decls check_ops.h.inc

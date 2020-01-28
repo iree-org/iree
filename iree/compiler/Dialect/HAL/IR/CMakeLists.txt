@@ -67,7 +67,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     HALEnumsGen
-  SRCS
+  TD_FILE
     HALBase.td
   OUTS
     -gen-enum-decls HALEnums.h.inc
@@ -77,7 +77,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     HALOpInterfaceGen
-  SRCS
+  TD_FILE
     HALBase.td
   OUTS
     -gen-op-interface-decls HALOpInterface.h.inc
@@ -87,7 +87,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     HALOpsGen
-  SRCS
+  TD_FILE
     HALOps.td
   OUTS
     -gen-op-decls HALOps.h.inc
