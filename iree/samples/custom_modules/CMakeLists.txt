@@ -21,7 +21,7 @@ iree_bytecode_module(
     "custom_modules_test.mlir"
   CC_NAMESPACE
     "iree::samples::custom_modules"
-  TRANSLATION_TOOL
+  TRANSLATE_TOOL
     iree_samples_custom_modules_dialect_custom-translate
   TRANSLATION
     "-iree-mlir-to-vm-bytecode-module"

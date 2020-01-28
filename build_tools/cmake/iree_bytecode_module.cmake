@@ -22,7 +22,7 @@ include(CMakeParseArguments)
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
 # TRANSLATION: Translation option to pass to the translation tool (string).
-# TRANSLATION_TOOL: Translation tool to invoke (CMake target).
+# TRANSLATE_TOOL: Translation tool to invoke (CMake target).
 # CC_NAMESPACE: Wraps everything in a C++ namespace.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 # Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC will be
@@ -38,26 +38,26 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATION;TRANSLATION_TOOL;CC_NAMESPACE"
+    "NAME;SRC;TRANSLATION;TRANSLATE_TOOL;CC_NAMESPACE"
     ""
     ${ARGN}
   )
 
   if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    # Set defaults for TRANSLATION and TRANSLATION_TOOL
+    # Set defaults for TRANSLATION and TRANSLATE_TOOL
     if(DEFINED _RULE_TRANSLATION)
       set(_TRANSLATION ${_RULE_TRANSLATION})
     else()
       set(_TRANSLATION "-iree-mlir-to-vm-bytecode-module")
     endif()
-    if(DEFINED _RULE_TRANSLATION_TOOL)
-      set(_TRANSLATION_TOOL ${_RULE_TRANSLATION_TOOL})
+    if(DEFINED _RULE_TRANSLATE_TOOL)
+      set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
     else()
-      set(_TRANSLATION_TOOL "iree_tools_iree-translate")
+      set(_TRANSLATE_TOOL "iree_tools_iree-translate")
     endif()
 
     # Resolve the executable binary path from the target name.
-    set(_TRANSLATION_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATION_TOOL}>)
+    set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
 
     set(_ARGS "${_TRANSLATION}")
     list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
@@ -66,8 +66,8 @@ function(iree_bytecode_module)
 
     add_custom_command(
       OUTPUT "${_RULE_NAME}.module"
-      COMMAND ${_TRANSLATION_TOOL_EXECUTABLE} ${_ARGS}
-      DEPENDS ${_TRANSLATION_TOOL}
+      COMMAND ${_TRANSLATE_TOOL_EXECUTABLE} ${_ARGS}
+      DEPENDS ${_TRANSLATE_TOOL}
     )
 
     if(DEFINED _RULE_CC_NAMESPACE)

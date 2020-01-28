@@ -21,7 +21,7 @@ iree_bytecode_module(
     "check_test.mlir"
   CC_NAMESPACE
     "iree::check"
-  TRANSLATION_TOOL
+  TRANSLATE_TOOL
     iree_modules_check_dialect_check-translate
   TRANSLATION
     "-iree-mlir-to-vm-bytecode-module"
