@@ -463,25 +463,39 @@ LogicalResult CmpIOpSPIRVLowering::lowerOperation(
   }
   auto boolType = builder.getI1Type();
   auto predicateVal = static_cast<CmpIPredicate>(opInfo.getInt());
-  switch (predicateVal) {
+
 #define DISPATCH(caseLabel, opName)                                       \
   case caseLabel:                                                         \
     spirvOp = builder.create<opName>(op->getLoc(), boolType, operands[0], \
                                      operands[1]);                        \
     break;
 
-    DISPATCH(CmpIPredicate::eq, spirv::IEqualOp);
-    DISPATCH(CmpIPredicate::ne, spirv::INotEqualOp);
-    DISPATCH(CmpIPredicate::slt, spirv::SLessThanOp);
-    DISPATCH(CmpIPredicate::sle, spirv::SLessThanEqualOp);
-    DISPATCH(CmpIPredicate::sgt, spirv::SGreaterThanOp);
-    DISPATCH(CmpIPredicate::sge, spirv::SGreaterThanEqualOp);
+  // Handle i1 type differently because SPIR-V arithmatic ops by default don't
+  // support i1 types.
+  if (operands[0].getType().cast<IntegerType>().getWidth() == 1) {
+    switch (predicateVal) {
+      DISPATCH(CmpIPredicate::eq, spirv::LogicalEqualOp);
+      DISPATCH(CmpIPredicate::ne, spirv::LogicalNotEqualOp);
+      default:
+        return op->emitError(
+            "unhandled predicate attribute for SPIR-V lowering of i1 type");
+    }
+  } else {
+    switch (predicateVal) {
+      DISPATCH(CmpIPredicate::eq, spirv::IEqualOp);
+      DISPATCH(CmpIPredicate::ne, spirv::INotEqualOp);
+      DISPATCH(CmpIPredicate::slt, spirv::SLessThanOp);
+      DISPATCH(CmpIPredicate::sle, spirv::SLessThanEqualOp);
+      DISPATCH(CmpIPredicate::sgt, spirv::SGreaterThanOp);
+      DISPATCH(CmpIPredicate::sge, spirv::SGreaterThanEqualOp);
+      default:
+        return op->emitError(
+            "unhandled predicate attribute for SPIR-V lowering");
+    }
+  }
 
 #undef DISPATCH
 
-    default:
-      return op->emitError("unhandled predicate attribute for SPIR-V lowering");
-  }
   valueCache.setValueAtIndex(op->getResult(0), index, spirvOp->getResult(0));
   return success();
 }

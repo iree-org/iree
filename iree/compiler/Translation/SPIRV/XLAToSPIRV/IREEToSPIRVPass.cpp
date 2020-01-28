@@ -100,6 +100,7 @@ static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
       // Standard dialect unary elementwise ops:
       // Standard dialect binary elementwise ops:
       SPIRVPwOpLowering<AddFOp, spirv::FAddOp>,
+      SPIRVPwOpLowering<AndOp, spirv::LogicalAndOp>,
       SPIRVPwOpLowering<DivFOp, spirv::FDivOp>,
       SPIRVPwOpLowering<MulFOp, spirv::FMulOp>,
       SPIRVPwOpLowering<SubFOp, spirv::FSubOp>,
