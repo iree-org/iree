@@ -68,6 +68,7 @@ include(iree_spirv_kernel_cc_library)
 include(iree_pybind_cc_library)
 include(iree_glob_lit_tests)
 include(iree_lit_test)
+include(iree_alwayslink)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
@@ -124,6 +125,7 @@ if(${IREE_ENABLE_LLVM})
   endif()
 
   add_subdirectory(third_party/llvm-project/llvm EXCLUDE_FROM_ALL)
+  set_alwayslink_mlir_libs()
 
   # Reset CMAKE_BUILD_TYPE to its previous setting
   set(CMAKE_BUILD_TYPE "${_CMAKE_BUILD_TYPE}" CACHE STRING "Build type (default ${DEFAULT_CMAKE_BUILD_TYPE})" FORCE)
@@ -133,6 +135,7 @@ endif()
 
 if(${IREE_BUILD_COMPILER})
   add_subdirectory(build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla EXCLUDE_FROM_ALL)
+  set_alwayslink_tensorflow_libs()
 endif()
 
 if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
@@ -184,6 +187,3 @@ add_subdirectory(iree/tools)
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
 endif()
-
-# Set ALWAYSLINK property after all targets have been created
-include(iree_alwayslink)
