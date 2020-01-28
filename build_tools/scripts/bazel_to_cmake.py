@@ -280,14 +280,14 @@ class BuildFileFunctions(object):
   def exports_files(self, *args, **kwargs):
     pass
 
-  def glob(self, include, exclude = [], exclude_directories=1):
+  def glob(self, include, exclude=[], exclude_directories=1):
     if exclude_directories != 1:
       raise ValueError("Non-default exclude_directories not supported")
 
     filepaths = []
     for pattern in include:
       if "**" in pattern:
-        # glob has some specific restrictions about crossing package boundaries.
+        # bazel's glob has some specific restrictions about crossing package boundaries.
         # We have no uses of recursive globs. Rather than try to emulate them or
         # silently give different behavior, just error out.
         # See https://docs.bazel.build/versions/master/be/functions.html#glob
@@ -300,9 +300,14 @@ class BuildFileFunctions(object):
       if "**" in pattern:
         # See comment above
         raise ValueError("Recursive globs not supported")
-      exclude_filepaths.update(glob.glob(self.converter.directory_path + "/" + pattern))
+      exclude_filepaths.update(
+          glob.glob(self.converter.directory_path + "/" + pattern))
 
-    basenames = sorted([os.path.basename(path) for path in filepaths if path not in exclude_filepaths])
+    basenames = sorted([
+        os.path.basename(path)
+        for path in filepaths
+        if path not in exclude_filepaths
+    ])
     return basenames
 
   def config_setting(self, **kwargs):
@@ -423,15 +428,15 @@ class BuildFileFunctions(object):
     srcs_block = self._convert_srcs_block(**kwargs)
     data_block = self._convert_data_block(**kwargs)
 
-    self.converter.body += (
-        "iree_lit_test_suite(\n"
-        "%(name_block)s"
-        "%(srcs_block)s"
-        "%(data_block)s)\n\n" % {
-            "name_block": name_block,
-            "srcs_block": srcs_block,
-            "data_block": data_block,
-        })
+    self.converter.body += ("iree_lit_test_suite(\n"
+                            "%(name_block)s"
+                            "%(srcs_block)s"
+                            "%(data_block)s)\n\n" % {
+                                "name_block": name_block,
+                                "srcs_block": srcs_block,
+                                "data_block": data_block,
+                            })
+
 
 class Converter(object):
   """Conversion state tracking and full file template substitution."""
