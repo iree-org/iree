@@ -325,9 +325,9 @@ class Buffer : public Resource {
   // TODO(benvanik): add debug_name.
 
   // Returns a longer debug string describing the buffer and its attributes.
-  std::string DebugString() const;
+  std::string DebugString() const override;
   // Returns a short debug string describing the buffer.
-  std::string DebugStringShort() const;
+  std::string DebugStringShort() const override;
 
   // Sets a range of the buffer to the given value.
   // This requires that the resource was allocated with
