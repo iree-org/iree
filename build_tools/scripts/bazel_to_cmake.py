@@ -34,8 +34,13 @@ import textwrap
 from collections import OrderedDict
 from itertools import repeat
 import glob
+import re
 
 repo_root = None
+
+EDIT_BLOCKING_PATTERN = re.compile(
+    "bazel[\s_]*to[\s_]*cmake[\s_]*:?[\s_]*do[\s_]*not[\s_]*edit",
+    flags=re.IGNORECASE)
 
 
 def parse_arguments():
@@ -475,18 +480,19 @@ class Converter(object):
     self.directory_path = directory_path
     self.rel_build_file_path = rel_build_file_path
 
-  def convert(self):
+  def convert(self, copyright_line):
     # One `add_subdirectory(name)` per subdirectory.
-    add_subdirectories = ""
+    add_subdir_commands = []
     for root, dirs, file_names in os.walk(self.directory_path):
-      add_subdirectories = "\n".join(
-          ["add_subdirectory(%s)" % (dir,) for dir in dirs])
+      for dir in sorted(dirs):
+        if os.path.isfile(os.path.join(root, dir, "CMakeLists.txt")):
+          add_subdir_commands.append("add_subdirectory(%s)" % (dir,))
       # Stop walk, only add direct subdirectories.
       break
 
     converted_file = self.template % {
-        "date_year": datetime.date.today().year,
-        "add_subdirectories": add_subdirectories,
+        "copyright_line": copyright_line,
+        "add_subdirectories": "\n".join(add_subdir_commands),
         "body": self.body,
     }
 
@@ -498,7 +504,7 @@ class Converter(object):
     return converted_file
 
   template = textwrap.dedent("""\
-    # Copyright %(date_year)s Google LLC
+    %(copyright_line)s
     #
     # Licensed under the Apache License, Version 2.0 (the "License");
     # you may not use this file except in compliance with the License.
@@ -527,7 +533,9 @@ def GetDict(obj):
 
 def convert_directory_tree(root_directory_path, write_files):
   print("convert_directory_tree: %s" % (root_directory_path,))
-  for root, dirs, file_names in os.walk(root_directory_path):
+  # Process directories starting at leaves so we can skip add_directory on
+  # subdirs without a CMakeLists file.
+  for root, dirs, file_names in os.walk(root_directory_path, topdown=False):
     convert_directory(root, write_files)
 
 
@@ -547,11 +555,29 @@ def convert_directory(directory_path, write_files):
   rel_cmakelists_file_path = os.path.relpath(cmakelists_file_path, repo_root)
   print("Converting %s to %s" % (rel_build_file_path, rel_cmakelists_file_path))
 
-  if write_files:
+  cmake_file_exists = os.path.isfile(cmakelists_file_path)
+  copyright_line = "# Copyright %s Google LLC" % (datetime.date.today().year,)
+  write_allowed = write_files
+  if cmake_file_exists:
+    with open(cmakelists_file_path) as f:
+      for i, line in enumerate(f):
+        if line.startswith("# Copyright"):
+          copyright_line = line.rstrip()
+        if EDIT_BLOCKING_PATTERN.search(line):
+          print(
+              "  %(path)s already exists, and line %(index)d: '%(line)s' prevents edits. Falling back to preview"
+              % {
+                  "path": rel_cmakelists_file_path,
+                  "index": i + 1,
+                  "line": line.strip()
+              })
+          write_allowed = False
+
+  if write_allowed:
     # TODO(scotttodd): Attempt to merge instead of overwrite?
     #   Existing CMakeLists.txt may have special logic that should be preserved
-    if os.path.isfile(cmakelists_file_path):
-      print("  %s already exists, overwritting" % (rel_cmakelists_file_path,))
+    if cmake_file_exists:
+      print("  %s already exists, overwriting" % (rel_cmakelists_file_path,))
     else:
       print("  %s does not exist yet, creating" % (rel_cmakelists_file_path,))
   print("")
@@ -561,9 +587,8 @@ def convert_directory(directory_path, write_files):
     converter = Converter(directory_path, rel_build_file_path)
     try:
       exec(build_file_code, GetDict(BuildFileFunctions(converter)))
-      converted_text = converter.convert()
-
-      if write_files:
+      converted_text = converter.convert(copyright_line)
+      if write_allowed:
         with open(cmakelists_file_path, "wt") as cmakelists_file:
           cmakelists_file.write(converted_text)
       else:
