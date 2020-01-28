@@ -281,6 +281,10 @@ class BuildFileFunctions(object):
     pass
 
   def glob(self, include, exclude=[], exclude_directories=1):
+    # Rather than converting bazel globs into CMake globs, we evaluate the glob at
+    # conversion time. This avoids issues with different glob semantics and dire
+    # warnings about not knowing when to reevaluate the glob.
+    # See https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
     if exclude_directories != 1:
       raise ValueError("Non-default exclude_directories not supported")
 
