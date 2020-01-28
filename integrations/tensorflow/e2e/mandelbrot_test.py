@@ -110,7 +110,7 @@ class MandelbrotTest(tf_test_utils.SavedModelTestCase):
 
     # This is a much more detailed view, so more iterations are needed.
     pixels = mandelbrot.calculate(-0.7436447860, 0.1318252536, 0.0000029336,
-                                  400, 10000)
+                                  400, 3000)
     pixels.assert_all_close()
 
 
