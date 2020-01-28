@@ -38,17 +38,18 @@ function(set_alwayslink_property)
   foreach(_LIB ${_RULE_ALWAYSLINK_LIBS})
     # If SKIP_NONEXISTING is false: Always try to set the property.
     # If SKIP_NONEXISTING is true : Only set the property if the target exists.
-    if((_RULE_SKIP_NONEXISTING AND TARGET ${_LIB}) OR NOT _RULE_SKIP_NONEXISTING)
-
-      # Check if the target is an aliased target.
-      # If so get the non aliased target.
-      get_target_property(_ALIASED_TARGET ${_LIB} ALIASED_TARGET)
-      if(_ALIASED_TARGET)
-        set(_LIB ${_ALIASED_TARGET})
-      endif()
-
-      set_property(TARGET ${_LIB} PROPERTY ALWAYSLINK 1)
+    if(NOT TARGET ${_LIB} AND _RULE_SKIP_NONEXISTING)
+      continue()
     endif()
+
+    # Check if the target is an aliased target.
+    # If so get the non aliased target.
+    get_target_property(_ALIASED_TARGET ${_LIB} ALIASED_TARGET)
+    if(_ALIASED_TARGET)
+      set(_LIB ${_ALIASED_TARGET})
+    endif()
+
+    set_property(TARGET ${_LIB} PROPERTY ALWAYSLINK 1)
   endforeach()
 endfunction()
 
