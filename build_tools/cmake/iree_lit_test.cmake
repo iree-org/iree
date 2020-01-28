@@ -50,7 +50,7 @@ function(iree_lit_test)
     COMMAND ${CMAKE_SOURCE_DIR}/iree/tools/run_lit.sh "${_TEST_FILE_PATH}"
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" # Make sure the lit runner can find all the binaries
   )
-  set_tests_properties(${_NAME} PROPERTIES DEPENDS _RULE_DATA)
+  # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()
 
 
