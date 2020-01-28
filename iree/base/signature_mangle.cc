@@ -173,6 +173,16 @@ void RawSignatureMangler::AddShapedNDBuffer(
   item_builder.AppendTo(builder_, 'B');
 }
 
+void RawSignatureMangler::AddScalar(AbiConstants::ScalarType type) {
+  SignatureBuilder item_builder;
+  // Fields:
+  //   't': scalar type code
+  if (static_cast<unsigned>(type) != 0) {
+    item_builder.Integer(static_cast<unsigned>(type), 't');
+  }
+  item_builder.AppendTo(builder_, 'S');
+}
+
 // -----------------------------------------------------------------------------
 // RawSignatureParser
 // -----------------------------------------------------------------------------
@@ -199,9 +209,20 @@ void RawSignatureParser::Description::ToString(std::string& s) const {
       absl::StrAppend(&s, "]>");
       break;
     }
-    case Type::kRefObject:
+    case Type::kRefObject: {
       absl::StrAppend(&s, "RefObject<?>");
       break;
+    }
+    case Type::kScalar: {
+      const char* type_name = "!BADTYPE!";
+      unsigned type_u = static_cast<unsigned>(scalar.type);
+      if (type_u >= 0 && type_u <= AbiConstants::kScalarTypeNames.size()) {
+        type_name =
+            AbiConstants::kScalarTypeNames[static_cast<unsigned>(type_u)];
+      }
+      absl::StrAppend(&s, type_name);
+      break;
+    }
     default:
       absl::StrAppend(&s, "!UNKNOWN!");
   }

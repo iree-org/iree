@@ -83,21 +83,28 @@ llvm::Optional<RawSignatureMangler> mangleTensorType(TensorType t) {
   }
 
   RawSignatureMangler mangler;
+  // Tensors map to buffers in the ABI.
   mangler.AddShapedNDBuffer(*scalarType, absl::MakeConstSpan(dims));
+  return mangler;
+}
+
+llvm::Optional<RawSignatureMangler> mangleScalarType(Type t) {
+  auto mappedType = mapScalarType(t);
+  if (!mappedType) return llvm::None;
+  RawSignatureMangler mangler;
+  mangler.AddScalar(*mappedType);
   return mangler;
 }
 
 StringAttr mangleType(Builder builder, Type type, char tag) {
   SignatureBuilder fBuilder;
+  auto mangledType = mangleScalarType(type);
   if (auto tensorType = type.dyn_cast<TensorType>()) {
-    // Tensors map to buffers in the ABI.
-    auto mangledTensor = mangleTensorType(tensorType);
-    if (!mangledTensor) return nullptr;
-    mangledTensor->builder().AppendTo(fBuilder, tag);
-    return builder.getStringAttr(fBuilder.encoded());
+    mangledType = mangleTensorType(tensorType);
   }
-
-  return nullptr;
+  if (!mangledType) return nullptr;
+  mangledType->builder().AppendTo(fBuilder, tag);
+  return builder.getStringAttr(fBuilder.encoded());
 }
 
 StringAttr unrecognizedTypeAttr(Builder builder, char tag) {

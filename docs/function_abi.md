@@ -52,9 +52,13 @@ signature ::= 'I' length-prefixed(type-sequence)
               'R' length-prefixed(type-sequence)
 
 type-sequence ::= (arg-result-type)*
-arg-result-type ::= buffer-type | ref-object-type | unrecognized-type
-buffer-type ::= 'B' length-prefixed(scalar-type? dim*)
-scalar-type ::= 't' (
+arg-result-type ::= buffer-type
+                  | ref-object-type
+                  | scalar-type
+                  | unrecognized-type
+buffer-type ::= 'B' length-prefixed(scalar-element-type? dim*)
+scalar-type ::= 'S' length-prefixed(scalar-element-type?)
+scalar-element-type ::= 't' (
                     '0'  # IEEE float32 (default if not specified)
                   | '1'  # IEEE float16
                   | '2'  # IEEE float64

@@ -109,6 +109,7 @@ cc_binary(
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:bytecode_module",
+        "//iree/vm:value",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",

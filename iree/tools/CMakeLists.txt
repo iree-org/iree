@@ -129,6 +129,7 @@ if(${IREE_BUILD_COMPILER})
       iree::modules::hal
       iree::vm
       iree::vm::bytecode_module
+      iree::vm::value
       LLVMSupport
       MLIRIR
       MLIRParser

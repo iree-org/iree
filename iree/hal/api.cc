@@ -389,15 +389,17 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
   IREE_TRACE_SCOPE0("iree_hal_buffer_map");
 
   if (!out_mapped_memory) {
+    LOG(ERROR) << "output mapped memory not set";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
   std::memset(out_mapped_memory, 0, sizeof(*out_mapped_memory));
 
-  auto* buffer_handle = reinterpret_cast<Buffer*>(buffer);
-  if (!buffer_handle) {
+  if (!buffer) {
+    LOG(ERROR) << "buffer not set";
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
+  auto* buffer_handle = reinterpret_cast<Buffer*>(buffer);
   IREE_API_ASSIGN_OR_RETURN(
       auto mapping, buffer_handle->MapMemory<uint8_t>(
                         static_cast<MemoryAccessBitfield>(memory_access),
