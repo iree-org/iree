@@ -250,6 +250,30 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    descriptor_set
+  HDRS
+    "descriptor_set.h"
+  DEPS
+    iree::hal::buffer
+    iree::hal::resource
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    descriptor_set_layout
+  HDRS
+    "descriptor_set_layout.h"
+  DEPS
+    iree::hal::buffer
+    iree::hal::resource
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     device
   HDRS
     "device.h"
@@ -257,8 +281,11 @@ iree_cc_library(
     iree::hal::allocator
     iree::hal::buffer
     iree::hal::command_queue
+    iree::hal::descriptor_set
+    iree::hal::descriptor_set_layout
     iree::hal::device_info
     iree::hal::event
+    iree::hal::executable_layout
     iree::hal::executable_cache
     iree::hal::semaphore
     iree::base::ref_ptr
@@ -387,6 +414,17 @@ iree_cc_library(
     "executable_format.h"
   DEPS
     absl::core_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    executable_layout
+  HDRS
+    "executable_layout.h"
+  DEPS
+    iree::hal::resource
+    iree::base::status
   PUBLIC
 )
 

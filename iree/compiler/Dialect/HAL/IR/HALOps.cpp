@@ -187,47 +187,6 @@ static void printExPushBindingOp(OpAsmPrinter &p, ExPushBindingOp op) {
 }
 
 //===----------------------------------------------------------------------===//
-// hal.ex.executable_descriptor_set_layout
-//===----------------------------------------------------------------------===//
-
-void ExExecutableDescriptorSetLayoutOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "dsl");
-}
-
-static ParseResult parseExExecutableDescriptorSetLayoutOp(
-    OpAsmParser &parser, OperationState *result) {
-  OpAsmParser::OperandType executable;
-  IntegerAttr setAttr;
-  Type descriptorSetLayoutType;
-  if (failed(parser.parseOperand(executable)) || failed(parser.parseComma()) ||
-      failed(parser.resolveOperand(
-          executable,
-          RefPtrType::get(ExecutableType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseAttribute(setAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "set", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(descriptorSetLayoutType))) {
-    return failure();
-  }
-  result->addTypes(descriptorSetLayoutType);
-  return success();
-}
-
-static void printExExecutableDescriptorSetLayoutOp(
-    OpAsmPrinter &p, ExExecutableDescriptorSetLayoutOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.executable());
-  p << ", " << op.set();
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"executable"});
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
-//===----------------------------------------------------------------------===//
 // hal.ex.defer_release
 //===----------------------------------------------------------------------===//
 
@@ -1875,10 +1834,10 @@ static void printCommandBufferCopyBufferOp(OpAsmPrinter &p,
 void CommandBufferBindDescriptorSetOp::build(Builder *builder,
                                              OperationState &state,
                                              Value commandBuffer,
-                                             Value executable, uint32_t set,
-                                             Value descriptorSet,
+                                             Value executableLayout,
+                                             uint32_t set, Value descriptorSet,
                                              ValueRange dynamicOffsets) {
-  state.addOperands({commandBuffer, executable, descriptorSet});
+  state.addOperands({commandBuffer, executableLayout, descriptorSet});
   state.addAttribute("set",
                      builder->getIntegerAttr(builder->getIntegerType(32), set));
   state.addOperands(dynamicOffsets);
@@ -1908,7 +1867,7 @@ static ParseResult parseCommandBufferBindDescriptorSetOp(
           },
           ArrayRef<Type>{
               RefPtrType::get(CommandBufferType::get(result->getContext())),
-              RefPtrType::get(ExecutableType::get(result->getContext())),
+              RefPtrType::get(ExecutableLayoutType::get(result->getContext())),
               RefPtrType::get(DescriptorSetType::get(result->getContext())),
           },
           operandsLoc, result->operands))) {
@@ -1936,7 +1895,7 @@ static void printCommandBufferBindDescriptorSetOp(
   p << op.getOperationName() << ' ';
   p.printOperand(op.command_buffer());
   p << ", ";
-  p.printOperand(op.executable());
+  p.printOperand(op.executable_layout());
   p << ", set=" << op.set() << ", ";
   p.printOperand(op.descriptor_set());
   if (!op.dynamic_offsets().empty()) {
@@ -2090,59 +2049,14 @@ static void printCommandBufferDispatchIndirectOp(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set.allocate
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetAllocateOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "descriptor_set");
-}
-
-static ParseResult parseDescriptorSetAllocateOp(OpAsmParser &parser,
-                                                OperationState *result) {
-  OpAsmParser::OperandType device;
-  OpAsmParser::OperandType setLayout;
-  Type descriptorSetType;
-  if (failed(parser.parseOperand(device)) ||
-      failed(parser.resolveOperand(
-          device, RefPtrType::get(DeviceType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(setLayout)) ||
-      failed(parser.resolveOperand(
-          setLayout,
-          RefPtrType::get(DescriptorSetLayoutType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(descriptorSetType))) {
-    return failure();
-  }
-  result->addTypes(descriptorSetType);
-  return success();
-}
-
-static void printDescriptorSetAllocateOp(OpAsmPrinter &p,
-                                         DescriptorSetAllocateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", ";
-  p.printOperand(op.set_layout());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
-//===----------------------------------------------------------------------===//
 // hal.descriptor_set.make_binding
 //===----------------------------------------------------------------------===//
 
 void DescriptorSetMakeBindingOp::build(Builder *builder, OperationState &state,
                                        int32_t binding, Value buffer,
-                                       Value offset, Value length,
-                                       IREE::HAL::MemoryAccessBitfield access) {
+                                       Value offset, Value length) {
   state.addAttribute("binding", builder->getI32IntegerAttr(binding));
   state.addOperands({buffer, offset, length});
-  state.addAttribute("access",
-                     builder->getI32IntegerAttr(static_cast<int32_t>(access)));
   state.addTypes({DescriptorSetBindingType::get(builder->getContext())});
 }
 
@@ -2179,9 +2093,6 @@ static ParseResult parseDescriptorSetMakeBindingOp(OpAsmParser &parser,
               getDeviceSizeType(parser),
           },
           operandLoc, result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<MemoryAccessBitfield, symbolizeMemoryAccessBitfield>(
-          parser, "access", result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
       failed(parser.parseColonType(resultType))) {
     return failure();
@@ -2195,29 +2106,35 @@ static void printDescriptorSetMakeBindingOp(OpAsmPrinter &p,
   p << op.getOperationName() << ' ';
   p << "binding=" << op.binding() << ", ";
   p.printOperands(op.getOperation()->getOperands());
-  p << ", \"" << stringifyMemoryAccessBitfield(op.access()) << "\"";
   p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"binding", "access"});
+                                     /*elidedAttrs=*/{"binding"});
   p << " : ";
   p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set.update
+// hal.descriptor_set.create
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseDescriptorSetUpdateOp(OpAsmParser &parser,
+void DescriptorSetCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "descriptor_set");
+}
+
+static ParseResult parseDescriptorSetCreateOp(OpAsmParser &parser,
                                               OperationState *result) {
   OpAsmParser::OperandType device;
-  OpAsmParser::OperandType set;
+  OpAsmParser::OperandType setLayout;
   SmallVector<OpAsmParser::OperandType, 4> bindings;
+  Type resultType;
   if (failed(parser.parseOperand(device)) ||
       failed(parser.resolveOperand(
           device, RefPtrType::get(DeviceType::get(result->getContext())),
           result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(set)) ||
+      failed(parser.parseComma()) || failed(parser.parseOperand(setLayout)) ||
       failed(parser.resolveOperand(
-          set, RefPtrType::get(DescriptorSetType::get(result->getContext())),
+          setLayout,
+          RefPtrType::get(DescriptorSetLayoutType::get(result->getContext())),
           result->operands)) ||
       failed(parser.parseComma()) || failed(parser.parseKeyword("bindings")) ||
       failed(parser.parseEqual()) ||
@@ -2226,22 +2143,145 @@ static ParseResult parseDescriptorSetUpdateOp(OpAsmParser &parser,
       failed(parser.resolveOperands(
           bindings, DescriptorSetBindingType::get(result->getContext()),
           result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.parseColonType(resultType))) {
     return failure();
   }
+  result->addTypes(resultType);
   return success();
 }
 
-static void printDescriptorSetUpdateOp(OpAsmPrinter &p,
-                                       DescriptorSetUpdateOp op) {
+static void printDescriptorSetCreateOp(OpAsmPrinter &p,
+                                       DescriptorSetCreateOp op) {
   p << op.getOperationName() << ' ';
   p.printOperand(op.device());
   p << ", ";
-  p.printOperand(op.set());
+  p.printOperand(op.set_layout());
   p << ", bindings=[";
   p.printOperands(op.bindings());
-  p << ']';
+  p << "]";
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p << " : ";
+  p.printType(op.result().getType());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.descriptor_set_layout.make_binding
+//===----------------------------------------------------------------------===//
+
+void DescriptorSetLayoutMakeBindingOp::build(
+    Builder *builder, OperationState &state, int32_t binding,
+    IREE::HAL::DescriptorType type, IREE::HAL::MemoryAccessBitfield access) {
+  state.addAttribute("binding", builder->getI32IntegerAttr(binding));
+  state.addAttribute("type",
+                     builder->getI32IntegerAttr(static_cast<int32_t>(type)));
+  state.addAttribute("access",
+                     builder->getI32IntegerAttr(static_cast<int32_t>(access)));
+  state.addTypes({DescriptorSetLayoutBindingType::get(builder->getContext())});
+}
+
+void DescriptorSetLayoutMakeBindingOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "binding");
+}
+
+static ParseResult parseDescriptorSetLayoutMakeBindingOp(
+    OpAsmParser &parser, OperationState *result) {
+  IntegerAttr bindingAttr;
+  OpAsmParser::OperandType buffer;
+  OpAsmParser::OperandType offset;
+  OpAsmParser::OperandType length;
+  llvm::SMLoc operandLoc;
+  Type resultType;
+  if (failed(parser.parseKeyword("binding")) || failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(bindingAttr,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "binding", result->attributes)) ||
+      failed(parser.parseComma()) || failed(parser.parseOperand(buffer)) ||
+      failed(parser.parseComma()) || failed(parser.parseOperand(offset)) ||
+      failed(parser.parseComma()) || failed(parser.parseOperand(length)) ||
+      failed(parser.getCurrentLocation(&operandLoc)) ||
+      failed(parser.resolveOperands(
+          {
+              buffer,
+              offset,
+              length,
+          },
+          ArrayRef<Type>{
+              RefPtrType::get(BufferType::get(result->getContext())),
+              getDeviceSizeType(parser),
+              getDeviceSizeType(parser),
+          },
+          operandLoc, result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.parseColonType(resultType))) {
+    return failure();
+  }
+  result->addTypes(resultType);
+  return success();
+}
+
+static void printDescriptorSetLayoutMakeBindingOp(
+    OpAsmPrinter &p, DescriptorSetLayoutMakeBindingOp op) {
+  p << op.getOperationName() << ' ';
+  p << "binding=" << op.binding() << ", ";
+  p.printOperands(op.getOperation()->getOperands());
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"binding"});
+  p << " : ";
+  p.printType(op.result().getType());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.descriptor_set_layout.create
+//===----------------------------------------------------------------------===//
+
+void DescriptorSetLayoutCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "descriptor_set_layout");
+}
+
+static ParseResult parseDescriptorSetLayoutCreateOp(OpAsmParser &parser,
+                                                    OperationState *result) {
+  OpAsmParser::OperandType device;
+  OpAsmParser::OperandType setLayout;
+  SmallVector<OpAsmParser::OperandType, 4> bindings;
+  Type resultType;
+  if (failed(parser.parseOperand(device)) ||
+      failed(parser.resolveOperand(
+          device, RefPtrType::get(DeviceType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseComma()) || failed(parser.parseOperand(setLayout)) ||
+      failed(parser.resolveOperand(
+          setLayout,
+          RefPtrType::get(DescriptorSetLayoutType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("bindings")) ||
+      failed(parser.parseEqual()) ||
+      failed(
+          parser.parseOperandList(bindings, OpAsmParser::Delimiter::Square)) ||
+      failed(parser.resolveOperands(
+          bindings, DescriptorSetBindingType::get(result->getContext()),
+          result->operands)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.parseColonType(resultType))) {
+    return failure();
+  }
+  result->addTypes(resultType);
+  return success();
+}
+
+static void printDescriptorSetLayoutCreateOp(OpAsmPrinter &p,
+                                             DescriptorSetLayoutCreateOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.device());
+  p << ", bindings=[";
+  p.printOperands(op.bindings());
+  p << "]";
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p << " : ";
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2408,6 +2448,67 @@ static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
 
   // TODO(benvanik): check export name conflicts.
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable_layout.create
+//===----------------------------------------------------------------------===//
+
+void ExecutableLayoutCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "executable_layout");
+}
+
+static ParseResult parseExecutableLayoutCreateOp(OpAsmParser &parser,
+                                                 OperationState *result) {
+  OpAsmParser::OperandType device;
+  SmallVector<OpAsmParser::OperandType, 4> setLayouts;
+  IntegerAttr pushConstants;
+  Type resultType;
+  if (failed(parser.parseOperand(device)) ||
+      failed(parser.resolveOperand(
+          device, RefPtrType::get(DeviceType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parser.parseKeyword("set_layouts")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseOperandList(setLayouts,
+                                     OpAsmParser::Delimiter::Square)) ||
+      failed(parser.resolveOperands(
+          setLayouts, DescriptorSetLayoutType::get(result->getContext()),
+          result->operands))) {
+    return failure();
+  }
+  if (succeeded(parser.parseOptionalComma())) {
+    if (failed(parser.parseKeyword("push_constants")) ||
+        failed(parser.parseEqual()) ||
+        failed(parser.parseAttribute(pushConstants, "push_constants",
+                                     result->attributes))) {
+      return failure();
+    }
+  }
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.parseColonType(resultType))) {
+    return failure();
+  }
+  result->addTypes(resultType);
+  return success();
+}
+
+static void printExecutableLayoutCreateOp(OpAsmPrinter &p,
+                                          ExecutableLayoutCreateOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.device());
+  p << ", set_layouts=[";
+  p.printOperands(op.set_layouts());
+  p << "]";
+  if (op.push_constants()) {
+    p << ", push_constants=";
+    p.printAttribute(op.push_constantsAttr());
+  }
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p << " : ";
+  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//

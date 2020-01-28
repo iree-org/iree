@@ -29,6 +29,7 @@ iree_cc_library(
     iree::vm
     iree::vm::module_abi_cc
     absl::core_headers
+    absl::inlined_vector
     absl::memory
     absl::strings
     absl::span

@@ -39,6 +39,7 @@ typedef struct iree_hal_descriptor_set_layout iree_hal_descriptor_set_layout_t;
 typedef struct iree_hal_device iree_hal_device_t;
 typedef struct iree_hal_driver iree_hal_driver_t;
 typedef struct iree_hal_executable iree_hal_executable_t;
+typedef struct iree_hal_executable_layout iree_hal_executable_layout_t;
 typedef struct iree_hal_fence iree_hal_fence_t;
 typedef struct iree_hal_semaphore iree_hal_semaphore_t;
 
@@ -197,6 +198,56 @@ typedef enum {
   // Command is considered a dispatch operation (dispatch/execute).
   IREE_HAL_COMMAND_CATEGORY_DISPATCH = 1 << 1,
 } iree_hal_command_category_t;
+
+// Specifies the type of a descriptor in a descriptor set.
+typedef enum {
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
+} iree_hal_descriptor_type_t;
+
+// Specifies a descriptor set binding.
+// The range specified by [offset, length) will be made available to executables
+// on the given binding. If the descriptor type is dynamic then the range will
+// be [offset + dynamic_offset, length).
+//
+// The IREE HAL buffer type may internally be offset; such offset is applied
+// here as if it were the base address of the buffer. Note that the offset will
+// be applied at the time the binding is recording into the command buffer.
+//
+// Maps to VkDescriptorSetBinding.
+typedef struct {
+  // The binding number of this entry and corresponds to a resource of the
+  // same binding number in the executable interface.
+  int32_t binding;
+  // Buffer bound to the binding number.
+  // May be nullptr if the binding is not used by the executable.
+  iree_hal_buffer_t* buffer;
+  // Offset, in bytes, into the buffer that the binding starts at.
+  // If the descriptor type is dynamic this will be added to the dynamic
+  // offset provided during binding.
+  iree_device_size_t offset;
+  // Length, in bytes, of the buffer that is available to the executable.
+  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // contents are larger than supported by the device (~128MiB, usually) this
+  // will fail. If the descriptor type is dynamic this will be used for all
+  // ranges regardless of offset.
+  iree_device_size_t length;
+} iree_hal_descriptor_set_binding_t;
+
+// Specifies a descriptor set layout binding.
+//
+// Maps to VkDescriptorSetLayoutBinding.
+typedef struct {
+  // The binding number of this entry and corresponds to a resource of the
+  // same binding number in the executable interface.
+  int32_t binding;
+  // Specifies which type of resource descriptors are used for this binding.
+  iree_hal_descriptor_type_t type;
+  // Specifies the memory access performed by the executables.
+  iree_hal_memory_access_t access;
+} iree_hal_descriptor_set_layout_binding_t;
 
 // Bitfield specifying which execution stage a brarrier should start/end at.
 //
@@ -670,6 +721,85 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length);
 
+// Binds a descriptor set to the given |set| matching that used in the
+// executable layout interface.
+//
+// The descriptor set will remain bound and valid so long as the executable
+// layouts used by dispatches are compatible (same descriptor layouts and push
+// constant sizes).
+//
+// If any dynamic descriptor types are defined in the descriptor set layout then
+// the dynamic offsets must be provided. These offsets will be added to the base
+// offset of the descriptor layout binding.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_bind_descriptor_set(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_layout_t* executable_layout, int32_t set,
+    iree_hal_descriptor_set_t* descriptor_set,
+    iree_host_size_t dynamic_offset_count,
+    const iree_device_size_t* dynamic_offsets);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point, int32_t workgroup_x,
+    int32_t workgroup_y, int32_t workgroup_z);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_dispatch_indirect(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSet
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Creates a descriptor set of the given layout and bindings.
+// Descriptor sets are immutable and retain their bindings.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
+    iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_binding_t* bindings,
+    iree_allocator_t allocator, iree_hal_descriptor_set_t** out_descriptor_set);
+
+// Retains the given |set| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_retain(iree_hal_descriptor_set_t* descriptor_set);
+
+// Releases the given |set| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSetLayout
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Creates a descriptor set layout with the given bindings.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_layout_create(
+    iree_hal_device_t* device, iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_allocator_t allocator,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
+
+// Retains the given |descriptor_set_layout| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_layout_retain(
+    iree_hal_descriptor_set_layout_t* descriptor_set_layout);
+
+// Releases the given |descriptor_set_layout| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_layout_release(
+    iree_hal_descriptor_set_layout_t* descriptor_set_layout);
+
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
@@ -773,6 +903,31 @@ iree_hal_executable_retain(iree_hal_executable_t* executable);
 // Releases the given |executable| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_executable_release(iree_hal_executable_t* executable);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::ExecutableLayout
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Creates an executable layout composed of the given descriptor set layouts.
+// The returned executable layout can be used by multiple executables with the
+// same compatible resource binding layouts.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
+    iree_hal_device_t* device, iree_host_size_t set_layout_count,
+    const iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_host_size_t push_constants, iree_allocator_t allocator,
+    iree_hal_executable_layout_t** out_executable_layout);
+
+// Retains the given |executable_layout| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_retain(
+    iree_hal_executable_layout_t* executable_layout);
+
+// Releases the given |executable_layout| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_release(
+    iree_hal_executable_layout_t* executable_layout);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

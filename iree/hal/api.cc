@@ -38,6 +38,23 @@
 namespace iree {
 namespace hal {
 
+// Defines the iree_hal_<type_name>_retain/_release methods.
+#define IREE_HAL_API_RETAIN_RELEASE(type_name, cc_type)         \
+  IREE_API_EXPORT iree_status_t iree_hal_##type_name##_retain(  \
+      iree_hal_##type_name##_t* type_name) {                    \
+    auto* handle = reinterpret_cast<cc_type*>(type_name);       \
+    if (!handle) return IREE_STATUS_INVALID_ARGUMENT;           \
+    handle->AddReference();                                     \
+    return IREE_STATUS_OK;                                      \
+  }                                                             \
+  IREE_API_EXPORT iree_status_t iree_hal_##type_name##_release( \
+      iree_hal_##type_name##_t* type_name) {                    \
+    auto* handle = reinterpret_cast<cc_type*>(type_name);       \
+    if (!handle) return IREE_STATUS_INVALID_ARGUMENT;           \
+    handle->ReleaseReference();                                 \
+    return IREE_STATUS_OK;                                      \
+  }
+
 //===----------------------------------------------------------------------===//
 // Utilities
 //===----------------------------------------------------------------------===//
@@ -114,27 +131,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_format_element_type(
 // iree::hal::Allocator
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t
-iree_hal_allocator_retain(iree_hal_allocator_t* allocator) {
-  IREE_TRACE_SCOPE0("iree_hal_allocator_retain");
-  auto* handle = reinterpret_cast<Allocator*>(allocator);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_allocator_release(iree_hal_allocator_t* allocator) {
-  IREE_TRACE_SCOPE0("iree_hal_allocator_release");
-  auto* handle = reinterpret_cast<Allocator*>(allocator);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
-  return IREE_STATUS_OK;
-}
+IREE_HAL_API_RETAIN_RELEASE(allocator, Allocator);
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
     const iree_hal_allocator_t* allocator, const int32_t* shape,
@@ -293,6 +290,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_wrap_buffer(
 // iree::hal::Buffer
 //===----------------------------------------------------------------------===//
 
+IREE_HAL_API_RETAIN_RELEASE(buffer, Buffer);
+
 IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
     iree_hal_buffer_t* buffer, iree_device_size_t byte_offset,
     iree_device_size_t byte_length, iree_allocator_t allocator,
@@ -314,28 +313,6 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_subspan(
 
   *out_buffer = reinterpret_cast<iree_hal_buffer_t*>(new_handle.release());
 
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_retain(iree_hal_buffer_t* buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_retain");
-  auto* handle = reinterpret_cast<Buffer*>(buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_release(iree_hal_buffer_t* buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_buffer_release");
-  auto* handle = reinterpret_cast<Buffer*>(buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
   return IREE_STATUS_OK;
 }
 
@@ -539,6 +516,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
 
+IREE_HAL_API_RETAIN_RELEASE(buffer_view, iree_hal_buffer_view);
+
 IREE_API_EXPORT iree_status_t iree_hal_buffer_view_create(
     iree_hal_buffer_t* buffer, const int32_t* shape, size_t shape_rank,
     iree_hal_element_type_t element_type, iree_allocator_t allocator,
@@ -602,24 +581,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
       allocator, out_buffer_view);
   iree_hal_buffer_release(subview_buffer);
   return result;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_view_retain(iree_hal_buffer_view_t* buffer_view) {
-  if (!buffer_view) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  buffer_view->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view) {
-  if (!buffer_view) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  buffer_view->ReleaseReference();
-  return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_hal_buffer_t* iree_hal_buffer_view_buffer(
@@ -705,6 +666,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
 // iree::hal::CommandBuffer
 //===----------------------------------------------------------------------===//
 
+IREE_HAL_API_RETAIN_RELEASE(command_buffer, CommandBuffer);
+
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories, iree_allocator_t allocator,
@@ -727,28 +690,6 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_create(
 
   *out_command_buffer =
       reinterpret_cast<iree_hal_command_buffer_t*>(command_buffer.release());
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_command_buffer_retain(iree_hal_command_buffer_t* command_buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_command_buffer_retain");
-  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_command_buffer_release(iree_hal_command_buffer_t* command_buffer) {
-  IREE_TRACE_SCOPE0("iree_hal_command_buffer_release");
-  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
   return IREE_STATUS_OK;
 }
 
@@ -818,38 +759,150 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
       reinterpret_cast<Buffer*>(target_buffer), target_offset, length));
 }
 
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_bind_descriptor_set(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_layout_t* executable_layout, int32_t set,
+    iree_hal_descriptor_set_t* descriptor_set,
+    iree_host_size_t dynamic_offset_count,
+    const iree_device_size_t* dynamic_offsets) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_bind_descriptor_set");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  // TODO(benvanik): implement descriptor sets.
+  return IREE_STATUS_UNIMPLEMENTED;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point, int32_t workgroup_x,
+    int32_t workgroup_y, int32_t workgroup_z) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_dispatch");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  // TODO(benvanik): implement descriptor sets.
+  return IREE_STATUS_UNIMPLEMENTED;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_dispatch_indirect(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_t* workgroups_buffer,
+    iree_device_size_t workgroups_offset) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_dispatch_indirect");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  // TODO(benvanik): implement descriptor sets.
+  return IREE_STATUS_UNIMPLEMENTED;
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSet
+//===----------------------------------------------------------------------===//
+
+IREE_HAL_API_RETAIN_RELEASE(descriptor_set, DescriptorSet);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
+    iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_binding_t* bindings,
+    iree_allocator_t allocator,
+    iree_hal_descriptor_set_t** out_descriptor_set) {
+  IREE_TRACE_SCOPE0("iree_hal_descriptor_set_create");
+  if (!out_descriptor_set) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_descriptor_set = nullptr;
+  if (!set_layout) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (binding_count && !bindings) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // TODO(benvanik): refactor the C++ types to use the C types for storage so
+  // that we can safely map between the two. For now assume size equality
+  // is layout equality (as compilers aren't allowed to reorder structs).
+  static_assert(sizeof(DescriptorSet::Binding) ==
+                    sizeof(iree_hal_descriptor_set_binding_t),
+                "Expecting identical layout");
+  IREE_API_ASSIGN_OR_RETURN(
+      auto descriptor_set,
+      handle->CreateDescriptorSet(
+          add_ref(reinterpret_cast<DescriptorSetLayout*>(set_layout)),
+          absl::MakeConstSpan(
+              reinterpret_cast<const DescriptorSet::Binding*>(bindings),
+              binding_count)));
+
+  *out_descriptor_set =
+      reinterpret_cast<iree_hal_descriptor_set_t*>(descriptor_set.release());
+  return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSetLayout
+//===----------------------------------------------------------------------===//
+
+IREE_HAL_API_RETAIN_RELEASE(descriptor_set_layout, DescriptorSetLayout);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_layout_create(
+    iree_hal_device_t* device, iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_allocator_t allocator,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
+  IREE_TRACE_SCOPE0("iree_hal_descriptor_set_layout_create");
+  if (!out_descriptor_set_layout) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_descriptor_set_layout = nullptr;
+  if (binding_count && !bindings) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // TODO(benvanik): refactor the C++ types to use the C types for storage so
+  // that we can safely map between the two. For now assume size equality
+  // is layout equality (as compilers aren't allowed to reorder structs).
+  static_assert(sizeof(DescriptorSetLayout::Binding) ==
+                    sizeof(iree_hal_descriptor_set_layout_binding_t),
+                "Expecting identical layout");
+  IREE_API_ASSIGN_OR_RETURN(
+      auto descriptor_set_layout,
+      handle->CreateDescriptorSetLayout(absl::MakeConstSpan(
+          reinterpret_cast<const DescriptorSetLayout::Binding*>(bindings),
+          binding_count)));
+
+  *out_descriptor_set_layout =
+      reinterpret_cast<iree_hal_descriptor_set_layout_t*>(
+          descriptor_set_layout.release());
+  return IREE_STATUS_OK;
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Device
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t
-iree_hal_device_retain(iree_hal_device_t* device) {
-  IREE_TRACE_SCOPE0("iree_hal_device_retain");
-  auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_device_release(iree_hal_device_t* device) {
-  IREE_TRACE_SCOPE0("iree_hal_device_release");
-  auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
-  return IREE_STATUS_OK;
-}
+IREE_HAL_API_RETAIN_RELEASE(device, Device);
 
 IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
 iree_hal_device_allocator(iree_hal_device_t* device) {
   auto* handle = reinterpret_cast<Device*>(device);
-  if (!handle) {
-    return nullptr;
-  }
+  if (!handle) return nullptr;
   return reinterpret_cast<iree_hal_allocator_t*>(handle->allocator());
 }
 
@@ -857,27 +910,7 @@ iree_hal_device_allocator(iree_hal_device_t* device) {
 // iree::hal::Driver
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_retain(iree_hal_driver_t* driver) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_retain");
-  auto* handle = reinterpret_cast<Driver*>(driver);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_driver_release(iree_hal_driver_t* driver) {
-  IREE_TRACE_SCOPE0("iree_hal_driver_release");
-  auto* handle = reinterpret_cast<Driver*>(driver);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
-  return IREE_STATUS_OK;
-}
+IREE_HAL_API_RETAIN_RELEASE(driver, Driver);
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_driver_query_available_devices(
@@ -1040,25 +1073,43 @@ iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
 // iree::hal::Executable
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t
-iree_hal_executable_retain(iree_hal_executable_t* executable) {
-  IREE_TRACE_SCOPE0("iree_hal_executable_retain");
-  auto* handle = reinterpret_cast<Executable*>(executable);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
+IREE_HAL_API_RETAIN_RELEASE(executable, Executable);
 
-IREE_API_EXPORT iree_status_t
-iree_hal_executable_release(iree_hal_executable_t* executable) {
-  IREE_TRACE_SCOPE0("iree_hal_executable_release");
-  auto* handle = reinterpret_cast<Executable*>(executable);
+//===----------------------------------------------------------------------===//
+// iree::hal::ExecutableLayout
+//===----------------------------------------------------------------------===//
+
+IREE_HAL_API_RETAIN_RELEASE(executable_layout, ExecutableLayout);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
+    iree_hal_device_t* device, iree_host_size_t set_layout_count,
+    const iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_host_size_t push_constants, iree_allocator_t allocator,
+    iree_hal_executable_layout_t** out_executable_layout) {
+  IREE_TRACE_SCOPE0("iree_hal_executable_layout_create");
+  if (!out_executable_layout) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_executable_layout = nullptr;
+  if (set_layout_count && !set_layouts) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  auto* handle = reinterpret_cast<Device*>(device);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  handle->ReleaseReference();
+
+  IREE_API_ASSIGN_OR_RETURN(
+      auto executable_layout,
+      handle->CreateExecutableLayout(
+          absl::MakeConstSpan(
+              reinterpret_cast<const ref_ptr<DescriptorSetLayout>*>(
+                  set_layouts),
+              set_layout_count),
+          push_constants));
+
+  *out_executable_layout = reinterpret_cast<iree_hal_executable_layout_t*>(
+      executable_layout.release());
   return IREE_STATUS_OK;
 }
 
@@ -1066,51 +1117,13 @@ iree_hal_executable_release(iree_hal_executable_t* executable) {
 // iree::hal::Fence
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t iree_hal_fence_retain(iree_hal_fence_t* fence) {
-  IREE_TRACE_SCOPE0("iree_hal_fence_retain");
-  auto* handle = reinterpret_cast<Fence*>(fence);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t iree_hal_fence_release(iree_hal_fence_t* fence) {
-  IREE_TRACE_SCOPE0("iree_hal_fence_release");
-  auto* handle = reinterpret_cast<Fence*>(fence);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
-  return IREE_STATUS_OK;
-}
+IREE_HAL_API_RETAIN_RELEASE(fence, Fence);
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Semaphore
 //===----------------------------------------------------------------------===//
 
-IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_retain(iree_hal_semaphore_t* semaphore) {
-  IREE_TRACE_SCOPE0("iree_hal_semaphore_retain");
-  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->AddReference();
-  return IREE_STATUS_OK;
-}
-
-IREE_API_EXPORT iree_status_t
-iree_hal_semaphore_release(iree_hal_semaphore_t* semaphore) {
-  IREE_TRACE_SCOPE0("iree_hal_semaphore_release");
-  auto* handle = reinterpret_cast<Semaphore*>(semaphore);
-  if (!handle) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  handle->ReleaseReference();
-  return IREE_STATUS_OK;
-}
+IREE_HAL_API_RETAIN_RELEASE(semaphore, Semaphore);
 
 }  // namespace hal
 }  // namespace iree

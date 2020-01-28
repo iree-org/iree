@@ -48,9 +48,12 @@ cc_library(
         ":buffer",
         ":buffer_view",
         ":command_buffer",
+        ":descriptor_set",
+        ":descriptor_set_layout",
         ":device",
         ":driver",
         ":driver_registry",
+        ":executable_layout",
         ":fence",
         ":heap_buffer",
         ":semaphore",
@@ -230,15 +233,38 @@ cc_test(
 )
 
 cc_library(
+    name = "descriptor_set",
+    hdrs = ["descriptor_set.h"],
+    deps = [
+        ":buffer",
+        ":resource",
+        "//iree/base:status",
+    ],
+)
+
+cc_library(
+    name = "descriptor_set_layout",
+    hdrs = ["descriptor_set_layout.h"],
+    deps = [
+        ":buffer",
+        ":resource",
+        "//iree/base:status",
+    ],
+)
+
+cc_library(
     name = "device",
     hdrs = ["device.h"],
     deps = [
         ":allocator",
         ":buffer",
         ":command_queue",
+        ":descriptor_set",
+        ":descriptor_set_layout",
         ":device_info",
         ":event",
         ":executable_cache",
+        ":executable_layout",
         ":semaphore",
         "//iree/base:ref_ptr",
         "//iree/base:status",
@@ -342,6 +368,15 @@ cc_library(
     hdrs = ["executable_format.h"],
     deps = [
         "@com_google_absl//absl/base:core_headers",
+    ],
+)
+
+cc_library(
+    name = "executable_layout",
+    hdrs = ["executable_layout.h"],
+    deps = [
+        ":resource",
+        "//iree/base:status",
     ],
 )
 

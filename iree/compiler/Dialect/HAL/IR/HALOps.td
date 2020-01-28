@@ -75,19 +75,6 @@ def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
   );
 }
 
-def HAL_ExExecutableDescriptorSetLayoutOp :
-  HAL_PureOp<"ex.executable_descriptor_set_layout", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let arguments = (ins
-    RefPtrOf<HAL_Executable>:$executable,
-    I32Attr:$set
-  );
-  let results = (outs
-    RefPtrOf<HAL_DescriptorSetLayout>:$result
-  );
-}
-
 // TODO(benvanik): replace with resource sets.
 def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
   let arguments = (ins
@@ -825,7 +812,7 @@ def HAL_CommandBufferBindDescriptorSetOp :
 
   let arguments = (ins
     RefPtrOf<HAL_CommandBuffer>:$command_buffer,
-    RefPtrOf<HAL_Executable>:$executable,
+    RefPtrOf<HAL_ExecutableLayout>:$executable_layout,
     I32Attr:$set,
     RefPtrOf<HAL_DescriptorSet>:$descriptor_set,
     Variadic<HAL_DeviceSize>:$dynamic_offsets
@@ -835,7 +822,7 @@ def HAL_CommandBufferBindDescriptorSetOp :
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state, Value commandBuffer,
-      Value executable, uint32_t set, Value descriptorSet,
+      Value executableLayout, uint32_t set, Value descriptorSet,
       ValueRange dynamicOffsets = {}
     }]>,
   ];
@@ -886,23 +873,6 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
 // iree::hal::DescriptorSet
 //===----------------------------------------------------------------------===//
 
-def HAL_DescriptorSetAllocateOp : HAL_Op<"descriptor_set.allocate", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{allocates a descriptor set from the device pool}];
-  let description = [{
-    Allocates a DescriptorSet from the device pool.
-  }];
-
-  let arguments = (ins
-    RefPtrOf<HAL_Device>:$device,
-    RefPtrOf<HAL_DescriptorSetLayout>:$set_layout
-  );
-  let results = (outs
-    RefPtrOf<HAL_DescriptorSet>:$result
-  );
-}
-
 def HAL_DescriptorSetMakeBindingOp :
   HAL_MakeTupleOp<"descriptor_set.make_binding", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
@@ -917,8 +887,7 @@ def HAL_DescriptorSetMakeBindingOp :
     I32Attr:$binding,
     RefPtrOf<HAL_Buffer>:$buffer,
     HAL_DeviceSize:$offset,
-    HAL_DeviceSize:$length,
-    HAL_MemoryAccessBitfieldAttr:$access
+    HAL_DeviceSize:$length
   );
   let results = (outs
     HAL_DescriptorSetBinding:$result
@@ -928,24 +897,77 @@ def HAL_DescriptorSetMakeBindingOp :
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &state,
-      int32_t binding, Value buffer, Value offset, Value length,
+      int32_t binding, Value buffer, Value offset, Value length
+    }]>,
+  ];
+}
+
+def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{allocates a descriptor set from the device pool}];
+  let description = [{
+    Creates a DescriptorSet from the device pool.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device,
+    RefPtrOf<HAL_DescriptorSetLayout>:$set_layout,
+    Variadic<HAL_DescriptorSetBinding>:$bindings
+  );
+  let results = (outs
+    RefPtrOf<HAL_DescriptorSet>:$result
+  );
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSetLayout
+//===----------------------------------------------------------------------===//
+
+def HAL_DescriptorSetLayoutMakeBindingOp :
+  HAL_MakeTupleOp<"descriptor_set_layout.make_binding", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{temporary layout binding allocation operation}];
+  let description = [{
+    Allocates a temporary DescriptorSetLayout binding struct that can be passed
+    to the hal.descriptor_set_layout.create operation.
+  }];
+
+  let arguments = (ins
+    I32Attr:$binding,
+    HAL_DescriptorTypeAttr:$type,
+    HAL_MemoryAccessBitfieldAttr:$access
+  );
+  let results = (outs
+    HAL_DescriptorSetLayoutBinding:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      int32_t binding, IREE::HAL::DescriptorType type,
       IREE::HAL::MemoryAccessBitfield access
     }]>,
   ];
 }
 
-def HAL_DescriptorSetUpdateOp : HAL_Op<"descriptor_set.update"> {
-  let summary = [{updates one or more bindings in a descriptor set}];
+def HAL_DescriptorSetLayoutCreateOp :
+  HAL_PureOp<"descriptor_set_layout.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{creates a descriptor set layout}];
   let description = [{
-    Updates bindings in a descriptor set. The descriptor set must not be
-    recorded into any command buffer that has not yet completed; updating when
-    in use will cause undefined behavior.
+    Creates a descriptor set layout that defines the bindings used within a set.
   }];
 
   let arguments = (ins
     RefPtrOf<HAL_Device>:$device,
-    RefPtrOf<HAL_DescriptorSet>:$set,
-    Variadic<HAL_DescriptorSetBinding>:$bindings
+    Variadic<HAL_DescriptorSetLayoutBinding>:$bindings
+  );
+  let results = (outs
+    RefPtrOf<HAL_DescriptorSetLayout>:$result
   );
 }
 
@@ -1103,6 +1125,32 @@ def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
 //===----------------------------------------------------------------------===//
 
 // TODO(benvanik): executable cache.
+
+//===----------------------------------------------------------------------===//
+// iree::hal::ExecutableLayout
+//===----------------------------------------------------------------------===//
+
+def HAL_ExecutableLayoutCreateOp :
+  HAL_PureOp<"executable_layout.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{creates an executable layout}];
+  let description = [{
+    Creates an executable layout from the given descriptor sets and push
+    constant required size. Executable layouts can be shared across any
+    executable that uses the same layout and push constant information.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Device>:$device,
+    Variadic<HAL_DescriptorSetLayout>:$set_layouts,
+    OptionalAttr<I32Attr>:$push_constants
+  );
+  let results = (outs
+    RefPtrOf<HAL_ExecutableLayout>:$result
+  );
+}
+
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Fence

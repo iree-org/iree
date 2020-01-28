@@ -130,6 +130,22 @@ def HAL_CommandCategoryBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_DescriptorType_UniformBuffer : I32EnumAttrCase<"UniformBuffer", 6>;
+def HAL_DescriptorType_StorageBuffer : I32EnumAttrCase<"StorageBuffer", 7>;
+def HAL_DescriptorType_UniformBufferDynamic : I32EnumAttrCase<"UniformBufferDynamic", 8>;
+def HAL_DescriptorType_StorageBufferDynamic : I32EnumAttrCase<"StorageBufferDynamic", 9>;
+def HAL_DescriptorTypeAttr :
+    I32EnumAttr<"DescriptorType", "IREE HAL DescriptorType", [
+      HAL_DescriptorType_UniformBuffer,
+      HAL_DescriptorType_StorageBuffer,
+      HAL_DescriptorType_UniformBufferDynamic,
+      HAL_DescriptorType_StorageBufferDynamic,
+    ]> {
+  let returnType = "uint32_t";
+  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_ExecutionStage_None : BitEnumAttrCase<"None", 0x0000>;
 def HAL_ExecutionStage_CommandIssue : BitEnumAttrCase<"CommandIssue", 0x0001>;
 def HAL_ExecutionStage_CommandProcess : BitEnumAttrCase<"CommandProcess", 0x0002>;
@@ -310,6 +326,15 @@ def HAL_ExecutableCache : DialectType<
   }];
 }
 
+def HAL_ExecutableLayout : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::ExecutableLayoutType>()">,
+    "executable_layout"> {
+  let typeDescription = [{
+    An executable layout describing the descriptor sets and push constants used.
+  }];
+}
+
 def HAL_Fence : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::FenceType>()">,
@@ -451,12 +476,23 @@ def HAL_DescriptorSetBinding : NamedTupleOf<[
     NamedTupleElement<1, "buffer", RefPtrOf<HAL_Buffer>>,
     NamedTupleElement<2, "buffer_offset", HAL_DeviceSize>,
     NamedTupleElement<3, "buffer_length", HAL_DeviceSize>,
-    NamedTupleElement<4, "access", I32>,
   ], "DescriptorSetBinding"> {
   let typeDescription = [{
     DescriptorSetBinding struct that can be passed to the
     hal.descriptor_set.update operation. Constructed via the
     hal.descriptor_set.make_binding operation.
+  }];
+}
+
+def HAL_DescriptorSetLayoutBinding : NamedTupleOf<[
+    NamedTupleElement<0, "binding", I32>,
+    NamedTupleElement<1, "type", I32>,
+    NamedTupleElement<2, "access", I32>,
+  ], "DescriptorSetLayoutBinding"> {
+  let typeDescription = [{
+    DescriptorSetLayoutBinding struct that can be passed to the
+    hal.descriptor_set_layout.create operation. Constructed via the
+    hal.descriptor_set_layout.make_binding operation.
   }];
 }
 

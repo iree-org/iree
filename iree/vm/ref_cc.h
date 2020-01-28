@@ -115,8 +115,12 @@ class ref {
     if (px_) ref_type_release<T>(px_);
   }
 
-  // No implicit ref copying allowed; use retain_ref instead.
-  ref(const ref&) noexcept = delete;
+  // Don't use implicit ref copying; use retain_ref instead to make things more
+  // readable. We can't delete the ctor (or, I couldn't find a way not to)
+  // because the templated parameter packing magic needs it.
+  ref(const ref& rhs) noexcept : px_(rhs.get()) {
+    if (px_) ref_type_retain<T>(px_);
+  }
   ref& operator=(const ref&) noexcept = delete;
 
   // Move support to transfer ownership from one ref to another.

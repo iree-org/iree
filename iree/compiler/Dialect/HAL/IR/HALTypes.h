@@ -152,6 +152,18 @@ class ExecutableCacheType
   }
 };
 
+class ExecutableLayoutType
+    : public Type::TypeBase<ExecutableLayoutType, RefObjectType> {
+ public:
+  using Base::Base;
+  static ExecutableLayoutType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::ExecutableLayout);
+  }
+  static bool kindof(unsigned kind) {
+    return kind == TypeKind::ExecutableLayout;
+  }
+};
+
 class FenceType : public Type::TypeBase<FenceType, RefObjectType> {
  public:
   using Base::Base;
@@ -217,6 +229,18 @@ class DescriptorSetBindingType {
         {
             IntegerType::get(32, context),
             RefPtrType::get(BufferType::get(context)),
+            IntegerType::get(32, context),
+            IntegerType::get(32, context),
+        },
+        context);
+  }
+};
+
+class DescriptorSetLayoutBindingType {
+ public:
+  static TupleType get(MLIRContext *context) {
+    return TupleType::get(
+        {
             IntegerType::get(32, context),
             IntegerType::get(32, context),
             IntegerType::get(32, context),

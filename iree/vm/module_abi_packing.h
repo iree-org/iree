@@ -61,8 +61,10 @@ struct ParamUnpack<opaque_ref> {
     iree_vm_ref_move(&frame->registers.ref[param_state->ref_ordinal++],
                      &reg.value);
   }
+  // clang-format off
   operator opaque_ref&() { return reg; }
   operator const opaque_ref&() const { return reg; }
+  // clang-format on
   opaque_ref reg;
 };
 
@@ -85,8 +87,10 @@ struct ParamUnpack<ref<T>> {
     }
     // NOTE: null is allowed here!
   }
+  // clang-format off
   operator ref<T> &() { return reg; }
   operator const ref<T> &() const { return reg; }
+  // clang-format on
   ref<T> reg;
 };
 
@@ -109,8 +113,10 @@ struct ParamUnpack<std::array<U, S>> {
                                                  std::index_sequence<I...>) {
     return {((void)I, ParamUnpack<T>(param_state, frame))...};
   }
-  operator std::array<U, S> &() { return regs; }
-  operator std::array<U, S>() const { return regs; }
+  // clang-format off
+  operator std::array<U, S>&() { return regs; }
+  operator std::array<U, S>&() const { return regs; }
+  // clang-format on
   std::array<U, S> regs;
 };
 
@@ -118,11 +124,17 @@ template <typename... Ts>
 struct ParamUnpack<std::tuple<Ts...>> {
   ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
     ++param_state->varargs_ordinal;
-    regs = std::make_tuple(ParamUnpack<Ts>(param_state, frame)...);
+    regs = std::make_tuple<typename std::decay<Ts>::type...>(
+        std::move(static_cast<typename std::decay<Ts>::type>(
+            ParamUnpack<Ts>(param_state, frame)))...);
   }
-  operator std::tuple<Ts...> &() { return regs; }
-  operator std::tuple<Ts...>() const { return regs; }
-  std::tuple<Ts...> regs;
+  // clang-format off
+  operator std::tuple<typename std::decay<Ts>::type...>&() { return regs; }
+  operator const std::tuple<typename std::decay<Ts>::type...>&() const {
+    return regs;
+  }
+  // clang-format on
+  std::tuple<typename std::decay<Ts>::type...> regs;
 };
 
 template <typename U>
@@ -133,13 +145,14 @@ struct ParamUnpack<absl::Span<U>> {
     int32_t original_varargs_ordinal = param_state->varargs_ordinal;
     regs.reserve(count);
     for (int i = 0; i < count; ++i) {
-      regs.push_back(
-          ParamUnpack<typename std::decay<U>::type>(param_state, frame));
+      regs.emplace_back(std::move(
+          ParamUnpack<typename std::decay<U>::type>(param_state, frame)));
     }
     param_state->varargs_ordinal = original_varargs_ordinal;
   }
-  operator absl::Span<U>() const { return absl::MakeSpan(regs); }
-  mutable std::vector<typename std::decay<U>::type> regs;
+  operator absl::Span<U>() { return absl::MakeSpan(regs); }
+  operator absl::Span<const U>() const { return absl::MakeConstSpan(regs); }
+  std::vector<typename std::decay<U>::type> regs;
 };
 
 //===----------------------------------------------------------------------===//

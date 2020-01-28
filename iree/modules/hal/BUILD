@@ -31,6 +31,7 @@ cc_library(
         "//iree/vm",
         "//iree/vm:module_abi_cc",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",

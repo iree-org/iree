@@ -37,11 +37,6 @@ vm.import @ex.push_binding(
   %element_type : i32
 )
 
-vm.import @ex.executable_descriptor_set_layout(
-  %executable : !iree.ref<!hal.executable>,
-  %set : i32
-) -> !iree.ref<!hal.descriptor_set_layout>
-
 vm.import @ex.defer_release(
   %operand : !iree.opaque_ref
 )
@@ -269,7 +264,7 @@ vm.import @command_buffer.copy_buffer(
 // Binds a descriptor set to the given set number.
 vm.import @command_buffer.bind_descriptor_set(
   %command_buffer : !iree.ref<!hal.command_buffer>,
-  %executable : !iree.ref<!hal.executable>,
+  %executable_layout : !iree.ref<!hal.executable_layout>,
   %set : i32,
   %descriptor_set : !iree.ref<!hal.descriptor_set>,
   %dynamic_offsets : i32 ...
@@ -299,23 +294,25 @@ vm.import @command_buffer.dispatch.indirect(
 // iree::hal::DescriptorSet
 //===----------------------------------------------------------------------===//
 
-// Allocates a new descriptor set based on the given layout.
-vm.import @descriptor_set.allocate(
+// Creates a new immutable descriptor set based on the given layout.
+vm.import @descriptor_set.create(
   %device : !iree.ref<!hal.device>,
-  %set_layout : !iree.ref<!hal.descriptor_set_layout>
+  %set_layout : !iree.ref<!hal.descriptor_set_layout>,
+  // <binding, buffer, offset, length>
+  %bindings : tuple<i32, !iree.ref<!hal.buffer>, i32, i32>...
 ) -> !iree.ref<!hal.descriptor_set>
 
-// Updates a single binding within a descriptor set.
-vm.import @descriptor_set.update(
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSetLayout
+//===----------------------------------------------------------------------===//
+
+// Creates a descriptor set layout that defines the bindings used within a set.
+vm.import @descriptor_set_layout.create(
   %device : !iree.ref<!hal.device>,
-  %set : !iree.ref<!hal.descriptor_set>,
-  // TODO(benvanik): tuples so that we can batch these updates.
-  %binding : i32,
-  %buffer : !iree.ref<!hal.buffer>,
-  %offset : i32,
-  %length : i32,
-  %access : i32
-)
+  // <binding, type, access>
+  %bindings : tuple<i32, i32, i32>...
+) -> !iree.ref<!hal.descriptor_set_layout>
+attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Device
@@ -326,6 +323,19 @@ vm.import @descriptor_set.update(
 vm.import @device.allocator(
   %device : !iree.ref<!hal.device>
 ) -> !iree.ref<!hal.allocator>
+attributes {nosideeffects}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::ExecutableLayout
+//===----------------------------------------------------------------------===//
+
+// Creates an executable layout from the given descriptor sets and push constant
+// required size.
+vm.import @executable_layout.create(
+  %device : !iree.ref<!hal.device>,
+  %set_layouts : !iree.ref<!hal.descriptor_set_layout>...,
+  %push_constants : i32
+) -> !iree.ref<!hal.executable_layout>
 attributes {nosideeffects}
 
 }  // module
