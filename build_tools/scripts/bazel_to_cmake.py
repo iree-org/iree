@@ -93,33 +93,36 @@ class BuildFileFunctions(object):
   # between similar rule conversions (e.g. cc_library and cc_binary).         #
   # ------------------------------------------------------------------------- #
 
-  def _convert_name_block(self, **kwargs):
+  def _convert_name_block(self, name):
     #  NAME
     #    rule_name
-    return "  NAME\n    %s\n" % (kwargs["name"])
+    return "  NAME\n    %s\n" % (name)
 
-  def _convert_cc_namespace_block(self, **kwargs):
+  def _convert_cc_namespace_block(self, cc_namespace):
     #  CC_NAMESPACE
     #    "cc_namespace"
-    return "  CC_NAMESPACE\n    \"%s\"\n" % (kwargs["cc_namespace"])
+    if not cc_namespace:
+      return ""
+    return "  CC_NAMESPACE\n    \"%s\"\n" % (cc_namespace)
 
-  def _convert_cpp_namespace_block(self, **kwargs):
+  def _convert_cpp_namespace_block(self, cpp_namespace):
+    if not cpp_namespace:
+      return ""
     #  CPP_NAMESPACE
     #    "cpp_namespace"
-    return "  CPP_NAMESPACE\n    \"%s\"\n" % (kwargs["cpp_namespace"])
+    return "  CPP_NAMESPACE\n    \"%s\"\n" % (cpp_namespace)
 
-  def _convert_translation_block(self, **kwargs):
-    return "  TRANSLATION\n    \"%s\"\n" % (kwargs["translation"])
+  def _convert_translation_block(self, translation):
+    return "  TRANSLATION\n    \"%s\"\n" % (translation)
 
-  def _convert_translate_tool_block(self, **kwargs):
-    translate_tool = kwargs.get("translate_tool")
+  def _convert_translate_tool_block(self, translate_tool):
     if translate_tool:
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
       translate_tool = translate_tool.replace("//", "")  # iree/base:api
       translate_tool = translate_tool.replace(":", "_")  # iree/base::api
       translate_tool = translate_tool.replace("/", "_")  # iree::base::api
-      return "  TRANSLATION_TOOL\n    %s\n" % (translate_tool)
+      return "  TRANSLATE_TOOL\n    %s\n" % (translate_tool)
     else:
       return ""
 
@@ -131,14 +134,14 @@ class BuildFileFunctions(object):
     else:
       return ""
 
-  def _convert_alwayslink_block(self, **kwargs):
-    return self._convert_option_block("ALWAYSLINK", kwargs.get("alwayslink"))
+  def _convert_alwayslink_block(self, alwayslink):
+    return self._convert_option_block("ALWAYSLINK", alwayslink)
 
-  def _convert_testonly_block(self, **kwargs):
-    return self._convert_option_block("TESTONLY", kwargs.get("testonly"))
+  def _convert_testonly_block(self, testonly):
+    return self._convert_option_block("TESTONLY", testonly)
 
-  def _convert_flatten_block(self, **kwargs):
-    return self._convert_option_block("FLATTEN", kwargs.get("flatten"))
+  def _convert_flatten_block(self, flatten):
+    return self._convert_option_block("FLATTEN", flatten)
 
   def _convert_filelist_block(self, list_name, files):
     if not files:
@@ -151,23 +154,22 @@ class BuildFileFunctions(object):
     files_list = "\n".join(["    \"%s\"" % (file) for file in files])
     return "  %s\n%s\n" % (list_name, files_list)
 
-  def _convert_hdrs_block(self, **kwargs):
-    return self._convert_filelist_block("HDRS", kwargs.get("hdrs"))
+  def _convert_hdrs_block(self, hdrs):
+    return self._convert_filelist_block("HDRS", hdrs)
 
-  def _convert_srcs_block(self, **kwargs):
-    return self._convert_filelist_block("SRCS", kwargs.get("srcs"))
+  def _convert_srcs_block(self, srcs):
+    return self._convert_filelist_block("SRCS", srcs)
 
-  def _convert_src_block(self, **kwargs):
-    return "  SRC\n    \"%s\"\n" % kwargs.get("src")
+  def _convert_src_block(self, src):
+    return "  SRC\n    \"%s\"\n" % src
 
-  def _convert_cc_file_output_block(self, **kwargs):
-    return "  CC_FILE_OUTPUT\n    \"%s\"\n" % kwargs.get("cc_file_output")
+  def _convert_cc_file_output_block(self, cc_file_output):
+    return "  CC_FILE_OUTPUT\n    \"%s\"\n" % (cc_file_output)
 
-  def _convert_h_file_output_block(self, **kwargs):
-    return "  H_FILE_OUTPUT\n    \"%s\"\n" % kwargs.get("h_file_output")
+  def _convert_h_file_output_block(self, h_file_output):
+    return "  H_FILE_OUTPUT\n    \"%s\"\n" % (h_file_output)
 
-  def _convert_td_file_block(self, **kwargs):
-    td_file = kwargs.get("td_file")
+  def _convert_td_file_block(self, td_file):
     if td_file.startswith("//iree"):
       # Bazel `//iree/dir/td_file.td`
       # -> CMake `${IREE_ROOT_DIR}/iree/dir/td_file.td
@@ -177,13 +179,11 @@ class BuildFileFunctions(object):
       td_file = td_file.replace(":", "/")
     return "  TD_FILE\n    \"%s\"\n" % (td_file)
 
-  def _convert_tbl_outs_block(self, **kwargs):
-    tbl_outs = kwargs.get("tbl_outs")
+  def _convert_tbl_outs_block(self, tbl_outs):
     outs_list = "\n".join(["    %s %s" % tbl_out for tbl_out in tbl_outs])
     return "  OUTS\n%s\n" % (outs_list)
 
-  def _convert_tblgen_block(self, **kwargs):
-    tblgen = kwargs.get("tblgen")
+  def _convert_tblgen_block(self, tblgen):
     if tblgen.endswith("iree-tblgen"):
       return "  TBLGEN\n    IREE\n"
     else:
@@ -217,30 +217,28 @@ class BuildFileFunctions(object):
       target = target.replace("/", "::")  # iree::base::api
     return target
 
-  def _convert_data_block(self, **kwargs):
-    if not kwargs.get("data"):
+  def _convert_data_block(self, data):
+    if not data:
       return ""
 
     #  DATA
     #    package1::target1
     #    package1::target2
     #    package2::target
-    data = kwargs.get("data")
     data_list = [self._convert_target(dep) for dep in data]
     # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
     data_list = list(filter(None, OrderedDict(zip(data_list, repeat(None)))))
     data_list = "\n".join(["    %s" % (data,) for data in data_list])
     return "  DATA\n%s\n" % (data_list,)
 
-  def _convert_deps_block(self, **kwargs):
-    if not kwargs.get("deps"):
+  def _convert_deps_block(self, deps):
+    if not deps:
       return ""
 
     #  DEPS
     #    package1::target1
     #    package1::target2
     #    package2::target
-    deps = kwargs.get("deps")
     deps_list = [self._convert_target(dep) for dep in deps]
     # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
     deps_list = list(filter(None, OrderedDict(zip(deps_list, repeat(None)))))
@@ -262,6 +260,7 @@ class BuildFileFunctions(object):
   # ------------------------------------------------------------------------- #
 
   def load(self, *args):
+    # No mapping to CMake, ignore.
     pass
 
   def package(self, **kwargs):
@@ -278,6 +277,7 @@ class BuildFileFunctions(object):
     self._convert_unimplemented_function("filegroup", **kwargs)
 
   def exports_files(self, *args, **kwargs):
+    # No mapping to CMake, ignore.
     pass
 
   def glob(self, include, exclude=[], exclude_directories=1):
@@ -318,13 +318,20 @@ class BuildFileFunctions(object):
     # No mapping to CMake, ignore.
     pass
 
-  def cc_library(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    hdrs_block = self._convert_hdrs_block(**kwargs)
-    srcs_block = self._convert_srcs_block(**kwargs)
-    deps_block = self._convert_deps_block(**kwargs)
-    alwayslink_block = self._convert_alwayslink_block(**kwargs)
-    testonly_block = self._convert_testonly_block(**kwargs)
+  def cc_library(self,
+                 name,
+                 hdrs=[],
+                 srcs=[],
+                 deps=[],
+                 alwayslink=False,
+                 testonly=False,
+                 **kwargs):
+    name_block = self._convert_name_block(name)
+    hdrs_block = self._convert_hdrs_block(hdrs)
+    srcs_block = self._convert_srcs_block(srcs)
+    deps_block = self._convert_deps_block(deps)
+    alwayslink_block = self._convert_alwayslink_block(alwayslink)
+    testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += """iree_cc_library(
 %(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s%(alwayslink_block)s%(testonly_block)s  PUBLIC
@@ -337,11 +344,11 @@ class BuildFileFunctions(object):
     "testonly_block": testonly_block,
     }
 
-  def cc_test(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    hdrs_block = self._convert_hdrs_block(**kwargs)
-    srcs_block = self._convert_srcs_block(**kwargs)
-    deps_block = self._convert_deps_block(**kwargs)
+  def cc_test(self, name, hdrs=[], srcs=[], deps=[], **kwargs):
+    name_block = self._convert_name_block(name)
+    hdrs_block = self._convert_hdrs_block(hdrs)
+    srcs_block = self._convert_srcs_block(srcs)
+    deps_block = self._convert_deps_block(deps)
 
     self.converter.body += """iree_cc_test(
 %(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
@@ -351,10 +358,10 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
-  def cc_binary(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    srcs_block = self._convert_srcs_block(**kwargs)
-    deps_block = self._convert_deps_block(**kwargs)
+  def cc_binary(self, name, srcs=[], deps=[], **kwargs):
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
+    deps_block = self._convert_deps_block(deps)
 
     self.converter.body += """iree_cc_binary(
 %(name_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
@@ -363,13 +370,24 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
-  def cc_embed_data(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    srcs_block = self._convert_srcs_block(**kwargs)
-    cc_file_output_block = self._convert_cc_file_output_block(**kwargs)
-    h_file_output_block = self._convert_h_file_output_block(**kwargs)
-    namespace_block = self._convert_cpp_namespace_block(**kwargs)
-    flatten_block = self._convert_flatten_block(**kwargs)
+  def cc_embed_data(self,
+                    name,
+                    srcs,
+                    cc_file_output,
+                    h_file_output,
+                    cpp_namespace=None,
+                    strip_prefix=None,
+                    flatten=False,
+                    identifier=None,
+                    **kwargs):
+    if identifier:
+      self._convert_unimplemented_function("cc_embed_data", name=name)
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
+    cc_file_output_block = self._convert_cc_file_output_block(cc_file_output)
+    h_file_output_block = self._convert_h_file_output_block(h_file_output)
+    namespace_block = self._convert_cpp_namespace_block(cpp_namespace)
+    flatten_block = self._convert_flatten_block(flatten)
 
     self.converter.body += """iree_cc_embed_data(
 %(name_block)s%(srcs_block)s%(cc_file_output_block)s%(h_file_output_block)s%(namespace_block)s%(flatten_block)s  PUBLIC\n)\n\n""" % {
@@ -381,9 +399,9 @@ class BuildFileFunctions(object):
     "flatten_block": flatten_block,
     }
 
-  def spirv_kernel_cc_library(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    srcs_block = self._convert_srcs_block(**kwargs)
+  def spirv_kernel_cc_library(self, name, srcs):
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
 
     self.converter.body += """iree_spirv_kernel_cc_library(
 %(name_block)s%(srcs_block)s)\n\n""" % {
@@ -391,12 +409,17 @@ class BuildFileFunctions(object):
     "srcs_block": srcs_block,
     }
 
-  def iree_bytecode_module(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    src_block = self._convert_src_block(**kwargs)
-    namespace_block = self._convert_cc_namespace_block(**kwargs)
-    translate_tool_block = self._convert_translate_tool_block(**kwargs)
-    translation_block = self._convert_translation_block(**kwargs)
+  def iree_bytecode_module(self,
+                           name,
+                           src,
+                           translation="-iree-mlir-to-vm-bytecode-module",
+                           translate_tool="//iree/tools:iree-translate",
+                           cc_namespace=None):
+    name_block = self._convert_name_block(name)
+    src_block = self._convert_src_block(src)
+    namespace_block = self._convert_cc_namespace_block(cc_namespace)
+    translate_tool_block = self._convert_translate_tool_block(translate_tool)
+    translation_block = self._convert_translation_block(translation)
 
     self.converter.body += """iree_bytecode_module(
 %(name_block)s%(src_block)s%(namespace_block)s%(translate_tool_block)s%(translation_block)s  PUBLIC\n)\n\n""" % {
@@ -407,11 +430,19 @@ class BuildFileFunctions(object):
     "translation_block": translation_block,
     }
 
-  def gentbl(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    td_file_block = self._convert_td_file_block(**kwargs)
-    outs_block = self._convert_tbl_outs_block(**kwargs)
-    tblgen_block = self._convert_tblgen_block(**kwargs)
+  def gentbl(self,
+             name,
+             tblgen,
+             td_file,
+             tbl_outs,
+             td_srcs=[],
+             td_includes=[],
+             strip_include_prefix=None,
+             test=False):
+    name_block = self._convert_name_block(name)
+    tblgen_block = self._convert_tblgen_block(tblgen)
+    td_file_block = self._convert_td_file_block(td_file)
+    outs_block = self._convert_tbl_outs_block(tbl_outs)
 
     self.converter.body += """iree_tablegen_library(
 %(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
@@ -421,16 +452,10 @@ class BuildFileFunctions(object):
     "tblgen_block": tblgen_block,
     }
 
-  def iree_setup_lit_package(self, **kwargs):
-    self._convert_unimplemented_function("iree_setup_lit_package", **kwargs)
-
-  def iree_glob_lit_tests(self, **kwargs):
-    self._convert_unimplemented_function("iree_glob_lit_tests", **kwargs)
-
-  def iree_lit_test_suite(self, **kwargs):
-    name_block = self._convert_name_block(**kwargs)
-    srcs_block = self._convert_srcs_block(**kwargs)
-    data_block = self._convert_data_block(**kwargs)
+  def iree_lit_test_suite(self, name, srcs, data, **kwargs):
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
+    data_block = self._convert_data_block(data)
 
     self.converter.body += ("iree_lit_test_suite(\n"
                             "%(name_block)s"
