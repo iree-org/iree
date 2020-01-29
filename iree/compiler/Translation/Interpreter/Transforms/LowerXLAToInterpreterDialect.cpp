@@ -63,6 +63,8 @@ UNARY_OP_LOWERING(LogOp, IREEInterp::HL::LogFOp);
 UNARY_OP_LOWERING(FloorOp, IREEInterp::HL::FloorFOp);
 UNARY_OP_LOWERING(RsqrtOp, IREEInterp::HL::RsqrtFOp);
 UNARY_OP_LOWERING(SqrtOp, IREEInterp::HL::SqrtFOp);
+UNARY_OP_LOWERING(CosOp, IREEInterp::HL::CosFOp);
+UNARY_OP_LOWERING(SinOp, IREEInterp::HL::SinFOp);
 UNARY_OP_LOWERING(TanhOp, IREEInterp::HL::TanhFOp);
 TERNARY_OP_LOWERING(SelectOp, IREEInterp::HL::SelectOp);
 
@@ -566,13 +568,14 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
 void populateLowerXlaToInterpreterPatterns(OwningRewritePatternList &patterns,
                                            MLIRContext *ctx) {
   xla_hlo::PopulateUnfuseBatchNormPatterns(ctx, &patterns);
-  patterns.insert<AbsOpLowering, BroadcastInDimOpLowering, ConcatOpLowering,
-                  ConvertLowering, CopyOpLowering, DotOpLowering,
-                  DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
-                  GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
-                  PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
-                  RsqrtOpLowering, SqrtOpLowering, SelectOpLowering,
-                  SliceOpLowering, TransposeOpLowering, TanhOpLowering>(ctx);
+  patterns
+      .insert<AbsOpLowering, BroadcastInDimOpLowering, ConcatOpLowering,
+              ConvertLowering, CopyOpLowering, CosOpLowering, DotOpLowering,
+              DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
+              GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
+              PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
+              RsqrtOpLowering, SinOpLowering, SqrtOpLowering, SelectOpLowering,
+              SliceOpLowering, TransposeOpLowering, TanhOpLowering>(ctx);
 }
 
 namespace {
