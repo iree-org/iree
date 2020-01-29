@@ -24,7 +24,7 @@ namespace hal {
 namespace vmla {
 namespace {
 
-StatusOr<ref_ptr<Driver>> CreateVMLADriver() { return make_ref<VMLADriver>(); }
+StatusOr<ref_ptr<Driver>> CreateVMLADriver() { return VMLADriver::Create(); }
 
 }  // namespace
 }  // namespace vmla

@@ -20,6 +20,8 @@
 #include "iree/base/memory.h"
 #include "iree/hal/device.h"
 #include "iree/hal/host/host_local_allocator.h"
+#include "iree/vm/instance.h"
+#include "iree/vm/module.h"
 
 namespace iree {
 namespace hal {
@@ -27,7 +29,8 @@ namespace vmla {
 
 class VMLADevice final : public Device {
  public:
-  explicit VMLADevice(DeviceInfo device_info);
+  explicit VMLADevice(DeviceInfo device_info, iree_vm_instance_t* instance,
+                      iree_vm_module_t* vmla_module);
   ~VMLADevice() override;
 
   Allocator* allocator() const override { return &allocator_; }
@@ -64,6 +67,9 @@ class VMLADevice final : public Device {
  private:
   mutable HostLocalAllocator allocator_;
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;
+
+  iree_vm_instance_t* instance_ = nullptr;
+  iree_vm_module_t* vmla_module_ = nullptr;
 };
 
 }  // namespace vmla

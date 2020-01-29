@@ -17,11 +17,15 @@
 
 #include <vector>
 
+#include "absl/container/inlined_vector.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_spec.h"
+#include "iree/vm/context.h"
+#include "iree/vm/instance.h"
+#include "iree/vm/module.h"
 
 namespace iree {
 namespace hal {
@@ -29,12 +33,12 @@ namespace vmla {
 
 class VMLAExecutable final : public Executable {
  public:
-  static StatusOr<ref_ptr<VMLAExecutable>> Load(hal::Allocator* allocator,
+  static StatusOr<ref_ptr<VMLAExecutable>> Load(iree_vm_instance_t* instance,
+                                                iree_vm_module_t* vmla_module,
                                                 ExecutableSpec spec,
                                                 bool allow_aliasing_data);
 
-  VMLAExecutable(hal::Allocator* allocator, ExecutableSpec spec,
-                 bool allow_aliasing_data);
+  VMLAExecutable(ExecutableSpec spec, bool allow_aliasing_data);
   ~VMLAExecutable() override;
 
   bool supports_debugging() const override { return false; }
@@ -44,9 +48,23 @@ class VMLAExecutable final : public Executable {
     return spec_.executable_data;
   }
 
+  // VM context containing the loaded executable module.
+  iree_vm_context_t* context() const { return context_; }
+
+  // Entry point functions in export order.
+  absl::Span<const iree_vm_function_t> entry_functions() const {
+    return absl::MakeConstSpan(entry_functions_);
+  }
+
  private:
+  Status Initialize(iree_vm_instance_t* instance,
+                    iree_vm_module_t* vmla_module);
+
   ExecutableSpec spec_;
   std::vector<uint8_t> cloned_executable_data_;
+
+  iree_vm_context_t* context_ = nullptr;
+  absl::InlinedVector<iree_vm_function_t, 4> entry_functions_;
 };
 
 }  // namespace vmla

@@ -18,6 +18,8 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
+#include "iree/vm/instance.h"
+#include "iree/vm/module.h"
 
 namespace iree {
 namespace hal {
@@ -25,7 +27,8 @@ namespace vmla {
 
 class VMLACache final : public ExecutableCache {
  public:
-  explicit VMLACache(hal::Allocator* allocator);
+  explicit VMLACache(iree_vm_instance_t* instance,
+                     iree_vm_module_t* vmla_module);
   ~VMLACache() override;
 
   bool CanPrepareFormat(ExecutableFormat format) const override;
@@ -34,7 +37,8 @@ class VMLACache final : public ExecutableCache {
       ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) override;
 
  private:
-  hal::Allocator* allocator_;
+  iree_vm_instance_t* instance_ = nullptr;
+  iree_vm_module_t* vmla_module_ = nullptr;
 };
 
 }  // namespace vmla

@@ -97,8 +97,14 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
 
 }  // namespace
 
-VMLADevice::VMLADevice(DeviceInfo device_info)
-    : Device(std::move(device_info)) {
+VMLADevice::VMLADevice(DeviceInfo device_info, iree_vm_instance_t* instance,
+                       iree_vm_module_t* vmla_module)
+    : Device(std::move(device_info)),
+      instance_(instance),
+      vmla_module_(vmla_module) {
+  iree_vm_instance_retain(instance_);
+  iree_vm_module_retain(vmla_module_);
+
   // We currently only expose a single command queue.
   auto command_queue = absl::make_unique<UnsynchronizedCommandQueue>(
       &allocator_, "cpu0",
@@ -111,10 +117,13 @@ VMLADevice::VMLADevice(DeviceInfo device_info)
   command_queues_.push_back(std::move(async_command_queue));
 }
 
-VMLADevice::~VMLADevice() = default;
+VMLADevice::~VMLADevice() {
+  iree_vm_module_release(vmla_module_);
+  iree_vm_instance_release(instance_);
+}
 
 ref_ptr<ExecutableCache> VMLADevice::CreateExecutableCache() {
-  return make_ref<VMLACache>(&allocator_);
+  return make_ref<VMLACache>(instance_, vmla_module_);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> VMLADevice::CreateCommandBuffer(

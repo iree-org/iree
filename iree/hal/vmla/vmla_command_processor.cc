@@ -14,13 +14,38 @@
 
 #include "iree/hal/vmla/vmla_command_processor.h"
 
+#include "iree/base/api_util.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vmla/vmla_executable.h"
+#include "iree/vm/invocation.h"
+#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace hal {
 namespace vmla {
+
+namespace {
+
+using UniqueVariantList =
+    std::unique_ptr<iree_vm_variant_list_t, void (*)(iree_vm_variant_list_t*)>;
+
+StatusOr<UniqueVariantList> MarshalIO(const DispatchRequest& dispatch_request) {
+  iree_vm_variant_list_t* io_list_ptr = nullptr;
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_variant_list_alloc(dispatch_request.bindings.size(),
+                                 IREE_ALLOCATOR_SYSTEM, &io_list_ptr),
+      IREE_LOC));
+  auto io_list = UniqueVariantList(
+      io_list_ptr,
+      [](iree_vm_variant_list_t* ptr) { iree_vm_variant_list_free(ptr); });
+
+  // TODO(benvanik): marshal buffers into byte buffers.
+
+  return std::move(io_list);
+}
+
+}  // namespace
 
 VMLACommandProcessor::VMLACommandProcessor(
     Allocator* allocator, CommandBufferModeBitfield mode,
@@ -32,11 +57,20 @@ VMLACommandProcessor::~VMLACommandProcessor() = default;
 Status VMLACommandProcessor::Dispatch(const DispatchRequest& dispatch_request) {
   IREE_TRACE_SCOPE0("VMLACommandProcessor::Dispatch");
 
-  // TODO(benvanik): launch VM in the context of the executable.
-  // auto* executable =
-  // static_cast<VMLAExecutable*>(dispatch_request.executable);
+  auto* executable = static_cast<VMLAExecutable*>(dispatch_request.executable);
+  if (dispatch_request.entry_point >= executable->entry_functions().size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid entry point ordinal " << dispatch_request.entry_point;
+  }
 
-  return OkStatus();
+  ASSIGN_OR_RETURN(UniqueVariantList io_list, MarshalIO(dispatch_request));
+  return FromApiStatus(
+      iree_vm_invoke(
+          executable->context(),
+          executable->entry_functions()[dispatch_request.entry_point],
+          /*policy=*/nullptr, io_list.get(), /*outputs=*/nullptr,
+          IREE_ALLOCATOR_SYSTEM),
+      IREE_LOC);
 }
 
 }  // namespace vmla

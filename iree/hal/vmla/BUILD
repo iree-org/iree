@@ -32,6 +32,8 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
+        "//iree/vm:instance",
+        "//iree/vm:module",
     ],
 )
 
@@ -41,9 +43,12 @@ cc_library(
     hdrs = ["vmla_command_processor.h"],
     deps = [
         ":vmla_executable",
+        "//iree/base:api_util",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal/host:host_local_command_processor",
+        "//iree/vm:invocation",
+        "//iree/vm:variant_list",
     ],
 )
 
@@ -66,6 +71,8 @@ cc_library(
         "//iree/hal/host:host_local_allocator",
         "//iree/hal/host:host_submission_queue",
         "//iree/hal/host:inproc_command_buffer",
+        "//iree/vm:instance",
+        "//iree/vm:module",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
@@ -78,8 +85,13 @@ cc_library(
     hdrs = ["vmla_driver.h"],
     deps = [
         ":vmla_device",
+        ":vmla_module",
+        "//iree/base:api_util",
+        "//iree/base:tracing",
         "//iree/hal:device_info",
         "//iree/hal:driver",
+        "//iree/vm:instance",
+        "//iree/vm:module",
     ],
 )
 
@@ -100,10 +112,17 @@ cc_library(
     srcs = ["vmla_executable.cc"],
     hdrs = ["vmla_executable.h"],
     deps = [
+        "//iree/base:api_util",
         "//iree/base:status",
+        "//iree/base:tracing",
         "//iree/hal:allocator",
         "//iree/hal:executable",
         "//iree/hal:executable_spec",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:context",
+        "//iree/vm:instance",
+        "//iree/vm:module",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/types:span",
     ],
 )

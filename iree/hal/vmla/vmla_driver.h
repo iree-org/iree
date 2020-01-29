@@ -16,6 +16,8 @@
 #define IREE_HAL_VMLA_VMLA_DRIVER_H_
 
 #include "iree/hal/driver.h"
+#include "iree/vm/instance.h"
+#include "iree/vm/module.h"
 
 namespace iree {
 namespace hal {
@@ -23,7 +25,9 @@ namespace vmla {
 
 class VMLADriver final : public Driver {
  public:
-  VMLADriver();
+  static StatusOr<ref_ptr<Driver>> Create();
+
+  VMLADriver(iree_vm_instance_t* instance, iree_vm_module_t* vmla_module);
   ~VMLADriver() override;
 
   StatusOr<std::vector<DeviceInfo>> EnumerateAvailableDevices() override;
@@ -31,6 +35,10 @@ class VMLADriver final : public Driver {
   StatusOr<ref_ptr<Device>> CreateDefaultDevice() override;
 
   StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
+
+ private:
+  iree_vm_instance_t* instance_ = nullptr;
+  iree_vm_module_t* vmla_module_ = nullptr;
 };
 
 }  // namespace vmla
