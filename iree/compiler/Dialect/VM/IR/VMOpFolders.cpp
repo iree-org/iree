@@ -488,13 +488,13 @@ OpFoldResult ShrI32UOp::fold(ArrayRef<Attribute> operands) {
 //===----------------------------------------------------------------------===//
 
 OpFoldResult TruncI8Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldUnaryOp<IntegerAttr>(operands,
-                                       [&](APInt a) { return a.trunc(8); });
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return a.trunc(8).zext(32); });
 }
 
 OpFoldResult TruncI16Op::fold(ArrayRef<Attribute> operands) {
-  return constFoldUnaryOp<IntegerAttr>(operands,
-                                       [&](APInt a) { return a.trunc(16); });
+  return constFoldUnaryOp<IntegerAttr>(
+      operands, [&](APInt a) { return a.trunc(16).zext(32); });
 }
 
 OpFoldResult ExtI8I32SOp::fold(ArrayRef<Attribute> operands) {
