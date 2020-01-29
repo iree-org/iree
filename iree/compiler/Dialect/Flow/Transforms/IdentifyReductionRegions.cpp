@@ -62,10 +62,9 @@ LogicalResult buildReductionRegion(Operation *originalOp,
   auto workload = calculateWorkload(originalOp, originalOp->getResult(0));
 
   // Build the region op and add it to the parent block.
-  SmallVector<Type, 4> resultTypes{originalOp->getResultTypes()};
   auto reductionRegionOp = parentBuilder.create<ReductionRegionOp>(
-      originalOp->getLoc(), resultTypes, workload, operands, initialValues,
-      dimensions);
+      originalOp->getLoc(), originalOp->getResultTypes(), workload, operands,
+      initialValues, dimensions);
 
   // Create the block and setup the arg mapping for captured values.
   BlockAndValueMapping mapping;

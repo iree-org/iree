@@ -59,9 +59,8 @@ LogicalResult outlineDispatchRegion(
   // Build function type matching 1:1 with the region signature.
   SmallVector<Type, 8> operandTypes(
       Operation::operand_type_range{regionOp.args()});
-  SmallVector<Type, 8> resultTypes(regionOp.getResultTypes());
-  auto functionType =
-      FunctionType::get(operandTypes, resultTypes, regionOp.getContext());
+  auto functionType = FunctionType::get(operandTypes, regionOp.getResultTypes(),
+                                        regionOp.getContext());
 
   // Create the executable with the region cloned into it.
   ExecutableOp executableOp;
