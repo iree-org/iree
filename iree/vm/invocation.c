@@ -48,9 +48,13 @@ static iree_status_t iree_vm_marshal_outputs(
   for (int i = 0; i < return_registers->size; ++i) {
     uint8_t reg = return_registers->registers[i];
     if (reg & IREE_REF_REGISTER_TYPE_BIT) {
-      // Always move (as the stack frame will be destroyed soon).
-      IREE_RETURN_IF_ERROR(iree_vm_variant_list_append_ref_move(
-          outputs, &registers->ref[reg & IREE_REF_REGISTER_MASK]));
+      if (reg & IREE_REF_REGISTER_MOVE_BIT) {
+        IREE_RETURN_IF_ERROR(iree_vm_variant_list_append_ref_move(
+            outputs, &registers->ref[reg & IREE_REF_REGISTER_MASK]));
+      } else {
+        IREE_RETURN_IF_ERROR(iree_vm_variant_list_append_ref_retain(
+            outputs, &registers->ref[reg & IREE_REF_REGISTER_MASK]));
+      }
     } else {
       iree_vm_value_t value;
       value.type = IREE_VM_VALUE_TYPE_I32;
