@@ -82,6 +82,7 @@ iree_cc_library(
     bytecode_kernels
   HDRS
     "bytecode_kernels.h"
+  TEXTUAL_HDRS
     "bytecode_kernels_generic.h"
     "bytecode_kernels_ruy.h"
   DEPS

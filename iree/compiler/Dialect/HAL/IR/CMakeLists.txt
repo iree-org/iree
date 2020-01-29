@@ -23,12 +23,13 @@ iree_cc_library(
     "HALOps.h"
     "HALOps.h.inc"
     "HALTypes.h"
+  TEXTUAL_HDRS
+    "HALOps.cpp.inc"
   SRCS
     "HALEnums.cpp.inc"
     "HALOpFolders.cpp"
     "HALOpInterface.cpp.inc"
     "HALOps.cpp"
-    "HALOps.cpp.inc"
     "HALTypes.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
