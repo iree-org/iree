@@ -138,5 +138,8 @@ def convert_external_target(target):
     return "SDL2-static"
   if target.startswith("@vulkan_headers"):
     return VULKAN_HEADERS_MAPPING[target]
+  if target.startswith("@vulkan_sdk//:sdk"):
+    # The Bazel target maps to the IMPORTED target defined by FindVulkan().
+    return "Vulkan::Vulkan"
 
   raise KeyError("No conversion found for target '%s'" % target)
