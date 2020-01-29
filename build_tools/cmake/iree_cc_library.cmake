@@ -71,6 +71,10 @@ function(iree_cc_library)
     ${ARGN}
   )
 
+  iree_package_ns(_PACKAGE_NS)
+  # Replace dependencies passed by ::name with ::iree::package::name
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+
   if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
     # Prefix the library with the package name, so we get: iree_package_name.
     iree_package_name(_PACKAGE_NAME)
@@ -165,7 +169,6 @@ function(iree_cc_library)
     # Alias the iree_package_name library to iree::package::name.
     # This lets us more clearly map to Bazel and makes it possible to
     # disambiguate the underscores in paths vs. the separators.
-    iree_package_ns(_PACKAGE_NS)
     add_library(${_PACKAGE_NS}::${_RULE_NAME} ALIAS ${_NAME})
     iree_package_dir(_PACKAGE_DIR)
     if(${_RULE_NAME} STREQUAL ${_PACKAGE_DIR})
