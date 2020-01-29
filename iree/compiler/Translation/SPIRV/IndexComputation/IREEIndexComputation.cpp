@@ -73,8 +73,7 @@ static LogicalResult initIndexPropagation(Location loc, FuncOp funcOp,
     }
     numElements *= launchSize[i - 1];
   }
-  auto launchMap =
-      index_computation_attribute::getAffineMap(funcOp, affineExprs);
+  auto launchMap = getAffineMap(funcOp, affineExprs);
 
   // The stored tensor can be a reshape of the launch dimension. It still
   // retains the requirement that each workitem is computing a single element
@@ -89,7 +88,7 @@ static LogicalResult initIndexPropagation(Location loc, FuncOp funcOp,
         "unable to map from launch id to element to compute within a "
         "workitem");
   }
-  return index_computation_attribute::addNewIndexMapForValue(value, valueMap);
+  return addNewIndexMapForValue(value, valueMap);
 }
 
 //===----------------------------------------------------------------------===//
@@ -137,8 +136,7 @@ LogicalResult IREEStoreReduceIndexPropagation::propagateIndexMap(
 
   // Set the index of the output as well based on which dimensions are reduced.
   SmallVector<AffineMap, 1> inputMap;
-  index_computation_attribute::getIndexMapsForValue(storeReduceOp.src(),
-                                                    inputMap);
+  getIndexMapsForValue(storeReduceOp.src(), inputMap);
   assert(inputMap.size() == 1);
   SmallVector<AffineExpr, 2> exprs;
   auto reductionDim =
@@ -153,9 +151,7 @@ LogicalResult IREEStoreReduceIndexPropagation::propagateIndexMap(
   if (exprs.empty()) {
     exprs.push_back(getAffineConstantExpr(0, operation->getContext()));
   }
-  index_computation_attribute::addNewIndexMapForValue(
-      storeReduceOp.dst(),
-      index_computation_attribute::getAffineMap(funcOp, exprs));
+  addNewIndexMapForValue(storeReduceOp.dst(), getAffineMap(funcOp, exprs));
   return success();
 }
 

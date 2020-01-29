@@ -207,8 +207,7 @@ LogicalResult getReshapeOperandMap(FuncOp funcOp, Builder &builder,
   }
   assert(operandExprs.size() == operandShape.size() &&
          "expected as many exprs for the operand as the rank of the operand");
-  operandIndexMap =
-      index_computation_attribute::getAffineMap(funcOp, operandExprs);
+  operandIndexMap = getAffineMap(funcOp, operandExprs);
 
   return success();
 }
@@ -223,7 +222,7 @@ LogicalResult IndexPropagation::propagateIndexMap(Operation *op) const {
         "default index propagation handles case with a single-return value");
   }
   SmallVector<AffineMap, 4> indices;
-  index_computation_attribute::getIndexMapsForValue(op->getResult(0), indices);
+  getIndexMapsForValue(op->getResult(0), indices);
   for (auto &resultIndexMap : indices) {
     SmallVector<AffineMap, 4> operandIndices;
     if (failed(this->propagateIndexMap(op, resultIndexMap, operandIndices))) {
@@ -232,13 +231,19 @@ LogicalResult IndexPropagation::propagateIndexMap(Operation *op) const {
     assert(operandIndices.size() == op->getNumOperands() &&
            "Expected as many indices as operands");
     for (auto arg : llvm::enumerate(op->getOperands())) {
-      if (failed(index_computation_attribute::addNewIndexMapForValue(
-              arg.value(), operandIndices[arg.index()]))) {
+      if (failed(addNewIndexMapForValue(arg.value(),
+                                        operandIndices[arg.index()]))) {
         return failure();
       }
     }
-    if (failed(index_computation_attribute::addOperandsIndexMap(
-            op, resultIndexMap, operandIndices))) {
+    // TODO(ravishankarm): WAR till Index computation is updated to handle the
+    // generality of IREE::IndexAttr.
+    SmallVector<SmallVector<AffineMap, 1>, 4> operandIndices2D(
+        operandIndices.size());
+    for (auto indexMap : enumerate(operandIndices)) {
+      operandIndices2D[indexMap.index()].push_back(indexMap.value());
+    }
+    if (failed(addOperandsIndexMap(op, resultIndexMap, operandIndices2D))) {
       return failure();
     }
   }
@@ -264,11 +269,10 @@ LogicalResult ExtractElementOpIndexPropagation::propagateIndexMap(
     return extractElementOp.emitError(
         "unhandled index propagation for non-zero ranked tensor types");
   }
-  auto scalarMap = index_computation_attribute::getAffineMap(
-      operation->getParentOfType<FuncOp>(),
-      getAffineConstantExpr(0, resultIndex.getContext()));
-  if (failed(index_computation_attribute::addNewIndexMapForValue(
-          extractElementOp.aggregate(), scalarMap))) {
+  auto scalarMap =
+      getAffineMap(operation->getParentOfType<FuncOp>(),
+                   getAffineConstantExpr(0, resultIndex.getContext()));
+  if (failed(addNewIndexMapForValue(extractElementOp.aggregate(), scalarMap))) {
     return failure();
   }
   operandIndices.push_back(scalarMap);

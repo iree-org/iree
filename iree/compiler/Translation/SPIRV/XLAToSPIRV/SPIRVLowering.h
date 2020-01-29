@@ -338,11 +338,18 @@ class SPIRVCodegen : public detail::SPIRVCodegenImpl {
     // Single return case.
     auto resultTensor = op->getResult(0);
     SmallVector<AffineMap, 4> indices;
-    index_computation_attribute::getIndexMapsForValue(resultTensor, indices);
+    getIndexMapsForValue(resultTensor, indices);
     for (auto &index : indices) {
+      // TODO(ravishankarm): This is a WAR till the XLA to SPIR-V lowering is
+      // updated to handle the generality expressed in IREE::IndexAttr.
+      SmallVector<SmallVector<AffineMap, 1>, 2> operandIndices2D;
+      getIndexMapsForOperands(op, index, operandIndices2D);
       SmallVector<AffineMap, 2> operandIndices;
-      index_computation_attribute::getIndexMapsForOperands(op, index,
-                                                           operandIndices);
+      for (auto &operandIndexList : operandIndices2D) {
+        assert(operandIndexList.size() == 1 &&
+               "unhandled multiple indices per operand");
+        operandIndices.push_back(operandIndexList[0]);
+      }
       SmallVector<Value, 2> scalarOperands;
       for (auto arg : llvm::enumerate(op->getOperands())) {
         auto scalarArg = valueCache.getValueAtIndex(

@@ -33,7 +33,13 @@ class Operation;
 class Value;
 
 namespace iree_compiler {
-namespace index_computation_attribute {
+
+#include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttr.h.inc"
+
+/// Helper method to build an IREE::IndexAttr
+IREE::IndexAttr getIndexAttr(
+    MLIRContext *context, ArrayRef<AffineMap> resultIndex,
+    ArrayRef<SmallVector<AffineMap, 1>> operandIndices = {});
 
 /// The attribute used to store the result of the index computation analysis is
 /// logically ArrayAttr<ArrayAttr<AffineMapAttr>>, which is implemented as just
@@ -62,8 +68,9 @@ Optional<int64_t> addNewSymbolNumberForTensorIndex(Value value,
 
 /// Records the operand index maps for a given result index map,
 /// computed based on the `op` semantics.
-LogicalResult addOperandsIndexMap(Operation *op, AffineMap resultIndexMap,
-                                  ArrayRef<AffineMap> operandIndices);
+LogicalResult addOperandsIndexMap(
+    Operation *op, AffineMap resultIndexMap,
+    ArrayRef<SmallVector<AffineMap, 1>> operandIndices);
 
 /// Builds the AffineMap that represents the index of a tensor accessed within
 /// the dispatch function.
@@ -73,8 +80,9 @@ AffineMap getAffineMap(FuncOp funcOp, ArrayRef<AffineExpr> exprs);
 void getIndexMapsForValue(Value value, SmallVectorImpl<AffineMap> &indices);
 
 /// Gets the index map for the operands given the index map of the result.
-void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
-                             SmallVectorImpl<AffineMap> &operandIndices);
+void getIndexMapsForOperands(
+    Operation *op, ArrayRef<AffineMap> resultIndices,
+    SmallVectorImpl<SmallVector<AffineMap, 1>> &operandIndices);
 
 /// Gets the symbol numbers that map to values read from the tensor. For now the
 /// tensors are restricted to be block arguments (which are really of memref
@@ -86,7 +94,6 @@ void getSymbolNumberForTensorIndex(
 /// Sets the number of launch dimensions for the dispatch function.
 void setNumLaunchDims(FuncOp funcOp, unsigned numLaunchDims);
 
-}  // namespace index_computation_attribute
 }  // namespace iree_compiler
 }  // namespace mlir
 #endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONATTR_H

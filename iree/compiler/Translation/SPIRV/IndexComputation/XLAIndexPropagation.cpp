@@ -38,8 +38,8 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
   Builder builder(operation->getContext());
   if (!broadcastDim || broadcastDim->getNumElements() == 0) {
     // This is a scalar. So all indices map to the same element.
-    AffineMap scalarMap = index_computation_attribute::getAffineMap(
-        operation->getParentOfType<FuncOp>(), builder.getAffineConstantExpr(0));
+    AffineMap scalarMap = getAffineMap(operation->getParentOfType<FuncOp>(),
+                                       builder.getAffineConstantExpr(0));
     indexMap.push_back(scalarMap);
     return success();
   }
@@ -54,8 +54,7 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
       exprs.push_back(resultExpr.value());
     }
   }
-  auto operandMap = index_computation_attribute::getAffineMap(
-      operation->getParentOfType<FuncOp>(), exprs);
+  auto operandMap = getAffineMap(operation->getParentOfType<FuncOp>(), exprs);
   indexMap.push_back(operandMap);
   return success();
 }
@@ -84,8 +83,7 @@ LogicalResult XLABroadcastOpIndexPropagation::propagateIndexMap(
     // The result is a scalar. Just add a constant expr 0.
     exprs.push_back(builder.getAffineConstantExpr(0));
   }
-  auto operandMap = index_computation_attribute::getAffineMap(
-      operation->getParentOfType<FuncOp>(), exprs);
+  auto operandMap = getAffineMap(operation->getParentOfType<FuncOp>(), exprs);
   indexMap.push_back(operandMap);
   return success();
 }
@@ -209,11 +207,9 @@ LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
                              : std::next(g.begin(), indexVectorDim));
     g.insert(insertPos, getAffineConstantExpr(k, context));
 
-    auto indexAccessMap = index_computation_attribute::getAffineMap(
-        op->getParentOfType<FuncOp>(), g);
+    auto indexAccessMap = getAffineMap(op->getParentOfType<FuncOp>(), g);
     auto symbolNum =
-        index_computation_attribute::addNewSymbolNumberForTensorIndex(
-            startIndices, indexAccessMap);
+        addNewSymbolNumberForTensorIndex(startIndices, indexAccessMap);
     if (!symbolNum) {
       return failure();
     }
@@ -239,8 +235,8 @@ LogicalResult XLAGatherOpIndexPropagation::propagateIndexMap(
         expr = getAffineConstantExpr(0, context);
       }
     }
-    operandIndices.push_back(index_computation_attribute::getAffineMap(
-        op->getParentOfType<FuncOp>(), exprs));
+    operandIndices.push_back(
+        getAffineMap(op->getParentOfType<FuncOp>(), exprs));
     operandIndices.push_back(indexAccessMap);
   }
   return success();

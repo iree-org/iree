@@ -29,9 +29,51 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace index_computation_attribute {
+
+#include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttr.cpp.inc"
+
+//===----------------------------------------------------------------------===//
+// Attribute build method
+//===----------------------------------------------------------------------===//
+
+IREE::IndexAttr getIndexAttr(
+    MLIRContext *context, ArrayRef<AffineMap> resultIndexMap,
+    ArrayRef<SmallVector<AffineMap, 1>> operandIndices) {
+  auto getArrayAttrFn = [&](ArrayRef<AffineMap> maps) -> ArrayAttr {
+    SmallVector<Attribute, 2> affineMapAttrs;
+    affineMapAttrs.reserve(maps.size());
+    for (auto map : maps) {
+      affineMapAttrs.push_back(AffineMapAttr::get(map));
+    }
+    return ArrayAttr::get(affineMapAttrs, context);
+  };
+  SmallVector<Attribute, 2> operandIndexAttrs;
+  operandIndexAttrs.reserve(operandIndices.size());
+  for (auto operandIndex : operandIndices) {
+    operandIndexAttrs.push_back(getArrayAttrFn(operandIndex));
+  }
+  return IREE::IndexAttr::get(getArrayAttrFn(resultIndexMap),
+                              ArrayAttr::get(operandIndexAttrs, context),
+                              context);
+}
 
 namespace {
+
+/// Helper method to check if the result_indices of `indexAttr` matches the
+/// indices passed in `resultIndices'
+bool matchResultIndices(IREE::IndexAttr indexAttr,
+                        ArrayRef<AffineMap> resultIndices) {
+  if (indexAttr.result_index().size() != resultIndices.size()) {
+    return false;
+  }
+  for (auto index : llvm::enumerate(indexAttr.result_index())) {
+    if (index.value().cast<AffineMapAttr>().getValue() !=
+        resultIndices[index.index()]) {
+      return false;
+    }
+  }
+  return true;
+}
 
 //===----------------------------------------------------------------------===//
 // Attribute updaters
@@ -41,20 +83,11 @@ namespace {
 /// which is an index computation attribute. Size of the `newEntryElements` must
 /// match the size of existing ArrayAttr in `currAttr`.
 ArrayAttr updateIndexComputationAttr(MLIRContext *context, ArrayAttr currAttr,
-                                     ArrayRef<Attribute> newEntryElements) {
-  auto newEntry = ArrayAttr::get(newEntryElements, context);
+                                     IREE::IndexAttr newEntry) {
   if (currAttr) {
     SmallVector<Attribute, 2> updatedList;
     auto currAttrValue = currAttr.getValue();
-    updatedList.reserve(currAttrValue.size() + 1);
     updatedList.append(currAttrValue.begin(), currAttrValue.end());
-    if (!updatedList.empty()) {
-      assert(currAttrValue.front().isa<ArrayAttr>() &&
-             currAttrValue.front().cast<ArrayAttr>().size() ==
-                 newEntryElements.size() &&
-             "All elements of the index information attribute must have the "
-             "same size");
-    }
     updatedList.push_back(newEntry);
     return ArrayAttr::get(updatedList, context);
   }
@@ -63,46 +96,38 @@ ArrayAttr updateIndexComputationAttr(MLIRContext *context, ArrayAttr currAttr,
 
 /// Records the `resultIndexMap` representing an access of an element of a
 /// tensor to `currAttr`, which is an index computation attribute.
-ArrayAttr updateIndexComputationAttrWithResultIndex(MLIRContext *context,
-                                                    ArrayAttr currAttr,
-                                                    AffineMap resultIndexMap,
-                                                    unsigned numOperands) {
+ArrayAttr updateIndexComputationAttrWithResultIndex(
+    MLIRContext *context, ArrayAttr currAttr,
+    ArrayRef<AffineMap> resultIndexMap) {
   if (currAttr) {
     // Check for a duplicate entry of resultIndexMap.
     for (auto entry : currAttr.getValue()) {
-      auto affineMapArrayAttr = entry.cast<ArrayAttr>().getValue();
-      assert(affineMapArrayAttr.size() == numOperands + 1);
-      if (affineMapArrayAttr[0].cast<AffineMapAttr>().getValue() ==
-          resultIndexMap) {
+      if (matchResultIndices(entry.cast<IREE::IndexAttr>(), resultIndexMap)) {
         return currAttr;
       }
     }
   }
-  SmallVector<Attribute, 4> newEntryElements(numOperands + 1);
-  newEntryElements[0] = AffineMapAttr::get(resultIndexMap);
-  return updateIndexComputationAttr(context, currAttr, newEntryElements);
+  return updateIndexComputationAttr(context, currAttr,
+                                    getIndexAttr(context, resultIndexMap));
 }
 
 /// Records the 'operandIndices` representing the indices of elements of the
 /// tensor operands needed to compute the value of the result tensor at position
 /// represented by `resultIndexMap`.
 ArrayAttr updateIndexComputationAttrWithOperandIndices(
-    MLIRContext *context, ArrayAttr currAttr, AffineMap resultIndexMap,
-    ArrayRef<AffineMap> operandIndices) {
+    MLIRContext *context, ArrayAttr currAttr,
+    ArrayRef<AffineMap> resultIndexMap,
+    ArrayRef<SmallVector<AffineMap, 1>> operandIndices) {
   assert(currAttr);
   SmallVector<Attribute, 4> updatedList(currAttr.size());
   for (auto list : enumerate(currAttr.getValue())) {
-    auto indices = list.value().cast<ArrayAttr>().getValue();
+    auto indexAttr = list.value().cast<IREE::IndexAttr>();
     // Check if the result index matches. If so update the operand indices.
-    if (resultIndexMap == indices[0].cast<AffineMapAttr>().getValue()) {
-      SmallVector<Attribute, 4> updatedIndices(indices.size());
-      assert(indices.size() == operandIndices.size() + 1);
-      updatedIndices[0] = indices[0];
-      for (auto operandIndex : enumerate(operandIndices)) {
-        updatedIndices[operandIndex.index() + 1] =
-            AffineMapAttr::get(operandIndex.value());
-      }
-      updatedList[list.index()] = ArrayAttr::get(updatedIndices, context);
+    if (matchResultIndices(indexAttr, resultIndexMap)) {
+      assert(indexAttr.operand_indices().getValue().empty() &&
+             "resetting operand_indices for an IndexAttr");
+      updatedList[list.index()] =
+          getIndexAttr(context, resultIndexMap, operandIndices);
     } else {
       updatedList[list.index()] = list.value();
     }
@@ -214,23 +239,25 @@ LogicalResult addBlockArgIndexMap(BlockArgument blockArg,
   auto attrName = getIndexComputationAttrName();
   auto currAttr = getBlockArgumentAttr<ArrayAttr>(blockArg, attrName);
   auto updatedAttr = updateIndexComputationAttrWithResultIndex(
-      blockArg.getContext(), currAttr, resultIndexMap, 0);
+      blockArg.getContext(), currAttr, resultIndexMap);
   return setBlockArgumentAttr(blockArg, updatedAttr, attrName);
 }
 
 /// Records the `resultIndexMap` representing an access to the result of the
 /// `op` to the index computation attribute.
-LogicalResult addOpResultIndexMap(Operation *op, AffineMap resultIndexMap) {
+LogicalResult addOpResultIndexMap(Operation *op,
+                                  ArrayRef<AffineMap> resultIndexMap) {
+  // TODO(ravishankarm): This check can probably be removed, but need to do it
+  // after an example of this is worked through.
   if (op->getNumResults() > 1) {
     return emitError(
         op->getLoc(),
         "unimplemented index propagation for op with multiple results");
   }
-  auto numOperands = op->getNumOperands();
   auto attrName = getIndexComputationAttrName();
   auto currAttr = op->getAttrOfType<ArrayAttr>(attrName);
   auto updatedAttr = updateIndexComputationAttrWithResultIndex(
-      op->getContext(), currAttr, resultIndexMap, numOperands);
+      op->getContext(), currAttr, resultIndexMap);
   return setOpAttr(op, updatedAttr, attrName);
 }
 
@@ -282,8 +309,9 @@ Optional<int64_t> addNewSymbolNumberForTensorIndex(Value value,
   return symbolNumber;
 }
 
-LogicalResult addOperandsIndexMap(Operation *op, AffineMap resultIndexMap,
-                                  ArrayRef<AffineMap> operandIndices) {
+LogicalResult addOperandsIndexMap(
+    Operation *op, AffineMap resultIndexMap,
+    ArrayRef<SmallVector<AffineMap, 1>> operandIndices) {
   auto attrName = getIndexComputationAttrName();
   auto currAttr = op->getAttrOfType<ArrayAttr>(attrName);
   auto updatedAttr = updateIndexComputationAttrWithOperandIndices(
@@ -310,17 +338,23 @@ void getIndexMapsForValue(Value value, SmallVectorImpl<AffineMap> &indices) {
   if (!allIndices) {
     return;
   }
-  for (auto attr : allIndices) {
-    auto affineMapList = attr.cast<ArrayAttr>().getValue();
-    if (affineMapList.empty()) {
-      continue;
-    }
-    indices.push_back(affineMapList.front().cast<AffineMapAttr>().getValue());
+  // TODO(ravishankarm): If the value is coming from an operation, then the
+  // result values need to be checked to see which result matches the `value`
+  // passed. For now just handle single result operations.
+  for (auto affineMapList : allIndices) {
+    auto indexList = affineMapList.cast<IREE::IndexAttr>();
+    assert(indexList.result_index().size() == 1 &&
+           "unhandled multiple result operation");
+    indices.push_back(indexList.result_index()
+                          .getValue()[0]
+                          .cast<AffineMapAttr>()
+                          .getValue());
   }
 }
 
-void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
-                             SmallVectorImpl<AffineMap> &operandIndices) {
+void getIndexMapsForOperands(
+    Operation *op, ArrayRef<AffineMap> resultIndices,
+    SmallVectorImpl<SmallVector<AffineMap, 1>> &operandIndices) {
   auto allIndices = op->getAttrOfType<ArrayAttr>(getIndexComputationAttrName());
   if (!allIndices) {
     return;
@@ -330,11 +364,18 @@ void getIndexMapsForOperands(Operation *op, AffineMap resultIndex,
   }
   assert(op->getNumResults() == 1);
   for (auto affineMapList : allIndices) {
-    auto currList = affineMapList.cast<ArrayAttr>().getValue();
-    assert(currList.size() >= op->getNumResults());
-    if (currList[0].cast<AffineMapAttr>().getValue() == resultIndex) {
-      for (auto operandIndex : currList.drop_front()) {
-        operandIndices.push_back(operandIndex.cast<AffineMapAttr>().getValue());
+    auto indexList = affineMapList.cast<IREE::IndexAttr>();
+    if (matchResultIndices(indexList, resultIndices)) {
+      operandIndices.clear();
+      operandIndices.resize(op->getNumOperands());
+      for (auto indices : llvm::enumerate(indexList.operand_indices())) {
+        auto &operandIndexList = operandIndices[indices.index()];
+        operandIndexList.resize(indices.value().cast<ArrayAttr>().size());
+        for (auto mapAttr :
+             llvm::enumerate(indices.value().cast<ArrayAttr>())) {
+          operandIndexList[mapAttr.index()] =
+              mapAttr.value().cast<AffineMapAttr>().getValue();
+        }
       }
     }
   }
@@ -362,6 +403,5 @@ void setNumLaunchDims(FuncOp funcOp, unsigned numLaunchDims) {
                                   numLaunchDims));
 }
 
-}  // namespace index_computation_attribute
 }  // namespace iree_compiler
 }  // namespace mlir

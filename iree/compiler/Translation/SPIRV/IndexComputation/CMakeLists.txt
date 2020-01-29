@@ -14,18 +14,30 @@
 
 add_subdirectory(test)
 
+iree_tablegen_library(
+  NAME
+    IndexComputationAttrGen
+  TD_FILE
+    IndexComputationAttr.td
+  OUTS
+    -gen-struct-attr-decls IndexComputationAttr.h.inc
+    -gen-struct-attr-defs IndexComputationAttr.cpp.inc
+)
+
 iree_cc_library(
   NAME
     IndexComputation
   HDRS
     "IREEIndexComputation.h"
     "IndexComputation.h"
+    "IndexComputationAttr.h.inc"
     "IndexComputationAttribute.h"
     "IndexComputationPass.h"
     "XLAIndexPropagation.h"
   SRCS
     "IREEIndexComputation.cpp"
     "IndexComputation.cpp"
+    "IndexComputationAttr.cpp.inc"
     "IndexComputationAttribute.cpp"
     "IndexComputationPass.cpp"
     "XLAIndexPropagation.cpp"

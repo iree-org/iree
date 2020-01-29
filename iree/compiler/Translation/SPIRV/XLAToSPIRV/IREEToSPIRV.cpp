@@ -41,7 +41,7 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
   auto storeOp = cast<IREE::StoreOutputOp>(op);
   auto src = storeOp.src();
   SmallVector<AffineMap, 1> indices;
-  index_computation_attribute::getIndexMapsForValue(src, indices);
+  getIndexMapsForValue(src, indices);
   if (indices.size() != 1) {
     return storeOp.emitError(
         "expected to compute a single element of the tensor that is stored "
@@ -80,13 +80,13 @@ LogicalResult IREEStoreReduceOpSPIRVLowering::lowerOperation(
   auto loc = storeReduceOp.getLoc();
   SmallVector<AffineMap, 1> srcIndices, dstIndices;
   Value src = storeReduceOp.src();
-  index_computation_attribute::getIndexMapsForValue(src, srcIndices);
+  getIndexMapsForValue(src, srcIndices);
   if (srcIndices.size() != 1) {
     return storeReduceOp.emitError(
         "expected to compute a single element of the tensor that is reduced");
   }
   Value dst = storeReduceOp.dst();
-  index_computation_attribute::getIndexMapsForValue(dst, dstIndices);
+  getIndexMapsForValue(dst, dstIndices);
   if (dstIndices.size() != 1) {
     return storeReduceOp.emitError(
         "expected to write to a single element of the output of reduction");

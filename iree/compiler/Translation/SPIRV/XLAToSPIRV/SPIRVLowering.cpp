@@ -241,7 +241,7 @@ LogicalResult SPIRVCodegenImpl::initArgValues(
     OpBuilder &builder, Location loc, TensorIndexToScalarValueMap &valueCache,
     Value origArg) {
   SmallVector<AffineMap, 4> indices;
-  index_computation_attribute::getIndexMapsForValue(origArg, indices);
+  getIndexMapsForValue(origArg, indices);
   for (auto indexMap : indices) {
     if (!loadArgValueAtIndex(builder, loc, valueCache, origArg, indexMap)) {
       return failure();
@@ -255,8 +255,7 @@ LogicalResult SPIRVCodegenImpl::initSymbolValues(
     Value origArg) {
   // Add values corresponding to the symbol numbers.
   SmallVector<std::pair<AffineMap, unsigned>, 2> symbolInfo;
-  index_computation_attribute::getSymbolNumberForTensorIndex(
-      origArg.cast<BlockArgument>(), symbolInfo);
+  getSymbolNumberForTensorIndex(origArg.cast<BlockArgument>(), symbolInfo);
   for (auto element : symbolInfo) {
     // Load the value at the index.
     auto val =

@@ -303,7 +303,7 @@ class IndexPropagationList {
                        "expected region of index propagation to be in dispatch "
                        "function to get launch size");
     }
-    index_computation_attribute::setNumLaunchDims(funcOp, launchSize.size());
+    setNumLaunchDims(funcOp, launchSize.size());
     // TODO(ravishankarm) : Need to process blocks in reverse topological order.
     for (auto it = region.rbegin(), ie = region.rend(); it != ie; ++it) {
       for (auto jt = it->rbegin(), je = it->rend(); jt != je; ++jt) {
