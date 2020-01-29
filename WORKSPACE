@@ -21,28 +21,22 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load(":repo_utils.bzl", "maybe")
 
 ###############################################################################
-# Bazel federation rules.
+# Bazel rules.
 http_archive(
-    name = "bazel_federation",
-    url = "https://github.com/bazelbuild/bazel-federation/archive/130c84ec6d60f31b711400e8445a8d0d4a2b5de8.zip",
-    sha256 = "9d4fdf7cc533af0b50f7dd8e58bea85df3b4454b7ae00056d7090eb98e3515cc",
-    strip_prefix = "bazel-federation-130c84ec6d60f31b711400e8445a8d0d4a2b5de8",
-    type = "zip",
+    name = "rules_cc",
+    sha256 = "cf3b76a90c86c0554c5b10f4b160f05af71d252026b71362c4674e2fb9936cf9",
+    strip_prefix = "rules_cc-01d4a48911d5e7591ecb1c06d3b8af47fe872371",
+    urls = [
+	"https://storage.googleapis.com/mirror.tensorflow.org/github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
+	"https://github.com/bazelbuild/rules_cc/archive/01d4a48911d5e7591ecb1c06d3b8af47fe872371.zip",
+    ],
 )
 
-load("@bazel_federation//:repositories.bzl",
-     "rules_cc",
-     "rules_python",
+http_archive(
+    name = "rules_python",
+    url = "https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz",
+    sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
 )
-
-rules_cc()
-load("@bazel_federation//setup:rules_cc.bzl", "rules_cc_setup")
-rules_cc_setup()
-
-rules_python()
-load("@bazel_federation//setup:rules_python.bzl", "rules_python_setup")
-rules_python_setup()
-
 load("@rules_python//python:repositories.bzl", "py_repositories")
 py_repositories()
 
