@@ -336,7 +336,10 @@ class BuildFileFunctions(object):
                  deps=[],
                  alwayslink=False,
                  testonly=False,
+                 textual_hdrs = None,
                  **kwargs):
+    if textual_hdrs:
+      _convert_unimplemented_function("cc_library (textual_hdrs)", name=name)
     name_block = self._convert_name_block(name)
     hdrs_block = self._convert_hdrs_block(hdrs)
     srcs_block = self._convert_srcs_block(srcs)
@@ -392,7 +395,7 @@ class BuildFileFunctions(object):
                     identifier=None,
                     **kwargs):
     if identifier:
-      self._convert_unimplemented_function("cc_embed_data", name=name)
+      self._convert_unimplemented_function("cc_embed_data (identifier)", name=name)
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     cc_file_output_block = self._convert_cc_file_output_block(cc_file_output)
