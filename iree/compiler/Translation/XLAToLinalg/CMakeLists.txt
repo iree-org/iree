@@ -33,3 +33,22 @@ iree_cc_library(
   ALWAYSLINK
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    "IREELinalgTensorToBuffer"
+  HDRS
+    "LinalgTensorToBuffer.h"
+  SRCS
+    "LinalgTensorToBuffer.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    MLIRIR
+    MLIRLinalgOps
+    MLIRPass
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransforms
+  ALWAYSLINK
+  PUBLIC
+)

@@ -37,3 +37,23 @@ cc_library(
     ],
     alwayslink = 1,
 )
+
+cc_library(
+    name = "IREELinalgTensorToBuffer",
+    srcs = [
+        "LinalgTensorToBuffer.cpp",
+    ],
+    hdrs = [
+        "LinalgTensorToBuffer.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/IREE/IR",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
+    ],
+    alwayslink = 1,
+)
