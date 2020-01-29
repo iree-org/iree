@@ -36,6 +36,10 @@ def _convert_absl_target(target):
     target_name = target.rsplit("/")[-1]
   return "absl::" + target_name
 
+DEAR_IMGUI_EXPLICIT_TARGET_MAPPING = {
+  "@dear_imgui": "dear_imgui::dear_imgui",
+  "@dear_imgui//:imgui_sdl_vulkan": "dear_imgui::impl_sdl\n    dear_imgui::impl_vulkan",
+}
 
 LLVM_TARGET_MAPPING = {
     "@llvm-project//llvm:support": "LLVMSupport",
@@ -116,6 +120,8 @@ def convert_external_target(target):
     return "benchmark"
   if target == "@com_github_google_flatbuffers//:flatbuffers":
     return "flatbuffers"
+  if target.startswith("@dear_imgui"):
+    return DEAR_IMGUI_EXPLICIT_TARGET_MAPPING[target]
   if target == "@com_google_googletest//:gtest":
     return "gtest"
   if target.startswith("@llvm-project//llvm"):
