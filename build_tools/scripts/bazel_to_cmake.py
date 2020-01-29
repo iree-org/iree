@@ -53,6 +53,11 @@ def parse_arguments():
       help="Prints results instead of writing files",
       action="store_true",
       default=False)
+  parser.add_argument(
+      "--strict",
+      help="Does not try to generate files where it cannot convert completely",
+      action="store_true",
+      default=False)
 
   # Specify only one of these (defaults to --root_dir=iree).
   group = parser.add_mutually_exclusive_group()
@@ -252,10 +257,10 @@ class BuildFileFunctions(object):
 
   def _convert_unimplemented_function(self, rule, *args, **kwargs):
     name = kwargs.get("name", "unnamed")
-    self.converter.body += "# Unimplemented %(rule)s %(name)s\n" % {
-        "rule": rule,
-        "name": name
-    }
+    message = "Unimplemented %(rule)s %(name)s\n" % {"rule": rule, "name": name}
+    if not self.converter.first_error:
+      self.converter.first_error = NotImplementedError(message)
+    self.converter.body += "# %s" % (message,)
 
   # ------------------------------------------------------------------------- #
   # Function handlers that convert BUILD definitions to CMake definitions.    #
@@ -290,8 +295,9 @@ class BuildFileFunctions(object):
     # conversion time. This avoids issues with different glob semantics and dire
     # warnings about not knowing when to reevaluate the glob.
     # See https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
+
     if exclude_directories != 1:
-      raise ValueError("Non-default exclude_directories not supported")
+      raise NotImplementedError("Non-default exclude_directories not supported")
 
     filepaths = []
     for pattern in include:
@@ -300,7 +306,7 @@ class BuildFileFunctions(object):
         # We have no uses of recursive globs. Rather than try to emulate them or
         # silently give different behavior, just error out.
         # See https://docs.bazel.build/versions/master/be/functions.html#glob
-        raise ValueError("Recursive globs not supported")
+        raise NotImplementedError("Recursive globs not supported")
 
       filepaths += glob.glob(self.converter.directory_path + "/" + pattern)
 
@@ -308,7 +314,7 @@ class BuildFileFunctions(object):
     for pattern in exclude:
       if "**" in pattern:
         # See comment above
-        raise ValueError("Recursive globs not supported")
+        raise NotImplementedError("Recursive globs not supported")
       exclude_filepaths.update(
           glob.glob(self.converter.directory_path + "/" + pattern))
 
@@ -330,7 +336,10 @@ class BuildFileFunctions(object):
                  deps=[],
                  alwayslink=False,
                  testonly=False,
+                 textual_hdrs=None,
                  **kwargs):
+    if textual_hdrs:
+      _convert_unimplemented_function("cc_library (textual_hdrs)", name=name)
     name_block = self._convert_name_block(name)
     hdrs_block = self._convert_hdrs_block(hdrs)
     srcs_block = self._convert_srcs_block(srcs)
@@ -386,7 +395,8 @@ class BuildFileFunctions(object):
                     identifier=None,
                     **kwargs):
     if identifier:
-      self._convert_unimplemented_function("cc_embed_data", name=name)
+      self._convert_unimplemented_function(
+          "cc_embed_data (identifier)", name=name)
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     cc_file_output_block = self._convert_cc_file_output_block(cc_file_output)
@@ -479,6 +489,7 @@ class Converter(object):
     self.body = ""
     self.directory_path = directory_path
     self.rel_build_file_path = rel_build_file_path
+    self.first_error = None
 
   def convert(self, copyright_line):
     # One `add_subdirectory(name)` per subdirectory.
@@ -531,15 +542,15 @@ def GetDict(obj):
   return ret
 
 
-def convert_directory_tree(root_directory_path, write_files):
+def convert_directory_tree(root_directory_path, write_files, strict):
   print("convert_directory_tree: %s" % (root_directory_path,))
   # Process directories starting at leaves so we can skip add_directory on
   # subdirs without a CMakeLists file.
   for root, dirs, file_names in os.walk(root_directory_path, topdown=False):
-    convert_directory(root, write_files)
+    convert_directory(root, write_files, strict)
 
 
-def convert_directory(directory_path, write_files):
+def convert_directory(directory_path, write_files, strict):
   if not os.path.isdir(directory_path):
     raise FileNotFoundError("Cannot find directory '%s'" % (directory_path,))
 
@@ -588,12 +599,14 @@ def convert_directory(directory_path, write_files):
     try:
       exec(build_file_code, GetDict(BuildFileFunctions(converter)))
       converted_text = converter.convert(copyright_line)
+      if strict and converter.first_error:
+        raise converter.first_error
       if write_allowed:
         with open(cmakelists_file_path, "wt") as cmakelists_file:
           cmakelists_file.write(converted_text)
       else:
         print(converted_text)
-    except NameError as e:
+    except (NameError, NotImplementedError) as e:
       print(
           "Failed to convert %s. Missing a rule handler in bazel_to_cmake.py?" %
           (rel_build_file_path))
@@ -612,9 +625,11 @@ def main(args):
   write_files = not args.preview
 
   if args.root_dir:
-    convert_directory_tree(os.path.join(repo_root, args.root_dir), write_files)
+    convert_directory_tree(
+        os.path.join(repo_root, args.root_dir), write_files, args.strict)
   elif args.dir:
-    convert_directory(os.path.join(repo_root, args.dir), write_files)
+    convert_directory(
+        os.path.join(repo_root, args.dir), write_files, args.strict)
 
 
 if __name__ == "__main__":
