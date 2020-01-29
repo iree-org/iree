@@ -52,7 +52,7 @@ class ElideTiedGetRankedShapePattern
     }
 
     auto tieOp = cast<TieShapeOp>(op.operand().getDefiningOp());
-    rewriter.replaceOp(op, tieOp.shape(), op.operand());
+    rewriter.replaceOp(op, tieOp.shape());
 
     return matchSuccess();
   }
@@ -71,7 +71,7 @@ class ElideDuplicateGetRankedShapePattern
 
     auto precedingGetRankedShapeOp =
         cast<GetRankedShapeOp>(op.operand().getDefiningOp());
-    rewriter.replaceOp(op, precedingGetRankedShapeOp.shape(), op.operand());
+    rewriter.replaceOp(op, precedingGetRankedShapeOp.shape());
     return matchSuccess();
   }
 };

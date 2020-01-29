@@ -99,10 +99,8 @@ class SimpleOpLowering : public OpRewritePattern<SrcOp> {
     // Certain ops, like reshape, return references to existing memrefs and
     // should still retain their results.
     if (!opTakesOutputOperands(DstOp::getOperationName())) {
-      SmallVector<Type, 8> resultTypes{op.getOperation()->getResultTypes()};
-
-      rewriter.replaceOpWithNewOp<DstOp>(op, resultTypes, operands,
-                                         op.getAttrs());
+      rewriter.replaceOpWithNewOp<DstOp>(
+          op, op.getOperation()->getResultTypes(), operands, op.getAttrs());
       return this->matchSuccess();
     }
 

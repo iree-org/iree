@@ -140,9 +140,8 @@ bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
     return true;
   }
 
-  SmallVector<Type, 4> originalTypes(oldOp->getOperation()->getResultTypes());
   SmallVector<Type, 4> resultTypes;
-  untupleTypes(originalTypes, &resultTypes);
+  untupleTypes(oldOp->getOperation()->getResultTypes(), &resultTypes);
   auto newOp = builder.create<CallOp>(oldOp->getLoc(), oldOp->getCallee(),
                                       resultTypes, newArgs);
   copyOperationAttrs(oldOp->getOperation(), newOp.getOperation());
