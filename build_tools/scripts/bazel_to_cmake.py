@@ -167,6 +167,9 @@ class BuildFileFunctions(object):
   def _convert_hdrs_block(self, hdrs):
     return self._convert_filelist_block("HDRS", hdrs)
 
+  def _convert_textual_hdrs_block(self, textual_hdrs):
+    return self._convert_filelist_block("TEXTUAL_HDRS", textual_hdrs)
+
   def _convert_srcs_block(self, srcs):
     return self._convert_filelist_block("SRCS", srcs)
 
@@ -332,26 +335,26 @@ class BuildFileFunctions(object):
   def cc_library(self,
                  name,
                  hdrs=[],
+                 textual_hdrs=[],
                  srcs=[],
                  deps=[],
                  alwayslink=False,
                  testonly=False,
-                 textual_hdrs=None,
                  **kwargs):
-    if textual_hdrs:
-      _convert_unimplemented_function("cc_library (textual_hdrs)", name=name)
     name_block = self._convert_name_block(name)
     hdrs_block = self._convert_hdrs_block(hdrs)
+    textual_hdrs_block = self._convert_textual_hdrs_block(textual_hdrs)
     srcs_block = self._convert_srcs_block(srcs)
     deps_block = self._convert_deps_block(deps)
     alwayslink_block = self._convert_alwayslink_block(alwayslink)
     testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += """iree_cc_library(
-%(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s%(alwayslink_block)s%(testonly_block)s  PUBLIC
+%(name_block)s%(hdrs_block)s%(textual_hdrs_block)s%(srcs_block)s%(deps_block)s%(alwayslink_block)s%(testonly_block)s  PUBLIC
 )\n\n""" % {
     "name_block": name_block,
     "hdrs_block": hdrs_block,
+    "textual_hdrs_block": textual_hdrs_block,
     "srcs_block": srcs_block,
     "deps_block": deps_block,
     "alwayslink_block": alwayslink_block,
