@@ -14,7 +14,7 @@
 
 # Common types and utilities used in the IREE codebase.
 
-load("//iree:build_defs.bzl", "platform_trampoline_deps")
+load("//iree:build_defs.oss.bzl", "platform_trampoline_deps")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -101,6 +101,7 @@ cc_library(
         ":shape",
         ":source_location",
         ":status",
+        "@com_google_absl//absl/container:flat_hash_map",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:span",
@@ -399,7 +400,7 @@ cc_library(
 
 cc_library(
     name = "status_matchers",
-    testonly = 1,
+    testonly = True,
     hdrs = ["status_matchers.h"],
     deps = platform_trampoline_deps("status_matchers"),
 )

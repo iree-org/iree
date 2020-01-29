@@ -21,6 +21,7 @@ iree_cc_library(
     "TypeUtils.cpp"
   DEPS
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
     MLIRIR
     MLIRStandardOps
     MLIRTransforms

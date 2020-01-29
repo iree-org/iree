@@ -15,8 +15,8 @@
 #ifndef IREE_HAL_TESTING_MOCK_ALLOCATOR_H_
 #define IREE_HAL_TESTING_MOCK_ALLOCATOR_H_
 
-#include "gmock/gmock.h"
 #include "iree/hal/allocator.h"
+#include "iree/testing/gtest.h"
 
 namespace iree {
 namespace hal {

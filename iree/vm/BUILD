@@ -149,6 +149,27 @@ cc_library(
 )
 
 cc_library(
+    name = "module_abi_cc",
+    hdrs = [
+        "module_abi_cc.h",
+        "module_abi_packing.h",
+    ],
+    deps = [
+        ":module",
+        ":ref",
+        ":ref_cc",
+        ":stack",
+        ":types",
+        "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:ref_ptr",
+        "//iree/base:status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
     name = "ref",
     srcs = ["ref.c"],
     hdrs = ["ref.h"],
@@ -165,6 +186,17 @@ cc_test(
         "//iree/base:api",
         "//iree/base:ref_ptr",
         "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
+    name = "ref_cc",
+    hdrs = ["ref_cc.h"],
+    deps = [
+        ":ref",
+        ":types",
+        "//iree/base:api",
+        "@com_google_absl//absl/base:core_headers",
     ],
 )
 

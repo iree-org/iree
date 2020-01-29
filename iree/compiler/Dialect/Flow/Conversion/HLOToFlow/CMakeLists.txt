@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     HLOToFlow
@@ -20,8 +22,8 @@ iree_cc_library(
   SRCS
     "ConvertHLOToFlow.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::IREE::IR
     MLIRIR
     MLIRPass
     MLIRStandardOps

@@ -14,7 +14,7 @@
 
 # Conformance Test Suite (CTS) for HAL implementations.
 
-load("//iree:build_defs.bzl", "PLATFORM_VULKAN_TEST_DEPS")
+load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],

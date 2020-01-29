@@ -11,3 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+# TODO(marbre): Add once iree-translate and custom-translate run without errors
+#add_subdirectory(custom_modules)
+#add_subdirectory(simple_embedding)
+#add_subdirectory(vulkan)

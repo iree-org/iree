@@ -22,7 +22,7 @@ function(iree_tablegen_library)
     _RULE
     "TESTONLY"
     "NAME;TBLGEN"
-    "SRCS;OUTS"
+    "TD_FILE;OUTS"
     ${ARGN}
   )
 
@@ -37,7 +37,7 @@ function(iree_tablegen_library)
       set(_TBLGEN "MLIR")
     endif()
 
-    set(LLVM_TARGET_DEFINITIONS ${_RULE_SRCS})
+    set(LLVM_TARGET_DEFINITIONS ${_RULE_TD_FILE})
     set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
     list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
     list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")

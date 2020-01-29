@@ -197,8 +197,6 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     // Extension opcodes (0x80-0xFF):
     // TODO(benvanik): SIMD dialect.
   ]> {
-  let returnType = "IREE::VM::Opcode";
-  let convertFromStorage = "static_cast<IREE::VM::Opcode>($_self.getInt())";
   let cppNamespace = "IREE::VM";
 }
 

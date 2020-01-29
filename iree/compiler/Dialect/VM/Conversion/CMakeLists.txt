@@ -32,7 +32,6 @@ iree_cc_library(
     MLIRIR
     MLIRParser
     MLIRStandardOps
-    MLIRSupport
     MLIRTransforms
   PUBLIC
 )

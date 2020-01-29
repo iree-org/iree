@@ -111,6 +111,22 @@ typedef struct {
   iree_string_view_t type_name;
 } iree_vm_ref_type_descriptor_t;
 
+// Directly retains the object with base |ptr| with the given |type_descriptor|.
+//
+// Note that this avoids any kind of type checking; for untrusted inputs use
+// the iree_vm_ref_t-based methods.
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_retain(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor);
+
+// Directly release the object with base |ptr| with the given |type_descriptor|,
+// possibly destroying it if it is the last reference. Assume that |ptr| is
+// invalid after this function returns.
+//
+// Note that this avoids any kind of type checking; for untrusted inputs use
+// the iree_vm_ref_t-based methods.
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor);
+
 // Registers a user-defined type with the IREE C ref system.
 // The provided destroy function will be used to destroy objects when their
 // reference count goes to 0. NULL can be used to no-op the destruction if the
@@ -124,6 +140,10 @@ typedef struct {
 // to register the types. Do not call this while any refs may be alive.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor);
+
+// Returns the type name for the given type, if found.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_ref_type_name(iree_vm_ref_type_t type);
 
 // Returns the registered type descriptor for the given type, if found.
 IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL
@@ -157,7 +177,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_ref_check(iree_vm_ref_t* ref, iree_vm_ref_type_t type);
 
 #define IREE_VM_DEREF_OR_RETURN(value_type, value, ref, type) \
-  IREE_API_RETURN_IF_API_ERROR(iree_vm_ref_check(ref, type)); \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_check(ref, type));         \
   value_type* value = (value_type*)(ref)->ptr;
 
 // Retains the reference-counted pointer |ref|.

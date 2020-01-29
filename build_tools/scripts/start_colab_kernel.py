@@ -81,10 +81,9 @@ def setup_environment():
 def build():
   """Builds the python bundle."""
   print("Building python bindings...")
-  subprocess.check_call(
-      [bazel_exe, "build", "//bindings/python/pyiree:everything_for_colab"],
-      cwd=repo_root,
-      env=bazel_env)
+  subprocess.check_call([bazel_exe, "build", "//colab:everything_for_colab"],
+                        cwd=repo_root,
+                        env=bazel_env)
 
 
 def run():
@@ -93,7 +92,7 @@ def run():
   if os.path.sep == "\\":
     runfiles_suffix = ".exe.runfiles"  # Windows uses a special name
 
-  runfiles_dir = os.path.join(bazel_bin, "bindings", "python", "pyiree",
+  runfiles_dir = os.path.join(bazel_bin, "colab",
                               "everything_for_colab" + runfiles_suffix)
   # Top level directories under the runfiles get added to the sys path.
   extra_python_path = []

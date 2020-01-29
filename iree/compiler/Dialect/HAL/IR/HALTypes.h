@@ -40,6 +40,17 @@ namespace HAL {
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterface.h.inc"
 
 //===----------------------------------------------------------------------===//
+// Enum utilities
+//===----------------------------------------------------------------------===//
+
+// Returns a stable identifier for the MLIR element type or nullopt if the
+// type is unsupported in the ABI.
+llvm::Optional<int32_t> getElementTypeValue(Type type);
+
+// Returns an attribute with the MLIR element type or {}.
+IntegerAttr getElementTypeAttr(Type type);
+
+//===----------------------------------------------------------------------===//
 // RefObject types
 //===----------------------------------------------------------------------===//
 
@@ -59,6 +70,15 @@ class BufferType : public Type::TypeBase<BufferType, RefObjectType> {
     return Base::get(context, TypeKind::Buffer);
   }
   static bool kindof(unsigned kind) { return kind == TypeKind::Buffer; }
+};
+
+class BufferViewType : public Type::TypeBase<BufferViewType, RefObjectType> {
+ public:
+  using Base::Base;
+  static BufferViewType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::BufferView);
+  }
+  static bool kindof(unsigned kind) { return kind == TypeKind::BufferView; }
 };
 
 class CommandBufferType
@@ -132,6 +152,18 @@ class ExecutableCacheType
   }
 };
 
+class ExecutableLayoutType
+    : public Type::TypeBase<ExecutableLayoutType, RefObjectType> {
+ public:
+  using Base::Base;
+  static ExecutableLayoutType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::ExecutableLayout);
+  }
+  static bool kindof(unsigned kind) {
+    return kind == TypeKind::ExecutableLayout;
+  }
+};
+
 class FenceType : public Type::TypeBase<FenceType, RefObjectType> {
  public:
   using Base::Base;
@@ -197,6 +229,18 @@ class DescriptorSetBindingType {
         {
             IntegerType::get(32, context),
             RefPtrType::get(BufferType::get(context)),
+            IntegerType::get(32, context),
+            IntegerType::get(32, context),
+        },
+        context);
+  }
+};
+
+class DescriptorSetLayoutBindingType {
+ public:
+  static TupleType get(MLIRContext *context) {
+    return TupleType::get(
+        {
             IntegerType::get(32, context),
             IntegerType::get(32, context),
             IntegerType::get(32, context),

@@ -31,9 +31,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_variant_list_alloc(
 
   iree_host_size_t alloc_size = iree_vm_variant_list_alloc_size(capacity);
   iree_vm_variant_list_t* list = NULL;
-  IREE_API_RETURN_IF_API_ERROR(
+  IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, alloc_size, (void**)&list));
-  IREE_API_RETURN_IF_API_ERROR(iree_vm_variant_list_init(list, capacity));
+  IREE_RETURN_IF_ERROR(iree_vm_variant_list_init(list, capacity));
   list->allocator = allocator;
   *out_list = list;
   return IREE_STATUS_OK;

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     Transforms
@@ -23,6 +25,9 @@ iree_cc_library(
     "OrdinalAllocation.cpp"
     "Passes.cpp"
   DEPS
+    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR
     LLVMSupport
     MLIRIR

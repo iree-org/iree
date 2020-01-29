@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     IR
@@ -36,7 +38,6 @@ iree_cc_library(
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils
-  ALWAYSLINK
   PUBLIC
 )
 
@@ -44,14 +45,14 @@ iree_cc_library(
   NAME
     HALDialect
   HDRS
-    "HALDialect.cpp"
-  SRCS
     "HALDialect.h"
+  SRCS
+    "HALDialect.cpp"
   DEPS
-    IR
-    iree::compiler::Dialect
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::HAL::Conversion::HALToVM
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
     LLVMSupport
     MLIRIR
@@ -66,7 +67,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     HALEnumsGen
-  SRCS
+  TD_FILE
     HALBase.td
   OUTS
     -gen-enum-decls HALEnums.h.inc
@@ -76,7 +77,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     HALOpInterfaceGen
-  SRCS
+  TD_FILE
     HALBase.td
   OUTS
     -gen-op-interface-decls HALOpInterface.h.inc
@@ -86,7 +87,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     HALOpsGen
-  SRCS
+  TD_FILE
     HALOps.td
   OUTS
     -gen-op-decls HALOps.h.inc

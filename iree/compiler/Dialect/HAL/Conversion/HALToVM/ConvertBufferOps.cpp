@@ -84,6 +84,8 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                    SymbolTable &importSymbols,
                                    TypeConverter &typeConverter,
                                    OwningRewritePatternList &patterns) {
+  patterns.insert<VMImportOpConversion<IREE::HAL::BufferAllocatorOp>>(
+      context, importSymbols, typeConverter, "hal.buffer.allocator");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferSubspanOp>>(
       context, importSymbols, typeConverter, "hal.buffer.subspan");
   patterns.insert<VMImportOpConversion<IREE::HAL::BufferFillOp>>(
@@ -98,15 +100,6 @@ void populateHALBufferToVMPatterns(MLIRContext *context,
                                           "hal.buffer.load");
   patterns.insert<BufferStoreOpConversion>(context, importSymbols,
                                            typeConverter, "hal.buffer.store");
-
-  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewComputeOffsetOp>>(
-      context, importSymbols, typeConverter, "hal.buffer_view.compute_offset");
-  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewComputeLengthOp>>(
-      context, importSymbols, typeConverter, "hal.buffer_view.compute_length");
-  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewComputeRangeOp>>(
-      context, importSymbols, typeConverter, "hal.buffer_view.compute_range");
-  patterns.insert<VMImportOpConversion<IREE::HAL::BufferViewSliceOp>>(
-      context, importSymbols, typeConverter, "hal.buffer_view.slice");
 }
 
 }  // namespace iree_compiler

@@ -105,8 +105,8 @@ Status PrintBufferViewToStream(const BufferView& buffer_view,
     return OkStatus();
   }
 
-  std::string type_str =
-      MakeBufferTypeString(buffer_view.element_size, print_mode);
+  ASSIGN_OR_RETURN(std::string type_str,
+                   MakeBufferTypeString(buffer_view.element_size, print_mode));
   PrintShapedTypeToStream(buffer_view.shape, type_str, stream);
   *stream << "=";
 

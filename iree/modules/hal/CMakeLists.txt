@@ -27,7 +27,9 @@ iree_cc_library(
     iree::hal::command_queue
     iree::hal::device
     iree::vm
+    iree::vm::module_abi_cc
     absl::core_headers
+    absl::inlined_vector
     absl::memory
     absl::strings
     absl::span

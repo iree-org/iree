@@ -1,0 +1,135 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+iree_cc_library(
+  NAME
+    vmla_cache
+  HDRS
+    "vmla_cache.h"
+  SRCS
+    "vmla_cache.cc"
+  DEPS
+    iree::hal::vmla::vmla_executable
+    iree::base::source_location
+    iree::base::status
+    iree::base::tracing
+    iree::hal::allocator
+    iree::hal::executable
+    iree::hal::executable_cache
+    iree::hal::executable_format
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla_command_processor
+  HDRS
+    "vmla_command_processor.h"
+  SRCS
+    "vmla_command_processor.cc"
+  DEPS
+    iree::hal::vmla::vmla_executable
+    iree::base::status
+    iree::base::tracing
+    iree::hal::host::host_local_command_processor
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla_device
+  HDRS
+    "vmla_device.h"
+  SRCS
+    "vmla_device.cc"
+  DEPS
+    iree::hal::vmla::vmla_cache
+    iree::hal::vmla::vmla_command_processor
+    iree::base::memory
+    iree::base::status
+    iree::base::tracing
+    iree::hal::command_buffer_validation
+    iree::hal::command_queue
+    iree::hal::device
+    iree::hal::fence
+    iree::hal::host::async_command_queue
+    iree::hal::host::host_event
+    iree::hal::host::host_local_allocator
+    iree::hal::host::host_submission_queue
+    iree::hal::host::inproc_command_buffer
+    absl::inlined_vector
+    absl::memory
+    absl::span
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla_driver
+  HDRS
+    "vmla_driver.h"
+  SRCS
+    "vmla_driver.cc"
+  DEPS
+    iree::hal::vmla::vmla_device
+    iree::hal::device_info
+    iree::hal::driver
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla_driver_module
+  SRCS
+    "vmla_driver_module.cc"
+  DEPS
+    iree::hal::vmla::vmla_driver
+    iree::base::init
+    iree::base::status
+    iree::hal::driver_registry
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla_executable
+  HDRS
+    "vmla_executable.h"
+  SRCS
+    "vmla_executable.cc"
+  DEPS
+    iree::base::status
+    iree::hal::allocator
+    iree::hal::executable
+    iree::hal::executable_spec
+    absl::span
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    vmla_module
+  HDRS
+    "vmla_module.h"
+  SRCS
+    "vmla_module.cc"
+  DEPS
+    iree::base::api
+    iree::base::tracing
+    iree::vm
+    iree::vm::module_abi_cc
+    absl::span
+  PUBLIC
+)

@@ -32,7 +32,7 @@ struct UnaryOpLowering : public OpConversionPattern<SrcOp> {
     auto value = loadAccessValue(op.getLoc(), operands[0], rewriter);
     value = wrapAsMemRef(value, op, rewriter);
 
-    auto dstType = convertTypeToMemRef(op.getResult());
+    auto dstType = convertLegacyTypeToMemRef(op.getResult());
     auto dstOp = rewriter.create<DstOp>(op.getLoc(), dstType, value);
     auto result = dstOp.getResult();
     result = wrapAsTensor(result, op, rewriter);
@@ -52,7 +52,7 @@ struct BinaryOpLowering : public OpConversionPattern<SrcOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto lhsValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
     auto rhsValue = loadAccessValue(op.getLoc(), operands[1], rewriter);
-    auto dstType = convertTypeToMemRef(op.getResult());
+    auto dstType = convertLegacyTypeToMemRef(op.getResult());
 
     lhsValue = wrapAsMemRef(lhsValue, op, rewriter);
     rhsValue = wrapAsMemRef(rhsValue, op, rewriter);
@@ -83,7 +83,7 @@ struct TernaryOpLowering : public OpConversionPattern<SrcOp> {
     bValue = wrapAsMemRef(bValue, op, rewriter);
     cValue = wrapAsMemRef(cValue, op, rewriter);
 
-    auto dstType = convertTypeToMemRef(op.getResult());
+    auto dstType = convertLegacyTypeToMemRef(op.getResult());
     auto dstOp =
         rewriter.create<DstOp>(op.getLoc(), dstType, aValue, bValue, cValue);
     auto result = dstOp.getResult();

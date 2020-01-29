@@ -23,6 +23,12 @@ namespace iree_compiler {
 namespace IREE {
 namespace Custom {
 
+// Populates conversion patterns from the tensor-based custom dialect ops to the
+// HAL buffer-based ones.
+void populateCustomToHALPatterns(MLIRContext *context,
+                                 OwningRewritePatternList &patterns,
+                                 TypeConverter &typeConverter);
+
 // Populates conversion patterns from the custom dialect to the VM dialect.
 void populateCustomToVMPatterns(MLIRContext *context,
                                 SymbolTable &importSymbols,

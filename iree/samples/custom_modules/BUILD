@@ -35,9 +35,13 @@ cc_test(
         ":native_module",
         "//iree/base:api",
         "//iree/base:logging",
+        "//iree/hal:api",
+        "//iree/hal/interpreter:interpreter_driver_module",
+        "//iree/modules/hal",
         "//iree/testing:gtest_main",
         "//iree/vm",
         "//iree/vm:bytecode_module",
+        "//iree/vm:ref",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/strings",
     ],
@@ -45,10 +49,17 @@ cc_test(
 
 cc_library(
     name = "native_module",
-    srcs = ["native_module.c"],
+    srcs = ["native_module.cc"],
     hdrs = ["native_module.h"],
     deps = [
         "//iree/base:api",
+        "//iree/base:api_util",
+        "//iree/base:buffer_string_util",
+        "//iree/base:shape",
+        "//iree/base:shaped_buffer_string_util",
+        "//iree/hal:api",
+        "//iree/modules/hal",
         "//iree/vm",
+        "//iree/vm:module_abi_cc",
     ],
 )

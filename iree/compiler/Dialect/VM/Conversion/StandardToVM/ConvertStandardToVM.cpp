@@ -58,13 +58,13 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
   }
 };
 
+// Whitelist of function attributes to retain when converting to vm.func.
+constexpr std::array<const char *, 1> kRetainedAttributes = {
+    "iree.reflection",
+};
+
 class FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
-
-  // Whitelist of function attributes to retain when converting to vm.func.
-  static constexpr std::array<const char *, 1> kRetainedAttributes = {
-      "iree.reflection",
-  };
 
   PatternMatchResult matchAndRewrite(
       FuncOp srcOp, ArrayRef<Value> operands,

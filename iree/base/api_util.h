@@ -29,12 +29,17 @@ inline iree_status_t ToApiStatus(const Status& status) {
   if (!status.ok()) {
     LOG(ERROR) << status;
   }
-  return static_cast<iree_status_t>(status.code());
+  return iree_make_status(status.code());
 }
 
 inline Status FromApiStatus(iree_status_t status_code, SourceLocation loc) {
   return StatusBuilder(static_cast<StatusCode>(status_code), loc);
 }
+
+#define IREE_RETURN_IF_NULL(value)                       \
+  if (!(value))                                          \
+    return ::iree::InvalidArgumentErrorBuilder(IREE_LOC) \
+           << #value << " is null/empty";
 
 // Internal helper for concatenating macro values.
 #define IREE_API_STATUS_MACROS_IMPL_CONCAT_INNER_(x, y) x##y
@@ -106,18 +111,6 @@ inline absl::Time ToAbslTime(iree_time_t time) {
   }
 }
 
-// Converts a Shape to an iree_shape_t.
-inline iree_status_t ToApiShape(const Shape& shape, iree_shape_t* out_shape) {
-  out_shape->rank = shape.size();
-  if (shape.size() > ABSL_ARRAYSIZE(out_shape->dims)) {
-    return IREE_STATUS_OUT_OF_RANGE;
-  }
-  for (int i = 0; i < out_shape->rank; ++i) {
-    out_shape->dims[i] = shape[i];
-  }
-  return IREE_STATUS_OK;
-}
-
 // Returns a vector initialized with the contents of a C-style list query.
 // For functions of the form (..., capacity, out_values, out_count) this will
 // try to fetch the items and resize as needed such that the returned value
@@ -131,10 +124,10 @@ absl::InlinedVector<T, 4> QueryListValues(
   absl::InlinedVector<T, 4> values(4);
   iree_host_size_t count = 0;
   iree_status_t status = fn(args..., values.size(), values.data(), &count);
-  if (status == IREE_STATUS_OUT_OF_RANGE) {
+  if (iree_status_is_out_of_range(status)) {
     values.resize(count);
     status = fn(args..., values.size(), values.data(), &count);
-  } else if (status != IREE_STATUS_OK) {
+  } else if (!iree_status_is_ok(status)) {
     return {};
   }
   values.resize(count);

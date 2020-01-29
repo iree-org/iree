@@ -42,12 +42,12 @@ iree_cc_library(
   NAME
     api_util
   HDRS
-    "api.h"
     "api_util.h"
   DEPS
     absl::base
     absl::container
     absl::time
+    iree::base::api_hdrs
     iree::base::logging
     iree::base::shape
     iree::base::status
@@ -74,7 +74,7 @@ iree_cc_test(
   SRCS
     "arena_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::arena
 )
 
@@ -94,8 +94,8 @@ iree_cc_test(
   SRCS
     "bitfield_test.cc"
   DEPS
-    absl::base
-    gtest_main
+    absl::core_headers
+    iree::testing::gtest_main
     iree::base::bitfield
 )
 
@@ -107,6 +107,7 @@ iree_cc_library(
   HDRS
     "buffer_string_util.h"
   DEPS
+    absl::flat_hash_map
     absl::strings
     absl::optional
     absl::span
@@ -122,12 +123,11 @@ iree_cc_test(
   SRCS
     "buffer_string_util_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::buffer_string_util
     iree::base::memory
     iree::base::status
     iree::base::status_matchers
-    absl::optional
     absl::strings
 )
 
@@ -200,7 +200,7 @@ iree_cc_test(
     "file_path_test.cc"
   DEPS
     iree::base::file_path
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -269,28 +269,17 @@ iree_cc_test(
     "intrusive_list_unique_ptr_test.cc"
   DEPS
     absl::memory
-    gtest_main
+    iree::testing::gtest_main
     iree::base::intrusive_list
 )
 
-# TODO(marbre): Moving to internal breaks iree::samples::rt::vulkan::vk_graphics_integration
-#  INTERFACE_LIBRARY targets may only have whitelisted properties.  The
-#  property "ALWAYSLINK" is not allowed.
 iree_cc_library(
   NAME
     logging
   HDRS
     "logging.h"
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
-    "internal/logging.h"
-  SRCS
-    # TODO(marbre): Pulled in as dep defined by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
-    "internal/logging.cc"
   DEPS
-    # TODO(marbre): Following deps pulled in by platform_trampoline_deps("logging") in the Bazel world. Move to internal.
-    absl::base
-    absl::flags
-    iree::base::platform_headers
+    iree::base::internal::logging_internal
   PUBLIC
 )
 
@@ -341,7 +330,7 @@ iree_cc_test(
   SRCS
     "ref_ptr_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::ref_ptr
 )
 
@@ -371,7 +360,7 @@ iree_cc_test(
     iree::base::shape
     iree::base::status
     iree::base::status_matchers
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -420,7 +409,7 @@ iree_cc_test(
     iree::base::shaped_buffer_string_util
     iree::base::status
     iree::base::status_matchers
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -446,7 +435,7 @@ iree_cc_test(
   SRCS
     "signature_mangle_test.cc"
   DEPS
-    gtest_main
+    iree::testing::gtest_main
     iree::base::signature_mangle
 )
 
@@ -602,7 +591,7 @@ endif()
 #     "wait_handle_test.cc"
 #   DEPS
 #     absl::time
-#     gtest_main
+#     iree::testing::gtest_main
 #     iree::base::status
 #     iree::base::status_matchers
 #     iree::base::wait_handle

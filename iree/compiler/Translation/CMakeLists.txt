@@ -14,6 +14,8 @@
 
 add_subdirectory(Interpreter)
 add_subdirectory(SPIRV)
+add_subdirectory(XLAToLinalg)
+add_subdirectory(test)
 
 iree_cc_library(
   NAME
@@ -26,17 +28,16 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Conversion::HALToVM
-    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::IREE::Transforms
+    iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRStandardDialectRegistration
+    MLIRStandardOps
     MLIRSupport
     MLIRTranslation
     tensorflow::mlir_xla

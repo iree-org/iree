@@ -14,7 +14,7 @@
 
 # HAL implementation using Vulkan and (likely) SPIR-V executables.
 
-load("//iree:build_defs.bzl", "PLATFORM_VULKAN_LOADER_COPTS", "PLATFORM_VULKAN_TEST_DEPS")
+load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_LOADER_COPTS", "PLATFORM_VULKAN_TEST_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],

@@ -16,17 +16,21 @@ iree_cc_library(
   NAME
     Utils
   HDRS
-    "DispatchUtils.h"
     "GraphUtils.h"
+    "IREECodegenUtils.h"
     "TypeConversionUtils.h"
   SRCS
-    "DispatchUtils.cpp"
     "GraphUtils.cpp"
+    "IREECodegenUtils.cpp"
     "TypeConversionUtils.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_xla
     LLVMSupport
     MLIRIR
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransformUtils
+    MLIRTransforms
+    tensorflow::mlir_xla
   PUBLIC
 )

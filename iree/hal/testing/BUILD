@@ -25,7 +25,7 @@ cc_library(
     hdrs = ["mock_allocator.h"],
     deps = [
         "//iree/hal:allocator",
-        "@com_google_googletest//:gtest",
+        "//iree/testing:gtest",
     ],
 )
 
@@ -35,7 +35,7 @@ cc_library(
     hdrs = ["mock_command_buffer.h"],
     deps = [
         "//iree/hal:command_buffer",
-        "@com_google_googletest//:gtest",
+        "//iree/testing:gtest",
     ],
 )
 
@@ -45,6 +45,6 @@ cc_library(
     hdrs = ["mock_command_queue.h"],
     deps = [
         "//iree/hal:command_queue",
-        "@com_google_googletest//:gtest",
+        "//iree/testing:gtest",
     ],
 )

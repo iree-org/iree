@@ -58,8 +58,7 @@ SmallVector<Value, 4> convertToDispatchOp(
   }
 
   // Calculate workload from the result shape.
-  auto workload =
-      calculateWorkload(regionOp, resultTypes.front().cast<ShapedType>());
+  auto workload = calculateWorkload(regionOp, regionOp->getResult(0));
 
   // Create the reduce op to the executable function.
   std::vector<Value> allOperands;

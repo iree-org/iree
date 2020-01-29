@@ -15,4 +15,5 @@
 add_subdirectory(Flow)
 add_subdirectory(HAL)
 add_subdirectory(IREE)
+add_subdirectory(Shape)
 add_subdirectory(VM)

@@ -54,6 +54,7 @@
 #include "iree/base/status.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -62,6 +63,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/value.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
@@ -187,10 +189,13 @@ StatusOr<std::string> PrepareModule(
       mlir::iree_compiler::IREE::HAL::getExecutableTargetOptionsFromFlags();
   executable_options.targets = {std::move(target_backend)};
   mlir::PassManager pass_manager(mlir_module->getContext());
+  mlir::applyPassManagerCLOptions(pass_manager);
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(
       pass_manager, executable_options);
   mlir::iree_compiler::IREE::VM::buildVMTransformPassPipeline(pass_manager);
+  pass_manager.addPass(
+      mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(pass_manager.run(mlir_module.get()))) {
     return InternalErrorBuilder(IREE_LOC)
            << "Conversion from source -> vm failed";
@@ -306,6 +311,11 @@ Status OutputFunctionResults(iree_vm_function_t function,
                           [&](const RawSignatureParser::Description& desc) {
                             output_descs.push_back(desc);
                           });
+  if (sig_parser.GetError()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Parsing function signature '" << sig_f.data
+           << "' failed getting results";
+  }
   if (output_descs.size() != iree_vm_variant_list_size(outputs)) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Result signature mismatch; expected " << output_descs.size()
@@ -314,16 +324,48 @@ Status OutputFunctionResults(iree_vm_function_t function,
 
   for (int i = 0; i < iree_vm_variant_list_size(outputs); ++i) {
     iree_vm_variant_t* variant = iree_vm_variant_list_get(outputs, i);
-    auto* buffer = iree_hal_buffer_deref(&variant->ref);
+    if (!variant) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "output " << i << "not present";
+    }
 
     const auto& desc = output_descs[i];
     std::string desc_str;
     desc.ToString(desc_str);
-    auto print_mode = BufferDataPrintMode::kFloatingPoint;
-    int8_t element_size = 4;
-    Shape shape;
+    LOG(INFO) << "result[" << i << "]: " << desc_str;
+
     switch (desc.type) {
-      case RawSignatureParser::Type::kBuffer:
+      case RawSignatureParser::Type::kScalar: {
+        if (variant->value_type != IREE_VM_VALUE_TYPE_I32) {
+          return InvalidArgumentErrorBuilder(IREE_LOC)
+                 << "output " << i << " has value type "
+                 << static_cast<int>(variant->value_type)
+                 << " but descriptor information " << desc_str;
+        }
+        if (desc.scalar.type == AbiConstants::ScalarType::kSint32) {
+          std::cout << "i32=" << variant->i32 << "\n";
+          break;
+        }
+        return UnimplementedErrorBuilder(IREE_LOC)
+               << "Unsupported signature scalar type: " << desc_str;
+      }
+      case RawSignatureParser::Type::kBuffer: {
+        if (variant->value_type != IREE_VM_VALUE_TYPE_NONE) {
+          return InvalidArgumentErrorBuilder(IREE_LOC)
+                 << "output " << i << " has value type "
+                 << static_cast<int>(variant->value_type)
+                 << " but descriptor information " << desc_str;
+        }
+        auto* buffer = iree_hal_buffer_deref(&variant->ref);
+        if (!buffer) {
+          return InvalidArgumentErrorBuilder(IREE_LOC)
+                 << "failed dereferencing output " << i;
+        }
+
+        auto print_mode = BufferDataPrintMode::kFloatingPoint;
+        int8_t element_size = 4;
+        Shape shape;
+
         switch (desc.buffer.scalar_type) {
           case AbiConstants::ScalarType::kIeeeFloat16:
           case AbiConstants::ScalarType::kIeeeFloat32:
@@ -349,28 +391,28 @@ Status OutputFunctionResults(iree_vm_function_t function,
         element_size = AbiConstants::kScalarTypeSize[static_cast<unsigned>(
             desc.buffer.scalar_type)];
         shape = Shape{desc.dims};
+
+        iree_hal_mapped_memory_t mapped_memory;
+        RETURN_IF_ERROR(FromApiStatus(
+            iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
+                                IREE_WHOLE_BUFFER, &mapped_memory),
+            IREE_LOC))
+            << "mapping hal buffer";
+        auto contents = absl::MakeConstSpan(mapped_memory.contents.data,
+                                            mapped_memory.contents.data_length);
+        ShapedBuffer shaped_buffer(
+            element_size, shape,
+            std::vector<uint8_t>(contents.begin(), contents.end()));
+        ASSIGN_OR_RETURN(auto result_str, PrintShapedBufferToString(
+                                              shaped_buffer, print_mode, 1024));
+        iree_hal_buffer_unmap(buffer, &mapped_memory);
+        std::cout << result_str << "\n";
         break;
+      }
       default:
         return UnimplementedErrorBuilder(IREE_LOC)
                << "Unsupported signature type: " << desc_str;
     }
-
-    // TODO(benvanik): debug string C API: buffer->DebugString();
-    LOG(INFO) << "result[" << i << "]: " << desc_str;
-    iree_hal_mapped_memory_t mapped_memory;
-    RETURN_IF_ERROR(
-        FromApiStatus(iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ,
-                                          0, IREE_WHOLE_BUFFER, &mapped_memory),
-                      IREE_LOC));
-    auto contents = absl::MakeConstSpan(mapped_memory.contents.data,
-                                        mapped_memory.contents.data_length);
-    ShapedBuffer shaped_buffer(
-        element_size, shape,
-        std::vector<uint8_t>(contents.begin(), contents.end()));
-    ASSIGN_OR_RETURN(auto result_str, PrintShapedBufferToString(
-                                          shaped_buffer, print_mode, 1024));
-    iree_hal_buffer_unmap(buffer, &mapped_memory);
-    std::cout << result_str << "\n";
   }
 
   return OkStatus();
@@ -554,7 +596,7 @@ Status RunFile(const std::string& mlir_filename) {
 
   // Split the buffer into separate modules and evaluate independently.
   // This matches the -split-input-file arg to mlir-opt.
-  const char kSplitMarker[] = "// -----\n";
+  const char kSplitMarker[] = "// -----";
   auto* full_buffer = file.get();
   llvm::SmallVector<llvm::StringRef, 8> source_buffers;
   full_buffer->getBuffer().split(source_buffers, kSplitMarker);

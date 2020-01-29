@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     Bytecode
@@ -32,6 +34,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms
     iree::schemas::bytecode_module_def_cc_fbs
+    flatbuffers
     LLVMSupport
     MLIRIR
     MLIRPass

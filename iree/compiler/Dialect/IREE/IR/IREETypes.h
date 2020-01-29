@@ -15,8 +15,10 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 #define IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 #include "mlir/IR/Types.h"
 
@@ -24,16 +26,22 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 
+namespace detail {
+struct RefPtrTypeStorage;
+struct RankedShapeTypeStorage;
+}  // namespace detail
+
 namespace TypeKind {
 enum Kind {
-  // TODO(b/143787186): move back down to +0 when old dialects are removed.
-  RefPtr = Type::FIRST_IREE_TYPE + 60,
+  RefPtr = Type::FIRST_IREE_TYPE,
   OpaqueRefObject,
   ByteBuffer,
   MutableByteBuffer,
 
   FIRST_HAL_TYPE = Type::FIRST_IREE_TYPE + 20,
   FIRST_SEQ_TYPE = Type::FIRST_IREE_TYPE + 40,
+  FIRST_SHAPE_TYPE = Type::FIRST_IREE_TYPE + 60,
+  FIRST_STRING_TYPE = Type::FIRST_IREE_TYPE + 80,
 };
 }  // namespace TypeKind
 
@@ -50,6 +58,7 @@ enum Kind {
   Event,
   Executable,
   ExecutableCache,
+  ExecutableLayout,
   Fence,
   RingBuffer,
   Semaphore,
@@ -67,6 +76,22 @@ enum Kind {
 };
 }  // namespace TypeKind
 }  // namespace SEQ
+
+namespace Shape {
+namespace TypeKind {
+enum Kind {
+  RankedShape = IREE::TypeKind::FIRST_SHAPE_TYPE,
+};
+}  // namespace TypeKind
+}  // namespace Shape
+
+namespace Strings {
+namespace TypeKind {
+enum Kind {
+  String = IREE::TypeKind::FIRST_STRING_TYPE,
+};
+}  // namespace TypeKind
+}  // namespace Strings
 
 /// Base type for RefObject-derived types.
 /// These can be wrapped in RefPtrType.
@@ -124,28 +149,6 @@ class MutableByteBufferType
   }
 };
 
-namespace detail {
-
-struct RefPtrTypeStorage : public TypeStorage {
-  RefPtrTypeStorage(Type objectType, unsigned subclassData = 0)
-      : TypeStorage(subclassData),
-        objectType(objectType.cast<RefObjectType>()) {}
-
-  /// The hash key used for uniquing.
-  using KeyTy = Type;
-  bool operator==(const KeyTy &key) const { return key == objectType; }
-
-  static RefPtrTypeStorage *construct(TypeStorageAllocator &allocator,
-                                      const KeyTy &key) {
-    // Initialize the memory using placement new.
-    return new (allocator.allocate<RefPtrTypeStorage>()) RefPtrTypeStorage(key);
-  }
-
-  RefObjectType objectType;
-};
-
-}  // namespace detail
-
 /// A ref_ptr containing a reference to a RefObjectType.
 class RefPtrType
     : public Type::TypeBase<RefPtrType, Type, detail::RefPtrTypeStorage> {
@@ -153,17 +156,12 @@ class RefPtrType
   using Base::Base;
 
   /// Gets or creates a RefPtrType with the provided target object type.
-  static RefPtrType get(RefObjectType objectType) {
-    return Base::get(objectType.getContext(), TypeKind::RefPtr, objectType);
-  }
+  static RefPtrType get(RefObjectType objectType);
 
   /// Gets or creates a RefPtrType with the provided target object type.
   /// This emits an error at the specified location and returns null if the
   /// object type isn't supported.
-  static RefPtrType getChecked(Type objectType, Location location) {
-    return Base::getChecked(location, objectType.getContext(), TypeKind::RefPtr,
-                            objectType);
-  }
+  static RefPtrType getChecked(Type objectType, Location location);
 
   /// Verifies construction of a type with the given object.
   static LogicalResult verifyConstructionInvariants(
@@ -177,7 +175,7 @@ class RefPtrType
     return success();
   }
 
-  RefObjectType getObjectType() { return getImpl()->objectType; }
+  RefObjectType getObjectType();
 
   static bool kindof(unsigned kind) { return kind == TypeKind::RefPtr; }
 };

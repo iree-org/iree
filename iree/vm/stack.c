@@ -28,7 +28,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_init(
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_stack_deinit(iree_vm_stack_t* stack) {
   while (stack->depth) {
-    IREE_API_RETURN_IF_API_ERROR(iree_vm_stack_function_leave(stack));
+    IREE_RETURN_IF_ERROR(iree_vm_stack_function_leave(stack));
   }
   return IREE_STATUS_OK;
 }
@@ -61,7 +61,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
     }
   }
   if (!callee_frame->module_state) {
-    IREE_API_RETURN_IF_API_ERROR(stack->state_resolver.query_module_state(
+    IREE_RETURN_IF_ERROR(stack->state_resolver.query_module_state(
         stack->state_resolver.self, function.module,
         &callee_frame->module_state));
   }

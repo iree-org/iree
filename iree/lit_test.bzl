@@ -14,52 +14,69 @@
 
 """Bazel macros for running lit tests."""
 
-def iree_setup_lit_package(data, **kwargs):
-    """Should be called once per test package that contains globbed lit tests.
+def iree_lit_test(
+        name,
+        test_file,
+        data,
+        size = "small",
+        driver = "//iree/tools:run_lit.sh",
+        **kwargs):
+    """Creates a lit test from the specified source file.
 
     Args:
-      data: Additional, project specific data deps to add.
-      **kwargs: Any additional arguments to the underlying filegroup.
+      name: name of the generated test suite.
+      test_file: the test file with the lit test
+      data: binaries used in the lit tests.
+      size: size of the tests.
+      driver: the shell runner for the lit tests.
+      **kwargs: Any additional arguments that will be passed to the underlying sh_test.
     """
-
-    # Bundle together all of the test utilities that are used by tests.
-    native.filegroup(
-        name = "lit_test_utilities",
-        testonly = True,
-        data = data + [
-            "//iree/tools:IreeFileCheck",
-        ],
+    native.sh_test(
+        name = name,
+        srcs = [driver],
+        size = size,
+        data = data + [test_file],
+        args = ["$(location %s)" % (test_file,)],
         **kwargs
     )
 
-def iree_glob_lit_tests(
-        data = [":lit_test_utilities"],
+def iree_lit_test_suite(
+        name,
+        data,
+        srcs,
+        size = "small",
         driver = "//iree/tools:run_lit.sh",
-        test_file_exts = ["mlir"],
+        tags = [],
         **kwargs):
-    """Globs lit test files into tests for a package.
-
-    For most packages, the defaults suffice. Packages that include this must
-    also include a call to iree_setup_lit_package().
+    """Creates one lit test per source file and a test suite that bundles them.
 
     Args:
-      data: Data files to include/build.
-      driver: Test driver.
-      test_file_exts: File extensions to glob.
-      **kwargs: Any additional arguments to the underlying sh_test.
+      name: name of the generated test suite.
+      data: binaries used in the lit tests.
+      srcs: test file sources.
+      size: size of the tests.
+      driver: the shell runner for the lit tests.
+      tags: tags to apply to the test. Note that as in standard test suites, manual
+            is treated specially and will also apply to the test suite itself.
+      **kwargs: Any additional arguments that will be passed to the underlying tests.
     """
-    for test_file_ext in test_file_exts:
-        test_files = native.glob([
-            "*.%s" % (test_file_ext,),
-            "**/*.%s" % (test_file_ext,),
-        ])
-        for test_file in test_files:
-            test_file_location = "$(location %s)" % (test_file,)
-            native.sh_test(
-                name = "%s.test" % (test_file,),
-                size = "small",
-                srcs = [driver],
-                data = data + [test_file],
-                args = [test_file_location],
-                **kwargs
-            )
+    tests = []
+    for test_file in srcs:
+        test_name = "%s_%s_test" % (name, test_file)
+        iree_lit_test(
+            name = test_name,
+            test_file = test_file,
+            size = size,
+            data = data,
+            driver = driver,
+            **kwargs
+        )
+        tests.append(test_name)
+
+    native.test_suite(
+        name = name,
+        tests = tests,
+        # Note that only the manual tag really has any effect here. Others are
+        # used for test suite filtering, but all tests are passed the same tags.
+        tags = tags,
+    )

@@ -3,6 +3,8 @@
 To run these notebooks with a local runtime, refer to the
 [Using Colab docs](../docs/using_colab.md).
 
+Hosted/remote runtimes are not yet supported.
+
 ## Notebooks
 
 ### [edge_detection\.ipynb](edge_detection.ipynb)
@@ -17,6 +19,13 @@ IREE
 Shows off some concepts of the low level IREE python bindings
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/master/colab/low_level_invoke_function.ipynb)
+
+### [mnist_tensorflow\.ipynb](mnist_tensorflow.ipynb)
+
+Trains a TensorFlow 2.0 model for recognizing handwritten digits and runs it
+using IREE
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/google/iree/blob/master/colab/mnist_tensorflow.ipynb)
 
 ### [simple_tensorflow_module_import\.ipynb](simple_tensorflow_module_import.ipynb)
 

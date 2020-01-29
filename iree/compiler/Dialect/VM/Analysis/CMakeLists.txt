@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     Analysis
@@ -27,8 +29,9 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::IR
     LLVMSupport
+    MLIRAnalysis
     MLIRIR
-    MLIRParser
+    MLIRPass
     MLIRSupport
   ALWAYSLINK
   PUBLIC

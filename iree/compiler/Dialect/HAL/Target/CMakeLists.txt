@@ -13,7 +13,9 @@
 # limitations under the License.
 
 add_subdirectory(LegacyInterpreter)
+add_subdirectory(VMLA)
 add_subdirectory(VulkanSPIRV)
+add_subdirectory(test)
 
 iree_cc_library(
   NAME

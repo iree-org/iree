@@ -34,13 +34,8 @@ vm.import @ex.push_binding(
   %ordinal : i32,
   %buffer : !iree.ref<!hal.buffer>,
   %shape : i32 ...,
-  %element_size : i32
+  %element_type : i32
 )
-
-vm.import @ex.executable_descriptor_set_layout(
-  %executable : !iree.ref<!hal.executable>,
-  %set : i32
-) -> !iree.ref<!hal.descriptor_set_layout>
 
 vm.import @ex.defer_release(
   %operand : !iree.opaque_ref
@@ -58,11 +53,28 @@ vm.import @ex.submit_and_wait(
 // Computes the byte size required for a buffer of the given shape and type.
 vm.import @allocator.compute_size(
   %allocator : !iree.ref<!hal.allocator>,
-  %memory_types : i32,
-  %buffer_usage : i32,
   %shape : i32 ...,
-  %element_size : i32
+  %element_type : i32
 ) -> i32
+attributes {nosideeffects}
+
+// Computes an element byte offset within a buffer.
+vm.import @allocator.compute_offset(
+  %allocator : !iree.ref<!hal.allocator>,
+  %shape : i32 ...,
+  %element_type : i32,
+  %indices : i32 ...
+) -> i32
+attributes {nosideeffects}
+
+// Computes a byte range within a buffer for one or more elements.
+vm.import @allocator.compute_range(
+  %allocator : !iree.ref<!hal.allocator>,
+  %shape : i32 ...,
+  %element_type : i32,
+  %indices : i32 ...,
+  %lengths : i32 ...
+) -> (i32, i32)
 attributes {nosideeffects}
 
 // Allocates a buffer from the allocator.
@@ -79,22 +91,18 @@ vm.import @allocator.allocate.const(
   %memory_types : i32,
   %buffer_usage : i32,
   %shape : i32 ...,
-  %element_size : i32,
+  %element_type : i32,
   %value : !iree.byte_buffer_ref
-) -> !iree.ref<!hal.buffer>
-
-// Allocates a buffer from the allocator.
-vm.import @allocator.allocate.shaped(
-  %allocator : !iree.ref<!hal.allocator>,
-  %memory_types : i32,
-  %buffer_usage : i32,
-  %shape : i32 ...,
-  %element_size : i32
 ) -> !iree.ref<!hal.buffer>
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Buffer
 //===----------------------------------------------------------------------===//
+
+// Returns the allocator the buffer was allocated with.
+vm.import @buffer.allocator(
+  %buffer : !iree.ref<!hal.buffer>
+) -> !iree.ref<!hal.allocator>
 
 // Returns a reference to a subspan of the buffer.
 vm.import @buffer.subspan(
@@ -157,39 +165,49 @@ vm.import @buffer.store(
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
 
-// Computes an element byte offset within a buffer.
-vm.import @buffer_view.compute_offset(
+// Creates a reference to a buffer with a particular shape and element type.
+vm.import @buffer_view.create(
   %buffer : !iree.ref<!hal.buffer>,
   %shape : i32 ...,
-  %indices : i32 ...,
-  %element_size : i32
-) -> i32
-
-// Computes a shaped buffer view length in bytes.
-vm.import @buffer_view.compute_length(
-  %buffer : !iree.ref<!hal.buffer>,
-  %shape : i32 ...,
-  %element_size : i32
-) -> i32
-
-// Computes a byte range within a buffer for one or more elements.
-vm.import @buffer_view.compute_range(
-  %buffer : !iree.ref<!hal.buffer>,
-  %shape : i32 ...,
-  %indices : i32 ...,
-  %lengths : i32 ...,
-  %element_size : i32
-) -> (i32, i32)
+  %element_type : i32
+) -> !iree.ref<!hal.buffer_view>
+attributes {nosideeffects}
 
 // Returns a view into a buffer. The buffer is not copied and both the original
 // and sliced references must be synchronized.
-vm.import @buffer_view.slice(
-  %buffer : !iree.ref<!hal.buffer>,
-  %shape : i32 ...,
+vm.import @buffer_view.subview(
+  %buffer_view : !iree.ref<!hal.buffer_view>,
   %indices : i32 ...,
-  %lengths : i32 ...,
-  %element_size : i32
+  %lengths : i32 ...
+) -> !iree.ref<!hal.buffer_view>
+attributes {nosideeffects}
+
+// Returns the backing buffer of the buffer view.
+vm.import @buffer_view.buffer(
+  %buffer_view : !iree.ref<!hal.buffer_view>
 ) -> !iree.ref<!hal.buffer>
+attributes {nosideeffects}
+
+// Returns the allocated size of a shaped buffer view in bytes.
+vm.import @buffer_view.byte_length(
+  %buffer_view : !iree.ref<!hal.buffer_view>
+) -> i32
+attributes {nosideeffects}
+
+// Computes an element byte offset within a buffer.
+vm.import @buffer_view.compute_offset(
+  %buffer_view : !iree.ref<!hal.buffer_view>,
+  %indices : i32 ...
+) -> i32
+attributes {nosideeffects}
+
+// Computes a byte range within a buffer for one or more elements.
+vm.import @buffer_view.compute_range(
+  %buffer_view : !iree.ref<!hal.buffer_view>,
+  %indices : i32 ...,
+  %lengths : i32 ...
+) -> (i32, i32)
+attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::CommandBuffer
@@ -246,7 +264,7 @@ vm.import @command_buffer.copy_buffer(
 // Binds a descriptor set to the given set number.
 vm.import @command_buffer.bind_descriptor_set(
   %command_buffer : !iree.ref<!hal.command_buffer>,
-  %executable : !iree.ref<!hal.executable>,
+  %executable_layout : !iree.ref<!hal.executable_layout>,
   %set : i32,
   %descriptor_set : !iree.ref<!hal.descriptor_set>,
   %dynamic_offsets : i32 ...
@@ -276,23 +294,25 @@ vm.import @command_buffer.dispatch.indirect(
 // iree::hal::DescriptorSet
 //===----------------------------------------------------------------------===//
 
-// Allocates a new descriptor set based on the given layout.
-vm.import @descriptor_set.allocate(
+// Creates a new immutable descriptor set based on the given layout.
+vm.import @descriptor_set.create(
   %device : !iree.ref<!hal.device>,
-  %set_layout : !iree.ref<!hal.descriptor_set_layout>
+  %set_layout : !iree.ref<!hal.descriptor_set_layout>,
+  // <binding, buffer, offset, length>
+  %bindings : tuple<i32, !iree.ref<!hal.buffer>, i32, i32>...
 ) -> !iree.ref<!hal.descriptor_set>
 
-// Updates a single binding within a descriptor set.
-vm.import @descriptor_set.update(
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSetLayout
+//===----------------------------------------------------------------------===//
+
+// Creates a descriptor set layout that defines the bindings used within a set.
+vm.import @descriptor_set_layout.create(
   %device : !iree.ref<!hal.device>,
-  %set : !iree.ref<!hal.descriptor_set>,
-  // TODO(benvanik): tuples so that we can batch these updates.
-  %binding : i32,
-  %buffer : !iree.ref<!hal.buffer>,
-  %offset : i32,
-  %length : i32,
-  %access : i32
-)
+  // <binding, type, access>
+  %bindings : tuple<i32, i32, i32>...
+) -> !iree.ref<!hal.descriptor_set_layout>
+attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Device
@@ -303,6 +323,19 @@ vm.import @descriptor_set.update(
 vm.import @device.allocator(
   %device : !iree.ref<!hal.device>
 ) -> !iree.ref<!hal.allocator>
+attributes {nosideeffects}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::ExecutableLayout
+//===----------------------------------------------------------------------===//
+
+// Creates an executable layout from the given descriptor sets and push constant
+// required size.
+vm.import @executable_layout.create(
+  %device : !iree.ref<!hal.device>,
+  %set_layouts : !iree.ref<!hal.descriptor_set_layout>...,
+  %push_constants : i32
+) -> !iree.ref<!hal.executable_layout>
 attributes {nosideeffects}
 
 }  // module

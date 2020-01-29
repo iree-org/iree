@@ -864,9 +864,8 @@ static void printDispatchOp(OpAsmPrinter &p, DispatchOp op) {
 }
 
 FunctionType DispatchOp::getEntryPointType() {
-  SmallVector<Type, 4> resultTypes(getResultTypes());
   SmallVector<Type, 8> argTypes(operand_type_range{operands()});
-  return FunctionType::get(argTypes, resultTypes, getContext());
+  return FunctionType::get(argTypes, getResultTypes(), getContext());
 }
 
 //===----------------------------------------------------------------------===//

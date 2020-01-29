@@ -175,8 +175,6 @@ def FLOW_PaddingModeAttr :
       FLOW_PM_ClampWindowToFit,
       FLOW_PM_PadBorder,
     ]> {
-  let returnType = "::mlir::iree_compiler::IREE::Flow::PaddingMode";
-  let convertFromStorage = "static_cast<::mlir::iree_compiler::IREE::Flow::PaddingMode>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE::Flow";
 }
 

@@ -42,11 +42,13 @@ static void makeLegacyExecutableDispatchABI(
   // Reset function type to memrefs with output args.
   SmallVector<Type, 4> inputTypes;
   for (const auto &oldType : funcOp.getType().getInputs()) {
-    inputTypes.push_back(convertTypeToMemRef(legalizeType(oldType)));
+    inputTypes.push_back(
+        convertLegacyTypeToMemRef(legalizeLegacyType(oldType)));
   }
   SmallVector<Type, 4> outputTypes;
   for (const auto &oldType : funcOp.getType().getResults()) {
-    outputTypes.push_back(convertTypeToMemRef(legalizeType(oldType)));
+    outputTypes.push_back(
+        convertLegacyTypeToMemRef(legalizeLegacyType(oldType)));
   }
   inputTypes.append(outputTypes.begin(), outputTypes.end());
   auto funcType = FunctionType::get(inputTypes, {}, moduleOp.getContext());
@@ -59,7 +61,7 @@ static void makeLegacyExecutableDispatchABI(
   entryBuilder.setInsertionPointToStart(&entryBlock);
   for (auto arg : entryBlock.getArguments()) {
     Type oldType = arg.getType();
-    arg.setType(convertTypeToMemRef(legalizeType(oldType)));
+    arg.setType(convertLegacyTypeToMemRef(legalizeLegacyType(oldType)));
     auto loadInputOp = entryBuilder.create<IREE::LoadInputOp>(
         dispatchEntryOp.getLoc(), oldType, arg);
     arg.replaceAllUsesWith(loadInputOp.getResult());
@@ -100,10 +102,12 @@ static void makeLegacyExecutableReductionABI(
   // Reset function type to memrefs with output args.
   SmallVector<Type, 4> inputTypes;
   for (const auto &oldType : funcOp.getType().getInputs()) {
-    inputTypes.push_back(convertTypeToMemRef(legalizeType(oldType)));
+    inputTypes.push_back(
+        convertLegacyTypeToMemRef(legalizeLegacyType(oldType)));
   }
   for (const auto &oldType : funcOp.getType().getResults()) {
-    inputTypes.push_back(convertTypeToMemRef(legalizeType(oldType)));
+    inputTypes.push_back(
+        convertLegacyTypeToMemRef(legalizeLegacyType(oldType)));
   }
   auto funcType = FunctionType::get(inputTypes, {}, moduleOp.getContext());
   funcOp.setType(funcType);

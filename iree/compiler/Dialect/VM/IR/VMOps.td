@@ -131,12 +131,9 @@ def VM_FuncOp : VM_Op<"func", [
     /// getNumArguments hook not failing.
     LogicalResult verifyType();
 
-    Region *getCallableRegion(CallInterfaceCallable) { return &body(); }
-    void getCallableRegions(SmallVectorImpl<Region *> &callables) {
-      if (!isExternal()) callables.push_back(&body());
-    }
-    ArrayRef<Type> getCallableResults(Region *region) {
-      assert(!isExternal() && region == &getBody() && "invalid callable");
+    Region *getCallableRegion() { return &body(); }
+    ArrayRef<Type> getCallableResults() {
+      assert(!isExternal() && "invalid callable");
       return getType().getResults();
     }
   }];
@@ -228,9 +225,8 @@ def VM_ImportOp : VM_Op<"import", [
     /// getNumArguments hook not failing.
     LogicalResult verifyType();
 
-    Region *getCallableRegion(CallInterfaceCallable) { return nullptr; }
-    void getCallableRegions(SmallVectorImpl<Region *> &callables) {}
-    ArrayRef<Type> getCallableResults(Region *region) {
+    Region *getCallableRegion() { return nullptr; }
+    ArrayRef<Type> getCallableResults() {
       return getType().getResults();
     }
   }];

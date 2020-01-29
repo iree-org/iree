@@ -15,6 +15,9 @@
 #ifndef IREE_HAL_RESOURCE_H_
 #define IREE_HAL_RESOURCE_H_
 
+#include <ostream>
+#include <string>
+
 #include "iree/base/ref_ptr.h"
 
 namespace iree {
@@ -25,9 +28,24 @@ namespace hal {
 class Resource : public RefObject<Resource> {
  public:
   virtual ~Resource() = default;
+
+  // Returns a longer debug string describing the resource and its attributes.
+  virtual std::string DebugString() const { return DebugStringShort(); }
+  // Returns a short debug string describing the resource.
+  virtual std::string DebugStringShort() const {
+    // TODO(benvanik): remove this when all resource types have custom logic.
+    return std::string("resource_") + std::to_string(static_cast<uint64_t>(
+                                          reinterpret_cast<uintptr_t>(this)));
+  }
 };
 
 }  // namespace hal
 }  // namespace iree
+
+inline std::ostream& operator<<(std::ostream& stream,
+                                const iree::hal::Resource& resource) {
+  stream << resource.DebugStringShort();
+  return stream;
+}
 
 #endif  // IREE_HAL_RESOURCE_H_

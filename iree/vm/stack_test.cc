@@ -49,7 +49,7 @@ static iree_status_t SentinelStateResolver(
 TEST(VMStackTest, Usage) {
   auto stack = std::make_unique<iree_vm_stack_t>();
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_init(state_resolver, stack.get()));
 
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack.get()));
@@ -57,8 +57,8 @@ TEST(VMStackTest, Usage) {
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 0};
   iree_vm_stack_frame_t* frame_a = nullptr;
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
+  IREE_EXPECT_OK(
+      iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
   EXPECT_EQ(0, frame_a->function.ordinal);
   EXPECT_EQ(frame_a, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack.get()));
@@ -66,39 +66,39 @@ TEST(VMStackTest, Usage) {
   iree_vm_function_t function_b = {MODULE_B_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 1};
   iree_vm_stack_frame_t* frame_b = nullptr;
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_stack_function_enter(stack.get(), function_b, &frame_b));
+  IREE_EXPECT_OK(
+      iree_vm_stack_function_enter(stack.get(), function_b, &frame_b));
   EXPECT_EQ(1, frame_b->function.ordinal);
   EXPECT_EQ(frame_b, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(frame_a, iree_vm_stack_parent_frame(stack.get()));
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_function_leave(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack.get()));
   EXPECT_EQ(frame_a, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack.get()));
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_function_leave(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack.get()));
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_deinit(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_deinit(stack.get()));
 }
 
 // Tests stack cleanup with unpopped frames (like during failure teardown).
 TEST(VMStackTest, DeinitWithRemainingFrames) {
   auto stack = std::make_unique<iree_vm_stack_t>();
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_init(state_resolver, stack.get()));
 
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 0};
   iree_vm_stack_frame_t* frame_a = nullptr;
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
+  IREE_EXPECT_OK(
+      iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
   EXPECT_EQ(0, frame_a->function.ordinal);
   EXPECT_EQ(frame_a, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack.get()));
 
   // Don't pop the last frame before deinit; it should handle it.
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_deinit(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_deinit(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack.get()));
 }
 
@@ -106,7 +106,7 @@ TEST(VMStackTest, DeinitWithRemainingFrames) {
 TEST(VMStackTest, StackOverflow) {
   auto stack = std::make_unique<iree_vm_stack_t>();
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_init(state_resolver, stack.get()));
 
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack.get()));
@@ -116,8 +116,8 @@ TEST(VMStackTest, StackOverflow) {
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 0};
   for (int i = 0; i < IREE_MAX_STACK_DEPTH; ++i) {
     iree_vm_stack_frame_t* frame_a = nullptr;
-    EXPECT_EQ(IREE_STATUS_OK,
-              iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
+    IREE_EXPECT_OK(
+        iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
   }
 
   // Try to push on one more frame.
@@ -130,26 +130,26 @@ TEST(VMStackTest, StackOverflow) {
   // Should still be frame A.
   EXPECT_EQ(0, iree_vm_stack_current_frame(stack.get())->function.ordinal);
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_deinit(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_deinit(stack.get()));
 }
 
 // Tests unbalanced stack popping.
 TEST(VMStackTest, UnbalancedPop) {
   auto stack = std::make_unique<iree_vm_stack_t>();
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_init(state_resolver, stack.get()));
 
   EXPECT_EQ(IREE_STATUS_FAILED_PRECONDITION,
             iree_vm_stack_function_leave(stack.get()));
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_deinit(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_deinit(stack.get()));
 }
 
 // Tests module state reuse and querying.
 TEST(VMStackTest, ModuleStateQueries) {
   auto stack = std::make_unique<iree_vm_stack_t>();
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_init(state_resolver, stack.get()));
 
   EXPECT_EQ(nullptr, iree_vm_stack_current_frame(stack.get()));
   EXPECT_EQ(nullptr, iree_vm_stack_parent_frame(stack.get()));
@@ -161,8 +161,8 @@ TEST(VMStackTest, ModuleStateQueries) {
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 0};
   iree_vm_stack_frame_t* frame_a = nullptr;
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
+  IREE_EXPECT_OK(
+      iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
   EXPECT_EQ(MODULE_A_STATE_SENTINEL, frame_a->module_state);
   EXPECT_EQ(1, module_a_state_resolve_count);
 
@@ -170,22 +170,22 @@ TEST(VMStackTest, ModuleStateQueries) {
   iree_vm_function_t function_b = {MODULE_B_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 1};
   iree_vm_stack_frame_t* frame_b = nullptr;
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_stack_function_enter(stack.get(), function_b, &frame_b));
+  IREE_EXPECT_OK(
+      iree_vm_stack_function_enter(stack.get(), function_b, &frame_b));
   EXPECT_EQ(MODULE_B_STATE_SENTINEL, frame_b->module_state);
   EXPECT_EQ(1, module_b_state_resolve_count);
 
   // [A, B, B (reuse)]
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_stack_function_enter(stack.get(), function_b, &frame_b));
+  IREE_EXPECT_OK(
+      iree_vm_stack_function_enter(stack.get(), function_b, &frame_b));
   EXPECT_EQ(MODULE_B_STATE_SENTINEL, frame_b->module_state);
   EXPECT_EQ(1, module_b_state_resolve_count);
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_function_leave(stack.get()));
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_function_leave(stack.get()));
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_function_leave(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack.get()));
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_deinit(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_deinit(stack.get()));
 }
 
 // Tests that module state query failures propagate to callers correctly.
@@ -198,7 +198,7 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
         // NOTE: always failing.
         return IREE_STATUS_INTERNAL;
       }};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_init(state_resolver, stack.get()));
 
   // Push should fail if we can't query state, status should propagate.
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
@@ -207,7 +207,7 @@ TEST(VMStackTest, ModuleStateQueryFailure) {
   EXPECT_EQ(IREE_STATUS_INTERNAL,
             iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_deinit(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_deinit(stack.get()));
 }
 
 static int dummy_object_count = 0;
@@ -234,7 +234,7 @@ iree_vm_ref_type_t DummyObject::kTypeID = IREE_VM_REF_TYPE_NULL;
 TEST(VMStackTest, RefRegisterCleanup) {
   auto stack = std::make_unique<iree_vm_stack_t>();
   iree_vm_state_resolver_t state_resolver = {nullptr, SentinelStateResolver};
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_init(state_resolver, stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_init(state_resolver, stack.get()));
 
   dummy_object_count = 0;
   DummyObject::RegisterType();
@@ -242,20 +242,19 @@ TEST(VMStackTest, RefRegisterCleanup) {
   iree_vm_function_t function_a = {MODULE_A_SENTINEL,
                                    IREE_VM_FUNCTION_LINKAGE_INTERNAL, 0};
   iree_vm_stack_frame_t* frame_a = nullptr;
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
+  IREE_EXPECT_OK(
+      iree_vm_stack_function_enter(stack.get(), function_a, &frame_a));
   frame_a->registers.ref_register_count = 1;
   memset(&frame_a->registers.ref[0], 0, sizeof(iree_vm_ref_t));
-  EXPECT_EQ(IREE_STATUS_OK,
-            iree_vm_ref_wrap_assign(new DummyObject(), DummyObject::kTypeID,
-                                    &frame_a->registers.ref[0]));
+  IREE_EXPECT_OK(iree_vm_ref_wrap_assign(
+      new DummyObject(), DummyObject::kTypeID, &frame_a->registers.ref[0]));
   EXPECT_EQ(1, dummy_object_count);
 
   // This should release the ref for us. Heap checker will yell if it doesn't.
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_function_leave(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_function_leave(stack.get()));
   EXPECT_EQ(0, dummy_object_count);
 
-  EXPECT_EQ(IREE_STATUS_OK, iree_vm_stack_deinit(stack.get()));
+  IREE_EXPECT_OK(iree_vm_stack_deinit(stack.get()));
 }
 
 }  // namespace

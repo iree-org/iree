@@ -45,3 +45,11 @@ flatbuffer_cc_library(
     "spirv_executable_def.fbs"
   PUBLIC
 )
+
+flatbuffer_cc_library(
+  NAME
+    vmla_executable_def_cc_fbs
+  SRCS
+    "vmla_executable_def.fbs"
+  PUBLIC
+)

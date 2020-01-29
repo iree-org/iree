@@ -32,7 +32,6 @@ include(CMakeParseArguments)
 # INCLUDES: Include directories to add to dependencies
 # LINKOPTS: List of link options
 # ALWAYSLINK: Always link the library into any binary with a direct dep.
-#   TODO(scotttodd): Make transitive deps also respect ALWAYSLINK
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
 # Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC will be
 # in ${PACKAGE}/internal.

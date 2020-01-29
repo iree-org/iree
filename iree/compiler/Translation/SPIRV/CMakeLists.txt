@@ -12,50 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Kernels)
-
-iree_cc_library(
-  NAME
-    SPIRV
-  HDRS
-    "EmbeddedKernels.h"
-    "IndexComputation.h"
-    "IndexComputationAttribute.h"
-    "IREECodegenUtils.h"
-    "IREEIndexComputation.h"
-    "IREEToSPIRV.h"
-    "IREEToSPIRVPass.h"
-    "SPIRVLowering.h"
-    "TensorIndexToScalarValueMap.h"
-    "XLAIndexPropagation.h"
-    "XLAToSPIRV.h"
-  SRCS
-    "AdjustIntegerWidthPass.cpp"
-    "EmbeddedKernels.cpp"
-    "IndexComputation.cpp"
-    "IndexComputationAttribute.cpp"
-    "IndexComputationPass.cpp"
-    "IREEIndexComputation.cpp"
-    "IREEToSPIRV.cpp"
-    "IREEToSPIRVPass.cpp"
-    "PrepareReductionDispatch.cpp"
-    "ReductionFnLowering.cpp"
-    "SPIRVLowering.cpp"
-    "XLAIndexPropagation.cpp"
-    "XLAToSPIRV.cpp"
-  DEPS
-    flatbuffers
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::SPIRV::Kernels
-    iree::compiler::Utils
-    iree::schemas::spirv_executable_def_cc_fbs
-    tensorflow::mlir_xla
-    LLVMSupport
-    MLIRIR
-    MLIRSPIRV
-    MLIRSPIRVSerialization
-    MLIRTransforms
-    MLIRTranslation
-  ALWAYSLINK
-  PUBLIC
-)
+add_subdirectory(EmbeddedKernels)
+add_subdirectory(IndexComputation)
+add_subdirectory(Passes)
+add_subdirectory(ReductionCodegen)
+add_subdirectory(XLAToSPIRV)
+add_subdirectory(LinalgToSPIRV)

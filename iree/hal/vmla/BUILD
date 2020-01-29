@@ -1,0 +1,122 @@
+# Copyright 2020 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# A VMLA (VM-based Linear Algebra) runtime HAL backend.
+
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "vmla_cache",
+    srcs = ["vmla_cache.cc"],
+    hdrs = ["vmla_cache.h"],
+    deps = [
+        ":vmla_executable",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:allocator",
+        "//iree/hal:executable",
+        "//iree/hal:executable_cache",
+        "//iree/hal:executable_format",
+    ],
+)
+
+cc_library(
+    name = "vmla_command_processor",
+    srcs = ["vmla_command_processor.cc"],
+    hdrs = ["vmla_command_processor.h"],
+    deps = [
+        ":vmla_executable",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal/host:host_local_command_processor",
+    ],
+)
+
+cc_library(
+    name = "vmla_device",
+    srcs = ["vmla_device.cc"],
+    hdrs = ["vmla_device.h"],
+    deps = [
+        ":vmla_cache",
+        ":vmla_command_processor",
+        "//iree/base:memory",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:command_buffer_validation",
+        "//iree/hal:command_queue",
+        "//iree/hal:device",
+        "//iree/hal:fence",
+        "//iree/hal/host:async_command_queue",
+        "//iree/hal/host:host_event",
+        "//iree/hal/host:host_local_allocator",
+        "//iree/hal/host:host_submission_queue",
+        "//iree/hal/host:inproc_command_buffer",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "vmla_driver",
+    srcs = ["vmla_driver.cc"],
+    hdrs = ["vmla_driver.h"],
+    deps = [
+        ":vmla_device",
+        "//iree/hal:device_info",
+        "//iree/hal:driver",
+    ],
+)
+
+cc_library(
+    name = "vmla_driver_module",
+    srcs = ["vmla_driver_module.cc"],
+    deps = [
+        ":vmla_driver",
+        "//iree/base:init",
+        "//iree/base:status",
+        "//iree/hal:driver_registry",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "vmla_executable",
+    srcs = ["vmla_executable.cc"],
+    hdrs = ["vmla_executable.h"],
+    deps = [
+        "//iree/base:status",
+        "//iree/hal:allocator",
+        "//iree/hal:executable",
+        "//iree/hal:executable_spec",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
+    name = "vmla_module",
+    srcs = ["vmla_module.cc"],
+    hdrs = ["vmla_module.h"],
+    deps = [
+        "//iree/base:api",
+        "//iree/base:tracing",
+        "//iree/vm",
+        "//iree/vm:module_abi_cc",
+        "@com_google_absl//absl/types:span",
+    ],
+)

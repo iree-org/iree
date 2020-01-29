@@ -57,9 +57,10 @@ HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
   addInterfaces<HALToVMConversionInterface>();
 
-  addTypes<AllocatorType, BufferType, CommandBufferType, DescriptorSetType,
-           DescriptorSetLayoutType, DeviceType, EventType, ExecutableType,
-           ExecutableCacheType, FenceType, RingBufferType, SemaphoreType>();
+  addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
+           DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
+           ExecutableType, ExecutableCacheType, ExecutableLayoutType, FenceType,
+           RingBufferType, SemaphoreType>();
 
 #define GET_OP_LIST
   addOperations<
@@ -78,6 +79,7 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
       llvm::StringSwitch<Type>(typeName)
           .Case("allocator", AllocatorType::get(getContext()))
           .Case("buffer", BufferType::get(getContext()))
+          .Case("buffer_view", BufferViewType::get(getContext()))
           .Case("command_buffer", CommandBufferType::get(getContext()))
           .Case("descriptor_set", DescriptorSetType::get(getContext()))
           .Case("descriptor_set_layout",
@@ -86,6 +88,7 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Case("event", EventType::get(getContext()))
           .Case("executable", ExecutableType::get(getContext()))
           .Case("executable_cache", ExecutableCacheType::get(getContext()))
+          .Case("executable_layout", ExecutableLayoutType::get(getContext()))
           .Case("fence", FenceType::get(getContext()))
           .Case("ring_buffer", RingBufferType::get(getContext()))
           .Case("semaphore", SemaphoreType::get(getContext()))
@@ -102,6 +105,8 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "allocator";
   } else if (type.isa<BufferType>()) {
     p << "buffer";
+  } else if (type.isa<BufferViewType>()) {
+    p << "buffer_view";
   } else if (type.isa<CommandBufferType>()) {
     p << "command_buffer";
   } else if (type.isa<DescriptorSetType>()) {
@@ -116,6 +121,8 @@ void HALDialect::printType(Type type, DialectAsmPrinter &p) const {
     p << "executable";
   } else if (type.isa<ExecutableCacheType>()) {
     p << "executable_cache";
+  } else if (type.isa<ExecutableLayoutType>()) {
+    p << "executable_layout";
   } else if (type.isa<FenceType>()) {
     p << "fence";
   } else if (type.isa<RingBufferType>()) {

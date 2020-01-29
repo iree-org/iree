@@ -56,6 +56,7 @@ LogicalResult analyzeOpRangeValues(
         if (!llvm::is_contained(opSet, use.getOwner())) {
           // An op outside of the ops set is using the value, needs to escape.
           escapingValues->insert(value);
+          continue;
         }
       }
     }
@@ -65,14 +66,14 @@ LogicalResult analyzeOpRangeValues(
 
 }  // namespace
 
-LogicalResult buildDispatchRegion(FuncOp func, Block *parentBlock,
-                                  Value workload, ArrayRef<Operation *> ops) {
+LogicalResult buildDispatchRegion(Block *parentBlock, Value workload,
+                                  ArrayRef<Operation *> ops) {
   // Fused location with all ops.
   SmallVector<Location, 16> opLocs;
   for (auto *op : ops) {
     opLocs.push_back(op->getLoc());
   }
-  auto regionLoc = FusedLoc::get(opLocs, func.getContext());
+  auto regionLoc = FusedLoc::get(opLocs, workload.getContext());
 
   // Get a list of values that we need to capture and values that escape the
   // region and need to be returned.

@@ -71,8 +71,8 @@ StatusOr<int> ParseBufferTypeElementSize(absl::string_view type_str);
 // Returns the canonical representation of a type based on its size in bytes and
 // the specified printing mode. For example, with a size of 4 and a printing
 // mode of kFloatingPoint it returns "f32".
-std::string MakeBufferTypeString(int element_size,
-                                 BufferDataPrintMode print_mode);
+StatusOr<std::string> MakeBufferTypeString(int element_size,
+                                           BufferDataPrintMode print_mode);
 
 // Returns a Shape parsed from the given NxMx... string.
 StatusOr<Shape> ParseShape(absl::string_view shape_str);

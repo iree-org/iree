@@ -25,20 +25,21 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_custom_message iree_custom_message_t;
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_custom_message, iree_custom_message_t);
 
 // Creates a new !custom.message object with a copy of the given |value|.
 iree_status_t iree_custom_message_create(iree_string_view_t value,
                                          iree_allocator_t allocator,
-                                         iree_vm_ref_t* out_message_ref);
+                                         iree_custom_message_t** out_message);
 
 // Wraps an externally-owned |value| in a !custom.message object.
 iree_status_t iree_custom_message_wrap(iree_string_view_t value,
                                        iree_allocator_t allocator,
-                                       iree_vm_ref_t* out_message_ref);
+                                       iree_custom_message_t** out_message);
 
 // Copies the value of the !custom.message to the given output buffer and adds
 // a \0 terminator.
-iree_status_t iree_custom_message_read_value(iree_vm_ref_t* message_ref,
+iree_status_t iree_custom_message_read_value(iree_custom_message_t* message,
                                              char* buffer,
                                              size_t buffer_capacity);
 

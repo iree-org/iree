@@ -27,6 +27,7 @@ namespace IREE {
 namespace VM {
 
 void buildVMTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createConversionPass());
   passManager.addPass(createGlobalInitializationPass());
   passManager.addPass(createCSEPass());

@@ -22,11 +22,36 @@
 #error "Your compiler does not ensure lock-free atomic ops"
 #endif  // ATOMIC_POINTER_LOCK_FREE
 
+#define IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor) \
+  ((volatile atomic_intptr_t*)(((uintptr_t)ptr) +      \
+                               type_descriptor->offsetof_counter))
+
 #define IREE_GET_REF_COUNTER_PTR(ref) \
   ((volatile atomic_intptr_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter))
 
 // TODO(benvanik): dynamic, if we care - otherwise keep small.
 #define IREE_VM_MAX_TYPE_ID 64
+
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_retain(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
+  if (!ptr) return;
+  volatile atomic_intptr_t* counter =
+      IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor);
+  atomic_fetch_add(counter, 1);
+}
+
+IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
+    void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
+  if (!ptr) return;
+  volatile atomic_intptr_t* counter =
+      IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor);
+  if (atomic_fetch_sub(counter, 1) == 1) {
+    if (type_descriptor->destroy) {
+      // NOTE: this makes us not re-entrant, but I think that's OK.
+      type_descriptor->destroy(ptr);
+    }
+  }
+}
 
 // A table of type descriptors registered at startup.
 // These provide quick dereferencing of destruction functions and type names for
@@ -59,6 +84,14 @@ iree_vm_ref_register_type(iree_vm_ref_type_descriptor_t* descriptor) {
   // Too many user-defined types registered; need to increase
   // IREE_VM_MAX_TYPE_ID.
   return IREE_STATUS_RESOURCE_EXHAUSTED;
+}
+
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_vm_ref_type_name(iree_vm_ref_type_t type) {
+  if (type == 0 || type >= IREE_VM_MAX_TYPE_ID) {
+    return iree_make_cstring_view("");
+  }
+  return iree_vm_ref_type_descriptors[type]->type_name;
 }
 
 IREE_API_EXPORT const iree_vm_ref_type_descriptor_t* IREE_API_CALL
@@ -98,7 +131,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_assign(
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
     void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
-  IREE_API_RETURN_IF_API_ERROR(iree_vm_ref_wrap_assign(ptr, type, out_ref));
+  IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(ptr, type, out_ref));
   if (out_ref->ptr) {
     volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
     atomic_fetch_add(counter, 1);

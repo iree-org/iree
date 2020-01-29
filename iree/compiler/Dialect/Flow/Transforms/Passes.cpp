@@ -26,6 +26,8 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  passManager.addPass(createCanonicalizerPass());
+
   // Flatten structured control flow to our CFG.
   passManager.addNestedPass<FuncOp>(xla_hlo::createLegalizeControlFlowPass());
 

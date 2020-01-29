@@ -19,11 +19,13 @@ set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
-cmake --version
+CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
+
+"$CMAKE_BIN" --version
+ninja --version
 
 cd ${ROOT_DIR?}
 rm -rf build/
 mkdir build && cd build
-cmake -DIREE_BUILD_COMPILER=ON -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
-cmake --build .
-rm -rf build/
+"$CMAKE_BIN" -G Ninja -DCMAKE_BUILD_TYPE=FastBuild -DIREE_BUILD_COMPILER=ON -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
+"$CMAKE_BIN" --build .

@@ -36,6 +36,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+#include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -62,6 +63,8 @@ UNARY_OP_LOWERING(LogOp, IREEInterp::HL::LogFOp);
 UNARY_OP_LOWERING(FloorOp, IREEInterp::HL::FloorFOp);
 UNARY_OP_LOWERING(RsqrtOp, IREEInterp::HL::RsqrtFOp);
 UNARY_OP_LOWERING(SqrtOp, IREEInterp::HL::SqrtFOp);
+UNARY_OP_LOWERING(CosOp, IREEInterp::HL::CosFOp);
+UNARY_OP_LOWERING(SinOp, IREEInterp::HL::SinFOp);
 UNARY_OP_LOWERING(TanhOp, IREEInterp::HL::TanhFOp);
 TERNARY_OP_LOWERING(SelectOp, IREEInterp::HL::SelectOp);
 
@@ -119,7 +122,7 @@ struct BroadcastInDimOpLowering
       ConversionPatternRewriter &rewriter) const override {
     auto inputValue = operands[0];
     auto inputType = inputValue.getType().cast<MemRefType>();
-    auto finalType = convertTypeToMemRef(*op);
+    auto finalType = convertLegacyTypeToMemRef(*op);
 
     // Reshape to scalar and broadcast.
     auto createFinal = createShapeTargetingOp<IREEInterp::HL::BroadcastOp>;
@@ -153,7 +156,7 @@ struct ConcatOpLowering : public XlaOpLowering<xla_hlo::ConcatenateOp> {
   Operation *rewriteInternal(
       xla_hlo::ConcatenateOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto finalType = convertTypeToMemRef(*op);
+    auto finalType = convertLegacyTypeToMemRef(*op);
 
     return rewriter.create<IREEInterp::HL::ConcatOp>(
         op->getLoc(), finalType, operands,
@@ -170,7 +173,7 @@ struct DotOpLowering : public XlaOpLowering<xla_hlo::DotOp> {
     auto lhsValue = operands[0];
     auto rhsValue = operands[1];
 
-    auto finalType = convertTypeToMemRef(*op);
+    auto finalType = convertLegacyTypeToMemRef(*op);
     auto elementType = finalType.getElementType();
     if (!elementType.isa<FloatType>()) {
       op->emitOpError("xla_hlo.dot only supports floating point values");
@@ -306,7 +309,7 @@ struct ConvertLowering : public XlaOpLowering<xla_hlo::ConvertOp> {
     auto operandType = operand.getType().cast<MemRefType>().getElementType();
     auto resultType = result.getType().cast<ShapedType>().getElementType();
 
-    auto newResultType = convertTypeToMemRef(result);
+    auto newResultType = convertLegacyTypeToMemRef(result);
 
 #define ConvertCase(InType, OutType, NewOp)                                \
   {                                                                        \
@@ -446,7 +449,7 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
         gatherOp.getLoc(), src, startIndices, dst, dstIndices, lengths);
 
     auto reshaped = createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
-        rewriter, gatherOp.getLoc(), dst, convertTypeToMemRef(gatherOp));
+        rewriter, gatherOp.getLoc(), dst, convertLegacyTypeToMemRef(gatherOp));
     rewriter.replaceOp(
         gatherOp, wrapAsTensor(reshaped->getResult(0), gatherOp, rewriter));
 
@@ -469,7 +472,7 @@ struct SliceOpLowering : public XlaOpLowering<xla_hlo::SliceOp> {
       return nullptr;
     }
 
-    auto finalType = convertTypeToMemRef(*op);
+    auto finalType = convertLegacyTypeToMemRef(*op);
     auto src = operands[0];
     std::vector<Value> dim_pieces;
     auto dst = rewriter.create<IREEInterp::HL::AllocHeapOp>(
@@ -515,7 +518,7 @@ struct PadOpLowering : public XlaOpLowering<xla_hlo::PadOp> {
         op->getLoc(), op->interior_padding());
 
     return rewriter.create<IREEInterp::HL::PadOp>(
-        op->getLoc(), convertTypeToMemRef(*op), src, paddingValue,
+        op->getLoc(), convertLegacyTypeToMemRef(*op), src, paddingValue,
         edgePaddingLowOp, edgePaddingHighOp, interiorPaddingOp);
   }
 };
@@ -527,7 +530,7 @@ struct ReshapeOpLowering : public XlaOpLowering<xla_hlo::ReshapeOp> {
       xla_hlo::ReshapeOp *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     return createShapeTargetingOp<IREEInterp::HL::ReshapeOp>(
-        rewriter, op->getLoc(), operands[0], convertTypeToMemRef(*op));
+        rewriter, op->getLoc(), operands[0], convertLegacyTypeToMemRef(*op));
   }
 };
 
@@ -541,7 +544,8 @@ struct TransposeOpLowering : public XlaOpLowering<xla_hlo::TransposeOp> {
         op->getLoc(), op->permutation());
 
     return rewriter.create<IREEInterp::HL::TransposeOp>(
-        op->getLoc(), convertTypeToMemRef(*op), operands[0], permutationOp);
+        op->getLoc(), convertLegacyTypeToMemRef(*op), operands[0],
+        permutationOp);
   }
 };
 
@@ -555,7 +559,7 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
         rewriter.create<IREEInterp::ConstantOp>(op->getLoc(), op->dimensions());
 
     return rewriter.create<IREEInterp::HL::ReverseOp>(
-        op->getLoc(), convertTypeToMemRef(*op), operands[0], reverseOp);
+        op->getLoc(), convertLegacyTypeToMemRef(*op), operands[0], reverseOp);
   }
 };
 
@@ -563,13 +567,15 @@ struct ReverseOpLowering : public XlaOpLowering<xla_hlo::ReverseOp> {
 
 void populateLowerXlaToInterpreterPatterns(OwningRewritePatternList &patterns,
                                            MLIRContext *ctx) {
-  patterns.insert<AbsOpLowering, BroadcastInDimOpLowering, ConcatOpLowering,
-                  ConvertLowering, CopyOpLowering, DotOpLowering,
-                  DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
-                  GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
-                  PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
-                  RsqrtOpLowering, SqrtOpLowering, SelectOpLowering,
-                  SliceOpLowering, TransposeOpLowering, TanhOpLowering>(ctx);
+  xla_hlo::PopulateUnfuseBatchNormPatterns(ctx, &patterns);
+  patterns
+      .insert<AbsOpLowering, BroadcastInDimOpLowering, ConcatOpLowering,
+              ConvertLowering, CopyOpLowering, CosOpLowering, DotOpLowering,
+              DynamicUpdateSliceOpLowering, ExpOpLowering, FloorOpLowering,
+              GatherOpLowering, LogOpLowering, MaxOpLowering, MinOpLowering,
+              PadOpLowering, ReshapeOpLowering, ReverseOpLowering,
+              RsqrtOpLowering, SinOpLowering, SqrtOpLowering, SelectOpLowering,
+              SliceOpLowering, TransposeOpLowering, TanhOpLowering>(ctx);
 }
 
 namespace {
@@ -585,6 +591,10 @@ class LowerXLAToInterpreterDialectPass
     ConversionTarget target(getContext());
     target.addLegalDialect<IREEHLInterpreterDialect, IREEInterpreterDialect,
                            IREEDialect>();
+
+    // Unfuse batch norm into primitive ops.
+    target.addIllegalOp<xla_hlo::BatchNormInferenceOp>();
+
     if (failed(applyPartialConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }

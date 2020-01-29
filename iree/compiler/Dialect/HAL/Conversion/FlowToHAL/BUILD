@@ -31,10 +31,12 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/HAL/Conversion",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
         "//iree/compiler/Dialect/HAL/Utils",
+        "//iree/compiler/Dialect/IREE/Conversion:PreserveCompilerHints",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:support",

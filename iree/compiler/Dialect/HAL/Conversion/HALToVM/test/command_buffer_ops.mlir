@@ -64,12 +64,12 @@ func @command_buffer_copy_buffer(%arg0 : !iree.ref<!hal.command_buffer>) {
 
 // CHECK-LABEL: @command_buffer_bind_descriptor_set
 func @command_buffer_bind_descriptor_set(%arg0 : !iree.ref<!hal.command_buffer>) {
-  %0 = "test_hal.executable"() : () -> !iree.ref<!hal.executable>
+  %0 = "test_hal.executable_layout"() : () -> !iree.ref<!hal.executable_layout>
   %1 = "test_hal.descriptor_set"() : () -> !iree.ref<!hal.descriptor_set>
   %2 = "test_hal.offset"() : () -> i32
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %0, %zero, %1, []) : (!iree.ref<!hal.command_buffer>, !iree.ref<!hal.executable>, i32, !iree.ref<!hal.descriptor_set>, i32...)
+  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %0, %zero, %1, []) : (!iree.ref<!hal.command_buffer>, !iree.ref<!hal.executable_layout>, i32, !iree.ref<!hal.descriptor_set>, i32...)
   hal.command_buffer.bind_descriptor_set %arg0, %0, set=0, %1
-  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %0, %zero_0, %1, [%2]) : (!iree.ref<!hal.command_buffer>, !iree.ref<!hal.executable>, i32, !iree.ref<!hal.descriptor_set>, i32...)
+  // CHECK: vm.call.variadic @hal.command_buffer.bind_descriptor_set(%arg0, %0, %zero_0, %1, [%2]) : (!iree.ref<!hal.command_buffer>, !iree.ref<!hal.executable_layout>, i32, !iree.ref<!hal.descriptor_set>, i32...)
   hal.command_buffer.bind_descriptor_set %arg0, %0, set=0, %1, offsets=[%2]
   return
 }

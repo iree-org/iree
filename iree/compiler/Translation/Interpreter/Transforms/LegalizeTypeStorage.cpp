@@ -59,7 +59,7 @@ bool convertOperation(Operation *oldOp, OpBuilder &builder,
     }
   }
   for (const auto &oldType : oldOp->getResultTypes()) {
-    state.types.push_back(legalizeType(oldType));
+    state.types.push_back(legalizeLegacyType(oldType));
   }
   state.attributes = {oldOp->getAttrs().begin(), oldOp->getAttrs().end()};
   auto newOp = builder.createOperation(state);
@@ -81,7 +81,7 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
     auto *newBlock = builder.createBlock(&newFunction.getBody());
     mapping.map(&oldBlock, newBlock);
     for (auto oldArg : oldBlock.getArguments()) {
-      auto newArg = newBlock->addArgument(legalizeType(oldArg.getType()));
+      auto newArg = newBlock->addArgument(legalizeLegacyType(oldArg.getType()));
       mapping.map(oldArg, newArg);
     }
   }
@@ -115,7 +115,7 @@ class LegalizeTypeStoragePass : public ModulePass<LegalizeTypeStoragePass> {
       // Create the replacement function, ensuring that we copy attributes.
       auto newFunction = FuncOp::create(
           oldFunction.getLoc(), oldFunction.getName(),
-          legalizeType(oldFunction.getType()).cast<FunctionType>(),
+          legalizeLegacyType(oldFunction.getType()).cast<FunctionType>(),
           oldFunction.getDialectAttrs());
       convertedFunctions.push_back({oldFunction, newFunction});
 

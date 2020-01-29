@@ -43,3 +43,11 @@ python3 -m pip install jupyter
 python3 -m pip install jupyter_http_over_ws
 jupyter serverextension enable --py jupyter_http_over_ws
 ```
+
+## Local and Hosted Runtimes
+
+IREE's Python bindings are not yet published in an accessible way, so they must
+be bundled within the runtime binary itself. Due to this, you must use a local
+runtime started as described above in order to execute IREE's Colab notebooks.
+Hosted/remote runtimes are not yet supported, though we have plans to improve
+this process as the project matures.

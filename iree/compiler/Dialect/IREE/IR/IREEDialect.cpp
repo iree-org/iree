@@ -16,9 +16,11 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
 
@@ -36,10 +38,6 @@ IREEDialect::IREEDialect(MLIRContext* context)
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
       >();
 }
-
-//===----------------------------------------------------------------------===//
-// Type parsing and printing
-//===----------------------------------------------------------------------===//
 
 Type IREEDialect::parseType(DialectAsmParser& parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());

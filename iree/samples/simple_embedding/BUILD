@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:build_defs.bzl", "PLATFORM_VULKAN_TEST_DEPS")
+load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS")
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 
 package(

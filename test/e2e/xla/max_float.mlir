@@ -1,9 +1,10 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @tensor
 func @tensor() -> tensor<4xf32> {
-  %lhs = constant dense<[1.0, 2.0, 7.0, 4.0]> : tensor<4xf32>
-  %rhs = constant dense<[5.0, 2.0, 3.0, 4.0]> : tensor<4xf32>
+  %lhs = iree.unfoldable_constant dense<[1.0, 2.0, 7.0, 4.0]> : tensor<4xf32>
+  %rhs = iree.unfoldable_constant dense<[5.0, 2.0, 3.0, 4.0]> : tensor<4xf32>
   %result = "xla_hlo.min"(%lhs, %rhs) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
   return %result : tensor<4xf32>
 }
@@ -13,8 +14,8 @@ func @tensor() -> tensor<4xf32> {
 
 // CHECK-LABEL: EXEC @scalar
 func @scalar() -> tensor<f32> {
-  %lhs = constant dense<1.0> : tensor<f32>
-  %rhs = constant dense<2.0> : tensor<f32>
+  %lhs = iree.unfoldable_constant dense<1.0> : tensor<f32>
+  %rhs = iree.unfoldable_constant dense<2.0> : tensor<f32>
   %result = "xla_hlo.min"(%lhs, %rhs) : (tensor<f32>, tensor<f32>) -> tensor<f32>
   return %result : tensor<f32>
 }
@@ -24,8 +25,8 @@ func @scalar() -> tensor<f32> {
 
 // CHECK-LABEL: EXEC @double
 func @double() -> tensor<f64> {
-  %lhs = constant dense<1.0> : tensor<f64>
-  %rhs = constant dense<2.0> : tensor<f64>
+  %lhs = iree.unfoldable_constant dense<1.0> : tensor<f64>
+  %rhs = iree.unfoldable_constant dense<2.0> : tensor<f64>
   %result = "xla_hlo.min"(%lhs, %rhs) : (tensor<f64>, tensor<f64>) -> tensor<f64>
   return %result : tensor<f64>
 }
@@ -35,8 +36,8 @@ func @double() -> tensor<f64> {
 
 // CHECK-LABEL: EXEC @negative
 func @negative() -> tensor<f32> {
-  %lhs = constant dense<1.0> : tensor<f32>
-  %rhs = constant dense<-2.0> : tensor<f32>
+  %lhs = iree.unfoldable_constant dense<1.0> : tensor<f32>
+  %rhs = iree.unfoldable_constant dense<-2.0> : tensor<f32>
   %result = "xla_hlo.min"(%lhs, %rhs) : (tensor<f32>, tensor<f32>) -> tensor<f32>
   return %result : tensor<f32>
 }

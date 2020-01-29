@@ -13,25 +13,21 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK-DAG: [[C4:%.+]] = constant 4
   // CHECK-DAG: [[C128:%.+]] = constant 128
   %cst = constant dense<[128, 1, 1]> : vector<3xi32>
-  // CHECK: [[RET_BUF:%.+]] = hal.allocator.allocate.shaped {{.+}}, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch", shape=[
-  // CHECK-SAME:   [[C128]]
-  // CHECK-SAME: ], element_size=4 : !iree.ref<!hal.buffer>
+  // CHECK: [[RET_BUF:%.+]] = hal.allocator.allocate {{.+}}, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch"
   // CHECK-NEXT: hal.ex.defer_release [[RET_BUF]]
-  // CHECK-NEXT: [[TMP_BUF:%.+]] = hal.allocator.allocate.shaped {{.+}}, "DeviceVisible|DeviceLocal", "Transfer|Dispatch", shape=[
-  // CHECK-SAME:   [[C128]]
-  // CHECK-SAME: ], element_size=4 : !iree.ref<!hal.buffer>
+  // CHECK: [[TMP_BUF:%.+]] = hal.allocator.allocate {{.+}}, "DeviceVisible|DeviceLocal", "Transfer|Dispatch"
   // CHECK-NEXT: hal.ex.defer_release [[TMP_BUF]]
-  // CHECK-NEXT: [[CMD:%.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
+  // CHECK: [[CMD:%.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
     // CHECK: [[EXE:%.+]] = hal.ex.cache_executable {{.+}}, @ex0 : !iree.ref<!hal.executable>
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 0, %arg0, shape=[
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_size=4
+    // CHECK-SAME: ], element_type=50331680
     // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[TMP_BUF]], shape=[
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_size=4
+    // CHECK-SAME: ], element_type=50331680
     // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], [[EXE]], entry_point=0, workgroup_xyz=[
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
@@ -40,11 +36,11 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
     %1 = flow.dispatch @ex0::@entry0[%arg1 : vector<3xi32>](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
     // CHECK: hal.ex.push_binding [[CMD]], 0, [[TMP_BUF]], shape=[
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_size=4
+    // CHECK-SAME: ], element_type=50331680
     // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[RET_BUF]], shape=[
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_size=4
+    // CHECK-SAME: ], element_type=50331680
     // CHECK-NEXT: hal.ex.defer_release
     // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], {{.+}}, entry_point=0, workgroup_xyz=[
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
@@ -67,12 +63,12 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
   // CHECK: [[C0:%.+]] = constant 0
   %c4 = constant 4 : i32
   %c1 = constant 1 : i32
-  // CHECK: [[RET_BUF:%.+]] = hal.allocator.allocate.shaped
+  // CHECK: [[RET_BUF:%.+]] = hal.allocator.allocate
   // CHECK: [[CMD:%.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
   %0 = flow.ex.stream.fragment(%arg2 = %arg0 : tensor<1x1x10xf32>, %arg3 = %arg1 : tensor<5x1x10xf32>, %arg4 = %c4 : i32, %arg5 = %c1 : i32) -> tensor<5x1x10xf32> {
-    // CHECK-NEXT: [[UOFF:%.+]], [[ULEN:%.+]] = hal.buffer_view.compute_range [[TBUF]]
-    // CHECK-NEXT: [[TLEN:%.+]] = hal.buffer_view.compute_length [[TBUF]]
+    // CHECK: [[UOFF:%.+]], [[ULEN:%.+]] = hal.allocator.compute_range {{%.+}}
+    // CHECK: [[TLEN:%.+]] = hal.allocator.compute_size {{%.+}}
     // CHECK-NEXT: hal.command_buffer.copy_buffer [[CMD]], [[TBUF]], [[C0]], [[RET_BUF]], [[C0]], [[TLEN]]
     // CHECK: hal.command_buffer.execution_barrier
     // CHECK-NEXT: hal.command_buffer.copy_buffer [[CMD]], [[UBUF]], [[C0]], [[RET_BUF]], [[UOFF]], [[ULEN]]

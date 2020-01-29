@@ -60,7 +60,7 @@ FunctionType getMemRefFunctionType(FunctionType type) {
   Builder builder(type.getContext());
   llvm::SmallVector<Type, 8> replacementInputs;
   for (auto type : type.getInputs()) {
-    auto memRefType = convertTypeToMemRef(type);
+    auto memRefType = convertLegacyTypeToMemRef(type);
     if (!memRefType) {
       return nullptr;
     }
@@ -68,7 +68,7 @@ FunctionType getMemRefFunctionType(FunctionType type) {
   }
   llvm::SmallVector<Type, 8> replacementResults;
   for (auto type : type.getResults()) {
-    auto memRefType = convertTypeToMemRef(type);
+    auto memRefType = convertLegacyTypeToMemRef(type);
     if (!memRefType) {
       return nullptr;
     }
@@ -147,7 +147,7 @@ Value insertStore(Operation *oldOp, Value oldValue, OpBuilder &builder,
 
   // Allocate the memref to store the value.
   auto newStorage = builder.create<AllocOp>(
-      oldOp->getLoc(), convertTypeToMemRef(oldValue.getType()));
+      oldOp->getLoc(), convertLegacyTypeToMemRef(oldValue.getType()));
 
   // Insert the store we'll use to box the value.
   builder.create<StoreOp>(oldOp->getLoc(), newValue, newStorage,
@@ -169,7 +169,7 @@ bool convertCallOp(CallOp *oldOp, OpBuilder &builder,
 
   SmallVector<Type, 4> resultTypes;
   for (auto oldType : oldOp->getOperation()->getResultTypes()) {
-    resultTypes.push_back(convertTypeToMemRef(oldType));
+    resultTypes.push_back(convertLegacyTypeToMemRef(oldType));
   }
   auto newOp = builder.create<CallOp>(oldOp->getLoc(), oldOp->getCallee(),
                                       resultTypes, newArgs);
@@ -334,7 +334,7 @@ bool convertFunction(FuncOp oldFunc, FuncOp newFunc) {
     auto *newBlock = builder.createBlock(&newFunc.getBody());
     for (auto oldArg : oldBlock.getArguments()) {
       // Replace the block args with memrefs.
-      auto memRefType = convertTypeToMemRef(oldArg.getType());
+      auto memRefType = convertLegacyTypeToMemRef(oldArg.getType());
       if (!memRefType) return true;
       auto newArg = newBlock->addArgument(memRefType);
 

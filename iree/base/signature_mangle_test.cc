@@ -227,6 +227,18 @@ TEST(RawSignatureManglerTest, FullBuffer) {
   EXPECT_EQ("B13!t2d-1d128d64", sm.builder().encoded());
 }
 
+TEST(RawSignatureManglerTest, DefaultScalar) {
+  RawSignatureMangler sm;
+  sm.AddScalar(AbiConstants::ScalarType::kIeeeFloat32);
+  EXPECT_EQ("S1!", sm.builder().encoded());
+}
+
+TEST(RawSignatureManglerTest, FullScalar) {
+  RawSignatureMangler sm;
+  sm.AddScalar(AbiConstants::ScalarType::kSint32);
+  EXPECT_EQ("S3!t6", sm.builder().encoded());
+}
+
 TEST(RawSignatureManglerTest, AnyRef) {
   RawSignatureMangler sm;
   sm.AddAnyReference();
@@ -282,25 +294,41 @@ TEST(RawSignatureParserTest, DynamicNdArrayBuffer) {
   EXPECT_EQ("(Buffer<float32[?x128x64]>) -> (Buffer<sint32[?x8x64]>)", *s);
 }
 
+TEST(RawSignatureParserTest, Scalar) {
+  RawSignatureMangler inputs;
+  inputs.AddScalar(AbiConstants::ScalarType::kSint32);
+  RawSignatureMangler results;
+  results.AddScalar(AbiConstants::ScalarType::kIeeeFloat64);
+
+  auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
+  EXPECT_EQ("I6!S3!t6R6!S3!t2", sig.encoded());
+
+  RawSignatureParser p;
+  auto s = p.FunctionSignatureToString(sig.encoded());
+  ASSERT_TRUE(s) << *p.GetError();
+  EXPECT_EQ("(sint32) -> (float64)", *s);
+}
+
 TEST(RawSignatureParserTest, AllTypes) {
   RawSignatureMangler inputs;
   inputs.AddAnyReference();
   std::vector<int> dims = {-1, 128, 64};
   inputs.AddShapedNDBuffer(AbiConstants::ScalarType::kIeeeFloat32,
                            absl::MakeSpan(dims));
+  inputs.AddScalar(AbiConstants::ScalarType::kSint32);
   RawSignatureMangler results;
   std::vector<int> dims2 = {32, -1, 64};
   results.AddShapedNDBuffer(AbiConstants::ScalarType::kUint64,
                             absl::MakeSpan(dims2));
 
   auto sig = RawSignatureMangler::ToFunctionSignature(inputs, results);
-  EXPECT_EQ("I18!O1!B11!d-1d128d64R17!B13!t11d32d-1d64", sig.encoded());
+  EXPECT_EQ("I23!O1!B11!d-1d128d64S3!t6R17!B13!t11d32d-1d64", sig.encoded());
 
   RawSignatureParser p;
   auto s = p.FunctionSignatureToString(sig.encoded());
   ASSERT_TRUE(s) << *p.GetError();
   EXPECT_EQ(
-      "(RefObject<?>, Buffer<float32[?x128x64]>) -> "
+      "(RefObject<?>, Buffer<float32[?x128x64]>, sint32) -> "
       "(Buffer<uint64[32x?x64]>)",
       *s);
 }

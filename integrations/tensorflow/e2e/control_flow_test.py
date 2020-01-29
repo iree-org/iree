@@ -17,7 +17,7 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy
-from pyiree import tf_test_utils
+from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 

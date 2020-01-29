@@ -14,6 +14,7 @@
 
 #include "iree/samples/custom_modules/dialect/custom_dialect.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/samples/custom_modules/dialect/conversion_patterns.h"
 #include "iree/samples/custom_modules/dialect/custom.imports.h"
@@ -32,6 +33,23 @@ namespace {
 
 static DialectRegistration<CustomDialect> custom_dialect;
 
+// Exposes conversion patterns that transition tensors to buffers during the
+// Flow->HAL dialect lowering. This is only required if the dialect has ops that
+// use tensor types.
+class CustomToHALConversionInterface : public HALConversionDialectInterface {
+ public:
+  using HALConversionDialectInterface::HALConversionDialectInterface;
+
+  void setupConversionTarget(ConversionTarget &target,
+                             OwningRewritePatternList &patterns,
+                             TypeConverter &typeConverter) const override {
+    populateCustomToHALPatterns(getDialect()->getContext(), patterns,
+                                typeConverter);
+  }
+};
+
+// Exposes the import module and conversion patterns used to convert custom
+// ops to their vm.import counterparts.
 class CustomToVMConversionInterface : public VMConversionDialectInterface {
  public:
   using VMConversionDialectInterface::VMConversionDialectInterface;
@@ -54,7 +72,8 @@ class CustomToVMConversionInterface : public VMConversionDialectInterface {
 
 CustomDialect::CustomDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
-  addInterfaces<CustomToVMConversionInterface>();
+  addInterfaces<CustomToHALConversionInterface,
+                CustomToVMConversionInterface>();
 
   addTypes<MessageType>();
 

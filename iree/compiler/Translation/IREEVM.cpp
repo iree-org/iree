@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "mlir/IR/Module.h"
@@ -28,6 +29,7 @@ namespace iree_compiler {
 
 LogicalResult convertToFlowModule(ModuleOp moduleOp) {
   PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError()
@@ -39,6 +41,7 @@ LogicalResult convertToFlowModule(ModuleOp moduleOp) {
 LogicalResult convertToHALModule(
     ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions) {
   PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError()
@@ -49,6 +52,7 @@ LogicalResult convertToHALModule(
 
 LogicalResult convertToVMModule(ModuleOp moduleOp) {
   PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
   IREE::VM::buildVMTransformPassPipeline(passManager);
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError()
@@ -65,6 +69,7 @@ static PassPipelineRegistration<> transformPassPipeline(
       IREE::HAL::buildHALTransformPassPipeline(
           passManager, IREE::HAL::getExecutableTargetOptionsFromFlags());
       IREE::VM::buildVMTransformPassPipeline(passManager);
+      passManager.addPass(IREE::createDropCompilerHintsPass());
     });
 
 LogicalResult translateFromMLIRToVMBytecodeModule(
@@ -75,9 +80,11 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
   // After this completes we have a non-bytecode-specific vm.module that we
   // could lower to other forms (LLVM IR, C, etc).
   PassManager passManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(passManager);
   IREE::Flow::buildFlowTransformPassPipeline(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
   IREE::VM::buildVMTransformPassPipeline(passManager);
+  passManager.addPass(mlir::iree_compiler::IREE::createDropCompilerHintsPass());
   if (failed(passManager.run(moduleOp))) {
     return moduleOp.emitError() << "conversion from source -> vm failed";
   }
@@ -88,6 +95,7 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
 
 static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
+  mlir::registerPassManagerCLOptions();
   auto executableTargetOptions =
       IREE::HAL::getExecutableTargetOptionsFromFlags();
   auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();

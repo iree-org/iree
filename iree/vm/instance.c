@@ -30,10 +30,10 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
   }
   *out_instance = NULL;
 
-  IREE_API_RETURN_IF_API_ERROR(iree_vm_register_builtin_types());
+  IREE_RETURN_IF_ERROR(iree_vm_register_builtin_types());
 
   iree_vm_instance_t* instance = NULL;
-  IREE_API_RETURN_IF_API_ERROR(iree_allocator_malloc(
+  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_vm_instance_t), (void**)&instance));
   instance->allocator = allocator;
   atomic_store(&instance->ref_count, 1);

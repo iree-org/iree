@@ -69,8 +69,6 @@ def HAL_MemoryTypeBitfieldAttr :
       HAL_MemoryType_DeviceVisible,
       HAL_MemoryType_DeviceLocal
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::MemoryTypeBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::MemoryTypeBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -89,8 +87,6 @@ def HAL_MemoryAccessBitfieldAttr :
       HAL_MemoryAccess_DiscardWrite,
       HAL_MemoryAccess_All
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::MemoryAccessBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::MemoryAccessBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -109,8 +105,6 @@ def HAL_BufferUsageBitfieldAttr :
       HAL_BufferUsage_Dispatch,
       HAL_BufferUsage_All
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::BufferUsageBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::BufferUsageBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -121,8 +115,6 @@ def HAL_CommandBufferModeBitfieldAttr :
       HAL_CommandBufferMode_None,
       HAL_CommandBufferMode_OneShot
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::CommandBufferModeBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::CommandBufferModeBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -135,9 +127,23 @@ def HAL_CommandCategoryBitfieldAttr :
       HAL_CommandCategory_Transfer,
       HAL_CommandCategory_Dispatch
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::CommandCategoryBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::CommandCategoryBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DescriptorType_UniformBuffer : I32EnumAttrCase<"UniformBuffer", 6>;
+def HAL_DescriptorType_StorageBuffer : I32EnumAttrCase<"StorageBuffer", 7>;
+def HAL_DescriptorType_UniformBufferDynamic : I32EnumAttrCase<"UniformBufferDynamic", 8>;
+def HAL_DescriptorType_StorageBufferDynamic : I32EnumAttrCase<"StorageBufferDynamic", 9>;
+def HAL_DescriptorTypeAttr :
+    I32EnumAttr<"DescriptorType", "IREE HAL DescriptorType", [
+      HAL_DescriptorType_UniformBuffer,
+      HAL_DescriptorType_StorageBuffer,
+      HAL_DescriptorType_UniformBufferDynamic,
+      HAL_DescriptorType_StorageBufferDynamic,
+    ]> {
+  let returnType = "uint32_t";
+  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
 def HAL_ExecutionStage_None : BitEnumAttrCase<"None", 0x0000>;
@@ -157,8 +163,6 @@ def HAL_ExecutionStageBitfieldAttr :
       HAL_ExecutionStage_CommandRetire,
       HAL_ExecutionStage_Host
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::ExecutionStageBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::ExecutionStageBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
@@ -187,10 +191,33 @@ def HAL_AccessScopeBitfieldAttr :
       HAL_AccessScope_MemoryRead,
       HAL_AccessScope_MemoryWrite
     ]> {
-  let returnType = "mlir::iree_compiler::IREE::HAL::AccessScopeBitfield";
-  let convertFromStorage = "static_cast<mlir::iree_compiler::IREE::HAL::AccessScopeBitfield>($_self.getInt())";
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
+
+// Values are FourCC codes.
+// See https://github.com/google/iree/tree/master/iree/hal/executable_format.h for more info.
+// https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
+// integer values for inclusion here.
+//
+// LINT.IfChange(executable_format)
+def HAL_EF_Unspecified : I32EnumAttrCase<"Unspecified", 538976288>;
+def HAL_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
+def HAL_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
+def HAL_EF_VMLA : I32EnumAttrCase<"VMLA", 1447906369>;
+def HAL_EF_SpirV : I32EnumAttrCase<"SpirV", 1397773893>;
+def HAL_ExecutableFormatAttr :
+    I32EnumAttr<"ExecutableFormat", "IREE HAL Executable format", [
+      HAL_EF_Unspecified,
+      HAL_EF_MlirText,
+      HAL_EF_IreeBytecode,
+      HAL_EF_VMLA,
+      HAL_EF_SpirV,
+    ]> {
+  let returnType = "uint32_t";
+  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+// LINT.ThenChange(//iree/iree/hal/executable_format.h:fourcc)
 
 //===----------------------------------------------------------------------===//
 // HAL types
@@ -215,6 +242,18 @@ def HAL_Buffer : DialectType<
     be any mix of host-accessible, host-coherent, or device-accessible for
     various usages. Depending on these memory types the buffers may be mapped
     for access on the host as memory though certain restrictions may be imposed.
+  }];
+}
+
+def HAL_BufferView : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::BufferViewType>()">,
+    "buffer_view"> {
+  let typeDescription = [{
+    A shaped and typed buffer reference. This just wraps an existing hal.buffer
+    with its associated metadata to make it easier to pass across ABI
+    boundaries. In most cases buffer views can be elided entirely by the
+    compiler and they'll only be seen when calling external functions.
   }];
 }
 
@@ -289,6 +328,15 @@ def HAL_ExecutableCache : DialectType<
   }];
 }
 
+def HAL_ExecutableLayout : DialectType<
+    HAL_Dialect,
+    CPred<"$_self.isa<IREE::HAL::ExecutableLayoutType>()">,
+    "executable_layout"> {
+  let typeDescription = [{
+    An executable layout describing the descriptor sets and push constants used.
+  }];
+}
+
 def HAL_Fence : DialectType<
     HAL_Dialect,
     CPred<"$_self.isa<IREE::HAL::FenceType>()">,
@@ -323,30 +371,9 @@ def HAL_Semaphore : DialectType<
 
 def HAL_OrdinalAttr : IntegerAttrBase<I32, "32-bit integer ordinal attribute">;
 
-// Values are FourCC codes.
-// See https://github.com/google/iree/tree/master/iree/iree/hal/executable_format.h for more info.
-// https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
-// integer values for inclusion here.
-//
-// LINT.IfChange(executable_format)
-def HAL_EF_Unspecified : I32EnumAttrCase<"Unspecified", 538976288>;
-def HAL_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
-def HAL_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
-def HAL_EF_SpirV : I32EnumAttrCase<"SpirV", 1397773893>;
-def HAL_ExecutableFormatAttr :
-    I32EnumAttr<"ExecutableFormat", "IREE HAL Executable format", [
-      HAL_EF_Unspecified,
-      HAL_EF_MlirText,
-      HAL_EF_IreeBytecode,
-      HAL_EF_SpirV,
-    ]> {
-  let returnType = "uint32_t";
-  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
-  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
-}
-// LINT.ThenChange(//iree/iree/hal/executable_format.h:fourcc)
-
 def HAL_ExecutableDataAttr : IntElementsAttr<8>;
+
+def HAL_ElementTypeAttr : IntegerAttrBase<I32, "element type attribute">;
 
 def HAL_DeviceSize : TypeAlias<I32>;
 def HAL_DeviceSizeAttr : IntegerAttrBase<I32, "device_size_t">;
@@ -451,12 +478,23 @@ def HAL_DescriptorSetBinding : NamedTupleOf<[
     NamedTupleElement<1, "buffer", RefPtrOf<HAL_Buffer>>,
     NamedTupleElement<2, "buffer_offset", HAL_DeviceSize>,
     NamedTupleElement<3, "buffer_length", HAL_DeviceSize>,
-    NamedTupleElement<4, "access", I32>,
   ], "DescriptorSetBinding"> {
   let typeDescription = [{
     DescriptorSetBinding struct that can be passed to the
     hal.descriptor_set.update operation. Constructed via the
     hal.descriptor_set.make_binding operation.
+  }];
+}
+
+def HAL_DescriptorSetLayoutBinding : NamedTupleOf<[
+    NamedTupleElement<0, "binding", I32>,
+    NamedTupleElement<1, "type", I32>,
+    NamedTupleElement<2, "access", I32>,
+  ], "DescriptorSetLayoutBinding"> {
+  let typeDescription = [{
+    DescriptorSetLayoutBinding struct that can be passed to the
+    hal.descriptor_set_layout.create operation. Constructed via the
+    hal.descriptor_set_layout.make_binding operation.
   }];
 }
 

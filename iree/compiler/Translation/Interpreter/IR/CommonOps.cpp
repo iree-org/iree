@@ -61,7 +61,7 @@ namespace {
 
 // TODO(gcmn) this is duplicated from MemRefUtils to avoid a circular
 // dependency. Extract op-dependent parts of memref utils to allow reuse.
-MemRefType convertTypeToMemRef(Type type) {
+MemRefType convertLegacyTypeToMemRef(Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
   } else if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
@@ -77,7 +77,7 @@ MemRefType convertTypeToMemRef(Type type) {
 
 void ConstantOp::build(Builder *builder, OperationState &state,
                        ElementsAttr value) {
-  auto type = convertTypeToMemRef(value.getType());
+  auto type = convertLegacyTypeToMemRef(value.getType());
   return build(builder, state, type, value);
 }
 
@@ -127,7 +127,7 @@ OpFoldResult TensorToMemRefOp::fold(ArrayRef<Attribute> operands) {
 
 void TensorToMemRefOp::build(Builder *builder, OperationState &state,
                              Value arg) {
-  build(builder, state, convertTypeToMemRef(arg.getType()), arg);
+  build(builder, state, convertLegacyTypeToMemRef(arg.getType()), arg);
 }
 
 //===----------------------------------------------------------------------===//
@@ -218,7 +218,7 @@ OpFoldResult ScalarToMemRefOp::fold(ArrayRef<Attribute> operands) {
 
 void ScalarToMemRefOp::build(Builder *builder, OperationState &state,
                              Value arg) {
-  build(builder, state, convertTypeToMemRef(arg.getType()), arg);
+  build(builder, state, convertLegacyTypeToMemRef(arg.getType()), arg);
 }
 
 //===----------------------------------------------------------------------===//

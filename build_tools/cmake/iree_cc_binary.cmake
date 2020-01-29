@@ -95,33 +95,44 @@ function(iree_cc_binary)
       ${_RULE_COPTS}
   )
 
-  # Split DEPS into two lists - one for whole archive (alwayslink) and one for
+  # List all dependencies, including transitive dependencies, then split the
+  # dependency list into one for whole archive (ALWAYSLINK) and one for
   # standard linking (which only links in symbols that are directly used).
-  #
-  # TODO(scotttodd): traverse transitive dependencies also (all direct
-  #                  dependencies of ALWAYSLINK libraries should be linked in)
+  _iree_transitive_dependencies("${_RULE_DEPS}" _TRANSITIVE_DEPS)
   set(_ALWAYS_LINK_DEPS "")
   set(_STANDARD_DEPS "")
-  foreach(DEP ${_RULE_DEPS})
-    get_target_property(_ALWAYS_LINK_DEP ${DEP} ALWAYSLINK)
-    if(_ALWAYS_LINK_DEP)
-      list(APPEND _ALWAYS_LINK_DEPS ${DEP})
+  foreach(_DEP ${_TRANSITIVE_DEPS})
+    # Check if _DEP is a library with the ALWAYSLINK property set.
+    set(_DEP_IS_ALWAYSLINK OFF)
+    if (TARGET ${_DEP})
+      get_target_property(_DEP_TYPE ${_DEP} TYPE)
+      if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
+        # Can't be ALWAYSLINK since it's an INTERFACE library.
+        # We also can't even query for the property, since it isn't whitelisted.
+      else()
+        get_target_property(_DEP_IS_ALWAYSLINK ${_DEP} ALWAYSLINK)
+      endif()
+    endif()
+
+    # Append to the corresponding list of deps.
+    if(_DEP_IS_ALWAYSLINK)
+      list(APPEND _ALWAYS_LINK_DEPS ${_DEP})
 
       # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
       # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
       # try to link the library in, so we need the flag *and* the dependency.
       if(MSVC)
-        get_target_property(_ALIASED_TARGET ${DEP} ALIASED_TARGET)
+        get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
         if (_ALIASED_TARGET)
           list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_ALIASED_TARGET}")
         else()
-          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${DEP}")
+          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_DEP}")
         endif()
       endif()
     else()
-      list(APPEND _STANDARD_DEPS ${DEP})
+      list(APPEND _STANDARD_DEPS ${_DEP})
     endif()
-  endforeach(DEP)
+  endforeach(_DEP)
 
   # Call into target_link_libraries with the lists of deps.
   # TODO(scotttodd): `-Wl,-force_load` version
@@ -151,4 +162,66 @@ function(iree_cc_binary)
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
+endfunction()
+
+# Lists all transitive dependencies of DIRECT_DEPS in TRANSITIVE_DEPS.
+function(_iree_transitive_dependencies DIRECT_DEPS TRANSITIVE_DEPS)
+  set(_TRANSITIVE "")
+
+  foreach(_DEP ${DIRECT_DEPS})
+    _iree_transitive_dependencies_helper(${_DEP} _TRANSITIVE)
+  endforeach(_DEP)
+
+  set(${TRANSITIVE_DEPS} "${_TRANSITIVE}" PARENT_SCOPE)
+endfunction()
+
+# Recursive helper function for _iree_transitive_dependencies.
+# Performs a depth-first search through the dependency graph, appending all
+# dependencies of TARGET to the TRANSITIVE_DEPS list.
+function(_iree_transitive_dependencies_helper TARGET TRANSITIVE_DEPS)
+  if (NOT TARGET ${TARGET})
+    # Excluded from the project, or invalid name? Just ignore.
+    return()
+  endif()
+
+  # Resolve aliases, canonicalize name formatting.
+  get_target_property(_ALIASED_TARGET ${TARGET} ALIASED_TARGET)
+  if(_ALIASED_TARGET)
+    set(_TARGET_NAME ${_ALIASED_TARGET})
+  else()
+    string(REPLACE "::" "_" _TARGET_NAME ${TARGET})
+  endif()
+
+  set(_RESULT "${${TRANSITIVE_DEPS}}")
+  if (${_TARGET_NAME} IN_LIST _RESULT)
+    # Already visited, ignore.
+    return()
+  endif()
+
+  # Append this target to the list. Dependencies of this target will be added
+  # (if valid and not already visited) in recursive function calls.
+  list(APPEND _RESULT ${_TARGET_NAME})
+
+  # Check for non-target identifiers again after resolving the alias.
+  if (NOT TARGET ${_TARGET_NAME})
+    return()
+  endif()
+
+  # Get the list of direct dependencies for this target.
+  get_target_property(_TARGET_TYPE ${_TARGET_NAME} TYPE)
+  if(NOT ${_TARGET_TYPE} STREQUAL "INTERFACE_LIBRARY")
+    get_target_property(_TARGET_DEPS ${_TARGET_NAME} LINK_LIBRARIES)
+  else()
+    get_target_property(_TARGET_DEPS ${_TARGET_NAME} INTERFACE_LINK_LIBRARIES)
+  endif()
+
+  if(_TARGET_DEPS)
+    # Recurse on each dependency.
+    foreach(_TARGET_DEP ${_TARGET_DEPS})
+      _iree_transitive_dependencies_helper(${_TARGET_DEP} _RESULT)
+    endforeach(_TARGET_DEP)
+  endif()
+
+  # Propagate the augmented list up to the parent scope.
+  set(${TRANSITIVE_DEPS} "${_RESULT}" PARENT_SCOPE)
 endfunction()

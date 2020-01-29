@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     Common
@@ -37,7 +39,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     CommonOpsGen
-  SRCS
+  TD_FILE
     CommonOps.td
   OUTS
     -gen-op-decls CommonOps.h.inc
@@ -64,13 +66,18 @@ iree_cc_library(
     "LLOps.cpp.inc"
     "OpWriters.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::Interpreter::IR::Common
     iree::compiler::Translation::Interpreter::IR::HLOpsGen
     iree::compiler::Translation::Interpreter::IR::LLOpsGen
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::Serialization
+    iree::compiler::Translation::Interpreter::Utils
     iree::compiler::Utils
+    iree::schemas::bytecode::interpreter_bytecode_v0
     LLVMSupport
     MLIRIR
+    MLIRStandardOps
+    MLIRSupport
   ALWAYSLINK
   PUBLIC
 )
@@ -78,7 +85,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     HLOpsGen
-  SRCS
+  TD_FILE
     HLOps.td
   OUTS
     -gen-op-decls HLOps.h.inc
@@ -88,7 +95,7 @@ iree_tablegen_library(
 iree_tablegen_library(
   NAME
     LLOpsGen
-  SRCS
+  TD_FILE
     LLOps.td
   OUTS
     -gen-op-decls LLOps.h.inc

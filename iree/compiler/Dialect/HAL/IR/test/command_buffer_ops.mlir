@@ -94,7 +94,7 @@ func @command_buffer_copy_buffer(%arg0 : !iree.ref<!hal.command_buffer>) {
 
 // CHECK-LABEL: @command_buffer_bind_descriptor_set
 func @command_buffer_bind_descriptor_set(%arg0 : !iree.ref<!hal.command_buffer>) {
-  %0 = "test_hal.executable"() : () -> !iree.ref<!hal.executable>
+  %0 = "test_hal.executable_layout"() : () -> !iree.ref<!hal.executable_layout>
   %1 = "test_hal.descriptor_set"() : () -> !iree.ref<!hal.descriptor_set>
   %2 = "test_hal.offset"() : () -> i32
   // CHECK: hal.command_buffer.bind_descriptor_set %arg0, %0, set=0, %1

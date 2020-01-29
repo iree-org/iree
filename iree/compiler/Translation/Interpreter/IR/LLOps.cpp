@@ -54,9 +54,8 @@ static void printCallOp(OpAsmPrinter &p, CallOp op) {
 }
 
 FunctionType CallOp::getCalleeType() {
-  SmallVector<Type, 4> resultTypes(getResultTypes());
   SmallVector<Type, 8> argTypes(getOperandTypes());
-  return FunctionType::get(argTypes, resultTypes, getContext());
+  return FunctionType::get(argTypes, getResultTypes(), getContext());
 }
 
 //===----------------------------------------------------------------------===//

@@ -14,6 +14,8 @@
 
 # Implementations for iree/base/
 
+load("//iree:build_defs.oss.bzl", "iree_build_test")
+
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
@@ -127,12 +129,26 @@ cc_library(
 
 cc_library(
     name = "status_matchers_internal",
-    testonly = 1,
+    testonly = True,
     hdrs = ["status_matchers.h"],
     deps = [
         "//iree/base:status",
+        "//iree/testing:gtest",
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:optional",
-        "@com_google_googletest//:gtest",
+    ],
+)
+
+iree_build_test(
+    name = "internal_build_test",
+    targets = [
+        ":file_handle_win32",
+        ":file_io_internal",
+        ":file_mapping_internal",
+        ":init_internal",
+        ":logging_internal",
+        ":source_location_internal",
+        ":status_internal",
+        ":status_matchers_internal",
     ],
 )

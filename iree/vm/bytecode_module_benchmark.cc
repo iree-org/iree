@@ -49,12 +49,11 @@ static iree_status_t RunFunction(benchmark::State& state,
   const auto* module_file_toc =
       iree::vm::bytecode_module_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
-  CHECK_EQ(IREE_STATUS_OK,
-           iree_vm_bytecode_module_create(
-               iree_const_byte_span_t{
-                   reinterpret_cast<const uint8_t*>(module_file_toc->data),
-                   module_file_toc->size},
-               IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+  IREE_CHECK_OK(iree_vm_bytecode_module_create(
+      iree_const_byte_span_t{
+          reinterpret_cast<const uint8_t*>(module_file_toc->data),
+          module_file_toc->size},
+      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
       << "Bytecode module failed to load";
 
   iree_vm_module_state_t* module_state;
@@ -81,11 +80,10 @@ static iree_status_t RunFunction(benchmark::State& state,
   iree_vm_stack_init(state_resolver, stack.get());
 
   iree_vm_function_t function;
-  CHECK_EQ(IREE_STATUS_OK,
-           module->lookup_function(
-               module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-               iree_string_view_t{function_name.data(), function_name.size()},
-               &function))
+  IREE_CHECK_OK(module->lookup_function(
+      module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      iree_string_view_t{function_name.data(), function_name.size()},
+      &function))
       << "Exported function '" << function_name << "' not found";
 
   while (state.KeepRunningBatch(batch_size)) {
@@ -98,8 +96,8 @@ static iree_status_t RunFunction(benchmark::State& state,
     }
 
     iree_vm_execution_result_t result;
-    CHECK_EQ(IREE_STATUS_OK,
-             module->execute(module->self, stack.get(), entry_frame, &result));
+    IREE_CHECK_OK(
+        module->execute(module->self, stack.get(), entry_frame, &result));
 
     iree_vm_stack_function_leave(stack.get());
   }
@@ -117,12 +115,11 @@ static void BM_ModuleCreate(benchmark::State& state) {
     const auto* module_file_toc =
         iree::vm::bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
-    CHECK_EQ(IREE_STATUS_OK,
-             iree_vm_bytecode_module_create(
-                 iree_const_byte_span_t{
-                     reinterpret_cast<const uint8_t*>(module_file_toc->data),
-                     module_file_toc->size},
-                 IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+    IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        iree_const_byte_span_t{
+            reinterpret_cast<const uint8_t*>(module_file_toc->data),
+            module_file_toc->size},
+        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
         << "Bytecode module failed to load";
 
     // Just testing creation and verification here!
@@ -137,12 +134,11 @@ static void BM_ModuleCreateState(benchmark::State& state) {
   const auto* module_file_toc =
       iree::vm::bytecode_module_benchmark_module_create();
   iree_vm_module_t* module = nullptr;
-  CHECK_EQ(IREE_STATUS_OK,
-           iree_vm_bytecode_module_create(
-               iree_const_byte_span_t{
-                   reinterpret_cast<const uint8_t*>(module_file_toc->data),
-                   module_file_toc->size},
-               IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+  IREE_CHECK_OK(iree_vm_bytecode_module_create(
+      iree_const_byte_span_t{
+          reinterpret_cast<const uint8_t*>(module_file_toc->data),
+          module_file_toc->size},
+      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
       << "Bytecode module failed to load";
 
   while (state.KeepRunning()) {
@@ -165,12 +161,11 @@ static void BM_FullModuleInit(benchmark::State& state) {
     const auto* module_file_toc =
         iree::vm::bytecode_module_benchmark_module_create();
     iree_vm_module_t* module = nullptr;
-    CHECK_EQ(IREE_STATUS_OK,
-             iree_vm_bytecode_module_create(
-                 iree_const_byte_span_t{
-                     reinterpret_cast<const uint8_t*>(module_file_toc->data),
-                     module_file_toc->size},
-                 IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+    IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        iree_const_byte_span_t{
+            reinterpret_cast<const uint8_t*>(module_file_toc->data),
+            module_file_toc->size},
+        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
         << "Bytecode module failed to load";
 
     iree_vm_module_state_t* module_state;
@@ -199,7 +194,7 @@ static void BM_EmptyFuncReference(benchmark::State& state) {
 BENCHMARK(BM_EmptyFuncReference);
 
 static void BM_EmptyFuncBytecode(benchmark::State& state) {
-  CHECK_EQ(IREE_STATUS_OK, RunFunction(state, "empty_func", {}));
+  IREE_CHECK_OK(RunFunction(state, "empty_func", {}));
 }
 BENCHMARK(BM_EmptyFuncBytecode);
 
@@ -236,8 +231,8 @@ static void BM_CallInternalFuncReference(benchmark::State& state) {
 BENCHMARK(BM_CallInternalFuncReference);
 
 static void BM_CallInternalFuncBytecode(benchmark::State& state) {
-  CHECK_EQ(IREE_STATUS_OK, RunFunction(state, "call_internal_func", {100},
-                                       /*batch_size=*/10));
+  IREE_CHECK_OK(RunFunction(state, "call_internal_func", {100},
+                            /*batch_size=*/10));
 }
 BENCHMARK(BM_CallInternalFuncBytecode);
 
@@ -265,8 +260,8 @@ static void BM_CallImportedFuncReference(benchmark::State& state) {
 BENCHMARK(BM_CallImportedFuncReference);
 
 static void BM_CallImportedFuncBytecode(benchmark::State& state) {
-  CHECK_EQ(IREE_STATUS_OK, RunFunction(state, "call_imported_func", {100},
-                                       /*batch_size=*/10));
+  IREE_CHECK_OK(RunFunction(state, "call_imported_func", {100},
+                            /*batch_size=*/10));
 }
 BENCHMARK(BM_CallImportedFuncBytecode);
 
@@ -287,9 +282,9 @@ static void BM_LoopSumReference(benchmark::State& state) {
 BENCHMARK(BM_LoopSumReference)->Arg(100000);
 
 static void BM_LoopSumBytecode(benchmark::State& state) {
-  CHECK_EQ(IREE_STATUS_OK, RunFunction(state, "loop_sum",
-                                       {static_cast<int32_t>(state.range(0))},
-                                       /*batch_size=*/state.range(0)));
+  IREE_CHECK_OK(RunFunction(state, "loop_sum",
+                            {static_cast<int32_t>(state.range(0))},
+                            /*batch_size=*/state.range(0)));
 }
 BENCHMARK(BM_LoopSumBytecode)->Arg(100000);
 

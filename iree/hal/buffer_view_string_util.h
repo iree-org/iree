@@ -14,7 +14,7 @@
 
 // Utilities for parsing and printing BufferView, mostly useful for
 // testing. The format is as described in
-// https://github.com/google/iree/tree/master/iree/iree/base/buffer_string_util.h
+// https://github.com/google/iree/tree/master/iree/base/buffer_string_util.h
 
 #ifndef IREE_HAL_BUFFER_VIEW_STRING_UTIL_H_
 #define IREE_HAL_BUFFER_VIEW_STRING_UTIL_H_

@@ -27,7 +27,7 @@ namespace HAL {
 
 void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    ExecutableTargetOptions executableOptions) {
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addPass(createCanonicalizerPass());
 
   // TODO(benvanik): run symbol DCE pass.
 

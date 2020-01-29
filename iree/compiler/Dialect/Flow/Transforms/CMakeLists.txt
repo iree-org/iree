@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     Transforms
@@ -36,6 +38,7 @@ iree_cc_library(
   DEPS
     iree::base::signature_mangle
     iree::compiler::Dialect::Flow::Analysis
+    iree::compiler::Dialect::Flow::Conversion
     iree::compiler::Dialect::Flow::Conversion::HLOToFlow
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR

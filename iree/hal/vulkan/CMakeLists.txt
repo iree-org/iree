@@ -197,7 +197,7 @@ iree_cc_test(
     iree::base::status_matchers
     iree::hal::vulkan::status_util
     iree::hal::vulkan::dynamic_symbols
-    gtest_main
+    iree::testing::gtest_main
 )
 
 iree_cc_library(

@@ -1,25 +1,4 @@
-// RUN: iree-opt -verify-diagnostics -canonicalize -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
-
-// CHECK-LABEL: @parse_print
-// CHECK-SAME: [[ARG0:%[a-zA-Z0-9]+]]
-// CHECK-SAME: [[ARG1:%[a-zA-Z0-9]+]]
-func @parse_print(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
-  // CHECK: iree.do_not_optimize()
-  iree.do_not_optimize()
-
-  // CHECK-NEXT: iree.do_not_optimize([[ARG0]]) : tensor<i32>
-  %1 = iree.do_not_optimize(%arg0) : tensor<i32>
-
-  // CHECK-NEXT: iree.do_not_optimize([[ARG0]], [[ARG1]]) : tensor<i32>, tensor<i32>
-  %2:2 = iree.do_not_optimize(%arg0, %arg1) : tensor<i32>, tensor<i32>
-
-  // CHECK-NEXT: iree.do_not_optimize([[ARG0]]) {some_unit} : tensor<i32>
-  %has_attr = iree.do_not_optimize(%arg0) {some_unit} : tensor<i32>
-
-  return
-}
-
-// -----
+// RUN: iree-opt -verify-diagnostics -canonicalize -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @no_fold_constant
 func @no_fold_constant() -> (i32) {
@@ -72,3 +51,13 @@ func @result_operand_type_mismatch(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
   return
 }
 
+// -----
+
+// CHECK-LABEL: @canonicalize_unfoldable_constant
+func @canonicalize_unfoldable_constant() -> i32 {
+  // CHECK-NEXT: [[C:%.+]] = constant 42 : i32
+  // CHECK-NEXT: [[R:%.+]] = iree.do_not_optimize([[C]]) : i32
+  %c42 = iree.unfoldable_constant 42 : i32
+  // CHECK-NEXT: return [[R]]
+  return %c42 : i32
+}

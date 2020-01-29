@@ -34,9 +34,12 @@ typedef struct iree_hal_allocator iree_hal_allocator_t;
 typedef struct iree_hal_buffer iree_hal_buffer_t;
 typedef struct iree_hal_buffer_view iree_hal_buffer_view_t;
 typedef struct iree_hal_command_buffer iree_hal_command_buffer_t;
+typedef struct iree_hal_descriptor_set iree_hal_descriptor_set_t;
+typedef struct iree_hal_descriptor_set_layout iree_hal_descriptor_set_layout_t;
 typedef struct iree_hal_device iree_hal_device_t;
 typedef struct iree_hal_driver iree_hal_driver_t;
 typedef struct iree_hal_executable iree_hal_executable_t;
+typedef struct iree_hal_executable_layout iree_hal_executable_layout_t;
 typedef struct iree_hal_fence iree_hal_fence_t;
 typedef struct iree_hal_semaphore iree_hal_semaphore_t;
 
@@ -196,6 +199,56 @@ typedef enum {
   IREE_HAL_COMMAND_CATEGORY_DISPATCH = 1 << 1,
 } iree_hal_command_category_t;
 
+// Specifies the type of a descriptor in a descriptor set.
+typedef enum {
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER = 6,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+  IREE_HAL_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC = 8,
+  IREE_HAL_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC = 9,
+} iree_hal_descriptor_type_t;
+
+// Specifies a descriptor set binding.
+// The range specified by [offset, length) will be made available to executables
+// on the given binding. If the descriptor type is dynamic then the range will
+// be [offset + dynamic_offset, length).
+//
+// The IREE HAL buffer type may internally be offset; such offset is applied
+// here as if it were the base address of the buffer. Note that the offset will
+// be applied at the time the binding is recording into the command buffer.
+//
+// Maps to VkDescriptorSetBinding.
+typedef struct {
+  // The binding number of this entry and corresponds to a resource of the
+  // same binding number in the executable interface.
+  int32_t binding;
+  // Buffer bound to the binding number.
+  // May be nullptr if the binding is not used by the executable.
+  iree_hal_buffer_t* buffer;
+  // Offset, in bytes, into the buffer that the binding starts at.
+  // If the descriptor type is dynamic this will be added to the dynamic
+  // offset provided during binding.
+  iree_device_size_t offset;
+  // Length, in bytes, of the buffer that is available to the executable.
+  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // contents are larger than supported by the device (~128MiB, usually) this
+  // will fail. If the descriptor type is dynamic this will be used for all
+  // ranges regardless of offset.
+  iree_device_size_t length;
+} iree_hal_descriptor_set_binding_t;
+
+// Specifies a descriptor set layout binding.
+//
+// Maps to VkDescriptorSetLayoutBinding.
+typedef struct {
+  // The binding number of this entry and corresponds to a resource of the
+  // same binding number in the executable interface.
+  int32_t binding;
+  // Specifies which type of resource descriptors are used for this binding.
+  iree_hal_descriptor_type_t type;
+  // Specifies the memory access performed by the executables.
+  iree_hal_memory_access_t access;
+} iree_hal_descriptor_set_layout_binding_t;
+
 // Bitfield specifying which execution stage a brarrier should start/end at.
 //
 // Maps to VkPipelineStageFlagBits.
@@ -274,6 +327,81 @@ typedef struct {
   iree_device_size_t length;
 } iree_hal_buffer_barrier_t;
 
+// LINT.IfChange(element_type)
+
+typedef enum {
+  IREE_HAL_NUMERICAL_TYPE_UNKNOWN = 0x00,
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED = 0x01,
+  IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED = 0x02,
+  // TODO(benvanik): specialize with semantics from APFloat.
+  IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE = 0x03,
+} iree_hal_numerical_type_t;
+
+#define IREE_HAL_ELEMENT_TYPE_VALUE(numerical_type, bit_count) \
+  (((uint32_t)(numerical_type) << 24) | (uint32_t)(bit_count))
+
+#define iree_hal_make_element_type(numerical_type, bit_count) \
+  (iree_hal_element_type_t)(                                  \
+      IREE_HAL_ELEMENT_TYPE_VALUE(numerical_type, bit_count))
+#define iree_hal_element_numerical_type(element_type) \
+  (iree_hal_numerical_type_t)((uint32_t)(element_type) >> 24)
+#define iree_hal_element_bit_count(element_type) (size_t)((element_type)&0xFF)
+#define iree_hal_element_byte_count(element_type) \
+  ((iree_hal_element_bit_count(element_type) + 8 - 1) / 8)
+
+// Defines the element type of a buffer in a standard format.
+//
+// Composed as a 32-bit bitfield to allow for opaque data types. Use
+// iree_hal_make_element_type to make a bitfield with the appropriate ordering.
+//
+//   MSB --------------------------------- LSB
+//   [numerical type] [x] [x] [number of bits]
+//
+// clang-format off
+typedef enum {
+  IREE_HAL_ELEMENT_TYPE_NONE             = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             0),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_8         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,             8),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_16        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_32        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_OPAQUE_64        = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,            64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_8           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,      8),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_8           = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,    8),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_16          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_16          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_32          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_32          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_SINT_64          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,     64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_UINT_64          = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,   64),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_FLOAT_16         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         16),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_FLOAT_32         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         32),  // NOLINT
+  IREE_HAL_ELEMENT_TYPE_FLOAT_64         = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,         64),  // NOLINT
+} iree_hal_element_type_t;
+// clang-format on
+
+// LINT.ThenChange(//iree/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
+
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Parses a serialized iree_hal_element_type_t and sets |out_element_type| if
+// it is valid. The format is the same as produced by
+// iree_hal_format_element_type.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_parse_element_type(
+    iree_string_view_t value, iree_hal_element_type_t* out_element_type);
+
+// Converts an iree_hal_element_type_t enum value to a canonical string
+// representation, like `IREE_HAL_ELEMENT_TYPE_FLOAT_16` to `f16`.
+// |capacity| defines the size of |buffer| in bytes and |out_length| will return
+// the string length in characters.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_format_element_type(iree_hal_element_type_t element_type,
+                             size_t capacity, char* buffer, size_t* out_length);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Allocator
 //===----------------------------------------------------------------------===//
@@ -287,6 +415,27 @@ iree_hal_allocator_retain(iree_hal_allocator_t* allocator);
 // Releases the given |allocator| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_allocator_release(iree_hal_allocator_t* allocator);
+
+// Calculates the allocation size of a buffer.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_size(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    iree_device_size_t* out_allocation_size);
+
+// Calculates a byte offset into a buffer at the given indices.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_offset(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    const int32_t* indices, size_t indices_count,
+    iree_device_size_t* out_offset);
+
+// Calculates a byte range into a buffer of the given contiguous range.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_allocator_compute_range(
+    const iree_hal_allocator_t* allocator, const int32_t* shape,
+    size_t shape_rank, iree_hal_element_type_t element_type,
+    const int32_t* start_indices, size_t indices_count, const int32_t* lengths,
+    size_t lengths_count, iree_device_size_t* out_start_offset,
+    iree_device_size_t* out_length);
 
 // Allocates a buffer from the allocator.
 // Fails if the memory type requested for the given usage cannot be serviced.
@@ -349,6 +498,10 @@ iree_hal_buffer_retain(iree_hal_buffer_t* buffer);
 // Releases the given |buffer| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_buffer_release(iree_hal_buffer_t* buffer);
+
+// Returns the allocator this buffer was allocated from.
+IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
+iree_hal_buffer_allocator(const iree_hal_buffer_t* buffer);
 
 // Returns the size in bytes of the buffer.
 IREE_API_EXPORT iree_device_size_t IREE_API_CALL
@@ -447,7 +600,14 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_heap_buffer_wrap(
 // Creates a buffer view with the given |buffer|, which may be nullptr.
 // |out_buffer_view| must be released by the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_create(
-    iree_hal_buffer_t* buffer, iree_shape_t shape, int8_t element_size,
+    iree_hal_buffer_t* buffer, const int32_t* shape, size_t shape_rank,
+    iree_hal_element_type_t element_type, iree_allocator_t allocator,
+    iree_hal_buffer_view_t** out_buffer_view);
+
+// Creates a buffer view referencing a subview of the given |buffer_view|.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_subview(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
+    size_t indices_count, const int32_t* lengths, size_t lengths_count,
     iree_allocator_t allocator, iree_hal_buffer_view_t** out_buffer_view);
 
 // Retains the given |buffer_view| for the caller.
@@ -458,30 +618,48 @@ iree_hal_buffer_view_retain(iree_hal_buffer_view_t* buffer_view);
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_buffer_view_release(iree_hal_buffer_view_t* buffer_view);
 
-// Sets the buffer view to point at the new |buffer| with the given metadata.
-// To clear a buffer_view to empty use iree_hal_buffer_view_reset.
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_assign(
-    iree_hal_buffer_view_t* buffer_view, iree_hal_buffer_t* buffer,
-    iree_shape_t shape, int8_t element_size);
-
-// Resets the buffer view to have an empty buffer and shape.
-IREE_API_EXPORT iree_status_t IREE_API_CALL
-iree_hal_buffer_view_reset(iree_hal_buffer_view_t* buffer_view);
-
 // Returns the buffer underlying the buffer view.
 // The caller must retain the returned buffer if they want to continue using it.
 IREE_API_EXPORT iree_hal_buffer_t* IREE_API_CALL
 iree_hal_buffer_view_buffer(const iree_hal_buffer_view_t* buffer_view);
 
-// Returns the shape of the buffer view in |out_shape|.
-// If there is not enough space in |out_shape| to store all dimensions then
-// IREE_STATUS_OUT_OF_RANGE is returned and |out_shape|.rank is set to the rank.
+// Returns the rank of the shape associated with the buffer view.
+IREE_API_EXPORT size_t IREE_API_CALL
+iree_hal_buffer_view_shape_rank(const iree_hal_buffer_view_t* buffer_view);
+
+// Returns the dimensions of the shape in |out_shape| and its rank in
+// |out_shape_rank|. |rank_capacity| indicates the number of dimensions
+// available in the |out_shape| buffer. If there is not enough capacity to store
+// all of the dimensions IREE_STATUS_OUT_OF_RANGE is returned.
+// |out_shape_rank| can be omitted if the rank is already known.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_shape(
-    const iree_hal_buffer_view_t* buffer_view, iree_shape_t* out_shape);
+    const iree_hal_buffer_view_t* buffer_view, size_t rank_capacity,
+    int32_t* out_shape, size_t* out_shape_rank);
+
+// Returns the element type of the buffer.
+IREE_API_EXPORT iree_hal_element_type_t IREE_API_CALL
+iree_hal_buffer_view_element_type(const iree_hal_buffer_view_t* buffer_view);
 
 // Returns the size of each element in the buffer view in bytes.
-IREE_API_EXPORT int8_t IREE_API_CALL
+// Note that not all buffers are contiguous or densely packed.
+IREE_API_EXPORT size_t IREE_API_CALL
 iree_hal_buffer_view_element_size(const iree_hal_buffer_view_t* buffer_view);
+
+// Returns the total size of the specified view in bytes.
+// Note that not all buffers are contiguous or densely packed.
+IREE_API_EXPORT iree_device_size_t IREE_API_CALL
+iree_hal_buffer_view_byte_length(const iree_hal_buffer_view_t* buffer_view);
+
+// Calculates a byte offset into the |buffer_view| at the given indices.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_offset(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* indices,
+    size_t indices_count, iree_device_size_t* out_offset);
+
+// Calculates a byte range into the |buffer_view| of the given contiguous range.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_view_compute_range(
+    const iree_hal_buffer_view_t* buffer_view, const int32_t* start_indices,
+    size_t indices_count, const int32_t* lengths, size_t lengths_count,
+    iree_device_size_t* out_start_offset, iree_device_size_t* out_length);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -530,6 +708,33 @@ iree_hal_command_buffer_execution_barrier(
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers);
 
+// Fills the target buffer with the given repeating value.
+// Expects that |pattern_length| is one of 1, 2, or 4 and that the offset and
+// length are aligned to the natural alignment of the value.
+// The target buffer must be compatible with the devices owned by this
+// device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_fill_buffer(
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* target_buffer,
+    iree_device_size_t target_offset, iree_device_size_t length,
+    const void* pattern, iree_host_size_t pattern_length);
+
+// Updates a range of the given target buffer from the source host memory.
+// The source host memory is copied immediately into the command buffer and
+// occupies command buffer space. It is strongly recommended that large buffer
+// updates are performed via iree_hal_command_buffer_copy_buffer where there is
+// the possibility of a zero-copy path.
+// The |source_buffer| may be releaed by the caller immediately after this
+// call returns.
+// The |target_buffer| must be compatible with the devices owned by this
+// device queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_update_buffer(iree_hal_command_buffer_t* command_buffer,
+                                      const void* source_buffer,
+                                      iree_host_size_t source_offset,
+                                      iree_hal_buffer_t* target_buffer,
+                                      iree_device_size_t target_offset,
+                                      iree_device_size_t length);
+
 // Copies a range of one buffer to another.
 // Both buffers must be compatible with the devices owned by this device
 // queue and be allocated with IREE_HAL_BUFFER_USAGE_TRANSFER. Though the source
@@ -542,6 +747,85 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
     iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* source_buffer,
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length);
+
+// Binds a descriptor set to the given |set| matching that used in the
+// executable layout interface.
+//
+// The descriptor set will remain bound and valid so long as the executable
+// layouts used by dispatches are compatible (same descriptor layouts and push
+// constant sizes).
+//
+// If any dynamic descriptor types are defined in the descriptor set layout then
+// the dynamic offsets must be provided. These offsets will be added to the base
+// offset of the descriptor layout binding.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_bind_descriptor_set(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_layout_t* executable_layout, int32_t set,
+    iree_hal_descriptor_set_t* descriptor_set,
+    iree_host_size_t dynamic_offset_count,
+    const iree_device_size_t* dynamic_offsets);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point, int32_t workgroup_x,
+    int32_t workgroup_y, int32_t workgroup_z);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_dispatch_indirect(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSet
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Creates a descriptor set of the given layout and bindings.
+// Descriptor sets are immutable and retain their bindings.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
+    iree_hal_device_t* device, iree_hal_descriptor_set_layout_t* set_layout,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_binding_t* bindings,
+    iree_allocator_t allocator, iree_hal_descriptor_set_t** out_descriptor_set);
+
+// Retains the given |set| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_retain(iree_hal_descriptor_set_t* descriptor_set);
+
+// Releases the given |set| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::DescriptorSetLayout
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Creates a descriptor set layout with the given bindings.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_layout_create(
+    iree_hal_device_t* device, iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_layout_binding_t* bindings,
+    iree_allocator_t allocator,
+    iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
+
+// Retains the given |descriptor_set_layout| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_layout_retain(
+    iree_hal_descriptor_set_layout_t* descriptor_set_layout);
+
+// Releases the given |descriptor_set_layout| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_descriptor_set_layout_release(
+    iree_hal_descriptor_set_layout_t* descriptor_set_layout);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
@@ -646,6 +930,31 @@ iree_hal_executable_retain(iree_hal_executable_t* executable);
 // Releases the given |executable| from the caller.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_executable_release(iree_hal_executable_t* executable);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
+// iree::hal::ExecutableLayout
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Creates an executable layout composed of the given descriptor set layouts.
+// The returned executable layout can be used by multiple executables with the
+// same compatible resource binding layouts.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
+    iree_hal_device_t* device, iree_host_size_t set_layout_count,
+    const iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_host_size_t push_constants, iree_allocator_t allocator,
+    iree_hal_executable_layout_t** out_executable_layout);
+
+// Retains the given |executable_layout| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_retain(
+    iree_hal_executable_layout_t* executable_layout);
+
+// Releases the given |executable_layout| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_release(
+    iree_hal_executable_layout_t* executable_layout);
 
 #endif  // IREE_API_NO_PROTOTYPES
 

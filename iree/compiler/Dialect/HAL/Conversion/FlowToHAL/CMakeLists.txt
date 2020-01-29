@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     FlowToHAL
@@ -24,12 +26,15 @@ iree_cc_library(
     "ConvertTensorOps.cpp"
     "ConvertVariableOps.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Dialect::HAL::Utils
-    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::IR
     LLVMSupport
     MLIRIR
     MLIRPass

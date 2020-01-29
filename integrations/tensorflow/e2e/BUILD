@@ -13,7 +13,7 @@
 # limitations under the License.
 
 load(
-    "//iree:build_defs.bzl",
+    "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
 )
@@ -31,16 +31,19 @@ package(
         # TODO(b/145815906) Get this running in OSS CI.
         tags = ["nokokoro"],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-            "//bindings/python/pyiree",
+            "//bindings/python/pyiree/tf/support",
         ],
     )
     for name in [
         "control_flow_test",
+        "dynamic_mlp_test",
         "exported_names_test",
         "keras_lstm_test",
+        "linspace_test",
         "simple_stateful_test",
         "mandelbrot_test",
         "simple_arithmetic_test",
+        "batch_norm_test",
     ]
 ]
 
@@ -54,6 +57,6 @@ py_test(
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//bindings/python/pyiree",
+        "//bindings/python/pyiree/tf/support",
     ],
 )

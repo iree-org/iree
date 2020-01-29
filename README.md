@@ -1,9 +1,10 @@
 # IREE: An Experimental MLIR Execution Environment
 
-**DISCLAIMER**: This is not an officially supported Google product. It's an
-experimental playground for low-level/tightly integrated machine learning
-libraries that make use of modern hardware acceleration APIs and techniques (see
-[non goals](#non-goals)).
+**DISCLAIMER**: This is an early phase project that we hope will graduate into a
+supported form someday, but it is far from ready for everyday use and is made
+available without any support. With that said, feel free to browse the issues
+and reach out on the
+[iree-discuss mailing list](https://groups.google.com/forum/#!forum/iree-discuss).
 
 ## Table of Contents
 
@@ -26,9 +27,9 @@ to join/post/read messages on the
 
 CI System      | Build System | Platform | Status
 -------------- | ------------ | -------- | ------
-GitHub Actions | CMake        | Linux    | [![github-cmake-linux-status](https://github.com/google/iree/workflows/CMake%20Build/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22CMake+Build%22)
-GitHub Actions | Bazel        | Linux    | [![github-bazel-linux-status](https://github.com/google/iree/workflows/Bazel%20Build/badge.svg)](https://github.com/google/iree/actions?query=branch%3Amaster+event%3Apush+workflow%3A%22Bazel+Build%22)
+GitHub Actions | Bazel        | Linux    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build%22)
 Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
+Kokoro         | CMake        | Linux    | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_result_linux.html)
 
 ## Quickstart
 
@@ -45,14 +46,16 @@ See also:
 
 *   [Using Colab](docs/using_colab.md)
 *   [Vulkan and SPIR-V](docs/vulkan_and_spirv.md)
+*   [Function ABI](docs/function_abi.md)
+*   [MNIST example on IREE](docs/mnist_example.md)
+*   [Details of IREE Repository Management](docs/repository_management.md)
 
 ## Project Goals
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
 pronounced as "eerie") is an experimental compiler backend for
-[MLIR](https://github.com/tensorflow/mlir) that lowers ML models to an IR that
-is optimized for real-time mobile/edge inference against heterogeneous hardware
-accelerators.
+[MLIR](https://mlir.llvm.org/) that lowers ML models to an IR that is optimized
+for real-time mobile/edge inference against heterogeneous hardware accelerators.
 
 The IR produced contains the sequencing information required to communicate
 pipelined data dependencies and parallelism to low-level hardware APIs like
@@ -122,20 +125,6 @@ to make ML efficient on their hardware without the need for bespoke runtimes and
 special access such that any ML workload produced by any tool runs well. We'd
 consider the IREE experiment a success if what resulted was some worked examples
 that help advance the entire ecosystem!
-
-## Non-Goals
-
-*   Replace parts of the supported TensorFlow ecosystem of tools: The authors
-    within Google work closely with TensorFlow and contribute to it regularly.
-    However, IREE is exploring some different angles of the problem and is
-    experimental. We will seek to leverage anything of value that we learn in an
-    appropriate way to make TensorFlow better over time, but the two should not
-    be conflated.
-*   Providing an [SLA](https://en.wikipedia.org/wiki/Service-level_agreement) of
-    any kind: IREE is infrastructure research, not a supported product. If it
-    gains mind-share or traction, we would revisit that in conjunction with
-    finding a more permanent way to align it with the broader constellation of
-    ML tooling.
 
 ## Milestones
 
@@ -220,9 +209,9 @@ particular use case please file an issue so we can make sure to fix it.
 
 The compiler has several layers that allow scaling the dependencies required
 based on the source and target formats. In all cases
-[MLIR](https://github.com/tensorflow/mlir) is required and for models not
-originating from TensorFlow (or already in XLA HLO format) it is the only
-dependency. When targeting the IREE Runtime VM and HAL
+[MLIR](https://mlir.llvm.org/) is required and for models not originating from
+TensorFlow (or already in XLA HLO format) it is the only dependency. When
+targeting the IREE Runtime VM and HAL
 [FlatBuffers](https://google.github.io/flatbuffers/) is required for
 serialization. Converting from TensorFlow models requires a dependency on
 TensorFlow (however only those parts required for conversion).

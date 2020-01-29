@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     IR
@@ -25,10 +27,12 @@ iree_cc_library(
     "IREEDialect.cpp"
     "IREEOps.cpp"
     "IREEOps.cpp.inc"
+    "IREETypes.cpp"
   DEPS
     LLVMSupport
     MLIRIR
     MLIRParser
+    MLIRStandardOps
     MLIRSupport
   ALWAYSLINK
   PUBLIC
@@ -38,7 +42,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     IREEOpsGen
-  SRCS
+  TD_FILE
     IREEOps.td
   OUTS
     -gen-op-decls IREEOps.h.inc

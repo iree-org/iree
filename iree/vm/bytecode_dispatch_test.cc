@@ -44,20 +44,19 @@ std::vector<TestParams> GetModuleTestParams() {
   const auto* module_file_toc =
       iree::vm::bytecode_dispatch_test_module_create();
   iree_vm_module_t* module = nullptr;
-  CHECK_EQ(IREE_STATUS_OK,
-           iree_vm_bytecode_module_create(
-               iree_const_byte_span_t{
-                   reinterpret_cast<const uint8_t*>(module_file_toc->data),
-                   module_file_toc->size},
-               IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
+  IREE_CHECK_OK(iree_vm_bytecode_module_create(
+      iree_const_byte_span_t{
+          reinterpret_cast<const uint8_t*>(module_file_toc->data),
+          module_file_toc->size},
+      IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &module))
       << "Bytecode module failed to load";
   iree_vm_module_signature_t signature = module->signature(module->self);
   function_names.reserve(signature.export_function_count);
   for (int i = 0; i < signature.export_function_count; ++i) {
     iree_string_view_t name;
-    CHECK_EQ(IREE_STATUS_OK,
-             module->get_function(module->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                                  i, nullptr, &name, nullptr));
+    IREE_CHECK_OK(module->get_function(module->self,
+                                       IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
+                                       nullptr, &name, nullptr));
     function_names.push_back({std::string(name.data, name.size)});
   }
   iree_vm_module_release(module);
@@ -70,23 +69,21 @@ class VMBytecodeDispatchTest
       public ::testing::WithParamInterface<TestParams> {
  protected:
   virtual void SetUp() {
-    CHECK_EQ(IREE_STATUS_OK,
-             iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
 
     const auto* module_file_toc =
         iree::vm::bytecode_dispatch_test_module_create();
-    CHECK_EQ(IREE_STATUS_OK,
-             iree_vm_bytecode_module_create(
-                 iree_const_byte_span_t{
-                     reinterpret_cast<const uint8_t*>(module_file_toc->data),
-                     module_file_toc->size},
-                 IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
+    IREE_CHECK_OK(iree_vm_bytecode_module_create(
+        iree_const_byte_span_t{
+            reinterpret_cast<const uint8_t*>(module_file_toc->data),
+            module_file_toc->size},
+        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
         << "Bytecode module failed to load";
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
-    CHECK_EQ(IREE_STATUS_OK, iree_vm_context_create_with_modules(
-                                 instance_, modules.data(), modules.size(),
-                                 IREE_ALLOCATOR_SYSTEM, &context_));
+    IREE_CHECK_OK(iree_vm_context_create_with_modules(
+        instance_, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
+        &context_));
   }
 
   virtual void TearDown() {
@@ -97,11 +94,10 @@ class VMBytecodeDispatchTest
 
   iree_status_t RunFunction(absl::string_view function_name) {
     iree_vm_function_t function;
-    CHECK_EQ(IREE_STATUS_OK,
-             bytecode_module_->lookup_function(
-                 bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                 iree_string_view_t{function_name.data(), function_name.size()},
-                 &function))
+    IREE_CHECK_OK(bytecode_module_->lookup_function(
+        bytecode_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+        iree_string_view_t{function_name.data(), function_name.size()},
+        &function))
         << "Exported function '" << function_name << "' not found";
 
     return iree_vm_invoke(context_, function,
@@ -119,7 +115,7 @@ TEST_P(VMBytecodeDispatchTest, Check) {
   bool expect_failure = absl::StartsWith(test_params.function_name, "fail_");
 
   iree_status_t result = RunFunction(test_params.function_name);
-  if (result == IREE_STATUS_OK) {
+  if (iree_status_is_ok(result)) {
     if (expect_failure) {
       GTEST_FAIL() << "Function expected failure but succeeded";
     } else {

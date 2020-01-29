@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     HALToVM
@@ -20,6 +22,7 @@ iree_cc_library(
   SRCS
     "ConvertAllocatorOps.cpp"
     "ConvertBufferOps.cpp"
+    "ConvertBufferViewOps.cpp"
     "ConvertCommandBufferOps.cpp"
     "ConvertDeviceOps.cpp"
     "ConvertExecutableOps.cpp"
@@ -27,13 +30,10 @@ iree_cc_library(
     "ConvertHALToVM.cpp"
     "ConvertVariableOps.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::HAL::hal_imports
-    iree::compiler::Dialect::HAL::IR::IR
-    iree::compiler::Dialect::HAL::IR::HALEnumsGen
-    iree::compiler::Dialect::HAL::IR::HALOpInterfaceGen
-    iree::compiler::Dialect::HAL::IR::HALOpsGen
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR

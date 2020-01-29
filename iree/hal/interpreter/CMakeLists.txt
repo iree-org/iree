@@ -20,13 +20,14 @@ iree_cc_library(
   SRCS
     "bytecode_cache.cc"
   DEPS
+    iree::hal::interpreter::bytecode_executable
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_cache
     iree::hal::executable_format
-    iree::hal::interpreter::bytecode_executable
   PUBLIC
 )
 
@@ -35,8 +36,6 @@ iree_cc_library(
     bytecode_executable
   HDRS
     "bytecode_dispatch.h"
-    "bytecode_dispatch_conversion.h"
-    "bytecode_dispatch_util.h"
     "bytecode_executable.h"
     "bytecode_reader.h"
     "bytecode_tables_interpreter.h"
@@ -44,8 +43,10 @@ iree_cc_library(
     "stack.h"
     "type.h"
   SRCS
-    "bytecode_cache.cc"
+    "bytecode_dispatch.cc"
+    "bytecode_dispatch_conversion.h"
     "bytecode_dispatch_util.cc"
+    "bytecode_dispatch_util.h"
     "bytecode_executable.cc"
     "bytecode_reader.cc"
     "bytecode_tables_interpreter.cc"
@@ -53,23 +54,26 @@ iree_cc_library(
     "stack.cc"
     "type.cc"
   DEPS
-    absl::base
-    absl::core_headers
-    absl::inlined_vector
-    absl::span
+    iree::hal::interpreter::bytecode_kernels
     iree::base::flatbuffer_util
     iree::base::logging
     iree::base::memory
+    iree::base::ref_ptr
     iree::base::shape
     iree::base::status
+    iree::base::tracing
     iree::hal::allocator
     iree::hal::buffer_view
     iree::hal::executable
     iree::hal::executable_spec
-    iree::hal::interpreter::bytecode_kernels
     iree::hal::heap_buffer
     iree::schemas::interpreter_module_def_cc_fbs
     iree::schemas::bytecode::interpreter_bytecode_v0
+    absl::core_headers
+    absl::inlined_vector
+    absl::strings
+    absl::optional
+    absl::span
   PUBLIC
 )
 
@@ -81,16 +85,16 @@ iree_cc_library(
     "bytecode_kernels_generic.h"
     "bytecode_kernels_ruy.h"
   DEPS
-    absl::algorithm
-    absl::base
-    absl::flat_hash_set
-    absl::inlined_vector
-    absl::memory
-    absl::span
     iree::base::shape
     iree::base::status
     iree::base::tracing
     iree::hal::buffer_view
+    absl::algorithm
+    absl::core_headers
+    absl::flat_hash_set
+    absl::inlined_vector
+    absl::memory
+    absl::span
     ruy
   PUBLIC
 )
@@ -101,10 +105,10 @@ iree_cc_test(
   SRCS
     "bytecode_kernels_test.cc"
   DEPS
-    gtest_main
+    iree::hal::interpreter::bytecode_kernels
     iree::base::memory
     iree::base::status_matchers
-    iree::hal::interpreter::bytecode_kernels
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
@@ -115,14 +119,14 @@ iree_cc_library(
   SRCS
     "interpreter_command_processor.cc"
   DEPS
-    absl::inlined_vector
-    absl::span
-    flatbuffers
+    iree::hal::interpreter::bytecode_executable
+    iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::buffer_view
     iree::hal::host::host_local_command_processor
-    ruy
+    absl::inlined_vector
+    absl::span
   PUBLIC
 )
 
@@ -134,9 +138,9 @@ iree_cc_library(
   SRCS
     "interpreter_device.cc"
   DEPS
-    absl::inlined_vector
-    absl::memory
-    absl::span
+    iree::hal::interpreter::bytecode_cache
+    iree::hal::interpreter::bytecode_kernels
+    iree::hal::interpreter::interpreter_command_processor
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -149,9 +153,9 @@ iree_cc_library(
     iree::hal::host::host_local_allocator
     iree::hal::host::host_submission_queue
     iree::hal::host::inproc_command_buffer
-    iree::hal::interpreter::bytecode_cache
-    iree::hal::interpreter::bytecode_kernels
-    iree::hal::interpreter::interpreter_command_processor
+    absl::inlined_vector
+    absl::memory
+    absl::span
   PUBLIC
 )
 
@@ -163,9 +167,9 @@ iree_cc_library(
   SRCS
     "interpreter_driver.cc"
   DEPS
+    iree::hal::interpreter::interpreter_device
     iree::hal::device_info
     iree::hal::driver
-    iree::hal::interpreter::interpreter_device
   PUBLIC
 )
 
@@ -175,9 +179,10 @@ iree_cc_library(
   SRCS
     "interpreter_driver_module.cc"
   DEPS
+    iree::hal::interpreter::interpreter_driver
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
-    iree::hal::interpreter::interpreter_driver
+  ALWAYSLINK
   PUBLIC
 )

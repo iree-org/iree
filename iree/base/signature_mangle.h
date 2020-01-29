@@ -182,6 +182,8 @@ class RawSignatureMangler {
   void AddShapedNDBuffer(AbiConstants::ScalarType element_type,
                          absl::Span<const int> shape);
 
+  void AddScalar(AbiConstants::ScalarType type);
+
   const SignatureBuilder& builder() const { return builder_; }
 
  private:
@@ -196,6 +198,7 @@ class RawSignatureParser {
   enum class Type {
     kBuffer = 0,
     kRefObject = 1,
+    kScalar = 2,
   };
 
   // Description of an input or result.
@@ -211,6 +214,10 @@ class RawSignatureParser {
       struct {
         AbiConstants::ScalarType scalar_type;
       } buffer;
+      // Further details for Type == kScalar.
+      struct {
+        AbiConstants::ScalarType type;
+      } scalar;
     };
 
     // Human readable description.
@@ -268,6 +275,11 @@ class RawSignatureParser {
             return;
           }
           break;
+        case 'S':
+          if (!FillScalar(d, SignatureParser(item_parser.nested()))) {
+            return;
+          }
+          break;
         default:
           SetError("Unrecognized raw tag");
           return;
@@ -276,6 +288,30 @@ class RawSignatureParser {
       v(d);
       item_parser.Next();
     }
+  }
+
+  bool FillScalar(Description& d, SignatureParser p) {
+    d.type = Type::kScalar;
+    d.buffer.scalar_type = AbiConstants::ScalarType::kIeeeFloat32;  // Default
+    while (!p.end_or_error()) {
+      switch (p.tag()) {
+        case 't':
+          if (p.ival() < 0 ||
+              p.ival() >
+                  static_cast<int>(AbiConstants::ScalarType::kMaxScalarType)) {
+            SetError("Illegal ScalarType code");
+            return false;
+          }
+          d.buffer.scalar_type =
+              static_cast<AbiConstants::ScalarType>(p.ival());
+          break;
+        default:
+          SetError("Unrecognized scalar field tag");
+          return false;
+      }
+      p.Next();
+    }
+    return true;
   }
 
   bool FillBuffer(Description& d, SignatureParser p) {

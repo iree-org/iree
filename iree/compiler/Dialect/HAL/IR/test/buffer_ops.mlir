@@ -2,6 +2,16 @@
 
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
+// CHECK-LABEL: @buffer_allocator
+func @buffer_allocator() -> !iree.ref<!hal.allocator> {
+  %0 = "test_hal.buffer"() : () -> !iree.ref<!hal.buffer>
+  // CHECK: %allocator = hal.buffer.allocator %0 : !iree.ref<!hal.allocator>
+  %allocator = hal.buffer.allocator %0 : !iree.ref<!hal.allocator>
+  return %allocator : !iree.ref<!hal.allocator>
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_subspan
 func @buffer_subspan() -> !iree.ref<!hal.buffer> {
   %0 = "test_hal.buffer"() : () -> !iree.ref<!hal.buffer>
@@ -81,49 +91,4 @@ func @buffer_store(%arg0 : i32, %arg1 : !iree.ref<!hal.buffer>) {
   // CHECK: hal.buffer.store %arg0, %arg1[%0] : i32
   hal.buffer.store %arg0, %arg1[%0] : i32
   return
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_view_compute_offset
-func @buffer_view_compute_offset(%arg0 : !iree.ref<!hal.buffer>) -> i32 {
-  %0:2 = "test_hal.shape"() : () -> (i32, i32)
-  %1:2 = "test_hal.indices"() : () -> (i32, i32)
-  // CHECK: %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], element_size=4
-  %off = hal.buffer_view.compute_offset %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], element_size=4
-  return %off : i32
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_view_compute_length
-func @buffer_view_compute_length(%arg0 : !iree.ref<!hal.buffer>) -> i32 {
-  %0:2 = "test_hal.shape"() : () -> (i32, i32)
-  // CHECK: %len = hal.buffer_view.compute_length %arg0, shape=[%0#0, %0#1], element_size=4
-  %len = hal.buffer_view.compute_length %arg0, shape=[%0#0, %0#1], element_size=4
-  return %len : i32
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_view_compute_range
-func @buffer_view_compute_range(%arg0 : !iree.ref<!hal.buffer>) -> (i32, i32) {
-  %0:2 = "test_hal.shape"() : () -> (i32, i32)
-  %1:2 = "test_hal.indices"() : () -> (i32, i32)
-  %2:2 = "test_hal.lengths"() : () -> (i32, i32)
-  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
-  %off, %len = hal.buffer_view.compute_range %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
-  return %off, %len : i32, i32
-}
-
-// -----
-
-// CHECK-LABEL: @buffer_view_slice
-func @buffer_view_slice(%arg0 : !iree.ref<!hal.buffer>) -> !iree.ref<!hal.buffer> {
-  %0:2 = "test_hal.shape"() : () -> (i32, i32)
-  %1:2 = "test_hal.indices"() : () -> (i32, i32)
-  %2:2 = "test_hal.lengths"() : () -> (i32, i32)
-  // CHECK: %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
-  %slice = hal.buffer_view.slice %arg0, shape=[%0#0, %0#1], indices=[%1#0, %1#1], lengths=[%2#0, %2#1], element_size=4
-  return %slice : !iree.ref<!hal.buffer>
 }

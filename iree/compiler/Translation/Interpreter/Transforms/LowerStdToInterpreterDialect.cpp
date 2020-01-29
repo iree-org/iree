@@ -113,7 +113,7 @@ struct CompareOpLowering : public OpConversionPattern<SrcOp> {
     auto predicate =
         rewriter.getI32IntegerAttr(static_cast<int32_t>(op.getPredicate()));
 
-    auto dstType = convertTypeToMemRef(op.getResult());
+    auto dstType = convertLegacyTypeToMemRef(op.getResult());
     auto midOp = rewriter.create<DstOp>(op.getLoc(), dstType, predicate,
                                         lhValue, rhValue);
 
