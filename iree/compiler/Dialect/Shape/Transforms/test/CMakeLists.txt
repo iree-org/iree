@@ -17,6 +17,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "expand_function_dynamic_dims.mlir"
+    "materialize_shape_calculations.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
