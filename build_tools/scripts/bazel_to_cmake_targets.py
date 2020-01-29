@@ -74,6 +74,10 @@ MLIR_EXPLICIT_TARGET_MAPPING = {
         "MLIRStandardOps",
     "@llvm-project//mlir:StandardToSPIRVConversions":
         "MLIRStandardToSPIRVTransforms",
+    "@llvm-project//mlir:TableGen":
+        "LLVMMLIRTableGen",
+    "@llvm-project//mlir:MlirTableGenMain":
+        "MLIRTableGen",
     "@llvm-project//mlir:MlirOptMain":
         "MLIROptMain",
 }
