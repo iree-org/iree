@@ -688,6 +688,8 @@ extern "C" int main(int argc, char** argv) {
                mapped_memory.contents.data_length);
         iree_hal_buffer_unmap(output_buffer, &mapped_memory);
         iree_vm_variant_list_free(output_list);
+
+        dirty = false;
       }
 
       // Display the latest computation output.
