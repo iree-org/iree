@@ -30,4 +30,5 @@ iree_cc_embed_data(
   CPP_NAMESPACE
     "mlir::iree_compiler"
   FLATTEN
+  PUBLIC
 )

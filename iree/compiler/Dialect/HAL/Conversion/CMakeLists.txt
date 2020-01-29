@@ -28,9 +28,9 @@ iree_cc_library(
   DEPS
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::IREE::IR
     MLIRIR
-    MLIRParser
     MLIRStandardOps
     MLIRTransforms
   PUBLIC

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     Transforms
@@ -21,11 +23,8 @@ iree_cc_library(
     "ExpandFunctionDynamicDims.cpp"
   DEPS
     iree::compiler::Dialect::Shape::IR
-    LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRSupport
-    MLIRTransformUtils
     MLIRTransforms
   ALWAYSLINK
   PUBLIC
