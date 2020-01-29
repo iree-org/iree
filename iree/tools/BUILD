@@ -69,6 +69,7 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/Transforms",
         "//iree/compiler/Translation/Interpreter/Transforms",
         "//iree/compiler/Translation:IREEVM",
+        "//iree/compiler/Translation/LLVM/Transforms:Passes",
         "//iree/compiler/Translation/XLAToLinalg",
         "//iree/compiler/Translation/XLAToLinalg:IREELinalgTensorToBuffer",
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",

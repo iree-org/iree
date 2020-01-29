@@ -13,6 +13,7 @@
 # limitations under the License.
 
 add_subdirectory(Interpreter)
+add_subdirectory(LLVM)
 add_subdirectory(SPIRV)
 add_subdirectory(XLAToLinalg)
 add_subdirectory(test)
