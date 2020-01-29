@@ -39,6 +39,7 @@ def _convert_absl_target(target):
 
 LLVM_TARGET_MAPPING = {
     "@llvm-project//llvm:support": "LLVMSupport",
+    "@llvm-project//llvm:tablegen": "LLVMTableGen",
 }
 
 VULKAN_HEADERS_MAPPING = {
