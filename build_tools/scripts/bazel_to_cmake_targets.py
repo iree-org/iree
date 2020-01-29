@@ -134,6 +134,8 @@ def convert_external_target(target):
   if target.startswith("@org_tensorflow//tensorflow/lite/experimental/ruy"):
     # All Bazel targets map to a single CMake target.
     return "ruy"
+  if target.startswith("@sdl2//:SDL2"):
+    return "SDL2-static"
   if target.startswith("@vulkan_headers"):
     return VULKAN_HEADERS_MAPPING[target]
 
