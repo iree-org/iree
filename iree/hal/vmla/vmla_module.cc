@@ -16,6 +16,7 @@
 
 #include "absl/types/span.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vmla/op_kernels.h"
 #include "iree/vm/module_abi_cc.h"
 #include "iree/vm/module_abi_packing.h"
 
@@ -52,7 +53,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vmla_module_register_types() {
 // Thread-compatible.
 class VMLAModuleState final {
  public:
-  VMLAModuleState(iree_allocator_t allocator) : allocator_(allocator) {}
+  VMLAModuleState(iree_allocator_t allocator,
+                  kernels::RuntimeState* kernel_state)
+      : allocator_(allocator), kernel_state_(kernel_state) {}
 
   ~VMLAModuleState() = default;
 
@@ -60,6 +63,12 @@ class VMLAModuleState final {
 
  private:
   iree_allocator_t allocator_;
+
+  // NOTE: kernel state must be externally synchronized as it is shared across
+  // all contexts using the VMLA module. This is fine in our current design as
+  // we only ever execute a single context at a time but if we start to allow
+  // concurrency across contexts we'll need to introduce locks.
+  kernels::RuntimeState* kernel_state_ = nullptr;
 };
 
 //===----------------------------------------------------------------------===//
@@ -86,18 +95,20 @@ class VMLAModule final : public vm::NativeModule<VMLAModuleState> {
 
   Status Initialize() {
     IREE_TRACE_SCOPE0("VMLAModule::Initialize");
-
     return OkStatus();
   }
 
   StatusOr<std::unique_ptr<VMLAModuleState>> CreateState(
       iree_allocator_t allocator) override {
     IREE_TRACE_SCOPE0("VMLAModule::CreateState");
-    auto state = std::make_unique<VMLAModuleState>(allocator);
+    auto state = std::make_unique<VMLAModuleState>(allocator, &kernel_state_);
     return state;
   }
 
  private:
+  // NOTE: shared across all contexts with the VMLA module loaded. See
+  // VMLAModuleState::kernel_state_ for more information.
+  kernels::RuntimeState kernel_state_;
 };
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vmla_module_create(

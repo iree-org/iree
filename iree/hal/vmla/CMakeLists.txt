@@ -14,6 +14,39 @@
 
 iree_cc_library(
   NAME
+    op_kernels
+  HDRS
+    "op_kernels.h"
+    "op_kernels_generic.h"
+    "op_kernels_ruy.h"
+  DEPS
+    iree::base::shape
+    iree::base::status
+    iree::base::tracing
+    absl::algorithm
+    absl::core_headers
+    absl::flat_hash_set
+    absl::inlined_vector
+    absl::memory
+    absl::span
+    ruy
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    op_kernels_test
+  SRCS
+    "op_kernels_test.cc"
+  DEPS
+    iree::hal::vmla::op_kernels
+    iree::base::memory
+    iree::base::status_matchers
+    iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
     vmla_cache
   HDRS
     "vmla_cache.h"
@@ -145,6 +178,7 @@ iree_cc_library(
   SRCS
     "vmla_module.cc"
   DEPS
+    iree::hal::vmla::op_kernels
     iree::base::api
     iree::base::tracing
     iree::vm

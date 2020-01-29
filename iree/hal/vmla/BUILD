@@ -20,6 +20,40 @@ package(
 )
 
 cc_library(
+    name = "op_kernels",
+    hdrs = ["op_kernels.h"],
+    textual_hdrs = [
+        # TODO(benvanik): SIMD variants.
+        "op_kernels_generic.h",
+        "op_kernels_ruy.h",
+    ],
+    deps = [
+        "//iree/base:shape",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "@com_google_absl//absl/algorithm",
+        "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:flat_hash_set",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
+        "@org_tensorflow//tensorflow/lite/experimental/ruy",
+        "@org_tensorflow//tensorflow/lite/experimental/ruy:context",
+    ],
+)
+
+cc_test(
+    name = "op_kernels_test",
+    srcs = ["op_kernels_test.cc"],
+    deps = [
+        ":op_kernels",
+        "//iree/base:memory",
+        "//iree/base:status_matchers",
+        "//iree/testing:gtest_main",
+    ],
+)
+
+cc_library(
     name = "vmla_cache",
     srcs = ["vmla_cache.cc"],
     hdrs = ["vmla_cache.h"],
@@ -132,6 +166,7 @@ cc_library(
     srcs = ["vmla_module.cc"],
     hdrs = ["vmla_module.h"],
     deps = [
+        ":op_kernels",
         "//iree/base:api",
         "//iree/base:tracing",
         "//iree/vm",
