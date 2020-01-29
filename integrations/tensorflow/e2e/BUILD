@@ -35,15 +35,16 @@ package(
         ],
     )
     for name in [
+        "batch_norm_test",
         "control_flow_test",
         "dynamic_mlp_test",
         "exported_names_test",
         "keras_lstm_test",
         "linspace_test",
-        "simple_stateful_test",
         "mandelbrot_test",
+        "math_test",
         "simple_arithmetic_test",
-        "batch_norm_test",
+        "simple_stateful_test",
     ]
 ]
 
