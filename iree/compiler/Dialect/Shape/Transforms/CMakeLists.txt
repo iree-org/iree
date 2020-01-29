@@ -20,12 +20,15 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "CleanupPlaceholders.cpp"
     "ExpandFunctionDynamicDims.cpp"
+    "MaterializeShapeCalculations.cpp"
   DEPS
     iree::compiler::Dialect::Shape::IR
     MLIRIR
     MLIRPass
     MLIRTransforms
+    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )

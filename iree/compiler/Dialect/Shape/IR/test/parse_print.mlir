@@ -31,3 +31,11 @@ func @ranked_dim(%arg0 : !shape.ranked_shape<2x4xi32>)  {
   %0 = shape.ranked_dim %arg0[1] : !shape.ranked_shape<2x4xi32>
   return
 }
+
+// -----
+// CHECK-LABEL: @cast_compatible_shape
+func @cast_compatible_shape(%arg0 : !shape.ranked_shape<2x4xi32>, %arg1 : !shape.ranked_shape<2x4xi32>)  {
+  %0 = shape.cast_compatible_shape %arg0, %arg1 : !shape.ranked_shape<2x4xi32>, !shape.ranked_shape<2x4xi32> ->
+      !shape.ranked_shape<2x4xi32>
+  return
+}

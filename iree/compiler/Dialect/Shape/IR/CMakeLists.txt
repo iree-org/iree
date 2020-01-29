@@ -16,11 +16,13 @@ iree_cc_library(
   NAME
     IR
   HDRS
+    "Builders.h"
     "ShapeDialect.h"
     "ShapeOps.h"
     "ShapeOps.h.inc"
     "ShapeTypes.h"
   SRCS
+    "Builders.cpp"
     "ShapeDialect.cpp"
     "ShapeOps.cpp"
     "ShapeOps.cpp.inc"

@@ -51,6 +51,30 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape"> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
+def Shape_CastCompatibleShapeOp : Shape_PureOp<"cast_compatible_shape"> {
+  let summary = "Casts and asserts that one or more shapes are compatible.";
+  let description = [{
+    In the most general case, each operand and the result can have different
+    shapes, so long as:
+      a) The operand shapes are co-compatible (known dimensions are equal
+         or unknown).
+      b) The result shape is at least as general as the operand shapes.
+
+    TODO: This op is currently very conservative, statically verifying that
+    all of the shapes are strictly the same.
+
+    Usage:
+      %0 = shape.cast_compatible_shape %1, ... %3 :
+          !shape.ranked_shape<...>...
+  }];
+
+  let arguments = (ins Variadic<Shape_RankedShape>:$operands);
+  let results = (outs Shape_RankedShape:$result);
+
+  let verifier = [{ return verify$cppClass(*this); }];
+  let hasCanonicalizer = 1;
+}
+
 def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
   let summary = "Gets the RankedShape associated with the given Tensor.";
   let description = [{
@@ -73,7 +97,7 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
     Any get_ranked_shape on a fully static shape will canonicalize to a const
     with unit value:
-      %0 = constant
+      %0 = constant_ranked_shape : !shape.ranked_shape<1x2xi32>
   }];
 
   let arguments = (ins AnyTensor:$operand);
@@ -81,6 +105,12 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
   let verifier = [{ return verify$cppClass(*this); }];
   let hasCanonicalizer = 1;
+
+  let extraClassDeclaration = [{
+    RankedShapeType getRankedShape() {
+      return shape().getType().cast<RankedShapeType>();
+    }
+  }];
 }
 
 def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape"> {

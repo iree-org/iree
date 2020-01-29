@@ -26,6 +26,13 @@ namespace iree_compiler {
 // rewrites it so that the dynamic dims are passed in/out.
 std::unique_ptr<OpPassBase<ModuleOp>> createExpandFunctionDynamicDimsPass();
 
+// Materializes shape calculations for any get_ranked_shape ops.
+std::unique_ptr<OpPassBase<FuncOp>> createMaterializeShapeCalculationsPass();
+
+// Cleans up any unnecessary shape placeholder ops. Can be run after all
+// shape calculation code has been lowered.
+std::unique_ptr<OpPassBase<FuncOp>> createCleanupShapePlaceholdersPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

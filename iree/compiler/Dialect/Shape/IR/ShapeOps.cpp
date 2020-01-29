@@ -58,7 +58,26 @@ class ElideTiedGetRankedShapePattern
   }
 };
 
-class ElideStaticGetRankedShape : public OpRewritePattern<GetRankedShapeOp> {
+class ElideDuplicateGetRankedShapePattern
+    : public OpRewritePattern<GetRankedShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    // If the immediate predecessor is a GetRankedShapeOp, then this op can be
+    // erased in favor of the input to the tie op.
+    if (!matchPattern(op.operand(), m_Op<GetRankedShapeOp>())) {
+      return matchFailure();
+    }
+
+    auto precedingGetRankedShapeOp =
+        cast<GetRankedShapeOp>(op.operand().getDefiningOp());
+    rewriter.replaceOp(op, precedingGetRankedShapeOp.shape(), op.operand());
+    return matchSuccess();
+  }
+};
+
+class ElideStaticGetRankedShapePattern
+    : public OpRewritePattern<GetRankedShapeOp> {
   using OpRewritePattern::OpRewritePattern;
   PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
                                      PatternRewriter &rewriter) const override {
@@ -70,6 +89,30 @@ class ElideStaticGetRankedShape : public OpRewritePattern<GetRankedShapeOp> {
 
     rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, shapeType);
     return matchSuccess();
+  }
+};
+
+class SafeCastCompatibleShapePattern
+    : public OpRewritePattern<CastCompatibleShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(CastCompatibleShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    // TODO(laurenzo): This is just eliding if everything is the same. Make
+    // it generic.
+    auto resultRs = op.result().getType().dyn_cast<RankedShapeType>();
+    if (resultRs) {
+      // Casting to a ranked shape.
+      for (auto operandType : op.getOperandTypes()) {
+        auto operandRs = operandType.dyn_cast<RankedShapeType>();
+        if (!operandRs || operandRs != resultRs) {
+          return matchFailure();
+        }
+      }
+      rewriter.replaceOp(op, op.operands()[0]);
+      return matchSuccess();
+    }
+
+    return matchFailure();
   }
 };
 
@@ -123,6 +166,66 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// shape.cast_compatible_shape
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseCastCompatibleShapeOp(OpAsmParser &parser,
+                                              OperationState &state) {
+  SmallVector<OpAsmParser::OperandType, 2> operands;
+  SmallVector<Type, 2> operandTypes;
+  if (parser.parseOperandList(operands) ||
+      parser.parseColonTypeList(operandTypes) ||
+      parser.parseOptionalArrowTypeList(state.types) ||
+      parser.parseOptionalAttrDict(state.attributes) ||
+      parser.resolveOperands(operands, operandTypes, parser.getNameLoc(),
+                             state.operands)) {
+    return failure();
+  }
+
+  return success();
+}
+
+static void printCastCompatibleShapeOp(OpAsmPrinter &p,
+                                       CastCompatibleShapeOp op) {
+  p << op.getOperationName() << " ";
+  p.printOperands(op.operands());
+  p << " : ";
+  interleaveComma(op.getOperandTypes(), p);
+  p << " -> ";
+  p.printType(op.result().getType());
+  p.printOptionalAttrDict(op.getOperation()->getAttrs());
+}
+
+static LogicalResult verifyCastCompatibleShapeOp(CastCompatibleShapeOp op) {
+  if (op.operands().empty()) {
+    return op.emitOpError() << "Must have at least one operand";
+  }
+
+  auto resultRs = op.result().getType().dyn_cast<RankedShapeType>();
+  if (resultRs) {
+    // TODO(laurenzo): Expand this to check true compatibility instead of
+    // just equality.
+    // Casting to a ranked shape.
+    for (auto operandType : op.getOperandTypes()) {
+      auto operandRs = operandType.dyn_cast<RankedShapeType>();
+      if (!operandRs || operandRs != resultRs) {
+        return op.emitOpError()
+               << "Incompatible static shape cast: " << operandRs << " -> "
+               << resultRs;
+      }
+    }
+    return success();
+  }
+
+  return failure();
+}
+
+void CastCompatibleShapeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &patterns, MLIRContext *context) {
+  patterns.insert<SafeCastCompatibleShapePattern>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // shape.get_ranked_shape
 //===----------------------------------------------------------------------===//
 
@@ -162,8 +265,9 @@ static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
 
 void GetRankedShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  patterns.insert<ElideTiedGetRankedShapePattern, ElideStaticGetRankedShape>(
-      context);
+  patterns
+      .insert<ElideTiedGetRankedShapePattern, ElideStaticGetRankedShapePattern,
+              ElideDuplicateGetRankedShapePattern>(context);
 }
 
 //===----------------------------------------------------------------------===//

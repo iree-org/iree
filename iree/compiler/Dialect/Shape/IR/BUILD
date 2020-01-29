@@ -29,12 +29,14 @@ filegroup(
 cc_library(
     name = "IR",
     srcs = [
+        "Builders.cpp",
         "ShapeDialect.cpp",
         "ShapeOps.cpp",
         "ShapeOps.cpp.inc",
         "ShapeTypes.cpp",
     ],
     hdrs = [
+        "Builders.h",
         "ShapeDialect.h",
         "ShapeOps.h",
         "ShapeOps.h.inc",

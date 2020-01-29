@@ -20,7 +20,9 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "CleanupPlaceholders.cpp",
         "ExpandFunctionDynamicDims.cpp",
+        "MaterializeShapeCalculations.cpp",
     ],
     hdrs = [
         "Passes.h",
@@ -30,6 +32,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Transforms",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
     alwayslink = 1,
 )
