@@ -39,6 +39,7 @@ iree_cc_test(
     iree::base::api
     iree::base::logging
     iree::hal::api
+    iree::hal::interpreter::interpreter_driver_module
     iree::modules::hal
     iree::testing::gtest_main
     iree::vm
@@ -59,6 +60,8 @@ iree_cc_library(
     iree::base::api
     iree::base::api_util
     iree::base::buffer_string_util
+    iree::base::shape
+    iree::base::shaped_buffer_string_util
     iree::hal::api
     iree::modules::hal
     iree::vm

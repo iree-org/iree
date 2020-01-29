@@ -12,31 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Implementations for iree/testing/
+iree_cc_library(
+  NAME
+    gtest_internal
+  HDRS
+    "gtest_internal.h"
+  DEPS
+    gtest
+  TESTONLY
+  PUBLIC
+)
 
-if(${IREE_BUILD_TESTS})
-
-  iree_cc_library(
-    NAME
-      gtest_internal
-    HDRS
-      "gtest_internal.h"
-    DEPS
-      gtest
-    PUBLIC
-  )
-
-  iree_cc_library(
-    NAME
-      gtest_main_internal
-    HDRS
-      "gtest_internal.h"
-    SRCS
-      "gtest_main_internal.cc"
-    DEPS
-      iree::base::init
-      gtest
-    PUBLIC
-  )
-
-endif()
+iree_cc_library(
+  NAME
+    gtest_main_internal
+  HDRS
+    "gtest_internal.h"
+  SRCS
+    "gtest_main_internal.cc"
+  DEPS
+    iree::base::init
+    gtest
+  TESTONLY
+  PUBLIC
+)

@@ -36,6 +36,8 @@ iree_bytecode_module(
     "bytecode_dispatch_test.mlir"
   CC_NAMESPACE
     "iree::vm"
+  TRANSLATE_TOOL
+    iree_tools_iree-translate
   TRANSLATION
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -52,7 +54,6 @@ iree_cc_library(
     "bytecode_module_impl.h"
     "bytecode_op_table.h"
   DEPS
-    iree::vm::bytecode_op_table_gen
     iree::vm::module
     iree::vm::ref
     iree::vm::stack
@@ -91,6 +92,8 @@ iree_bytecode_module(
     "bytecode_module_benchmark.mlir"
   CC_NAMESPACE
     "iree::vm"
+  TRANSLATE_TOOL
+    iree_tools_iree-translate
   TRANSLATION
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -115,7 +118,7 @@ iree_tablegen_library(
     -gen-iree-vm-op-table-defs bytecode_op_table.h
   TBLGEN
     IREE
- )
+)
 
 iree_cc_library(
   NAME

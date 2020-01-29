@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# TODO(suderman): fix cmake build
+# bazel_to_cmake: DO NOT EDIT
+
 iree_cc_library(
   NAME
     strings
