@@ -17,6 +17,7 @@ iree_cc_library(
     op_kernels
   HDRS
     "op_kernels.h"
+  TEXTUAL_HDRS
     "op_kernels_generic.h"
     "op_kernels_ruy.h"
   DEPS
@@ -180,10 +181,12 @@ iree_cc_library(
   DEPS
     iree::hal::vmla::op_kernels
     iree::base::api
+    iree::base::memory
     iree::base::ref_ptr
     iree::base::tracing
     iree::vm
     iree::vm::module_abi_cc
+    iree::vm::types
     absl::span
   PUBLIC
 )
