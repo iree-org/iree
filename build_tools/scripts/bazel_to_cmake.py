@@ -205,13 +205,12 @@ class BuildFileFunctions(object):
   def _convert_target(self, target):
     if target.startswith(":"):
       target = target.replace(":", "::")
-      if target.endswith("_gen"):
+      if target.endswith(("_gen","Gen")):
         # Files created by gentbl have to be included as source and header files
         # and not as a dependency. Adding these targets to the dependencies list,
         # results in linkage failures if the library including the gentbl dep is
         # marked as ALWAYSLINK.
-        # TODO: Some targets not to be included end to "Gen", but others like
-        #       LLVMTableGen still need to be included.
+        # This drops deps in the local namespace ending with '_gen' and 'Gen'
         return ""
     elif not target.startswith("//iree"):
       # External target, call helper method for special case handling.
