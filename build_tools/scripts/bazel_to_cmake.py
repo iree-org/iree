@@ -203,23 +203,22 @@ class BuildFileFunctions(object):
       return ""
 
   def _convert_target(self, target):
-    if target.startswith(":"):
-      target = target.replace(":", "::")
-      if target.endswith(("_gen","Gen")):
-        # Files created by gentbl have to be included as source and header files
-        # and not as a dependency. Adding these targets to the dependencies list,
-        # results in linkage failures if the library including the gentbl dep is
-        # marked as ALWAYSLINK.
-        # This drops deps in the local namespace ending with '_gen' and 'Gen'
-        return ""
-    elif not target.startswith("//iree"):
+    if target.startswith(":") and target.endswith(("_gen","Gen")):
+      # Files created by gentbl have to be included as source and header files
+      # and not as a dependency. Adding these targets to the dependencies list,
+      # results in linkage failures if the library including the gentbl dep is
+      # marked as ALWAYSLINK.
+      # This drops deps in the local namespace ending with '_gen' and 'Gen'
+      target = ""
+    elif not target.startswith(("//iree",":")):
       # External target, call helper method for special case handling.
       target = bazel_to_cmake_targets.convert_external_target(target)
     else:
+      # Bazel `:api`            -> CMake `::api`
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
       target = target.replace("//", "")  # iree/base:api
-      target = target.replace(":", "::")  # iree/base::api
+      target = target.replace(":", "::")  # iree/base::api or ::api
       target = target.replace("/", "::")  # iree::base::api
     return target
 
