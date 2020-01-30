@@ -134,11 +134,11 @@ def convert_external_target(target):
   if target.startswith("@org_tensorflow//tensorflow/lite/experimental/ruy"):
     # All Bazel targets map to a single CMake target.
     return "ruy"
-  if target.startswith("@sdl2//:SDL2"):
+  if target  == "@sdl2//:SDL2":
     return "SDL2-static"
   if target.startswith("@vulkan_headers"):
     return VULKAN_HEADERS_MAPPING[target]
-  if target.startswith("@vulkan_sdk//:sdk"):
+  if target == "@vulkan_sdk//:sdk":
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
     return "Vulkan::Vulkan"
 
