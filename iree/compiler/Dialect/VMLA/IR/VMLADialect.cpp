@@ -59,11 +59,10 @@ VMLADialect::VMLADialect(MLIRContext *context)
 
   addTypes<BufferType>();
 
-  // TODO(benvanik): add ops.
-  // #define GET_OP_LIST
-  //   addOperations<
-  // #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.cpp.inc"
-  //       >();
+#define GET_OP_LIST
+  addOperations<
+#include "iree/compiler/Dialect/VMLA/IR/VMLAOps.cpp.inc"
+      >();
 }
 
 //===----------------------------------------------------------------------===//

@@ -29,6 +29,7 @@ iree_cc_library(
     "VMLATypes.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
     LLVMSupport
     MLIRIR
     MLIRStandardOps

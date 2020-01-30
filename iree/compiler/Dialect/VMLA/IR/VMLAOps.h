@@ -18,6 +18,7 @@
 #include <cstdint>
 
 #include "iree/compiler/Dialect/IREE/IR/IREETraits.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Dialect.h"
