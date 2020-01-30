@@ -180,6 +180,7 @@ iree_cc_library(
   DEPS
     iree::hal::vmla::op_kernels
     iree::base::api
+    iree::base::ref_ptr
     iree::base::tracing
     iree::vm
     iree::vm::module_abi_cc

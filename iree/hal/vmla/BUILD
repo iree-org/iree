@@ -168,9 +168,12 @@ cc_library(
     deps = [
         ":op_kernels",
         "//iree/base:api",
+        "//iree/base:memory",
+        "//iree/base:ref_ptr",
         "//iree/base:tracing",
         "//iree/vm",
         "//iree/vm:module_abi_cc",
+        "//iree/vm:types",
         "@com_google_absl//absl/types:span",
     ],
 )
