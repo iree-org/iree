@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
-
 iree_cc_library(
   NAME
     dialect
   HDRS
     "conversion_patterns.h"
     "strings_dialect.h"
-    "strings_ops.h"
     "strings_ops.h.inc"
   SRCS
     "conversion_patterns.cc"
     "strings_dialect.cc"
-    "strings_ops.cc"
     "strings_ops.cc.inc"
   DEPS
     LLVMSupport
@@ -35,7 +31,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::VM::Conversion
-    iree::modules::Check::dialect::Check_imports
+    iree::modules::strings::dialect::strings_imports
   ALWAYSLINK
   PUBLIC
 )
@@ -43,7 +39,7 @@ iree_cc_library(
 iree_tablegen_library(
   NAME
     strings_ops_gen
-  SRCS
+  TD_FILE
     strings_ops.td
   OUTS
     -gen-op-decls strings_ops.h.inc
@@ -64,19 +60,3 @@ iree_cc_embed_data(
   FLATTEN
 )
 
-iree_cc_binary(
-  NAME
-    strings-opt
-  DEPS
-    MLIROptMain
-    iree::modules::Check::dialect
-    iree::tools::iree_opt_library
-)
-
-iree_cc_binary(
-  NAME
-    strings-translate
-  DEPS
-    iree::modules::Check::dialect
-    iree::tools::iree_translate_library
-)

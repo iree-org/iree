@@ -15,6 +15,8 @@
 # TODO(suderman): fix cmake build
 # bazel_to_cmake: DO NOT EDIT
 
+add_subdirectory(dialect)
+
 iree_cc_library(
   NAME
     strings
