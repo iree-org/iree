@@ -29,6 +29,7 @@ exports_files([
 
 TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
+    "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
 ]
 
@@ -62,6 +63,10 @@ cc_library(
         "//iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//iree/compiler/Dialect/VM/IR",
         "//iree/compiler/Dialect/VM/Transforms",
+        "//iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA",
+        "//iree/compiler/Dialect/VMLA/Conversion/VMLAToVM",
+        "//iree/compiler/Dialect/VMLA/IR",
+        "//iree/compiler/Dialect/VMLA/Transforms",
         "//iree/compiler/Translation/Interpreter/Transforms",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/XLAToLinalg",
@@ -125,6 +130,7 @@ cc_binary(
         "//iree/hal/interpreter:interpreter_driver_module",
         # TODO(b/142004903): enable when Dawn HAL implementation is functional
         # "//iree/hal/dawn:dawn_driver_module",
+        "//iree/hal/vmla:vmla_driver_module",
         "//iree/hal/vulkan:vulkan_driver_module",
     ],
 )

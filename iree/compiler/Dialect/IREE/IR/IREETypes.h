@@ -42,6 +42,7 @@ enum Kind {
   FIRST_SEQ_TYPE = Type::FIRST_IREE_TYPE + 40,
   FIRST_SHAPE_TYPE = Type::FIRST_IREE_TYPE + 60,
   FIRST_STRING_TYPE = Type::FIRST_IREE_TYPE + 80,
+  FIRST_VMLA_TYPE = Type::FIRST_IREE_TYPE + 100,
 };
 }  // namespace TypeKind
 
@@ -92,6 +93,14 @@ enum Kind {
 };
 }  // namespace TypeKind
 }  // namespace Strings
+
+namespace VMLA {
+namespace TypeKind {
+enum Kind {
+  Buffer = IREE::TypeKind::FIRST_VMLA_TYPE,
+};
+}  // namespace TypeKind
+}  // namespace VMLA
 
 /// Base type for RefObject-derived types.
 /// These can be wrapped in RefPtrType.
