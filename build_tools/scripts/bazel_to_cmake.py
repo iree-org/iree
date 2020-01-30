@@ -204,13 +204,7 @@ class BuildFileFunctions(object):
 
   def _convert_target(self, target):
     if target.startswith(":"):
-      # Bazel package-relative `:logging` -> CMake absolute `iree::base::logging`
-      package = os.path.dirname(self.converter.rel_build_file_path)
-      package = package.replace(os.path.sep, "::")
-      if package.endswith(target):
-        target = package  # Omit target if it matches the package name
-      else:
-        target = package + ":" + target
+      target = target.replace(":", "::")
       if target.endswith("_gen"):
         # Files created by gentbl have to be included as source and header files
         # and not as a dependency. Adding these targets to the dependencies list,
