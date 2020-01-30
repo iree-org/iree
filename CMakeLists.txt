@@ -35,8 +35,9 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
+option(IREE_BUILD_EXPERIMENTAL "Builds experimental projects." OFF)
 
-if(${IREE_BUILD_SAMPLES})
+if(${IREE_BUILD_SAMPLES} OR ${IREE_BUILD_EXPERIMENTAL})
   set(IREE_BUILD_COMPILER ON CACHE BOOL "Build the IREE compiler for sample projects." FORCE)
 endif()
 
@@ -186,4 +187,8 @@ add_subdirectory(iree/tools)
 
 if(${IREE_BUILD_SAMPLES})
   add_subdirectory(iree/samples)
+endif()
+
+if(${IREE_BUILD_EXPERIMENTAL})
+  add_subdirectory(experimental)
 endif()
