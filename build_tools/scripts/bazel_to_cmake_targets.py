@@ -37,8 +37,16 @@ def _convert_absl_target(target):
   return "absl::" + target_name
 
 
+DEAR_IMGUI_EXPLICIT_TARGET_MAPPING = {
+    "@dear_imgui":
+        "dear_imgui::dear_imgui",
+    "@dear_imgui//:imgui_sdl_vulkan":
+        "dear_imgui::impl_sdl\n    dear_imgui::impl_vulkan",
+}
+
 LLVM_TARGET_MAPPING = {
     "@llvm-project//llvm:support": "LLVMSupport",
+    "@llvm-project//llvm:tablegen": "LLVMTableGen",
 }
 
 VULKAN_HEADERS_MAPPING = {
@@ -73,6 +81,10 @@ MLIR_EXPLICIT_TARGET_MAPPING = {
         "MLIRStandardOps",
     "@llvm-project//mlir:StandardToSPIRVConversions":
         "MLIRStandardToSPIRVTransforms",
+    "@llvm-project//mlir:TableGen":
+        "LLVMMLIRTableGen",
+    "@llvm-project//mlir:MlirTableGenMain":
+        "MLIRTableGen",
     "@llvm-project//mlir:MlirOptMain":
         "MLIROptMain",
 }
@@ -111,6 +123,8 @@ def convert_external_target(target):
     return "benchmark"
   if target == "@com_github_google_flatbuffers//:flatbuffers":
     return "flatbuffers"
+  if target.startswith("@dear_imgui"):
+    return DEAR_IMGUI_EXPLICIT_TARGET_MAPPING[target]
   if target == "@com_google_googletest//:gtest":
     return "gtest"
   if target.startswith("@llvm-project//llvm"):
@@ -123,7 +137,12 @@ def convert_external_target(target):
   if target.startswith("@org_tensorflow//tensorflow/lite/experimental/ruy"):
     # All Bazel targets map to a single CMake target.
     return "ruy"
+  if target == "@sdl2//:SDL2":
+    return "SDL2-static"
   if target.startswith("@vulkan_headers"):
     return VULKAN_HEADERS_MAPPING[target]
+  if target == "@vulkan_sdk//:sdk":
+    # The Bazel target maps to the IMPORTED target defined by FindVulkan().
+    return "Vulkan::Vulkan"
 
   raise KeyError("No conversion found for target '%s'" % target)
