@@ -1,8 +1,3 @@
-// Note that IREE uses the following LICENSE and blocks if it is not here.
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-
 //===- MLIRRunnerUtils.h - Utils for debugging MLIR CPU execution ---------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
