@@ -48,6 +48,13 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager);
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
+// Dialect conversion
+//===----------------------------------------------------------------------===//
+
+// Converts from various dialects (standard, HLO, etc) to the VMLA dialect.
+std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass();
+
 }  // namespace VMLA
 }  // namespace IREE
 }  // namespace iree_compiler

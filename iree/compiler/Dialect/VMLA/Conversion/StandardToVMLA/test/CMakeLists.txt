@@ -12,30 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
-
-iree_cc_library(
+iree_lit_test_suite(
   NAME
-    Transforms
-  HDRS
-    "Passes.h"
+    lit
   SRCS
-    "Conversion.cpp"
-    "Passes.cpp"
-  DEPS
-    iree::compiler::Dialect::VMLA::Conversion
-    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
-    iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
-    iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Utils
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRSupport
-    MLIRTransformUtils
-    MLIRTransforms
-    tensorflow::mlir_xla
-  ALWAYSLINK
-  PUBLIC
+    "constant_ops.mlir"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
+#include "iree/compiler/Dialect/VMLA/Conversion/StandardToVMLA/ConvertStandardToVMLA.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
@@ -26,20 +26,13 @@
 #include "mlir/IR/Module.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-void populateHLOToVMLAPatterns(MLIRContext *context,
-                               OwningRewritePatternList &patterns,
-                               TypeConverter &typeConverter) {
-  // We rely on some additional HLO->HLO/HLO->std patterns and assume they
-  // have been run already. In case they haven't we provide them here (useful
-  // for standalone conversion testing).
-  xla_hlo::PopulateXlaToStdPatterns(&patterns, context);
-  xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
-
+void populateStandardToVMLAPatterns(MLIRContext *context,
+                                    OwningRewritePatternList &patterns,
+                                    TypeConverter &typeConverter) {
   // TODO(benvanik): conversion patterns.
 }
 

@@ -40,9 +40,8 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
   // TODO(benvanik): legalize input.
   // passManager.addPass(IREE::VMLA::createLegalizeInputTypesPass());
 
-  // TODO(benvanik): convert HLO->VMLA.
-  // TODO(benvanik): convert std->VMLA.
-  // TODO(benvanik): convert VMLA->VM.
+  // Convert from the various input dialects to the VMLA dialect.
+  passManager.addPass(createConversionPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCSEPass());

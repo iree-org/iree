@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_VMLA_CONVERSION_HLOTOVMLA_CONVERTHLOTOVMLA_H_
-#define IREE_COMPILER_DIALECT_VMLA_CONVERSION_HLOTOVMLA_CONVERTHLOTOVMLA_H_
+#ifndef IREE_COMPILER_DIALECT_VMLA_CONVERSION_STANDARDTOVMLA_CONVERTSTANDARDTOVMLA_H_  // NOLINT
+#define IREE_COMPILER_DIALECT_VMLA_CONVERSION_STANDARDTOVMLA_CONVERTSTANDARDTOVMLA_H_  // NOLINT
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -21,12 +21,13 @@
 namespace mlir {
 namespace iree_compiler {
 
-// Populates conversion patterns from the XLA HLO dialect to the VMLA dialect.
-void populateHLOToVMLAPatterns(MLIRContext *context,
-                               OwningRewritePatternList &patterns,
-                               TypeConverter &typeConverter);
+// Populates conversion patterns from the std dialect to the VMLA dialect.
+void populateStandardToVMLAPatterns(MLIRContext *context,
+                                    OwningRewritePatternList &patterns,
+                                    TypeConverter &typeConverter);
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_VMLA_CONVERSION_HLOTOVMLA_CONVERTHLOTOVMLA_H_
+#endif  // IREE_COMPILER_DIALECT_VMLA_CONVERSION_STANDARDTOVMLA_CONVERTSTANDARDTOVMLA_H_
+        // // NOLINT

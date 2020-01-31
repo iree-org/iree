@@ -12,30 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
-iree_cc_library(
-  NAME
-    Transforms
-  HDRS
-    "Passes.h"
-  SRCS
-    "Conversion.cpp"
-    "Passes.cpp"
-  DEPS
-    iree::compiler::Dialect::VMLA::Conversion
-    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
-    iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
-    iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Utils
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRSupport
-    MLIRTransformUtils
-    MLIRTransforms
-    tensorflow::mlir_xla
-  ALWAYSLINK
-  PUBLIC
+cc_library(
+    name = "Conversion",
+    srcs = [
+        "ConversionTarget.cpp",
+        "TypeConverter.cpp",
+    ],
+    hdrs = [
+        "ConversionTarget.h",
+        "TypeConverter.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/VMLA/IR",
+        "//iree/compiler/Dialect/VMLA/IR:VMLADialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Transforms",
+    ],
 )

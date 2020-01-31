@@ -16,6 +16,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "constant_ops.mlir"
+    "math_ops.mlir"
+    "shaping_ops.mlir"
+    "view_ops.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

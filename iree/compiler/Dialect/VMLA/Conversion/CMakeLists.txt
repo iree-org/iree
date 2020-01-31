@@ -13,4 +13,24 @@
 # limitations under the License.
 
 add_subdirectory(HLOToVMLA)
+add_subdirectory(StandardToVMLA)
 add_subdirectory(VMLAToVM)
+
+iree_cc_library(
+  NAME
+    Conversion
+  HDRS
+    "ConversionTarget.h"
+    "TypeConverter.h"
+  SRCS
+    "ConversionTarget.cpp"
+    "TypeConverter.cpp"
+  DEPS
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VMLA::IR
+    iree::compiler::Dialect::VMLA::IR::VMLADialect
+    MLIRIR
+    MLIRStandardOps
+    MLIRTransforms
+  PUBLIC
+)
