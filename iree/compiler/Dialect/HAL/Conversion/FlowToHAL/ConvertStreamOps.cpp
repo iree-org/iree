@@ -203,8 +203,11 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
               IREE::HAL::AccessScopeBitfield::DispatchRead)
           .getResult();
   rewriter.create<IREE::HAL::CommandBufferExecutionBarrierOp>(
-      loc, commandBuffer, IREE::HAL::ExecutionStageBitfield::CommandRetire,
-      IREE::HAL::ExecutionStageBitfield::CommandIssue,
+      loc, commandBuffer,
+      IREE::HAL::ExecutionStageBitfield::CommandRetire |
+          IREE::HAL::ExecutionStageBitfield::Dispatch,
+      IREE::HAL::ExecutionStageBitfield::CommandIssue |
+          IREE::HAL::ExecutionStageBitfield::Dispatch,
       ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
 }
 
