@@ -159,8 +159,7 @@ bool isLegallyShapedSignatureType(Type thisType, Type nextType) {
 
   // Are dims equal.
   auto thisDims = rankedType.getShape();
-  SmallVector<int64_t, 7> shapeDims;
-  rankedShapeType.getAllDims(shapeDims);
+  auto shapeDims = rankedShapeType.getAllDims();
   if (!thisDims.equals(shapeDims)) return false;  // Illegal: Mismatched shape.
   return true;  // Legal: dynamic tensor followed by matching shape.
 }

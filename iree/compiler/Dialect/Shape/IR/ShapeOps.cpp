@@ -116,6 +116,37 @@ class SafeCastCompatibleShapePattern
   }
 };
 
+class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(RankedDimOp op,
+                                     PatternRewriter &rewriter) const override {
+    // If the immediate predecessor is a MakeRankedShapeOp, then this op can be
+    // erased in favor of the corresponding input to that op.
+    auto makeRsOp =
+        dyn_cast_or_null<MakeRankedShapeOp>(op.shape().getDefiningOp());
+    if (!makeRsOp) return matchFailure();
+
+    RankedShapeType rsType = op.getRankedShapeType();
+    unsigned index = op.getIndex();
+    auto allDims = rsType.getAllDims();
+    assert(index < allDims.size());
+    if (allDims[index] >= 0) {
+      // Not dynamic.
+      return matchFailure();
+    }
+
+    // Map the overall index to the dynamic dim index.
+    int dynamicDimIndex = 0;
+    for (unsigned i = 0; i < index; ++i) {
+      if (allDims[i] < 0) dynamicDimIndex++;
+    }
+
+    assert(dynamicDimIndex < makeRsOp.dynamic_dimensions().size());
+    rewriter.replaceOp(op, makeRsOp.dynamic_dimensions()[dynamicDimIndex]);
+    return matchSuccess();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // shape.tie_shape
 //===----------------------------------------------------------------------===//
@@ -157,9 +188,7 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
     return op.emitOpError("currently only ranked tensors are supported");
   }
 
-  SmallVector<int64_t, 4> rsDims;
-  rsType.getAllDims(rsDims);
-  if (!rankedTensorType.getShape().equals(rsDims)) {
+  if (!rankedTensorType.getShape().equals(rsType.getAllDims())) {
     return op.emitOpError("dims must match between tensor and shape");
   }
   return success();
@@ -229,6 +258,16 @@ void CastCompatibleShapeOp::getCanonicalizationPatterns(
 // shape.get_ranked_shape
 //===----------------------------------------------------------------------===//
 
+void GetRankedShapeOp::build(Builder *builder, OperationState &result,
+                             Value operand) {
+  auto rankedOperandType = operand.getType().dyn_cast<RankedTensorType>();
+  if (rankedOperandType) {
+    result.types.push_back(RankedShapeType::get(rankedOperandType.getShape(),
+                                                builder->getIndexType()));
+  }
+  result.addOperands(operand);
+}
+
 static ParseResult parseGetRankedShapeOp(OpAsmParser &parser,
                                          OperationState &state) {
   OpAsmParser::OperandType operandType;
@@ -254,8 +293,7 @@ static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
   if (tensorType.getRank() != rsType.getRank()) {
     return op.emitOpError("operand and result must be of same rank");
   }
-  SmallVector<int64_t, 4> rsDims;
-  rsType.getAllDims(rsDims);
+  auto rsDims = rsType.getAllDims();
   if (!std::equal(rsDims.begin(), rsDims.end(),
                   tensorType.getShape().begin())) {
     return op.emitOpError("operand tensor and result shape must be equal");
@@ -299,6 +337,64 @@ static LogicalResult verifyConstRankedShapeOp(ConstRankedShapeOp op) {
   auto rsType = op.result().getType().dyn_cast<RankedShapeType>();
   if (!rsType || !rsType.isFullyStatic()) {
     return op.emitOpError("must be a fully static ranked_shape");
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// shape.make_ranked_shape
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseMakeRankedShapeOp(OpAsmParser &parser,
+                                          OperationState &state) {
+  SmallVector<OpAsmParser::OperandType, 4> operands;
+  SmallVector<Type, 4> operandTypes;
+  if (parser.parseOperandList(operands) ||
+      parser.parseOptionalArrowTypeList(state.types) ||
+      parser.parseOptionalAttrDict(state.attributes)) {
+    return failure();
+  }
+  if (state.types.empty()) {
+    return parser.emitError(parser.getNameLoc())
+           << "operation type is required";
+  }
+  auto rsType = state.types.front().dyn_cast<RankedShapeType>();
+  if (!rsType) {
+    return parser.emitError(parser.getNameLoc())
+           << "operation must have a ranked_shape result type";
+  }
+  operandTypes.resize(operands.size());
+  for (auto &operandType : operandTypes) {
+    operandType = rsType.getDimType();
+  }
+  if (parser.resolveOperands(operands, operandTypes, parser.getNameLoc(),
+                             state.operands)) {
+    return failure();
+  }
+  return success();
+}
+
+static void printMakeRankedShapeOp(OpAsmPrinter &p, MakeRankedShapeOp op) {
+  p << op.getOperationName() << " ";
+  // Note that the types of the operands is implied by the dim type of the
+  // shape.
+  p.printOperands(op.dynamic_dimensions());
+  p.printOptionalArrowTypeList(ArrayRef<Type>{op.shape().getType()});
+  p.printOptionalAttrDict(op.getOperation()->getAttrs());
+}
+
+static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
+  auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
+  if (!rsType || rsType.getNumDynamicDims() != op.dynamic_dimensions().size()) {
+    return op.emitOpError()
+           << "expected number of operands to match number of shape dynamic "
+           << "dims";
+  }
+  for (auto operand : op.dynamic_dimensions()) {
+    if (operand.getType() != rsType.getDimType()) {
+      return op.emitOpError()
+             << "expected operands to be of type " << rsType.getDimType();
+    }
   }
   return success();
 }
@@ -358,6 +454,11 @@ OpFoldResult RankedDimOp::fold(ArrayRef<Attribute> operand) {
   }
 
   return {};
+}
+
+void RankedDimOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &patterns, MLIRContext *context) {
+  patterns.insert<DynamicMakeRankedShapeDimPattern>(context);
 }
 
 #define GET_OP_CLASSES

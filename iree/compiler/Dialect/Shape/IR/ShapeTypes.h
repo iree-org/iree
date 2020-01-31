@@ -55,15 +55,10 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
   static LogicalResult verifyConstructionInvariants(Optional<Location> loc,
                                                     MLIRContext *context,
                                                     ArrayRef<int64_t> dims,
-                                                    Type dimType,
-                                                    VectorType dynamicDimsType);
+                                                    Type dimType);
 
   // Gets an integral type suitable for holding dimensions of this shape.
-  IntegerType getDimType() const;
-
-  // Gets a vector type suitable for holding all dynamic dims at runtime.
-  // Will be null if no dynamic dims.
-  VectorType getDynamicDimsType() const;
+  Type getDimType() const;
 
   // Gets the rank (counting all dims, static and dynamic).
   int64_t getRank() const;
@@ -72,21 +67,19 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
   bool isFullyStatic() const;
 
   // Gets all dims of this shape, where dynamic dims are represented by -1.
-  // The size of the dims vector will be the same as reported by getValueRank().
-  void getAllDims(SmallVectorImpl<int64_t> &dims);
+  // The size of the dims vector will be the same as reported by getRank().
+  ArrayRef<int64_t> getAllDims() const;
+
+  // Gets the number of dynamic dims.
+  unsigned getNumDynamicDims() const;
 
   // Returns whether the indexed dimension is dynamic.
-  bool isDimDynamic(int allDimsIndex);
+  bool isDimDynamic(int allDimsIndex) const;
 
   // Returns the static dimension at the overall shape index.
   // It is an error to request a static index for which isDimDynamic() is
   // true.
-  int64_t getStaticDim(int allDimsIndex);
-
-  // Given an index into the overall shape for a dynamic dimension, returns
-  // a corresponding dimension into the runtime getDynamicDimsType().
-  // It is an error to request an index for which isDimDynamic() is false.
-  unsigned getDynamicDimIndex(int allDimsIndex);
+  int64_t getStaticDim(int allDimsIndex) const;
 };
 
 }  // namespace Shape

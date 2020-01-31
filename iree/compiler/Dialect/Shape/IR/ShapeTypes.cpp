@@ -25,29 +25,23 @@ namespace detail {
 
 struct RankedShapeTypeStorage : public TypeStorage {
   struct KeyTy {
-    KeyTy(ArrayRef<int64_t> offsetDims, Type dimType,
-          VectorType dynamicDimsType)
-        : offsetDims(offsetDims),
-          dimType(dimType.cast<IntegerType>()),
-          dynamicDimsType(dynamicDimsType) {}
+    KeyTy(ArrayRef<int64_t> dims, Type dimType)
+        : dims(dims), dimType(dimType) {}
     bool operator==(const KeyTy &other) const {
-      return dimType == dimType && dynamicDimsType == other.dynamicDimsType &&
-             offsetDims.equals(other.offsetDims);
+      return dimType == dimType && dims.equals(other.dims);
     }
     unsigned getHashValue() const {
       return llvm::hash_combine(
-          dimType, dynamicDimsType,
-          llvm::hash_combine_range(offsetDims.begin(), offsetDims.end()));
+          dimType, llvm::hash_combine_range(dims.begin(), dims.end()));
     }
-    ArrayRef<int64_t> offsetDims;
-    IntegerType dimType;
-    VectorType dynamicDimsType;
+    ArrayRef<int64_t> dims;
+    Type dimType;
   };
 
   RankedShapeTypeStorage(const KeyTy &key) : key(key) {}
   static RankedShapeTypeStorage *construct(TypeStorageAllocator &allocator,
                                            KeyTy key) {
-    key.offsetDims = allocator.copyInto(key.offsetDims);
+    key.dims = allocator.copyInto(key.dims);
     return new (allocator.allocate<RankedShapeTypeStorage>())
         RankedShapeTypeStorage(key);
   }
@@ -70,107 +64,65 @@ using namespace mlir::iree_compiler::Shape;
 // RankedShapeType
 //===----------------------------------------------------------------------===//
 
-static void computeOffsetDims(Type dimType, ArrayRef<int64_t> dims,
-                              SmallVectorImpl<int64_t> &offsetDims,
-                              VectorType &dynamicDimsType) {
-  // Compute offset dims.
-  offsetDims.resize(dims.size());
-  int64_t dynamicOffset = 0;
-  int64_t dynamicDimCount = 0;
-  for (size_t i = 0, e = dims.size(); i < e; ++i) {
-    auto dim = dims[i];
-    if (dim >= 0) {
-      // Static dim.
-      offsetDims[i] = dim;
-    } else {
-      // Dynamic dim.
-      offsetDims[i] = --dynamicOffset;
-      dynamicDimCount += 1;
-    }
-  }
-
-  // Dynamic dims type.
-  if (dynamicDimCount == 0)
-    dynamicDimsType = nullptr;
-  else
-    dynamicDimsType = VectorType::get({dynamicDimCount}, dimType);
-}
-
 RankedShapeType RankedShapeType::get(ArrayRef<int64_t> dims, Type dimType) {
-  VectorType dynamicDimsType;
-  SmallVector<int64_t, 7> offsetDims;
-  computeOffsetDims(dimType, dims, offsetDims, dynamicDimsType);
   return Base::get(dimType.getContext(), IREE::Shape::TypeKind::RankedShape,
-                   offsetDims, dimType, dynamicDimsType);
+                   dims, dimType);
 }
 
 RankedShapeType RankedShapeType::getChecked(ArrayRef<int64_t> dims,
                                             Type dimType, Location loc) {
-  VectorType dynamicDimsType;
-  SmallVector<int64_t, 7> offsetDims;
-  computeOffsetDims(dimType, dims, offsetDims, dynamicDimsType);
   return Base::getChecked(loc, dimType.getContext(),
-                          IREE::Shape::TypeKind::RankedShape, offsetDims,
-                          dimType, dynamicDimsType);
+                          IREE::Shape::TypeKind::RankedShape, dims, dimType);
 }
 
 LogicalResult RankedShapeType::verifyConstructionInvariants(
     Optional<Location> loc, MLIRContext *context, ArrayRef<int64_t> dims,
-    Type dimType, VectorType dynamicDimsType) {
+    Type dimType) {
+  for (auto dim : dims) {
+    if (dim < 0 && dim != -1) {
+      return emitOptionalError(loc, "dims must be -1 for dynamic");
+    }
+  }
   if (!dimType) {
     return emitOptionalError(loc, "RankedShapeType must have a dim type");
   }
-  if (!dimType.isa<IntegerType>()) {
+  if (!dimType.isa<IntegerType>() && !dimType.isa<IndexType>()) {
     return emitOptionalError(loc,
-                             "RankedShapeType must have an integral dim type");
+                             "RankedShapeType must have an integral or index "
+                             "dim type");
   }
   return success();
 }
 
-IntegerType RankedShapeType::getDimType() const {
-  return getImpl()->key.dimType;
-}
+Type RankedShapeType::getDimType() const { return getImpl()->key.dimType; }
 
-VectorType RankedShapeType::getDynamicDimsType() const {
-  return getImpl()->key.dynamicDimsType;
-}
-
-int64_t RankedShapeType::getRank() const {
-  return getImpl()->key.offsetDims.size();
-}
+int64_t RankedShapeType::getRank() const { return getImpl()->key.dims.size(); }
 
 bool RankedShapeType::isFullyStatic() const {
-  for (auto dim : getImpl()->key.offsetDims) {
+  for (auto dim : getImpl()->key.dims) {
     if (dim < 0) return false;
   }
   return true;
 }
 
-void RankedShapeType::getAllDims(SmallVectorImpl<int64_t> &dims) {
-  dims.clear();
-  for (auto offsetDim : getImpl()->key.offsetDims) {
-    if (offsetDim < 0)
-      dims.push_back(-1);
-    else
-      dims.push_back(offsetDim);
-  }
+ArrayRef<int64_t> RankedShapeType::getAllDims() const {
+  return getImpl()->key.dims;
 }
 
-bool RankedShapeType::isDimDynamic(int allDimsIndex) {
-  assert(allDimsIndex >= 0 && allDimsIndex < getImpl()->key.offsetDims.size());
-  return getImpl()->key.offsetDims[allDimsIndex] < 0;
+unsigned RankedShapeType::getNumDynamicDims() const {
+  auto allDims = getAllDims();
+  return std::count_if(allDims.begin(), allDims.end(),
+                       [](int64_t dim) { return dim < 0; });
 }
 
-int64_t RankedShapeType::getStaticDim(int allDimsIndex) {
-  assert(allDimsIndex >= 0 && allDimsIndex < getImpl()->key.offsetDims.size());
-  auto dim = getImpl()->key.offsetDims[allDimsIndex];
+bool RankedShapeType::isDimDynamic(int allDimsIndex) const {
+  assert(allDimsIndex >= 0 && allDimsIndex < getImpl()->key.dims.size());
+  return getImpl()->key.dims[allDimsIndex] < 0;
+}
+
+int64_t RankedShapeType::getStaticDim(int allDimsIndex) const {
+  assert(allDimsIndex >= 0 && allDimsIndex < getRank());
+  auto dim = getAllDims()[allDimsIndex];
   assert(dim >= 0 && "getStaticDim() called on dynamic dimension");
   return dim;
-}
-
-unsigned RankedShapeType::getDynamicDimIndex(int allDimsIndex) {
-  assert(allDimsIndex >= 0 && allDimsIndex < getImpl()->key.offsetDims.size());
-  auto dim = getImpl()->key.offsetDims[allDimsIndex];
-  assert(dim < 0 && "getDynamicDimIndex() called on static dimension");
-  return -(dim + 1);  // negative offset dim -1 == dynamic index 0
 }

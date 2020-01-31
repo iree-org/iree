@@ -87,7 +87,9 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
     Usage:
       %0 = shape.get_ranked_shape %arg0 : tensor<2x?xf32> ->
-          !shape.ranked_shape<2x?xf32>
+          !shape.ranked_shape<[2,?]>  // based on index type
+      %0 = shape.get_ranked_shape %arg0 : tensor<2x?xf32> ->
+          !shape.ranked_shape<[2,?],i32>  // explicit dim type
 
     Canonicalization: This op includes a canonicalization pattern such that
     if its operand is supplied by a tie_shape op, then it will replace itself
@@ -97,7 +99,7 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
     Any get_ranked_shape on a fully static shape will canonicalize to a const
     with unit value:
-      %0 = constant_ranked_shape : !shape.ranked_shape<1x2xi32>
+      %0 = constant_ranked_shape : !shape.ranked_shape<[1,2],i32>
   }];
 
   let arguments = (ins AnyTensor:$operand);
@@ -105,6 +107,14 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
 
   let verifier = [{ return verify$cppClass(*this); }];
   let hasCanonicalizer = 1;
+
+  let builders = [
+    // Short-hand for building with a shape equivalent to the tensor operand
+    // and 'index' dim type.
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Value operand
+    }]>,
+  ];
 
   let extraClassDeclaration = [{
     RankedShapeType getRankedShape() {
@@ -121,7 +131,7 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape"> {
     in the type, not have dims represented as const SSA values.
 
     Usage:
-      %0 = shape.const ranked_shape : !shape.ranked_shape<1x2xi32>
+      %0 = shape.const_ranked_shape : !shape.ranked_shape<[1,2],i32>
   }];
 
   let arguments = (ins);
@@ -135,27 +145,56 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape"> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
+def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape"> {
+  let summary = "Makes a ranked_shape from individual dims.";
+  let description = [{
+    Given a list of SSA values holding compatible dims, makes a corresponding
+    ranked_shape.
+
+    Usage:
+      %0 = shape.make_ranked_shape %dim0, %dim1 ->
+          !shape.ranked_shape<[?,?,128]>
+
+    Note that the type of the dims is is implied by the dim type of the result.
+  }];
+
+  let arguments = (ins Variadic<Shape_DimType>:$dynamic_dimensions);
+  let results = (outs Shape_RankedShape:$shape);
+
+  let verifier = [{ return verify$cppClass(*this); }];
+
+  let extraClassDeclaration = [{
+    RankedShapeType getRankedShapeType() {
+      return shape().getType().cast<RankedShapeType>();
+    }
+  }];
+}
+
 def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
   let summary = "Gets a dimension value from a ranked_shape.";
   let description = [{
     Static dimensions will fold to constants.
 
     Usage:
-      %0 = shape.const ranked_shape : !shape.ranked_shape<1x2xi32>
-      %1 = shape.ranked_dim %0[0] : !shape.ranked_shape<1x2xi32>
+      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2],i32>
+      %1 = shape.ranked_dim %0[0] : !shape.ranked_shape<[1,2],i32>
   }];
 
   let arguments = (ins Shape_RankedShape:$shape,
                    APIntAttr:$index);
-  let results = (outs AnyInteger:$result);
+  let results = (outs Shape_DimType:$result);
   let verifier = [{ return verify$cppClass(*this); }];
 
   let extraClassDeclaration = [{
+    RankedShapeType getRankedShapeType() {
+      return shape().getType().cast<RankedShapeType>();
+    }
     unsigned getIndex() {
       return getAttrOfType<IntegerAttr>("index").getValue().getZExtValue();
     }
   }];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 #endif  // IREE_DIALECT_SHAPE_OPS

@@ -19,10 +19,12 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
+#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -45,12 +47,44 @@ ShapeDialect::ShapeDialect(MLIRContext* context)
 static Type parseRankedShape(DialectAsmParser& parser) {
   llvm::SmallVector<int64_t, 7> dims;
   Type dimType;
-  if (parser.parseLess()) return nullptr;
-  if (failed(parser.parseDimensionList(dims))) {
+  // Parse: ranked_shape<[
+  if (failed(parser.parseLess()) || failed(parser.parseLSquare()))
     return nullptr;
+
+  // Parse list of comma-separated dims, where each dim is an integer >= 0
+  // or ?.
+  for (bool first = true;; first = false) {
+    if (!first) {
+      if (failed(parser.parseOptionalComma())) break;
+    }
+
+    int64_t dim;
+    OptionalParseResult optionalInteger = parser.parseOptionalInteger(dim);
+    if (optionalInteger.hasValue()) {
+      if (dim < 0) {
+        parser.emitError(parser.getNameLoc(), "expected dim >= 0 or '?'");
+        return nullptr;
+      }
+    } else if (succeeded(parser.parseOptionalQuestion())) {
+      dim = -1;
+    } else if (first) {
+      // It is fine to not have a first dim.
+      break;
+    } else {
+      parser.emitError(parser.getNameLoc(), "expected shape dim");
+      return nullptr;
+    }
+    dims.push_back(dim);
   }
-  if (failed(parser.parseType(dimType))) {
-    return nullptr;
+  if (failed(parser.parseRSquare())) return nullptr;
+
+  // Parse optional: , type
+  if (succeeded(parser.parseOptionalComma())) {
+    if (failed(parser.parseType(dimType))) {
+      return nullptr;
+    }
+  } else {
+    dimType = parser.getBuilder().getIndexType();
   }
   if (failed(parser.parseGreater())) {
     parser.emitError(parser.getNameLoc(), "expected terminating '>'");
@@ -63,25 +97,24 @@ static Type parseRankedShape(DialectAsmParser& parser) {
 
 static void printRankedShape(Shape::RankedShapeType type,
                              DialectAsmPrinter& printer) {
-  llvm::SmallVector<int64_t, 7> dims;
-  type.getAllDims(dims);
-  printer << "ranked_shape<";
-  bool first = true;
-  for (auto dim : dims) {
-    if (first) {
-      first = false;
-    } else {
-      printer << "x";
-    }
-
-    if (dim < 0)
-      printer << "?";
-    else
-      printer << dim;
+  auto dims = type.getAllDims();
+  printer << "ranked_shape<[";
+  interleave(
+      dims, printer,
+      [&](int64_t dim) {
+        if (dim < 0)
+          printer << "?";
+        else
+          printer << dim;
+      },
+      ",");
+  printer << "]";
+  auto dimType = type.getDimType();
+  if (!dimType.isa<IndexType>()) {
+    // Only print for non index type.
+    printer << ",";
+    printer.printType(dimType);
   }
-
-  if (!first) printer << "x";
-  printer.printType(type.getDimType());
   printer << ">";
 }
 
