@@ -32,7 +32,7 @@ import datetime
 import os
 import textwrap
 from collections import OrderedDict
-from itertools import repeat
+from itertools import repeat, chain
 import glob
 import re
 
@@ -209,7 +209,7 @@ class BuildFileFunctions(object):
       # results in linkage failures if the library including the gentbl dep is
       # marked as ALWAYSLINK.
       # This drops deps in the local namespace ending with '_gen' and 'Gen'
-      target = ""
+      target = [""]
     elif not target.startswith(("//iree", ":")):
       # External target, call helper method for special case handling.
       target = bazel_to_cmake_targets.convert_external_target(target)
@@ -220,6 +220,7 @@ class BuildFileFunctions(object):
       target = target.replace("//", "")  # iree/base:api
       target = target.replace(":", "::")  # iree/base::api or ::api
       target = target.replace("/", "::")  # iree::base::api
+      target = [target]
     return target
 
   def _convert_data_block(self, data):
@@ -231,6 +232,8 @@ class BuildFileFunctions(object):
     #    package1::target2
     #    package2::target
     data_list = [self._convert_target(dep) for dep in data]
+    # Flatten lists
+    data_list = list(chain.from_iterable(data_list))
     # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
     data_list = list(filter(None, OrderedDict(zip(data_list, repeat(None)))))
     data_list = "\n".join(["    %s" % (data,) for data in data_list])
@@ -245,6 +248,8 @@ class BuildFileFunctions(object):
     #    package1::target2
     #    package2::target
     deps_list = [self._convert_target(dep) for dep in deps]
+    # Flatten lists
+    deps_list = list(chain.from_iterable(deps_list))
     # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
     deps_list = list(filter(None, OrderedDict(zip(deps_list, repeat(None)))))
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])

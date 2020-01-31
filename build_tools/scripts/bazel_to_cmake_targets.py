@@ -16,8 +16,8 @@
 # Bazel to CMake target name conversions used by bazel_to_cmake.py.
 
 ABSL_EXPLICIT_TARGET_MAPPING = {
-    "@com_google_absl//absl/flags:flag": "absl::flags",
-    "@com_google_absl//absl/flags:parse": "absl::flags_parse",
+    "@com_google_absl//absl/flags:flag": ["absl::flags"],
+    "@com_google_absl//absl/flags:parse": ["absl::flags_parse"],
 }
 
 
@@ -34,61 +34,61 @@ def _convert_absl_target(target):
     target_name = target.rsplit(":")[-1]
   else:
     target_name = target.rsplit("/")[-1]
-  return "absl::" + target_name
+  return ["absl::" + target_name]
 
 
 DEAR_IMGUI_EXPLICIT_TARGET_MAPPING = {
     "@dear_imgui":
-        "dear_imgui::dear_imgui",
+        ["dear_imgui::dear_imgui"],
     "@dear_imgui//:imgui_sdl_vulkan":
-        "dear_imgui::impl_sdl\n    dear_imgui::impl_vulkan",
+        ["dear_imgui::impl_sdl", "dear_imgui::impl_vulkan"],
 }
 
 LLVM_TARGET_MAPPING = {
-    "@llvm-project//llvm:support": "LLVMSupport",
-    "@llvm-project//llvm:tablegen": "LLVMTableGen",
+    "@llvm-project//llvm:support": ["LLVMSupport"],
+    "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
 }
 
 VULKAN_HEADERS_MAPPING = {
     # TODO(scotttodd): Set -DVK_NO_PROTOTYPES to COPTS for _no_prototypes.
     #   Maybe add a wrapper CMake lib within build_tools/third_party/?
-    "@vulkan_headers//:vulkan_headers": "Vulkan::Headers",
-    "@vulkan_headers//:vulkan_headers_no_prototypes": "Vulkan::Headers",
+    "@vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
+    "@vulkan_headers//:vulkan_headers_no_prototypes": ["Vulkan::Headers"],
 }
 
 MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AffineDialectRegistration":
-        "MLIRAffineOps",
+        ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms":
-        "MLIRAffineToStandard",
+        ["MLIRAffineToStandard"],
     "@llvm-project//mlir:GPUToSPIRVTransforms":
-        "MLIRGPUtoSPIRVTransforms",
+        ["MLIRGPUtoSPIRVTransforms"],
     "@llvm-project//mlir:GPUTransforms":
-        "MLIRGPU",
+        ["MLIRGPU"],
     "@llvm-project//mlir:LinalgDialectRegistration":
-        "MLIRLinalgOps",
+        ["MLIRLinalgOps"],
     "@llvm-project//mlir:LoopsToGPUPass":
-        "MLIRLoopsToGPU",
+        ["MLIRLoopsToGPU"],
     "@llvm-project//mlir:SPIRVDialect":
-        "MLIRSPIRV",
+        ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVDialectRegistration":
-        "MLIRSPIRV",
+        ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering":
-        "MLIRSPIRV",
+        ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVTranslateRegistration":
-        "MLIRSPIRVSerialization",
+        ["MLIRSPIRVSerialization"],
     "@llvm-project//mlir:StandardDialectRegistration":
-        "MLIRStandardOps",
+        ["MLIRStandardOps"],
     "@llvm-project//mlir:StandardToSPIRVConversions":
-        "MLIRStandardToSPIRVTransforms",
+        ["MLIRStandardToSPIRVTransforms"],
     "@llvm-project//mlir:TableGen":
-        "LLVMMLIRTableGen",
+        ["LLVMMLIRTableGen"],
     "@llvm-project//mlir:mlir-translate":
-        "mlir-translate",
+        ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain":
-        "MLIRTableGen",
+        ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptMain":
-        "MLIROptMain",
+        ["MLIROptMain"],
 }
 
 
@@ -100,7 +100,7 @@ def _convert_mlir_target(target):
   # Take "MLIR" and append the name part of the full target identifier, e.g.
   #   "@llvm-project//mlir:IR"   -> "MLIRIR"
   #   "@llvm-project//mlir:Pass" -> "MLIRPass"
-  return "MLIR" + target.rsplit(":")[-1]
+  return ["MLIR" + target.rsplit(":")[-1]]
 
 
 def convert_external_target(target):
@@ -122,29 +122,29 @@ def convert_external_target(target):
   if target.startswith("@com_google_absl"):
     return _convert_absl_target(target)
   if target == "@com_google_benchmark//:benchmark":
-    return "benchmark"
+    return ["benchmark"]
   if target == "@com_github_google_flatbuffers//:flatbuffers":
-    return "flatbuffers"
+    return ["flatbuffers"]
   if target.startswith("@dear_imgui"):
     return DEAR_IMGUI_EXPLICIT_TARGET_MAPPING[target]
   if target == "@com_google_googletest//:gtest":
-    return "gtest"
+    return ["gtest"]
   if target.startswith("@llvm-project//llvm"):
     return LLVM_TARGET_MAPPING[target]
   if target.startswith("@llvm-project//mlir"):
     return _convert_mlir_target(target)
   if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
     # All Bazel targets map to a single CMake target.
-    return "tensorflow::mlir_xla"
+    return ["tensorflow::mlir_xla"]
   if target.startswith("@org_tensorflow//tensorflow/lite/experimental/ruy"):
     # All Bazel targets map to a single CMake target.
-    return "ruy"
+    return ["ruy"]
   if target == "@sdl2//:SDL2":
-    return "SDL2-static"
+    return ["SDL2-static"]
   if target.startswith("@vulkan_headers"):
     return VULKAN_HEADERS_MAPPING[target]
   if target == "@vulkan_sdk//:sdk":
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
-    return "Vulkan::Vulkan"
+    return ["Vulkan::Vulkan"]
 
   raise KeyError("No conversion found for target '%s'" % target)
