@@ -51,6 +51,17 @@ struct RemoveDeadStorePattern : OpConversionPattern<IREE::StoreOutputOp> {
   }
 };
 
+/// Replace iree.return with std.return operation.
+struct IREEReturnOpLowering : OpConversionPattern<IREE::ReturnOp> {
+  using OpConversionPattern<IREE::ReturnOp>::OpConversionPattern;
+  PatternMatchResult matchAndRewrite(
+      IREE::ReturnOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const {
+    rewriter.replaceOpWithNewOp<ReturnOp>(op);
+    return matchSuccess();
+  }
+};
+
 }  // namespace
 
 PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
@@ -110,8 +121,8 @@ PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
 
 void populateLinalgTensorToBufferConversionPattern(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<LinalgTensorToBufferConverter, RemoveDeadStorePattern>(
-      context);
+  patterns.insert<LinalgTensorToBufferConverter, RemoveDeadStorePattern,
+                  IREEReturnOpLowering>(context);
 }
 
 struct LinalgTensorToBufferConversionPass
@@ -122,7 +133,6 @@ struct LinalgTensorToBufferConversionPass
     ConversionTarget target(*context);
     target.addLegalDialect<linalg::LinalgDialect, StandardOpsDialect>();
     target.addLegalOp<IREE::LoadInputOp>();
-    target.addLegalOp<IREE::ReturnOp>();
     target.addLegalOp<FuncOp>();
     target.addDynamicallyLegalOp<linalg::GenericOp>([&](linalg::GenericOp op) {
       return llvm::all_of(op.getOperands(),

@@ -24,6 +24,7 @@ module {
       linalg.yield %3 : f32
     }: tensor<2x2xf32>, tensor<2x2xf32> -> tensor<2x2xf32>
     iree.store_output(%2 : tensor<2x2xf32>, %arg2 : memref<2x2xf32>)
+    // CHECK: return
     iree.return
   }
 }
