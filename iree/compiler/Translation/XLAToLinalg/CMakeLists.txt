@@ -19,6 +19,7 @@ iree_cc_library(
     XLAToLinalg
   HDRS
     "MapHloToScalarOp.h"
+    "XLAToLinalg.h"
   SRCS
     "XLAToLinalg.cpp"
   DEPS

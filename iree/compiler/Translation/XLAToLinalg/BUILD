@@ -24,6 +24,7 @@ cc_library(
     ],
     hdrs = [
         "MapHloToScalarOp.h",
+        "XLAToLinalg.h",
     ],
     deps = [
         "@llvm-project//llvm:support",
