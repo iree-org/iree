@@ -90,15 +90,17 @@ def VMLA_Buffer : DialectType<
 
 def VMLA_BufferRef : TypeAlias<RefPtrOf<VMLA_Buffer>>;
 
-def VMLA_AnyTypeAttr : Confined<TypeAttr, [I8Attr, I16Attr, I32Attr, F32Attr]> {
-  let constBuilderCall = ?;
-  let defaultValue = ?;
-}
-
-def VMLA_FloatTypeAttr : Confined<TypeAttr, [F32Attr]> {
-  let constBuilderCall = ?;
-  let defaultValue = ?;
-}
+// TODO(benvanik): figure out how to get constraints to work.
+// def VMLA_AnyTypeAttr : Confined<TypeAttr, [I8Attr, I16Attr, I32Attr, F32Attr]> {
+//   let constBuilderCall = ?;
+//   let defaultValue = ?;
+// }
+// def VMLA_FloatTypeAttr : Confined<TypeAttr, [F32Attr]> {
+//   let constBuilderCall = ?;
+//   let defaultValue = ?;
+// }
+def VMLA_AnyTypeAttr : TypeAttrBase<"Type", "any type attribute">;
+def VMLA_FloatTypeAttr : TypeAttrBase<"Type", "any type attribute">;
 
 //===----------------------------------------------------------------------===//
 // Base VMLA op classes

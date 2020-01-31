@@ -16,6 +16,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "conversion.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

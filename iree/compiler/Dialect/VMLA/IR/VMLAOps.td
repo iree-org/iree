@@ -190,9 +190,7 @@ def VMLA_CeilOp : VMLA_UnaryOp<"ceil", VMLA_FloatTypeAttr>;
 def VMLA_ConvertOp : VMLA_Op<"convert"> {
   let arguments = (ins
     VMLA_BufferRef:$src,
-    VMLA_Shape:$src_shape,
     VMLA_BufferRef:$dst,
-    VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$src_type,
     VMLA_AnyTypeAttr:$dst_type
   );
@@ -212,7 +210,7 @@ def VMLA_MatMulOp : VMLA_Op<"matmul"> {
     VMLA_Shape:$dst_shape,
     VMLA_FloatTypeAttr:$lhs_type,
     VMLA_FloatTypeAttr:$rhs_type,
-    VMLA_FloatTypeAttr:$result_type
+    VMLA_FloatTypeAttr:$dst_type
   );
 }
 

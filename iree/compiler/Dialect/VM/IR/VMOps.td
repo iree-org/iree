@@ -201,6 +201,14 @@ def VM_ImportOp : VM_Op<"import", [
           .cast<FunctionType>();
     }
 
+    /// Returns true if the import must be invoked via vm.call.variadic.
+    bool isVariadic() {
+      for (int i = 0; i < getNumFuncArguments(); ++i) {
+        if (isFuncArgumentVariadic(i)) return true;
+      }
+      return false;
+    }
+
     /// Returns the name of the given function argument.
     StringRef getFuncArgumentName(int i) {
       return getArgAttrOfType<StringAttr>(i, "vm.name").getValue();

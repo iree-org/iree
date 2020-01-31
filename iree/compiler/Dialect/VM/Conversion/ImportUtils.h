@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -26,6 +27,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+// Represents a fixed single-value non-variadic segment in the variadic call
+// segment_sizes array.
+constexpr int kFixedSingleValue = -1;
+
 // Appends a set of vm.import ops from a module to a target VM module.
 // Imports will only be added if they are not already present in the target
 // module.
@@ -33,6 +38,111 @@ LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
                                  ModuleOp targetModuleOp);
 LogicalResult appendImportModule(StringRef importModuleSrc,
                                  ModuleOp targetModuleOp);
+
+// Rewrites the op T to a VM call to |importOp|.
+// Automatically handles type conversion and special logic for variadic operands
+// and special types (such as ranked shape).
+template <typename T, typename Adaptor = typename T::OperandAdaptor>
+LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
+                            TypeConverter &typeConverter,
+                            ConversionPatternRewriter &rewriter) {
+  auto *operation = op.getOperation();
+  bool isOpVariadic = importOp.isVariadic();
+  OperationState state{
+      op.getLoc(), isOpVariadic ? IREE::VM::CallVariadicOp::getOperationName()
+                                : IREE::VM::CallOp::getOperationName()};
+  state.addAttributes(llvm::to_vector<4>(operation->getDialectAttrs()));
+  state.addAttribute("callee", rewriter.getSymbolRefAttr(importOp));
+
+  auto importType = importOp.getType();
+  for (auto resultType : operation->getResultTypes()) {
+    if (failed(typeConverter.convertType(resultType, state.types))) {
+      return failure();
+    }
+  }
+
+  SmallVector<uint8_t, 4> segmentSizes;
+  int inputSetIndex = 0;
+  for (auto input : llvm::enumerate(importType.getInputs())) {
+    auto inputType = input.value();
+    auto inputName = importOp.getFuncArgumentName(input.index());
+    if (auto attrValue = op.getAttr(inputName)) {
+      if (auto intAttr = attrValue.template dyn_cast<IntegerAttr>()) {
+        // NOTE: we intentionally go to std.constant ops so that the standard
+        // conversions can do their job. If we want to remove the dependency
+        // from standard ops in the future we could instead go directly to
+        // one of the vm constant ops.
+        auto constOp = rewriter.createOrFold<mlir::ConstantOp>(
+            op.getLoc(), inputType, intAttr);
+        state.operands.push_back(constOp);
+        segmentSizes.push_back(kFixedSingleValue);
+      } else if (auto elementsAttr =
+                     attrValue.template dyn_cast<DenseIntElementsAttr>()) {
+        for (auto intAttr : elementsAttr.getAttributeValues()) {
+          auto constOp = rewriter.createOrFold<mlir::ConstantOp>(
+              op.getLoc(), elementsAttr.getType().getElementType(), intAttr);
+          state.operands.push_back(constOp);
+        }
+        segmentSizes.push_back(elementsAttr.getNumElements());
+      } else {
+        op.emitOpError() << "unsupported attribute encoding: "
+                         << attrValue.getType();
+        return failure();
+      }
+    } else {
+      auto oldOperands = llvm::to_vector<4>(op.getODSOperands(inputSetIndex));
+      auto newOperands =
+          llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex));
+      ++inputSetIndex;
+      if (oldOperands.size() == 1 &&
+          oldOperands[0].getType().template isa<Shape::RankedShapeType>()) {
+        // Expand a ranked_shape into its dimensions.
+        // We need to rematerialize the static dimensions and then pass through
+        // the new dynamic dimensions that we have the SSA values for.
+        auto rankedShapeType = oldOperands[0]
+                                   .getType()
+                                   .template dyn_cast<Shape::RankedShapeType>();
+        int dynamicDimIndex = 0;
+        for (int i = 0; i < rankedShapeType.getRank(); ++i) {
+          if (rankedShapeType.isDimDynamic(i)) {
+            state.addOperands({newOperands[dynamicDimIndex++]});
+          } else {
+            auto dimOp = rewriter.createOrFold<mlir::ConstantOp>(
+                op.getLoc(), rankedShapeType.getDimType(),
+                rewriter.getIntegerAttr(rankedShapeType.getDimType(),
+                                        rankedShapeType.getStaticDim(i)));
+            state.addOperands({dimOp});
+          }
+        }
+        segmentSizes.push_back(rankedShapeType.getRank());
+      } else {
+        state.addOperands(newOperands);
+        if (importOp.isFuncArgumentVariadic(input.index())) {
+          segmentSizes.push_back(newOperands.size());
+        } else {
+          segmentSizes.push_back(kFixedSingleValue);
+        }
+      }
+    }
+  }
+  if (isOpVariadic) {
+    state.addAttribute(
+        "segment_sizes",
+        DenseIntElementsAttr::get(
+            VectorType::get({static_cast<int64_t>(segmentSizes.size())},
+                            rewriter.getIntegerType(8)),
+            segmentSizes));
+    state.addAttribute("segment_types",
+                       rewriter.getArrayAttr(llvm::to_vector<4>(llvm::map_range(
+                           importType.getInputs(), [&](Type type) {
+                             return TypeAttr::get(type).cast<Attribute>();
+                           }))));
+  }
+
+  auto *callOp = rewriter.createOperation(state);
+  rewriter.replaceOp(op, callOp->getResults());
+  return success();
+}
 
 // Utility for op to vm.call conversion.
 template <typename T, typename Adaptor = typename T::OperandAdaptor>
@@ -45,89 +155,13 @@ class VMImportOpConversion : public OpConversionPattern<T> {
     assert(importOp);
   }
 
-  // Returns true if the import must be called with vm.call.variadic.
-  bool isVariadic() const {
-    for (int i = 0; i < importOp.getNumFuncArguments(); ++i) {
-      if (importOp.isFuncArgumentVariadic(i)) return true;
-    }
-    return false;
-  }
-
   PatternMatchResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (failed(rewriteToCall(op, Adaptor{operands}, rewriter))) {
-      return OpConversionPattern<T>::matchFailure();
-    }
-    return OpConversionPattern<T>::matchSuccess();
-  }
-
-  virtual LogicalResult rewriteToCall(
-      T op, Adaptor adaptor, ConversionPatternRewriter &rewriter) const {
-    auto *operation = op.getOperation();
-    bool isOpVariadic = isVariadic();
-    OperationState state{
-        op.getLoc(), isOpVariadic ? IREE::VM::CallVariadicOp::getOperationName()
-                                  : IREE::VM::CallOp::getOperationName()};
-    state.addAttributes(llvm::to_vector<4>(operation->getDialectAttrs()));
-    state.addAttribute("callee", rewriter.getSymbolRefAttr(importOp));
-
-    auto importType = importOp.getType();
-    for (auto resultType : operation->getResultTypes()) {
-      if (failed(typeConverter.convertType(resultType, state.types))) {
-        return failure();
-      }
-    }
-
-    SmallVector<uint8_t, 4> segmentSizes;
-    int inputSetIndex = 0;
-    for (auto input : llvm::enumerate(importType.getInputs())) {
-      auto inputType = input.value();
-      auto inputName = importOp.getFuncArgumentName(input.index());
-      if (auto attrValue = op.getAttr(inputName)) {
-        if (auto intAttr = attrValue.template dyn_cast<IntegerAttr>()) {
-          // NOTE: we intentionally go to std.constant ops so that the standard
-          // conversions can do their job. If we want to remove the dependency
-          // from standard ops in the future we could instead go directly to
-          // one of the vm constant ops.
-          auto constOp = rewriter.createOrFold<mlir::ConstantOp>(
-              op.getLoc(), inputType, intAttr);
-          state.operands.push_back(constOp);
-        } else {
-          op.emitOpError() << "unsupported attribute encoding: "
-                           << attrValue.getType();
-          return failure();
-        }
-        segmentSizes.push_back(-1);
-      } else {
-        auto operands =
-            llvm::to_vector<4>(adaptor.getODSOperands(inputSetIndex++));
-        state.addOperands(operands);
-        if (importOp.isFuncArgumentVariadic(input.index())) {
-          segmentSizes.push_back(operands.size());
-        } else {
-          segmentSizes.push_back(-1);
-        }
-      }
-    }
-    if (isOpVariadic) {
-      state.addAttribute(
-          "segment_sizes",
-          DenseIntElementsAttr::get(
-              VectorType::get({static_cast<int64_t>(segmentSizes.size())},
-                              rewriter.getIntegerType(8)),
-              segmentSizes));
-      state.addAttribute(
-          "segment_types",
-          rewriter.getArrayAttr(llvm::to_vector<4>(
-              llvm::map_range(importType.getInputs(), [&](Type type) {
-                return TypeAttr::get(type).cast<Attribute>();
-              }))));
-    }
-
-    auto *callOp = rewriter.createOperation(state);
-    rewriter.replaceOp(op, callOp->getResults());
-    return success();
+    return succeeded(rewriteToCall(op, Adaptor{operands}, importOp,
+                                   typeConverter, rewriter))
+               ? OpConversionPattern<T>::matchSuccess()
+               : llvm::None;
   }
 
  protected:

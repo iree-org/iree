@@ -15,11 +15,26 @@
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
+
+LogicalResult VMTypeConverter::convertType(Type t,
+                                           SmallVectorImpl<Type> &results) {
+  if (auto rankedShape = t.dyn_cast<Shape::RankedShapeType>()) {
+    for (int i = 0; i < rankedShape.getRank(); ++i) {
+      if (rankedShape.isDimDynamic(i)) {
+        results.push_back(rankedShape.getDimType());
+      }
+    }
+    return success();
+  }
+  results.push_back(convertType(t));
+  return success();
+}
 
 Type VMTypeConverter::convertType(Type t) {
   if (auto integerType = t.dyn_cast<IntegerType>()) {
