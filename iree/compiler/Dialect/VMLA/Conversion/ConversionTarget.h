@@ -32,14 +32,6 @@ class VMLAConversionTarget : public ConversionTarget {
  public:
   VMLAConversionTarget(MLIRContext *context, TypeConverter &typeConverter);
 
-  // Configures the conversion target so that all otherwise unhandled ops will
-  // be checked to ensure that their operand/result types are legal based on the
-  // TypeConverter::isLegal check.
-  //
-  // This must only be called after all other legality information has been
-  // specified as it otherwise overwrites the legality handlers.
-  void setupFallbackTypeLegality();
-
   // Attempts to rewrite an op that may use tensor values into an op using VMLA
   // buffers. See VMLAOpConversion for more information.
   static LogicalResult applyDefaultBufferRewrite(

@@ -32,12 +32,12 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   // Setup the fallback handler such that all ops without explicitly
   // registered patterns will be checked to ensure that they don't use any
   // illegal types.
-  setupFallbackTypeLegality();
+  markUnknownOpDynamicallyLegal();
 
   // The HAL dialect expects both standard ops and the HAL ops (in case some
   // conversion has already happened).
   addLegalDialect<StandardOpsDialect>();
-  addLegalOp<FuncOp, ModuleOp, ModuleTerminatorOp>();
+  addLegalOp<ModuleOp, ModuleTerminatorOp>();
   addLegalDialect<IREE::HAL::HALDialect>();
 
   // We don't care about the contents of a HAL executable: it may have any kind
@@ -49,13 +49,6 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
       [&](FuncOp op) { return typeConverter.isSignatureLegal(op.getType()); });
   addDynamicallyLegalOp<ConstantOp>(
       [&](ConstantOp op) { return typeConverter.isLegal(op.getType()); });
-}
-
-void HALConversionTarget::setupFallbackTypeLegality() {
-  // TODO(b/147671560): a way to more cleanly support type fallbacks.
-  for (auto *dialect : context.getRegisteredDialects()) {
-    addDynamicallyLegalDialect(dialect->getNamespace());
-  }
 }
 
 bool HALConversionTarget::isDynamicallyLegal(Operation *op) const {
