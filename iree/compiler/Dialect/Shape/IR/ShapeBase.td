@@ -23,7 +23,7 @@ include "mlir/IR/OpBase.td"
 
 // TODO(b/143787186): rename when old dialects are removed.
 def Shape_Dialect : Dialect {
-  let name = "shape";
+  let name = "shapex";
   let cppNamespace = "Shape";
 
   let summary = [{

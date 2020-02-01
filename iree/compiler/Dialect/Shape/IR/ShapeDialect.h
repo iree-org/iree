@@ -25,7 +25,7 @@ class ShapeDialect : public Dialect {
  public:
   explicit ShapeDialect(MLIRContext* context);
   // TODO(b/143787186): rename to iree.
-  static StringRef getDialectNamespace() { return "shape"; }
+  static StringRef getDialectNamespace() { return "shapex"; }
 
   Type parseType(DialectAsmParser& parser) const override;
   void printType(Type type, DialectAsmPrinter& os) const override;
