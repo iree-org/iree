@@ -34,6 +34,8 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
 
   let arguments = (ins AnyInteger:$operand);
 
+  let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
+
   let parser = [{ return parse$cppClass(parser, result); }];
   let printer = [{ print$cppClass(p, *this); }];
 }

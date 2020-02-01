@@ -38,16 +38,6 @@ namespace VM {
 // Structural ops
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseRegionEndOp(OpAsmParser &parser,
-                                    OperationState *result) {
-  return parser.parseOptionalAttrDict(result->attributes);
-}
-
-static void printRegionEndOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName();
-  p.printOptionalAttrDict(op->getAttrs());
-}
-
 static ParseResult parseModuleOp(OpAsmParser &parser, OperationState *result) {
   StringAttr nameAttr;
   if (failed(parser.parseSymbolName(nameAttr,
@@ -506,27 +496,6 @@ void GlobalRefOp::build(Builder *builder, OperationState &result,
   build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
 }
 
-static ParseResult parseGlobalLoadOp(OpAsmParser &parser,
-                                     OperationState *result) {
-  FlatSymbolRefAttr globalAttr;
-  Type valueType;
-  if (failed(parser.parseAttribute(globalAttr, "global", result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(valueType))) {
-    return failure();
-  }
-  result->addTypes({valueType});
-  return success();
-}
-
-static void printGlobalLoadOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ';
-  p.printSymbolName(op->getAttrOfType<FlatSymbolRefAttr>("global").getValue());
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"global"});
-  p << " : ";
-  p.printType(op->getResult(0).getType());
-}
-
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
@@ -542,31 +511,6 @@ static LogicalResult verifyGlobalLoadOp(Operation *op) {
            << globalType << " but load is " << loadType;
   }
   return success();
-}
-
-static ParseResult parseGlobalStoreOp(OpAsmParser &parser,
-                                      OperationState *result) {
-  FlatSymbolRefAttr globalAttr;
-  OpAsmParser::OperandType value;
-  Type valueType;
-  if (failed(parser.parseAttribute(globalAttr, "global", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(value)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(valueType)) ||
-      failed(parser.resolveOperand(value, valueType, result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printGlobalStoreOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ';
-  p.printSymbolName(op->getAttrOfType<FlatSymbolRefAttr>("global").getValue());
-  p << ", ";
-  p.printOperand(op->getOperand(0));
-  p.printOptionalAttrDict(op->getAttrs(), /*elidedAttrs=*/{"global"});
-  p << " : ";
-  p.printType(op->getOperand(0).getType());
 }
 
 static LogicalResult verifyGlobalStoreOp(Operation *op) {
@@ -588,22 +532,6 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
                              << " is not mutable and cannot be stored to";
   }
   return success();
-}
-
-static ParseResult parseGlobalResetRefOp(OpAsmParser &parser,
-                                         OperationState *result) {
-  FlatSymbolRefAttr globalAttr;
-  if (failed(parser.parseAttribute(globalAttr, "global", result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printGlobalResetRefOp(OpAsmPrinter &p, GlobalResetRefOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.global());
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"global"});
 }
 
 static LogicalResult verifyGlobalResetRefOp(GlobalResetRefOp &op) {
@@ -712,50 +640,8 @@ void ConstI32Op::build(Builder *builder, OperationState &result,
   return build(builder, result, builder->getI32IntegerAttr(value));
 }
 
-static ParseResult parseConstI32ZeroOp(OpAsmParser &parser,
-                                       OperationState *result) {
-  Type valueType;
-  if (failed(parser.parseColonType(valueType))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Invalid integer type";
-  }
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Failed to parse optional attribute dict";
-  }
-  return parser.addTypeToList(valueType, result->types);
-}
-
-static void printConstI32ZeroOp(OpAsmPrinter &p, ConstI32ZeroOp &op) {
-  p << op.getOperationName();
-  p << " : ";
-  p.printType(op.getResult().getType());
-  p.printOptionalAttrDict(op.getAttrs());
-}
-
 void ConstI32ZeroOp::build(Builder *builder, OperationState &result) {
   result.addTypes(builder->getIntegerType(32));
-}
-
-static ParseResult parseConstRefZeroOp(OpAsmParser &parser,
-                                       OperationState *result) {
-  Type objectType;
-  if (failed(parser.parseColonType(objectType))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Invalid ref_ptr type";
-  }
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return parser.emitError(parser.getCurrentLocation())
-           << "Failed to parse optional attribute dict";
-  }
-  return parser.addTypeToList(objectType, result->types);
-}
-
-static void printConstRefZeroOp(OpAsmPrinter &p, ConstRefZeroOp &op) {
-  p << op.getOperationName();
-  p << " : ";
-  p.printType(op.getResult().getType());
-  p.printOptionalAttrDict(op.getAttrs());
 }
 
 void ConstRefZeroOp::build(Builder *builder, OperationState &result,
@@ -787,27 +673,6 @@ void RodataOp::build(Builder *builder, OperationState &result, StringRef name,
   result.addAttribute("sym_name", builder->getStringAttr(name));
   result.addAttribute("value", value);
   result.addAttributes(attrs);
-}
-
-static ParseResult parseConstRefRodataOp(OpAsmParser &parser,
-                                         OperationState *result) {
-  FlatSymbolRefAttr rodataAttr;
-  Type valueType;
-  if (failed(parser.parseAttribute(rodataAttr, "rodata", result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(valueType))) {
-    return failure();
-  }
-  result->addTypes({valueType});
-  return success();
-}
-
-static void printConstRefRodataOp(OpAsmPrinter &p, ConstRefRodataOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.rodata());
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"rodata"});
-  p << " : ";
-  p.printType(op.value().getType());
 }
 
 static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
@@ -1060,35 +925,6 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp &op) {
   p.printOptionalAttrDict(op.getAttrs());
 }
 
-static ParseResult parseCallOp(OpAsmParser &parser, OperationState *result) {
-  FlatSymbolRefAttr calleeAttr;
-  FunctionType calleeType;
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  auto calleeLoc = parser.getNameLoc();
-  if (failed(parser.parseAttribute(calleeAttr, "callee", result->attributes)) ||
-      failed(
-          parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(calleeType)) ||
-      failed(parser.addTypesToList(calleeType.getResults(), result->types)) ||
-      failed(parser.resolveOperands(operands, calleeType.getInputs(), calleeLoc,
-                                    result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCallOp(OpAsmPrinter &p, CallOp &op) {
-  p << op.getOperationName() << ' ' << op.getAttr("callee") << '(';
-  p.printOperands(op.getOperands());
-  p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
-  p << " : ";
-  p.printType(FunctionType::get(llvm::to_vector<4>(op.getOperandTypes()),
-                                llvm::to_vector<4>(op.getResultTypes()),
-                                op.getContext()));
-}
-
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,
                                        OperationState *result) {
   FlatSymbolRefAttr calleeAttr;
@@ -1282,60 +1118,6 @@ static void printYieldOp(OpAsmPrinter &p, YieldOp &op) {
 //===----------------------------------------------------------------------===//
 // Debugging
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseTraceOp(OpAsmParser &parser, OperationState *result) {
-  StringAttr eventNameAttr;
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  SmallVector<Type, 4> operandTypes;
-  auto eventNameLoc = parser.getNameLoc();
-  if (failed(parser.parseAttribute(eventNameAttr, "event_name",
-                                   result->attributes)) ||
-      failed(
-          parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonTypeList(operandTypes)) ||
-      failed(parser.resolveOperands(operands, operandTypes, eventNameLoc,
-                                    result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printTraceOp(OpAsmPrinter &p, TraceOp &op) {
-  p << op.getOperationName() << " " << op.getAttr("event_name") << "(";
-  p.printOperands(op.getOperands());
-  p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"event_name"});
-  p << " : ";
-  interleaveComma(op.getOperandTypes(), p);
-}
-
-static ParseResult parsePrintOp(OpAsmParser &parser, OperationState *result) {
-  StringAttr messageAttr;
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  SmallVector<Type, 4> operandTypes;
-  auto messageLoc = parser.getNameLoc();
-  if (failed(
-          parser.parseAttribute(messageAttr, "message", result->attributes)) ||
-      failed(
-          parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonTypeList(operandTypes)) ||
-      failed(parser.resolveOperands(operands, operandTypes, messageLoc,
-                                    result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printPrintOp(OpAsmPrinter &p, PrintOp &op) {
-  p << op.getOperationName() << " " << op.getAttr("message") << "(";
-  p.printOperands(op.getOperands());
-  p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"message"});
-  p << " : ";
-  interleaveComma(op.getOperandTypes(), p);
-}
 
 static ParseResult parseBreakOp(OpAsmParser &parser, OperationState *result) {
   Block *dest;

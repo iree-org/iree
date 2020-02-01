@@ -82,6 +82,10 @@ def IREEInterpLL_CallOp : IREEInterpLL_Op<"call"> {
       result.addTypes(results);
   }]>];
 
+  let assemblyFormat = [{
+    $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
+  }];
+
   let extraClassDeclaration = [{
     // TODO(b/132296600): make tablegen follow the style guide.
     StringRef getCallee() { return callee(); }

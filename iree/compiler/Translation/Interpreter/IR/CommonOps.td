@@ -37,6 +37,8 @@ def IREEInterp_ConstantOp : IREEInterp_PureOp<"constant", [
   let arguments = (ins ElementsAttr:$value);
   let results = (outs IREEHL_MemRef:$result);
 
+  let assemblyFormat = "`[` $value `]` attr-dict `:` type($result)";
+
   let extraClassDeclaration = [{
     Attribute getValue() { return value(); }
   }];
@@ -53,6 +55,10 @@ def IREEInterp_TensorToMemRefOp : IREEInterp_PureOp<"tensor_to_memref", [
   let arguments = (ins AnyTensor);
   let results = (outs IREEHL_MemRef);
 
+  let assemblyFormat = [{
+    `(` operands `:` type(operands) `)` attr-dict `:` type(results)
+  }];
+
   let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 
   let hasFolder = 1;
@@ -63,6 +69,11 @@ def IREEInterp_MemRefToTensorOp : IREEInterp_PureOp<"memref_to_tensor", [
 ]> {
   let arguments = (ins IREEHL_MemRef);
   let results = (outs AnyTensor);
+
+  let assemblyFormat = [{
+    `(` operands `:` type(operands) `)` attr-dict `:` type(results)
+  }];
+
   let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 
   let hasFolder = 1;
@@ -74,6 +85,10 @@ def IREEInterp_ScalarToMemRefOp : IREEInterp_PureOp<"scalar_to_memref", [
   let arguments = (ins IREEHL_Element);
   let results = (outs IREEHL_AnyScalar);
 
+  let assemblyFormat = [{
+    `(` operands `:` type(operands) `)` attr-dict `:` type(results)
+  }];
+
   let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 
   let hasFolder = 1;
@@ -84,6 +99,10 @@ def IREEInterp_MemRefToScalarOp : IREEInterp_PureOp<"memref_to_scalar", [
 ]> {
   let arguments = (ins IREEHL_AnyScalar);
   let results = (outs IREEHL_Element);
+
+  let assemblyFormat = [{
+    `(` operands `:` type(operands) `)` attr-dict `:` type(results)
+  }];
 
   let builders = [OpBuilder<"Builder*, OperationState&, Value ">];
 

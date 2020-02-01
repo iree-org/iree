@@ -74,6 +74,8 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load"> {
     AnyRankedTensor:$result
   );
 
+  let assemblyFormat = "$variable attr-dict `:` type($result)";
+
   let verifier = [{ return verifyVariableLoadOp(*this); }];
 
   let hasCanonicalizer = 1;
@@ -89,6 +91,8 @@ def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
     AnyRankedTensor:$value,
     FLOW_VariableRefAttr:$variable
   );
+
+  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";
 
   let verifier = [{ return verifyVariableStoreOp(*this); }];
 
@@ -458,6 +462,8 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
     FLOW_Tensor:$result
   );
 
+  let assemblyFormat = "$source `:` type($source) `->` type($result) attr-dict";
+
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
@@ -582,6 +588,11 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
   let results = (outs
     FLOW_Tensor:$result
   );
+
+  let assemblyFormat = [{
+    $source `[` $start_indices `for` $lengths `]` `:` type($source) `->`
+    type($result) attr-dict
+  }];
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:

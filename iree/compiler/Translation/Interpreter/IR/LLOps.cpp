@@ -27,32 +27,6 @@ namespace LL {
 // iree_ll_interp.call
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseCallOp(OpAsmParser &parser, OperationState &state) {
-  FlatSymbolRefAttr calleeAttr;
-  FunctionType calleeType;
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  auto calleeLoc = parser.getNameLoc();
-  if (parser.parseAttribute(calleeAttr, "callee", state.attributes) ||
-      parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren) ||
-      parser.parseOptionalAttrDict(state.attributes) ||
-      parser.parseColonType(calleeType) ||
-      parser.addTypesToList(calleeType.getResults(), state.types) ||
-      parser.resolveOperands(operands, calleeType.getInputs(), calleeLoc,
-                             state.operands)) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCallOp(OpAsmPrinter &p, CallOp op) {
-  p << "iree_ll_interp.call " << op.getAttr("callee") << '(';
-  p.printOperands(op.getOperands());
-  p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
-  p << " : ";
-  p.printType(op.getCalleeType());
-}
-
 FunctionType CallOp::getCalleeType() {
   SmallVector<Type, 8> argTypes(getOperandTypes());
   return FunctionType::get(argTypes, getResultTypes(), getContext());

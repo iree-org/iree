@@ -21,7 +21,7 @@ func @elideTiedGetRankedShape(%arg0: tensor<1x?x2x?xf32>, %arg1: !shapex.ranked_
 // CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<1x2xf32>
 func @staticGetRankedShapeToConst(%arg0: tensor<1x2xf32>) -> (!shapex.ranked_shape<[1,2],i32>) {
   // CHECK-NOT: %[[T]]
-  // CHECK: %[[S:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2],i32>
+  // CHECK: %[[S:.+]] = shapex.const_ranked_shape {value} : !shapex.ranked_shape<[1,2],i32>
   %0 = shapex.get_ranked_shape %arg0 : tensor<1x2xf32> -> !shapex.ranked_shape<[1,2],i32>
   // CHECK: return %[[S]]
   return %0 : !shapex.ranked_shape<[1,2],i32>

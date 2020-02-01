@@ -64,8 +64,7 @@ def VM_ModuleEndOp : VM_Op<"module_end", [
   ]> {
   let summary = [{terminator pseudo-op for the module op}];
 
-  let parser = [{ return parseRegionEndOp(parser, &result); }];
-  let printer = [{ return printRegionEndOp(p, *this); }];
+  let assemblyFormat = "attr-dict";
 }
 
 // TODO(b/142336293): DCE functions when unused and not exports.
@@ -326,8 +325,8 @@ class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
     type:$value
   );
 
-  let parser = [{ return parseGlobalLoadOp(parser, &result); }];
-  let printer = [{ return printGlobalLoadOp(p, *this); }];
+  let assemblyFormat = "$global attr-dict `:` type($value)";
+
   let verifier = [{ return verifyGlobalLoadOp(*this); }];
 }
 
@@ -339,6 +338,8 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
     VM_GlobalRefAttr:$global,
     type:$value
   );
+
+  let assemblyFormat = "$global `,` $value attr-dict `:` type($value)";
 
   let parser = [{ return parseGlobalStoreOp(parser, &result); }];
   let printer = [{ return printGlobalStoreOp(p, *this); }];
@@ -415,6 +416,8 @@ def VM_GlobalResetRefOp : VM_Op<"global.reset.ref", [
     VM_GlobalRefAttr:$global
   );
 
+  let assemblyFormat = "$global attr-dict";
+
   let encoding = [
     VM_EncOpcode<VM_OPC_GlobalResetRef>,
     VM_EncGlobalAttr<"global">,
@@ -490,6 +493,8 @@ def VM_ConstI32ZeroOp : VM_PureOp<"const.i32.zero", [
     I32:$result
   );
 
+  let assemblyFormat = "`:` type($result) attr-dict";
+
   let encoding = [
     VM_EncOpcode<VM_OPC_ConstI32Zero>,
     VM_EncResult<"result">,
@@ -517,6 +522,8 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
   let results = (outs
     AnyRefPtr:$result
   );
+
+  let assemblyFormat = "`:` type($result) attr-dict";
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ConstRefZero>,
@@ -580,6 +587,8 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   let results = (outs
     ByteBufferRef:$value
   );
+
+  let assemblyFormat = "$rodata attr-dict `:` type($value)";
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ConstRefRodata>,
@@ -1253,6 +1262,10 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
     Variadic<VM_AnyType>:$results
   );
 
+  let assemblyFormat = [{
+    $callee `(` operands `)` attr-dict `:` functional-type(operands, results)
+  }];
+
   let encoding = [
     VM_EncOpcode<VM_OPC_Call>,
     VM_EncFuncAttr<"callee">,
@@ -1423,6 +1436,10 @@ def VM_TraceOp : VM_Op<"trace", [
     Variadic<VM_AnyType>:$operands
   );
 
+  let assemblyFormat = [{
+    $event_name `(` operands `)` attr-dict `:` type(operands)
+  }];
+
   let encoding = [
     VM_EncOpcode<VM_OPC_Trace>,
     VM_EncStrAttr<"event_name">,
@@ -1446,6 +1463,10 @@ def VM_PrintOp : VM_Op<"print", [
     StrAttr:$message,
     Variadic<VM_AnyType>:$operands
   );
+
+  let assemblyFormat = [{
+    $message `(` operands `)` attr-dict `:` type(operands)
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Print>,

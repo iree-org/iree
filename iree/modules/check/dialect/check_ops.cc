@@ -21,26 +21,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Check {
 
-void printExpectTrueOp(OpAsmPrinter &p, ExpectTrueOp op) {
-  p << "check.expect_true";
-  p << "(";
-  p.printOperand(op.getOperand());
-  p << ")";
-  p.printOptionalAttrDict(op.getAttrs());
-  p << " : ";
-  p.printType(op.getOperand().getType());
-}
-
-ParseResult parseExpectTrueOp(OpAsmParser &parser, OperationState &state) {
-  OpAsmParser::OperandType arg;
-  Type type;
-  return failure(parser.parseLParen() || parser.parseOperand(arg) ||
-                 parser.parseRParen() ||
-                 parser.parseOptionalAttrDict(state.attributes) ||
-                 parser.parseColonType(type) ||
-                 parser.resolveOperand(arg, type, state.operands));
-}
-
 #define GET_OP_CLASSES
 #include "iree/modules/check/dialect/check_ops.cc.inc"
 

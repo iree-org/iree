@@ -179,28 +179,6 @@ void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
 // flow.variable.load
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseVariableLoadOp(OpAsmParser &parser,
-                                       OperationState *result) {
-  FlatSymbolRefAttr variableAttr;
-  Type valueType;
-  if (failed(parser.parseAttribute(variableAttr, "variable",
-                                   result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(valueType))) {
-    return failure();
-  }
-  result->addTypes({valueType});
-  return success();
-}
-
-static void printVariableLoadOp(OpAsmPrinter &p, VariableLoadOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.variable());
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
   auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
   if (!symbolOp) {
@@ -219,32 +197,6 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
 //===----------------------------------------------------------------------===//
 // flow.variable.store
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseVariableStoreOp(OpAsmParser &parser,
-                                        OperationState *result) {
-  OpAsmParser::OperandType value;
-  FlatSymbolRefAttr variableAttr;
-  Type valueType;
-  if (failed(parser.parseOperand(value)) || failed(parser.parseComma()) ||
-      failed(parser.parseAttribute(variableAttr, "variable",
-                                   result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(valueType)) ||
-      failed(parser.resolveOperand(value, valueType, result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printVariableStoreOp(OpAsmPrinter &p, VariableStoreOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.value());
-  p << ", ";
-  p.printSymbolName(op.variable());
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
-  p << " : ";
-  p.printType(op.value().getType());
-}
 
 static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
   auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
@@ -869,39 +821,6 @@ FunctionType DispatchOp::getEntryPointType() {
 }
 
 //===----------------------------------------------------------------------===//
-// flow.tensor.reshape
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseTensorReshapeOp(OpAsmParser &parser,
-                                        OperationState *result) {
-  OpAsmParser::OperandType sourceOperand;
-  ShapedType sourceType;
-  ShapedType resultType;
-  if (failed(parser.parseOperand(sourceOperand)) ||
-      failed(parser.parseColonType(sourceType)) ||
-      failed(parser.parseArrow()) || failed(parser.parseType(resultType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  if (failed(
-          parser.resolveOperand(sourceOperand, sourceType, result->operands))) {
-    return failure();
-  }
-  result->addTypes({resultType});
-  return success();
-}
-
-static void printTensorReshapeOp(OpAsmPrinter &p, TensorReshapeOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.source());
-  p << " : ";
-  p.printType(op.source().getType());
-  p << " -> ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
 // flow.tensor.load
 //===----------------------------------------------------------------------===//
 
@@ -1033,56 +952,6 @@ static void printTensorCloneOp(OpAsmPrinter &p, TensorCloneOp &op) {
   p << op.getOperationName() << ' ';
   p.printOperand(op.operand());
   p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.slice
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseTensorSliceOp(OpAsmParser &parser,
-                                      OperationState *result) {
-  OpAsmParser::OperandType sourceOperand;
-  SmallVector<OpAsmParser::OperandType, 4> indexOperands;
-  SmallVector<OpAsmParser::OperandType, 4> lengthOperands;
-  ShapedType sourceType;
-  ShapedType resultType;
-  if (failed(parser.parseOperand(sourceOperand)) ||
-      failed(parser.parseLSquare()) ||
-      failed(parser.parseOperandList(indexOperands,
-                                     OpAsmParser::Delimiter::None)) ||
-      failed(parser.parseKeyword("for")) ||
-      failed(parser.parseOperandList(lengthOperands,
-                                     OpAsmParser::Delimiter::None)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.parseColonType(sourceType)) ||
-      failed(parser.parseArrow()) || failed(parser.parseType(resultType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(
-          parser.resolveOperand(sourceOperand, sourceType, result->operands)) ||
-      failed(parser.resolveOperands(indexOperands,
-                                    parser.getBuilder().getIntegerType(32),
-                                    result->operands)) ||
-      failed(parser.resolveOperands(lengthOperands,
-                                    parser.getBuilder().getIntegerType(32),
-                                    result->operands))) {
-    return failure();
-  }
-  result->addTypes({resultType});
-  return success();
-}
-
-static void printTensorSliceOp(OpAsmPrinter &p, TensorSliceOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.source());
-  p << '[';
-  p.printOperands(op.start_indices());
-  p << " for ";
-  p.printOperands(op.lengths());
-  p << "] : ";
-  p.printType(op.source().getType());
-  p << " -> ";
   p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }

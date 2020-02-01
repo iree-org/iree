@@ -33,30 +33,6 @@ namespace IREEInterp {
 // iree_interp.constant
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseConstantOp(OpAsmParser &parser,
-                                   OperationState &result) {
-  Attribute valueAttr;
-  Type type;
-  if (parser.parseLSquare() ||
-      parser.parseAttribute(valueAttr, "value", result.attributes) ||
-      parser.parseRSquare() ||
-      parser.parseOptionalAttrDict(result.attributes) ||
-      parser.parseColonType(type))
-    return failure();
-
-  return parser.addTypeToList(type, result.types);
-}
-
-static void printConstantOp(OpAsmPrinter &p, ConstantOp &op) {
-  p << "iree_interp.constant[";
-  p.printAttribute(op.getValue());
-  p << "] ";
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"value"});
-
-  p << " : ";
-  p.printType(op.getType());
-}
-
 namespace {
 
 // TODO(gcmn) this is duplicated from MemRefUtils to avoid a circular
@@ -91,31 +67,6 @@ void ConstantOp::build(Builder *builder, OperationState &state,
 // iree_interp.tensor_to_memref
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseTensorToMemRefOp(OpAsmParser &parser,
-                                         OperationState &state) {
-  OpAsmParser::OperandType operand;
-  Type operandType;
-  Type resultType;
-  if (failed(parser.parseLParen()) || failed(parser.parseOperand(operand)) ||
-      failed(parser.parseColonType(operandType)) ||
-      failed(parser.resolveOperand(operand, operandType, state.operands)) ||
-      failed(parser.parseRParen()) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.addTypeToList(resultType, state.types))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printTensorToMemRefOp(OpAsmPrinter &p, TensorToMemRefOp &op) {
-  p << "iree_interp.tensor_to_memref(";
-  p.printOperand(op.getOperand());
-  p << " : ";
-  p.printType(op.getOperand().getType());
-  p << ") : ";
-  p.printType(op.getType());
-}
-
 OpFoldResult TensorToMemRefOp::fold(ArrayRef<Attribute> operands) {
   if (auto memrefToTensorOp = dyn_cast_or_null<IREEInterp::MemRefToTensorOp>(
           getOperand().getDefiningOp())) {
@@ -133,31 +84,6 @@ void TensorToMemRefOp::build(Builder *builder, OperationState &state,
 //===----------------------------------------------------------------------===//
 // iree_interp.memref_to_tensor
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseMemRefToTensorOp(OpAsmParser &parser,
-                                         OperationState &state) {
-  OpAsmParser::OperandType operand;
-  Type operandType;
-  Type resultType;
-  if (failed(parser.parseLParen()) || failed(parser.parseOperand(operand)) ||
-      failed(parser.parseColonType(operandType)) ||
-      failed(parser.resolveOperand(operand, operandType, state.operands)) ||
-      failed(parser.parseRParen()) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.addTypeToList(resultType, state.types))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printMemRefToTensorOp(OpAsmPrinter &p, MemRefToTensorOp &op) {
-  p << "iree_interp.memref_to_tensor(";
-  p.printOperand(op.getOperand());
-  p << " : ";
-  p.printType(op.getOperand().getType());
-  p << ") : ";
-  p.printType(op.getType());
-}
 
 OpFoldResult MemRefToTensorOp::fold(ArrayRef<Attribute> operands) {
   if (auto tensorToMemRefOp = dyn_cast_or_null<IREEInterp::TensorToMemRefOp>(
@@ -182,31 +108,6 @@ void MemRefToTensorOp::build(Builder *builder, OperationState &state,
 // iree_interp.scalar_to_memref
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseScalarToMemRefOp(OpAsmParser &parser,
-                                         OperationState &state) {
-  OpAsmParser::OperandType operand;
-  Type operandType;
-  Type resultType;
-  if (failed(parser.parseLParen()) || failed(parser.parseOperand(operand)) ||
-      failed(parser.parseColonType(operandType)) ||
-      failed(parser.resolveOperand(operand, operandType, state.operands)) ||
-      failed(parser.parseRParen()) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.addTypeToList(resultType, state.types))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printScalarToMemRefOp(OpAsmPrinter &p, ScalarToMemRefOp &op) {
-  p << "iree_interp.scalar_to_memref(";
-  p.printOperand(op.getOperand());
-  p << " : ";
-  p.printType(op.getOperand().getType());
-  p << ") : ";
-  p.printType(op.getType());
-}
-
 OpFoldResult ScalarToMemRefOp::fold(ArrayRef<Attribute> operands) {
   if (auto memrefToScalarOp = dyn_cast_or_null<IREEInterp::MemRefToScalarOp>(
           getOperand().getDefiningOp())) {
@@ -224,31 +125,6 @@ void ScalarToMemRefOp::build(Builder *builder, OperationState &state,
 //===----------------------------------------------------------------------===//
 // iree_interp.memref_to_scalar
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseMemRefToScalarOp(OpAsmParser &parser,
-                                         OperationState &state) {
-  OpAsmParser::OperandType operand;
-  Type operandType;
-  Type resultType;
-  if (failed(parser.parseLParen()) || failed(parser.parseOperand(operand)) ||
-      failed(parser.parseColonType(operandType)) ||
-      failed(parser.resolveOperand(operand, operandType, state.operands)) ||
-      failed(parser.parseRParen()) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.addTypeToList(resultType, state.types))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printMemRefToScalarOp(OpAsmPrinter &p, MemRefToScalarOp &op) {
-  p << "iree_interp.memref_to_scalar(";
-  p.printOperand(op.getOperand());
-  p << " : ";
-  p.printType(op.getOperand().getType());
-  p << ") : ";
-  p.printType(op.getType());
-}
 
 OpFoldResult MemRefToScalarOp::fold(ArrayRef<Attribute> operands) {
   if (auto scalarToMemRefOp = dyn_cast_or_null<IREEInterp::ScalarToMemRefOp>(

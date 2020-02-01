@@ -105,6 +105,10 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
   let arguments = (ins AnyTensor:$operand);
   let results = (outs Shape_RankedShape:$shape);
 
+  let assemblyFormat = [{
+    $operand attr-dict `:` type($operand) `->` type($shape)
+  }];
+
   let verifier = [{ return verify$cppClass(*this); }];
   let hasCanonicalizer = 1;
 
@@ -136,6 +140,9 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape"> {
 
   let arguments = (ins);
   let results = (outs Shape_RankedShape:$result);
+
+  let assemblyFormat = "attr-dict `:` type($result)";
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{

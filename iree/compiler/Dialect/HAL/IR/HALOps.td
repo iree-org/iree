@@ -30,6 +30,8 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
     RefPtrOf<HAL_Device>:$result
   );
 
+  let assemblyFormat = "attr-dict `:` type($result)";
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -80,6 +82,8 @@ def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
   let arguments = (ins
     AnyRefPtr:$operand
   );
+
+  let assemblyFormat = "$operand `:` type($operand) attr-dict";
 }
 
 def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
@@ -215,6 +219,8 @@ def HAL_VariableLoadOp : HAL_Op<"variable.load"> {
     HAL_VariableType:$result
   );
 
+  let assemblyFormat = "$variable attr-dict `:` type($result)";
+
   let verifier = [{ return verifyVariableLoadOp(*this); }];
 
   let hasCanonicalizer = 1;
@@ -230,6 +236,8 @@ def HAL_VariableStoreOp : HAL_Op<"variable.store"> {
     HAL_VariableType:$value,
     HAL_VariableRefAttr:$variable
   );
+
+  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";
 
   let verifier = [{ return verifyVariableStoreOp(*this); }];
 

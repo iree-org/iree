@@ -268,25 +268,6 @@ void GetRankedShapeOp::build(Builder *builder, OperationState &result,
   result.addOperands(operand);
 }
 
-static ParseResult parseGetRankedShapeOp(OpAsmParser &parser,
-                                         OperationState &state) {
-  OpAsmParser::OperandType operandType;
-  Type resultType;
-  return failure(
-      parser.parseOperand(operandType) || parser.parseColonType(resultType) ||
-      parser.parseOptionalArrowTypeList(state.types) ||
-      parser.resolveOperand(operandType, resultType, state.operands));
-}
-
-static void printGetRankedShapeOp(OpAsmPrinter &p, GetRankedShapeOp op) {
-  p << op.getOperationName() << " ";
-  p.printOperand(op.operand());
-  p << " : ";
-  p.printType(op.operand().getType());
-  p << " -> ";
-  p.printType(op.shape().getType());
-}
-
 static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
   auto tensorType = op.operand().getType().cast<TensorType>();
   auto rsType = op.shape().getType().cast<RankedShapeType>();
@@ -316,21 +297,6 @@ void ConstRankedShapeOp::build(Builder *builder, OperationState &result,
                                Type type) {
   result.addAttribute("value", UnitAttr::get(builder->getContext()));
   result.types.push_back(type);
-}
-
-static ParseResult parseConstRankedShapeOp(OpAsmParser &parser,
-                                           OperationState &state) {
-  Type resultType;
-  if (parser.parseColonType(resultType)) {
-    return failure();
-  }
-  state.types.push_back(resultType);
-  return success();
-}
-
-static void printConstRankedShapeOp(OpAsmPrinter &p, ConstRankedShapeOp op) {
-  p << op.getOperationName() << " : ";
-  p.printType(op.result().getType());
 }
 
 static LogicalResult verifyConstRankedShapeOp(ConstRankedShapeOp op) {

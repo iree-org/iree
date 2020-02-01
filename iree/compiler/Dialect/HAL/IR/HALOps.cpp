@@ -75,24 +75,6 @@ void ExSharedDeviceOp::getAsmResultNames(
   setNameFn(result(), "dev");
 }
 
-static ParseResult parseExSharedDeviceOp(OpAsmParser &parser,
-                                         OperationState *result) {
-  Type deviceType;
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(deviceType))) {
-    return failure();
-  }
-  result->addTypes(deviceType);
-  return success();
-}
-
-static void printExSharedDeviceOp(OpAsmPrinter &p, ExSharedDeviceOp op) {
-  p << op.getOperationName();
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.ex.cache_executable
 //===----------------------------------------------------------------------===//
@@ -184,31 +166,6 @@ static void printExPushBindingOp(OpAsmPrinter &p, ExPushBindingOp op) {
   p.printOptionalAttrDictWithKeyword(
       op.getAttrs(),
       /*elidedAttrs=*/{"ordinal", "element_type"});
-}
-
-//===----------------------------------------------------------------------===//
-// hal.ex.defer_release
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseExDeferReleaseOp(OpAsmParser &parser,
-                                         OperationState *result) {
-  OpAsmParser::OperandType operand;
-  Type operandType;
-  if (failed(parser.parseOperand(operand)) ||
-      failed(parser.parseColonType(operandType)) ||
-      failed(parser.resolveOperand(operand, operandType, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printExDeferReleaseOp(OpAsmPrinter &p, ExDeferReleaseOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.operand());
-  p << " : ";
-  p.printType(op.operand().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -500,28 +457,6 @@ void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
 // hal.variable.load
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseVariableLoadOp(OpAsmParser &parser,
-                                       OperationState *result) {
-  FlatSymbolRefAttr variableAttr;
-  Type valueType;
-  if (failed(parser.parseAttribute(variableAttr, "variable",
-                                   result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(valueType))) {
-    return failure();
-  }
-  result->addTypes({valueType});
-  return success();
-}
-
-static void printVariableLoadOp(OpAsmPrinter &p, VariableLoadOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSymbolName(op.variable());
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
   auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
   if (!symbolOp) {
@@ -540,32 +475,6 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
 //===----------------------------------------------------------------------===//
 // hal.variable.store
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseVariableStoreOp(OpAsmParser &parser,
-                                        OperationState *result) {
-  OpAsmParser::OperandType value;
-  FlatSymbolRefAttr variableAttr;
-  Type valueType;
-  if (failed(parser.parseOperand(value)) || failed(parser.parseComma()) ||
-      failed(parser.parseAttribute(variableAttr, "variable",
-                                   result->attributes)) ||
-      failed(parser.parseOptionalAttrDict(result->attributes)) ||
-      failed(parser.parseColonType(valueType)) ||
-      failed(parser.resolveOperand(value, valueType, result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printVariableStoreOp(OpAsmPrinter &p, VariableStoreOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.value());
-  p << ", ";
-  p.printSymbolName(op.variable());
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"variable"});
-  p << " : ";
-  p.printType(op.value().getType());
-}
 
 static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
   auto *symbolOp = SymbolTable::lookupNearestSymbolFrom(op, op.variable());
