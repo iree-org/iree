@@ -52,8 +52,6 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_library(
     NAME
       iree_opt_library
-    SRCS
-      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-opt/mlir-opt.cpp"
     DEPS
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
@@ -83,6 +81,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRAffineOps
       MLIRLinalgOps
       MLIRLinalgUtils
+      MLIROptMain
       MLIRStandardOps
       MLIRSPIRV
       MLIRSPIRVSerialization
@@ -99,7 +98,7 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       iree::tools::iree_opt_library
-      MLIROptMain
+      MLIRMlirOptLib
   )
   add_executable(iree-opt ALIAS iree_tools_iree-opt)
 

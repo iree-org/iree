@@ -71,6 +71,7 @@ function(set_alwayslink_mlir_libs)
     MLIRSupport
     MLIRVectorOps
     MLIRLinalgOps
+    MLIROptMain
   )
 
   set_alwayslink_property(

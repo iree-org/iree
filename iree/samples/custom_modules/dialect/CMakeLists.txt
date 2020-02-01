@@ -71,7 +71,7 @@ iree_cc_binary(
   DEPS
     iree::samples::custom_modules::dialect
     iree::tools::iree_opt_library
-    MLIROptMain
+    MLIRMlirOptLib
 )
 
 iree_cc_binary(
