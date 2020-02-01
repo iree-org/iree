@@ -28,11 +28,17 @@ iree_lit_test_suite(
         ":test-mnist-jit",
         "//iree/tools:IreeFileCheck",
     ],
+    tags = [
+        "noga",
+    ],
 )
 
 cc_binary(
     name = "test-mnist-jit",
     srcs = ["TestMNISTJIT.cpp"],
+    tags = [
+        "noga",
+    ],
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
