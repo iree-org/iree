@@ -63,6 +63,10 @@ function(iree_cc_test)
     ${ARGN}
   )
 
+  iree_package_ns(_PACKAGE_NS)
+  # Replace dependencies passed by ::name with ::iree::package::name
+  list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
+  
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
