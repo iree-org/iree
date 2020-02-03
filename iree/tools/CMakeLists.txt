@@ -47,6 +47,48 @@ if (${IREE_ENABLE_LLVM})
   add_executable(iree-tblgen ALIAS iree_tools_iree-tblgen)
 endif()
 
+iree_cc_library(
+  NAME
+    vm_util
+  HDRS
+    "vm_util.h"
+  SRCS
+    "vm_util.cc"
+  DEPS
+    iree::base::api_util
+    iree::base::buffer_string_util
+    iree::base::shape
+    iree::base::shaped_buffer
+    iree::base::shaped_buffer_string_util
+    iree::base::signature_mangle
+    iree::base::status
+    iree::hal::api
+    iree::modules::hal
+    iree::vm
+    iree::vm::bytecode_module
+    iree::vm::module
+    iree::vm::variant_list
+    absl::span
+  PUBLIC
+)
+
+iree_cc_test(
+  NAME
+    vm_util_test
+  SRCS
+    "vm_util_test.cc"
+  DEPS
+    iree::tools::vm_util
+    iree::base::api
+    iree::hal::api
+    iree::hal::interpreter::interpreter_driver_module
+    iree::modules::hal
+    iree::testing::gtest_main
+    iree::vm
+    iree::vm::value
+    iree::vm::variant_list
+)
+
 if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
@@ -111,8 +153,10 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "run_mlir_main.cc"
     DEPS
+      ::vm_util
       absl::flags
       absl::strings
+      absl::span
       iree::base::api
       iree::base::api_util
       iree::base::shaped_buffer

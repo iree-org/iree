@@ -99,13 +99,12 @@ cc_binary(
     name = "iree-run-mlir",
     srcs = ["run_mlir_main.cc"],
     deps = [
+        ":vm_util",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
         "//iree/base:api",
         "//iree/base:api_util",
-        "//iree/base:shaped_buffer",
-        "//iree/base:shaped_buffer_string_util",
-        "//iree/base:signature_mangle",
         "//iree/base:source_location",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/Transforms",
@@ -181,4 +180,43 @@ sh_binary(
     testonly = True,
     srcs = ["IreeFileCheck.sh"],
     data = ["@llvm-project//llvm:FileCheck"],
+)
+
+cc_library(
+    name = "vm_util",
+    srcs = ["vm_util.cc"],
+    hdrs = ["vm_util.h"],
+    visibility = ["//visibility:private"],
+    deps = [
+        "//iree/base:api_util",
+        "//iree/base:buffer_string_util",
+        "//iree/base:shape",
+        "//iree/base:shaped_buffer",
+        "//iree/base:shaped_buffer_string_util",
+        "//iree/base:signature_mangle",
+        "//iree/base:status",
+        "//iree/hal:api",
+        "//iree/modules/hal",
+        "//iree/vm:bytecode_module",
+        "//iree/vm:module",
+        "//iree/vm:variant_list",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_test(
+    name = "vm_util_test",
+    srcs = ["vm_util_test.cc"],
+    deps = [
+        ":vm_util",
+        "//iree/base:api",
+        "//iree/base:status_matchers",
+        "//iree/hal:api",
+        "//iree/hal/interpreter:interpreter_driver_module",
+        "//iree/modules/hal",
+        "//iree/testing:gtest_main",
+        "//iree/vm:value",
+        "//iree/vm:variant_list",
+    ],
 )

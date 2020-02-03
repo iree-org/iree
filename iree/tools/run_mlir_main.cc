@@ -40,16 +40,11 @@
 #include <utility>
 
 #include "absl/flags/flag.h"
-#include "absl/strings/numbers.h"
-#include "absl/strings/str_replace.h"
-#include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/init.h"
-#include "iree/base/shaped_buffer.h"
-#include "iree/base/shaped_buffer_string_util.h"
-#include "iree/base/signature_mangle.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
@@ -61,6 +56,7 @@
 #include "iree/compiler/Translation/IREEVM.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
+#include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/value.h"
@@ -248,176 +244,6 @@ StatusOr<std::string> PrepareModule(
   return binary_contents;
 }
 
-// Parses a list of input shapes and values from a string of newline-separated
-// inputs. Expects the contents to have one value per line with each value
-// listed as
-//   [shape]xtype=[value]
-// Example:
-//   4x4xi8=0,1,2,3
-StatusOr<iree_vm_variant_list_t*> ParseInputsFromFlags(
-    iree_vm_function_t function, iree_hal_allocator_t* allocator) {
-  iree_vm_variant_list_t* inputs = nullptr;
-  RETURN_IF_ERROR(
-      FromApiStatus(iree_vm_variant_list_alloc(input_values_flag.size(),
-                                               IREE_ALLOCATOR_SYSTEM, &inputs),
-                    IREE_LOC));
-  for (const auto& input_value : input_values_flag) {
-    ASSIGN_OR_RETURN(auto shaped_buffer,
-                     ParseShapedBufferFromString(input_value),
-                     _ << "Parsing input value '" << input_value << "'");
-    iree_hal_buffer_t* input_buffer = nullptr;
-    // TODO(benvanik): combined function for linear to optimal upload.
-    iree_device_size_t allocation_size =
-        shaped_buffer.shape().element_count() * shaped_buffer.element_size();
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_allocator_allocate_buffer(
-            allocator,
-            static_cast<iree_hal_memory_type_t>(
-                IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-            static_cast<iree_hal_buffer_usage_t>(
-                IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT),
-            allocation_size, &input_buffer),
-        IREE_LOC))
-        << "Allocating input buffer";
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_write_data(input_buffer, 0,
-                                   shaped_buffer.contents().data(),
-                                   shaped_buffer.contents().size()),
-        IREE_LOC))
-        << "Populating input buffer contents";
-    auto input_buffer_ref = iree_hal_buffer_move_ref(input_buffer);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_vm_variant_list_append_ref_move(inputs, &input_buffer_ref),
-        IREE_LOC));
-  }
-  return inputs;
-}
-
-// Outputs all results from the function to stdout in IREE BufferView format.
-Status OutputFunctionResults(iree_vm_function_t function,
-                             iree_vm_variant_list_t* outputs) {
-  iree_string_view_t sig_fv =
-      iree_vm_function_reflection_attr(&function, iree_make_cstring_view("fv"));
-  if (iree_string_view_compare(sig_fv, iree_make_cstring_view("1")) != 0) {
-    return UnimplementedErrorBuilder(IREE_LOC) << "Unsupported function ABI";
-  }
-
-  iree_string_view_t sig_f =
-      iree_vm_function_reflection_attr(&function, iree_make_cstring_view("f"));
-  RawSignatureParser sig_parser;
-  absl::InlinedVector<RawSignatureParser::Description, 4> output_descs;
-  sig_parser.VisitResults(absl::string_view{sig_f.data, sig_f.size},
-                          [&](const RawSignatureParser::Description& desc) {
-                            output_descs.push_back(desc);
-                          });
-  if (sig_parser.GetError()) {
-    return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Parsing function signature '" << sig_f.data
-           << "' failed getting results";
-  }
-  if (output_descs.size() != iree_vm_variant_list_size(outputs)) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
-           << "Result signature mismatch; expected " << output_descs.size()
-           << " results but VM returned " << iree_vm_variant_list_size(outputs);
-  }
-
-  for (int i = 0; i < iree_vm_variant_list_size(outputs); ++i) {
-    iree_vm_variant_t* variant = iree_vm_variant_list_get(outputs, i);
-    if (!variant) {
-      return InvalidArgumentErrorBuilder(IREE_LOC)
-             << "output " << i << "not present";
-    }
-
-    const auto& desc = output_descs[i];
-    std::string desc_str;
-    desc.ToString(desc_str);
-    LOG(INFO) << "result[" << i << "]: " << desc_str;
-
-    switch (desc.type) {
-      case RawSignatureParser::Type::kScalar: {
-        if (variant->value_type != IREE_VM_VALUE_TYPE_I32) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "output " << i << " has value type "
-                 << static_cast<int>(variant->value_type)
-                 << " but descriptor information " << desc_str;
-        }
-        if (desc.scalar.type == AbiConstants::ScalarType::kSint32) {
-          std::cout << "i32=" << variant->i32 << "\n";
-          break;
-        }
-        return UnimplementedErrorBuilder(IREE_LOC)
-               << "Unsupported signature scalar type: " << desc_str;
-      }
-      case RawSignatureParser::Type::kBuffer: {
-        if (variant->value_type != IREE_VM_VALUE_TYPE_NONE) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "output " << i << " has value type "
-                 << static_cast<int>(variant->value_type)
-                 << " but descriptor information " << desc_str;
-        }
-        auto* buffer = iree_hal_buffer_deref(&variant->ref);
-        if (!buffer) {
-          return InvalidArgumentErrorBuilder(IREE_LOC)
-                 << "failed dereferencing output " << i;
-        }
-
-        auto print_mode = BufferDataPrintMode::kFloatingPoint;
-        int8_t element_size = 4;
-        Shape shape;
-
-        switch (desc.buffer.scalar_type) {
-          case AbiConstants::ScalarType::kIeeeFloat16:
-          case AbiConstants::ScalarType::kIeeeFloat32:
-          case AbiConstants::ScalarType::kIeeeFloat64:
-            print_mode = BufferDataPrintMode::kFloatingPoint;
-            break;
-          case AbiConstants::ScalarType::kSint8:
-          case AbiConstants::ScalarType::kSint16:
-          case AbiConstants::ScalarType::kSint32:
-          case AbiConstants::ScalarType::kSint64:
-            print_mode = BufferDataPrintMode::kSignedInteger;
-            break;
-          case AbiConstants::ScalarType::kUint8:
-          case AbiConstants::ScalarType::kUint16:
-          case AbiConstants::ScalarType::kUint32:
-          case AbiConstants::ScalarType::kUint64:
-            print_mode = BufferDataPrintMode::kUnsignedInteger;
-            break;
-          default:
-            print_mode = BufferDataPrintMode::kBinary;
-            break;
-        }
-        element_size = AbiConstants::kScalarTypeSize[static_cast<unsigned>(
-            desc.buffer.scalar_type)];
-        shape = Shape{desc.dims};
-
-        iree_hal_mapped_memory_t mapped_memory;
-        RETURN_IF_ERROR(FromApiStatus(
-            iree_hal_buffer_map(buffer, IREE_HAL_MEMORY_ACCESS_READ, 0,
-                                IREE_WHOLE_BUFFER, &mapped_memory),
-            IREE_LOC))
-            << "mapping hal buffer";
-        auto contents = absl::MakeConstSpan(mapped_memory.contents.data,
-                                            mapped_memory.contents.data_length);
-        ShapedBuffer shaped_buffer(
-            element_size, shape,
-            std::vector<uint8_t>(contents.begin(), contents.end()));
-        ASSIGN_OR_RETURN(auto result_str, PrintShapedBufferToString(
-                                              shaped_buffer, print_mode, 1024));
-        iree_hal_buffer_unmap(buffer, &mapped_memory);
-        std::cout << result_str << "\n";
-        break;
-      }
-      default:
-        return UnimplementedErrorBuilder(IREE_LOC)
-               << "Unsupported signature type: " << desc_str;
-    }
-  }
-
-  return OkStatus();
-}
-
 // Evaluates a single function in its own fiber, printing the results to stdout.
 Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
@@ -426,14 +252,19 @@ Status EvaluateFunction(iree_vm_context_t* context,
   std::cout << "EXEC @"
             << absl::string_view(function_name.data, function_name.size)
             << std::endl;
+  ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
+  ASSIGN_OR_RETURN(
+      auto* input_list,
+      ParseToVariantList(input_descs, allocator,
+                         absl::MakeConstSpan(&input_values_flag.front(),
+                                             input_values_flag.size())));
 
-  // Parse inputs and create the required input buffers.
-  ASSIGN_OR_RETURN(auto* input_list, ParseInputsFromFlags(function, allocator));
-
+  ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   // Prepare outputs list to accept the results from the invocation.
   iree_vm_variant_list_t* output_list = nullptr;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_variant_list_alloc(16, IREE_ALLOCATOR_SYSTEM, &output_list),
+      iree_vm_variant_list_alloc(output_descs.size(), IREE_ALLOCATOR_SYSTEM,
+                                 &output_list),
       IREE_LOC));
 
   // Synchronously invoke the function.
@@ -445,7 +276,7 @@ Status EvaluateFunction(iree_vm_context_t* context,
   iree_vm_variant_list_free(input_list);
 
   // Print outputs.
-  RETURN_IF_ERROR(OutputFunctionResults(function, output_list));
+  RETURN_IF_ERROR(PrintVariantList(output_descs, output_list));
   iree_vm_variant_list_free(output_list);
 
   return OkStatus();
@@ -453,23 +284,16 @@ Status EvaluateFunction(iree_vm_context_t* context,
 
 // Evaluates all exported functions within given module.
 Status EvaluateFunctions(iree_vm_instance_t* instance,
-                         absl::string_view target_backend,
+                         absl::string_view driver_name,
                          const std::string& flatbuffer_data) {
-  LOG(INFO) << "Evaluating all functions in module for backend '"
-            << target_backend << "'...";
+  LOG(INFO) << "Evaluating all functions in module for driver '" << driver_name
+            << "'...";
 
   // Load the bytecode module from the flatbuffer data.
   // We do this first so that if we fail validation we know prior to dealing
   // with devices.
   iree_vm_module_t* bytecode_module = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_bytecode_module_create(
-          iree_const_byte_span_t{
-              reinterpret_cast<const uint8_t*>(flatbuffer_data.c_str()),
-              flatbuffer_data.size()},
-          IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module),
-      IREE_LOC))
-      << "Deserializing flatbuffer module";
+  RETURN_IF_ERROR(LoadBytecodeModule(flatbuffer_data, &bytecode_module));
 
   if (!run_flag) {
     // Just wanted verification; return without running.
@@ -477,26 +301,10 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
     return OkStatus();
   }
 
-  // Create the driver/device as defined by the test and setup the HAL module.
-  LOG(INFO) << "Creating target backend driver '" << target_backend << "'...";
-  iree_hal_driver_t* driver = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_driver_registry_create_driver(
-          iree_string_view_t{target_backend.data(), target_backend.size()},
-          IREE_ALLOCATOR_SYSTEM, &driver),
-      IREE_LOC))
-      << "Creating driver for " << target_backend;
   iree_hal_device_t* device = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(iree_hal_driver_create_default_device(
-                                    driver, IREE_ALLOCATOR_SYSTEM, &device),
-                                IREE_LOC))
-      << "Creating default device for " << target_backend;
+  RETURN_IF_ERROR(CreateDevice(driver_name, &device));
   iree_vm_module_t* hal_module = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_hal_module_create(device, IREE_ALLOCATOR_SYSTEM, &hal_module),
-      IREE_LOC))
-      << "Creating HAL module";
-  iree_hal_driver_release(driver);
+  RETURN_IF_ERROR(CreateHalModule(device, &hal_module));
 
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
@@ -512,6 +320,7 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
       // Skip internal functions.
       return OkStatus();
     }
+    RETURN_IF_ERROR(ValidateFunctionAbi(function));
 
     // Create the context we'll use for this (ensuring that we can't interfere
     // with other running evaluations, such as when in a multithreaded test
