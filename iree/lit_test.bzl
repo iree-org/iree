@@ -69,6 +69,7 @@ def iree_lit_test_suite(
             size = size,
             data = data,
             driver = driver,
+            tags = tags,
             **kwargs
         )
         tests.append(test_name)
