@@ -76,7 +76,7 @@ StatusOr<std::unique_ptr<VmaAllocator>> VmaAllocator::Create(
   record_settings.pFilePath = nullptr;
 #endif  // VMA_RECORDING_ENABLED
 
-  VmaAllocatorCreateInfo create_info;
+  VmaAllocatorCreateInfo create_info{};
   create_info.flags = 0;
   create_info.physicalDevice = physical_device;
   create_info.device = *logical_device;
