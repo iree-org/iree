@@ -12,9 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.13)
 if(POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
+endif()
+# Allow target_link_libraries() from other directories (since 3.13):
+#   https://cmake.org/cmake/help/v3.13/policy/CMP0079.html
+if(POLICY CMP0079)
+  cmake_policy(SET CMP0079 NEW)
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -192,3 +197,6 @@ endif()
 if(${IREE_BUILD_EXPERIMENTAL})
   add_subdirectory(experimental)
 endif()
+
+# Note: this must be called after all libraries have been declared.
+iree_complete_binary_link_options()

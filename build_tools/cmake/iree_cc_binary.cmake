@@ -14,6 +14,10 @@
 
 include(CMakeParseArguments)
 
+if (NOT DEFINED _IREE_CC_BINARY_NAMES)
+  set(_IREE_CC_BINARY_NAMES "")
+endif()
+
 # iree_cc_binary()
 #
 # CMake function to imitate Bazel's cc_binary rule.
@@ -99,73 +103,17 @@ function(iree_cc_binary)
   # Replace dependencies passed by ::name with ::iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
 
-  # List all dependencies, including transitive dependencies, then split the
-  # dependency list into one for whole archive (ALWAYSLINK) and one for
-  # standard linking (which only links in symbols that are directly used).
-  _iree_transitive_dependencies("${_RULE_DEPS}" _TRANSITIVE_DEPS)
-  set(_ALWAYS_LINK_DEPS "")
-  set(_STANDARD_DEPS "")
-  foreach(_DEP ${_TRANSITIVE_DEPS})
-    # Check if _DEP is a library with the ALWAYSLINK property set.
-    set(_DEP_IS_ALWAYSLINK OFF)
-    if (TARGET ${_DEP})
-      get_target_property(_DEP_TYPE ${_DEP} TYPE)
-      if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
-        # Can't be ALWAYSLINK since it's an INTERFACE library.
-        # We also can't even query for the property, since it isn't whitelisted.
-      else()
-        get_target_property(_DEP_IS_ALWAYSLINK ${_DEP} ALWAYSLINK)
-      endif()
-    endif()
-
-    # Append to the corresponding list of deps.
-    if(_DEP_IS_ALWAYSLINK)
-      list(APPEND _ALWAYS_LINK_DEPS ${_DEP})
-
-      # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
-      # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
-      # try to link the library in, so we need the flag *and* the dependency.
-      if(MSVC)
-        get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
-        if (_ALIASED_TARGET)
-          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_ALIASED_TARGET}")
-        else()
-          list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_DEP}")
-        endif()
-      endif()
-    else()
-      list(APPEND _STANDARD_DEPS ${_DEP})
-    endif()
-  endforeach(_DEP)
-
-  # Call into target_link_libraries with the lists of deps.
-  # TODO(scotttodd): `-Wl,-force_load` version
-  if(MSVC)
-    target_link_libraries(${_NAME}
-      PUBLIC
-        ${_ALWAYS_LINK_DEPS}
-        ${_STANDARD_DEPS}
-      PRIVATE
-        ${_RULE_LINKOPTS}
-    )
-  else()
-    target_link_libraries(${_NAME}
-      PUBLIC
-        "-Wl,--whole-archive"
-        ${_ALWAYS_LINK_DEPS}
-        "-Wl,--no-whole-archive"
-        ${_STANDARD_DEPS}
-      PRIVATE
-        ${_RULE_LINKOPTS}
-    )
-  endif()
-
   # Add all IREE targets to a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/binaries)
 
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
+  # Defer computing transitive dependencies and calling target_link_libraries()
+  # until all libraries have been declared.
+  # Track target and deps, use in iree_complete_binary_link_options() later.
+  set_property(GLOBAL APPEND PROPERTY _IREE_CC_BINARY_NAMES "${_NAME}")
+  set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 endfunction()
 
 # Lists all transitive dependencies of DIRECT_DEPS in TRANSITIVE_DEPS.
@@ -183,7 +131,7 @@ endfunction()
 # Performs a depth-first search through the dependency graph, appending all
 # dependencies of TARGET to the TRANSITIVE_DEPS list.
 function(_iree_transitive_dependencies_helper TARGET TRANSITIVE_DEPS)
-  if (NOT TARGET ${TARGET})
+  if (NOT TARGET "${TARGET}")
     # Excluded from the project, or invalid name? Just ignore.
     return()
   endif()
@@ -228,4 +176,75 @@ function(_iree_transitive_dependencies_helper TARGET TRANSITIVE_DEPS)
 
   # Propagate the augmented list up to the parent scope.
   set(${TRANSITIVE_DEPS} "${_RESULT}" PARENT_SCOPE)
+endfunction()
+
+# Sets target_link_libraries() on all registered binaries.
+# This must be called after all libraries have been declared.
+function(iree_complete_binary_link_options)
+  get_property(_NAMES GLOBAL PROPERTY _IREE_CC_BINARY_NAMES)
+
+  foreach(_NAME ${_NAMES})
+    get_target_property(_DIRECT_DEPS ${_NAME} DIRECT_DEPS)
+
+    # List all dependencies, including transitive dependencies, then split the
+    # dependency list into one for whole archive (ALWAYSLINK) and one for
+    # standard linking (which only links in symbols that are directly used).
+    _iree_transitive_dependencies("${_DIRECT_DEPS}" _TRANSITIVE_DEPS)
+    set(_ALWAYS_LINK_DEPS "")
+    set(_STANDARD_DEPS "")
+    foreach(_DEP ${_TRANSITIVE_DEPS})
+      # Check if _DEP is a library with the ALWAYSLINK property set.
+      set(_DEP_IS_ALWAYSLINK OFF)
+      if (TARGET ${_DEP})
+        get_target_property(_DEP_TYPE ${_DEP} TYPE)
+        if(${_DEP_TYPE} STREQUAL "INTERFACE_LIBRARY")
+          # Can't be ALWAYSLINK since it's an INTERFACE library.
+          # We also can't even query for the property, since it isn't whitelisted.
+        else()
+          get_target_property(_DEP_IS_ALWAYSLINK ${_DEP} ALWAYSLINK)
+        endif()
+      endif()
+
+      # Append to the corresponding list of deps.
+      if(_DEP_IS_ALWAYSLINK)
+        list(APPEND _ALWAYS_LINK_DEPS ${_DEP})
+
+        # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
+        # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
+        # try to link the library in, so we need the flag *and* the dependency.
+        if(MSVC)
+          get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
+          if (_ALIASED_TARGET)
+            list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_ALIASED_TARGET}")
+          else()
+            list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_DEP}")
+          endif()
+        endif()
+      else()
+        list(APPEND _STANDARD_DEPS ${_DEP})
+      endif()
+    endforeach(_DEP)
+
+    # Call into target_link_libraries with the lists of deps.
+    # TODO(scotttodd): `-Wl,-force_load` version
+    if(MSVC)
+      target_link_libraries(${_NAME}
+        PUBLIC
+          ${_ALWAYS_LINK_DEPS}
+          ${_STANDARD_DEPS}
+        PRIVATE
+          ${_RULE_LINKOPTS}
+      )
+    else()
+      target_link_libraries(${_NAME}
+        PUBLIC
+          "-Wl,--whole-archive"
+          ${_ALWAYS_LINK_DEPS}
+          "-Wl,--no-whole-archive"
+          ${_STANDARD_DEPS}
+        PRIVATE
+          ${_RULE_LINKOPTS}
+      )
+    endif()
+  endforeach(_NAME)
 endfunction()
