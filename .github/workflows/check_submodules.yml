@@ -25,4 +25,4 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Checking submodules
-        run: ./git_scripts/submodule_versions.py check
+        run: ./scripts/git/submodule_versions.py check

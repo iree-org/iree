@@ -28,7 +28,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Initializing submodules
-        run: ./git_scripts/submodule_versions.py init
+        run: ./scripts/git/submodule_versions.py init
       - name: Checking submodule state
         run: |
           echo "::set-env name=has_diff::false"
