@@ -19,32 +19,35 @@ iree_bytecode_module(
     "simple_mul.mlir"
   CC_NAMESPACE
     "iree::samples::vulkan"
-  TRANSLATE_TOOL
-    iree_tools_iree-translate
-  TRANSLATION
-    "-iree-mlir-to-vm-bytecode-module"
-  PUBLIC
 )
 
+# bazel_to_cmake: DO NOT EDIT
+# TODO(scotttodd): handle vulkan in bazel_to_cmake
+# Statically link against Vulkan.
+# Requires installing the Vulkan SDK from https://vulkan.lunarg.com/.
+include(FindVulkan)
+if(NOT Vulkan_FOUND)
+  message(FATAL_ERROR "Vulkan library was not found")
+endif()
+
 iree_cc_binary(
-  NAME
-    vulkan_inference_gui
-  SRCS
-    "vulkan_inference_gui.cc"
-  DEPS
-    ::simple_mul_bytecode_module_cc
-    iree::base::api
-    iree::base::logging
-    iree::hal::api
-    iree::hal::vulkan::api
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode_module
-    absl::core_headers
-    dear_imgui::dear_imgui
-    dear_imgui::impl_sdl
-    dear_imgui::impl_vulkan
-    SDL2-static
-    Vulkan::Headers
-    Vulkan::Vulkan
+    NAME
+      vulkan_inference_gui
+    SRCS
+      "vulkan_inference_gui.cc"
+    DEPS
+      absl::base
+      dear_imgui::dear_imgui
+      dear_imgui::impl_sdl
+      dear_imgui::impl_vulkan
+      iree::base::api
+      iree::base::logging
+      iree::hal::api
+      iree::hal::vulkan::api
+      iree::modules::hal
+      iree::samples::vulkan::simple_mul_bytecode_module_cc
+      iree::vm
+      iree::vm::bytecode_module
+      SDL2-static
+      Vulkan::Vulkan
 )
