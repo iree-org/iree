@@ -9,7 +9,7 @@ out e2e flows that cross the ML framework, compiler and runtime interactively.
 Run:
 
 ```shell
-./build_tools/scripts/start_colab_kernel.py
+./colab/start_colab_kernel.py
 ```
 
 This will start a jupyter notebook on port 8888. Then navigate to

@@ -150,7 +150,7 @@ your use.
 Note that if you will be cloning frequently, it can be sped up significantly by
 creating a reference repo and setting
 `IREE_CLONE_ARGS="--reference=/path/to/reference/repo"`. See
-`build_tools/scripts/populate_reference_repo.sh` for further details.
+`scripts/git/populate_reference_repo.sh` for further details.
 
 ```shell
 IREE_CLONE_ARGS=""

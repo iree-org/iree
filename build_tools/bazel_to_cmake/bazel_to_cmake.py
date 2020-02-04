@@ -24,7 +24,7 @@
 # Bazel rules (e.g. cc_library -> iree_cc_library.cmake).
 #
 # For usage, see:
-#   python3 build_tools/scripts/bazel_to_cmake.py --help
+#   python3 build_tools/bazel_to_cmake/bazel_to_cmake.py --help
 
 import argparse
 import bazel_to_cmake_targets
