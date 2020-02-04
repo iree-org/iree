@@ -299,10 +299,9 @@ class BuildFileFunctions(object):
     # See https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
 
     if exclude_directories != 1:
-      self._convert_unimplemented_function("glob", name="with exclude")
+      self._convert_unimplemented_function("glob", "with exclude")
     if exclude:
-      self._convert_unimplemented_function(
-          "glob", name="with exclude_directories")
+      self._convert_unimplemented_function("glob", "with exclude_directories")
 
     glob_vars = []
     for pattern in include:
