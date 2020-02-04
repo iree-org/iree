@@ -26,7 +26,7 @@ iree_cc_library(
   SRCS
     "allocator.cc"
   DEPS
-    iree::hal::buffer
+    ::buffer
     iree::base::ref_ptr
     iree::base::source_location
     iree::base::status
@@ -44,19 +44,19 @@ iree_cc_library(
   SRCS
     "api.cc"
   DEPS
-    iree::hal::api_hdrs
-    iree::hal::buffer
-    iree::hal::buffer_view
-    iree::hal::command_buffer
-    iree::hal::descriptor_set
-    iree::hal::descriptor_set_layout
-    iree::hal::device
-    iree::hal::driver
-    iree::hal::driver_registry
-    iree::hal::executable_layout
-    iree::hal::fence
-    iree::hal::heap_buffer
-    iree::hal::semaphore
+    ::api_hdrs
+    ::buffer
+    ::buffer_view
+    ::command_buffer
+    ::descriptor_set
+    ::descriptor_set_layout
+    ::device
+    ::driver
+    ::driver_registry
+    ::executable_layout
+    ::fence
+    ::heap_buffer
+    ::semaphore
     iree::base::api
     iree::base::api_util
     iree::base::ref_ptr
@@ -85,7 +85,7 @@ iree_cc_library(
   SRCS
     "buffer.cc"
   DEPS
-    iree::hal::resource
+    ::resource
     iree::base::bitfield
     iree::base::logging
     iree::base::source_location
@@ -104,8 +104,8 @@ iree_cc_test(
     "buffer_mapping_test.cc"
     "buffer_test.cc"
   DEPS
-    iree::hal::buffer
-    iree::hal::heap_buffer
+    ::buffer
+    ::heap_buffer
     iree::base::status
     iree::base::status_matchers
     iree::testing::gtest_main
@@ -120,7 +120,7 @@ iree_cc_library(
   SRCS
     "buffer_view.cc"
   DEPS
-    iree::hal::buffer
+    ::buffer
     iree::base::shape
     iree::base::source_location
     iree::base::status
@@ -135,9 +135,9 @@ iree_cc_test(
   SRCS
     "buffer_view_test.cc"
   DEPS
-    iree::hal::buffer
-    iree::hal::buffer_view
-    iree::hal::heap_buffer
+    ::buffer
+    ::buffer_view
+    ::heap_buffer
     iree::base::status
     iree::base::status_matchers
     iree::testing::gtest_main
@@ -151,9 +151,9 @@ iree_cc_library(
   SRCS
     "buffer_view_string_util.cc"
   DEPS
-    iree::hal::allocator
-    iree::hal::buffer_view
-    iree::hal::heap_buffer
+    ::allocator
+    ::buffer_view
+    ::heap_buffer
     iree::base::buffer_string_util
     iree::base::source_location
     iree::base::status
@@ -168,7 +168,7 @@ iree_cc_test(
   SRCS
     "buffer_view_string_util_test.cc"
   DEPS
-    iree::hal::buffer_view_string_util
+    ::buffer_view_string_util
     iree::base::status
     iree::base::status_matchers
     iree::testing::gtest_main
@@ -182,12 +182,12 @@ iree_cc_library(
   SRCS
     "command_buffer.cc"
   DEPS
-    iree::hal::allocator
-    iree::hal::buffer
-    iree::hal::buffer_view
-    iree::hal::event
-    iree::hal::executable
-    iree::hal::resource
+    ::allocator
+    ::buffer
+    ::buffer_view
+    ::event
+    ::executable
+    ::resource
     iree::base::bitfield
     iree::base::shape
     iree::base::status
@@ -203,7 +203,7 @@ iree_cc_library(
   SRCS
     "command_buffer_validation.cc"
   DEPS
-    iree::hal::command_buffer
+    ::command_buffer
     iree::base::logging
     iree::base::status
   PUBLIC
@@ -215,9 +215,9 @@ iree_cc_library(
   HDRS
     "command_queue.h"
   DEPS
-    iree::hal::command_buffer
-    iree::hal::fence
-    iree::hal::semaphore
+    ::command_buffer
+    ::fence
+    ::semaphore
     iree::base::bitfield
     iree::base::status
     iree::base::time
@@ -234,8 +234,8 @@ iree_cc_library(
   SRCS
     "deferred_buffer.cc"
   DEPS
-    iree::hal::allocator
-    iree::hal::buffer
+    ::allocator
+    ::buffer
     iree::base::status
   PUBLIC
 )
@@ -246,8 +246,8 @@ iree_cc_test(
   SRCS
     "deferred_buffer_test.cc"
   DEPS
-    iree::hal::deferred_buffer
-    iree::hal::heap_buffer
+    ::deferred_buffer
+    ::heap_buffer
     iree::base::status_matchers
     iree::hal::testing::mock_allocator
     iree::testing::gtest_main
@@ -260,8 +260,8 @@ iree_cc_library(
   HDRS
     "descriptor_set.h"
   DEPS
-    iree::hal::buffer
-    iree::hal::resource
+    ::buffer
+    ::resource
     iree::base::status
   PUBLIC
 )
@@ -272,8 +272,8 @@ iree_cc_library(
   HDRS
     "descriptor_set_layout.h"
   DEPS
-    iree::hal::buffer
-    iree::hal::resource
+    ::buffer
+    ::resource
     iree::base::status
   PUBLIC
 )
@@ -284,16 +284,16 @@ iree_cc_library(
   HDRS
     "device.h"
   DEPS
-    iree::hal::allocator
-    iree::hal::buffer
-    iree::hal::command_queue
-    iree::hal::descriptor_set
-    iree::hal::descriptor_set_layout
-    iree::hal::device_info
-    iree::hal::event
-    iree::hal::executable_cache
-    iree::hal::executable_layout
-    iree::hal::semaphore
+    ::allocator
+    ::buffer
+    ::command_queue
+    ::descriptor_set
+    ::descriptor_set_layout
+    ::device_info
+    ::event
+    ::executable_cache
+    ::executable_layout
+    ::semaphore
     iree::base::ref_ptr
     iree::base::status
     iree::base::time
@@ -320,14 +320,14 @@ iree_cc_library(
   SRCS
     "device_manager.cc"
   DEPS
-    iree::hal::allocator
-    iree::hal::buffer
-    iree::hal::command_queue
-    iree::hal::device
-    iree::hal::device_placement
-    iree::hal::executable_format
-    iree::hal::fence
-    iree::hal::heap_buffer
+    ::allocator
+    ::buffer
+    ::command_queue
+    ::device
+    ::device_placement
+    ::executable_format
+    ::fence
+    ::heap_buffer
     iree::base::source_location
     iree::base::status
     iree::base::time
@@ -352,8 +352,8 @@ iree_cc_library(
   HDRS
     "driver.h"
   DEPS
-    iree::hal::device
-    iree::hal::device_info
+    ::device
+    ::device_info
     iree::base::ref_ptr
     iree::base::status
   PUBLIC
@@ -367,7 +367,7 @@ iree_cc_library(
   SRCS
     "driver_registry.cc"
   DEPS
-    iree::hal::driver
+    ::driver
     iree::base::initializer
     iree::base::ref_ptr
     iree::base::status
@@ -382,7 +382,7 @@ iree_cc_library(
   HDRS
     "event.h"
   DEPS
-    iree::hal::resource
+    ::resource
   PUBLIC
 )
 
@@ -392,7 +392,7 @@ iree_cc_library(
   HDRS
     "executable.h"
   DEPS
-    iree::hal::resource
+    ::resource
   PUBLIC
 )
 
@@ -404,9 +404,9 @@ iree_cc_library(
   SRCS
     "executable_cache.cc"
   DEPS
-    iree::hal::executable
-    iree::hal::executable_format
-    iree::hal::executable_spec
+    ::executable
+    ::executable_format
+    ::executable_spec
     iree::base::bitfield
     iree::base::ref_ptr
     iree::base::status
@@ -429,7 +429,7 @@ iree_cc_library(
   HDRS
     "executable_layout.h"
   DEPS
-    iree::hal::resource
+    ::resource
     iree::base::status
   PUBLIC
 )
@@ -440,7 +440,7 @@ iree_cc_library(
   HDRS
     "executable_spec.h"
   DEPS
-    iree::hal::executable_format
+    ::executable_format
     absl::span
   PUBLIC
 )
@@ -451,7 +451,7 @@ iree_cc_library(
   HDRS
     "fence.h"
   DEPS
-    iree::hal::resource
+    ::resource
     iree::base::status
   PUBLIC
 )
@@ -464,8 +464,8 @@ iree_cc_library(
   SRCS
     "heap_buffer.cc"
   DEPS
-    iree::hal::allocator
-    iree::hal::buffer
+    ::allocator
+    ::buffer
     iree::base::source_location
     iree::base::status
     iree::base::tracing
@@ -490,7 +490,7 @@ iree_cc_library(
   HDRS
     "semaphore.h"
   DEPS
-    iree::hal::resource
+    ::resource
     absl::variant
   PUBLIC
 )

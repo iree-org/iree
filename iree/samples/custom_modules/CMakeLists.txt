@@ -34,8 +34,8 @@ iree_cc_test(
   SRCS
     "custom_modules_test.cc"
   DEPS
-    iree::samples::custom_modules::custom_modules_test_module_cc
-    iree::samples::custom_modules::native_module
+    ::custom_modules_test_module_cc
+    ::native_module
     iree::base::api
     iree::base::logging
     iree::hal::api

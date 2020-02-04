@@ -19,8 +19,9 @@ iree_lit_test_suite(
     "arithmetic_ops.mlir"
     "dynamic_shape.mlir"
     "exp.mlir"
+    "linalg_tensor_to_buffer.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
-    MLIRmlir-translate
+    mlir-translate
 )

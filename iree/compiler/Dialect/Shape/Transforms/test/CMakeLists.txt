@@ -16,6 +16,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "convert-hlo-to-shape-dialect.mlir"
     "expand_function_dynamic_dims.mlir"
     "materialize_shape_calculations.mlir"
   DATA

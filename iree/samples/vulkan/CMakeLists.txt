@@ -21,6 +21,8 @@ iree_bytecode_module(
     "iree::samples::vulkan"
 )
 
+# bazel_to_cmake: DO NOT EDIT
+# TODO(scotttodd): handle vulkan in bazel_to_cmake
 # Statically link against Vulkan.
 # Requires installing the Vulkan SDK from https://vulkan.lunarg.com/.
 include(FindVulkan)

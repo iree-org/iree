@@ -26,8 +26,8 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VMLA::IR
     iree::compiler::Dialect::VMLA::vmla_imports
+    iree::compiler::Dialect::VMLA::IR
     MLIRIR
     MLIRPass
     MLIRStandardOps

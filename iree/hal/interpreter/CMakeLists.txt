@@ -20,7 +20,7 @@ iree_cc_library(
   SRCS
     "bytecode_cache.cc"
   DEPS
-    iree::hal::interpreter::bytecode_executable
+    ::bytecode_executable
     iree::base::source_location
     iree::base::status
     iree::base::tracing
@@ -54,7 +54,7 @@ iree_cc_library(
     "stack.cc"
     "type.cc"
   DEPS
-    iree::hal::interpreter::bytecode_kernels
+    ::bytecode_kernels
     iree::base::flatbuffer_util
     iree::base::logging
     iree::base::memory
@@ -106,7 +106,7 @@ iree_cc_test(
   SRCS
     "bytecode_kernels_test.cc"
   DEPS
-    iree::hal::interpreter::bytecode_kernels
+    ::bytecode_kernels
     iree::base::memory
     iree::base::status_matchers
     iree::testing::gtest_main
@@ -120,7 +120,7 @@ iree_cc_library(
   SRCS
     "interpreter_command_processor.cc"
   DEPS
-    iree::hal::interpreter::bytecode_executable
+    ::bytecode_executable
     iree::base::source_location
     iree::base::status
     iree::base::tracing
@@ -139,9 +139,9 @@ iree_cc_library(
   SRCS
     "interpreter_device.cc"
   DEPS
-    iree::hal::interpreter::bytecode_cache
-    iree::hal::interpreter::bytecode_kernels
-    iree::hal::interpreter::interpreter_command_processor
+    ::bytecode_cache
+    ::bytecode_kernels
+    ::interpreter_command_processor
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -168,7 +168,7 @@ iree_cc_library(
   SRCS
     "interpreter_driver.cc"
   DEPS
-    iree::hal::interpreter::interpreter_device
+    ::interpreter_device
     iree::hal::device_info
     iree::hal::driver
   PUBLIC
@@ -180,7 +180,7 @@ iree_cc_library(
   SRCS
     "interpreter_driver_module.cc"
   DEPS
-    iree::hal::interpreter::interpreter_driver
+    ::interpreter_driver
     iree::base::init
     iree::base::status
     iree::hal::driver_registry

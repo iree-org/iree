@@ -26,7 +26,7 @@ iree_cc_library(
     "MaterializeShapeCalculations.cpp"
   DEPS
     iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Plugins::XLA
+    iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
     MLIRIR
     MLIRPass
     MLIRStandardOps

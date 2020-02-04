@@ -14,13 +14,14 @@
 
 iree_cc_library(
   NAME
-    XLA
+    XlaHloShapeBuilder
   HDRS
     "XlaHloShapeBuilder.h"
   SRCS
     "XlaHloShapeBuilder.cpp"
   DEPS
     iree::compiler::Dialect::Shape::IR
+    LLVMSupport
     MLIRIR
     tensorflow::mlir_xla
   PUBLIC
