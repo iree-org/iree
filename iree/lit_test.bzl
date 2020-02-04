@@ -58,7 +58,7 @@ def iree_lit_test_suite(
       driver: the shell runner for the lit tests.
       tags: tags to apply to the test. Note that as in standard test suites, manual
             is treated specially and will also apply to the test suite itself.
-      **kwargs: Any additional arguments that will be passed to the underlying tests.
+      **kwargs: Any additional arguments that will be passed to the underlying tests and test_suite.
     """
     tests = []
     for test_file in srcs:
@@ -83,4 +83,8 @@ def iree_lit_test_suite(
         # Note that only the manual tag really has any effect here. Others are
         # used for test suite filtering, but all tests are passed the same tags.
         tags = tags,
+        # If there are kwargs that need to be passed here which only apply to
+        # the generated tests and not to test_suite, they should be extracted
+        # into separate named arguments.
+        **kwargs
     )
