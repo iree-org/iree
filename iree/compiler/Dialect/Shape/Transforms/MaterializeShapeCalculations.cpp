@@ -13,15 +13,16 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/Shape/Plugins/XLA/XlaHloShapeBuilder.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/PassRegistry.h"
-#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -29,67 +30,126 @@ namespace Shape {
 
 namespace {
 
-// TODO(laurenzo): Replace this with a standard facility instead of a switch
-// mess.
-template <typename HloOp>
-bool rewriteXlaBinaryElementwiseOpShape(Value &result,
-                                        GetRankedShapeOp getShapeOp,
-                                        Operation *inputOperation,
+Value rewriteShapexRankedBroadcastShape(RankedBroadcastShapeOp bcastOp,
                                         OpBuilder &builder) {
-  auto hlo_op = dyn_cast<HloOp>(inputOperation);
-  if (!hlo_op) return false;
+  auto lhsRs = bcastOp.lhs().getType().cast<RankedShapeType>();
+  auto rhsRs = bcastOp.rhs().getType().cast<RankedShapeType>();
 
-  if (hlo_op.broadcast_dimensions()) {
-    // Has implicit broadcast - ignore for now.
-    return false;
+  auto loc = bcastOp.getLoc();
+  auto resultRs = bcastOp.getResult().getType().cast<RankedShapeType>();
+  auto dimType = resultRs.getDimType();
+
+  // Pairs of the shape dim and corresponding value if dynamic.
+  SmallVector<std::pair<Optional<int>, Value>, 4> lhsDims;
+  SmallVector<std::pair<Optional<int>, Value>, 4> rhsDims;
+  lhsDims.resize(resultRs.getRank());
+  rhsDims.resize(resultRs.getRank());
+
+  // Populate the lhs dims.
+  for (auto dimMap : llvm::enumerate(bcastOp.lhs_broadcast_dimensions())) {
+    auto inputDimIndex = dimMap.index();
+    auto outputDimIndex = dimMap.value().getZExtValue();
+    assert(outputDimIndex < lhsDims.size());
+    if (!resultRs.isDimDynamic(outputDimIndex)) {
+      // No need to populate fully static dimensions.
+      continue;
+    }
+    if (lhsRs.isDimDynamic(inputDimIndex)) {
+      lhsDims[outputDimIndex] =
+          std::make_pair(-1, builder.create<RankedDimOp>(
+                                 loc, dimType, bcastOp.lhs(),
+                                 builder.getI64IntegerAttr(inputDimIndex)));
+    } else {
+      lhsDims[outputDimIndex] = std::make_pair(inputDimIndex, nullptr);
+    }
   }
 
-  // No implicit broadcast. Tread as same element type.
-  llvm::SmallVector<Value, 4> inputOperands(inputOperation->getOperands());
-  result = buildCastInputsToResultShape(inputOperation->getLoc(),
-                                        getShapeOp.getRankedShape(),
-                                        inputOperands, builder);
-  // Build may still have failed but match is successful.
-  return true;
-}
-
-Value rewriteCustomOpShape(GetRankedShapeOp getShapeOp,
-                           Operation *inputOperation, OpBuilder &builder) {
-  // HLO binary elementwise ops.
-  Value result;
-  if (rewriteXlaBinaryElementwiseOpShape<xla_hlo::AddOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::Atan2Op>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::DivOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::MaxOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::MinOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::MulOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::PowOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::RemOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::ShiftLeftOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::ShiftRightArithmeticOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::ShiftRightLogicalOp>(
-          result, getShapeOp, inputOperation, builder) ||
-      rewriteXlaBinaryElementwiseOpShape<xla_hlo::SubOp>(
-          result, getShapeOp, inputOperation, builder)) {
-    return result;
+  // Populate the rhs dims.
+  for (auto dimMap : llvm::enumerate(bcastOp.rhs_broadcast_dimensions())) {
+    auto inputDimIndex = dimMap.index();
+    auto outputDimIndex = dimMap.value().getZExtValue();
+    assert(outputDimIndex < rhsDims.size());
+    if (!resultRs.isDimDynamic(outputDimIndex)) {
+      // No need to populate fully static dimensions.
+      continue;
+    }
+    if (rhsRs.isDimDynamic(inputDimIndex)) {
+      rhsDims[outputDimIndex] =
+          std::make_pair(-1, builder.create<RankedDimOp>(
+                                 loc, dimType, bcastOp.rhs(),
+                                 builder.getI64IntegerAttr(inputDimIndex)));
+    } else {
+      rhsDims[outputDimIndex] = std::make_pair(inputDimIndex, nullptr);
+    }
   }
 
-  return result;
+  // Now compute dynamic dims for each output dim.
+  SmallVector<Value, 4> dynamicDims;
+  for (int i = 0; i < lhsDims.size(); ++i) {
+    if (!resultRs.isDimDynamic(i)) continue;
+    auto lhsDimInfo = lhsDims[i];
+    auto lhsDimSize = lhsDimInfo.first ? *lhsDimInfo.first : -1;
+    auto rhsDimInfo = rhsDims[i];
+    auto rhsDimSize = rhsDimInfo.first ? *rhsDimInfo.first : -1;
+
+    if (lhsDimSize > 1) {
+      // Non-degenerate static.
+      bcastOp.emitRemark(
+          "broadcast of non-degenerate lhs static dim not implemented");
+      return nullptr;
+    } else if (rhsDimSize > 1) {
+      // Non-degenerate static.
+      bcastOp.emitRemark(
+          "broadcast of non-degenerate rhs static dim not implemented");
+      return nullptr;
+    } else if (lhsDimSize == 1) {
+      // Degenerate static.
+      bcastOp.emitRemark(
+          "broadcast of degenerate lhs static dim not implemented");
+      return nullptr;
+    } else if (rhsDimSize == 1) {
+      // Degenerate static.
+      bcastOp.emitRemark(
+          "broadcast of degenerate rhs static dim not implemented");
+      return nullptr;
+    } else {
+      // Dynamic.
+      // TODO: Generate code to assert.
+      if (lhsDimInfo.second) {
+        dynamicDims.push_back(lhsDimInfo.second);
+      } else if (rhsDimInfo.second) {
+        dynamicDims.push_back(rhsDimInfo.second);
+      } else {
+        return nullptr;
+      }
+    }
+  }
+
+  // And make the result shape.
+  return builder.create<MakeRankedShapeOp>(loc, resultRs, dynamicDims);
 }
 
-class GetRankedShapePattern : public OpRewritePattern<Shape::GetRankedShapeOp> {
+class ExpandRankedBroadcastShapePattern
+    : public OpRewritePattern<RankedBroadcastShapeOp> {
  public:
   using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(RankedBroadcastShapeOp bcastOp,
+                                     PatternRewriter &rewriter) const override {
+    auto newValue = rewriteShapexRankedBroadcastShape(bcastOp, rewriter);
+    if (!newValue) return matchFailure();
+
+    rewriter.replaceOp(bcastOp, newValue);
+    return matchSuccess();
+  }
+};
+
+class MaterializeRankedShapePattern
+    : public OpRewritePattern<Shape::GetRankedShapeOp> {
+ public:
+  MaterializeRankedShapePattern(
+      const CustomOpShapeBuilderList *customOpShapeBuilder,
+      MLIRContext *context)
+      : OpRewritePattern(context), customOpShapeBuilder(customOpShapeBuilder) {}
 
   PatternMatchResult matchAndRewrite(GetRankedShapeOp getShapeOp,
                                      PatternRewriter &rewriter) const override {
@@ -125,13 +185,22 @@ class GetRankedShapePattern : public OpRewritePattern<Shape::GetRankedShapeOp> {
                                                rewriter);
     }
 
-    auto customShape =
-        rewriteCustomOpShape(getShapeOp, inputOperation, rewriter);
-    if (customShape) {
-      rewriter.replaceOp(getShapeOp, customShape);
-      return matchSuccess();
+    // Custom shapes.
+    if (customOpShapeBuilder) {
+      auto resultShape = getShapeOp.getRankedShape();
+      for (auto &shapeBuilder : *customOpShapeBuilder) {
+        Value customShape = shapeBuilder->buildRankedShape(
+            resultShape, inputOperation, rewriter);
+        if (customShape) {
+          rewriter.replaceOp(getShapeOp, customShape);
+          return matchSuccess();
+        }
+      }
     }
 
+    inputOperation->emitWarning()
+        << "unable to materialize shape calculation (unsupported op '"
+        << inputOperation->getName() << "'?)";
     return matchFailure();
   }
 
@@ -146,17 +215,37 @@ class GetRankedShapePattern : public OpRewritePattern<Shape::GetRankedShapeOp> {
     rewriter.replaceOp(getShapeOp, {combinedShapeOp});
     return matchSuccess();
   }
+
+  const CustomOpShapeBuilderList *customOpShapeBuilder;
 };
 
 class MaterializeShapeCalculationsPass
     : public FunctionPass<MaterializeShapeCalculationsPass> {
+ public:
+  // Gets a CustomOpShapeBuilderList for expanding shapes of custom ops.
+  // By default, returns nullptr, which will not handle custom op shapes.
+  // TODO(laurenzo): Since it isn't clear yet whether we need this facility
+  // long term (i.e. this should come from the ops themselves), we are just
+  // hard-linking it here at the expense of a dependency problem. Decouple this
+  // if the facility persists.
+  const CustomOpShapeBuilderList *getCustomOpShapeBuilder() {
+    static CustomOpShapeBuilderList globalBuilders = ([]() {
+      CustomOpShapeBuilderList builders;
+      xla_hlo::populateXlaHloCustomOpShapeBuilder(builders);
+      return builders;
+    })();
+    return &globalBuilders;
+  }
+
   void runOnFunction() override {
     OwningRewritePatternList patterns;
-    // Always apply the canonicalizations for GetRankedShape.
+    // Always include certain canonicalizations that interop.
     GetRankedShapeOp::getCanonicalizationPatterns(patterns, &getContext());
     CastCompatibleShapeOp::getCanonicalizationPatterns(patterns, &getContext());
-    patterns.insert<GetRankedShapePattern>(&getContext());
-    // TODO: apply repeatedly.
+    RankedDimOp::getCanonicalizationPatterns(patterns, &getContext());
+    patterns.insert<MaterializeRankedShapePattern>(getCustomOpShapeBuilder(),
+                                                   &getContext());
+    patterns.insert<ExpandRankedBroadcastShapePattern>(&getContext());
     applyPatternsGreedily(getFunction(), patterns);
   }
 };

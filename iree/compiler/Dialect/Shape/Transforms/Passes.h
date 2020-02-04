@@ -17,6 +17,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -32,6 +33,10 @@ std::unique_ptr<OpPassBase<FuncOp>> createMaterializeShapeCalculationsPass();
 // Cleans up any unnecessary shape placeholder ops. Can be run after all
 // shape calculation code has been lowered.
 std::unique_ptr<OpPassBase<FuncOp>> createCleanupShapePlaceholdersPass();
+
+// Converts shape-sensitive HLOs to be based on facilities in the shape
+// dialect.
+std::unique_ptr<OpPassBase<FuncOp>> createConvertHLOToShapePass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

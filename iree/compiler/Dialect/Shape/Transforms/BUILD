@@ -21,6 +21,7 @@ cc_library(
     name = "Transforms",
     srcs = [
         "CleanupPlaceholders.cpp",
+        "ConvertHLOToShapeDialect.cpp",
         "ExpandFunctionDynamicDims.cpp",
         "MaterializeShapeCalculations.cpp",
     ],
@@ -29,8 +30,10 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Shape/Plugins/XLA:XlaHloShapeBuilder",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],

@@ -31,7 +31,7 @@ class Shape_PureOp<string mnemonic, list<OpTrait> traits = []> :
     Shape_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
-// Dynamic shape support
+// RankedShapeType manipulation
 //===----------------------------------------------------------------------===//
 
 def Shape_TieShapeOp : Shape_PureOp<"tie_shape"> {
@@ -202,6 +202,52 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
   }];
   let hasFolder = 1;
   let hasCanonicalizer = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// Broadcasting
+//===----------------------------------------------------------------------===//
+
+def Shape_RankedBroadcastShapeOp : Shape_PureOp<"ranked_broadcast_shape"> {
+  let summary = "Broadcasts operands to a result shape.";
+  let description = [{
+    Applies numpy broadcasting semantics to shape operands.
+
+    Usage:
+      %0 = shape.ranked_broadcast_shape %shp0, %shp1 :
+          !shape.ranked_shape<...>, !shape.ranked_shape<...>
+  }];
+
+  let arguments = (ins Shape_RankedShape:$lhs,
+                       Shape_RankedShape:$rhs,
+                       I64ElementsAttr:$lhs_broadcast_dimensions,
+                       I64ElementsAttr:$rhs_broadcast_dimensions);
+  let results = (outs Shape_RankedShape:$result);
+
+  // TODO: Custom parser/printer
+  let parser = ?;
+  let printer = ?;
+}
+
+def Shape_RankedBroadcastInDimOp : Shape_PureOp<"ranked_broadcast_in_dim"> {
+  let summary = "Broadcasts dimensions from the input into the result.";
+  let description = [{
+    Usage:
+      %0 = shape.ranked_broadcast_in_dim [...] (%operand, %result_shp) :
+          tensor<...xf32>, !shape.ranked_shape<...xi32>
+
+      Note that the result type will be a RankedTensorType with dims from
+      %result_shp and the element type from %operand.
+  }];
+
+  let arguments = (ins AnyRankedTensor:$operand,
+                       Shape_RankedShape:$result_shape,
+                       OptionalAttr<I64ElementsAttr>:$broadcast_dimensions);
+  let results = (outs AnyRankedTensor:$result);
+
+  // TODO: Custom parser/printer
+  let parser = ?;
+  let printer = ?;
 }
 
 #endif  // IREE_DIALECT_SHAPE_OPS

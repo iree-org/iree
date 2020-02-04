@@ -12,26 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
-
 iree_cc_library(
   NAME
-    Transforms
+    XLA
   HDRS
-    "Passes.h"
+    "XlaHloShapeBuilder.h"
   SRCS
-    "CleanupPlaceholders.cpp"
-    "ConvertHLOToShapeDialect.cpp"
-    "ExpandFunctionDynamicDims.cpp"
-    "MaterializeShapeCalculations.cpp"
+    "XlaHloShapeBuilder.cpp"
   DEPS
     iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Plugins::XLA
     MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRTransforms
     tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )

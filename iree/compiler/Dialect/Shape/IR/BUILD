@@ -31,6 +31,7 @@ cc_library(
     srcs = [
         "Builders.cpp",
         "ShapeDialect.cpp",
+        "ShapeInterface.cpp",
         "ShapeOps.cpp",
         "ShapeOps.cpp.inc",
         "ShapeTypes.cpp",
@@ -38,6 +39,7 @@ cc_library(
     hdrs = [
         "Builders.h",
         "ShapeDialect.h",
+        "ShapeInterface.h",
         "ShapeOps.h",
         "ShapeOps.h.inc",
         "ShapeTypes.h",

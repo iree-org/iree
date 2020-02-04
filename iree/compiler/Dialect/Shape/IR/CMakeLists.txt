@@ -18,12 +18,14 @@ iree_cc_library(
   HDRS
     "Builders.h"
     "ShapeDialect.h"
+    "ShapeInterface.h"
     "ShapeOps.h"
     "ShapeOps.h.inc"
     "ShapeTypes.h"
   SRCS
     "Builders.cpp"
     "ShapeDialect.cpp"
+    "ShapeInterface.cpp"
     "ShapeOps.cpp"
     "ShapeOps.cpp.inc"
     "ShapeTypes.cpp"

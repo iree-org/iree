@@ -38,10 +38,10 @@ class DynamicDimsTypeConverter : public TypeConverter {
 
     // Dimension is hard-coded to 32bits currently but better decisions are
     // possible in some situations.
-    auto dimType = IntegerType::get(32, t.getContext());
+    auto dimType = IndexType::get(t.getContext());
     auto shapeType =
         Shape::RankedShapeType::get(tensorType.getShape(), dimType);
-    // Expand tensor<?...x*> -> (tensor<...>, ranked_shape<...xi32>)
+    // Expand tensor<?...x*> -> (tensor<...>, ranked_shape<...,index>)
     results.push_back(t);
     results.push_back(shapeType);
     return success();

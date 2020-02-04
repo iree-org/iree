@@ -12,26 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
-iree_cc_library(
-  NAME
-    Transforms
-  HDRS
-    "Passes.h"
-  SRCS
-    "CleanupPlaceholders.cpp"
-    "ConvertHLOToShapeDialect.cpp"
-    "ExpandFunctionDynamicDims.cpp"
-    "MaterializeShapeCalculations.cpp"
-  DEPS
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Plugins::XLA
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRTransforms
-    tensorflow::mlir_xla
-  ALWAYSLINK
-  PUBLIC
+cc_library(
+    name = "XlaHloShapeBuilder",
+    srcs = [
+        "XlaHloShapeBuilder.cpp",
+    ],
+    hdrs = [
+        "XlaHloShapeBuilder.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/Shape/IR",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+    ],
 )

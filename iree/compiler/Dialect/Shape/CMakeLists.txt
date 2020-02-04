@@ -13,4 +13,5 @@
 # limitations under the License.
 
 add_subdirectory(IR)
+add_subdirectory(Plugins)
 add_subdirectory(Transforms)
