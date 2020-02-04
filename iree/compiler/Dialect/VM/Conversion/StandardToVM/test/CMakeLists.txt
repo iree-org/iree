@@ -12,17 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "arithmetic_ops.mlir"
-    "assignment_ops.mlir"
-    "comparison_ops.mlir"
-    "const_ops.mlir"
-    "control_flow_ops.mlir"
-    "func_attrs.mlir"
-    "structural_ops.mlir"
+    "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
