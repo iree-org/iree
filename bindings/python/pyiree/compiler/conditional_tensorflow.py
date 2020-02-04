@@ -33,7 +33,8 @@ from .binding import CompilerModule as Module
 # for input to the IREE compiler.
 TF_IMPORT_PASS_PIPELINE = (
     # Clean up tf_executor and extraneous unused functions.
-    "tf-saved-model-delete-unused-funcs",
+    "tf-saved-model-mark-func-visibility",
+    "symbol-dce",
     "tf-executor-graph-pruning",
     "tf-standard-pipeline",
     "canonicalize",
@@ -43,7 +44,8 @@ TF_IMPORT_PASS_PIPELINE = (
     "inline",
 
     # Some further cleanups now that control flow is in better shape.
-    "tf-saved-model-delete-unused-funcs",
+    "tf-saved-model-mark-func-visibility",
+    "symbol-dce",
     "tf-shape-inference",
     "canonicalize",
 
