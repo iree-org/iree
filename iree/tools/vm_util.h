@@ -40,24 +40,29 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseInputSignature(
 StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
     const iree_vm_function_t& function);
 
-// Parses a list of shapes and values into VM buffers.
-// Expects strings in the IREE standard shaped buffer format:
+// Parses |input_strings| into a variant list of VM scalars and buffers.
+// Scalars should be in the format:
+//   type=value
+// Buffers should be in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
 // https://github.com/google/iree/tree/master/iree/base/buffer_string_util.h
-// Uses |allocator| to allocate the buffers, validating them against the type
-// descriptors in |descs|. The returned variant list must be freed by the
-// caller.
+// Uses |allocator| to allocate the buffers.
+// Uses descriptors in |descs| for type information and validation.
+// The returned variant list must be freed by the caller.
 StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
-    iree_hal_allocator_t* allocator, absl::Span<const std::string> buf_strings);
+    iree_hal_allocator_t* allocator,
+    absl::Span<const std::string> input_strings);
 
 // Prints a variant list of VM scalars and buffers to |os|.
-// Uses the IREE standard shaped buffer format:
+// Prints scalars in the format:
+//   type=value
+// Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
 // https://github.com/google/iree/tree/master/iree/base/buffer_string_util.h
-// Uses |descs| for type information and validation.
+// Uses descriptors in |descs| for type information and validation.
 Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                         iree_vm_variant_list_t* variant_list,
                         std::ostream* os = &std::cout);

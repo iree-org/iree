@@ -16,7 +16,9 @@
 
 #include <ostream>
 
+#include "absl/strings/numbers.h"
 #include "absl/strings/string_view.h"
+#include "absl/strings/strip.h"
 #include "absl/types/span.h"
 #include "iree/base/api_util.h"
 #include "iree/base/buffer_string_util.h"
@@ -28,6 +30,7 @@
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/module.h"
+#include "iree/vm/variant_list.h"
 
 namespace iree {
 
@@ -80,46 +83,81 @@ StatusOr<std::vector<RawSignatureParser::Description>> ParseOutputSignature(
 StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
     absl::Span<const RawSignatureParser::Description> descs,
     iree_hal_allocator_t* allocator,
-    absl::Span<const std::string> buf_strings) {
-  if (buf_strings.size() != descs.size()) {
+    absl::Span<const std::string> input_strings) {
+  if (input_strings.size() != descs.size()) {
     return FailedPreconditionErrorBuilder(IREE_LOC)
            << "Signature mismatch; expected " << descs.size()
-           << " buffer strings but received " << buf_strings.size();
+           << " buffer strings but received " << input_strings.size();
   }
   iree_vm_variant_list_t* variant_list = nullptr;
   RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_variant_list_alloc(buf_strings.size(), IREE_ALLOCATOR_SYSTEM,
+      iree_vm_variant_list_alloc(input_strings.size(), IREE_ALLOCATOR_SYSTEM,
                                  &variant_list),
       IREE_LOC));
-  for (const auto& buf_string : buf_strings) {
-    // TODO(gcmn) Handle scalar variants.
-    ASSIGN_OR_RETURN(auto shaped_buffer,
-                     ParseShapedBufferFromString(buf_string),
-                     _ << "Parsing value '" << buf_string << "'");
-    iree_hal_buffer_t* buf = nullptr;
-    // TODO(benvanik): combined function for linear to optimal upload.
-    iree_device_size_t allocation_size =
-        shaped_buffer.shape().element_count() * shaped_buffer.element_size();
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_allocator_allocate_buffer(
-            allocator,
-            static_cast<iree_hal_memory_type_t>(
-                IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-            static_cast<iree_hal_buffer_usage_t>(
-                IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT),
-            allocation_size, &buf),
-        IREE_LOC))
-        << "Allocating buffer";
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_buffer_write_data(buf, 0, shaped_buffer.contents().data(),
-                                   shaped_buffer.contents().size()),
-        IREE_LOC))
-        << "Populating buffer contents ";
-    auto buf_ref = iree_hal_buffer_move_ref(buf);
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_vm_variant_list_append_ref_move(variant_list, &buf_ref),
-        IREE_LOC));
+  for (int i = 0; i < input_strings.size(); ++i) {
+    auto input_string = input_strings[i];
+    auto desc = descs[i];
+    std::string desc_str;
+    desc.ToString(desc_str);
+    switch (desc.type) {
+      case RawSignatureParser::Type::kScalar: {
+        if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
+          return UnimplementedErrorBuilder(IREE_LOC)
+                 << "Unsupported signature scalar type: " << desc_str;
+        }
+        absl::string_view input_view = absl::StripAsciiWhitespace(input_string);
+        input_view = absl::StripPrefix(input_view, "\"");
+        input_view = absl::StripSuffix(input_view, "\"");
+        if (!absl::ConsumePrefix(&input_view, "i32=")) {
+          return InvalidArgumentErrorBuilder(IREE_LOC)
+                 << "Parsing '" << input_string
+                 << "'. Has i32 descriptor but does not start with 'i32='";
+        }
+        int32_t val;
+        if (!absl::SimpleAtoi(input_view, &val)) {
+          return InvalidArgumentErrorBuilder(IREE_LOC)
+                 << "Converting '" << input_view << "' to i32 when parsing '"
+                 << input_string << "'";
+        }
+        iree_vm_variant_list_append_value(variant_list,
+                                          IREE_VM_VALUE_MAKE_I32(val));
+        break;
+      }
+      case RawSignatureParser::Type::kBuffer: {
+        ASSIGN_OR_RETURN(auto shaped_buffer,
+                         ParseShapedBufferFromString(input_string),
+                         _ << "Parsing value '" << input_string << "'");
+        iree_hal_buffer_t* buf = nullptr;
+        // TODO(benvanik): combined function for linear to optimal upload.
+        iree_device_size_t allocation_size =
+            shaped_buffer.shape().element_count() *
+            shaped_buffer.element_size();
+        RETURN_IF_ERROR(FromApiStatus(
+            iree_hal_allocator_allocate_buffer(
+                allocator,
+                static_cast<iree_hal_memory_type_t>(
+                    IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+                    IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+                static_cast<iree_hal_buffer_usage_t>(
+                    IREE_HAL_BUFFER_USAGE_ALL | IREE_HAL_BUFFER_USAGE_CONSTANT),
+                allocation_size, &buf),
+            IREE_LOC))
+            << "Allocating buffer";
+        RETURN_IF_ERROR(FromApiStatus(
+            iree_hal_buffer_write_data(buf, 0, shaped_buffer.contents().data(),
+                                       shaped_buffer.contents().size()),
+            IREE_LOC))
+            << "Populating buffer contents ";
+        auto buf_ref = iree_hal_buffer_move_ref(buf);
+        RETURN_IF_ERROR(FromApiStatus(
+            iree_vm_variant_list_append_ref_move(variant_list, &buf_ref),
+            IREE_LOC));
+        break;
+      }
+      default:
+        return UnimplementedErrorBuilder(IREE_LOC)
+               << "Unsupported signature type: " << desc_str;
+    }
   }
   return variant_list;
 }
@@ -147,12 +185,12 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                  << static_cast<int>(variant->value_type)
                  << " but descriptor information " << desc_str;
         }
-        if (desc.scalar.type == AbiConstants::ScalarType::kSint32) {
-          *os << "i32=" << variant->i32 << "\n";
-          break;
+        if (desc.scalar.type != AbiConstants::ScalarType::kSint32) {
+          return UnimplementedErrorBuilder(IREE_LOC)
+                 << "Unsupported signature scalar type: " << desc_str;
         }
-        return UnimplementedErrorBuilder(IREE_LOC)
-               << "Unsupported signature scalar type: " << desc_str;
+        *os << "i32=" << variant->i32 << "\n";
+        break;
       }
       case RawSignatureParser::Type::kBuffer: {
         if (variant->value_type != IREE_VM_VALUE_TYPE_NONE) {
