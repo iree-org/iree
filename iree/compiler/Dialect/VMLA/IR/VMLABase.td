@@ -103,8 +103,37 @@ def VMLA_AnyTypeAttr : TypeAttrBase<"Type", "any type attribute">;
 def VMLA_FloatTypeAttr : TypeAttrBase<"Type", "any type attribute">;
 
 //===----------------------------------------------------------------------===//
+// VMLA op traits
+//===----------------------------------------------------------------------===//
+
+// Operations with this trait require shapes be provided for all buffers.
+// For example, if the original HLO op had an `%arg : tensor<4x?xf32>`, adding
+// this trait will have the converted op contain both a `%arg : !vmla.buffer`
+// and an `%arg_shape : shapex.ranked_shape<[4,?]>`.
+def VMLA_IncludeShapes : NativeOpTrait<"IREE::VMLA::IncludeShapes">;
+
+//===----------------------------------------------------------------------===//
 // Base VMLA op classes
 //===----------------------------------------------------------------------===//
+
+def VMLA_OpInterface : OpInterface<"VMLAOp"> {
+  let description = [{
+    Interface for VMLA ops that can be used to customize the lowering.
+    This is required as there is not a way to get reflection information about
+    ops.
+  }];
+
+  let methods = [
+    StaticInterfaceMethod<
+      "Extracts type information attributes that may be required by the op.",
+      "void", "extractTypeAttributes", (ins "OperationState &":$state, "ArrayRef<Type>":$operandTypes, "ArrayRef<Type>":$resultTypes), [{
+        ConcreteOp::extractTypeAttributes(state, operandTypes, resultTypes);
+      }], [{
+        return;  // default to no extraction
+      }]
+    >,
+  ];
+}
 
 class VMLA_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<VMLA_Dialect, mnemonic, !listconcat(traits, [])> {
@@ -116,22 +145,35 @@ class VMLA_Op<string mnemonic, list<OpTrait> traits = []> :
 class VMLA_PureOp<string mnemonic, list<OpTrait> traits = []> :
     VMLA_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
+class VMLA_ElementTypeOp<string mnemonic, list<OpTrait> traits = []> :
+    VMLA_Op<mnemonic, !listconcat(traits, [VMLA_OpInterface])> {
+  let extraClassDeclaration = [{
+    static void extractTypeAttributes(OperationState &state, ArrayRef<Type> operandTypes, ArrayRef<Type> resultTypes) {
+      state.addAttribute("element_type", TypeAttr::get(resultTypes[0]));
+    }
+  }];
+}
+
 class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
-    VMLA_Op<mnemonic, traits> {
+    VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     RefPtrOf<VMLA_Buffer>:$src,
     RefPtrOf<VMLA_Buffer>:$dst,
-    typeAttr:$element_type
+    typeAttr:$element_type,
+    // TODO(benvanik): remove once unsigned types are in MLIR.
+    UnitAttr:$forceUnsigned
   );
 }
 
 class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
-    VMLA_Op<mnemonic, traits> {
+    VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     RefPtrOf<VMLA_Buffer>:$lhs,
     RefPtrOf<VMLA_Buffer>:$rhs,
     RefPtrOf<VMLA_Buffer>:$dst,
-    typeAttr:$element_type
+    typeAttr:$element_type,
+    // TODO(benvanik): remove once unsigned types are in MLIR.
+    UnitAttr:$forceUnsigned
   );
 }
 

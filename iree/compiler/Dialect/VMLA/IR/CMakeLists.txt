@@ -19,11 +19,14 @@ iree_cc_library(
     IR
   HDRS
     "VMLAEnums.h.inc"
+    "VMLAOpInterface.h.inc"
     "VMLAOps.h"
     "VMLAOps.h.inc"
+    "VMLATraits.h"
     "VMLATypes.h"
   SRCS
     "VMLAEnums.cpp.inc"
+    "VMLAOpInterface.cpp.inc"
     "VMLAOps.cpp"
     "VMLAOps.cpp.inc"
     "VMLATypes.cpp"
@@ -78,4 +81,14 @@ iree_tablegen_library(
   OUTS
     -gen-op-decls VMLAOps.h.inc
     -gen-op-defs VMLAOps.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    VMLAOpInterfaceGen
+  TD_FILE
+    VMLABase.td
+  OUTS
+    -gen-op-interface-decls VMLAOpInterface.h.inc
+    -gen-op-interface-defs VMLAOpInterface.cpp.inc
 )

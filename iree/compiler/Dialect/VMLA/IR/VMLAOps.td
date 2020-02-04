@@ -19,6 +19,32 @@ include "iree/compiler/Dialect/VMLA/IR/VMLABase.td"
 include "mlir/IR/OpAsmInterface.td"
 
 //===----------------------------------------------------------------------===//
+// VMLA Ops: pseudo ops
+//===----------------------------------------------------------------------===//
+
+def VMLA_ConstantOp : VMLA_PureOp<"constant"> {
+  let summary = [{constant buffer declaration}];
+  let description = [{
+    A pseudo-op used to represent a buffer with constant contents. This is later
+    expanded into VM ops and the vmla.buffer.const op.
+  }];
+
+  let arguments = (ins
+    ElementsAttr:$value
+  );
+  let results = (outs
+    VMLA_BufferRef:$result
+  );
+
+  let builders = [
+    OpBuilder<"Builder *builder, OperationState &result, ElementsAttr value", [{
+      build(builder, result, IREE::RefPtrType::get(
+          IREE::VMLA::BufferType::get(builder->getContext())), value);
+    }]>,
+  ];
+}
+
+//===----------------------------------------------------------------------===//
 // VMLA Ops: buffer manipulation
 //===----------------------------------------------------------------------===//
 
@@ -81,7 +107,7 @@ def VMLA_BufferFillOp : VMLA_Op<"buffer.fill"> {
 // VMLA Ops: comparison
 //===----------------------------------------------------------------------===//
 
-def VMLA_CmpOp : VMLA_Op<"cmp"> {
+def VMLA_CmpOp : VMLA_ElementTypeOp<"cmp"> {
   let arguments = (ins
     VMLA_CmpPredicateAttr:$predicate,
     VMLA_BufferRef:$lhs,
@@ -91,7 +117,7 @@ def VMLA_CmpOp : VMLA_Op<"cmp"> {
   );
 }
 
-def VMLA_SelectOp : VMLA_Op<"select"> {
+def VMLA_SelectOp : VMLA_ElementTypeOp<"select"> {
   let arguments = (ins
     VMLA_BufferRef:$cond,
     VMLA_BufferRef:$lhs,
@@ -105,41 +131,44 @@ def VMLA_SelectOp : VMLA_Op<"select"> {
 // VMLA Ops: shape/structure
 //===----------------------------------------------------------------------===//
 
-def VMLA_TransposeOp : VMLA_Op<"transpose"> {
+def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_BufferRef:$src,
     VMLA_Shape:$src_shape,
-    I32ElementsAttr:$dims,
+    ElementsAttr:$dimensions,
     VMLA_BufferRef:$dst,
+    VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
 }
 
-def VMLA_ReverseOp : VMLA_Op<"reverse"> {
+def VMLA_ReverseOp : VMLA_ElementTypeOp<"reverse", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_BufferRef:$src,
     VMLA_Shape:$src_shape,
-    I32ElementsAttr:$dims,
+    ElementsAttr:$dimensions,
     VMLA_BufferRef:$dst,
+    VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
 }
 
-def VMLA_PadOp : VMLA_Op<"pad"> {
+def VMLA_PadOp : VMLA_ElementTypeOp<"pad", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_BufferRef:$src,
     VMLA_Shape:$src_shape,
     VMLA_BufferRef:$value,
+    VMLA_Shape:$value_shape,
     VMLA_BufferRef:$dst,
     VMLA_Shape:$dst_shape,
-    I32ElementsAttr:$edge_padding_low,
-    I32ElementsAttr:$edge_padding_high,
-    I32ElementsAttr:$interior_padding,
+    ElementsAttr:$edge_padding_low,
+    ElementsAttr:$edge_padding_high,
+    ElementsAttr:$interior_padding,
     VMLA_AnyTypeAttr:$element_type
   );
 }
 
-def VMLA_TileOp : VMLA_Op<"tile"> {
+def VMLA_TileOp : VMLA_ElementTypeOp<"tile", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_BufferRef:$src,
     VMLA_Shape:$src_shape,
@@ -167,8 +196,11 @@ def VMLA_ShrOp : VMLA_BinaryOp<"shr", VMLA_AnyTypeAttr>;
 def VMLA_AddOp : VMLA_BinaryOp<"add", VMLA_AnyTypeAttr>;
 def VMLA_SubOp : VMLA_BinaryOp<"sub", VMLA_AnyTypeAttr>;
 def VMLA_AbsOp : VMLA_UnaryOp<"abs", VMLA_AnyTypeAttr>;
+def VMLA_NegOp : VMLA_UnaryOp<"neg", VMLA_AnyTypeAttr>;
+def VMLA_MulOp : VMLA_BinaryOp<"mul", VMLA_AnyTypeAttr>;
 def VMLA_DivOp : VMLA_BinaryOp<"div", VMLA_AnyTypeAttr>;
 def VMLA_RemOp : VMLA_BinaryOp<"rem", VMLA_AnyTypeAttr>;
+def VMLA_PowOp : VMLA_BinaryOp<"pow", VMLA_FloatTypeAttr>;
 def VMLA_ExpOp : VMLA_BinaryOp<"exp", VMLA_FloatTypeAttr>;
 def VMLA_LogOp : VMLA_BinaryOp<"log", VMLA_FloatTypeAttr>;
 def VMLA_RsqrtOp : VMLA_BinaryOp<"rsqrt", VMLA_FloatTypeAttr>;
@@ -187,20 +219,27 @@ def VMLA_CeilOp : VMLA_UnaryOp<"ceil", VMLA_FloatTypeAttr>;
 // VMLA Ops: conversion
 //===----------------------------------------------------------------------===//
 
-def VMLA_ConvertOp : VMLA_Op<"convert"> {
+def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
   let arguments = (ins
     VMLA_BufferRef:$src,
     VMLA_BufferRef:$dst,
     VMLA_AnyTypeAttr:$src_type,
     VMLA_AnyTypeAttr:$dst_type
   );
+
+  let extraClassDeclaration = [{
+    static void extractTypeAttributes(OperationState &state, ArrayRef<Type> operandTypes, ArrayRef<Type> resultTypes) {
+      state.addAttribute("src_type", TypeAttr::get(operandTypes[0]));
+      state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
 // VMLA Ops: GEMM/GEMV
 //===----------------------------------------------------------------------===//
 
-def VMLA_MatMulOp : VMLA_Op<"matmul"> {
+def VMLA_MatMulOp : VMLA_Op<"matmul", [VMLA_OpInterface, VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_BufferRef:$lhs,
     VMLA_Shape:$lhs_shape,
@@ -212,6 +251,14 @@ def VMLA_MatMulOp : VMLA_Op<"matmul"> {
     VMLA_FloatTypeAttr:$rhs_type,
     VMLA_FloatTypeAttr:$dst_type
   );
+
+  let extraClassDeclaration = [{
+    static void extractTypeAttributes(OperationState &state, ArrayRef<Type> operandTypes, ArrayRef<Type> resultTypes) {
+      state.addAttribute("lhs_type", TypeAttr::get(operandTypes[0]));
+      state.addAttribute("rhs_type", TypeAttr::get(operandTypes[1]));
+      state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -219,11 +266,12 @@ def VMLA_MatMulOp : VMLA_Op<"matmul"> {
 //===----------------------------------------------------------------------===//
 
 class VMLA_ReduceOp<string mnemonic, list<OpTrait> traits = []> :
-    VMLA_Op<mnemonic, traits> {
+    VMLA_ElementTypeOp<mnemonic, !listconcat(traits, [VMLA_IncludeShapes])> {
   let arguments = (ins
     VMLA_BufferRef:$src,
     VMLA_Shape:$src_shape,
     VMLA_BufferRef:$init,
+    VMLA_Shape:$init_shape,
     I32Attr:$dimension,
     VMLA_BufferRef:$dst,
     VMLA_Shape:$dst_shape,

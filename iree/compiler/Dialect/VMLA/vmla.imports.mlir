@@ -61,39 +61,39 @@ vm.import @select.x32(%cond : !iree.ref<!vmla.buffer>, %lhs : !iree.ref<!vmla.bu
 
 vm.import @transpose.x8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dims : i32 ...,
-  %dst : !iree.ref<!vmla.buffer>
+  %dimensions : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @transpose.x16(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dims : i32 ...,
-  %dst : !iree.ref<!vmla.buffer>
+  %dimensions : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @transpose.x32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dims : i32 ...,
-  %dst : !iree.ref<!vmla.buffer>
+  %dimensions : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
 vm.import @reverse.x8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dims : i32 ...,
-  %dst : !iree.ref<!vmla.buffer>
+  %dimensions : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reverse.x16(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dims : i32 ...,
-  %dst : !iree.ref<!vmla.buffer>
+  %dimensions : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reverse.x32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dims : i32 ...,
-  %dst : !iree.ref<!vmla.buffer>
+  %dimensions : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
 vm.import @pad.x8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %value : !iree.ref<!vmla.buffer>,
+  %value : !iree.ref<!vmla.buffer>, %value_shape : i32 ...,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...,
   %edge_padding_low : i32 ...,
   %edge_padding_high : i32 ...,
@@ -101,14 +101,14 @@ vm.import @pad.x8(
 )
 vm.import @pad.x16(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %value : !iree.ref<!vmla.buffer>,
+  %value : !iree.ref<!vmla.buffer>, %value_shape : i32 ...,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...,
   %edge_padding_low : i32 ..., %edge_padding_high : i32 ...,
   %interior_padding : i32 ...
 )
 vm.import @pad.x32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %value : !iree.ref<!vmla.buffer>,
+  %value : !iree.ref<!vmla.buffer>, %value_shape : i32 ...,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...,
   %edge_padding_low : i32 ..., %edge_padding_high : i32 ...,
   %interior_padding : i32 ...
@@ -161,6 +161,14 @@ vm.import @abs.i8(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>
 vm.import @abs.i16(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @abs.i32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @abs.f32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @neg.i8(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @neg.i16(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @neg.i32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @neg.f32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @mul.i8(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @mul.i16(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @mul.i32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @mul.f32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @div.i8(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @div.i16(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @div.i32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
@@ -175,6 +183,7 @@ vm.import @rem.u8(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>
 vm.import @rem.u16(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @rem.u32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @rem.f32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @pow.f32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @exp.f32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @log.f32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @rsqrt.f32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
@@ -216,75 +225,75 @@ vm.import @matmul.f32f32.f32(
 
 vm.import @reduce.sum.i8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.sum.i16(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.sum.i32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.sum.f32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
 vm.import @reduce.min.i8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.min.i16(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.min.i32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.min.f32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
 vm.import @reduce.max.i8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.max.i16(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.max.i32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @reduce.max.f32(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %init : !iree.ref<!vmla.buffer>,
+  %init : !iree.ref<!vmla.buffer>, %init_shape : i32 ...,
   %dimension : i32,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
 )

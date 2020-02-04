@@ -400,7 +400,7 @@ class VMLAModuleState final {
 #define IREE_VMLA_TRANSPOSE_OP(name, type)                                     \
   Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
               absl::Span<const int32_t> dims,                                  \
-              vm::ref<iree_vmla_buffer_t>& dst) {                              \
+              vm::ref<iree_vmla_buffer_t>& dst, iree_vmla_shape_t dst_shape) { \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernels::Transpose::Execute<type>(src->As<type>(), dst->As<type>(), \
                                              Shape(src_shape), dims);          \
@@ -409,30 +409,31 @@ class VMLAModuleState final {
   IREE_VMLA_TRANSPOSE_OP(TransposeX16, uint16_t);
   IREE_VMLA_TRANSPOSE_OP(TransposeX32, uint32_t);
 
-#define IREE_VMLA_REVERSE_OP(name, type)                                     \
-  Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape, \
-              absl::Span<const int32_t> dims,                                \
-              vm::ref<iree_vmla_buffer_t>& dst) {                            \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
-    return kernels::Reverse::Execute<type>(src->As<type>(), dst->As<type>(), \
-                                           Shape(src_shape), dims);          \
+#define IREE_VMLA_REVERSE_OP(name, type)                                       \
+  Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
+              absl::Span<const int32_t> dims,                                  \
+              vm::ref<iree_vmla_buffer_t>& dst, iree_vmla_shape_t dst_shape) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernels::Reverse::Execute<type>(src->As<type>(), dst->As<type>(),   \
+                                           Shape(src_shape), dims);            \
   }
   IREE_VMLA_REVERSE_OP(ReverseX8, uint8_t);
   IREE_VMLA_REVERSE_OP(ReverseX16, uint16_t);
   IREE_VMLA_REVERSE_OP(ReverseX32, uint32_t);
 
-#define IREE_VMLA_PAD_OP(name, type)                                         \
-  Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape, \
-              vm::ref<iree_vmla_buffer_t>& value,                            \
-              vm::ref<iree_vmla_buffer_t>& dst, iree_vmla_shape_t dst_shape, \
-              absl::Span<const int32_t> edge_padding_low,                    \
-              absl::Span<const int32_t> edge_padding_high,                   \
-              absl::Span<const int32_t> interior_padding) {                  \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
-    return kernels::Pad::Execute<type>(src->As<type>(), value->As<type>(),   \
-                                       dst->As<type>(), Shape(src_shape),    \
-                                       Shape(dst_shape), edge_padding_low,   \
-                                       edge_padding_high, interior_padding); \
+#define IREE_VMLA_PAD_OP(name, type)                                           \
+  Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
+              vm::ref<iree_vmla_buffer_t>& value,                              \
+              iree_vmla_shape_t value_shape, vm::ref<iree_vmla_buffer_t>& dst, \
+              iree_vmla_shape_t dst_shape,                                     \
+              absl::Span<const int32_t> edge_padding_low,                      \
+              absl::Span<const int32_t> edge_padding_high,                     \
+              absl::Span<const int32_t> interior_padding) {                    \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernels::Pad::Execute<type>(src->As<type>(), value->As<type>(),     \
+                                       dst->As<type>(), Shape(src_shape),      \
+                                       Shape(dst_shape), edge_padding_low,     \
+                                       edge_padding_high, interior_padding);   \
   }
   IREE_VMLA_PAD_OP(PadX8, uint8_t);
   IREE_VMLA_PAD_OP(PadX16, uint16_t);
@@ -491,6 +492,14 @@ class VMLAModuleState final {
   IREE_VMLA_UNARY_OP(AbsI16, kernels::Abs, int16_t);
   IREE_VMLA_UNARY_OP(AbsI32, kernels::Abs, int32_t);
   IREE_VMLA_UNARY_OP(AbsF32, kernels::Abs, float);
+  IREE_VMLA_UNARY_OP(NegI8, kernels::Neg, int8_t);
+  IREE_VMLA_UNARY_OP(NegI16, kernels::Neg, int16_t);
+  IREE_VMLA_UNARY_OP(NegI32, kernels::Neg, int32_t);
+  IREE_VMLA_UNARY_OP(NegF32, kernels::Neg, float);
+  IREE_VMLA_BINARY_OP(MulI8, kernels::Mul, int8_t);
+  IREE_VMLA_BINARY_OP(MulI16, kernels::Mul, int16_t);
+  IREE_VMLA_BINARY_OP(MulI32, kernels::Mul, int32_t);
+  IREE_VMLA_BINARY_OP(MulF32, kernels::Mul, float);
   IREE_VMLA_BINARY_OP(DivI8, kernels::Div, int8_t);
   IREE_VMLA_BINARY_OP(DivI16, kernels::Div, int16_t);
   IREE_VMLA_BINARY_OP(DivI32, kernels::Div, int32_t);
@@ -505,6 +514,7 @@ class VMLAModuleState final {
   IREE_VMLA_BINARY_OP(RemU16, kernels::Rem, uint16_t);
   IREE_VMLA_BINARY_OP(RemU32, kernels::Rem, uint32_t);
   IREE_VMLA_BINARY_OP(RemF32, kernels::Rem, float);
+  IREE_VMLA_BINARY_OP(PowF32, kernels::Pow, float);
   IREE_VMLA_UNARY_OP(ExpF32, kernels::Exp, float);
   IREE_VMLA_UNARY_OP(LogF32, kernels::Log, float);
   IREE_VMLA_UNARY_OP(RsqrtF32, kernels::Rsqrt, float);
@@ -577,8 +587,9 @@ class VMLAModuleState final {
 
 #define IREE_VMLA_REDUCTION_OP(name, kernel, type)                             \
   Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
-              vm::ref<iree_vmla_buffer_t>& init, int32_t dimension,            \
-              vm::ref<iree_vmla_buffer_t>& dst, iree_vmla_shape_t dst_shape) { \
+              vm::ref<iree_vmla_buffer_t>& init, iree_vmla_shape_t init_shape, \
+              int32_t dimension, vm::ref<iree_vmla_buffer_t>& dst,             \
+              iree_vmla_shape_t dst_shape) {                                   \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernel::Execute<type>(src->As<type>(), init->As<type>(),            \
                                  dst->As<type>(), dimension, Shape(src_shape), \
@@ -674,6 +685,14 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("abs.i16", &VMLAModuleState::AbsI16),
     vm::MakeNativeFunction("abs.i32", &VMLAModuleState::AbsI32),
     vm::MakeNativeFunction("abs.f32", &VMLAModuleState::AbsF32),
+    vm::MakeNativeFunction("neg.i8", &VMLAModuleState::NegI8),
+    vm::MakeNativeFunction("neg.i16", &VMLAModuleState::NegI16),
+    vm::MakeNativeFunction("neg.i32", &VMLAModuleState::NegI32),
+    vm::MakeNativeFunction("neg.f32", &VMLAModuleState::NegF32),
+    vm::MakeNativeFunction("mul.i8", &VMLAModuleState::MulI8),
+    vm::MakeNativeFunction("mul.i16", &VMLAModuleState::MulI16),
+    vm::MakeNativeFunction("mul.i32", &VMLAModuleState::MulI32),
+    vm::MakeNativeFunction("mul.f32", &VMLAModuleState::MulF32),
     vm::MakeNativeFunction("div.i8", &VMLAModuleState::DivI8),
     vm::MakeNativeFunction("div.i16", &VMLAModuleState::DivI16),
     vm::MakeNativeFunction("div.i32", &VMLAModuleState::DivI32),
@@ -688,6 +707,7 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("rem.u16", &VMLAModuleState::RemU16),
     vm::MakeNativeFunction("rem.u32", &VMLAModuleState::RemU32),
     vm::MakeNativeFunction("rem.f32", &VMLAModuleState::RemF32),
+    vm::MakeNativeFunction("pow.f32", &VMLAModuleState::PowF32),
     vm::MakeNativeFunction("exp.f32", &VMLAModuleState::ExpF32),
     vm::MakeNativeFunction("log.f32", &VMLAModuleState::LogF32),
     vm::MakeNativeFunction("rsqrt.f32", &VMLAModuleState::RsqrtF32),

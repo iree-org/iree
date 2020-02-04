@@ -30,13 +30,16 @@ cc_library(
     name = "IR",
     srcs = [
         "VMLAEnums.cpp.inc",
+        "VMLAOpInterface.cpp.inc",
         "VMLAOps.cpp",
         "VMLATypes.cpp",
     ],
     hdrs = [
         "VMLAEnums.h.inc",
+        "VMLAOpInterface.h.inc",
         "VMLAOps.h",
         "VMLAOps.h.inc",
+        "VMLATraits.h",
         "VMLATypes.h",
     ],
     textual_hdrs = [
@@ -44,9 +47,11 @@ cc_library(
     ],
     deps = [
         ":VMLAEnumsGen",
+        ":VMLAOpInterfaceGen",
         ":VMLAOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",
@@ -108,5 +113,22 @@ gentbl(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
         "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)
+
+gentbl(
+    name = "VMLAOpInterfaceGen",
+    tbl_outs = [
+        ("-gen-op-interface-decls", "VMLAOpInterface.h.inc"),
+        ("-gen-op-interface-defs", "VMLAOpInterface.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VMLABase.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/Shape/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
     ],
 )

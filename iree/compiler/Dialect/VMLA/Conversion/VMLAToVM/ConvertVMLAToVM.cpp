@@ -56,8 +56,8 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
     assert(importOp);
     return succeeded(rewriteToCall(op, Adaptor{operands}, importOp,
                                    typeConverter, rewriter))
-               ? OpConversionPattern<T>::matchSuccess()
-               : llvm::None;
+               ? this->matchSuccess()
+               : this->matchFailure();
   }
 
  protected:
@@ -67,12 +67,13 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
     return "x" + std::to_string(elementType.getIntOrFloatBitWidth());
   }
 
-  std::string getTypedTypeStr(Type elementType) const {
+  std::string getTypedTypeStr(Type elementType,
+                              bool forceUnsigned = false) const {
     std::string typePrefix = "x";
     if (elementType.isa<FloatType>()) {
       typePrefix = "f";
     } else if (elementType.isa<IntegerType>()) {
-      typePrefix = "i";
+      typePrefix = forceUnsigned ? "u" : "i";
     }
     return typePrefix + std::to_string(elementType.getIntOrFloatBitWidth());
   }
@@ -111,7 +112,9 @@ class VMLATypedImportOpConversion : public VMLAImportOpConversion<T> {
   using VMLAImportOpConversion<T>::VMLAImportOpConversion;
 
   std::string getImportSuffix(T op) const override {
-    return std::string(".") + this->getTypedTypeStr(op.element_type());
+    bool forceUnsigned =
+        !!static_cast<Operation *>(op)->getAttr("forceUnsigned");
+    return "." + this->getTypedTypeStr(op.element_type(), forceUnsigned);
   }
 };
 #define VMLA_TYPED_IMPORT_OP(op_type, op_mnemonic)       \
@@ -170,8 +173,11 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::AddOp, "vmla.add");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::SubOp, "vmla.sub");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::AbsOp, "vmla.abs");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::NegOp, "vmla.neg");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::MulOp, "vmla.mul");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::DivOp, "vmla.div");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::RemOp, "vmla.rem");
+  VMLA_TYPED_IMPORT_OP(IREE::VMLA::PowOp, "vmla.pow");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ExpOp, "vmla.exp");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::LogOp, "vmla.log");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::RsqrtOp, "vmla.rsqrt");

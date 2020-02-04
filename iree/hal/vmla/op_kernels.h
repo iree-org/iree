@@ -200,6 +200,12 @@ struct Abs {
                         absl::Span<T> dst_buffer);
 };
 
+struct Neg {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<T> dst_buffer);
+};
+
 struct Mul {
   template <typename T>
   static Status Execute(absl::Span<const T> lhs_buffer,
@@ -221,12 +227,11 @@ struct Rem {
                         absl::Span<T> dst_buffer);
 };
 
-// a + (b * c)
-struct MulAdd {
+struct Pow {
   template <typename T>
-  static Status Execute(absl::Span<const T> a_buffer,
-                        absl::Span<const T> b_buffer,
-                        absl::Span<const T> c_buffer, absl::Span<T> dst_buffer);
+  static Status Execute(absl::Span<const T> lhs_buffer,
+                        absl::Span<const T> rhs_buffer,
+                        absl::Span<T> dst_buffer);
 };
 
 struct Exp {

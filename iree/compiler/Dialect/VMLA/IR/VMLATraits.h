@@ -12,21 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
+#ifndef IREE_COMPILER_DIALECT_VMLA_IR_VMLATRAITS_H_
+#define IREE_COMPILER_DIALECT_VMLA_IR_VMLATRAITS_H_
 
-#include "llvm/ADT/StringExtras.h"
-
-// Order matters:
-#include "iree/compiler/Dialect/VMLA/IR/VMLAEnums.cpp.inc"
+#include "mlir/IR/OpDefinition.h"
 
 namespace mlir {
-namespace iree_compiler {
+namespace OpTrait {
 namespace IREE {
 namespace VMLA {
 
-#include "iree/compiler/Dialect/VMLA/IR/VMLAOpInterface.cpp.inc"
+template <typename ConcreteType>
+class IncludeShapes : public OpTrait::TraitBase<ConcreteType, IncludeShapes> {
+ public:
+  static LogicalResult verifyTrait(Operation *op) { return success(); }
+};
 
 }  // namespace VMLA
 }  // namespace IREE
-}  // namespace iree_compiler
+}  // namespace OpTrait
 }  // namespace mlir
+
+#endif  // IREE_COMPILER_DIALECT_VMLA_IR_VMLATRAITS_H_

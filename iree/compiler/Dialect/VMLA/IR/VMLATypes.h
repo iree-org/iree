@@ -37,6 +37,8 @@ namespace iree_compiler {
 namespace IREE {
 namespace VMLA {
 
+#include "iree/compiler/Dialect/VMLA/IR/VMLAOpInterface.h.inc"
+
 //===----------------------------------------------------------------------===//
 // RefObject types
 //===----------------------------------------------------------------------===//
