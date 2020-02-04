@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# bazel_to_cmake: DO NOT EDIT
 add_subdirectory(test)
 
 iree_cc_library(
@@ -28,10 +29,8 @@ iree_cc_library(
     "check_ops.cc.inc"
     "conversion_patterns.cc"
   DEPS
-    iree::modules::check::dialect::check_imports
-    iree::modules::check::dialect::check_ops_gen
+    ::check_imports
     iree::compiler::Dialect::VM::Conversion
-    iree::samples::custom_modules::dialect::custom_imports
     LLVMSupport
     MLIRIR
     MLIRParser
@@ -46,7 +45,7 @@ iree_tablegen_library(
   NAME
     check_ops_gen
   TD_FILE
-    check_ops.td
+    "check_ops.td"
   OUTS
     -gen-op-decls check_ops.h.inc
     -gen-op-defs check_ops.cc.inc
@@ -64,23 +63,28 @@ iree_cc_embed_data(
   CPP_NAMESPACE
     "mlir::iree_compiler::IREE::Check"
   FLATTEN
+  PUBLIC
 )
 
 iree_cc_binary(
   NAME
     check-opt
+  OUT
+    check-opt
   DEPS
-    iree::modules::check::dialect
+    ::dialect
     iree::tools::iree_opt_library
     # MLIRMlirOptLib: includes main(); The equivalent Bazel library is MLIROptMain.
     # TODO(marbre): Replace with appropriate target after upstreams CMake is revised.
     MLIRMlirOptLib
 )
+add_executable(check-opt ALIAS iree_modules_check_dialect_check-opt)
 
 iree_cc_binary(
   NAME
     check-translate
   DEPS
-    iree::modules::check::dialect
+    ::dialect
     iree::tools::iree_translate_library
 )
+add_executable(check-translate ALIAS iree_modules_check_dialect_check-translate)

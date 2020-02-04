@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# bazel_to_cmake: DO NOT EDIT
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     dialect
@@ -24,14 +27,15 @@ iree_cc_library(
     "strings_dialect.cc"
     "strings_ops.cc.inc"
   DEPS
+    ::strings_imports
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
     LLVMSupport
     MLIRIR
     MLIRParser
     MLIRPass
     MLIRSupport
     MLIRTransforms
-    iree::compiler::Dialect::VM::Conversion
-    iree::modules::strings::dialect::strings_imports
   ALWAYSLINK
   PUBLIC
 )
@@ -40,7 +44,7 @@ iree_tablegen_library(
   NAME
     strings_ops_gen
   TD_FILE
-    strings_ops.td
+    "strings_ops.td"
   OUTS
     -gen-op-decls strings_ops.h.inc
     -gen-op-defs strings_ops.cc.inc
@@ -58,5 +62,28 @@ iree_cc_embed_data(
   CPP_NAMESPACE
     "mlir::iree_compiler::IREE::Strings"
   FLATTEN
+  PUBLIC
 )
 
+iree_cc_binary(
+  NAME
+    strings-opt
+  OUT
+    strings-opt
+  DEPS
+    ::dialect
+    iree::tools::iree_opt_library
+    # MLIRMlirOptLib: includes main(); The equivalent Bazel library is MLIROptMain.
+    # TODO(marbre): Replace with appropriate target after upstreams CMake is revised.
+    MLIRMlirOptLib
+)
+add_executable(strings-opt ALIAS iree_modules_strings_dialect_strings-opt)
+
+iree_cc_binary(
+  NAME
+    strings-translate
+  DEPS
+    ::dialect
+    iree::tools::iree_translate_library
+)
+add_executable(strings-translate ALIAS iree_modules_strings_dialect_strings-translate)

@@ -34,8 +34,8 @@ iree_cc_test(
   SRCS
     "check_test.cc"
   DEPS
-    iree::modules::check::check_test_module_cc
-    iree::modules::check::native_module
+    ::check_test_module_cc
+    ::native_module
     iree::base::api
     iree::base::logging
     iree::hal::api

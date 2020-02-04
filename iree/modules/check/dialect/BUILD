@@ -43,7 +43,6 @@ cc_library(
         ":check_imports",
         ":check_ops_gen",
         "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/samples/custom_modules/dialect:custom_imports",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
