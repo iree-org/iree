@@ -16,14 +16,14 @@ Shortcut commands (read below for full documentation):
 
 ```shell
 # Update SUBMODULE_VERSIONS from current git submodule pointers
-./git_scripts/submodule_versions.py export
+./scripts/git/submodule_versions.py export
 
 # Update current git submodule pointers based on SUBMODULE_VERSIONS
-./git_scripts/submodule_versions.py import
+./scripts/git/submodule_versions.py import
 
 # Bump TensorFlow and LLVM to (TensorFlow) head.
 # (Also updates SUBMODULE_VERSIONS).
-./git_scripts/update_tf_llvm_submodules.py
+./scripts/git/update_tf_llvm_submodules.py
 ```
 
 ### The special relationship with LLVM and TensorFlow
@@ -91,7 +91,7 @@ To generate it, run:
 ```shell
 # Performs a submodule sync+update and stages an updated SUBMODULE_VERSIONS
 # file.
-./git_scripts/submodule_versions.py export
+./scripts/git/submodule_versions.py export
 ```
 
 If you don't know if this is required, you may run:
@@ -100,7 +100,7 @@ If you don't know if this is required, you may run:
 # The check command is intended to eventually be usable as a git hook
 # for verification of consistency between SUBMODULE_VERSIONS and the
 # corresponding local git state.
-./git_scripts/submodule_versions.py check
+./scripts/git/submodule_versions.py check
 ```
 
 #### Pulling dependency changes
@@ -111,7 +111,7 @@ the current git state:
 ```shell
 # Updates the commit hash of any entries in SUBMODULE_VERSIONS that differ
 # and stages the changes.
-./git_scripts/submodule_versions.py import
+./scripts/git/submodule_versions.py import
 ```
 
 This will stage any needed changes to the submodules to bring them up to date
@@ -133,19 +133,19 @@ TODO(laurenzo): Add a GitHub hook to auto-commit submodule updates on
 # third_party/llvm-project to the commit that tensorflow references.
 # Also updates the IREE mirrors of key build files. All changes will
 # be staged for commit.
-./git_scripts/update_tf_llvm_submodules.py
+./scripts/git/update_tf_llvm_submodules.py
 
 # You can also select various other options:
 # Don't update the tensorflow commit, just bring LLVM to the correct
 # linked commit.
-./git_scripts/update_tf_llvm_submodules.py --tensorflow_commit=KEEP
+./scripts/git/update_tf_llvm_submodules.py --tensorflow_commit=KEEP
 
 # Don't update the LLVM commit.
-./git_scripts/update_tf_llvm_submodules.py --llvm_commit=KEEP
+./scripts/git/update_tf_llvm_submodules.py --llvm_commit=KEEP
 
 # Update to a specific TensorFlow commit (and corresponding LLVM).
-./git_scripts/update_tf_llvm_submodules.py --tensorflow_commit=<somehash>
+./scripts/git/update_tf_llvm_submodules.py --tensorflow_commit=<somehash>
 
 # Update to a specific LLVM commit.
-./git_scripts/update_tf_llvm_submodules.py --llvm_commit=<somehash>
+./scripts/git/update_tf_llvm_submodules.py --llvm_commit=<somehash>
 ```

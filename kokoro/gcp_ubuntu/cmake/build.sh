@@ -34,7 +34,7 @@ export CXX="$(which clang++-6.0)"
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 echo "Initializing submodules"
-./git_scripts/submodule_versions.py init
+./scripts/git/submodule_versions.py init
 
 echo "Building and testing with cmake"
-./build_tools/scripts/cmake_build.sh
+./build_tools/cmake/build.sh

@@ -14,7 +14,7 @@
 # limitations under the License.
 
 # Usage:
-#   python3 build_tools/scripts/start_colab_kernel.py
+#   python3 colab/start_colab_kernel.py
 #
 # Note that in the case that multiple python interpreters are present on
 # your path, it is best to not risk it: use an explicit one.
