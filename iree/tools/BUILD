@@ -33,6 +33,15 @@ TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
 ]
 
+# Driver modules that register themselves at link time.
+IREE_DRIVER_MODULES = [
+    "//iree/hal/interpreter:interpreter_driver_module",
+    # TODO(b/142004903): enable when Dawn HAL implementation is functional
+    # "//iree/hal/dawn:dawn_driver_module",
+    "//iree/hal/vmla:vmla_driver_module",
+    "//iree/hal/vulkan:vulkan_driver_module",
+]
+
 cc_binary(
     name = "iree-dump-module",
     srcs = ["dump_module_main.cc"],
@@ -125,13 +134,24 @@ cc_binary(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/compiler/Translation:IREEVM",
-    ] + TARGET_COMPILER_BACKENDS + PLATFORM_VULKAN_DEPS + [
-        "//iree/hal/interpreter:interpreter_driver_module",
-        # TODO(b/142004903): enable when Dawn HAL implementation is functional
-        # "//iree/hal/dawn:dawn_driver_module",
-        "//iree/hal/vmla:vmla_driver_module",
-        "//iree/hal/vulkan:vulkan_driver_module",
-    ],
+    ] + TARGET_COMPILER_BACKENDS + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+)
+
+cc_binary(
+    name = "iree-run-module",
+    srcs = ["run_module_main.cc"],
+    deps = [
+        ":vm_util",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "//iree/base:api_util",
+        "//iree/base:file_io",
+        "//iree/base:init",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/modules/hal",
+        "//iree/vm:bytecode_module",
+    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
 )
 
 cc_binary(
