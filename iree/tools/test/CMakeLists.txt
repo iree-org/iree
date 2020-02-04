@@ -16,9 +16,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "iree_runners_multiple_args_test.mlir"
-    "iree_runners_scalar_test.mlir"
-    "iree_runners_simple_test.mlir"
+    "multiple_args.mlir"
+    "scalar.mlir"
+    "simple.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
