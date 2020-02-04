@@ -94,7 +94,8 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
             continue;
           }
           return operand.getOwner()->emitError()
-                 << "unknown op operating on resource for global tensor";
+                 << "unknown op operating on resource for global tensor : "
+                 << operand.getOwner()->getName();
         }
       } else {
         // The value is already a tensor value type. Just RAUW it with a
