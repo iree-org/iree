@@ -299,9 +299,12 @@ class BuildFileFunctions(object):
     # See https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
 
     if exclude_directories != 1:
-      raise NotImplementedError("Non-default exclude_directories not supported")
+      self._convert_unimplemented_function("glob", name="with exclude")
+    if exclude:
+      self._convert_unimplemented_function(
+          "glob", name="with exclude_directories")
 
-    filepaths = []
+    glob_vars = []
     for pattern in include:
       if "**" in pattern:
         # bazel's glob has some specific restrictions about crossing package boundaries.
@@ -309,23 +312,14 @@ class BuildFileFunctions(object):
         # silently give different behavior, just error out.
         # See https://docs.bazel.build/versions/master/be/functions.html#glob
         raise NotImplementedError("Recursive globs not supported")
-
-      filepaths += glob.glob(self.converter.directory_path + "/" + pattern)
-
-    exclude_filepaths = set([])
-    for pattern in exclude:
-      if "**" in pattern:
-        # See comment above
-        raise NotImplementedError("Recursive globs not supported")
-      exclude_filepaths.update(
-          glob.glob(self.converter.directory_path + "/" + pattern))
-
-    basenames = sorted([
-        os.path.basename(path)
-        for path in filepaths
-        if path not in exclude_filepaths
-    ])
-    return basenames
+      glob_var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
+      glob_vars.append("${%s}" % (glob_var,))
+      self.converter.body += ("file(GLOB %(var)s CONFIGURE_DEPENDS "
+                              "%(pattern)s)\n") % {
+          "var": glob_var,
+          "pattern": pattern
+      }
+    return glob_vars
 
   def config_setting(self, **kwargs):
     # No mapping to CMake, ignore.
