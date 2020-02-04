@@ -160,12 +160,10 @@ iree_make_cstring_view(const char* str) {
 
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs) {
-  if (lhs.size < rhs.size) {
-    return -1;
-  } else if (lhs.size > rhs.size) {
-    return 1;
-  }
-  return strncmp(lhs.data, rhs.data, rhs.size);
+  size_t min_size = std::min(lhs.size, rhs.size);
+  int cmp = strncmp(lhs.data, rhs.data, min_size);
+  if (cmp != 0) return cmp;
+  return rhs.size - lhs.size;
 }
 
 IREE_API_EXPORT bool IREE_API_CALL iree_string_view_starts_with(

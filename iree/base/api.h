@@ -393,7 +393,7 @@ typedef struct {
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL
 iree_make_cstring_view(const char* str);
 
-// Like strncmp but with iree_string_view_t values.
+// Like std::string::compare but with iree_string_view_t values.
 IREE_API_EXPORT int IREE_API_CALL
 iree_string_view_compare(iree_string_view_t lhs, iree_string_view_t rhs);
 
