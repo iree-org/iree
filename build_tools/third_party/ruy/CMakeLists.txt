@@ -32,6 +32,8 @@ iree_select_compiler_opts(RUY_COPTS_BASE
     "-Wno-unused-local-typedef"
 )
 set(RUY_COPTS_AVX2)
+set(RUY_COPTS_AVX_VNNI)
+set(RUY_COPTS_SSE42)
 set(RUY_COPTS_SKYLAKE)
 
 external_cc_library(
@@ -171,6 +173,28 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
+    ruy::opt_set
+    ruy::platform
+    ruy::time
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    prepacked_cache
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "prepacked_cache.cc"
+  HDRS
+    "prepacked_cache.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    gemmlowp::profiler
+    ruy::allocator
+    ruy::matrix
     ruy::opt_set
     ruy::platform
     ruy::time
@@ -629,6 +653,128 @@ external_cc_library(
   PACKAGE
     ruy
   NAME
+    kernel_sse42
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "kernel_sse42.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_SSE42}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::kernel_common
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    pack_sse42
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "pack_sse42.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_SSE42}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::matrix
+    ruy::opt_set
+    ruy::pack_common
+    ruy::path
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    have_built_path_for_sse42
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "have_built_path_for_sse42.cc"
+  HDRS
+    "have_built_path_for.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_SSE42}
+  DEPS
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    kernel_avxvnni
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "kernel_avxvnni.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_SKYLAKE}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::kernel_common
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    pack_avxvnni
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "pack_avxvnni.cc"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_AVX_VNNI}
+  DEPS
+    gemmlowp::profiler
+    ruy::check_macros
+    ruy::matrix
+    ruy::opt_set
+    ruy::pack_common
+    ruy::path
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    have_built_path_for_avxvnni
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "have_built_path_for_avxvnni.cc"
+  HDRS
+    "have_built_path_for.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+    ${RUY_COPTS_AVX_VNNI}
+  DEPS
+    ruy::opt_set
+    ruy::platform
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
     kernel
   ROOT
     ${RUY_SRC_ROOT}
@@ -646,7 +792,9 @@ external_cc_library(
     ruy::kernel_arm
     ruy::kernel_avx2
     ruy::kernel_avx512
+    ruy::kernel_avxvnni
     ruy::kernel_common
+    ruy::kernel_sse42
     ruy::matrix
     ruy::opt_set
     ruy::path
@@ -679,7 +827,9 @@ external_cc_library(
     ruy::pack_arm  # fixdeps: keep
     ruy::pack_avx2  # fixdeps: keep
     ruy::pack_avx512  # fixdeps: keep
+    ruy::pack_avxvnni
     ruy::pack_common
+    ruy::pack_sse42
     ruy::path
     ruy::platform
     ruy::tune
@@ -697,6 +847,8 @@ external_cc_library(
   DEPS
     ruy::have_built_path_for_avx2
     ruy::have_built_path_for_avx512
+    ruy::have_built_path_for_avxvnni
+    ruy::have_built_path_for_sse42
     ruy::platform
 )
 
@@ -721,6 +873,7 @@ external_cc_library(
     ruy::have_built_path_for
     ruy::path
     ruy::platform
+    ruy::prepacked_cache
     ruy::thread_pool
     ruy::trace
     ruy::tune
@@ -802,6 +955,7 @@ external_cc_library(
     ruy::opt_set
     ruy::pack
     ruy::path
+    ruy::prepacked_cache
     ruy::side_pair
     ruy::size_util
     ruy::spec
