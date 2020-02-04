@@ -111,7 +111,7 @@ function(iree_cc_binary)
 
   # Defer computing transitive dependencies and calling target_link_libraries()
   # until all libraries have been declared.
-  # Track target and deps, use in iree_finally_set_binary_link_options() later.
+  # Track target and deps, use in iree_complete_binary_link_options() later.
   set_property(GLOBAL APPEND PROPERTY _IREE_CC_BINARY_NAMES "${_NAME}")
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 endfunction()
@@ -180,7 +180,7 @@ endfunction()
 
 # Sets target_link_libraries() on all registered binaries.
 # This must be called after all libraries have been declared.
-function(iree_finally_set_binary_link_options)
+function(iree_complete_binary_link_options)
   get_property(_NAMES GLOBAL PROPERTY _IREE_CC_BINARY_NAMES)
 
   foreach(_NAME ${_NAMES})

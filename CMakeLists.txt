@@ -199,4 +199,4 @@ if(${IREE_BUILD_EXPERIMENTAL})
 endif()
 
 # Note: this must be called after all libraries have been declared.
-iree_finally_set_binary_link_options()
+iree_complete_binary_link_options()
