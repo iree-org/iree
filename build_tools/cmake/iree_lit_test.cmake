@@ -44,7 +44,7 @@ function(iree_lit_test)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
   get_filename_component(_TEST_FILE_PATH ${_RULE_TEST_FILE} ABSOLUTE)
-  
+
   add_test(
     NAME ${_NAME}
     COMMAND ${CMAKE_SOURCE_DIR}/iree/tools/run_lit.sh "${_TEST_FILE_PATH}"
@@ -84,7 +84,7 @@ function(iree_lit_test_suite)
     get_filename_component(_TEST_BASENAME ${_TEST_FILE} NAME)
     iree_lit_test(
       NAME
-        "${_RULE_NAME}_${_TEST_BASENAME}_test"
+        "${_TEST_BASENAME}.test"
       TEST_FILE
         "${_TEST_FILE}"
       DATA

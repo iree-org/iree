@@ -62,7 +62,10 @@ def iree_lit_test_suite(
     """
     tests = []
     for test_file in srcs:
-        test_name = "%s_%s_test" % (name, test_file)
+        # It's generally good practice to prefix any generated names with the
+        # macro name, but we're trying to match the style of the names that are
+        # used for LLVM internally.
+        test_name = "%s.test" % (test_file)
         iree_lit_test(
             name = test_name,
             test_file = test_file,
