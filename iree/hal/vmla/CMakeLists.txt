@@ -40,7 +40,7 @@ iree_cc_test(
   SRCS
     "op_kernels_test.cc"
   DEPS
-    iree::hal::vmla::op_kernels
+    ::op_kernels
     iree::base::memory
     iree::base::status_matchers
     iree::testing::gtest_main
@@ -54,7 +54,7 @@ iree_cc_library(
   SRCS
     "vmla_cache.cc"
   DEPS
-    iree::hal::vmla::vmla_executable
+    ::vmla_executable
     iree::base::source_location
     iree::base::status
     iree::base::tracing
@@ -75,7 +75,7 @@ iree_cc_library(
   SRCS
     "vmla_command_processor.cc"
   DEPS
-    iree::hal::vmla::vmla_executable
+    ::vmla_executable
     iree::base::api_util
     iree::base::status
     iree::base::tracing
@@ -93,8 +93,8 @@ iree_cc_library(
   SRCS
     "vmla_device.cc"
   DEPS
-    iree::hal::vmla::vmla_cache
-    iree::hal::vmla::vmla_command_processor
+    ::vmla_cache
+    ::vmla_command_processor
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -123,8 +123,8 @@ iree_cc_library(
   SRCS
     "vmla_driver.cc"
   DEPS
-    iree::hal::vmla::vmla_device
-    iree::hal::vmla::vmla_module
+    ::vmla_device
+    ::vmla_module
     iree::base::api_util
     iree::base::tracing
     iree::hal::device_info
@@ -140,7 +140,7 @@ iree_cc_library(
   SRCS
     "vmla_driver_module.cc"
   DEPS
-    iree::hal::vmla::vmla_driver
+    ::vmla_driver
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
@@ -179,7 +179,7 @@ iree_cc_library(
   SRCS
     "vmla_module.cc"
   DEPS
-    iree::hal::vmla::op_kernels
+    ::op_kernels
     iree::base::api
     iree::base::memory
     iree::base::ref_ptr

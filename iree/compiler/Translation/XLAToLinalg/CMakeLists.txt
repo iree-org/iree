@@ -37,7 +37,7 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
-    "IREELinalgTensorToBuffer"
+    IREELinalgTensorToBuffer
   HDRS
     "LinalgTensorToBuffer.h"
   SRCS

@@ -18,7 +18,7 @@ iree_tablegen_library(
   NAME
     IndexComputationAttrGen
   TD_FILE
-    IndexComputationAttr.td
+    "IndexComputationAttr.td"
   OUTS
     -gen-struct-attr-decls IndexComputationAttr.h.inc
     -gen-struct-attr-defs IndexComputationAttr.cpp.inc
@@ -43,6 +43,7 @@ iree_cc_library(
     "XLAIndexPropagation.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::SPIRV::IndexComputation::IndexComputationAttrGen
     iree::compiler::Utils
     LLVMSupport
     MLIRIR

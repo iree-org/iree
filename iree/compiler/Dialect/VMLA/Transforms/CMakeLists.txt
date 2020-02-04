@@ -27,13 +27,10 @@ iree_cc_library(
     iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
     iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
     iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Utils
     LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRStandardOps
     MLIRSupport
-    MLIRTransformUtils
     MLIRTransforms
     tensorflow::mlir_xla
   ALWAYSLINK

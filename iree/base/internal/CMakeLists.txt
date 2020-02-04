@@ -35,7 +35,7 @@ iree_cc_library(
     "file_io_posix.cc"
     "file_io_win32.cc"
   DEPS
-    iree::base::internal::file_handle_win32
+    ::file_handle_win32
     iree::base::file_io_hdrs
     iree::base::platform_headers
     iree::base::status
@@ -52,7 +52,7 @@ iree_cc_library(
     "file_mapping_posix.cc"
     "file_mapping_win32.cc"
   DEPS
-    iree::base::internal::file_handle_win32
+    ::file_handle_win32
     iree::base::file_mapping_hdrs
     iree::base::platform_headers
     iree::base::target_platform
@@ -117,7 +117,7 @@ iree_cc_library(
     "status_win32_errors.cc"
     "statusor.cc"
   DEPS
-    iree::base::internal::logging_internal
+    ::logging_internal
     iree::base::platform_headers
     iree::base::source_location
     iree::base::target_platform

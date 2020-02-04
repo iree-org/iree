@@ -20,7 +20,7 @@ iree_cc_library(
   SRCS
     "async_command_queue.cc"
   DEPS
-    iree::hal::host::host_submission_queue
+    ::host_submission_queue
     iree::base::status
     iree::base::tracing
     iree::hal::command_queue
@@ -36,8 +36,8 @@ iree_cc_test(
   SRCS
     "async_command_queue_test.cc"
   DEPS
-    iree::hal::host::async_command_queue
-    iree::hal::host::host_submission_queue
+    ::async_command_queue
+    ::host_submission_queue
     iree::base::status
     iree::base::status_matchers
     iree::base::time
@@ -101,7 +101,7 @@ iree_cc_test(
   SRCS
     "host_fence_test.cc"
   DEPS
-    iree::hal::host::host_fence
+    ::host_fence
     iree::base::status
     iree::base::status_matchers
     iree::testing::gtest_main
@@ -116,7 +116,7 @@ iree_cc_library(
   SRCS
     "host_local_allocator.cc"
   DEPS
-    iree::hal::host::host_buffer
+    ::host_buffer
     iree::base::source_location
     iree::base::status
     iree::base::tracing
@@ -148,7 +148,7 @@ iree_cc_library(
   SRCS
     "host_submission_queue.cc"
   DEPS
-    iree::hal::host::host_fence
+    ::host_fence
     iree::base::intrusive_list
     iree::base::status
     iree::base::tracing
@@ -167,7 +167,7 @@ iree_cc_test(
   SRCS
     "host_submission_queue_test.cc"
   DEPS
-    iree::hal::host::host_submission_queue
+    ::host_submission_queue
     iree::testing::gtest_main
 )
 

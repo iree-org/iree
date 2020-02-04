@@ -17,7 +17,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "multiple_args.mlir"
-    "scalar.mlir"
+    "scalars.mlir"
     "simple.mlir"
   DATA
     iree::tools::IreeFileCheck
