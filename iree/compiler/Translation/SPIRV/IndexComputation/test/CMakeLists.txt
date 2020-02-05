@@ -12,21 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "broadcast.mlir"
-    "broadcast_in_dim.mlir"
-    "concatenate.mlir"
-    "copy.mlir"
-    "extract_element.mlir"
-    "gather.mlir"
-    "pad.mlir"
-    "reverse.mlir"
-    "slice.mlir"
-    "store_reduce.mlir"
-    "transpose_add.mlir"
+    "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

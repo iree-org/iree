@@ -12,21 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "assign_executable_workloads.mlir"
-    "fold_compatible_dispatch_regions.mlir"
-    "form_streams.mlir"
-    "identify_dispatch_regions.mlir"
-    "identify_reduction_regions.mlir"
-    "legalize_input_types.mlir"
-    "materialize_and_merge_exported_reflection.mlir"
-    "materialize_exported_reflection.mlir"
-    "merge_exported_reflection.mlir"
-    "rematerialize_dispatch_constants.mlir"
-    "transformation.mlir"
+    "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

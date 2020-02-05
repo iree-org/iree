@@ -255,12 +255,14 @@ class BuildFileFunctions(object):
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
 
-  def _convert_unimplemented_function(self, rule, *args, **kwargs):
-    name = kwargs.get("name", "unnamed")
-    message = "Unimplemented %(rule)s %(name)s\n" % {"rule": rule, "name": name}
+  def _convert_unimplemented_function(self, function, details=""):
+    message = "Unimplemented %(function)s: %(details)s" % {
+        "function": function,
+        "details": details,
+    }
     if not self.converter.first_error:
       self.converter.first_error = NotImplementedError(message)
-    self.converter.body += "# %s" % (message,)
+    self.converter.body += "# %s\n" % (message,)
 
   # ------------------------------------------------------------------------- #
   # Function handlers that convert BUILD definitions to CMake definitions.    #
@@ -280,11 +282,11 @@ class BuildFileFunctions(object):
   def iree_build_test(self, **kwargs):
     pass
 
-  def filegroup(self, **kwargs):
+  def filegroup(self, name, **kwargs):
     # Not implemented yet. Might be a no-op, or may want to evaluate the srcs
     # attribute and pass them along to any targets that depend on the filegroup.
     # Cross-package dependencies and complicated globs could be hard to handle.
-    self._convert_unimplemented_function("filegroup", **kwargs)
+    self._convert_unimplemented_function("filegroup", name)
 
   def exports_files(self, *args, **kwargs):
     # No mapping to CMake, ignore.
@@ -297,9 +299,11 @@ class BuildFileFunctions(object):
     # See https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
 
     if exclude_directories != 1:
-      raise NotImplementedError("Non-default exclude_directories not supported")
+      self._convert_unimplemented_function("glob", "with exclude")
+    if exclude:
+      self._convert_unimplemented_function("glob", "with exclude_directories")
 
-    filepaths = []
+    glob_vars = []
     for pattern in include:
       if "**" in pattern:
         # bazel's glob has some specific restrictions about crossing package boundaries.
@@ -307,23 +311,15 @@ class BuildFileFunctions(object):
         # silently give different behavior, just error out.
         # See https://docs.bazel.build/versions/master/be/functions.html#glob
         raise NotImplementedError("Recursive globs not supported")
-
-      filepaths += glob.glob(self.converter.directory_path + "/" + pattern)
-
-    exclude_filepaths = set([])
-    for pattern in exclude:
-      if "**" in pattern:
-        # See comment above
-        raise NotImplementedError("Recursive globs not supported")
-      exclude_filepaths.update(
-          glob.glob(self.converter.directory_path + "/" + pattern))
-
-    basenames = sorted([
-        os.path.basename(path)
-        for path in filepaths
-        if path not in exclude_filepaths
-    ])
-    return basenames
+      # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
+      glob_var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
+      glob_vars.append("${%s}" % (glob_var,))
+      self.converter.body += ("file(GLOB %(var)s CONFIGURE_DEPENDS "
+                              "%(pattern)s)\n") % {
+                                  "var": glob_var,
+                                  "pattern": pattern
+                              }
+    return glob_vars
 
   def config_setting(self, **kwargs):
     # No mapping to CMake, ignore.
@@ -395,8 +391,8 @@ class BuildFileFunctions(object):
                     identifier=None,
                     **kwargs):
     if identifier:
-      self._convert_unimplemented_function(
-          "cc_embed_data (identifier)", name=name)
+      self._convert_unimplemented_function("cc_embed_data",
+                                           name + " has identifier")
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     cc_file_output_block = self._convert_cc_file_output_block(cc_file_output)

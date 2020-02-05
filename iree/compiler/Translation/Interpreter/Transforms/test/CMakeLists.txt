@@ -14,12 +14,12 @@
 
 add_subdirectory(xla)
 
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "clone.mlir"
-    "make_executable_abi.mlir"
+    "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt

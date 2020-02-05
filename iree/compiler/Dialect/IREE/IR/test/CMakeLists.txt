@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "bindings.mlir"
-    "do_not_optimize.mlir"
-    "parse_print.mlir"
+    "${_GLOB_X_MLIR}"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
