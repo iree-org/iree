@@ -90,10 +90,7 @@ def get_comment_syntax(args):
   if from_filename:
     return from_filename
   _, ext = os.path.splitext(args.filename)
-  from_ext = ext_to_comment.get(ext, args.default_comment)
-  if from_ext:
-    return from_ext
-  raise ValueError("Could not determine comment syntax for " + args.filename)
+  return ext_to_comment.get(ext, args.default_comment)
 
 
 def parse_arguments():
@@ -115,6 +112,22 @@ def parse_arguments():
       help=(
           "Filename to use for determining comment syntax. Default: actual name"
           "of input file."))
+  parser.add_argument(
+      "--year",
+      "-y",
+      help="Year to add copyright. Default: the current year ({})".format(
+          current_year),
+      default=current_year)
+  parser.add_argument(
+      "--holder",
+      help="Copyright holder. Default: Google LLC",
+      default="Google LLC")
+  parser.add_argument(
+      "--quiet",
+      help=("Don't raise a runtime error on encountering an unhandled filetype."
+            "Useful for running across many files at once. Default: False"),
+      action="store_true",
+      default=False)
   output_group = parser.add_mutually_exclusive_group()
   output_group.add_argument(
       "-o",
@@ -129,16 +142,6 @@ def parse_arguments():
       action="store_true",
       help="Run formatting in place. Default: False",
       default=False)
-  parser.add_argument(
-      "--year",
-      "-y",
-      help="Year to add copyright. Default: the current year ({})".format(
-          current_year),
-      default=current_year)
-  parser.add_argument(
-      "--holder",
-      help="Copyright holder. Default: Google LLC",
-      default="Google LLC")
   comment_group = parser.add_mutually_exclusive_group()
   comment_group.add_argument(
       "--comment",
@@ -180,16 +183,23 @@ def main(args):
     header = shebang
   else:
     comment_syntax = get_comment_syntax(args)
-    header = LICENSE_HEADER_FORMATTER.format(
-        # Add a blank line between shebang and license.
-        shebang=(shebang + "\n" if shebang else ""),
-        start_comment=comment_syntax.start_comment,
-        middle_comment=comment_syntax.middle_comment,
-        # Add a blank line before the end comment.
-        end_comment=("\n" + comment_syntax.end_comment
-                     if comment_syntax.end_comment else ""),
-        year=args.year,
-        holder=args.holder)
+    if not comment_syntax:
+      if args.quiet:
+        header = shebang
+      else:
+        raise ValueError("Could not determine comment syntax for " +
+                         args.filename)
+    else:
+      header = LICENSE_HEADER_FORMATTER.format(
+          # Add a blank line between shebang and license.
+          shebang=(shebang + "\n" if shebang else ""),
+          start_comment=comment_syntax.start_comment,
+          middle_comment=comment_syntax.middle_comment,
+          # Add a blank line before the end comment.
+          end_comment=("\n" + comment_syntax.end_comment
+                       if comment_syntax.end_comment else ""),
+          year=args.year,
+          holder=args.holder)
 
   # Have to open for write after we're done reading.
   if args.in_place:
