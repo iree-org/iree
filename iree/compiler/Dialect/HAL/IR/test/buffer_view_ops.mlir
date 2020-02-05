@@ -18,8 +18,8 @@ func @buffer_view_create(%arg0 : !iree.ref<!hal.buffer>) -> !iree.ref<!hal.buffe
 func @buffer_view_subview(%arg0 : !iree.ref<!hal.buffer_view>) -> !iree.ref<!hal.buffer_view> {
   %0:2 = "test_hal.indices"() : () -> (i32, i32)
   %1:2 = "test_hal.lengths"() : () -> (i32, i32)
-  // CHECK: %view = hal.buffer_view.subview %arg0, indices=[%0#0, %0#1], lengths=[%1#0, %1#1] : !iree.ref<!hal.buffer_view>
-  %view = hal.buffer_view.subview %arg0, indices=[%0#0, %0#1], lengths=[%1#0, %1#1] : !iree.ref<!hal.buffer_view>
+  // CHECK: %view = hal.buffer_view.subview %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : !iree.ref<!hal.buffer_view>
+  %view = hal.buffer_view.subview %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : !iree.ref<!hal.buffer_view>
   return %view : !iree.ref<!hal.buffer_view>
 }
 
@@ -46,8 +46,8 @@ func @buffer_view_byte_length(%arg0 : !iree.ref<!hal.buffer_view>) -> i32 {
 // CHECK-LABEL: @buffer_view_compute_offset
 func @buffer_view_compute_offset(%arg0 : !iree.ref<!hal.buffer_view>) -> i32 {
   %0:2 = "test_hal.indices"() : () -> (i32, i32)
-  // CHECK: %off = hal.buffer_view.compute_offset %arg0, indices=[%0#0, %0#1]
-  %off = hal.buffer_view.compute_offset %arg0, indices=[%0#0, %0#1]
+  // CHECK: %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1]
+  %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1]
   return %off : i32
 }
 
@@ -57,7 +57,7 @@ func @buffer_view_compute_offset(%arg0 : !iree.ref<!hal.buffer_view>) -> i32 {
 func @buffer_view_compute_range(%arg0 : !iree.ref<!hal.buffer_view>) -> (i32, i32) {
   %0:2 = "test_hal.indices"() : () -> (i32, i32)
   %1:2 = "test_hal.lengths"() : () -> (i32, i32)
-  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, indices=[%0#0, %0#1], lengths=[%1#0, %1#1]
-  %off, %len = hal.buffer_view.compute_range %arg0, indices=[%0#0, %0#1], lengths=[%1#0, %1#1]
+  // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1]
+  %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1]
   return %off, %len : i32, i32
 }

@@ -69,6 +69,11 @@ class NamedTupleElement<int thisOrdinal, string thisName, Type thisType> {
   Type type = thisType;
 }
 
+// Check if all of the tuple elements are buildable.
+class AreTupleElementsBuildable<list<NamedTupleElement> lst> {
+  bit ret = !foldl(1, lst, lhs, y, !and(lhs, !ne(y.type.builderCall, "")));
+}
+
 // TODO(b/143188410): support ordered tuples in OpBase.td.
 class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
     Type<And<[
@@ -79,7 +84,13 @@ class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
               "$_self",
               "$_self.cast<TupleType>().getType(" # element.ordinal # ")",
               element.type.predicate>)>
-    ]>, descr>;
+    ]>, descr> {
+  // Generate a builder call if all of the elements are buildable.
+  let builderCall = !if(!eq(AreTupleElementsBuildable<elements>.ret, 0),
+    "", "$_builder.getTupleType({" #
+        StrJoin<!foreach(t, elements, t.type.builderCall)>.result # "})"
+  );
+}
 
 //===----------------------------------------------------------------------===//
 // ref_ptr types
@@ -108,7 +119,11 @@ class RefPtrOf<Type type> :
       CPred<"$_self.isa<IREE::RefPtrType>()">,
       SubstLeaves<"$_self", "$_self.cast<IREE::RefPtrType>().getObjectType()",
                   type.predicate>
-    ]>, "ref<" # type.description # ">">;
+    ]>, "ref<" # type.description # ">"> {
+  // Set the builder call if the base type has a builder call.
+  string builderCall = !if(!empty(type.builderCall),
+                           "", "RefPtrType::get(" # type.builderCall # ")");
+}
 
 def ByteBufferType : DialectType<
     IREE_Dialect,

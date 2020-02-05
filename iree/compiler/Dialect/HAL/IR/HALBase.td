@@ -243,6 +243,7 @@ def HAL_Buffer : DialectType<
     various usages. Depending on these memory types the buffers may be mapped
     for access on the host as memory though certain restrictions may be imposed.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::BufferType>()";
 }
 
 def HAL_BufferView : DialectType<
@@ -255,6 +256,7 @@ def HAL_BufferView : DialectType<
     boundaries. In most cases buffer views can be elided entirely by the
     compiler and they'll only be seen when calling external functions.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::BufferViewType>()";
 }
 
 def HAL_CommandBuffer : DialectType<
@@ -265,6 +267,7 @@ def HAL_CommandBuffer : DialectType<
     Asynchronous command buffer recording interface. Commands are recorded by
     the implementation for later submission to command queues.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::CommandBufferType>()";
 }
 
 def HAL_DescriptorSet : DialectType<
@@ -283,6 +286,7 @@ def HAL_DescriptorSetLayout : DialectType<
   let typeDescription = [{
     Descriptor set layout.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::DescriptorSetLayoutType>()";
 }
 
 def HAL_Device : DialectType<
@@ -292,6 +296,7 @@ def HAL_Device : DialectType<
   let typeDescription = [{
     Logical device instance.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::DeviceType>()";
 }
 
 def HAL_Event : DialectType<

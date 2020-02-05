@@ -53,6 +53,8 @@ def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
     RefPtrOf<HAL_Executable>:$result
   );
 
+  let assemblyFormat = "$device `,` $executable attr-dict `:` type($result)";
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -91,6 +93,8 @@ def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
     RefPtrOf<HAL_Device>:$device,
     RefPtrOf<HAL_CommandBuffer>:$command_buffer
   );
+
+  let assemblyFormat = "$device `,` $command_buffer attr-dict";
 }
 
 //===----------------------------------------------------------------------===//
@@ -420,6 +424,8 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
     RefPtrOf<HAL_Allocator>:$result
   );
 
+  let assemblyFormat = "$buffer `:` type($result) attr-dict";
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -448,6 +454,8 @@ def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
   let results = (outs
     RefPtrOf<HAL_Buffer>:$result
   );
+
+  let assemblyFormat = "operands attr-dict `:` type($result)";
 }
 
 def HAL_BufferFillOp : HAL_Op<"buffer.fill"> {
@@ -462,6 +470,8 @@ def HAL_BufferFillOp : HAL_Op<"buffer.fill"> {
     HAL_DeviceSize:$length,
     I32:$pattern
   );
+
+  let assemblyFormat = "operands attr-dict";
 }
 
 def HAL_BufferReadDataOp : HAL_Op<"buffer.read_data"> {
@@ -477,6 +487,8 @@ def HAL_BufferReadDataOp : HAL_Op<"buffer.read_data"> {
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
+
+  let assemblyFormat = "operands attr-dict `:` type($target_buffer)";
 }
 
 def HAL_BufferWriteDataOp : HAL_Op<"buffer.write_data"> {
@@ -492,6 +504,8 @@ def HAL_BufferWriteDataOp : HAL_Op<"buffer.write_data"> {
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
+
+  let assemblyFormat = "operands attr-dict `:` type($source_buffer)";
 }
 
 def HAL_BufferCopyDataOp : HAL_Op<"buffer.copy_data"> {
@@ -507,6 +521,8 @@ def HAL_BufferCopyDataOp : HAL_Op<"buffer.copy_data"> {
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
+
+  let assemblyFormat = "operands attr-dict";
 }
 
 def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
@@ -522,6 +538,10 @@ def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
   let results = (outs
     AnyTypeOf<[HAL_PrimitiveType, AnyVector]>:$result
   );
+
+  let assemblyFormat = [{
+    $source_buffer `[` $source_offset `]` `:` type($result) attr-dict
+  }];
 }
 
 def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
@@ -535,6 +555,10 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
     RefPtrOf<HAL_Buffer>:$target_buffer,
     HAL_DeviceSize:$target_offset
   );
+
+  let assemblyFormat = [{
+    $value `,` $target_buffer `[` $target_offset `]` `:` type($value) attr-dict
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -588,6 +612,11 @@ def HAL_BufferViewSubviewOp : HAL_PureOp<"buffer_view.subview", [
   let results = (outs
     RefPtrOf<HAL_BufferView>:$result
   );
+
+  let assemblyFormat = [{
+    $buffer_view `,` `indices` `=` `[` $indices `]` `,` `lengths` `=` `[`
+    $lengths `]` `:` type($result) attr-dict
+  }];
 }
 
 def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
@@ -604,6 +633,8 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
   let results = (outs
     RefPtrOf<HAL_Buffer>:$result
   );
+
+  let assemblyFormat = "$buffer_view `:` type($result) attr-dict";
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -630,6 +661,8 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
     HAL_DeviceSize:$result
   );
 
+  let assemblyFormat = "$buffer_view `:` type($result) attr-dict";
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -654,6 +687,10 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   let results = (outs
     HAL_DeviceSize:$offset
   );
+
+  let assemblyFormat = [{
+    $buffer_view `,` `indices` `=` `[` $indices `]` attr-dict
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -683,6 +720,11 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
     HAL_DeviceSize:$offset,
     HAL_DeviceSize:$length
   );
+
+  let assemblyFormat = [{
+    $buffer_view `,` `indices` `=` `[` $indices `]` `,` `lengths` `=` `[`
+    $lengths `]` attr-dict
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -734,6 +776,8 @@ def HAL_CommandBufferBeginOp : HAL_Op<"command_buffer.begin"> {
   let arguments = (ins
     RefPtrOf<HAL_CommandBuffer>:$command_buffer
   );
+
+  let assemblyFormat = "$command_buffer attr-dict";
 }
 
 def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
@@ -745,6 +789,8 @@ def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
   let arguments = (ins
     RefPtrOf<HAL_CommandBuffer>:$command_buffer
   );
+
+  let assemblyFormat = "$command_buffer attr-dict";
 }
 
 def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barrier", [
@@ -790,6 +836,8 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
     HAL_DeviceSize:$length,
     I32:$pattern
   );
+
+  let assemblyFormat = "operands attr-dict";
 }
 
 // TODO(benvanik): update buffer op.
@@ -808,6 +856,8 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
+
+  let assemblyFormat = "operands attr-dict";
 }
 
 def HAL_CommandBufferBindDescriptorSetOp :
@@ -926,6 +976,11 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
   let results = (outs
     RefPtrOf<HAL_DescriptorSet>:$result
   );
+
+  let assemblyFormat = [{
+    $device `,` $set_layout `,` `bindings` `=` `[` $bindings `]` attr-dict `:`
+    type($result)
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -977,6 +1032,10 @@ def HAL_DescriptorSetLayoutCreateOp :
   let results = (outs
     RefPtrOf<HAL_DescriptorSetLayout>:$result
   );
+
+  let assemblyFormat = [{
+    $device `,` `bindings` `=` `[` $bindings `]` attr-dict `:` type($result)
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -998,6 +1057,8 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   let results = (outs
     RefPtrOf<HAL_Allocator>:$result
   );
+
+  let assemblyFormat = "$device attr-dict `:` type($result)";
 
   let skipDefaultBuilders = 1;
   let builders = [

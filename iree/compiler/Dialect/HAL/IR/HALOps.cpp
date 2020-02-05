@@ -84,36 +84,6 @@ void ExCacheExecutableOp::getAsmResultNames(
   setNameFn(result(), "exe");
 }
 
-static ParseResult parseExCacheExecutableOp(OpAsmParser &parser,
-                                            OperationState *result) {
-  OpAsmParser::OperandType device;
-  FlatSymbolRefAttr executableAttr;
-  Type executableType;
-  if (failed(parser.parseOperand(device)) || failed(parser.parseComma()) ||
-      failed(parser.parseAttribute(executableAttr, "executable",
-                                   result->attributes)) ||
-      failed(parser.resolveOperand(
-          device, RefPtrType::get(DeviceType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(executableType))) {
-    return failure();
-  }
-  result->addTypes(executableType);
-  return success();
-}
-
-static void printExCacheExecutableOp(OpAsmPrinter &p, ExCacheExecutableOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", ";
-  p.printSymbolName(op.executable());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"executable"});
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.ex.push_binding
 //===----------------------------------------------------------------------===//
@@ -166,35 +136,6 @@ static void printExPushBindingOp(OpAsmPrinter &p, ExPushBindingOp op) {
   p.printOptionalAttrDictWithKeyword(
       op.getAttrs(),
       /*elidedAttrs=*/{"ordinal", "element_type"});
-}
-
-//===----------------------------------------------------------------------===//
-// hal.ex.submit_and_wait
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseExSubmitAndWaitOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 2> operands;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(DeviceType::get(result->getContext())),
-              RefPtrType::get(CommandBufferType::get(result->getContext()))},
-          operandsLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printExSubmitAndWaitOp(OpAsmPrinter &p, ExSubmitAndWaitOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", ";
-  p.printOperand(op.command_buffer());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -844,30 +785,6 @@ void BufferAllocatorOp::getAsmResultNames(
   setNameFn(result(), "allocator");
 }
 
-static ParseResult parseBufferAllocatorOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  OpAsmParser::OperandType buffer;
-  Type resultType;
-  if (failed(parser.parseOperand(buffer)) ||
-      failed(parser.resolveOperand(
-          buffer, RefPtrType::get(BufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printBufferAllocatorOp(OpAsmPrinter &p, BufferAllocatorOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.buffer());
-  p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.buffer.subspan
 //===----------------------------------------------------------------------===//
@@ -875,278 +792,6 @@ static void printBufferAllocatorOp(OpAsmPrinter &p, BufferAllocatorOp op) {
 void BufferSubspanOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "buffer");
-}
-
-static ParseResult parseBufferSubspanOp(OpAsmParser &parser,
-                                        OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 3> operands;
-  Type resultType;
-  auto loc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          loc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printBufferSubspanOp(OpAsmPrinter &p, BufferSubspanOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.source_buffer());
-  p << ", ";
-  p.printOperand(op.source_offset());
-  p << ", ";
-  p.printOperand(op.length());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer.fill
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseBufferFillOp(OpAsmParser &parser,
-                                     OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  auto loc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-              parser.getBuilder().getIntegerType(32),
-          },
-          loc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printBufferFillOp(OpAsmPrinter &p, BufferFillOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.target_buffer());
-  p << ", ";
-  p.printOperand(op.target_offset());
-  p << ", ";
-  p.printOperand(op.length());
-  p << ", ";
-  p.printOperand(op.pattern());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer.read_data
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseBufferReadDataOp(OpAsmParser &parser,
-                                         OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 5> operands;
-  Type targetBufferType;
-  auto loc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(targetBufferType)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              targetBufferType,
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          loc, result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printBufferReadDataOp(OpAsmPrinter &p, BufferReadDataOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.source_buffer());
-  p << ", ";
-  p.printOperand(op.source_offset());
-  p << ", ";
-  p.printOperand(op.target_buffer());
-  p << ", ";
-  p.printOperand(op.target_offset());
-  p << ", ";
-  p.printOperand(op.length());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.target_buffer().getType());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer.write_data
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseBufferWriteDataOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 5> operands;
-  Type sourceBufferType;
-  auto loc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(sourceBufferType)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              sourceBufferType,
-              getDeviceSizeType(parser),
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          loc, result->operands))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printBufferWriteDataOp(OpAsmPrinter &p, BufferWriteDataOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.source_buffer());
-  p << ", ";
-  p.printOperand(op.source_offset());
-  p << ", ";
-  p.printOperand(op.target_buffer());
-  p << ", ";
-  p.printOperand(op.target_offset());
-  p << ", ";
-  p.printOperand(op.length());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.source_buffer().getType());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer.copy_data
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseBufferCopyDataOp(OpAsmParser &parser,
-                                         OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 5> operands;
-  auto loc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          loc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printBufferCopyDataOp(OpAsmPrinter &p, BufferCopyDataOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.source_buffer());
-  p << ", ";
-  p.printOperand(op.source_offset());
-  p << ", ";
-  p.printOperand(op.target_buffer());
-  p << ", ";
-  p.printOperand(op.target_offset());
-  p << ", ";
-  p.printOperand(op.length());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer.load
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseBufferLoadOp(OpAsmParser &parser,
-                                     OperationState *result) {
-  OpAsmParser::OperandType sourceBuffer;
-  OpAsmParser::OperandType sourceOffset;
-  Type resultType;
-  if (failed(parser.parseOperand(sourceBuffer)) ||
-      failed(parser.resolveOperand(
-          sourceBuffer, RefPtrType::get(BufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseLSquare()) ||
-      failed(parser.parseOperand(sourceOffset)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.resolveOperand(sourceOffset, getDeviceSizeType(parser),
-                                   result->operands)) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes({resultType});
-  return success();
-}
-
-static void printBufferLoadOp(OpAsmPrinter &p, BufferLoadOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.source_buffer());
-  p << "[";
-  p.printOperand(op.source_offset());
-  p << "] : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.buffer.store
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseBufferStoreOp(OpAsmParser &parser,
-                                      OperationState *result) {
-  OpAsmParser::OperandType value;
-  OpAsmParser::OperandType targetBuffer;
-  OpAsmParser::OperandType targetOffset;
-  Type valueType;
-  if (failed(parser.parseOperand(value)) || failed(parser.parseComma()) ||
-      failed(parser.parseOperand(targetBuffer)) ||
-      failed(parser.parseLSquare()) ||
-      failed(parser.parseOperand(targetOffset)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.parseColonType(valueType)) ||
-      failed(parser.resolveOperand(value, valueType, result->operands)) ||
-      failed(parser.resolveOperand(
-          targetBuffer, RefPtrType::get(BufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.resolveOperand(targetOffset, getDeviceSizeType(parser),
-                                   result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printBufferStoreOp(OpAsmPrinter &p, BufferStoreOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.value());
-  p << ", ";
-  p.printOperand(op.target_buffer());
-  p << "[";
-  p.printOperand(op.target_offset());
-  p << "] : ";
-  p.printType(op.value().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"element_type"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1217,49 +862,6 @@ void BufferViewSubviewOp::getAsmResultNames(
   setNameFn(result(), "view");
 }
 
-static ParseResult parseBufferViewSubviewOp(OpAsmParser &parser,
-                                            OperationState *result) {
-  OpAsmParser::OperandType bufferView;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-  SmallVector<OpAsmParser::OperandType, 4> lengths;
-  Type resultType;
-  if (failed(parser.parseOperand(bufferView)) ||
-      failed(parser.resolveOperand(
-          bufferView,
-          RefPtrType::get(BufferViewType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("indices")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(indices, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(indices, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("lengths")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(lengths, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(lengths, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printBufferViewSubviewOp(OpAsmPrinter &p, BufferViewSubviewOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.buffer_view());
-  p << ", indices=[";
-  p.printOperands(op.indices());
-  p << "], lengths=[";
-  p.printOperands(op.lengths());
-  p << "] : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.buffer_view.buffer
 //===----------------------------------------------------------------------===//
@@ -1273,31 +875,6 @@ void BufferViewBufferOp::build(Builder *builder, OperationState &state,
 void BufferViewBufferOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "buffer");
-}
-
-static ParseResult parseBufferViewBufferOp(OpAsmParser &parser,
-                                           OperationState *result) {
-  OpAsmParser::OperandType bufferView;
-  Type bufferType;
-  if (failed(parser.parseOperand(bufferView)) ||
-      failed(parser.parseColonType(bufferType)) ||
-      failed(parser.resolveOperand(
-          bufferView,
-          RefPtrType::get(BufferViewType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(bufferType);
-  return success();
-}
-
-static void printBufferViewBufferOp(OpAsmPrinter &p, BufferViewBufferOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.buffer_view());
-  p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1315,33 +892,6 @@ void BufferViewByteLengthOp::getAsmResultNames(
   setNameFn(result(), "len");
 }
 
-static ParseResult parseBufferViewByteLengthOp(OpAsmParser &parser,
-                                               OperationState *result) {
-  OpAsmParser::OperandType bufferView;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-  Type lengthType;
-  if (failed(parser.parseOperand(bufferView)) ||
-      failed(parser.resolveOperand(
-          bufferView,
-          RefPtrType::get(BufferViewType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseColonType(lengthType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(getDeviceSizeType(parser));
-  return success();
-}
-
-static void printBufferViewByteLengthOp(OpAsmPrinter &p,
-                                        BufferViewByteLengthOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.buffer_view());
-  p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.buffer_view.compute_offset
 //===----------------------------------------------------------------------===//
@@ -1356,38 +906,6 @@ void BufferViewComputeOffsetOp::build(Builder *builder, OperationState &state,
 void BufferViewComputeOffsetOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(offset(), "off");
-}
-
-static ParseResult parseBufferViewComputeOffsetOp(OpAsmParser &parser,
-                                                  OperationState *result) {
-  OpAsmParser::OperandType bufferView;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-  if (failed(parser.parseOperand(bufferView)) ||
-      failed(parser.resolveOperand(
-          bufferView,
-          RefPtrType::get(BufferViewType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("indices")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(indices, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(indices, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(getDeviceSizeType(parser));
-  return success();
-}
-
-static void printBufferViewComputeOffsetOp(OpAsmPrinter &p,
-                                           BufferViewComputeOffsetOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.buffer_view());
-  p << ", indices=[";
-  p.printOperands(op.indices());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1407,47 +925,6 @@ void BufferViewComputeRangeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(offset(), "off");
   setNameFn(length(), "len");
-}
-
-static ParseResult parseBufferViewComputeRangeOp(OpAsmParser &parser,
-                                                 OperationState *result) {
-  OpAsmParser::OperandType bufferView;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-  SmallVector<OpAsmParser::OperandType, 4> lengths;
-  if (failed(parser.parseOperand(bufferView)) ||
-      failed(parser.resolveOperand(
-          bufferView,
-          RefPtrType::get(BufferViewType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("indices")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(indices, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(indices, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("lengths")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(lengths, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(lengths, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes({getDeviceSizeType(parser), getDeviceSizeType(parser)});
-  return success();
-}
-
-static void printBufferViewComputeRangeOp(OpAsmPrinter &p,
-                                          BufferViewComputeRangeOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.buffer_view());
-  p << ", indices=[";
-  p.printOperands(op.indices());
-  p << "], lengths=[";
-  p.printOperands(op.lengths());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1511,55 +988,6 @@ static void printCommandBufferCreateOp(OpAsmPrinter &p,
       /*elidedAttrs=*/{"modes", "command_categories"});
   p << " : ";
   p.printType(op.result().getType());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.begin
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCommandBufferBeginOp(OpAsmParser &parser,
-                                             OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.resolveOperand(
-          commandBuffer,
-          RefPtrType::get(CommandBufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferBeginOp(OpAsmPrinter &p,
-                                      CommandBufferBeginOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.command_buffer());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.end
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCommandBufferEndOp(OpAsmParser &parser,
-                                           OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.resolveOperand(
-          commandBuffer,
-          RefPtrType::get(CommandBufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferEndOp(OpAsmPrinter &p, CommandBufferEndOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.command_buffer());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1669,71 +1097,6 @@ static void printCommandBufferExecutionBarrierOp(
                                          "target_stage_mask",
                                          "operand_segment_sizes",
                                      });
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.fill_buffer
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCommandBufferFillBufferOp(OpAsmParser &parser,
-                                                  OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 5> operands;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(CommandBufferType::get(result->getContext())),
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-              parser.getBuilder().getIntegerType(32),
-          },
-          operandsLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferFillBufferOp(OpAsmPrinter &p,
-                                           CommandBufferFillBufferOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperands(op.getOperation()->getOperands());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.copy_buffer
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCommandBufferCopyBufferOp(OpAsmParser &parser,
-                                                  OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 6> operands;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperandList(operands)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(CommandBufferType::get(result->getContext())),
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          operandsLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferCopyBufferOp(OpAsmPrinter &p,
-                                           CommandBufferCopyBufferOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperands(op.getOperation()->getOperands());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }
 
 //===----------------------------------------------------------------------===//
@@ -2030,50 +1393,6 @@ void DescriptorSetCreateOp::getAsmResultNames(
   setNameFn(result(), "descriptor_set");
 }
 
-static ParseResult parseDescriptorSetCreateOp(OpAsmParser &parser,
-                                              OperationState *result) {
-  OpAsmParser::OperandType device;
-  OpAsmParser::OperandType setLayout;
-  SmallVector<OpAsmParser::OperandType, 4> bindings;
-  Type resultType;
-  if (failed(parser.parseOperand(device)) ||
-      failed(parser.resolveOperand(
-          device, RefPtrType::get(DeviceType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(setLayout)) ||
-      failed(parser.resolveOperand(
-          setLayout,
-          RefPtrType::get(DescriptorSetLayoutType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("bindings")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(bindings, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(
-          bindings, DescriptorSetBindingType::get(result->getContext()),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printDescriptorSetCreateOp(OpAsmPrinter &p,
-                                       DescriptorSetCreateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", ";
-  p.printOperand(op.set_layout());
-  p << ", bindings=[";
-  p.printOperands(op.bindings());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.descriptor_set_layout.make_binding
 //===----------------------------------------------------------------------===//
@@ -2151,48 +1470,6 @@ void DescriptorSetLayoutCreateOp::getAsmResultNames(
   setNameFn(result(), "descriptor_set_layout");
 }
 
-static ParseResult parseDescriptorSetLayoutCreateOp(OpAsmParser &parser,
-                                                    OperationState *result) {
-  OpAsmParser::OperandType device;
-  OpAsmParser::OperandType setLayout;
-  SmallVector<OpAsmParser::OperandType, 4> bindings;
-  Type resultType;
-  if (failed(parser.parseOperand(device)) ||
-      failed(parser.resolveOperand(
-          device, RefPtrType::get(DeviceType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(setLayout)) ||
-      failed(parser.resolveOperand(
-          setLayout,
-          RefPtrType::get(DescriptorSetLayoutType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("bindings")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(bindings, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(
-          bindings, DescriptorSetBindingType::get(result->getContext()),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printDescriptorSetLayoutCreateOp(OpAsmPrinter &p,
-                                             DescriptorSetLayoutCreateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", bindings=[";
-  p.printOperands(op.bindings());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.device.allocator
 //===----------------------------------------------------------------------===//
@@ -2200,30 +1477,6 @@ static void printDescriptorSetLayoutCreateOp(OpAsmPrinter &p,
 void DeviceAllocatorOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "allocator");
-}
-
-static ParseResult parseDeviceAllocatorOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  OpAsmParser::OperandType device;
-  Type allocatorType;
-  if (failed(parser.parseOperand(device)) ||
-      failed(parser.resolveOperand(
-          device, RefPtrType::get(DeviceType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(allocatorType))) {
-    return failure();
-  }
-  result->addTypes(allocatorType);
-  return success();
-}
-
-static void printDeviceAllocatorOp(OpAsmPrinter &p, DeviceAllocatorOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//

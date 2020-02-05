@@ -151,36 +151,7 @@ class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
 // shape.tie_shape
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseTieShapeOp(OpAsmParser &parser, OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 2> operands;
-  SmallVector<Type, 2> operandTypes;
-  if (parser.parseOperandList(operands) ||
-      parser.parseColonTypeList(operandTypes) ||
-      parser.parseOptionalAttrDict(state.attributes) ||
-      parser.resolveOperands(operands, operandTypes, parser.getNameLoc(),
-                             state.operands)) {
-    return failure();
-  }
-
-  // The result type is the same as the first operand.
-  if (state.operands.empty()) return failure();
-  state.types.push_back(state.operands.front().getType());
-  return success();
-}
-
-static void printTieShapeOp(OpAsmPrinter &p, TieShapeOp op) {
-  p << op.getOperationName() << " ";
-  p.printOperands(op.getOperands());
-  p << " : ";
-  interleaveComma(op.getOperandTypes(), p);
-  p.printOptionalAttrDict(op.getOperation()->getAttrs());
-}
-
 static LogicalResult verifyTieShapeOp(TieShapeOp op) {
-  if (op.operand().getType() != op.result().getType()) {
-    return op.emitOpError("operand and result must be the same type");
-  }
-
   // tie_shape currently only supports ranked tensors.
   auto rankedTensorType = op.operand().getType().dyn_cast<RankedTensorType>();
   auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();

@@ -34,7 +34,8 @@ class Shape_PureOp<string mnemonic, list<OpTrait> traits = []> :
 // RankedShapeType manipulation
 //===----------------------------------------------------------------------===//
 
-def Shape_TieShapeOp : Shape_PureOp<"tie_shape"> {
+def Shape_TieShapeOp : Shape_PureOp<"tie_shape",
+    [AllTypesMatch<["operand", "result"]>]> {
   let summary = "Ties a tensor and a shape together.";
   let description = [{
     Ties a specific tensor and its shape together in the IR, allowing further
@@ -47,6 +48,8 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape"> {
 
   let arguments = (ins AnyTensor:$operand, Shape_RankedShape:$shape);
   let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = "operands attr-dict `:` type($operand) `,` type($shape)";
 
   let verifier = [{ return verify$cppClass(*this); }];
 }

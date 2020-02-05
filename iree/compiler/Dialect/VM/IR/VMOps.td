@@ -649,6 +649,8 @@ class VM_SelectPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
+  let assemblyFormat = "operands attr-dict `:` type($result)";
+
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"condition", 0>,
@@ -656,9 +658,6 @@ class VM_SelectPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
     VM_EncOperand<"false_value", 2>,
     VM_EncResult<"result">,
   ];
-
-  let parser = [{ return parseSelectOp(parser, &result); }];
-  let printer = [{ return printSelectOp(p, *this); }];
 }
 
 def VM_SelectI32Op : VM_SelectPrimitiveOp<I32, "select.i32", VM_OPC_SelectI32> {
@@ -686,6 +685,8 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
     AnyRefPtr:$result
   );
 
+  let assemblyFormat = "operands attr-dict `:` type($result)";
+
   let encoding = [
     VM_EncOpcode<VM_OPC_SelectRef>,
     VM_EncOperand<"condition", 0>,
@@ -694,9 +695,6 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
     VM_EncOperand<"false_value", 2>,
     VM_EncResult<"result">,
   ];
-
-  let parser = [{ return parseSelectOp(parser, &result); }];
-  let printer = [{ return printSelectOp(p, *this); }];
 
   let hasFolder = 1;
 }
@@ -718,14 +716,13 @@ class VM_UnaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
+  let assemblyFormat = "$operand attr-dict `:` type($result)";
+
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"operand", 0>,
     VM_EncResult<"result">,
   ];
-
-  let parser = [{ return parseUnaryArithmeticOp(parser, &result); }];
-  let printer = [{ return printUnaryArithmeticOp(p, *this); }];
 }
 
 class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
@@ -742,15 +739,14 @@ class VM_BinaryArithmeticOp<Type type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
+  let assemblyFormat = "operands attr-dict `:` type($result)";
+
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"lhs", 0>,
     VM_EncOperand<"rhs", 1>,
     VM_EncResult<"result">,
   ];
-
-  let parser = [{ return parseBinaryArithmeticOp(parser, &result); }];
-  let printer = [{ return printBinaryArithmeticOp(p, *this); }];
 }
 
 def VM_AddI32Op :
@@ -917,14 +913,13 @@ class VM_UnaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
     I32:$result
   );
 
+  let assemblyFormat = "$operand attr-dict `:` type($operand)";
+
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"operand", 0>,
     VM_EncResult<"result">,
   ];
-
-  let parser = [{ return parseUnaryComparisonOp(parser, &result); }];
-  let printer = [{ return printUnaryComparisonOp(p, *this); }];
 }
 
 class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
@@ -945,15 +940,14 @@ class VM_BinaryComparisonOp<Type type, string mnemonic, VM_OPC opcode,
     I32:$result
   );
 
+  let assemblyFormat = "operands attr-dict `:` type($lhs)";
+
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"lhs", 0>,
     VM_EncOperand<"rhs", 1>,
     VM_EncResult<"result">,
   ];
-
-  let parser = [{ return parseBinaryComparisonOp(parser, &result); }];
-  let printer = [{ return printBinaryComparisonOp(p, *this); }];
 }
 
 def VM_CmpEQI32Op :

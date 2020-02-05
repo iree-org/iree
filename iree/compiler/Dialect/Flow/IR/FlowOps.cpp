@@ -624,16 +624,6 @@ static LogicalResult verifyExecutableOp(ExecutableOp op) {
   return success();
 }
 
-static ParseResult parseRegionEndOp(OpAsmParser &parser,
-                                    OperationState *result) {
-  return parser.parseOptionalAttrDict(result->attributes);
-}
-
-static void printRegionEndOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName();
-  p.printOptionalAttrDict(op->getAttrs());
-}
-
 //===----------------------------------------------------------------------===//
 // flow.dispatch.entry
 //===----------------------------------------------------------------------===//
@@ -926,78 +916,6 @@ static void printTensorSplatOp(OpAsmPrinter &p, TensorSplatOp &op) {
   p << op.getOperationName() << ' ';
   p.printOperand(op.value());
   p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.clone
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseTensorCloneOp(OpAsmParser &parser,
-                                      OperationState *result) {
-  OpAsmParser::OperandType operand;
-  ShapedType type;
-  if (failed(parser.parseOperand(operand)) ||
-      failed(parser.parseColonType(type)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.resolveOperand(operand, type, result->operands))) {
-    return failure();
-  }
-  result->addTypes({type});
-  return success();
-}
-
-static void printTensorCloneOp(OpAsmPrinter &p, TensorCloneOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.operand());
-  p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-}
-
-//===----------------------------------------------------------------------===//
-// flow.tensor.update
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseTensorUpdateOp(OpAsmParser &parser,
-                                       OperationState *result) {
-  OpAsmParser::OperandType updateOperand;
-  OpAsmParser::OperandType targetOperand;
-  SmallVector<OpAsmParser::OperandType, 4> indexOperands;
-  ShapedType updateType;
-  ShapedType targetType;
-  if (failed(parser.parseOperand(updateOperand)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseOperand(targetOperand)) ||
-      failed(parser.parseOperandList(indexOperands,
-                                     OpAsmParser::Delimiter::Square)) ||
-      failed(parser.parseColonType(updateType)) ||
-      failed(parser.parseArrow()) || failed(parser.parseType(targetType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(
-          parser.resolveOperand(updateOperand, updateType, result->operands)) ||
-      failed(
-          parser.resolveOperand(targetOperand, targetType, result->operands)) ||
-      failed(parser.resolveOperands(indexOperands,
-                                    parser.getBuilder().getIntegerType(32),
-                                    result->operands))) {
-    return failure();
-  }
-  result->addTypes({targetType});
-  return success();
-}
-
-static void printTensorUpdateOp(OpAsmPrinter &p, TensorUpdateOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.update());
-  p << ", ";
-  p.printOperand(op.target());
-  p << '[';
-  p.printOperands(op.start_indices());
-  p << "] : ";
-  p.printType(op.update().getType());
-  p << " -> ";
   p.printType(op.result().getType());
   p.printOptionalAttrDictWithKeyword(op.getAttrs());
 }

@@ -703,74 +703,6 @@ void ConstRefRodataOp::build(Builder *builder, OperationState &result,
 //===----------------------------------------------------------------------===//
 
 //===----------------------------------------------------------------------===//
-// Conditional assignment
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseSelectOp(OpAsmParser &parser, OperationState *result) {
-  OpAsmParser::OperandType condOperand;
-  SmallVector<OpAsmParser::OperandType, 2> ops;
-  Type type;
-  if (failed(parser.parseOperand(condOperand)) ||
-      failed(parser.resolveOperand(condOperand,
-                                   parser.getBuilder().getIntegerType(32),
-                                   result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperandList(ops, 2)) ||
-      failed(parser.parseColonType(type)) ||
-      failed(parser.resolveOperands(ops, type, result->operands))) {
-    return failure();
-  }
-  result->addTypes({type});
-  return success();
-}
-
-static void printSelectOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << op->getOperand(0) << ", " << op->getOperand(1)
-    << ", " << op->getOperand(2);
-  p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getResult(0).getType();
-}
-
-//===----------------------------------------------------------------------===//
-// Native integer arithmetic
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseUnaryArithmeticOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 1> ops;
-  Type type;
-  if (parser.parseOperandList(ops, 1) || parser.parseColonType(type) ||
-      parser.resolveOperands(ops, type, result->operands)) {
-    return failure();
-  }
-  result->addTypes({type});
-  return success();
-}
-
-static void printUnaryArithmeticOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << op->getOperand(0);
-  p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getOperand(0).getType();
-}
-
-static ParseResult parseBinaryArithmeticOp(OpAsmParser &parser,
-                                           OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 2> ops;
-  Type type;
-  if (parser.parseOperandList(ops, 2) || parser.parseColonType(type) ||
-      parser.resolveOperands(ops, type, result->operands)) {
-    return failure();
-  }
-  result->addTypes({type});
-  return success();
-}
-
-static void printBinaryArithmeticOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << op->getOperand(0) << ", " << op->getOperand(1);
-  p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getResult(0).getType();
-}
-
-//===----------------------------------------------------------------------===//
 // Native bitwise shifts and rotates
 //===----------------------------------------------------------------------===//
 
@@ -796,55 +728,6 @@ static void printShiftArithmeticOp(OpAsmPrinter &p, Operation *op) {
     << op->getAttrOfType<IntegerAttr>("amount").getInt();
   p.printOptionalAttrDict(op->getAttrs(), {"amount"});
   p << " : " << op->getResult(0).getType();
-}
-
-//===----------------------------------------------------------------------===//
-// Casting and type conversion/emulation
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// Native reduction (horizontal) arithmetic
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// Comparison ops
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseUnaryComparisonOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  OpAsmParser::OperandType op;
-  Type type;
-  if (failed(parser.parseOperand(op)) || failed(parser.parseColonType(type)) ||
-      failed(parser.resolveOperand(op, type, result->operands))) {
-    return failure();
-  }
-  result->addTypes({IntegerType::get(32, result->getContext())});
-  return success();
-}
-
-static void printUnaryComparisonOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << op->getOperand(0);
-  p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getOperand(0).getType();
-}
-
-static ParseResult parseBinaryComparisonOp(OpAsmParser &parser,
-                                           OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 2> ops;
-  Type type;
-  if (failed(parser.parseOperandList(ops, 2)) ||
-      failed(parser.parseColonType(type)) ||
-      failed(parser.resolveOperands(ops, type, result->operands))) {
-    return failure();
-  }
-  result->addTypes({IntegerType::get(32, result->getContext())});
-  return success();
-}
-
-static void printBinaryComparisonOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << op->getOperand(0) << ", " << op->getOperand(1);
-  p.printOptionalAttrDict(op->getAttrs());
-  p << " : " << op->getOperand(0).getType();
 }
 
 //===----------------------------------------------------------------------===//

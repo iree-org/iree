@@ -314,9 +314,7 @@ def FLOW_ExecutableEndOp : FLOW_Op<"executable_end", [
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable op}];
-
-  let parser = [{ return parseRegionEndOp(parser, &result); }];
-  let printer = [{ return printRegionEndOp(p, *this); }];
+  let assemblyFormat = "attr-dict";
 }
 
 def FLOW_DispatchEntryOp : FLOW_Op<"dispatch.entry", [
@@ -556,6 +554,8 @@ def FLOW_TensorCloneOp : FLOW_PureOp<"tensor.clone", [
     FLOW_Tensor:$result
   );
 
+  let assemblyFormat = "$operand `:` type($result) attr-dict";
+
   let extraClassDeclaration = [{
     // StreamableOpInterface:
     bool isTransfer() { return true; }
@@ -609,7 +609,7 @@ def FLOW_TensorSliceOp : FLOW_PureOp<"tensor.slice", [
 def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
     FLOW_StreamableOp,
     AllRanksMatch<["update", "target", "result"]>,
-    AllShapesMatch<["target", "result"]>,
+    AllTypesMatch<["target", "result"]>,
     AllElementTypesMatch<["update", "target", "result"]>,
   ]> {
   let summary = [{updates a tensor with the contents of another tensor}];
@@ -626,6 +626,11 @@ def FLOW_TensorUpdateOp : FLOW_PureOp<"tensor.update", [
   let results = (outs
     FLOW_Tensor:$result
   );
+
+  let assemblyFormat = [{
+    $update `,` $target `[` $start_indices `]` `:` type($update) `->`
+    type($result) attr-dict
+  }];
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:
