@@ -16,6 +16,7 @@ load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
+    "iree_py_test",
 )
 
 package(
@@ -24,7 +25,7 @@ package(
 )
 
 [
-    py_test(
+    iree_py_test(
         name = name,
         srcs = [name + ".py"],
         python_version = "PY3",
@@ -50,7 +51,7 @@ package(
     ]
 ]
 
-py_test(
+iree_py_test(
     name = "vulkan_conv_test",
     srcs = ["vulkan_conv_test.py"],
     python_version = "PY3",
