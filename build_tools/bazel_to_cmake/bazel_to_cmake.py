@@ -311,6 +311,7 @@ class BuildFileFunctions(object):
         # silently give different behavior, just error out.
         # See https://docs.bazel.build/versions/master/be/functions.html#glob
         raise NotImplementedError("Recursive globs not supported")
+      # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
       glob_var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
       glob_vars.append("${%s}" % (glob_var,))
       self.converter.body += ("file(GLOB %(var)s CONFIGURE_DEPENDS "
