@@ -304,6 +304,21 @@ cc_library(
 )
 
 cc_library(
+    name = "renderdoc_capture_manager",
+    srcs = ["renderdoc_capture_manager.cc"],
+    hdrs = ["renderdoc_capture_manager.h"],
+    linkopts = ["-ldl"],
+    deps = [
+        "//iree/base:logging",
+        "//iree/base:platform_headers",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:debug_capture_manager",
+        "@renderdoc_api//:renderdoc_app",
+    ],
+)
+
+cc_library(
     name = "status_util",
     srcs = ["status_util.cc"],
     hdrs = ["status_util.h"],
@@ -363,6 +378,7 @@ cc_library(
         ":native_binary_semaphore",
         ":native_event",
         ":pipeline_cache",
+        ":renderdoc_capture_manager",
         ":status_util",
         ":vma_allocator",
         "//iree/base:math",
@@ -392,6 +408,7 @@ cc_library(
         ":debug_reporter",
         ":dynamic_symbols",
         ":extensibility_util",
+        ":renderdoc_capture_manager",
         ":status_util",
         ":vulkan_device",
         "//iree/base:memory",

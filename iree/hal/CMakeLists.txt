@@ -228,6 +228,16 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    debug_capture_manager
+  HDRS
+    "debug_capture_manager.h"
+  DEPS
+    iree::base::status
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     deferred_buffer
   HDRS
     "deferred_buffer.h"
@@ -352,6 +362,7 @@ iree_cc_library(
   HDRS
     "driver.h"
   DEPS
+    ::debug_capture_manager
     ::device
     ::device_info
     iree::base::ref_ptr

@@ -345,6 +345,29 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_select_compiler_opts(RENDERDOC_CAPTURE_MANAGER_LINKOPTS
+  CLANG_OR_GCC
+    "-ldl"
+)
+
+iree_cc_library(
+  NAME
+    renderdoc_capture_manager
+  HDRS
+    "renderdoc_capture_manager.h"
+  SRCS
+    "renderdoc_capture_manager.cc"
+  DEPS
+    iree::base::logging
+    iree::base::platform_headers
+    iree::base::status
+    iree::base::tracing
+    iree::hal::debug_capture_manager
+    renderdoc_api::renderdoc_app
+  LINKOPTS
+    ${RENDERDOC_CAPTURE_MANAGER_LINKOPTS}
+)
+
 iree_cc_library(
   NAME
     status_util
@@ -429,6 +452,7 @@ iree_cc_library(
     iree::hal::vulkan::native_binary_semaphore
     iree::hal::vulkan::native_event
     iree::hal::vulkan::pipeline_cache
+    iree::hal::vulkan::renderdoc_capture_manager
     iree::hal::vulkan::status_util
     iree::hal::vulkan::vma_allocator
     Vulkan::Headers
@@ -454,6 +478,7 @@ iree_cc_library(
     iree::hal::vulkan::debug_reporter
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::extensibility_util
+    iree::hal::vulkan::renderdoc_capture_manager
     iree::hal::vulkan::status_util
     iree::hal::vulkan::vulkan_device
     Vulkan::Headers

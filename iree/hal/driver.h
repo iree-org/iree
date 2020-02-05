@@ -21,6 +21,7 @@
 
 #include "iree/base/ref_ptr.h"
 #include "iree/base/status.h"
+#include "iree/hal/debug_capture_manager.h"
 #include "iree/hal/device.h"
 #include "iree/hal/device_info.h"
 
@@ -50,6 +51,9 @@ class Driver : public RefObject<Driver> {
   StatusOr<ref_ptr<Device>> CreateDevice(const DeviceInfo& device_info) {
     return CreateDevice(device_info.device_id());
   }
+
+  // Gets the capture manager for this driver, if one exists.
+  virtual DebugCaptureManager* debug_capture_manager() { return nullptr; }
 
  protected:
   explicit Driver(std::string name) : name_(std::move(name)) {}
