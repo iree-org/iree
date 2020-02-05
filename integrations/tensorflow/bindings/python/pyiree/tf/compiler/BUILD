@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 load(
     "//bindings/python:build_defs.oss.bzl",
+    "INTREE_TENSORFLOW_PY_DEPS",
     "NUMPY_DEPS",
     "PYBIND_COPTS",
     "PYBIND_EXTENSION_COPTS",
@@ -29,18 +30,14 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-COMPILER_DEPS = [
-    # Transforms.
-    "//iree/compiler/Dialect/Flow/Transforms",
-    "//iree/compiler/Dialect/HAL/Transforms",
-    "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
-    "//iree/compiler/Dialect/VM/Transforms",
+# Runtime deps needed to compile the tensorflow compiler.
+SAVED_MODEL_TF_RUNTIME_DEPS = [
+    "@org_tensorflow//tensorflow/core:ops",
+]
 
-    # Targets.
-    "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
-    "//iree/compiler/Dialect/HAL/Target/VMLA",
-    "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    "//iree/compiler/Dialect/VM/Target/Bytecode",
+TF_XLA_PASS_DEPS = [
+    "//integrations/tensorflow/compiler:tensorflow",
+    "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
 ]
 
 iree_py_library(
@@ -53,6 +50,7 @@ iree_py_library(
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
+        "//integrations/tensorflow/bindings/python:pathsetup",  # build_cleaner: keep
     ],
 )
 
@@ -69,35 +67,36 @@ iree_py_extension(
     deps = [
         ":compiler_library",
         "//bindings/python/pyiree/common",
+        "//bindings/python/pyiree/compiler:compiler_library",
     ],
 )
 
 pybind_cc_library(
     name = "compiler_library",
     srcs = [
-        "compiler.cc",
+        "register_tensorflow.cc",
     ],
     hdrs = [
-        "compiler.h",
+        "register_tensorflow.h",
     ],
     tags = ["nokokoro"],
-    deps = COMPILER_DEPS + [
+    deps = SAVED_MODEL_TF_RUNTIME_DEPS + TF_XLA_PASS_DEPS + [
         "//bindings/python/pyiree/common",
+        "//bindings/python/pyiree/compiler:compiler_library",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Pass",
+        "@org_tensorflow//tensorflow/cc/saved_model:loader_lite",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:convert_graphdef",
     ],
 )
 
 iree_py_test(
-    name = "compiler_test",
-    srcs = ["compiler_test.py"],
+    name = "saved_model_test",
+    srcs = ["saved_model_test.py"],
     python_version = "PY3",
     tags = ["nokokoro"],
-    deps = NUMPY_DEPS + [
-        "//bindings/python:pathsetup",  # build_cleaner: keep
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "@absl_py//absl/testing:absltest",
-        "//bindings/python/pyiree/compiler",
+        "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",
     ],
 )

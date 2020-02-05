@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/pyiree/compiler/tf_interop/register_tensorflow.h"
+#include <mutex>  // NOLINT
+
+#include "bindings/python/pyiree/common/binding.h"
+#include "bindings/python/pyiree/compiler/compiler.h"
+#include "integrations/tensorflow/bindings/python/pyiree/tf/compiler/register_tensorflow.h"
 
 namespace iree {
 namespace python {
 
-void SetupTensorFlowBindings(pybind11::module m) {}
+PYBIND11_MODULE(binding, m) {
+  m.doc() = "IREE TensorFlow Compiler Interface";
+  SetupCommonCompilerBindings(m);
+  SetupTensorFlowBindings(m);
+}
 
 }  // namespace python
 }  // namespace iree

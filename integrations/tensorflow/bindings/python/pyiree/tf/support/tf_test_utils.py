@@ -26,8 +26,8 @@ import tempfile
 from absl import flags
 from absl import logging
 import numpy as np
-from pyiree import compiler
 from pyiree import rt
+from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
 flags.DEFINE_string(

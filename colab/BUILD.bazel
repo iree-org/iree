@@ -15,6 +15,7 @@
 py_binary(
     name = "everything_for_colab",
     srcs = ["dummy.py"],
+    legacy_create_init = False,
     main = "dummy.py",
     python_version = "PY3",
     # TODO(b/145815906) Get this running in OSS CI.
@@ -23,6 +24,12 @@ py_binary(
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "//bindings/python/pyiree/compiler",  # build_cleaner: keep
         "//bindings/python/pyiree/rt",  # build_cleaner: keep
-        "//bindings/python/pyiree/tf/support",  # build_cleaner: keep
-    ],
+    ] + select({
+        "//iree:enable_tensorflow": [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",  # build_cleaner: keep
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",  # build_cleaner: keep
+        ],
+        "//conditions:default": [
+        ],
+    }),
 )

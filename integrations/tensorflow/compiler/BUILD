@@ -19,40 +19,27 @@ package(
 
 cc_library(
     name = "tensorflow",
-    srcs = select({
-        "//iree:enable_tensorflow": [
-            "TFSavedModelLowerExportedFunctions.cpp",
-            "TFSavedModelLowerGlobalTensors.cpp",
-            "Passes.cpp",
-        ],
-        "//conditions:default": [
-        ],
-    }),
+    srcs = [
+        "Passes.cpp",
+        "TFSavedModelLowerExportedFunctions.cpp",
+        "TFSavedModelLowerGlobalTensors.cpp",
+    ],
     hdrs = [
         "Passes.h",
     ],
-    defines = select({
-        "//iree:enable_tensorflow": [
-            "IREE_COMPILER_TENSORFLOW_ENABLED",
-        ],
-        "//conditions:default": [
-        ],
-    }),
-    deps = select({
-        "//iree:enable_tensorflow": [
-            "@llvm-project//llvm:support",
-            "@llvm-project//mlir:Support",
-            "@llvm-project//mlir:TransformUtils",
-            "@llvm-project//mlir:IR",
-            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-            "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
-            "//iree/compiler/Dialect/Flow/IR",
-        ],
-        "//conditions:default": [
-        ],
-    }) + [
+    defines = [
+        "IREE_COMPILER_TENSORFLOW_ENABLED",
+    ],
+    deps = [
         "//iree/base:signature_mangle",
+        "//iree/compiler/Dialect/Flow/IR",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformUtils",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
     ],
     alwayslink = 1,
 )

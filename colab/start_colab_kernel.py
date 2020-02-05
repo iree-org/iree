@@ -100,6 +100,9 @@ def run():
   # first on the path.
   extra_python_path.append(
       os.path.join(runfiles_dir, "iree_core", "bindings", "python"))
+  extra_python_path.append(
+      os.path.join(runfiles_dir, "iree_core", "integrations", "tensorflow",
+                   "bindings", "python"))
   for python_module in os.listdir(runfiles_dir):
     python_module_path = os.path.join(runfiles_dir, python_module)
     if os.path.isdir(python_module_path):

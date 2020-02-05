@@ -20,6 +20,8 @@ load(
     "PYBIND_EXTENSION_COPTS",
     "PYBIND_FEATURES",
     "iree_py_extension",
+    "iree_py_library",
+    "iree_py_test",
     "pybind_cc_library",
 )
 
@@ -33,7 +35,7 @@ DRIVER_DEPS = PLATFORM_VULKAN_DEPS + [
     "//iree/hal/vulkan:vulkan_driver_module",
 ]
 
-py_library(
+iree_py_library(
     name = "rt",
     srcs = [
         "__init__.py",
@@ -102,7 +104,7 @@ pybind_cc_library(
     ],
 )
 
-py_library(
+iree_py_library(
     name = "system_api",
     srcs = ["system_api.py"],
     srcs_version = "PY3",
@@ -114,7 +116,7 @@ py_library(
     ],
 )
 
-py_test(
+iree_py_test(
     name = "function_abi_test",
     srcs = ["function_abi_test.py"],
     python_version = "PY3",
@@ -132,7 +134,7 @@ py_test(
     # TODO(b/145815906) Get this running in OSS CI.
 )
 
-py_test(
+iree_py_test(
     name = "hal_test",
     srcs = ["hal_test.py"],
     python_version = "PY3",
@@ -145,7 +147,7 @@ py_test(
     ],
 )
 
-py_test(
+iree_py_test(
     name = "system_api_test",
     srcs = ["system_api_test.py"],
     python_version = "PY3",
@@ -165,7 +167,7 @@ py_test(
     ],
 )
 
-py_test(
+iree_py_test(
     name = "vm_test",
     srcs = ["vm_test.py"],
     python_version = "PY3",
@@ -182,112 +184,3 @@ py_test(
         "//bindings/python/pyiree/rt",
     ],
 )
-
-# py_library(
-#     name = "pyiree",
-#     srcs = [
-#         "__init__.py",
-#     ],
-#     srcs_version = "PY3",
-#     # TODO(b/145815906) Get this running in OSS CI.
-#     tags = ["nokokoro"],
-#     deps = [
-#         ":binding",
-#         ":compiler",
-#         ":system_api",
-#         "//bindings/python:pathsetup",  # build_cleaner: keep
-#     ] + select({
-#         "//iree:enable_tensorflow": [
-#             "//bindings/python/pyiree/tf_interop:test_utils",
-#             "//bindings/python/pyiree/tf_interop:tf_test_driver",
-#         ],
-#         "//conditions:default": [
-#         ],
-#     }),
-# )
-#
-#
-# cc_library(
-#     name = "base",
-#     srcs = [
-#         "compiler.cc",
-#         "function_abi.cc",
-#         "hal.cc",
-#         "host_types.cc",
-#         "status_utils.cc",
-#         "vm.cc",
-#     ],
-#     hdrs = [
-#         "binding.h",
-#         "compiler.h",
-#         "function_abi.h",
-#         "hal.h",
-#         "host_types.h",
-#         "status_utils.h",
-#         "vm.h",
-#     ],
-#     copts = DEFAULT_COPTS,
-#     features = DEFAULT_FEATURES,
-#     # TODO(b/145815906) Get this running in OSS CI.
-#     tags = ["nokokoro"],
-#     deps = [
-#         "@com_google_absl//absl/container:inlined_vector",
-#         "@com_google_absl//absl/memory",
-#         "@com_google_absl//absl/strings",
-#         "@com_google_absl//absl/types:optional",
-#         "@com_google_absl//absl/types:span",
-#         "@com_google_absl//absl/types:variant",
-#         "//iree/compiler/Utils",
-#         "//iree/modules/hal",
-#         "//iree/vm",
-#         "//iree/vm:bytecode_module",
-#         "//iree/vm:invocation",
-#         "//iree/vm:module",
-#         "//iree/vm:ref",
-#         "//iree/vm:variant_list",
-#         "//third_party/llvm/llvm/projects/google_mlir:IR",
-#         "//iree/base:api",
-#         "//iree/base:status",
-#         "//iree/base:signature_mangle",
-#         "//iree/hal:api",
-#         "//iree/vm:api",
-#         "@llvm-project//llvm:support",
-#         "//third_party/llvm/llvm/projects/google_mlir:Parser",
-#         "//third_party/llvm/llvm/projects/google_mlir:Pass",
-#         "@iree_pybind11//:pybind11",
-#     ] + COMPILER_DEPS + DRIVER_DEPS + PYTHON_HEADERS_DEPS,
-# )
-#
-# iree_py_extension(
-#     name = "binding",
-#     srcs = [
-#         "initialize_module.cc",
-#     ],
-#     copts = DEFAULT_COPTS,
-#     features = DEFAULT_FEATURES,
-#     linkstatic = 1,
-#     # TODO(b/145815906) Get this running in OSS CI.
-#     tags = ["nokokoro"],
-#     win_def_file = "export.def",
-#     deps = [
-#         ":base",
-#         "//bindings/python/pyiree/tf_interop",
-#         "//iree/base:initializer",
-#         "//iree/base:tracing",
-#         "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
-#     ],
-# )
-#
-# py_test(
-#     name = "compiler_test",
-#     srcs = ["compiler_test.py"],
-#     python_version = "PY3",
-#     # TODO(b/145815906) Get this running in OSS CI.
-#     tags = ["nokokoro"],
-#     deps = [
-#         "//bindings/python:pathsetup",  # build_cleaner: keep
-#         "@absl_py//absl/testing:absltest",
-#         "//bindings/python/pyiree",
-#     ],
-# )
-#

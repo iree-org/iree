@@ -16,43 +16,13 @@
 
 #include "bindings/python/pyiree/common/binding.h"
 #include "bindings/python/pyiree/compiler/compiler.h"
-#include "bindings/python/pyiree/compiler/tf_interop/register_tensorflow.h"
 
 namespace iree {
 namespace python {
 
 PYBIND11_MODULE(binding, m) {
   m.doc() = "IREE Compiler Interface";
-  py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob",
-                                                      py::buffer_protocol())
-      .def_buffer([](OpaqueBlob* self) -> py::buffer_info {
-        return py::buffer_info(
-            self->data(),                           // Pointer to buffer
-            sizeof(uint8_t),                        // Size of one scalar
-            py::format_descriptor<uint8_t>::value,  // Python struct-style
-                                                    // format
-            1,                                      // Number of dimensions
-            {self->size()},                         // Buffer dimensions
-            {self->size()}                          // Strides
-        );
-      })
-      .def_property_readonly("bytes",
-                             [](OpaqueBlob* self) -> py::bytes {
-                               return py::bytes(
-                                   static_cast<const char*>(self->data()),
-                                   self->size());
-                             })
-      .def_property_readonly("text", [](OpaqueBlob* self) -> py::str {
-        return py::str(static_cast<const char*>(self->data()), self->size());
-      });
-
-  SetupCompilerBindings(m);
-
-// TensorFlow.
-#if defined(IREE_TENSORFLOW_ENABLED)
-  auto tf_m = m.def_submodule("tf_interop", "IREE TensorFlow interop");
-  SetupTensorFlowBindings(tf_m);
-#endif
+  SetupCommonCompilerBindings(m);
 }
 
 }  // namespace python

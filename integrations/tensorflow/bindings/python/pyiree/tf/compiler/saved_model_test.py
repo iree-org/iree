@@ -21,12 +21,7 @@ import os
 import sys
 import tempfile
 
-from pyiree import compiler
-
-# Determine if compiled with tf_interop support.
-if not hasattr(compiler, "tf_interop"):
-  print("Not running tests because tf_interop support not compiled")
-  sys.exit(0)
+from pyiree.tf import compiler
 
 # Dynamically import tensorflow.
 try:

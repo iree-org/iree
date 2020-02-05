@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "bindings/python/pyiree/compiler/tf_interop/register_tensorflow.h"
+#include "integrations/tensorflow/bindings/python/pyiree/tf/compiler/register_tensorflow.h"
 
 #include <string>
 #include <vector>

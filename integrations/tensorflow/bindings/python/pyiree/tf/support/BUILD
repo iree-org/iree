@@ -13,45 +13,26 @@
 # limitations under the License.
 
 load(
-    "//iree:build_defs.oss.bzl",
-    "INTREE_FILECHECK_TARGET",
-)
-load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
+    "iree_py_library",
 )
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_lit_test_suite(
-    name = "lit",
-    srcs = glob(["*.mlir"]),
-    data = [
-        "//integrations/tensorflow/compiler:iree-tf-opt",
-        "//iree/tools:IreeFileCheck",
-    ],
-    tags = ["nokokoro"],
-)
-
-py_test(
-    name = "saved_model_adopt_exports",
+iree_py_library(
+    name = "support",
     srcs = [
-        "saved_model_adopt_exports.py",
+        "__init__.py",
+        "tf_test_driver.py",
+        "tf_test_utils.py",
     ],
-    args = [
-        "--filecheck_binary=$(rootpath %s)" % INTREE_FILECHECK_TARGET,
-    ],
-    data = [
-        INTREE_FILECHECK_TARGET,
-    ],
-    python_version = "PY3",
-    # TODO(b/145815906) Get this running in OSS CI.
     tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",
+        "//bindings/python/pyiree/rt",
     ],
 )

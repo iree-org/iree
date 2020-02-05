@@ -1,5 +1,7 @@
-# Lint as: python3
-# Copyright 2019 Google LLC
+# Lint-as: python3
+"""Module init for the python bindings."""
+
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +14,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""High level compiler API.
 
-This imports parts of the native bindings as appropriate.
-"""
+# pylint: disable=g-multiple-import
+# pylint: disable=g-bad-import-order
+# pylint: disable=g-import-not-at-top
+# pylint: disable=wildcard-import
 
 __all__ = [
+    # Common
+    "Context",
+    "Module",
+    "CompileOptions",
+    "OutputFormat",
+    # TensorFlow
     "TF_IMPORT_PASS_PIPELINE",
     "tf_load_saved_model",
     "tf_compile_saved_model",
@@ -25,9 +34,13 @@ __all__ = [
 
 from typing import Collection, Optional, Sequence
 
-from . import binding as _binding
-from .binding import CompilerContext as Context
-from .binding import CompilerModule as Module
+from . import binding as binding
+
+# Native aliases (matches those in the generic compiler).
+Context = binding.CompilerContext
+Module = binding.CompilerModule
+CompileOptions = binding.CompileOptions
+OutputFormat = binding.OutputFormat
 
 # Pass pipeline that should run to lower a TF saved_model to a form suitable
 # for input to the IREE compiler.
@@ -86,7 +99,7 @@ def tf_load_saved_model(
   """
   if not compiler_context:
     compiler_context = Context()
-  input_module = _binding.tf_interop.load_saved_model(
+  input_module = binding.load_saved_model(
       compiler_context, saved_model_dir, exported_names=exported_names)
   if pass_pipeline:
     input_module.run_pass_pipeline(pass_pipeline)
@@ -99,7 +112,7 @@ def tf_compile_saved_model(
     exported_names: Collection[str] = (),
     pass_pipeline: Sequence[str] = TF_IMPORT_PASS_PIPELINE,
     target_backends: Collection[str] = ()
-) -> _binding.OpaqueBlob:
+) -> binding.OpaqueBlob:
   """Loads and compiles a TensorFlow saved model in one shot.
 
   Args:

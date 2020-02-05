@@ -31,7 +31,7 @@ package(
         # TODO(b/145815906) Get this running in OSS CI.
         tags = ["nokokoro"],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-            "//bindings/python/pyiree/tf/support",
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
     )
     for name in [
@@ -58,6 +58,6 @@ py_test(
         "nokokoro",
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//bindings/python/pyiree/tf/support",
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],
 )

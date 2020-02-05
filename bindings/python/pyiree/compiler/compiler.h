@@ -212,7 +212,7 @@ class CompilerContextBundle
   absl::optional<std::string> crash_reproducer_path_;
 };
 
-void SetupCompilerBindings(pybind11::module m);
+void SetupCommonCompilerBindings(pybind11::module m);
 
 }  // namespace python
 }  // namespace iree

@@ -323,7 +323,30 @@ void CompilerModuleBundle::RunPassPipeline(
   }
 }
 
-void SetupCompilerBindings(pybind11::module m) {
+void SetupCommonCompilerBindings(pybind11::module m) {
+  py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob",
+                                                      py::buffer_protocol())
+      .def_buffer([](OpaqueBlob* self) -> py::buffer_info {
+        return py::buffer_info(
+            self->data(),                           // Pointer to buffer
+            sizeof(uint8_t),                        // Size of one scalar
+            py::format_descriptor<uint8_t>::value,  // Python struct-style
+                                                    // format
+            1,                                      // Number of dimensions
+            {self->size()},                         // Buffer dimensions
+            {self->size()}                          // Strides
+        );
+      })
+      .def_property_readonly("bytes",
+                             [](OpaqueBlob* self) -> py::bytes {
+                               return py::bytes(
+                                   static_cast<const char*>(self->data()),
+                                   self->size());
+                             })
+      .def_property_readonly("text", [](OpaqueBlob* self) -> py::str {
+        return py::str(static_cast<const char*>(self->data()), self->size());
+      });
+
   py::class_<CompilerContextBundle, std::shared_ptr<CompilerContextBundle>>(
       m, "CompilerContext")
       .def(py::init<>([]() {
