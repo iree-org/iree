@@ -14,16 +14,6 @@
 
 add_subdirectory(test)
 
-# TODO(marbre): Move to build_tools/cmake/iree_build_defs.cmake if PR #549 is merged
-# Driver modules that register themselves at link time.
-set(IREE_DRIVER_MODULES
-  iree::hal::interpreter::interpreter_driver_module
-  # TODO(b/142004903): enable when Dawn HAL implementation is functional
-  # iree::hal::dawn::dawn_driver_module
-  iree::hal::vmla::vmla_driver_module
-  iree::hal::vulkan::vulkan_driver_module
-)
-
 iree_cc_binary(
   NAME
     iree-dump-module
@@ -227,7 +217,11 @@ if(${IREE_BUILD_COMPILER})
       iree::modules::hal
       iree::vm::bytecode_module
       # TODO(marbre): Add PLATFORM_VULKAN_DEPS
-      ${IREE_DRIVER_MODULES}
+      iree::hal::interpreter::interpreter_driver_module
+      # TODO(b/142004903): enable when Dawn HAL implementation is functional
+      # iree::hal::dawn::dawn_driver_module
+      iree::hal::vmla::vmla_driver_module
+      iree::hal::vulkan::vulkan_driver_module
   )
   add_executable(iree-run-module ALIAS iree_tools_iree-run-module)
 
