@@ -117,8 +117,8 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Transforms
       iree::compiler::Translation::Interpreter::Transforms
       iree::compiler::Translation::IREEVM
-      iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::SPIRV::LinalgToSPIRV
+      iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::XLAToLinalg
       iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
       LLVMSupport

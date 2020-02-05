@@ -16,8 +16,10 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "single_pw_op.mlir"
+    "pw_add.mlir"
+    "pw_add_e2e.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-opt
+    iree::tools::iree-run-mlir
 )

@@ -20,18 +20,26 @@ package(
 cc_library(
     name = "LinalgToSPIRV",
     srcs = [
-        "LinalgToSPIRV.cpp",
+        "LowerToSPIRV.cpp",
+    ],
+    hdrs = [
+        "LowerToSPIRV.h",
     ],
     deps = [
+        "//iree/compiler/Translation/XLAToLinalg:IREELinalgTensorToBuffer",
+        "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineOps",
         "@llvm-project//mlir:AffineToStandardTransforms",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
-        "@llvm-project//mlir:LoopsToGPUPass",
+        "@llvm-project//mlir:LoopOps",
+        "@llvm-project//mlir:LoopsToGPU",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVLowering",
@@ -39,6 +47,8 @@ cc_library(
         "@llvm-project//mlir:StandardToSPIRVConversions",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_linalg",
     ],
     alwayslink = 1,
 )

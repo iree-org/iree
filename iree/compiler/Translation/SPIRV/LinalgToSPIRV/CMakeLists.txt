@@ -17,17 +17,23 @@ add_subdirectory(test)
 iree_cc_library(
   NAME
     LinalgToSPIRV
+  HDRS
+    "LowerToSPIRV.h"
   SRCS
-    "LinalgToSPIRV.cpp"
+    "LowerToSPIRV.cpp"
   DEPS
+    iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
+    iree::compiler::Utils
     LLVMSupport
     MLIRAffineOps
     MLIRAffineToStandard
+    MLIREDSC
     MLIRGPUtoSPIRVTransforms
     MLIRGPU
     MLIRIR
     MLIRLinalgOps
     MLIRLinalgTransforms
+    MLIRLoopOps
     MLIRLoopsToGPU
     MLIRPass
     MLIRSPIRV
@@ -35,6 +41,7 @@ iree_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRSupport
     MLIRTransforms
+    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )

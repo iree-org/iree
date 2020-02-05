@@ -43,11 +43,13 @@ external_cc_library(
     "transforms/lower_general_dot.cc"
     "transforms/materialize_broadcasts.cc"
     "transforms/unfuse_batch_norm.cc"
+    "transforms/xla_legalize_to_linalg.cc"
   HDRS
     "convert_op_folder.h"
     "ir/hlo_ops.h"
     "ir/hlo_utils.h"
     "ir/lhlo_ops.h"
+    "transforms/map_xla_to_scalar_op.h"
     "transforms/passes.h"
     "transforms/rewriters.h"
   COPTS

@@ -48,8 +48,9 @@ LogicalResult getLegacyLaunchSize(FuncOp funcOp,
 }
 
 /// Gets the workgroup size.
+template <typename intType>
 LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
-                                     SmallVectorImpl<int32_t> &workGroupSize) {
+                                     SmallVectorImpl<intType> &workGroupSize) {
   if (!funcOp.getAttr("iree.executable.export")) {
     return funcOp.emitError(
         "expected operation to be in dispatch function to get launch size");
@@ -67,6 +68,11 @@ LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
   }
   return success();
 }
+
+template LogicalResult getLegacyWorkGroupSize<int32_t>(
+    FuncOp funcOp, SmallVectorImpl<int32_t> &workGroupSize);
+template LogicalResult getLegacyWorkGroupSize<int64_t>(
+    FuncOp funcOp, SmallVectorImpl<int64_t> &workGroupSize);
 
 }  // namespace iree_compiler
 }  // namespace mlir

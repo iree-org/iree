@@ -29,10 +29,10 @@ namespace iree_compiler {
 LogicalResult getLegacyLaunchSize(FuncOp funcOp,
                                   SmallVectorImpl<int64_t> &launchSize);
 
-// TODO(ravishankarm): remove this; it is not safe for variable sizes.
-/// Gets the workgroup size.
+/// Gets the workgroup size. Has to be a static constant.
+template <typename intType>
 LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
-                                     SmallVectorImpl<int32_t> &workGroupSize);
+                                     SmallVectorImpl<intType> &workGroupSize);
 
 }  // namespace iree_compiler
 }  // namespace mlir

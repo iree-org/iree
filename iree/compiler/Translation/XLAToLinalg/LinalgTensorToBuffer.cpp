@@ -22,6 +22,17 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
+/// Remove IREE::LoadInputOp operations
+struct RemoveLoadInputOpPattern : OpConversionPattern<IREE::LoadInputOp> {
+  using OpConversionPattern<IREE::LoadInputOp>::OpConversionPattern;
+  PatternMatchResult matchAndRewrite(
+      IREE::LoadInputOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, op.getOperand());
+    return matchSuccess();
+  }
+};
+
 /// Convert from a linalg.generic on tensors to linalg.generic on buffers. In
 /// IREE it is expected that each dispatch region will become a single
 /// linalg.generic op on tensors (after XLA-HLO -> Linalg conversion and
@@ -41,11 +52,11 @@ struct LinalgTensorToBufferConverter
 };
 
 /// Remove IREE::StoreOutputOp operations.
-struct RemoveDeadStorePattern : OpConversionPattern<IREE::StoreOutputOp> {
+struct RemoveStoreOutputOpPattern : OpConversionPattern<IREE::StoreOutputOp> {
   using OpConversionPattern<IREE::StoreOutputOp>::OpConversionPattern;
   PatternMatchResult matchAndRewrite(
       IREE::StoreOutputOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const {
+      ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
     return matchSuccess();
   }
@@ -61,7 +72,6 @@ struct IREEReturnOpLowering : OpConversionPattern<IREE::ReturnOp> {
     return matchSuccess();
   }
 };
-
 }  // namespace
 
 PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
@@ -69,17 +79,7 @@ PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
     ConversionPatternRewriter &rewriter) const {
   // TODO(ravishankarm): Find a way to write this using Matchers, but need to
   // figure out how to match operations with variadic operands.
-  SmallVector<Value, 2> memrefArgs;
-  for (auto arg : op.getOperands()) {
-    if (!arg.getType().isa<RankedTensorType>()) {
-      return matchFailure();
-    }
-    auto definingOp = dyn_cast_or_null<IREE::LoadInputOp>(arg.getDefiningOp());
-    if (!definingOp) {
-      return matchFailure();
-    }
-    memrefArgs.push_back(definingOp.getOperand());
-  }
+  SmallVector<Value, 2> memrefArgs(operands.begin(), operands.end());
   // For result, check that there is a single use in an iree::store_output op.
   for (auto result : op.getResults()) {
     if (!result.hasOneUse()) {
@@ -121,8 +121,9 @@ PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
 
 void populateLinalgTensorToBufferConversionPattern(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<LinalgTensorToBufferConverter, RemoveDeadStorePattern,
-                  IREEReturnOpLowering>(context);
+  patterns.insert<IREEReturnOpLowering, LinalgTensorToBufferConverter,
+                  RemoveLoadInputOpPattern, RemoveStoreOutputOpPattern>(
+      context);
 }
 
 struct LinalgTensorToBufferConversionPass
@@ -132,7 +133,6 @@ struct LinalgTensorToBufferConversionPass
     MLIRContext *context = &getContext();
     ConversionTarget target(*context);
     target.addLegalDialect<linalg::LinalgDialect, StandardOpsDialect>();
-    target.addLegalOp<IREE::LoadInputOp>();
     target.addLegalOp<FuncOp>();
     target.addDynamicallyLegalOp<linalg::GenericOp>([&](linalg::GenericOp op) {
       return llvm::all_of(op.getOperands(),

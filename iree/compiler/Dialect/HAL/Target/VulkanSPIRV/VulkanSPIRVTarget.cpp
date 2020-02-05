@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels/EmbeddedKernels.h"
+#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
@@ -42,6 +43,12 @@ namespace HAL {
 // TODO(benvanik): add flags.
 // static llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
 //     "IREE Vulkan/SPIR-V backend options");
+
+static llvm::cl::opt<bool> useLinalgPathForCodegen(
+    "iree-use-linalg-to-spirv-path",
+    llvm::cl::desc(
+        "Flag to use the XLA-HLO to Linalg To SPIR-V pass pipeline."),
+    llvm::cl::init(false));
 
 VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   VulkanSPIRVTargetOptions targetOptions;
@@ -140,7 +147,11 @@ LogicalResult translateToVulkanSPIRVExecutable(
 
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
-    addIREEToSPIRVPasses(conversionPassManager);
+    if (useLinalgPathForCodegen) {
+      addLowerToSPIRVPasses(conversionPassManager);
+    } else {
+      addIREEToSPIRVPasses(conversionPassManager);
+    }
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";
     }
