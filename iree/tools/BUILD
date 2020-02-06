@@ -44,6 +44,25 @@ IREE_DRIVER_MODULES = [
 ]
 
 cc_binary(
+    name = "iree-benchmark-module",
+    testonly = True,
+    srcs = ["benchmark_module_main.cc"],
+    deps = [
+        ":vm_util",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/strings",
+        "@com_google_benchmark//:benchmark",
+        "//iree/base:api_util",
+        "//iree/base:file_io",
+        "//iree/base:source_location",
+        "//iree/base:status",
+        "//iree/modules/hal",
+        "//iree/vm:bytecode_module",
+        "//iree/testing:benchmark_main",
+    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+)
+
+cc_binary(
     name = "iree-dump-module",
     srcs = ["dump_module_main.cc"],
     deps = [

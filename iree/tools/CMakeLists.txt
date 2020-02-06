@@ -30,6 +30,34 @@ iree_cc_binary(
 )
 add_executable(iree-dump-module ALIAS iree_tools_iree-dump-module)
 
+iree_cc_binary(
+  NAME
+    iree-benchmark-module
+  OUT
+    iree-benchmark-module
+  SRCS
+    "benchmark_module_main.cc"
+  DEPS
+    ::vm_util
+    absl::flags
+    absl::strings
+    benchmark
+    iree::base::api_util
+    iree::base::file_io
+    iree::base::source_location
+    iree::base::status
+    iree::modules::hal
+    iree::vm::bytecode_module
+    iree::testing::benchmark_main
+    # TODO(marbre): Add PLATFORM_VULKAN_DEPS
+    iree::hal::interpreter::interpreter_driver_module
+    # TODO(b/142004903): enable when Dawn HAL implementation is functional
+    # iree::hal::dawn::dawn_driver_module
+    iree::hal::vmla::vmla_driver_module
+    iree::hal::vulkan::vulkan_driver_module
+)
+add_executable(iree-benchmark-module ALIAS iree_tools_iree-benchmark-module)
+
 if (${IREE_ENABLE_LLVM})
   iree_cc_binary(
     NAME

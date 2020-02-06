@@ -26,6 +26,7 @@ iree_lit_test_suite(
     srcs = glob(["*.mlir"]),
     data = [
         "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-benchmark-module",
         "//iree/tools:iree-run-mlir",
         "//iree/tools:iree-run-module",
         "//iree/tools:iree-translate",
