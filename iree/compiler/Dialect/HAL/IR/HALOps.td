@@ -565,6 +565,38 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
 // iree::hal::BufferView
 //===----------------------------------------------------------------------===//
 
+def HAL_BufferViewConstOp : HAL_PureOp<"buffer_view.const", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{buffer view constant initializer}];
+  let description = [{
+    Pseudo-op for allocating a constant buffer view. Expands to a buffer
+    allocation and a buffer view wrapper.
+  }];
+
+  let arguments = (ins
+    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_MemoryTypeBitfieldAttr:$memory_types,
+    HAL_BufferUsageBitfieldAttr:$buffer_usage,
+    ElementsAttr:$value
+  );
+  let results = (outs
+    RefPtrOf<HAL_BufferView>:$result
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value allocator,
+      IREE::HAL::MemoryTypeBitfield memoryTypes,
+      IREE::HAL::BufferUsageBitfield bufferUsage,
+      ElementsAttr value
+    }]>,
+  ];
+
+  let hasCanonicalizer = 1;
+}
+
 def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {

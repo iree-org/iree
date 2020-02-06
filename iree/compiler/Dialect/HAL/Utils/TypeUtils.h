@@ -32,11 +32,11 @@ int32_t getRoundedElementByteWidth(Type type);
 
 // Returns an array of i32 values representing the shape of the |shapedType|.
 SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
-                                         ConversionPatternRewriter &rewriter);
+                                         PatternRewriter &rewriter);
 
 // Returns an array of i32 values representing the shape of the |shapedValue|.
 SmallVector<Value, 4> getShapeDims(Value shapedValue,
-                                   ConversionPatternRewriter &rewriter);
+                                   PatternRewriter &rewriter);
 
 // An adaptor used for tensor->buffer rewrites.
 // This abstracts the source and destination types to allow for implicit

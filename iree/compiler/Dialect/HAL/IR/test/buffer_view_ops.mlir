@@ -4,6 +4,16 @@
 
 // -----
 
+// CHECK-LABEL: @buffer_view_const
+func @buffer_view_const() -> !iree.ref<!hal.buffer_view> {
+  %0 = "test_hal.allocator"() : () -> !iree.ref<!hal.allocator>
+  // CHECK: %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", "Transfer" : !iree.ref<!hal.buffer_view> = dense<[4, 1, 2]> : tensor<3xi32>
+  %view = hal.buffer_view.const %0, "HostVisible|HostCoherent", "Transfer" : !iree.ref<!hal.buffer_view> = dense<[4, 1, 2]> : tensor<3xi32>
+  return %view : !iree.ref<!hal.buffer_view>
+}
+
+// -----
+
 // CHECK-LABEL: @buffer_view_create
 func @buffer_view_create(%arg0 : !iree.ref<!hal.buffer>) -> !iree.ref<!hal.buffer_view> {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)

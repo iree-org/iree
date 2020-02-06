@@ -795,6 +795,70 @@ void BufferSubspanOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.buffer_view.const
+//===----------------------------------------------------------------------===//
+
+void BufferViewConstOp::build(Builder *builder, OperationState &state,
+                              Value allocator,
+                              IREE::HAL::MemoryTypeBitfield memoryTypes,
+                              IREE::HAL::BufferUsageBitfield bufferUsage,
+                              ElementsAttr value) {
+  state.addOperands({allocator});
+  state.addAttribute("memory_types", builder->getI32IntegerAttr(
+                                         static_cast<int32_t>(memoryTypes)));
+  state.addAttribute("buffer_usage", builder->getI32IntegerAttr(
+                                         static_cast<int32_t>(bufferUsage)));
+  state.addAttribute("value", value);
+  state.addTypes({RefPtrType::get(BufferViewType::get(builder->getContext()))});
+}
+
+void BufferViewConstOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "view");
+}
+
+static ParseResult parseBufferViewConstOp(OpAsmParser &parser,
+                                          OperationState *result) {
+  OpAsmParser::OperandType allocator;
+  Type resultType;
+  ElementsAttr valueAttr;
+  if (failed(parser.parseOperand(allocator)) ||
+      failed(parser.resolveOperand(
+          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
+          result->operands)) ||
+      failed(parser.parseComma()) ||
+      failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
+          parser, "memory_types", result->attributes)) ||
+      failed(parser.parseComma()) ||
+      failed(parseEnumAttr<BufferUsageBitfield, symbolizeBufferUsageBitfield>(
+          parser, "buffer_usage", result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.parseColonType(resultType)) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
+    return failure();
+  }
+  result->addTypes(resultType);
+  return success();
+}
+
+static void printBufferViewConstOp(OpAsmPrinter &p, BufferViewConstOp op) {
+  p << op.getOperationName() << ' ';
+  p.printOperand(op.allocator());
+  p << ", ";
+  p << "\"" << stringifyMemoryTypeBitfield(op.memory_types()) << "\"";
+  p << ", ";
+  p << "\"" << stringifyBufferUsageBitfield(op.buffer_usage()) << "\"";
+  p << " : ";
+  p.printType(op.result().getType());
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{"memory_types", "buffer_usage", "value"});
+  p << " = ";
+  p.printAttribute(op.value());
+}
+
+//===----------------------------------------------------------------------===//
 // hal.buffer_view.create
 //===----------------------------------------------------------------------===//
 

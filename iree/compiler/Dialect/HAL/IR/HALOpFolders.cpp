@@ -162,6 +162,46 @@ void BufferAllocatorOp::getCanonicalizationPatterns(
 
 namespace {
 
+/// Expands hal.buffer_view.const to an allocation and buffer view wrapper.
+struct ExpandBufferViewConstOp : public OpRewritePattern<BufferViewConstOp> {
+  using OpRewritePattern<BufferViewConstOp>::OpRewritePattern;
+
+  PatternMatchResult matchAndRewrite(BufferViewConstOp op,
+                                     PatternRewriter &rewriter) const override {
+    auto shapedType = op.value().getType();
+    auto elementType = getElementTypeValue(shapedType.getElementType());
+    if (!elementType.hasValue()) {
+      return matchFailure();
+    }
+
+    auto buffer = rewriter.createOrFold<AllocatorAllocateConstOp>(
+        op.getLoc(), op.allocator(), op.memory_types(), op.buffer_usage(),
+        op.value());
+
+    SmallVector<Value, 4> shape;
+    if (shapedType.getRank() >= 1) {
+      for (auto dim : shapedType.getShape()) {
+        shape.push_back(rewriter.createOrFold<mlir::ConstantOp>(
+            op.getLoc(),
+            rewriter.getI32IntegerAttr(static_cast<int32_t>(dim))));
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<BufferViewCreateOp>(op, buffer, shape,
+                                                    elementType.getValue());
+    return matchSuccess();
+  }
+};
+
+}  // namespace
+
+void BufferViewConstOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ExpandBufferViewConstOp>(context);
+}
+
+namespace {
+
 /// Skips a hal.buffer_view.buffer accessor when the buffer view was created in
 /// the same scope and we know the origin buffer.
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
