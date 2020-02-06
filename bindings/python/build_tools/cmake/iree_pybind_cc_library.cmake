@@ -65,9 +65,7 @@ function(iree_pybind_cc_library)
         "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
       PRIVATE
-        # TODO(marbre): Check if both pybind includes are necessary
         ${PYBIND11_INCLUDE_DIR}
-        ${pybind11_INCLUDE_DIR} 
         ${Python3_INCLUDE_DIRS}
     )
     target_compile_options(${_NAME}
