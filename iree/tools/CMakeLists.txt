@@ -201,6 +201,33 @@ if(${IREE_BUILD_COMPILER})
   )
   add_executable(iree-run-mlir ALIAS iree_tools_iree-run-mlir)
 
+  iree_cc_binary(
+    NAME
+      iree-run-module
+    OUT
+      iree-run-module
+    SRCS
+      "run_module_main.cc"
+    DEPS
+      ::vm_util
+      absl::flags
+      absl::strings
+      iree::base::api_util
+      iree::base::file_io
+      iree::base::init
+      iree::base::source_location
+      iree::base::status
+      iree::modules::hal
+      iree::vm::bytecode_module
+      # TODO(marbre): Add PLATFORM_VULKAN_DEPS
+      iree::hal::interpreter::interpreter_driver_module
+      # TODO(b/142004903): enable when Dawn HAL implementation is functional
+      # iree::hal::dawn::dawn_driver_module
+      iree::hal::vmla::vmla_driver_module
+      iree::hal::vulkan::vulkan_driver_module
+  )
+  add_executable(iree-run-module ALIAS iree_tools_iree-run-module)
+
   iree_cc_library(
     NAME
       iree_translate_library
