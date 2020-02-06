@@ -59,11 +59,28 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
   std::string contents;
   contents.resize(file_size);
   if (std::fread(const_cast<char*>(contents.data()), file_size, 1,
-                 file.get()) != file_size) {
+                 file.get()) != 1) {
     return UnavailableErrorBuilder(IREE_LOC)
            << "Unable to read entire file contents";
   }
   return contents;
+}
+
+Status SetFileContents(const std::string& path, const std::string& content) {
+  std::unique_ptr<FILE, void (*)(FILE*)> file = {std::fopen(path.c_str(), "wb"),
+                                                 +[](FILE* file) {
+                                                   if (file) fclose(file);
+                                                 }};
+  if (file == nullptr) {
+    return ErrnoToCanonicalStatusBuilder(errno, "Failed to open file",
+                                         IREE_LOC);
+  }
+  if (std::fwrite(const_cast<char*>(content.data()), content.size(), 1,
+                  file.get()) != 1) {
+    return UnavailableErrorBuilder(IREE_LOC)
+           << "Unable to write entire file contents";
+  }
+  return OkStatus();
 }
 
 Status DeleteFile(const std::string& path) {

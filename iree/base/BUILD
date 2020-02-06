@@ -139,6 +139,20 @@ cc_library(
     deps = [":status"],
 )
 
+cc_test(
+    name = "file_io_test",
+    srcs = ["file_io_test.cc"],
+    deps = [
+        ":file_io",
+        ":file_path",
+        ":init",
+        ":status",
+        ":status_matchers",
+        "//iree/testing:gtest_main",
+        "@com_google_absl//absl/strings",
+    ],
+)
+
 cc_library(
     name = "file_mapping",
     hdrs = ["file_mapping.h"],

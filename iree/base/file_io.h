@@ -31,6 +31,9 @@ Status FileExists(const std::string& path);
 // Synchronously reads a file's contents into a string.
 StatusOr<std::string> GetFileContents(const std::string& path);
 
+// Synchronously writes a string into a file, overwriting its contents.
+Status SetFileContents(const std::string& path, const std::string& content);
+
 // Deletes the file at the provided path.
 Status DeleteFile(const std::string& path);
 

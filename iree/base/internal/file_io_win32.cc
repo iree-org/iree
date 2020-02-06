@@ -51,6 +51,11 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
   return result;
 }
 
+Status SetFileContents(const std::string& path, const std::string& content) {
+  return UnimplementedErrorBuilder(IREE_LOC)
+         << "SetFileContents unimplemented on Windows";
+}
+
 Status DeleteFile(const std::string& path) {
   if (::DeleteFileA(path.c_str()) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)

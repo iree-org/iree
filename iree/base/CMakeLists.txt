@@ -155,6 +155,21 @@ iree_cc_library(
     iree::base::status
 )
 
+iree_cc_test(
+  NAME
+    file_io_test
+  SRCS
+    "file_io_test.cc"
+  DEPS
+    ::file_io
+    ::file_path
+    ::init
+    ::status
+    ::status_matchers
+    absl::strings
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     file_mapping
