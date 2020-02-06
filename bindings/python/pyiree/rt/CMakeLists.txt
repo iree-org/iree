@@ -42,5 +42,5 @@ iree_pybind_cc_library(
     absl::optional
     absl::span
   TYPE
-    MODULE
+    SHARED
 )
