@@ -72,6 +72,7 @@ include(iree_glslang)
 include(iree_glsl_vulkan)
 include(iree_spirv_kernel_cc_library)
 include(iree_pybind_cc_library)
+include(iree_py_extension)
 include(iree_glob_lit_tests)
 include(iree_lit_test)
 include(iree_alwayslink)
@@ -101,11 +102,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # Third-party dependencies
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_COMPILER})
-  # Compiler dependencies require Python.
-  # Find version 3+ first, so CMake doesn't find a lower version like 2.7 first.
-  find_package(PythonInterp 3 REQUIRED)
-  find_package(PythonLibs 3 REQUIRED)
+if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
+  find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH

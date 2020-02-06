@@ -12,6 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_py_extension(
+  NAME
+    binding
+  SRCS
+    "initialize_module.cc"
+  DEPS
+    iree::hal::interpreter::interpreter_driver_module
+    iree::hal::vulkan::vulkan_driver_module
+    ::rt_library
+    bindings::python::pyiree::common
+    iree::base::initializer
+    iree::base::tracing
+    # TODO(marbre): Add dependency
+    # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
+  TYPE
+    SHARED
+)
+
 iree_pybind_cc_library(
   NAME
     rt_library
@@ -42,5 +60,5 @@ iree_pybind_cc_library(
     absl::optional
     absl::span
   TYPE
-    MODULE
+    SHARED
 )

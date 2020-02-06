@@ -14,9 +14,9 @@
 
 include(CMakeParseArguments)
 
-# iree_pybind_cc_library()
+# iree_py_extension()
 #
-# CMake function to imitate Bazel's pybind_cc_library rule.
+# CMake function to imitate Bazel's iree_py_extension rule.
 #
 # Parameters:
 # NAME: name of target
@@ -30,7 +30,7 @@ include(CMakeParseArguments)
 # TYPE: Type of library to be crated: either "MODULE", "SHARED" or "STATIC" (default).
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
 
-function(iree_pybind_cc_library)
+function(iree_py_extension)
 
   cmake_parse_arguments(
     _RULE
@@ -58,12 +58,15 @@ function(iree_pybind_cc_library)
       message(FATAL_ERROR "Unsported library TYPE for iree_pybind_cc_library: ${_RULE_TYPE}")
     endif()
 
+
     add_library(${_NAME} ${_uppercase_RULE_TYPE} "")
     target_sources(${_NAME}
       PRIVATE
         ${_RULE_SRCS}
+        ${_RULE_TEXTUAL_HDRS}
         ${_RULE_HDRS}
     )
+
     target_include_directories(${_NAME}
       PUBLIC
         "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
@@ -72,10 +75,10 @@ function(iree_pybind_cc_library)
         ${PYBIND11_INCLUDE_DIR}
         ${Python3_INCLUDE_DIRS}
     )
+
     target_compile_options(${_NAME}
       PRIVATE
         ${_RULE_COPTS}
-        ${PYBIND_COPTS}
         ${IREE_DEFAULT_COPTS}
     )
 
@@ -83,30 +86,16 @@ function(iree_pybind_cc_library)
       PUBLIC
         ${_RULE_DEPS}
       PRIVATE
-        pybind11
-        ${Python3_LIBRARIES}
         ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
+        ${Python3_LIBRARIES}
     )
     target_compile_definitions(${_NAME}
       PUBLIC
         ${_RULE_DEFINES}
     )
 
-    # Add all IREE targets to a folder in the IDE for organization.
-    if(_RULE_PUBLIC)
-      set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER})
-    elseif(_RULE_TESTONLY)
-      set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
-    else()
-      set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/internal)
-    endif()
-
-    # INTERFACE libraries can't have the CXX_STANDARD property set.
-    set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
-    set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
-
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "lib${_RULE_NAME}")
+    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
 
     if(NOT _uppercase_RULE_TYPE MATCHES "STATIC")
       set_property(TARGET ${_NAME} PROPERTY PREFIX "${PYTHON_MODULE_PREFIX}")
