@@ -33,6 +33,14 @@ func @ranked_dim(%arg0 : !shapex.ranked_shape<[2,4],i32>)  {
 }
 
 // -----
+// CHECK-LABEL: @ranked_dims
+func @ranked_dims(%arg0 : !shapex.ranked_shape<[2,4],i32>)  {
+  // CHECK: shapex.ranked_dims %arg0 : !shapex.ranked_shape<[2,4],i32>
+  %0:2 = shapex.ranked_dims %arg0 : !shapex.ranked_shape<[2,4],i32>
+  return
+}
+
+// -----
 // CHECK-LABEL: @cast_compatible_shape
 func @cast_compatible_shape(%arg0 : !shapex.ranked_shape<[2,4],i32>, %arg1 : !shapex.ranked_shape<[2,4],i32>)  {
   // CHECK: shapex.cast_compatible_shape %arg0, %arg1 :

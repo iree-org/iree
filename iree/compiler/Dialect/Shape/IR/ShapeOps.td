@@ -195,6 +195,12 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
   let results = (outs Shape_DimType:$result);
   let verifier = [{ return verify$cppClass(*this); }];
 
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Value shape, int index
+    }]>,
+  ];
+
   let extraClassDeclaration = [{
     RankedShapeType getRankedShapeType() {
       return shape().getType().cast<RankedShapeType>();
@@ -204,6 +210,34 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
     }
   }];
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
+}
+
+def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
+  let summary = "Gets all dimension values from a ranked_shape.";
+  let description = [{
+    Static dimensions will fold to constants.
+
+    Usage:
+      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2],i32>
+      %1, %2 = shape.ranked_dims %0 : !shape.ranked_shape<[1,2],i32>
+  }];
+
+  let arguments = (ins Shape_RankedShape:$shape);
+  let results = (outs Variadic<Shape_DimType>:$result);
+  let verifier = [{ return verify$cppClass(*this); }];
+
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Value shape
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    RankedShapeType getRankedShapeType() {
+      return shape().getType().cast<RankedShapeType>();
+    }
+  }];
   let hasCanonicalizer = 1;
 }
 

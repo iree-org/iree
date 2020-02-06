@@ -147,6 +147,22 @@ class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
   }
 };
 
+// Expands a shape.ranked_dims op into multiple shape.ranked_dim ops.
+// This allows better folding of static dimensions.
+class ExpandRankedShapeDimsPattern : public OpRewritePattern<RankedDimsOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(RankedDimsOp op,
+                                     PatternRewriter &rewriter) const override {
+    auto rsType = op.getRankedShapeType();
+    SmallVector<Value, 4> dims(rsType.getRank());
+    for (int i = 0; i < rsType.getRank(); ++i) {
+      dims[i] = rewriter.createOrFold<RankedDimOp>(op.getLoc(), op.shape(), i);
+    }
+    rewriter.replaceOp(op, dims);
+    return matchSuccess();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // shape.tie_shape
 //===----------------------------------------------------------------------===//
@@ -340,6 +356,15 @@ static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
 // shape.ranked_dim
 //===----------------------------------------------------------------------===//
 
+void RankedDimOp::build(Builder *builder, OperationState &result, Value shape,
+                        int index) {
+  result.addOperands(shape);
+  result.addAttribute("index",
+                      builder->getIntegerAttr(builder->getIndexType(), index));
+  auto rankedShapeType = shape.getType().cast<RankedShapeType>();
+  result.addTypes({rankedShapeType.getDimType()});
+}
+
 ParseResult parseRankedDimOp(OpAsmParser &parser, OperationState &state) {
   OpAsmParser::OperandType operand;
   Type operandType;
@@ -396,6 +421,64 @@ OpFoldResult RankedDimOp::fold(ArrayRef<Attribute> operand) {
 void RankedDimOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
   patterns.insert<DynamicMakeRankedShapeDimPattern>(context);
+}
+
+//===----------------------------------------------------------------------===//
+// shape.ranked_dims
+//===----------------------------------------------------------------------===//
+
+void RankedDimsOp::build(Builder *builder, OperationState &result,
+                         Value shape) {
+  result.addOperands(shape);
+  auto rankedShapeType = shape.getType().cast<RankedShapeType>();
+  for (int i = 0; i < rankedShapeType.getRank(); ++i) {
+    result.types.push_back(rankedShapeType.getDimType());
+  }
+}
+
+ParseResult parseRankedDimsOp(OpAsmParser &parser, OperationState &state) {
+  OpAsmParser::OperandType operand;
+  Type operandType;
+  if (parser.parseOperand(operand) || parser.parseColonType(operandType) ||
+      parser.resolveOperand(operand, operandType, state.operands)) {
+    return failure();
+  }
+
+  auto rsType = operandType.dyn_cast<RankedShapeType>();
+  if (!rsType) {
+    return parser.emitError(parser.getNameLoc());
+  }
+  for (int i = 0; i < rsType.getRank(); ++i) {
+    state.types.push_back(rsType.getDimType());
+  }
+  return success();
+}
+
+static void printRankedDimsOp(OpAsmPrinter &p, RankedDimsOp op) {
+  p << op.getOperationName() << " ";
+  p.printOperand(op.shape());
+  p << " : ";
+  p.printType(op.shape().getType());
+}
+
+static LogicalResult verifyRankedDimsOp(RankedDimsOp op) {
+  auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
+  for (auto result : op.getResults()) {
+    if (result.getType() != rsType.getDimType()) {
+      return op.emitOpError()
+             << "expected result of type " << rsType.getDimType();
+    }
+  }
+  if (op.getResults().size() != rsType.getRank()) {
+    return op.emitOpError()
+           << "expected " << rsType.getRank() << " returned dimensions";
+  }
+  return success();
+}
+
+void RankedDimsOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &patterns, MLIRContext *context) {
+  patterns.insert<ExpandRankedShapeDimsPattern>(context);
 }
 
 #define GET_OP_CLASSES
