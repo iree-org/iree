@@ -68,7 +68,7 @@ function(iree_pybind_cc_library)
         # TODO(marbre): Check if both pybind includes are necessary
         ${PYBIND11_INCLUDE_DIR}
         ${pybind11_INCLUDE_DIR} 
-        ${PYTHON_INCLUDE_DIRS}
+        ${Python3_INCLUDE_DIRS}
     )
     target_compile_options(${_NAME}
       PRIVATE
