@@ -80,7 +80,7 @@ function(iree_pybind_cc_library)
         ${_RULE_DEPS}
       PRIVATE
         pybind11
-        # TODO(marbre): Add PYTHON_HEADERS_DEPS
+        ${Python3_LIBRARIES}
         ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
     )
