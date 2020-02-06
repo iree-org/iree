@@ -101,7 +101,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 # Third-party dependencies
 #-------------------------------------------------------------------------------
 
-if(${IREE_BUILD_COMPILER})
+if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 endif()
 
