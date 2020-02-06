@@ -51,9 +51,8 @@ def setup_environment():
   global repo_root
   global bazel_exe
 
-  # Determine the repository root (two dir-levels up).
-  repo_root = os.path.dirname(
-      os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+  # Determine the repository root (one dir-level up).
+  repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
   print("Repository root: %s" % (repo_root,))
 
   # Use 'bazelisk' instead of 'bazel' if it exists on the path.
