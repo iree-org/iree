@@ -41,5 +41,5 @@ jobs:
     - name: Running clang-format on changed source files
       # TODO(benvanik): actually filter to changed files.
       run: |
-        /tmp/git-clang-format origin/master --binary=clang-format-9
+        /tmp/git-clang-format origin/master --binary=clang-format-9 --style=file
         git diff --exit-code
