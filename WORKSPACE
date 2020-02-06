@@ -221,5 +221,11 @@ maybe(new_local_repository,
     build_file = "build_tools/third_party/dear_imgui/BUILD.overlay",
 )
 
+maybe(new_local_repository,
+    name = "renderdoc_api",
+    path = "third_party/renderdoc_api",
+    build_file = "build_tools/third_party/renderdoc_api/BUILD.overlay",
+)
+
 # Bootstrap TensorFlow deps last so that ours can take precedence.
 tf_repositories()
