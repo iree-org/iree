@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,29 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(LLVM)
-add_subdirectory(LegacyInterpreter)
-add_subdirectory(VMLA)
-add_subdirectory(VulkanSPIRV)
-add_subdirectory(test)
-
 iree_cc_library(
   NAME
-    ExecutableTarget
+    LLVM
   HDRS
-    "ExecutableTarget.h"
-    "LegacyUtil.h"
+    "LLVMTarget.h"
   SRCS
-    "ExecutableTarget.cpp"
-    "LegacyUtil.cpp"
+    "LLVMTarget.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Utils
-    LLVMSupport
+    LLVMIR
+    MLIRCFGTransforms
     MLIRIR
+    MLIRLLVMTransforms
+    MLIRLinalgOps
+    MLIRLinalgTransforms
+    MLIRPass
     MLIRStandardOps
+    MLIRStandardToSPIRVTransforms
+    MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::XLAToLinalg
+    iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
+    iree::schemas::llvmir_executable_def_cc_fbs
   ALWAYSLINK
   PUBLIC
 )

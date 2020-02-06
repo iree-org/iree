@@ -61,6 +61,12 @@ constexpr ExecutableFormat kExecutableFormatVMLA =
 constexpr ExecutableFormat kExecutableFormatSpirV =
     MakeExecutableFormatID("SPVE");
 
+// LLVMIR executable in FlatBuffer format using the
+// https://github.com/google/iree/tree/master/iree/schemas/llvmir_executable_def.fbs
+// schema.
+constexpr ExecutableFormat kExecutableFormatLLVM =
+    MakeExecutableFormatID("LLVM");
+
 // LINT.ThenChange(//iree/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
 
 }  // namespace hal

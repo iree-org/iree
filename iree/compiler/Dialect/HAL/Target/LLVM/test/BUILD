@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,29 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(LLVM)
-add_subdirectory(LegacyInterpreter)
-add_subdirectory(VMLA)
-add_subdirectory(VulkanSPIRV)
-add_subdirectory(test)
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
-iree_cc_library(
-  NAME
-    ExecutableTarget
-  HDRS
-    "ExecutableTarget.h"
-    "LegacyUtil.h"
-  SRCS
-    "ExecutableTarget.cpp"
-    "LegacyUtil.cpp"
-  DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Utils
-    LLVMSupport
-    MLIRIR
-    MLIRStandardOps
-  ALWAYSLINK
-  PUBLIC
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
 )

@@ -53,3 +53,11 @@ flatbuffer_cc_library(
     "vmla_executable_def.fbs"
   PUBLIC
 )
+
+flatbuffer_cc_library(
+  NAME
+    llvmir_executable_def_cc_fbs
+  SRCS
+    "llvmir_executable_def.fbs"
+  PUBLIC
+)

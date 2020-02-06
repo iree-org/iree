@@ -205,6 +205,7 @@ def HAL_EF_MlirText : I32EnumAttrCase<"MlirText", 1296845138>;
 def HAL_EF_IreeBytecode : I32EnumAttrCase<"IreeBytecode", 1230128453>;
 def HAL_EF_VMLA : I32EnumAttrCase<"VMLA", 1447906369>;
 def HAL_EF_SpirV : I32EnumAttrCase<"SpirV", 1397773893>;
+def HAL_EF_LLVM : I32EnumAttrCase<"LLVM", 1280071245>;
 def HAL_ExecutableFormatAttr :
     I32EnumAttr<"ExecutableFormat", "IREE HAL Executable format", [
       HAL_EF_Unspecified,
@@ -212,6 +213,7 @@ def HAL_ExecutableFormatAttr :
       HAL_EF_IreeBytecode,
       HAL_EF_VMLA,
       HAL_EF_SpirV,
+      HAL_EF_LLVM
     ]> {
   let returnType = "uint32_t";
   let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";

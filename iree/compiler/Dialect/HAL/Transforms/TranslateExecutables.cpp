@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
+#include "llvm/ADT/StringSet.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/StandardTypes.h"
@@ -28,6 +29,9 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+// TODO(ataei): Better way of listing default backends translation.
+static llvm::StringSet<> excludedBackends = {"llvm-ir"};
 
 // TODO(GH-67): move workgroup size determination to backends.
 // Returns an (x,y,z) workgroup size for the given |targetFuncOp|.
@@ -59,8 +63,11 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
     // Get the target backends we want to translate executables into.
     SmallVector<std::string, 4> targetBackends;
     if (executableOptions_.targets.empty()) {
-      targetBackends.append(getExecutableTargetRegistry().keys().begin(),
-                            getExecutableTargetRegistry().keys().end());
+      for (const auto backend : getExecutableTargetRegistry().keys()) {
+        if (!excludedBackends.count(backend)) {
+          targetBackends.emplace_back(backend);
+        }
+      }
     } else {
       for (auto targetName : executableOptions_.targets) {
         auto backendNames = matchExecutableTargetNames(targetName);

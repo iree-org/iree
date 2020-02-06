@@ -31,6 +31,7 @@ TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
     "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
+    "//iree/compiler/Dialect/HAL/Target/LLVM",
 ]
 
 # Driver modules that register themselves at link time.

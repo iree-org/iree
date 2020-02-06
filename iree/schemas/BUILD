@@ -63,6 +63,12 @@ iree_flatbuffer_cc_library(
     flatc_args = FLATC_ARGS,
 )
 
+iree_flatbuffer_cc_library(
+    name = "llvmir_executable_def_cc_fbs",
+    srcs = ["llvmir_executable_def.fbs"],
+    flatc_args = FLATC_ARGS,
+)
+
 iree_build_test(
     name = "schema_build_test",
     targets = [
