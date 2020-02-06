@@ -28,9 +28,9 @@ and Installable Client Drivers (ICDs).
 
 See also:
 
-    * https://www.lunarg.com/tutorial-overview-of-vulkan-loader-layers/
-    * https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
-    * https://github.com/KhronosGroup/Vulkan-Loader
+*   https://www.lunarg.com/tutorial-overview-of-vulkan-loader-layers/
+*   https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
+*   https://github.com/KhronosGroup/Vulkan-Loader
 
 #### Choosing ICDs and SwiftShader
 
