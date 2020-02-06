@@ -80,6 +80,9 @@ class ModelBuilder : public OpBuilder {
 
   OwningModuleRef &getModuleRef() { return module; }
 
+  // Build the MLIR representation for an f32 constant.
+  static Value constant_f32(float v);
+
   // Build an MLIR FuncOp that will be callable after JIT compilation occured.
   FuncOp makeFunction(StringRef name, ArrayRef<Type> results = {},
                       ArrayRef<Type> args = {}, bool declOnly = false);
@@ -91,12 +94,30 @@ class ModelBuilder : public OpBuilder {
   // per-need basis.
   MemRefType getMemRefType(ArrayRef<int64_t> shape, Type elementType);
 
-  // FCBiasTanh implements:
+  // Build an MLIR RankedTensorType with a base `elementType` and a `shape` that
+  // can be any mix of static and dynamic values. For now this only supports a
+  // dense and contiguous layout.
+  // In the future, this can be extended support more advanced layouts, on a
+  // per-need basis.
+  RankedTensorType getRankedTensorType(ArrayRef<int64_t> shape,
+                                       Type elementType);
+
+  // Build the MLIR representation for:
   //   1. fc(I, W, O)
   //   2. pointwise(O, bias) in-place with explicit bias broadcast to compute:
   //      `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
   // Returns O.
+  // Version with a MemRef output argument.
   ValueHandle FCBiasTanh(std::array<Value, 3> fcArgs, Value biasValueArg);
+  // Version with a RankedTensor result.
+  Value FCBiasTanhTensors(RankedTensorType outputTensorType,
+                          std::array<Value, 2> fcArgs, Value biasValueArg);
+
+  // Build the MLIR representation for:
+  //   `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
+  // This assumes `x` and `bias` capture scalar MLIR values of type f32.
+  // This is used as a region builder when constructing e.g. a pointwise op.
+  static Value fusedBiasTanh(ValueHandle x, ValueHandle bias);
 
  protected:
   static thread_local MLIRContext ctx;

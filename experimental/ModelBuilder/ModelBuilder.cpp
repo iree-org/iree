@@ -32,6 +32,11 @@ mlir::ModelBuilder::ModelBuilder()
       i8(IntegerType::get(8, &ctx)),
       f32(FloatType::getF32(&ctx)) {}
 
+Value mlir::ModelBuilder::constant_f32(float v) {
+  return constant_float(llvm::APFloat(v),
+                        FloatType::getF32(ScopedContext::getContext()));
+}
+
 FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
                                         ArrayRef<Type> args, bool declOnly) {
   auto function =
@@ -44,6 +49,20 @@ FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
 MemRefType mlir::ModelBuilder::getMemRefType(ArrayRef<int64_t> shape,
                                              Type elementType) {
   return MemRefType::get(shape, elementType, {});
+}
+
+RankedTensorType mlir::ModelBuilder::getRankedTensorType(
+    ArrayRef<int64_t> shape, Type elementType) {
+  return RankedTensorType::get(shape, elementType);
+}
+
+Value mlir::ModelBuilder::fusedBiasTanh(ValueHandle x, ValueHandle bias) {
+  using edsc::op::operator+;
+  using edsc::op::operator*;
+  using edsc::intrinsics::tanh;
+  assert(x.getType().isF32() && bias.getType().isF32() && "f32 expected");
+  ValueHandle half(constant_f32(0.5f));
+  return x + half * tanh((x + bias) * half) + half;
 }
 
 ValueHandle mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
@@ -62,31 +81,36 @@ ValueHandle mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
   AffineExpr i, j;
   bindDims(&ctx, i, j);
 
-  // Define the pointwise computation:
-  //   `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
-  // This assumes ValueHandle captures an MLIR Value with a proper type
-  // (in this case `f32`)
-  auto opBuilder = [this](const ValueHandle &x,
-                          const ValueHandle &bias) -> Value {
-    using edsc::op::operator+;
-    using edsc::op::operator*;
-    using edsc::intrinsics::tanh;
-
-    // `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
-    auto half = constant_float(llvm::APFloat(0.5f), f32);
-    return x + half * tanh((x + bias) * half) + half;
-  };
-
   // Emit a linalg.generic op that implements pointwise with `opBuilder` for:
   //   `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
   //
   // This performs the (inplace) computation:
-  //   `SO[i, j] <- pointwise(SBias[j], SO[i, j])`
+  //   `o[i, j] <- pointwise(bias[j], o[i, j])`
   //
-  // in which SBias is broadcast along `i`.
-  ValueHandle Bias(biasValueArg);
-  StructuredIndexed SO(O), SBias(Bias);
-  linalg_pointwise(opBuilder, SO({i, j}), SBias({j}), SO({i, j}));
+  // in which bias is broadcast along `i`.
+  StructuredIndexed o(O), bias(biasValueArg);
+  linalg_pointwise(fusedBiasTanh, o({i, j}), bias({j}), o({i, j}));
 
   return O;
+}
+
+Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
+                                      std::array<Value, 2> fcArgs,
+                                      Value biasValueArg) {
+  //==========================================================================//
+  // Layer 1: FC
+  //==========================================================================//
+  ValueHandle I(fcArgs[0]), W(fcArgs[1]);
+  Value O2 = linalg_matmul(I, W, outputTensorType)->getResult(0);
+
+  //==========================================================================//
+  // Layer 2: BiasAddTanh Block
+  //==========================================================================//
+  ValueHandle Bias(biasValueArg);
+  AffineExpr i, j;
+  bindDims(&ctx, i, j);
+  // in-place with explicit bias broacast
+  StructuredIndexed o2(O2), bias(Bias), o3Type(outputTensorType);
+  return linalg_pointwise(fusedBiasTanh, o2({i, j}), bias({j}), o3Type({i, j}))
+      ->getResult(0);
 }

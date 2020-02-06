@@ -12,11 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: test-mnist-jit | IreeFileCheck %s
+// RUN: test-mnist-jit 2>&1 | IreeFileCheck %s
 
 #include "experimental/ModelBuilder/MemRefUtils.h"
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
+#include "mlir/IR/Function.h"
+#include "mlir/IR/StandardTypes.h"
 
 using namespace mlir;
 
@@ -65,8 +67,8 @@ void buildMNIST(ModelBuilder &modelBuilder, StringLiteral funcName, unsigned B,
       alloc(modelBuilder.getMemRefType({-1, W2}, f32), batchSize);
   Value outputBlock3 = func.getArgument(1);
 
-  auto zero = constant_float(llvm::APFloat(0.0f), f32);
-  auto someVal = constant_float(llvm::APFloat(0.1123f), f32);
+  ValueHandle zero(modelBuilder.constant_f32(0.0f));
+  ValueHandle someVal(modelBuilder.constant_f32(0.1123f));
   linalg_fill(h1Weights, someVal);
   linalg_fill(h2Weights, someVal);
   linalg_fill(h3Weights, someVal);
@@ -94,20 +96,81 @@ void buildMNIST(ModelBuilder &modelBuilder, StringLiteral funcName, unsigned B,
   (ret());
 }
 
+// Helper function to build a func `funcName` that takes a tensors for the input
+// in the form of a `tensor<?x784xf32>` as well as static tensors for all the
+// weights and biases.
+//
+// This is the counterpart of `buildMNIST` which builds a similar model on
+// buffers.
+void buildMNISTOnTensors(ModelBuilder &modelBuilder, StringLiteral funcName,
+                         int64_t B, int64_t W0, int64_t W1, int64_t W2,
+                         int64_t W3) {
+  auto f32 = modelBuilder.f32;
+  auto inputType = modelBuilder.getRankedTensorType({B, W0}, f32);
+  auto h1WeightsType = modelBuilder.getRankedTensorType({W0, W1}, f32);
+  auto h2WeightsType = modelBuilder.getRankedTensorType({W1, W2}, f32);
+  auto h3WeightsType = modelBuilder.getRankedTensorType({W2, W3}, f32);
+  auto bias1Type = modelBuilder.getRankedTensorType({W1}, f32);
+  auto bias2Type = modelBuilder.getRankedTensorType({W2}, f32);
+  auto bias3Type = modelBuilder.getRankedTensorType({W3}, f32);
+  auto outputType = modelBuilder.getRankedTensorType({B, W3}, f32);
+  auto func = modelBuilder.makeFunction(
+      funcName, {outputType},
+      {inputType, h1WeightsType, h2WeightsType, h3WeightsType, bias1Type,
+       bias2Type, bias3Type});
+  Value input = func.getArgument(0);
+  Value h1Weights = func.getArgument(1);
+  Value h2Weights = func.getArgument(2);
+  Value h3Weights = func.getArgument(3);
+  Value bias1 = func.getArgument(4);
+  Value bias2 = func.getArgument(5);
+  Value bias3 = func.getArgument(6);
+
+  // 2. Fill the body (3 blocks of FCBiasTanh), alloc everything manually atm.
+  OpBuilder b(&func.getBody());
+  ScopedContext scope(b, func.getLoc());
+
+  auto outputBlock1Type = modelBuilder.getRankedTensorType({B, W1}, f32);
+  auto outputBlock1 = modelBuilder.FCBiasTanhTensors(outputBlock1Type,
+                                                     {input, h1Weights}, bias1);
+  auto outputBlock2Type = modelBuilder.getRankedTensorType({B, W2}, f32);
+  auto outputBlock2 = modelBuilder.FCBiasTanhTensors(
+      outputBlock2Type, {outputBlock1, h2Weights}, bias2);
+  auto outputBlock3Type = outputType;
+  auto outputBlock3 = modelBuilder.FCBiasTanhTensors(
+      outputBlock3Type, {outputBlock2, h3Weights}, bias3);
+  // Vexing parses.
+  (ret(outputBlock3));
+}
+
 int main() {
-  constexpr StringLiteral kFuncName = "test_mnist_jit";
   constexpr unsigned B = 3, W0 = 784, W1 = 256, W2 = 256, W3 = 10;
 
-  // 1. Build a func "mnist" that takes a memref<?x784xf32> buffer
-  //    (use batch size M=3 in this example)
   ModelBuilder modelBuilder;
-  buildMNIST(modelBuilder, kFuncName, B, W0, W1, W2, W3);
+  // 1. Build a func "test_mnist_jit_tensors".
+  constexpr StringLiteral kFuncTensorsName = "test_mnist_jit_tensors";
+  buildMNISTOnTensors(modelBuilder, kFuncTensorsName, ShapedType::kDynamicSize,
+                      W0, W1, W2, W3);
+  // 1.b. Dump the function for testing and erase it: we can't compile it to
+  // buffers for now.
+  modelBuilder.getModuleRef()->dump();
+  SymbolTable::lookupNearestSymbolFrom(
+      modelBuilder.getModuleRef()->getOperation(), kFuncTensorsName)
+      ->erase();
 
-  // 2. Compile the function.
+  // 2. Build a separate func "test_mnist_jit_buffers" that takes a
+  // memref<?x784xf32> buffer
+  //    (use batch size M=3 in this example)
+  // In the future, when we can lower the function built in 1. to buffers we
+  // will.
+  constexpr StringLiteral kFuncBuffersName = "test_mnist_jit_buffers";
+  buildMNIST(modelBuilder, kFuncBuffersName, B, W0, W1, W2, W3);
+
+  // 3. Compile the function.
   ModelRunner runner(modelBuilder.getModuleRef());
   runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3);
 
-  // 3. Allocate data within data structures that interoperate with the MLIR ABI
+  // 4. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
   auto inputLinearInit = [](unsigned idx, float *ptr) { *ptr = 0.032460f; };
   ManagedUnrankedMemRefDescriptor inputBuffer =
@@ -116,17 +179,55 @@ int main() {
   ManagedUnrankedMemRefDescriptor outputBuffer =
       makeInitializedUnrankedDescriptor<float>({B, W3}, outputLinearInit);
 
-  // 4. Call the funcOp name `kFuncName` with arguments.
+  // 5. Call the funcOp name `kFuncBuffersName` with arguments.
   void *args[2] = {&inputBuffer->descriptor, &outputBuffer->descriptor};
-  auto error =
-      runner.engine->invoke(kFuncName, llvm::MutableArrayRef<void *>{args});
+  auto error = runner.engine->invoke(kFuncBuffersName,
+                                     llvm::MutableArrayRef<void *>{args});
 
-  // 5. Dump content of output buffer for testing with FileCheck.
+  // 6. Dump content of output buffer for testing with FileCheck.
   if (!error)
     ::impl::printMemRef(
         *static_cast<StridedMemRefType<float, 2> *>(outputBuffer->descriptor));
 }
 
+// For now, we can only dump the IR for `test_mnist_jit_tensors`.
+// Once buffer allocation is implemented we will only have an execution test.
+//
+// CHECK: func @test_mnist_jit_tensors
+//
+// Matmul
+// CHECK: linalg.generic
+// CHECK:   tensor<?x784xf32>, tensor<784x256xf32> -> tensor<?x256xf32>
+//
+// Pointwise
+// CHECK: linalg.generic
+// CHECK:   addf
+// CHECK:   mulf
+// CHECK:   tanh
+// CHECK:   mulf
+// CHECK:   addf
+// CHECK:   addf
+// CHECK:   tensor<?x256xf32>, tensor<256xf32> -> tensor<?x256xf32>
+//
+// Matmul
+// CHECK: linalg.generic
+// CHECK:   tensor<?x256xf32>, tensor<256x256xf32> -> tensor<?x256xf32>
+//
+// Pointwise
+// CHECK: linalg.generic
+// CHECK:   tensor<?x256xf32>, tensor<256xf32> -> tensor<?x256xf32>
+//
+// Matmul
+// CHECK: linalg.generic
+// CHECK:   tensor<?x256xf32>, tensor<256x10xf32> -> tensor<?x10xf32>
+//
+// Pointwise
+// CHECK: linalg.generic
+// CHECK:   tensor<?x10xf32>, tensor<10xf32> -> tensor<?x10xf32>
+// CHECK:   return {{.*}} : tensor<?x10xf32>
+
+// Execution test for `test_mnist_jit_buffers`.
+//
 // CHECK: Memref base@ = {{.*}} rank = 2 offset = 0 sizes = [3, 10]
 // CHECK-SAME: strides = [10, 1] data =
 // clang-format off
