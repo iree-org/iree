@@ -19,6 +19,7 @@ load(
 load(
     "//bindings/python:build_defs.oss.bzl",
     "INTREE_TENSORFLOW_PY_DEPS",
+    "iree_py_test",
 )
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
@@ -37,7 +38,7 @@ iree_lit_test_suite(
     tags = ["nokokoro"],
 )
 
-py_test(
+iree_py_test(
     name = "saved_model_adopt_exports",
     srcs = [
         "saved_model_adopt_exports.py",
