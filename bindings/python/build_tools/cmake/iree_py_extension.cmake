@@ -73,7 +73,7 @@ function(iree_py_extension)
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
       PRIVATE
         ${PYBIND11_INCLUDE_DIR}
-        ${Python3_INCLUDE_DIRS}
+        ${PYTHON_INCLUDE_DIR}
     )
 
     target_compile_options(${_NAME}
@@ -88,7 +88,7 @@ function(iree_py_extension)
       PRIVATE
         ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
-        ${Python3_LIBRARIES}
+        ${PYTHON_LIBRARY}
     )
     target_compile_definitions(${_NAME}
       PUBLIC
