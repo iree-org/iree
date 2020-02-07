@@ -44,6 +44,10 @@ DEAR_IMGUI_EXPLICIT_TARGET_MAPPING = {
     ],
 }
 
+RENDERDOC_API_MAPPING = {
+    "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"]
+}
+
 LLVM_TARGET_MAPPING = {
     "@llvm-project//llvm:support": ["LLVMSupport"],
     "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
@@ -115,6 +119,8 @@ def convert_external_target(target):
     return ["flatbuffers"]
   if target.startswith("@dear_imgui"):
     return DEAR_IMGUI_EXPLICIT_TARGET_MAPPING[target]
+  if target.startswith("@renderdoc_api"):
+    return RENDERDOC_API_MAPPING[target]
   if target == "@com_google_googletest//:gtest":
     return ["gtest"]
   if target.startswith("@llvm-project//llvm"):
