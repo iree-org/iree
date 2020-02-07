@@ -45,6 +45,7 @@ DEAR_IMGUI_EXPLICIT_TARGET_MAPPING = {
 }
 
 LLVM_TARGET_MAPPING = {
+    "@llvm-project//llvm:core": ["LLVMCore"],
     "@llvm-project//llvm:support": ["LLVMSupport"],
     "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
 }
@@ -59,9 +60,11 @@ VULKAN_HEADERS_MAPPING = {
 MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AffineDialectRegistration": ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
+    "@llvm-project//mlir:CFGTransforms" : ["MLIRLoopToStandard"],
     "@llvm-project//mlir:GPUToSPIRVTransforms": ["MLIRGPUtoSPIRVTransforms"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
     "@llvm-project//mlir:LinalgDialectRegistration": ["MLIRLinalgOps"],
+    "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:LoopsToGPUPass": ["MLIRLoopsToGPU"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVDialectRegistration": ["MLIRSPIRV"],
