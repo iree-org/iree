@@ -85,7 +85,7 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
     iree_hal_allocator_t* allocator,
     absl::Span<const std::string> input_strings) {
   if (input_strings.size() != descs.size()) {
-    return FailedPreconditionErrorBuilder(IREE_LOC)
+    return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Signature mismatch; expected " << descs.size()
            << " buffer strings but received " << input_strings.size();
   }
