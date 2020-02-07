@@ -70,7 +70,7 @@ function(iree_pybind_cc_library)
         "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
       PRIVATE
         ${PYBIND11_INCLUDE_DIR}
-        ${Python3_INCLUDE_DIRS}
+        ${PYTHON_INCLUDE_DIR}
     )
     target_compile_options(${_NAME}
       PRIVATE
@@ -84,7 +84,7 @@ function(iree_pybind_cc_library)
         ${_RULE_DEPS}
       PRIVATE
         pybind11
-        ${Python3_LIBRARIES}
+        ${PYTHON_LIBRARY}
         ${_RULE_LINKOPTS}
         ${IREE_DEFAULT_LINKOPTS}
     )
