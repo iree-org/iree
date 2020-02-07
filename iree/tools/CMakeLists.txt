@@ -55,6 +55,7 @@ iree_cc_binary(
     # iree::hal::dawn::dawn_driver_module
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
+    iree::hal::llvmjit::llvmjit_driver_module
 )
 add_executable(iree-benchmark-module ALIAS iree_tools_iree-benchmark-module)
 

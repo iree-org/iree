@@ -41,6 +41,7 @@ IREE_DRIVER_MODULES = [
     # "//iree/hal/dawn:dawn_driver_module",
     "//iree/hal/vmla:vmla_driver_module",
     "//iree/hal/vulkan:vulkan_driver_module",
+    "//iree/hal/llvmjit:llvmjit_driver_module",
 ]
 
 cc_binary(
