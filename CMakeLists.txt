@@ -104,6 +104,12 @@ set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 if(${IREE_BUILD_COMPILER} OR ${IREE_BUILD_PYTHON_BINDINGS})
   find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
+  # Also use the (deprecated) FindPythonInterp/FindPythonLibs functions before
+  # any of our dependencies do. If one dependency finds Python 2 (the default),
+  # any others that try to find Python 3 will fail.
+  # (Also come on, it's $CURRENT_YEAR - please just use Python 3 already.)
+  find_package(PythonInterp 3 REQUIRED)
+  find_package(PythonLibs 3 REQUIRED)
 endif()
 
 list(APPEND CMAKE_MODULE_PATH
