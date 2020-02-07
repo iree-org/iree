@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     LLVM
@@ -20,22 +22,20 @@ iree_cc_library(
   SRCS
     "LLVMTarget.cpp"
   DEPS
-    LLVMIR
-    MLIRCFGTransforms
-    MLIRIR
-    MLIRLLVMTransforms
-    MLIRLinalgOps
-    MLIRLinalgTransforms
-    MLIRPass
-    MLIRStandardOps
-    MLIRStandardToSPIRVTransforms
-    MLIRSupport
-    MLIRTransforms
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
-    iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::XLAToLinalg
     iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
     iree::schemas::llvmir_executable_def_cc_fbs
+    LLVMCore
+    MLIRLoopToStandard
+    MLIRIR
+    MLIRStandardToLLVM
+    MLIRLinalgOps
+    MLIRLinalgTransforms
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTargetLLVMIR
+    MLIRTransforms
   ALWAYSLINK
   PUBLIC
 )

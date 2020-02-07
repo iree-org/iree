@@ -60,12 +60,15 @@ function(set_alwayslink_mlir_libs)
     MLIRAnalysis
     MLIREDSC
     MLIRIR
+    MLIRLoopToStandard
     MLIRParser
     MLIRPass
     MLIRSPIRV
     MLIRSPIRVSerialization
     MLIRSPIRVTransforms
     MLIRStandardOps
+    MLIRStandardToLLVM
+    MLIRTargetLLVMIR
     MLIRTransforms
     MLIRTranslation
     MLIRSupport
