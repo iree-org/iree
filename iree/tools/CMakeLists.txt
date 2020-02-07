@@ -162,6 +162,11 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVTransforms
       MLIRTranslation
       tensorflow::mlir_xla
+      # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
+      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
+      iree::compiler::Dialect::HAL::Target::VMLA
+      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+      iree::compiler::Dialect::HAL::Target::LLVM
     ALWAYSLINK
   )
 
@@ -224,7 +229,9 @@ if(${IREE_BUILD_COMPILER})
       # TODO(marbre): Add PLATFORM_VULKAN_DEPS
       # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
       iree::compiler::Dialect::HAL::Target::LegacyInterpreter
+      iree::compiler::Dialect::HAL::Target::VMLA
       iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+      iree::compiler::Dialect::HAL::Target::LLVM
       iree::hal::vulkan::vulkan_driver_module
   )
   add_executable(iree-run-mlir ALIAS iree_tools_iree-run-mlir)
@@ -264,8 +271,6 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       iree::compiler::Dialect::Flow::Conversion
       iree::compiler::Dialect::HAL::Conversion
-      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
-      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::XLAToSPIRV
@@ -286,6 +291,11 @@ if(${IREE_BUILD_COMPILER})
       MLIRTranslation
       MLIRVectorOps
       tensorflow::mlir_xla
+      # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
+      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
+      iree::compiler::Dialect::HAL::Target::VMLA
+      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+      iree::compiler::Dialect::HAL::Target::LLVM
     ALWAYSLINK
   )
 
