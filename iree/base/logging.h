@@ -58,7 +58,7 @@
 //   They are useful when problems are definitely unrelated to program flow,
 //   e.g. when validating user input.
 
-#ifdef IREE_CONFIG_GOOGLE_INTERNAL
+#if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
 #include "iree/base/google/logging_google.h"
 #else
 #include "iree/base/internal/logging.h"

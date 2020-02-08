@@ -18,7 +18,7 @@
 // Initialization happens automatically during InitializeEnvironment(), which
 // should be called early in main(), before other code runs.
 
-#ifdef IREE_CONFIG_GOOGLE_INTERNAL
+#if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
 #include "iree/base/google/init_google.h"
 #else
 #include "iree/base/internal/init_internal.h"

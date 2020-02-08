@@ -15,7 +15,7 @@
 #ifndef IREE_BASE_STATUS_MATCHERS_H_
 #define IREE_BASE_STATUS_MATCHERS_H_
 
-#ifdef IREE_CONFIG_GOOGLE_INTERNAL
+#if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
 
 #include "iree/base/google/status_matchers_google.h"  // IWYU pragma: export
 
