@@ -240,9 +240,11 @@ class MaterializeShapeCalculationsPass
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     // Always include certain canonicalizations that interop.
-    GetRankedShapeOp::getCanonicalizationPatterns(patterns, &getContext());
     CastCompatibleShapeOp::getCanonicalizationPatterns(patterns, &getContext());
+    GetRankedShapeOp::getCanonicalizationPatterns(patterns, &getContext());
+    MakeRankedShapeOp::getCanonicalizationPatterns(patterns, &getContext());
     RankedDimOp::getCanonicalizationPatterns(patterns, &getContext());
+    TieShapeOp::getCanonicalizationPatterns(patterns, &getContext());
     patterns.insert<MaterializeRankedShapePattern>(getCustomOpShapeBuilder(),
                                                    &getContext());
     patterns.insert<ExpandRankedBroadcastShapePattern>(&getContext());

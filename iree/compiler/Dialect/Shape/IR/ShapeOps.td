@@ -52,6 +52,15 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape",
   let assemblyFormat = "operands attr-dict `:` type($operand) `,` type($shape)";
 
   let verifier = [{ return verify$cppClass(*this); }];
+
+  let builders = [
+    // Short-hand for building with a shape equivalent to the tensor operand
+    // and 'index' dim type.
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Value operand, Value shape
+    }]>,
+  ];
+  let hasCanonicalizer = 1;
 }
 
 def Shape_CastCompatibleShapeOp : Shape_PureOp<"cast_compatible_shape"> {
@@ -178,6 +187,7 @@ def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape"> {
       return shape().getType().cast<RankedShapeType>();
     }
   }];
+  let hasCanonicalizer = 1;
 }
 
 def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {

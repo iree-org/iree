@@ -24,6 +24,7 @@ iree_cc_library(
     "ConvertHLOToShapeDialect.cpp"
     "ExpandFunctionDynamicDims.cpp"
     "MaterializeShapeCalculations.cpp"
+    "TieDynamicShapes.cpp"
   DEPS
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder

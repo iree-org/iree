@@ -27,6 +27,10 @@ namespace iree_compiler {
 // rewrites it so that the dynamic dims are passed in/out.
 std::unique_ptr<OpPassBase<ModuleOp>> createExpandFunctionDynamicDimsPass();
 
+// For any dynamically shaped edges in a function, introduces an appropriate
+// get_ranked_shape and corresponding tie_shape op to make the association.
+std::unique_ptr<OpPassBase<FuncOp>> createTieDynamicShapesPass();
+
 // Materializes shape calculations for any get_ranked_shape ops.
 std::unique_ptr<OpPassBase<FuncOp>> createMaterializeShapeCalculationsPass();
 

@@ -98,3 +98,95 @@ func @dynamicMakeRankedShapeDim(%arg0: index, %arg1 : index) -> (index, index, i
   // CHECK-DAG: return %[[DD0]], %[[C8]], %[[DD1]], %[[C16]]
   return %d0, %d1, %d2, %d3 : index, index, index, index
 }
+
+//===----------------------------------------------------------------------===//
+// ElideDuplicateTieShapePattern tests
+//===----------------------------------------------------------------------===//
+
+// -----
+// CHECK-LABEL: @elideDuplicateTieShapePattern_match
+// CHECK-SAME: %[[ARGT:[^:[:space:]]+]]: tensor
+// CHECK-SAME: %[[ARGRS:[^:[:space:]]+]]: !shapex.ranked_shape
+func @elideDuplicateTieShapePattern_match(%arg0 : tensor<?xf32>, %arg1 : !shapex.ranked_shape<[?]>) -> (tensor<?xf32>) {
+  %0 = shapex.tie_shape %arg0, %arg1 : tensor<?xf32>, !shapex.ranked_shape<[?]>
+  %1 = shapex.tie_shape %0, %arg1 : tensor<?xf32>, !shapex.ranked_shape<[?]>
+  // CHECK: %[[T:.+]] = shapex.tie_shape %[[ARGT]], %[[ARGRS]]
+  // CHECK: return %[[T]]
+  return %1 : tensor<?xf32>
+}
+
+// -----
+// CHECK-LABEL: @elideDuplicateTieShapePattern_different_shapes
+// CHECK-SAME: %[[ARGT:[^:[:space:]]+]]: tensor
+// CHECK-SAME: %[[ARGRS1:[^:[:space:]]+]]: !shapex.ranked_shape
+// CHECK-SAME: %[[ARGRS2:[^:[:space:]]+]]: !shapex.ranked_shape
+func @elideDuplicateTieShapePattern_different_shapes(%arg0 : tensor<?xf32>, %arg1 : !shapex.ranked_shape<[?]>, %arg2 : !shapex.ranked_shape<[?]>) -> (tensor<?xf32>) {
+  %0 = shapex.tie_shape %arg0, %arg1 : tensor<?xf32>, !shapex.ranked_shape<[?]>
+  %1 = shapex.tie_shape %0, %arg2 : tensor<?xf32>, !shapex.ranked_shape<[?]>
+  // CHECK: %[[T:.+]] = shapex.tie_shape %[[ARGT]], %[[ARGRS1]]
+  // CHECK: shapex.tie_shape %[[T]], %[[ARGRS2]]
+  return %1 : tensor<?xf32>
+}
+
+//===----------------------------------------------------------------------===//
+// IdentityMakeRankedShapePattern tests
+//===----------------------------------------------------------------------===//
+
+// -----
+// CHECK-LABEL: @identityMakeRankedShape_match_1dim
+// CHECK-SAME: %[[ARGRS:[^:[:space:]]+]]: !shapex.ranked_shape
+func @identityMakeRankedShape_match_1dim(%arg0 : !shapex.ranked_shape<[?,16]>) -> !shapex.ranked_shape<[?,16]> {
+  // CHECK-NOT: shapex.make_ranked_shape
+  %0 = shapex.ranked_dim %arg0[0] : !shapex.ranked_shape<[?,16]>
+  %1 = shapex.make_ranked_shape %0 -> !shapex.ranked_shape<[?,16]>
+  // CHECK: return %[[ARGRS]]
+  return %1 : !shapex.ranked_shape<[?,16]>
+}
+
+// -----
+// CHECK-LABEL: @identityMakeRankedShape_match_2dim
+// CHECK-SAME: %[[ARGRS:[^:[:space:]]+]]: !shapex.ranked_shape
+func @identityMakeRankedShape_match_2dim(%arg0 : !shapex.ranked_shape<[?,16,?]>) -> !shapex.ranked_shape<[?,16,?]> {
+  // CHECK-NOT: shapex.make_ranked_shape
+  %0 = shapex.ranked_dim %arg0[0] : !shapex.ranked_shape<[?,16,?]>
+  %1 = shapex.ranked_dim %arg0[2] : !shapex.ranked_shape<[?,16,?]>
+  %2 = shapex.make_ranked_shape %0, %1 -> !shapex.ranked_shape<[?,16,?]>
+  // CHECK: return %[[ARGRS]]
+  return %2 : !shapex.ranked_shape<[?,16,?]>
+}
+
+// -----
+// CHECK-LABEL: @identityMakeRankedShape_nomatch_swap_dims
+// CHECK-SAME: %[[ARGRS:[^:[:space:]]+]]: !shapex.ranked_shape
+func @identityMakeRankedShape_nomatch_swap_dims(%arg0 : !shapex.ranked_shape<[?,16,?]>) -> !shapex.ranked_shape<[?,16,?]> {
+  %0 = shapex.ranked_dim %arg0[2] : !shapex.ranked_shape<[?,16,?]>
+  %1 = shapex.ranked_dim %arg0[0] : !shapex.ranked_shape<[?,16,?]>
+  %2 = shapex.make_ranked_shape %0, %1 -> !shapex.ranked_shape<[?,16,?]>
+  // CHECK: %[[RS:.+]] = shapex.make_ranked_shape
+  // CHECK: return %[[RS]]
+  return %2 : !shapex.ranked_shape<[?,16,?]>
+}
+
+// -----
+// CHECK-LABEL: @identityMakeRankedShape_nomatch_static_dim
+// CHECK-SAME: %[[ARGRS:[^:[:space:]]+]]: !shapex.ranked_shape
+func @identityMakeRankedShape_nomatch_static_dim(%arg0 : !shapex.ranked_shape<[?,16,?]>) -> !shapex.ranked_shape<[?,16,?]> {
+  %0 = shapex.ranked_dim %arg0[1] : !shapex.ranked_shape<[?,16,?]>
+  %1 = shapex.ranked_dim %arg0[2] : !shapex.ranked_shape<[?,16,?]>
+  %2 = shapex.make_ranked_shape %0, %1 -> !shapex.ranked_shape<[?,16,?]>
+  // CHECK: %[[RS:.+]] = shapex.make_ranked_shape
+  // CHECK: return %[[RS]]
+  return %2 : !shapex.ranked_shape<[?,16,?]>
+}
+
+// CHECK-LABEL: @identityMakeRankedShape_nomatch_different_shape
+// CHECK-SAME: %[[ARGRS1:[^:[:space:]]+]]: !shapex.ranked_shape
+// CHECK-SAME: %[[ARGRS2:[^:[:space:]]+]]: !shapex.ranked_shape
+func @identityMakeRankedShape_nomatch_different_shape(%arg0 : !shapex.ranked_shape<[?,16,?]>, %arg1 : !shapex.ranked_shape<[?,16,?]>) -> !shapex.ranked_shape<[?,16,?]> {
+  %0 = shapex.ranked_dim %arg0[0] : !shapex.ranked_shape<[?,16,?]>
+  %1 = shapex.ranked_dim %arg1[2] : !shapex.ranked_shape<[?,16,?]>
+  %2 = shapex.make_ranked_shape %0, %1 -> !shapex.ranked_shape<[?,16,?]>
+  // CHECK: %[[RS:.+]] = shapex.make_ranked_shape
+  // CHECK: return %[[RS]]
+  return %2 : !shapex.ranked_shape<[?,16,?]>
+}

@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -40,58 +41,6 @@ namespace Shape {
 // Canonicalization
 //===----------------------------------------------------------------------===//
 
-class ElideTiedGetRankedShapePattern
-    : public OpRewritePattern<GetRankedShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
-                                     PatternRewriter &rewriter) const override {
-    // If the immediate predecessor is a TieShapeOp, then this op can be
-    // erased in favor of the input to the tie op.
-    if (!matchPattern(op.operand(), m_Op<TieShapeOp>())) {
-      return matchFailure();
-    }
-
-    auto tieOp = cast<TieShapeOp>(op.operand().getDefiningOp());
-    rewriter.replaceOp(op, tieOp.shape());
-
-    return matchSuccess();
-  }
-};
-
-class ElideDuplicateGetRankedShapePattern
-    : public OpRewritePattern<GetRankedShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
-                                     PatternRewriter &rewriter) const override {
-    // If the immediate predecessor is a GetRankedShapeOp, then this op can be
-    // erased in favor of the input to the tie op.
-    if (!matchPattern(op.operand(), m_Op<GetRankedShapeOp>())) {
-      return matchFailure();
-    }
-
-    auto precedingGetRankedShapeOp =
-        cast<GetRankedShapeOp>(op.operand().getDefiningOp());
-    rewriter.replaceOp(op, precedingGetRankedShapeOp.shape());
-    return matchSuccess();
-  }
-};
-
-class ElideStaticGetRankedShapePattern
-    : public OpRewritePattern<GetRankedShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
-                                     PatternRewriter &rewriter) const override {
-    auto operandType = op.operand().getType().dyn_cast<RankedTensorType>();
-    auto shapeType = op.shape().getType().dyn_cast<RankedShapeType>();
-    if (!operandType || !shapeType || !operandType.hasStaticShape()) {
-      return matchFailure();
-    }
-
-    rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, shapeType);
-    return matchSuccess();
-  }
-};
-
 class SafeCastCompatibleShapePattern
     : public OpRewritePattern<CastCompatibleShapeOp> {
   using OpRewritePattern::OpRewritePattern;
@@ -113,6 +62,104 @@ class SafeCastCompatibleShapePattern
     }
 
     return matchFailure();
+  }
+};
+
+class ElideTiedGetRankedShapePattern
+    : public OpRewritePattern<GetRankedShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    // If the immediate predecessor is a TieShapeOp, then this op can be
+    // erased in favor of the input to the tie op.
+    auto tieOp = dyn_cast_or_null<TieShapeOp>(op.operand().getDefiningOp());
+    if (!tieOp) return matchFailure();
+
+    rewriter.replaceOp(op, tieOp.shape());
+
+    return matchSuccess();
+  }
+};
+
+class ElideDuplicateGetRankedShapePattern
+    : public OpRewritePattern<GetRankedShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    // If the immediate predecessor is a GetRankedShapeOp, then this op can be
+    // erased in favor of the input to the tie op.
+    auto precedingGetRankedShapeOp =
+        dyn_cast_or_null<GetRankedShapeOp>(op.operand().getDefiningOp());
+    if (!precedingGetRankedShapeOp) return matchFailure();
+
+    rewriter.replaceOp(op, precedingGetRankedShapeOp.shape());
+    return matchSuccess();
+  }
+};
+
+class ElideStaticGetRankedShapePattern
+    : public OpRewritePattern<GetRankedShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    auto operandType = op.operand().getType().dyn_cast<RankedTensorType>();
+    auto shapeType = op.shape().getType().dyn_cast<RankedShapeType>();
+    if (!operandType || !shapeType || !operandType.hasStaticShape()) {
+      return matchFailure();
+    }
+
+    rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, shapeType);
+    return matchSuccess();
+  }
+};
+
+class IdentityMakeRankedShapePattern
+    : public OpRewritePattern<MakeRankedShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(MakeRankedShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    if (op.dynamic_dimensions().empty()) {
+      // Do not match static shapes.
+      return matchFailure();
+    }
+
+    // Detects make_ranked_shape ops whose dynamic dimensions are provided by
+    // ranked_dim ops that extract dimensions from an identical ranked_shape.
+    auto rankedShape = op.getRankedShapeType();
+    RankedDimOp commonRankedDimOp;
+    unsigned previousProvidingIndex = 0;
+    for (auto providingDim : op.dynamic_dimensions()) {
+      auto rankedDimOp =
+          llvm::dyn_cast_or_null<RankedDimOp>(providingDim.getDefiningOp());
+      if (!rankedDimOp) return matchFailure();
+
+      // Shapes must match and refer to a dynamic index.
+      unsigned providingIndex = rankedDimOp.getIndex();
+      if (rankedDimOp.getRankedShapeType() != rankedShape ||
+          !rankedShape.isDimDynamic(providingIndex)) {
+        return matchFailure();
+      }
+
+      if (commonRankedDimOp) {
+        // Not first dim: verify same providing shape and indexes into next
+        // dynamic dim.
+        if (rankedDimOp.shape() != commonRankedDimOp.shape() ||
+            providingIndex <= previousProvidingIndex) {
+          return matchFailure();
+        }
+      }
+
+      commonRankedDimOp = rankedDimOp;
+      previousProvidingIndex = rankedDimOp.getIndex();
+    }
+
+    // Fall-through: this op produces an identical shape as
+    // commonRankedDimOp.
+    assert(commonRankedDimOp &&
+           "dynamic ranked_shape did not find a common provider");
+
+    rewriter.replaceOp(op, commonRankedDimOp.shape());
+    return matchSuccess();
   }
 };
 
@@ -163,9 +210,39 @@ class ExpandRankedShapeDimsPattern : public OpRewritePattern<RankedDimsOp> {
   }
 };
 
+class ElideDuplicateTieShapePattern : public OpRewritePattern<TieShapeOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(TieShapeOp op,
+                                     PatternRewriter &rewriter) const override {
+    // If the immediate predecessor is a TieShapeOp, then it can be possible
+    // to merge these. This can often happen when function/block tie_shape
+    // placeholders are inserted prior to materializing later parts of the
+    // computation.
+    auto precedingTieShapeOp =
+        dyn_cast_or_null<TieShapeOp>(op.operand().getDefiningOp());
+    if (!precedingTieShapeOp) return matchFailure();
+
+    if (op.shape() != precedingTieShapeOp.shape()) {
+      // This can happen in intermediate states before all shape calculations
+      // are collapsed (i.e. the shapes may actually be equivalent but
+      // constructed through different branches).
+      return matchFailure();
+    }
+
+    rewriter.replaceOp(op, precedingTieShapeOp.result());
+    return matchSuccess();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // shape.tie_shape
 //===----------------------------------------------------------------------===//
+
+void TieShapeOp::build(Builder *builder, OperationState &result, Value operand,
+                       Value shape) {
+  result.types.push_back(operand.getType());
+  result.addOperands({operand, shape});
+}
 
 static LogicalResult verifyTieShapeOp(TieShapeOp op) {
   // tie_shape currently only supports ranked tensors.
@@ -179,6 +256,11 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
     return op.emitOpError("dims must match between tensor and shape");
   }
   return success();
+}
+
+void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
+                                             MLIRContext *context) {
+  patterns.insert<ElideDuplicateTieShapePattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -350,6 +432,11 @@ static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
     }
   }
   return success();
+}
+
+void MakeRankedShapeOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &patterns, MLIRContext *context) {
+  patterns.insert<IdentityMakeRankedShapePattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
