@@ -17,6 +17,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = 1280071245 : i32} {
 // CHECK-NEXT:     module {
-// CHECK-NEXT:       llvm.func @simpleMath_rgn_dispatch_0(%arg0: !llvm<"{ float*, float*, i64, [1 x i64], [1 x i64] }*">, %arg1: !llvm<"{ float*, float*, i64, [1 x i64], [1 x i64] }*">) attributes {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>, iree.executable.workload = dense<[4, 1, 1]> : vector<3xi32>} {
-// CHECK-NEXT:          %0 = llvm.load %arg0 : !llvm<"{ float*, float*, i64, [1 x i64], [1 x i64] }*">
-// CHECK-NEXT:          %1 = llvm.load %arg1 : !llvm<"{ float*, float*, i64, [1 x i64], [1 x i64] }*">
+// CHECK-NEXT:       llvm.func @simpleMath_rgn_dispatch_0(
+// CHECK-SAME: %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64,
+// CHECK-SAME: %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64)
+// CHECK-SAME: attributes {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>, iree.executable.workload = dense<[4, 1, 1]> : vector<3xi32>} {

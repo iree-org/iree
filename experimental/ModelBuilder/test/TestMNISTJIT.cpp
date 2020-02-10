@@ -179,9 +179,13 @@ int main() {
   ManagedUnrankedMemRefDescriptor outputBuffer =
       makeInitializedUnrankedDescriptor<float>({B, W3}, outputLinearInit);
 
-  // 5. Call the funcOp name `kFuncBuffersName` with arguments.
+  // 5. Call the funcOp name `kFuncBuffersName` with arguments. Call the wrapped
+  // C-compatible function rather than the function defined above and delegate
+  // memref descriptor unpacking to generated code.
+  const std::string kFuncAdapterName =
+      (llvm::Twine("_mlir_ciface_") + kFuncBuffersName).str();
   void *args[2] = {&inputBuffer->descriptor, &outputBuffer->descriptor};
-  auto error = runner.engine->invoke(kFuncBuffersName,
+  auto error = runner.engine->invoke(kFuncAdapterName,
                                      llvm::MutableArrayRef<void *>{args});
 
   // 6. Dump content of output buffer for testing with FileCheck.
