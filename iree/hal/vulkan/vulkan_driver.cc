@@ -86,6 +86,8 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   IREE_TRACE_SCOPE0("VulkanDriver::Create");
 
   // Load and connect to RenderDoc before instance creation.
+  // Note: RenderDoc assumes that only a single VkDevice is used:
+  //   https://renderdoc.org/docs/behind_scenes/vulkan_support.html#current-support
   std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager;
   if (absl::GetFlag(FLAGS_vulkan_enable_renderdoc)) {
     renderdoc_capture_manager = std::make_unique<RenderDocCaptureManager>();
@@ -206,7 +208,7 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
   return assign_ref(new VulkanDriver(
       std::move(syms), instance, /*owns_instance=*/false,
       std::move(debug_reporter), std::move(options.device_extensibility),
-      /*renderdoc_capture_manager=*/nullptr));
+      /*debug_capture_manager=*/nullptr));
 }
 
 VulkanDriver::VulkanDriver(

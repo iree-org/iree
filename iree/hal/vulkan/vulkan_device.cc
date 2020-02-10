@@ -204,7 +204,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     VkPhysicalDevice physical_device,
     const ExtensibilitySpec& extensibility_spec,
     const ref_ptr<DynamicSymbols>& syms,
-    RenderDocCaptureManager* renderdoc_capture_manager) {
+    DebugCaptureManager* debug_capture_manager) {
   IREE_TRACE_SCOPE0("VulkanDevice::Create");
 
   // Find the layers and extensions we need (or want) that are also available
@@ -344,7 +344,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
       std::move(logical_device), std::move(allocator),
       std::move(command_queues), std::move(dispatch_command_pool),
       std::move(transfer_command_pool), std::move(legacy_fence_pool),
-      renderdoc_capture_manager));
+      debug_capture_manager));
 }
 
 // static
@@ -415,7 +415,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
       std::move(driver), device_info, physical_device, std::move(device_handle),
       std::move(allocator), std::move(command_queues),
       std::move(dispatch_command_pool), std::move(transfer_command_pool),
-      std::move(legacy_fence_pool), /*renderdoc_capture_manager=*/nullptr));
+      std::move(legacy_fence_pool), /*debug_capture_manager=*/nullptr));
 }
 
 VulkanDevice::VulkanDevice(
@@ -426,7 +426,7 @@ VulkanDevice::VulkanDevice(
     ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
     ref_ptr<VkCommandPoolHandle> transfer_command_pool,
     ref_ptr<LegacyFencePool> legacy_fence_pool,
-    RenderDocCaptureManager* renderdoc_capture_manager)
+    DebugCaptureManager* debug_capture_manager)
     : Device(device_info),
       driver_(std::move(driver)),
       physical_device_(physical_device),
@@ -438,7 +438,7 @@ VulkanDevice::VulkanDevice(
       dispatch_command_pool_(std::move(dispatch_command_pool)),
       transfer_command_pool_(std::move(transfer_command_pool)),
       legacy_fence_pool_(std::move(legacy_fence_pool)),
-      renderdoc_capture_manager_(renderdoc_capture_manager) {
+      debug_capture_manager_(debug_capture_manager) {
   // Populate the queue lists based on queue capabilities.
   for (auto& command_queue : command_queues_) {
     if (command_queue->can_dispatch()) {
@@ -451,20 +451,16 @@ VulkanDevice::VulkanDevice(
     }
   }
 
-  if (renderdoc_capture_manager_ &&
-      renderdoc_capture_manager_->is_connected()) {
+  if (debug_capture_manager_ && debug_capture_manager_->is_connected()) {
     // Record a capture covering the duration of this VkDevice's lifetime.
-    // Note: RenderDoc assumes that only a single VkDevice is used:
-    //   https://renderdoc.org/docs/behind_scenes/vulkan_support.html#current-support
-    renderdoc_capture_manager_->StartCapture();
+    debug_capture_manager_->StartCapture();
   }
 }
 
 VulkanDevice::~VulkanDevice() {
   IREE_TRACE_SCOPE0("VulkanDevice::dtor");
-  if (renderdoc_capture_manager_ &&
-      renderdoc_capture_manager_->is_capturing()) {
-    renderdoc_capture_manager_->StopCapture();
+  if (debug_capture_manager_ && debug_capture_manager_->is_capturing()) {
+    debug_capture_manager_->StopCapture();
   }
 
   // Drop all command queues. These may wait until idle.

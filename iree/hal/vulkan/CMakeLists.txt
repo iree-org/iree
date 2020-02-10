@@ -439,6 +439,7 @@ iree_cc_library(
     iree::hal::allocator
     iree::hal::command_buffer_validation
     iree::hal::command_queue
+    iree::hal::debug_capture_manager
     iree::hal::device
     iree::hal::driver
     iree::hal::fence
@@ -452,7 +453,6 @@ iree_cc_library(
     iree::hal::vulkan::native_binary_semaphore
     iree::hal::vulkan::native_event
     iree::hal::vulkan::pipeline_cache
-    iree::hal::vulkan::renderdoc_capture_manager
     iree::hal::vulkan::status_util
     iree::hal::vulkan::vma_allocator
     Vulkan::Headers
