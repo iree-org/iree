@@ -27,7 +27,8 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
-// TODO(scotttodd): absl flag for RTLD_NOLOAD / RTLD_NOW
+// TODO(scotttodd): absl flag for RTLD_NOLOAD / RTLD_NOW?
+//     https://renderdoc.org/docs/in_application_api.html suggests RTLD_NOLOAD
 
 RenderDocCaptureManager::RenderDocCaptureManager() {}
 

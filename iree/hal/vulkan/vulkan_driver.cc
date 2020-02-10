@@ -205,6 +205,10 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
                          instance, syms, /*allocation_callbacks=*/nullptr));
   }
 
+  // Note: no RenderDocCaptureManager here since the VkInstance is already
+  // created externally. Applications using this function must provide their
+  // own RenderDoc / debugger integration as desired.
+
   return assign_ref(new VulkanDriver(
       std::move(syms), instance, /*owns_instance=*/false,
       std::move(debug_reporter), std::move(options.device_extensibility),
