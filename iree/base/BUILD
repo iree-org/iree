@@ -145,7 +145,6 @@ cc_test(
     deps = [
         ":file_io",
         ":file_path",
-        ":init",
         ":status",
         ":status_matchers",
         "//iree/testing:gtest_main",
