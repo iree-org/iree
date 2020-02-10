@@ -31,66 +31,65 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace {
+static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
+    ModuleOp module) {
+  OpBuilder globalBuilder(module.getBodyRegion());
+  SymbolTable symbolTable(module);
 
-LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
-  OpBuilder global_builder(module.getBodyRegion());
-  SymbolTable symbol_table(module);
-
-  DenseMap<StringRef, std::string> sym_name_to_flow_sym_name;
-  for (auto global_tensor : module.getOps<tf_saved_model::GlobalTensorOp>()) {
-    auto exported_names = tf_saved_model::GetExportedNames(global_tensor);
-    std::string flow_sym_name;
-    if (exported_names.empty()) {
-      flow_sym_name = "__iree_flow_" + global_tensor.sym_name().str();
-    } else if (exported_names.size() == 1) {
-      flow_sym_name = exported_names[0].str();
+  DenseMap<StringRef, std::string> symNameToFlowSymName;
+  for (auto globalTensor : module.getOps<tf_saved_model::GlobalTensorOp>()) {
+    auto exportedNames = tf_saved_model::GetExportedNames(globalTensor);
+    std::string flowSymName;
+    if (exportedNames.empty()) {
+      flowSymName = "__iree_flow_" + globalTensor.sym_name().str();
+    } else if (exportedNames.size() == 1) {
+      flowSymName = exportedNames[0].str();
     } else {
-      return global_tensor.emitError()
+      return globalTensor.emitError()
              << "Multiple exported names for global tensor not supported yet";
     }
-    sym_name_to_flow_sym_name[global_tensor.sym_name()] = flow_sym_name;
-    global_builder.create<IREE::Flow::VariableOp>(
-        global_tensor.getLoc(), flow_sym_name, global_tensor.is_mutable(),
-        global_tensor.type(), global_tensor.value());
+    symNameToFlowSymName[globalTensor.sym_name()] = flowSymName;
+    globalBuilder.create<IREE::Flow::VariableOp>(
+        globalTensor.getLoc(), flowSymName, globalTensor.is_mutable(),
+        globalTensor.type(), globalTensor.value());
   }
 
   for (auto func : module.getOps<FuncOp>()) {
-    SmallVector<unsigned, 4> args_to_erase;
+    SmallVector<unsigned, 4> argsToErase;
     for (int i = 0, e = func.getNumArguments(); i < e; i++) {
-      tf_saved_model::GlobalTensorOp global_tensor =
-          tf_saved_model::LookupBoundInput(func, i, symbol_table);
-      if (!global_tensor) {
+      tf_saved_model::GlobalTensorOp globalTensor =
+          tf_saved_model::LookupBoundInput(func, i, symbolTable);
+      if (!globalTensor) {
         continue;
       }
-      args_to_erase.push_back(i);
-      auto flow_sym_ref = global_builder.getSymbolRefAttr(
-          sym_name_to_flow_sym_name[global_tensor.sym_name()]);
+      argsToErase.push_back(i);
+      auto flowSymRef = globalBuilder.getSymbolRefAttr(
+          symNameToFlowSymName[globalTensor.sym_name()]);
       Value arg = func.getArgument(i);
-      if (global_tensor.is_mutable()) {
+      if (globalTensor.is_mutable()) {
         // The value is a tensor<*x!tf.resource> type, which flows into
         // tf.ReadVariableOp/tf.AssignVariableOp.
         // XLA resource functionalization should have canonicalized everything
         // to uses of those two ops in the body of the tf_saved_model exported
         // function.
         for (OpOperand &operand : llvm::make_early_inc_range(arg.getUses())) {
-          if (auto read_variable =
+          if (auto readVariable =
                   dyn_cast<TF::ReadVariableOp>(operand.getOwner())) {
-            auto load = OpBuilder(read_variable)
+            auto load = OpBuilder(readVariable)
                             .create<IREE::Flow::VariableLoadOp>(
-                                read_variable.getLoc(),
-                                read_variable.value().getType(), flow_sym_ref);
-            read_variable.value().replaceAllUsesWith(load.result());
-            read_variable.erase();
+                                readVariable.getLoc(),
+                                readVariable.value().getType(), flowSymRef);
+            readVariable.value().replaceAllUsesWith(load.result());
+            readVariable.erase();
             continue;
           }
-          if (auto assign_variable =
+          if (auto assignVariable =
                   dyn_cast<TF::AssignVariableOp>(operand.getOwner())) {
-            OpBuilder(assign_variable)
-                .create<IREE::Flow::VariableStoreOp>(assign_variable.getLoc(),
-                                                     assign_variable.value(),
-                                                     flow_sym_ref);
-            assign_variable.erase();
+            OpBuilder(assignVariable)
+                .create<IREE::Flow::VariableStoreOp>(assignVariable.getLoc(),
+                                                     assignVariable.value(),
+                                                     flowSymRef);
+            assignVariable.erase();
             continue;
           }
           return operand.getOwner()->emitError()
@@ -100,31 +99,28 @@ LogicalResult ImportTfSavedModelGlobalTensorsToIREEFlow(ModuleOp module) {
       } else {
         // The value is already a tensor value type. Just RAUW it with a
         // `flow.variable.load`.
-        auto load =
-            OpBuilder(func.getBody())
-                .create<IREE::Flow::VariableLoadOp>(
-                    global_tensor.getLoc(), arg.getType(), flow_sym_ref);
+        auto load = OpBuilder(func.getBody())
+                        .create<IREE::Flow::VariableLoadOp>(
+                            globalTensor.getLoc(), arg.getType(), flowSymRef);
         arg.replaceAllUsesWith(load.result());
       }
     }
-    func.eraseArguments(args_to_erase);
+    func.eraseArguments(argsToErase);
   }
 
   // Erase all the global tensors.
-  for (auto global_tensor : llvm::make_early_inc_range(
+  for (auto globalTensor : llvm::make_early_inc_range(
            module.getOps<tf_saved_model::GlobalTensorOp>())) {
-    global_tensor.erase();
+    globalTensor.erase();
   }
   return success();
 }
-
-}  // namespace
 
 class TFSavedModelLowerGlobalTensors
     : public ModulePass<TFSavedModelLowerGlobalTensors> {
  public:
   void runOnModule() override {
-    if (failed(ImportTfSavedModelGlobalTensorsToIREEFlow(getModule()))) {
+    if (failed(importTfSavedModelGlobalTensorsToIREEFlow(getModule()))) {
       signalPassFailure();
     }
   }
