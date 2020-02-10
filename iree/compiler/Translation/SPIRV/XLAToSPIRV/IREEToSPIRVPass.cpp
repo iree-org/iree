@@ -115,6 +115,7 @@ static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
       SPIRVPwOpLowering<xla_hlo::AbsOp, spirv::GLSLSAbsOp, spirv::GLSLFAbsOp>,
       SPIRVPwOpLowering<xla_hlo::CeilOp, spirv::GLSLCeilOp>,
       SPIRVPwOpLowering<xla_hlo::CosOp, spirv::GLSLCosOp>,
+      SPIRVPwOpLowering<xla_hlo::SinOp, spirv::GLSLSinOp>,
       SPIRVPwOpLowering<xla_hlo::ExpOp, spirv::GLSLExpOp>,
       // TODO(ravishankarm) : For now extract-elementOp is a no-op cause index
       // propagation only supports aggregates of rank 0.

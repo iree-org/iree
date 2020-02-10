@@ -70,6 +70,7 @@ void IndexComputationPass::runOnFunction() {
       NoBroadcastPwOpIndexPropagation<xla_hlo::CeilOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::ConvertOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::CosOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::SinOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::ExpOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::FloorOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::LogOp>,
