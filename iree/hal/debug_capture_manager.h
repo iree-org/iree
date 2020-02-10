@@ -45,11 +45,11 @@ class DebugCaptureManager {
   virtual bool is_connected() const = 0;
 
   // Starts capturing commands.
-  // Must already be connected.
+  // Must already be connected and must not already be capturing.
   virtual void StartCapture() = 0;
 
   // Stops capturing commands and saves the capture.
-  // Must already be capturing.
+  // Must already be connected and capturing.
   virtual void StopCapture() = 0;
 
   // Returns true if currently capturing commands.

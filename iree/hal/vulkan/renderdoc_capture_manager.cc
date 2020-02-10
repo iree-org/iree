@@ -96,6 +96,7 @@ void RenderDocCaptureManager::StartCapture() {
   IREE_TRACE_SCOPE0("RenderDocCaptureManager::StartCapture");
 
   CHECK(is_connected()) << "Can't start capture when not connected";
+  CHECK(!is_capturing()) << "Capture is already started";
 
   LOG(INFO) << "Starting RenderDoc capture";
   renderdoc_api_->StartFrameCapture(NULL, NULL);
