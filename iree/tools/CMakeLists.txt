@@ -100,7 +100,6 @@ iree_cc_library(
     iree::vm::module
     iree::vm::variant_list
     absl::span
-  PUBLIC
 )
 
 iree_cc_test(
