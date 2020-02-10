@@ -14,8 +14,6 @@
 
 set(NUMPY_DEPS "")
 
-# TODO(marbre): Set PYTHON_HEADERS_DEPS to something useful
-set(PYTHON_HEADERS_DEPS "")
 set(PYBIND_COPTS "-fexceptions")
 set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
 

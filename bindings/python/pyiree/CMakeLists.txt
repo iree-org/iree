@@ -15,9 +15,6 @@
 add_subdirectory(common)
 add_subdirectory(rt)
 
-# TODO(marbre): The base pyiree-compiler supporting build-in dialects should be
-#               buildable with CMake after TensorFlow components are moved to
-#               pyiree-tf-compiler
-#if(${IREE_BUILD_COMPILER})
-#  add_subdirectory(compiler)
-#endif()
+if(${IREE_BUILD_COMPILER})
+  add_subdirectory(compiler)
+endif()

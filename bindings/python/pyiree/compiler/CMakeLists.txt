@@ -18,14 +18,8 @@ iree_py_extension(
   SRCS
     "initialize_module.cc"
   DEPS
-    iree::hal::interpreter::interpreter_driver_module
-    iree::hal::vulkan::vulkan_driver_module
-    ::rt_library
+    ::compiler_library
     bindings::python::pyiree::common
-    iree::base::initializer
-    iree::base::tracing
-    # TODO(marbre): Add dependency
-    # "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
   COPTS
     ${PYBIND_COPTS}
     ${PYBIND_EXTENSION_COPTS}
@@ -35,33 +29,27 @@ iree_py_extension(
 
 iree_pybind_cc_library(
   NAME
-    rt_library
+    compiler_library
   HDRS
-    "function_abi.h"
-    "hal.h"
-    "host_types.h"
-    "vm.h"
+    "compiler.h"
   SRCS
-    "function_abi.cc"
-    "hal.cc"
-    "host_types.cc"
-    "vm.cc"
+    "compiler.cc"
   DEPS
+    # Transforms. Adopted from the Bazel variable COMPILER_DEPS.
+    iree::compiler::Dialect::Flow::Transforms
+    iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::VM::Transforms
+    # Targets. Adopted from the Bazel variable COMPILER_DEPS.
+    iree::compiler::Dialect::HAL::Target::LegacyInterpreter
+    iree::compiler::Dialect::HAL::Target::VMLA
+    iree::compiler::Dialect::HAL::Target::VulkanSPIRV
+    iree::compiler::Dialect::VM::Target::Bytecode
     bindings::python::pyiree::common
-    iree::base::api
-    iree::base::signature_mangle
-    iree::hal::api
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::invocation
-    iree::vm::ref
-    iree::vm::variant_list
-    absl::inlined_vector
-    absl::memory
-    absl::strings
-    absl::optional
-    absl::span
+    LLVMSupport
+    MLIRIR
+    MLIRParser
+    MLIRPass
   TYPE
     SHARED
 )
