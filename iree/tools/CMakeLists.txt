@@ -232,7 +232,12 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Target::VMLA
       iree::compiler::Dialect::HAL::Target::VulkanSPIRV
       iree::compiler::Dialect::HAL::Target::LLVM
+      iree::hal::interpreter::interpreter_driver_module
+      # TODO(b/142004903): enable when Dawn HAL implementation is functional
+      # iree::hal::dawn::dawn_driver_module
+      iree::hal::vmla::vmla_driver_module
       iree::hal::vulkan::vulkan_driver_module
+      iree::hal::llvmjit::llvmjit_driver_module
   )
   add_executable(iree-run-mlir ALIAS iree_tools_iree-run-mlir)
 
@@ -260,6 +265,7 @@ if(${IREE_BUILD_COMPILER})
       # iree::hal::dawn::dawn_driver_module
       iree::hal::vmla::vmla_driver_module
       iree::hal::vulkan::vulkan_driver_module
+      iree::hal::llvmjit::llvmjit_driver_module
   )
   add_executable(iree-run-module ALIAS iree_tools_iree-run-module)
 
