@@ -15,6 +15,8 @@
 #ifndef IREE_BASE_INTERNAL_STATUS_BUILDER_H_
 #define IREE_BASE_INTERNAL_STATUS_BUILDER_H_
 
+#include "absl/strings/str_cat.h"
+#include "iree/base/internal/ostringstream.h"
 #include "iree/base/internal/status.h"
 #include "iree/base/source_location.h"
 
@@ -80,12 +82,42 @@ class ABSL_MUST_USE_RESULT StatusBuilder {
   // The location to record if this status is logged.
   SourceLocation loc_;
 
-  // The message that will be added to the original status.
-  std::string message_;
+  // Lazy construction of the expensive stream.
+  struct Rep {
+    explicit Rep() = default;
+    Rep(const Rep& r);
+
+    // Gathers additional messages added with `<<` for use in the final status.
+    std::string stream_message;
+    iree::OStringStream stream{&stream_message};
+  };
+
+  std::unique_ptr<Rep> rep_;
 };
+
+inline StatusBuilder::StatusBuilder(const StatusBuilder& sb)
+    : status_(sb.status_), loc_(sb.loc_) {
+  if (sb.rep_ != nullptr) {
+    rep_ = absl::make_unique<Rep>(*sb.rep_);
+  }
+}
+
+inline StatusBuilder& StatusBuilder::operator=(const StatusBuilder& sb) {
+  status_ = sb.status_;
+  loc_ = sb.loc_;
+  if (sb.rep_ != nullptr) {
+    rep_ = absl::make_unique<Rep>(*sb.rep_);
+  } else {
+    rep_ = nullptr;
+  }
+  return *this;
+}
 
 template <typename T>
 StatusBuilder& StatusBuilder::operator<<(const T& value) & {
+  if (status_.ok()) return *this;
+  if (rep_ == nullptr) rep_ = absl::make_unique<Rep>();
+  rep_->stream << value;
   return *this;
 }
 template <typename T>

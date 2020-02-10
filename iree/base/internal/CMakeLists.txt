@@ -92,6 +92,16 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    ostringstream
+  HDRS
+    "ostringstream.h"
+  SRCS
+    "ostringstream.cc"
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     source_location_internal
   HDRS
     "source_location.h"
@@ -118,6 +128,7 @@ iree_cc_library(
     "statusor.cc"
   DEPS
     ::logging_internal
+    ::ostringstream
     iree::base::platform_headers
     iree::base::source_location
     iree::base::target_platform

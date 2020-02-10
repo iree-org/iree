@@ -485,6 +485,17 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_test(
+  NAME
+    status_test
+  SRCS
+    "status_test.cc"
+  DEPS
+    ::status
+    ::status_matchers
+    iree::testing::gtest_main
+)
+
 iree_cc_library(
   NAME
     target_platform

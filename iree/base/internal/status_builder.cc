@@ -20,6 +20,9 @@
 
 namespace iree {
 
+StatusBuilder::Rep::Rep(const Rep& r)
+    : stream_message(r.stream_message), stream(&stream_message) {}
+
 StatusBuilder::StatusBuilder(const Status& original_status,
                              SourceLocation location)
     : status_(original_status), loc_(location) {}
@@ -27,23 +30,17 @@ StatusBuilder::StatusBuilder(const Status& original_status,
 StatusBuilder::StatusBuilder(Status&& original_status, SourceLocation location)
     : status_(original_status), loc_(location) {}
 
-StatusBuilder::StatusBuilder(const StatusBuilder& sb)
-    : status_(sb.status_), loc_(sb.loc_), message_(sb.message_) {}
-
 StatusBuilder::StatusBuilder(StatusCode code, SourceLocation location)
     : status_(code, ""), loc_(location) {}
 
-StatusBuilder& StatusBuilder::operator=(const StatusBuilder& sb) {
-  status_ = sb.status_;
-  loc_ = sb.loc_;
-  message_ = sb.message_;
-  return *this;
-}
-
 StatusBuilder::operator Status() const& {
+  if (rep_ == nullptr) return status_;
   return StatusBuilder(*this).CreateStatus();
 }
-StatusBuilder::operator Status() && { return std::move(*this).CreateStatus(); }
+StatusBuilder::operator Status() && {
+  if (rep_ == nullptr) return status_;
+  return std::move(*this).CreateStatus();
+}
 
 bool StatusBuilder::ok() const { return status_.ok(); }
 
@@ -52,11 +49,11 @@ StatusCode StatusBuilder::code() const { return status_.code(); }
 SourceLocation StatusBuilder::source_location() const { return loc_; }
 
 Status StatusBuilder::CreateStatus() && {
-  Status result = JoinMessageToStatus(status_, message_);
+  Status result = JoinMessageToStatus(status_, rep_->stream_message);
 
   // Reset the status after consuming it.
   status_ = UnknownError("");
-  message_ = "";
+  rep_ = nullptr;
   return result;
 }
 

@@ -418,6 +418,16 @@ cc_library(
     deps = platform_trampoline_deps("status_matchers"),
 )
 
+cc_test(
+    name = "status_test",
+    srcs = ["status_test.cc"],
+    deps = [
+        ":status",
+        ":status_matchers",
+        "//iree/testing:gtest_main",
+    ],
+)
+
 cc_library(
     name = "target_platform",
     hdrs = ["target_platform.h"],

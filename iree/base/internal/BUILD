@@ -91,6 +91,13 @@ cc_library(
 )
 
 cc_library(
+    name = "ostringstream",
+    srcs = ["ostringstream.cc"],
+    hdrs = ["ostringstream.h"],
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
     name = "source_location_internal",
     hdrs = ["source_location.h"],
 )
@@ -116,6 +123,7 @@ cc_library(
     ],
     deps = [
         ":logging_internal",
+        ":ostringstream",
         "//iree/base:platform_headers",
         "//iree/base:source_location",
         "//iree/base:target_platform",
