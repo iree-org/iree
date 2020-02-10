@@ -212,7 +212,17 @@ function(iree_complete_binary_link_options)
 
       # Append to the corresponding list of deps.
       if(_DEP_IS_ALWAYSLINK)
-        list(APPEND _ALWAYS_LINK_DEPS ${_DEP})
+
+        if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+          get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
+          if (_ALIASED_TARGET)
+            list(APPEND _ALWAYS_LINK_DEPS "-Wl,-force_load ${_ALIASED_TARGET}")
+          else()
+            list(APPEND _ALWAYS_LINK_DEPS "-Wl,-force_load ${_DEP}")
+          endif()
+        else()
+          list(APPEND _ALWAYS_LINK_DEPS ${_DEP})
+        endif()
 
         # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
         # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
@@ -232,7 +242,7 @@ function(iree_complete_binary_link_options)
 
     # Call into target_link_libraries with the lists of deps.
     # TODO(scotttodd): `-Wl,-force_load` version
-    if(MSVC)
+    if(MSVC OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin"))
       target_link_libraries(${_NAME}
         PUBLIC
           ${_ALWAYS_LINK_DEPS}
