@@ -17,7 +17,7 @@ func @buffer_view_const() -> !iree.ref<!hal.buffer_view> {
 // CHECK-LABEL: @buffer_view_create
 func @buffer_view_create(%arg0 : !iree.ref<!hal.buffer>) -> !iree.ref<!hal.buffer_view> {
   %0:2 = "test_hal.shape"() : () -> (i32, i32)
-  // CHECK: %view = hal.buffer_view.create %arg0, shape=[%0#0, %0#1], element_type=32 : !iree.ref<!hal.buffer_view>
+  // CHECK: %view = hal.buffer_view.create %arg0, shape = [%0#0, %0#1], element_type = 32 : !iree.ref<!hal.buffer_view>
   %view = hal.buffer_view.create %arg0, shape=[%0#0, %0#1], element_type=32 : !iree.ref<!hal.buffer_view>
   return %view : !iree.ref<!hal.buffer_view>
 }

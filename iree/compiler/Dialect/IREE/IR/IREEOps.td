@@ -49,10 +49,18 @@ def IREE_ReturnOp : IREE_Op<"return", [Terminator]> {
 def IREE_LoadInputOp : IREE_PureOp<"load_input"> {
   let arguments = (ins IREE_MemRef:$src);
   let results = (outs AnyType);
+
+  let assemblyFormat = [{
+    `(` $src `:` type($src) `)` attr-dict `:` type(results)
+  }];
 }
 
 def IREE_StoreOutputOp : IREE_Op<"store_output"> {
   let arguments = (ins AnyType:$src, IREE_MemRef:$dst);
+
+  let assemblyFormat = [{
+    `(` $src `:` type($src) `,` $dst `:` type($dst) `)` attr-dict
+  }];
 }
 
 def IREE_StoreReduceOp : IREE_Op<"store_reduce"> {
@@ -61,6 +69,11 @@ def IREE_StoreReduceOp : IREE_Op<"store_reduce"> {
     IREE_MemRef:$dst,
     FlatSymbolRefAttr:$reduction_fn
   );
+
+  let assemblyFormat = [{
+    `(` $src `:` type($src) `,` $dst `:` type($dst) `,` $reduction_fn `)`
+    attr-dict
+  }];
 }
 
 //===----------------------------------------------------------------------===//

@@ -77,6 +77,11 @@ def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
     HAL_Shape:$shape,
     HAL_ElementTypeAttr:$element_type
   );
+
+  let assemblyFormat = [{
+    $command_buffer `,` $ordinal `,` $buffer `,` `shape` `=` `[` $shape `]` `,`
+    `element_type` `=` $element_type attr-dict
+  }];
 }
 
 // TODO(benvanik): replace with resource sets.
@@ -270,6 +275,11 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
     HAL_DeviceSize:$result
   );
 
+  let assemblyFormat = [{
+    $allocator `,` `shape` `=` `[` $shape `]` `,` `element_type` `=`
+    $element_type attr-dict
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -299,6 +309,11 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   let results = (outs
     HAL_DeviceSize:$offset
   );
+
+  let assemblyFormat = [{
+    $allocator `,` `shape` `=` `[` $shape `]` `,` `element_type` `=`
+    $element_type `,` `indices` `=` `[` $indices `]` attr-dict
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -331,6 +346,12 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
     HAL_DeviceSize:$offset,
     HAL_DeviceSize:$length
   );
+
+  let assemblyFormat = [{
+    $allocator `,` `shape` `=` `[` $shape `]` `,` `element_type` `=`
+    $element_type `,` `indices` `=` `[` $indices `]` `,` `lengths` `=` `[`
+    $lengths `]` attr-dict
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -616,6 +637,11 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   let results = (outs
     RefPtrOf<HAL_BufferView>:$result
   );
+
+  let assemblyFormat = [{
+    $buffer `,` `shape` `=` `[` $shape `]` `,` `element_type` `=` $element_type
+    `:` type($result) attr-dict
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -933,6 +959,12 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
     HAL_Dim:$workgroup_z
   );
 
+  let assemblyFormat = [{
+    $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
+    `workgroup_xyz` `=` `[` $workgroup_x `,` $workgroup_y `,` $workgroup_z `]`
+    attr-dict
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -957,6 +989,11 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
     RefPtrOf<HAL_Buffer>:$workgroups_buffer,
     HAL_DeviceSize:$workgroups_offset
   );
+
+  let assemblyFormat = [{
+    $command_buffer `,` $executable `,` `entry_point` `=` $entry_point `,`
+    `workgroups` `=` $workgroups_buffer `[` $workgroups_offset `]` attr-dict
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -982,6 +1019,10 @@ def HAL_DescriptorSetMakeBindingOp :
   let results = (outs
     HAL_DescriptorSetBinding:$result
   );
+
+  let assemblyFormat = [{
+    `binding` `=` $binding `,` operands attr-dict `:` type($result)
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1149,8 +1190,7 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable op}];
-  let parser = [{ return parseRegionEndOp(parser, &result); }];
-  let printer = [{ return printRegionEndOp(p, *this); }];
+  let assemblyFormat = "attr-dict";
 }
 
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
@@ -1217,8 +1257,7 @@ def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
     Terminator,
   ]> {
   let summary = [{terminator pseudo-op for the executable binary op}];
-  let parser = [{ return parseRegionEndOp(parser, &result); }];
-  let printer = [{ return printRegionEndOp(p, *this); }];
+  let assemblyFormat = "attr-dict";
 }
 
 //===----------------------------------------------------------------------===//

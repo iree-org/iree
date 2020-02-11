@@ -699,38 +699,6 @@ void ConstRefRodataOp::build(Builder *builder, OperationState &result,
 }
 
 //===----------------------------------------------------------------------===//
-// ref_ptr operations
-//===----------------------------------------------------------------------===//
-
-//===----------------------------------------------------------------------===//
-// Native bitwise shifts and rotates
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseShiftArithmeticOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  OpAsmParser::OperandType op;
-  Type type;
-  IntegerAttr amount;
-  if (failed(parser.parseOperand(op)) || failed(parser.parseComma()) ||
-      failed(parser.parseAttribute(amount,
-                                   parser.getBuilder().getIntegerType(8),
-                                   "amount", result->attributes)) ||
-      failed(parser.parseColonType(type)) ||
-      failed(parser.resolveOperand(op, type, result->operands))) {
-    return failure();
-  }
-  result->addTypes({type});
-  return success();
-}
-
-static void printShiftArithmeticOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName() << ' ' << op->getOperand(0) << ", "
-    << op->getAttrOfType<IntegerAttr>("amount").getInt();
-  p.printOptionalAttrDict(op->getAttrs(), {"amount"});
-  p << " : " << op->getResult(0).getType();
-}
-
-//===----------------------------------------------------------------------===//
 // Control flow
 //===----------------------------------------------------------------------===//
 

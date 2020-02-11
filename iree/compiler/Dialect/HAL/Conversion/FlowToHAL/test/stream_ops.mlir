@@ -21,28 +21,28 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
     // CHECK: [[EXE:%.+]] = hal.ex.cache_executable {{.+}}, @ex0 : !iree.ref<!hal.executable>
-    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 0, %arg0, shape=[
+    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 0, %arg0, shape = [
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type=50331680
+    // CHECK-SAME: ], element_type = 50331680
     // CHECK-NEXT: hal.ex.defer_release
-    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[TMP_BUF]], shape=[
+    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[TMP_BUF]], shape = [
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type=50331680
+    // CHECK-SAME: ], element_type = 50331680
     // CHECK-NEXT: hal.ex.defer_release
-    // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], [[EXE]], entry_point=0, workgroup_xyz=[
+    // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], [[EXE]], entry_point = 0, workgroup_xyz = [
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
     // CHECK: hal.command_buffer.execution_barrier
     %1 = flow.dispatch @ex0::@entry0[%arg1 : vector<3xi32>](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
-    // CHECK: hal.ex.push_binding [[CMD]], 0, [[TMP_BUF]], shape=[
+    // CHECK: hal.ex.push_binding [[CMD]], 0, [[TMP_BUF]], shape = [
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type=50331680
+    // CHECK-SAME: ], element_type = 50331680
     // CHECK-NEXT: hal.ex.defer_release
-    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[RET_BUF]], shape=[
+    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[RET_BUF]], shape = [
     // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type=50331680
+    // CHECK-SAME: ], element_type = 50331680
     // CHECK-NEXT: hal.ex.defer_release
-    // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], {{.+}}, entry_point=0, workgroup_xyz=[
+    // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], {{.+}}, entry_point = 0, workgroup_xyz = [
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
     // CHECK: hal.command_buffer.execution_barrier

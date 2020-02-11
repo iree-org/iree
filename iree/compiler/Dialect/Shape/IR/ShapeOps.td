@@ -83,6 +83,10 @@ def Shape_CastCompatibleShapeOp : Shape_PureOp<"cast_compatible_shape"> {
   let arguments = (ins Variadic<Shape_RankedShape>:$operands);
   let results = (outs Shape_RankedShape:$result);
 
+  let assemblyFormat = [{
+    operands `:` type(operands) `->` type($result) attr-dict
+  }];
+
   let verifier = [{ return verify$cppClass(*this); }];
   let hasCanonicalizer = 1;
 }

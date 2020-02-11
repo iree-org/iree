@@ -85,60 +85,6 @@ void ExCacheExecutableOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.ex.push_binding
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseExPushBindingOp(OpAsmParser &parser,
-                                        OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  OpAsmParser::OperandType buffer;
-  SmallVector<OpAsmParser::OperandType, 4> shape;
-  IntegerAttr ordinalAttr;
-  IntegerAttr elementTypeAttr;
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.resolveOperand(
-          commandBuffer,
-          RefPtrType::get(CommandBufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseAttribute(ordinalAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "ordinal", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(buffer)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.resolveOperand(
-          buffer, RefPtrType::get(BufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseKeyword("shape")) || failed(parser.parseEqual()) ||
-      failed(parser.parseOperandList(shape, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(shape, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("element_type")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(elementTypeAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "element_type", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printExPushBindingOp(OpAsmPrinter &p, ExPushBindingOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.command_buffer());
-  p << ", " << op.ordinal() << ", ";
-  p.printOperand(op.buffer());
-  p << ", shape=[";
-  interleaveComma(op.shape(), p, [&](Value value) { p.printOperand(value); });
-  p << "], element_type=" << op.element_type();
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"ordinal", "element_type"});
-}
-
-//===----------------------------------------------------------------------===//
 // hal.make_memory_barrier
 //===----------------------------------------------------------------------===//
 
@@ -454,44 +400,6 @@ void AllocatorComputeSizeOp::getAsmResultNames(
   setNameFn(result(), "sz");
 }
 
-static ParseResult parseAllocatorComputeSizeOp(OpAsmParser &parser,
-                                               OperationState *result) {
-  OpAsmParser::OperandType allocator;
-  SmallVector<OpAsmParser::OperandType, 4> shape;
-  IntegerAttr elementType;
-  if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(
-          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("shape")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperandList(shape, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(shape, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("element_type")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(elementType, getDeviceSizeType(parser),
-                                   "element_type", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(getDeviceSizeType(parser));
-  return success();
-}
-
-static void printAllocatorComputeSizeOp(OpAsmPrinter &p,
-                                        AllocatorComputeSizeOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.allocator());
-  p << ", shape=[";
-  p.printOperands(op.shape());
-  p << "], element_type=" << op.element_type();
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"memory_types", "buffer_usage", "element_type"});
-}
-
 //===----------------------------------------------------------------------===//
 // hal.allocator.compute_offset
 //===----------------------------------------------------------------------===//
@@ -509,55 +417,6 @@ void AllocatorComputeOffsetOp::build(Builder *builder, OperationState &state,
 void AllocatorComputeOffsetOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(offset(), "off");
-}
-
-static ParseResult parseAllocatorComputeOffsetOp(OpAsmParser &parser,
-                                                 OperationState *result) {
-  OpAsmParser::OperandType allocator;
-  SmallVector<OpAsmParser::OperandType, 4> shape;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-  IntegerAttr elementType;
-  if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(
-          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("shape")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperandList(shape, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(shape, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("element_type")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(elementType,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "element_type", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("indices")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(indices, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(indices, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(getDeviceSizeType(parser));
-  return success();
-}
-
-static void printAllocatorComputeOffsetOp(OpAsmPrinter &p,
-                                          AllocatorComputeOffsetOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.allocator());
-  p << ", shape=[";
-  p.printOperands(op.shape());
-  p << "], element_type=" << op.element_type();
-  p << ", indices=[";
-  p.printOperands(op.indices());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"memory_types", "buffer_usage", "element_type"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -580,64 +439,6 @@ void AllocatorComputeRangeOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(offset(), "off");
   setNameFn(length(), "len");
-}
-
-static ParseResult parseAllocatorComputeRangeOp(OpAsmParser &parser,
-                                                OperationState *result) {
-  OpAsmParser::OperandType allocator;
-  SmallVector<OpAsmParser::OperandType, 4> shape;
-  SmallVector<OpAsmParser::OperandType, 4> indices;
-  SmallVector<OpAsmParser::OperandType, 4> lengths;
-  IntegerAttr elementType;
-  if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(
-          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("shape")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperandList(shape, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(shape, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("element_type")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(elementType,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "element_type", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("indices")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(indices, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(indices, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("lengths")) ||
-      failed(parser.parseEqual()) ||
-      failed(
-          parser.parseOperandList(lengths, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(lengths, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes({getDeviceSizeType(parser), getDeviceSizeType(parser)});
-  return success();
-}
-
-static void printAllocatorComputeRangeOp(OpAsmPrinter &p,
-                                         AllocatorComputeRangeOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.allocator());
-  p << ", shape=[";
-  p.printOperands(op.shape());
-  p << "], element_type=" << op.element_type();
-  p << ", indices=[";
-  p.printOperands(op.indices());
-  p << "], lengths=[";
-  p.printOperands(op.lengths());
-  p << "]";
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"memory_types", "buffer_usage", "element_type"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -874,47 +675,6 @@ void BufferViewCreateOp::build(Builder *builder, OperationState &state,
 void BufferViewCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "view");
-}
-
-static ParseResult parseBufferViewCreateOp(OpAsmParser &parser,
-                                           OperationState *result) {
-  OpAsmParser::OperandType buffer;
-  SmallVector<OpAsmParser::OperandType, 4> shape;
-  IntegerAttr elementType;
-  Type resultType;
-  if (failed(parser.parseOperand(buffer)) ||
-      failed(parser.resolveOperand(
-          buffer, RefPtrType::get(BufferType::get(result->getContext())),
-          result->operands)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("shape")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperandList(shape, OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(shape, getDimType(parser),
-                                    result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("element_type")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(elementType,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "element_type", result->attributes)) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printBufferViewCreateOp(OpAsmPrinter &p, BufferViewCreateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.buffer());
-  p << ", shape=[";
-  p.printOperands(op.shape());
-  p << "], element_type=" << op.element_type();
-  p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"element_type"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -1260,130 +1020,6 @@ void CommandBufferDispatchOp::build(
                                              entryPoint.ordinal()));
 }
 
-static ParseResult parseCommandBufferDispatchOp(OpAsmParser &parser,
-                                                OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  OpAsmParser::OperandType executable;
-  IntegerAttr entryPointAttr;
-  OpAsmParser::OperandType workgroupX, workgroupY, workgroupZ;
-  SmallVector<OpAsmParser::OperandType, 4> bindings;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(executable)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("entry_point")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(entryPointAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "entry_point", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("workgroup_xyz")) ||
-      failed(parser.parseEqual()) || failed(parser.parseLSquare()) ||
-      failed(parser.parseOperand(workgroupX)) || failed(parser.parseComma()) ||
-      failed(parser.parseOperand(workgroupY)) || failed(parser.parseComma()) ||
-      failed(parser.parseOperand(workgroupZ)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.resolveOperands(
-          ArrayRef<OpAsmParser::OperandType>{
-              commandBuffer,
-              executable,
-              workgroupX,
-              workgroupY,
-              workgroupZ,
-          },
-          ArrayRef<Type>{
-              RefPtrType::get(CommandBufferType::get(result->getContext())),
-              RefPtrType::get(ExecutableType::get(result->getContext())),
-              parser.getBuilder().getIntegerType(32),
-              parser.getBuilder().getIntegerType(32),
-              parser.getBuilder().getIntegerType(32),
-          },
-          operandsLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferDispatchOp(OpAsmPrinter &p,
-                                         CommandBufferDispatchOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.command_buffer());
-  p << ", ";
-  p.printOperand(op.executable());
-  p << ", entry_point=" << op.entry_point() << ", workgroup_xyz=[";
-  interleaveComma(
-      ValueRange{op.workgroup_x(), op.workgroup_y(), op.workgroup_z()}, p,
-      [&](Value value) { p.printOperand(value); });
-  p << "]";
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
-                              "entry_point",
-                          });
-}
-
-//===----------------------------------------------------------------------===//
-// hal.command_buffer.dispatch.indirect
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCommandBufferDispatchIndirectOp(
-    OpAsmParser &parser, OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  OpAsmParser::OperandType executable;
-  IntegerAttr entryPointAttr;
-  OpAsmParser::OperandType workgroupsBuffer;
-  OpAsmParser::OperandType workgroupsOffset;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(executable)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("entry_point")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(entryPointAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "entry_point", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("workgroups")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperand(workgroupsBuffer)) ||
-      failed(parser.parseLSquare()) ||
-      failed(parser.parseOperand(workgroupsOffset)) ||
-      failed(parser.parseRSquare()) ||
-      failed(parser.resolveOperands(
-          ArrayRef<OpAsmParser::OperandType>{
-              commandBuffer,
-              executable,
-              workgroupsBuffer,
-              workgroupsOffset,
-          },
-          ArrayRef<Type>{
-              RefPtrType::get(CommandBufferType::get(result->getContext())),
-              RefPtrType::get(ExecutableType::get(result->getContext())),
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-          },
-          operandsLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferDispatchIndirectOp(
-    OpAsmPrinter &p, CommandBufferDispatchIndirectOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.command_buffer());
-  p << ", ";
-  p.printOperand(op.executable());
-  p << ", entry_point=" << op.entry_point() << ", workgroups=";
-  p.printOperand(op.workgroups_buffer());
-  p << '[';
-  p.printOperand(op.workgroups_offset());
-  p << ']';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
-                              "entry_point",
-                          });
-}
-
 //===----------------------------------------------------------------------===//
 // hal.descriptor_set.make_binding
 //===----------------------------------------------------------------------===//
@@ -1399,53 +1035,6 @@ void DescriptorSetMakeBindingOp::build(Builder *builder, OperationState &state,
 void DescriptorSetMakeBindingOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "binding");
-}
-
-static ParseResult parseDescriptorSetMakeBindingOp(OpAsmParser &parser,
-                                                   OperationState *result) {
-  OpAsmParser::OperandType buffer;
-  OpAsmParser::OperandType offset;
-  OpAsmParser::OperandType length;
-  llvm::SMLoc operandLoc;
-  IntegerAttr bindingAttr;
-  Type resultType;
-  if (failed(parser.parseKeyword("binding")) || failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(bindingAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "binding", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(buffer)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(offset)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(length)) ||
-      failed(parser.getCurrentLocation(&operandLoc)) ||
-      failed(parser.resolveOperands(
-          {
-              buffer,
-              offset,
-              length,
-          },
-          ArrayRef<Type>{
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          operandLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printDescriptorSetMakeBindingOp(OpAsmPrinter &p,
-                                            DescriptorSetMakeBindingOp op) {
-  p << op.getOperationName() << ' ';
-  p << "binding=" << op.binding() << ", ";
-  p.printOperands(op.getOperation()->getOperands());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"binding"});
-  p << " : ";
-  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1588,16 +1177,6 @@ static void printExecutableOp(OpAsmPrinter &p, ExecutableOp op) {
 static LogicalResult verifyExecutableOp(ExecutableOp op) {
   // TODO(benvanik): check export name conflicts.
   return success();
-}
-
-static ParseResult parseRegionEndOp(OpAsmParser &parser,
-                                    OperationState *result) {
-  return parser.parseOptionalAttrDict(result->attributes);
-}
-
-static void printRegionEndOp(OpAsmPrinter &p, Operation *op) {
-  p << op->getName();
-  p.printOptionalAttrDict(op->getAttrs());
 }
 
 //===----------------------------------------------------------------------===//

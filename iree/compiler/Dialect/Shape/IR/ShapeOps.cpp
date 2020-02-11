@@ -267,33 +267,6 @@ void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
 // shape.cast_compatible_shape
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseCastCompatibleShapeOp(OpAsmParser &parser,
-                                              OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 2> operands;
-  SmallVector<Type, 2> operandTypes;
-  if (parser.parseOperandList(operands) ||
-      parser.parseColonTypeList(operandTypes) ||
-      parser.parseOptionalArrowTypeList(state.types) ||
-      parser.parseOptionalAttrDict(state.attributes) ||
-      parser.resolveOperands(operands, operandTypes, parser.getNameLoc(),
-                             state.operands)) {
-    return failure();
-  }
-
-  return success();
-}
-
-static void printCastCompatibleShapeOp(OpAsmPrinter &p,
-                                       CastCompatibleShapeOp op) {
-  p << op.getOperationName() << " ";
-  p.printOperands(op.operands());
-  p << " : ";
-  interleaveComma(op.getOperandTypes(), p);
-  p << " -> ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDict(op.getOperation()->getAttrs());
-}
-
 static LogicalResult verifyCastCompatibleShapeOp(CastCompatibleShapeOp op) {
   if (op.operands().empty()) {
     return op.emitOpError() << "Must have at least one operand";

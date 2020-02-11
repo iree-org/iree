@@ -112,8 +112,8 @@ func @command_buffer_dispatch(%arg0 : !iree.ref<!hal.command_buffer>) {
   %1 = "test_hal.workgroup_x"() : () -> i32
   %2 = "test_hal.workgroup_y"() : () -> i32
   %3 = "test_hal.workgroup_z"() : () -> i32
-  // CHECK: hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroup_xyz=[%1, %2, %3]
-  hal.command_buffer.dispatch %arg0, %0, entry_point=0, workgroup_xyz=[%1, %2, %3]
+  // CHECK: hal.command_buffer.dispatch %arg0, %0, entry_point = 0, workgroup_xyz = [%1, %2, %3]
+  hal.command_buffer.dispatch %arg0, %0, entry_point = 0, workgroup_xyz = [%1, %2, %3]
   return
 }
 
@@ -124,7 +124,7 @@ func @command_buffer_dispatch_indirect(%arg0 : !iree.ref<!hal.command_buffer>) {
   %0 = "test_hal.executable"() : () -> !iree.ref<!hal.executable>
   %1 = "test_hal.buffer"() : () -> !iree.ref<!hal.buffer>
   %2 = "test_hal.offset"() : () -> i32
-  // CHECK: hal.command_buffer.dispatch.indirect %arg0, %0, entry_point=0, workgroups=%1[%2]
-  hal.command_buffer.dispatch.indirect %arg0, %0, entry_point=0, workgroups=%1[%2]
+  // CHECK: hal.command_buffer.dispatch.indirect %arg0, %0, entry_point = 0, workgroups = %1[%2]
+  hal.command_buffer.dispatch.indirect %arg0, %0, entry_point = 0, workgroups = %1[%2]
   return
 }

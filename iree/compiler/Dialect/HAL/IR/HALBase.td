@@ -232,6 +232,7 @@ def HAL_Allocator : DialectType<
   let typeDescription = [{
     Allocates buffers for a particular device memory space.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::AllocatorType>()";
 }
 
 def HAL_Buffer : DialectType<
@@ -319,6 +320,7 @@ def HAL_Executable : DialectType<
   let typeDescription = [{
     A prepared and ready-to-dispatch executable.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::ExecutableType>()";
 }
 
 def HAL_ExecutableCache : DialectType<

@@ -837,15 +837,14 @@ class VM_ShiftArithmeticOp<I type, string mnemonic, VM_OPC opcode,
     type:$result
   );
 
+  let assemblyFormat = "$operand `,` $amount attr-dict `:` type($operand)";
+
   let encoding = [
     VM_EncOpcode<opcode>,
     VM_EncOperand<"operand", 0>,
     VM_EncIntAttr<"amount", type.bitwidth>,
     VM_EncResult<"result">,
   ];
-
-  let parser = [{ return parseShiftArithmeticOp(parser, &result); }];
-  let printer = [{ return printShiftArithmeticOp(p, *this); }];
 }
 
 def VM_ShlI32Op : VM_ShiftArithmeticOp<I32, "shl.i32", VM_OPC_ShlI32> {
