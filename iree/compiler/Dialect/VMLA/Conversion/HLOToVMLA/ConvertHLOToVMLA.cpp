@@ -65,6 +65,43 @@ struct IdentityOpConversion : public OpConversionPattern<SRC> {
   }
 };
 
+// Converts a broadcast_in_dim op to either a broadcast or a tile depending on
+// the input shape.
+struct BroadcastInDimOpConversion
+    : public OpConversionPattern<xla_hlo::BroadcastInDimOp> {
+  BroadcastInDimOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  PatternMatchResult matchAndRewrite(
+      xla_hlo::BroadcastInDimOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto srcShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+    auto dstShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+
+    auto tensorType = srcOp.operand().getType().cast<TensorType>();
+    if (tensorType.getRank() == 0) {
+      // Broadcast of a scalar value.
+      rewriter.create<IREE::VMLA::BroadcastOp>(
+          srcOp.getLoc(), operands[0], srcShape, dst, dstShape,
+          TypeAttr::get(tensorType.getElementType()));
+    } else {
+      // Tiling a non-scalar value.
+      rewriter.create<IREE::VMLA::TileOp>(
+          srcOp.getLoc(), operands[0], srcShape, dst, dstShape,
+          TypeAttr::get(tensorType.getElementType()));
+    }
+
+    rewriter.replaceOp(srcOp, {dst});
+    return matchSuccess();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 }  // namespace
 
 void populateHLOToVMLAPatterns(MLIRContext *context,
@@ -154,6 +191,10 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // these entirely by just passing on their input values.
   patterns.insert<IdentityOpConversion<xla_hlo::BitcastConvertOp>>(context);
   patterns.insert<IdentityOpConversion<xla_hlo::ReshapeOp>>(context);
+
+  // Conversions that don't have a 1:1 mapping, mostly involving buffer views
+  // or transfers.
+  patterns.insert<BroadcastInDimOpConversion>(context, typeConverter);
 
   // TODO(benvanik): add missing ops:
   // - ConvOp
