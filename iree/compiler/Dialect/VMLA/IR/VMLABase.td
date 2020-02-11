@@ -72,6 +72,8 @@ def VMLA_DeviceSizeAttr : IntegerAttrBase<I32, "device_size_t">;
 def VMLA_HostSize : TypeAlias<I32>;
 def VMLA_HostSizeAttr : IntegerAttrBase<I32, "size_t">;
 
+def VMLA_Index : TypeAlias<I32>;
+
 def VMLA_Shape : TypeAlias<Shape_RankedShape>;
 
 def VMLA_HostBufferRef : AnyTypeOf<[

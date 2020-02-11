@@ -50,6 +50,12 @@ vm.import @buffer.fill(
   %dst : !iree.ref<!vmla.buffer>
 )
 
+vm.import @buffer.load.i32(
+  %src : !iree.ref<!vmla.buffer>,
+  %byte_offset : i32
+) -> i32
+attributes {nosideeffects}
+
 vm.import @cmp.i8(%predicate : i32, %lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @cmp.i16(%predicate : i32, %lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @cmp.i32(%predicate : i32, %lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
@@ -58,6 +64,24 @@ vm.import @cmp.f32(%predicate : i32, %lhs : !iree.ref<!vmla.buffer>, %rhs : !ire
 vm.import @select.x8(%cond : !iree.ref<!vmla.buffer>, %lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @select.x16(%cond : !iree.ref<!vmla.buffer>, %lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @select.x32(%cond : !iree.ref<!vmla.buffer>, %lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+
+// TODO(benvanik): do the copies with buffer.copy instead and leave the offset
+// calculations in the IR for the compiler to simplify.
+vm.import @copy.x8(
+  %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ...,
+  %lengths : i32 ...
+)
+vm.import @copy.x16(
+  %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ...,
+  %lengths : i32 ...
+)
+vm.import @copy.x32(
+  %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ..., %src_indices : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ..., %dst_indices : i32 ...,
+  %lengths : i32 ...
+)
 
 vm.import @transpose.x8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,

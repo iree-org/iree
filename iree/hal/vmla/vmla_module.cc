@@ -304,6 +304,15 @@ class VMLAModuleState final {
     return OkStatus();
   }
 
+  StatusOr<int32_t> BufferLoadI32(vm::ref<iree_vmla_buffer_t>& src,
+                                  iree_vmla_size_t byte_offset) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::BufferLoadI32");
+    IREE_RETURN_IF_NULL(src);
+    ASSIGN_OR_RETURN(auto data,
+                     src->RangeAs<int32_t>(byte_offset, sizeof(int32_t)));
+    return data[0];
+  }
+
   //===--------------------------------------------------------------------===//
   // Common helpers for defining ops
   //===--------------------------------------------------------------------===//
@@ -396,6 +405,21 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
   // VMLA Ops: shape/structure
   //===--------------------------------------------------------------------===//
+
+#define IREE_VMLA_COPY_OP(name, size)                                          \
+  Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
+              absl::Span<const int32_t> src_indices,                           \
+              vm::ref<iree_vmla_buffer_t>& dst, iree_vmla_shape_t dst_shape,   \
+              absl::Span<const int32_t> dst_indices,                           \
+              absl::Span<const int32_t> lengths) {                             \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernels::Copy::Execute<size>(                                       \
+        src->As<uint8_t>(), Shape(src_shape), src_indices, dst->As<uint8_t>(), \
+        Shape(dst_shape), dst_indices, lengths);                               \
+  }
+  IREE_VMLA_COPY_OP(CopyX8, sizeof(uint8_t));
+  IREE_VMLA_COPY_OP(CopyX16, sizeof(uint16_t));
+  IREE_VMLA_COPY_OP(CopyX32, sizeof(uint32_t));
 
 #define IREE_VMLA_TRANSPOSE_OP(name, type)                                     \
   Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
@@ -644,6 +668,7 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("buffer.view", &VMLAModuleState::BufferView),
     vm::MakeNativeFunction("buffer.copy", &VMLAModuleState::BufferCopy),
     vm::MakeNativeFunction("buffer.fill", &VMLAModuleState::BufferFill),
+    vm::MakeNativeFunction("buffer.load.i32", &VMLAModuleState::BufferLoadI32),
 
     vm::MakeNativeFunction("cmp.i8", &VMLAModuleState::CmpI8),
     vm::MakeNativeFunction("cmp.i16", &VMLAModuleState::CmpI16),
@@ -653,9 +678,12 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("select.x16", &VMLAModuleState::SelectX16),
     vm::MakeNativeFunction("select.x32", &VMLAModuleState::SelectX32),
 
-    vm::MakeNativeFunction("reverse.x8", &VMLAModuleState::ReverseX8),
-    vm::MakeNativeFunction("reverse.x16", &VMLAModuleState::ReverseX16),
-    vm::MakeNativeFunction("reverse.x32", &VMLAModuleState::ReverseX32),
+    vm::MakeNativeFunction("copy.x8", &VMLAModuleState::CopyX8),
+    vm::MakeNativeFunction("copy.x16", &VMLAModuleState::CopyX16),
+    vm::MakeNativeFunction("copy.x32", &VMLAModuleState::CopyX32),
+    vm::MakeNativeFunction("transpose.x8", &VMLAModuleState::TransposeX8),
+    vm::MakeNativeFunction("transpose.x16", &VMLAModuleState::TransposeX16),
+    vm::MakeNativeFunction("transpose.x32", &VMLAModuleState::TransposeX32),
     vm::MakeNativeFunction("reverse.x8", &VMLAModuleState::ReverseX8),
     vm::MakeNativeFunction("reverse.x16", &VMLAModuleState::ReverseX16),
     vm::MakeNativeFunction("reverse.x32", &VMLAModuleState::ReverseX32),

@@ -154,10 +154,12 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   VMLA_IMPORT_OP(IREE::VMLA::BufferViewOp, "vmla.buffer.view");
   VMLA_IMPORT_OP(IREE::VMLA::BufferCopyOp, "vmla.buffer.copy");
   VMLA_IMPORT_OP(IREE::VMLA::BufferFillOp, "vmla.buffer.fill");
+  VMLA_IMPORT_OP(IREE::VMLA::BufferLoadI32Op, "vmla.buffer.load.i32");
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::CmpOp, "vmla.cmp");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::SelectOp, "vmla.select");
 
+  VMLA_SIZED_IMPORT_OP(IREE::VMLA::CopyOp, "vmla.copy");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::TransposeOp, "vmla.transpose");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::ReverseOp, "vmla.reverse");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::PadOp, "vmla.pad");

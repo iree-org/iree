@@ -102,6 +102,113 @@ struct BroadcastInDimOpConversion
   TypeConverter &typeConverter;
 };
 
+// Converts a static slice op to a copy (if the source must be preserved).
+struct SliceOpConversion : public OpConversionPattern<xla_hlo::SliceOp> {
+  SliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  PatternMatchResult matchAndRewrite(
+      xla_hlo::SliceOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto isNotOne = [](APInt stride) { return stride != 1; };
+    if (llvm::any_of(srcOp.strides(), isNotOne)) {
+      srcOp.emitWarning()
+          << "Could not lower slice op with non-singular strides";
+      return matchFailure();
+    }
+
+    // TODO(benvanik): if the source is only used by this op then replace with
+    // a vmla.buffer.view op.
+
+    auto srcShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+    auto dstShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+
+    int rank = srcOp.operand().getType().cast<ShapedType>().getRank();
+    auto indexType = rewriter.getIntegerType(32);
+    SmallVector<Value, 4> srcIndices(rank);
+    SmallVector<Value, 4> dstIndices(rank);
+    SmallVector<Value, 4> lengths(rank);
+    Value zero = rewriter.createOrFold<mlir::ConstantOp>(
+        srcOp.getLoc(), indexType, rewriter.getI32IntegerAttr(0));
+    for (int i = 0; i < rank; ++i) {
+      uint64_t ui = static_cast<uint64_t>(i);
+      srcIndices[i] = rewriter.createOrFold<mlir::ConstantOp>(
+          srcOp.getLoc(), indexType,
+          rewriter.getI32IntegerAttr(
+              srcOp.start_indices().getValue<int64_t>({ui})));
+      dstIndices[i] = zero;
+      lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
+          srcOp.getLoc(), indexType,
+          rewriter.getI32IntegerAttr(
+              srcOp.limit_indices().getValue<int64_t>({ui}) -
+              srcOp.start_indices().getValue<int64_t>({ui})));
+    }
+
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    rewriter.create<IREE::VMLA::CopyOp>(
+        srcOp.getLoc(), operands[0], srcShape, srcIndices, dst, dstShape,
+        dstIndices, lengths,
+        TypeAttr::get(srcOp.getType().cast<ShapedType>().getElementType()));
+    rewriter.replaceOp(srcOp, {dst});
+    return matchSuccess();
+  }
+
+  TypeConverter &typeConverter;
+};
+
+// Converts a dynamic slice op to a copy (if the source must be preserved).
+struct DynamicSliceOpConversion
+    : public OpConversionPattern<xla_hlo::DynamicSliceOp> {
+  DynamicSliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  PatternMatchResult matchAndRewrite(
+      xla_hlo::DynamicSliceOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // TODO(benvanik): if the source is only used by this op then replace with
+    // a vmla.buffer.view op.
+
+    auto srcShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+    auto dstShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.result(), typeConverter, rewriter);
+
+    int rank = srcOp.operand().getType().cast<ShapedType>().getRank();
+    auto indexType = rewriter.getIntegerType(32);
+    SmallVector<Value, 4> srcIndices(rank);
+    SmallVector<Value, 4> dstIndices(rank);
+    SmallVector<Value, 4> lengths(rank);
+    Value zero = rewriter.createOrFold<mlir::ConstantOp>(
+        srcOp.getLoc(), indexType, rewriter.getI32IntegerAttr(0));
+    for (int i = 0; i < rank; ++i) {
+      srcIndices[i] = rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
+          srcOp.getLoc(), rewriter.getIntegerType(32), operands[1],
+          rewriter.createOrFold<mlir::ConstantOp>(
+              srcOp.getLoc(), indexType,
+              rewriter.getI32IntegerAttr(i * sizeof(int32_t))));
+      dstIndices[i] = zero;
+      lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
+          srcOp.getLoc(), indexType,
+          rewriter.getI32IntegerAttr(srcOp.slice_sizes().getValue<int64_t>(
+              {static_cast<uint64_t>(i)})));
+    }
+
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    rewriter.create<IREE::VMLA::CopyOp>(
+        srcOp.getLoc(), operands[0], srcShape, srcIndices, dst, dstShape,
+        dstIndices, lengths,
+        TypeAttr::get(srcOp.getType().cast<ShapedType>().getElementType()));
+    rewriter.replaceOp(srcOp, {dst});
+    return matchSuccess();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 }  // namespace
 
 void populateHLOToVMLAPatterns(MLIRContext *context,
@@ -195,6 +302,8 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // Conversions that don't have a 1:1 mapping, mostly involving buffer views
   // or transfers.
   patterns.insert<BroadcastInDimOpConversion>(context, typeConverter);
+  patterns.insert<SliceOpConversion>(context, typeConverter);
+  patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
 
   // TODO(benvanik): add missing ops:
   // - ConvOp

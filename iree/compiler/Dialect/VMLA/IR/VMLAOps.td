@@ -103,6 +103,16 @@ def VMLA_BufferFillOp : VMLA_Op<"buffer.fill"> {
   );
 }
 
+def VMLA_BufferLoadI32Op : VMLA_PureOp<"buffer.load.i32"> {
+  let arguments = (ins
+    VMLA_BufferRef:$src,
+    VMLA_DeviceSize:$byte_offset
+  );
+  let results = (outs
+    I32:$result
+  );
+}
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: comparison
 //===----------------------------------------------------------------------===//
@@ -130,6 +140,22 @@ def VMLA_SelectOp : VMLA_ElementTypeOp<"select"> {
 //===----------------------------------------------------------------------===//
 // VMLA Ops: shape/structure
 //===----------------------------------------------------------------------===//
+
+def VMLA_CopyOp : VMLA_ElementTypeOp<"copy", [
+    VMLA_IncludeShapes,
+    SameVariadicOperandSize,
+  ]> {
+  let arguments = (ins
+    VMLA_BufferRef:$src,
+    VMLA_Shape:$src_shape,
+    Variadic<VMLA_Index>:$src_indices,
+    VMLA_BufferRef:$dst,
+    VMLA_Shape:$dst_shape,
+    Variadic<VMLA_Index>:$dst_indices,
+    Variadic<VMLA_Index>:$lengths,
+    VMLA_AnyTypeAttr:$element_type
+  );
+}
 
 def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
   let arguments = (ins
