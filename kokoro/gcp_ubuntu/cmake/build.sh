@@ -36,5 +36,8 @@ cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
-echo "Building and testing with cmake"
+echo "Building with cmake"
 ./build_tools/cmake/build.sh
+
+echo "Testing with ctest"
+./build_tools/cmake/test.sh
