@@ -102,6 +102,58 @@ struct BroadcastInDimOpConversion
   TypeConverter &typeConverter;
 };
 
+// Converts a concat into a set of copies into the destination buffer.
+struct ConcatenateOpConversion
+    : public OpConversionPattern<xla_hlo::ConcatenateOp> {
+  ConcatenateOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  PatternMatchResult matchAndRewrite(
+      xla_hlo::ConcatenateOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto indexType = rewriter.getIntegerType(32);
+    auto zero = rewriter.createOrFold<mlir::ConstantOp>(
+        srcOp.getLoc(), indexType, rewriter.getI32IntegerAttr(0));
+
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    auto dstShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+
+    auto finalType = srcOp.getResult().getType().cast<TensorType>();
+    int rank = finalType.getRank();
+    llvm::SmallVector<Value, 4> srcIndices(rank, zero);
+    llvm::SmallVector<Value, 4> dstIndices(rank, zero);
+    auto concatDimension = srcOp.dimension().getZExtValue();
+    for (auto srcDstOperand : llvm::zip(srcOp.val(), operands)) {
+      Value tensorOperand, bufferOperand;
+      std::tie(tensorOperand, bufferOperand) = srcDstOperand;
+
+      auto srcShape = VMLAConversionTarget::getTensorShape(
+          srcOp.getLoc(), tensorOperand, typeConverter, rewriter);
+      SmallVector<Value, 4> lengths(rank);
+      for (int i = 0; i < rank; ++i) {
+        lengths[i] = rewriter.createOrFold<Shape::RankedDimOp>(srcOp.getLoc(),
+                                                               srcShape, i);
+      }
+
+      rewriter.create<IREE::VMLA::CopyOp>(
+          srcOp.getLoc(), bufferOperand, srcShape, srcIndices, dst, dstShape,
+          dstIndices, lengths,
+          TypeAttr::get(srcOp.getType().cast<ShapedType>().getElementType()));
+
+      dstIndices[concatDimension] = rewriter.createOrFold<mlir::AddIOp>(
+          srcOp.getLoc(), dstIndices[concatDimension],
+          lengths[concatDimension]);
+    }
+
+    rewriter.replaceOp(srcOp, {dst});
+    return matchSuccess();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 // Converts a static slice op to a copy (if the source must be preserved).
 struct SliceOpConversion : public OpConversionPattern<xla_hlo::SliceOp> {
   SliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
@@ -302,6 +354,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // Conversions that don't have a 1:1 mapping, mostly involving buffer views
   // or transfers.
   patterns.insert<BroadcastInDimOpConversion>(context, typeConverter);
+  patterns.insert<ConcatenateOpConversion>(context, typeConverter);
   patterns.insert<SliceOpConversion>(context, typeConverter);
   patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
 
