@@ -47,6 +47,7 @@
 
 #include "mlir/Dialect/Linalg/EDSC/Builders.h"
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
+#include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/EDSC/Builders.h"
 #include "mlir/EDSC/Intrinsics.h"
 
@@ -62,11 +63,11 @@ using edsc::ValueHandle;
 // From the Linalg Dialect.
 using edsc::intrinsics::linalg_fill;
 // From the Std Dialect.
-using edsc::intrinsics::alloc;
-using edsc::intrinsics::constant_float;
-using edsc::intrinsics::dealloc;
-using edsc::intrinsics::dim;
-using edsc::intrinsics::ret;
+using edsc::intrinsics::std_alloc;
+using edsc::intrinsics::std_constant_float;
+using edsc::intrinsics::std_dealloc;
+using edsc::intrinsics::std_dim;
+using edsc::intrinsics::std_ret;
 // -----------------------------------------------------------------------------
 
 // Entry point class to build a whole model declaratively with C++ EDSCs.

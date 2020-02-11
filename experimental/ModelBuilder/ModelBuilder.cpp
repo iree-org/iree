@@ -14,6 +14,7 @@
 
 #include "experimental/ModelBuilder/ModelBuilder.h"
 
+#include "mlir/Dialect/AffineOps/EDSC/Builders.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -33,8 +34,8 @@ mlir::ModelBuilder::ModelBuilder()
       f32(FloatType::getF32(&ctx)) {}
 
 Value mlir::ModelBuilder::constant_f32(float v) {
-  return constant_float(llvm::APFloat(v),
-                        FloatType::getF32(ScopedContext::getContext()));
+  return std_constant_float(llvm::APFloat(v),
+                            FloatType::getF32(ScopedContext::getContext()));
 }
 
 FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
@@ -59,10 +60,10 @@ RankedTensorType mlir::ModelBuilder::getRankedTensorType(
 Value mlir::ModelBuilder::fusedBiasTanh(ValueHandle x, ValueHandle bias) {
   using edsc::op::operator+;
   using edsc::op::operator*;
-  using edsc::intrinsics::tanh;
+  using edsc::intrinsics::std_tanh;
   assert(x.getType().isF32() && bias.getType().isF32() && "f32 expected");
   ValueHandle half(constant_f32(0.5f));
-  return x + half * tanh((x + bias) * half) + half;
+  return x + half * std_tanh((x + bias) * half) + half;
 }
 
 ValueHandle mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,

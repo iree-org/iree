@@ -54,17 +54,17 @@ void buildMNIST(ModelBuilder &modelBuilder, StringLiteral funcName, unsigned B,
   OpBuilder b(&func.getBody());
   ScopedContext scope(b, func.getLoc());
   Value input = func.getArgument(0);
-  Value batchSize = dim(input, 0);
-  Value h1Weights = alloc(modelBuilder.getMemRefType({W0, W1}, f32));
-  Value h2Weights = alloc(modelBuilder.getMemRefType({W1, W2}, f32));
-  Value h3Weights = alloc(modelBuilder.getMemRefType({W2, W3}, f32));
-  Value bias1 = alloc(modelBuilder.getMemRefType({W1}, f32));
-  Value bias2 = alloc(modelBuilder.getMemRefType({W2}, f32));
-  Value bias3 = alloc(modelBuilder.getMemRefType({W3}, f32));
+  Value batchSize = std_dim(input, 0);
+  Value h1Weights = std_alloc(modelBuilder.getMemRefType({W0, W1}, f32));
+  Value h2Weights = std_alloc(modelBuilder.getMemRefType({W1, W2}, f32));
+  Value h3Weights = std_alloc(modelBuilder.getMemRefType({W2, W3}, f32));
+  Value bias1 = std_alloc(modelBuilder.getMemRefType({W1}, f32));
+  Value bias2 = std_alloc(modelBuilder.getMemRefType({W2}, f32));
+  Value bias3 = std_alloc(modelBuilder.getMemRefType({W3}, f32));
   Value outputBlock1 =
-      alloc(modelBuilder.getMemRefType({-1, W1}, f32), batchSize);
+      std_alloc(modelBuilder.getMemRefType({-1, W1}, f32), batchSize);
   Value outputBlock2 =
-      alloc(modelBuilder.getMemRefType({-1, W2}, f32), batchSize);
+      std_alloc(modelBuilder.getMemRefType({-1, W2}, f32), batchSize);
   Value outputBlock3 = func.getArgument(1);
 
   ValueHandle zero(modelBuilder.constant_f32(0.0f));
@@ -84,16 +84,16 @@ void buildMNIST(ModelBuilder &modelBuilder, StringLiteral funcName, unsigned B,
 
   // TODO(ntv): tensor->buffer, drop all alloc/fill/dealloc.
   // Vexing parses.
-  (dealloc(h1Weights));
-  (dealloc(h2Weights));
-  (dealloc(h3Weights));
-  (dealloc(bias1));
-  (dealloc(bias2));
-  (dealloc(bias3));
-  (dealloc(outputBlock1));
-  (dealloc(outputBlock2));
+  (std_dealloc(h1Weights));
+  (std_dealloc(h2Weights));
+  (std_dealloc(h3Weights));
+  (std_dealloc(bias1));
+  (std_dealloc(bias2));
+  (std_dealloc(bias3));
+  (std_dealloc(outputBlock1));
+  (std_dealloc(outputBlock2));
 
-  (ret());
+  (std_ret());
 }
 
 // Helper function to build a func `funcName` that takes a tensors for the input
@@ -140,7 +140,7 @@ void buildMNISTOnTensors(ModelBuilder &modelBuilder, StringLiteral funcName,
   auto outputBlock3 = modelBuilder.FCBiasTanhTensors(
       outputBlock3Type, {outputBlock2, h3Weights}, bias3);
   // Vexing parses.
-  (ret(outputBlock3));
+  (std_ret(outputBlock3));
 }
 
 int main() {
@@ -179,9 +179,13 @@ int main() {
   ManagedUnrankedMemRefDescriptor outputBuffer =
       makeInitializedUnrankedDescriptor<float>({B, W3}, outputLinearInit);
 
-  // 5. Call the funcOp name `kFuncBuffersName` with arguments.
+  // 5. Call the funcOp name `kFuncBuffersName` with arguments. Call the wrapped
+  // C-compatible function rather than the function defined above and delegate
+  // memref descriptor unpacking to generated code.
+  const std::string kFuncAdapterName =
+      (llvm::Twine("_mlir_ciface_") + kFuncBuffersName).str();
   void *args[2] = {&inputBuffer->descriptor, &outputBuffer->descriptor};
-  auto error = runner.engine->invoke(kFuncBuffersName,
+  auto error = runner.engine->invoke(kFuncAdapterName,
                                      llvm::MutableArrayRef<void *>{args});
 
   // 6. Dump content of output buffer for testing with FileCheck.

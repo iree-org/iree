@@ -196,11 +196,16 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
         });
     SPIRVTypeConverter typeConverter;
     OwningRewritePatternList patterns;
-    SmallVector<int64_t, 3> workGroupSize;
-    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSize))) {
-      return;
-    }
-    populateGPUToSPIRVPatterns(context, typeConverter, patterns, workGroupSize);
+    SmallVector<int32_t, 3> workGroupSize;
+    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSize))) return;
+
+    // Set spv.entry_point_abi on each kernel functions to drive SPIR-V CodeGen.
+    StringRef abiAttrName = spirv::getEntryPointABIAttrName();
+    auto abiAttr = spirv::getEntryPointABIAttr(workGroupSize, context);
+    for (Operation *kernel : kernelModules)
+      kernel->setAttr(abiAttrName, abiAttr);
+
+    populateGPUToSPIRVPatterns(context, typeConverter, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
 
     std::unique_ptr<ConversionTarget> target =
