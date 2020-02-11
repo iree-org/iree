@@ -163,6 +163,7 @@ iree_cc_test(
   DEPS
     ::file_io
     ::file_path
+    ::logging
     ::status
     ::status_matchers
     absl::strings

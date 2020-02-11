@@ -17,6 +17,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/file_path.h"
+#include "iree/base/logging.h"
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/testing/gtest.h"
@@ -28,7 +29,9 @@ namespace {
 using ::iree::testing::status::StatusIs;
 
 std::string GetUniquePath(absl::string_view unique_name) {
-  return file_path::JoinPaths(getenv("TEST_TMPDIR"),
+  char* test_tmpdir = getenv("TEST_TMPDIR");
+  CHECK(test_tmpdir) << "TEST_TMPDIR not defined";
+  return file_path::JoinPaths(test_tmpdir,
                               absl::StrCat(unique_name, "_test.txt"));
 }
 
@@ -44,7 +47,7 @@ TEST(FileIo, GetSetContents) {
 
   ASSERT_OK(SetFileContents(path, to_write));
   ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(path));
-  CHECK_EQ(to_write, read);
+  EXPECT_EQ(to_write, read);
 }
 
 TEST(FileIo, SetDeleteExists) {
@@ -72,7 +75,7 @@ TEST(FileIo, MoveFile) {
   EXPECT_THAT(FileExists(from_path), StatusIs(StatusCode::kNotFound));
   EXPECT_OK(FileExists(to_path));
   ASSERT_OK_AND_ASSIGN(std::string read, GetFileContents(to_path));
-  CHECK_EQ(to_write, read);
+  EXPECT_EQ(to_write, read);
 }
 
 }  // namespace
