@@ -73,7 +73,6 @@ include(iree_glsl_vulkan)
 include(iree_spirv_kernel_cc_library)
 include(iree_pybind_cc_library)
 include(iree_py_extension)
-include(iree_glob_lit_tests)
 include(iree_lit_test)
 include(iree_alwayslink)
 
