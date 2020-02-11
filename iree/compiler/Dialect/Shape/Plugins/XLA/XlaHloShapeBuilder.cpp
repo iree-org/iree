@@ -29,6 +29,7 @@ using namespace mlir::iree_compiler::Shape;
 
 namespace mlir {
 namespace xla_hlo {
+namespace {
 
 template <typename HloOp>
 Value rewriteXlaBinaryElementwiseOpShape(RankedShapeType resultShape, HloOp op,
@@ -97,6 +98,56 @@ Value rewriteXlaDotOpShape(RankedShapeType resultRs, DotOp dotOp,
   }
 }
 
+Value rewriteReduce(RankedShapeType resultShape, ReduceOp reduceOp,
+                    OpBuilder &builder) {
+  Location loc = reduceOp.getLoc();
+
+  // Get a common operand shape.
+  Value operandShape;
+  SmallVector<Value, 4> operandShapes;
+  RankedShapeType operandRs;
+  for (auto operand : reduceOp.operands()) {
+    auto shape = builder.create<GetRankedShapeOp>(loc, operand);
+    operandRs = shape.getRankedShape();
+    operandShapes.push_back(shape);
+  }
+  assert(!operandShapes.empty());
+  if (operandShapes.size() == 1) {
+    // Single operand.
+    operandShape = operandShapes.front();
+  } else {
+    // Multiple operands must be compatible.
+    operandShape =
+        builder.create<CastCompatibleShapeOp>(loc, operandRs, operandShapes);
+  }
+
+  // Map reduction dims onto operand dimensions.
+  SmallVector<bool, 4> isDimReduced;
+  isDimReduced.resize(operandRs.getRank());
+  for (auto apIntValue : reduceOp.dimensions().getIntValues()) {
+    auto intValue = apIntValue.getZExtValue();
+    assert(intValue < isDimReduced.size());
+    isDimReduced[intValue] = true;
+  }
+
+  // Map operand -> result dynamic dims.
+  assert(resultShape.getRank() ==
+         (operandRs.getRank() - reduceOp.dimensions().getNumElements()));
+  SmallVector<Value, 4> resultDims;
+  for (unsigned operandDimIndex = 0, e = isDimReduced.size();
+       operandDimIndex < e; ++operandDimIndex) {
+    unsigned resultDimIndex = resultDims.size();
+    // Skip reduced operand indices and non-dynamic result indices.
+    if (isDimReduced[operandDimIndex] ||
+        !resultShape.isDimDynamic(resultDimIndex))
+      continue;
+    resultDims.push_back(
+        builder.create<RankedDimOp>(loc, operandShape, operandDimIndex));
+  }
+
+  return builder.create<MakeRankedShapeOp>(loc, resultShape, resultDims);
+}
+
 // NOTE: This op is an HLO interloper and is just here until a corresponding
 // HLO is created. As such, it is included in this file even though not HLO
 // currently.
@@ -106,6 +157,8 @@ Value rewriteShapexRankedBroadcastInDim(RankedShapeType resultShape,
   if (!bidOp) return nullptr;
   return bidOp.result_shape();
 }
+
+}  // namespace
 
 // Creates a custom op shape builder for XLA-HLO ops that are not otherwise
 // supported through traits or other declarative means.
@@ -131,6 +184,7 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   b.insertOpRankedShapeBuilder<DotOp>(rewriteXlaDotOpShape);
   b.insertOpRankedShapeBuilder<RankedBroadcastInDimOp>(
       rewriteShapexRankedBroadcastInDim);
+  b.insertOpRankedShapeBuilder<ReduceOp>(rewriteReduce);
 }
 
 }  // namespace xla_hlo
