@@ -200,10 +200,13 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
     if (failed(getLegacyWorkGroupSize(funcOp, workGroupSize))) return;
 
     // Set spv.entry_point_abi on each kernel functions to drive SPIR-V CodeGen.
+    // This is required because SPIR-V CodeGen's contract.
     StringRef abiAttrName = spirv::getEntryPointABIAttrName();
     auto abiAttr = spirv::getEntryPointABIAttr(workGroupSize, context);
-    for (Operation *kernel : kernelModules)
-      kernel->setAttr(abiAttrName, abiAttr);
+    for (Operation *gpuModule : kernelModules)
+      gpuModule->walk([abiAttrName, abiAttr](gpu::GPUFuncOp gpuFunc) {
+        gpuFunc.setAttr(abiAttrName, abiAttr);
+      });
 
     populateGPUToSPIRVPatterns(context, typeConverter, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
