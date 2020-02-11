@@ -114,6 +114,19 @@ vm.import @pad.x32(
   %interior_padding : i32 ...
 )
 
+vm.import @broadcast.x8(
+  %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+vm.import @broadcast.x16(
+  %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+vm.import @broadcast.x32(
+  %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
+)
+
 vm.import @tile.x8(
   %src : !iree.ref<!vmla.buffer>, %src_shape : i32 ...,
   %dst : !iree.ref<!vmla.buffer>, %dst_shape : i32 ...
@@ -201,6 +214,10 @@ vm.import @max.i8(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>
 vm.import @max.i16(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @max.i32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @max.f32(%lhs : !iree.ref<!vmla.buffer>, %rhs : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @clamp.i8(%min : !iree.ref<!vmla.buffer>, %value : !iree.ref<!vmla.buffer>, %max : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @clamp.i16(%min : !iree.ref<!vmla.buffer>, %value : !iree.ref<!vmla.buffer>, %max : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @clamp.i32(%min : !iree.ref<!vmla.buffer>, %value : !iree.ref<!vmla.buffer>, %max : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
+vm.import @clamp.f32(%min : !iree.ref<!vmla.buffer>, %value : !iree.ref<!vmla.buffer>, %max : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @floor.f32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 vm.import @ceil.f32(%src : !iree.ref<!vmla.buffer>, %dst : !iree.ref<!vmla.buffer>)
 

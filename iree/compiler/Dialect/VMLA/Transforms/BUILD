@@ -27,6 +27,8 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/IREE/Transforms",
+        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/VMLA/Conversion",
         "//iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA",
         "//iree/compiler/Dialect/VMLA/Conversion/StandardToVMLA",
@@ -34,6 +36,7 @@ cc_library(
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",

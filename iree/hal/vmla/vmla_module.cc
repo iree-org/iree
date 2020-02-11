@@ -439,6 +439,17 @@ class VMLAModuleState final {
   IREE_VMLA_PAD_OP(PadX16, uint16_t);
   IREE_VMLA_PAD_OP(PadX32, uint32_t);
 
+#define IREE_VMLA_BROADCAST_OP(name, type)                                     \
+  Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
+              vm::ref<iree_vmla_buffer_t>& dst, iree_vmla_shape_t dst_shape) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernels::Broadcast::Execute<type>(src->As<type>(),                  \
+                                             dst->As<type>());                 \
+  }
+  IREE_VMLA_BROADCAST_OP(BroadcastX8, uint8_t);
+  IREE_VMLA_BROADCAST_OP(BroadcastX16, uint16_t);
+  IREE_VMLA_BROADCAST_OP(BroadcastX32, uint32_t);
+
 #define IREE_VMLA_TILE_OP(name, type)                                          \
   Status name(vm::ref<iree_vmla_buffer_t>& src, iree_vmla_shape_t src_shape,   \
               vm::ref<iree_vmla_buffer_t>& dst, iree_vmla_shape_t dst_shape) { \
@@ -532,6 +543,10 @@ class VMLAModuleState final {
   IREE_VMLA_BINARY_OP(MaxI16, kernels::Max, int16_t);
   IREE_VMLA_BINARY_OP(MaxI32, kernels::Max, int32_t);
   IREE_VMLA_BINARY_OP(MaxF32, kernels::Max, float);
+  IREE_VMLA_TERNARY_OP(ClampI8, kernels::Clamp, int8_t);
+  IREE_VMLA_TERNARY_OP(ClampI16, kernels::Clamp, int16_t);
+  IREE_VMLA_TERNARY_OP(ClampI32, kernels::Clamp, int32_t);
+  IREE_VMLA_TERNARY_OP(ClampF32, kernels::Clamp, float);
   IREE_VMLA_UNARY_OP(FloorF32, kernels::Floor, float);
   IREE_VMLA_UNARY_OP(CeilF32, kernels::Ceil, float);
 

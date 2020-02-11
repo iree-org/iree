@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/StandardToVMLA/ConvertStandardToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -38,11 +40,17 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
     VMLATypeConverter typeConverter;
     VMLAConversionTarget conversionTarget(context, typeConverter);
 
+    // Ensure all HLO goes away.
     conversionTarget.addIllegalDialect<xla_hlo::XlaHloDialect>();
+    conversionTarget.addLegalDialect<ShapeDialect>();
 
     OwningRewritePatternList conversionPatterns;
     populateStandardToVMLAPatterns(context, conversionPatterns, typeConverter);
     populateHLOToVMLAPatterns(context, conversionPatterns, typeConverter);
+
+    // Ensure FuncOp signatures are updated.
+    populateFuncOpTypeConversionPattern(conversionPatterns, context,
+                                        typeConverter);
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       conversionPatterns, &typeConverter))) {

@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
@@ -39,6 +40,9 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
   // Legalize input types.
   // TODO(benvanik): legalize input.
   // passManager.addPass(IREE::VMLA::createLegalizeInputTypesPass());
+
+  // TODO(benvanik): preserve these hints during conversion.
+  passManager.addNestedPass<FuncOp>(createDropCompilerHintsPass());
 
   // Convert from the various input dialects to the VMLA dialect.
   passManager.addPass(createConversionPass());

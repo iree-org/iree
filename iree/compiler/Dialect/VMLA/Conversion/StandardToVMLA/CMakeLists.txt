@@ -23,6 +23,7 @@ iree_cc_library(
     "ConvertStandardToVMLA.cpp"
   DEPS
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VMLA::Conversion
     iree::compiler::Dialect::VMLA::IR
     iree::compiler::Dialect::VMLA::IR::VMLADialect
     MLIRIR

@@ -161,6 +161,7 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::TransposeOp, "vmla.transpose");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::ReverseOp, "vmla.reverse");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::PadOp, "vmla.pad");
+  VMLA_SIZED_IMPORT_OP(IREE::VMLA::BroadcastOp, "vmla.broadcast");
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::TileOp, "vmla.tile");
 
   VMLA_SIZED_IMPORT_OP(IREE::VMLA::NotOp, "vmla.not");

@@ -168,6 +168,16 @@ def VMLA_PadOp : VMLA_ElementTypeOp<"pad", [VMLA_IncludeShapes]> {
   );
 }
 
+def VMLA_BroadcastOp : VMLA_ElementTypeOp<"broadcast", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_BufferRef:$src,
+    VMLA_Shape:$src_shape,
+    VMLA_BufferRef:$dst,
+    VMLA_Shape:$dst_shape,
+    VMLA_AnyTypeAttr:$element_type
+  );
+}
+
 def VMLA_TileOp : VMLA_ElementTypeOp<"tile", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_BufferRef:$src,
@@ -212,6 +222,7 @@ def VMLA_Atan2Op : VMLA_BinaryOp<"atan2", VMLA_FloatTypeAttr>;
 
 def VMLA_MinOp : VMLA_BinaryOp<"min", VMLA_AnyTypeAttr>;
 def VMLA_MaxOp : VMLA_BinaryOp<"max", VMLA_AnyTypeAttr>;
+def VMLA_ClampOp : VMLA_TernaryOp<"clamp", VMLA_AnyTypeAttr>;
 def VMLA_FloorOp : VMLA_UnaryOp<"floor", VMLA_FloatTypeAttr>;
 def VMLA_CeilOp : VMLA_UnaryOp<"ceil", VMLA_FloatTypeAttr>;
 

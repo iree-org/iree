@@ -29,6 +29,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/VMLA/IR",
         "//iree/compiler/Dialect/VMLA/IR:VMLADialect",
         "@llvm-project//mlir:IR",

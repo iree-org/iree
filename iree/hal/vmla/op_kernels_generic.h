@@ -539,8 +539,8 @@ Status Max::Execute(absl::Span<const T> lhs_buffer,
 }
 
 template <typename T>
-Status Clamp::Execute(absl::Span<const T> src_buffer,
-                      absl::Span<const T> min_buffer,
+Status Clamp::Execute(absl::Span<const T> min_buffer,
+                      absl::Span<const T> src_buffer,
                       absl::Span<const T> max_buffer,
                       absl::Span<T> dst_buffer) {
   for (size_t i = 0; i < dst_buffer.size(); ++i) {

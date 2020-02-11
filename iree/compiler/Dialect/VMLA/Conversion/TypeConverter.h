@@ -22,6 +22,12 @@ namespace iree_compiler {
 
 class VMLATypeConverter : public TypeConverter {
  public:
+  // Returns the number of bytes an element of the given type occupies
+  // post-conversion. For example, the size of i1 would be '1 byte'.
+  static int32_t getRoundedElementByteWidth(Type type) {
+    return (type.getIntOrFloatBitWidth() + 8 - 1) / 8;
+  }
+
   Type convertType(Type type) override;
 
   // TODO(benvanik): signature conversion for output buffers.

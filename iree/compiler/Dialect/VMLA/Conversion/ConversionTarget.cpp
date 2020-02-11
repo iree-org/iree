@@ -15,8 +15,14 @@
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
+#include "iree/compiler/Dialect/VMLA/IR/VMLATraits.h"
+#include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/StandardTypes.h"
 
@@ -31,7 +37,6 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
   // The VMLA dialect expects both standard ops and the VMLA ops (in case some
   // conversion has already happened).
   addLegalOp<ModuleOp, ModuleTerminatorOp>();
-  addLegalDialect<StandardOpsDialect>();
   addLegalDialect<IREE::VMLA::VMLADialect>();
 
   // Allow other ops to pass through so long as their type is valid (not a
@@ -54,10 +59,182 @@ bool VMLAConversionTarget::isDynamicallyLegal(Operation *op) const {
 
 // static
 LogicalResult VMLAConversionTarget::applyDefaultBufferRewrite(
-    Operation *srcOp, ArrayRef<Value> operands, StringRef dstOpName,
+    Operation *srcOp, ArrayRef<Value> operands, VMLAOpSemantics semantics,
+    StringRef dstOpName, TypeConverter &typeConverter,
+    ConversionPatternRewriter &rewriter) {
+  OperationState state{srcOp->getLoc(), dstOpName};
+  state.addAttributes(srcOp->getAttrs());
+
+  auto *dstOperation = state.name.getAbstractOperation();
+  auto *opInterface = dstOperation->getInterface<IREE::VMLA::VMLAOp>();
+
+  // Allow the op to get at any of the type information it requires. For
+  // example, if the op may later need to know the type of the elements in a
+  // type-erased buffer it can stash the original tensor type as an attribute.
+  if (opInterface) {
+    opInterface->extractTypeAttributes(
+        state, llvm::to_vector<4>(srcOp->getOperandTypes()),
+        llvm::to_vector<4>(srcOp->getResultTypes()));
+  }
+
+  // Until MLIR supports unsigned types we need to sidechannel this to the
+  // VMLA->VM conversion that really needs to know.
+  switch (semantics) {
+    default:
+      break;
+    case VMLAOpSemantics::kForceUnsigned:
+      state.addAttribute("force_unsigned", UnitAttr::get(srcOp->getContext()));
+      break;
+  }
+
+  // Add all input operands.
+  for (auto srcDstOperand : llvm::zip(srcOp->getOperands(), operands)) {
+    auto srcOperand = std::get<0>(srcDstOperand);
+    auto dstOperand = std::get<1>(srcDstOperand);
+    if (auto tensorType =
+            srcOperand.getType().template dyn_cast<TensorType>()) {
+      // Some ops also require shape information.
+      state.addOperands({dstOperand});
+      if (dstOperation->hasTrait<OpTrait::IREE::VMLA::IncludeShapes>()) {
+        Value operandShape = getTensorShape(srcOp->getLoc(), srcOperand,
+                                            typeConverter, rewriter);
+        if (!operandShape) {
+          return srcOp->emitError() << "failed to get operand tensor shape";
+        }
+        state.addOperands({operandShape});
+      }
+    } else {
+      // Normal pass-through operand.
+      state.addOperands({dstOperand});
+    }
+  }
+
+  // Allocate output buffers for tensors returned by the op. We'll append these
+  // to the operands in order (as is convention here).
+  SmallVector<Value, 4> allocatedBuffers;
+  for (auto srcResult : srcOp->getResults()) {
+    if (auto tensorType = srcResult.getType().template dyn_cast<TensorType>()) {
+      auto dstBuffer = allocateOutputBuffer(srcOp->getLoc(), srcResult,
+                                            typeConverter, rewriter);
+      if (!dstBuffer) {
+        return srcOp->emitError()
+               << "failed to allocate output buffer for tensor result";
+      }
+      state.addOperands({dstBuffer});
+      allocatedBuffers.push_back(dstBuffer);
+    } else {
+      // Normal pass-through result.
+      state.addTypes({srcResult.getType()});
+    }
+  }
+
+  // Rebuild the result list and replace the op ensuring that all original op
+  // results are represented in order even if we changed them to out params.
+  auto *dstOp = rewriter.createOperation(state);
+  auto dstResults = llvm::to_vector<4>(dstOp->getResults());
+  SmallVector<Value, 4> resultValues;
+  for (auto resultType : srcOp->getResultTypes()) {
+    if (resultType.template isa<TensorType>()) {
+      resultValues.push_back(allocatedBuffers.front());
+      allocatedBuffers.erase(allocatedBuffers.begin());
+    } else {
+      resultValues.push_back(dstResults.front());
+      dstResults.erase(dstResults.begin());
+    }
+  }
+  rewriter.replaceOp(srcOp, resultValues);
+  return success();
+}
+
+// static
+Value VMLAConversionTarget::getTensorShape(
+    Location loc, Value originalValue, TypeConverter &typeConverter,
+    ConversionPatternRewriter &rewriter) {
+  // TODO(benvanik): use tie_shape to find the ranked shape to use for the
+  // originalValue tensor.
+  auto originalType = originalValue.getType().cast<ShapedType>();
+  return rewriter.createOrFold<Shape::ConstRankedShapeOp>(
+      loc, Shape::RankedShapeType::get(originalType.getShape(),
+                                       rewriter.getIntegerType(32)));
+}
+
+// static
+Value VMLAConversionTarget::getBufferOffset(
+    Location loc, Value tensorValue, Value indicesValue,
     TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
-  // TODO(benvanik): implement rewriting.
-  return failure();
+  auto indicesType = indicesValue.getType().cast<ShapedType>();
+  SmallVector<Value, 4> indices(indicesType.getNumElements());
+  for (int i = 0; i < indicesType.getNumElements(); ++i) {
+    auto extractIndex = rewriter.createOrFold<mlir::ConstantOp>(
+        loc, rewriter.getIntegerType(32), rewriter.getI32IntegerAttr(i));
+    indices[i] = rewriter.createOrFold<mlir::ExtractElementOp>(
+        loc, indicesValue, ValueRange{extractIndex});
+  }
+  return getBufferOffset(loc, tensorValue, indices, typeConverter, rewriter);
+}
+
+// static
+Value VMLAConversionTarget::getBufferOffset(
+    Location loc, Value tensorValue, ValueRange indices,
+    TypeConverter &typeConverter, ConversionPatternRewriter &rewriter) {
+  // Element type byte length as the base.
+  auto tensorType = tensorValue.getType().cast<ShapedType>();
+  auto elementType = tensorType.getElementType();
+  auto elementSize = rewriter.createOrFold<mlir::ConstantOp>(
+      loc, rewriter.getIntegerType(32),
+      rewriter.getI32IntegerAttr(
+          VMLATypeConverter::getRoundedElementByteWidth(elementType)));
+
+  auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
+  Value offset = rewriter.createOrFold<mlir::ConstantOp>(
+      loc, rewriter.getIntegerType(32), rewriter.getI32IntegerAttr(0));
+  for (int i = 0; i < tensorType.getRank(); ++i) {
+    auto axisOffset = indices[i];
+    for (int j = i + 1; j < tensorType.getRank(); ++j) {
+      auto dim = rewriter.createOrFold<Shape::RankedDimOp>(loc, shape, j);
+      axisOffset = rewriter.createOrFold<mlir::MulIOp>(loc, axisOffset, dim);
+    }
+    offset = rewriter.createOrFold<mlir::AddIOp>(loc, offset, axisOffset);
+  }
+  return rewriter.createOrFold<mlir::MulIOp>(loc, offset, elementSize);
+}
+
+// static
+Value VMLAConversionTarget::getBufferLength(
+    Location loc, Value tensorValue, TypeConverter &typeConverter,
+    ConversionPatternRewriter &rewriter) {
+  // Element type byte length as the base.
+  auto tensorType = tensorValue.getType().cast<ShapedType>();
+  auto elementType = tensorType.getElementType();
+  auto elementSize = rewriter.createOrFold<mlir::ConstantOp>(
+      loc, rewriter.getIntegerType(32),
+      rewriter.getI32IntegerAttr(
+          VMLATypeConverter::getRoundedElementByteWidth(elementType)));
+
+  auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
+  auto dims = rewriter.create<Shape::RankedDimsOp>(loc, shape);
+  Value length = elementSize;
+  for (auto dim : dims.getResults()) {
+    length = rewriter.createOrFold<mlir::MulIOp>(loc, length, dim);
+  }
+  return length;
+}
+
+// static
+Value VMLAConversionTarget::allocateOutputBuffer(
+    Location loc, Value originalValue, TypeConverter &typeConverter,
+    ConversionPatternRewriter &rewriter) {
+  // Compute the required buffer size. Since we are always dense (right now)
+  // this is just normal x*y*z*...
+  Value byteLength =
+      getBufferLength(loc, originalValue, typeConverter, rewriter);
+
+  // Allocate the buffer of the required size.
+  // The caller can then use the buffer instead of the original SSA value.
+  return rewriter.createOrFold<IREE::VMLA::BufferAllocOp>(
+      loc,
+      IREE::RefPtrType::get(IREE::VMLA::BufferType::get(rewriter.getContext())),
+      byteLength);
 }
 
 }  // namespace iree_compiler

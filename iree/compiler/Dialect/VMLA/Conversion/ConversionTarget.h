@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/StandardTypes.h"
@@ -25,6 +26,12 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+enum class VMLAOpSemantics {
+  kDefault = 0,
+  // Forces integers to be treated as unsigned integers.
+  kForceUnsigned,
+};
 
 // A conversion target for the VMLA dialect that ensures that tensor types are
 // fully removed. Conversions targeting the VMLA dialect should always use this.
@@ -35,8 +42,34 @@ class VMLAConversionTarget : public ConversionTarget {
   // Attempts to rewrite an op that may use tensor values into an op using VMLA
   // buffers. See VMLAOpConversion for more information.
   static LogicalResult applyDefaultBufferRewrite(
-      Operation *srcOp, ArrayRef<Value> operands, StringRef dstOpName,
-      TypeConverter &typeConverter, ConversionPatternRewriter &rewriter);
+      Operation *srcOp, ArrayRef<Value> operands, VMLAOpSemantics semantics,
+      StringRef dstOpName, TypeConverter &typeConverter,
+      ConversionPatternRewriter &rewriter);
+
+  // Returns the shape of the |originalValue| tensor as an SSA ranked shape.
+  static Value getTensorShape(Location loc, Value originalValue,
+                              TypeConverter &typeConverter,
+                              ConversionPatternRewriter &rewriter);
+
+  // Returns the offset, in bytes, of an index within a linearized dense buffer.
+  static Value getBufferOffset(Location loc, Value tensorValue,
+                               Value indicesValue, TypeConverter &typeConverter,
+                               ConversionPatternRewriter &rewriter);
+  static Value getBufferOffset(Location loc, Value tensorValue,
+                               ValueRange indices, TypeConverter &typeConverter,
+                               ConversionPatternRewriter &rewriter);
+
+  // Returns the length, in bytes, of a linearized dense buffer.
+  static Value getBufferLength(Location loc, Value tensorValue,
+                               TypeConverter &typeConverter,
+                               ConversionPatternRewriter &rewriter);
+
+  // Allocates a VMLA buffer for an output operand of an op.
+  // Returns a buffer allocated with the appropriate size for storing the value.
+  // Callers must replace uses of |originalValue| with the returned value.
+  static Value allocateOutputBuffer(Location loc, Value originalValue,
+                                    TypeConverter &typeConverter,
+                                    ConversionPatternRewriter &rewriter);
 
  private:
   bool isDynamicallyLegal(Operation *op) const override;
@@ -52,7 +85,8 @@ class VMLAConversionTarget : public ConversionTarget {
 // will be IREE::VMLA::BufferTypes. Any static information available about the
 // tensor (such as static dimensions, element type, layout, etc) are extracted
 // here and lowered as expanded values.
-template <typename SRC, typename DST>
+template <typename SRC, typename DST,
+          VMLAOpSemantics semantics = VMLAOpSemantics::kDefault>
 class VMLAOpConversion : public OpConversionPattern<SRC> {
  public:
   VMLAOpConversion(MLIRContext *context, TypeConverter &typeConverter)
@@ -62,7 +96,7 @@ class VMLAOpConversion : public OpConversionPattern<SRC> {
       SRC srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (succeeded(VMLAConversionTarget::applyDefaultBufferRewrite(
-            srcOp, operands, DST::getOperationName(), typeConverter,
+            srcOp, operands, semantics, DST::getOperationName(), typeConverter,
             rewriter))) {
       return OpConversionPattern<SRC>::matchSuccess();
     }

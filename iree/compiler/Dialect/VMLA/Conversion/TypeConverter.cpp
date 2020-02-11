@@ -26,6 +26,9 @@ Type VMLATypeConverter::convertType(Type type) {
     // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
     return IREE::RefPtrType::get(
         IREE::VMLA::BufferType::get(type.getContext()));
+  } else if (type.isInteger(1)) {
+    // Widen i1 to i8.
+    return IntegerType::get(8, type.getContext());
   }
   return type;
 }

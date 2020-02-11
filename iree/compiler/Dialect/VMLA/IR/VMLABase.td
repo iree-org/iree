@@ -149,7 +149,7 @@ class VMLA_ElementTypeOp<string mnemonic, list<OpTrait> traits = []> :
     VMLA_Op<mnemonic, !listconcat(traits, [VMLA_OpInterface])> {
   let extraClassDeclaration = [{
     static void extractTypeAttributes(OperationState &state, ArrayRef<Type> operandTypes, ArrayRef<Type> resultTypes) {
-      state.addAttribute("element_type", TypeAttr::get(resultTypes[0]));
+      state.addAttribute("element_type", TypeAttr::get(resultTypes[0].cast<ShapedType>().getElementType()));
     }
   }];
 }
@@ -170,6 +170,19 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
   let arguments = (ins
     RefPtrOf<VMLA_Buffer>:$lhs,
     RefPtrOf<VMLA_Buffer>:$rhs,
+    RefPtrOf<VMLA_Buffer>:$dst,
+    typeAttr:$element_type,
+    // TODO(benvanik): remove once unsigned types are in MLIR.
+    UnitAttr:$forceUnsigned
+  );
+}
+
+class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
+    VMLA_ElementTypeOp<mnemonic, traits> {
+  let arguments = (ins
+    RefPtrOf<VMLA_Buffer>:$a,
+    RefPtrOf<VMLA_Buffer>:$b,
+    RefPtrOf<VMLA_Buffer>:$c,
     RefPtrOf<VMLA_Buffer>:$dst,
     typeAttr:$element_type,
     // TODO(benvanik): remove once unsigned types are in MLIR.

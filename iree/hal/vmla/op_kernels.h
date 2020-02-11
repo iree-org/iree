@@ -299,8 +299,8 @@ struct Max {
 
 struct Clamp {
   template <typename T>
-  static Status Execute(absl::Span<const T> src_buffer,
-                        absl::Span<const T> min_buffer,
+  static Status Execute(absl::Span<const T> min_buffer,
+                        absl::Span<const T> src_buffer,
                         absl::Span<const T> max_buffer,
                         absl::Span<T> dst_buffer);
 };
