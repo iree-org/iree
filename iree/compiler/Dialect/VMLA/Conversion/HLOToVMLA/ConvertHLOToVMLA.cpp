@@ -111,9 +111,8 @@ struct ConcatenateOpConversion
   PatternMatchResult matchAndRewrite(
       xla_hlo::ConcatenateOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto indexType = rewriter.getIntegerType(32);
     auto zero = rewriter.createOrFold<mlir::ConstantOp>(
-        srcOp.getLoc(), indexType, rewriter.getI32IntegerAttr(0));
+        srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
@@ -154,6 +153,114 @@ struct ConcatenateOpConversion
   TypeConverter &typeConverter;
 };
 
+// Lowers a subset of gathers along axis 0 that are really just a slice and
+// reshape.
+struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
+  GatherOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  // TODO(gcmn): This only handles a minimal number of cases. When XLA
+  // redefines gather to be simpler, lower it properly.
+  PatternMatchResult matchAndRewrite(
+      xla_hlo::GatherOp gatherOp, ArrayRef<Value> operandValues,
+      ConversionPatternRewriter &rewriter) const override {
+    xla_hlo::GatherOpOperandAdaptor operands(operandValues);
+    auto dimension_numbers = gatherOp.dimension_numbers();
+    if (dimension_numbers.index_vector_dim().getValue().getSExtValue() != 0) {
+      gatherOp.emitRemark()
+          << "couldn't lower gather with index_vector_dim != 0";
+      return matchFailure();
+    }
+    if (dimension_numbers.start_index_map().getType().getRank() != 1 ||
+        dimension_numbers.start_index_map()
+                .getValue(0)
+                .cast<IntegerAttr>()
+                .getValue() != 0) {
+      gatherOp.emitRemark()
+          << "couldn't lower gather with start_index_map != [0]";
+      return matchFailure();
+    }
+    if (dimension_numbers.collapsed_slice_dims().getType().getRank() != 1 ||
+        dimension_numbers.collapsed_slice_dims()
+                .getValue(0)
+                .cast<IntegerAttr>()
+                .getValue() != 0) {
+      gatherOp.emitRemark()
+          << "couldn't lower gather with collapsed_dims != [0]";
+      return matchFailure();
+    }
+
+    auto resultType = gatherOp.getResult().getType().cast<RankedTensorType>();
+    if (dimension_numbers.offset_dims().getType().getNumElements() !=
+        resultType.getRank()) {
+      gatherOp.emitRemark() << "couldn't lower gather with offset_dims != "
+                               "[0,...,rank of output]";
+      return matchFailure();
+    }
+    for (auto it : llvm::enumerate(dimension_numbers.offset_dims())) {
+      if (it.index() != it.value()) {
+        gatherOp.emitRemark() << "couldn't lower gather with offset_dims != "
+                                 "[0,...,rank of output]";
+        return matchFailure();
+      }
+    }
+
+    for (auto it : llvm::enumerate(resultType.getShape())) {
+      if (gatherOp.slice_sizes()
+              .getValue(it.index() + 1)
+              .cast<IntegerAttr>()
+              .getValue() != it.value()) {
+        gatherOp.emitRemark()
+            << "couldn't lower gather with slice_sizes not [1] + final shape";
+        return matchFailure();
+      }
+    }
+
+    auto srcShape = VMLAConversionTarget::getTensorShape(
+        gatherOp.getLoc(), gatherOp.operand(), typeConverter, rewriter);
+    auto dstShape = VMLAConversionTarget::getTensorShape(
+        gatherOp.getLoc(), gatherOp.getResult(), typeConverter, rewriter);
+
+    auto inputType = gatherOp.operand().getType().cast<RankedTensorType>();
+    auto startIndicesType =
+        gatherOp.start_indices().getType().cast<ShapedType>();
+    int rank = inputType.getRank();
+    SmallVector<Value, 4> srcIndices(rank);
+    SmallVector<Value, 4> dstIndices(rank);
+    SmallVector<Value, 4> lengths(rank);
+    Value zero = rewriter.createOrFold<mlir::ConstantOp>(
+        gatherOp.getLoc(), rewriter.getI32IntegerAttr(0));
+    for (int i = 0; i < rank; ++i) {
+      if (i < startIndicesType.getNumElements()) {
+        auto srcIndexByteOffset = rewriter.createOrFold<mlir::ConstantOp>(
+            gatherOp.getLoc(), rewriter.getI32IntegerAttr(i * sizeof(int32_t)));
+        srcIndices[i] = rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
+            gatherOp.getLoc(), rewriter.getIntegerType(32),
+            operands.start_indices(), srcIndexByteOffset);
+      } else {
+        // Pad missing dimensions to zero offsets.
+        srcIndices[i] = zero;
+      }
+      dstIndices[i] = zero;
+      lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
+          gatherOp.getLoc(),
+          rewriter.getI32IntegerAttr(gatherOp.slice_sizes().getValue<int64_t>(
+              {static_cast<uint64_t>(i)})));
+    }
+
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        gatherOp.getLoc(), gatherOp.getResult(), typeConverter, rewriter);
+    rewriter.create<IREE::VMLA::CopyOp>(
+        gatherOp.getLoc(), operands.operand(), srcShape, srcIndices, dst,
+        dstShape, dstIndices, lengths,
+        TypeAttr::get(inputType.getElementType()));
+    rewriter.replaceOp(gatherOp, {dst});
+    return matchSuccess();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 // Converts a static slice op to a copy (if the source must be preserved).
 struct SliceOpConversion : public OpConversionPattern<xla_hlo::SliceOp> {
   SliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
@@ -178,24 +285,21 @@ struct SliceOpConversion : public OpConversionPattern<xla_hlo::SliceOp> {
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
 
     int rank = srcOp.operand().getType().cast<ShapedType>().getRank();
-    auto indexType = rewriter.getIntegerType(32);
     SmallVector<Value, 4> srcIndices(rank);
     SmallVector<Value, 4> dstIndices(rank);
     SmallVector<Value, 4> lengths(rank);
     Value zero = rewriter.createOrFold<mlir::ConstantOp>(
-        srcOp.getLoc(), indexType, rewriter.getI32IntegerAttr(0));
+        srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
     for (int i = 0; i < rank; ++i) {
       uint64_t ui = static_cast<uint64_t>(i);
       srcIndices[i] = rewriter.createOrFold<mlir::ConstantOp>(
-          srcOp.getLoc(), indexType,
-          rewriter.getI32IntegerAttr(
-              srcOp.start_indices().getValue<int64_t>({ui})));
+          srcOp.getLoc(), rewriter.getI32IntegerAttr(
+                              srcOp.start_indices().getValue<int64_t>({ui})));
       dstIndices[i] = zero;
       lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
-          srcOp.getLoc(), indexType,
-          rewriter.getI32IntegerAttr(
-              srcOp.limit_indices().getValue<int64_t>({ui}) -
-              srcOp.start_indices().getValue<int64_t>({ui})));
+          srcOp.getLoc(), rewriter.getI32IntegerAttr(
+                              srcOp.limit_indices().getValue<int64_t>({ui}) -
+                              srcOp.start_indices().getValue<int64_t>({ui})));
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
@@ -229,21 +333,19 @@ struct DynamicSliceOpConversion
         srcOp.getLoc(), srcOp.result(), typeConverter, rewriter);
 
     int rank = srcOp.operand().getType().cast<ShapedType>().getRank();
-    auto indexType = rewriter.getIntegerType(32);
     SmallVector<Value, 4> srcIndices(rank);
     SmallVector<Value, 4> dstIndices(rank);
     SmallVector<Value, 4> lengths(rank);
     Value zero = rewriter.createOrFold<mlir::ConstantOp>(
-        srcOp.getLoc(), indexType, rewriter.getI32IntegerAttr(0));
+        srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
     for (int i = 0; i < rank; ++i) {
       srcIndices[i] = rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
           srcOp.getLoc(), rewriter.getIntegerType(32), operands[1],
           rewriter.createOrFold<mlir::ConstantOp>(
-              srcOp.getLoc(), indexType,
-              rewriter.getI32IntegerAttr(i * sizeof(int32_t))));
+              srcOp.getLoc(), rewriter.getI32IntegerAttr(i * sizeof(int32_t))));
       dstIndices[i] = zero;
       lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
-          srcOp.getLoc(), indexType,
+          srcOp.getLoc(),
           rewriter.getI32IntegerAttr(srcOp.slice_sizes().getValue<int64_t>(
               {static_cast<uint64_t>(i)})));
     }
@@ -355,6 +457,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // or transfers.
   patterns.insert<BroadcastInDimOpConversion>(context, typeConverter);
   patterns.insert<ConcatenateOpConversion>(context, typeConverter);
+  patterns.insert<GatherOpConversion>(context, typeConverter);
   patterns.insert<SliceOpConversion>(context, typeConverter);
   patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
 

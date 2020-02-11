@@ -337,7 +337,6 @@ void GetRankedShapeOp::getCanonicalizationPatterns(
 
 void ConstRankedShapeOp::build(Builder *builder, OperationState &result,
                                Type type) {
-  result.addAttribute("value", UnitAttr::get(builder->getContext()));
   result.types.push_back(type);
 }
 
