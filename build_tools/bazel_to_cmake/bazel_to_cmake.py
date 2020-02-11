@@ -255,6 +255,13 @@ class BuildFileFunctions(object):
     deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
     return "  DEPS\n%s\n" % (deps_list,)
 
+  def _convert_flatc_args_block(self, flatc_args):
+    if not flatc_args:
+      return ""
+    flatc_args = "\n".join(
+        ["    \"%s\"" % (flatc_arg,) for flatc_arg in flatc_args])
+    return "  FLATC_ARGS\n%s\n" % (flatc_args,)
+
   def _convert_unimplemented_function(self, function, details=""):
     message = "Unimplemented %(function)s: %(details)s" % {
         "function": function,
@@ -439,6 +446,18 @@ class BuildFileFunctions(object):
     "namespace_block": namespace_block,
     "translate_tool_block": translate_tool_block,
     "translation_block": translation_block,
+    }
+
+  def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=[]):
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
+    flatc_args_block = self._convert_flatc_args_block(flatc_args)
+
+    self.converter.body += """flatbuffer_cc_library(
+%(name_block)s%(srcs_block)s%(flatc_args_block)s  PUBLIC\n)\n\n""" % {
+    "name_block": name_block,
+    "srcs_block": srcs_block,
+    "flatc_args_block": flatc_args_block,
     }
 
   def gentbl(self,

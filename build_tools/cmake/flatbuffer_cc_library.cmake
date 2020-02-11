@@ -26,6 +26,11 @@ include(CMakeParseArguments)
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # LINKOPTS: List of link options
+# FLATC_ARGS: List of flattbuffers arguments. Default:
+#             "--keep-prefix"
+#             "--scoped-enums"
+#             "--reflect-names"
+#             "--gen-object-api"
 # PUBLIC: Add this so that this library will be exported under iree::
 # Also in IDE, target will appear in IREE folder while non PUBLIC will be in IREE/internal.
 # TESTONLY: When added, this target will only be built if user passes -DIREE_BUILD_TESTS=ON to CMake.
@@ -62,7 +67,7 @@ function(flatbuffer_cc_library)
   cmake_parse_arguments(_RULE
     "PUBLIC;TESTONLY"
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
+    "SRCS;COPTS;DEFINES;LINKOPTS;DEPS;FLATC_ARGS"
     ${ARGN}
   )
 
@@ -71,17 +76,22 @@ function(flatbuffer_cc_library)
     iree_package_name(_PACKAGE_NAME)
     set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-    set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS
-      # Preserve root-relative include paths in generated code.
-      "--keep-prefix"
-      # Use C++11 'enum class' for enums.
-      "--scoped-enums"
-      # Include reflection tables used for dumping debug representations.
-      "--reflect-names"
-      # Generate FooT types for unpack/pack support. Note that this should only
-      # be used in tooling as the code size/runtime overhead is non-trivial.
-      "--gen-object-api"
-    )
+    if(NOT DEFINED _RULE_FLATC_ARGS)
+      set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS
+        # Preserve root-relative include paths in generated code.
+        "--keep-prefix"
+        # Use C++11 'enum class' for enums.
+        "--scoped-enums"
+        # Include reflection tables used for dumping debug representations.
+        "--reflect-names"
+        # Generate FooT types for unpack/pack support. Note that this should only
+        # be used in tooling as the code size/runtime overhead is non-trivial.
+        "--gen-object-api"
+      )
+    else()
+      set(FLATBUFFERS_FLATC_SCHEMA_EXTRA_ARGS ${_RULE_FLATC_ARGS})
+    endif()
+
     build_flatbuffers(
       "${_RULE_SRCS}"
       "${IREE_ROOT_DIR}"
