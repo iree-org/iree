@@ -25,13 +25,9 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
 EXCLUDED_TESTS=(
-    iree_base_file_io_test
     iree_compiler_Translation_SPIRV_LinalgToSPIRV_test_pw_add.mlir.test
     iree_hal_vulkan_dynamic_symbols_test
     iree_tools_vm_util_test
-    iree_tools_test_multiple_args.mlir.test
-    iree_tools_test_scalars.mlir.test
-    iree_tools_test_simple.mlir.test
 )
 
 # Join with | and add anchors
