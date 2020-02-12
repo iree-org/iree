@@ -26,12 +26,12 @@ namespace iree_compiler {
 
 // TODO(ravishankarm): remove this; it does not work with dynamic shapes.
 /// Gets the launch size associated with the dispatch function.
-LogicalResult getLegacyLaunchSize(FuncOp funcOp,
+LogicalResult getLegacyLaunchSize(Operation *funcOp,
                                   SmallVectorImpl<int64_t> &launchSize);
 
 /// Gets the workgroup size. Has to be a static constant.
 template <typename intType>
-LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
+LogicalResult getLegacyWorkGroupSize(Operation *funcOp,
                                      SmallVectorImpl<intType> &workGroupSize);
 
 }  // namespace iree_compiler

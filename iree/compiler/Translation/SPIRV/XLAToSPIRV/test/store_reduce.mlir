@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
 module {
-  // CHECK: func @reduction_entry
+  // CHECK: spv.func @reduction_entry
   // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<!spv.array<5 x i32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG2:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
@@ -23,7 +23,7 @@ module {
 // -----
 
 module {
-  // CHECK: func @reduction_2D_dim0_entry
+  // CHECK: spv.func @reduction_2D_dim0_entry
   // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<!spv.array<20 x i32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG2:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<!spv.array<4 x i32 [4]> [0]>, StorageBuffer>
@@ -45,7 +45,7 @@ module {
 // -----
 
 module {
-  // CHECK: func @reduction_2D_dim1_entry
+  // CHECK: spv.func @reduction_2D_dim1_entry
   // CHECK-SAME: [[ARG2:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<!spv.array<5 x i32 [4]> [0]>, StorageBuffer>
   func @reduction_2D_dim1_entry(%arg0: memref<5x4xi32>, %arg1: memref<i32>, %arg2: memref<5xi32>) attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 1 : i32, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.executable.workload = dense<[4, 5, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
     // CHECK: [[GLOBALIDPTR:%[a-zA-Z0-9_]*]] = spv._address_of @globalInvocationID

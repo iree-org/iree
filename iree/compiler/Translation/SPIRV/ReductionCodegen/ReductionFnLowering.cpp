@@ -20,6 +20,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Function.h"
@@ -33,7 +34,7 @@ namespace iree_compiler {
 namespace {
 
 /// Type converter for legalization of reduction apply function.
-class SPIRVReductionTypeConverter : public TypeConverter {
+class SPIRVReductionTypeConverter : public SPIRVTypeConverter {
  public:
   Type convertType(Type t) override;
 };
@@ -177,8 +178,8 @@ ReductionOpConversion<OpTy, ReplacementOpTy>::matchAndRewrite(
 //===----------------------------------------------------------------------===//
 LogicalResult lowerReductionApplyFunction(MLIRContext *context,
                                           ArrayRef<Operation *> fns) {
-  OwningRewritePatternList patterns;
   SPIRVReductionTypeConverter typeConverter;
+  OwningRewritePatternList patterns;
   patterns
       .insert<ReductionApplyFnConversion,
               ReductionOpConversion<xla_hlo::MinOp, spirv::AtomicSMinOp>,
@@ -186,10 +187,10 @@ LogicalResult lowerReductionApplyFunction(MLIRContext *context,
               ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>,
               ReturnOpConversion<IREE::ReturnOp>, ReturnOpConversion<ReturnOp>>(
           context, typeConverter);
+  populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
+
   ConversionTarget target(*context);
   target.addLegalDialect<spirv::SPIRVDialect>();
-  target.addDynamicallyLegalOp<FuncOp>(
-      [&](FuncOp op) { return typeConverter.isSignatureLegal(op.getType()); });
   if (failed(applyPartialConversion(fns, target, patterns))) {
     return failure();
   }

@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
 module {
-  // CHECK: func @slice_unit_stride
+  // CHECK: spv.func @slice_unit_stride
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<36 x f32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<6 x f32 [4]> [0]>, StorageBuffer>
   func @slice_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)
@@ -20,7 +20,7 @@ module {
 // -----
 
 module {
-  // CHECK: func @slice_non_unit_stride
+  // CHECK: spv.func @slice_non_unit_stride
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<36 x f32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<6 x f32 [4]> [0]>, StorageBuffer>
   func @slice_non_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)

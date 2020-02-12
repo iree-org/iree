@@ -7,7 +7,7 @@ module{
     // CHECK: spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
-    func @foo_i64(%arg0 : i64, %arg1 : i64) -> () {
+    spv.func @foo_i64(%arg0 : i64, %arg1 : i64) -> () "None" {
       // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
@@ -32,7 +32,7 @@ module{
     // CHECK: spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
-    func @foo_i16(%arg0 : i16, %arg1 : i16) -> () {
+    spv.func @foo_i16(%arg0 : i16, %arg1 : i16) -> () "None" {
       // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
@@ -56,7 +56,7 @@ module{
     // CHECK: spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
-    func @foo_i8(%arg0 : i8, %arg1 : i8) -> () {
+    spv.func @foo_i8(%arg0 : i8, %arg1 : i8) -> () "None" {
       // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
@@ -80,7 +80,7 @@ module{
     // CHECK: spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
-    func @foo_i1(%arg0 : i1, %arg1 : i1) -> () {
+    spv.func @foo_i1(%arg0 : i1, %arg1 : i1) -> () "None" {
       // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
       // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
@@ -105,7 +105,7 @@ module{
     spv.globalVariable @globalInvocationID built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
     spv.globalVariable @arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
     spv.globalVariable @arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
-    func @add(%arg0: i64, %arg1: i64) -> () {
+    spv.func @add(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -118,7 +118,7 @@ module{
       spv.Return
     }
 
-    func @sub(%arg0: i64, %arg1: i64) -> () {
+    spv.func @sub(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -132,7 +132,7 @@ module{
       spv.Return
     }
 
-    func @mul(%arg0: i64, %arg1: i64) -> () {
+    spv.func @mul(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -145,7 +145,7 @@ module{
       spv.Return
     }
 
-    func @sdiv(%arg0: i64, %arg1: i64) -> () {
+    spv.func @sdiv(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -158,7 +158,7 @@ module{
       spv.Return
     }
 
-    func @smod(%arg0: i64, %arg1: i64) -> () {
+    spv.func @smod(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -171,7 +171,7 @@ module{
       spv.Return
     }
 
-    func @srem(%arg0: i64, %arg1: i64) -> () {
+    spv.func @srem(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -184,7 +184,7 @@ module{
       spv.Return
     }
 
-    func @udiv(%arg0: i64, %arg1: i64) -> () {
+    spv.func @udiv(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -197,7 +197,7 @@ module{
       spv.Return
     }
 
-    func @umod(%arg0: i64, %arg1: i64) -> () {
+    spv.func @umod(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -210,7 +210,7 @@ module{
       spv.Return
     }
 
-    func @abs(%arg0: i64, %arg1: i64) -> () {
+    spv.func @abs(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -223,7 +223,7 @@ module{
       spv.Return
     }
 
-    func @smax(%arg0: i64, %arg1: i64) -> () {
+    spv.func @smax(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -236,7 +236,7 @@ module{
       spv.Return
     }
 
-    func @smin(%arg0: i64, %arg1: i64) -> () {
+    spv.func @smin(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -249,7 +249,7 @@ module{
       spv.Return
     }
 
-    func @sign(%arg0: i64, %arg1: i64) -> () {
+    spv.func @sign(%arg0: i64, %arg1: i64) -> () "None" {
       %0 = spv._address_of @arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -262,7 +262,7 @@ module{
       spv.Return
     }
 
-    func @constant_i64(%arg1: i64) -> () {
+    spv.func @constant_i64(%arg1: i64) -> () "None" {
       // CHECK: spv.constant 1337 : i32
       %0 = spv.constant 1337 : i64
       %1 = spv.constant 0 : i32

@@ -18,16 +18,16 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Gets the launch size associated with the dispatch function.
-LogicalResult getLegacyLaunchSize(FuncOp funcOp,
+LogicalResult getLegacyLaunchSize(Operation *funcOp,
                                   SmallVectorImpl<int64_t> &launchSize) {
-  if (!funcOp.getAttr("iree.executable.export")) {
-    return funcOp.emitError(
+  if (!funcOp->getAttr("iree.executable.export")) {
+    return funcOp->emitError(
         "expected operation to be in dispatch function to get launch size");
   }
   auto workloadAttr =
-      funcOp.getAttrOfType<DenseElementsAttr>("iree.executable.workload");
+      funcOp->getAttrOfType<DenseElementsAttr>("iree.executable.workload");
   if (!workloadAttr) {
-    return funcOp.emitError(
+    return funcOp->emitError(
         "unable to find workload size, missing attribute "
         "iree.executable.workload in dispatch function");
   }
@@ -49,16 +49,16 @@ LogicalResult getLegacyLaunchSize(FuncOp funcOp,
 
 /// Gets the workgroup size.
 template <typename intType>
-LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
+LogicalResult getLegacyWorkGroupSize(Operation *funcOp,
                                      SmallVectorImpl<intType> &workGroupSize) {
-  if (!funcOp.getAttr("iree.executable.export")) {
-    return funcOp.emitError(
+  if (!funcOp->getAttr("iree.executable.export")) {
+    return funcOp->emitError(
         "expected operation to be in dispatch function to get launch size");
   }
-  auto workGroupSizeAttr =
-      funcOp.getAttrOfType<DenseElementsAttr>("iree.executable.workgroup_size");
+  auto workGroupSizeAttr = funcOp->getAttrOfType<DenseElementsAttr>(
+      "iree.executable.workgroup_size");
   if (!workGroupSizeAttr) {
-    return funcOp.emitError(
+    return funcOp->emitError(
         "unable to find workload size, missing attribute "
         "iree.executable.workload in dispatch function");
   }
@@ -70,9 +70,9 @@ LogicalResult getLegacyWorkGroupSize(FuncOp funcOp,
 }
 
 template LogicalResult getLegacyWorkGroupSize<int32_t>(
-    FuncOp funcOp, SmallVectorImpl<int32_t> &workGroupSize);
+    Operation *funcOp, SmallVectorImpl<int32_t> &workGroupSize);
 template LogicalResult getLegacyWorkGroupSize<int64_t>(
-    FuncOp funcOp, SmallVectorImpl<int64_t> &workGroupSize);
+    Operation *funcOp, SmallVectorImpl<int64_t> &workGroupSize);
 
 }  // namespace iree_compiler
 }  // namespace mlir
