@@ -74,9 +74,7 @@ function(set_alwayslink_mlir_libs)
     MLIRSupport
     MLIRVectorOps
     MLIRLinalgOps
-    # MLIROptMain: lib; The equivalent Bazel library is MLIROptLib.
-    # TODO(marbre): Replace with appropriate target after upstreams CMake is revised.
-    MLIROptMain
+    MLIROptLib
   )
 
   set_alwayslink_property(

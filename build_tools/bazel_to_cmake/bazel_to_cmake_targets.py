@@ -84,7 +84,7 @@ MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:TableGen": ["LLVMMLIRTableGen"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
-    "@llvm-project//mlir:MlirOptMain": ["MLIROptMain"],
+    "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
 }
 
 
