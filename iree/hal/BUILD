@@ -209,6 +209,14 @@ cc_library(
 )
 
 cc_library(
+    name = "debug_capture_manager",
+    hdrs = ["debug_capture_manager.h"],
+    deps = [
+        "//iree/base:status",
+    ],
+)
+
+cc_library(
     name = "deferred_buffer",
     srcs = ["deferred_buffer.cc"],
     hdrs = ["deferred_buffer.h"],
@@ -314,6 +322,7 @@ cc_library(
     name = "driver",
     hdrs = ["driver.h"],
     deps = [
+        ":debug_capture_manager",
         ":device",
         ":device_info",
         "//iree/base:ref_ptr",

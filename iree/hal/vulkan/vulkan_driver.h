@@ -24,6 +24,7 @@
 #include "iree/hal/vulkan/debug_reporter.h"
 #include "iree/hal/vulkan/dynamic_symbols.h"
 #include "iree/hal/vulkan/extensibility_util.h"
+#include "iree/hal/vulkan/renderdoc_capture_manager.h"
 #include "iree/hal/vulkan/vulkan_device.h"
 
 namespace iree {
@@ -78,17 +79,23 @@ class VulkanDriver final : public Driver {
                                        const QueueSet& compute_queue_set,
                                        const QueueSet& transfer_queue_set);
 
+  DebugCaptureManager* debug_capture_manager() override {
+    return renderdoc_capture_manager_.get();
+  }
+
  private:
-  VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,
-               bool owns_instance,
-               std::unique_ptr<DebugReporter> debug_reporter,
-               ExtensibilitySpec device_extensibility_spec);
+  VulkanDriver(
+      ref_ptr<DynamicSymbols> syms, VkInstance instance, bool owns_instance,
+      std::unique_ptr<DebugReporter> debug_reporter,
+      ExtensibilitySpec device_extensibility_spec,
+      std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager);
 
   ref_ptr<DynamicSymbols> syms_;
   VkInstance instance_;
   bool owns_instance_;
   std::unique_ptr<DebugReporter> debug_reporter_;
   ExtensibilitySpec device_extensibility_spec_;
+  std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager_;
 };
 
 }  // namespace vulkan

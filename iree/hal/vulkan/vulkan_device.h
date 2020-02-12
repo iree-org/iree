@@ -24,6 +24,7 @@
 #include "absl/types/span.h"
 #include "iree/base/memory.h"
 #include "iree/hal/allocator.h"
+#include "iree/hal/debug_capture_manager.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
 #include "iree/hal/vulkan/descriptor_pool_cache.h"
@@ -53,7 +54,8 @@ class VulkanDevice final : public Device {
       ref_ptr<Driver> driver, const DeviceInfo& device_info,
       VkPhysicalDevice physical_device,
       const ExtensibilitySpec& extensibility_spec,
-      const ref_ptr<DynamicSymbols>& syms);
+      const ref_ptr<DynamicSymbols>& syms,
+      DebugCaptureManager* debug_capture_manager);
 
   // Creates a device that wraps an externally managed VkDevice.
   static StatusOr<ref_ptr<VulkanDevice>> Wrap(
@@ -108,7 +110,8 @@ class VulkanDevice final : public Device {
       absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
       ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
       ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-      ref_ptr<LegacyFencePool> legacy_fence_pool);
+      ref_ptr<LegacyFencePool> legacy_fence_pool,
+      DebugCaptureManager* debug_capture_manager);
 
   ref_ptr<Driver> driver_;
   VkPhysicalDevice physical_device_;
@@ -128,6 +131,8 @@ class VulkanDevice final : public Device {
   // TODO(b/140141417): implement timeline semaphore fences and conditionally
   // compile the legacy fence pool out.
   ref_ptr<LegacyFencePool> legacy_fence_pool_;
+
+  DebugCaptureManager* debug_capture_manager_ = nullptr;
 };
 
 }  // namespace vulkan

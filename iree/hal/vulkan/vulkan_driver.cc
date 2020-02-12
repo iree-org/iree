@@ -17,12 +17,15 @@
 #include <memory>
 
 #include "absl/container/inlined_vector.h"
+#include "absl/flags/flag.h"
 #include "iree/base/memory.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/device_info.h"
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
+
+ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
 
 namespace iree {
 namespace hal {
@@ -80,6 +83,15 @@ StatusOr<DeviceInfo> PopulateDeviceInfo(VkPhysicalDevice physical_device,
 StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
     Options options, ref_ptr<DynamicSymbols> syms) {
   IREE_TRACE_SCOPE0("VulkanDriver::Create");
+
+  // Load and connect to RenderDoc before instance creation.
+  // Note: RenderDoc assumes that only a single VkDevice is used:
+  //   https://renderdoc.org/docs/behind_scenes/vulkan_support.html#current-support
+  std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager;
+  if (absl::GetFlag(FLAGS_vulkan_renderdoc)) {
+    renderdoc_capture_manager = std::make_unique<RenderDocCaptureManager>();
+    RETURN_IF_ERROR(renderdoc_capture_manager->Connect());
+  }
 
   // Find the layers and extensions we need (or want) that are also available
   // on the instance. This will fail when required ones are not present.
@@ -152,7 +164,8 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   return assign_ref(new VulkanDriver(std::move(syms), instance,
                                      /*owns_instance=*/true,
                                      std::move(debug_reporter),
-                                     std::move(options.device_extensibility)));
+                                     std::move(options.device_extensibility),
+                                     std::move(renderdoc_capture_manager)));
 }
 
 // static
@@ -191,21 +204,28 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::CreateUsingInstance(
                          instance, syms, /*allocation_callbacks=*/nullptr));
   }
 
+  // Note: no RenderDocCaptureManager here since the VkInstance is already
+  // created externally. Applications using this function must provide their
+  // own RenderDoc / debugger integration as desired.
+
   return assign_ref(new VulkanDriver(
       std::move(syms), instance, /*owns_instance=*/false,
-      std::move(debug_reporter), std::move(options.device_extensibility)));
+      std::move(debug_reporter), std::move(options.device_extensibility),
+      /*debug_capture_manager=*/nullptr));
 }
 
-VulkanDriver::VulkanDriver(ref_ptr<DynamicSymbols> syms, VkInstance instance,
-                           bool owns_instance,
-                           std::unique_ptr<DebugReporter> debug_reporter,
-                           ExtensibilitySpec device_extensibility_spec)
+VulkanDriver::VulkanDriver(
+    ref_ptr<DynamicSymbols> syms, VkInstance instance, bool owns_instance,
+    std::unique_ptr<DebugReporter> debug_reporter,
+    ExtensibilitySpec device_extensibility_spec,
+    std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager)
     : Driver("vulkan"),
       syms_(std::move(syms)),
       instance_(instance),
       owns_instance_(owns_instance),
       debug_reporter_(std::move(debug_reporter)),
-      device_extensibility_spec_(std::move(device_extensibility_spec)) {}
+      device_extensibility_spec_(std::move(device_extensibility_spec)),
+      renderdoc_capture_manager_(std::move(renderdoc_capture_manager)) {}
 
 VulkanDriver::~VulkanDriver() {
   IREE_TRACE_SCOPE0("VulkanDriver::dtor");
@@ -264,7 +284,8 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
   // disabled by the system, or permission is denied.
   ASSIGN_OR_RETURN(auto device, VulkanDevice::Create(
                                     add_ref(this), device_info, physical_device,
-                                    device_extensibility_spec_, syms()));
+                                    device_extensibility_spec_, syms(),
+                                    renderdoc_capture_manager_.get()));
 
   return device;
 }

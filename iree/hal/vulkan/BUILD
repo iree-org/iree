@@ -304,6 +304,21 @@ cc_library(
 )
 
 cc_library(
+    name = "renderdoc_capture_manager",
+    srcs = ["renderdoc_capture_manager.cc"],
+    hdrs = ["renderdoc_capture_manager.h"],
+    linkopts = ["-ldl"],
+    deps = [
+        "//iree/base:logging",
+        "//iree/base:platform_headers",
+        "//iree/base:status",
+        "//iree/base:tracing",
+        "//iree/hal:debug_capture_manager",
+        "@renderdoc_api//:renderdoc_app",
+    ],
+)
+
+cc_library(
     name = "status_util",
     srcs = ["status_util.cc"],
     hdrs = ["status_util.h"],
@@ -372,6 +387,7 @@ cc_library(
         "//iree/hal:allocator",
         "//iree/hal:command_buffer_validation",
         "//iree/hal:command_queue",
+        "//iree/hal:debug_capture_manager",
         "//iree/hal:device",
         "//iree/hal:driver",
         "//iree/hal:fence",
@@ -392,6 +408,7 @@ cc_library(
         ":debug_reporter",
         ":dynamic_symbols",
         ":extensibility_util",
+        ":renderdoc_capture_manager",
         ":status_util",
         ":vulkan_device",
         "//iree/base:memory",
@@ -400,6 +417,7 @@ cc_library(
         "//iree/hal:device_info",
         "//iree/hal:driver",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/flags:flag",
         "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )

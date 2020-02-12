@@ -203,7 +203,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
     ref_ptr<Driver> driver, const DeviceInfo& device_info,
     VkPhysicalDevice physical_device,
     const ExtensibilitySpec& extensibility_spec,
-    const ref_ptr<DynamicSymbols>& syms) {
+    const ref_ptr<DynamicSymbols>& syms,
+    DebugCaptureManager* debug_capture_manager) {
   IREE_TRACE_SCOPE0("VulkanDevice::Create");
 
   // Find the layers and extensions we need (or want) that are also available
@@ -342,7 +343,8 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
       std::move(driver), device_info, physical_device,
       std::move(logical_device), std::move(allocator),
       std::move(command_queues), std::move(dispatch_command_pool),
-      std::move(transfer_command_pool), std::move(legacy_fence_pool)));
+      std::move(transfer_command_pool), std::move(legacy_fence_pool),
+      debug_capture_manager));
 }
 
 // static
@@ -413,7 +415,7 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Wrap(
       std::move(driver), device_info, physical_device, std::move(device_handle),
       std::move(allocator), std::move(command_queues),
       std::move(dispatch_command_pool), std::move(transfer_command_pool),
-      std::move(legacy_fence_pool)));
+      std::move(legacy_fence_pool), /*debug_capture_manager=*/nullptr));
 }
 
 VulkanDevice::VulkanDevice(
@@ -423,7 +425,8 @@ VulkanDevice::VulkanDevice(
     absl::InlinedVector<std::unique_ptr<CommandQueue>, 4> command_queues,
     ref_ptr<VkCommandPoolHandle> dispatch_command_pool,
     ref_ptr<VkCommandPoolHandle> transfer_command_pool,
-    ref_ptr<LegacyFencePool> legacy_fence_pool)
+    ref_ptr<LegacyFencePool> legacy_fence_pool,
+    DebugCaptureManager* debug_capture_manager)
     : Device(device_info),
       driver_(std::move(driver)),
       physical_device_(physical_device),
@@ -434,7 +437,8 @@ VulkanDevice::VulkanDevice(
           make_ref<DescriptorPoolCache>(add_ref(logical_device_))),
       dispatch_command_pool_(std::move(dispatch_command_pool)),
       transfer_command_pool_(std::move(transfer_command_pool)),
-      legacy_fence_pool_(std::move(legacy_fence_pool)) {
+      legacy_fence_pool_(std::move(legacy_fence_pool)),
+      debug_capture_manager_(debug_capture_manager) {
   // Populate the queue lists based on queue capabilities.
   for (auto& command_queue : command_queues_) {
     if (command_queue->can_dispatch()) {
@@ -446,10 +450,18 @@ VulkanDevice::VulkanDevice(
       transfer_queues_.push_back(command_queue.get());
     }
   }
+
+  if (debug_capture_manager_ && debug_capture_manager_->is_connected()) {
+    // Record a capture covering the duration of this VkDevice's lifetime.
+    debug_capture_manager_->StartCapture();
+  }
 }
 
 VulkanDevice::~VulkanDevice() {
   IREE_TRACE_SCOPE0("VulkanDevice::dtor");
+  if (debug_capture_manager_ && debug_capture_manager_->is_capturing()) {
+    debug_capture_manager_->StopCapture();
+  }
 
   // Drop all command queues. These may wait until idle.
   command_queues_.clear();

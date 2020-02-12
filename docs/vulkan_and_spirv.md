@@ -112,4 +112,23 @@ supported: https://vulkan.gpuinfo.org/displayreport.php?id=6436#device
 
 ### RenderDoc
 
-TODO(benvanik): launching with renderdoc.
+RenderDoc captures of IREE Vulkan execution may be recorded through RenderDoc's
+GUI and through IREE's headless (command line) programs.
+
+For IREE's GUI programs like samples/vulkan/vulkan_inference_gui, you should be
+able to launch the program through RenderDoc itself and control captures using
+the UI overlay it injects.
+
+For IREE's headless programs, set the `vulkan_enable_renderdoc` flag to tell
+IREE to load RenderDoc, connect to it's in-application API, and trigger
+capturing on its own. For example, this command runs `iree-run-mlir` on a simple
+MLIR file with some sample input values and saves a RenderDoc capture to the
+default location on your system (e.g. /tmp/RenderDoc/):
+
+```shell
+$ bazel build iree/tools:iree-run-mlir && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$RENDERDOC_LIB bazel-bin/iree/tools/iree-run-mlir $PWD/iree/samples/vulkan/simple_mul.mlir -iree-hal-target-backends=vulkan-spirv -input-value="4xf32=1,2,3,4" -input-value="4xf32=2,4,6,8" -run-arg="--vulkan_renderdoc"
+```
+
+You can also launch IREE's headless programs through RenderDoc itself, just be
+sure to set the command line arguments appropriately. Saving capture settings in
+RenderDoc can help if you find yourself doing this frequently.
