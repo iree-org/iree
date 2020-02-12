@@ -126,7 +126,7 @@ MLIR file with some sample input values and saves a RenderDoc capture to the
 default location on your system (e.g. /tmp/RenderDoc/):
 
 ```shell
-$ bazel build iree/tools:iree-run-mlir && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$RENDERDOC_LIB bazel-bin/iree/tools/iree-run-mlir $PWD/iree/samples/vulkan/simple_mul.mlir -iree-hal-target-backends=vulkan-spirv -input-value="4xf32=1,2,3,4" -input-value="4xf32=2,4,6,8" -run-arg="--vulkan_enable_renderdoc"
+$ bazel build iree/tools:iree-run-mlir && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$RENDERDOC_LIB bazel-bin/iree/tools/iree-run-mlir $PWD/iree/samples/vulkan/simple_mul.mlir -iree-hal-target-backends=vulkan-spirv -input-value="4xf32=1,2,3,4" -input-value="4xf32=2,4,6,8" -run-arg="--vulkan_renderdoc"
 ```
 
 You can also launch IREE's headless programs through RenderDoc itself, just be

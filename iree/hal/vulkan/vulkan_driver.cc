@@ -25,8 +25,7 @@
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/status_util.h"
 
-ABSL_FLAG(bool, vulkan_enable_renderdoc, false,
-          "Enables RenderDoc API integration.");
+ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
 
 namespace iree {
 namespace hal {
@@ -89,7 +88,7 @@ StatusOr<ref_ptr<VulkanDriver>> VulkanDriver::Create(
   // Note: RenderDoc assumes that only a single VkDevice is used:
   //   https://renderdoc.org/docs/behind_scenes/vulkan_support.html#current-support
   std::unique_ptr<RenderDocCaptureManager> renderdoc_capture_manager;
-  if (absl::GetFlag(FLAGS_vulkan_enable_renderdoc)) {
+  if (absl::GetFlag(FLAGS_vulkan_renderdoc)) {
     renderdoc_capture_manager = std::make_unique<RenderDocCaptureManager>();
     RETURN_IF_ERROR(renderdoc_capture_manager->Connect());
   }
