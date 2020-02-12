@@ -40,6 +40,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSPIRV
+    MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRSupport

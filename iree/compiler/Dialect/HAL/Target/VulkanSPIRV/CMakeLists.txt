@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSPIRV
+    MLIRSPIRVTransforms
     MLIRSPIRVSerialization
     MLIRSupport
     MLIRTransforms

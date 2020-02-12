@@ -73,7 +73,7 @@ MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:LoopsToGPUPass": ["MLIRLoopsToGPU"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVDialectRegistration": ["MLIRSPIRV"],
-    "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV"],
+    "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
     "@llvm-project//mlir:SPIRVTranslateRegistration": [
         "MLIRSPIRVSerialization"
     ],
