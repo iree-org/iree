@@ -14,6 +14,7 @@
 
 #include <cstdio>
 
+#include "absl/strings/str_cat.h"
 #include "iree/base/file_io.h"
 #include "iree/base/status.h"
 #include "iree/base/target_platform.h"
@@ -30,8 +31,9 @@ namespace file_io {
 
 Status FileExists(const std::string& path) {
   struct stat stat_buf;
-  return stat(path.c_str(), &stat_buf) == 0 ? OkStatus()
-                                            : NotFoundErrorBuilder(IREE_LOC);
+  return stat(path.c_str(), &stat_buf) == 0
+             ? OkStatus()
+             : NotFoundErrorBuilder(IREE_LOC) << "'" << path << "'";
 }
 
 StatusOr<std::string> GetFileContents(const std::string& path) {
@@ -40,28 +42,29 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
                                                    if (file) fclose(file);
                                                  }};
   if (file == nullptr) {
-    return ErrnoToCanonicalStatusBuilder(errno, "Failed to open file",
-                                         IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(
+        errno, absl::StrCat("Failed to open file '", path, "'"), IREE_LOC);
   }
   if (std::fseek(file.get(), 0, SEEK_END) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, "Failed to seek file",
-                                         IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(
+        errno, absl::StrCat("Failed to seek file '", path, "'"), IREE_LOC);
   }
   size_t file_size = std::ftell(file.get());
   if (file_size == -1L) {
-    return ErrnoToCanonicalStatusBuilder(errno, "Failed to read file length",
-                                         IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(
+        errno, absl::StrCat("Failed to read file length '", path, "'"),
+        IREE_LOC);
   }
   if (std::fseek(file.get(), 0, SEEK_SET) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, "Failed to seek file",
-                                         IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(
+        errno, absl::StrCat("Failed to seek file '", path, "'"), IREE_LOC);
   }
   std::string contents;
   contents.resize(file_size);
   if (std::fread(const_cast<char*>(contents.data()), file_size, 1,
                  file.get()) != 1) {
     return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to read entire file contents";
+           << "Unable to read entire file contents of '" << path << "'";
   }
   return contents;
 }
@@ -72,21 +75,21 @@ Status SetFileContents(const std::string& path, const std::string& content) {
                                                    if (file) fclose(file);
                                                  }};
   if (file == nullptr) {
-    return ErrnoToCanonicalStatusBuilder(errno, "Failed to open file",
-                                         IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(
+        errno, absl::StrCat("Failed to open file '", path, "'"), IREE_LOC);
   }
   if (std::fwrite(const_cast<char*>(content.data()), content.size(), 1,
                   file.get()) != 1) {
     return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to write entire file contents";
+           << "Unable to write entire file contents of '" << path << "'";
   }
   return OkStatus();
 }
 
 Status DeleteFile(const std::string& path) {
   if (::remove(path.c_str()) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, "Failed to delete file",
-                                         IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(
+        errno, absl::StrCat("Failed to delete file '", path, "'"), IREE_LOC);
   }
   return OkStatus();
 }
@@ -94,8 +97,11 @@ Status DeleteFile(const std::string& path) {
 Status MoveFile(const std::string& source_path,
                 const std::string& destination_path) {
   if (::rename(source_path.c_str(), destination_path.c_str()) == -1) {
-    return ErrnoToCanonicalStatusBuilder(errno, "Failed to rename file",
-                                         IREE_LOC);
+    return ErrnoToCanonicalStatusBuilder(
+        errno,
+        absl::StrCat("Failed to rename file '", source_path, "' to '",
+                     destination_path, "'"),
+        IREE_LOC);
   }
   return OkStatus();
 }

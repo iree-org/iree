@@ -42,11 +42,12 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
   if (::ReadFile(file->handle(), const_cast<char*>(result.data()),
                  result.size(), &bytes_read, nullptr) == FALSE) {
     return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
-           << "Unable to read file span of " << result.size() << " bytes";
+           << "Unable to read file span of " << result.size() << " bytes from '"
+           << path << "'";
   } else if (bytes_read != file->size()) {
     return ResourceExhaustedErrorBuilder(IREE_LOC)
-           << "Unable to read all " << file->size()
-           << " bytes from the file (got " << bytes_read << ")";
+           << "Unable to read all " << file->size() << " bytes from '" << path
+           << "' (got " << bytes_read << ")";
   }
   return result;
 }
