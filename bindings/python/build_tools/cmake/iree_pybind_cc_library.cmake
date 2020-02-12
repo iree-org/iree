@@ -106,7 +106,7 @@ function(iree_pybind_cc_library)
     set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
     set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "lib${_RULE_NAME}")
+    set_target_properties(${_NAME} PROPERTIES OUTPUT_NAME "${_RULE_NAME}")
 
     if(NOT _uppercase_RULE_TYPE MATCHES "STATIC")
       set_property(TARGET ${_NAME} PROPERTY PREFIX "${PYTHON_MODULE_PREFIX}")
