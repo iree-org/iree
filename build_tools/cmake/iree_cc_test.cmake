@@ -103,5 +103,7 @@ function(iree_cc_test)
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
 
-  add_test(NAME ${_NAME} COMMAND ${_NAME})
+  # We run all our tests through a custom test runner to allow setup and teardown.
+  add_test(NAME ${_NAME} COMMAND ${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.sh "${CMAKE_CURRENT_BINARY_DIR}/${_NAME}")
+  set_property(TEST ${_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
 endfunction()

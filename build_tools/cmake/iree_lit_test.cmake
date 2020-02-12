@@ -47,9 +47,11 @@ function(iree_lit_test)
 
   add_test(
     NAME ${_NAME}
-    COMMAND ${CMAKE_SOURCE_DIR}/iree/tools/run_lit.sh "${_TEST_FILE_PATH}"
+    # We run all our tests through a custom test runner to allow setup and teardown.
+    COMMAND ${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.sh ${CMAKE_SOURCE_DIR}/iree/tools/run_lit.sh ${_TEST_FILE_PATH}
     WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" # Make sure the lit runner can find all the binaries
   )
+  set_property(TEST ${_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()
 
