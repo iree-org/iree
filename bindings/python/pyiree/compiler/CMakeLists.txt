@@ -51,5 +51,5 @@ iree_pybind_cc_library(
     MLIRParser
     MLIRPass
   TYPE
-    SHARED
+    STATIC
 )
