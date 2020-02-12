@@ -37,6 +37,7 @@ iree_cc_library(
     MLIRLoopsToGPU
     MLIRPass
     MLIRSPIRV
+    MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRSupport

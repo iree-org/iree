@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSPIRV
+    MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRTransforms
   ALWAYSLINK
