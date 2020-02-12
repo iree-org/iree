@@ -153,9 +153,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRAffineOps
       MLIRLinalgOps
       MLIRLinalgUtils
-      # MLIROptMain: lib; The equivalent Bazel library is MLIROptLib.
-      # TODO(marbre): Replace with appropriate target after upstreams CMake is revised.
-      MLIROptMain
+      MLIROptLib
       MLIRStandardOps
       MLIRSPIRV
       MLIRSPIRVSerialization
@@ -177,9 +175,7 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       iree::tools::iree_opt_library
-      # MLIRMlirOptLib: includes main(); The equivalent Bazel library is MLIROptMain.
-      # TODO(marbre): Replace with appropriate target after upstreams CMake is revised.
-      MLIRMlirOptLib
+      MLIRMlirOptMain
   )
   add_executable(iree-opt ALIAS iree_tools_iree-opt)
 
