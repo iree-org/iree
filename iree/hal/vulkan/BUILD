@@ -417,6 +417,7 @@ cc_library(
         "//iree/hal:device_info",
         "//iree/hal:driver",
         "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/flags:flag",
         "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )

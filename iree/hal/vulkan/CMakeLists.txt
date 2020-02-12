@@ -469,6 +469,7 @@ iree_cc_library(
   COPTS
     "-DVK_NO_PROTOTYPES"
   DEPS
+    absl::flags
     absl::inlined_vector
     iree::base::memory
     iree::base::status
