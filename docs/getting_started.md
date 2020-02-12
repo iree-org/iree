@@ -91,13 +91,14 @@ $ bazel run //iree/tools:iree-opt -- \
 The `iree-translate` program translates from a .mlir input file into an IREE
 module.
 
-For example, to translate `gather.mlir` to an IREE module with Bazel on Linux,
+For example, to translate `simple.mlir` to an IREE module with bazel on Linux,
 use this command:
 
 ```shell
 $ bazel run //iree/tools:iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  $PWD/test/e2e/xla/gather.mlir \
+  --iree-hal-target-backends=interpreter-bytecode \
+  $PWD/iree/tools/test/simple.mlir \
   -o /tmp/module.fb
 ```
 
@@ -105,15 +106,40 @@ Custom translations may also be layered on top of `iree-translate` - see
 [iree/samples/custom_modules/dialect](../iree/samples/custom_modules/dialect)
 for a sample.
 
+### iree-run-module
+
+The `iree-run-module` program takes an already translated IREE module as input
+and executes an exported main function using the provided inputs.
+
+This program can be used in sequence with `iree-translate` to translate a .mlir
+file to an IREE module and then execute it. Here is an example command that
+executes the simple `module.fb` compiled from `simple.mlir` above on the IREE
+interpreter
+
+```shell
+$ bazel run //iree/tools:iree-run-module -- \
+  --input_file=/tmp/module.fb \
+  --driver=interpreter \
+  --entry_function=abs \
+  --inputs="i32=-2"
+```
+
 ### iree-run-mlir
 
 The `iree-run-mlir` program takes a .mlir file as input, translates it to an
 IREE bytecode module, and executes the module.
 
+It is designed for testing and debugging, not production use cases, and
+therefore does some additional work that usually must be explicit, like marking
+every function as exported by default and running all of them.
+
 For example, to execute the contents of a test .mlir file, use this command:
 
 ```shell
-$ bazel run //iree/tools:iree-run-mlir -- $PWD/test/e2e/xla/reverse.mlir
+$ bazel run //iree/tools:iree-run-mlir -- \
+  $PWD/iree/tools/test/simple.mlir \
+  --input-value="i32=-2" \
+  --iree-hal-target-backends=interpreter-bytecode
 ```
 
 ### iree-dump-module
