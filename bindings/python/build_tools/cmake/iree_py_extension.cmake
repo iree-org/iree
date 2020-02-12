@@ -14,6 +14,10 @@
 
 include(CMakeParseArguments)
 
+if (NOT DEFINED _IREE_PY_EXTENSION_NAMES)
+  set(_IREE_PY_EXTENSION_NAMES "")
+endif()
+
 # iree_py_extension()
 #
 # CMake function to imitate Bazel's iree_py_extension rule.
@@ -82,14 +86,6 @@ function(iree_py_extension)
         ${IREE_DEFAULT_COPTS}
     )
 
-    target_link_libraries(${_NAME}
-      PUBLIC
-        ${_RULE_DEPS}
-      PRIVATE
-        ${_RULE_LINKOPTS}
-        ${IREE_DEFAULT_LINKOPTS}
-        ${PYTHON_LIBRARY}
-    )
     target_compile_definitions(${_NAME}
       PUBLIC
         ${_RULE_DEFINES}
@@ -112,6 +108,11 @@ function(iree_py_extension)
       # For example, foo/bar/ library 'bar' would end up as 'foo::bar'.
       add_library(${_PACKAGE_NS} ALIAS ${_NAME})
     endif()
+    # Defer computing transitive dependencies and calling target_link_libraries()
+    # until all libraries have been declared.
+    # Track target and deps, use in iree_complete_binary_link_options() later.
+    set_property(GLOBAL APPEND PROPERTY _IREE_PY_EXTENSION_NAMES "${_NAME}")
+    set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
   endif()
 endfunction()
 

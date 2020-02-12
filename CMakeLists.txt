@@ -205,3 +205,6 @@ endif()
 
 # Note: this must be called after all libraries have been declared.
 iree_complete_binary_link_options()
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  iree_complete_py_extension_link_options()
+endif()
