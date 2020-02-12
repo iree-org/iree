@@ -65,6 +65,7 @@ MLIR_EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AffineDialectRegistration": ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRLoopToStandard"],
+    "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
     "@llvm-project//mlir:GPUToSPIRVTransforms": ["MLIRGPUtoSPIRVTransforms"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
     "@llvm-project//mlir:LinalgDialectRegistration": ["MLIRLinalgOps"],
