@@ -28,7 +28,7 @@ namespace hal {
 class DebugCaptureManager {
  public:
   DebugCaptureManager() {}
-  ~DebugCaptureManager() = default;
+  virtual ~DebugCaptureManager() = default;
 
   // Attempts to connect to a command recorder, if not already connected.
   //

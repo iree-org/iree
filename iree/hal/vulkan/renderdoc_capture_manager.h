@@ -28,7 +28,7 @@ namespace vulkan {
 class RenderDocCaptureManager final : public DebugCaptureManager {
  public:
   RenderDocCaptureManager();
-  ~RenderDocCaptureManager();
+  ~RenderDocCaptureManager() override;
 
   // Note: Connect() must be called *before* creating a VkInstance.
   Status Connect() override;
