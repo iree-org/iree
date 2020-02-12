@@ -44,11 +44,19 @@ namespace HAL {
 // static llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
 //     "IREE Vulkan/SPIR-V backend options");
 
+// TODO(ravishankarm): Flags to test the Linalg To SPIR-V path. Need a better
+// way to handle these options.
+#define USE_LINALG_TO_SPIRV "iree-use-linalg-to-spirv-path"
+
 static llvm::cl::opt<bool> useLinalgPathForCodegen(
-    "iree-use-linalg-to-spirv-path",
+    USE_LINALG_TO_SPIRV,
     llvm::cl::desc(
         "Flag to use the XLA-HLO to Linalg To SPIR-V pass pipeline."),
     llvm::cl::init(false));
+static llvm::cl::list<unsigned> clLinalgToSPIRVWorkGroupSize(
+    "iree-linalg-to-spirv-workgroup-size",
+    llvm::cl::desc("Workgroup size to use for XLA to Linalg to SPIRV path"),
+    llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
 
 VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   VulkanSPIRVTargetOptions targetOptions;
@@ -122,6 +130,25 @@ static std::unique_ptr<iree::VkPipelineLayoutDefT> populatePipelineLayout(
   return pipelineLayoutDef;
 }
 
+/// Update the workgroup size in the targetOp.
+// TODO(ravishankarm): This is either to be deprecated or moved into a more
+// convenient place.
+static void propagateModifiedExecutableABI(IREE::Flow::ExecutableOp sourceOp,
+                                           ModuleOp moduleOp,
+                                           IREE::HAL::ExecutableOp targetOp) {
+  for (auto &op : sourceOp.getBlock()) {
+    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
+      auto targetEntryOp =
+          targetOp.lookupSymbol<IREE::HAL::ExecutableEntryPointOp>(
+              entryOp.sym_name());
+      auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
+      auto workGroupSize = funcOp.getAttrOfType<DenseIntElementsAttr>(
+          "iree.executable.workgroup_size");
+      targetEntryOp.setAttr("workgroup_size", workGroupSize);
+    }
+  }
+}
+
 LogicalResult translateToVulkanSPIRVExecutable(
     IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
     ExecutableTargetOptions executableOptions,
@@ -148,13 +175,19 @@ LogicalResult translateToVulkanSPIRVExecutable(
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
     if (useLinalgPathForCodegen) {
-      addLowerToSPIRVPasses(conversionPassManager);
+      SmallVector<int64_t, 3> workGroupSizes(
+          clLinalgToSPIRVWorkGroupSize.begin(),
+          clLinalgToSPIRVWorkGroupSize.end());
+      addLowerToSPIRVPasses(conversionPassManager, workGroupSizes);
     } else {
       addIREEToSPIRVPasses(conversionPassManager);
     }
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";
     }
+    // Drop the gpu.container_module attribute.
+    moduleOp.removeAttr("gpu.container_module");
+    propagateModifiedExecutableABI(sourceOp, moduleOp, targetOp);
     auto spvModuleOps = moduleOp.getOps<spirv::ModuleOp>();
     if (std::distance(spvModuleOps.begin(), spvModuleOps.end()) != 1) {
       return moduleOp.emitError()

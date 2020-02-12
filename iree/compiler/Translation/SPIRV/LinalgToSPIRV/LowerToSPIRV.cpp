@@ -48,6 +48,18 @@
 namespace mlir {
 namespace iree_compiler {
 
+static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
+  if (vector.empty()) return vector;
+  auto numTrailingOnes = 0;
+  for (unsigned i = vector.size() - 1; i > 0; --i) {
+    if (vector[i] != 1) {
+      break;
+    }
+    numTrailingOnes++;
+  }
+  return vector.drop_back(numTrailingOnes);
+}
+
 namespace {
 /// These options are only for testing purposes. For actual execution with IREE,
 /// these are computed by IREE/Backends automatically.
@@ -94,31 +106,47 @@ namespace {
 struct IREETileLinalgPass : public FunctionPass<IREETileLinalgPass> {
   void runOnFunction() override {
     FuncOp funcOp = getFunction();
-    SmallVector<int64_t, 3> workGroupSize;
-    workGroupSize.reserve(3);
-    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSize))) {
-      return;
-    }
+    SmallVector<int64_t, 3> workGroupSizeVec;
+    workGroupSizeVec.reserve(3);
+    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSizeVec))) return;
+    ArrayRef<int64_t> workGroupSize = dropTrailingOnes(workGroupSizeVec);
+
     OpBuilder builder(funcOp);
     OperationFolder folder(funcOp.getContext());
-    funcOp.walk([&workGroupSize, &builder, &folder](linalg::LinalgOp op) {
-      if (!op.hasBufferSemantics()) {
-        return;
-      }
-      SmallVector<int64_t, 3> tileSizes;
-      auto nLoops = op.getNumLoops();
-      tileSizes.assign(workGroupSize.begin(), workGroupSize.end());
-      // Linalg convention is to use 0 for no tiling. If the workgroup size is
-      // 1, then dont tile along that dimension. So overriding 1 to 0.
-      for (auto &tileSize : tileSizes) {
-        if (tileSize == 1) tileSize = 0;
-      }
-      tileSizes.resize(nLoops, 0);
-      auto tiledOp = linalg::tileLinalgOp(builder, op, tileSizes, {}, &folder);
-      if (tiledOp) {
-        op.erase();
-      }
-    });
+    Region &body = funcOp.getBody();
+    if (!mlir::has_single_element(body)) {
+      funcOp.emitError(
+          "unhandled dispatch function that doesn't have a single block");
+      return signalPassFailure();
+    }
+    auto linalgOps = body.front().getOps<linalg::LinalgOp>();
+    if (!mlir::has_single_element(linalgOps)) {
+      funcOp.emitError(
+          "unhandled SPIR-V code generation with multiple linalg operations");
+      return signalPassFailure();
+    }
+    linalg::LinalgOp linalgOp = *linalgOps.begin();
+    if (!linalgOp.hasBufferSemantics()) {
+      linalgOp.emitError(
+          "expected linalg op with buffer semantics during SPIR-V "
+          "code generation");
+      return signalPassFailure();
+    }
+
+    // Tile sizes to use are reverse of the workGroupSize.
+    SmallVector<int64_t, 3> tileSizes(reverse(workGroupSize));
+    // Linalg convention is to use 0 for no tiling. If the workgroup size is
+    // 1, then dont tile along that dimension. So overriding 1 to 0.
+    for (auto &tileSize : tileSizes)
+      if (tileSize == 1) tileSize = 0;
+    tileSizes.resize(linalgOp.getNumLoops(), 0);
+    auto tiledOp =
+        linalg::tileLinalgOp(builder, linalgOp, tileSizes, {}, &folder);
+    if (!tiledOp) {
+      linalgOp.emitError("unable to tile linalg op for SPIR-V code generation");
+      return signalPassFailure();
+    }
+    linalgOp.erase();
   }
 };
 
@@ -131,32 +159,43 @@ struct LoopsToGPUPass : public FunctionPass<LoopsToGPUPass> {
   void runOnFunction() override {
     // Get the workgroup size from the attributes.
     FuncOp funcOp = getFunction();
-    SmallVector<int64_t, 3> workGroupSize;
-    workGroupSize.reserve(3);
-    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSize))) {
-      return;
+    SmallVector<int64_t, 3> workGroupSizeVec;
+    workGroupSizeVec.reserve(3);
+    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSizeVec))) return;
+    ArrayRef<int64_t> workGroupSize = dropTrailingOnes(workGroupSizeVec);
+
+    // While we can use any valid input for numWorkGroups, there might be
+    // canonicalizations that can be used if the workgroup size is passed
+    // accurately. For now compute the workgroup size based on the workload and
+    // workgroup size.
+    // TODO(ravishankarm): This assumes this is static for now. To handle
+    // dynamic cases, generate the IR that corresponds to the operations here.
+    SmallVector<int64_t, 3> workLoad;
+    workLoad.reserve(3);
+    if (failed(getLegacyLaunchSize(funcOp, workLoad))) {
+      funcOp.emitError("unable to retrieve workload size in dispatch function");
+      return signalPassFailure();
     }
-    // TODO(ravishankarm): Currently evaluating only 2D tiling. Generalize this.
-    workGroupSize.resize(2);
-    // The Loop To GPU pass expects the numWorkGroups only to create the
-    // host-side launch operation. We don't care about that, so just pass {1, 1,
-    // 1} for that.
+    workLoad.resize(workGroupSize.size());
+
     SmallVector<int64_t, 3> numWorkGroups(workGroupSize.size(), 1);
+    for (auto index : llvm::seq<unsigned>(0, workGroupSize.size())) {
+      numWorkGroups[index] = workLoad[index] / workGroupSize[index];
+      numWorkGroups[index] +=
+          static_cast<bool>(workLoad[index] % workGroupSize[index]);
+    }
+
     SmallVector<Value, 3> numWorkGroupsVal, workGroupSizeVal;
     numWorkGroupsVal.reserve(3);
     workGroupSizeVal.reserve(3);
     createConstantsInFunc(funcOp, numWorkGroups, numWorkGroupsVal);
     createConstantsInFunc(funcOp, workGroupSize, workGroupSizeVal);
-    for (Block &block : getFunction()) {
-      for (Operation &op : llvm::make_early_inc_range(block)) {
-        if (auto forOp = dyn_cast<loop::ForOp>(&op)) {
+    for (Block &block : getFunction())
+      for (Operation &op : llvm::make_early_inc_range(block))
+        if (auto forOp = dyn_cast<loop::ForOp>(&op))
           if (failed(convertLoopToGPULaunch(forOp, numWorkGroupsVal,
-                                            workGroupSizeVal))) {
+                                            workGroupSizeVal)))
             return signalPassFailure();
-          }
-        }
-      }
-    }
   }
 };
 
@@ -171,9 +210,7 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
     FuncOp funcOp = nullptr;
     auto walkResult = moduleOp.walk([&funcOp](FuncOp fOp) -> WalkResult {
       if (fOp.getAttr("iree.executable.export")) {
-        if (funcOp) {
-          return WalkResult::interrupt();
-        }
+        if (funcOp) return WalkResult::interrupt();
         funcOp = fOp;
       }
       return WalkResult::advance();
@@ -185,15 +222,38 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
     SmallVector<Operation *, 1> kernelModules;
     OpBuilder builder(context);
     builder.setInsertionPoint(funcOp.getOperation());
+    StringRef fnName = SymbolTable::getSymbolName(funcOp);
 
-    // Clone the GPU module into the funcop to convert into a SPIR-V module.
-    funcOp.walk(
-        [&builder, &moduleOp, &kernelModules](gpu::LaunchFuncOp gpuLaunchOp) {
+    auto funcWalkResult =
+        funcOp.walk([&builder, &moduleOp, &kernelModules,
+                     &fnName](gpu::LaunchFuncOp gpuLaunchOp) -> WalkResult {
           auto kernelModuleName = gpuLaunchOp.getKernelModuleName();
           auto gpuModuleOp =
               moduleOp.lookupSymbol<gpu::GPUModuleOp>(kernelModuleName);
-          kernelModules.push_back(builder.clone(*gpuModuleOp.getOperation()));
+          if (!gpuModuleOp) return WalkResult::interrupt();
+
+          // Clone the GPU module into the funcop to convert into a SPIR-V
+          // module.
+          auto cloneModuleOp = cast<gpu::GPUModuleOp>(
+              builder.clone(*gpuModuleOp.getOperation()));
+          // This is a dirty hack to make the gpu.func the same name as the
+          // dispatch function (GPU outlining pass changed the name, and its
+          // easiest to change it here to what is expected in IREE)
+          auto gpuFuncOps =
+              cloneModuleOp.body().front().getOps<gpu::GPUFuncOp>();
+          if (!mlir::has_single_element(gpuFuncOps))
+            return WalkResult::interrupt();
+          gpu::GPUFuncOp gpuFuncOp = *gpuFuncOps.begin();
+          SymbolTable::setSymbolName(gpuFuncOp, fnName);
+          kernelModules.push_back(cloneModuleOp);
+          return WalkResult::advance();
         });
+    if (funcWalkResult.wasInterrupted()) {
+      funcOp.emitError(
+          "expected gpu.func operation within gpu.module operation while "
+          "lowering to SPIR-V");
+      return signalPassFailure();
+    }
     SPIRVTypeConverter typeConverter;
     OwningRewritePatternList patterns;
     SmallVector<int32_t, 3> workGroupSize;
@@ -226,20 +286,57 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
 };
 
 /// Pass to override the workgroup_size attribute value of a dispatch function.
-// TODO(ravishankarm): Use a more cohorent strategy than just setting it to {2,
-// 2}.
 struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
   UpdateWorkGroupSizePass(ArrayRef<int64_t> workGroupSize)
       : workGroupSize(workGroupSize.begin(), workGroupSize.end()) {}
   void runOnFunction() {
     FuncOp funcOp = getFunction();
-    if (!funcOp.getAttr("iree.executable.export")) {
-      return;
-    }
+    if (!funcOp.getAttr("iree.executable.export")) return;
+
     if (workGroupSize.empty()) {
-      workGroupSize = {2, 2};
+      // By default look at the number of "parallel" loops in the generic op.
+      Region &body = funcOp.getBody();
+      // Only handle single block functions.
+      if (body.getBlocks().size() != 1) {
+        funcOp.emitError("unhandled dispatch function with multiple blocks");
+        return signalPassFailure();
+      }
+      Block &block = body.front();
+      auto genericOps = block.getOps<linalg::GenericOp>();
+      if (!mlir::has_single_element(genericOps)) {
+        funcOp.emitError(
+            "unhandled SPIR-V code-generation with multiple generic ops in "
+            "dispatch region");
+        return signalPassFailure();
+      }
+      // Find the number of leading parallel loops in the generic op
+      unsigned numOuterParallelLoops = 0;
+      auto genericOp = *genericOps.begin();
+      for (auto iteratorType : genericOp.iterator_types()) {
+        if (iteratorType.cast<StringAttr>().getValue() !=
+            getParallelIteratorTypeName()) {
+          break;
+        }
+        numOuterParallelLoops++;
+      }
+      workGroupSize.resize(3, 1);
+      if (numOuterParallelLoops > 0) {
+        workGroupSize[0] = 32;
+      }
+      if (numOuterParallelLoops > 1) {
+        workGroupSize[1] = 4;
+      }
+      if (numOuterParallelLoops > 2) {
+        // Change workGroupsSize[1] such that the total size is equal to 128,
+        // which is the minimum gauranteed by Vulkan spec.
+        workGroupSize[1] = 2;
+        workGroupSize[2] = 2;
+      }
+      // TODO(ravishankarm) : The current code-generation will "serialize" all
+      // the inner loops that are more than 3 deep. We can potentially "fold"
+      // all the parallel loops so that they all executed on different
+      // workitems.
     }
-    workGroupSize.resize(3, 1);
     OpBuilder builder(&getContext());
     funcOp.setAttr("iree.executable.workgroup_size",
                    getDenseIntElementsAttrVal(&builder, workGroupSize));

@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
+# TODO(ravishankarm): Vulkan not supported in OSS build testing, so
+# disabling this for now.
+# add_subdirectory(test)
 
 iree_cc_library(
   NAME
