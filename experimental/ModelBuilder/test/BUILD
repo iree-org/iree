@@ -42,8 +42,8 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgDialectRegistration",
     ],
 )
