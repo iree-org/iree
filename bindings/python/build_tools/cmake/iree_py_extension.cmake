@@ -26,7 +26,7 @@ endif()
 # NAME: name of target
 # HDRS: List of public header files for the library
 # SRCS: List of source files for the library
-# DEPS: List of other libraries to be linked in to the binary targets
+# DEPS: List of other libraries to be linked in to the py extension targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # INCLUDES: Include directories to add to dependencies
@@ -110,7 +110,7 @@ function(iree_py_extension)
     endif()
     # Defer computing transitive dependencies and calling target_link_libraries()
     # until all libraries have been declared.
-    # Track target and deps, use in iree_complete_binary_link_options() later.
+    # Track target and deps, use in iree_complete_py_extension_link_options() later.
     set_property(GLOBAL APPEND PROPERTY _IREE_PY_EXTENSION_NAMES "${_NAME}")
     set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
   endif()
