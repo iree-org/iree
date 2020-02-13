@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_py_library(
+  NAME
+    rt
+  SRCS
+    "__init__.py"
+    # "system_api.py"
+  DEPS
+    ::binding
+)
+
 iree_py_extension(
   NAME
     binding
@@ -64,4 +74,13 @@ iree_pybind_cc_library(
     absl::span
   TYPE
     STATIC
+)
+
+iree_py_library(
+  NAME
+    system_api
+  SRCS
+    "system_api.py"
+  DEPS
+    ::binding
 )
