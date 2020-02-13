@@ -84,3 +84,31 @@ iree_py_library(
   DEPS
     ::binding
 )
+
+iree_py_test(
+  NAME
+    function_abi_test
+  SRCS
+    "function_abi_test.py"
+)
+
+iree_py_test(
+  NAME
+    hal_test
+  SRCS
+    "hal_test.py"
+)
+
+iree_py_test(
+  NAME
+    system_api_test
+  SRCS
+    "system_api_test.py"
+)
+
+iree_py_test(
+  NAME
+    vm_test
+  SRCS
+    "vm_test.py"
+)

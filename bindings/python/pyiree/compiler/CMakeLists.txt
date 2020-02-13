@@ -62,3 +62,10 @@ iree_pybind_cc_library(
   TYPE
     STATIC
 )
+
+iree_py_test(
+  NAME
+    compiler_test
+  SRCS
+    "compiler_test.py"
+)
