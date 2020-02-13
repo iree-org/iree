@@ -3,7 +3,7 @@
 module {
   // CHECK:spv.module "Logical" "GLSL450"
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: func [[FN:@broadcast_in_dim_2D_3D]]
+  // CHECK: spv.func [[FN:@broadcast_in_dim_2D_3D]]
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<504 x i32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<1512 x i32 [4]> [0]>, StorageBuffer>
   func @broadcast_in_dim_2D_3D(%arg0: memref<12x42xi32>, %arg1: memref<3x12x42xi32>)
@@ -20,7 +20,7 @@ module {
 module {
   // CHECK:spv.module "Logical" "GLSL450"
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
-  // CHECK: func [[FN:@broadcast_in_dim_scalar_3D]]
+  // CHECK: spv.func [[FN:@broadcast_in_dim_scalar_3D]]
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<1512 x i32 [4]> [0]>, StorageBuffer>
   func @broadcast_in_dim_scalar_3D(%arg0: memref<i32>, %arg1: memref<3x12x42xi32>)
@@ -65,7 +65,7 @@ module {
 // -----
 
 module {
-  // CHECK: func @const_int_nonsplat
+  // CHECK: spv.func @const_int_nonsplat
   // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<!spv.array<1008 x i32 [4]> [0]>, StorageBuffer>
   func @const_int_nonsplat(%arg0: memref<2x12x42xi32>)
     attributes  {iree.executable.export, iree.executable.workload = dense<[42, 12, 2]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {

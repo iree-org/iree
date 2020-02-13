@@ -135,8 +135,7 @@ LogicalResult SPIRVCodegenImpl::createEntryFn(
   }
 
   auto entryFnType = builder.getFunctionType(entryFnArgTypes, ArrayRef<Type>());
-  auto entryFn = builder.create<FuncOp>(loc, fn.getName(), entryFnType,
-                                        ArrayRef<NamedAttribute>());
+  auto entryFn = builder.create<spirv::FuncOp>(loc, fn.getName(), entryFnType);
   entryFn.addEntryBlock();
 
   SmallVector<int32_t, 3> workGroupSize;
@@ -301,7 +300,7 @@ Value SPIRVCodegenImpl::loadArgValueAtIndex(
 }
 
 LogicalResult SPIRVCodegenImpl::lowerFunction(
-    OpBuilder &builder, FuncOp fn, FuncOp entryFn,
+    OpBuilder &builder, FuncOp fn, spirv::FuncOp entryFn,
     TensorIndexToScalarValueMap &valueCache) {
   if (failed(createLaunchGuard(builder, fn))) {
     return failure();

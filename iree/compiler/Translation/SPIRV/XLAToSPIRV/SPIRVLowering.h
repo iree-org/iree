@@ -277,7 +277,8 @@ class SPIRVCodegenImpl {
                             Value origArg, AffineMap indexMap);
 
   /// Lowers the body of the function in the original dialect to SPIR-V dialect.
-  LogicalResult lowerFunction(OpBuilder &builder, FuncOp fn, FuncOp entryFn,
+  LogicalResult lowerFunction(OpBuilder &builder, FuncOp fn,
+                              spirv::FuncOp entryFn,
                               TensorIndexToScalarValueMap &valueCache);
 
   /// Method to lower the operations within the dispatch function.
