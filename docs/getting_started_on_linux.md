@@ -8,7 +8,7 @@ to the documentation.
 
 ## Pre-requisites
 
-### Install Bazel >= 1.0
+### Install Bazel >= 2.0
 
 *Optional if you will only be using the CMake build for runtime deps.*
 
