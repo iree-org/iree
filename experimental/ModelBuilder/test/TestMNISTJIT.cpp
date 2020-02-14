@@ -20,7 +20,7 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/StandardTypes.h"
 
-using namespace mlir;
+using namespace mlir;  // NOLINT
 
 // Helper function to build a func "mnist" that takes a memref<?x784xf32> buffer
 //    (use batch size B=3 in this example).

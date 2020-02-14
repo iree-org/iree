@@ -47,6 +47,11 @@ FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
   return function;
 }
 
+VectorType mlir::ModelBuilder::getVectorType(ArrayRef<int64_t> shape,
+                                             Type elementalType) {
+  return VectorType::get(shape, elementalType);
+}
+
 MemRefType mlir::ModelBuilder::getMemRefType(ArrayRef<int64_t> shape,
                                              Type elementType) {
   return MemRefType::get(shape, elementType, {});

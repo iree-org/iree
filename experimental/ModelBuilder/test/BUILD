@@ -26,6 +26,7 @@ iree_lit_test_suite(
     srcs = glob(["*.cpp"]),
     data = [
         ":test-mnist-jit",
+        ":test-simple-jit",
         "//iree/tools:IreeFileCheck",
     ],
     tags = [
@@ -36,6 +37,21 @@ iree_lit_test_suite(
 cc_binary(
     name = "test-mnist-jit",
     srcs = ["TestMNISTJIT.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+cc_binary(
+    name = "test-simple-jit",
+    srcs = ["TestSimpleJIT.cpp"],
     tags = [
         "noga",
     ],

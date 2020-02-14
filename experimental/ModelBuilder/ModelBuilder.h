@@ -23,8 +23,8 @@
 // The ModelBuilder exposes relevant core MLIR classes and APIs that are
 // sufficient to build whole models. This set of classes and APIs encompass:
 //  1. mlir::FuncOp creation.
-//  2. key types creation such as mlir::FloatType, mlir::IntegerType and
-//     mlir::MemRefType.
+//  2. key types creation such as mlir::FloatType, mlir::IntegerType,
+//     mlir::VectorType, and mlir::MemRefType.
 //  3. layer creation functions such as FCBiasTanh.
 //
 // Usage:
@@ -45,14 +45,11 @@
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_
 
-#include "mlir/Dialect/Linalg/EDSC/Builders.h"
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
 #include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
-#include "mlir/EDSC/Builders.h"
-#include "mlir/EDSC/Intrinsics.h"
+#include "mlir/Dialect/VectorOps/EDSC/Intrinsics.h"
 
 namespace mlir {
-
 using edsc::ScopedContext;
 using edsc::StructuredIndexed;
 using edsc::ValueHandle;
@@ -62,6 +59,12 @@ using edsc::ValueHandle;
 // -----------------------------------------------------------------------------
 // From the Linalg Dialect.
 using edsc::intrinsics::linalg_fill;
+using edsc::intrinsics::linalg_yield;
+using edsc::ops::linalg_matmul;
+// From the Vector Dialect.
+using edsc::intrinsics::vector_contract;
+using edsc::ops::vector_contraction;
+using edsc::ops::vector_matmul;
 // From the Std Dialect.
 using edsc::intrinsics::std_alloc;
 using edsc::intrinsics::std_constant_float;
@@ -87,6 +90,9 @@ class ModelBuilder : public OpBuilder {
   // Build an MLIR FuncOp that will be callable after JIT compilation occured.
   FuncOp makeFunction(StringRef name, ArrayRef<Type> results = {},
                       ArrayRef<Type> args = {}, bool declOnly = false);
+
+  // Build an MLIR VectorType with a base `elementalType` and a `shape`.
+  VectorType getVectorType(ArrayRef<int64_t> shape, Type elementalType);
 
   // Build an MLIR MemRefType with a base `elementType` and a `shape` that can
   // be any mix of static and dynamic values. For now this only supports a dense
