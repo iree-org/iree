@@ -25,6 +25,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(
         ["*.mlir"],
+        # TODO(b/149270254) : Enable test after diagnosing flakiness.
+        exclude = ["pw_add_mul.mlir"],
     ),
     data = [
         "//iree/tools:IreeFileCheck",

@@ -20,12 +20,15 @@ package(
 cc_library(
     name = "LinalgToSPIRV",
     srcs = [
+        "LinalgFusion.cpp",
         "LowerToSPIRV.cpp",
     ],
     hdrs = [
         "LowerToSPIRV.h",
+        "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/XLAToLinalg:IREELinalgTensorToBuffer",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:support",

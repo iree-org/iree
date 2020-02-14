@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Translation/XLAToLinalg/LinalgTensorToBuffer.h"
 #include "iree/compiler/Utils/IREECodegenUtils.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
@@ -332,7 +333,7 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
         workGroupSize[1] = 2;
         workGroupSize[2] = 2;
       }
-      // TODO(ravishankarm) : The current code-generation will "serialize" all
+      // TODO(ravishankarm): The current code-generation will "serialize" all
       // the inner loops that are more than 3 deep. We can potentially "fold"
       // all the parallel loops so that they all executed on different
       // workitems.
@@ -376,6 +377,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm) {
 
 void addLowerToSPIRVPasses(OpPassManager &pm, ArrayRef<int64_t> workGroupSize) {
   pm.addPass(xla_hlo::createLegalizeHloToLinalgPass());
+  pm.addPass(createLinalgFusionPass());
   pm.addPass(createLinalgTensorToBufferConversionPass());
   pm.addPass(std::make_unique<UpdateWorkGroupSizePass>(workGroupSize));
   addLinalgToSPIRVPasses(pm);
