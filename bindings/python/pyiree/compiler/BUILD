@@ -84,6 +84,7 @@ pybind_cc_library(
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",

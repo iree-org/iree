@@ -28,6 +28,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Location.h"
+#include "mlir/InitAllDialects.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -324,6 +325,7 @@ void CompilerModuleBundle::RunPassPipeline(
 }
 
 void SetupCommonCompilerBindings(pybind11::module m) {
+  mlir::registerAllDialects();
   py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob",
                                                       py::buffer_protocol())
       .def_buffer([](OpaqueBlob* self) -> py::buffer_info {
