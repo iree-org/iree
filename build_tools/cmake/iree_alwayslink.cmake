@@ -56,24 +56,35 @@ endfunction()
 
 function(set_alwayslink_mlir_libs)
   set(_ALWAYSLINK_LIBS_MLIR
-    MLIRAffineOps
+    # Dep tagged ALWAYSLINK for mlir-translate
+    MLIRSPIRVSerialization
+    # Required IR targets
+    MLIRIR
+    MLIRTestIR
+    # Required passes
+    MLIRPass
+    MLIRTestPass
+    MLIRSPIRVTestPasses
+    # Required transforms
+    MLIRTestTransforms
+    MLIRGPUtoCUDATransforms
+    MLIRGPUtoNVVMTransforms
+    MLIRGPUtoROCDLTransforms
+    MLIRGPUtoVulkanTransforms
+    MLIRQuantizerTransforms
+    MLIRLinalgToLLVM # createConvertLinalgToLLVMPass()
+    MLIRLinalgToSPIRVTransforms
+    # TODO(marbre): Check the previously added libs
     MLIRAnalysis
     MLIREDSC
-    MLIRIR
     MLIRLoopToStandard
     MLIRParser
-    MLIRPass
-    MLIRSPIRV
-    MLIRSPIRVSerialization
     MLIRSPIRVTransforms
-    MLIRStandardOps
     MLIRStandardToLLVM
     MLIRTargetLLVMIR
     MLIRTransforms
     MLIRTranslation
     MLIRSupport
-    MLIRVectorOps
-    MLIRLinalgOps
     MLIROptLib
   )
 
