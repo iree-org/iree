@@ -29,6 +29,7 @@ iree_cc_library(
     iree::schemas::spirv_executable_def_cc_fbs
     flatbuffers
     LLVMSupport
+    MLIRAllDialects
     MLIRIR
     MLIRPass
     MLIRSPIRV

@@ -121,6 +121,18 @@ iree_cc_test(
 
 if(${IREE_BUILD_COMPILER})
 
+  # Logic to identify targets_to_link adopted from MLIR:
+  # Manually expand the target library, since our MLIR libraries
+  # aren't plugged into the LLVM dependency tracking. If we don't
+  # do this then we can't insert the CodeGen library after ourselves
+  llvm_expand_pseudo_components(TARGET_LIBS AllTargetsCodeGens)
+  # Prepend LLVM in front of every target, this is how the library
+  # are named with CMake
+  set(targets_to_link)
+  foreach(t ${TARGET_LIBS})
+    list(APPEND targets_to_link "LLVM${t}")
+  endforeach(t)
+
   iree_cc_library(
     NAME
       iree_opt_library
@@ -152,12 +164,23 @@ if(${IREE_BUILD_COMPILER})
       LLVMSupport
       MLIRAffineOps
       MLIRLinalgOps
+      MLIRTestIR
+      MLIRTestPass
+      MLIRTestTransforms
+      MLIRGPUtoCUDATransforms
+      MLIRGPUtoNVVMTransforms
+      MLIRGPUtoROCDLTransforms
+      MLIRGPUtoVulkanTransforms
+      MLIRQuantizerTransforms
+      MLIRLinalgToSPIRVTransforms
+      MLIRLinalgToLLVM
       MLIRLinalgUtils
       MLIROptLib
       MLIRStandardOps
       MLIRSPIRV
       MLIRSPIRVSerialization
       MLIRSPIRVTransforms
+      MLIRSPIRVTestPasses
       MLIRTranslation
       tensorflow::mlir_xla
       # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
@@ -165,6 +188,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::HAL::Target::VMLA
       iree::compiler::Dialect::HAL::Target::VulkanSPIRV
       iree::compiler::Dialect::HAL::Target::LLVM
+      ${targets_to_link}
     ALWAYSLINK
   )
 
@@ -277,21 +301,18 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       LLVMSupport
-      MLIRAffineOps
+      MLIRAllDialects
       MLIRAnalysis
       MLIREDSC
       MLIRParser
       MLIRIR
       MLIRPass
-      MLIRSPIRV
       MLIRSPIRVSerialization
       MLIRSPIRVTransforms
       MLIRSupport
-      MLIRStandardOps
       MLIRTransforms
       MLIRTranslateClParser
       MLIRTranslation
-      MLIRVectorOps
       tensorflow::mlir_xla
       # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
       iree::compiler::Dialect::HAL::Target::LegacyInterpreter

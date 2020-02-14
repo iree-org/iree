@@ -35,6 +35,7 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
     LLVMSupport
+    MLIRAllDialects
     MLIRIR
     MLIRPass
     MLIRStandardOps
