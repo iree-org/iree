@@ -71,9 +71,7 @@ iree_cc_binary(
   DEPS
     iree::samples::custom_modules::dialect
     iree::tools::iree_opt_library
-      # MLIRMlirOptLib: includes main(); The equivalent Bazel library is MLIROptMain.
-      # TODO(marbre): Replace with appropriate target after upstreams CMake is revised.
-    MLIRMlirOptLib
+    MLIRMlirOptMain
 )
 
 iree_cc_binary(
