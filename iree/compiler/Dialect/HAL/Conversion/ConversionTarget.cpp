@@ -89,7 +89,9 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
           IREE::HAL::BufferViewType::get(rewriter.getContext())));
     } else {
       // Normal pass-through result.
-      state.addTypes({resultType});
+      if (failed(typeConverter.convertType(resultType, state.types))) {
+        return failure();
+      }
     }
   }
 

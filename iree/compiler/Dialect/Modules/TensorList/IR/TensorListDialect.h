@@ -12,31 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
+#ifndef IREE_COMPILER_DIALECT_MODULES_TENSORLIST_IR_TENSORLIST_DIALECT_H_
+#define IREE_COMPILER_DIALECT_MODULES_TENSORLIST_IR_TENSORLIST_DIALECT_H_
 
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace TensorList {
 
-LogicalResult HALTypeConverter::convertType(Type type,
-                                            SmallVectorImpl<Type> &results) {
-  if (type.isa<TensorType>()) {
-    // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
-    results.push_back(
-        IREE::RefPtrType::get(IREE::HAL::BufferType::get(type.getContext())));
-    return success();
-  }
-  for (auto *conversionInterface : conversionInterfaces) {
-    if (succeeded(conversionInterface->convertType(type, results))) {
-      return success();
-    }
-  }
-  results.push_back(type);
-  return success();
-}
+class TensorListDialect : public Dialect {
+ public:
+  explicit TensorListDialect(MLIRContext *context);
+  static StringRef getDialectNamespace() { return "tensorlist"; }
 
+  Type parseType(DialectAsmParser &parser) const override;
+  void printType(Type type, DialectAsmPrinter &p) const override;
+};
+
+}  // namespace TensorList
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
+
+#endif  // IREE_COMPILER_DIALECT_MODULES_TENSORLIST_IR_TENSORLIST_DIALECT_H_

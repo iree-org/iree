@@ -42,6 +42,13 @@ class HALConversionDialectInterface
   virtual void setupConversionTarget(ConversionTarget &target,
                                      OwningRewritePatternList &patterns,
                                      TypeConverter &typeConverter) const = 0;
+
+  // Converts a type.
+  // Will be called from the corresponding TypeConverter hook.
+  virtual LogicalResult convertType(Type t,
+                                    SmallVectorImpl<Type> &results) const {
+    return failure();
+  }
 };
 
 }  // namespace iree_compiler

@@ -64,7 +64,17 @@ class ConvertFlowToHALPass : public ModulePass<ConvertFlowToHALPass> {
   void runOnModule() override {
     auto *context = &getContext();
 
-    HALTypeConverter typeConverter;
+    SmallVector<const HALConversionDialectInterface *, 4> conversionInterfaces;
+    // Gather all interfaces from registered dialects.
+    // These will perform the tensor->buffer mapping for their ops.
+    for (auto *dialect : context->getRegisteredDialects()) {
+      if (auto *conversionInterface =
+              dialect
+                  ->getRegisteredInterface<HALConversionDialectInterface>()) {
+        conversionInterfaces.emplace_back(conversionInterface);
+      }
+    }
+    HALTypeConverter typeConverter(conversionInterfaces);
     HALConversionTarget target(context, typeConverter);
     target.addIllegalDialect<IREE::Flow::FlowDialect>();
 
@@ -78,13 +88,9 @@ class ConvertFlowToHALPass : public ModulePass<ConvertFlowToHALPass> {
 
     // Gather all HAL dialect conversion patterns from custom dialects.
     // These will perform the tensor->buffer mapping for their ops.
-    for (auto *dialect : context->getRegisteredDialects()) {
-      if (auto *conversionInterface =
-              dialect
-                  ->getRegisteredInterface<HALConversionDialectInterface>()) {
-        conversionInterface->setupConversionTarget(target, patterns,
-                                                   typeConverter);
-      }
+    for (auto *conversionInterface : conversionInterfaces) {
+      conversionInterface->setupConversionTarget(target, patterns,
+                                                 typeConverter);
     }
 
     // NOTE: we allow ops that we don't know about to allow custom dialects
