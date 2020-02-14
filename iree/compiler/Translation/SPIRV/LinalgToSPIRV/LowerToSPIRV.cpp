@@ -22,6 +22,7 @@
 #include "iree/compiler/Translation/XLAToLinalg/LinalgTensorToBuffer.h"
 #include "iree/compiler/Utils/IREECodegenUtils.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
+#include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRV.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPU.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
@@ -98,7 +99,99 @@ static void createConstantsInFunc(FuncOp funcOp, ArrayRef<int64_t> intVal,
   }
 }
 
+/// Returns success if `module` contains at most one dispatch region. Writes the
+/// single dispatch function in `module` to `funcOp` if found. Emits error if
+/// more than one dispatch functions are found.
+template <class FuncTy>
+static LogicalResult getTheSingleDispatchFunction(ModuleOp module,
+                                                  FuncTy &funcOp) {
+  funcOp = nullptr;
+  for (auto op : module.getOps<FuncTy>()) {
+    if (!op.getAttr("iree.executable.export")) continue;
+    if (funcOp)
+      return module.emitError(
+          "expected no more than one single dispatch function within module");
+    funcOp = op;
+  }
+  return success();
+}
+
+/// Moves all SPIR-V ops directly in the given `srcModule` to the given
+/// `dstModule`.
+static void moveSPIRVOpsAcrossRegion(ModuleOp srcModule,
+                                     spirv::ModuleOp dstModule) {
+  Dialect *spvDialect = dstModule.getDialect();
+  OpBuilder builder(dstModule.body());
+  for (Operation &op : llvm::make_early_inc_range(*srcModule.getBody())) {
+    if (op.getDialect() == spvDialect) {
+      builder.clone(op);
+      op.erase();
+    }
+  }
+}
+
 namespace {
+/// A pattern to directly convert certain known Linalg ops to SPIR-V modules
+/// (without lowering ABI attributes). This is used as the "fast track" in the
+/// compilation pipeline where we have special instructions for certain Linalg
+/// inputs and not suitable to go through the default path.
+struct IREELinalgToSPIRVPass : public ModulePass<IREELinalgToSPIRVPass> {
+  void runOnModule() override {
+    MLIRContext *context = &getContext();
+    ModuleOp module = getModule();
+
+    // Find the dispatch function.
+    FuncOp dispatchFn;
+    if (failed(getTheSingleDispatchFunction(module, dispatchFn)))
+      return signalPassFailure();
+    if (!dispatchFn) return;
+
+    SPIRVTypeConverter typeConverter;
+    OwningRewritePatternList patterns;
+    populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
+    populateLinalgToSPIRVPatterns(context, typeConverter, patterns);
+    populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+
+    auto targetEnv = spirv::lookupTargetEnvOrDefault(dispatchFn);
+    std::unique_ptr<ConversionTarget> target =
+        spirv::SPIRVConversionTarget::get(targetEnv, context);
+
+    // Try to apply the conversion as a whole. This avoids us in intermediate
+    // broken state on failure so that following passes can still have a chance
+    // to handle them.
+    if (succeeded(applyFullConversion(dispatchFn, *target, patterns))) {
+      // Okay, succeeded. Now we need to attach the interface variable ABI
+      // attributes, which are used by later passes.
+      // TODO(antiagainst): This should actually happen at the beginning of the
+      // pipeline and the information should come from IREE.
+      spirv::FuncOp spvEntryFn;
+      getTheSingleDispatchFunction(module, spvEntryFn);
+      assert(spvEntryFn && "should have one spv.func as entry point");
+      StringRef abiAttrName = spirv::getInterfaceVarABIAttrName();
+      for (unsigned i = 0, e = spvEntryFn.getNumArguments(); i < e; ++i) {
+        auto abiAttr = spirv::getInterfaceVarABIAttr(
+            /*descriptorSet=*/0, /*binding=*/i,
+            spirv::StorageClass::StorageBuffer, context);
+        spvEntryFn.setArgAttr(i, abiAttrName, abiAttr);
+      }
+
+      // Create the spv.module and move all generated SPIR-V ops into it so we
+      // are following similar IR structure like the default path so later
+      // nested spv.module pass can kick in without problem.
+      OpBuilder builder(context);
+      auto spvModule = builder.create<spirv::ModuleOp>(
+          module.getLoc(), spirv::AddressingModel::Logical,
+          spirv::MemoryModel::GLSL450,
+          llvm::makeArrayRef({spirv::Capability::Shader,
+                              spirv::Capability::GroupNonUniformArithmetic}),
+          llvm::makeArrayRef(
+              spirv::Extension::SPV_KHR_storage_buffer_storage_class));
+      moveSPIRVOpsAcrossRegion(module, spvModule);
+      module.getBody()->getOperations().insert(module.getBody()->begin(),
+                                               spvModule);
+    }
+  }
+};
 
 /// To be able to use the workgroup size from the dispatch function attribute
 /// within the linalg tiling pass, need to actually implement a pass to retrieve
@@ -208,18 +301,12 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
   void runOnModule() {
     MLIRContext *context = &getContext();
     ModuleOp moduleOp = getModule();
-    FuncOp funcOp = nullptr;
-    auto walkResult = moduleOp.walk([&funcOp](FuncOp fOp) -> WalkResult {
-      if (fOp.getAttr("iree.executable.export")) {
-        if (funcOp) return WalkResult::interrupt();
-        funcOp = fOp;
-      }
-      return WalkResult::advance();
-    });
-    if (!funcOp || walkResult.wasInterrupted()) {
-      moduleOp.emitError("expected a single dispatch function within module");
+
+    FuncOp funcOp;
+    if (failed(getTheSingleDispatchFunction(moduleOp, funcOp)))
       return signalPassFailure();
-    }
+    if (!funcOp) return;
+
     SmallVector<Operation *, 1> kernelModules;
     OpBuilder builder(context);
     builder.setInsertionPoint(funcOp.getOperation());
@@ -349,6 +436,10 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
 }  // namespace
 
 static void addLinalgToSPIRVPasses(OpPassManager &pm) {
+  // Direct Linalg to SPIR-V passes. This should be placed before others so we
+  // try these patterns first.
+  pm.addPass(std::make_unique<IREELinalgToSPIRVPass>());
+
   // Linalg to loops.
   pm.addPass(std::make_unique<IREETileLinalgPass>());
   pm.addPass(createConvertLinalgToLoopsPass());

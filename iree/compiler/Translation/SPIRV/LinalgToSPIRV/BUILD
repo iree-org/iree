@@ -40,6 +40,7 @@ cc_library(
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgToSPIRV",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LoopOps",
         "@llvm-project//mlir:LoopsToGPU",
