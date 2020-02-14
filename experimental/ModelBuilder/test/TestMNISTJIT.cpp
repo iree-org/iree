@@ -173,18 +173,22 @@ int main() {
   // 4. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
   auto inputLinearInit = [](unsigned idx, float *ptr) { *ptr = 0.032460f; };
-  ManagedUnrankedMemRefDescriptor inputBuffer =
-      makeInitializedUnrankedDescriptor<float>({B, W0}, inputLinearInit);
+  // Exercise the ranked strided memref descriptor.
+  auto inputBuffer = makeInitializedStridedMemRefDescriptor<float, 2>(
+      {B, W0}, inputLinearInit);
   auto outputLinearInit = [](unsigned idx, float *ptr) { *ptr = 0.0f; };
-  ManagedUnrankedMemRefDescriptor outputBuffer =
-      makeInitializedUnrankedDescriptor<float>({B, W3}, outputLinearInit);
+  // Exercise the unranked memref descriptor, with extra level of indirection.
+  auto outputBuffer =
+      makeInitializedUnrankedDescriptor<float, 2>({B, W3}, outputLinearInit);
 
   // 5. Call the funcOp name `kFuncBuffersName` with arguments. Call the wrapped
   // C-compatible function rather than the function defined above and delegate
   // memref descriptor unpacking to generated code.
   const std::string kFuncAdapterName =
       (llvm::Twine("_mlir_ciface_") + kFuncBuffersName).str();
-  void *args[2] = {&inputBuffer->descriptor, &outputBuffer->descriptor};
+  // runner.engine->invoke requires an extra level of indirection.
+  auto *inputDescriptor = inputBuffer.get();
+  void *args[2] = {&inputDescriptor, &outputBuffer->descriptor};
   auto error = runner.engine->invoke(kFuncAdapterName,
                                      llvm::MutableArrayRef<void *>{args});
 

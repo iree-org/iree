@@ -27,19 +27,20 @@
 //
 //  // 2. Allocate managed input and outputs with proper shapes and init value.
 //  auto inputLinearInit = [](unsigned idx, float *ptr) { *ptr = 0.032460f; };
-//  ManagedUnrankedMemRefDescriptor inputBuffer =
-//      makeInitializedUnrankedDescriptor<float>({B, W0}, inputLinearInit);
+//  auto inputBuffer = makeInitializedStridedMemRefDescriptor<float, 2>(
+//     {B, W0}, inputLinearInit);
 //  auto outputLinearInit = [](unsigned idx, float *ptr) { *ptr = 0.0f; };
-//  ManagedUnrankedMemRefDescriptor outputBuffer =
-//      makeInitializedUnrankedDescriptor<float>({B, W3}, outputLinearInit);
+//  auto outputBuffer = makeInitializedStridedMemRefDescriptor<float, 2>(
+//     {B, W3}, outputLinearInit);
 //
 //  // 3. Pack pointers to MLIR ABI compliant buffers and call the named func.
 //  void *packedArgs[2] = {&inputBuffer->descriptor, &outputBuffer->descriptor};
 //  runner.engine->invoke(funcName, llvm::MutableArrayRef<void *>{packedArgs});
 // ```
 
+#include <algorithm>
+#include <array>
 #include <memory>
-#include <vector>
 
 #include "experimental/ModelBuilder/MLIRRunnerUtils.h"
 
@@ -47,24 +48,25 @@
 #define IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_
 
 namespace mlir {
+using AllocFunType = std::function<void *(size_t)>;
+
 namespace detail {
 
 // Given a shape with sizes greater than 0 along all dimensions,
 // returns the distance, in number of elements, between a slice in a dimension
 // and the next slice in the same dimension.
 //   e.g. shape[3, 4, 5] -> strides[20, 5, 1]
-inline std::vector<int64_t> makeStrides(const std::vector<int64_t> &shape) {
-  std::vector<int64_t> tmp;
-  if (shape.empty()) return tmp;
-  tmp.reserve(shape.size());
+template <size_t N>
+inline std::array<int64_t, N> makeStrides(const std::array<int64_t, N> &shape) {
+  if (N == 0) return shape;
+  std::array<int64_t, N> res;
   int64_t running = 1;
-  for (auto rit = shape.rbegin(), reit = shape.rend(); rit != reit; ++rit) {
-    assert(*rit > 0 &&
-           "size must be greater than 0 along all dimensions of shape");
-    tmp.push_back(running);
-    running *= *rit;
+  for (int64_t idx = N - 1; idx >= 0; --idx) {
+    assert(shape[idx] && "size must be nonnegatice for all shape dimensions");
+    res[idx] = running;
+    running *= shape[idx];
   }
-  return std::vector<int64_t>(tmp.rbegin(), tmp.rend());
+  return res;
 }
 
 // Mallocs a StridedMemRefDescriptor<T, N>* that matches the MLIR ABI.
@@ -72,14 +74,15 @@ inline std::vector<int64_t> makeStrides(const std::vector<int64_t> &shape) {
 // conventions.
 template <typename T, int N>
 StridedMemRefType<T, N> *makeStridedMemRefDescriptor(
-    void *ptr, const std::vector<int64_t> &shape) {
+    void *ptr, const std::array<int64_t, N> &shape,
+    AllocFunType alloc = &::malloc) {
   StridedMemRefType<T, N> *descriptor = static_cast<StridedMemRefType<T, N> *>(
-      malloc(sizeof(StridedMemRefType<T, N>)));
+      alloc(sizeof(StridedMemRefType<T, N>)));
   descriptor->basePtr = static_cast<T *>(ptr);
   descriptor->data = static_cast<T *>(ptr);
   descriptor->offset = 0;
   std::copy(shape.begin(), shape.end(), descriptor->sizes);
-  auto strides = makeStrides(shape);
+  auto strides = makeStrides<N>(shape);
   std::copy(strides.begin(), strides.end(), descriptor->strides);
   return descriptor;
 }
@@ -89,9 +92,9 @@ StridedMemRefType<T, N> *makeStridedMemRefDescriptor(
 // with MLIR codegen conventions.
 template <typename T>
 StridedMemRefType<T, 0> *makeStridedMemRefDescriptor(
-    void *ptr, const std::vector<int64_t> &shape) {
+    void *ptr, AllocFunType alloc = &::malloc) {
   StridedMemRefType<T, 0> *descriptor = static_cast<StridedMemRefType<T, 0> *>(
-      malloc(sizeof(StridedMemRefType<T, 0>)));
+      alloc(sizeof(StridedMemRefType<T, 0>)));
   descriptor->basePtr = static_cast<T *>(ptr);
   descriptor->data = static_cast<T *>(ptr);
   descriptor->offset = 0;
@@ -101,28 +104,17 @@ StridedMemRefType<T, 0> *makeStridedMemRefDescriptor(
 // Mallocs an UnrankedMemRefType<T>* that contains a ranked
 // StridedMemRefDescriptor<T, Rank>* and matches the MLIR ABI. This is an
 // implementation detail that is kept in sync with MLIR codegen conventions.
-template <typename T>
+template <typename T, int N>
 ::UnrankedMemRefType<T> *allocUnrankedDescriptor(
-    void *data, const std::vector<int64_t> &shape) {
+    void *data, const std::array<int64_t, N> &shape,
+    AllocFunType alloc = &::malloc) {
   ::UnrankedMemRefType<T> *res = static_cast<::UnrankedMemRefType<T> *>(
-      malloc(sizeof(::UnrankedMemRefType<T>)));
-  res->rank = shape.size();
-  if (res->rank == 0)
-    res->descriptor = makeStridedMemRefDescriptor<T>(data, shape);
-  else if (res->rank == 1)
-    res->descriptor = makeStridedMemRefDescriptor<T, 1>(data, shape);
-  else if (res->rank == 2)
-    res->descriptor = makeStridedMemRefDescriptor<T, 2>(data, shape);
-  else if (res->rank == 3)
-    res->descriptor = makeStridedMemRefDescriptor<T, 3>(data, shape);
-  else if (res->rank == 4)
-    res->descriptor = makeStridedMemRefDescriptor<T, 4>(data, shape);
-  else if (res->rank == 5)
-    res->descriptor = makeStridedMemRefDescriptor<T, 5>(data, shape);
-  else if (res->rank == 6)
-    res->descriptor = makeStridedMemRefDescriptor<T, 6>(data, shape);
+      alloc(sizeof(::UnrankedMemRefType<T>)));
+  res->rank = N;
+  if (N == 0)
+    res->descriptor = makeStridedMemRefDescriptor<T>(data);
   else
-    assert(false && "Unsupported 6+D memref descriptor");
+    res->descriptor = makeStridedMemRefDescriptor<T, N>(data, shape);
   return res;
 }
 
@@ -135,9 +127,9 @@ void freeUnrankedDescriptor(::UnrankedMemRefType<T> *desc) {
 
 }  // namespace detail
 
-using ManagedUnrankedMemRefDescriptor =
-    std::unique_ptr<::UnrankedMemRefType<float>,
-                    decltype(&detail::freeUnrankedDescriptor<float>)>;
+//===----------------------------------------------------------------------===//
+// Public API
+//===----------------------------------------------------------------------===//
 
 // Inefficient initializer called on each element during
 // `makeInitializedUnrankedDescriptor`. Takes the linear index and the shape so
@@ -147,17 +139,35 @@ template <typename T>
 using LinearInitializer = std::function<void(unsigned idx, T *ptr)>;
 
 // Entry point to allocate a dense buffer with a given `shape` and initializer
-// of type PointwiseInitializer.
-template <typename T>
-ManagedUnrankedMemRefDescriptor makeInitializedUnrankedDescriptor(
-    const std::vector<int64_t> &shape, LinearInitializer<T> init) {
+// of type PointwiseInitializer. Can optionally take specific `alloc` and `free`
+// functions.
+template <typename T, int N, typename FreeFunType = decltype(&::free)>
+auto makeInitializedUnrankedDescriptor(const std::array<int64_t, N> &shape,
+                                       LinearInitializer<T> init,
+                                       AllocFunType alloc = &::malloc,
+                                       FreeFunType freeFun = &::free) {
   int64_t size = 1;
   for (int64_t s : shape) size *= s;
-  auto *data = static_cast<T *>(malloc(size * sizeof(T)));
+  auto *data = static_cast<T *>(alloc(size * sizeof(T)));
   for (unsigned i = 0; i < size; ++i) init(i, data + i);
-  return ManagedUnrankedMemRefDescriptor(
-      detail::allocUnrankedDescriptor<T>(data, shape),
-      &detail::freeUnrankedDescriptor);
+  return std::unique_ptr<::UnrankedMemRefType<float>, FreeFunType>(
+      detail::allocUnrankedDescriptor<T, N>(data, shape), freeFun);
+}
+
+// Entry point to allocate a dense buffer with a given `shape` and initializer
+// of type PointwiseInitializer. Can optionally take specific `alloc` and `free`
+// functions.
+template <typename T, int N, typename FreeFunType = decltype(&::free)>
+auto makeInitializedStridedMemRefDescriptor(const std::array<int64_t, N> &shape,
+                                            LinearInitializer<T> init,
+                                            AllocFunType alloc = &::malloc,
+                                            FreeFunType freeFun = &::free) {
+  int64_t size = 1;
+  for (int64_t s : shape) size *= s;
+  auto *data = static_cast<T *>(alloc(size * sizeof(T)));
+  for (unsigned i = 0; i < size; ++i) init(i, data + i);
+  return std::unique_ptr<StridedMemRefType<T, N>, FreeFunType>(
+      detail::makeStridedMemRefDescriptor<T, N>(data, shape, alloc), freeFun);
 }
 
 }  // namespace mlir
