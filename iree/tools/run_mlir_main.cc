@@ -64,6 +64,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/InitAllDialects.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
@@ -454,6 +455,7 @@ extern "C" int main(int argc, char** argv) {
     }
   }
 
+  mlir::registerAllDialects();
   mlir::registerPassManagerCLOptions();
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);

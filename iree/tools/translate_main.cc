@@ -21,6 +21,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/InitAllDialects.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
@@ -46,6 +47,7 @@ static llvm::cl::opt<bool> splitInputFile(
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
+  mlir::registerAllDialects();
   mlir::registerPassManagerCLOptions();
 
   // Add flags for all the registered translations.
