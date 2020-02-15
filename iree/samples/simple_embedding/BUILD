@@ -31,9 +31,7 @@ cc_test(
     name = "simple_embedding_test",
     srcs = ["simple_embedding_test.cc"],
     data = [
-        # When building with --config=asan you must specify the following
-        # envvar when using Vulkan + a local Nvidia GPU:
-        #   LSAN_OPTIONS=suppressions=third_party/iree/tools/sanitizer_suppressions.txt
+        # For AddressSanitizer when using Vulkan + a local Nvidia GPU
         "//iree/tools:sanitizer_suppressions.txt",
     ],
     # TODO(b/145815906) Get this running in OSS CI.

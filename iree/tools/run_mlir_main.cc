@@ -16,7 +16,7 @@
 // This is meant to be called from LIT for FileCheck tests, and tries to match
 // the interface of mlir-opt (featuring -split-input-file, etc) so it's easier
 // to work with there. If you want a more generalized runner for standalone
-// precompiled IREE modules use //third_party/iree/tools:iree-run-module.
+// precompiled IREE modules use iree-run-module.
 //
 // By default all exported functions in the module will be run in order.
 // All input values, provided via -input-values, will be passed to the

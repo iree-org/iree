@@ -26,9 +26,7 @@ cc_library(
     testonly = True,
     hdrs = ["cts_test_base.h"],
     data = [
-        # When building with --config=asan you must specify the following
-        # envvar when using Vulkan + a local Nvidia GPU:
-        #   LSAN_OPTIONS=suppressions=third_party/iree/tools/sanitizer_suppressions.txt
+        # For AddressSanitizer when using Vulkan + a local Nvidia GPU
         "//iree/tools:sanitizer_suppressions.txt",
     ],
     deps = [
