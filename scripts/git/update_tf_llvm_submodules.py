@@ -24,7 +24,7 @@ corresponding version that tensorflow depends on. In addition, some BUILD
 files must be sync'd for the new version.
 
 Typical usage:
-  Syntax: ./git_scripts/update_tf_llvm_modules.py
+  Syntax: ./scripts/git/update_tf_llvm_modules.py
 
   By default, this will update the tensorflow submodule to remote HEAD and
   update the llvm-project submodule to the corresponding version. It will
