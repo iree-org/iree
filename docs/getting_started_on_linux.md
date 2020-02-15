@@ -134,9 +134,8 @@ build:debug --compilation_mode=dbg --copt=-O2 --per_file_copt=iree@-O0 --strip=n
 ### Build
 
 ```shell
-# Run all tests (as of Oct-23-2019, all tests build but some still fail in the
-# OSS version).
-bazel test -k iree/... test/... bindings/python/...
+# Run all core tests
+bazel test -k iree/...
 
 # Or build with optimizations disabled (just for IREE, not for deps) and
 # debug symbols retained. This assumes you have an alias like above setup):
