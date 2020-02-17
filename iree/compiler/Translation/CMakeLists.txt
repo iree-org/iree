@@ -38,7 +38,6 @@ iree_cc_library(
     MLIRAllDialects
     MLIRIR
     MLIRPass
-    MLIRStandardOps
     MLIRSupport
     MLIRTranslation
     tensorflow::mlir_xla

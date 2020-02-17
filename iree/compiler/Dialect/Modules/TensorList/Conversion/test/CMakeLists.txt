@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,24 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
-
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
   NAME
-    ReductionCodegen
-  HDRS
-    "ReductionCodegenPasses.h"
+    lit
   SRCS
-    "PrepareReductionDispatch.cpp"
-    "ReductionFnLowering.cpp"
-  DEPS
-    iree::compiler::Dialect::IREE::IR
-    MLIRIR
-    MLIRPass
-    MLIRSPIRV
-    MLIRSPIRVTransforms
-    MLIRStandardOps
-    MLIRTransforms
-    tensorflow::mlir_xla
-  PUBLIC
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::compiler::Dialect::Modules::TensorList::tensorlist-opt
+    iree::tools::IreeFileCheck
 )

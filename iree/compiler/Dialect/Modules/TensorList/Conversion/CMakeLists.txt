@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,36 +16,16 @@ add_subdirectory(test)
 
 iree_cc_library(
   NAME
-    LinalgToSPIRV
+    Conversion
   HDRS
-    "LowerToSPIRV.h"
-    "Passes.h"
+    "ConvertHALToVM.h"
   SRCS
-    "LinalgFusion.cpp"
-    "LowerToSPIRV.cpp"
+    "ConvertHALToVM.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
-    iree::compiler::Utils
-    LLVMSupport
-    MLIRAffineOps
-    MLIRAffineToStandard
-    MLIREDSC
-    MLIRGPU
-    MLIRGPUtoSPIRVTransforms
-    MLIRIR
-    MLIRLinalgOps
-    MLIRLinalgTransforms
-    MLIRLoopOps
-    MLIRLoopsToGPU
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::Modules::TensorList::IR
+    iree::compiler::Dialect::VM::Conversion
     MLIRPass
-    MLIRSPIRV
-    MLIRSPIRVTransforms
-    MLIRStandardOps
-    MLIRStandardToSPIRVTransforms
-    MLIRSupport
     MLIRTransforms
-    tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )
