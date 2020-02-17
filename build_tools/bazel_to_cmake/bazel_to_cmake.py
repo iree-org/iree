@@ -31,7 +31,6 @@ import bazel_to_cmake_targets
 import datetime
 import os
 import textwrap
-from collections import OrderedDict
 from itertools import repeat, chain
 import glob
 import re
@@ -234,8 +233,12 @@ class BuildFileFunctions(object):
     targets = [self._convert_target(t) for t in targets]
     # Flatten lists
     targets = list(chain.from_iterable(targets))
-    # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
-    targets = list(filter(None, OrderedDict(zip(targets, repeat(None)))))
+    # Remove duplicates
+    targets = set(targets)
+    # Remove Falsey (None and empty string) values
+    targets = filter(None, targets)
+    # Sort the targets and convert to a list
+    targets = sorted(targets)
     target_list_string = "\n".join(["    %s" % (t,) for t in targets])
     return "  %s\n%s\n" % (
         list_name,
