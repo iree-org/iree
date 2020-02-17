@@ -24,9 +24,9 @@ iree_cc_test(
     ::instance
     ::invocation
     ::module
+    absl::strings
     iree::base::logging
     iree::testing::gtest_main
-    absl::strings
 )
 
 iree_bytecode_module(
@@ -59,11 +59,11 @@ iree_cc_library(
     ::stack
     ::types
     ::value
+    flatbuffers
     iree::base::api
     iree::base::flatbuffer_util
     iree::base::target_platform
     iree::schemas::bytecode_module_def_cc_fbs
-    flatbuffers
   PUBLIC
 )
 
@@ -77,12 +77,12 @@ iree_cc_test(
     ::bytecode_module_benchmark_module_cc
     ::module
     ::stack
-    iree::base::api
-    iree::base::logging
-    iree::testing::benchmark_main
     absl::inlined_vector
     absl::strings
     benchmark
+    iree::base::api
+    iree::base::logging
+    iree::testing::benchmark_main
 )
 
 iree_bytecode_module(
@@ -187,12 +187,12 @@ iree_cc_library(
     ::ref_cc
     ::stack
     ::types
+    absl::span
+    absl::strings
     iree::base::api
     iree::base::api_util
     iree::base::ref_ptr
     iree::base::status
-    absl::strings
-    absl::span
   PUBLIC
 )
 
@@ -228,8 +228,8 @@ iree_cc_library(
   DEPS
     ::ref
     ::types
-    iree::base::api
     absl::core_headers
+    iree::base::api
   PUBLIC
 )
 

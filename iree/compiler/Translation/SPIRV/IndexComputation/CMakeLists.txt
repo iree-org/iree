@@ -42,14 +42,14 @@ iree_cc_library(
     "IndexComputationPass.cpp"
     "XLAIndexPropagation.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::SPIRV::IndexComputation::IndexComputationAttrGen
-    iree::compiler::Utils
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRSPIRV
     MLIRStandardOps
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::SPIRV::IndexComputation::IndexComputationAttrGen
+    iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

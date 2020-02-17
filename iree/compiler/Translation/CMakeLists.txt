@@ -25,6 +25,12 @@ iree_cc_library(
   SRCS
     "IREEVM.cpp"
   DEPS
+    LLVMSupport
+    MLIRAllDialects
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTranslation
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Conversion::HALToVM
@@ -34,12 +40,6 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::compiler::Dialect::VM::Transforms
-    LLVMSupport
-    MLIRAllDialects
-    MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTranslation
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

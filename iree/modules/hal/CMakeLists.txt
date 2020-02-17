@@ -20,6 +20,11 @@ iree_cc_library(
   SRCS
     "hal_module.cc"
   DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::memory
+    absl::span
+    absl::strings
     iree::base::api
     iree::base::api_util
     iree::base::tracing
@@ -28,10 +33,5 @@ iree_cc_library(
     iree::hal::device
     iree::vm
     iree::vm::module_abi_cc
-    absl::core_headers
-    absl::inlined_vector
-    absl::memory
-    absl::strings
-    absl::span
   PUBLIC
 )

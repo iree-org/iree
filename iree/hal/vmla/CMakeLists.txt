@@ -21,15 +21,15 @@ iree_cc_library(
     "op_kernels_generic.h"
     "op_kernels_ruy.h"
   DEPS
-    iree::base::shape
-    iree::base::status
-    iree::base::tracing
     absl::algorithm
     absl::core_headers
     absl::flat_hash_set
     absl::inlined_vector
     absl::memory
     absl::span
+    iree::base::shape
+    iree::base::status
+    iree::base::tracing
     ruy
   PUBLIC
 )
@@ -95,6 +95,9 @@ iree_cc_library(
   DEPS
     ::vmla_cache
     ::vmla_command_processor
+    absl::inlined_vector
+    absl::memory
+    absl::span
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -109,9 +112,6 @@ iree_cc_library(
     iree::hal::host::inproc_command_buffer
     iree::vm::instance
     iree::vm::module
-    absl::inlined_vector
-    absl::memory
-    absl::span
   PUBLIC
 )
 
@@ -156,6 +156,8 @@ iree_cc_library(
   SRCS
     "vmla_executable.cc"
   DEPS
+    absl::inlined_vector
+    absl::span
     iree::base::api_util
     iree::base::status
     iree::base::tracing
@@ -166,8 +168,6 @@ iree_cc_library(
     iree::vm::context
     iree::vm::instance
     iree::vm::module
-    absl::inlined_vector
-    absl::span
   PUBLIC
 )
 
@@ -180,6 +180,7 @@ iree_cc_library(
     "vmla_module.cc"
   DEPS
     ::op_kernels
+    absl::span
     iree::base::api
     iree::base::memory
     iree::base::ref_ptr
@@ -187,6 +188,5 @@ iree_cc_library(
     iree::vm
     iree::vm::module_abi_cc
     iree::vm::types
-    absl::span
   PUBLIC
 )

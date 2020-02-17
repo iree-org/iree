@@ -22,15 +22,15 @@ iree_cc_library(
   SRCS
     "ConvertHLOToVMLA.cpp"
   DEPS
+    MLIRIR
+    MLIRPass
+    MLIRStandardOps
+    MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VMLA::Conversion
     iree::compiler::Dialect::VMLA::IR
     iree::compiler::Dialect::VMLA::IR::VMLADialect
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRTransforms
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

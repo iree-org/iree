@@ -22,10 +22,10 @@ iree_cc_library(
   SRCS
     "ConvertHALToVM.cpp"
   DEPS
+    MLIRPass
+    MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::Modules::TensorList::IR
     iree::compiler::Dialect::VM::Conversion
-    MLIRPass
-    MLIRTransforms
   PUBLIC
 )

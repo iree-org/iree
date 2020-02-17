@@ -25,16 +25,16 @@ iree_cc_library(
     "OrdinalAllocation.cpp"
     "Passes.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
-    iree::compiler::Dialect::VM::IR
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::Conversion::StandardToVM
+    iree::compiler::Dialect::VM::IR
   ALWAYSLINK
   PUBLIC
 )

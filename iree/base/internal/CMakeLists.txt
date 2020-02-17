@@ -20,11 +20,11 @@ iree_cc_library(
   SRCS
     "file_handle_win32.cc"
   DEPS
+    absl::memory
+    absl::strings
     iree::base::platform_headers
     iree::base::status
     iree::base::target_platform
-    absl::memory
-    absl::strings
   PUBLIC
 )
 
@@ -36,12 +36,12 @@ iree_cc_library(
     "file_io_win32.cc"
   DEPS
     ::file_handle_win32
+    absl::memory
+    absl::strings
     iree::base::file_io_hdrs
     iree::base::platform_headers
     iree::base::status
     iree::base::target_platform
-    absl::memory
-    absl::strings
   PUBLIC
 )
 
@@ -53,12 +53,12 @@ iree_cc_library(
     "file_mapping_win32.cc"
   DEPS
     ::file_handle_win32
+    absl::memory
+    absl::strings
     iree::base::file_mapping_hdrs
     iree::base::platform_headers
     iree::base::target_platform
     iree::base::tracing
-    absl::memory
-    absl::strings
   PUBLIC
 )
 
@@ -70,9 +70,9 @@ iree_cc_library(
   SRCS
     "init_internal.cc"
   DEPS
+    absl::flags_parse
     iree::base::initializer
     iree::base::target_platform
-    absl::flags_parse
   PUBLIC
 )
 
@@ -84,9 +84,9 @@ iree_cc_library(
   SRCS
     "logging.cc"
   DEPS
-    iree::base::platform_headers
     absl::core_headers
     absl::flags
+    iree::base::platform_headers
   PUBLIC
 )
 
@@ -129,14 +129,14 @@ iree_cc_library(
   DEPS
     ::logging_internal
     ::ostringstream
+    absl::core_headers
+    absl::flags
+    absl::memory
+    absl::stacktrace
+    absl::strings
     iree::base::platform_headers
     iree::base::source_location
     iree::base::target_platform
-    absl::core_headers
-    absl::stacktrace
-    absl::flags
-    absl::memory
-    absl::strings
   PUBLIC
 )
 
@@ -146,10 +146,10 @@ iree_cc_library(
   HDRS
     "status_matchers.h"
   DEPS
+    absl::optional
+    absl::strings
     iree::base::status
     iree::testing::gtest
-    absl::strings
-    absl::optional
   TESTONLY
   PUBLIC
 )

@@ -36,14 +36,6 @@ iree_cc_library(
     "PrePostPartitioningConversion.cpp"
     "RematerializeDispatchConstants.cpp"
   DEPS
-    iree::base::signature_mangle
-    iree::compiler::Dialect::Flow::Analysis
-    iree::compiler::Dialect::Flow::Conversion
-    iree::compiler::Dialect::Flow::Conversion::HLOToFlow
-    iree::compiler::Dialect::Flow::Conversion::StandardToFlow
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Utils
-    iree::compiler::Utils
     LLVMSupport
     MLIRAnalysis
     MLIRIR
@@ -52,6 +44,14 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::base::signature_mangle
+    iree::compiler::Dialect::Flow::Analysis
+    iree::compiler::Dialect::Flow::Conversion
+    iree::compiler::Dialect::Flow::Conversion::HLOToFlow
+    iree::compiler::Dialect::Flow::Conversion::StandardToFlow
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

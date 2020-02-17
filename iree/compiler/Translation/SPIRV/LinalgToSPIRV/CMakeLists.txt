@@ -24,9 +24,6 @@ iree_cc_library(
     "LinalgFusion.cpp"
     "LowerToSPIRV.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
-    iree::compiler::Utils
     LLVMSupport
     MLIRAffineOps
     MLIRAffineToStandard
@@ -45,6 +42,9 @@ iree_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
+    iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

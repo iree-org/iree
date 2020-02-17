@@ -20,11 +20,11 @@ iree_cc_library(
   SRCS
     "llvmjit_executable.cc"
   DEPS
+    absl::span
     iree::base::status
     iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_spec
-    absl::span
   PUBLIC
 )
 
@@ -71,6 +71,9 @@ iree_cc_library(
   DEPS
     ::llvmjit_command_processor
     ::llvmjit_executable_cache
+    absl::inlined_vector
+    absl::memory
+    absl::span
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -83,9 +86,6 @@ iree_cc_library(
     iree::hal::host::host_local_allocator
     iree::hal::host::host_submission_queue
     iree::hal::host::inproc_command_buffer
-    absl::inlined_vector
-    absl::memory
-    absl::span
   PUBLIC
 )
 

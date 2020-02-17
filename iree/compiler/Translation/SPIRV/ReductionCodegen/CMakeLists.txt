@@ -23,13 +23,13 @@ iree_cc_library(
     "PrepareReductionDispatch.cpp"
     "ReductionFnLowering.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     MLIRIR
     MLIRPass
     MLIRSPIRV
     MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_xla
   PUBLIC
 )

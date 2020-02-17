@@ -28,14 +28,14 @@ iree_cc_library(
     "VMFunctionTableBuilder.cpp"
     "VMModuleBuilder.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::Interpreter::Utils
-    iree::schemas::interpreter_module_def_cc_fbs
-    iree::schemas::bytecode::interpreter_bytecode_v0
-    flatbuffers
     LLVMSupport
     MLIRIR
     MLIRStandardOps
     MLIRSupport
+    flatbuffers
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::Interpreter::Utils
+    iree::schemas::bytecode::interpreter_bytecode_v0
+    iree::schemas::interpreter_module_def_cc_fbs
   PUBLIC
 )

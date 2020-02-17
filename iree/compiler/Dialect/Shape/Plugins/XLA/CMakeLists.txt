@@ -20,9 +20,9 @@ iree_cc_library(
   SRCS
     "XlaHloShapeBuilder.cpp"
   DEPS
-    iree::compiler::Dialect::Shape::IR
     LLVMSupport
     MLIRIR
+    iree::compiler::Dialect::Shape::IR
     tensorflow::mlir_xla
   PUBLIC
 )

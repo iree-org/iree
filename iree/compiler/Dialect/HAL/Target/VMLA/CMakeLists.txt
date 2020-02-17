@@ -20,9 +20,9 @@ iree_cc_library(
   SRCS
     "VMLATarget.cpp"
   DEPS
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
     LLVMSupport
     MLIRSupport
+    iree::compiler::Dialect::HAL::Target::ExecutableTarget
   ALWAYSLINK
   PUBLIC
 )

@@ -28,11 +28,11 @@ iree_cc_library(
     "allocator.cc"
   DEPS
     ::buffer
+    absl::span
     iree::base::ref_ptr
     iree::base::source_location
     iree::base::status
     iree::base::tracing
-    absl::span
   PUBLIC
 )
 
@@ -58,13 +58,13 @@ iree_cc_library(
     ::fence
     ::heap_buffer
     ::semaphore
+    absl::span
+    absl::strings
     iree::base::api
     iree::base::api_util
     iree::base::ref_ptr
     iree::base::shape
     iree::base::tracing
-    absl::strings
-    absl::span
   PUBLIC
 )
 
@@ -87,14 +87,14 @@ iree_cc_library(
     "buffer.cc"
   DEPS
     ::resource
+    absl::core_headers
+    absl::span
+    absl::strings
+    absl::variant
     iree::base::bitfield
     iree::base::logging
     iree::base::source_location
     iree::base::status
-    absl::core_headers
-    absl::strings
-    absl::span
-    absl::variant
   PUBLIC
 )
 
@@ -107,10 +107,10 @@ iree_cc_test(
   DEPS
     ::buffer
     ::heap_buffer
+    absl::span
     iree::base::status
     iree::base::status_matchers
     iree::testing::gtest_main
-    absl::span
 )
 
 iree_cc_library(
@@ -122,11 +122,11 @@ iree_cc_library(
     "buffer_view.cc"
   DEPS
     ::buffer
+    absl::inlined_vector
+    absl::strings
     iree::base::shape
     iree::base::source_location
     iree::base::status
-    absl::inlined_vector
-    absl::strings
   PUBLIC
 )
 
@@ -155,11 +155,11 @@ iree_cc_library(
     ::allocator
     ::buffer_view
     ::heap_buffer
+    absl::optional
+    absl::strings
     iree::base::buffer_string_util
     iree::base::source_location
     iree::base::status
-    absl::strings
-    absl::optional
   PUBLIC
 )
 
@@ -189,10 +189,10 @@ iree_cc_library(
     ::event
     ::executable
     ::resource
+    absl::core_headers
     iree::base::bitfield
     iree::base::shape
     iree::base::status
-    absl::core_headers
   PUBLIC
 )
 
@@ -219,11 +219,11 @@ iree_cc_library(
     ::command_buffer
     ::fence
     ::semaphore
+    absl::span
+    absl::time
     iree::base::bitfield
     iree::base::status
     iree::base::time
-    absl::time
-    absl::span
   PUBLIC
 )
 
@@ -259,10 +259,10 @@ iree_cc_test(
   DEPS
     ::deferred_buffer
     ::heap_buffer
+    absl::memory
     iree::base::status_matchers
     iree::hal::testing::mock_allocator
     iree::testing::gtest_main
-    absl::memory
 )
 
 iree_cc_library(
@@ -305,10 +305,10 @@ iree_cc_library(
     ::executable_cache
     ::executable_layout
     ::semaphore
+    absl::time
     iree::base::ref_ptr
     iree::base::status
     iree::base::time
-    absl::time
   PUBLIC
 )
 
@@ -318,8 +318,8 @@ iree_cc_library(
   HDRS
     "device_info.h"
   DEPS
-    iree::base::bitfield
     absl::core_headers
+    iree::base::bitfield
   PUBLIC
 )
 
@@ -339,13 +339,13 @@ iree_cc_library(
     ::executable_format
     ::fence
     ::heap_buffer
+    absl::span
+    absl::synchronization
+    absl::time
     iree::base::source_location
     iree::base::status
     iree::base::time
     iree::base::tracing
-    absl::synchronization
-    absl::time
-    absl::span
   PUBLIC
 )
 
@@ -380,11 +380,11 @@ iree_cc_library(
     "driver_registry.cc"
   DEPS
     ::driver
+    absl::core_headers
+    absl::synchronization
     iree::base::initializer
     iree::base::ref_ptr
     iree::base::status
-    absl::core_headers
-    absl::synchronization
   PUBLIC
 )
 
@@ -478,11 +478,11 @@ iree_cc_library(
   DEPS
     ::allocator
     ::buffer
+    absl::core_headers
     iree::base::source_location
     iree::base::status
     iree::base::tracing
     iree::hal::host::host_buffer
-    absl::core_headers
   PUBLIC
 )
 

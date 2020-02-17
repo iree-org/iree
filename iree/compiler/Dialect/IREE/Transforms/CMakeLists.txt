@@ -22,9 +22,9 @@ iree_cc_library(
   SRCS
     "DropCompilerHints.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     MLIRIR
     MLIRPass
+    iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC
 )
