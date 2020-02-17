@@ -6,6 +6,8 @@ available without any support. With that said, feel free to browse the issues
 and reach out on the
 [iree-discuss mailing list](https://groups.google.com/forum/#!forum/iree-discuss).
 
+DO NOT SUBMIT
+
 ## Table of Contents
 
 -   [Contact](#contact)
