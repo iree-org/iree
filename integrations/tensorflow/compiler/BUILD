@@ -40,6 +40,7 @@ cc_library(
         "@llvm-project//mlir:TransformUtils",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
     ],
     alwayslink = 1,
 )
