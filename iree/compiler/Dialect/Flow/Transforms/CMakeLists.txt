@@ -45,6 +45,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Utils
     iree::compiler::Utils
     LLVMSupport
+    MLIRAnalysis
     MLIRIR
     MLIRPass
     MLIRStandardOps

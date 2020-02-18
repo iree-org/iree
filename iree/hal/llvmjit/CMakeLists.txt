@@ -14,6 +14,36 @@
 
 iree_cc_library(
   NAME
+    llvmjit_executable
+  HDRS
+    "llvmjit_executable.h"
+  SRCS
+    "llvmjit_executable.cc"
+  DEPS
+    iree::base::status
+    iree::hal::allocator
+    iree::hal::executable
+    iree::hal::executable_spec
+    absl::span
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    llvmjit_command_processor
+  HDRS
+    "llvmjit_command_processor.h"
+  SRCS
+    "llvmjit_command_processor.cc"
+  DEPS
+    ::llvmjit_executable
+    iree::base::tracing
+    iree::hal::host::host_local_command_processor
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     llvmjit_executable_cache
   HDRS
     "llvmjit_executable_cache.h"
@@ -28,26 +58,6 @@ iree_cc_library(
     iree::hal::executable
     iree::hal::executable_cache
     iree::hal::executable_format
-    iree::vm::instance
-    iree::vm::module
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_command_processor
-  HDRS
-    "llvmjit_command_processor.h"
-  SRCS
-    "llvmjit_command_processor.cc"
-  DEPS
-    ::llvmjit_executable
-    iree::base::api_util
-    iree::base::status
-    iree::base::tracing
-    iree::hal::host::host_local_command_processor
-    iree::vm::invocation
-    iree::vm::variant_list
   PUBLIC
 )
 
@@ -59,8 +69,8 @@ iree_cc_library(
   SRCS
     "llvmjit_device.cc"
   DEPS
-    ::llvmjit_executable_cache
     ::llvmjit_command_processor
+    ::llvmjit_executable_cache
     iree::base::memory
     iree::base::status
     iree::base::tracing
@@ -73,8 +83,6 @@ iree_cc_library(
     iree::hal::host::host_local_allocator
     iree::hal::host::host_submission_queue
     iree::hal::host::inproc_command_buffer
-    iree::vm::instance
-    iree::vm::module
     absl::inlined_vector
     absl::memory
     absl::span
@@ -90,13 +98,8 @@ iree_cc_library(
     "llvmjit_driver.cc"
   DEPS
     ::llvmjit_device
-    ::llvmjit_module
-    iree::base::api_util
-    iree::base::tracing
     iree::hal::device_info
     iree::hal::driver
-    iree::vm::instance
-    iree::vm::module
   PUBLIC
 )
 
@@ -111,48 +114,5 @@ iree_cc_library(
     iree::base::status
     iree::hal::driver_registry
   ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_executable
-  HDRS
-    "llvmjit_executable.h"
-  SRCS
-    "llvmjit_executable.cc"
-  DEPS
-    iree::base::api_util
-    iree::base::status
-    iree::base::tracing
-    iree::hal::allocator
-    iree::hal::executable
-    iree::hal::executable_spec
-    iree::vm::bytecode_module
-    iree::vm::context
-    iree::vm::instance
-    iree::vm::module
-    absl::inlined_vector
-    absl::span
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    llvmjit_module
-  HDRS
-    "llvmjit_module.h"
-  SRCS
-    "llvmjit_module.cc"
-  DEPS
-    ::op_kernels
-    iree::base::api
-    iree::base::memory
-    iree::base::ref_ptr
-    iree::base::tracing
-    iree::vm
-    iree::vm::module_abi_cc
-    iree::vm::types
-    absl::span
   PUBLIC
 )

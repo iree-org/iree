@@ -14,6 +14,7 @@
 
 add_subdirectory(host)
 add_subdirectory(interpreter)
+add_subdirectory(llvmjit)
 add_subdirectory(testing)
 add_subdirectory(vmla)
 add_subdirectory(vulkan)
