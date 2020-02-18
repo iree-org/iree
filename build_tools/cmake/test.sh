@@ -24,6 +24,8 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
+export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
+
 EXCLUDED_TESTS=(
     iree_compiler_Translation_SPIRV_LinalgToSPIRV_test_pw_add.mlir.test
     iree_hal_vulkan_dynamic_symbols_test
@@ -31,6 +33,7 @@ EXCLUDED_TESTS=(
     iree_tools_test_multiple_args.mlir.test
     iree_tools_test_scalars.mlir.test
     iree_tools_test_simple.mlir.test
+    iree_vm_bytecode_module_benchmark # Make this test not take an eternity
 )
 
 # Join with | and add anchors

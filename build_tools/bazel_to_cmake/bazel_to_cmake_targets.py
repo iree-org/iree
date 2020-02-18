@@ -62,6 +62,10 @@ VULKAN_HEADERS_MAPPING = {
 }
 
 MLIR_EXPLICIT_TARGET_MAPPING = {
+    "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
+    "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
+        "MLIRAllDialects"
+    ],
     "@llvm-project//mlir:AffineDialectRegistration": ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRLoopToStandard"],
