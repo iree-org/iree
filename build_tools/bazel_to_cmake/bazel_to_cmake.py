@@ -153,7 +153,7 @@ class BuildFileFunctions(object):
   def _convert_flatten_block(self, flatten):
     return self._convert_option_block("FLATTEN", flatten)
 
-  def _convert_filelist_block(self, list_name, files):
+  def _convert_file_list_block(self, list_name, files):
     if not files:
       return ""
 
@@ -165,13 +165,13 @@ class BuildFileFunctions(object):
     return "  %s\n%s\n" % (list_name, files_list)
 
   def _convert_hdrs_block(self, hdrs):
-    return self._convert_filelist_block("HDRS", hdrs)
+    return self._convert_file_list_block("HDRS", hdrs)
 
   def _convert_textual_hdrs_block(self, textual_hdrs):
-    return self._convert_filelist_block("TEXTUAL_HDRS", textual_hdrs)
+    return self._convert_file_list_block("TEXTUAL_HDRS", textual_hdrs)
 
   def _convert_srcs_block(self, srcs):
-    return self._convert_filelist_block("SRCS", srcs)
+    return self._convert_file_list_block("SRCS", srcs)
 
   def _convert_src_block(self, src):
     return "  SRC\n    \"%s\"\n" % src
@@ -223,37 +223,30 @@ class BuildFileFunctions(object):
       target = [target]
     return target
 
-  def _convert_data_block(self, data):
-    if not data:
-      return ""
-
-    #  DATA
-    #    package1::target1
-    #    package1::target2
-    #    package2::target
-    data_list = [self._convert_target(dep) for dep in data]
-    # Flatten lists
-    data_list = list(chain.from_iterable(data_list))
-    # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
-    data_list = list(filter(None, OrderedDict(zip(data_list, repeat(None)))))
-    data_list = "\n".join(["    %s" % (data,) for data in data_list])
-    return "  DATA\n%s\n" % (data_list,)
-
-  def _convert_deps_block(self, deps):
-    if not deps:
+  def _convert_target_list_block(self, list_name, targets):
+    if not targets:
       return ""
 
     #  DEPS
     #    package1::target1
     #    package1::target2
     #    package2::target
-    deps_list = [self._convert_target(dep) for dep in deps]
+    targets = [self._convert_target(t) for t in targets]
     # Flatten lists
-    deps_list = list(chain.from_iterable(deps_list))
+    targets = list(chain.from_iterable(targets))
     # Remove Falsey (None and empty string) values and duplicates, preserving the original ordering.
-    deps_list = list(filter(None, OrderedDict(zip(deps_list, repeat(None)))))
-    deps_list = "\n".join(["    %s" % (dep,) for dep in deps_list])
-    return "  DEPS\n%s\n" % (deps_list,)
+    targets = list(filter(None, OrderedDict(zip(targets, repeat(None)))))
+    target_list_string = "\n".join(["    %s" % (t,) for t in targets])
+    return "  %s\n%s\n" % (
+        list_name,
+        target_list_string,
+    )
+
+  def _convert_data_block(self, data):
+    return self._convert_target_list_block("DATA", data)
+
+  def _convert_deps_block(self, deps):
+    return self._convert_target_list_block("DEPS", deps)
 
   def _convert_flatc_args_block(self, flatc_args):
     if not flatc_args:
