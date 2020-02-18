@@ -12,18 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: Presubmits
+name: Format
 
-on:
-  pull_request:
-    types: [opened, ready_for_review, synchronize]
+on: [pull_request]
 
 jobs:
   # Run clang-format and verify there are no errors. We don't want to bother
   # building until we've at least got clean code.
-  # TODO(benvanik): add other checks (license, etc).
-  lint:
-    name: Code Style Check
+  format:
+    name: Code Format Check
     runs-on: ubuntu-18.04
     steps:
     - name: Installing dependencies
@@ -39,7 +36,6 @@ jobs:
     - name: Fetching master
       run: git fetch --no-tags --prune --depth=1 origin master
     - name: Running clang-format on changed source files
-      # TODO(benvanik): actually filter to changed files.
       run: |
         /tmp/git-clang-format origin/master --binary=clang-format-9 --style=file
         git diff --exit-code
