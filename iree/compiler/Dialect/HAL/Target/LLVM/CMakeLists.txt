@@ -22,20 +22,20 @@ iree_cc_library(
   SRCS
     "LLVMTarget.cpp"
   DEPS
+    LLVMCore
+    MLIRIR
+    MLIRLinalgOps
+    MLIRLinalgTransforms
+    MLIRLoopToStandard
+    MLIRStandardOps
+    MLIRStandardToLLVM
+    MLIRSupport
+    MLIRTargetLLVMIR
+    MLIRTransforms
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Translation::XLAToLinalg
     iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
     iree::schemas::llvmir_executable_def_cc_fbs
-    LLVMCore
-    MLIRLoopToStandard
-    MLIRIR
-    MLIRStandardToLLVM
-    MLIRLinalgOps
-    MLIRLinalgTransforms
-    MLIRStandardOps
-    MLIRSupport
-    MLIRTargetLLVMIR
-    MLIRTransforms
   ALWAYSLINK
   PUBLIC
 )

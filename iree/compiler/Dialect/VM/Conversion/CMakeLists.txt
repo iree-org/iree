@@ -27,12 +27,12 @@ iree_cc_library(
     "ImportUtils.cpp"
     "TypeConverter.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VM::IR
     MLIRIR
     MLIRParser
     MLIRStandardOps
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::VM::IR
   PUBLIC
 )

@@ -31,8 +31,8 @@ iree_cc_library(
   SRCS
     "gtest_main_internal.cc"
   DEPS
-    iree::base::init
     gtest
+    iree::base::init
   TESTONLY
   PUBLIC
 )

@@ -24,7 +24,6 @@ iree_cc_library(
     "IREECodegenUtils.cpp"
     "TypeConversionUtils.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRPass
@@ -32,6 +31,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_xla
   PUBLIC
 )

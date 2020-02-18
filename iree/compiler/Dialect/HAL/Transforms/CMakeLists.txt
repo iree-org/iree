@@ -23,15 +23,15 @@ iree_cc_library(
     "Passes.cpp"
     "TranslateExecutables.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::Target::ExecutableTarget
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

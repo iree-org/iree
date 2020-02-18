@@ -29,11 +29,6 @@ iree_cc_library(
     "SPIRVLowering.cpp"
     "XLAToSPIRV.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::SPIRV::IndexComputation
-    iree::compiler::Translation::SPIRV::Passes
-    iree::compiler::Translation::SPIRV::ReductionCodegen
-    iree::compiler::Utils
     LLVMSupport
     MLIRAffineOps
     MLIRAffineToStandard
@@ -45,6 +40,11 @@ iree_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::SPIRV::IndexComputation
+    iree::compiler::Translation::SPIRV::Passes
+    iree::compiler::Translation::SPIRV::ReductionCodegen
+    iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

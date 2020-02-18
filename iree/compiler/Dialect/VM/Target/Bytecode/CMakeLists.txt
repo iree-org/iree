@@ -29,18 +29,18 @@ iree_cc_library(
     "TranslationFlags.cpp"
     "TranslationRegistration.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM::Analysis
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VM::Transforms
-    iree::schemas::bytecode_module_def_cc_fbs
-    flatbuffers
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRSupport
     MLIRTransforms
     MLIRTranslation
+    flatbuffers
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Analysis
+    iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VM::Transforms
+    iree::schemas::bytecode_module_def_cc_fbs
   ALWAYSLINK
   PUBLIC
 )

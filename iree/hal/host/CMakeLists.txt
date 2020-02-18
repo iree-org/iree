@@ -21,12 +21,12 @@ iree_cc_library(
     "async_command_queue.cc"
   DEPS
     ::host_submission_queue
+    absl::core_headers
+    absl::synchronization
     iree::base::status
     iree::base::tracing
     iree::hal::command_queue
     iree::hal::fence
-    absl::core_headers
-    absl::synchronization
   PUBLIC
 )
 
@@ -38,6 +38,8 @@ iree_cc_test(
   DEPS
     ::async_command_queue
     ::host_submission_queue
+    absl::memory
+    absl::time
     iree::base::status
     iree::base::status_matchers
     iree::base::time
@@ -45,8 +47,6 @@ iree_cc_test(
     iree::hal::testing::mock_command_buffer
     iree::hal::testing::mock_command_queue
     iree::testing::gtest_main
-    absl::memory
-    absl::time
 )
 
 iree_cc_library(
@@ -57,11 +57,11 @@ iree_cc_library(
   SRCS
     "host_buffer.cc"
   DEPS
+    absl::core_headers
     iree::base::logging
     iree::base::source_location
     iree::base::status
     iree::hal::buffer
-    absl::core_headers
   PUBLIC
 )
 
@@ -85,13 +85,13 @@ iree_cc_library(
   SRCS
     "host_fence.cc"
   DEPS
+    absl::core_headers
+    absl::inlined_vector
+    absl::span
+    absl::synchronization
     iree::base::status
     iree::base::tracing
     iree::hal::fence
-    absl::core_headers
-    absl::inlined_vector
-    absl::synchronization
-    absl::span
   PUBLIC
 )
 
@@ -102,10 +102,10 @@ iree_cc_test(
     "host_fence_test.cc"
   DEPS
     ::host_fence
+    absl::time
     iree::base::status
     iree::base::status_matchers
     iree::testing::gtest_main
-    absl::time
 )
 
 iree_cc_library(
@@ -149,15 +149,15 @@ iree_cc_library(
     "host_submission_queue.cc"
   DEPS
     ::host_fence
+    absl::core_headers
+    absl::inlined_vector
+    absl::synchronization
     iree::base::intrusive_list
     iree::base::status
     iree::base::tracing
     iree::hal::command_queue
     iree::hal::fence
     iree::hal::semaphore
-    absl::core_headers
-    absl::inlined_vector
-    absl::synchronization
   PUBLIC
 )
 

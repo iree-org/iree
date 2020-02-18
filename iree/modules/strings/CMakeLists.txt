@@ -22,6 +22,10 @@ iree_cc_library(
   SRCS
     "strings_module.cc"
   DEPS
+    absl::inlined_vector
+    absl::span
+    absl::strings
+    benchmark
     iree::base::api
     iree::base::logging
     iree::vm
@@ -31,10 +35,6 @@ iree_cc_library(
     iree::vm::ref
     iree::vm::stack
     iree::vm::types
-    absl::inlined_vector
-    absl::strings
-    absl::span
-    benchmark
   PUBLIC
 )
 
@@ -46,6 +46,9 @@ iree_cc_test(
   DEPS
     ::strings_module
     ::strings_module_test_module_cc
+    absl::inlined_vector
+    absl::strings
+    benchmark
     iree::base::api
     iree::base::logging
     iree::testing::gtest_main
@@ -56,9 +59,6 @@ iree_cc_test(
     iree::vm::ref
     iree::vm::stack
     iree::vm::types
-    absl::inlined_vector
-    absl::strings
-    benchmark
 )
 
 iree_bytecode_module(

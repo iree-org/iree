@@ -23,9 +23,6 @@ iree_cc_library(
     "ConvertStandardToVM.cpp"
     "ConvertStandardToVMPass.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::IR
     LLVMSupport
     MLIRIR
     MLIRPass
@@ -33,6 +30,9 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::IR
   ALWAYSLINK
   PUBLIC
 )

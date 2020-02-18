@@ -26,12 +26,12 @@ iree_cc_library(
     "ConversionTarget.cpp"
     "TypeConverter.cpp"
   DEPS
+    MLIRIR
+    MLIRStandardOps
+    MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VMLA::IR
     iree::compiler::Dialect::VMLA::IR::VMLADialect
-    MLIRIR
-    MLIRStandardOps
-    MLIRTransforms
   PUBLIC
 )

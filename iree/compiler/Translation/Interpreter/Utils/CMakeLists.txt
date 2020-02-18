@@ -23,8 +23,6 @@ iree_cc_library(
     "MemRefUtils.cpp"
     "OpCreationUtils.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::Interpreter::IR::Common
     LLVMSupport
     MLIRIR
     MLIRPass
@@ -32,6 +30,8 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::Interpreter::IR::Common
     tensorflow::mlir_xla
   PUBLIC
 )

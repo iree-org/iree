@@ -22,11 +22,11 @@ iree_cc_library(
     "DispatchUtils.cpp"
     "WorkloadUtils.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
     LLVMSupport
     MLIRIR
     MLIRStandardOps
     MLIRSupport
+    iree::compiler::Dialect::Flow::IR
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

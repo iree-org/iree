@@ -37,13 +37,6 @@ iree_cc_library(
     "LowerXLAToIreeDialect.cpp"
     "MakeExecutableABI.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::Interpreter::IR
-    iree::compiler::Translation::Interpreter::IR::Common
-    iree::compiler::Translation::Interpreter::Serialization
-    iree::compiler::Translation::Interpreter::Utils
-    iree::compiler::Utils
-    iree::schemas::bytecode::interpreter_bytecode_v0
     LLVMSupport
     MLIRAnalysis
     MLIRIR
@@ -52,6 +45,13 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::Interpreter::IR
+    iree::compiler::Translation::Interpreter::IR::Common
+    iree::compiler::Translation::Interpreter::Serialization
+    iree::compiler::Translation::Interpreter::Utils
+    iree::compiler::Utils
+    iree::schemas::bytecode::interpreter_bytecode_v0
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

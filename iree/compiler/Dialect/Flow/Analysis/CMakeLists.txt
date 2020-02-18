@@ -23,14 +23,14 @@ iree_cc_library(
     "Dispatchability.cpp"
     "DispatchabilityTest.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Utils
-    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRStandardOps
     MLIRSupport
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

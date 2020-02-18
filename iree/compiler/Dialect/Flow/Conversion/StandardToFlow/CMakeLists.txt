@@ -22,12 +22,12 @@ iree_cc_library(
   SRCS
     "ConvertStandardToFlow.cpp"
   DEPS
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::IREE::IR
     MLIRIR
     MLIRPass
     MLIRStandardOps
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC
 )

@@ -20,6 +20,12 @@ iree_cc_library(
   SRCS
     "LegacyInterpreterTarget.cpp"
   DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTransforms
+    flatbuffers
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
@@ -29,12 +35,6 @@ iree_cc_library(
     iree::compiler::Translation::Interpreter::Serialization
     iree::compiler::Translation::Interpreter::Transforms
     iree::compiler::Utils
-    flatbuffers
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRSupport
-    MLIRTransforms
   ALWAYSLINK
   PUBLIC
 )

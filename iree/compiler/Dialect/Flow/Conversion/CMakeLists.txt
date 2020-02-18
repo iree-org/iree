@@ -23,9 +23,9 @@ iree_cc_library(
   SRCS
     "TypeConverter.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     MLIRIR
     MLIRParser
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )

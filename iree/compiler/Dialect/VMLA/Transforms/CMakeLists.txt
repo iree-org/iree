@@ -23,18 +23,18 @@ iree_cc_library(
     "Conversion.cpp"
     "Passes.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::Transforms
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VMLA::Conversion
-    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
-    iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
-    iree::compiler::Dialect::VMLA::IR
     LLVMSupport
     MLIRIR
     MLIRPass
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::IREE::Transforms
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::VMLA::Conversion
+    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
+    iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
+    iree::compiler::Dialect::VMLA::IR
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

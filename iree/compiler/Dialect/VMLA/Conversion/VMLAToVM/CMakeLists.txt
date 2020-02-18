@@ -22,16 +22,16 @@ iree_cc_library(
   SRCS
     "ConvertVMLAToVM.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VMLA::vmla_imports
-    iree::compiler::Dialect::VMLA::IR
     MLIRIR
     MLIRPass
     MLIRStandardOps
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::Conversion::StandardToVM
+    iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VMLA::IR
+    iree::compiler::Dialect::VMLA::vmla_imports
   ALWAYSLINK
   PUBLIC
 )

@@ -26,6 +26,11 @@ iree_cc_library(
     "ConvertTensorOps.cpp"
     "ConvertVariableOps.cpp"
   DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRStandardOps
+    MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR
@@ -35,11 +40,6 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::IR
-    LLVMSupport
-    MLIRIR
-    MLIRPass
-    MLIRStandardOps
-    MLIRTransforms
   ALWAYSLINK
   PUBLIC
 )

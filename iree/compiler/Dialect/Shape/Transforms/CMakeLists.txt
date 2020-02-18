@@ -26,12 +26,12 @@ iree_cc_library(
     "MaterializeShapeCalculations.cpp"
     "TieDynamicShapes.cpp"
   DEPS
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
     MLIRIR
     MLIRPass
     MLIRStandardOps
     MLIRTransforms
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

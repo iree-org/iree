@@ -20,6 +20,16 @@ iree_cc_library(
   SRCS
     "VulkanSPIRVTarget.cpp"
   DEPS
+    LLVMSupport
+    MLIRAllDialects
+    MLIRIR
+    MLIRPass
+    MLIRSPIRV
+    MLIRSPIRVSerialization
+    MLIRSPIRVTransforms
+    MLIRSupport
+    MLIRTransforms
+    flatbuffers
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Dialect::IREE::IR
@@ -27,16 +37,6 @@ iree_cc_library(
     iree::compiler::Translation::SPIRV::LinalgToSPIRV
     iree::compiler::Translation::SPIRV::XLAToSPIRV
     iree::schemas::spirv_executable_def_cc_fbs
-    flatbuffers
-    LLVMSupport
-    MLIRAllDialects
-    MLIRIR
-    MLIRPass
-    MLIRSPIRV
-    MLIRSPIRVTransforms
-    MLIRSPIRVSerialization
-    MLIRSupport
-    MLIRTransforms
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

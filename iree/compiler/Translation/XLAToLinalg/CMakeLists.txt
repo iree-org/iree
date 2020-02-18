@@ -43,13 +43,13 @@ iree_cc_library(
   SRCS
     "LinalgTensorToBuffer.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     MLIRIR
     MLIRLinalgOps
     MLIRPass
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC
 )

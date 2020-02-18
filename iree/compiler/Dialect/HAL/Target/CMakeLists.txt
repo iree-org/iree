@@ -28,13 +28,13 @@ iree_cc_library(
     "ExecutableTarget.cpp"
     "LegacyUtil.cpp"
   DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRStandardOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Utils
-    LLVMSupport
-    MLIRIR
-    MLIRStandardOps
   ALWAYSLINK
   PUBLIC
 )
