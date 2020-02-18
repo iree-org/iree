@@ -12,6 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_py_library(
+  NAME
+    rt
+  SRCS
+    "__init__.py"
+    # "system_api.py"
+  DEPS
+    ::binding
+)
+
 iree_py_extension(
   NAME
     binding
@@ -63,5 +73,42 @@ iree_pybind_cc_library(
     absl::optional
     absl::span
   TYPE
-    SHARED
+    STATIC
+)
+
+iree_py_library(
+  NAME
+    system_api
+  SRCS
+    "system_api.py"
+  DEPS
+    ::binding
+)
+
+iree_py_test(
+  NAME
+    function_abi_test
+  SRCS
+    "function_abi_test.py"
+)
+
+iree_py_test(
+  NAME
+    hal_test
+  SRCS
+    "hal_test.py"
+)
+
+iree_py_test(
+  NAME
+    system_api_test
+  SRCS
+    "system_api_test.py"
+)
+
+iree_py_test(
+  NAME
+    vm_test
+  SRCS
+    "vm_test.py"
 )

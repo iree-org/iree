@@ -73,6 +73,8 @@ include(iree_glsl_vulkan)
 include(iree_spirv_kernel_cc_library)
 include(iree_pybind_cc_library)
 include(iree_py_extension)
+include(iree_py_library)
+include(iree_py_test)
 include(iree_lit_test)
 include(iree_alwayslink)
 
@@ -205,3 +207,6 @@ endif()
 
 # Note: this must be called after all libraries have been declared.
 iree_complete_binary_link_options()
+if(${IREE_BUILD_PYTHON_BINDINGS})
+  iree_complete_py_extension_link_options()
+endif()

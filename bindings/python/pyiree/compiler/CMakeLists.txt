@@ -12,6 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_py_library(
+  NAME
+    compiler
+  SRCS
+    "__init__.py"
+  DEPS
+    ::binding
+)
+
 iree_py_extension(
   NAME
     binding
@@ -51,5 +60,12 @@ iree_pybind_cc_library(
     MLIRParser
     MLIRPass
   TYPE
-    SHARED
+    STATIC
+)
+
+iree_py_test(
+  NAME
+    compiler_test
+  SRCS
+    "compiler_test.py"
 )
