@@ -38,7 +38,7 @@ import re
 repo_root = None
 
 EDIT_BLOCKING_PATTERN = re.compile(
-    "bazel[\s_]*to[\s_]*cmake[\s_]*:?[\s_]*do[\s_]*not[\s_]*edit",
+    r"bazel[\s_]*to[\s_]*cmake[\s_]*:?[\s_]*do[\s_]*not[\s_]*edit",
     flags=re.IGNORECASE)
 
 
@@ -128,7 +128,7 @@ class BuildFileFunctions(object):
     if translate_tool:
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
-      translate_tool = translate_tool.replace("//", "")  # iree/base:api
+      translate_tool = translate_tool.replace("//iree", "iree")  # iree/base:api
       translate_tool = translate_tool.replace(":", "_")  # iree/base::api
       translate_tool = translate_tool.replace("/", "_")  # iree::base::api
       return "  TRANSLATE_TOOL\n    %s\n" % (translate_tool)
@@ -187,7 +187,7 @@ class BuildFileFunctions(object):
       # -> CMake `${IREE_ROOT_DIR}/iree/dir/td_file.td
       # Bazel `//iree/dir/IR:td_file.td`
       # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
-      td_file = td_file.replace("//", "${IREE_ROOT_DIR}/")
+      td_file = td_file.replace("//iree", "${IREE_ROOT_DIR}/iree")
       td_file = td_file.replace(":", "/")
     return "  TD_FILE\n    \"%s\"\n" % (td_file)
 
@@ -216,7 +216,7 @@ class BuildFileFunctions(object):
       # Bazel `:api`            -> CMake `::api`
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
-      target = target.replace("//", "")  # iree/base:api
+      target = target.replace("//iree", "iree")  # iree/base:api
       target = target.replace(":", "::")  # iree/base::api or ::api
       target = target.replace("/", "::")  # iree::base::api
       target = [target]
