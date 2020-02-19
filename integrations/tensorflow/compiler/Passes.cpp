@@ -14,8 +14,10 @@
 
 #include "integrations/tensorflow/compiler/Passes.h"
 
+#include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Transforms/Passes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -23,6 +25,17 @@ namespace iree_compiler {
 // All IREE-specific passes that lower TF representations before reaching the
 // IREE core should go here.
 void createIreeTfImportPipeline(OpPassManager &pm) {
+  ////////////////////////////////////////////////////
+  // Lowering tf dialect to tf_tensorlist dialect.
+  ////////////////////////////////////////////////////
+  // TODO(silvasean): We shouldn't need the canonicalizer pass here.
+  // TODO(silvasean): Write the conversion pass properly.
+  pm.addPass(tf_tensorlist::createConvertTfToTfTensorList());
+  pm.addPass(createCanonicalizerPass());
+
+  ////////////////////////////////////////////////////
+  // Lowering tf_saved_model dialect to IREE dialects.
+  ////////////////////////////////////////////////////
   // First, eliminate tf_saved_model.global_tensor's and corresponding
   // tf_saved_model.bound_input's.
   pm.addPass(createTFSavedModelLowerGlobalTensors());
