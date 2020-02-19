@@ -117,12 +117,11 @@ def IREEInterpLL_ReturnOp : IREEInterpLL_Op<"return", [Terminator]> {
 }
 
 def IREEInterpLL_BranchOp : IREEInterpLL_Op<"br", [Terminator]> {
-  let arguments = (ins Variadic<IREELL_MemRef>:$operands);
+  let successors = (successor AnySuccessor:$dest);
 
   let builders = [OpBuilder<
-    "Builder *, OperationState &result, Block *dest,"
-    "ValueRange operands = {}", [{
-      result.addSuccessor(dest, operands);
+    "Builder *, OperationState &result, Block *dest", [{
+      result.addSuccessor(dest, llvm::None);
   }]>];
 
   let extraClassDeclaration = [{
@@ -138,19 +137,8 @@ def IREEInterpLL_BranchOp : IREEInterpLL_Op<"br", [Terminator]> {
 }
 
 def IREEInterpLL_CondBranchOp : IREEInterpLL_Op<"cond_br", [Terminator]> {
-  let arguments = (ins
-      IREELL_BoolScalar:$condition,
-      Variadic<IREELL_MemRef>:$branchOperands
-  );
-
-  let builders = [OpBuilder<
-    "Builder *, OperationState &result, Value condition,"
-    "Block *trueDest, ValueRange trueOperands,"
-    "Block *falseDest, ValueRange falseOperands", [{
-      result.addOperands(condition);
-      result.addSuccessor(trueDest, trueOperands);
-      result.addSuccessor(falseDest, falseOperands);
-  }]>];
+  let arguments = (ins IREELL_BoolScalar:$condition);
+  let successors = (successor AnySuccessor:$trueDest, AnySuccessor:$falseDest);
 
   let extraClassDeclaration = [{
     // These are the indices into the dests list.
