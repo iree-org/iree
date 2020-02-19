@@ -41,10 +41,10 @@ function(iree_py_test)
 
   add_test(
     NAME ${_NAME}
-    COMMAND ${PYTHON_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
+    COMMAND ${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.sh ${PYTHON_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
-  set_property(TEST ${_NAME} PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH}")
+  set_property(TEST ${_NAME} PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH};TEST_TMPDIR=${_NAME}_test_tmpdir")
   # TODO(marbre): Find out how to add deps to tests.
   #               Similar to _RULE_DATA in iree_lit_test().
 
