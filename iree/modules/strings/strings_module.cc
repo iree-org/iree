@@ -29,26 +29,26 @@
 #include "iree/vm/stack.h"
 #include "iree/vm/types.h"
 
-static iree_vm_ref_type_descriptor_t iree_string_descriptor = {0};
+static iree_vm_ref_type_descriptor_t vmstring_descriptor = {0};
 
-typedef struct iree_string {
+typedef struct vmstring {
   iree_vm_ref_object_t ref_object;
   iree_allocator_t allocator;
   iree_string_view_t value;
-} iree_string_t;
+} vmstring_t;
 
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_string, iree_string_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(vmstring, vmstring_t);
 
-iree_status_t iree_string_create(iree_string_view_t value,
-                                 iree_allocator_t allocator,
-                                 iree_string_t** out_message) {
+iree_status_t vmstring_create(iree_string_view_t value,
+                              iree_allocator_t allocator,
+                              vmstring_t** out_message) {
   // Note that we allocate the message and the string value together.
-  iree_string_t* message = NULL;
+  vmstring_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(iree_string_t) + value.size, (void**)&message));
+      allocator, sizeof(vmstring_t) + value.size, (void**)&message));
   message->ref_object.counter = 1;
   message->allocator = allocator;
-  message->value.data = ((const char*)message) + sizeof(iree_string_t);
+  message->value.data = ((const char*)message) + sizeof(vmstring_t);
   message->value.size = value.size;
   memcpy((void*)message->value.data, value.data, message->value.size);
   *out_message = message;
@@ -67,7 +67,7 @@ class StringsModuleState final {
   Status Initialize() { return OkStatus(); }
 
   // strings.print(%str)
-  Status Print(vm::ref<iree_string_t>& str) {
+  Status Print(vm::ref<vmstring_t>& str) {
     fwrite(str->value.data, 1, str->value.size, stdout);
     fputc('\n', stdout);
     fflush(stdout);
@@ -75,12 +75,12 @@ class StringsModuleState final {
   }
 
   // strings.i32_to_string(%value) -> %str
-  StatusOr<vm::ref<iree_string_t>> I32ToString(int32_t value) {
-    vm::ref<iree_string_t> new_string;
+  StatusOr<vm::ref<vmstring_t>> I32ToString(int32_t value) {
+    vm::ref<vmstring_t> new_string;
     std::string str = std::to_string(value);
     RETURN_IF_ERROR(
-        FromApiStatus(iree_string_create(iree_make_cstring_view(str.c_str()),
-                                         allocator_, &new_string),
+        FromApiStatus(vmstring_create(iree_make_cstring_view(str.c_str()),
+                                      allocator_, &new_string),
                       IREE_LOC));
 
     return std::move(new_string);
@@ -120,20 +120,20 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
 }  // namespace
 }  // namespace iree
 
-void iree_string_destroy(void* ptr) {
-  iree_string_t* message = (iree_string_t*)ptr;
+void vmstring_destroy(void* ptr) {
+  vmstring_t* message = (vmstring_t*)ptr;
   iree_allocator_free(message->allocator, ptr);
 }
 
 extern "C" iree_status_t strings_module_register_types() {
-  if (iree_string_descriptor.type) {
+  if (vmstring_descriptor.type) {
     return IREE_STATUS_OK;  // Already registered.
   }
-  iree_string_descriptor.type_name = iree_make_cstring_view("strings.string");
-  iree_string_descriptor.offsetof_counter =
-      offsetof(iree_string_t, ref_object.counter);
-  iree_string_descriptor.destroy = iree_string_destroy;
-  return iree_vm_ref_register_type(&iree_string_descriptor);
+  vmstring_descriptor.type_name = iree_make_cstring_view("strings.string");
+  vmstring_descriptor.offsetof_counter =
+      offsetof(vmstring_t, ref_object.counter);
+  vmstring_descriptor.destroy = vmstring_destroy;
+  return iree_vm_ref_register_type(&vmstring_descriptor);
 }
 
 extern "C" iree_status_t strings_module_create(iree_allocator_t allocator,

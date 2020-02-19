@@ -12,43 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT
-add_subdirectory(test)
-
-iree_cc_library(
-  NAME
-    dialect
-  HDRS
-    "conversion_patterns.h"
-    "strings_dialect.h"
-    "strings_ops.h.inc"
-  SRCS
-    "conversion_patterns.cc"
-    "strings_dialect.cc"
-    "strings_ops.cc.inc"
-  DEPS
-    ::strings_imports
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM::Conversion
-    LLVMSupport
-    MLIRIR
-    MLIRParser
-    MLIRPass
-    MLIRSupport
-    MLIRTransforms
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_tablegen_library(
-  NAME
-    strings_ops_gen
-  TD_FILE
-    "strings_ops.td"
-  OUTS
-    -gen-op-decls strings_ops.h.inc
-    -gen-op-defs strings_ops.cc.inc
-)
+add_subdirectory(Conversion)
+add_subdirectory(IR)
 
 iree_cc_embed_data(
   NAME
@@ -71,17 +36,17 @@ iree_cc_binary(
   OUT
     strings-opt
   DEPS
-    ::dialect
-    iree::tools::iree_opt_library
     MLIRMlirOptMain
+    iree::compiler::Dialect::Modules::Strings::IR::Dialect
+    iree::tools::iree_opt_library
 )
-add_executable(strings-opt ALIAS iree_modules_strings_dialect_strings-opt)
 
 iree_cc_binary(
   NAME
     strings-translate
+  OUT
+    strings-translate
   DEPS
-    ::dialect
+    iree::compiler::Dialect::Modules::Strings::IR::Dialect
     iree::tools::iree_translate_library
 )
-add_executable(strings-translate ALIAS iree_modules_strings_dialect_strings-translate)

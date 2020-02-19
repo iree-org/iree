@@ -19,6 +19,6 @@ iree_lit_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    iree::modules::strings::dialect::strings-opt
+    iree::compiler::Dialect::Modules::Strings::strings-opt
     iree::tools::IreeFileCheck
 )

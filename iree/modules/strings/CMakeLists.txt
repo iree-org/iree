@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(dialect)
-
 iree_cc_library(
   NAME
     strings_module
@@ -69,7 +67,7 @@ iree_bytecode_module(
   CC_NAMESPACE
     "iree::strings_module_test"
   TRANSLATE_TOOL
-    iree_modules_strings_dialect_strings-translate
+    iree_compiler_Dialect_Modules_Strings_strings-translate
   TRANSLATION
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC

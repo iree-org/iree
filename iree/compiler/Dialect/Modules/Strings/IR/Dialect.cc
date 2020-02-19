@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/modules/strings/dialect/strings_dialect.h"
+#include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
 
+#include "iree/compiler/Dialect/Modules/Strings/Conversion/StringsToVM.h"
+#include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h"
+#include "iree/compiler/Dialect/Modules/Strings/strings.imports.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
-#include "iree/modules/strings/dialect/conversion_patterns.h"
-#include "iree/modules/strings/dialect/strings.imports.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -61,7 +62,7 @@ StringsDialect::StringsDialect(MLIRContext *context)
 
 #define GET_OP_LIST
   addOperations<
-#include "iree/modules/strings/dialect/strings_ops.cc.inc"
+#include "iree/compiler/Dialect/Modules/Strings/IR/Ops.cc.inc"
       >();
 }
 
@@ -85,9 +86,6 @@ void StringsDialect::printType(Type type, DialectAsmPrinter &p) const {
     llvm_unreachable("unknown type");
   }
 }
-
-#define GET_OP_CLASSES
-#include "iree/modules/strings/dialect/strings_ops.cc.inc"
 
 }  // namespace Strings
 }  // namespace IREE

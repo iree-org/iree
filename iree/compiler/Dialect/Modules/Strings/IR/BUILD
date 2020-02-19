@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -26,20 +25,17 @@ filegroup(
 )
 
 cc_library(
-    name = "dialect",
+    name = "IR",
     srcs = [
-        "conversion_patterns.cc",
-        "strings_dialect.cc",
-        "strings_ops.cc.inc",
+        "Ops.cc",
+        "Ops.cc.inc",
     ],
     hdrs = [
-        "conversion_patterns.h",
-        "strings_dialect.h",
-        "strings_ops.h.inc",
+        "Ops.h",
+        "Ops.h.inc",
     ],
     deps = [
-        ":strings_imports",
-        ":strings_ops_gen",
+        ":Ops_gen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:support",
@@ -52,43 +48,42 @@ cc_library(
     alwayslink = 1,
 )
 
+cc_library(
+    name = "Dialect",
+    srcs = [
+        "Dialect.cc",
+    ],
+    hdrs = [
+        "Dialect.h",
+    ],
+    deps = [
+        ":IR",
+        ":Ops_gen",
+        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Modules/Strings:strings_imports",
+        "//iree/compiler/Dialect/Modules/Strings/Conversion",
+        "//iree/compiler/Dialect/VM/Conversion",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
+    ],
+    alwayslink = 1,
+)
+
 gentbl(
-    name = "strings_ops_gen",
+    name = "Ops_gen",
     tbl_outs = [
-        ("-gen-op-decls", "strings_ops.h.inc"),
-        ("-gen-op-defs", "strings_ops.cc.inc"),
+        ("-gen-op-decls", "Ops.h.inc"),
+        ("-gen-op-defs", "Ops.cc.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "strings_ops.td",
+    td_file = "Ops.td",
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:StdOpsTdFiles",
-    ],
-)
-
-cc_embed_data(
-    name = "strings_imports",
-    srcs = ["strings.imports.mlir"],
-    cc_file_output = "strings.imports.cc",
-    cpp_namespace = "mlir::iree_compiler::IREE::Strings",
-    flatten = True,
-    h_file_output = "strings.imports.h",
-)
-
-cc_binary(
-    name = "strings-opt",
-    deps = [
-        ":dialect",
-        "//iree/tools:iree_opt_library",
-        "@llvm-project//mlir:MlirOptMain",
-    ],
-)
-
-cc_binary(
-    name = "strings-translate",
-    deps = [
-        ":dialect",
-        "//iree/tools:iree_translate_library",
     ],
 )
