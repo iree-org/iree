@@ -34,10 +34,10 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Translation/CodegenUtils",
         "//iree/compiler/Translation/SPIRV/IndexComputation",
         "//iree/compiler/Translation/SPIRV/Passes",
         "//iree/compiler/Translation/SPIRV/ReductionCodegen",
-        "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineOps",
         "@llvm-project//mlir:AffineToStandardTransforms",

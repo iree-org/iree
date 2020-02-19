@@ -1,0 +1,130 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
+
+#include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/IR/StandardTypes.h"
+
+namespace mlir {
+namespace iree_compiler {
+
+ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
+  if (vector.empty()) return vector;
+  auto numTrailingOnes = 0;
+  for (unsigned i = vector.size() - 1; i > 0; --i) {
+    if (vector[i] != 1) {
+      break;
+    }
+    numTrailingOnes++;
+  }
+  return vector.drop_back(numTrailingOnes);
+}
+
+bool isDispatchFunction(FuncOp funcOp) {
+  return funcOp.getAttr("iree.executable.export") != nullptr;
+}
+
+/// Helper function to check shapes are equal.
+static bool areShapesEqual(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
+  return lhs == rhs;
+}
+
+/// Get the shape to use for a type. For now this is returning shapes as static
+/// value.
+// TODO(ravishankarm) : Modify this to return the Values to use for the extent.
+static LogicalResult getExtentFromStoreOpSrc(Operation *storeOp,
+                                             SmallVectorImpl<int64_t> &extent) {
+  extent.clear();
+  extent.resize(3, 1);
+  Value srcVal = storeOp->getOperand(0);
+  if (srcVal.getType().isIntOrFloat()) return success();
+  auto workload = dyn_cast_or_null<ConstantOp>(
+      IREE::Flow::calculateWorkload(srcVal.getDefiningOp(), srcVal)
+          .getDefiningOp());
+  if (!workload) return failure();
+  auto extentVal = workload.getValue().cast<DenseIntElementsAttr>();
+  for (auto val : enumerate(extentVal.getValues<APInt>()))
+    extent[val.index()] = val.value().getSExtValue();
+  workload.erase();
+  return success();
+}
+
+LogicalResult getLaunchSize(FuncOp funcOp,
+                            SmallVectorImpl<int64_t> &launchSize) {
+  auto &body = funcOp.getBody();
+  if (!mlir::has_single_element(body)) {
+    return funcOp.emitError(
+        "unhandled multiple blocks within dispatch function");
+  }
+  SmallVector<Operation *, 1> storeOperations;
+  auto storeOps = body.front().getOps<IREE::StoreOutputOp>();
+  storeOperations.assign(storeOps.begin(), storeOps.end());
+  auto storeReduceOps = body.front().getOps<IREE::StoreReduceOp>();
+  storeOperations.append(storeReduceOps.begin(), storeReduceOps.end());
+  if (storeOperations.begin() == storeOperations.end()) {
+    return funcOp.emitError(
+        "expected dispatch function to have at least one iree.store_output "
+        "instruction");
+  }
+
+  Operation *firstStoreOp = *storeOperations.begin();
+  if (failed(getExtentFromStoreOpSrc(firstStoreOp, launchSize))) {
+    return firstStoreOp->emitError("unhandled type of the output tensor");
+  }
+  for (auto it = std::next(storeOperations.begin()), ie = storeOperations.end();
+       it != ie; ++it) {
+    SmallVector<int64_t, 3> checkShape;
+    Operation *storeOp = *it;
+    if (failed(getExtentFromStoreOpSrc(storeOp, checkShape))) {
+      return storeOp->emitError("unhandled type of the output tensor");
+    }
+    if (!areShapesEqual(launchSize, checkShape)) {
+      return storeOp->emitError("mismatch in shapes of the output tensors");
+    }
+  }
+  return success();
+}
+
+/// Gets the workgroup size.
+template <typename intType>
+LogicalResult getWorkGroupSize(FuncOp funcOp,
+                               SmallVectorImpl<intType> &workGroupSize) {
+  if (!funcOp.getAttr("iree.executable.export")) {
+    return funcOp.emitError(
+        "expected operation to be in dispatch function to get launch size");
+  }
+  auto workGroupSizeAttr =
+      funcOp.getAttrOfType<DenseElementsAttr>("iree.executable.workgroup_size");
+  if (!workGroupSizeAttr) {
+    return funcOp.emitError(
+        "unable to find workload size, missing attribute "
+        "iree.executable.workload in dispatch function");
+  }
+  workGroupSize.clear();
+  for (auto value : workGroupSizeAttr.getValues<APInt>()) {
+    workGroupSize.push_back(value.getSExtValue());
+  }
+  return success();
+}
+
+template LogicalResult getWorkGroupSize<int32_t>(
+    FuncOp funcOp, SmallVectorImpl<int32_t> &workGroupSize);
+template LogicalResult getWorkGroupSize<int64_t>(
+    FuncOp funcOp, SmallVectorImpl<int64_t> &workGroupSize);
+
+}  // namespace iree_compiler
+}  // namespace mlir

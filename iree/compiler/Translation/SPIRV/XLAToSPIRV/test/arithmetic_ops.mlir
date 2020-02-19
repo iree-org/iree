@@ -6,7 +6,7 @@
 // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<4 x f32 [4]> [0]>, StorageBuffer>
 // CHECK-SAME: [[ARG2:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<4 x f32 [4]> [0]>, StorageBuffer>
 func @mul_1D(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xf32>)
-attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
   // CHECK: [[GLOBALIDPTR:%.*]] = spv._address_of [[GLOBALIDVAR]]
   // CHECK: [[GLOBALID:%.*]] = spv.Load "Input" [[GLOBALIDPTR]]
   // CHECK: [[GLOBALIDX:%.*]] = spv.CompositeExtract [[GLOBALID]][0 : i32]
@@ -31,7 +31,7 @@ attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]>
 // -----
 
 func @frem(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xf32>)
-attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FRem
@@ -43,7 +43,7 @@ attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]>
 // -----
 
 func @srem(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi32>)
-attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.SRem
@@ -55,7 +55,7 @@ attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]>
 // -----
 
 func @srem(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi32>)
-attributes  {iree.executable.export, iree.executable.workload = dense<[4, 1, 1]> : tensor<3xi32>, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.SRem

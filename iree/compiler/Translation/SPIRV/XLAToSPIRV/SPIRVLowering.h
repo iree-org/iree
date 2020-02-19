@@ -20,9 +20,9 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H
 
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttribute.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/TensorIndexToScalarValueMap.h"
-#include "iree/compiler/Utils/IREECodegenUtils.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"

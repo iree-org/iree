@@ -139,7 +139,7 @@ LogicalResult SPIRVCodegenImpl::createEntryFn(
   entryFn.addEntryBlock();
 
   SmallVector<int32_t, 3> workGroupSize;
-  if (failed(getLegacyWorkGroupSize(fn, workGroupSize))) {
+  if (failed(getWorkGroupSize(fn, workGroupSize))) {
     return failure();
   }
   auto entryFnAttr =
@@ -188,7 +188,7 @@ LogicalResult SPIRVCodegenImpl::createLaunchGuard(OpBuilder &builder,
                                                   FuncOp fn) {
   // First check that the global invocation id is in bounds.
   SmallVector<int64_t, 3> launchSize;
-  if (failed(getLegacyLaunchSize(fn, launchSize))) {
+  if (failed(getLaunchSize(fn, launchSize))) {
     return failure();
   }
   auto loc = fn.getLoc();

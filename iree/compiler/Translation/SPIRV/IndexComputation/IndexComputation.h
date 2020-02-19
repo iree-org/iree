@@ -21,8 +21,8 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H
 
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttribute.h"
-#include "iree/compiler/Utils/IREECodegenUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -298,7 +298,7 @@ class IndexPropagationList {
     // Set the attribute for the number of launch dims.
     auto funcOp = region.getParentOfType<FuncOp>();
     SmallVector<int64_t, 3> launchSize;
-    if (failed(getLegacyLaunchSize(funcOp, launchSize))) {
+    if (failed(getLaunchSize(funcOp, launchSize))) {
       return emitError(region.getLoc(),
                        "expected region of index propagation to be in dispatch "
                        "function to get launch size");

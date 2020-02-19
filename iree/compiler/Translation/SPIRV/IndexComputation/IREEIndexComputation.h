@@ -20,8 +20,9 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H
 
+#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/XLAIndexPropagation.h"
-#include "iree/compiler/Utils/IREECodegenUtils.h"
 #include "mlir/IR/Function.h"
 
 namespace mlir {

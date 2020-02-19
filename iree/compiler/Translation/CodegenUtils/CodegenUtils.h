@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,29 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_UTILS_IREECODEGENUTILS_H
-#define IREE_COMPILER_UTILS_IREECODEGENUTILS_H
+#ifndef IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H
+#define IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H
 
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/IR/Function.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// WARNING: this file is deprecated and will be removed soon. Do not use.
+/// Drop trailing ones.
+ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector);
 
-// TODO(ravishankarm): remove this; it does not work with dynamic shapes.
-/// Gets the launch size associated with the dispatch function.
-LogicalResult getLegacyLaunchSize(Operation *funcOp,
-                                  SmallVectorImpl<int64_t> &launchSize);
+/// Checks that a given function is a dispatch function.
+bool isDispatchFunction(FuncOp funcOp);
+
+/// The launch size is the size of the outputs of the kernel. For now all
+/// outputs have to be the same shape and static shaped.
+LogicalResult getLaunchSize(FuncOp funcOp,
+                            SmallVectorImpl<int64_t> &launchSize);
 
 /// Gets the workgroup size. Has to be a static constant.
 template <typename intType>
-LogicalResult getLegacyWorkGroupSize(Operation *funcOp,
-                                     SmallVectorImpl<intType> &workGroupSize);
+LogicalResult getWorkGroupSize(FuncOp funcOp,
+                               SmallVectorImpl<intType> &workGroupSize);
 
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_UTILS_IREECODEGENUTILS_H
+#endif  // IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H

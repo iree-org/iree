@@ -18,9 +18,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Translation/XLAToLinalg/LinalgTensorToBuffer.h"
-#include "iree/compiler/Utils/IREECodegenUtils.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPU.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
@@ -48,18 +48,6 @@
 
 namespace mlir {
 namespace iree_compiler {
-
-static ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
-  if (vector.empty()) return vector;
-  auto numTrailingOnes = 0;
-  for (unsigned i = vector.size() - 1; i > 0; --i) {
-    if (vector[i] != 1) {
-      break;
-    }
-    numTrailingOnes++;
-  }
-  return vector.drop_back(numTrailingOnes);
-}
 
 namespace {
 /// These options are only for testing purposes. For actual execution with IREE,
@@ -109,7 +97,7 @@ struct IREETileLinalgPass : public FunctionPass<IREETileLinalgPass> {
     FuncOp funcOp = getFunction();
     SmallVector<int64_t, 3> workGroupSizeVec;
     workGroupSizeVec.reserve(3);
-    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSizeVec))) return;
+    if (failed(getWorkGroupSize(funcOp, workGroupSizeVec))) return;
     ArrayRef<int64_t> workGroupSize = dropTrailingOnes(workGroupSizeVec);
 
     OpBuilder builder(funcOp);
@@ -162,29 +150,16 @@ struct LoopsToGPUPass : public FunctionPass<LoopsToGPUPass> {
     FuncOp funcOp = getFunction();
     SmallVector<int64_t, 3> workGroupSizeVec;
     workGroupSizeVec.reserve(3);
-    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSizeVec))) return;
+    if (failed(getWorkGroupSize(funcOp, workGroupSizeVec))) return;
     ArrayRef<int64_t> workGroupSize = dropTrailingOnes(workGroupSizeVec);
 
-    // While we can use any valid input for numWorkGroups, there might be
-    // canonicalizations that can be used if the workgroup size is passed
-    // accurately. For now compute the workgroup size based on the workload and
-    // workgroup size.
-    // TODO(ravishankarm): This assumes this is static for now. To handle
-    // dynamic cases, generate the IR that corresponds to the operations here.
-    SmallVector<int64_t, 3> workLoad;
-    workLoad.reserve(3);
-    if (failed(getLegacyLaunchSize(funcOp, workLoad))) {
-      funcOp.emitError("unable to retrieve workload size in dispatch function");
-      return signalPassFailure();
-    }
-    workLoad.resize(workGroupSize.size());
-
+    // For now just use number of workgroups to be [1, 1, 1]. The loop to GPU
+    // lowering doesnt use the value of number of workgroups in the codegen
+    // itself, but rather only uses this in the gpu.launch op which is
+    // irrelevant for IREE.
+    // TODO(ravishankarm): Fix the GPU lowering to allow not using gpu.launch at
+    // all.
     SmallVector<int64_t, 3> numWorkGroups(workGroupSize.size(), 1);
-    for (auto index : llvm::seq<unsigned>(0, workGroupSize.size())) {
-      numWorkGroups[index] = workLoad[index] / workGroupSize[index];
-      numWorkGroups[index] +=
-          static_cast<bool>(workLoad[index] % workGroupSize[index]);
-    }
 
     SmallVector<Value, 3> numWorkGroupsVal, workGroupSizeVal;
     numWorkGroupsVal.reserve(3);
@@ -210,7 +185,7 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
     ModuleOp moduleOp = getModule();
     FuncOp funcOp = nullptr;
     auto walkResult = moduleOp.walk([&funcOp](FuncOp fOp) -> WalkResult {
-      if (fOp.getAttr("iree.executable.export")) {
+      if (isDispatchFunction(fOp)) {
         if (funcOp) return WalkResult::interrupt();
         funcOp = fOp;
       }
@@ -258,7 +233,7 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
     SPIRVTypeConverter typeConverter;
     OwningRewritePatternList patterns;
     SmallVector<int32_t, 3> workGroupSize;
-    if (failed(getLegacyWorkGroupSize(funcOp, workGroupSize))) return;
+    if (failed(getWorkGroupSize(funcOp, workGroupSize))) return;
 
     // Set spv.entry_point_abi on each kernel functions to drive SPIR-V CodeGen.
     // This is required because SPIR-V CodeGen's contract.
@@ -292,7 +267,7 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
       : workGroupSize(workGroupSize.begin(), workGroupSize.end()) {}
   void runOnFunction() {
     FuncOp funcOp = getFunction();
-    if (!funcOp.getAttr("iree.executable.export")) return;
+    if (!isDispatchFunction(funcOp)) return;
 
     if (workGroupSize.empty()) {
       // By default look at the number of "parallel" loops in the generic op.

@@ -17,7 +17,7 @@ module {
   // CHECK-SAME: iree.symbol_number_info
   // CHECK-SAME: [affine_map<(d0, d1, d2) -> (0)>, 0 : i32]
   func @foo(%arg0: memref<5x1x10xf32>, %arg1: memref<i64>, %arg2: memref<1x10xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.executable.workload = dense<[10, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<5x1x10xf32>) : tensor<5x1x10xf32>
     %1 = iree.load_input(%arg1 : memref<i64>) : tensor<i64>
     %2 = "xla_hlo.gather"(%0, %1) {

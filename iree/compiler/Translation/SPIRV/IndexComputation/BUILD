@@ -60,8 +60,8 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Translation/CodegenUtils",
         "//iree/compiler/Translation/SPIRV/IndexComputation:IndexComputationAttrGen",
-        "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

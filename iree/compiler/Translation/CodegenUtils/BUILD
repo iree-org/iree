@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,24 +20,19 @@ package(
 )
 
 cc_library(
-    name = "Utils",
+    name = "CodegenUtils",
     srcs = [
-        "GraphUtils.cpp",
-        "TypeConversionUtils.cpp",
+        "CodegenUtils.cpp",
     ],
     hdrs = [
-        "GraphUtils.h",
-        "TypeConversionUtils.h",
+        "CodegenUtils.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Flow/Utils",
         "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TransformUtils",
-        "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
+    alwayslink = 1,
 )

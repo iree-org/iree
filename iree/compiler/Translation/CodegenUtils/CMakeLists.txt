@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,40 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
-
 iree_cc_library(
   NAME
-    XLAToSPIRV
+    CodegenUtils
   HDRS
-    "IREEToSPIRV.h"
-    "IREEToSPIRVPass.h"
-    "SPIRVLowering.h"
-    "TensorIndexToScalarValueMap.h"
-    "XLAToSPIRV.h"
+    "CodegenUtils.h"
   SRCS
-    "IREEToSPIRV.cpp"
-    "IREEToSPIRVPass.cpp"
-    "SPIRVLowering.cpp"
-    "XLAToSPIRV.cpp"
+    "CodegenUtils.cpp"
   DEPS
-    LLVMSupport
-    MLIRAffineOps
-    MLIRAffineToStandard
     MLIRIR
-    MLIRPass
-    MLIRSPIRV
-    MLIRSPIRVTransforms
     MLIRStandardOps
-    MLIRStandardToSPIRVTransforms
     MLIRSupport
-    MLIRTransforms
+    iree::compiler::Dialect::Flow::Utils
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Translation::CodegenUtils
-    iree::compiler::Translation::SPIRV::IndexComputation
-    iree::compiler::Translation::SPIRV::Passes
-    iree::compiler::Translation::SPIRV::ReductionCodegen
-    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )
