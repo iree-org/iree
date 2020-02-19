@@ -51,6 +51,8 @@ cc_binary(
         ":tensorflow",
         "//iree/tools:iree_opt_library",
         "@llvm-project//mlir:MlirOptMain",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],
 )
 
