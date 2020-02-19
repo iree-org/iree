@@ -41,7 +41,6 @@ jobs:
           git commit -am "Synchronize submodules"
       - name: Pushing changes
         if: env.has_diff == 'true'
-        # Will push regardless, but exit successfully if already up to date with master
         uses: ad-m/github-push-action@v0.5.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
