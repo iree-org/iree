@@ -38,12 +38,11 @@ iree_cc_library(
   PUBLIC
 )
 
-
 iree_tablegen_library(
   NAME
     IREEOpsGen
   TD_FILE
-    IREEOps.td
+    "IREEOps.td"
   OUTS
     -gen-op-decls IREEOps.h.inc
     -gen-op-defs IREEOps.cpp.inc

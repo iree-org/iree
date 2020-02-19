@@ -24,17 +24,17 @@ iree_cc_library(
     "custom_dialect.cc"
     "custom_ops.cc.inc"
   DEPS
-    iree::samples::custom_modules::dialect::custom_imports
-    iree::compiler::Dialect::HAL::Conversion
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM::Conversion
+    ::custom_imports
     LLVMSupport
     MLIRIR
     MLIRParser
     MLIRPass
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
   ALWAYSLINK
   PUBLIC
 )
@@ -43,7 +43,7 @@ iree_tablegen_library(
   NAME
     custom_ops_gen
   TD_FILE
-    custom_ops.td
+    "custom_ops.td"
   OUTS
     -gen-op-decls custom_ops.h.inc
     -gen-op-defs custom_ops.cc.inc
@@ -61,6 +61,7 @@ iree_cc_embed_data(
   CPP_NAMESPACE
     "mlir::iree_compiler::IREE::Custom"
   FLATTEN
+  PUBLIC
 )
 
 iree_cc_binary(
@@ -69,9 +70,9 @@ iree_cc_binary(
   OUT
     custom-opt
   DEPS
-    iree::samples::custom_modules::dialect
-    iree::tools::iree_opt_library
+    ::dialect
     MLIRMlirOptMain
+    iree::tools::iree_opt_library
 )
 
 iree_cc_binary(
@@ -80,6 +81,6 @@ iree_cc_binary(
   OUT
     custom-translate
   DEPS
-    iree::samples::custom_modules::dialect
+    ::dialect
     iree::tools::iree_translate_library
 )

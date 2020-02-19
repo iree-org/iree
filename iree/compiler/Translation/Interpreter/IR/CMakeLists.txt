@@ -26,12 +26,11 @@ iree_cc_library(
     "CommonOps.cpp"
     "CommonOps.cpp.inc"
   DEPS
-    iree::compiler::Translation::Interpreter::IR::CommonOpsGen
-    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRStandardOps
     MLIRSupport
+    iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC
 )
@@ -40,7 +39,7 @@ iree_tablegen_library(
   NAME
     CommonOpsGen
   TD_FILE
-    CommonOps.td
+    "CommonOps.td"
   OUTS
     -gen-op-decls CommonOps.h.inc
     -gen-op-defs CommonOps.cpp.inc
@@ -66,18 +65,16 @@ iree_cc_library(
     "LLOps.cpp.inc"
     "OpWriters.cpp"
   DEPS
-    iree::compiler::Translation::Interpreter::IR::Common
-    iree::compiler::Translation::Interpreter::IR::HLOpsGen
-    iree::compiler::Translation::Interpreter::IR::LLOpsGen
+    ::Common
+    LLVMSupport
+    MLIRIR
+    MLIRStandardOps
+    MLIRSupport
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::Serialization
     iree::compiler::Translation::Interpreter::Utils
     iree::compiler::Utils
     iree::schemas::bytecode::interpreter_bytecode_v0
-    LLVMSupport
-    MLIRIR
-    MLIRStandardOps
-    MLIRSupport
   ALWAYSLINK
   PUBLIC
 )
@@ -86,7 +83,7 @@ iree_tablegen_library(
   NAME
     HLOpsGen
   TD_FILE
-    HLOps.td
+    "HLOps.td"
   OUTS
     -gen-op-decls HLOps.h.inc
     -gen-op-defs HLOps.cpp.inc
@@ -96,7 +93,7 @@ iree_tablegen_library(
   NAME
     LLOpsGen
   TD_FILE
-    LLOps.td
+    "LLOps.td"
   OUTS
     -gen-op-decls LLOps.h.inc
     -gen-op-defs LLOps.cpp.inc

@@ -33,12 +33,12 @@ iree_cc_library(
     "FlowOps.cpp.inc"
     "FlowTypes.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils
+    iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC
 )
@@ -47,7 +47,7 @@ iree_tablegen_library(
   NAME
     FlowEnumsGen
   TD_FILE
-    FlowBase.td
+    "FlowBase.td"
   OUTS
     -gen-enum-decls FlowEnums.h.inc
     -gen-enum-defs FlowEnums.cpp.inc
@@ -57,7 +57,7 @@ iree_tablegen_library(
   NAME
     FlowOpInterfaceGen
   TD_FILE
-    FlowBase.td
+    "FlowBase.td"
   OUTS
     -gen-op-interface-decls FlowOpInterface.h.inc
     -gen-op-interface-defs FlowOpInterface.cpp.inc
@@ -67,7 +67,7 @@ iree_tablegen_library(
   NAME
     FlowOpsGen
   TD_FILE
-    FlowOps.td
+    "FlowOps.td"
   OUTS
     -gen-op-decls FlowOps.h.inc
     -gen-op-defs FlowOps.cpp.inc
