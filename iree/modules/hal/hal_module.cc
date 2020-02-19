@@ -53,32 +53,26 @@ static iree_vm_ref_type_descriptor_t iree_hal_executable_descriptor = {0};
 static iree_vm_ref_type_descriptor_t iree_hal_executable_layout_descriptor = {
     0};
 
-#define IREE_HAL_REGISTER_CC_TYPE(type, name, descriptor) \
-  descriptor.type_name = iree_make_cstring_view(name);    \
-  descriptor.offsetof_counter = type::offsetof_counter(); \
-  descriptor.destroy = type::DirectDestroy;               \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
-
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_module_register_types() {
   static bool has_registered = false;
   if (has_registered) return IREE_STATUS_OK;
 
-  IREE_HAL_REGISTER_CC_TYPE(Allocator, "hal.allocator",
-                            iree_hal_allocator_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(Buffer, "hal.buffer", iree_hal_buffer_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(iree_hal_buffer_view, "hal.buffer_view",
-                            iree_hal_buffer_view_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(CommandBuffer, "hal.command_buffer",
-                            iree_hal_command_buffer_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(DescriptorSet, "hal.descriptor_set",
-                            iree_hal_descriptor_set_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(DescriptorSetLayout, "hal.descriptor_set_layout",
-                            iree_hal_descriptor_set_layout_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(Device, "hal.device", iree_hal_device_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(Executable, "hal.executable",
-                            iree_hal_executable_descriptor);
-  IREE_HAL_REGISTER_CC_TYPE(ExecutableLayout, "hal.executable_layout",
-                            iree_hal_executable_layout_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(Allocator, "hal.allocator",
+                           iree_hal_allocator_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(Buffer, "hal.buffer", iree_hal_buffer_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(iree_hal_buffer_view, "hal.buffer_view",
+                           iree_hal_buffer_view_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(CommandBuffer, "hal.command_buffer",
+                           iree_hal_command_buffer_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(DescriptorSet, "hal.descriptor_set",
+                           iree_hal_descriptor_set_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(DescriptorSetLayout, "hal.descriptor_set_layout",
+                           iree_hal_descriptor_set_layout_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(Device, "hal.device", iree_hal_device_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(Executable, "hal.executable",
+                           iree_hal_executable_descriptor);
+  IREE_VM_REGISTER_CC_TYPE(ExecutableLayout, "hal.executable_layout",
+                           iree_hal_executable_layout_descriptor);
 
   has_registered = true;
   return IREE_STATUS_OK;

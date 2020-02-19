@@ -41,8 +41,15 @@ struct ref_type_descriptor {
   };                                                    \
   }                                                     \
   }
+
+#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)  \
+  descriptor.type_name = iree_make_cstring_view(name);    \
+  descriptor.offsetof_counter = type::offsetof_counter(); \
+  descriptor.destroy = type::DirectDestroy;               \
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
 #else
 #define IREE_VM_DECLARE_CC_TYPE_LOOKUP(name, T)
+#define IREE_VM_REGISTER_CC_TYPE(type, name, descriptor)
 #endif  // __cplusplus
 
 #ifdef __cplusplus
