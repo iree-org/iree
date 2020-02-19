@@ -14,7 +14,7 @@
 
 name: Format
 
-on: [pull_request]
+on: [pull_request, push]
 
 jobs:
   # Run clang-format and verify there are no errors. We don't want to bother
