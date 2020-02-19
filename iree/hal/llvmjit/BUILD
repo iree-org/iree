@@ -106,3 +106,10 @@ cc_library(
     ],
     alwayslink = 1,
 )
+
+cc_library(
+    name = "memref_runtime",
+    hdrs = [
+        "memref_runtime.h",
+    ],
+)

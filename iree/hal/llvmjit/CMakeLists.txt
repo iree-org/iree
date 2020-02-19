@@ -116,3 +116,11 @@ iree_cc_library(
   ALWAYSLINK
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    memref_runtime
+  HDRS
+    "memref_runtime.h"
+  PUBLIC
+)
