@@ -32,13 +32,13 @@ iree_cc_library(
     "HALOps.cpp"
     "HALTypes.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRParser
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )
 
@@ -50,17 +50,17 @@ iree_cc_library(
   SRCS
     "HALDialect.cpp"
   DEPS
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::hal_imports
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::VM::Conversion
+    ::IR
     LLVMSupport
     MLIRIR
     MLIRParser
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils
+    iree::compiler::Dialect::HAL::Conversion::HALToVM
+    iree::compiler::Dialect::HAL::hal_imports
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::VM::Conversion
   ALWAYSLINK
   PUBLIC
 )
@@ -69,7 +69,7 @@ iree_tablegen_library(
   NAME
     HALEnumsGen
   TD_FILE
-    HALBase.td
+    "HALBase.td"
   OUTS
     -gen-enum-decls HALEnums.h.inc
     -gen-enum-defs HALEnums.cpp.inc
@@ -79,7 +79,7 @@ iree_tablegen_library(
   NAME
     HALOpInterfaceGen
   TD_FILE
-    HALBase.td
+    "HALBase.td"
   OUTS
     -gen-op-interface-decls HALOpInterface.h.inc
     -gen-op-interface-defs HALOpInterface.cpp.inc
@@ -89,7 +89,7 @@ iree_tablegen_library(
   NAME
     HALOpsGen
   TD_FILE
-    HALOps.td
+    "HALOps.td"
   OUTS
     -gen-op-decls HALOps.h.inc
     -gen-op-defs HALOps.cpp.inc

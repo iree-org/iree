@@ -30,22 +30,21 @@ iree_cc_library(
     "ShapeOps.cpp.inc"
     "ShapeTypes.cpp"
   DEPS
-    iree::compiler::Dialect::IREE::IR
     LLVMSupport
     MLIRIR
     MLIRParser
     MLIRStandardOps
     MLIRSupport
+    iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC
 )
-
 
 iree_tablegen_library(
   NAME
     ShapeOpsGen
   TD_FILE
-    ShapeOps.td
+    "ShapeOps.td"
   OUTS
     -gen-op-decls ShapeOps.h.inc
     -gen-op-defs ShapeOps.cpp.inc
