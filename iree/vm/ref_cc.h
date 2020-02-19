@@ -206,7 +206,7 @@ class ref {
 //  ref<MyType> b = retain_ref(a);  // ref count + 1
 //  retain_ref(b);  // ref count + 1
 template <typename T>
-inline ref<T> retain_ref(ref<T>& value) {
+inline ref<T> retain_ref(const ref<T>& value) {
   if (value) ref_type_retain<T>(value.get());
   return ref<T>(value.get());
 }
