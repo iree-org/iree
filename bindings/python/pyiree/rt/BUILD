@@ -90,6 +90,7 @@ pybind_cc_library(
         "//iree/base:signature_mangle",
         "//iree/hal:api",
         "//iree/modules/hal",
+        "//iree/modules/tensorlist:native_module",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:invocation",

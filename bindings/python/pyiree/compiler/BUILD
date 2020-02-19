@@ -32,6 +32,7 @@ package(
 COMPILER_DEPS = [
     # Transforms.
     "//iree/compiler/Dialect/Flow/Transforms",
+    "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
     "//iree/compiler/Dialect/HAL/Transforms",
     "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
     "//iree/compiler/Dialect/VM/Transforms",

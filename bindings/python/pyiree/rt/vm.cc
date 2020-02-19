@@ -20,6 +20,7 @@
 #include "bindings/python/pyiree/rt/function_abi.h"
 #include "iree/base/api.h"
 #include "iree/modules/hal/hal_module.h"
+#include "iree/modules/tensorlist/native_module.h"
 #include "iree/vm/invocation.h"
 #include "iree/vm/module.h"
 
@@ -33,6 +34,13 @@ VmModule CreateHalModule(HalDevice* device) {
   CheckApiStatus(
       iree_hal_module_create(device->raw_ptr(), IREE_ALLOCATOR_SYSTEM, &module),
       "Error creating hal module");
+  return VmModule::CreateRetained(module);
+}
+
+VmModule CreateTensorListModule() {
+  iree_vm_module_t* module;
+  CheckApiStatus(iree_tensorlist_module_create(IREE_ALLOCATOR_SYSTEM, &module),
+                 "Error creating tensorlist module");
   return VmModule::CreateRetained(module);
 }
 
@@ -207,9 +215,11 @@ std::string VmVariantList::DebugString() const {
 void SetupVmBindings(pybind11::module m) {
   CHECK_EQ(IREE_STATUS_OK, iree_vm_register_builtin_types());
   CHECK_EQ(IREE_STATUS_OK, iree_hal_module_register_types());
+  CHECK_EQ(IREE_STATUS_OK, iree_tensorlist_module_register_types());
 
   // Built-in module creation.
   m.def("create_hal_module", &CreateHalModule);
+  m.def("create_tensorlist_module", &CreateTensorListModule);
 
   py::enum_<iree_vm_function_linkage_t>(m, "Linkage")
       .value("INTERNAL", IREE_VM_FUNCTION_LINKAGE_INTERNAL)

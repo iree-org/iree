@@ -40,6 +40,7 @@ package(
         "control_flow_test",
         "dynamic_mlp_test",
         "exported_names_test",
+        "tensorlist_test",
         "keras_lstm_test",
         "linspace_test",
         "mandelbrot_test",
