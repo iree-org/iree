@@ -28,23 +28,24 @@ namespace {
 
 class DynamicDimsTypeConverter : public TypeConverter {
  public:
-  LogicalResult convertType(Type t, SmallVectorImpl<Type> &results) override {
-    auto tensorType = t.dyn_cast<RankedTensorType>();
-    if (!tensorType || tensorType.getNumDynamicDims() == 0) {
-      // No conversion - not ranked tensor or static.
-      results.push_back(t);
-      return success();
-    }
+  DynamicDimsTypeConverter() {
+    // Add a default conversion to allow partial type conversions.
+    addConversion([](Type type) { return type; });
+    addConversion([](RankedTensorType type, SmallVectorImpl<Type> &results) {
+      if (type.hasStaticShape()) {
+        results.push_back(type);
+        return success();
+      }
 
-    // Dimension is hard-coded to 32bits currently but better decisions are
-    // possible in some situations.
-    auto dimType = IndexType::get(t.getContext());
-    auto shapeType =
-        Shape::RankedShapeType::get(tensorType.getShape(), dimType);
-    // Expand tensor<?...x*> -> (tensor<...>, ranked_shape<...,index>)
-    results.push_back(t);
-    results.push_back(shapeType);
-    return success();
+      // Dimension is hard-coded to 32bits currently but better decisions
+      // are possible in some situations.
+      auto dimType = IndexType::get(type.getContext());
+      auto shapeType = Shape::RankedShapeType::get(type.getShape(), dimType);
+      // Expand tensor<?...x*> -> (tensor<...>, ranked_shape<...,index>)
+      results.push_back(type);
+      results.push_back(shapeType);
+      return success();
+    });
   }
 
   Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,

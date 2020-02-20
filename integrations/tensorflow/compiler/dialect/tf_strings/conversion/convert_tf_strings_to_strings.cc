@@ -87,23 +87,19 @@ struct PrintOpLowering : public OpRewritePattern<PrintOp> {
 
 class IreeStringTypeConverter : public TypeConverter {
  public:
-  Type convertType(Type t) override {
-    if (!getElementTypeOrSelf(t).isa<TFStrings::StringType>()) {
-      return t;
-    }
-
-    if (auto type = t.dyn_cast<TFStrings::StringType>()) {
+  IreeStringTypeConverter() {
+    // Allow types through by default.
+    addConversion([](Type type) { return type; });
+    addConversion([](TFStrings::StringType type) {
       return IREE::RefPtrType::get(
-          IREE::Strings::StringType::get(t.getContext()));
-    } else if (auto type = t.dyn_cast<ShapedType>()) {
-      auto elementType =
-          IREE::RefPtrType::get(IREE::Strings::StringType::get(t.getContext()));
+          IREE::Strings::StringType::get(type.getContext()));
+    });
+    addConversion([](ShapedType type) {
+      auto elementType = IREE::RefPtrType::get(
+          IREE::Strings::StringType::get(type.getContext()));
       return RankedTensorType::get(type.getShape(), elementType);
-    }
-
-    return t;
+    });
   }
-  using TypeConverter::convertType;
 
   Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
                                    ArrayRef<Value> inputs,

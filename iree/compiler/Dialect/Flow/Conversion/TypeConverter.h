@@ -22,8 +22,7 @@ namespace iree_compiler {
 
 class FlowTypeConverter : public TypeConverter {
  public:
-  Type convertType(Type t) override;
-  using TypeConverter::convertType;
+  FlowTypeConverter();
 
   Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
                                    ArrayRef<Value> inputs,
