@@ -14,7 +14,6 @@
 
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 
-#include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/StandardTypes.h"
@@ -38,31 +37,46 @@ bool isDispatchFunction(FuncOp funcOp) {
   return funcOp.getAttr("iree.executable.export") != nullptr;
 }
 
-/// Helper function to check shapes are equal.
+/// Helper function to check shapes are equal. Only care that the number of
+/// elements be equal.
 static bool areShapesEqual(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
-  return lhs == rhs;
+  auto reduceFn = [](ArrayRef<int64_t> vector) -> int64_t {
+    int64_t init = 1;
+    for (auto val : vector) init *= val;
+    return init;
+  };
+  return reduceFn(lhs) == reduceFn(rhs);
 }
 
 /// Get the shape to use for a type. For now this is returning shapes as static
 /// value.
-// TODO(ravishankarm) : Modify this to return the Values to use for the extent.
+// TODO(ravishankarm) : Modify this to return the Values to use for the extent
+// to handle dynamic shapes.
 static LogicalResult getExtentFromStoreOpSrc(Operation *storeOp,
                                              SmallVectorImpl<int64_t> &extent) {
-  extent.clear();
-  extent.resize(3, 1);
   Value srcVal = storeOp->getOperand(0);
-  if (srcVal.getType().isIntOrFloat()) return success();
-  auto workload = dyn_cast_or_null<ConstantOp>(
-      IREE::Flow::calculateWorkload(srcVal.getDefiningOp(), srcVal)
-          .getDefiningOp());
-  if (!workload) return failure();
-  auto extentVal = workload.getValue().cast<DenseIntElementsAttr>();
-  for (auto val : enumerate(extentVal.getValues<APInt>()))
-    extent[val.index()] = val.value().getSExtValue();
-  workload.erase();
-  return success();
+  if (srcVal.getType().isIntOrFloat()) {
+    extent.clear();
+    extent.push_back(1);
+    return success();
+  }
+  if (auto shapedType = srcVal.getType().dyn_cast<ShapedType>()) {
+    if (shapedType.hasStaticShape()) {
+      extent.assign(shapedType.getShape().rbegin(),
+                    shapedType.getShape().rend());
+      if (extent.empty()) {
+        extent.clear();
+        extent.push_back(1);
+      }
+      return success();
+    }
+  }
+  return storeOp->emitError(
+      "unable to extract domain size from store operation");
 }
 
+// TODO(ravishankarm) : Modify this to return the Values to support dynamic
+// shapes.
 LogicalResult getLaunchSize(FuncOp funcOp,
                             SmallVectorImpl<int64_t> &launchSize) {
   auto &body = funcOp.getBody();

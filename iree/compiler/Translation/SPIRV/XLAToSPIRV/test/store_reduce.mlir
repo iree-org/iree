@@ -45,14 +45,19 @@ module {
 // -----
 
 module {
+  // CHECK-DAG: spv.globalVariable [[GLOBALID:@.*]] built_in("GlobalInvocationId")
   // CHECK: spv.func @reduction_2D_dim1_entry
   // CHECK-SAME: [[ARG2:%[a-zA-Z0-9_]*]]: !spv.ptr<!spv.struct<!spv.array<5 x i32 [4]> [0]>, StorageBuffer>
   func @reduction_2D_dim1_entry(%arg0: memref<5x4xi32>, %arg1: memref<i32>, %arg2: memref<5xi32>) attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 1 : i32, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.ordinal = 0 : i32} {
-    // CHECK: [[GLOBALIDPTR:%[a-zA-Z0-9_]*]] = spv._address_of @globalInvocationID
+    // CHECK: spv.loop
+    // CHECK: [[GLOBALIDPTR:%[a-zA-Z0-9_]*]] = spv._address_of [[GLOBALID]]
     // CHECK: [[GLOBALID:%[a-zA-Z0-9_]*]] = spv.Load "Input" [[GLOBALIDPTR]] : vector<3xi32>
     // CHECK: [[GLOBALIDY:%[a-zA-Z0-9_]*]] = spv.CompositeExtract [[GLOBALID]]{{\[}}1 : i32{{\]}}
+    // CHECK: spv.loop
+    // CHECK: spv.Branch ^[[HEADERY:.*]]([[GLOBALIDY]] : i32)
+    // CHECK: ^[[HEADERY]]([[IVY:%.*]]: i32):
     %0 = iree.load_input(%arg0 : memref<5x4xi32>)  : tensor<5x4xi32>
-    // CHECK: spv.AccessChain [[ARG2]]{{\[}}{{.*}}, [[GLOBALIDY]]{{\]}}
+    // CHECK: spv.AccessChain [[ARG2]]{{\[}}{{.*}}, [[IVY]]{{\]}}
     iree.store_reduce(%0 : tensor<5x4xi32>, %arg2 : memref<5xi32>, @reduction_apply)
     iree.return
   }

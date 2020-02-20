@@ -237,23 +237,24 @@ class SPIRVCodegenImpl {
   LogicalResult createEntryFn(OpBuilder &builder, FuncOp &fn,
                               TensorIndexToScalarValueMap &valueCache);
 
-  /// Mapping from argument of the dispatch function in tensor dialect to the
-  /// corresponding spv.globalVariable.
-  DenseMap<Value, spirv::GlobalVariableOp> inputArgToVariable;
-
-  /// List of spv.globalVariables created for tensors returned by the dispatch
-  /// function in tensor dialects.
-  SmallVector<spirv::GlobalVariableOp, 1> resultIndexToVariable;
-
  private:
   /// Adds the spv.EntryPointOp and records all the interface variables used in
   /// the entryFn.
   LogicalResult createEntryPoint(FuncOp fn, OpBuilder &builder, Location loc,
                                  FuncOp entryFn);
 
-  /// Creates the spirv::SelectionOp that checks that the global invocation ID
-  /// of the workitem is less than the launch bounds.
-  LogicalResult createLaunchGuard(OpBuilder &builder, FuncOp fn);
+  /// Creates the loops around the core of the computation to make sure the
+  /// entire domain of the output is executed irrespective of the number of
+  /// workgroups used at launch. The `domainSize` is the size of the "iteration
+  /// space" (for now based on the size of one of the output tensors), with the
+  /// fastest varying dimensions first. For sizes greater than 3-D, the sizes
+  /// get flattened into 3D.  In `dimValues` is returned the point in the
+  /// iteration space the workitem is executing (starting from the fastest
+  /// varying dimension first).  This is a recursive call, but the original
+  /// callee should see domainSize.size() == dimValues.size() on return.
+  LogicalResult createLaunchLoop(OpBuilder &builder, Operation *op,
+                                 ArrayRef<Value> domainSize,
+                                 SmallVectorImpl<Value> &dimValues);
 
   /// Method to load the values of globalVariables corresponding to the
   /// arguments of the dispatch function at all indices needed within the
@@ -266,10 +267,6 @@ class SPIRVCodegenImpl {
   LogicalResult initSymbolValues(OpBuilder &builder, Location loc,
                                  TensorIndexToScalarValueMap &valueCache,
                                  Value origArg);
-
-  /// Gets the global invocation ID along a particular dimension (0 -> x, 1 ->
-  /// y, 2 -> z).
-  Value getGlobalInvocationID(unsigned dim);
 
   /// Method to load the values of an argument at an index.
   Value loadArgValueAtIndex(OpBuilder &builder, Location loc,
@@ -285,13 +282,6 @@ class SPIRVCodegenImpl {
   virtual LogicalResult lowerOperation(OpBuilder &builder,
                                        TensorIndexToScalarValueMap &valueCache,
                                        Operation *op) = 0;
-
-  /// I/O interface for the entry function containing global variables that are
-  /// used by the entire function call tree.
-  SmallVector<Attribute, 4> interface;
-
-  /// GlobalInvocationID variable.
-  SmallVector<Value, 3> globalInvocationIDs;
 };
 }  // namespace detail
 

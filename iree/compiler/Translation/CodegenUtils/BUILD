@@ -28,7 +28,6 @@ cc_library(
         "CodegenUtils.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/Flow/Utils",
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:StandardOps",

@@ -41,7 +41,9 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // VKSPV-SAME:     format = 1397773893 : i32} {
 // VKSPV-NEXT:     module {
 // VKSPV-NEXT:       spv.module "Logical" "GLSL450" {
-//      VKSPV:         spv.EntryPoint "GLCompute" @simpleMath_rgn_dispatch_0, @globalInvocationID
+//  VKSPV-DAG:         spv.globalVariable [[GLOBALID:@.*]] built_in("GlobalInvocationId")
+//  VKSPV-DAG:         spv.globalVariable [[NUMWORKGROUPS:@.*]] built_in("NumWorkgroups")
+//      VKSPV:         spv.EntryPoint "GLCompute" @simpleMath_rgn_dispatch_0, [[GLOBALID]], [[NUMWORKGROUPS]]
 // VKSPV-NEXT:         spv.ExecutionMode @simpleMath_rgn_dispatch_0 "LocalSize", 32, 1, 1
 // VKSPV-NEXT:       } attributes {
 // VKSPV-SAME:         capabilities = ["Shader"],

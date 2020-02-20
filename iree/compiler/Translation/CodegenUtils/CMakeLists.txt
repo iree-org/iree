@@ -23,7 +23,6 @@ iree_cc_library(
     MLIRIR
     MLIRStandardOps
     MLIRSupport
-    iree::compiler::Dialect::Flow::Utils
     iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC

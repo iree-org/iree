@@ -89,23 +89,10 @@ static spirv::PointerType convertArgTypeToVariableType(Location loc,
       spirv::StorageClass::StorageBuffer);
 }
 
-static spirv::GlobalVariableOp createGlobalInvocationID(OpBuilder &builder,
-                                                        Location loc) {
-  auto i32Type = builder.getIntegerType(32);
-  auto idType = VectorType::get(3, i32Type);
-  auto ptrIdType = spirv::PointerType::get(idType, spirv::StorageClass::Input);
-  return builder.create<spirv::GlobalVariableOp>(
-      loc, ptrIdType, "globalInvocationID", spirv::BuiltIn::GlobalInvocationId);
-}
-
 namespace detail {
 LogicalResult SPIRVCodegenImpl::createEntryFn(
     OpBuilder &builder, FuncOp &fn, TensorIndexToScalarValueMap &valueCache) {
   auto loc = fn.getLoc();
-
-  // Create the Global invocation ID.
-  auto globalInvocationID = createGlobalInvocationID(builder, fn.getLoc());
-  interface.push_back(builder.getSymbolRefAttr(globalInvocationID.sym_name()));
 
   // Add ABI attributes to function arguments and return values.
   auto fnType = fn.getType();
@@ -156,25 +143,8 @@ LogicalResult SPIRVCodegenImpl::createEntryFn(
   // Start a scope to create an insertion guard to reset the builder once the
   // function is lowered.
   {
-    assert(globalInvocationIDs.empty());
     OpBuilder::InsertionGuard funcInsertGuard(builder);
     builder.setInsertionPointToStart(&entryFn.getBody().front());
-
-    auto globalInvocationIDPtr =
-        builder.create<spirv::AddressOfOp>(loc, globalInvocationID);
-    auto id = builder.create<spirv::LoadOp>(loc, globalInvocationIDPtr, nullptr,
-                                            nullptr);
-
-    auto id_x = builder.create<spirv::CompositeExtractOp>(loc, id, 0);
-    globalInvocationIDs.push_back(id_x);
-    auto id_y = builder.create<spirv::CompositeExtractOp>(loc, id, 1);
-    globalInvocationIDs.push_back(id_y);
-    auto id_z = builder.create<spirv::CompositeExtractOp>(loc, id, 2);
-    globalInvocationIDs.push_back(id_z);
-
-    for (auto id : enumerate(globalInvocationIDs)) {
-      valueCache.setDimValue(id.index(), id.value());
-    }
 
     if (failed(lowerFunction(builder, fn, entryFn, valueCache))) {
       return failure();
@@ -184,56 +154,96 @@ LogicalResult SPIRVCodegenImpl::createEntryFn(
   return success();
 }
 
-LogicalResult SPIRVCodegenImpl::createLaunchGuard(OpBuilder &builder,
-                                                  FuncOp fn) {
-  // First check that the global invocation id is in bounds.
-  SmallVector<int64_t, 3> launchSize;
-  if (failed(getLaunchSize(fn, launchSize))) {
-    return failure();
-  }
-  auto loc = fn.getLoc();
-  auto i1Type = builder.getI1Type();
-  auto i32Type = builder.getIntegerType(32);
-  Value condn = spirv::ConstantOp::getOne(i1Type, loc, &builder);
-  for (auto launchDim : enumerate(launchSize)) {
-    if (launchDim.value() == 1) {
-      continue;
-    }
-    Value id = getGlobalInvocationID(launchDim.index());
-    auto extent = builder.create<spirv::ConstantOp>(
-        loc, i32Type, builder.getI32IntegerAttr(launchDim.value()));
-    auto check = builder.create<spirv::SLessThanOp>(loc, i1Type, id, extent);
-    condn = builder.create<spirv::LogicalAndOp>(loc, i1Type, condn, check);
-  }
-  auto selectionOp =
-      builder.create<spirv::SelectionOp>(loc, spirv::SelectionControl::None);
-  selectionOp.addMergeBlock();
+/// Creates the spv.loop operation given the lb, ub and step.
+// TODO(ravishankarm): Move this into SPIR-V dialect as a utility function.
+static Value createLoop(OpBuilder &builder, Location loc, Value lb, Value ub,
+                        Value step) {
+  auto loopControl = builder.getI32IntegerAttr(
+      static_cast<uint32_t>(spirv::LoopControl::None));
+  auto loopOp = builder.create<spirv::LoopOp>(loc, loopControl);
+  loopOp.addEntryAndMergeBlock();
+  // Header block.
+  auto header = new Block();
+  // Insert the header.
+  loopOp.body().getBlocks().insert(std::next(loopOp.body().begin(), 1), header);
+  // Insert the body.
+  Block *body = new Block();
+  loopOp.body().getBlocks().insert(std::next(loopOp.body().begin(), 2), body);
+  // Header block arg is the induction variable.
+  BlockArgument newIndVar = header->addArgument(lb.getType());
 
-  // Create the header block and then blocks.
-  auto headerBlock = builder.createBlock(&selectionOp.body(),
-                                         std::prev(selectionOp.body().end()));
-  auto thenBlock = builder.createBlock(&selectionOp.body(),
-                                       std::prev(selectionOp.body().end()));
+  // Emit the entry code.
+  Block *entry = loopOp.getEntryBlock();
+  builder.setInsertionPointToEnd(entry);
+  builder.create<spirv::BranchOp>(loc, header, lb);
 
-  // Add branch to the header block.
-  builder.setInsertionPointToEnd(headerBlock);
+  // Emit the header code.
+  builder.setInsertionPointToEnd(header);
+  auto cmpOp = builder.create<spirv::SLessThanOp>(loc, builder.getI1Type(),
+                                                  newIndVar, ub);
+  Block *merge = loopOp.getMergeBlock();
   builder.create<spirv::BranchConditionalOp>(
-      loc, condn, thenBlock, ArrayRef<Value>(), selectionOp.getMergeBlock(),
-      ArrayRef<Value>());
+      loc, cmpOp, body, ArrayRef<Value>(), merge, ArrayRef<Value>());
 
-  // Add branch to merge block in the then block.
-  builder.setInsertionPointToEnd(thenBlock);
-  auto branchOp =
-      builder.create<spirv::BranchOp>(loc, selectionOp.getMergeBlock());
-  builder.setInsertionPoint(branchOp);
-  return success();
+  // Emit the continue/latch block.
+  Block *continueBlock = loopOp.getContinueBlock();
+  builder.setInsertionPointToEnd(continueBlock);
+  Value updatedIndVar =
+      builder.create<spirv::IAddOp>(loc, newIndVar.getType(), newIndVar, step);
+  builder.create<spirv::BranchOp>(loc, header, updatedIndVar);
+  builder.setInsertionPointToStart(body);
+  return newIndVar;
 }
 
-Value SPIRVCodegenImpl::getGlobalInvocationID(unsigned dim) {
-  if (dim < globalInvocationIDs.size()) {
-    return globalInvocationIDs[dim];
+LogicalResult SPIRVCodegenImpl::createLaunchLoop(
+    OpBuilder &builder, Operation *op, ArrayRef<Value> domainSize,
+    SmallVectorImpl<Value> &dimValues) {
+  if (domainSize.empty()) {
+    return success();
   }
-  return nullptr;
+  auto loc = op->getLoc();
+  Value ub = nullptr;
+  if (domainSize.size() >= 3) {
+    ub = domainSize[2];
+    for (auto i : llvm::seq<unsigned>(3, domainSize.size())) {
+      ub = builder.create<spirv::IMulOp>(loc, ub.getType(), ub, domainSize[i]);
+    }
+  } else {
+    ub = domainSize.back();
+  }
+  auto dim = std::min<unsigned>(domainSize.size() - 1, 2);
+  Value gID = spirv::getBuiltinVariableValue(
+      op, spirv::BuiltIn::GlobalInvocationId, builder);
+  Value lb = builder.create<spirv::CompositeExtractOp>(loc, gID, dim);
+  Value numWorkGroupsID = spirv::getBuiltinVariableValue(
+      op, spirv::BuiltIn::NumWorkgroups, builder);
+  Value numWorkGroups =
+      builder.create<spirv::CompositeExtractOp>(loc, numWorkGroupsID, dim);
+  // Get the workgroup size from the entry_point_abi attr.
+  DenseIntElementsAttr workGroupSizeAttr = spirv::lookupLocalWorkGroupSize(op);
+  auto workGroupSizeVal = workGroupSizeAttr.getValue<APInt>(dim).getSExtValue();
+  auto integerType = IntegerType::get(32, builder.getContext());
+  auto workGroupSize = builder.create<spirv::ConstantOp>(
+      loc, integerType, builder.getI32IntegerAttr(workGroupSizeVal));
+  Value step = builder.create<spirv::IMulOp>(loc, numWorkGroups.getType(),
+                                             numWorkGroups, workGroupSize);
+
+  Value inductionVar = createLoop(builder, loc, lb, ub, step);
+
+  if (domainSize.size() > 3) {
+    for (auto i : llvm::seq<unsigned>(2, domainSize.size())) {
+      dimValues.push_back(builder.create<spirv::SModOp>(
+          loc, inductionVar.getType(), inductionVar, domainSize[i]));
+      inductionVar = builder.create<spirv::SDivOp>(loc, inductionVar.getType(),
+                                                   inductionVar, domainSize[i]);
+    }
+  } else {
+    dimValues.insert(dimValues.begin(), inductionVar);
+  }
+  return createLaunchLoop(
+      builder, op,
+      domainSize.drop_back((domainSize.size() > 3 ? domainSize.size() - 2 : 1)),
+      dimValues);
 }
 
 LogicalResult SPIRVCodegenImpl::initArgValues(
@@ -302,8 +312,29 @@ Value SPIRVCodegenImpl::loadArgValueAtIndex(
 LogicalResult SPIRVCodegenImpl::lowerFunction(
     OpBuilder &builder, FuncOp fn, spirv::FuncOp entryFn,
     TensorIndexToScalarValueMap &valueCache) {
-  if (failed(createLaunchGuard(builder, fn))) {
+  SmallVector<int64_t, 3> launchSize;
+  if (failed(getLaunchSize(fn, launchSize))) {
     return failure();
+  }
+  // TODO(ravishankarm): The launch size is for now obtained from static shapes,
+  // but they will be dynamic soon. So just create constants for now and adapt
+  // later for dynamic shapes.
+  SmallVector<Value, 3> launchSizeVal, dimValues;
+  launchSizeVal.reserve(launchSize.size());
+  auto integerType = IntegerType::get(32, builder.getContext());
+  for (auto size : launchSize) {
+    launchSizeVal.push_back(builder.create<spirv::ConstantOp>(
+        fn.getLoc(), integerType, builder.getI32IntegerAttr(size)));
+  }
+  if (launchSizeVal.size() < 3)
+    launchSizeVal.resize(
+        3, spirv::ConstantOp::getOne(integerType, fn.getLoc(), &builder));
+  if (failed(createLaunchLoop(builder, entryFn, launchSizeVal, dimValues))) {
+    return failure();
+  }
+  assert(launchSizeVal.size() == dimValues.size());
+  for (auto id : enumerate(dimValues)) {
+    valueCache.setDimValue(id.index(), id.value());
   }
 
   for (auto arg : fn.getArguments()) {

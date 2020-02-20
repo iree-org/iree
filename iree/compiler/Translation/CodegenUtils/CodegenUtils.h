@@ -29,6 +29,8 @@ bool isDispatchFunction(FuncOp funcOp);
 
 /// The launch size is the size of the outputs of the kernel. For now all
 /// outputs have to be the same shape and static shaped.
+// TODO(ravishankarm) : Modify this to return the Values to support dynamic
+// shapes.
 LogicalResult getLaunchSize(FuncOp funcOp,
                             SmallVectorImpl<int64_t> &launchSize);
 

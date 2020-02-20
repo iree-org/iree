@@ -58,14 +58,14 @@ module {
     // CHECK-SAME: operand_indices
     // CHECK-SAME: []
     // CHECK-SAME: result_index
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1)>]
+    // CHECK-SAME: [affine_map<(d0, d1) -> (d1)>]
     %0 = constant dense<1.0> : tensor<12xf32>
     // CHECK: xla_hlo.broadcast_in_dim
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1)>]
+    // CHECK-SAME: [affine_map<(d0, d1) -> (d1)>]
     // CHECK-SAME: result_index
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1, d0)>]
+    // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xf32>) -> tensor<12x42xf32>
     iree.store_output(%1 : tensor<12x42xf32>, %arg0 : memref<12x42xf32>)
     iree.return
@@ -82,14 +82,14 @@ module {
     // CHECK-SAME: operand_indices
     // CHECK-SAME: []
     // CHECK-SAME: result_index
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1)>]
+    // CHECK-SAME: [affine_map<(d0, d1) -> (d1)>]
     %0 = constant dense<42> : tensor<12xi32>
     // CHECK: xla_hlo.broadcast_in_dim
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1)>]
+    // CHECK-SAME: [affine_map<(d0, d1) -> (d1)>]
     // CHECK-SAME: result_index
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1, d0)>]
+    // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xi32>) -> tensor<12x42xi32>
     iree.store_output(%1 : tensor<12x42xi32>, %arg0 : memref<12x42xi32>)
     iree.return
@@ -129,9 +129,9 @@ module {
     // CHECK: xla_hlo.broadcast_in_dim
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (0)>]
+    // CHECK-SAME: [affine_map<(d0) -> (0)>]
     // CHECK-SAME: result_index
-    // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d0)>]
+    // CHECK-SAME: [affine_map<(d0) -> (d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<4xf32>
     iree.store_output(%1 : tensor<4xf32>, %arg1 : memref<4xf32>)
     iree.return
