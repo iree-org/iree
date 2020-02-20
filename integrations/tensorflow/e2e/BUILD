@@ -45,6 +45,7 @@ package(
         "linspace_test",
         "mandelbrot_test",
         "math_test",
+        "matrix_ops_test",
         "ring_buffer_test",
         "sliding_window_test",
         "simple_arithmetic_test",
