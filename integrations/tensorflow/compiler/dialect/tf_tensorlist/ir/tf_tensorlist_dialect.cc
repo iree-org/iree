@@ -22,51 +22,6 @@ namespace tf_tensorlist {
 
 static DialectRegistration<TfTensorListDialect> registration;
 
-LogicalResult Reserve::inferReturnTypes(
-    MLIRContext *context, Optional<Location> location, ValueRange operands,
-    ArrayRef<NamedAttribute> attributes, RegionRange regions,
-    SmallVectorImpl<Type> &inferedReturnTypes) {
-  inferedReturnTypes.push_back(TensorListType::get(context));
-  return success();
-}
-
-LogicalResult SetItem::inferReturnTypes(
-    MLIRContext *context, Optional<Location> location, ValueRange operands,
-    ArrayRef<NamedAttribute> attributes, RegionRange regions,
-    SmallVectorImpl<Type> &inferedReturnTypes) {
-  inferedReturnTypes.push_back(TensorListType::get(context));
-  return success();
-}
-
-LogicalResult FromVariant::inferReturnTypes(
-    MLIRContext *context, Optional<Location> location, ValueRange operands,
-    ArrayRef<NamedAttribute> attributes, RegionRange regions,
-    SmallVectorImpl<Type> &inferedReturnTypes) {
-  inferedReturnTypes.push_back(TensorListType::get(context));
-  return success();
-}
-
-namespace {
-class FromVariantToVariantIsIdentity : public OpRewritePattern<FromVariant> {
- public:
-  using OpRewritePattern<FromVariant>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(FromVariant from_variant,
-                                     PatternRewriter &rewriter) const override {
-    auto to_variant =
-        dyn_cast<ToVariant>(from_variant.variant().getDefiningOp());
-    if (!to_variant) return matchFailure();
-    from_variant.list().replaceAllUsesWith(to_variant.list());
-    rewriter.eraseOp(from_variant);
-    return matchSuccess();
-  }
-};
-}  // namespace
-
-void FromVariant::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                              MLIRContext *context) {
-  results.insert<FromVariantToVariantIsIdentity>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // TfTensorListDialect Dialect
 //===----------------------------------------------------------------------===//

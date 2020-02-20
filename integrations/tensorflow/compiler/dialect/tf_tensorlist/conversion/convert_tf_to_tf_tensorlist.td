@@ -18,19 +18,14 @@ include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.td"
 include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_ops.td"
 
 def : Pat<(TF_TensorListReserveOp $element_shape, $num_elements),
-          (TfTensorList_ToVariant
-            (TfTensorList_Reserve $element_shape, $num_elements))>;
+          (TfTensorList_Reserve $element_shape, $num_elements)>;
 
 def : Pat<(TF_TensorListGetItemOp $input_handle, $index, $element_shape),
           (TfTensorList_GetItem
-            (TfTensorList_FromVariant $input_handle),
+            $input_handle,
             $index,
             $element_shape)>;
 
 def : Pat<(TF_TensorListSetItemOp $input_handle, $index, $item),
-          (TfTensorList_ToVariant
-            (TfTensorList_SetItem
-              (TfTensorList_FromVariant $input_handle),
-              $index,
-              $item))>;
+          (TfTensorList_SetItem $input_handle, $index, $item)>;
 

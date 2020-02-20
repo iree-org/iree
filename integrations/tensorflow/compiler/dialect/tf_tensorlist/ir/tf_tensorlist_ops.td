@@ -24,48 +24,7 @@ class TfTensorList_Op<string mnemonic, list<OpTrait> traits = []> :
     Op<TfTensorList_Dialect, mnemonic, traits> {
 }
 
-def TfTensorList_ToVariant : TfTensorList_Op<"ToVariant", [NoSideEffect]> {
-  let summary = "Convert tensorflow variant to tensorlist";
-  let description = [{
-    This op is created transiently as part of the conversion process from
-    tf dialect to tf_tensorlist and bridges between the two type systems.
-    // TODO(silvasean): Avoid needing this.
-  }];
-  let arguments = (ins
-    TfTensorList_TensorList:$list
-  );
-  let results = (outs
-    TF_VariantTensor:$variant
-  );
-}
-
-// TODO(silvasean): Is there a cleaner way to factor InferTypeOpInterface?
-// Right now we need the verbose
-// `DeclareOpInterfaceMethods<InferTypeOpInterface>` and then
-// the implementation of FromVariant::inferReturnTypes in the .cc file.
-// It would be nice if we could just say `ReturnsTensorList` in the trait list.
-
-def TfTensorList_FromVariant :
-    TfTensorList_Op<"FromVariant",
-      [NoSideEffect, DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
-  let summary = "Convert tensorlist to tensorflow variant";
-  let description = [{
-    This op is created transiently as part of the conversion process from
-    tf dialect to tf_tensorlist and bridges between the two type systems.
-    // TODO(silvasean): Avoid needing this.
-  }];
-  let arguments = (ins
-    TF_VariantTensor:$variant
-  );
-  let results = (outs
-    TfTensorList_TensorList:$list
-  );
-  let hasCanonicalizer = 1;
-}
-
-def TfTensorList_Reserve :
-    TfTensorList_Op<"Reserve",
-      [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+def TfTensorList_Reserve : TfTensorList_Op<"Reserve"> {
   let summary = "Return a TensorList of the given size with empty elements.";
 
   let description = [{
@@ -112,9 +71,7 @@ def TfTensorList_GetItem : TfTensorList_Op<"GetItem"> {
   );
 }
 
-def TfTensorList_SetItem :
-    TfTensorList_Op<"SetItem",
-      [DeclareOpInterfaceMethods<InferTypeOpInterface>]> {
+def TfTensorList_SetItem : TfTensorList_Op<"SetItem"> {
   let summary = "Sets an item of the TensorList, returning an updated list.";
 
   let description = [{

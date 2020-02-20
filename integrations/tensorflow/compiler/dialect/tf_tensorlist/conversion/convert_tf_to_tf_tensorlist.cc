@@ -29,8 +29,28 @@ class ConvertTfToTfTensorList
   void runOnOperation() override;
 };
 
+bool isTfVariant(Type type) {
+  if (auto tensorType = type.dyn_cast<TensorType>()) {
+    return tensorType.getElementType().isa<TF::VariantType>();
+  }
+  return false;
+}
+
 void ConvertTfToTfTensorList::runOnOperation() {
   auto func = getOperation();
+
+  // The conversion happens in 2 steps:
+  // 1. We blindly replace all tf ops operating on TensorList's with
+  // tf_tensorlist ops. No types change in this step (so the IR is transiently
+  // invalid).
+  // 2. We rewrite all the types to make the IR valid again.
+  //
+  // The reason we need to do the rewriting this way is that not all TF variant
+  // types actually represent a tensorlist. Only by looking at ops that we know
+  // produce tensorlists can we deduce which TF varaints are tensorlists.
+  //
+  // The MLIR type conversion infrastructure doesn't handle this situation well.
+  // It only knows how to handle blindly convert one type to another type.
 
   OwningRewritePatternList patterns;
   populateWithGenerated(&getContext(), &patterns);
@@ -43,6 +63,62 @@ void ConvertTfToTfTensorList::runOnOperation() {
   if (failed(applyPartialConversion(func, target, patterns))) {
     func.emitError() << "unable to lower to tf_tensorlist dialect";
     return signalPassFailure();
+  }
+
+  // The above conversions didn't do any type conversion since we don't
+  // want to blindly update all variant types to tensorlist. So here we do a
+  // targeted rewrite.
+  auto *tfTensorListDialect =
+      func.getContext()->getRegisteredDialect<TfTensorListDialect>();
+  auto tensorListType = TensorListType::get(func.getContext());
+  SmallVector<Value, 8> typeConversionWorklist;
+  func.walk([&](Operation *op) {
+    if (op->getDialect() != tfTensorListDialect) {
+      return;
+    }
+    for (auto result : op->getResults()) {
+      if (isTfVariant(result.getType())) {
+        result.setType(tensorListType);
+        typeConversionWorklist.push_back(result);
+      }
+    }
+  });
+  while (!typeConversionWorklist.empty()) {
+    Value v = typeConversionWorklist.pop_back_val();
+    for (OpOperand &use : v.getUses()) {
+      Operation *owner = use.getOwner();
+      // If the user is already in the tf_tensorlist dialect, then everything is
+      // ok.
+      if (owner->getDialect() == tfTensorListDialect) {
+        continue;
+      }
+      // If a user is just a terminator passing the value through a successor
+      // operand, propagate through the successor operand.
+      if (owner->isKnownTerminator()) {
+        if (auto arg =
+                owner->getSuccessorBlockArgument(use.getOperandNumber())) {
+          if (!arg->getType().isa<TensorListType>()) {
+            arg->setType(tensorListType);
+            typeConversionWorklist.push_back(*arg);
+          }
+          continue;
+        }
+      }
+      // !tf.variant can have various subtypes which we blindly turn into just
+      // !tf_tensorlist.list here. So elide all casts.
+      if (auto castOp = dyn_cast<TF::CastOp>(owner)) {
+        assert(v == castOp.x());
+        castOp.y().replaceAllUsesWith(castOp.x());
+        castOp.erase();
+        // The RAUW could have added more uses of `v`, so put it back on the
+        // worklist and process it again.
+        typeConversionWorklist.push_back(v);
+        break;
+      }
+      owner->emitError() << "unable to convert tensorlist op: "
+                         << owner->getName();
+      return signalPassFailure();
+    }
   }
 }
 

@@ -25,13 +25,10 @@ namespace iree_compiler {
 // All IREE-specific passes that lower TF representations before reaching the
 // IREE core should go here.
 void createIreeTfImportPipeline(OpPassManager &pm) {
-  ////////////////////////////////////////////////////
-  // Lowering tf dialect to tf_tensorlist dialect.
-  ////////////////////////////////////////////////////
-  // TODO(silvasean): We shouldn't need the canonicalizer pass here.
-  // TODO(silvasean): Write the conversion pass properly.
+  ////////////////////////////////////////////////////////////////////////////
+  // Lowering TensorList-related parts of tf dialect to tf_tensorlist dialect.
+  ////////////////////////////////////////////////////////////////////////////
   pm.addPass(tf_tensorlist::createConvertTfToTfTensorList());
-  pm.addPass(createCanonicalizerPass());
 
   ////////////////////////////////////////////////////
   // Lowering tf_saved_model dialect to IREE dialects.
