@@ -32,7 +32,7 @@ static DialectRegistration<IREEDialect> base_dialect;
 IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
   addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType,
-           IREE::OpaqueRefObjectType, IREE::RefPtrType>();
+           IREE::OpaqueRefObjectType, IREE::PtrType, IREE::RefPtrType>();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
@@ -42,7 +42,21 @@ IREEDialect::IREEDialect(MLIRContext* context)
 Type IREEDialect::parseType(DialectAsmParser& parser) const {
   Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
   llvm::StringRef spec = parser.getFullSymbolSpec();
-  if (spec.consume_front("ref")) {
+  if (spec.consume_front("ptr")) {
+    if (!spec.consume_front("<") || !spec.consume_back(">")) {
+      parser.emitError(parser.getCurrentLocation())
+          << "malformed ptr type '" << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    auto variableType = mlir::parseType(spec, getContext());
+    if (!variableType) {
+      parser.emitError(parser.getCurrentLocation())
+          << "invalid ptr object type specification: '"
+          << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    return IREE::PtrType::getChecked(variableType, loc);
+  } else if (spec.consume_front("ref")) {
     if (!spec.consume_front("<") || !spec.consume_back(">")) {
       parser.emitError(parser.getCurrentLocation())
           << "malformed ref_ptr type '" << parser.getFullSymbolSpec() << "'";
@@ -78,6 +92,11 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
 
 void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
   switch (type.getKind()) {
+    case IREE::TypeKind::Ptr: {
+      auto targetType = type.cast<IREE::PtrType>().getTargetType();
+      os << "ptr<" << targetType << ">";
+      break;
+    }
     case IREE::TypeKind::RefPtr: {
       auto objectType = type.cast<IREE::RefPtrType>().getObjectType();
       if (objectType.isa<IREE::ByteBufferType>()) {

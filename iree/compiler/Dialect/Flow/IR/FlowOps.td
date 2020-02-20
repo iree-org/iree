@@ -61,6 +61,23 @@ def FLOW_VariableOp : FLOW_Op<"variable", [
   let hasCanonicalizer = 1;
 }
 
+def FLOW_VariableAddressOp : FLOW_PureOp<"variable.address"> {
+  let summary = [{returns an address reference to a variable}];
+  let description = [{
+    Returns the address of a variable as a typed reference. Can be used with the
+    variable load and store indirect ops.
+  }];
+
+  let arguments = (ins
+    FLOW_VariableRefAttr:$variable
+  );
+  let results = (outs
+    FLOW_VariablePtr:$result
+  );
+
+  let assemblyFormat = "$variable attr-dict `:` type($result)";
+}
+
 def FLOW_VariableLoadOp : FLOW_Op<"variable.load"> {
   let summary = [{loads a value from a global variable}];
   let description = [{
@@ -81,6 +98,26 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load"> {
   let hasCanonicalizer = 1;
 }
 
+def FLOW_VariableLoadIndirectOp : FLOW_Op<"variable.load.indirect"> {
+  let summary = [{loads a value from a global variable}];
+  let description = [{
+    Returns a copy of the variable value.
+  }];
+
+  let arguments = (ins
+    FLOW_VariablePtr:$variable
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = "$variable attr-dict `:` type($variable) `->` type($result)";
+
+  let verifier = [{ return verifyVariableLoadIndirectOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
 def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
   let summary = [{stores a value into a global variable}];
   let description = [{
@@ -95,6 +132,24 @@ def FLOW_VariableStoreOp : FLOW_Op<"variable.store"> {
   let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";
 
   let verifier = [{ return verifyVariableStoreOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def FLOW_VariableStoreIndirectOp : FLOW_Op<"variable.store.indirect"> {
+  let summary = [{stores a value into a global variable}];
+  let description = [{
+    Stores a copy of the value into a variable.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$value,
+    FLOW_VariablePtr:$variable
+  );
+
+  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value) `->` type($variable)";
+
+  let verifier = [{ return verifyVariableStoreIndirectOp(*this); }];
 
   let hasCanonicalizer = 1;
 }

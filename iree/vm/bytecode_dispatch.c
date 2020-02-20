@@ -213,8 +213,6 @@ iree_status_t iree_vm_bytecode_dispatch(
   regs->ref[bytecode_data[offset + i] & IREE_REF_REGISTER_MASK]
 #define OP_R_REF_IS_MOVE(i) \
   (bytecode_data[offset + i] & IREE_REF_REGISTER_MOVE_BIT)
-#define OP_GLOBAL_I32(ord) module_state->global_i32_table[ord]
-#define OP_GLOBAL_REF(ord) module_state->global_ref_table[ord]
 
 #if defined(IREE_IS_LITTLE_ENDIAN)
 #define OP_I8(i) bytecode_data[offset + i]
@@ -268,7 +266,14 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncGlobalAttr<"global">,
       //   VM_EncResult<"value">,
       // ];
-      OP_R_I32(4) = OP_GLOBAL_I32(OP_I32(0));
+      int byte_offset = OP_I32(0);
+      if (byte_offset < 0 ||
+          byte_offset >= module_state->rwdata_storage.data_length) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
+      const int32_t* global_ptr =
+          (const int32_t*)(module_state->rwdata_storage.data + byte_offset);
+      OP_R_I32(4) = *global_ptr;
       offset += 4 + 1;
     });
     DISPATCH_OP(GlobalStoreI32, {
@@ -277,9 +282,50 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncGlobalAttr<"global">,
       //   VM_EncOperand<"value", 0>,
       // ];
-      OP_GLOBAL_I32(OP_I32(0)) = OP_R_I32(4);
+      int byte_offset = OP_I32(0);
+      if (byte_offset < 0 ||
+          byte_offset >= module_state->rwdata_storage.data_length) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
+      int32_t* global_ptr =
+          (int32_t*)(module_state->rwdata_storage.data + byte_offset);
+      *global_ptr = OP_R_I32(4);
       offset += 4 + 1;
     });
+
+    DISPATCH_OP(GlobalLoadIndirectI32, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_GlobalLoadIndirectI32>,
+      //   VM_EncOperand<"global", 0>,
+      //   VM_EncResult<"value">,
+      // ];
+      int byte_offset = OP_R_I32(0);
+      if (byte_offset < 0 ||
+          byte_offset >= module_state->rwdata_storage.data_length) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
+      const int32_t* global_ptr =
+          (const int32_t*)(module_state->rwdata_storage.data + byte_offset);
+      OP_R_I32(1) = *global_ptr;
+      offset += 1 + 1;
+    });
+    DISPATCH_OP(GlobalStoreIndirectI32, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_GlobalStoreIndirectI32>,
+      //   VM_EncOperand<"global", 0>,
+      //   VM_EncOperand<"value", 1>,
+      // ];
+      int byte_offset = OP_R_I32(0);
+      if (byte_offset < 0 ||
+          byte_offset >= module_state->rwdata_storage.data_length) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
+      int32_t* global_ptr =
+          (int32_t*)(module_state->rwdata_storage.data + byte_offset);
+      *global_ptr = OP_R_I32(1);
+      offset += 1 + 1;
+    });
+
     DISPATCH_OP(GlobalLoadRef, {
       // let encoding = [
       //   VM_EncOpcode<VM_OPC_GlobalLoadRef>,
@@ -287,11 +333,15 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncTypeOf<"value">,
       //   VM_EncResult<"value">,
       // ];
+      int global = OP_I32(0);
+      if (global < 0 || global >= module_state->global_ref_count) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
       int type_id = OP_I32(4);
       type_id = type_id >= module->type_count ? 0 : type_id;
       const iree_vm_type_def_t* type_def = &module->type_table[type_id];
-      iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(8),
-                                         &OP_GLOBAL_REF(OP_I32(0)),
+      iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
+      iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(8), global_ref,
                                          type_def->ref_type, &OP_R_REF(8));
       offset += 4 + 4 + 1;
     });
@@ -302,21 +352,56 @@ iree_status_t iree_vm_bytecode_dispatch(
       //   VM_EncTypeOf<"value">,
       //   VM_EncOperand<"value", 0>,
       // ];
+      int global = OP_I32(0);
+      if (global < 0 || global >= module_state->global_ref_count) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
       int type_id = OP_I32(4);
       type_id = type_id >= module->type_count ? 0 : type_id;
       const iree_vm_type_def_t* type_def = &module->type_table[type_id];
+      iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
       iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(8), &OP_R_REF(8),
-                                         type_def->ref_type,
-                                         &OP_GLOBAL_REF(OP_I32(0)));
+                                         type_def->ref_type, global_ref);
       offset += 4 + 4 + 1;
     });
-    DISPATCH_OP(GlobalResetRef, {
+
+    DISPATCH_OP(GlobalLoadIndirectRef, {
       // let encoding = [
-      //   VM_EncOpcode<VM_OPC_GlobalResetRef>,
-      //   VM_EncGlobalAttr<"global">,
+      //   VM_EncOpcode<VM_OPC_GlobalLoadIndirectRef>,
+      //   VM_EncOperand<"global", 0>,
+      //   VM_EncTypeOf<"value">,
+      //   VM_EncResult<"value">,
       // ];
-      iree_vm_ref_release(&OP_GLOBAL_REF(OP_I32(0)));
-      offset += 4;
+      int global = OP_R_I32(0);
+      if (global < 0 || global >= module_state->global_ref_count) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
+      int type_id = OP_I32(1);
+      type_id = type_id >= module->type_count ? 0 : type_id;
+      const iree_vm_type_def_t* type_def = &module->type_table[type_id];
+      iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
+      iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(5), global_ref,
+                                         type_def->ref_type, &OP_R_REF(5));
+      offset += 1 + 4 + 1;
+    });
+    DISPATCH_OP(GlobalStoreIndirectRef, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_GlobalStoreIndirectRef>,
+      //   VM_EncOperand<"global", 0>,
+      //   VM_EncTypeOf<"value">,
+      //   VM_EncOperand<"value", 1>,
+      // ];
+      int global = OP_R_I32(0);
+      if (global < 0 || global >= module_state->global_ref_count) {
+        return IREE_STATUS_OUT_OF_RANGE;
+      }
+      int type_id = OP_I32(1);
+      type_id = type_id >= module->type_count ? 0 : type_id;
+      const iree_vm_type_def_t* type_def = &module->type_table[type_id];
+      iree_vm_ref_t* global_ref = &module_state->global_ref_table[global];
+      iree_vm_ref_retain_or_move_checked(OP_R_REF_IS_MOVE(5), &OP_R_REF(5),
+                                         type_def->ref_type, global_ref);
+      offset += 1 + 4 + 1;
     });
 
     //===------------------------------------------------------------------===//

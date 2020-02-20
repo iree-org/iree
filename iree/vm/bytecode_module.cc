@@ -448,7 +448,6 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
   uint8_t* p = ((uint8_t*)state) + sizeof(iree_vm_bytecode_module_state_t);
   state->rwdata_storage = {p, (iree_host_size_t)rwdata_storage_capacity};
   p += rwdata_storage_capacity;
-  state->global_i32_table = (int32_t*)state->rwdata_storage.data;
   state->global_ref_count = global_ref_count;
   state->global_ref_table = (iree_vm_ref_t*)p;
   p += global_ref_count * sizeof(*state->global_ref_table);

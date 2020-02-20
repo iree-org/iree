@@ -30,3 +30,24 @@ func @nop_load_store() {
   return
 }
 
+// -----
+
+hal.variable @v : !iree.ref<!hal.buffer>
+// CHECK-LABEL: @fold_load_indirect
+func @fold_load_indirect() -> !iree.ref<!hal.buffer> {
+  %0 = hal.variable.address @v : !iree.ptr<!iree.ref<!hal.buffer>>
+  // CHECK-NEXT: = hal.variable.load @v
+  %1 = hal.variable.load.indirect %0 : !iree.ptr<!iree.ref<!hal.buffer>> -> !iree.ref<!hal.buffer>
+  return %1 : !iree.ref<!hal.buffer>
+}
+
+// -----
+
+hal.variable @v mutable : !iree.ref<!hal.buffer>
+// CHECK-LABEL: @fold_store_indirect
+func @fold_store_indirect(%arg0 : !iree.ref<!hal.buffer>) {
+  %0 = hal.variable.address @v : !iree.ptr<!iree.ref<!hal.buffer>>
+  // CHECK-NEXT: hal.variable.store %arg0, @v
+  hal.variable.store.indirect %arg0, %0 : !iree.ref<!hal.buffer> -> !iree.ptr<!iree.ref<!hal.buffer>>
+  return
+}

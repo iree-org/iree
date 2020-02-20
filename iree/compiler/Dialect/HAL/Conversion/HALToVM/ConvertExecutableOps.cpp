@@ -198,7 +198,7 @@ class ExecutableOpConversion
     funcBuilder.setInsertionPointToStart(switchExitBlock);
     Value valueArg = switchExitBlock->addArgument(globalOp.type());
     funcBuilder.create<IREE::VM::GlobalStoreRefOp>(
-        loc, funcBuilder.getSymbolRefAttr(globalOp), valueArg);
+        loc, valueArg, funcBuilder.getSymbolRefAttr(globalOp));
     funcBuilder.create<IREE::VM::ReturnOp>(loc, valueArg);
 
     funcOp.getBlocks().push_back(failBlock);

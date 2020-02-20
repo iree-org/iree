@@ -352,7 +352,7 @@ static ParseResult parseGlobalOp(OpAsmParser &parser, OperationState *result) {
     result->addAttribute("type", TypeAttr::get(type));
   }
 
-  return success();
+  return parser.parseOptionalAttrDictWithKeyword(result->attributes);
 }
 
 static void printGlobalOp(OpAsmPrinter &p, Operation *op) {
@@ -375,6 +375,12 @@ static void printGlobalOp(OpAsmPrinter &p, Operation *op) {
     p << " : ";
     p.printType(op->getAttrOfType<TypeAttr>("type").getValue());
   }
+  p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
+                                         "sym_name",
+                                         "is_mutable",
+                                         "initial_value",
+                                         "type",
+                                     });
 }
 
 static LogicalResult verifyGlobalOp(Operation *op) {
@@ -496,6 +502,14 @@ void GlobalRefOp::build(Builder *builder, OperationState &result,
   build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
 }
 
+static LogicalResult verifyGlobalAddressOp(GlobalAddressOp op) {
+  auto *globalOp = op.getParentOfType<VM::ModuleOp>().lookupSymbol(op.global());
+  if (!globalOp) {
+    return op.emitOpError() << "Undefined global: " << op.global();
+  }
+  return success();
+}
+
 static LogicalResult verifyGlobalLoadOp(Operation *op) {
   auto globalAttr = op->getAttrOfType<FlatSymbolRefAttr>("global");
   auto *globalOp =
@@ -530,23 +544,6 @@ static LogicalResult verifyGlobalStoreOp(Operation *op) {
   if (!globalOp->getAttrOfType<UnitAttr>("is_mutable")) {
     return op->emitOpError() << "Global " << globalAttr
                              << " is not mutable and cannot be stored to";
-  }
-  return success();
-}
-
-static LogicalResult verifyGlobalResetRefOp(GlobalResetRefOp &op) {
-  auto *globalOp = op.getParentOfType<VM::ModuleOp>().lookupSymbol(op.global());
-  if (!globalOp) {
-    return op.emitOpError() << "Undefined global: " << op.global();
-  }
-  auto globalType = globalOp->getAttrOfType<TypeAttr>("type");
-  if (!globalType.getValue().isa<RefPtrType>()) {
-    return op.emitOpError() << "Global type mismatch; global " << op.global()
-                            << " is " << globalType << " and not a ref_ptr";
-  }
-  if (!globalOp->getAttrOfType<UnitAttr>("is_mutable")) {
-    return op.emitOpError() << "Global " << op.global()
-                            << " is not mutable and cannot be stored to";
   }
   return success();
 }

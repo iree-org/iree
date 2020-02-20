@@ -23,7 +23,16 @@ namespace iree_compiler {
 
 LogicalResult HALTypeConverter::convertType(Type type,
                                             SmallVectorImpl<Type> &results) {
-  if (type.isa<TensorType>()) {
+  if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
+    // Recursively handle pointer target types (we want to convert ptr<index> to
+    // ptr<i32>, for example).
+    auto targetType = convertType(ptrType.getTargetType());
+    if (!targetType) {
+      return failure();
+    }
+    results.push_back(IREE::PtrType::get(targetType));
+    return success();
+  } else if (type.isa<TensorType>()) {
     // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
     results.push_back(
         IREE::RefPtrType::get(IREE::HAL::BufferType::get(type.getContext())));

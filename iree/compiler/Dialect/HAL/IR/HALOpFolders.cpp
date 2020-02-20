@@ -96,6 +96,32 @@ void VariableLoadOp::getCanonicalizationPatterns(
 
 namespace {
 
+class PropagateVariableLoadAddress
+    : public OpRewritePattern<VariableLoadIndirectOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+ public:
+  PatternMatchResult matchAndRewrite(VariableLoadIndirectOp op,
+                                     PatternRewriter &rewriter) const override {
+    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
+            op.variable().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<VariableLoadOp>(op, op.result().getType(),
+                                                  addressOp.variable());
+      return matchSuccess();
+    }
+    return matchFailure();
+  }
+};
+
+}  // namespace
+
+void VariableLoadIndirectOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<PropagateVariableLoadAddress>(context);
+}
+
+namespace {
+
 /// Erases hal.variable.store ops that are no-ops.
 /// This can happen if there was a variable load, some DCE'd usage, and a
 /// store back to the same variable: we want to be able to elide the entire load
@@ -121,6 +147,32 @@ struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
 void VariableStoreOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<EraseUnusedVariableStoreOp>(context);
+}
+
+namespace {
+
+class PropagateVariableStoreAddress
+    : public OpRewritePattern<VariableStoreIndirectOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+ public:
+  PatternMatchResult matchAndRewrite(VariableStoreIndirectOp op,
+                                     PatternRewriter &rewriter) const override {
+    if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
+            op.variable().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<VariableStoreOp>(op, op.value(),
+                                                   addressOp.variable());
+      return matchSuccess();
+    }
+    return matchFailure();
+  }
+};
+
+}  // namespace
+
+void VariableStoreIndirectOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<PropagateVariableStoreAddress>(context);
 }
 
 //===----------------------------------------------------------------------===//

@@ -25,7 +25,6 @@ namespace iree_compiler {
 class IREEDialect : public Dialect {
  public:
   explicit IREEDialect(MLIRContext* context);
-  // TODO(b/143787186): rename to iree.
   static StringRef getDialectNamespace() { return "iree"; }
 
   /// Parses a type registered to this dialect.

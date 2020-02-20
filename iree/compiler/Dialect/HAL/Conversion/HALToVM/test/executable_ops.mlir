@@ -38,7 +38,7 @@ hal.executable @exe {
 // CHECK-NEXT:   %ref_3 = vm.call @hal.ex.cache_executable(%arg0, %5, %exe_data_1397773893) : (!iree.ref<!hal.device>, i32, !iree.byte_buffer_ref) -> !iree.ref<!hal.executable>
 // CHECK-NEXT:   vm.br ^bb7(%ref_3 : !iree.ref<!hal.executable>)
 // CHECK-NEXT: ^bb7(%6: !iree.ref<!hal.executable>):
-// CHECK-NEXT:   vm.global.store.ref @exe_cached, %6 : !iree.ref<!hal.executable>
+// CHECK-NEXT:   vm.global.store.ref %6, @exe_cached : !iree.ref<!hal.executable>
 // CHECK-NEXT:   vm.return %6 : !iree.ref<!hal.executable>
 // CHECK-NEXT: ^bb8:
 // CHECK-NEXT:   %null = vm.const.ref.zero : !iree.ref<!hal.executable>

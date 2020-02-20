@@ -15,7 +15,6 @@
 #ifndef IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 #define IREE_COMPILER_DIALECT_IREE_IR_IREETYPES_H_
 
-#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/StandardTypes.h"
@@ -27,13 +26,15 @@ namespace iree_compiler {
 namespace IREE {
 
 namespace detail {
+struct PtrTypeStorage;
 struct RefPtrTypeStorage;
 struct RankedShapeTypeStorage;
 }  // namespace detail
 
 namespace TypeKind {
 enum Kind {
-  RefPtr = Type::FIRST_IREE_TYPE,
+  Ptr = Type::FIRST_IREE_TYPE,
+  RefPtr,
   OpaqueRefObject,
   ByteBuffer,
   MutableByteBuffer,
@@ -103,6 +104,18 @@ enum Kind {
 };
 }  // namespace TypeKind
 }  // namespace VMLA
+
+/// Base for typed pointer-like references.
+class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
+ public:
+  static PtrType get(Type targetType);
+  static PtrType getChecked(Type targetType, Location location);
+  static bool kindof(unsigned kind) { return kind == TypeKind::Ptr; }
+
+  using Base::Base;
+
+  Type getTargetType();
+};
 
 /// Base type for RefObject-derived types.
 /// These can be wrapped in RefPtrType.

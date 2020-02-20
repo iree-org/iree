@@ -69,9 +69,12 @@ class VM_OPC<int opcode, string name> : I32EnumAttrCase<name, opcode>;
 // Globals:
 def VM_OPC_GlobalLoadI32         : VM_OPC<0x00, "GlobalLoadI32">;
 def VM_OPC_GlobalStoreI32        : VM_OPC<0x01, "GlobalStoreI32">;
-def VM_OPC_GlobalLoadRef         : VM_OPC<0x02, "GlobalLoadRef">;
-def VM_OPC_GlobalStoreRef        : VM_OPC<0x03, "GlobalStoreRef">;
-def VM_OPC_GlobalResetRef        : VM_OPC<0x04, "GlobalResetRef">;
+def VM_OPC_GlobalLoadIndirectI32 : VM_OPC<0x02, "GlobalLoadIndirectI32">;
+def VM_OPC_GlobalStoreIndirectI32: VM_OPC<0x03, "GlobalStoreIndirectI32">;
+def VM_OPC_GlobalLoadRef         : VM_OPC<0x04, "GlobalLoadRef">;
+def VM_OPC_GlobalStoreRef        : VM_OPC<0x05, "GlobalStoreRef">;
+def VM_OPC_GlobalLoadIndirectRef : VM_OPC<0x06, "GlobalLoadIndirectRef">;
+def VM_OPC_GlobalStoreIndirectRef: VM_OPC<0x07, "GlobalStoreIndirectRef">;
 
 // Constants:
 def VM_OPC_ConstI32Zero          : VM_OPC<0x08, "ConstI32Zero">;
@@ -147,9 +150,12 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     // Core VM opcodes (0x00-0x7F):
     VM_OPC_GlobalLoadI32,
     VM_OPC_GlobalStoreI32,
+    VM_OPC_GlobalLoadIndirectI32,
+    VM_OPC_GlobalStoreIndirectI32,
     VM_OPC_GlobalLoadRef,
     VM_OPC_GlobalStoreRef,
-    VM_OPC_GlobalResetRef,
+    VM_OPC_GlobalLoadIndirectRef,
+    VM_OPC_GlobalStoreIndirectRef,
     VM_OPC_ConstI32Zero,
     VM_OPC_ConstI32,
     VM_OPC_ConstRefZero,
@@ -360,6 +366,8 @@ def VM_GlobalRefAttr : AliasedSymbolRefAttr;
 def VM_FuncRefAttr : AliasedSymbolRefAttr;
 
 def VM_Ordinal : IntegerAttrBase<I32, "ordinal value">;
+
+def VM_Ptr : I<32>;
 
 def VM_CondValue : I<32> {
   let typeDescription = [{

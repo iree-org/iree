@@ -398,6 +398,7 @@ def HAL_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
 
 def HAL_VariableRefAttr : AliasedSymbolRefAttr;
 def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, AnyRefPtr]>;
+def HAL_VariablePtr : PtrOf<HAL_VariableType>;
 
 def HAL_Dim : I<32>;
 def HAL_Dims : Variadic<HAL_Dim>;

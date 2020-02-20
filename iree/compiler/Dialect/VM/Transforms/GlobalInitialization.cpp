@@ -99,16 +99,16 @@ class GlobalInitializationPass
     if (globalOp.initial_value().hasValue()) {
       auto constOp = builder.create<ConstI32Op>(globalOp.getLoc(),
                                                 globalOp.initial_valueAttr());
-      builder.create<GlobalStoreI32Op>(globalOp.getLoc(), globalOp.sym_name(),
-                                       constOp.getResult());
+      builder.create<GlobalStoreI32Op>(globalOp.getLoc(), constOp.getResult(),
+                                       globalOp.sym_name());
       globalOp.clearInitialValue();
       globalOp.makeMutable();
     } else if (globalOp.initializer().hasValue()) {
       auto callOp = builder.create<CallOp>(
           globalOp.getLoc(), globalOp.initializerAttr(),
           ArrayRef<Type>{globalOp.type()}, ArrayRef<Value>{});
-      builder.create<GlobalStoreI32Op>(globalOp.getLoc(), globalOp.sym_name(),
-                                       callOp.getResult(0));
+      builder.create<GlobalStoreI32Op>(globalOp.getLoc(), callOp.getResult(0),
+                                       globalOp.sym_name());
       globalOp.clearInitializer();
       globalOp.makeMutable();
     }
@@ -120,8 +120,8 @@ class GlobalInitializationPass
       auto callOp = builder.create<CallOp>(
           globalOp.getLoc(), globalOp.initializerAttr(),
           ArrayRef<Type>{globalOp.type()}, ArrayRef<Value>{});
-      builder.create<GlobalStoreRefOp>(globalOp.getLoc(), globalOp.sym_name(),
-                                       callOp.getResult(0));
+      builder.create<GlobalStoreRefOp>(globalOp.getLoc(), callOp.getResult(0),
+                                       globalOp.sym_name());
       globalOp.clearInitializer();
       globalOp.makeMutable();
     }

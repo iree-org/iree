@@ -360,6 +360,21 @@ static LogicalResult verifyVariableLoadOp(VariableLoadOp &op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.variable.load.indirect
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyVariableLoadIndirectOp(VariableLoadIndirectOp &op) {
+  auto variableType =
+      op.variable().getType().cast<IREE::PtrType>().getTargetType();
+  auto loadType = op.result().getType();
+  if (!isVariableTypeCompatible(variableType, loadType)) {
+    return op.emitOpError() << "variable type mismatch; variable pointer is "
+                            << variableType << " but load is " << loadType;
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.variable.store
 //===----------------------------------------------------------------------===//
 
@@ -378,6 +393,22 @@ static LogicalResult verifyVariableStoreOp(VariableStoreOp &op) {
   if (!variableOp.is_mutable()) {
     return op.emitOpError() << "variable " << op.variable()
                             << " is not mutable and cannot be stored to";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// hal.variable.store.indirect
+//===----------------------------------------------------------------------===//
+
+static LogicalResult verifyVariableStoreIndirectOp(
+    VariableStoreIndirectOp &op) {
+  auto variableType =
+      op.variable().getType().cast<IREE::PtrType>().getTargetType();
+  auto storeType = op.value().getType();
+  if (!isVariableTypeCompatible(variableType, storeType)) {
+    return op.emitOpError() << "variable type mismatch; variable pointer is "
+                            << variableType << " but store is " << storeType;
   }
   return success();
 }

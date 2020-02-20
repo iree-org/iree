@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/MLIRContext.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Support/LLVM.h"
@@ -43,6 +45,7 @@ class OrdinalAllocationPass
   void runOnOperation() override {
     Builder builder(&getContext());
 
+    // Assign ordinals based on IR order (which should be deterministic).
     int nextFuncOrdinal = 0;
     int nextImportOrdinal = 0;
     int nextExportOrdinal = 0;
@@ -68,6 +71,27 @@ class OrdinalAllocationPass
       if (ordinal.hasValue()) {
         op.setAttr("ordinal", builder.getI32IntegerAttr(ordinal.getValue()));
       }
+    }
+
+    SymbolTable symbolTable(getOperation());
+
+    // Convert all global address pseudo-ops to constants referencing the
+    // ordinals we just assigned.
+    SmallVector<Operation *, 32> deadOps;
+    getOperation().walk([&](IREE::VM::GlobalAddressOp op) {
+      auto *globalOp = symbolTable.lookupNearestSymbolFrom(op, op.global());
+      assert(globalOp);
+      auto ordinal = globalOp->getAttrOfType<IntegerAttr>("ordinal").getInt();
+
+      OpBuilder builder(op);
+      auto ordinalOp =
+          builder.create<IREE::VM::ConstI32Op>(op.getLoc(), ordinal);
+      op.result().replaceAllUsesWith(ordinalOp);
+
+      deadOps.push_back(op);
+    });
+    for (auto *deadOp : deadOps) {
+      deadOp->erase();
     }
   }
 };

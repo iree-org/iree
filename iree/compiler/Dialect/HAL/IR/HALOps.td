@@ -215,6 +215,23 @@ def HAL_VariableOp : HAL_Op<"variable", [
   let hasCanonicalizer = 1;
 }
 
+def HAL_VariableAddressOp : HAL_PureOp<"variable.address"> {
+  let summary = [{returns an address reference to a variable}];
+  let description = [{
+    Returns the address of a variable as a typed reference. Can be used with the
+    variable load and store indirect ops.
+  }];
+
+  let arguments = (ins
+    HAL_VariableRefAttr:$variable
+  );
+  let results = (outs
+    HAL_VariablePtr:$result
+  );
+
+  let assemblyFormat = "$variable attr-dict `:` type($result)";
+}
+
 def HAL_VariableLoadOp : HAL_Op<"variable.load"> {
   let summary = [{loads a value from a global variable}];
   let description = [{
@@ -235,6 +252,26 @@ def HAL_VariableLoadOp : HAL_Op<"variable.load"> {
   let hasCanonicalizer = 1;
 }
 
+def FLOW_VariableLoadIndirectOp : HAL_Op<"variable.load.indirect"> {
+  let summary = [{loads a value from a global variable}];
+  let description = [{
+    Returns a copy of the variable value.
+  }];
+
+  let arguments = (ins
+    HAL_VariablePtr:$variable
+  );
+  let results = (outs
+    HAL_VariableType:$result
+  );
+
+  let assemblyFormat = "$variable attr-dict `:` type($variable) `->` type($result)";
+
+  let verifier = [{ return verifyVariableLoadIndirectOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
 def HAL_VariableStoreOp : HAL_Op<"variable.store"> {
   let summary = [{stores a value into a global variable}];
   let description = [{
@@ -249,6 +286,24 @@ def HAL_VariableStoreOp : HAL_Op<"variable.store"> {
   let assemblyFormat = "$value `,` $variable attr-dict `:` type($value)";
 
   let verifier = [{ return verifyVariableStoreOp(*this); }];
+
+  let hasCanonicalizer = 1;
+}
+
+def HAL_VariableStoreIndirectOp : HAL_Op<"variable.store.indirect"> {
+  let summary = [{stores a value into a global variable}];
+  let description = [{
+    Stores a copy of the value into a variable.
+  }];
+
+  let arguments = (ins
+    HAL_VariableType:$value,
+    HAL_VariablePtr:$variable
+  );
+
+  let assemblyFormat = "$value `,` $variable attr-dict `:` type($value) `->` type($variable)";
+
+  let verifier = [{ return verifyVariableStoreIndirectOp(*this); }];
 
   let hasCanonicalizer = 1;
 }

@@ -83,3 +83,27 @@ vm.module @global_load_ref_folds {
     vm.return %g1 : !iree.opaque_ref
   }
 }
+
+// -----
+
+// CHECK-LABEL: @global_indirect_folds
+vm.module @global_indirect_folds {
+  vm.global.i32 @g0 mutable : i32
+
+  // CHECK-LABEL: @fold_load_i32
+  vm.func @fold_load_i32() -> i32 {
+    %0 = vm.global.address @g0 : !iree.ptr<i32>
+    // CHECK-NEXT: [[VALUE:%.+]] = vm.global.load.i32 @g0 : i32
+    %1 = vm.global.load.indirect.i32 %0 : !iree.ptr<i32> -> i32
+    // CHECK-NEXT: vm.return [[VALUE]]
+    vm.return %1 : i32
+  }
+
+  // CHECK-LABEL: @fold_store_i32
+  vm.func @fold_store_i32(%arg0 : i32) {
+    %0 = vm.global.address @g0 : !iree.ptr<i32>
+    // CHECK-NEXT: vm.global.store.i32 %arg0, @g0 : i32
+    vm.global.store.indirect.i32 %arg0, %0 : i32 -> !iree.ptr<i32>
+    vm.return
+  }
+}

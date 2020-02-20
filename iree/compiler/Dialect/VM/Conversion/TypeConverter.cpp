@@ -48,6 +48,14 @@ Type VMTypeConverter::convertType(Type t) {
       // materialization of trunc/ext.
       return IntegerType::get(32, t.getContext());
     }
+  } else if (auto ptrType = t.dyn_cast<IREE::PtrType>()) {
+    // Recursively handle pointer target types (we want to convert ptr<index> to
+    // ptr<i32>, for example).
+    auto targetType = convertType(ptrType.getTargetType());
+    if (!targetType) {
+      return {};
+    }
+    return IREE::PtrType::get(targetType);
   } else if (t.isa<IREE::RefPtrType>()) {
     // All ref_ptr types are passed through unmodified.
     return t;

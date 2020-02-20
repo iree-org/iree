@@ -93,6 +93,43 @@ class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
 }
 
 //===----------------------------------------------------------------------===//
+// ptr types
+//===----------------------------------------------------------------------===//
+
+def AnyPtr : DialectType<
+    IREE_Dialect,
+    CPred<"$_self.isa<IREE::PtrType>()">,
+    "ptr"> {
+  let typeDescription = [{
+    Pointer to a typed value.
+  }];
+  let builderCall = "$_builder.getType<IREE::PtrType>()";
+}
+
+class PtrOf<Type type> :
+    Type<And<[
+      CPred<"$_self.isa<IREE::PtrType>()">,
+      SubstLeaves<"$_self", "$_self.cast<IREE::PtrType>().getTargetType()",
+                  type.predicate>
+    ]>, "ptr<" # type.description # ">"> {
+  // Set the builder call if the base type has a builder call.
+  string builderCall = !if(!empty(type.builderCall),
+                           "", "PtrType::get(" # type.builderCall # ")");
+}
+
+class AnyPtrOf<list<Type> types> :
+    Type<And<[
+      CPred<"$_self.isa<IREE::PtrType>()">,
+      Or<!foreach(type, types,
+          SubstLeaves<
+              "$_self",
+              "$_self.cast<IREE::PtrType>().getTargetType()",
+              type.predicate>)>,
+    ]>, StrJoin<!foreach(type, types, type.description), " or ">.result> {
+  string builderCall = "";
+}
+
+//===----------------------------------------------------------------------===//
 // ref_ptr types
 //===----------------------------------------------------------------------===//
 

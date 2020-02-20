@@ -128,6 +128,7 @@ def FLOW_Tensor : TypeAlias<AnyRankedTensor>;
 
 def FLOW_ExecutableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariableRefAttr : AliasedSymbolRefAttr;
+def FLOW_VariablePtr : AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
 // TODO(benvanik): use index types instead of i32.
 def FLOW_Workload : VectorOfLengthAndType<[3], [I32]> {

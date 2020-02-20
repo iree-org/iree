@@ -89,6 +89,27 @@ class VariableOpConversion
   TypeConverter &converter;
 };
 
+class VariableAddressOpConversion
+    : public OpConversionPattern<IREE::Flow::VariableAddressOp> {
+ public:
+  VariableAddressOpConversion(MLIRContext *ctx, TypeConverter &converter)
+      : OpConversionPattern(ctx), converter(converter) {}
+
+  PatternMatchResult matchAndRewrite(
+      IREE::Flow::VariableAddressOp addressOp,
+      llvm::ArrayRef<Value> newOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    // TODO(benvanik): multiple converted type results to multiple variables.
+    rewriter.replaceOpWithNewOp<IREE::HAL::VariableAddressOp>(
+        addressOp, converter.convertType(addressOp.result().getType()),
+        addressOp.variable());
+    return matchSuccess();
+  }
+
+ private:
+  TypeConverter &converter;
+};
+
 class VariableLoadOpConversion
     : public OpConversionPattern<IREE::Flow::VariableLoadOp> {
  public:
@@ -102,6 +123,27 @@ class VariableLoadOpConversion
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableLoadOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
         rewriter.getSymbolRefAttr(loadOp.variable()));
+    return matchSuccess();
+  }
+
+ private:
+  TypeConverter &converter;
+};
+
+class VariableLoadIndirectOpConversion
+    : public OpConversionPattern<IREE::Flow::VariableLoadIndirectOp> {
+ public:
+  VariableLoadIndirectOpConversion(MLIRContext *ctx, TypeConverter &converter)
+      : OpConversionPattern(ctx), converter(converter) {}
+
+  PatternMatchResult matchAndRewrite(
+      IREE::Flow::VariableLoadIndirectOp loadOp,
+      llvm::ArrayRef<Value> newOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    // TODO(benvanik): multiple converted type results to multiple variables.
+    rewriter.replaceOpWithNewOp<IREE::HAL::VariableLoadIndirectOp>(
+        loadOp, converter.convertType(loadOp.result().getType()),
+        loadOp.variable());
     return matchSuccess();
   }
 
@@ -127,13 +169,33 @@ class VariableStoreOpConversion
   }
 };
 
+class VariableStoreIndirectOpConversion
+    : public OpConversionPattern<IREE::Flow::VariableStoreIndirectOp> {
+ public:
+  VariableStoreIndirectOpConversion(MLIRContext *ctx, TypeConverter &converter)
+      : OpConversionPattern(ctx) {}
+
+  PatternMatchResult matchAndRewrite(
+      IREE::Flow::VariableStoreIndirectOp storeOp,
+      llvm::ArrayRef<Value> newOperands,
+      ConversionPatternRewriter &rewriter) const override {
+    IREE::Flow::VariableStoreIndirectOpOperandAdaptor operands(newOperands);
+    // TODO(benvanik): multiple converted type results to multiple variables.
+    rewriter.replaceOpWithNewOp<IREE::HAL::VariableStoreIndirectOp>(
+        storeOp, operands.value(), storeOp.variable());
+    return matchSuccess();
+  }
+};
+
 }  // namespace
 
 void populateFlowVariableToHALPatterns(MLIRContext *context,
                                        OwningRewritePatternList &patterns,
                                        TypeConverter &converter) {
-  patterns.insert<VariableOpConversion, VariableLoadOpConversion,
-                  VariableStoreOpConversion>(context, converter);
+  patterns.insert<VariableOpConversion, VariableAddressOpConversion,
+                  VariableLoadOpConversion, VariableLoadIndirectOpConversion,
+                  VariableStoreOpConversion, VariableStoreIndirectOpConversion>(
+      context, converter);
 }
 
 }  // namespace iree_compiler

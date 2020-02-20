@@ -82,9 +82,6 @@ typedef struct {
   // Aligned to 16 bytes (128-bits) for SIMD usage.
   iree_byte_span_t rwdata_storage;
 
-  // Global i32 storage, aligned to 16 bytes (128-bits) for SIMD usage.
-  int32_t* global_i32_table;
-
   // Global ref_ptr values, indexed by global ordinal.
   int32_t global_ref_count;
   iree_vm_ref_t* global_ref_table;

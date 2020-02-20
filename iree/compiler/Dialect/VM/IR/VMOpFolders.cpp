@@ -196,6 +196,75 @@ void GlobalLoadRefOp::getCanonicalizationPatterns(
   results.insert<InlineConstGlobalLoadRefOp>(context);
 }
 
+namespace {
+
+template <typename INDIRECT, typename DIRECT>
+class PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
+  using OpRewritePattern<INDIRECT>::OpRewritePattern;
+
+ public:
+  PatternMatchResult matchAndRewrite(INDIRECT op,
+                                     PatternRewriter &rewriter) const override {
+    if (auto addressOp =
+            dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<DIRECT>(op, op.value().getType(),
+                                          addressOp.global());
+      return this->matchSuccess();
+    }
+    return this->matchFailure();
+  }
+};
+
+}  // namespace
+
+void GlobalLoadIndirectI32Op::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<
+      PropagateGlobalLoadAddress<GlobalLoadIndirectI32Op, GlobalLoadI32Op>>(
+      context);
+}
+
+void GlobalLoadIndirectRefOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<
+      PropagateGlobalLoadAddress<GlobalLoadIndirectRefOp, GlobalLoadRefOp>>(
+      context);
+}
+
+namespace {
+
+template <typename INDIRECT, typename DIRECT>
+class PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
+  using OpRewritePattern<INDIRECT>::OpRewritePattern;
+
+ public:
+  PatternMatchResult matchAndRewrite(INDIRECT op,
+                                     PatternRewriter &rewriter) const override {
+    if (auto addressOp =
+            dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
+      rewriter.replaceOpWithNewOp<DIRECT>(op, op.value(), addressOp.global());
+      return this->matchSuccess();
+    }
+    return this->matchFailure();
+  }
+};
+
+}  // namespace
+
+void GlobalStoreIndirectI32Op::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<
+      PropagateGlobalStoreAddress<GlobalStoreIndirectI32Op, GlobalStoreI32Op>>(
+      context);
+}
+
+void GlobalStoreIndirectRefOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<
+      PropagateGlobalStoreAddress<GlobalStoreIndirectRefOp, GlobalStoreRefOp>>(
+      context);
+}
+
 //===----------------------------------------------------------------------===//
 // Constants
 //===----------------------------------------------------------------------===//

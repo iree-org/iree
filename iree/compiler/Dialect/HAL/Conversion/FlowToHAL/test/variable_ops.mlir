@@ -23,6 +23,20 @@ func @fn() {
 }
 
 // -----
+
+// CHECK-LABEL: hal.variable @var_indirect mutable : !iree.ref<!hal.buffer>
+flow.variable @var_indirect mutable : tensor<i32>
+func @fn() {
+  // CHECK: [[ADDR:%.+]] = hal.variable.address @var_indirect
+  %0 = flow.variable.address @var_indirect : !iree.ptr<tensor<i32>>
+  // CHECK-NEXT: [[VALUE:%.+]] = hal.variable.load.indirect [[ADDR]]
+  %1 = flow.variable.load.indirect %0 : !iree.ptr<tensor<i32>> -> tensor<i32>
+  // CHECK-NEXT: hal.variable.store.indirect [[VALUE]], [[ADDR]]
+  flow.variable.store.indirect %1, %0 : tensor<i32> -> !iree.ptr<tensor<i32>>
+  return
+}
+
+// -----
 // Checks that an initializer function is generated, used and operates on
 // a hal.buffer (versus tensor).
 // CHECK-LABEL: func @__var_with_tensor_initializer_initializer() -> !iree.ref<!hal.buffer>

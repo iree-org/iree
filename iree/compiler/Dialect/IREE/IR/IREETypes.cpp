@@ -21,6 +21,47 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
+
+//===----------------------------------------------------------------------===//
+// PtrType
+//===----------------------------------------------------------------------===//
+
+namespace detail {
+
+struct PtrTypeStorage : public TypeStorage {
+  PtrTypeStorage(Type targetType, unsigned subclassData = 0)
+      : TypeStorage(subclassData), targetType(targetType) {}
+
+  /// The hash key used for uniquing.
+  using KeyTy = Type;
+  bool operator==(const KeyTy &key) const { return key == targetType; }
+
+  static PtrTypeStorage *construct(TypeStorageAllocator &allocator,
+                                   const KeyTy &key) {
+    // Initialize the memory using placement new.
+    return new (allocator.allocate<PtrTypeStorage>()) PtrTypeStorage(key);
+  }
+
+  Type targetType;
+};
+
+}  // namespace detail
+
+PtrType PtrType::get(Type targetType) {
+  return Base::get(targetType.getContext(), TypeKind::Ptr, targetType);
+}
+
+PtrType PtrType::getChecked(Type targetType, Location location) {
+  return Base::getChecked(location, targetType.getContext(), TypeKind::Ptr,
+                          targetType);
+}
+
+Type PtrType::getTargetType() { return getImpl()->targetType; }
+
+//===----------------------------------------------------------------------===//
+// RefPtrType
+//===----------------------------------------------------------------------===//
+
 namespace detail {
 
 struct RefPtrTypeStorage : public TypeStorage {
@@ -42,16 +83,6 @@ struct RefPtrTypeStorage : public TypeStorage {
 };
 
 }  // namespace detail
-}  // namespace IREE
-}  // namespace iree_compiler
-}  // namespace mlir
-
-using namespace mlir;
-using namespace mlir::iree_compiler::IREE;
-
-//===----------------------------------------------------------------------===//
-// RefPtrType
-//===----------------------------------------------------------------------===//
 
 RefPtrType RefPtrType::get(RefObjectType objectType) {
   return Base::get(objectType.getContext(), TypeKind::RefPtr, objectType);
@@ -63,3 +94,7 @@ RefPtrType RefPtrType::getChecked(Type objectType, Location location) {
 }
 
 RefObjectType RefPtrType::getObjectType() { return getImpl()->objectType; }
+
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir

@@ -314,6 +314,26 @@ def VM_GlobalRefOp : VM_GlobalOp<"global.ref", UnitAttr> {
   let hasCanonicalizer = 1;
 }
 
+def VM_GlobalAddressOp : VM_PureOp<"global.address"> {
+  let summary = [{returns an address reference to a global}];
+  let description = [{
+    Returns an indirect address reference to the given global. During export the
+    address will be converted to the natural format of the global table (for
+    example, ordinals for refs and byte offsets for primitive types).
+  }];
+
+  let arguments = (ins
+    VM_GlobalRefAttr:$global
+  );
+  let results = (outs
+    AnyPtr:$result
+  );
+
+  let assemblyFormat = "$global attr-dict `:` type($result)";
+
+  let verifier = [{ return verifyGlobalAddressOp(*this); }];
+}
+
 class VM_GlobalLoadOp<Type type, string mnemonic, list<OpTrait> traits = []> :
     VM_Op<mnemonic, !listconcat(traits, [
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
@@ -335,15 +355,39 @@ class VM_GlobalStoreOp<Type type, string mnemonic, list<OpTrait> traits = []> :
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
   let arguments = (ins
-    VM_GlobalRefAttr:$global,
+    type:$value,
+    VM_GlobalRefAttr:$global
+  );
+
+  let assemblyFormat = "$value `,` $global attr-dict `:` type($value)";
+
+  let verifier = [{ return verifyGlobalStoreOp(*this); }];
+}
+
+class VM_GlobalLoadIndirectOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ])> {
+  let arguments = (ins
+    AnyTypeOf<[VM_Ptr, PtrOf<type>]>:$global
+  );
+  let results = (outs
     type:$value
   );
 
-  let assemblyFormat = "$global `,` $value attr-dict `:` type($value)";
+  let assemblyFormat = "$global attr-dict `:` type($global) `->` type($value)";
+}
 
-  let parser = [{ return parseGlobalStoreOp(parser, &result); }];
-  let printer = [{ return printGlobalStoreOp(p, *this); }];
-  let verifier = [{ return verifyGlobalStoreOp(*this); }];
+class VM_GlobalStoreIndirectOp<Type type, string mnemonic, list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    ])> {
+  let arguments = (ins
+    type:$value,
+    AnyTypeOf<[VM_Ptr, PtrOf<type>]>:$global
+  );
+
+  let assemblyFormat = "$value `,` $global attr-dict `:` type($value) `->` type($global)";
 }
 
 def VM_GlobalLoadI32Op : VM_GlobalLoadOp<I32, "global.load.i32"> {
@@ -372,6 +416,38 @@ def VM_GlobalStoreI32Op : VM_GlobalStoreOp<I32, "global.store.i32"> {
     VM_EncGlobalAttr<"global">,
     VM_EncOperand<"value", 0>,
   ];
+}
+
+def VM_GlobalLoadIndirectI32Op :
+    VM_GlobalLoadIndirectOp<I32, "global.load.indirect.i32"> {
+  let summary = [{global 32-bit integer load operation}];
+  let description = [{
+    Loads the value of a global containing a 32-bit integer.
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_GlobalLoadIndirectI32>,
+    VM_EncOperand<"global", 0>,
+    VM_EncResult<"value">,
+  ];
+
+  let hasCanonicalizer = 1;
+}
+
+def VM_GlobalStoreIndirectI32Op :
+    VM_GlobalStoreIndirectOp<I32, "global.store.indirect.i32"> {
+  let summary = [{global 32-bit integer store operation}];
+  let description = [{
+    Stores the 32-bit integer value to a global.
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_GlobalStoreIndirectI32>,
+    VM_EncOperand<"global", 0>,
+    VM_EncOperand<"value", 1>,
+  ];
+
+  let hasCanonicalizer = 1;
 }
 
 def VM_GlobalLoadRefOp : VM_GlobalLoadOp<AnyRefPtr, "global.load.ref"> {
@@ -404,26 +480,38 @@ def VM_GlobalStoreRefOp : VM_GlobalStoreOp<AnyRefPtr, "global.store.ref"> {
   ];
 }
 
-def VM_GlobalResetRefOp : VM_Op<"global.reset.ref", [
-    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
-  ]> {
-  let summary = [{global ref_ptr<T> reset operation}];
+def VM_GlobalLoadIndirectRefOp :
+    VM_GlobalLoadIndirectOp<AnyRefPtr, "global.load.indirect.ref"> {
+  let summary = [{global ref_ptr<T> load operation}];
   let description = [{
-    Resets the given global value to clear its value.
+    Loads the value of a global containing a ref_ptr of the given type.
   }];
 
-  let arguments = (ins
-    VM_GlobalRefAttr:$global
-  );
-
-  let assemblyFormat = "$global attr-dict";
-
   let encoding = [
-    VM_EncOpcode<VM_OPC_GlobalResetRef>,
-    VM_EncGlobalAttr<"global">,
+    VM_EncOpcode<VM_OPC_GlobalLoadIndirectRef>,
+    VM_EncOperand<"global", 0>,
+    VM_EncTypeOf<"value">,
+    VM_EncResult<"value">,
   ];
 
-  let verifier = [{ return verify$cppClass(*this); }];
+  let hasCanonicalizer = 1;
+}
+
+def VM_GlobalStoreIndirectRefOp :
+    VM_GlobalStoreIndirectOp<AnyRefPtr, "global.store.indirect.ref"> {
+  let summary = [{global ref_ptr<T> stores operation}];
+  let description = [{
+    Stores a ref_ptr<T> to a global, retaining it until the global is reset.
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_GlobalStoreIndirectRef>,
+    VM_EncOperand<"global", 0>,
+    VM_EncTypeOf<"value">,
+    VM_EncOperand<"value", 1>,
+  ];
+
+  let hasCanonicalizer = 1;
 }
 
 //===----------------------------------------------------------------------===//

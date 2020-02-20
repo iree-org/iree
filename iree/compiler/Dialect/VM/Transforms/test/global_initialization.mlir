@@ -24,11 +24,11 @@ vm.module @initI32 {
 
   // CHECK: vm.func @__init() {
   // CHECK-NEXT:   %0 = vm.call @g0init()
-  // CHECK-NEXT:   vm.global.store.i32 @g0, %0
+  // CHECK-NEXT:   vm.global.store.i32 %0, @g0
   // CHECK-NEXT:   %c123 = vm.const.i32 123 : i32
-  // CHECK-NEXT:   vm.global.store.i32 @g1, %c123
+  // CHECK-NEXT:   vm.global.store.i32 %c123, @g1
   // CHECK-NEXT:   %c123_0 = vm.const.i32 123 : i32
-  // CHECK-NEXT:   vm.global.store.i32 @g2, %c123_0
+  // CHECK-NEXT:   vm.global.store.i32 %c123_0, @g2
   // CHECK-NEXT:   vm.return
   // CHECK-NEXT: }
 }
@@ -52,7 +52,7 @@ vm.module @initRef {
 
   // CHECK: vm.func @__init() {
   // CHECK-NEXT:   %ref = vm.call @g0init()
-  // CHECK-NEXT:   vm.global.store.ref @g0, %ref
+  // CHECK-NEXT:   vm.global.store.ref %ref, @g0
   // CHECK-NEXT:   vm.return
   // CHECK-NEXT: }
 }

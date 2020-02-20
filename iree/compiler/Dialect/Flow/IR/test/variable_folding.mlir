@@ -30,3 +30,24 @@ func @nop_load_store() {
   return
 }
 
+// -----
+
+flow.variable @v : tensor<4xf32>
+// CHECK-LABEL: @fold_load_indirect
+func @fold_load_indirect() -> tensor<4xf32> {
+  %0 = flow.variable.address @v : !iree.ptr<tensor<4xf32>>
+  // CHECK-NEXT: = flow.variable.load @v
+  %1 = flow.variable.load.indirect %0 : !iree.ptr<tensor<4xf32>> -> tensor<4xf32>
+  return %1 : tensor<4xf32>
+}
+
+// -----
+
+flow.variable @v mutable : tensor<4xf32>
+// CHECK-LABEL: @fold_store_indirect
+func @fold_store_indirect(%arg0 : tensor<4xf32>) {
+  %0 = flow.variable.address @v : !iree.ptr<tensor<4xf32>>
+  // CHECK-NEXT: flow.variable.store %arg0, @v
+  flow.variable.store.indirect %arg0, %0 : tensor<4xf32> -> !iree.ptr<tensor<4xf32>>
+  return
+}
