@@ -15,3 +15,4 @@
 add_subdirectory(check)
 add_subdirectory(hal)
 add_subdirectory(strings)
+add_subdirectory(tensorlist)
