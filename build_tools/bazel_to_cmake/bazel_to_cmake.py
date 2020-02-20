@@ -107,6 +107,11 @@ class BuildFileFunctions(object):
     #    rule_name
     return "  NAME\n    %s\n" % (name)
 
+  def _convert_out_block(self, out):
+    #  OUT
+    #    out_name
+    return "  OUT\n    %s\n" % (out)
+
   def _convert_cc_namespace_block(self, cc_namespace):
     #  CC_NAMESPACE
     #    "cc_namespace"
@@ -373,12 +378,14 @@ class BuildFileFunctions(object):
 
   def cc_binary(self, name, srcs=[], deps=[], **kwargs):
     name_block = self._convert_name_block(name)
+    out_block = self._convert_out_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     deps_block = self._convert_deps_block(deps)
 
     self.converter.body += """iree_cc_binary(
-%(name_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
+%(name_block)s%(out_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
     "name_block": name_block,
+    "out_block": out_block,
     "srcs_block": srcs_block,
     "deps_block": deps_block,
     }
