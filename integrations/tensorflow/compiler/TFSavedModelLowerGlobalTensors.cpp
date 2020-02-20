@@ -260,7 +260,8 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
                 return isResourceVarType(v.getType());
               })) {
             return op.emitError()
-                   << "unknown op operating on resource for global tensor";
+                   << "unknown op operating on resource for global tensor: "
+                   << op.getName();
           }
           continue;
         }
