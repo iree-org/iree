@@ -218,11 +218,11 @@ sh_binary(
     data = ["@llvm-project//llvm:FileCheck"],
 )
 
+# TODO(b/146898896): Refactor these into more coherent packages.
 cc_library(
     name = "vm_util",
     srcs = ["vm_util.cc"],
     hdrs = ["vm_util.h"],
-    visibility = ["//visibility:private"],
     deps = [
         "//iree/base:api_util",
         "//iree/base:buffer_string_util",

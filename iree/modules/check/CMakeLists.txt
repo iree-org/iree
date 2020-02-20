@@ -13,6 +13,7 @@
 # limitations under the License.
 
 add_subdirectory(dialect)
+add_subdirectory(test)
 
 iree_bytecode_module(
   NAME
@@ -47,6 +48,34 @@ iree_cc_test(
     iree::vm::bytecode_module
     iree::vm::ref
 )
+
+iree_cc_binary(
+  NAME
+    iree-check-module
+  SRCS
+    "check_module_main.cc"
+  OUT
+    iree-check-module
+  DEPS
+    ::native_module
+    absl::flags
+    absl::strings
+    iree::base::api
+    iree::base::api_util
+    iree::base::file_io
+    iree::base::init
+    iree::base::source_location
+    iree::base::status
+    # TODO(marbre): Add PLATFORM_VULKAN_DEPS
+    iree::hal::interpreter::interpreter_driver_module
+    iree::hal::vmla::vmla_driver_module
+    iree::hal::vulkan::vulkan_driver_module
+    iree::modules::hal
+    iree::tools::vm_util
+    iree::vm::bytecode_module
+)
+add_executable(iree-check-module ALIAS iree_modules_check_iree-check-module)
+
 
 iree_cc_library(
   NAME

@@ -81,6 +81,8 @@ add_executable(check-opt ALIAS iree_modules_check_dialect_check-opt)
 iree_cc_binary(
   NAME
     check-translate
+  OUT
+    check-translate
   DEPS
     ::dialect
     iree::tools::iree_translate_library
