@@ -127,6 +127,11 @@ typedef enum {
   // Memory will be discarded and completely overwritten in a single operation.
   IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE =
       IREE_HAL_MEMORY_ACCESS_WRITE | IREE_HAL_MEMORY_ACCESS_DISCARD,
+  // A flag that can be applied to any access type to indicate that the buffer
+  // storage being accessed may alias with other accesses occurring concurrently
+  // within or across operations. The lack of the flag indicates that the access
+  // is guaranteed not to alias (ala C's `restrict` keyword).
+  IREE_HAL_MEMORY_ACCESS_MAY_ALIAS = 1 << 3,
   // Memory may have any operation performed on it.
   IREE_HAL_MEMORY_ACCESS_ALL = IREE_HAL_MEMORY_ACCESS_READ |
                                IREE_HAL_MEMORY_ACCESS_WRITE |

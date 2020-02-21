@@ -60,6 +60,7 @@ std::string MemoryAccessString(MemoryAccessBitfield memory_access) {
                                  {MemoryAccess::kRead, "kRead"},
                                  {MemoryAccess::kWrite, "kWrite"},
                                  {MemoryAccess::kDiscard, "kDiscard"},
+                                 {MemoryAccess::kMayAlias, "kMayAlias"},
                              });
 }
 

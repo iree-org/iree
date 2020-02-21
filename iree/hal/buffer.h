@@ -168,6 +168,12 @@ enum class MemoryAccess : uint32_t {
   // Memory will be discarded and completely overwritten in a single operation.
   kDiscardWrite = kWrite | kDiscard,
 
+  // A flag that can be applied to any access type to indicate that the buffer
+  // storage being accessed may alias with other accesses occurring concurrently
+  // within or across operations. The lack of the flag indicates that the access
+  // is guaranteed not to alias (ala C's `restrict` keyword).
+  kMayAlias = 1 << 3,
+
   // Memory may have any operation performed on it.
   kAll = kRead | kWrite | kDiscard,
 };

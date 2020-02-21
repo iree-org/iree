@@ -77,6 +77,7 @@ def HAL_MemoryAccess_Read : BitEnumAttrCase<"Read", 0x0001>;
 def HAL_MemoryAccess_Write : BitEnumAttrCase<"Write", 0x0002>;
 def HAL_MemoryAccess_Discard : BitEnumAttrCase<"Discard", 0x0004>;
 def HAL_MemoryAccess_DiscardWrite : BitEnumAttrCase<"DiscardWrite", 0x0006>;
+def HAL_MemoryAccess_MayAlias : BitEnumAttrCase<"MayAlias", 0x0008>;
 def HAL_MemoryAccess_All : BitEnumAttrCase<"All", 0x0007>;
 def HAL_MemoryAccessBitfieldAttr :
     BitEnumAttr<"MemoryAccessBitfield", "valid MemoryAccess", [
@@ -85,6 +86,7 @@ def HAL_MemoryAccessBitfieldAttr :
       HAL_MemoryAccess_Write,
       HAL_MemoryAccess_Discard,
       HAL_MemoryAccess_DiscardWrite,
+      HAL_MemoryAccess_MayAlias,
       HAL_MemoryAccess_All
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
@@ -141,8 +143,6 @@ def HAL_DescriptorTypeAttr :
       HAL_DescriptorType_UniformBufferDynamic,
       HAL_DescriptorType_StorageBufferDynamic,
     ]> {
-  let returnType = "uint32_t";
-  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
