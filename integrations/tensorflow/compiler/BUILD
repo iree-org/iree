@@ -36,6 +36,7 @@ cc_library(
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "//iree/base:signature_mangle",
         "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

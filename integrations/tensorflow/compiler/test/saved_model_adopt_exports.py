@@ -142,7 +142,7 @@ class T0002e_Error_VarMultipleExportedNames(tf.Module):
 
 
 # CHECK-LABEL: RUN_TEST: T0002f_Error_UnsupportedResourceOp
-# CHECK: [ERROR]: unknown op operating on resource for global tensor
+# CHECK: [ERROR]: could not lower resource op to flow
 # CHECK: FINISH_TEST
 class T0002f_Error_UnsupportedResourceOp(tf.Module):
 

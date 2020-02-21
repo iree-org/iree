@@ -16,6 +16,7 @@
 #include "iree/base/signature_mangle.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/IR/Attributes.h"
@@ -32,190 +33,26 @@
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {
-
-namespace {
-
-// Lattice value with monotonic merge operation for dataflow analysis.
-//
-// See LatticeTracker for more details about what dataflow analysis we are
-// performing.
-struct LatticeValue {
-  // The set of possible global tensors which a particular Value might
-  // dynamically correspond to.
-  std::set<Operation *> possibleGlobalTensors;
-
-  static LatticeValue singleGlobalTensor(
-      tf_saved_model::GlobalTensorOp globalTensor) {
-    LatticeValue ret;
-    ret.possibleGlobalTensors.insert(globalTensor.getOperation());
-    return ret;
-  }
-
-  static LatticeValue merge(LatticeValue a, LatticeValue b) {
-    LatticeValue ret = a;
-    for (Operation *globalTensor : b.possibleGlobalTensors)
-      ret.possibleGlobalTensors.insert(globalTensor);
-    return ret;
-  }
-};
-
-bool operator==(LatticeValue a, LatticeValue b) {
-  return a.possibleGlobalTensors == b.possibleGlobalTensors;
-}
-bool operator!=(LatticeValue a, LatticeValue b) { return !operator==(a, b); }
-
-}  // namespace
-
-static bool isResourceVarType(Type type) {
-  if (auto tensorType = type.dyn_cast<TensorType>())
-    if (tensorType.getElementType().isa<TF::ResourceType>()) return true;
-  return false;
-}
-
-namespace {
-// Map used for dataflow analysis to determine which global tensors might
-// dynamically be represented by a resource variable.
-class LatticeTracker {
- public:
-  // Merge dataflow information from `mergeFromVal` into `v`.
-  void mergeFrom(Value v, Value mergeFromVal) {
-    assert(isResourceVarType(v.getType()));
-    assert(isResourceVarType(mergeFromVal.getType()));
-    mergeFromLatticeValue(v, lattice[mergeFromVal]);
-  }
-
-  // Merge the latticeValue `mergeFromLatticeValue` into the dataflow
-  // information for `v`.
-  void mergeFromLatticeValue(Value v, LatticeValue mergeFromLatticeValue) {
-    assert(isResourceVarType(v.getType()));
-    LatticeValue &latticeValue = lattice[v];
-    LatticeValue originalValue = latticeValue;
-    latticeValue = LatticeValue::merge(latticeValue, mergeFromLatticeValue);
-    changed |= (originalValue != latticeValue);
-  }
-
-  LatticeValue getLatticeValue(Value v) {
-    assert(v);
-    assert(isResourceVarType(v.getType()));
-    return lattice[v];
-  }
-
-  // Methods for tracking if a fixed-point was reached on this particular
-  // dataflow iteration.
-  void resetChanged() { changed = false; }
-  bool hasChanged() { return changed; }
-
- private:
-  bool changed = false;
-  DenseMap<Value, LatticeValue> lattice;
-};
-
-}  // namespace
-
-/// For each predecessor of `block`, return the argument lists it uses to invoke
-/// `block`.
-/// Note that a single predecessor can result in multiple arg lists, for example
-/// a conditional branch with both sides jumping to the same `block`.
-static SmallVector<Operation::operand_range, 4> getPredecessorArgLists(
-    Block *block) {
-  SmallVector<Operation::operand_range, 4> argLists;
-  for (Block *pred : block->getPredecessors()) {
-    Operation *term = pred->getTerminator();
-    for (int i = 0, e = term->getNumSuccessors(); i < e; i++)
-      if (term->getSuccessor(i) == block)
-        argLists.push_back(term->getSuccessorOperands(i));
-  }
-  return argLists;
-}
-
-static void analyzeModule(LatticeTracker &latticeTracker, ModuleOp module,
-                          const SymbolTable &symbolTable) {
-  // TODO(silvasean): Make this analysis interprocedural.
-  // TODO(silvasean): Add !flow.variable_ref type to avoid needing to do this in
-  // the first place.
-
-  // Simple dataflow analysis that only looks through phi nodes.
-  // We don't handle "internally created resources" at all. That is, we assume
-  // that all values of resource type are function arguments or block arguments
-  // derived from function arguments.
-  for (auto func : module.getOps<FuncOp>()) {
-    if (!tf_saved_model::IsExported(func)) continue;
-
-    // Initialize the lattice.
-    for (int i = 0, e = func.getNumArguments(); i < e; i++) {
-      auto globalTensor =
-          tf_saved_model::LookupBoundInput(func, i, symbolTable);
-      if (globalTensor) {
-        latticeTracker.mergeFromLatticeValue(
-            func.getArgument(i),
-            LatticeValue::singleGlobalTensor(globalTensor));
-      }
-    }
-    // Propagate to a fixed-point.
-    Block *entry = &func.front();
-    llvm::ReversePostOrderTraversal<Block *> rpo(entry);
-    do {
-      latticeTracker.resetChanged();
-      for (Block *block : llvm::make_range(rpo.begin(), rpo.end())) {
-        if (block == entry) continue;
-        SmallVector<Operation::operand_range, 4> argLists =
-            getPredecessorArgLists(block);
-        for (auto &argList : argLists)
-          for (int i = 0, e = argList.size(); i < e; i++)
-            if (isResourceVarType(block->getArgument(i).getType()))
-              latticeTracker.mergeFrom(block->getArgument(i), argList[i]);
-      }
-    } while (latticeTracker.hasChanged());
-  }
-}
-
-// Return a name that would be useful in a diagnostic mentioning this
-// global tensor.
-static StringRef getNameForDiagnostics(
-    tf_saved_model::GlobalTensorOp globalTensor) {
-  // If there is an exported name, that's probably the most useful.
-  auto exportedNames = tf_saved_model::GetExportedNames(globalTensor);
-  if (!exportedNames.empty()) {
-    return exportedNames[0];
-  }
-  // Otherwise, the importer hopefully chose a useful sym_name.
-  return globalTensor.sym_name();
-}
-
 namespace iree_compiler {
 
-// This function, together with `rewriteResourceForKnownOp`, define the lowering
-// of resource ops to the flow dialect.
-static Value findResourceForKnownOp(Operation &op) {
+static LogicalResult rewriteTfResourceOpToFlowOp(Operation &op, Value flowPtr) {
   if (auto readVariable = dyn_cast<TF::ReadVariableOp>(op)) {
-    return readVariable.resource();
-  } else if (auto assignVariable = dyn_cast<TF::AssignVariableOp>(op)) {
-    return assignVariable.resource();
-  }
-  return nullptr;
-}
-
-// For an op whose resource was found by `findResourceForKnownOp`, rewrite it
-// to a corresponding flow variable, on the assumption that the resource is
-// guaranteed to correspond to `correspondingFlowSymbol`.
-static void rewriteResourceForKnownOp(
-    Operation &op, FlatSymbolRefAttr correspondingFlowSymbol) {
-  if (auto readVariable = dyn_cast<TF::ReadVariableOp>(op)) {
-    auto load = OpBuilder(readVariable)
-                    .create<IREE::Flow::VariableLoadOp>(
-                        readVariable.getLoc(), readVariable.value().getType(),
-                        correspondingFlowSymbol);
+    auto load =
+        OpBuilder(readVariable)
+            .create<IREE::Flow::VariableLoadIndirectOp>(
+                readVariable.getLoc(), readVariable.value().getType(), flowPtr);
     readVariable.value().replaceAllUsesWith(load.result());
     readVariable.erase();
   } else if (auto assignVariable = dyn_cast<TF::AssignVariableOp>(op)) {
     OpBuilder(assignVariable)
-        .create<IREE::Flow::VariableStoreOp>(assignVariable.getLoc(),
-                                             assignVariable.value(),
-                                             correspondingFlowSymbol);
+        .create<IREE::Flow::VariableStoreIndirectOp>(
+            assignVariable.getLoc(), assignVariable.value(), flowPtr);
     assignVariable.erase();
   } else {
-    llvm_unreachable("attempting to rewrite resource for unknown op");
+    return op.emitError() << "could not lower resource op to flow: "
+                          << op.getName();
   }
+  return success();
 }
 
 static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
@@ -241,90 +78,72 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
         globalTensor.type(), globalTensor.value());
   }
 
-  LatticeTracker latticeTracker;
-  analyzeModule(latticeTracker, module, symbolTable);
-
+  // TODO(silvasean): Make this conversion interprocedural.
   for (auto func : module.getOps<FuncOp>()) {
-    // Our analysis only handles exported functions now.
-    if (!tf_saved_model::IsExported(func)) continue;
-
-    for (Block &block : func) {
-      for (Operation &op : llvm::make_early_inc_range(block)) {
-        // Identify if this an op that we can rewrite and find what resource it
-        // operates on.
-        Value resource = findResourceForKnownOp(op);
-        if (!resource) {
-          // Resources in successor operands are fine and will be rewritten
-          // below. Otherwise, we cannot transform the program.
-          if (llvm::any_of(op.getNonSuccessorOperands(), [](Value v) {
-                return isResourceVarType(v.getType());
-              })) {
-            return op.emitError()
-                   << "unknown op operating on resource for global tensor: "
-                   << op.getName();
-          }
-          continue;
-        }
-
-        // Extract out the unique global tensor referred to by this op, or
-        // emit a diagnostic.
-        auto latticeValue = latticeTracker.getLatticeValue(resource);
-        if (latticeValue.possibleGlobalTensors.size() != 1) {
-          SmallVector<StringRef, 4> possibleGlobalTensorNames;
-          for (Operation *globalTensor : latticeValue.possibleGlobalTensors) {
-            possibleGlobalTensorNames.push_back(getNameForDiagnostics(
-                cast<tf_saved_model::GlobalTensorOp>(globalTensor)));
-          }
-          llvm::sort(possibleGlobalTensorNames);
-          std::string allGlobalTensorNames;
-          for (auto globalTensorName : possibleGlobalTensorNames) {
-            if (!allGlobalTensorNames.empty()) {
-              allGlobalTensorNames += ", ";
-            }
-            allGlobalTensorNames += "'" + globalTensorName.str() + "'";
-          }
-          return op.emitError() << "cannot prove resource op uses a single "
-                                   "global tensor: potential global tensors: "
-                                << allGlobalTensorNames;
-        }
-        auto globalTensor = cast<tf_saved_model::GlobalTensorOp>(
-            *latticeValue.possibleGlobalTensors.begin());
-
-        // Rewrite the op.
-        auto correspondingFlowSymbol = globalBuilder.getSymbolRefAttr(
-            symNameToFlowSymName[globalTensor.sym_name()]);
-        rewriteResourceForKnownOp(op, correspondingFlowSymbol);
-      }
+    if (!tf_saved_model::IsExported(func)) {
+      continue;
     }
-
-    for (Block &block : func) {
-      // The entry block will be rewritten below.
-      if (&block == &func.front()) {
+    SmallVector<unsigned, 4> argsToErase;
+    OpBuilder builder(func.getBody());
+    SmallVector<Value, 8> typeConversionWorklist;
+    for (int i = 0, e = func.getNumArguments(); i < e; i++) {
+      auto globalTensor =
+          tf_saved_model::LookupBoundInput(func, i, symbolTable);
+      if (!globalTensor) {
         continue;
       }
-      for (int i = 0, e = block.getNumArguments(); i < e; i++) {
-        int argNo = e - i - 1;
-        // Erase in reverse to avoid shifting later arguments when erasing
-        // earlier arguments.
-        if (isResourceVarType(block.getArgument(argNo).getType())) {
-          block.getArgument(argNo).dropAllUses();
-          block.eraseArgument(argNo);
+      auto variableAddressOp = builder.create<IREE::Flow::VariableAddressOp>(
+          globalTensor.getLoc(), IREE::PtrType::get(globalTensor.type()),
+          builder.getSymbolRefAttr(
+              symNameToFlowSymName[globalTensor.sym_name()]));
+      typeConversionWorklist.push_back(variableAddressOp.getResult());
+      func.getArgument(i).replaceAllUsesWith(variableAddressOp.getResult());
+      argsToErase.push_back(i);
+    }
+    func.eraseArguments(argsToErase);
+    Dialect *ireeFlowDialect =
+        func.getContext()->getRegisteredDialect<IREE::Flow::FlowDialect>();
+    while (!typeConversionWorklist.empty()) {
+      Value v = typeConversionWorklist.pop_back_val();
+      Type desiredType = v.getType();
+      for (OpOperand &use : llvm::make_early_inc_range(v.getUses())) {
+        Operation *owner = use.getOwner();
+        // If the user is already in the flow dialect, then everything is ok.
+        if (owner->getDialect() == ireeFlowDialect) {
+          continue;
+        }
+        // If a user is just a terminator passing the value through a successor
+        // operand, propagate through the successor operand.
+        // TODO(silvasean): Handle case of different types in preds.
+        // This would require calculating a common type.
+        // This won't be a problem unless we see IR that effectively phi's
+        // together different resources, which I don't think tensorflow does.
+        if (owner->isKnownTerminator()) {
+          if (auto arg =
+                  owner->getSuccessorBlockArgument(use.getOperandNumber())) {
+            if (arg->getType() != desiredType) {
+              arg->setType(desiredType);
+              typeConversionWorklist.push_back(*arg);
+            }
+            continue;
+          }
+        }
+        // Resource types can have subtypes (or lack thereof) and casting
+        // between them is allowed. Here we just pass through.
+        if (auto castOp = dyn_cast<TF::CastOp>(owner)) {
+          assert(v == castOp.x());
+          castOp.y().replaceAllUsesWith(castOp.x());
+          castOp.erase();
+          // The RAUW could have added more uses of `v`, so put it back on the
+          // worklist and process it again.
+          typeConversionWorklist.push_back(v);
+          break;
+        }
+        if (failed(rewriteTfResourceOpToFlowOp(*owner, v))) {
+          return failure();
         }
       }
     }
-  }
-
-  for (auto func : module.getOps<FuncOp>()) {
-    // Our analysis only handles exported functions now.
-    if (!tf_saved_model::IsExported(func)) continue;
-    SmallVector<unsigned, 4> argsToErase;
-    for (int i = 0, e = func.getNumArguments(); i < e; i++) {
-      if (auto globalTensor =
-              tf_saved_model::LookupBoundInput(func, i, symbolTable)) {
-        argsToErase.push_back(i);
-      }
-    }
-    func.eraseArguments(argsToErase);
   }
 
   // Erase all the global tensors.
