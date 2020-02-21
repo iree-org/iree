@@ -157,11 +157,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_select_compiler_opts(DYNAMIC_SYMBOLS_LINKOPTS
-  CLANG_OR_GCC
-    "-ldl"
-)
-
 iree_cc_library(
   NAME
     dynamic_symbols
@@ -175,14 +170,14 @@ iree_cc_library(
   DEPS
     absl::core_headers
     absl::memory
+    absl::span
+    iree::base::dynamic_library
     iree::base::platform_headers
     iree::base::ref_ptr
     iree::base::status
     iree::base::target_platform
     iree::base::tracing
     Vulkan::Headers
-  LINKOPTS
-    ${DYNAMIC_SYMBOLS_LINKOPTS}
   PUBLIC
 )
 
@@ -345,11 +340,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_select_compiler_opts(RENDERDOC_CAPTURE_MANAGER_LINKOPTS
-  CLANG_OR_GCC
-    "-ldl"
-)
-
 iree_cc_library(
   NAME
     renderdoc_capture_manager
@@ -358,14 +348,14 @@ iree_cc_library(
   SRCS
     "renderdoc_capture_manager.cc"
   DEPS
+    iree::base::dynamic_library
     iree::base::logging
     iree::base::platform_headers
     iree::base::status
     iree::base::tracing
     iree::hal::debug_capture_manager
     renderdoc_api::renderdoc_app
-  LINKOPTS
-    ${RENDERDOC_CAPTURE_MANAGER_LINKOPTS}
+  PUBLIC
 )
 
 iree_cc_library(
