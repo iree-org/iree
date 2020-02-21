@@ -145,7 +145,7 @@ static void analyzeModule(LatticeTracker &latticeTracker, ModuleOp module,
     for (int i = 0, e = func.getNumArguments(); i < e; i++) {
       auto globalTensor =
           tf_saved_model::LookupBoundInput(func, i, symbolTable);
-      if (globalTensor && globalTensor.is_mutable()) {
+      if (globalTensor) {
         latticeTracker.mergeFromLatticeValue(
             func.getArgument(i),
             LatticeValue::singleGlobalTensor(globalTensor));
@@ -311,25 +311,6 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
           block.eraseArgument(argNo);
         }
       }
-    }
-  }
-
-  for (auto func : module.getOps<FuncOp>()) {
-    // Our analysis only handles exported functions now.
-    if (!tf_saved_model::IsExported(func)) continue;
-
-    for (int i = 0, e = func.getNumArguments(); i < e; i++) {
-      tf_saved_model::GlobalTensorOp globalTensor =
-          tf_saved_model::LookupBoundInput(func, i, symbolTable);
-      if (!globalTensor) continue;
-      if (globalTensor.is_mutable()) continue;
-      auto correspondingFlowSymbol = globalBuilder.getSymbolRefAttr(
-          symNameToFlowSymName[globalTensor.sym_name()]);
-      auto load = OpBuilder(func.getBody())
-                      .create<IREE::Flow::VariableLoadOp>(
-                          globalTensor.getLoc(), func.getArgument(i).getType(),
-                          correspondingFlowSymbol);
-      func.getArgument(i).replaceAllUsesWith(load.result());
     }
   }
 
