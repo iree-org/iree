@@ -8,7 +8,7 @@ module {
     //CHECK: [[COMPARE:%.*]] = spv.GLSL.FMax [[VAL1:%.*]], [[VAL2:%.*]] : f32
     %2 = xla_hlo.max %0, %1 : tensor<12x42xf32>
     iree.store_output(%2 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -22,7 +22,7 @@ module {
     //CHECK: [[COMPARE:%.*]] = spv.GLSL.SMax [[VAL1:%.*]], [[VAL2:%.*]] : i32
     %2 = xla_hlo.max %0, %1 : tensor<12x42xi32>
     iree.store_output(%2 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 

@@ -12,7 +12,7 @@ module {
     // CHECK: [[STOREPTR:%[a-zA-Z0-9_]*]] = spv.AccessChain [[ARG2]]
     // CHECK: spv.FunctionCall @reduction_apply([[LOADVAL]], [[STOREPTR]])
     iree.store_reduce(%0 : tensor<5xi32>, %arg2 : memref<i32>, @reduction_apply)
-    iree.return
+    return
   }
   func @reduction_apply(%arg0: i32, %arg1: !spv.ptr<i32, StorageBuffer>) {
     %0 = spv.AtomicSMax "Device" "None" %arg1, %arg0 : !spv.ptr<i32, StorageBuffer>
@@ -34,7 +34,7 @@ module {
     // CHECK: [[STOREPTR:%[a-zA-Z0-9_]*]] = spv.AccessChain [[ARG2]]
     // CHECK: spv.FunctionCall @reduction_apply([[LOADVAL]], [[STOREPTR]])
     iree.store_reduce(%0 : tensor<5x4xi32>, %arg2 : memref<4xi32>, @reduction_apply)
-    iree.return
+    return
   }
   func @reduction_apply(%arg0: i32, %arg1: !spv.ptr<i32, StorageBuffer>) {
     %0 = spv.AtomicSMax "Device" "None" %arg1, %arg0 : !spv.ptr<i32, StorageBuffer>
@@ -59,7 +59,7 @@ module {
     %0 = iree.load_input(%arg0 : memref<5x4xi32>)  : tensor<5x4xi32>
     // CHECK: spv.AccessChain [[ARG2]]{{\[}}{{.*}}, [[IVY]]{{\]}}
     iree.store_reduce(%0 : tensor<5x4xi32>, %arg2 : memref<5xi32>, @reduction_apply)
-    iree.return
+    return
   }
   func @reduction_apply(%arg0: i32, %arg1: !spv.ptr<i32, StorageBuffer>) {
     %0 = spv.AtomicSMax "Device" "None" %arg1, %arg0 : !spv.ptr<i32, StorageBuffer>

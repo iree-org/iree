@@ -14,7 +14,7 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<12x42xi32>, %arg1 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -34,7 +34,7 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<12x42xi32>, %arg1 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -54,7 +54,7 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<12x42x1x1xi32>, %arg1 : memref<12x42x1x1xi32>)
-    iree.return
+    return
   }
 }
 
@@ -74,7 +74,7 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<12x1x1x42xi32>, %arg1 : memref<12x1x1x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -94,6 +94,6 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<12x42xi32>, %arg1 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }

@@ -21,7 +21,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %2 = "xla_hlo.pad"(%0, %1) {edge_padding_high = dense<[2, 3]> : tensor<2xi64>, edge_padding_low = dense<[4, 5]> : tensor<2xi64>, interior_padding = dense<0> : tensor<2xi64>} : (tensor<12x4xf32>, tensor<f32>) -> tensor<18x12xf32>
     iree.store_output(%2 : tensor<18x12xf32>, %arg1 : memref<18x12xf32>)
-    iree.return
+    return
   }
 }
 
@@ -47,7 +47,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %2 = "xla_hlo.pad"(%0, %1) {edge_padding_high = dense<[0, 0]> : tensor<2xi64>, edge_padding_low = dense<[0, 0]> : tensor<2xi64>, interior_padding = dense<0> : tensor<2xi64>} : (tensor<12x4xf32>, tensor<f32>) -> tensor<12x4xf32>
     iree.store_output(%2 : tensor<12x4xf32>, %arg1 : memref<12x4xf32>)
-    iree.return
+    return
   }
 }
 
@@ -74,6 +74,6 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %2 = "xla_hlo.pad"(%0, %1) {edge_padding_high = dense<[2, 3]> : tensor<2xi64>, edge_padding_low = dense<[4, 5]> : tensor<2xi64>, interior_padding = dense<[1, 2]> : tensor<2xi64>} : (tensor<12x4xf32>, tensor<f32>) -> tensor<29x18xf32>
     iree.store_output(%2 : tensor<29x18xf32>, %arg1 : memref<29x18xf32>)
-    iree.return
+    return
   }
 }

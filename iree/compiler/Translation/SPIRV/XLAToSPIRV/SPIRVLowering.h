@@ -79,6 +79,17 @@ class ConstantOpSPIRVLowering final : public SPIRVOpLowering<ConstantOp> {
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
+class ReturnOpSPIRVLowering final : public SPIRVOpLowering<ReturnOp> {
+ public:
+  using SPIRVOpLowering<ReturnOp>::SPIRVOpLowering;
+
+  LogicalResult lowerOperation(
+      Operation *op, OpBuilder &builder,
+      TensorIndexToScalarValueMap &valueCache) const override {
+    return success();
+  }
+};
+
 /// SPIR-V lowering for CmpIOp.
 class CmpIOpSPIRVLowering final : public SPIRVOpLowering<CmpIOp> {
  public:

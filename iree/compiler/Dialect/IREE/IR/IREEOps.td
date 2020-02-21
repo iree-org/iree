@@ -31,18 +31,6 @@ class IREE_PureOp<string mnemonic, list<OpTrait> traits = []> :
     IREE_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
-// Utilities
-//===----------------------------------------------------------------------===//
-
-def IREE_ReturnOp : IREE_Op<"return", [Terminator]> {
-  let arguments = (ins Variadic<AnyType>:$operands);
-
-  let builders = [OpBuilder<
-    "Builder *b, OperationState &result", [{ build(b, result, llvm::None); }]
-  >];
-}
-
-//===----------------------------------------------------------------------===//
 // Executable ABI
 //===----------------------------------------------------------------------===//
 

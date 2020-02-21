@@ -13,7 +13,7 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<12x12xf32>, %arg1 : memref<12x12xf32>)
-    iree.return
+    return
   }
 }
 
@@ -32,6 +32,6 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<3x3x3xf32>, %arg1 : memref<3x3x3xf32>)
-    iree.return
+    return
   }
 }

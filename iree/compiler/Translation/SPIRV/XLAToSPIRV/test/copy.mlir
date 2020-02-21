@@ -94,6 +94,6 @@ module {
     %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
     %1 = "xla_hlo.copy"(%0) : (tensor<12x42xi32>) -> tensor<12x42xi32>
     iree.store_output(%1 : tensor<12x42xi32>, %arg1 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }

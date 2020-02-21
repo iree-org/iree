@@ -34,29 +34,6 @@ namespace iree_compiler {
 namespace IREE {
 
 //===----------------------------------------------------------------------===//
-// iree.return
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 2> opInfo;
-  SmallVector<Type, 2> types;
-  llvm::SMLoc loc = parser.getCurrentLocation();
-  return failure(parser.parseOperandList(opInfo) ||
-                 (!opInfo.empty() && parser.parseColonTypeList(types)) ||
-                 parser.resolveOperands(opInfo, types, loc, state.operands));
-}
-
-static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
-  p << "iree.return";
-  if (op.getNumOperands() > 0) {
-    p << ' ';
-    p.printOperands(op.operand_begin(), op.operand_end());
-    p << " : ";
-    interleaveComma(op.getOperandTypes(), p);
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // iree.do_not_optimize
 //===----------------------------------------------------------------------===//
 

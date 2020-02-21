@@ -11,7 +11,7 @@ module {
     %1 = "xla_hlo.constant"() {value = dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32>} : () -> (tensor<2x3xf32>)
     %2 = "xla_hlo.add"(%0, %1) : (tensor<2x3xf32>, tensor<2x3xf32>) -> tensor<2x3xf32>
     iree.store_output(%2 : tensor<2x3xf32>, %arg1 : memref<2x3xf32>)
-    iree.return
+    return
   }
 }
 
@@ -25,7 +25,7 @@ module {
     %1 = "xla_hlo.constant"() {value = dense<1.0> : tensor<2x3xf32>} : () -> (tensor<2x3xf32>)
     %2 = "xla_hlo.add"(%0, %1) : (tensor<2x3xf32>, tensor<2x3xf32>) -> tensor<2x3xf32>
     iree.store_output(%2 : tensor<2x3xf32>, %arg1 : memref<2x3xf32>)
-    iree.return
+    return
   }
 }
 
@@ -42,6 +42,6 @@ module {
     %1 = "xla_hlo.constant"() {value = dense<[[1, 2, 3], [4, 5, 6]]> : tensor<2x3xi32>} : () -> (tensor<2x3xi32>)
     %2 = "xla_hlo.add"(%0, %1) : (tensor<2x3xi32>, tensor<2x3xi32>) -> tensor<2x3xi32>
     iree.store_output(%2 : tensor<2x3xi32>, %arg0 : memref<2x3xi32>)
-    iree.return
+    return
   }
 }

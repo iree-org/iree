@@ -22,6 +22,7 @@
 #include "iree/schemas/interpreter_module_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/Module.h"
@@ -47,7 +48,8 @@ LogicalResult WriteGenericIreeOp(Block *block, Operation *op,
   auto strippedOpName = opName.substr(opName.find('.') + 1).str();
   if (dialectNamespace == "iree_ll_interp" ||
       // TODO(gcmn) remove special case for IREE dialect?
-      dialectNamespace == IREEDialect::getDialectNamespace()) {
+      dialectNamespace == IREEDialect::getDialectNamespace() ||
+      dialectNamespace == "std") {
     auto opcode = GetInterpreterOpcodeByName(strippedOpName);
     if (!opcode.hasValue()) {
       return op->emitOpError()
@@ -240,7 +242,8 @@ LogicalResult VMFunctionBuilder::WriteOperation(Block *block, Operation *baseOp,
 
   // Fallback to using the generic writer.
   if (baseOp->getAbstractOperation()->dialect.getNamespace().startswith(
-          "iree")) {
+          "iree") ||
+      isa<mlir::ReturnOp>(baseOp)) {
     RETURN_IF_FAILURE(WriteGenericIreeOp(block, baseOp, writer));
   } else {
     return baseOp->emitError()

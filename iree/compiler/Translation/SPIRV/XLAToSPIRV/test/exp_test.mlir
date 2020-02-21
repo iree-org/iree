@@ -7,7 +7,7 @@ module {
     //CHECK: {{%.*}} = spv.GLSL.Exp {{%.*}} : f32
     %0 = "xla_hlo.exp"(%cst) : (tensor<f32>) -> tensor<f32>
     iree.store_output(%0 : tensor<f32>, %arg0 : memref<f32>)
-    iree.return
+    return
   }
 }
 
@@ -20,6 +20,6 @@ module {
     //CHECK: {{%.*}} = spv.GLSL.Exp {{%.*}} : f32
     %2 = "xla_hlo.exp"(%0) : (tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%2 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }

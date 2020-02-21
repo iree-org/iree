@@ -27,6 +27,6 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (0, d0)>]
     %2 = "xla_hlo.concatenate"(%0, %1) {dimension = 1 : i64} : (tensor<1x64xf32>, tensor<1x10xf32>) -> tensor<1x74xf32>
     iree.store_output(%2 : tensor<1x74xf32>, %arg2 : memref<1x74xf32>)
-    iree.return
+    return
   }
 }

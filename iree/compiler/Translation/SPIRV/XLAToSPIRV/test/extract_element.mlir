@@ -13,6 +13,6 @@ module {
     // CHECK: [[ZERO2:%.*]] = spv.constant 0 : i32
     // CHECK: {{%.*}} = spv.AccessChain [[ARG1]]{{\[}}[[ZERO2]]{{\]}}
     "iree.store_output"(%1, %arg1) : (i1, memref<i1>) -> ()
-    "iree.return"() : () -> ()
+    "std.return"() : () -> ()
   }
 }

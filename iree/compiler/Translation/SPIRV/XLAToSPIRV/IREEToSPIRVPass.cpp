@@ -93,10 +93,10 @@ static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
                                            operation_range fns) {
   // Initialize the spir-v codegenerator.
   SPIRVCodegen<
-      ConstantOpSPIRVLowering,
+      ConstantOpSPIRVLowering, ReturnOpSPIRVLowering,
       // IREE-specific ops:
-      IREELoadOpSPIRVLowering, IREEReturnOpSPIRVLowering,
-      IREEStoreOpSPIRVLowering, IREEStoreReduceOpSPIRVLowering,
+      IREELoadOpSPIRVLowering, IREEStoreOpSPIRVLowering,
+      IREEStoreReduceOpSPIRVLowering,
       // Standard dialect unary elementwise ops:
       // Standard dialect binary elementwise ops:
       SPIRVPwOpLowering<AddFOp, spirv::FAddOp>,

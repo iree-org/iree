@@ -27,6 +27,6 @@ module {
     %1 = iree.load_input(%arg1 : memref<1x10xf32>) : tensor<1x10xf32>
     %2 = "xla_hlo.concatenate"(%0, %1) {dimension = 1 : i64} : (tensor<1x64xf32>, tensor<1x10xf32>) -> tensor<1x74xf32>
     iree.store_output(%2 : tensor<1x74xf32>, %arg2 : memref<1x74xf32>)
-    iree.return
+    return
   }
 }

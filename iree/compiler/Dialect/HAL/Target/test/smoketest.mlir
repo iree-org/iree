@@ -27,7 +27,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // INTERP-NEXT:         %1 = "iree_ll_interp.constant"() {value = dense<0> : tensor<1xi64>} : () -> memref<1xi64>
 // INTERP-NEXT:         %2 = "iree_ll_interp.constant"() {value = dense<4> : tensor<1xi64>} : () -> memref<1xi64>
 // INTERP-NEXT:         "iree_ll_interp.dynamic_copy"(%0, %1, %arg1, %1, %2) : (memref<4xf32>, memref<1xi64>, memref<4xf32>, memref<1xi64>, memref<1xi64>) -> ()
-// INTERP-NEXT:         iree.return
+// INTERP-NEXT:         return
 // INTERP-NEXT:       }
 // INTERP-NEXT:     }
 // INTERP-NEXT:   }

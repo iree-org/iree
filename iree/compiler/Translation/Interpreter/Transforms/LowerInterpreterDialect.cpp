@@ -227,7 +227,7 @@ class LowerInterpreterDialectPass
 
     ConversionTarget target(getContext());
     target.addLegalDialect<IREELLInterpreterDialect>();
-    target.addLegalOp<FuncOp, IREE::ReturnOp>();
+    target.addLegalOp<FuncOp, mlir::ReturnOp>();
     if (failed(applyFullConversion(getFunction(), target, patterns))) {
       return signalPassFailure();
     }

@@ -21,7 +21,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32,
   // CHECK: [[ARG2STOREPTR:%.*]] = spv.AccessChain [[ARG2]]{{\[}}[[ZERO3]], {{.*}}{{\]}}
   // CHECK: spv.Store "StorageBuffer" [[ARG2STOREPTR]], [[RESULT]]
   iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
-  iree.return
+  return
 }
 
 // -----
@@ -33,7 +33,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32,
   // CHECK: spv.FRem
   %2 = remf %0, %1 : tensor<4xf32>
   iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
-  iree.return
+  return
 }
 
 // -----
@@ -45,7 +45,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32,
   // CHECK: spv.SRem
   %2 = remi_signed %0, %1 : tensor<4xi32>
   iree.store_output(%2 : tensor<4xi32>, %arg2 : memref<4xi32>)
-  iree.return
+  return
 }
 
 // -----
@@ -57,5 +57,5 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32,
   // CHECK: spv.SRem
   %2 = remi_unsigned %0, %1 : tensor<4xi32>
   iree.store_output(%2 : tensor<4xi32>, %arg2 : memref<4xi32>)
-  iree.return
+  return
 }

@@ -12,7 +12,7 @@ module {
 
   func @reduction_apply(%arg0: tensor<i32>, %arg1: tensor<i32>) -> tensor<i32> {
     %0 = xla_hlo.max %arg0, %arg1 : tensor<i32>
-    iree.return %0 : tensor<i32>
+    return %0 : tensor<i32>
   }
 }
 

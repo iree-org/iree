@@ -65,14 +65,6 @@ LogicalResult IREEStoreOpSPIRVLowering::lowerOperation(
   return success();
 }
 
-/// IREE::ReturnOp in dispatch functions lowered to SPIR-V should have no
-/// operands.
-LogicalResult IREEReturnOpSPIRVLowering::lowerOperation(
-    Operation *op, OpBuilder &builder,
-    TensorIndexToScalarValueMap &valueCache) const {
-  return success();
-}
-
 LogicalResult IREEStoreReduceOpSPIRVLowering::lowerOperation(
     Operation *op, OpBuilder &builder,
     TensorIndexToScalarValueMap &valueCache) const {

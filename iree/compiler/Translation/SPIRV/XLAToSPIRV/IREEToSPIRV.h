@@ -38,16 +38,6 @@ class IREELoadOpSPIRVLowering final
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
-/// Translation of iree.return operation.
-class IREEReturnOpSPIRVLowering final : public SPIRVOpLowering<IREE::ReturnOp> {
- public:
-  using SPIRVOpLowering<IREE::ReturnOp>::SPIRVOpLowering;
-
-  LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder,
-      TensorIndexToScalarValueMap &valueCache) const override;
-};
-
 /// Translation of iree.store_output operation.
 class IREEStoreOpSPIRVLowering final
     : public SPIRVOpLowering<IREE::StoreOutputOp> {

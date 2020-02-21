@@ -180,13 +180,11 @@ LogicalResult lowerReductionApplyFunction(MLIRContext *context,
                                           ArrayRef<Operation *> fns) {
   SPIRVReductionTypeConverter typeConverter;
   OwningRewritePatternList patterns;
-  patterns
-      .insert<ReductionApplyFnConversion,
-              ReductionOpConversion<xla_hlo::MinOp, spirv::AtomicSMinOp>,
-              ReductionOpConversion<xla_hlo::MaxOp, spirv::AtomicSMaxOp>,
-              ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>,
-              ReturnOpConversion<IREE::ReturnOp>, ReturnOpConversion<ReturnOp>>(
-          context, typeConverter);
+  patterns.insert<ReductionApplyFnConversion,
+                  ReductionOpConversion<xla_hlo::MinOp, spirv::AtomicSMinOp>,
+                  ReductionOpConversion<xla_hlo::MaxOp, spirv::AtomicSMaxOp>,
+                  ReductionOpConversion<AddIOp, spirv::AtomicIAddOp>,
+                  ReturnOpConversion<ReturnOp>>(context, typeConverter);
   populateBuiltinFuncToSPIRVPatterns(context, typeConverter, patterns);
 
   ConversionTarget target(*context);

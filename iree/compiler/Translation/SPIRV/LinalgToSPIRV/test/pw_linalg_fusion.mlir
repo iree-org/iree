@@ -17,7 +17,7 @@ attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32,
   %4 = "xla_hlo.mul"(%0, %1) : (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   %5 = "xla_hlo.add"(%4, %2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   iree.store_output(%5 : tensor<4x8xi32>, %arg3 : memref<4x8xi32>)
-  iree.return
+  return
 }
 
 // -----
@@ -43,7 +43,7 @@ attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32,
   %5 = "xla_hlo.add"(%4, %2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   %6 = "xla_hlo.sub"(%5, %3) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   iree.store_output(%6 : tensor<4x8xi32>, %arg4 : memref<4x8xi32>)
-  iree.return
+  return
 }
 
 // -----
@@ -69,7 +69,7 @@ attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32,
   %5 = "xla_hlo.add"(%2, %3) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   %6 = "xla_hlo.sub"(%4, %5) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   iree.store_output(%6 : tensor<4x8xi32>, %arg4 : memref<4x8xi32>)
-  iree.return
+  return
 }
 
 // -----
@@ -94,5 +94,5 @@ attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32,
   %4 = "xla_hlo.add"(%0, %2) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   %5 = "xla_hlo.sub"(%3, %4) :  (tensor<4x8xi32>, tensor<4x8xi32>) -> tensor<4x8xi32>
   iree.store_output(%5 : tensor<4x8xi32>, %arg3 : memref<4x8xi32>)
-  iree.return
+  return
 }

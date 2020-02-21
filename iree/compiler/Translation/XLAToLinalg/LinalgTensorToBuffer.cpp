@@ -62,16 +62,6 @@ struct RemoveStoreOutputOpPattern : OpConversionPattern<IREE::StoreOutputOp> {
   }
 };
 
-/// Replace iree.return with std.return operation.
-struct IREEReturnOpLowering : OpConversionPattern<IREE::ReturnOp> {
-  using OpConversionPattern<IREE::ReturnOp>::OpConversionPattern;
-  PatternMatchResult matchAndRewrite(
-      IREE::ReturnOp op, ArrayRef<Value> operands,
-      ConversionPatternRewriter &rewriter) const {
-    rewriter.replaceOpWithNewOp<ReturnOp>(op);
-    return matchSuccess();
-  }
-};
 }  // namespace
 
 PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
@@ -121,9 +111,8 @@ PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
 
 void populateLinalgTensorToBufferConversionPattern(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<IREEReturnOpLowering, LinalgTensorToBufferConverter,
-                  RemoveLoadInputOpPattern, RemoveStoreOutputOpPattern>(
-      context);
+  patterns.insert<LinalgTensorToBufferConverter, RemoveLoadInputOpPattern,
+                  RemoveStoreOutputOpPattern>(context);
 }
 
 struct LinalgTensorToBufferConversionPass

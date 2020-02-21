@@ -310,7 +310,7 @@ bool convertOperation(Operation *oldOp, OpBuilder &builder,
     return convertCallOp(&callOp, builder, mapping);
   } else if (auto callIndirectOp = dyn_cast<CallIndirectOp>(oldOp)) {
     return convertCallIndirectOp(&callIndirectOp, builder, mapping);
-  } else if (isa<ReturnOp>(oldOp) || isa<IREE::ReturnOp>(oldOp)) {
+  } else if (isa<ReturnOp>(oldOp)) {
     return convertReturnOp(oldOp, builder, mapping);
   } else if (auto branchOp = dyn_cast<BranchOp>(oldOp)) {
     return convertBranchOp(&branchOp, builder, mapping);

@@ -19,7 +19,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %1 = "xla_hlo.reverse"(%0) {dimensions = dense<[1, 0]> : tensor<2xi64>} : (tensor<12x12xf32>) -> tensor<12x12xf32>
     iree.store_output(%1 : tensor<12x12xf32>, %arg1 : memref<12x12xf32>)
-    iree.return
+    return
   }
 }
 
@@ -44,6 +44,6 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, d1, d0)>]
     %1 = "xla_hlo.reverse"(%0) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<3x3x3xf32>) -> tensor<3x3x3xf32>
     iree.store_output(%1 : tensor<3x3x3xf32>, %arg1 : memref<3x3x3xf32>)
-    iree.return
+    return
   }
 }

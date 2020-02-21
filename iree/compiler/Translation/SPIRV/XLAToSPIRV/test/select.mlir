@@ -10,7 +10,7 @@ module {
     //CHECK: {{%.*}} = spv.Select [[COMPARE]], {{%.*}}, {{%.*}}
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -25,7 +25,7 @@ module {
     %2 = cmpf "oeq", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -40,7 +40,7 @@ module {
     %2 = cmpf "ogt", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -55,7 +55,7 @@ module {
     %2 = cmpf "olt", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -70,7 +70,7 @@ module {
     %2 = cmpf "ole", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -85,7 +85,7 @@ module {
     %2 = cmpf "one", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -100,7 +100,7 @@ module {
     %2 = cmpf "ueq", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -115,7 +115,7 @@ module {
     %2 = cmpf "uge", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -130,7 +130,7 @@ module {
     %2 = cmpf "ugt", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -145,7 +145,7 @@ module {
     %2 = cmpf "ult", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -160,7 +160,7 @@ module {
     %2 = cmpf "ule", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -175,7 +175,7 @@ module {
     %2 = cmpf "une", %0, %1 : tensor<12x42xf32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xf32>, tensor<12x42xf32>) -> tensor<12x42xf32>
     iree.store_output(%3 : tensor<12x42xf32>, %arg2 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -190,7 +190,7 @@ module {
     %2 = cmpi "eq", %0, %1 : tensor<12x42xi32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
     iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -205,7 +205,7 @@ module {
     %2 = cmpi "ne", %0, %1 : tensor<12x42xi32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
     iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -220,7 +220,7 @@ module {
     %2 = cmpi "slt", %0, %1 : tensor<12x42xi32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
     iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -235,7 +235,7 @@ module {
     %2 = cmpi "sle", %0, %1 : tensor<12x42xi32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
     iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -251,7 +251,7 @@ module {
     //CHECK: {{%.*}} = spv.Select [[COMPARE]], {{%.*}}, {{%.*}}
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
     iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -266,6 +266,6 @@ module {
     %2 = cmpi "sgt", %0, %1 : tensor<12x42xi32>
     %3 = "xla_hlo.select"(%2, %0, %1) : (tensor<12x42xi1>, tensor<12x42xi32>, tensor<12x42xi32>) -> tensor<12x42xi32>
     iree.store_output(%3 : tensor<12x42xi32>, %arg2 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }

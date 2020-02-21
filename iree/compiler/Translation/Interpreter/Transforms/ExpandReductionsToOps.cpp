@@ -165,7 +165,7 @@ LogicalResult expandReductionFunction(FuncOp entryFunc) {
     return applyFunc.emitError() << "Unable to convert apply func";
   }
 
-  builder.create<IREE::ReturnOp>(builder.getUnknownLoc());
+  builder.create<mlir::ReturnOp>(builder.getUnknownLoc());
 
   // Remove the apply function as we have inlined it.
   applyFunc.erase();

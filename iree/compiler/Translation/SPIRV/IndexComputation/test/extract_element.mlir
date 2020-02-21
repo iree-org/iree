@@ -25,6 +25,6 @@ module {
     // CHECK-SAME: [affine_map<(d0) -> (0)>]
     %1 = "std.extract_element"(%0) : (tensor<i1>) -> i1
     "iree.store_output"(%1, %arg1) : (i1, memref<i1>) -> ()
-    "iree.return"() : () -> ()
+    "std.return"() : () -> ()
   }
 }

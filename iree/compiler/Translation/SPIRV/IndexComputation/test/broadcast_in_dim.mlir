@@ -19,7 +19,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, d1, d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<12x42xi32>) -> tensor<3x12x42xi32>
     iree.store_output(%1 : tensor<3x12x42xi32>, %arg1 : memref<3x12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -44,7 +44,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, d1, d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) : (tensor<i32>) -> tensor<3x12x42xi32>
     iree.store_output(%1 : tensor<3x12x42xi32>, %arg1 : memref<3x12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -68,7 +68,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xf32>) -> tensor<12x42xf32>
     iree.store_output(%1 : tensor<12x42xf32>, %arg0 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -92,7 +92,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xi32>) -> tensor<12x42xi32>
     iree.store_output(%1 : tensor<12x42xi32>, %arg0 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -116,7 +116,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, d1, d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<2xi32>) -> tensor<2x12x42xi32>
     iree.store_output(%1 : tensor<2x12x42xi32>, %arg0 : memref<2x12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -134,6 +134,6 @@ module {
     // CHECK-SAME: [affine_map<(d0) -> (d0)>]
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<4xf32>
     iree.store_output(%1 : tensor<4xf32>, %arg1 : memref<4xf32>)
-    iree.return
+    return
   }
 }

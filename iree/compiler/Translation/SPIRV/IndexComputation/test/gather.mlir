@@ -30,6 +30,6 @@ module {
       slice_sizes = dense<[1, 1, 10]> : tensor<3xi64>
     } : (tensor<5x1x10xf32>, tensor<i64>) -> tensor<1x10xf32>
     iree.store_output(%2 : tensor<1x10xf32>, %arg2 : memref<1x10xf32>)
-    iree.return
+    return
   }
 }

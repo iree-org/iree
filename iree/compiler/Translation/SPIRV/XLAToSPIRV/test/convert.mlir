@@ -7,7 +7,7 @@ module {
     // CHECK-NOT: spv.FConvert
     %1 = "xla_hlo.convert"(%0) : (tensor<12xf32>) -> tensor<12xf32>
     iree.store_output(%1 : tensor<12xf32>, %arg1 : memref<12xf32>)
-    iree.return
+    return
   }
 }
 
@@ -20,7 +20,7 @@ module {
     // CHECK: spv.FConvert {{%.*}} f32 to f16
     %1 = "xla_hlo.convert"(%0) : (tensor<12xf32>) -> tensor<12xf16>
     iree.store_output(%1 : tensor<12xf16>, %arg1 : memref<12xf16>)
-    iree.return
+    return
   }
 }
 
@@ -33,7 +33,7 @@ module {
     // CHECK-NOT: spv.SConvert
     %1 = "xla_hlo.convert"(%0) : (tensor<12xi32>) -> tensor<12xi32>
     iree.store_output(%1 : tensor<12xi32>, %arg1 : memref<12xi32>)
-    iree.return
+    return
   }
 }
 
@@ -46,7 +46,7 @@ module {
     // CHECK: spv.SConvert {{%.*}} i32 to i16
     %1 = "xla_hlo.convert"(%0) : (tensor<12xi32>) -> tensor<12xi16>
     iree.store_output(%1 : tensor<12xi16>, %arg1 : memref<12xi16>)
-    iree.return
+    return
   }
 }
 
@@ -59,7 +59,7 @@ module {
     // CHECK: spv.ConvertSToF
     %1 = "xla_hlo.convert"(%0) : (tensor<12xi32>) -> tensor<12xf32>
     iree.store_output(%1 : tensor<12xf32>, %arg1 : memref<12xf32>)
-    iree.return
+    return
   }
 }
 
@@ -72,7 +72,7 @@ module {
     // CHECK: spv.ConvertFToS
     %1 = "xla_hlo.convert"(%0) : (tensor<12xf32>) -> tensor<12xi32>
     iree.store_output(%1 : tensor<12xi32>, %arg1 : memref<12xi32>)
-    iree.return
+    return
   }
 }
 
@@ -88,6 +88,6 @@ module {
     %0 = iree.load_input(%arg0 : memref<12xi1>) : tensor<12xi1>
     %1 = "xla_hlo.convert"(%0) : (tensor<12xi1>) -> tensor<12xi32>
     iree.store_output(%1 : tensor<12xi32>, %arg1 : memref<12xi32>)
-    iree.return
+    return
   }
 }

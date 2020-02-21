@@ -17,7 +17,7 @@ module {
   func @reduction_entry(%arg0: memref<5xi32>, %arg1: memref<i32>, %arg2: memref<i32>) attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 0 : i32, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<5xi32>)  : tensor<5xi32>
     iree.store_reduce(%0 : tensor<5xi32>, %arg2 : memref<i32>, @reduction_apply)
-    iree.return
+    return
   }
 }
 
@@ -40,7 +40,7 @@ module {
   func @reduction_2D_dim0_entry(%arg0: memref<5x4xi32>, %arg1: memref<i32>, %arg2: memref<4xi32>) attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 0 : i32, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<5x4xi32>)  : tensor<5x4xi32>
     iree.store_reduce(%0 : tensor<5x4xi32>, %arg2 : memref<4xi32>, @reduction_apply)
-    iree.return
+    return
   }
 }
 
@@ -63,6 +63,6 @@ module {
   func @reduction_2D_dim1_entry(%arg0: memref<5x4xi32>, %arg1: memref<i32>, %arg2: memref<5xi32>) attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 1 : i32, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<5x4xi32>)  : tensor<5x4xi32>
     iree.store_reduce(%0 : tensor<5x4xi32>, %arg2 : memref<5xi32>, @reduction_apply)
-    iree.return
+    return
   }
 }

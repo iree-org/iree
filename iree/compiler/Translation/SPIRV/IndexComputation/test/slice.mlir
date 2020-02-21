@@ -19,7 +19,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %1 = "xla_hlo.slice"(%0) {start_indices = dense<[2, 1]> : tensor<2xi64>, limit_indices = dense<[4, 4]> : tensor<2xi64>, strides = dense<[1, 1]> : tensor<2xi64>} : (tensor<6x6xf32>) -> tensor<2x3xf32>
     iree.store_output(%1 : tensor<2x3xf32>, %arg1 : memref<2x3xf32>)
-    iree.return
+    return
   }
 }
 
@@ -44,6 +44,6 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
     %1 = "xla_hlo.slice"(%0) {start_indices = dense<[2, 1]> : tensor<2xi64>, limit_indices = dense<[4, 6]> : tensor<2xi64>, strides = dense<[1, 2]> : tensor<2xi64>} : (tensor<6x6xf32>) -> tensor<2x3xf32>
     iree.store_output(%1 : tensor<2x3xf32>, %arg1 : memref<2x3xf32>)
-    iree.return
+    return
   }
 }

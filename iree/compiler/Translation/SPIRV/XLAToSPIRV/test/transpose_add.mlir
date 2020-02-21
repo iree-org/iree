@@ -17,6 +17,6 @@ module {
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[RESULT]]
     %2 = "xla_hlo.add"(%0, %1) : (tensor<12x12xf32>, tensor<12x12xf32>) -> tensor<12x12xf32>
     iree.store_output(%2 : tensor<12x12xf32>, %arg1 : memref<12x12xf32>)
-    iree.return
+    return
   }
 }

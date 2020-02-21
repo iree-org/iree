@@ -11,7 +11,7 @@ module {
     %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<12x42xi32>) -> tensor<3x12x42xi32>
     iree.store_output(%1 : tensor<3x12x42xi32>, %arg1 : memref<3x12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -32,7 +32,7 @@ module {
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
     // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL]]
     iree.store_output(%1 : tensor<3x12x42xi32>, %arg1 : memref<3x12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -45,7 +45,7 @@ module {
     %0 = constant dense<1.0> : tensor<12xf32>
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xf32>) -> tensor<12x42xf32>
     iree.store_output(%1 : tensor<12x42xf32>, %arg0 : memref<12x42xf32>)
-    iree.return
+    return
   }
 }
 
@@ -58,7 +58,7 @@ module {
     %0 = constant dense<42> : tensor<12xi32>
     %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (tensor<12xi32>) -> tensor<12x42xi32>
     iree.store_output(%1 : tensor<12x42xi32>, %arg0 : memref<12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -78,6 +78,6 @@ module {
     // CHECK: [[STOREPTR:%.*]] = spv.AccessChain [[ARG0]]
     // CHECK: spv.Store "StorageBuffer" [[STOREPTR]], [[LOADVAL]]
     iree.store_output(%1 : tensor<2x12x42xi32>, %arg0 : memref<2x12x42xi32>)
-    iree.return
+    return
   }
 }

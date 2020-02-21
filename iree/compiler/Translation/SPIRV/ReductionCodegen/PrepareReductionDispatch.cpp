@@ -20,6 +20,7 @@
 #include <numeric>
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "mlir/Dialect/StandardOps/Ops.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
@@ -97,7 +98,7 @@ PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(
       src);
   rewriter.create<IREE::StoreReduceOp>(loc, loadInputOp.getResult(), dst,
                                        applyFn);
-  rewriter.create<IREE::ReturnOp>(fn.getLoc());
+  rewriter.create<mlir::ReturnOp>(fn.getLoc());
 
   // Finally update the workload size to be determined by the size of the input.
   auto convertFn = [&](std::array<int32_t, 3> value,

@@ -75,7 +75,7 @@ static void makeLegacyExecutableDispatchABI(
       returnBuilder.create<IREE::StoreOutputOp>(
           returnOp.getLoc(), operand.value(), outputArgs[operand.index()]);
     }
-    returnBuilder.create<IREE::ReturnOp>(returnOp.getLoc());
+    returnBuilder.create<mlir::ReturnOp>(returnOp.getLoc());
     deadOps.push_back(returnOp);
   });
   for (auto *deadOp : deadOps) deadOp->erase();

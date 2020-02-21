@@ -19,7 +19,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, d1, d0)>]
     %1 = "xla_hlo.broadcast"(%0) {broadcast_sizes = dense<[3]> : tensor<1xi64>} : (tensor<12x42xi32>) -> tensor<3x12x42xi32>
     iree.store_output(%1 : tensor<3x12x42xi32>, %arg1 : memref<3x12x42xi32>)
-    iree.return
+    return
   }
 }
 
@@ -44,6 +44,6 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, d1, d0)>]
     %1 = "xla_hlo.broadcast"(%0) {broadcast_sizes = dense<[3, 12, 42]>: tensor<3xi64>} : (tensor<i32>) -> tensor<3x12x42xi32>
     iree.store_output(%1 : tensor<3x12x42xi32>, %arg1 : memref<3x12x42xi32>)
-    iree.return
+    return
   }
 }
