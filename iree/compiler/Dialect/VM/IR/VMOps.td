@@ -450,7 +450,7 @@ def VM_GlobalStoreIndirectI32Op :
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalLoadRefOp : VM_GlobalLoadOp<AnyRefPtr, "global.load.ref"> {
+def VM_GlobalLoadRefOp : VM_GlobalLoadOp<VM_AnyRef, "global.load.ref"> {
   let summary = [{global ref_ptr<T> load operation}];
   let description = [{
     Loads the value of a global containing a ref_ptr of the given type.
@@ -466,7 +466,7 @@ def VM_GlobalLoadRefOp : VM_GlobalLoadOp<AnyRefPtr, "global.load.ref"> {
   let hasCanonicalizer = 1;
 }
 
-def VM_GlobalStoreRefOp : VM_GlobalStoreOp<AnyRefPtr, "global.store.ref"> {
+def VM_GlobalStoreRefOp : VM_GlobalStoreOp<VM_AnyRef, "global.store.ref"> {
   let summary = [{global ref_ptr<T> stores operation}];
   let description = [{
     Stores a ref_ptr<T> to a global, retaining it until the global is reset.
@@ -481,7 +481,7 @@ def VM_GlobalStoreRefOp : VM_GlobalStoreOp<AnyRefPtr, "global.store.ref"> {
 }
 
 def VM_GlobalLoadIndirectRefOp :
-    VM_GlobalLoadIndirectOp<AnyRefPtr, "global.load.indirect.ref"> {
+    VM_GlobalLoadIndirectOp<VM_AnyRef, "global.load.indirect.ref"> {
   let summary = [{global ref_ptr<T> load operation}];
   let description = [{
     Loads the value of a global containing a ref_ptr of the given type.
@@ -498,7 +498,7 @@ def VM_GlobalLoadIndirectRefOp :
 }
 
 def VM_GlobalStoreIndirectRefOp :
-    VM_GlobalStoreIndirectOp<AnyRefPtr, "global.store.indirect.ref"> {
+    VM_GlobalStoreIndirectOp<VM_AnyRef, "global.store.indirect.ref"> {
   let summary = [{global ref_ptr<T> stores operation}];
   let description = [{
     Stores a ref_ptr<T> to a global, retaining it until the global is reset.
@@ -608,7 +608,7 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
   }];
 
   let results = (outs
-    AnyRefPtr:$result
+    VM_AnyRef:$result
   );
 
   let assemblyFormat = "`:` type($result) attr-dict";
@@ -673,7 +673,7 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   );
 
   let results = (outs
-    ByteBufferRef:$value
+    VM_RefOf<ByteBufferType>:$value
   );
 
   let assemblyFormat = "$rodata attr-dict `:` type($value)";
@@ -766,11 +766,11 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
 
   let arguments = (ins
     VM_CondValue:$condition,
-    AnyRefPtr:$true_value,
-    AnyRefPtr:$false_value
+    VM_AnyRef:$true_value,
+    VM_AnyRef:$false_value
   );
   let results = (outs
-    AnyRefPtr:$result
+    VM_AnyRef:$result
   );
 
   let assemblyFormat = "operands attr-dict `:` type($result)";
@@ -1099,7 +1099,7 @@ def VM_CmpGTEI32UOp :
 }
 
 def VM_CmpEQRefOp :
-    VM_BinaryComparisonOp<AnyRefPtr, "cmp.eq.ref", VM_OPC_CmpEQRef,
+    VM_BinaryComparisonOp<VM_AnyRef, "cmp.eq.ref", VM_OPC_CmpEQRef,
                           [Commutative]> {
   let summary = [{ref_ptr equality comparison operation}];
   let hasFolder = 1;
@@ -1108,7 +1108,7 @@ def VM_CmpEQRefOp :
 
 // TODO(benvanik): remove and just rely on eq & flipped cond_br?
 def VM_CmpNERefOp :
-    VM_BinaryComparisonOp<AnyRefPtr, "cmp.ne.ref", VM_OPC_CmpNERef,
+    VM_BinaryComparisonOp<VM_AnyRef, "cmp.ne.ref", VM_OPC_CmpNERef,
                           [Commutative]> {
   let summary = [{ref_ptr inequality comparison operation}];
   let hasFolder = 1;
@@ -1116,7 +1116,7 @@ def VM_CmpNERefOp :
 }
 
 def VM_CmpNZRefOp :
-    VM_UnaryComparisonOp<AnyRefPtr, "cmp.nz.ref", VM_OPC_CmpNZRef> {
+    VM_UnaryComparisonOp<VM_AnyRef, "cmp.nz.ref", VM_OPC_CmpNZRef> {
   let summary = [{ref_ptr non-zero comparison operation}];
   let description = [{
     Compares the given ref_ptr operand for a non-zero/null value.

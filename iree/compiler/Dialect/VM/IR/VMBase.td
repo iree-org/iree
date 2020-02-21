@@ -359,6 +359,39 @@ def VM_DebugOnly : NativeOpTrait<"IREE::VM::DebugOnly">;
 def VM_FullBarrier : NativeOpTrait<"IREE::VM::FullBarrier">;
 
 //===----------------------------------------------------------------------===//
+// ref<T> types
+//===----------------------------------------------------------------------===//
+
+def VM_AnyRefObject : DialectType<
+    IREE_Dialect,
+    CPred<"IREE::VM::RefType::isCompatible($_self)">,
+    "ref_object"> {
+  let typeDescription = [{
+    An object that can be referenced by a vm.ref.
+  }];
+}
+
+def VM_AnyRef : DialectType<
+    IREE_Dialect,
+    CPred<"$_self.isa<IREE::VM::RefType>()">,
+    "ref"> {
+  let typeDescription = [{
+    An iree_vm_ref_t/iree::vm::ref<T> of some type.
+  }];
+}
+
+class VM_RefOf<Type type> :
+    Type<And<[
+      CPred<"$_self.isa<IREE::VM::RefType>()">,
+      SubstLeaves<"$_self", "$_self.cast<IREE::VM::RefType>().getObjectType()",
+                  type.predicate>
+    ]>, "ref<" # type.description # ">"> {
+  // Set the builder call if the base type has a builder call.
+  string builderCall = !if(!empty(type.builderCall),
+                           "", "IREE::VM::RefType::get(" # type.builderCall # ")");
+}
+
+//===----------------------------------------------------------------------===//
 // VM types
 //===----------------------------------------------------------------------===//
 
@@ -379,7 +412,7 @@ def VM_CondValue : I<32> {
 def VM_AnyType : AnyTypeOf<[
   I32,
   VM_CondValue,
-  AnyRefPtr,
+  VM_AnyRef,
 ]>;
 
 class VM_ConstIntValueAttr<I type> : Attr<

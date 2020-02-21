@@ -99,7 +99,7 @@ static ModuleCounts computeModuleSymbolCounts(IREE::VM::ModuleOp moduleOp) {
 static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
   llvm::DenseMap<Type, std::string> typeMap;
   auto tryInsertType = [&](Type type) {
-    if (auto refPtrType = type.dyn_cast<RefPtrType>()) {
+    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
       type = refPtrType.getObjectType();
     }
     std::string str;
@@ -198,7 +198,7 @@ static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
   std::vector<int32_t> argumentTypes(functionType.getNumInputs());
   for (int i = 0; i < argumentTypes.size(); ++i) {
     Type type = functionType.getInput(i);
-    if (auto refPtrType = type.dyn_cast<RefPtrType>()) {
+    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
       type = refPtrType.getObjectType();
     }
     argumentTypes[i] = typeTable.lookup(type);
@@ -209,7 +209,7 @@ static Offset<iree::vm::FunctionSignatureDef> makeFunctionSignatureDef(
   std::vector<int32_t> resultTypes(functionType.getNumResults());
   for (int i = 0; i < resultTypes.size(); ++i) {
     Type type = functionType.getResult(i);
-    if (auto refPtrType = type.dyn_cast<RefPtrType>()) {
+    if (auto refPtrType = type.dyn_cast<IREE::VM::RefType>()) {
       type = refPtrType.getObjectType();
     }
     resultTypes[i] = typeTable.lookup(type);

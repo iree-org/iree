@@ -16,10 +16,10 @@ vm.module @my_module {
 // CHECK-LABEL: @select_ref
 vm.module @my_module {
   vm.func @select_ref(%arg0 : i32,
-                      %arg1 : !iree.opaque_ref,
-                      %arg2 : !iree.opaque_ref) -> !iree.opaque_ref {
-    // CHECK: %ref = vm.select.ref %arg0, %arg1, %arg2 : !iree.opaque_ref
-    %ref = vm.select.ref %arg0, %arg1, %arg2 : !iree.opaque_ref
-    vm.return %ref : !iree.opaque_ref
+                      %arg1 : !vm.ref<?>,
+                      %arg2 : !vm.ref<?>) -> !vm.ref<?> {
+    // CHECK: %ref = vm.select.ref %arg0, %arg1, %arg2 : !vm.ref<?>
+    %ref = vm.select.ref %arg0, %arg1, %arg2 : !vm.ref<?>
+    vm.return %ref : !vm.ref<?>
   }
 }

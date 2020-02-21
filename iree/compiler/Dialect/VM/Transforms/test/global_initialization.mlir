@@ -37,18 +37,18 @@ vm.module @initI32 {
 
 // CHECK-LABEL: @initRef
 vm.module @initRef {
-  // CHECK: vm.global.ref @g0 mutable : !iree.opaque_ref
-  vm.global.ref @g0 mutable init(@g0init) : !iree.opaque_ref
-  vm.func @g0init() -> !iree.opaque_ref {
-    %null = vm.const.ref.zero : !iree.opaque_ref
-    vm.return %null : !iree.opaque_ref
+  // CHECK: vm.global.ref @g0 mutable : !vm.ref<?>
+  vm.global.ref @g0 mutable init(@g0init) : !vm.ref<?>
+  vm.func @g0init() -> !vm.ref<?> {
+    %null = vm.const.ref.zero : !vm.ref<?>
+    vm.return %null : !vm.ref<?>
   }
 
-  // CHECK: vm.global.ref @g1 mutable : !iree.opaque_ref
-  vm.global.ref @g1 mutable : !iree.opaque_ref
+  // CHECK: vm.global.ref @g1 mutable : !vm.ref<?>
+  vm.global.ref @g1 mutable : !vm.ref<?>
 
-  // CHECK: vm.global.ref @g2 : !iree.opaque_ref
-  vm.global.ref @g2 : !iree.opaque_ref
+  // CHECK: vm.global.ref @g2 : !vm.ref<?>
+  vm.global.ref @g2 : !vm.ref<?>
 
   // CHECK: vm.func @__init() {
   // CHECK-NEXT:   %ref = vm.call @g0init()

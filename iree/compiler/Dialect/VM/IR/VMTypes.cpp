@@ -14,4 +14,68 @@
 
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/TypeSupport.h"
+
+// Order matters:
 #include "iree/compiler/Dialect/VM/IR/VMEnums.cpp.inc"
+
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace VM {
+
+//===----------------------------------------------------------------------===//
+// RefType
+//===----------------------------------------------------------------------===//
+
+namespace detail {
+
+struct RefTypeStorage : public TypeStorage {
+  RefTypeStorage(Type objectType, unsigned subclassData = 0)
+      : TypeStorage(subclassData), objectType(objectType.cast<Type>()) {}
+
+  /// The hash key used for uniquing.
+  using KeyTy = Type;
+  bool operator==(const KeyTy &key) const { return key == objectType; }
+
+  static RefTypeStorage *construct(TypeStorageAllocator &allocator,
+                                   const KeyTy &key) {
+    // Initialize the memory using placement new.
+    return new (allocator.allocate<RefTypeStorage>()) RefTypeStorage(key);
+  }
+
+  Type objectType;
+};
+
+}  // namespace detail
+
+// static
+bool RefType::isCompatible(Type type) {
+  if (type.isa<RefType>()) {
+    // Already a ref - don't double-wrap.
+    return false;
+  } else if (type.isIntOrIndexOrFloat()) {
+    // Ignore known primitive types.
+    return false;
+  }
+  // Assume all other types (user types, buffers, etc) can be wrapped.
+  return true;
+}
+
+RefType RefType::get(Type objectType) {
+  return Base::get(objectType.getContext(), TypeKind::Ref, objectType);
+}
+
+RefType RefType::getChecked(Type objectType, Location location) {
+  return Base::getChecked(location, objectType.getContext(), TypeKind::Ref,
+                          objectType);
+}
+
+Type RefType::getObjectType() { return getImpl()->objectType; }
+
+}  // namespace VM
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir

@@ -38,6 +38,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRParser
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils

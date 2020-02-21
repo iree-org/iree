@@ -129,39 +129,6 @@ class AnyPtrOf<list<Type> types> :
   string builderCall = "";
 }
 
-//===----------------------------------------------------------------------===//
-// ref_ptr types
-//===----------------------------------------------------------------------===//
-
-def AnyRefObject : DialectType<
-    IREE_Dialect,
-    CPred<"IREE::RefPtrType::isCompatible($_self)">,
-    "ref_object"> {
-  let typeDescription = [{
-    An iree::RefObject subclass.
-  }];
-}
-
-def AnyRefPtr : DialectType<
-    IREE_Dialect,
-    CPred<"$_self.isa<IREE::RefPtrType>()">,
-    "ref"> {
-  let typeDescription = [{
-    An iree::ref_ptr<T> of some type.
-  }];
-}
-
-class RefPtrOf<Type type> :
-    Type<And<[
-      CPred<"$_self.isa<IREE::RefPtrType>()">,
-      SubstLeaves<"$_self", "$_self.cast<IREE::RefPtrType>().getObjectType()",
-                  type.predicate>
-    ]>, "ref<" # type.description # ">"> {
-  // Set the builder call if the base type has a builder call.
-  string builderCall = !if(!empty(type.builderCall),
-                           "", "RefPtrType::get(" # type.builderCall # ")");
-}
-
 def ByteBufferType : DialectType<
     IREE_Dialect,
     CPred<"$_self.isa<IREE::ByteBufferType>()">,
@@ -170,7 +137,6 @@ def ByteBufferType : DialectType<
     A constant buffer of mapped host memory.
   }];
 }
-def ByteBufferRef : RefPtrOf<ByteBufferType>;
 def ByteBufferRefAttr : AliasedSymbolRefAttr;
 
 def MutableByteBufferType : DialectType<
@@ -181,7 +147,6 @@ def MutableByteBufferType : DialectType<
     A buffer of read-write host memory.
   }];
 }
-def MutableByteBufferRef : RefPtrOf<MutableByteBufferType>;
 
 //===----------------------------------------------------------------------===//
 // Common traits

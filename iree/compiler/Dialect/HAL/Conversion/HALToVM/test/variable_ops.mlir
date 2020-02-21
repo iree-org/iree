@@ -5,28 +5,28 @@ hal.variable @v_initialized_const 4 : i32
 
 // -----
 
-// CHECK: vm.global.ref @v_initialized init(@initializer) : !iree.ref<!hal.buffer>
+// CHECK: vm.global.ref @v_initialized init(@initializer) : !vm.ref<!hal.buffer>
 hal.variable @v_initialized init(@initializer) : !hal.buffer
 func @initializer() -> !hal.buffer
 
 // -----
 
-// CHECK: vm.global.ref @v_loaded : !iree.ref<!hal.buffer>
+// CHECK: vm.global.ref @v_loaded : !vm.ref<!hal.buffer>
 hal.variable @v_loaded : !hal.buffer
 // CHECK-LABEL: func @loaded
 func @loaded() {
-  // CHECK: %v_loaded = vm.global.load.ref @v_loaded : !iree.ref<!hal.buffer>
+  // CHECK: %v_loaded = vm.global.load.ref @v_loaded : !vm.ref<!hal.buffer>
   %0 = hal.variable.load @v_loaded : !hal.buffer
   return
 }
 
 // -----
 
-// CHECK: vm.global.ref @v_stored mutable : !iree.ref<!hal.buffer>
+// CHECK: vm.global.ref @v_stored mutable : !vm.ref<!hal.buffer>
 hal.variable @v_stored mutable : !hal.buffer
 // CHECK-LABEL: func @stored
 func @stored(%arg0 : !hal.buffer) {
-  // CHECK: vm.global.store.ref %arg0, @v_stored : !iree.ref<!hal.buffer>
+  // CHECK: vm.global.store.ref %arg0, @v_stored : !vm.ref<!hal.buffer>
   hal.variable.store %arg0, @v_stored : !hal.buffer
   return
 }

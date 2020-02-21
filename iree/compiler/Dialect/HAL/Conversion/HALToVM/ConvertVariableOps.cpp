@@ -31,8 +31,8 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
       IREE::HAL::VariableOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto convertedType = typeConverter.convertType(op.type());
-    if (convertedType.isa<IREE::RefPtrType>() ||
-        IREE::RefPtrType::isCompatible(convertedType)) {
+    if (convertedType.isa<IREE::VM::RefType>() ||
+        IREE::VM::RefType::isCompatible(convertedType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));

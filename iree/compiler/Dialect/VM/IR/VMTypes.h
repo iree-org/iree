@@ -26,4 +26,63 @@
 // Order matters.
 #include "iree/compiler/Dialect/VM/IR/VMEnums.h.inc"
 
+namespace mlir {
+namespace iree_compiler {
+namespace IREE {
+namespace VM {
+
+namespace detail {
+struct RefTypeStorage;
+}  // namespace detail
+
+/// An opaque ref object that comes from an external source.
+class OpaqueType : public Type::TypeBase<OpaqueType, Type> {
+ public:
+  using Base::Base;
+
+  static bool kindof(unsigned kind) { return kind == TypeKind::Opaque; }
+
+  static OpaqueType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::Opaque);
+  }
+};
+
+/// A ref_ptr containing a reference to a ref-object-compatible type.
+class RefType : public Type::TypeBase<RefType, Type, detail::RefTypeStorage> {
+ public:
+  using Base::Base;
+
+  /// Returns true if the given type can be wrapped in a ref ptr.
+  static bool isCompatible(Type type);
+
+  /// Gets or creates a RefType with the provided target object type.
+  static RefType get(Type objectType);
+
+  /// Gets or creates a RefType with the provided target object type.
+  /// This emits an error at the specified location and returns null if the
+  /// object type isn't supported.
+  static RefType getChecked(Type objectType, Location location);
+
+  /// Verifies construction of a type with the given object.
+  static LogicalResult verifyConstructionInvariants(
+      llvm::Optional<Location> loc, MLIRContext *context, Type objectType) {
+    if (!isCompatible(objectType)) {
+      if (loc) {
+        emitError(*loc) << "invalid object type for a ref: " << objectType;
+      }
+      return failure();
+    }
+    return success();
+  }
+
+  Type getObjectType();
+
+  static bool kindof(unsigned kind) { return kind == TypeKind::Ref; }
+};
+
+}  // namespace VM
+}  // namespace IREE
+}  // namespace iree_compiler
+}  // namespace mlir
+
 #endif  // IREE_COMPILER_DIALECT_VM_IR_VMTYPES_H_

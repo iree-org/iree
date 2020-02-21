@@ -24,12 +24,12 @@ vm.module @strings {
 
 // Returns the string representation of an i32.
 // Maps to the IREE::Strings::I32ToString.
-vm.import @i32_to_string(%value : i32) -> !iree.ref<!strings.string>
+vm.import @i32_to_string(%value : i32) -> !vm.ref<!strings.string>
 attributes {nosideeffects}
 
 
 // Prints the contents of a string.
 // Maps to the IREE::Strings::Print.
-vm.import @print(%value : !iree.ref<!strings.string>)
+vm.import @print(%value : !vm.ref<!strings.string>)
 
 }  // vm.module

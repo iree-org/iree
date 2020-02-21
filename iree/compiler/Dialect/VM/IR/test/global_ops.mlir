@@ -56,11 +56,11 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_load_ref
 vm.module @my_module {
-  vm.global.ref @g0 : !iree.opaque_ref
-  vm.func @global_load_ref() -> !iree.opaque_ref {
-    // CHECK: %g0 = vm.global.load.ref @g0 : !iree.opaque_ref
-    %g0 = vm.global.load.ref @g0 : !iree.opaque_ref
-    vm.return %g0 : !iree.opaque_ref
+  vm.global.ref @g0 : !vm.ref<?>
+  vm.func @global_load_ref() -> !vm.ref<?> {
+    // CHECK: %g0 = vm.global.load.ref @g0 : !vm.ref<?>
+    %g0 = vm.global.load.ref @g0 : !vm.ref<?>
+    vm.return %g0 : !vm.ref<?>
   }
 }
 
@@ -68,10 +68,10 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_store_ref
 vm.module @my_module {
-  vm.global.ref @g0 mutable : !iree.opaque_ref
-  vm.func @global_store_ref(%arg0 : !iree.opaque_ref) {
-    // CHECK: vm.global.store.ref %arg0, @g0 : !iree.opaque_ref
-    vm.global.store.ref %arg0, @g0 : !iree.opaque_ref
+  vm.global.ref @g0 mutable : !vm.ref<?>
+  vm.func @global_store_ref(%arg0 : !vm.ref<?>) {
+    // CHECK: vm.global.store.ref %arg0, @g0 : !vm.ref<?>
+    vm.global.store.ref %arg0, @g0 : !vm.ref<?>
     vm.return
   }
 }
@@ -80,13 +80,13 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_load_indirect_ref
 vm.module @my_module {
-  vm.global.ref @g0 : !iree.opaque_ref
-  vm.func @global_load_indirect_ref() -> !iree.opaque_ref {
-    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<!iree.opaque_ref>
-    %0 = vm.global.address @g0 : !iree.ptr<!iree.opaque_ref>
-    // CHECK-NEXT: = vm.global.load.indirect.ref [[ADDR]] : !iree.ptr<!iree.opaque_ref> -> !iree.opaque_ref
-    %1 = vm.global.load.indirect.ref %0 : !iree.ptr<!iree.opaque_ref> -> !iree.opaque_ref
-    vm.return %1 : !iree.opaque_ref
+  vm.global.ref @g0 : !vm.ref<?>
+  vm.func @global_load_indirect_ref() -> !vm.ref<?> {
+    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
+    %0 = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
+    // CHECK-NEXT: = vm.global.load.indirect.ref [[ADDR]] : !iree.ptr<!vm.ref<?>> -> !vm.ref<?>
+    %1 = vm.global.load.indirect.ref %0 : !iree.ptr<!vm.ref<?>> -> !vm.ref<?>
+    vm.return %1 : !vm.ref<?>
   }
 }
 
@@ -94,12 +94,12 @@ vm.module @my_module {
 
 // CHECK-LABEL: @global_store_indirect_ref
 vm.module @my_module {
-  vm.global.ref @g0 mutable : !iree.opaque_ref
-  vm.func @global_store_indirect_ref(%arg0 : !iree.opaque_ref) {
-    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<!iree.opaque_ref>
-    %0 = vm.global.address @g0 : !iree.ptr<!iree.opaque_ref>
-    // CHECK-NEXT: vm.global.store.indirect.ref %arg0, [[ADDR]] : !iree.opaque_ref -> !iree.ptr<!iree.opaque_ref>
-    vm.global.store.indirect.ref %arg0, %0 : !iree.opaque_ref -> !iree.ptr<!iree.opaque_ref>
+  vm.global.ref @g0 mutable : !vm.ref<?>
+  vm.func @global_store_indirect_ref(%arg0 : !vm.ref<?>) {
+    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
+    %0 = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
+    // CHECK-NEXT: vm.global.store.indirect.ref %arg0, [[ADDR]] : !vm.ref<?> -> !iree.ptr<!vm.ref<?>>
+    vm.global.store.indirect.ref %arg0, %0 : !vm.ref<?> -> !iree.ptr<!vm.ref<?>>
     vm.return
   }
 }

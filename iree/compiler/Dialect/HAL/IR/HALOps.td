@@ -87,7 +87,7 @@ def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
 // TODO(benvanik): replace with resource sets.
 def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
   let arguments = (ins
-    AnyRefObject:$operand
+    HAL_ObjectType:$operand
   );
 
   let assemblyFormat = "$operand `:` type($operand) attr-dict";

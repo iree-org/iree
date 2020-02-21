@@ -114,10 +114,10 @@ vm.module @my_module {
 
 // CHECK-LABEL: @cmp_eq_ref
 vm.module @my_module {
-  vm.func @cmp_eq_ref(%arg0 : !iree.opaque_ref,
-                      %arg1 : !iree.opaque_ref) -> i32 {
-    // CHECK: %req = vm.cmp.eq.ref %arg0, %arg1 : !iree.opaque_ref
-    %req = vm.cmp.eq.ref %arg0, %arg1 : !iree.opaque_ref
+  vm.func @cmp_eq_ref(%arg0 : !vm.ref<?>,
+                      %arg1 : !vm.ref<?>) -> i32 {
+    // CHECK: %req = vm.cmp.eq.ref %arg0, %arg1 : !vm.ref<?>
+    %req = vm.cmp.eq.ref %arg0, %arg1 : !vm.ref<?>
     vm.return %req : i32
   }
 }
@@ -126,10 +126,10 @@ vm.module @my_module {
 
 // CHECK-LABEL: @cmp_ne_ref
 vm.module @my_module {
-  vm.func @cmp_ne_ref(%arg0 : !iree.opaque_ref,
-                      %arg1 : !iree.opaque_ref) -> i32 {
-    // CHECK: %rne = vm.cmp.ne.ref %arg0, %arg1 : !iree.opaque_ref
-    %rne = vm.cmp.ne.ref %arg0, %arg1 : !iree.opaque_ref
+  vm.func @cmp_ne_ref(%arg0 : !vm.ref<?>,
+                      %arg1 : !vm.ref<?>) -> i32 {
+    // CHECK: %rne = vm.cmp.ne.ref %arg0, %arg1 : !vm.ref<?>
+    %rne = vm.cmp.ne.ref %arg0, %arg1 : !vm.ref<?>
     vm.return %rne : i32
   }
 }
@@ -138,9 +138,9 @@ vm.module @my_module {
 
 // CHECK-LABEL: @cmp_nz_ref
 vm.module @my_module {
-  vm.func @cmp_nz_ref(%arg0 : !iree.opaque_ref) -> i32 {
-    // CHECK: %rnz = vm.cmp.nz.ref %arg0 : !iree.opaque_ref
-    %rnz = vm.cmp.nz.ref %arg0 : !iree.opaque_ref
+  vm.func @cmp_nz_ref(%arg0 : !vm.ref<?>) -> i32 {
+    // CHECK: %rnz = vm.cmp.nz.ref %arg0 : !vm.ref<?>
+    %rnz = vm.cmp.nz.ref %arg0 : !vm.ref<?>
     vm.return %rnz : i32
   }
 }

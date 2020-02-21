@@ -34,8 +34,8 @@ namespace {
 
 static FunctionType getExecutableCachingFunctionType(MLIRContext *context) {
   return FunctionType::get(
-      {IREE::RefPtrType::get(IREE::HAL::DeviceType::get(context))},
-      {IREE::RefPtrType::get(IREE::HAL::ExecutableType::get(context))},
+      {IREE::VM::RefType::get(IREE::HAL::DeviceType::get(context))},
+      {IREE::VM::RefType::get(IREE::HAL::ExecutableType::get(context))},
       context);
 }
 
@@ -97,7 +97,7 @@ class ExecutableOpConversion
     auto globalOp = rewriter.create<IREE::VM::GlobalRefOp>(
         loc, (executableOp.getName() + "_cached").str(),
         /*isMutable=*/true,
-        IREE::RefPtrType::get(
+        IREE::VM::RefType::get(
             IREE::HAL::ExecutableType::get(rewriter.getContext())));
 
     // Caching function that creates the executable if needed.
@@ -142,7 +142,7 @@ class ExecutableOpConversion
             "hal.ex.match_supported_executable_format"),
         ArrayRef<Type>({funcBuilder.getIntegerType(32)}),
         ArrayRef<int8_t>({-1, static_cast<int8_t>(rodataOps.size())}),
-        ArrayRef<Type>({IREE::RefPtrType::get(
+        ArrayRef<Type>({IREE::VM::RefType::get(
                             IREE::HAL::DeviceType::get(funcOp.getContext())),
                         funcBuilder.getIntegerType(32)}),
         queryCallArgs);
@@ -227,7 +227,7 @@ class ExCacheExecutableOpConversion
         cacheExecutableOp,
         rewriter.getSymbolRefAttr(cacheExecutableOp.executable()),
         ArrayRef<Type>{
-            IREE::RefPtrType::get(cacheExecutableOp.getResult().getType())},
+            IREE::VM::RefType::get(cacheExecutableOp.getResult().getType())},
         ArrayRef<Value>{operands[0]});
     return matchSuccess();
   }

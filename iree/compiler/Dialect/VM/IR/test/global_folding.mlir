@@ -28,11 +28,11 @@ vm.module @global_i32_folds {
 
 // CHECK-LABEL: @global_ref_folds_null
 vm.module @global_ref_folds_null {
-  // CHECK: vm.global.ref @g0 mutable : !iree.opaque_ref
-  vm.global.ref @g0 mutable init(@g0init) : !iree.opaque_ref
-  vm.func @g0init() -> !iree.opaque_ref {
-    %null = vm.const.ref.zero : !iree.opaque_ref
-    vm.return %null : !iree.opaque_ref
+  // CHECK: vm.global.ref @g0 mutable : !vm.ref<?>
+  vm.global.ref @g0 mutable init(@g0init) : !vm.ref<?>
+  vm.func @g0init() -> !vm.ref<?> {
+    %null = vm.const.ref.zero : !vm.ref<?>
+    vm.return %null : !vm.ref<?>
   }
 }
 
@@ -64,23 +64,23 @@ vm.module @global_load_i32_folds {
 
 // CHECK-LABEL: @global_load_ref_folds
 vm.module @global_load_ref_folds {
-  vm.global.ref @g0 : !iree.opaque_ref
+  vm.global.ref @g0 : !vm.ref<?>
   // CHECK-LABEL: @inline_const_null
-  vm.func @inline_const_null() -> !iree.opaque_ref {
-    // CHECK-NEXT: %null = vm.const.ref.zero : !iree.opaque_ref
-    // CHECK-NEXT: vm.return %null : !iree.opaque_ref
-    %g0 = vm.global.load.ref @g0 : !iree.opaque_ref
-    vm.return %g0 : !iree.opaque_ref
+  vm.func @inline_const_null() -> !vm.ref<?> {
+    // CHECK-NEXT: %null = vm.const.ref.zero : !vm.ref<?>
+    // CHECK-NEXT: vm.return %null : !vm.ref<?>
+    %g0 = vm.global.load.ref @g0 : !vm.ref<?>
+    vm.return %g0 : !vm.ref<?>
   }
 
-  vm.global.ref @g1 mutable : !iree.opaque_ref
+  vm.global.ref @g1 mutable : !vm.ref<?>
   // CHECK-LABEL: @ignore_nonconst_value
-  vm.func @ignore_nonconst_value() -> !iree.opaque_ref {
+  vm.func @ignore_nonconst_value() -> !vm.ref<?> {
     // NOTE: ensure we don't inline non-constant values.
-    // CHECK-NEXT: %g1 = vm.global.load.ref @g1 : !iree.opaque_ref
-    // CHECK-NEXT: vm.return %g1 : !iree.opaque_ref
-    %g1 = vm.global.load.ref @g1 : !iree.opaque_ref
-    vm.return %g1 : !iree.opaque_ref
+    // CHECK-NEXT: %g1 = vm.global.load.ref @g1 : !vm.ref<?>
+    // CHECK-NEXT: vm.return %g1 : !vm.ref<?>
+    %g1 = vm.global.load.ref @g1 : !vm.ref<?>
+    vm.return %g1 : !vm.ref<?>
   }
 }
 

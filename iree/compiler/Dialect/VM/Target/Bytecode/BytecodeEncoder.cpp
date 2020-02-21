@@ -82,7 +82,7 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeType(Value value) override {
-    auto refPtrType = value.getType().dyn_cast<IREE::RefPtrType>();
+    auto refPtrType = value.getType().dyn_cast<IREE::VM::RefType>();
     if (!refPtrType) {
       return currentOp_->emitOpError()
              << "type " << value.getType()

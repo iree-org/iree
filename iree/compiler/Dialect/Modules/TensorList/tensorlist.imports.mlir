@@ -16,25 +16,25 @@ vm.module @tensorlist {
 
 // Maps to IREE::TensorList::Reserve.
 vm.import @reserve(
-  %element_shape : !iree.ref<!hal.buffer_view>,
-  %num_elements : !iree.ref<!hal.buffer_view>
-) -> !iree.ref<!tensorlist.list>
+  %element_shape : !vm.ref<!hal.buffer_view>,
+  %num_elements : !vm.ref<!hal.buffer_view>
+) -> !vm.ref<!tensorlist.list>
 attributes {nosideeffects}
 
 // Maps to IREE::TensorList::GetItem.
 vm.import @get_item(
-  %list : !iree.ref<!tensorlist.list>,
-  %index : !iree.ref<!hal.buffer_view>,
-  %element_shape: !iree.ref<!hal.buffer_view>
-) -> !iree.ref<!hal.buffer_view>
+  %list : !vm.ref<!tensorlist.list>,
+  %index : !vm.ref<!hal.buffer_view>,
+  %element_shape: !vm.ref<!hal.buffer_view>
+) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
 
 // Maps to IREE:TensorList::SetItem
 vm.import @set_item(
-  %list : !iree.ref<!tensorlist.list>,
-  %index : !iree.ref<!hal.buffer_view>,
-  %item : !iree.ref<!hal.buffer_view>
-) -> !iree.ref<!tensorlist.list>
+  %list : !vm.ref<!tensorlist.list>,
+  %index : !vm.ref<!hal.buffer_view>,
+  %item : !vm.ref<!hal.buffer_view>
+) -> !vm.ref<!tensorlist.list>
 attributes {nosideeffects}
 
 }  // vm.module

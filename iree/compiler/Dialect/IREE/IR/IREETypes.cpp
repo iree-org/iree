@@ -58,55 +58,6 @@ PtrType PtrType::getChecked(Type targetType, Location location) {
 
 Type PtrType::getTargetType() { return getImpl()->targetType; }
 
-//===----------------------------------------------------------------------===//
-// RefPtrType
-//===----------------------------------------------------------------------===//
-
-namespace detail {
-
-struct RefPtrTypeStorage : public TypeStorage {
-  RefPtrTypeStorage(Type objectType, unsigned subclassData = 0)
-      : TypeStorage(subclassData), objectType(objectType.cast<Type>()) {}
-
-  /// The hash key used for uniquing.
-  using KeyTy = Type;
-  bool operator==(const KeyTy &key) const { return key == objectType; }
-
-  static RefPtrTypeStorage *construct(TypeStorageAllocator &allocator,
-                                      const KeyTy &key) {
-    // Initialize the memory using placement new.
-    return new (allocator.allocate<RefPtrTypeStorage>()) RefPtrTypeStorage(key);
-  }
-
-  Type objectType;
-};
-
-}  // namespace detail
-
-// static
-bool RefPtrType::isCompatible(Type type) {
-  if (type.isa<RefPtrType>()) {
-    // Already a ref - don't double-wrap.
-    return false;
-  } else if (type.isIntOrIndexOrFloat()) {
-    // Ignore known primitive types.
-    return false;
-  }
-  // Assume all other types (user types, buffers, etc) can be wrapped.
-  return true;
-}
-
-RefPtrType RefPtrType::get(Type objectType) {
-  return Base::get(objectType.getContext(), TypeKind::RefPtr, objectType);
-}
-
-RefPtrType RefPtrType::getChecked(Type objectType, Location location) {
-  return Base::getChecked(location, objectType.getContext(), TypeKind::RefPtr,
-                          objectType);
-}
-
-Type RefPtrType::getObjectType() { return getImpl()->objectType; }
-
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

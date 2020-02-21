@@ -27,15 +27,12 @@ namespace IREE {
 
 namespace detail {
 struct PtrTypeStorage;
-struct RefPtrTypeStorage;
 struct RankedShapeTypeStorage;
 }  // namespace detail
 
 namespace TypeKind {
 enum Kind {
   Ptr = Type::FIRST_IREE_TYPE,
-  RefPtr,
-  OpaqueRefObject,
   ByteBuffer,
   MutableByteBuffer,
 
@@ -43,6 +40,7 @@ enum Kind {
   FIRST_SEQ_TYPE = Type::FIRST_IREE_TYPE + 40,
   FIRST_SHAPE_TYPE = Type::FIRST_IREE_TYPE + 60,
   FIRST_STRING_TYPE = Type::FIRST_IREE_TYPE + 80,
+  FIRST_VM_TYPE = Type::FIRST_IREE_TYPE + 90,
   FIRST_VMLA_TYPE = Type::FIRST_IREE_TYPE + 100,
   FIRST_TENSORLIST_TYPE = Type::FIRST_IREE_TYPE + 120,
   FIRST_TF_TENSORLIST_TYPE = Type::FIRST_IREE_TYPE + 140,
@@ -97,6 +95,15 @@ enum Kind {
 }  // namespace TypeKind
 }  // namespace Strings
 
+namespace VM {
+namespace TypeKind {
+enum Kind {
+  Ref = IREE::TypeKind::FIRST_VM_TYPE,
+  Opaque,
+};
+}  // namespace TypeKind
+}  // namespace VM
+
 namespace VMLA {
 namespace TypeKind {
 enum Kind {
@@ -115,20 +122,6 @@ class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
   using Base::Base;
 
   Type getTargetType();
-};
-
-/// An opaque ref object that comes from an external source.
-class OpaqueType : public Type::TypeBase<OpaqueType, Type> {
- public:
-  using Base::Base;
-
-  static bool kindof(unsigned kind) {
-    return kind == TypeKind::OpaqueRefObject;
-  }
-
-  static OpaqueType get(MLIRContext *context) {
-    return Base::get(context, TypeKind::OpaqueRefObject);
-  }
 };
 
 /// A buffer of constant mapped memory.
@@ -156,40 +149,6 @@ class MutableByteBufferType
   static MutableByteBufferType get(MLIRContext *context) {
     return Base::get(context, TypeKind::MutableByteBuffer);
   }
-};
-
-/// A ref_ptr containing a reference to a ref-object-compatible type.
-class RefPtrType
-    : public Type::TypeBase<RefPtrType, Type, detail::RefPtrTypeStorage> {
- public:
-  using Base::Base;
-
-  /// Returns true if the given type can be wrapped in a ref ptr.
-  static bool isCompatible(Type type);
-
-  /// Gets or creates a RefPtrType with the provided target object type.
-  static RefPtrType get(Type objectType);
-
-  /// Gets or creates a RefPtrType with the provided target object type.
-  /// This emits an error at the specified location and returns null if the
-  /// object type isn't supported.
-  static RefPtrType getChecked(Type objectType, Location location);
-
-  /// Verifies construction of a type with the given object.
-  static LogicalResult verifyConstructionInvariants(
-      llvm::Optional<Location> loc, MLIRContext *context, Type objectType) {
-    if (!isCompatible(objectType)) {
-      if (loc) {
-        emitError(*loc) << "invalid object type for a ref_ptr: " << objectType;
-      }
-      return failure();
-    }
-    return success();
-  }
-
-  Type getObjectType();
-
-  static bool kindof(unsigned kind) { return kind == TypeKind::RefPtr; }
 };
 
 }  // namespace IREE

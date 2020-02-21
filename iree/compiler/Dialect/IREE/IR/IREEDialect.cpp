@@ -31,8 +31,7 @@ static DialectRegistration<IREEDialect> base_dialect;
 
 IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
-  addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType, IREE::OpaqueType,
-           IREE::PtrType, IREE::RefPtrType>();
+  addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType, IREE::PtrType>();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
@@ -56,25 +55,6 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
       return Type();
     }
     return IREE::PtrType::getChecked(variableType, loc);
-  } else if (spec.consume_front("ref")) {
-    if (!spec.consume_front("<") || !spec.consume_back(">")) {
-      parser.emitError(parser.getCurrentLocation())
-          << "malformed ref_ptr type '" << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    auto objectType = mlir::parseType(spec, getContext());
-    if (!objectType) {
-      parser.emitError(parser.getCurrentLocation())
-          << "invalid ref_ptr object type specification: '"
-          << parser.getFullSymbolSpec() << "'";
-      return Type();
-    }
-    return IREE::RefPtrType::getChecked(objectType, loc);
-  } else if (spec == "opaque_ref") {
-    return IREE::RefPtrType::getChecked(IREE::OpaqueType::get(getContext()),
-                                        loc);
-  } else if (spec == "opaque") {
-    return IREE::OpaqueType::get(getContext());
   } else if (spec == "byte_buffer") {
     return IREE::ByteBufferType::get(getContext());
   } else if (spec == "mutable_byte_buffer") {
@@ -91,18 +71,6 @@ void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
       os << "ptr<" << targetType << ">";
       break;
     }
-    case IREE::TypeKind::RefPtr: {
-      auto objectType = type.cast<IREE::RefPtrType>().getObjectType();
-      if (objectType.isa<IREE::OpaqueType>()) {
-        os << "opaque_ref";
-      } else {
-        os << "ref<" << objectType << ">";
-      }
-      break;
-    }
-    case IREE::TypeKind::OpaqueRefObject:
-      os << "opaque";
-      break;
     case IREE::TypeKind::ByteBuffer:
       os << "byte_buffer";
       break;

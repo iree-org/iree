@@ -25,33 +25,33 @@ vm.module @custom {
 // Formats the tensor using the IREE buffer printer to have a shape/type and
 // the contents as a string.
 vm.import @buffer_to_message(
-  %buffer_view : !iree.ref<!hal.buffer_view>
-) -> !iree.ref<!custom.message>
+  %buffer_view : !vm.ref<!hal.buffer_view>
+) -> !vm.ref<!custom.message>
 attributes {nosideeffects}
 
 // Parses the message containing a IREE buffer parser-formatted tensor.
 vm.import @message_to_buffer(
-  %message : !iree.ref<!custom.message>
-) -> !iree.ref<!hal.buffer_view>
+  %message : !vm.ref<!custom.message>
+) -> !vm.ref<!hal.buffer_view>
 attributes {nosideeffects}
 
 // Prints the %message provided %count times.
 // Maps to the IREE::Custom::PrintOp.
 vm.import @print(
-  %message : !iree.ref<!custom.message>,
+  %message : !vm.ref<!custom.message>,
   %count : i32
 )
 
 // Returns the message with its characters reversed.
 // Maps to the IREE::Custom::ReverseOp.
 vm.import @reverse(
-  %message : !iree.ref<!custom.message>
-) -> !iree.ref<!custom.message>
+  %message : !vm.ref<!custom.message>
+) -> !vm.ref<!custom.message>
 attributes {nosideeffects}
 
 // Returns a per-context unique message.
 // Maps to the IREE::Custom::GetUniqueMessageOp.
-vm.import @get_unique_message() -> !iree.ref<!custom.message>
+vm.import @get_unique_message() -> !vm.ref<!custom.message>
 attributes {nosideeffects}
 
 }  // vm.module

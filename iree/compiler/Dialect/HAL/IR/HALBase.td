@@ -378,6 +378,23 @@ def HAL_Semaphore : DialectType<
   }];
 }
 
+def HAL_ObjectType : AnyTypeOf<[
+  HAL_Allocator,
+  HAL_Buffer,
+  HAL_BufferView,
+  HAL_CommandBuffer,
+  HAL_DescriptorSet,
+  HAL_DescriptorSetLayout,
+  HAL_Device,
+  HAL_Event,
+  HAL_Executable,
+  HAL_ExecutableCache,
+  HAL_ExecutableLayout,
+  HAL_Fence,
+  HAL_RingBuffer,
+  HAL_Semaphore,
+]>;
+
 def HAL_OrdinalAttr : IntegerAttrBase<I32, "32-bit integer ordinal attribute">;
 
 def HAL_ExecutableDataAttr : IntElementsAttr<8>;
@@ -397,7 +414,7 @@ def HAL_Status : TypeAlias<I32>;
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
 
 def HAL_VariableRefAttr : AliasedSymbolRefAttr;
-def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, AnyRefObject]>;
+def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
 def HAL_VariablePtr : PtrOf<HAL_VariableType>;
 
 def HAL_Dim : I<32>;

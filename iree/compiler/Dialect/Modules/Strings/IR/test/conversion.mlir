@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @i32ToStringOp
 func @i32ToStringOp(%arg0 : i32) -> !strings.string {
-  // CHECK: vm.call @strings.i32_to_string(%arg0) : (i32) -> !iree.ref<!strings.string>
+  // CHECK: vm.call @strings.i32_to_string(%arg0) : (i32) -> !vm.ref<!strings.string>
   %0 = "strings.i32_to_string"(%arg0) : (i32) -> !strings.string
   return %0 : !strings.string
 }
@@ -13,7 +13,7 @@ func @i32ToStringOp(%arg0 : i32) -> !strings.string {
 
 // CHECK-LABEL: @printOp
 func @printOp(%arg0 : !strings.string) {
-  // CHECK: vm.call @strings.print(%arg0) : (!iree.ref<!strings.string>)
+  // CHECK: vm.call @strings.print(%arg0) : (!vm.ref<!strings.string>)
   "strings.print"(%arg0) : (!strings.string) -> ()
   return
 }

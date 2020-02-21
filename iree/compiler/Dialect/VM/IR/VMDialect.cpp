@@ -18,7 +18,9 @@
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Parser.h"
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/InliningUtils.h"
 
@@ -66,7 +68,7 @@ struct VMOpAsmInterface : public OpAsmDialectInterface {
       }
     } else if (auto rodataOp = dyn_cast<ConstRefRodataOp>(op)) {
       os << rodataOp.rodata();
-    } else if (op->getResult(0).getType().isa<RefPtrType>()) {
+    } else if (op->getResult(0).getType().isa<IREE::VM::RefType>()) {
       os << "ref";
     } else if (isa<CmpEQI32Op>(op)) {
       os << "eq";
@@ -173,12 +175,65 @@ struct VMFolderInterface : public OpFolderDialectInterface {
 
 VMDialect::VMDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
+  addTypes<IREE::VM::OpaqueType, IREE::VM::RefType>();
   addInterfaces<VMInlinerInterface, VMOpAsmInterface, VMFolderInterface>();
 
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/VM/IR/VMOps.cpp.inc"
       >();
+}
+
+//===----------------------------------------------------------------------===//
+// Type printing and parsing
+//===----------------------------------------------------------------------===//
+
+Type VMDialect::parseType(DialectAsmParser &parser) const {
+  Location loc = parser.getEncodedSourceLoc(parser.getNameLoc());
+  llvm::StringRef spec = parser.getFullSymbolSpec();
+  if (spec.consume_front("ref")) {
+    if (!spec.consume_front("<") || !spec.consume_back(">")) {
+      parser.emitError(parser.getCurrentLocation())
+          << "malformed ref_ptr type '" << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    if (spec == "?") {
+      // Special case for opaque types (where any type can match).
+      return IREE::VM::RefType::getChecked(
+          IREE::VM::OpaqueType::get(getContext()), loc);
+    }
+    auto objectType = mlir::parseType(spec, getContext());
+    if (!objectType) {
+      parser.emitError(parser.getCurrentLocation())
+          << "invalid ref_ptr object type specification: '"
+          << parser.getFullSymbolSpec() << "'";
+      return Type();
+    }
+    return IREE::VM::RefType::getChecked(objectType, loc);
+  } else if (spec == "opaque") {
+    return IREE::VM::OpaqueType::get(getContext());
+  }
+  emitError(loc, "unknown VM type: ") << spec;
+  return Type();
+}
+
+void VMDialect::printType(Type type, DialectAsmPrinter &os) const {
+  switch (type.getKind()) {
+    case IREE::VM::TypeKind::Ref: {
+      auto objectType = type.cast<IREE::VM::RefType>().getObjectType();
+      if (objectType.isa<IREE::VM::OpaqueType>()) {
+        os << "ref<?>";
+      } else {
+        os << "ref<" << objectType << ">";
+      }
+      break;
+    }
+    case IREE::VM::TypeKind::Opaque:
+      os << "opaque";
+      break;
+    default:
+      llvm_unreachable("unhandled VM type");
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -193,7 +248,7 @@ Operation *VMDialect::materializeConstant(OpBuilder &builder, Attribute value,
       return builder.create<VM::ConstI32ZeroOp>(loc);
     }
     return builder.create<VM::ConstI32Op>(loc, convertedValue);
-  } else if (type.isa<RefPtrType>()) {
+  } else if (type.isa<IREE::VM::RefType>()) {
     // The only constant type we support for ref_ptrs is null so we can just
     // emit that here.
     // TODO(b/144027097): relace unit attr with a proper null ref_ptr attr.

@@ -32,6 +32,12 @@ class VMDialect : public Dialect {
   explicit VMDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "vm"; }
 
+  /// Parses a type registered to this dialect.
+  Type parseType(DialectAsmParser &parser) const override;
+
+  /// Prints a type registered to this dialect.
+  void printType(Type type, DialectAsmPrinter &os) const override;
+
   Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
                                  Location loc) override;
 };

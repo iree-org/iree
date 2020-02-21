@@ -26,10 +26,10 @@ vm.module @my_module {
 
 vm.module @my_module {
   // CHECK-LABEL: @const_ref_zero
-  vm.func @const_ref_zero() -> !iree.opaque_ref {
-    // CHECK: %null = vm.const.ref.zero : !iree.opaque_ref
-    %null = vm.const.ref.zero : !iree.opaque_ref
-    vm.return %null : !iree.opaque_ref
+  vm.func @const_ref_zero() -> !vm.ref<?> {
+    // CHECK: %null = vm.const.ref.zero : !vm.ref<?>
+    %null = vm.const.ref.zero : !vm.ref<?>
+    vm.return %null : !vm.ref<?>
   }
 }
 
@@ -38,9 +38,9 @@ vm.module @my_module {
 vm.module @my_module {
   vm.rodata @buf0 dense<[0, 1, 2]> : tensor<3xi8>
   // CHECK-LABEL: @const_ref_rodata
-  vm.func @const_ref_rodata() -> !iree.ref<!iree.byte_buffer> {
-    // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !iree.ref<!iree.byte_buffer>
-    %buf0 = vm.const.ref.rodata @buf0 : !iree.ref<!iree.byte_buffer>
-    vm.return %buf0 : !iree.ref<!iree.byte_buffer>
+  vm.func @const_ref_rodata() -> !vm.ref<!iree.byte_buffer> {
+    // CHECK: %buf0 = vm.const.ref.rodata @buf0 : !vm.ref<!iree.byte_buffer>
+    %buf0 = vm.const.ref.rodata @buf0 : !vm.ref<!iree.byte_buffer>
+    vm.return %buf0 : !vm.ref<!iree.byte_buffer>
   }
 }

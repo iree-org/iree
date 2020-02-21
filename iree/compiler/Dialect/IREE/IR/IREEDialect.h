@@ -21,7 +21,6 @@
 namespace mlir {
 namespace iree_compiler {
 
-// TODO(b/143787186): rename to IREEDialect.
 class IREEDialect : public Dialect {
  public:
   explicit IREEDialect(MLIRContext* context);
