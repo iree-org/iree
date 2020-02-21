@@ -126,7 +126,7 @@ LogicalResult getWorkGroupSize(FuncOp funcOp,
   if (!workGroupSizeAttr) {
     return funcOp.emitError(
         "unable to find workload size, missing attribute "
-        "iree.executable.workload in dispatch function");
+        "iree.executable.workgroup_size in dispatch function");
   }
   workGroupSize.clear();
   for (auto value : workGroupSizeAttr.getValues<APInt>()) {

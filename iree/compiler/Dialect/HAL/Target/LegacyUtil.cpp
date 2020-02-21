@@ -34,8 +34,6 @@ static void makeLegacyExecutableDispatchABI(
   auto funcOp = moduleOp.lookupSymbol<FuncOp>(dispatchEntryOp.function_ref());
   funcOp.setAttr("iree.executable.export",
                  UnitAttr::get(moduleOp.getContext()));
-  funcOp.setAttr("iree.executable.workload",
-                 dispatchEntryOp.workload().getValue());
   funcOp.setAttr("iree.executable.workgroup_size",
                  targetEntryOp.workgroup_size());
 

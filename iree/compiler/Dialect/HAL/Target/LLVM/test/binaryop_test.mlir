@@ -20,4 +20,4 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-NEXT:       llvm.func @simpleMath_rgn_dispatch_0(
 // CHECK-SAME: %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64,
 // CHECK-SAME: %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64)
-// CHECK-SAME: attributes {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>, iree.executable.workload = dense<[4, 1, 1]> : vector<3xi32>} {
+// CHECK-SAME: attributes {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>} {

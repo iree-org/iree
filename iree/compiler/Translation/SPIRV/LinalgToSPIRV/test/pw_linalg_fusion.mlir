@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @pw_fusion_two
 func @pw_fusion_two(%arg0: memref<4x8xi32>, %arg1: memref<4x8xi32>, %arg2 : memref<4x8xi32>, %arg3: memref<4x8xi32>)
-attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>, iree.executable.workload = dense<[8, 4, 1]> : tensor<3xi32>} {
+attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>} {
   %0 = iree.load_input(%arg0 : memref<4x8xi32>) : tensor<4x8xi32>
   %1 = iree.load_input(%arg1 : memref<4x8xi32>) : tensor<4x8xi32>
   %2 = iree.load_input(%arg2 : memref<4x8xi32>) : tensor<4x8xi32>
@@ -24,7 +24,7 @@ attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32,
 
 // CHECK-LABEL: @pw_fusion_three
 func @pw_fusion_three(%arg0: memref<4x8xi32>, %arg1: memref<4x8xi32>, %arg2 : memref<4x8xi32>, %arg3: memref<4x8xi32>, %arg4: memref<4x8xi32>)
-attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>, iree.executable.workload = dense<[8, 4, 1]> : tensor<3xi32>} {
+attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>} {
   %0 = iree.load_input(%arg0 : memref<4x8xi32>) : tensor<4x8xi32>
   %1 = iree.load_input(%arg1 : memref<4x8xi32>) : tensor<4x8xi32>
   %2 = iree.load_input(%arg2 : memref<4x8xi32>) : tensor<4x8xi32>
@@ -50,7 +50,7 @@ attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32,
 
 // CHECK-LABEL: @pw_fusion_dag
 func @pw_fusion_dag(%arg0: memref<4x8xi32>, %arg1: memref<4x8xi32>, %arg2 : memref<4x8xi32>, %arg3: memref<4x8xi32>, %arg4: memref<4x8xi32>)
-attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>, iree.executable.workload = dense<[8, 4, 1]> : tensor<3xi32>} {
+attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>} {
   %0 = iree.load_input(%arg0 : memref<4x8xi32>) : tensor<4x8xi32>
   %1 = iree.load_input(%arg1 : memref<4x8xi32>) : tensor<4x8xi32>
   %2 = iree.load_input(%arg2 : memref<4x8xi32>) : tensor<4x8xi32>
@@ -76,7 +76,7 @@ attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32,
 
 // CHECK-LABEL: @pw_fusion_dag2
 func @pw_fusion_dag2(%arg0: memref<4x8xi32>, %arg1: memref<4x8xi32>, %arg2 : memref<4x8xi32>, %arg3: memref<4x8xi32>)
-attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>, iree.executable.workload = dense<[8, 4, 1]> : tensor<3xi32>} {
+attributes { iree.executable.export, iree.executable.workgroup_size = dense<[32, 8, 1]> : tensor<3xi32>} {
   %0 = iree.load_input(%arg0 : memref<4x8xi32>) : tensor<4x8xi32>
   %1 = iree.load_input(%arg1 : memref<4x8xi32>) : tensor<4x8xi32>
   %2 = iree.load_input(%arg2 : memref<4x8xi32>) : tensor<4x8xi32>
