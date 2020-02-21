@@ -25,9 +25,13 @@ EXPLICIT_TARGET_MAPPING = {
         "dear_imgui::impl_sdl", "dear_imgui::impl_vulkan"
     ],
     # LLVM
+    "@llvm-project//llvm:asm_parser": ["LLVMAsmParser"],
     "@llvm-project//llvm:core": ["LLVMCore"],
+    "@llvm-project//llvm:execution_engine": ["LLVMExecutionEngine"],
     "@llvm-project//llvm:support": ["LLVMSupport"],
+    "@llvm-project//llvm:orcjit": ["LLVMOrcJIT"],
     "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
+    "@llvm-project//llvm:x86_target": ["LLVMX86CodeGen"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
