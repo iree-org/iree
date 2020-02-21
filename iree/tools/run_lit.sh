@@ -47,6 +47,7 @@ function find_executables() {
 # can be found on the path for execution. So we just iterate over the
 # entries in the MANIFEST and extend the PATH.
 SUBPATH=""
+FOO=$(find_executables "${RUNFILES_DIR}")
 for runfile_path in $(find_executables "${RUNFILES_DIR}"); do
   # Prepend so that local things override.
   EXEDIR="$(dirname ${runfile_path})"
