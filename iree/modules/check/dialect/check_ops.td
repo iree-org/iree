@@ -32,7 +32,7 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
     any non-zero integer.
   }];
 
-  let arguments = (ins AnyInteger:$operand);
+  let arguments = (ins AnySignlessInteger:$operand);
 
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
 

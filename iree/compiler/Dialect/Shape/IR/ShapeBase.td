@@ -39,6 +39,6 @@ def Shape_RankedShape :
     Type<CPred<"$_self.isa<::mlir::iree_compiler::Shape::RankedShapeType>()">,
          "Ranked shape type">;
 
-def Shape_DimType : AnyTypeOf<[Index, AnyInteger]>;
+def Shape_DimType : AnyTypeOf<[Index, AnySignlessInteger]>;
 
 #endif  // IREE_DIALECT_SHAPE_BASE

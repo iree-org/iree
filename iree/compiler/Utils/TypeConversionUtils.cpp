@@ -49,7 +49,7 @@ Type legalizeLegacyType(Type type) {
 }
 
 MemRefType convertLegacyTypeToMemRef(Type type) {
-  if (type.isIntOrIndexOrFloat()) {
+  if (type.isSignlessIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
   } else if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
     return MemRefType::get(tensorType.getShape(), tensorType.getElementType());

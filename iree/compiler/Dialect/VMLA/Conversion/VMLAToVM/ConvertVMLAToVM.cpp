@@ -72,7 +72,7 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
     std::string typePrefix = "x";
     if (elementType.isa<FloatType>()) {
       typePrefix = "f";
-    } else if (elementType.isa<IntegerType>()) {
+    } else if (elementType.isSignlessInteger()) {
       typePrefix = forceUnsigned ? "u" : "i";
     }
     return typePrefix + std::to_string(elementType.getIntOrFloatBitWidth());

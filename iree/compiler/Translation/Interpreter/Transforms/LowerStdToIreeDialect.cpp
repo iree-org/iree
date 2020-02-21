@@ -39,7 +39,7 @@ struct ConstantOpLowering : public OpRewritePattern<ConstantOp> {
     }
 
     auto type = op.getValue().getType();
-    if (!type.isIntOrFloat()) {
+    if (!type.isSignlessIntOrFloat()) {
       return matchFailure();
     }
     auto elementsValue =
