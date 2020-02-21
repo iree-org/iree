@@ -40,11 +40,13 @@ namespace {
 
 // Returns the set of values that must be captured for use by |ops| and the
 // set of values defined by |ops| that are used outside of the set.
-LogicalResult analyzeOpRangeValues(
-    const llvm::SmallDenseSet<Operation *> &opSet,
-    llvm::SetVector<Value> *capturedValues,
-    llvm::SetVector<Value> *escapingValues) {
-  for (auto *op : opSet) {
+LogicalResult analyzeOpRangeValues(ArrayRef<Operation *> ops,
+                                   llvm::SetVector<Value> *capturedValues,
+                                   llvm::SetVector<Value> *escapingValues) {
+  llvm::SmallDenseSet<Operation *> opSet;
+  opSet.reserve(ops.size());
+  opSet.insert(ops.begin(), ops.end());
+  for (auto *op : ops) {
     for (auto value : op->getOperands()) {
       if (!llvm::is_contained(opSet, value.getDefiningOp())) {
         // Op is using a value not in the ops set, ensure we capture it.
@@ -77,12 +79,9 @@ LogicalResult buildDispatchRegion(Block *parentBlock, Value workload,
 
   // Get a list of values that we need to capture and values that escape the
   // region and need to be returned.
-  llvm::SmallDenseSet<Operation *> opSet;
-  opSet.reserve(ops.size());
-  opSet.insert(ops.begin(), ops.end());
   llvm::SetVector<Value> capturedValues;
   llvm::SetVector<Value> escapingValues;
-  if (failed(analyzeOpRangeValues(opSet, &capturedValues, &escapingValues))) {
+  if (failed(analyzeOpRangeValues(ops, &capturedValues, &escapingValues))) {
     return failure();
   }
   SmallVector<Type, 8> escapingTypes;
