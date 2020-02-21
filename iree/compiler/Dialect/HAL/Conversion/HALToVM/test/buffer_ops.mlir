@@ -1,19 +1,18 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
 // CHECK-LABEL: @buffer_subspan
-func @buffer_subspan() -> !iree.ref<!hal.buffer> {
-  %0 = "test_hal.buffer"() : () -> !iree.ref<!hal.buffer>
+func @buffer_subspan(%arg0 : !hal.buffer) -> !hal.buffer {
+  %0 = "test_hal.device_size"() : () -> i32
   %1 = "test_hal.device_size"() : () -> i32
-  %2 = "test_hal.device_size"() : () -> i32
-  // CHECK: %ref = vm.call @hal.buffer.subspan(%0, %1, %2) : (!iree.ref<!hal.buffer>, i32, i32) -> !iree.ref<!hal.buffer>
-  %buffer = hal.buffer.subspan %0, %1, %2 : !iree.ref<!hal.buffer>
-  return %buffer : !iree.ref<!hal.buffer>
+  // CHECK: %ref = vm.call @hal.buffer.subspan(%arg0, %0, %1) : (!iree.ref<!hal.buffer>, i32, i32) -> !iree.ref<!hal.buffer>
+  %buffer = hal.buffer.subspan %arg0, %0, %1 : !hal.buffer
+  return %buffer : !hal.buffer
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_fill
-func @buffer_fill(%arg0 : !iree.ref<!hal.buffer>) {
+func @buffer_fill(%arg0 : !hal.buffer) {
   %0 = "test_hal.device_size"() : () -> i32
   %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.pattern"() : () -> i32
@@ -25,33 +24,31 @@ func @buffer_fill(%arg0 : !iree.ref<!hal.buffer>) {
 // -----
 
 // CHECK-LABEL: @buffer_read_data
-func @buffer_read_data(%arg0 : !iree.ref<!hal.buffer>) {
+func @buffer_read_data(%arg0 : !hal.buffer, %arg1 : !iree.mutable_byte_buffer) {
   %0 = "test_hal.device_size"() : () -> i32
-  %1 = "test_hal.mutable_data"() : () -> !iree.mutable_byte_buffer_ref
+  %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.device_size"() : () -> i32
-  %3 = "test_hal.device_size"() : () -> i32
-  // CHECK: vm.call @hal.buffer.read_data(%arg0, %0, %1, %2, %3) : (!iree.ref<!hal.buffer>, i32, !iree.mutable_byte_buffer_ref, i32, i32) -> ()
-  hal.buffer.read_data %arg0, %0, %1, %2, %3 : !iree.mutable_byte_buffer_ref
+  // CHECK: vm.call @hal.buffer.read_data(%arg0, %0, %arg1, %1, %2) : (!iree.ref<!hal.buffer>, i32, !iree.ref<!iree.mutable_byte_buffer>, i32, i32) -> ()
+  hal.buffer.read_data %arg0, %0, %arg1, %1, %2 : !iree.mutable_byte_buffer
   return
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_write_data
-func @buffer_write_data(%arg0 : !iree.ref<!hal.buffer>) {
-  %0 = "test_hal.mutable_data"() : () -> !iree.mutable_byte_buffer_ref
+func @buffer_write_data(%arg0 : !hal.buffer, %arg1 : !iree.mutable_byte_buffer) {
+  %0 = "test_hal.device_size"() : () -> i32
   %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.device_size"() : () -> i32
-  %3 = "test_hal.device_size"() : () -> i32
-  // CHECK: vm.call @hal.buffer.write_data(%0, %1, %arg0, %2, %3) : (!iree.mutable_byte_buffer_ref, i32, !iree.ref<!hal.buffer>, i32, i32) -> ()
-  hal.buffer.write_data %0, %1, %arg0, %2, %3 : !iree.mutable_byte_buffer_ref
+  // CHECK: vm.call @hal.buffer.write_data(%arg1, %0, %arg0, %1, %2) : (!iree.ref<!iree.mutable_byte_buffer>, i32, !iree.ref<!hal.buffer>, i32, i32) -> ()
+  hal.buffer.write_data %arg1, %0, %arg0, %1, %2 : !iree.mutable_byte_buffer
   return
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_copy_data
-func @buffer_copy_data(%arg0 : !iree.ref<!hal.buffer>, %arg1 : !iree.ref<!hal.buffer>) {
+func @buffer_copy_data(%arg0 : !hal.buffer, %arg1 : !hal.buffer) {
   %0 = "test_hal.device_size"() : () -> i32
   %1 = "test_hal.device_size"() : () -> i32
   %2 = "test_hal.device_size"() : () -> i32
@@ -63,7 +60,7 @@ func @buffer_copy_data(%arg0 : !iree.ref<!hal.buffer>, %arg1 : !iree.ref<!hal.bu
 // -----
 
 // CHECK-LABEL: @buffer_load
-func @buffer_load(%arg0 : !iree.ref<!hal.buffer>) -> (i8, i16, i32) {
+func @buffer_load(%arg0 : !hal.buffer) -> (i8, i16, i32) {
   %0 = "test_hal.device_size"() : () -> i32
   // CHECK: %1 = vm.call @hal.buffer.load(%arg0, %0, %c1) : (!iree.ref<!hal.buffer>, i32, i32) -> i32
   %1 = hal.buffer.load %arg0[%0] : i8
@@ -77,7 +74,7 @@ func @buffer_load(%arg0 : !iree.ref<!hal.buffer>) -> (i8, i16, i32) {
 // -----
 
 // CHECK-LABEL: @buffer_store
-func @buffer_store(%arg0 : !iree.ref<!hal.buffer>, %arg1 : i8, %arg2 : i16, %arg3 : i32) {
+func @buffer_store(%arg0 : !hal.buffer, %arg1 : i8, %arg2 : i16, %arg3 : i32) {
   %0 = "test_hal.device_size"() : () -> i32
   // CHECK: vm.call @hal.buffer.store(%arg1, %arg0, %0, %c1) : (i32, !iree.ref<!hal.buffer>, i32, i32) -> ()
   hal.buffer.store %arg1, %arg0[%0] : i8

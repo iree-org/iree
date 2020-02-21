@@ -85,8 +85,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
   }
   for (auto resultType : srcOp->getResultTypes()) {
     if (auto tensorType = resultType.template dyn_cast<TensorType>()) {
-      state.addTypes(IREE::RefPtrType::get(
-          IREE::HAL::BufferViewType::get(rewriter.getContext())));
+      state.addTypes(IREE::HAL::BufferViewType::get(rewriter.getContext()));
     } else {
       // Normal pass-through result.
       if (failed(typeConverter.convertType(resultType, state.types))) {

@@ -27,7 +27,7 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
   let results = (outs
-    RefPtrOf<HAL_Device>:$result
+    HAL_Device:$result
   );
 
   let assemblyFormat = "attr-dict `:` type($result)";
@@ -37,7 +37,7 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
     OpBuilder<[{
       Builder *builder, OperationState &state
     }], [{
-      state.addTypes({RefPtrType::get(DeviceType::get(builder->getContext()))});
+      state.addTypes({DeviceType::get(builder->getContext())});
     }]>,
   ];
 }
@@ -46,11 +46,11 @@ def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
   let arguments = (ins
-    RefPtrOf<HAL_Device>:$device,
+    HAL_Device:$device,
     FlatSymbolRefAttr:$executable
   );
   let results = (outs
-    RefPtrOf<HAL_Executable>:$result
+    HAL_Executable:$result
   );
 
   let assemblyFormat = "$device `,` $executable attr-dict `:` type($result)";
@@ -63,7 +63,7 @@ def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
     }], [{
       state.addOperands({device});
       state.addAttribute("executable", builder->getSymbolRefAttr(executable));
-      state.addTypes({RefPtrType::get(ExecutableType::get(builder->getContext()))});
+      state.addTypes({ExecutableType::get(builder->getContext())});
     }]>,
   ];
 }
@@ -71,9 +71,9 @@ def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
 // TODO(benvanik): remove and replace with descriptor sets.
 def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    HAL_CommandBuffer:$command_buffer,
     I32Attr:$ordinal,
-    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Buffer:$buffer,
     HAL_Shape:$shape,
     HAL_ElementTypeAttr:$element_type
   );
@@ -87,7 +87,7 @@ def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
 // TODO(benvanik): replace with resource sets.
 def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
   let arguments = (ins
-    AnyRefPtr:$operand
+    AnyRefObject:$operand
   );
 
   let assemblyFormat = "$operand `:` type($operand) attr-dict";
@@ -95,8 +95,8 @@ def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
 
 def HAL_ExSubmitAndWaitOp : HAL_Op<"ex.submit_and_wait", [YieldPoint]> {
   let arguments = (ins
-    RefPtrOf<HAL_Device>:$device,
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer
+    HAL_Device:$device,
+    HAL_CommandBuffer:$command_buffer
   );
 
   let assemblyFormat = "$device `,` $command_buffer attr-dict";
@@ -145,7 +145,7 @@ def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
   let arguments = (ins
     HAL_AccessScopeBitfieldAttr:$source_scope,
     HAL_AccessScopeBitfieldAttr:$target_scope,
-    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Buffer:$buffer,
     HAL_DeviceSize:$offset,
     HAL_DeviceSize:$length
   );
@@ -322,7 +322,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Allocator:$allocator,
     HAL_Shape:$shape,
     HAL_ElementTypeAttr:$element_type
   );
@@ -355,7 +355,7 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Allocator:$allocator,
     HAL_Shape:$shape,
     HAL_ElementTypeAttr:$element_type,
     HAL_Dims:$indices
@@ -390,7 +390,7 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Allocator:$allocator,
     HAL_Shape:$shape,
     HAL_ElementTypeAttr:$element_type,
     HAL_Dims:$indices,
@@ -429,13 +429,13 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Allocator:$allocator,
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
     HAL_DeviceSize:$allocation_size
   );
   let results = (outs
-    RefPtrOf<HAL_Buffer>:$result
+    HAL_Buffer:$result
   );
 
   let skipDefaultBuilders = 1;
@@ -461,13 +461,13 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Allocator:$allocator,
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
     ElementsAttr:$value
   );
   let results = (outs
-    RefPtrOf<HAL_Buffer>:$result
+    HAL_Buffer:$result
   );
 
   let skipDefaultBuilders = 1;
@@ -494,10 +494,10 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$buffer
+    HAL_Buffer:$buffer
   );
   let results = (outs
-    RefPtrOf<HAL_Allocator>:$result
+    HAL_Allocator:$result
   );
 
   let assemblyFormat = "$buffer `:` type($result) attr-dict";
@@ -523,12 +523,12 @@ def HAL_BufferSubspanOp : HAL_PureOp<"buffer.subspan", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_Buffer:$source_buffer,
     HAL_DeviceSize:$source_offset,
     HAL_DeviceSize:$length
   );
   let results = (outs
-    RefPtrOf<HAL_Buffer>:$result
+    HAL_Buffer:$result
   );
 
   let assemblyFormat = "operands attr-dict `:` type($result)";
@@ -541,7 +541,7 @@ def HAL_BufferFillOp : HAL_Op<"buffer.fill"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
     I32:$pattern
@@ -557,9 +557,9 @@ def HAL_BufferReadDataOp : HAL_Op<"buffer.read_data"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_Buffer:$source_buffer,
     HAL_DeviceSize:$source_offset,
-    RefPtrOf<MutableByteBufferType>:$target_buffer,
+    MutableByteBufferType:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
@@ -574,9 +574,9 @@ def HAL_BufferWriteDataOp : HAL_Op<"buffer.write_data"> {
   }];
 
   let arguments = (ins
-    HAL_HostBufferRef:$source_buffer,
+    HAL_HostBuffer:$source_buffer,
     HAL_DeviceSize:$source_offset,
-    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
@@ -591,9 +591,9 @@ def HAL_BufferCopyDataOp : HAL_Op<"buffer.copy_data"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_Buffer:$source_buffer,
     HAL_DeviceSize:$source_offset,
-    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
@@ -608,7 +608,7 @@ def HAL_BufferLoadOp : HAL_PureOp<"buffer.load"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_Buffer:$source_buffer,
     HAL_DeviceSize:$source_offset
   );
   let results = (outs
@@ -628,7 +628,7 @@ def HAL_BufferStoreOp : HAL_Op<"buffer.store"> {
 
   let arguments = (ins
     AnyTypeOf<[HAL_PrimitiveType, AnyVector]>:$value,
-    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset
   );
 
@@ -651,13 +651,13 @@ def HAL_BufferViewConstOp : HAL_PureOp<"buffer_view.const", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Allocator>:$allocator,
+    HAL_Allocator:$allocator,
     HAL_MemoryTypeBitfieldAttr:$memory_types,
     HAL_BufferUsageBitfieldAttr:$buffer_usage,
     ElementsAttr:$value
   );
   let results = (outs
-    RefPtrOf<HAL_BufferView>:$result
+    HAL_BufferView:$result
   );
 
   let skipDefaultBuilders = 1;
@@ -685,12 +685,12 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Buffer:$buffer,
     HAL_Shape:$shape,
     HAL_ElementTypeAttr:$element_type
   );
   let results = (outs
-    RefPtrOf<HAL_BufferView>:$result
+    HAL_BufferView:$result
   );
 
   let assemblyFormat = [{
@@ -718,12 +718,12 @@ def HAL_BufferViewSubviewOp : HAL_PureOp<"buffer_view.subview", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_BufferView>:$buffer_view,
+    HAL_BufferView:$buffer_view,
     HAL_Dims:$indices,
     HAL_Dims:$lengths
   );
   let results = (outs
-    RefPtrOf<HAL_BufferView>:$result
+    HAL_BufferView:$result
   );
 
   let assemblyFormat = [{
@@ -741,10 +741,10 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_BufferView>:$buffer_view
+    HAL_BufferView:$buffer_view
   );
   let results = (outs
-    RefPtrOf<HAL_Buffer>:$result
+    HAL_Buffer:$result
   );
 
   let assemblyFormat = "$buffer_view `:` type($result) attr-dict";
@@ -768,7 +768,7 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_BufferView>:$buffer_view
+    HAL_BufferView:$buffer_view
   );
   let results = (outs
     HAL_DeviceSize:$result
@@ -793,7 +793,7 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_BufferView>:$buffer_view,
+    HAL_BufferView:$buffer_view,
     HAL_Dims:$indices
   );
 
@@ -824,7 +824,7 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_BufferView>:$buffer_view,
+    HAL_BufferView:$buffer_view,
     HAL_Dims:$indices,
     HAL_Dims:$lengths
   );
@@ -861,12 +861,12 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Device>:$device,
+    HAL_Device:$device,
     HAL_CommandBufferModeBitfieldAttr:$modes,
     HAL_CommandCategoryBitfieldAttr:$command_categories
   );
   let results = (outs
-    RefPtrOf<HAL_CommandBuffer>:$result
+    HAL_CommandBuffer:$result
   );
 
   let skipDefaultBuilders = 1;
@@ -887,7 +887,7 @@ def HAL_CommandBufferBeginOp : HAL_Op<"command_buffer.begin"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer
+    HAL_CommandBuffer:$command_buffer
   );
 
   let assemblyFormat = "$command_buffer attr-dict";
@@ -900,7 +900,7 @@ def HAL_CommandBufferEndOp : HAL_Op<"command_buffer.end"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer
+    HAL_CommandBuffer:$command_buffer
   );
 
   let assemblyFormat = "$command_buffer attr-dict";
@@ -916,7 +916,7 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
+    HAL_CommandBuffer:$command_buffer,
     HAL_ExecutionStageBitfieldAttr:$source_stage_mask,
     HAL_ExecutionStageBitfieldAttr:$target_stage_mask,
     Variadic<HAL_MemoryBarrier>:$memory_barriers,
@@ -943,8 +943,8 @@ def HAL_CommandBufferFillBufferOp : HAL_Op<"command_buffer.fill_buffer"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
-    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length,
     I32:$pattern
@@ -962,10 +962,10 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
-    RefPtrOf<HAL_Buffer>:$source_buffer,
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Buffer:$source_buffer,
     HAL_DeviceSize:$source_offset,
-    RefPtrOf<HAL_Buffer>:$target_buffer,
+    HAL_Buffer:$target_buffer,
     HAL_DeviceSize:$target_offset,
     HAL_DeviceSize:$length
   );
@@ -982,10 +982,10 @@ def HAL_CommandBufferBindDescriptorSetOp :
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
-    RefPtrOf<HAL_ExecutableLayout>:$executable_layout,
+    HAL_CommandBuffer:$command_buffer,
+    HAL_ExecutableLayout:$executable_layout,
     I32Attr:$set,
-    RefPtrOf<HAL_DescriptorSet>:$descriptor_set,
+    HAL_DescriptorSet:$descriptor_set,
     Variadic<HAL_DeviceSize>:$dynamic_offsets
   );
 
@@ -1006,8 +1006,8 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
-    RefPtrOf<HAL_Executable>:$executable,
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Executable:$executable,
     HAL_OrdinalAttr:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
@@ -1038,10 +1038,10 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_CommandBuffer>:$command_buffer,
-    RefPtrOf<HAL_Executable>:$executable,
+    HAL_CommandBuffer:$command_buffer,
+    HAL_Executable:$executable,
     HAL_OrdinalAttr:$entry_point,
-    RefPtrOf<HAL_Buffer>:$workgroups_buffer,
+    HAL_Buffer:$workgroups_buffer,
     HAL_DeviceSize:$workgroups_offset
   );
 
@@ -1067,7 +1067,7 @@ def HAL_DescriptorSetMakeBindingOp :
 
   let arguments = (ins
     I32Attr:$binding,
-    RefPtrOf<HAL_Buffer>:$buffer,
+    HAL_Buffer:$buffer,
     HAL_DeviceSize:$offset,
     HAL_DeviceSize:$length
   );
@@ -1097,12 +1097,12 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Device>:$device,
-    RefPtrOf<HAL_DescriptorSetLayout>:$set_layout,
+    HAL_Device:$device,
+    HAL_DescriptorSetLayout:$set_layout,
     Variadic<HAL_DescriptorSetBinding>:$bindings
   );
   let results = (outs
-    RefPtrOf<HAL_DescriptorSet>:$result
+    HAL_DescriptorSet:$result
   );
 
   let assemblyFormat = [{
@@ -1154,11 +1154,11 @@ def HAL_DescriptorSetLayoutCreateOp :
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Device>:$device,
+    HAL_Device:$device,
     Variadic<HAL_DescriptorSetLayoutBinding>:$bindings
   );
   let results = (outs
-    RefPtrOf<HAL_DescriptorSetLayout>:$result
+    HAL_DescriptorSetLayout:$result
   );
 
   let assemblyFormat = [{
@@ -1180,10 +1180,10 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Device>:$device
+    HAL_Device:$device
   );
   let results = (outs
-    RefPtrOf<HAL_Allocator>:$result
+    HAL_Allocator:$result
   );
 
   let assemblyFormat = "$device attr-dict `:` type($result)";
@@ -1194,7 +1194,7 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
       Builder *builder, OperationState &state, Value device
     }], [{
       state.addOperands({device});
-      state.addTypes({RefPtrType::get(AllocatorType::get(builder->getContext()))});
+      state.addTypes({AllocatorType::get(builder->getContext())});
     }]>,
   ];
 }
@@ -1337,12 +1337,12 @@ def HAL_ExecutableLayoutCreateOp :
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_Device>:$device,
+    HAL_Device:$device,
     Variadic<HAL_DescriptorSetLayout>:$set_layouts,
     OptionalAttr<I32Attr>:$push_constants
   );
   let results = (outs
-    RefPtrOf<HAL_ExecutableLayout>:$result
+    HAL_ExecutableLayout:$result
   );
 }
 

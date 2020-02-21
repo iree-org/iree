@@ -1,6 +1,6 @@
 // RUN: iree-tf-opt <%s -iree-convert-flow-to-hal -split-input-file | IreeFileCheck %s
 
-// CHECK-LABEL: func @Reserve(%arg0: !iree.ref<!hal.buffer>, %arg1: !iree.ref<!hal.buffer>) -> !iree.ref<!tensorlist.list> {
+// CHECK-LABEL: func @Reserve(%arg0: !hal.buffer, %arg1: !hal.buffer) -> !tensorlist.list {
 func @Reserve(%arg0: tensor<0xi32>, %arg1: tensor<i32>) -> !tf_tensorlist.list{
 // CHECK:         [[VIEW0:%.+]] = hal.buffer_view.create %arg0{{.*}}
 // CHECK:         [[VIEW1:%.+]] = hal.buffer_view.create %arg1{{.*}}
@@ -9,7 +9,7 @@ func @Reserve(%arg0: tensor<0xi32>, %arg1: tensor<i32>) -> !tf_tensorlist.list{
   return %0 : !tf_tensorlist.list
 }
 
-// CHECK-LABEL: func @SetItem(%arg0: !iree.ref<!tensorlist.list>, %arg1: !iree.ref<!hal.buffer>, %arg2: !iree.ref<!hal.buffer>) -> !iree.ref<!tensorlist.list> {
+// CHECK-LABEL: func @SetItem(%arg0: !tensorlist.list, %arg1: !hal.buffer, %arg2: !hal.buffer) -> !tensorlist.list {
 func @SetItem(%arg0: !tf_tensorlist.list, %arg1: tensor<i32>, %arg2: tensor<f32>) -> !tf_tensorlist.list{
 // CHECK:         [[VIEW1:%.+]]  = hal.buffer_view.create %arg1{{.*}}
 // CHECK:         [[VIEW2:%.+]]  = hal.buffer_view.create %arg2{{.*}}
@@ -18,7 +18,7 @@ func @SetItem(%arg0: !tf_tensorlist.list, %arg1: tensor<i32>, %arg2: tensor<f32>
   return %0 : !tf_tensorlist.list
 }
 
-// CHECK-LABEL: func @GetItem(%arg0: !iree.ref<!tensorlist.list>, %arg1: !iree.ref<!hal.buffer>, %arg2: !iree.ref<!hal.buffer>) -> !iree.ref<!hal.buffer> {
+// CHECK-LABEL: func @GetItem(%arg0: !tensorlist.list, %arg1: !hal.buffer, %arg2: !hal.buffer) -> !hal.buffer {
 func @GetItem(%arg0: !tf_tensorlist.list, %arg1: tensor<i32>, %arg2: tensor<0xi32>) -> tensor<f32> {
 // CHECK:         [[VIEW1:%.+]] = hal.buffer_view.create %arg1{{.*}}
 // CHECK:         [[VIEW2:%.+]] = hal.buffer_view.create %arg2{{.*}}

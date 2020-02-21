@@ -28,13 +28,13 @@ def TensorList_Reserve : Op<TensorList_Dialect, "Reserve"> {
 
   let arguments = (ins
     // TODO(silvasean): Do we need element_shape?
-    RefPtrOf<HAL_BufferView>:$element_shape,
+    HAL_BufferView:$element_shape,
     // TODO(silvasean): Convert to `I32:$count` instead.
-    RefPtrOf<HAL_BufferView>:$count
+    HAL_BufferView:$count
   );
 
   let results = (outs
-    RefPtrOf<TensorList_TensorList>:$list
+    TensorList_TensorList:$list
   );
 }
 
@@ -45,15 +45,15 @@ def TensorList_GetItem : Op<TensorList_Dialect, "GetItem"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<TensorList_TensorList>:$list,
+    TensorList_TensorList:$list,
     // TODO(silvasean): Convert to `I32:$index` instead.
-    RefPtrOf<HAL_BufferView>:$index,
+    HAL_BufferView:$index,
     // TODO(silvasean): Do we need element_shape?
-    RefPtrOf<HAL_BufferView>:$element_shape
+    HAL_BufferView:$element_shape
   );
 
   let results = (outs
-    RefPtrOf<HAL_BufferView>:$item
+    HAL_BufferView:$item
   );
 }
 
@@ -65,14 +65,14 @@ def TensorList_SetItem : Op<TensorList_Dialect, "SetItem"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<TensorList_TensorList>:$list,
+    TensorList_TensorList:$list,
     // TODO(silvasean): Convert to `I32:$index` instead.
-    RefPtrOf<HAL_BufferView>:$index,
-    RefPtrOf<HAL_BufferView>:$item
+    HAL_BufferView:$index,
+    HAL_BufferView:$item
   );
 
   let results = (outs
-    RefPtrOf<TensorList_TensorList>:$new_list
+    TensorList_TensorList:$new_list
   );
 }
 

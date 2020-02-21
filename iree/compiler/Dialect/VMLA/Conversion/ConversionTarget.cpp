@@ -232,9 +232,7 @@ Value VMLAConversionTarget::allocateOutputBuffer(
   // Allocate the buffer of the required size.
   // The caller can then use the buffer instead of the original SSA value.
   return rewriter.createOrFold<IREE::VMLA::BufferAllocOp>(
-      loc,
-      IREE::RefPtrType::get(IREE::VMLA::BufferType::get(rewriter.getContext())),
-      byteLength);
+      loc, IREE::VMLA::BufferType::get(rewriter.getContext()), byteLength);
 }
 
 }  // namespace iree_compiler

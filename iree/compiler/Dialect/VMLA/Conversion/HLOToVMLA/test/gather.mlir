@@ -1,8 +1,8 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s -verify-diagnostics | IreeFileCheck %s
 
 // CHECK-LABEL: @gather_scalar_indices
-// CHECK-SAME: [[SRC:%.+]]: !iree.ref<!vmla.buffer>,
-// CHECK-SAME: [[INDICES:%.+]]: !iree.ref<!vmla.buffer>)
+// CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
+// CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
 func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<i64>) -> tensor<1x5xi32> {
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,1,5],i32>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,5],i32>
@@ -29,8 +29,8 @@ func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<
 // -----
 
 // CHECK-LABEL: @gather_fully_specified_indices
-// CHECK-SAME: [[SRC:%.+]]: !iree.ref<!vmla.buffer>,
-// CHECK-SAME: [[INDICES:%.+]]: !iree.ref<!vmla.buffer>)
+// CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
+// CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
 func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices : tensor<3xi64>) -> tensor<2x3xf32> {
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,2,3],i32>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[2,3],i32>

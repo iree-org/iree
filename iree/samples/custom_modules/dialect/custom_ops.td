@@ -59,8 +59,7 @@ def CUSTOM_TensorToMessageOp : Op<CUSTOM_Dialect, "tensor_to_message"> {
     AnyRankedTensor:$operand
   );
   let results = (outs
-    // TODO(benvanik): remove the use of RefPtrOf here.
-    RefPtrOf<CUSTOM_Message>:$result
+    CUSTOM_Message:$result
   );
 }
 
@@ -72,11 +71,10 @@ def CUSTOM_BufferToMessageOp : Op<CUSTOM_Dialect, "buffer_to_message"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<HAL_BufferView>:$buffer_view
+    HAL_BufferView:$buffer_view
   );
   let results = (outs
-    // TODO(benvanik): remove the use of RefPtrOf here.
-    RefPtrOf<CUSTOM_Message>:$result
+    CUSTOM_Message:$result
   );
 }
 
@@ -87,10 +85,9 @@ def CUSTOM_MessageToTensorOp : Op<CUSTOM_Dialect, "message_to_tensor"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<CUSTOM_Message>:$message
+    CUSTOM_Message:$message
   );
   let results = (outs
-    // TODO(benvanik): remove the use of RefPtrOf here.
     AnyRankedTensor:$result
   );
 }
@@ -102,11 +99,10 @@ def CUSTOM_MessageToBufferOp : Op<CUSTOM_Dialect, "message_to_buffer"> {
   }];
 
   let arguments = (ins
-    RefPtrOf<CUSTOM_Message>:$message
+    CUSTOM_Message:$message
   );
   let results = (outs
-    // TODO(benvanik): remove the use of RefPtrOf here.
-    RefPtrOf<HAL_BufferView>:$result
+    HAL_BufferView:$result
   );
 }
 
@@ -120,8 +116,7 @@ def CUSTOM_PrintOp : Op<CUSTOM_Dialect, "print"> {
   }];
 
   let arguments = (ins
-    // TODO(benvanik): remove the use of RefPtrOf here.
-    RefPtrOf<CUSTOM_Message>:$message,
+    CUSTOM_Message:$message,
     I32:$count
   );
 }
@@ -138,12 +133,10 @@ def CUSTOM_ReverseOp : Op<CUSTOM_Dialect, "reverse", [NoSideEffect]> {
   }];
 
   let arguments = (ins
-    // TODO(benvanik): remove the use of RefPtrOf here.
-    RefPtrOf<CUSTOM_Message>:$operand
+    CUSTOM_Message:$operand
   );
   let results = (outs
-    // TODO(benvanik): remove the use of RefPtrOf here.
-    RefPtrOf<CUSTOM_Message>:$result
+    CUSTOM_Message:$result
   );
 }
 
@@ -157,8 +150,7 @@ def CUSTOM_GetUniqueMessageOp : Op<CUSTOM_Dialect, "get_unique_message", [NoSide
   }];
 
   let results = (outs
-    // TODO(benvanik): remove the use of RefPtrOf here.
-    RefPtrOf<CUSTOM_Message>:$result
+    CUSTOM_Message:$result
   );
 }
 

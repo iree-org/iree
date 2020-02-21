@@ -26,16 +26,16 @@ hal.executable @exe {
 // CHECK-NEXT:   %eq = vm.cmp.eq.i32 %2, %c1230128453_0 : i32
 // CHECK-NEXT:   vm.cond_br %eq, ^bb4(%2 : i32), ^bb5(%2 : i32)
 // CHECK-NEXT: ^bb4(%3: i32):
-// CHECK-NEXT:   %exe_data_1230128453 = vm.const.ref.rodata @exe_data_1230128453 : !iree.byte_buffer_ref
-// CHECK-NEXT:   %ref = vm.call @hal.ex.cache_executable(%arg0, %3, %exe_data_1230128453) : (!iree.ref<!hal.device>, i32, !iree.byte_buffer_ref) -> !iree.ref<!hal.executable>
+// CHECK-NEXT:   %exe_data_1230128453 = vm.const.ref.rodata @exe_data_1230128453 : !iree.ref<!iree.byte_buffer>
+// CHECK-NEXT:   %ref = vm.call @hal.ex.cache_executable(%arg0, %3, %exe_data_1230128453) : (!iree.ref<!hal.device>, i32, !iree.ref<!iree.byte_buffer>) -> !iree.ref<!hal.executable>
 // CHECK-NEXT:   vm.br ^bb7(%ref : !iree.ref<!hal.executable>)
 // CHECK-NEXT: ^bb5(%4: i32):
 // CHECK-NEXT:   %c1397773893_1 = vm.const.i32 1397773893 : i32
 // CHECK-NEXT:   %eq_2 = vm.cmp.eq.i32 %4, %c1397773893_1 : i32
 // CHECK-NEXT:   vm.cond_br %eq_2, ^bb6(%4 : i32), ^bb8
 // CHECK-NEXT: ^bb6(%5: i32):
-// CHECK-NEXT:   %exe_data_1397773893 = vm.const.ref.rodata @exe_data_1397773893 : !iree.byte_buffer_ref
-// CHECK-NEXT:   %ref_3 = vm.call @hal.ex.cache_executable(%arg0, %5, %exe_data_1397773893) : (!iree.ref<!hal.device>, i32, !iree.byte_buffer_ref) -> !iree.ref<!hal.executable>
+// CHECK-NEXT:   %exe_data_1397773893 = vm.const.ref.rodata @exe_data_1397773893 : !iree.ref<!iree.byte_buffer>
+// CHECK-NEXT:   %ref_3 = vm.call @hal.ex.cache_executable(%arg0, %5, %exe_data_1397773893) : (!iree.ref<!hal.device>, i32, !iree.ref<!iree.byte_buffer>) -> !iree.ref<!hal.executable>
 // CHECK-NEXT:   vm.br ^bb7(%ref_3 : !iree.ref<!hal.executable>)
 // CHECK-NEXT: ^bb7(%6: !iree.ref<!hal.executable>):
 // CHECK-NEXT:   vm.global.store.ref %6, @exe_cached : !iree.ref<!hal.executable>
@@ -48,8 +48,8 @@ hal.executable @exe {
 // -----
 
 // CHECK-LABEL: @exeLookup
-func @exeLookup(%arg0 : !iree.ref<!hal.device>) -> !iree.ref<!hal.executable> {
+func @exeLookup(%arg0 : !hal.device) -> !hal.executable {
   // CHECK: vm.call @exe(%arg0) : (!iree.ref<!hal.device>) -> !iree.ref<!hal.executable>
-  %0 = hal.ex.cache_executable %arg0, @exe : !iree.ref<!hal.executable>
-  return %0 : !iree.ref<!hal.executable>
+  %0 = hal.ex.cache_executable %arg0, @exe : !hal.executable
+  return %0 : !hal.executable
 }

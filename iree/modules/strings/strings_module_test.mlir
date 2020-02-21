@@ -13,7 +13,7 @@
 // limitations under the License.
 
 func @print_example_func(%arg0 : i32) attributes { iree.module.export } {
-  %0 = "strings.i32_to_string"(%arg0) : (i32) -> !iree.ref<!strings.string>
-  "strings.print"(%0) : (!iree.ref<!strings.string>) -> ()
+  %0 = "strings.i32_to_string"(%arg0) : (i32) -> !strings.string
+  "strings.print"(%0) : (!strings.string) -> ()
   return
 }

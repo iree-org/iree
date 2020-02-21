@@ -367,7 +367,7 @@ class ExStreamFragmentOpConversion
     // Remap non-tensor operands (such as workloads).
     auto &entryBlock = streamOp.body().front();
     for (int i = 0; i < operands.size(); ++i) {
-      if (operands[i].getType().isa<IREE::RefPtrType>()) {
+      if (operands[i].getType().isa<IREE::HAL::BufferType>()) {
         bufferSet.rangeMap[entryBlock.getArgument(i)] =
             BufferRange{operands[i]};
       } else {
@@ -407,7 +407,7 @@ class ExStreamFragmentOpConversion
     // otherwise we lose access to the original values (which we need for
     // shape information).
     for (int i = 0; i < operands.size(); ++i) {
-      if (operands[i].getType().isa<IREE::RefPtrType>()) {
+      if (operands[i].getType().isa<IREE::HAL::BufferType>()) {
         rewriter.replaceUsesOfBlockArgument(entryBlock.getArgument(i),
                                             operands[i]);
       }

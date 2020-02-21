@@ -30,17 +30,17 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
   PatternMatchResult matchAndRewrite(
       IREE::HAL::VariableOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (op.type().isa<IREE::RefPtrType>()) {
+    auto convertedType = typeConverter.convertType(op.type());
+    if (convertedType.isa<IREE::RefPtrType>() ||
+        IREE::RefPtrType::isCompatible(convertedType)) {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
-          op, op.sym_name(), op.is_mutable(),
-          typeConverter.convertType(op.type()), op.initializer(),
+          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
       return matchSuccess();
-    } else if (op.type().isIntOrIndex()) {
+    } else if (convertedType.isIntOrIndex()) {
       // TODO(benvanik): support other types.
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
-          op, op.sym_name(), op.is_mutable(),
-          typeConverter.convertType(op.type()), op.initializer(),
+          op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
       return matchSuccess();
     }

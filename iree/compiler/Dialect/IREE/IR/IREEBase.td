@@ -135,7 +135,7 @@ class AnyPtrOf<list<Type> types> :
 
 def AnyRefObject : DialectType<
     IREE_Dialect,
-    CPred<"$_self.isa<IREE::RefObjectType>()">,
+    CPred<"IREE::RefPtrType::isCompatible($_self)">,
     "ref_object"> {
   let typeDescription = [{
     An iree::RefObject subclass.

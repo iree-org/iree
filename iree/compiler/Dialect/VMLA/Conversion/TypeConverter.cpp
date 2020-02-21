@@ -24,8 +24,7 @@ namespace iree_compiler {
 Type VMLATypeConverter::convertType(Type type) {
   if (type.isa<TensorType>()) {
     // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
-    return IREE::RefPtrType::get(
-        IREE::VMLA::BufferType::get(type.getContext()));
+    return IREE::VMLA::BufferType::get(type.getContext());
   } else if (type.isInteger(1)) {
     // Widen i1 to i8.
     return IntegerType::get(8, type.getContext());

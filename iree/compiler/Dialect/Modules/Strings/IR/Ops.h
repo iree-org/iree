@@ -24,7 +24,7 @@ namespace iree_compiler {
 namespace IREE {
 namespace Strings {
 
-class StringType : public Type::TypeBase<StringType, RefObjectType> {
+class StringType : public Type::TypeBase<StringType, Type> {
  public:
   using Base::Base;
   static StringType get(MLIRContext *context) {

@@ -43,7 +43,7 @@ namespace VMLA {
 // RefObject types
 //===----------------------------------------------------------------------===//
 
-class BufferType : public Type::TypeBase<BufferType, RefObjectType> {
+class BufferType : public Type::TypeBase<BufferType, Type> {
  public:
   using Base::Base;
   static BufferType get(MLIRContext *context) {

@@ -96,6 +96,8 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
                                 convertedResultTypes, srcOp.getContext());
     auto newFuncOp = rewriter.create<IREE::VM::FuncOp>(
         srcOp.getLoc(), srcOp.getName(), newFuncType);
+    rewriter.inlineRegionBefore(srcOp.getBody(), newFuncOp.getBody(),
+                                newFuncOp.end());
 
     // Retain function attributes in the whitelist.
     for (auto retainAttrName : kRetainedAttributes) {
@@ -105,11 +107,6 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
         newFuncOp.setAttr(attrName, attr);
       }
     }
-
-    // Move the body region from src -> new.
-    auto &srcRegion = srcOp.getOperation()->getRegion(0);
-    auto &newRegion = newFuncOp.getOperation()->getRegion(0);
-    newRegion.takeBody(srcRegion);
 
     // Tell the rewriter to convert the region signature.
     rewriter.applySignatureConversion(&newFuncOp.getBody(),

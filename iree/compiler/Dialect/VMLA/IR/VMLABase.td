@@ -76,9 +76,9 @@ def VMLA_Index : TypeAlias<I32>;
 
 def VMLA_Shape : TypeAlias<Shape_RankedShape>;
 
-def VMLA_HostBufferRef : AnyTypeOf<[
-  RefPtrOf<ByteBufferType>,
-  RefPtrOf<MutableByteBufferType>,
+def VMLA_HostBuffer : AnyTypeOf<[
+  ByteBufferType,
+  MutableByteBufferType,
 ]>;
 
 def VMLA_Buffer : DialectType<
@@ -89,8 +89,6 @@ def VMLA_Buffer : DialectType<
     A lightweight unshaped byte buffer.
   }];
 }
-
-def VMLA_BufferRef : TypeAlias<RefPtrOf<VMLA_Buffer>>;
 
 // TODO(benvanik): figure out how to get constraints to work.
 // def VMLA_AnyTypeAttr : Confined<TypeAttr, [I8Attr, I16Attr, I32Attr, F32Attr]> {
@@ -159,8 +157,8 @@ class VMLA_ElementTypeOp<string mnemonic, list<OpTrait> traits = []> :
 class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
-    RefPtrOf<VMLA_Buffer>:$src,
-    RefPtrOf<VMLA_Buffer>:$dst,
+    VMLA_Buffer:$src,
+    VMLA_Buffer:$dst,
     typeAttr:$element_type,
     // TODO(benvanik): remove once unsigned types are in MLIR.
     UnitAttr:$forceUnsigned
@@ -170,9 +168,9 @@ class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
 class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
-    RefPtrOf<VMLA_Buffer>:$lhs,
-    RefPtrOf<VMLA_Buffer>:$rhs,
-    RefPtrOf<VMLA_Buffer>:$dst,
+    VMLA_Buffer:$lhs,
+    VMLA_Buffer:$rhs,
+    VMLA_Buffer:$dst,
     typeAttr:$element_type,
     // TODO(benvanik): remove once unsigned types are in MLIR.
     UnitAttr:$forceUnsigned
@@ -182,10 +180,10 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
 class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
-    RefPtrOf<VMLA_Buffer>:$a,
-    RefPtrOf<VMLA_Buffer>:$b,
-    RefPtrOf<VMLA_Buffer>:$c,
-    RefPtrOf<VMLA_Buffer>:$dst,
+    VMLA_Buffer:$a,
+    VMLA_Buffer:$b,
+    VMLA_Buffer:$c,
+    VMLA_Buffer:$dst,
     typeAttr:$element_type,
     // TODO(benvanik): remove once unsigned types are in MLIR.
     UnitAttr:$forceUnsigned

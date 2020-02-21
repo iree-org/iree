@@ -50,7 +50,7 @@ def IREESTRINGS_I32ToStringOp : Op<IREESTRINGS_Dialect, "i32_to_string", [NoSide
   let arguments = (ins I32:$value);
 
   let results = (outs
-    RefPtrOf<IREESTRINGS_String>:$result
+    IREESTRINGS_String:$result
   );
 }
 
@@ -60,7 +60,7 @@ def IREESTRINGS_PrintOp : Op<IREESTRINGS_Dialect, "print"> {
     Prints the contents of a string.
   }];
 
-  let arguments = (ins RefPtrOf<IREESTRINGS_String>:$value);
+  let arguments = (ins IREESTRINGS_String:$value);
 }
 
 #endif  // IREE_SAMPLES_IREESTRINGS_MODULES_DIALECT_IREESTRINGS_OPS

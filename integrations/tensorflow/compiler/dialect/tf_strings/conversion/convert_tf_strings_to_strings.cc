@@ -40,9 +40,7 @@ Value ToStringHelper(Location loc, Value value, OpBuilder &builder) {
     return value;
   } else if (type.isInteger(32)) {
     auto toString = builder.create<IREE::Strings::I32ToStringOp>(
-        loc,
-        IREE::RefPtrType::get(builder.getType<IREE::Strings::StringType>()),
-        value);
+        loc, builder.getType<IREE::Strings::StringType>(), value);
     return toString.getResult();
   }
 
@@ -72,8 +70,7 @@ struct PrintOpLowering : public OpRewritePattern<PrintOp> {
       stringVal = op.getOperand();
     } else if (type.isInteger(32)) {
       auto toString = rewriter.create<IREE::Strings::I32ToStringOp>(
-          op.getLoc(),
-          IREE::RefPtrType::get(rewriter.getType<IREE::Strings::StringType>()),
+          op.getLoc(), rewriter.getType<IREE::Strings::StringType>(),
           op.getOperand());
       stringVal = toString.getResult();
     }
@@ -93,11 +90,9 @@ class IreeStringTypeConverter : public TypeConverter {
     }
 
     if (auto type = t.dyn_cast<TFStrings::StringType>()) {
-      return IREE::RefPtrType::get(
-          IREE::Strings::StringType::get(t.getContext()));
+      return IREE::Strings::StringType::get(t.getContext());
     } else if (auto type = t.dyn_cast<ShapedType>()) {
-      auto elementType =
-          IREE::RefPtrType::get(IREE::Strings::StringType::get(t.getContext()));
+      auto elementType = IREE::Strings::StringType::get(t.getContext());
       return RankedTensorType::get(type.getShape(), elementType);
     }
 

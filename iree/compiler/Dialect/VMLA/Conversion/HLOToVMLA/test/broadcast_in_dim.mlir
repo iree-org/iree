@@ -10,7 +10,7 @@ func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> {
   // CHECK-NEXT: [[DST:%.+]] = "vmla.buffer.alloc"([[DST_SIZE]])
   // CHECK-NEXT: "vmla.tile"([[SRC]], [[SRC_SHAPE]], [[DST]], [[DST_SHAPE]]) {element_type = i32}
   %0 = "xla_hlo.broadcast_in_dim"(%input) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
-  // CHECK-NEXT: return [[DST]] : !iree.ref<!vmla.buffer>
+  // CHECK-NEXT: return [[DST]] : !vmla.buffer
   return %0 : tensor<3x2x4xi32>
 }
 
@@ -26,6 +26,6 @@ func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> {
   // CHECK-NEXT: [[DST:%.+]] = "vmla.buffer.alloc"([[DST_SIZE]])
   // CHECK-NEXT: "vmla.broadcast"([[SRC]], [[SRC_SHAPE]], [[DST]], [[DST_SHAPE]]) {element_type = i32}
   %0 = "xla_hlo.broadcast_in_dim"(%input) : (tensor<i32>) -> tensor<3x2x4xi32>
-  // CHECK-NEXT: return [[DST]] : !iree.ref<!vmla.buffer>
+  // CHECK-NEXT: return [[DST]] : !vmla.buffer
   return %0 : tensor<3x2x4xi32>
 }

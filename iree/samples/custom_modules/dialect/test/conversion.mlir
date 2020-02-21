@@ -27,19 +27,19 @@ func @tensorToMessage(%tensor : tensor<2x4xf32>) {
   // CHECK-SAME:     [[DIM0]], [[DIM1]]
   // CHECK-SAME: ], [[TYPE]])
   // CHECK-NEXT: [[MSG:%.+]] = vm.call @custom.buffer_to_message([[VIEW]]) : (!iree.ref<!hal.buffer_view>) -> !iree.ref<!custom.message>
-  %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !iree.ref<!custom.message>
+  %0 = "custom.tensor_to_message"(%tensor) : (tensor<2x4xf32>) -> !custom.message
   %c1 = constant 1 : i32
   // CHECK: vm.call @custom.print([[MSG]]
-  "custom.print"(%0, %c1) : (!iree.ref<!custom.message>, i32) -> ()
+  "custom.print"(%0, %c1) : (!custom.message, i32) -> ()
   return
 }
 
 // -----
 
 // CHECK-LABEL: @messageToTensor
-func @messageToTensor(%arg0 : !iree.ref<!custom.message>) -> tensor<2x4xf32> {
+func @messageToTensor(%arg0 : !custom.message) -> tensor<2x4xf32> {
   // CHECK: [[VIEW:%.+]] = vm.call @custom.message_to_buffer(%arg0) : (!iree.ref<!custom.message>) -> !iree.ref<!hal.buffer_view>
-  %0 = "custom.message_to_tensor"(%arg0) : (!iree.ref<!custom.message>) -> tensor<2x4xf32>
+  %0 = "custom.message_to_tensor"(%arg0) : (!custom.message) -> tensor<2x4xf32>
   // CHECK-NEXT: [[BUFFER:%.+]] = vm.call @hal.buffer_view.buffer([[VIEW]]) : (!iree.ref<!hal.buffer_view>) -> !iree.ref<!hal.buffer>
   // CHECK-NEXT: vm.return [[BUFFER]]
   return %0 : tensor<2x4xf32>
@@ -48,10 +48,10 @@ func @messageToTensor(%arg0 : !iree.ref<!custom.message>) -> tensor<2x4xf32> {
 // -----
 
 // CHECK-LABEL: @printOp
-func @printOp(%arg0 : !iree.ref<!custom.message>) {
+func @printOp(%arg0 : !custom.message) {
   %c1_i32 = constant 1 : i32
   // CHECK: vm.call @custom.print(%arg0, %c1) : (!iree.ref<!custom.message>, i32) -> ()
-  "custom.print"(%arg0, %c1_i32) : (!iree.ref<!custom.message>, i32) -> ()
+  "custom.print"(%arg0, %c1_i32) : (!custom.message, i32) -> ()
   return
 }
 
@@ -60,10 +60,10 @@ func @printOp(%arg0 : !iree.ref<!custom.message>) {
 // -----
 
 // CHECK-LABEL: @reverseOp
-func @reverseOp(%arg0 : !iree.ref<!custom.message>) -> !iree.ref<!custom.message> {
+func @reverseOp(%arg0 : !custom.message) -> !custom.message {
   // CHECK: %ref = vm.call @custom.reverse(%arg0) : (!iree.ref<!custom.message>) -> !iree.ref<!custom.message>
-  %0 = "custom.reverse"(%arg0) : (!iree.ref<!custom.message>) -> !iree.ref<!custom.message>
-  return %0 : !iree.ref<!custom.message>
+  %0 = "custom.reverse"(%arg0) : (!custom.message) -> !custom.message
+  return %0 : !custom.message
 }
 
 // CHECK: vm.import @custom.reverse
@@ -71,10 +71,10 @@ func @reverseOp(%arg0 : !iree.ref<!custom.message>) -> !iree.ref<!custom.message
 // -----
 
 // CHECK-LABEL: @getUniqueMessageOp
-func @getUniqueMessageOp() -> !iree.ref<!custom.message> {
+func @getUniqueMessageOp() -> !custom.message {
   // CHECK: %ref = vm.call @custom.get_unique_message() : () -> !iree.ref<!custom.message>
-  %0 = "custom.get_unique_message"() : () -> !iree.ref<!custom.message>
-  return %0 : !iree.ref<!custom.message>
+  %0 = "custom.get_unique_message"() : () -> !custom.message
+  return %0 : !custom.message
 }
 
 // CHECK: vm.import @custom.get_unique_message

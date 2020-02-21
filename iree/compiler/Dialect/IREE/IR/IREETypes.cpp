@@ -66,8 +66,7 @@ namespace detail {
 
 struct RefPtrTypeStorage : public TypeStorage {
   RefPtrTypeStorage(Type objectType, unsigned subclassData = 0)
-      : TypeStorage(subclassData),
-        objectType(objectType.cast<RefObjectType>()) {}
+      : TypeStorage(subclassData), objectType(objectType.cast<Type>()) {}
 
   /// The hash key used for uniquing.
   using KeyTy = Type;
@@ -79,12 +78,25 @@ struct RefPtrTypeStorage : public TypeStorage {
     return new (allocator.allocate<RefPtrTypeStorage>()) RefPtrTypeStorage(key);
   }
 
-  RefObjectType objectType;
+  Type objectType;
 };
 
 }  // namespace detail
 
-RefPtrType RefPtrType::get(RefObjectType objectType) {
+// static
+bool RefPtrType::isCompatible(Type type) {
+  if (type.isa<RefPtrType>()) {
+    // Already a ref - don't double-wrap.
+    return false;
+  } else if (type.isIntOrIndexOrFloat()) {
+    // Ignore known primitive types.
+    return false;
+  }
+  // Assume all other types (user types, buffers, etc) can be wrapped.
+  return true;
+}
+
+RefPtrType RefPtrType::get(Type objectType) {
   return Base::get(objectType.getContext(), TypeKind::RefPtr, objectType);
 }
 
@@ -93,7 +105,7 @@ RefPtrType RefPtrType::getChecked(Type objectType, Location location) {
                           objectType);
 }
 
-RefObjectType RefPtrType::getObjectType() { return getImpl()->objectType; }
+Type RefPtrType::getObjectType() { return getImpl()->objectType; }
 
 }  // namespace IREE
 }  // namespace iree_compiler

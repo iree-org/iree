@@ -117,23 +117,8 @@ class PtrType : public Type::TypeBase<PtrType, Type, detail::PtrTypeStorage> {
   Type getTargetType();
 };
 
-/// Base type for RefObject-derived types.
-/// These can be wrapped in RefPtrType.
-class RefObjectType : public Type {
- public:
-  using ImplType = TypeStorage;
-  using Type::Type;
-
-  static bool classof(Type type) {
-    // TODO(benvanik): figure out how to do a semi-open type system.
-    return true;
-  }
-};
-
-// TODO(benvanik): checked version with supported type kinds.
 /// An opaque ref object that comes from an external source.
-class OpaqueRefObjectType
-    : public Type::TypeBase<OpaqueRefObjectType, RefObjectType> {
+class OpaqueType : public Type::TypeBase<OpaqueType, Type> {
  public:
   using Base::Base;
 
@@ -141,13 +126,13 @@ class OpaqueRefObjectType
     return kind == TypeKind::OpaqueRefObject;
   }
 
-  static OpaqueRefObjectType get(MLIRContext *context) {
+  static OpaqueType get(MLIRContext *context) {
     return Base::get(context, TypeKind::OpaqueRefObject);
   }
 };
 
 /// A buffer of constant mapped memory.
-class ByteBufferType : public Type::TypeBase<ByteBufferType, RefObjectType> {
+class ByteBufferType : public Type::TypeBase<ByteBufferType, Type> {
  public:
   using Base::Base;
 
@@ -160,7 +145,7 @@ class ByteBufferType : public Type::TypeBase<ByteBufferType, RefObjectType> {
 
 /// A buffer of read-write memory.
 class MutableByteBufferType
-    : public Type::TypeBase<MutableByteBufferType, RefObjectType> {
+    : public Type::TypeBase<MutableByteBufferType, Type> {
  public:
   using Base::Base;
 
@@ -173,14 +158,17 @@ class MutableByteBufferType
   }
 };
 
-/// A ref_ptr containing a reference to a RefObjectType.
+/// A ref_ptr containing a reference to a ref-object-compatible type.
 class RefPtrType
     : public Type::TypeBase<RefPtrType, Type, detail::RefPtrTypeStorage> {
  public:
   using Base::Base;
 
+  /// Returns true if the given type can be wrapped in a ref ptr.
+  static bool isCompatible(Type type);
+
   /// Gets or creates a RefPtrType with the provided target object type.
-  static RefPtrType get(RefObjectType objectType);
+  static RefPtrType get(Type objectType);
 
   /// Gets or creates a RefPtrType with the provided target object type.
   /// This emits an error at the specified location and returns null if the
@@ -190,7 +178,7 @@ class RefPtrType
   /// Verifies construction of a type with the given object.
   static LogicalResult verifyConstructionInvariants(
       llvm::Optional<Location> loc, MLIRContext *context, Type objectType) {
-    if (!RefObjectType::classof(objectType)) {
+    if (!isCompatible(objectType)) {
       if (loc) {
         emitError(*loc) << "invalid object type for a ref_ptr: " << objectType;
       }
@@ -199,7 +187,7 @@ class RefPtrType
     return success();
   }
 
-  RefObjectType getObjectType();
+  Type getObjectType();
 
   static bool kindof(unsigned kind) { return kind == TypeKind::RefPtr; }
 };

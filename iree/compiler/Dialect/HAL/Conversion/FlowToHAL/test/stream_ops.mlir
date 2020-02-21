@@ -20,7 +20,7 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK: [[CMD:%.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
-    // CHECK: [[EXE:%.+]] = hal.ex.cache_executable {{.+}}, @ex0 : !iree.ref<!hal.executable>
+    // CHECK: [[EXE:%.+]] = hal.ex.cache_executable {{.+}}, @ex0 : !hal.executable
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 0, %arg0, shape = [
     // CHECK-SAME:   [[C128]]
     // CHECK-SAME: ], element_type = 50331680

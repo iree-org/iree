@@ -33,13 +33,12 @@ def VMLA_ConstantOp : VMLA_PureOp<"constant"> {
     ElementsAttr:$value
   );
   let results = (outs
-    VMLA_BufferRef:$result
+    VMLA_Buffer:$result
   );
 
   let builders = [
     OpBuilder<"Builder *builder, OperationState &result, ElementsAttr value", [{
-      build(builder, result, IREE::RefPtrType::get(
-          IREE::VMLA::BufferType::get(builder->getContext())), value);
+      build(builder, result, IREE::VMLA::BufferType::get(builder->getContext()), value);
     }]>,
   ];
 }
@@ -50,10 +49,10 @@ def VMLA_ConstantOp : VMLA_PureOp<"constant"> {
 
 def VMLA_BufferConstOp : VMLA_PureOp<"buffer.const"> {
   let arguments = (ins
-    VMLA_HostBufferRef:$value
+    VMLA_HostBuffer:$value
   );
   let results = (outs
-    VMLA_BufferRef:$result
+    VMLA_Buffer:$result
   );
 }
 
@@ -62,35 +61,35 @@ def VMLA_BufferAllocOp : VMLA_PureOp<"buffer.alloc"> {
     VMLA_DeviceSize:$byte_length
   );
   let results = (outs
-    VMLA_BufferRef:$result
+    VMLA_Buffer:$result
   );
 }
 
 def VMLA_BufferCloneOp : VMLA_PureOp<"buffer.clone"> {
   let arguments = (ins
-    VMLA_BufferRef:$src
+    VMLA_Buffer:$src
   );
   let results = (outs
-    VMLA_BufferRef:$result
+    VMLA_Buffer:$result
   );
 }
 
 def VMLA_BufferViewOp : VMLA_PureOp<"buffer.view"> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_DeviceSize:$byte_offset,
     VMLA_DeviceSize:$byte_length
   );
   let results = (outs
-    VMLA_BufferRef:$result
+    VMLA_Buffer:$result
   );
 }
 
 def VMLA_BufferCopyOp : VMLA_Op<"buffer.copy"> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_DeviceSize:$src_byte_offset,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_DeviceSize:$dst_byte_offset,
     VMLA_DeviceSize:$byte_length
   );
@@ -98,14 +97,14 @@ def VMLA_BufferCopyOp : VMLA_Op<"buffer.copy"> {
 
 def VMLA_BufferFillOp : VMLA_Op<"buffer.fill"> {
   let arguments = (ins
-    VMLA_BufferRef:$value,
-    VMLA_BufferRef:$dst
+    VMLA_Buffer:$value,
+    VMLA_Buffer:$dst
   );
 }
 
 def VMLA_BufferLoadI32Op : VMLA_PureOp<"buffer.load.i32"> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_DeviceSize:$byte_offset
   );
   let results = (outs
@@ -120,19 +119,19 @@ def VMLA_BufferLoadI32Op : VMLA_PureOp<"buffer.load.i32"> {
 def VMLA_CmpOp : VMLA_ElementTypeOp<"cmp"> {
   let arguments = (ins
     VMLA_CmpPredicateAttr:$predicate,
-    VMLA_BufferRef:$lhs,
-    VMLA_BufferRef:$rhs,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$lhs,
+    VMLA_Buffer:$rhs,
+    VMLA_Buffer:$dst,
     VMLA_AnyTypeAttr:$element_type
   );
 }
 
 def VMLA_SelectOp : VMLA_ElementTypeOp<"select"> {
   let arguments = (ins
-    VMLA_BufferRef:$cond,
-    VMLA_BufferRef:$lhs,
-    VMLA_BufferRef:$rhs,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$cond,
+    VMLA_Buffer:$lhs,
+    VMLA_Buffer:$rhs,
+    VMLA_Buffer:$dst,
     VMLA_AnyTypeAttr:$element_type
   );
 }
@@ -146,10 +145,10 @@ def VMLA_CopyOp : VMLA_ElementTypeOp<"copy", [
     SameVariadicOperandSize,
   ]> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
     Variadic<VMLA_Index>:$src_indices,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     Variadic<VMLA_Index>:$dst_indices,
     Variadic<VMLA_Index>:$lengths,
@@ -159,10 +158,10 @@ def VMLA_CopyOp : VMLA_ElementTypeOp<"copy", [
 
 def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
     ElementsAttr:$dimensions,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
@@ -170,10 +169,10 @@ def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
 
 def VMLA_ReverseOp : VMLA_ElementTypeOp<"reverse", [VMLA_IncludeShapes]> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
     ElementsAttr:$dimensions,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
@@ -181,11 +180,11 @@ def VMLA_ReverseOp : VMLA_ElementTypeOp<"reverse", [VMLA_IncludeShapes]> {
 
 def VMLA_PadOp : VMLA_ElementTypeOp<"pad", [VMLA_IncludeShapes]> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
-    VMLA_BufferRef:$value,
+    VMLA_Buffer:$value,
     VMLA_Shape:$value_shape,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     ElementsAttr:$edge_padding_low,
     ElementsAttr:$edge_padding_high,
@@ -196,9 +195,9 @@ def VMLA_PadOp : VMLA_ElementTypeOp<"pad", [VMLA_IncludeShapes]> {
 
 def VMLA_BroadcastOp : VMLA_ElementTypeOp<"broadcast", [VMLA_IncludeShapes]> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
@@ -206,9 +205,9 @@ def VMLA_BroadcastOp : VMLA_ElementTypeOp<"broadcast", [VMLA_IncludeShapes]> {
 
 def VMLA_TileOp : VMLA_ElementTypeOp<"tile", [VMLA_IncludeShapes]> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
@@ -258,8 +257,8 @@ def VMLA_CeilOp : VMLA_UnaryOp<"ceil", VMLA_FloatTypeAttr>;
 
 def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$src,
+    VMLA_Buffer:$dst,
     VMLA_AnyTypeAttr:$src_type,
     VMLA_AnyTypeAttr:$dst_type
   );
@@ -278,11 +277,11 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
 
 def VMLA_MatMulOp : VMLA_Op<"matmul", [VMLA_OpInterface, VMLA_IncludeShapes]> {
   let arguments = (ins
-    VMLA_BufferRef:$lhs,
+    VMLA_Buffer:$lhs,
     VMLA_Shape:$lhs_shape,
-    VMLA_BufferRef:$rhs,
+    VMLA_Buffer:$rhs,
     VMLA_Shape:$rhs_shape,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     VMLA_FloatTypeAttr:$lhs_type,
     VMLA_FloatTypeAttr:$rhs_type,
@@ -305,12 +304,12 @@ def VMLA_MatMulOp : VMLA_Op<"matmul", [VMLA_OpInterface, VMLA_IncludeShapes]> {
 class VMLA_ReduceOp<string mnemonic, list<OpTrait> traits = []> :
     VMLA_ElementTypeOp<mnemonic, !listconcat(traits, [VMLA_IncludeShapes])> {
   let arguments = (ins
-    VMLA_BufferRef:$src,
+    VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
-    VMLA_BufferRef:$init,
+    VMLA_Buffer:$init,
     VMLA_Shape:$init_shape,
     I32Attr:$dimension,
-    VMLA_BufferRef:$dst,
+    VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );

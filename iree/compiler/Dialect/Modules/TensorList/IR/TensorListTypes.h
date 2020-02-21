@@ -30,7 +30,7 @@ enum Kind {
 };
 }  // namespace TypeKind
 
-class TensorListType : public Type::TypeBase<TensorListType, RefObjectType> {
+class TensorListType : public Type::TypeBase<TensorListType, Type> {
  public:
   using Base::Base;
   static TensorListType get(MLIRContext *context) {

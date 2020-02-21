@@ -397,7 +397,7 @@ def HAL_Status : TypeAlias<I32>;
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
 
 def HAL_VariableRefAttr : AliasedSymbolRefAttr;
-def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, AnyRefPtr]>;
+def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, AnyRefObject]>;
 def HAL_VariablePtr : PtrOf<HAL_VariableType>;
 
 def HAL_Dim : I<32>;
@@ -430,9 +430,9 @@ class HAL_RankedIntElementsAttr<int width, list<int> dims> : ElementsAttrBase<
 
 def HAL_WorkgroupSizeAttr : HAL_RankedIntElementsAttr<32, [3]>;
 
-def HAL_HostBufferRef : AnyTypeOf<[
-  RefPtrOf<ByteBufferType>,
-  RefPtrOf<MutableByteBufferType>,
+def HAL_HostBuffer : AnyTypeOf<[
+  ByteBufferType,
+  MutableByteBufferType,
 ]>;
 
 def HAL_CommandQueueAffinityAttr : IntElementsAttr<32> {
@@ -472,7 +472,7 @@ def HAL_MemoryBarrierList : TupleOf<[HAL_MemoryBarrier]>;
 def HAL_BufferBarrier : NamedTupleOf<[
     NamedTupleElement<0, "source_scope", I32>,
     NamedTupleElement<1, "target_scope", I32>,
-    NamedTupleElement<2, "buffer", RefPtrOf<HAL_Buffer>>,
+    NamedTupleElement<2, "buffer", HAL_Buffer>,
     NamedTupleElement<3, "offset", HAL_DeviceSize>,
     NamedTupleElement<4, "length", HAL_DeviceSize>
   ], "BufferBarrier"> {
@@ -485,7 +485,7 @@ def HAL_BufferBarrierList : TupleOf<[HAL_BufferBarrier]>;
 
 def HAL_DescriptorSetBinding : NamedTupleOf<[
     NamedTupleElement<0, "binding", I32>,
-    NamedTupleElement<1, "buffer", RefPtrOf<HAL_Buffer>>,
+    NamedTupleElement<1, "buffer", HAL_Buffer>,
     NamedTupleElement<2, "buffer_offset", HAL_DeviceSize>,
     NamedTupleElement<3, "buffer_length", HAL_DeviceSize>,
   ], "DescriptorSetBinding"> {
@@ -509,7 +509,7 @@ def HAL_DescriptorSetLayoutBinding : NamedTupleOf<[
 }
 
 def HAL_FenceValue : NamedTupleOf<[
-    NamedTupleElement<0, "fence", RefPtrOf<HAL_Fence>>,
+    NamedTupleElement<0, "fence", HAL_Fence>,
     NamedTupleElement<1, "value", I64>
   ], "FenceValue"> {
   let typeDescription = [{
@@ -518,7 +518,7 @@ def HAL_FenceValue : NamedTupleOf<[
 }
 
 def HAL_SemaphoreValue : NamedTupleOf<[
-    NamedTupleElement<0, "semaphore", RefPtrOf<HAL_Semaphore>>,
+    NamedTupleElement<0, "semaphore", HAL_Semaphore>,
     NamedTupleElement<1, "value", I64>
   ], "SemaphoreValue"> {
   let typeDescription = [{

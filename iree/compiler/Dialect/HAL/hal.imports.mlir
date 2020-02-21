@@ -25,7 +25,7 @@ attributes {nosideeffects}
 vm.import @ex.cache_executable(
   %device : !iree.ref<!hal.device>,
   %executable_format : i32,
-  %executable_data : !iree.byte_buffer_ref
+  %executable_data : !iree.ref<!iree.byte_buffer>
 ) -> !iree.ref<!hal.executable>
 attributes {nosideeffects}
 
@@ -92,7 +92,7 @@ vm.import @allocator.allocate.const(
   %buffer_usage : i32,
   %shape : i32 ...,
   %element_type : i32,
-  %value : !iree.byte_buffer_ref
+  %value : !iree.ref<!iree.byte_buffer>
 ) -> !iree.ref<!hal.buffer>
 
 //===----------------------------------------------------------------------===//
@@ -123,7 +123,7 @@ vm.import @buffer.fill(
 vm.import @buffer.read_data(
   %source_buffer : !iree.ref<!hal.buffer>,
   %source_offset : i32,
-  %target_buffer : !iree.mutable_byte_buffer_ref,
+  %target_buffer : !iree.ref<!iree.mutable_byte_buffer>,
   %target_offset : i32,
   %length : i32
 )
@@ -132,7 +132,7 @@ vm.import @buffer.read_data(
 vm.import @buffer.write_data(
   %target_buffer : !iree.ref<!hal.buffer>,
   %target_offset : i32,
-  %source_buffer : !iree.byte_buffer_ref,
+  %source_buffer : !iree.ref<!iree.byte_buffer>,
   %source_offset : i32,
   %length : i32
 )

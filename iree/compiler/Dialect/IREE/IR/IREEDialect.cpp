@@ -31,8 +31,8 @@ static DialectRegistration<IREEDialect> base_dialect;
 
 IREEDialect::IREEDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
-  addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType,
-           IREE::OpaqueRefObjectType, IREE::PtrType, IREE::RefPtrType>();
+  addTypes<IREE::ByteBufferType, IREE::MutableByteBufferType, IREE::OpaqueType,
+           IREE::PtrType, IREE::RefPtrType>();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.cpp.inc"
@@ -71,16 +71,10 @@ Type IREEDialect::parseType(DialectAsmParser& parser) const {
     }
     return IREE::RefPtrType::getChecked(objectType, loc);
   } else if (spec == "opaque_ref") {
-    return IREE::RefPtrType::getChecked(
-        IREE::OpaqueRefObjectType::get(getContext()), loc);
-  } else if (spec == "byte_buffer_ref") {
-    return IREE::RefPtrType::getChecked(IREE::ByteBufferType::get(getContext()),
+    return IREE::RefPtrType::getChecked(IREE::OpaqueType::get(getContext()),
                                         loc);
-  } else if (spec == "mutable_byte_buffer_ref") {
-    return IREE::RefPtrType::getChecked(
-        IREE::MutableByteBufferType::get(getContext()), loc);
   } else if (spec == "opaque") {
-    return IREE::OpaqueRefObjectType::get(getContext());
+    return IREE::OpaqueType::get(getContext());
   } else if (spec == "byte_buffer") {
     return IREE::ByteBufferType::get(getContext());
   } else if (spec == "mutable_byte_buffer") {
@@ -99,11 +93,7 @@ void IREEDialect::printType(Type type, DialectAsmPrinter& os) const {
     }
     case IREE::TypeKind::RefPtr: {
       auto objectType = type.cast<IREE::RefPtrType>().getObjectType();
-      if (objectType.isa<IREE::ByteBufferType>()) {
-        os << "byte_buffer_ref";
-      } else if (objectType.isa<IREE::MutableByteBufferType>()) {
-        os << "mutable_byte_buffer_ref";
-      } else if (objectType.isa<IREE::OpaqueRefObjectType>()) {
+      if (objectType.isa<IREE::OpaqueType>()) {
         os << "opaque_ref";
       } else {
         os << "ref<" << objectType << ">";

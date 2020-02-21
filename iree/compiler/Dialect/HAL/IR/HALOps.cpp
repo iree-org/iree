@@ -165,14 +165,13 @@ static ParseResult parseMakeBufferBarrierOp(OpAsmParser &parser,
       failed(parser.parseComma()) ||
       failed(parser.parseOperandList(operands, 3)) ||
       failed(parser.getCurrentLocation(&operandLoc)) ||
-      failed(parser.resolveOperands(
-          operands,
-          ArrayRef<Type>{
-              RefPtrType::get(BufferType::get(result->getContext())),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          operandLoc, result->operands)) ||
+      failed(parser.resolveOperands(operands,
+                                    ArrayRef<Type>{
+                                        BufferType::get(result->getContext()),
+                                        getDeviceSizeType(parser),
+                                        getDeviceSizeType(parser),
+                                    },
+                                    operandLoc, result->operands)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
       failed(parser.parseColonType(bufferBarrierType))) {
     return failure();
@@ -486,7 +485,7 @@ void AllocatorAllocateOp::build(Builder *builder, OperationState &state,
                                          static_cast<int32_t>(memoryTypes)));
   state.addAttribute("buffer_usage", builder->getI32IntegerAttr(
                                          static_cast<int32_t>(bufferUsage)));
-  state.addTypes({RefPtrType::get(BufferType::get(builder->getContext()))});
+  state.addTypes({BufferType::get(builder->getContext())});
 }
 
 void AllocatorAllocateOp::getAsmResultNames(
@@ -500,9 +499,9 @@ static ParseResult parseAllocatorAllocateOp(OpAsmParser &parser,
   OpAsmParser::OperandType allocationSize;
   Type resultType;
   if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(
-          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
-          result->operands)) ||
+      failed(parser.resolveOperand(allocator,
+                                   AllocatorType::get(result->getContext()),
+                                   result->operands)) ||
       failed(parser.parseComma()) ||
       failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
           parser, "memory_types", result->attributes)) ||
@@ -552,7 +551,7 @@ void AllocatorAllocateConstOp::build(Builder *builder, OperationState &state,
   state.addAttribute("buffer_usage", builder->getI32IntegerAttr(
                                          static_cast<int32_t>(bufferUsage)));
   state.addAttribute("value", value);
-  state.addTypes({RefPtrType::get(BufferType::get(builder->getContext()))});
+  state.addTypes({BufferType::get(builder->getContext())});
 }
 
 void AllocatorAllocateConstOp::getAsmResultNames(
@@ -566,9 +565,9 @@ static ParseResult parseAllocatorAllocateConstOp(OpAsmParser &parser,
   ElementsAttr valueAttr;
   Type resultType;
   if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(
-          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
-          result->operands)) ||
+      failed(parser.resolveOperand(allocator,
+                                   AllocatorType::get(result->getContext()),
+                                   result->operands)) ||
       failed(parser.parseComma()) ||
       failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
           parser, "memory_types", result->attributes)) ||
@@ -609,7 +608,7 @@ static void printAllocatorAllocateConstOp(OpAsmPrinter &p,
 void BufferAllocatorOp::build(Builder *builder, OperationState &state,
                               Value buffer) {
   state.addOperands({buffer});
-  state.addTypes({RefPtrType::get(AllocatorType::get(builder->getContext()))});
+  state.addTypes({AllocatorType::get(builder->getContext())});
 }
 
 void BufferAllocatorOp::getAsmResultNames(
@@ -641,7 +640,7 @@ void BufferViewConstOp::build(Builder *builder, OperationState &state,
   state.addAttribute("buffer_usage", builder->getI32IntegerAttr(
                                          static_cast<int32_t>(bufferUsage)));
   state.addAttribute("value", value);
-  state.addTypes({RefPtrType::get(BufferViewType::get(builder->getContext()))});
+  state.addTypes({BufferViewType::get(builder->getContext())});
 }
 
 void BufferViewConstOp::getAsmResultNames(
@@ -655,9 +654,9 @@ static ParseResult parseBufferViewConstOp(OpAsmParser &parser,
   Type resultType;
   ElementsAttr valueAttr;
   if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(
-          allocator, RefPtrType::get(AllocatorType::get(result->getContext())),
-          result->operands)) ||
+      failed(parser.resolveOperand(allocator,
+                                   AllocatorType::get(result->getContext()),
+                                   result->operands)) ||
       failed(parser.parseComma()) ||
       failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
           parser, "memory_types", result->attributes)) ||
@@ -700,7 +699,7 @@ void BufferViewCreateOp::build(Builder *builder, OperationState &state,
   state.addOperands({buffer});
   state.addOperands(shape);
   state.addAttribute("element_type", builder->getI32IntegerAttr(elementType));
-  state.addTypes({RefPtrType::get(BufferViewType::get(builder->getContext()))});
+  state.addTypes({BufferViewType::get(builder->getContext())});
 }
 
 void BufferViewCreateOp::getAsmResultNames(
@@ -724,7 +723,7 @@ void BufferViewSubviewOp::getAsmResultNames(
 void BufferViewBufferOp::build(Builder *builder, OperationState &state,
                                Value bufferView) {
   state.addOperands({bufferView});
-  state.addTypes({RefPtrType::get(BufferType::get(builder->getContext()))});
+  state.addTypes({BufferType::get(builder->getContext())});
 }
 
 void BufferViewBufferOp::getAsmResultNames(
@@ -796,8 +795,7 @@ void CommandBufferCreateOp::build(
   state.addAttribute(
       "command_categories",
       builder->getI32IntegerAttr(static_cast<int32_t>(commandCategories)));
-  state.addTypes(
-      {RefPtrType::get(CommandBufferType::get(builder->getContext()))});
+  state.addTypes({CommandBufferType::get(builder->getContext())});
 }
 
 void CommandBufferCreateOp::getAsmResultNames(
@@ -811,8 +809,7 @@ static ParseResult parseCommandBufferCreateOp(OpAsmParser &parser,
   Type resultType;
   if (failed(parser.parseOperand(device)) ||
       failed(parser.resolveOperand(
-          device, RefPtrType::get(DeviceType::get(result->getContext())),
-          result->operands)) ||
+          device, DeviceType::get(result->getContext()), result->operands)) ||
       failed(parser.parseComma()) ||
       failed(parseEnumAttr<CommandBufferModeBitfield,
                            symbolizeCommandBufferModeBitfield>(
@@ -874,10 +871,9 @@ static ParseResult parseCommandBufferExecutionBarrierOp(
     OpAsmParser &parser, OperationState *result) {
   OpAsmParser::OperandType commandBuffer;
   if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.resolveOperand(
-          commandBuffer,
-          RefPtrType::get(CommandBufferType::get(result->getContext())),
-          result->operands)) ||
+      failed(parser.resolveOperand(commandBuffer,
+                                   CommandBufferType::get(result->getContext()),
+                                   result->operands)) ||
       failed(parser.parseComma()) ||
       failed(parseEnumAttr<ExecutionStageBitfield,
                            symbolizeExecutionStageBitfield>(
@@ -993,9 +989,9 @@ static ParseResult parseCommandBufferBindDescriptorSetOp(
               descriptorSet,
           },
           ArrayRef<Type>{
-              RefPtrType::get(CommandBufferType::get(result->getContext())),
-              RefPtrType::get(ExecutableLayoutType::get(result->getContext())),
-              RefPtrType::get(DescriptorSetType::get(result->getContext())),
+              CommandBufferType::get(result->getContext()),
+              ExecutableLayoutType::get(result->getContext()),
+              DescriptorSetType::get(result->getContext()),
           },
           operandsLoc, result->operands))) {
     return failure();
@@ -1120,7 +1116,7 @@ static ParseResult parseDescriptorSetLayoutMakeBindingOp(
               length,
           },
           ArrayRef<Type>{
-              RefPtrType::get(BufferType::get(result->getContext())),
+              BufferType::get(result->getContext()),
               getDeviceSizeType(parser),
               getDeviceSizeType(parser),
           },
@@ -1303,8 +1299,7 @@ static ParseResult parseExecutableLayoutCreateOp(OpAsmParser &parser,
   Type resultType;
   if (failed(parser.parseOperand(device)) ||
       failed(parser.resolveOperand(
-          device, RefPtrType::get(DeviceType::get(result->getContext())),
-          result->operands)) ||
+          device, DeviceType::get(result->getContext()), result->operands)) ||
       failed(parser.parseComma()) ||
       failed(parser.parseKeyword("set_layouts")) ||
       failed(parser.parseEqual()) ||

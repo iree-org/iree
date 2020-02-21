@@ -60,7 +60,7 @@ class HALConversionTarget : public ConversionTarget {
 //   my.tensor_op(%arg0 : tensor<2x4xf32>)
 // Target:
 //   %arg0_view = hal.buffer_view.create %arg0, ...
-//   my.buffer_op(%arg0_view : !iree.ref<!hal.buffer_view>)
+//   my.buffer_op(%arg0_view : !hal.buffer_view)
 template <typename SRC, typename DST>
 class HALOpConversion : public OpConversionPattern<SRC> {
  public:

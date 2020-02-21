@@ -56,9 +56,7 @@ struct IdentityOpConversion : public OpConversionPattern<SRC> {
       // More than one user of the operand exist and we need to ensure they
       // keep a valid snapshot of the buffer.
       rewriter.replaceOpWithNewOp<IREE::VMLA::BufferCloneOp>(
-          srcOp,
-          IREE::RefPtrType::get(
-              IREE::VMLA::BufferType::get(rewriter.getContext())),
+          srcOp, IREE::VMLA::BufferType::get(rewriter.getContext()),
           operands[0]);
       return this->matchSuccess();
     }

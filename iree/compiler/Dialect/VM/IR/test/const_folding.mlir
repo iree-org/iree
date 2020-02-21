@@ -44,11 +44,11 @@ vm.module @const_rodata_folds {
   // CHECK-NEXT: vm.rodata @r2
   vm.rodata @r2 dense<[9, 9, 9]> : vector<3xi32>
   // CHECK-NEXT: @cse_rodata_loads
-  vm.func @cse_rodata_loads() -> (!iree.byte_buffer_ref, !iree.byte_buffer_ref) {
-    // CHECK-NEXT: %r2 = vm.const.ref.rodata @r2 : !iree.byte_buffer_ref
-    // CHECK-NEXT: vm.return %r2, %r2 : !iree.byte_buffer_ref, !iree.byte_buffer_ref
-    %0 = vm.const.ref.rodata @r2 : !iree.byte_buffer_ref
-    %1 = vm.const.ref.rodata @r2 : !iree.byte_buffer_ref
-    vm.return %0, %1 : !iree.byte_buffer_ref, !iree.byte_buffer_ref
+  vm.func @cse_rodata_loads() -> (!iree.ref<!iree.byte_buffer>, !iree.ref<!iree.byte_buffer>) {
+    // CHECK-NEXT: %r2 = vm.const.ref.rodata @r2 : !iree.ref<!iree.byte_buffer>
+    // CHECK-NEXT: vm.return %r2, %r2 : !iree.ref<!iree.byte_buffer>, !iree.ref<!iree.byte_buffer>
+    %0 = vm.const.ref.rodata @r2 : !iree.ref<!iree.byte_buffer>
+    %1 = vm.const.ref.rodata @r2 : !iree.ref<!iree.byte_buffer>
+    vm.return %0, %1 : !iree.ref<!iree.byte_buffer>, !iree.ref<!iree.byte_buffer>
   }
 }

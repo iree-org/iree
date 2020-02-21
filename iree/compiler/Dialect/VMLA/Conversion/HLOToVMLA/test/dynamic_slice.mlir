@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @slice_whole_buffer
-// CHECK-SAME: [[SRC_INDICES:%.+]]: !iree.ref<!vmla.buffer>
+// CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
 func @slice_whole_buffer(%src_indices : tensor<2xi64>) -> tensor<3x4xi32> {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
@@ -29,7 +29,7 @@ func @slice_whole_buffer(%src_indices : tensor<2xi64>) -> tensor<3x4xi32> {
 // -----
 
 // CHECK-LABEL: @slice_whole_stride
-// CHECK-SAME: [[SRC_INDICES:%.+]]: !iree.ref<!vmla.buffer>
+// CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
 func @slice_whole_stride(%src_indices : tensor<2xi64>) -> tensor<1x4xi32> {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
@@ -57,7 +57,7 @@ func @slice_whole_stride(%src_indices : tensor<2xi64>) -> tensor<1x4xi32> {
 // -----
 
 // CHECK-LABEL: @slice_stride_part
-// CHECK-SAME: [[SRC_INDICES:%.+]]: !iree.ref<!vmla.buffer>
+// CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
 func @slice_stride_part(%src_indices : tensor<2xi64>) -> tensor<1x2xi32> {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
@@ -85,7 +85,7 @@ func @slice_stride_part(%src_indices : tensor<2xi64>) -> tensor<1x2xi32> {
 // -----
 
 // CHECK-LABEL: @slice_multi_stride
-// CHECK-SAME: [[SRC_INDICES:%.+]]: !iree.ref<!vmla.buffer>
+// CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
 func @slice_multi_stride(%src_indices : tensor<2xi64>) -> tensor<2x4xi32> {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[

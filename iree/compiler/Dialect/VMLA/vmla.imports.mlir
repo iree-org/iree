@@ -18,7 +18,7 @@
 vm.module @vmla {
 
 vm.import @buffer.const(
-  %value : !iree.byte_buffer_ref
+  %value : !iree.ref<!iree.byte_buffer>
 ) -> !iree.ref<!vmla.buffer>
 attributes {nosideeffects}
 

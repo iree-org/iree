@@ -49,8 +49,8 @@ class TfTensorListToHALConversionInterface
   LogicalResult convertType(Type type,
                             SmallVectorImpl<Type> &results) const override {
     if (type.isa<tf_tensorlist::TensorListType>()) {
-      results.push_back(IREE::RefPtrType::get(
-          IREE::TensorList::TensorListType::get(type.getContext())));
+      results.push_back(
+          IREE::TensorList::TensorListType::get(type.getContext()));
       return success();
     }
     return failure();

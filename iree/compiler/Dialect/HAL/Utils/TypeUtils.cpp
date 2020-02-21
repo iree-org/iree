@@ -56,8 +56,7 @@ Value TensorRewriteAdaptor::getAllocator() {
 }
 
 bool TensorRewriteAdaptor::isBufferView() {
-  auto refPtrType = newValue.getType().cast<IREE::RefPtrType>();
-  return refPtrType.getObjectType().isa<IREE::HAL::BufferViewType>();
+  return newValue.getType().isa<IREE::HAL::BufferViewType>();
 }
 
 Value TensorRewriteAdaptor::getBuffer() {

@@ -47,7 +47,7 @@ static FunctionType getExecutableCachingFunctionType(MLIRContext *context) {
 // debugging clearer.
 //
 // The resulting function is effectively:
-//   func @exe(%device : !iree.ref<!hal.device>) -> !iree.ref<!hal.executable> {
+//   func @exe(%device : !hal.device) -> !hal.executable {
 //     if (%cached = @exe_cached) return %cached
 //     %format = pick_supported_format(%device, exe_format_1, exe_format_2, ...)
 //     switch (%format) {
@@ -226,7 +226,8 @@ class ExCacheExecutableOpConversion
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         cacheExecutableOp,
         rewriter.getSymbolRefAttr(cacheExecutableOp.executable()),
-        ArrayRef<Type>{cacheExecutableOp.getResult().getType()},
+        ArrayRef<Type>{
+            IREE::RefPtrType::get(cacheExecutableOp.getResult().getType())},
         ArrayRef<Value>{operands[0]});
     return matchSuccess();
   }

@@ -34,8 +34,7 @@ LogicalResult HALTypeConverter::convertType(Type type,
     return success();
   } else if (type.isa<TensorType>()) {
     // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
-    results.push_back(
-        IREE::RefPtrType::get(IREE::HAL::BufferType::get(type.getContext())));
+    results.push_back(IREE::HAL::BufferType::get(type.getContext()));
     return success();
   }
   for (auto *conversionInterface : conversionInterfaces) {

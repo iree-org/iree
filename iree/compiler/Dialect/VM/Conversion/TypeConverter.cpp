@@ -56,6 +56,9 @@ Type VMTypeConverter::convertType(Type t) {
       return {};
     }
     return IREE::PtrType::get(targetType);
+  } else if (IREE::RefPtrType::isCompatible(t)) {
+    // Wrap ref types.
+    return IREE::RefPtrType::get(t);
   } else if (t.isa<IREE::RefPtrType>()) {
     // All ref_ptr types are passed through unmodified.
     return t;
