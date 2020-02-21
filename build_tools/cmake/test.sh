@@ -29,6 +29,7 @@ export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 EXCLUDED_TESTS=(
     iree_compiler_Translation_SPIRV_LinalgToSPIRV_test_pw_add.mlir.test
     iree_hal_vulkan_dynamic_symbols_test
+    iree_modules_tensorlist_tensorlist_test
     iree_tools_vm_util_test
     iree_tools_test_multiple_args.mlir.test
     iree_tools_test_scalars.mlir.test
