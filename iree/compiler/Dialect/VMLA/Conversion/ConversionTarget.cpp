@@ -46,6 +46,7 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
       [&](FuncOp op) { return typeConverter.isSignatureLegal(op.getType()); });
   addDynamicallyLegalOp<ConstantOp>(
       [&](ConstantOp op) { return typeConverter.isLegal(op.getType()); });
+  addLegalOp<ReturnOp>();
 }
 
 bool VMLAConversionTarget::isDynamicallyLegal(Operation *op) const {

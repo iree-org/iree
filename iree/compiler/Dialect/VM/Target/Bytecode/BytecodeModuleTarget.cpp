@@ -505,6 +505,7 @@ LogicalResult translateModuleToBytecode(IREE::VM::ModuleOp moduleOp,
       llvm_unreachable("unimplemented output format");
   }
 
+  output.flush();
   return success();
 }
 

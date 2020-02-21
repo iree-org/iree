@@ -1249,10 +1249,10 @@ def HAL_ExecutableEndOp : HAL_Op<"executable_end", [
 }
 
 def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
-  let summary = [{compiled executable binary data}];
+  let summary = [{executable entry point declaration}];
   let description = [{
-    A compiled executable binary with an optional nested module containing the
-    IR prior to serialization (for debugging).
+    An entry point exported by the executable with statically-available
+    information describing the IO interface it uses and other dispatch metadata.
   }];
 
   let arguments = (ins
