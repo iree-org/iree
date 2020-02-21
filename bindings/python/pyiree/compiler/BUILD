@@ -87,6 +87,7 @@ pybind_cc_library(
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
     ],

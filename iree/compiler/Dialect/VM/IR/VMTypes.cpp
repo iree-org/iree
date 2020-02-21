@@ -69,8 +69,7 @@ RefType RefType::get(Type objectType) {
 }
 
 RefType RefType::getChecked(Type objectType, Location location) {
-  return Base::getChecked(location, objectType.getContext(), TypeKind::Ref,
-                          objectType);
+  return Base::getChecked(location, TypeKind::Ref, objectType);
 }
 
 Type RefType::getObjectType() { return getImpl()->objectType; }

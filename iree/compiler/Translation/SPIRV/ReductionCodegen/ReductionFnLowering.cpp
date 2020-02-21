@@ -33,25 +33,18 @@ namespace iree_compiler {
 
 namespace {
 
-/// Type converter for legalization of reduction apply function.
-class SPIRVReductionTypeConverter : public SPIRVTypeConverter {
- public:
-  Type convertType(Type t) override;
-};
-
 /// Base class for legalization of operations within the reduction apply
 /// function (and the function itself).
 template <typename OpTy>
 class SPIRVReductionConversion : public OpConversionPattern<OpTy> {
  public:
-  SPIRVReductionConversion(MLIRContext *context,
-                           SPIRVReductionTypeConverter &typeConverter,
+  SPIRVReductionConversion(MLIRContext *context, TypeConverter &typeConverter,
                            PatternBenefit benefit = 1)
       : OpConversionPattern<OpTy>(context, benefit),
         typeConverter(typeConverter) {}
 
  protected:
-  SPIRVReductionTypeConverter &typeConverter;
+  TypeConverter &typeConverter;
 };
 
 /// The apply function has a signature (lhs, rhs) -> output, all of the same
@@ -99,22 +92,6 @@ class ReductionOpConversion final : public SPIRVReductionConversion<OpTy> {
 };
 
 }  // namespace
-
-//===----------------------------------------------------------------------===//
-// Type Conversion
-//===----------------------------------------------------------------------===//
-
-Type SPIRVReductionTypeConverter::convertType(Type t) {
-  if (spirv::SPIRVDialect::isValidType(t)) {
-    return t;
-  }
-  if (auto tensorType = t.dyn_cast<RankedTensorType>()) {
-    if (tensorType.getRank() == 0) {
-      return tensorType.getElementType();
-    }
-  }
-  return nullptr;
-}
 
 //===----------------------------------------------------------------------===//
 // Apply fn conversion.
@@ -178,7 +155,14 @@ ReductionOpConversion<OpTy, ReplacementOpTy>::matchAndRewrite(
 //===----------------------------------------------------------------------===//
 LogicalResult lowerReductionApplyFunction(MLIRContext *context,
                                           ArrayRef<Operation *> fns) {
-  SPIRVReductionTypeConverter typeConverter;
+  SPIRVTypeConverter typeConverter;
+  typeConverter.addConversion([](Type type) {
+    return spirv::SPIRVDialect::isValidType(type) ? type : Optional<Type>();
+  });
+  typeConverter.addConversion([](RankedTensorType type) {
+    return type.getRank() == 0 ? type.getElementType() : Optional<Type>();
+  });
+
   OwningRewritePatternList patterns;
   patterns.insert<ReductionApplyFnConversion,
                   ReductionOpConversion<xla_hlo::MinOp, spirv::AtomicSMinOp>,

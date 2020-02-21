@@ -46,6 +46,7 @@ cc_binary(
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
     ],
 )
 
@@ -61,5 +62,6 @@ cc_binary(
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
     ],
 )

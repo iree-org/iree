@@ -26,27 +26,9 @@ namespace iree_compiler {
 class HALTypeConverter : public TypeConverter {
  public:
   HALTypeConverter(
-      ArrayRef<const HALConversionDialectInterface *> conversionInterfaces)
-      : conversionInterfaces(conversionInterfaces.vec()) {}
+      ArrayRef<const HALConversionDialectInterface *> conversionInterfaces);
 
-  LogicalResult convertType(Type type, SmallVectorImpl<Type> &results) override;
   // TODO(benvanik): signature conversion for output buffers.
-
-  // Since we override the more complex convertType above, the default
-  // behavior of the simpler convertType becomes a footgun. Override it here so
-  // that it respects the complex convertType, and also assert in case it
-  // is is used when the more complex one is needed.
-  // TODO(b/148971171): It's really confusing that this doesn't automatically
-  // inherit behavior from the more complex convertType above.
-  Type convertType(Type type) override {
-    SmallVector<Type, 4> results;
-    if (failed(convertType(type, results))) {
-      return nullptr;
-    }
-    assert(results.size() == 1 &&
-           "using simple convertType when a complex case needs to be handled!");
-    return results[0];
-  }
 
  private:
   // The set of dialect conversion interfaces we should query to convert types.

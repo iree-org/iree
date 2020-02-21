@@ -20,38 +20,42 @@
 namespace mlir {
 namespace iree_compiler {
 
-Type FlowTypeConverter::convertType(Type t) {
-  if (t.isIndex()) {
+FlowTypeConverter::FlowTypeConverter() {
+  // Allow types through by default.
+  addConversion([](Type type) { return type; });
+  addConversion([](IndexType type) {
     // Always treat as 32-bit.
-    return IntegerType::get(32, t.getContext());
-  } else if (t.isIntOrIndexOrFloat()) {
-    if (auto integerType = t.dyn_cast<IntegerType>()) {
-      if (integerType.getWidth() > 32) {
-        // Don't support 64-bit types in general. Rewrite to i32 (if desired).
-        // TODO(benvanik): split to i32+i32? allow and use availability?
-        // TODO(benvanik): make an option.
-        return IntegerType::get(32, t.getContext());
-      }
-    } else if (auto floatType = t.dyn_cast<FloatType>()) {
-      if (floatType.getWidth() > 32) {
-        // Don't support 64-bit types in general. Rewrite to f32 (if desired).
-        // TODO(benvanik): make an option.
-        return FloatType::getF32(t.getContext());
-      }
+    return IntegerType::get(32, type.getContext());
+  });
+  addConversion([](IntegerType integerType) -> Optional<Type> {
+    if (integerType.getWidth() > 32) {
+      // Don't support 64-bit types in general. Rewrite to i32 (if desired).
+      // TODO(benvanik): split to i32+i32? allow and use availability?
+      // TODO(benvanik): make an option.
+      return IntegerType::get(32, integerType.getContext());
     }
-  } else if (auto tensorType = t.dyn_cast<RankedTensorType>()) {
+    return llvm::None;
+  });
+  addConversion([](FloatType floatType) -> Optional<Type> {
+    if (floatType.getWidth() > 32) {
+      // Don't support 64-bit types in general. Rewrite to f32 (if desired).
+      // TODO(benvanik): make an option.
+      return FloatType::getF32(floatType.getContext());
+    }
+    return llvm::None;
+  });
+  addConversion([this](RankedTensorType tensorType) -> Optional<Type> {
     auto convertedElementType = convertType(tensorType.getElementType());
     if (!convertedElementType) {
-      return {};
+      return llvm::None;
     }
     return RankedTensorType::get(tensorType.getShape(), convertedElementType);
-  } else if (auto tensorType = t.dyn_cast<TensorType>()) {
+  });
+  addConversion([](UnrankedTensorType tensorType) {
     // We only support ranked tensors. We could convert unranked to ranked
     // here for certain cases (such as * on the LHS).
-    return {};
-  }
-  // Allow types through by default.
-  return t;
+    return Type();
+  });
 }
 
 Operation *FlowTypeConverter::materializeConversion(PatternRewriter &rewriter,

@@ -21,15 +21,18 @@
 namespace mlir {
 namespace iree_compiler {
 
-Type VMLATypeConverter::convertType(Type type) {
-  if (type.isa<TensorType>()) {
+VMLATypeConverter::VMLATypeConverter() {
+  addConversion([](Type type) -> Type {
+    if (type.isInteger(1)) {
+      // Widen i1 to i8.
+      return IntegerType::get(8, type.getContext());
+    }
+    return type;
+  });
+  addConversion([](TensorType type) {
     // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
     return IREE::VMLA::BufferType::get(type.getContext());
-  } else if (type.isInteger(1)) {
-    // Widen i1 to i8.
-    return IntegerType::get(8, type.getContext());
-  }
-  return type;
+  });
 }
 
 }  // namespace iree_compiler
