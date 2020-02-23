@@ -52,8 +52,7 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
                                     Location loc);
 
   // Verifies construction invariants and issues errors/warnings.
-  static LogicalResult verifyConstructionInvariants(Optional<Location> loc,
-                                                    MLIRContext *context,
+  static LogicalResult verifyConstructionInvariants(Location loc,
                                                     ArrayRef<int64_t> dims,
                                                     Type dimType);
 

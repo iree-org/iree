@@ -22,52 +22,49 @@
 namespace mlir {
 namespace iree_compiler {
 
-LogicalResult VMTypeConverter::convertType(Type t,
-                                           SmallVectorImpl<Type> &results) {
-  if (auto rankedShape = t.dyn_cast<Shape::RankedShapeType>()) {
-    for (int i = 0; i < rankedShape.getRank(); ++i) {
-      if (rankedShape.isDimDynamic(i)) {
-        results.push_back(rankedShape.getDimType());
-      }
+VMTypeConverter::VMTypeConverter() {
+  // All ref_ptr types are passed through unmodified.
+  addConversion([](IREE::VM::RefType type) { return type; });
+  // Wrap ref types.
+  addConversion([](Type type) -> Optional<Type> {
+    if (IREE::VM::RefType::isCompatible(type)) {
+      return IREE::VM::RefType::get(type);
     }
-    return success();
-  }
-  results.push_back(convertType(t));
-  return success();
-}
-
-Type VMTypeConverter::convertType(Type t) {
-  if (auto integerType = t.dyn_cast<IntegerType>()) {
+    return llvm::None;
+  });
+  // Convert integer types.
+  addConversion([](IntegerType integerType) {
     if (integerType.isInteger(32)) {
-      return t;
+      return integerType;
     } else if (integerType.isInteger(1)) {
       // Promote i1 -> i32.
-      return IntegerType::get(32, t.getContext());
+      return IntegerType::get(32, integerType.getContext());
     } else {
       // TODO(benvanik): ensure we want to do this and not something that forces
       // materialization of trunc/ext.
-      return IntegerType::get(32, t.getContext());
+      return IntegerType::get(32, integerType.getContext());
     }
-  } else if (auto ptrType = t.dyn_cast<IREE::PtrType>()) {
+  });
+  // All ref_ptr types are passed through unmodified.
+  addConversion([this](IREE::PtrType type) -> Type {
     // Recursively handle pointer target types (we want to convert ptr<index> to
     // ptr<i32>, for example).
-    auto targetType = convertType(ptrType.getTargetType());
+    auto targetType = convertType(type.getTargetType());
     if (!targetType) {
-      return {};
+      return Type();
     }
     return IREE::PtrType::get(targetType);
-  } else if (IREE::VM::RefType::isCompatible(t)) {
-    // Wrap ref types.
-    return IREE::VM::RefType::get(t);
-  } else if (t.isa<IREE::VM::RefType>()) {
-    // All ref_ptr types are passed through unmodified.
-    return t;
-  }
-
-  // Default to not supporting the type. This dialect is very limited
-  // with respect to valid types and the above should be expanded as
-  // needed.
-  return {};
+  });
+  // Convert ranked shape types.
+  addConversion(
+      [](Shape::RankedShapeType rankedShape, SmallVectorImpl<Type> &results) {
+        for (int i = 0; i < rankedShape.getRank(); ++i) {
+          if (rankedShape.isDimDynamic(i)) {
+            results.push_back(rankedShape.getDimType());
+          }
+        }
+        return success();
+      });
 }
 
 Operation *VMTypeConverter::materializeConversion(PatternRewriter &rewriter,

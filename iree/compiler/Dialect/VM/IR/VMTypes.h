@@ -64,13 +64,10 @@ class RefType : public Type::TypeBase<RefType, Type, detail::RefTypeStorage> {
   static RefType getChecked(Type objectType, Location location);
 
   /// Verifies construction of a type with the given object.
-  static LogicalResult verifyConstructionInvariants(
-      llvm::Optional<Location> loc, MLIRContext *context, Type objectType) {
+  static LogicalResult verifyConstructionInvariants(Location loc,
+                                                    Type objectType) {
     if (!isCompatible(objectType)) {
-      if (loc) {
-        emitError(*loc) << "invalid object type for a ref: " << objectType;
-      }
-      return failure();
+      return emitError(loc) << "invalid object type for a ref: " << objectType;
     }
     return success();
   }

@@ -52,8 +52,7 @@ PtrType PtrType::get(Type targetType) {
 }
 
 PtrType PtrType::getChecked(Type targetType, Location location) {
-  return Base::getChecked(location, targetType.getContext(), TypeKind::Ptr,
-                          targetType);
+  return Base::getChecked(location, TypeKind::Ptr, targetType);
 }
 
 Type PtrType::getTargetType() { return getImpl()->targetType; }

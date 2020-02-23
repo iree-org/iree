@@ -21,29 +21,31 @@
 namespace mlir {
 namespace iree_compiler {
 
-LogicalResult HALTypeConverter::convertType(Type type,
-                                            SmallVectorImpl<Type> &results) {
-  if (auto ptrType = type.dyn_cast<IREE::PtrType>()) {
+HALTypeConverter::HALTypeConverter(
+    ArrayRef<const HALConversionDialectInterface *> conversionInterfaces)
+    : conversionInterfaces(conversionInterfaces.vec()) {
+  addConversion([this](Type type, SmallVectorImpl<Type> &results) {
+    for (auto *conversionInterface : this->conversionInterfaces) {
+      if (succeeded(conversionInterface->convertType(type, results))) {
+        return success();
+      }
+    }
+    results.push_back(type);
+    return success();
+  });
+  addConversion([](TensorType type) {
+    // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
+    return IREE::HAL::BufferType::get(type.getContext());
+  });
+  addConversion([this](IREE::PtrType type) -> Type {
     // Recursively handle pointer target types (we want to convert ptr<index> to
     // ptr<i32>, for example).
-    auto targetType = convertType(ptrType.getTargetType());
+    auto targetType = convertType(type.getTargetType());
     if (!targetType) {
-      return failure();
+      return Type();
     }
-    results.push_back(IREE::PtrType::get(targetType));
-    return success();
-  } else if (type.isa<TensorType>()) {
-    // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
-    results.push_back(IREE::HAL::BufferType::get(type.getContext()));
-    return success();
-  }
-  for (auto *conversionInterface : conversionInterfaces) {
-    if (succeeded(conversionInterface->convertType(type, results))) {
-      return success();
-    }
-  }
-  results.push_back(type);
-  return success();
+    return IREE::PtrType::get(targetType);
+  });
 }
 
 }  // namespace iree_compiler

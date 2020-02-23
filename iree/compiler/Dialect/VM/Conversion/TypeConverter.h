@@ -22,8 +22,7 @@ namespace iree_compiler {
 
 class VMTypeConverter : public TypeConverter {
  public:
-  LogicalResult convertType(Type t, SmallVectorImpl<Type> &results) override;
-  Type convertType(Type t) override;
+  VMTypeConverter();
 
   Operation *materializeConversion(PatternRewriter &rewriter, Type resultType,
                                    ArrayRef<Value> inputs,

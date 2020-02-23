@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 
+#include "llvm/ADT/Twine.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
@@ -71,25 +72,24 @@ RankedShapeType RankedShapeType::get(ArrayRef<int64_t> dims, Type dimType) {
 
 RankedShapeType RankedShapeType::getChecked(ArrayRef<int64_t> dims,
                                             Type dimType, Location loc) {
-  return Base::getChecked(loc, dimType.getContext(),
-                          IREE::Shape::TypeKind::RankedShape, dims, dimType);
+  return Base::getChecked(loc, IREE::Shape::TypeKind::RankedShape, dims,
+                          dimType);
 }
 
 LogicalResult RankedShapeType::verifyConstructionInvariants(
-    Optional<Location> loc, MLIRContext *context, ArrayRef<int64_t> dims,
-    Type dimType) {
+    Location loc, ArrayRef<int64_t> dims, Type dimType) {
   for (auto dim : dims) {
     if (dim < 0 && dim != -1) {
-      return emitOptionalError(loc, "dims must be -1 for dynamic");
+      return emitError(loc, "dims must be -1 for dynamic");
     }
   }
   if (!dimType) {
-    return emitOptionalError(loc, "RankedShapeType must have a dim type");
+    return emitError(loc, "RankedShapeType must have a dim type");
   }
   if (!dimType.isa<IntegerType>() && !dimType.isa<IndexType>()) {
-    return emitOptionalError(loc,
-                             "RankedShapeType must have an integral or index "
-                             "dim type");
+    return emitError(loc,
+                     "RankedShapeType must have an integral or index "
+                     "dim type");
   }
   return success();
 }
