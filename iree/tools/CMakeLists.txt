@@ -175,6 +175,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRLinalgToSPIRVTransforms
       MLIRLinalgToLLVM
       MLIRLinalgUtils
+      MLIRLoopOpsTransforms
       MLIROptLib
       MLIRStandardOps
       MLIRSPIRV

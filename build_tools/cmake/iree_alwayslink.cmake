@@ -74,6 +74,7 @@ function(set_alwayslink_mlir_libs)
     MLIRQuantizerTransforms
     MLIRLinalgToLLVM # createConvertLinalgToLLVMPass()
     MLIRLinalgToSPIRVTransforms
+    MLIRLoopOpsTransforms
     # TODO(marbre): Check the previously added libs
     MLIRAnalysis
     MLIREDSC
