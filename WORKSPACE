@@ -46,11 +46,11 @@ py_repositories()
 # bazel toolchains rules for remote execution (https://releases.bazel.build/bazel-toolchains.html).
 http_archive(
     name = "bazel_toolchains",
-    sha256 = "ca8aa49ceb47e9bee04dd67f0bec0b010032b37ebbe67147b535237e801d9a87",
-    strip_prefix = "bazel-toolchains-1.2.2",
+    sha256 = "e2126599d29f2028e6b267eba273dcc8e7f4a35ff323e9600cf42fb03875b7c6",
+    strip_prefix = "bazel-toolchains-2.0.0",
     urls = [
-        "https://github.com/bazelbuild/bazel-toolchains/releases/download/1.2.2/bazel-toolchains-1.2.2.tar.gz",
-        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/1.2.2.tar.gz",
+        "https://github.com/bazelbuild/bazel-toolchains/releases/download/2.0.0/bazel-toolchains-2.0.0.tar.gz",
+        "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/2.0.0.tar.gz",
     ],
 )
 
