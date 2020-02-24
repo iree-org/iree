@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
+file(GLOB _GLOB_X_TD CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
     dialect
