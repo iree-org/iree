@@ -18,7 +18,7 @@
 #include "iree/compiler/Translation/Interpreter/Serialization/BytecodeWriter.h"
 #include "iree/compiler/Translation/Interpreter/Serialization/VMFunctionTableBuilder.h"
 #include "iree/schemas/interpreter_module_def_generated.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/StandardTypes.h"

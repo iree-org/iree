@@ -20,7 +20,7 @@
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IREEIndexComputation.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

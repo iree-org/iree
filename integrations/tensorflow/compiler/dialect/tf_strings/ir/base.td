@@ -47,12 +47,13 @@ class TFStrings_Op<string mnemonic, list<OpTrait> traits = []> :
 }
 
 def TFStrings_StringTensor : TensorOf<[TFStrings_String]>;
-def TFStrings_NumericTensor : TensorOf<[AnyFloat, AnyInteger]>;
+def TFStrings_NumericTensor : TensorOf<[AnyFloat, AnySignlessInteger]>;
 def TFStrings_AnyString : AnyTypeOf<[TFStrings_String, TFStrings_StringTensor]>;
 
-def TFStrings_AnyTensor : TensorOf<[AnyFloat, AnyInteger, TFStrings_String]>;
+def TFStrings_AnyTensor : TensorOf<[
+  AnyFloat, AnySignlessInteger, TFStrings_String]>;
 def TFStrings_Any : AnyTypeOf<[
-  TFStrings_AnyTensor, TFStrings_String, AnyFloat, AnyInteger]>;
+  TFStrings_AnyTensor, TFStrings_String, AnyFloat, AnySignlessInteger]>;
 
 
 #endif //  STRINGS_BASE

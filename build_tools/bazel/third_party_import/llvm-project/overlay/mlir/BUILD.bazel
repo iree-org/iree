@@ -216,7 +216,7 @@ filegroup(
     name = "StdOpsTdFiles",
     srcs = [
         "include/mlir/Analysis/CallInterfaces.td",
-        "include/mlir/Dialect/StandardOps/Ops.td",
+        "include/mlir/Dialect/StandardOps/IR/Ops.td",
         "include/mlir/IR/OpAsmInterface.td",
         ":OpBaseTdFiles",
     ],
@@ -228,23 +228,23 @@ gentbl(
     tbl_outs = [
         (
             "-gen-op-decls",
-            "include/mlir/Dialect/StandardOps/Ops.h.inc",
+            "include/mlir/Dialect/StandardOps/IR/Ops.h.inc",
         ),
         (
             "-gen-op-defs",
-            "include/mlir/Dialect/StandardOps/Ops.cpp.inc",
+            "include/mlir/Dialect/StandardOps/IR/Ops.cpp.inc",
         ),
         (
             "-gen-enum-decls",
-            "include/mlir/Dialect/StandardOps/OpsEnums.h.inc",
+            "include/mlir/Dialect/StandardOps/IR/OpsEnums.h.inc",
         ),
         (
             "-gen-enum-defs",
-            "include/mlir/Dialect/StandardOps/OpsEnums.cpp.inc",
+            "include/mlir/Dialect/StandardOps/IR/OpsEnums.cpp.inc",
         ),
     ],
     tblgen = ":mlir-tblgen",
-    td_file = "include/mlir/Dialect/StandardOps/Ops.td",
+    td_file = "include/mlir/Dialect/StandardOps/IR/Ops.td",
     td_srcs = [
         ":StdOpsTdFiles",
     ],
@@ -2521,7 +2521,7 @@ exports_files(
         "include/mlir/Analysis/CallInterfaces.h",
         "include/mlir/Analysis/CallInterfaces.td",
         "include/mlir/Dialect/LLVMIR/LLVMOpBase.td",
-        "include/mlir/Dialect/StandardOps/Ops.td",
+        "include/mlir/Dialect/StandardOps/IR/Ops.td",
         "include/mlir/IR/OpAsmInterface.td",
         "include/mlir/IR/OpBase.td",
         "include/mlir/Transforms/InliningUtils.h",

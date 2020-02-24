@@ -23,7 +23,7 @@
 #include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Allocator.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Function.h"

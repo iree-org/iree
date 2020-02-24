@@ -37,7 +37,7 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
       return matchSuccess();
-    } else if (convertedType.isIntOrIndex()) {
+    } else if (convertedType.isSignlessIntOrIndex()) {
       // TODO(benvanik): support other types.
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),

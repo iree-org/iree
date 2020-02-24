@@ -595,7 +595,7 @@ bool ConstI32Op::isBuildableWith(Attribute value, Type type) {
          (value.isa<ElementsAttr>() && value.cast<ElementsAttr>()
                                            .getType()
                                            .getElementType()
-                                           .isa<IntegerType>());
+                                           .isSignlessInteger());
 }
 
 // static

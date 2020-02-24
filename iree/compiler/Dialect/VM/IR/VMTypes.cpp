@@ -56,7 +56,7 @@ bool RefType::isCompatible(Type type) {
   if (type.isa<RefType>()) {
     // Already a ref - don't double-wrap.
     return false;
-  } else if (type.isIntOrIndexOrFloat()) {
+  } else if (type.isSignlessIntOrIndexOrFloat()) {
     // Ignore known primitive types.
     return false;
   }
