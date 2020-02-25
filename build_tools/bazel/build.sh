@@ -30,14 +30,13 @@ test_env_args=(
 echo "Running with test env args: ${test_env_args[@]}"
 
 # Build and test everything not explicitly marked as excluded from CI (using the
-# tag "nokokoro").
+# tag "nokokoro"), explicitly including those marked "manual".
 # Note that somewhat contrary to its name `bazel test` will also build
 # any non-test targets specified.
-# We use `bazel query //...` piped to `bazel test` rather than the simpler
-# `bazel test //...` because the latter excludes targets tagged "manual". The
-# "manual" tag allows targets to be excluded from human wildcard builds, but we
-# want them built by CI unless they are excluded with "nokokoro".
-bazel query '//... except attr("tags", "nokokoro", //...)' | \
-  xargs bazel test ${test_env_args[@]} --define=iree_tensorflow=true \
-    --config=rbe --config=rs \
-    --keep_going --test_output=errors
+bazel test \
+  --test_tag_filters=manual,-nokokoro \
+  //iree/... \
+  //bindings/python/... \
+  //test/... \
+  --keep_going --test_output=errors \
+  --config=rbe --config=rs
