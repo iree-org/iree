@@ -14,6 +14,12 @@
 
 # Disable warnings we don't care about.
 build --copt=-Wno-unused-local-typedef
+build --copt=-Wno-unused-private-field
+build --copt=-Wno-unused-const-variable
+# Matches upstream. Cannot impact due to extern C inclusion method.
+build --copt=-Wno-extern-c-compat
+# Technically UB but needed for intrusive ptrs
+build --copt=-Wno-invalid-offsetof
 
 # C++14 standard version is required.
 build --cxxopt=-std=c++14 --host_cxxopt=-std=c++14

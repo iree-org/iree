@@ -39,8 +39,7 @@ using iree_vmla_shape_t = absl::Span<const int32_t>;
 //
 // The provided data pointer and length is always for the buffer itself; it'll
 // already be offset/clamped to parent buffer bounds when a view.
-class iree_vmla_buffer final : public RefObject<iree_vmla_buffer> {
- public:
+struct iree_vmla_buffer final : public RefObject<iree_vmla_buffer> {
   static StatusOr<vm::ref<iree_vmla_buffer>> Allocate(
       size_t byte_length, iree_allocator_t allocator) {
     void* data = nullptr;
