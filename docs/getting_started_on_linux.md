@@ -8,19 +8,16 @@ to the documentation.
 
 ## Pre-requisites
 
-### Install Bazel >= 1.0
+### Install Bazel
 
 *Optional if you will only be using the CMake build for runtime deps.*
+
+Check the .bazelversion file for the version you should install. You can also
+use [Bazelisk](https://github.com/bazelbuild/bazelisk) to manage Bazel versions.
 
 Follow the
 [install instructions](https://docs.bazel.build/versions/master/install-ubuntu.html)
 and verify with: `bazel --version`.
-
-If you are planning on using TensorFlow/Colab, make sure that the Bazel version
-you install is
-[supported by TensorFlow](https://www.tensorflow.org/install/source#install_bazel).
-A .bazelversion file is also provided if you want to use
-[Bazelisk](https://github.com/bazelbuild/bazelisk) to manage Bazel versions.
 
 ### Install clang
 

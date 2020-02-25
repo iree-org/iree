@@ -70,11 +70,11 @@ scoop install vscode
 
 TODO: Upgrade to head python.
 
-If you are planning on using TensorFlow/Colab, make sure that the Bazel version
-you install is
-[supported by TensorFlow](https://www.tensorflow.org/install/source#install_bazel).
-A .bazelversion file is also provided if you want to use
-[Bazelisk](https://github.com/bazelbuild/bazelisk) to manage Bazel versions.
+Check the .bazelversion file for the version of Bazel you should install. You
+can also use [Bazelisk](https://github.com/bazelbuild/bazelisk) to manage Bazel
+versions.
+
+TODO: Specific steps to install a compatible version of Bazel directly
 
 ## Setup MSYS2
 
