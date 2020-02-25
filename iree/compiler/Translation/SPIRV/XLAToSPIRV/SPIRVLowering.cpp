@@ -67,7 +67,7 @@ static spirv::PointerType convertArgTypeToVariableType(Location loc,
     return nullptr;
   }
   auto elementType = argType.getElementType();
-  if (!elementType.isIntOrFloat()) {
+  if (!elementType.isSignlessIntOrFloat()) {
     emitError(loc, "unhandled element type ")
         << elementType << " while lowering to SPIR-V";
     return nullptr;
@@ -382,7 +382,7 @@ static LogicalResult lowerSplatConstant(
   auto attr = constOp.value().dyn_cast<DenseElementsAttr>();
   auto resultType = constOp.getResult().getType();
   Type resultElemType;
-  if (resultType.isIntOrFloat()) {
+  if (resultType.isSignlessIntOrFloat()) {
     resultElemType = resultType;
   } else if (auto shapedType = resultType.dyn_cast<ShapedType>()) {
     resultElemType = shapedType.getElementType();
@@ -408,7 +408,7 @@ static LogicalResult lowerNonSplatConstant(
   if (!argType.hasStaticShape()) {
     return constOp.emitError("expected static shaped tensor");
   }
-  if (!elementType.isIntOrFloat()) {
+  if (!elementType.isSignlessIntOrFloat()) {
     return op->emitError("unhandled element type of the result :")
            << elementType;
   }
@@ -423,7 +423,7 @@ static LogicalResult lowerNonSplatConstant(
     // deleted), but potentially can "move" the data here.
     auto tensorType =
         RankedTensorType::get(argType.getNumElements(), elementType);
-    if (elementType.isa<IntegerType>()) {
+    if (elementType.isSignlessInteger()) {
       auto values =
           constOp.value().cast<DenseElementsAttr>().getValues<APInt>();
       SmallVector<APInt, 4> valuesVec(values.begin(), values.end());

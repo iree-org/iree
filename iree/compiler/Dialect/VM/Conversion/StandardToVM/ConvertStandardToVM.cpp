@@ -17,7 +17,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
@@ -242,8 +242,7 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdaptor(operands);
     auto type = srcOp.getType();
-    if (!type.template isa<IntegerType>() ||
-        type.getIntOrFloatBitWidth() != kBits) {
+    if (!type.isSignlessInteger() || type.getIntOrFloatBitWidth() != kBits) {
       return matchFailure();
     }
     APInt amount;

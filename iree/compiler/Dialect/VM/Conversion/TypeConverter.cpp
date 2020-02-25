@@ -34,16 +34,17 @@ VMTypeConverter::VMTypeConverter() {
   });
   // Convert integer types.
   addConversion([](IntegerType integerType) {
-    if (integerType.isInteger(32)) {
+    if (integerType.isSignlessInteger(32)) {
       return integerType;
     } else if (integerType.isInteger(1)) {
       // Promote i1 -> i32.
       return IntegerType::get(32, integerType.getContext());
-    } else {
+    } else if (integerType.isSignlessInteger()) {
       // TODO(benvanik): ensure we want to do this and not something that forces
       // materialization of trunc/ext.
       return IntegerType::get(32, integerType.getContext());
     }
+    llvm_unreachable("unexpected integerType");
   });
   // All ref_ptr types are passed through unmodified.
   addConversion([this](IREE::PtrType type) -> Type {

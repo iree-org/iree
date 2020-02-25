@@ -405,7 +405,7 @@ struct GatherOpLowering : public OpConversionPattern<xla_hlo::GatherOp> {
       }
 
       ElementsAttr elementsAttr;
-      if (elementType.isInteger(32)) {
+      if (elementType.isSignlessInteger(32)) {
         llvm::SmallVector<int32_t, 4> zeroes(extraDims);
         elementsAttr = DenseIntElementsAttr::get(
             RankedTensorType::get(zeroes.size(), elementType),

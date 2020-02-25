@@ -28,7 +28,7 @@ FlowTypeConverter::FlowTypeConverter() {
     return IntegerType::get(32, type.getContext());
   });
   addConversion([](IntegerType integerType) -> Optional<Type> {
-    if (integerType.getWidth() > 32) {
+    if (integerType.isSignlessInteger() && integerType.getWidth() > 32) {
       // Don't support 64-bit types in general. Rewrite to i32 (if desired).
       // TODO(benvanik): split to i32+i32? allow and use availability?
       // TODO(benvanik): make an option.

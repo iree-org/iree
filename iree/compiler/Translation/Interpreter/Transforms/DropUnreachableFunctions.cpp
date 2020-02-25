@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include "llvm/ADT/SetVector.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
 #include "mlir/Pass/Pass.h"

@@ -14,7 +14,7 @@
 
 #include "iree/compiler/Utils/TypeConversionUtils.h"
 #include "llvm/ADT/DenseSet.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Location.h"

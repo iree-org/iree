@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_XLATOLINALG_MAPHLOTOSCALAROP_H_
 #define IREE_COMPILER_TRANSLATION_XLATOLINALG_MAPHLOTOSCALAROP_H_
 
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
@@ -57,7 +57,7 @@ struct ScalarOp<xla_hlo::MulOp> {
 template <typename HloOp>
 Operation* mapToStdScalarOp(HloOp hloOp, Type resultType,
                             ArrayRef<Value> blockArgs, OpBuilder builder) {
-  if (resultType.isa<IntegerType>()) {
+  if (resultType.isSignlessInteger()) {
     return builder.template create<ScalarIOp<HloOp>>(hloOp.getLoc(), resultType,
                                                      blockArgs, mlir::None);
   }

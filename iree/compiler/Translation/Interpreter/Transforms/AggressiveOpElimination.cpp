@@ -18,7 +18,7 @@
 #include "iree/compiler/Translation/Interpreter/IR/HLOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/LLOps.h"
 #include "mlir/Analysis/Dominance.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Block.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"

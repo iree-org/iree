@@ -37,7 +37,7 @@ def IREE_Dialect : Dialect {
 
 def IREE_Bool :
     AnyTypeOf<[I1, I8], "boolean-storing type (1 or 8 -bit integer)">;
-def IREE_Element : AnyTypeOf<[AnyInteger, AnyFloat]>;
+def IREE_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
 def IREE_MemRef : MemRefOf<[IREE_Element]>;
 
 //===----------------------------------------------------------------------===//
