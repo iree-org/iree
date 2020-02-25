@@ -411,7 +411,7 @@ def HAL_TimelineValue : TypeAlias<I32>;
 
 def HAL_Status : TypeAlias<I32>;
 
-def HAL_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
+def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
 def HAL_VariableRefAttr : AliasedSymbolRefAttr;
 def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
@@ -427,7 +427,7 @@ def HAL_Shape : Variadic<HAL_Dim>;
 class HAL_RankedIntElementsAttr<int width, list<int> dims> : ElementsAttrBase<
   CPred<"$_self.isa<DenseIntElementsAttr>() &&"
       "$_self.cast<DenseIntElementsAttr>().getType()."
-      "getElementType().isInteger(" # width # ") && "
+      "getElementType().isSignlessInteger(" # width # ") && "
       // Check that this is ranked and has the specified shape.
       "$_self.cast<DenseIntElementsAttr>().getType().hasRank() && "
       "$_self.cast<DenseIntElementsAttr>().getType().getShape() == "

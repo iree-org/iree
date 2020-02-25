@@ -86,7 +86,7 @@ LogicalResult RankedShapeType::verifyConstructionInvariants(
   if (!dimType) {
     return emitError(loc, "RankedShapeType must have a dim type");
   }
-  if (!dimType.isa<IntegerType>() && !dimType.isa<IndexType>()) {
+  if (!dimType.isSignlessInteger() && !dimType.isa<IndexType>()) {
     return emitError(loc,
                      "RankedShapeType must have an integral or index "
                      "dim type");

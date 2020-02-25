@@ -38,7 +38,7 @@ Value ToStringHelper(Location loc, Value value, OpBuilder &builder) {
   auto type = value.getType();
   if (type.dyn_cast<TFStrings::StringType>()) {
     return value;
-  } else if (type.isInteger(32)) {
+  } else if (type.isSignlessInteger(32)) {
     auto toString = builder.create<IREE::Strings::I32ToStringOp>(
         loc, builder.getType<IREE::Strings::StringType>(), value);
     return toString.getResult();
@@ -68,7 +68,7 @@ struct PrintOpLowering : public OpRewritePattern<PrintOp> {
     Type type = op.getOperand().getType();
     if (auto stringType = type.dyn_cast<TFStrings::StringType>()) {
       stringVal = op.getOperand();
-    } else if (type.isInteger(32)) {
+    } else if (type.isSignlessInteger(32)) {
       auto toString = rewriter.create<IREE::Strings::I32ToStringOp>(
           op.getLoc(), rewriter.getType<IREE::Strings::StringType>(),
           op.getOperand());

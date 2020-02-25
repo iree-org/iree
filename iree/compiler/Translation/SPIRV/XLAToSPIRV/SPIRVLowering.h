@@ -186,7 +186,7 @@ class SPIRVPwOpLowering final : public SPIRVOpLowering<OpTy> {
     }
     auto elementType = resultType.getElementType();
     Operation *scalarOp = nullptr;
-    if (elementType.template isa<IntegerType>()) {
+    if (elementType.isSignlessInteger()) {
       scalarOp = builder
                      .create<ReplacementOpTy>(op->getLoc(), elementType,
                                               scalarOperands,

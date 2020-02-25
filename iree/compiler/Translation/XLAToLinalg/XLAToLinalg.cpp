@@ -58,7 +58,7 @@ class PointwiseConverter : public OpConversionPattern<HloOp> {
     auto operation = hloOp.getOperation();
     ShapedType argType =
         operation->getOperand(0).getType().template dyn_cast<ShapedType>();
-    if (!argType || !argType.getElementType().isIntOrFloat()) {
+    if (!argType || !argType.getElementType().isSignlessIntOrFloat()) {
       return ConversionPattern::matchFailure();
     }
 

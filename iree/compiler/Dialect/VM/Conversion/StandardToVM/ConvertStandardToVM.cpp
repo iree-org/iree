@@ -242,8 +242,7 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdaptor(operands);
     auto type = srcOp.getType();
-    if (!type.template isa<IntegerType>() ||
-        type.getIntOrFloatBitWidth() != kBits) {
+    if (!type.isSignlessInteger() || type.getIntOrFloatBitWidth() != kBits) {
       return matchFailure();
     }
     APInt amount;
