@@ -15,7 +15,7 @@
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
@@ -55,7 +55,7 @@ static bool areShapesEqual(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
 static LogicalResult getExtentFromStoreOpSrc(Operation *storeOp,
                                              SmallVectorImpl<int64_t> &extent) {
   Value srcVal = storeOp->getOperand(0);
-  if (srcVal.getType().isIntOrFloat()) {
+  if (srcVal.getType().isSignlessIntOrFloat()) {
     extent.clear();
     extent.push_back(1);
     return success();

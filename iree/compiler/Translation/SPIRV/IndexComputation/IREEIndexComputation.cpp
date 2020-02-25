@@ -41,7 +41,7 @@ static LogicalResult initIndexPropagation(Location loc, FuncOp funcOp,
     valueShape.append(valueShapedType.getShape().begin(),
                       valueShapedType.getShape().end());
     valueNumElements = valueShapedType.getNumElements();
-  } else if (valueType.isIntOrFloat()) {
+  } else if (valueType.isSignlessIntOrFloat()) {
     valueShape.push_back(1);
     valueNumElements = 1;
   } else {

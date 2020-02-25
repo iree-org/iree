@@ -38,7 +38,7 @@ namespace {
 // TODO(gcmn) this is duplicated from MemRefUtils to avoid a circular
 // dependency. Extract op-dependent parts of memref utils to allow reuse.
 MemRefType convertLegacyTypeToMemRef(Type type) {
-  if (type.isIntOrIndexOrFloat()) {
+  if (type.isSignlessIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
   } else if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
     return MemRefType::get(tensorType.getShape(), tensorType.getElementType());

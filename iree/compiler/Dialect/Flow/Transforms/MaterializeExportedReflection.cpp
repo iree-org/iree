@@ -36,7 +36,7 @@ namespace {
 
 llvm::Optional<ScalarType> mapScalarType(Type elementType) {
   // Map ScalarType.
-  if (elementType.isa<IntegerType>()) {
+  if (elementType.isSignlessInteger()) {
     auto bits = elementType.getIntOrFloatBitWidth();
     // TODO(laurenzo): These types are still signless. Assume signed and
     // preserve once represented.

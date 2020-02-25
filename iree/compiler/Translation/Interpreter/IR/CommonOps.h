@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_INTERPRETER_IR_COMMON_OPS_H_
 #define IREE_COMPILER_TRANSLATION_INTERPRETER_IR_COMMON_OPS_H_
 
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"

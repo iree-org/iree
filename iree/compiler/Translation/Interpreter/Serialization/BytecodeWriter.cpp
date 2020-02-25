@@ -37,13 +37,13 @@ LogicalResult BytecodeWriter::WriteCount(int count) {
 
 LogicalResult BytecodeWriter::WriteTypeIndex(Type type) {
   iree::BuiltinType type_index;
-  if (type.isInteger(8)) {
+  if (type.isSignlessInteger(8)) {
     type_index = iree::BuiltinType::kI8;
-  } else if (type.isInteger(16)) {
+  } else if (type.isSignlessInteger(16)) {
     type_index = iree::BuiltinType::kI16;
-  } else if (type.isInteger(32)) {
+  } else if (type.isSignlessInteger(32)) {
     type_index = iree::BuiltinType::kI32;
-  } else if (type.isInteger(64)) {
+  } else if (type.isSignlessInteger(64)) {
     type_index = iree::BuiltinType::kI64;
   } else if (type.isF16()) {
     type_index = iree::BuiltinType::kF16;

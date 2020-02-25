@@ -93,7 +93,7 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
 // Forms a register reference byte as interpreted by the VM.
 // Assumes that the ordinal has been constructed in the valid range.
 static uint8_t makeRegisterByte(Type type, int ordinal, bool isMove) {
-  if (type.isIntOrIndexOrFloat()) {
+  if (type.isSignlessIntOrIndexOrFloat()) {
     assert(ordinal < kIntRegisterCount);
     return ordinal;
   } else {
@@ -117,7 +117,7 @@ struct RegisterUsage {
   }
 
   Optional<uint8_t> allocateRegister(Type type) {
-    if (type.isIntOrIndexOrFloat()) {
+    if (type.isSignlessIntOrIndexOrFloat()) {
       int ordinal = intRegisters.find_first_unset();
       if (ordinal >= kIntRegisterCount) {
         return {};

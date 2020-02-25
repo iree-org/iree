@@ -101,7 +101,7 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
           .getOperation();
     };
     Operation *scalarOp = nullptr;
-    if (resultElemType.isa<IntegerType>()) {
+    if (resultElemType.isSignlessInteger()) {
       if (auto intOperandType = operandElemType.dyn_cast<IntegerType>()) {
         // spv.SConvertOp does not support converting a bool to integer, use
         // spv.SelectOp instead.

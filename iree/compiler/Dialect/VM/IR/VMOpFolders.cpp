@@ -951,10 +951,11 @@ struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
 
     if (condValue.getValue() != 0) {
       // True - always break (to the same destination).
-      rewriter.replaceOpWithNewOp<BreakOp>(op, op.getDest(), op.operands());
+      rewriter.replaceOpWithNewOp<BreakOp>(op, op.getDest(), op.destOperands());
     } else {
       // False - skip the break.
-      rewriter.replaceOpWithNewOp<BranchOp>(op, op.getDest(), op.operands());
+      rewriter.replaceOpWithNewOp<BranchOp>(op, op.getDest(),
+                                            op.destOperands());
     }
     return matchSuccess();
   }

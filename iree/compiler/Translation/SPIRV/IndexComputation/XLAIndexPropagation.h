@@ -24,7 +24,7 @@
 
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputation.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttribute.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Function.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
