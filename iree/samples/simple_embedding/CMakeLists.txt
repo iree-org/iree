@@ -19,6 +19,8 @@ iree_bytecode_module(
     "simple_embedding_test.mlir"
   CC_NAMESPACE
     "iree::samples"
+  TRANSLATE_TOOL
+    iree_tools_iree-translate
   TRANSLATION
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
@@ -30,20 +32,17 @@ iree_cc_test(
   SRCS
     "simple_embedding_test.cc"
   DEPS
-    iree::samples::simple_embedding::simple_embedding_test_bytecode_module_cc
+    ::simple_embedding_test_bytecode_module_cc
     absl::core_headers
     absl::strings
     iree::base::api
     iree::base::api_util
     iree::base::logging
     iree::hal::api
-    iree::modules::hal
-    iree::vm::bytecode_module
-    iree::vm
-    # These are the drivers we support running with and can produce
-    # executables for from the source MLIR.
     iree::hal::interpreter::interpreter_driver_module
     iree::hal::vulkan::vulkan_driver_module
-    # TODO(marbre): Set PLATFORM_VULKAN_TEST_DEPS somewhere instead of adding dependencies directly
+    iree::modules::hal
     iree::testing::gtest_main
+    iree::vm
+    iree::vm::bytecode_module
 )

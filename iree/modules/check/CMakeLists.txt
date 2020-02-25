@@ -52,10 +52,10 @@ iree_cc_test(
 iree_cc_binary(
   NAME
     iree-check-module
-  SRCS
-    "check_module_main.cc"
   OUT
     iree-check-module
+  SRCS
+    "check_module_main.cc"
   DEPS
     ::native_module
     absl::flags
@@ -66,7 +66,6 @@ iree_cc_binary(
     iree::base::init
     iree::base::source_location
     iree::base::status
-    # TODO(marbre): Add PLATFORM_VULKAN_DEPS
     iree::hal::interpreter::interpreter_driver_module
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
@@ -74,8 +73,6 @@ iree_cc_binary(
     iree::tools::vm_util
     iree::vm::bytecode_module
 )
-add_executable(iree-check-module ALIAS iree_modules_check_iree-check-module)
-
 
 iree_cc_library(
   NAME

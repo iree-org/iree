@@ -19,6 +19,11 @@ flatbuffer_cc_library(
     buffer_data_def_cc_fbs
   SRCS
     "buffer_data_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
   PUBLIC
 )
 
@@ -27,6 +32,11 @@ flatbuffer_cc_library(
     bytecode_module_def_cc_fbs
   SRCS
     "bytecode_module_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
   PUBLIC
 )
 
@@ -35,6 +45,11 @@ flatbuffer_cc_library(
     interpreter_module_def_cc_fbs
   SRCS
     "interpreter_module_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
   PUBLIC
 )
 
@@ -43,6 +58,11 @@ flatbuffer_cc_library(
     spirv_executable_def_cc_fbs
   SRCS
     "spirv_executable_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
   PUBLIC
 )
 
@@ -51,6 +71,11 @@ flatbuffer_cc_library(
     vmla_executable_def_cc_fbs
   SRCS
     "vmla_executable_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
   PUBLIC
 )
 
@@ -59,5 +84,22 @@ flatbuffer_cc_library(
     llvmir_executable_def_cc_fbs
   SRCS
     "llvmir_executable_def.fbs"
+  FLATC_ARGS
+    "--keep-prefix"
+    "--scoped-enums"
+    "--reflect-names"
+    "--gen-object-api"
+  PUBLIC
+)
+
+iree_cc_embed_data(
+  NAME
+    reflection_data
+  CC_FILE_OUTPUT
+    "reflection_data.cc"
+  H_FILE_OUTPUT
+    "reflection_data.h"
+  CPP_NAMESPACE
+    "iree::schemas"
   PUBLIC
 )

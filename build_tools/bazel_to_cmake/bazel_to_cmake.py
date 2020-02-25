@@ -96,6 +96,11 @@ class BuildFileFunctions(object):
 
   def __init__(self, converter):
     self.converter = converter
+    # TODO(gcmn): Do this in a less hard-coded way
+    self.PLATFORM_VULKAN_DEPS = []
+    self.PLATFORM_VULKAN_TEST_DEPS = ["//iree/testing:gtest_main"]
+    self.FLATBUFFER_SUPPORTS_REFLECTIONS = False
+    self.PLATFORM_VULKAN_LOADER_COPTS = []
 
   # ------------------------------------------------------------------------- #
   # Conversion utilities, written to reduce boilerplate and allow for reuse   #
@@ -296,6 +301,9 @@ class BuildFileFunctions(object):
     # Cross-package dependencies and complicated globs could be hard to handle.
     self._convert_unimplemented_function("filegroup", name)
 
+  def sh_binary(self, name, **kwargs):
+    self._convert_unimplemented_function("sh_binary", name)
+
   def exports_files(self, *args, **kwargs):
     # No mapping to CMake, ignore.
     pass
@@ -328,6 +336,14 @@ class BuildFileFunctions(object):
                                   "pattern": pattern
                               }
     return glob_vars
+
+  # TODO(gcmn) implement these types of functions in a less hard-coded way
+  def platform_trampoline_deps(self, basename, path="base"):
+    return ["//iree/%s/internal:%s_internal" % (path, basename)]
+
+  def select(self, d):
+    self._convert_unimplemented_function("select", str(d))
+    return d["//conditions:default"]
 
   def config_setting(self, **kwargs):
     # No mapping to CMake, ignore.
