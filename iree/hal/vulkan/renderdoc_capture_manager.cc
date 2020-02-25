@@ -54,7 +54,6 @@ Status RenderDocCaptureManager::Connect() {
     return NotFoundErrorBuilder(IREE_LOC)
            << "Could not load librenderdoc.so. Is it on LD_LIBRARY_PATH?";
   }
-#endif
 
   // Fetch the API object from the loaded library.
   pRENDERDOC_GetAPI RENDERDOC_GetAPI =
@@ -70,6 +69,7 @@ Status RenderDocCaptureManager::Connect() {
   LOG(INFO) << "Connected to RenderDoc's API";
 
   return OkStatus();
+#endif
 }
 
 void RenderDocCaptureManager::Disconnect() {
