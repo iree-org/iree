@@ -19,7 +19,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/StandardTypes.h"
 
@@ -49,7 +49,7 @@ Type legalizeLegacyType(Type type) {
 }
 
 MemRefType convertLegacyTypeToMemRef(Type type) {
-  if (type.isIntOrIndexOrFloat()) {
+  if (type.isSignlessIntOrIndexOrFloat()) {
     return MemRefType::get({}, type, {}, 0);
   } else if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
     return MemRefType::get(tensorType.getShape(), tensorType.getElementType());

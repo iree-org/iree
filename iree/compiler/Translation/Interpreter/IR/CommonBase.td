@@ -42,23 +42,23 @@ class IREE_ScalarMemRefOf<list<Type> allowedTypes> :
 
 def IREEHL_Bool :
     AnyTypeOf<[I1, I8], "boolean-storing type (1 or 8 -bit integer)">;
-def IREEHL_Element : AnyTypeOf<[AnyInteger, AnyFloat]>;
+def IREEHL_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
 
 def IREEHL_MemRef : MemRefOf<[IREEHL_Element]>;
 def IREEHL_BoolMemRef : MemRefOf<[IREEHL_Bool]>;
-def IREEHL_IntMemRef : MemRefOf<[AnyInteger]>;
+def IREEHL_IntMemRef : MemRefOf<[AnySignlessInteger]>;
 def IREEHL_FloatMemRef : MemRefOf<[AnyFloat]>;
-def IREEHL_IndexMemRef : MemRefOf<[AnyInteger]>;
+def IREEHL_IndexMemRef : MemRefOf<[AnySignlessInteger]>;
 
 def IREEHL_AnyScalar : IREE_ScalarMemRefOf<[IREEHL_Element]>;
 def IREEHL_BoolScalar : IREE_ScalarMemRefOf<[IREEHL_Bool]>;
-def IREEHL_IntScalar : IREE_ScalarMemRefOf<[AnyInteger]>;
+def IREEHL_IntScalar : IREE_ScalarMemRefOf<[AnySignlessInteger]>;
 def IREEHL_FloatScalar : IREE_ScalarMemRefOf<[AnyFloat]>;
-def IREEHL_IndexScalar : IREE_ScalarMemRefOf<[AnyInteger]>;
+def IREEHL_IndexScalar : IREE_ScalarMemRefOf<[AnySignlessInteger]>;
 def IREEHL_I32Scalar : IREE_ScalarMemRefOf<[I32]>;
 
-def IREEHL_1DIntMemRef : MemRefRankOf<[AnyInteger], [1]>;
-def IREEHL_1DIndexMemRef : MemRefRankOf<[AnyInteger], [1]>;
+def IREEHL_1DIntMemRef : MemRefRankOf<[AnySignlessInteger], [1]>;
+def IREEHL_1DIndexMemRef : MemRefRankOf<[AnySignlessInteger], [1]>;
 
 //===----------------------------------------------------------------------===//
 // Low-level types

@@ -34,7 +34,7 @@
 #include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/EDSC/Intrinsics.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"

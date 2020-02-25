@@ -17,7 +17,7 @@
 #include "iree/compiler/Translation/Interpreter/IR/HLDialect.h"
 #include "iree/compiler/Translation/Interpreter/IR/LLDialect.h"
 #include "iree/compiler/Translation/Interpreter/Transforms/Rewrites.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"

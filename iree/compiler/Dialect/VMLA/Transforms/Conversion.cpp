@@ -19,7 +19,7 @@
 #include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Module.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"

@@ -16,7 +16,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/CommonOps.h"
 #include "iree/compiler/Translation/Interpreter/Utils/MemRefUtils.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir {
@@ -39,7 +39,7 @@ struct ConstantOpLowering : public OpRewritePattern<ConstantOp> {
     }
 
     auto type = op.getValue().getType();
-    if (!type.isIntOrFloat()) {
+    if (!type.isSignlessIntOrFloat()) {
       return matchFailure();
     }
     auto elementsValue =

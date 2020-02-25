@@ -25,7 +25,7 @@
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/TensorIndexToScalarValueMap.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Support/StringExtras.h"
 
 namespace mlir {
@@ -186,7 +186,7 @@ class SPIRVPwOpLowering final : public SPIRVOpLowering<OpTy> {
     }
     auto elementType = resultType.getElementType();
     Operation *scalarOp = nullptr;
-    if (elementType.template isa<IntegerType>()) {
+    if (elementType.isSignlessInteger()) {
       scalarOp = builder
                      .create<ReplacementOpTy>(op->getLoc(), elementType,
                                               scalarOperands,

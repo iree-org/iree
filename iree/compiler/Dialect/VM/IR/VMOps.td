@@ -1145,27 +1145,25 @@ def VM_BranchOp : VM_Op<"br", [
    ```
   }];
 
-  let arguments = (ins
-    Variadic<VM_AnyType>:$operands
+  let successors = (successor
+    AnySuccessor:$dest
   );
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Branch>,
-    VM_EncBranch<"dest", "operands", 0>,
+    VM_EncBranch<"dest", "getOperands", 0>,
   ];
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Block *dest,
-      ValueRange operands = {}
+      Builder *, OperationState &result, Block *dest
     }], [{
-      result.addSuccessor(dest, operands);
+      result.addSuccessor(dest, llvm::None);
     }]>,
    ];
 
   let extraClassDeclaration = [{
     Block *getDest();
-    Block *dest() { return getDest(); }
     void setDest(Block *block);
 
     /// Erase the operand at 'index' from the operand list.
@@ -1195,8 +1193,12 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   }];
 
   let arguments = (ins
-    VM_CondValue:$condition,
-    Variadic<VM_AnyType>:$branchOperands
+    VM_CondValue:$condition
+  );
+
+  let successors = (successor
+    AnySuccessor:$trueDest,
+    AnySuccessor:$falseDest
   );
 
   let encoding = [
@@ -1204,18 +1206,6 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     VM_EncOperand<"condition", 0>,
     VM_EncBranch<"getTrueDest", "getTrueOperands", 0>,
     VM_EncBranch<"getFalseDest", "getFalseOperands", 1>,
-  ];
-
-  let builders = [
-    OpBuilder<[{
-      Builder *, OperationState &result, Value condition,
-      Block *trueDest, ValueRange trueOperands,
-      Block *falseDest, ValueRange falseOperands
-    }], [{
-      result.addOperands(condition);
-      result.addSuccessor(trueDest, trueOperands);
-      result.addSuccessor(falseDest, falseOperands);
-    }]>,
   ];
 
   let extraClassDeclaration = [{
@@ -1572,27 +1562,25 @@ def VM_BreakOp : VM_Op<"break", [
     target block.
   }];
 
-  let arguments = (ins
-    Variadic<VM_AnyType>:$operands
+  let successors = (successor
+    AnySuccessor:$dest
   );
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Break>,
-    VM_EncBranch<"dest", "operands", 0>,
+    VM_EncBranch<"dest", "getOperands", 0>,
   ];
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Block *dest,
-      ValueRange operands = {}
+      Builder *, OperationState &result, Block *dest
     }], [{
-      result.addSuccessor(dest, operands);
+      result.addSuccessor(dest, llvm::None);
     }]>,
   ];
 
   let extraClassDeclaration = [{
     Block *getDest();
-    Block *dest() { return getDest(); }
     void setDest(Block *block);
 
     /// Erase the operand at 'index' from the operand list.
@@ -1617,28 +1605,29 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
   }];
 
   let arguments = (ins
-    VM_CondValue:$condition,
-    Variadic<VM_AnyType>:$operands
+    VM_CondValue:$condition
+  );
+
+  let successors = (successor
+    AnySuccessor:$dest
   );
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBreak>,
-    VM_EncBranch<"dest", "operands", 0>,
+    VM_EncBranch<"dest", "getOperands", 0>,
   ];
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Value condition, Block *dest,
-      ValueRange operands = {}
+      Builder *, OperationState &result, Value condition, Block *dest
     }], [{
       result.addOperands({condition});
-      result.addSuccessor(dest, operands);
+      result.addSuccessor(dest, llvm::None);
     }]>,
   ];
 
   let extraClassDeclaration = [{
     Block *getDest();
-    Block *dest() { return getDest(); }
     void setDest(Block *block);
 
     /// Erase the operand at 'index' from the operand list.

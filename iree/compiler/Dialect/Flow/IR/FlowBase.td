@@ -119,7 +119,7 @@ def FLOW_StreamableOp : OpInterface<"StreamableOpInterface"> {
 // TODO(benvanik): move to base?
 class Optional<Type type> : Variadic<type>;
 
-def FLOW_PrimitiveType : AnyTypeOf<[Index, AnyInteger, AnyFloat]>;
+def FLOW_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
 // TODO(benvanik): use index here instead? need to wait for si dialect.
 def FLOW_Dim : I<32>;
@@ -144,7 +144,7 @@ def FLOW_Workload : VectorOfLengthAndType<[3], [I32]> {
 class FLOW_RankedIntVectorAttr<int width, list<int> dims> : ElementsAttrBase<
   CPred<"$_self.isa<DenseIntElementsAttr>() &&"
       "$_self.cast<DenseIntElementsAttr>().getType()."
-      "getElementType().isInteger(" # width # ") && "
+      "getElementType().isSignlessInteger(" # width # ") && "
       // Check that this is ranked and has the specified shape.
       "$_self.cast<DenseIntElementsAttr>().getType().hasRank() && "
       "$_self.cast<DenseIntElementsAttr>().getType().getShape() == "

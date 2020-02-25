@@ -15,7 +15,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/Interpreter/IR/HLOps.h"
 #include "iree/compiler/Translation/Interpreter/Utils/OpCreationUtils.h"
-#include "mlir/Dialect/StandardOps/Ops.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
@@ -41,7 +41,7 @@ LogicalResult replaceLoadInputOp(IREE::LoadInputOp bindOp) {
     auto castOp = builder.create<IREEInterp::MemRefToTensorOp>(bindOp.getLoc(),
                                                                bindOp.src());
     newValue = castOp.getResult();
-  } else if (dstType.isIntOrIndexOrFloat()) {
+  } else if (dstType.isSignlessIntOrIndexOrFloat()) {
     auto loadOp = builder.create<LoadOp>(bindOp.getLoc(), dstType, bindOp.src(),
                                          ArrayRef<Value>{});
     newValue = loadOp.getResult();
@@ -80,7 +80,7 @@ LogicalResult replaceStoreOutputOp(IREE::StoreOutputOp bindOp) {
         createArrayConstant(builder, bindOp.getLoc(), dst.getShape());
     builder.create<IREEInterp::HL::CopyOp>(bindOp.getLoc(), castOp.getResult(),
                                            zeros, bindOp.dst(), zeros, lengths);
-  } else if (srcType.isIntOrIndexOrFloat()) {
+  } else if (srcType.isSignlessIntOrIndexOrFloat()) {
     builder.create<StoreOp>(bindOp.getLoc(), bindOp.src(), bindOp.dst(),
                             ArrayRef<Value>{});
   } else {
