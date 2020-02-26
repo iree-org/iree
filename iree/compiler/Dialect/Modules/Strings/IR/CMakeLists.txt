@@ -15,7 +15,6 @@
 add_subdirectory(test)
 
 file(GLOB _GLOB_X_TD CONFIGURE_DEPENDS *.td)
-# Unimplemented filegroup: td_files
 iree_cc_library(
   NAME
     IR

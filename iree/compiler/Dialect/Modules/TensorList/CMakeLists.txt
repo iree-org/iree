@@ -15,6 +15,7 @@
 add_subdirectory(Conversion)
 add_subdirectory(IR)
 
+file(GLOB _GLOB_X_TD CONFIGURE_DEPENDS *.td)
 iree_cc_embed_data(
   NAME
     tensorlist_imports

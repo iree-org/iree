@@ -299,6 +299,13 @@ class BuildFileFunctions(object):
     # Not implemented yet. Might be a no-op, or may want to evaluate the srcs
     # attribute and pass them along to any targets that depend on the filegroup.
     # Cross-package dependencies and complicated globs could be hard to handle.
+
+    # We have a bunch of filegroups that just contain TD files. CMake doesn't model
+    # this at all, so we'll just hardcode this special case.
+    # TODO(gcmn): Handle this robustly
+    if (name == "td_files"):
+      return
+
     self._convert_unimplemented_function("filegroup", name)
 
   def sh_binary(self, name, **kwargs):
