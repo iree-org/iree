@@ -45,6 +45,7 @@
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_
 
+#include "mlir/Dialect/AffineOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
 #include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/VectorOps/EDSC/Intrinsics.h"
