@@ -33,49 +33,128 @@ namespace iree {
 namespace vm {
 namespace packing {
 
+namespace impl {
+
+// Workaround required to ensure proper evaluation order of parameter packs.
+// MSVC (and other compilers, like clang-cl in MSVC compat mode) may evaluate
+// parameter pack function arguments in any order. This shim allows us to expand
+// the parameter pack inside of an initializer list, which unlike function
+// arguments must be evaluated by the compiler in the order the elements appear
+// in the list.
+//
+// Example:
+//  impl::order_sequence{(ExpandedAction(), 0)...};
+//
+// More information:
+// https://stackoverflow.com/questions/29194858/order-of-function-calls-in-variadic-template-expansion
+struct order_sequence {
+  template <typename... T>
+  order_sequence(T&&...) {}
+};
+
+// Coming in C++20, but not widely available yet.
+template <class T>
+struct remove_cvref {
+  typedef std::remove_cv_t<std::remove_reference_t<T>> type;
+};
+
+// Counts the total number of leaf elements in a type tree.
+// For example:
+//   LeafCount<int>::value == 1
+//   LeafCount<std::tuple<int, int>> == 2
+//   LeafCount<std::tuple<int, std::tuple<int, int>>>::value == 3
+template <typename T>
+struct LeafCount {
+  constexpr static int value = 1;
+};
+template <typename... Ts>
+struct LeafCount<std::tuple<Ts...>> {
+  template <int I, typename... Tail>
+  struct Adder;
+  template <int I, typename T, typename... Tail>
+  struct Adder<I, T, Tail...> {
+    constexpr static int value =
+        LeafCount<T>::value + Adder<sizeof...(Tail), Tail...>::value;
+  };
+  template <typename T, typename... Tail>
+  struct Adder<1, T, Tail...> {
+    constexpr static int value = LeafCount<T>::value;
+  };
+  constexpr static int value = Adder<sizeof...(Ts), Ts...>::value;
+};
+
+}  // namespace impl
+
 //===----------------------------------------------------------------------===//
 // Parameter unpacking
 //===----------------------------------------------------------------------===//
 
+template <typename T>
+struct ParamUnpack;
+
 struct ParamUnpackState {
+  iree_vm_stack_frame_t* frame;
   int i32_ordinal = 0;
   int ref_ordinal = 0;
   int varargs_ordinal = 0;
   Status status;
+
+  template <typename... Ts>
+  static StatusOr<std::tuple<typename ParamUnpack<
+      typename std::remove_reference<Ts>::type>::storage_type...>>
+  LoadSequence(iree_vm_stack_frame_t* frame) {
+    auto params = std::make_tuple(
+        typename ParamUnpack<
+            typename impl::remove_cvref<Ts>::type>::storage_type()...);
+
+    ParamUnpackState param_state{frame};
+    ApplyLoad<Ts...>(&param_state, params,
+                     std::make_index_sequence<sizeof...(Ts)>());
+    RETURN_IF_ERROR(param_state.status);
+    return std::move(params);
+  }
+
+  template <typename... Ts, typename T, size_t... I>
+  static void ApplyLoad(ParamUnpackState* param_state, T&& params,
+                        std::index_sequence<I...>) {
+    impl::order_sequence{
+        (ParamUnpack<typename std::tuple_element<I, std::tuple<Ts...>>::type>::
+             Load(param_state, std::get<I>(params)),
+         0)...};
+  }
 };
 
 template <typename T>
 struct ParamUnpack {
-  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+  using storage_type = T;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
     ++param_state->varargs_ordinal;
-    reg = static_cast<T>(frame->registers.i32[param_state->i32_ordinal++]);
+    out_param = static_cast<T>(
+        param_state->frame->registers.i32[param_state->i32_ordinal++]);
   }
-  operator T() const { return reg; }
-  T reg;
 };
 
 template <>
 struct ParamUnpack<opaque_ref> {
-  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+  using storage_type = opaque_ref;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
     ++param_state->varargs_ordinal;
-    iree_vm_ref_move(&frame->registers.ref[param_state->ref_ordinal++],
-                     &reg.value);
+    iree_vm_ref_move(
+        &param_state->frame->registers.ref[param_state->ref_ordinal++],
+        &out_param.value);
   }
-  // clang-format off
-  operator opaque_ref&() { return reg; }
-  operator const opaque_ref&() const { return reg; }
-  // clang-format on
-  opaque_ref reg;
 };
 
 template <typename T>
 struct ParamUnpack<ref<T>> {
-  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+  using storage_type = ref<T>;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
     ++param_state->varargs_ordinal;
-    auto& ref_storage = frame->registers.ref[param_state->ref_ordinal++];
+    auto& ref_storage =
+        param_state->frame->registers.ref[param_state->ref_ordinal++];
     if (ref_storage.type == ref_type_descriptor<T>::get()->type) {
       // Move semantics.
-      reg = ref<T>{reinterpret_cast<T*>(ref_storage.ptr)};
+      out_param = ref<T>{reinterpret_cast<T*>(ref_storage.ptr)};
       std::memset(&ref_storage, 0, sizeof(ref_storage));
     } else if (ref_storage.type != IREE_VM_REF_TYPE_NULL) {
       param_state->status =
@@ -83,15 +162,10 @@ struct ParamUnpack<ref<T>> {
           << "Parameter contains a reference to the wrong type; have "
           << iree_vm_ref_type_name(ref_storage.type).data << " but expected "
           << ref_type_descriptor<T>::get()->type_name.data << " ("
-          << typeid(reg).name() << ")";
+          << typeid(storage_type).name() << ")";
     }
     // NOTE: null is allowed here!
   }
-  // clang-format off
-  operator ref<T> &() { return reg; }
-  operator const ref<T> &() const { return reg; }
-  // clang-format on
-  ref<T> reg;
 };
 
 template <typename U, size_t S>
@@ -103,56 +177,48 @@ struct ParamUnpack<absl::Span<U>>;
 
 template <typename U, size_t S>
 struct ParamUnpack<std::array<U, S>> {
-  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+  using element_type = typename impl::remove_cvref<U>::type;
+  using storage_type = std::array<element_type, S>;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
     ++param_state->varargs_ordinal;
-    regs = UnpackArray<U>(param_state, frame, std::make_index_sequence<S>());
+    for (int i = 0; i < S; ++i) {
+      ParamUnpack::Load(param_state, out_param[i]);
+    }
   }
-  template <typename T, size_t... I>
-  inline std::array<T, sizeof...(I)> UnpackArray(ParamUnpackState* param_state,
-                                                 iree_vm_stack_frame_t* frame,
-                                                 std::index_sequence<I...>) {
-    return {((void)I, ParamUnpack<T>(param_state, frame))...};
-  }
-  // clang-format off
-  operator std::array<U, S>&() { return regs; }
-  operator std::array<U, S>&() const { return regs; }
-  // clang-format on
-  std::array<U, S> regs;
 };
 
 template <typename... Ts>
 struct ParamUnpack<std::tuple<Ts...>> {
-  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
+  using storage_type = std::tuple<typename impl::remove_cvref<Ts>::type...>;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
     ++param_state->varargs_ordinal;
-    regs = std::make_tuple<typename std::decay<Ts>::type...>(
-        std::move(static_cast<typename std::decay<Ts>::type>(
-            ParamUnpack<Ts>(param_state, frame)))...);
+    UnpackTuple(param_state, out_param,
+                std::make_index_sequence<sizeof...(Ts)>());
   }
-  // clang-format off
-  operator std::tuple<typename std::decay<Ts>::type...>&() { return regs; }
-  operator const std::tuple<typename std::decay<Ts>::type...>&() const {
-    return regs;
+  template <size_t... I>
+  static void UnpackTuple(ParamUnpackState* param_state, storage_type& params,
+                          std::index_sequence<I...>) {
+    impl::order_sequence{
+        (ParamUnpack<typename std::tuple_element<I, std::tuple<Ts...>>::type>::
+             Load(param_state, std::get<I>(params)),
+         0)...};
   }
-  // clang-format on
-  std::tuple<typename std::decay<Ts>::type...> regs;
 };
 
 template <typename U>
 struct ParamUnpack<absl::Span<U>> {
-  ParamUnpack(ParamUnpackState* param_state, iree_vm_stack_frame_t* frame) {
-    uint8_t count =
-        frame->return_registers->registers[param_state->varargs_ordinal++];
+  using element_type = typename impl::remove_cvref<U>::type;
+  using storage_type = std::vector<element_type>;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
+    const uint8_t count = param_state->frame->return_registers
+                              ->registers[param_state->varargs_ordinal++];
     int32_t original_varargs_ordinal = param_state->varargs_ordinal;
-    regs.reserve(count);
+    out_param.resize(count);
     for (int i = 0; i < count; ++i) {
-      regs.emplace_back(std::move(
-          ParamUnpack<typename std::decay<U>::type>(param_state, frame)));
+      ParamUnpack<element_type>::Load(param_state, out_param[i]);
     }
     param_state->varargs_ordinal = original_varargs_ordinal;
   }
-  operator absl::Span<U>() { return absl::MakeSpan(regs); }
-  operator absl::Span<const U>() const { return absl::MakeConstSpan(regs); }
-  std::vector<typename std::decay<U>::type> regs;
 };
 
 //===----------------------------------------------------------------------===//
@@ -160,40 +226,23 @@ struct ParamUnpack<absl::Span<U>> {
 //===----------------------------------------------------------------------===//
 
 struct ResultPackState {
+  iree_vm_stack_frame_t* frame;
   int i32_ordinal = 0;
   int ref_ordinal = 0;
   Status status;
 };
 
 template <typename T>
-struct ResultCount {
-  constexpr static int value = 1;
-};
-template <typename... Ts>
-struct ResultCount<std::tuple<Ts...>> {
-  template <int I, typename... Tail>
-  struct Adder;
-  template <int I, typename T, typename... Tail>
-  struct Adder<I, T, Tail...> {
-    constexpr static int value =
-        ResultCount<T>::value + Adder<sizeof...(Tail), Tail...>::value;
-  };
-  template <typename T, typename... Tail>
-  struct Adder<1, T, Tail...> {
-    constexpr static int value = ResultCount<T>::value;
-  };
-  constexpr static int value = Adder<sizeof...(Ts), Ts...>::value;
-};
-
-template <typename T>
 struct ResultRegister {
   constexpr static auto value = std::make_tuple<uint8_t>(0);
 };
+
 template <typename T>
 struct ResultRegister<ref<T>> {
   constexpr static auto value = std::make_tuple<uint8_t>(
       IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT);
 };
+
 template <typename... Ts>
 struct ResultRegister<std::tuple<Ts...>> {
   constexpr static auto value = std::tuple_cat(ResultRegister<Ts>::value...);
@@ -201,19 +250,17 @@ struct ResultRegister<std::tuple<Ts...>> {
 
 template <typename T>
 struct ResultPack {
-  ResultPack(ResultPackState* result_state, iree_vm_stack_frame_t* frame,
-             T value) {
-    frame->registers.i32[result_state->i32_ordinal++] =
+  static void Store(ResultPackState* result_state, T value) {
+    result_state->frame->registers.i32[result_state->i32_ordinal++] =
         static_cast<int32_t>(value);
   }
 };
+
 template <typename T>
 struct ResultPack<ref<T>> {
-  ResultPack(ResultPackState* result_state, iree_vm_stack_frame_t* frame,
-             ref<T> value) {
-    // TODO(benvanik): only clear the output if we didn't already do it for
-    // a parameter read.
-    auto* reg_ptr = &frame->registers.ref[result_state->ref_ordinal++];
+  static void Store(ResultPackState* result_state, ref<T> value) {
+    auto* reg_ptr =
+        &result_state->frame->registers.ref[result_state->ref_ordinal++];
     std::memset(reg_ptr, 0, sizeof(*reg_ptr));
     iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
   }
@@ -221,20 +268,17 @@ struct ResultPack<ref<T>> {
 
 template <typename... Ts>
 struct ResultPack<std::tuple<Ts...>> {
-  ResultPack(ResultPackState* result_state, iree_vm_stack_frame_t* frame,
-             std::tuple<Ts...> results) {
-    PackTuple(result_state, frame, results,
-              std::make_index_sequence<sizeof...(Ts)>());
+  static void Store(ResultPackState* result_state, std::tuple<Ts...> results) {
+    PackTuple(result_state, results, std::make_index_sequence<sizeof...(Ts)>());
   }
-
   template <typename... T, size_t... I>
-  inline std::tuple<ResultPack<T>...> PackTuple(ResultPackState* result_state,
-                                                iree_vm_stack_frame_t* frame,
-                                                std::tuple<T...>& value,
-                                                std::index_sequence<I...>) {
-    return std::make_tuple<ResultPack<T>...>(
-        ResultPack<typename std::tuple_element<I, std::tuple<T...>>::type>(
-            result_state, frame, std::move(std::get<I>(value)))...);
+  static inline void PackTuple(ResultPackState* result_state,
+                               std::tuple<T...>& value,
+                               std::index_sequence<I...>) {
+    impl::order_sequence{
+        (ResultPack<typename std::tuple_element<I, std::tuple<T...>>::type>::
+             Store(result_state, std::move(std::get<I>(value))),
+         0)...};
   }
 };
 
@@ -242,28 +286,26 @@ struct ResultPack<std::tuple<Ts...>> {
 // Function wrapping
 //===----------------------------------------------------------------------===//
 
-template <typename T, uint8_t... I>
-constexpr auto ConstTupleOr(std::integer_sequence<uint8_t, I...>) {
-  return std::make_tuple(
-      (static_cast<uint8_t>(std::get<I>(ResultRegister<T>::value) | I))...);
-}
-
-template <typename T, size_t... I>
-constexpr auto TupleToArray(const T& t, std::index_sequence<I...>) {
-  return std::array<uint8_t, std::tuple_size<T>::value>{std::get<I>(t)...};
-}
-
 template <typename Owner, typename Results, typename... Params>
 struct DispatchFunctor {
   using FnPtr = StatusOr<Results> (Owner::*)(Params...);
 
+  template <typename T, uint8_t... I>
+  static constexpr auto ConstTupleOr(std::integer_sequence<uint8_t, I...>) {
+    return std::make_tuple(
+        (static_cast<uint8_t>(std::get<I>(ResultRegister<T>::value) | I))...);
+  }
+
+  template <typename T, size_t... I>
+  static constexpr auto TupleToArray(const T& t, std::index_sequence<I...>) {
+    return std::array<uint8_t, std::tuple_size<T>::value>{std::get<I>(t)...};
+  }
+
   static Status Call(void (Owner::*ptr)(), Owner* self, iree_vm_stack_t* stack,
                      iree_vm_stack_frame_t* frame,
                      iree_vm_execution_result_t* out_result) {
-    ParamUnpackState param_state;
-    auto params = std::make_tuple(
-        ParamUnpack<typename std::decay<Params>::type>(&param_state, frame)...);
-    RETURN_IF_ERROR(param_state.status);
+    ASSIGN_OR_RETURN(auto params,
+                     ParamUnpackState::LoadSequence<Params...>(frame));
 
     frame->return_registers = nullptr;
     frame->registers.ref_register_count = 0;
@@ -275,28 +317,25 @@ struct DispatchFunctor {
       return std::move(results_or).status();
     }
 
-    static const int kResultCount = ResultCount<Results>::value;
+    static const int kLeafCount = impl::LeafCount<Results>::value;
     static const auto kResultList = TupleToArray(
-        std::tuple_cat(
-            std::make_tuple<uint8_t>(kResultCount),
-            ConstTupleOr<Results>(
-                std::make_integer_sequence<uint8_t, kResultCount>())),
-        std::make_index_sequence<1 + kResultCount>());
+        std::tuple_cat(std::make_tuple<uint8_t>(kLeafCount),
+                       ConstTupleOr<Results>(
+                           std::make_integer_sequence<uint8_t, kLeafCount>())),
+        std::make_index_sequence<1 + kLeafCount>());
     frame->return_registers =
         reinterpret_cast<const iree_vm_register_list_t*>(kResultList.data());
 
-    ResultPackState result_state;
+    ResultPackState result_state{frame};
     auto results = std::move(results_or).ValueOrDie();
-    ResultPack<Results>(&result_state, frame, std::move(results));
+    ResultPack<Results>::Store(&result_state, std::move(results));
     return result_state.status;
   }
 
-  template <size_t... I>
-  static StatusOr<Results> ApplyFn(
-      FnPtr ptr, Owner* self,
-      std::tuple<ParamUnpack<typename std::decay<Params>::type>...>&& params,
-      std::index_sequence<I...>) {
-    return (self->*ptr)(std::get<I>(params)...);
+  template <typename T, size_t... I>
+  static StatusOr<Results> ApplyFn(FnPtr ptr, Owner* self, T&& params,
+                                   std::index_sequence<I...>) {
+    return (self->*ptr)(std::move(std::get<I>(params))...);
   }
 };
 
@@ -307,10 +346,8 @@ struct DispatchFunctorVoid {
   static Status Call(void (Owner::*ptr)(), Owner* self, iree_vm_stack_t* stack,
                      iree_vm_stack_frame_t* frame,
                      iree_vm_execution_result_t* out_result) {
-    ParamUnpackState param_state;
-    auto params = std::make_tuple(
-        ParamUnpack<typename std::decay<Params>::type>(&param_state, frame)...);
-    RETURN_IF_ERROR(param_state.status);
+    ASSIGN_OR_RETURN(auto params,
+                     ParamUnpackState::LoadSequence<Params...>(frame));
 
     frame->return_registers = nullptr;
     frame->registers.ref_register_count = 0;
@@ -319,12 +356,10 @@ struct DispatchFunctorVoid {
                    std::make_index_sequence<sizeof...(Params)>());
   }
 
-  template <size_t... I>
-  static Status ApplyFn(
-      FnPtr ptr, Owner* self,
-      std::tuple<ParamUnpack<typename std::decay<Params>::type>...>&& params,
-      std::index_sequence<I...>) {
-    return (self->*ptr)(std::get<I>(params)...);
+  template <typename T, size_t... I>
+  static Status ApplyFn(FnPtr ptr, Owner* self, T&& params,
+                        std::index_sequence<I...>) {
+    return (self->*ptr)(std::move(std::get<I>(params))...);
   }
 };
 

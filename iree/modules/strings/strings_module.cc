@@ -67,7 +67,7 @@ class StringsModuleState final {
   Status Initialize() { return OkStatus(); }
 
   // strings.print(%str)
-  Status Print(vm::ref<vmstring_t>& str) {
+  Status Print(vm::ref<vmstring_t> str) {
     fwrite(str->value.data, 1, str->value.size, stdout);
     fputc('\n', stdout);
     fflush(stdout);

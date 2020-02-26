@@ -141,7 +141,7 @@ class CustomModuleState final {
 
   // custom.buffer_to_message(%buffer_view) -> %result
   StatusOr<vm::ref<iree_custom_message_t>> BufferToMessage(
-      vm::ref<iree_hal_buffer_view_t>& buffer_view) {
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
     IREE_RETURN_IF_NULL(buffer_view);
     iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view.get());
 
@@ -197,7 +197,7 @@ class CustomModuleState final {
 
   // custom.message_to_buffer(%message) -> %buffer_view
   StatusOr<vm::ref<iree_hal_buffer_view_t>> MessageToBuffer(
-      vm::ref<iree_custom_message_t>& message) {
+      vm::ref<iree_custom_message_t> message) {
     IREE_RETURN_IF_NULL(message);
 
     // NOTE: these old-style parsing routines need to be updated for the new
@@ -255,7 +255,7 @@ class CustomModuleState final {
   }
 
   // custom.print(%message, %count)
-  Status Print(vm::ref<iree_custom_message_t>& message, int32_t count) {
+  Status Print(vm::ref<iree_custom_message_t> message, int32_t count) {
     for (int i = 0; i < count; ++i) {
       fwrite(message->value.data, 1, message->value.size, stdout);
       fputc('\n', stdout);
@@ -266,7 +266,7 @@ class CustomModuleState final {
 
   // custom.reverse(%message) -> %result
   StatusOr<vm::ref<iree_custom_message_t>> Reverse(
-      vm::ref<iree_custom_message_t>& message) {
+      vm::ref<iree_custom_message_t> message) {
     vm::ref<iree_custom_message_t> reversed_message;
     RETURN_IF_ERROR(FromApiStatus(
         iree_custom_message_create(message->value, message->allocator,

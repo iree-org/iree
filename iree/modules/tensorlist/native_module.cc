@@ -128,8 +128,8 @@ class TensorListModuleState final {
 
   // tensorlist.reserve(%element_shape, %num_elements) -> %list
   StatusOr<vm::ref<TensorList>> Reserve(
-      vm::ref<iree_hal_buffer_view_t>& element_shape,
-      vm::ref<iree_hal_buffer_view_t>& num_elements_buf) {
+      vm::ref<iree_hal_buffer_view_t> element_shape,
+      vm::ref<iree_hal_buffer_view_t> num_elements_buf) {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape;
     TensorList* tensorlist = new TensorList;
@@ -141,9 +141,8 @@ class TensorListModuleState final {
 
   // tensorlist.get_item(%list, %index, %element_shape) -> %item
   StatusOr<vm::ref<iree_hal_buffer_view_t>> GetItem(
-      vm::ref<TensorList>& tensorlist,
-      vm::ref<iree_hal_buffer_view_t>& index_buf,
-      vm::ref<iree_hal_buffer_view_t>& element_shape) {
+      vm::ref<TensorList> tensorlist, vm::ref<iree_hal_buffer_view_t> index_buf,
+      vm::ref<iree_hal_buffer_view_t> element_shape) {
     // TODO(silvasean): Emulate element shape and dtype tracking in TensorList.
     (void)element_shape;
     ASSIGN_OR_RETURN(int32_t index,
@@ -153,8 +152,8 @@ class TensorListModuleState final {
 
   // tensorlist.set_item(%list, %index, %item) -> %new_list
   StatusOr<vm::ref<TensorList>> SetItem(
-      vm::ref<TensorList>& list, vm::ref<iree_hal_buffer_view_t>& index_buf,
-      vm::ref<iree_hal_buffer_view_t>& item) {
+      vm::ref<TensorList> list, vm::ref<iree_hal_buffer_view_t> index_buf,
+      vm::ref<iree_hal_buffer_view_t> item) {
     TensorList* new_list = new TensorList;
     ASSIGN_OR_RETURN(int32_t index,
                      ReadInt32FromScalarBufferView(index_buf.get()));
