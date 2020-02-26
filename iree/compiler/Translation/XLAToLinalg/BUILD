@@ -41,3 +41,24 @@ cc_library(
     ],
     alwayslink = 1,
 )
+
+cc_library(
+    name = "ReductionLowering",
+    srcs = [
+        "ReductionLowering.cpp",
+    ],
+    hdrs = [
+        "ReductionLowering.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/IREE/IR",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Transforms",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:map_xla_to_scalar_op",
+    ],
+    alwayslink = 1,
+)

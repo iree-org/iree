@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +31,25 @@ iree_cc_library(
     MLIRPass
     MLIRStandardOps
     MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::IREE::IR
+    tensorflow::mlir_xla
+  ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    ReductionLowering
+  HDRS
+    "ReductionLowering.h"
+  SRCS
+    "ReductionLowering.cpp"
+  DEPS
+    MLIRIR
+    MLIRLinalgOps
+    MLIRPass
+    MLIRStandardOps
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_xla

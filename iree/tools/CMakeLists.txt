@@ -160,6 +160,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::LinalgToSPIRV
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::XLAToLinalg
+      iree::compiler::Translation::XLAToLinalg::ReductionLowering
       LLVMSupport
       MLIRAffineOps
       MLIRLinalgOps
