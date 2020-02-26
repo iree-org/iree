@@ -36,17 +36,8 @@ namespace iree_compiler {
 namespace {
 
 /// Pass to lower the reduction dispatch functions to Linalg.
-struct HLOReductionToLinalgPass
-    : public OperationPass<HLOReductionToLinalgPass> {
-  void runOnOperation() override;
-};
-
-/// The entry function of the reduction dispatches is empty. This pattern fills
-/// the body with linalg ops for reduction.
-struct AddReductionEntryFnBody : OpRewritePattern<FuncOp> {
-  using OpRewritePattern<FuncOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(FuncOp fn,
-                                     PatternRewriter &rewriter) const override;
+struct HLOReductionToLinalgPass : public ModulePass<HLOReductionToLinalgPass> {
+  void runOnModule() override;
 };
 
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
@@ -90,22 +81,21 @@ struct ReductionApplyFnConversion final : ApplyFunctionConversion<FuncOp> {
 // Reduction entry function body
 //===----------------------------------------------------------------------===//
 
-PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(
-    FuncOp fn, PatternRewriter &rewriter) const {
-  if (!fn.getAttr("iree.executable.reduction") || !fn.empty())
-    return matchFailure();
-  if (fn.getNumArguments() != 3) return matchFailure();
+/// Adds a body with linalg ops for the reduction entry function `fn`. `fn` is
+/// assumed to be empty. The apply function and the dimension to reduce must be
+/// set as attributes on `fn`.
+static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn) {
+  if (fn.getNumArguments() != 3) return failure();
 
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToStart(fn.addEntryBlock());
-  rewriter.startRootUpdate(fn);
+  OpBuilder::InsertionGuard guard(builder);
+  builder.setInsertionPointToStart(fn.addEntryBlock());
   auto src = fn.getArgument(0);
   auto initVal = fn.getArgument(1);
   auto dst = fn.getArgument(2);
 
   auto srcArgType = src.getType().template cast<ShapedType>();
   unsigned nInputRank = srcArgType.getRank();
-  if (!nInputRank) return matchFailure();
+  if (!nInputRank) return failure();
 
   auto loc = fn.getLoc();
   int reductionDim =
@@ -116,31 +106,31 @@ PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(
   // initial value and dst, respectively.
   SmallVector<Attribute, 2> indexingMaps;
   indexingMaps.emplace_back(
-      AffineMapAttr::get(rewriter.getMultiDimIdentityMap(nInputRank)));
+      AffineMapAttr::get(builder.getMultiDimIdentityMap(nInputRank)));
   indexingMaps.emplace_back(AffineMapAttr::get(AffineMap::get(
-      nInputRank, /*symbolCount=*/0, {rewriter.getAffineConstantExpr(0)})));
+      nInputRank, /*symbolCount=*/0, {builder.getAffineConstantExpr(0)})));
   SmallVector<AffineExpr, 4> exprs;
   for (int i = 0; i < nInputRank; i++) {
     if (i == reductionDim) continue;
-    exprs.push_back(rewriter.getAffineDimExpr(i));
+    exprs.push_back(builder.getAffineDimExpr(i));
   }
   indexingMaps.emplace_back(
       AffineMapAttr::get(AffineMap::get(nInputRank, /*symbolCount=*/0, exprs)));
 
   SmallVector<Type, 2> resultTypes = {};
   SmallVector<Value, 2> linalgOpArgs = {src, initVal, dst};
-  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
+  auto linalgOp = builder.create<linalg::IndexedGenericOp>(
       loc, resultTypes, linalgOpArgs,
-      rewriter.getI64IntegerAttr(2),  // args_in
-      rewriter.getI64IntegerAttr(1),  // args_out
-      rewriter.getArrayAttr(indexingMaps),
-      getNLoopsAttrs(rewriter, nInputRank, reductionDim),
+      builder.getI64IntegerAttr(2),  // args_in
+      builder.getI64IntegerAttr(1),  // args_out
+      builder.getArrayAttr(indexingMaps),
+      getNLoopsAttrs(builder, nInputRank, reductionDim),
       /*doc=*/nullptr, /*fun=*/nullptr, /*library_call=*/nullptr);
 
   // Add a block to the region.
   auto *region = &linalgOp.region();
-  auto *block = rewriter.createBlock(region, region->end());
-  Type indexType = rewriter.getIndexType();
+  auto *block = builder.createBlock(region, region->end());
+  Type indexType = builder.getIndexType();
   Type elemType = srcArgType.getElementType();
   for (int i = 0; i < nInputRank; ++i) block->addArguments(indexType);
   for (int i = 0; i < linalgOp.getNumInputsAndOutputs(); ++i)
@@ -149,23 +139,23 @@ PatternMatchResult AddReductionEntryFnBody::matchAndRewrite(
   auto blockSrcArg = block->getArgument(numArgs - 3);
   auto blockInitArg = block->getArgument(numArgs - 2);
   auto blockDstArg = block->getArgument(numArgs - 1);
-  auto zero = rewriter.create<ConstantOp>(
-      loc, indexType, rewriter.getIntegerAttr(indexType, 0));
-  auto cond = rewriter.create<CmpIOp>(loc, CmpIPredicate::eq,
-                                      block->getArgument(reductionDim),
-                                      zero.getResult());
+  auto zero = builder.create<ConstantOp>(loc, indexType,
+                                         builder.getIntegerAttr(indexType, 0));
+  auto cond = builder.create<CmpIOp>(loc, CmpIPredicate::eq,
+                                     block->getArgument(reductionDim),
+                                     zero.getResult());
   auto applyFn =
       fn.getAttrOfType<FlatSymbolRefAttr>("iree.executable.reduction.apply");
-  auto lhs = rewriter.create<SelectOp>(loc, cond, blockInitArg, blockDstArg);
+  auto lhs = builder.create<SelectOp>(loc, cond, blockInitArg, blockDstArg);
   auto rhs = blockSrcArg;
   auto result =
-      rewriter.create<CallOp>(loc, applyFn, elemType, ValueRange{lhs, rhs});
-  rewriter.create<linalg::YieldOp>(loc, result.getResult(0));
+      builder.create<CallOp>(loc, applyFn, elemType, ValueRange{lhs, rhs});
+  builder.create<linalg::YieldOp>(loc, result.getResult(0));
 
-  rewriter.setInsertionPointAfter(linalgOp);
-  rewriter.create<ReturnOp>(loc);
-  rewriter.finalizeRootUpdate(fn);
-  return matchSuccess();
+  builder.setInsertionPointAfter(linalgOp);
+  builder.create<ReturnOp>(loc);
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -218,6 +208,25 @@ struct ReductionOpConversion final : public ApplyFunctionConversion<OpTy> {
 };
 
 //===----------------------------------------------------------------------===//
+// Utils
+//===----------------------------------------------------------------------===//
+
+static LogicalResult getApplyFunctions(ModuleOp module,
+                                       SmallVectorImpl<Operation *> &applyFns) {
+  auto fns = module.getOps<FuncOp>();
+  SymbolTable table(module);
+  for (auto funcOp : fns) {
+    if (!funcOp.getAttr("iree.executable.reduction")) continue;
+    auto applyFnSymRef = funcOp.template getAttrOfType<FlatSymbolRefAttr>(
+        "iree.executable.reduction.apply");
+    auto applyFn = table.lookup<FuncOp>(applyFnSymRef.getValue());
+    if (!applyFn) return module.emitError("can't find the apply function");
+    applyFns.push_back(applyFn.getOperation());
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // Pattern builder
 //===----------------------------------------------------------------------===//
 
@@ -238,10 +247,17 @@ static LogicalResult lowerReductionApplyFnToLinalg(MLIRContext *context,
   target.addLegalDialect<linalg::LinalgDialect, StandardOpsDialect>();
   target.addDynamicallyLegalOp<FuncOp>(
       [&](FuncOp op) { return converter.isSignatureLegal(op.getType()); });
-  // TODO(hanchung): Use applyFullConversion so we can catch early if something
-  // doesn't convert.
-  if (failed(applyPartialConversion(fns, target, patterns))) return failure();
+  if (failed(applyFullConversion(fns, target, patterns))) return failure();
+  return success();
+}
 
+static LogicalResult lowerReductionEntryFnToLinalg(MLIRContext *context,
+                                                   ModuleOp module) {
+  OpBuilder builder(module.getBodyRegion());
+  for (auto fn : module.getOps<FuncOp>()) {
+    if (!fn.getAttr("iree.executable.reduction") || !fn.empty()) continue;
+    if (failed(addReductionEntryFnBody(builder, fn))) return failure();
+  }
   return success();
 }
 
@@ -249,17 +265,17 @@ static LogicalResult lowerReductionApplyFnToLinalg(MLIRContext *context,
 // Pass for invoking the conversion
 //===----------------------------------------------------------------------===//
 
-void HLOReductionToLinalgPass::runOnOperation() {
-  OwningRewritePatternList patterns;
+void HLOReductionToLinalgPass::runOnModule() {
   MLIRContext *context = &getContext();
-  Operation *op = getOperation();
+  auto module = getModule();
 
-  // Lower the entry function.
-  patterns.insert<AddReductionEntryFnBody>(context);
-  applyPatternsGreedily(op->getRegions(), patterns);
+  if (failed(lowerReductionEntryFnToLinalg(context, module)))
+    return signalPassFailure();
 
-  // Lower the apply function.
-  if (failed(lowerReductionApplyFnToLinalg(context, op)))
+  SmallVector<Operation *, 1> applyFns;
+  if (failed(getApplyFunctions(module, applyFns))) return signalPassFailure();
+
+  if (failed(lowerReductionApplyFnToLinalg(context, applyFns)))
     return signalPassFailure();
 }
 

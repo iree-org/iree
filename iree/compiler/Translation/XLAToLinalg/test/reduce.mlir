@@ -14,7 +14,7 @@ module {
   // CHECK-SAME: iterator_types = ["parallel", "reduction"]}
   // CHECK-SAME: %{{.*}}, %{{.*}}, %{{.*}} {
   // CHECK-NEXT: ^{{.+}}({{%.*}}, [[IDX:%.*]]: index, [[SRC:%.*]]: f32, [[INIT:%.*]]: f32, [[DST:%.*]]: f32):
-  // CHECK-NEXT:   [[COND:%.*]] = cmpi
+  //      CHECK:   [[COND:%.*]] = cmpi
   // CHECK-NEXT:   [[OPERAND:%.*]] = select [[COND]], [[INIT]], [[DST]] : f32
   // CHECK-NEXT:   [[RES:%.*]] = call @reduction_apply([[OPERAND]], [[SRC]]) : (f32, f32) -> f32
   // CHECK-NEXT:   linalg.yield [[RES]] : f32
