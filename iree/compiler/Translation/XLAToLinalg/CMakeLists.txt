@@ -18,38 +18,22 @@ iree_cc_library(
   NAME
     XLAToLinalg
   HDRS
-    "MapHloToScalarOp.h"
-    "XLAToLinalg.h"
+    "Passes.h"
   SRCS
+    "LinalgFusion.cpp"
+    "LinalgTensorToBuffer.cpp"
     "XLAToLinalg.cpp"
   DEPS
     LLVMSupport
     MLIRIR
     MLIRLinalgOps
-    MLIRPass
-    MLIRStandardOps
-    MLIRSupport
-    MLIRTransforms
-    tensorflow::mlir_xla
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    IREELinalgTensorToBuffer
-  HDRS
-    "LinalgTensorToBuffer.h"
-  SRCS
-    "LinalgTensorToBuffer.cpp"
-  DEPS
-    MLIRIR
-    MLIRLinalgOps
+    MLIRLinalgTransforms
     MLIRPass
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
+    tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
 )

@@ -19,8 +19,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
-#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
-#include "iree/compiler/Translation/XLAToLinalg/LinalgTensorToBuffer.h"
+#include "iree/compiler/Translation/XLAToLinalg/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPU.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
@@ -351,7 +350,7 @@ static void addLinalgToSPIRVPasses(OpPassManager &pm) {
 }
 
 void addLowerToSPIRVPasses(OpPassManager &pm, ArrayRef<int64_t> workGroupSize) {
-  pm.addPass(xla_hlo::createLegalizeHloToLinalgPass());
+  pm.addPass(createXLAToLinalgPass());
   pm.addPass(createLinalgFusionPass());
   pm.addPass(createLinalgTensorToBufferConversionPass());
   pm.addPass(std::make_unique<UpdateWorkGroupSizePass>(workGroupSize));

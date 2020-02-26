@@ -18,13 +18,7 @@
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {
-namespace iree_compiler {
-// Populates patterns to convert HLO to Linalg.
-void populateXlaToLinalgConversionPattern(MLIRContext* context,
-                                          OwningRewritePatternList* patterns);
-// Creates XLAHLO to linalg transformation pass.
-std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgPass();
-}  // namespace iree_compiler
+namespace iree_compiler {}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_COMPILER_TRANSLATION_XLATOLINALG_XLATOLINALGPASS_H

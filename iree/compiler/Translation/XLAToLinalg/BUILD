@@ -20,41 +20,24 @@ package(
 cc_library(
     name = "XLAToLinalg",
     srcs = [
+        "LinalgFusion.cpp",
+        "LinalgTensorToBuffer.cpp",
         "XLAToLinalg.cpp",
     ],
     hdrs = [
-        "MapHloToScalarOp.h",
-        "XLAToLinalg.h",
+        "Passes.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
-    ],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "IREELinalgTensorToBuffer",
-    srcs = [
-        "LinalgTensorToBuffer.cpp",
-    ],
-    hdrs = [
-        "LinalgTensorToBuffer.h",
-    ],
-    deps = [
-        "//iree/compiler/Dialect/IREE/IR",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgOps",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
 )

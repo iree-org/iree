@@ -28,7 +28,6 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
         "//iree/compiler/Translation/XLAToLinalg",
-        "//iree/compiler/Translation/XLAToLinalg:IREELinalgTensorToBuffer",
         "//iree/schemas:llvmir_executable_def_cc_fbs",
         "@llvm-project//llvm:core",
         "@llvm-project//mlir:CFGTransforms",
@@ -36,6 +35,7 @@ cc_library(
         "@llvm-project//mlir:LLVMTransforms",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TargetLLVMIR",

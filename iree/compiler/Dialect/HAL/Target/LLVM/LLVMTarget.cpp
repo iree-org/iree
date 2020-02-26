@@ -15,8 +15,7 @@
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
 
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
-#include "iree/compiler/Translation/XLAToLinalg/LinalgTensorToBuffer.h"
-#include "iree/compiler/Translation/XLAToLinalg/XLAToLinalg.h"
+#include "iree/compiler/Translation/XLAToLinalg/Passes.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/IR/Module.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
@@ -25,6 +24,7 @@
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"

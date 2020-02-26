@@ -19,9 +19,7 @@ iree_cc_library(
     LinalgToSPIRV
   HDRS
     "LowerToSPIRV.h"
-    "Passes.h"
   SRCS
-    "LinalgFusion.cpp"
     "LowerToSPIRV.cpp"
   DEPS
     LLVMSupport
@@ -44,7 +42,7 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::CodegenUtils
-    iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
+    iree::compiler::Translation::XLAToLinalg
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRLinalgOps
     MLIRLinalgTransforms
     MLIRLoopToStandard
+    MLIRPass
     MLIRStandardOps
     MLIRStandardToLLVM
     MLIRSupport
@@ -34,7 +35,6 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Translation::XLAToLinalg
-    iree::compiler::Translation::XLAToLinalg::IREELinalgTensorToBuffer
     iree::schemas::llvmir_executable_def_cc_fbs
   ALWAYSLINK
   PUBLIC

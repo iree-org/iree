@@ -100,7 +100,6 @@ cc_library(
         "//iree/compiler/Translation/Interpreter/Transforms",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/XLAToLinalg",
-        "//iree/compiler/Translation/XLAToLinalg:IREELinalgTensorToBuffer",
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
         "@llvm-project//llvm:support",
