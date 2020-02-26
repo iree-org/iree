@@ -1,8 +1,14 @@
 // RUN: iree-opt -split-input-file -iree-convert-flow-to-hal -canonicalize %s | IreeFileCheck %s
 
 hal.executable @ex0 {
+  hal.interface @interface {
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
   hal.executable.entry_point @entry0 attributes {
+    interface = @interface,
     ordinal = 0 : i32,
+    signature = (tensor<128xf32>) -> tensor<128xf32>,
     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>
   }
 }

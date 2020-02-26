@@ -20,7 +20,9 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "MaterializeInterfaces.cpp",
         "Passes.cpp",
+        "RewriteLegacyIO.cpp",
         "TranslateExecutables.cpp",
     ],
     hdrs = [
@@ -31,9 +33,12 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",

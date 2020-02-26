@@ -29,12 +29,12 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::HAL::Target::LegacyUtil
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::Interpreter::IR
     iree::compiler::Translation::Interpreter::Serialization
     iree::compiler::Translation::Interpreter::Transforms
-    iree::compiler::Utils
   ALWAYSLINK
   PUBLIC
 )

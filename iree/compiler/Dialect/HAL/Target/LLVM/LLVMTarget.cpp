@@ -14,9 +14,11 @@
 
 #include "iree/compiler/Dialect/HAL/Target/LLVM/LLVMTarget.h"
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Translation/XLAToLinalg/Passes.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/Module.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -65,11 +67,20 @@ void buildLLVMTransformPassPipeline(OpPassManager& pm) {
 }
 
 LogicalResult translateToLLVMExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions,
     LLVMTargetOptions targetOptions) {
-  auto moduleOp = sourceOp.getInnerModule().clone();
-  makeLegacyExecutableABI(sourceOp, moduleOp, targetOp);
+  // Clone the module containing the things we want to translate. We do this so
+  // that multiple targets can pull from the same source without conflicting.
+  auto sourceOp = executableOp.getSourceOp().clone();
+  auto sourceOpErase =
+      llvm::make_scope_exit([&sourceOp]() { sourceOp.erase(); });
+  auto flowExecutableOp =
+      *sourceOp.getInnerModule().getOps<IREE::Flow::ExecutableOp>().begin();
+  auto moduleOp = flowExecutableOp.getInnerModule();
+  if (failed(makeLegacyExecutableABI(sourceOp))) {
+    return failure();
+  }
 
   // Lower module to LLVM Dialect.
   PassManager conversionPassManager(moduleOp.getContext());
@@ -101,22 +112,21 @@ LogicalResult translateToLLVMExecutable(
   std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
 
   // Add the binary data to the target executable.
-  OpBuilder targetBuilder(&targetOp.getBlock());
-  targetBuilder.setInsertionPoint(&targetOp.getBlock().back());
+  OpBuilder targetBuilder(&executableOp.getBlock());
+  targetBuilder.setInsertionPoint(&executableOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-      targetOp.getLoc(),
+      executableOp.getLoc(),
       static_cast<uint32_t>(IREE::HAL::ExecutableFormat::LLVM),
       std::move(bytes));
-  binaryOp.getBlock().getOperations().insert(
-      Block::iterator(binaryOp.getBlock().back()), moduleOp);
+  OpBuilder binaryBuilder(&binaryOp.getBlock().back());
+  binaryBuilder.clone(*moduleOp.getOperation());
   return success();
 }
 
 static ExecutableTargetRegistration targetRegistration(
-    "llvm-ir",
-    +[](IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
-        ExecutableTargetOptions executableOptions) {
-      return translateToLLVMExecutable(sourceOp, targetOp, executableOptions,
+    "llvm-ir", +[](IREE::HAL::ExecutableOp executableOp,
+                   ExecutableTargetOptions executableOptions) {
+      return translateToLLVMExecutable(executableOp, executableOptions,
                                        getLLVMTargetOptionsFromFlags());
     });
 

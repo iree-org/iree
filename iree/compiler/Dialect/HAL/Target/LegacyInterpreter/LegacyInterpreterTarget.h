@@ -33,7 +33,7 @@ LegacyInterpreterTargetOptions getLegacyInterpreterTargetOptionsFromFlags();
 
 // Translates an executable to the VM/LA backend with the given options.
 LogicalResult translateToLegacyInterpreterExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions,
     LegacyInterpreterTargetOptions targetOptions);
 

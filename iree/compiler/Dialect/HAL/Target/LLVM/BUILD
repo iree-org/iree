@@ -26,10 +26,13 @@ cc_library(
         "LLVMTarget.h",
     ],
     deps = [
+        "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+        "//iree/compiler/Dialect/HAL/Target:LegacyUtil",
         "//iree/compiler/Translation/XLAToLinalg",
         "//iree/schemas:llvmir_executable_def_cc_fbs",
         "@llvm-project//llvm:core",
+        "@llvm-project//llvm:support",
         "@llvm-project//mlir:CFGTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMTransforms",

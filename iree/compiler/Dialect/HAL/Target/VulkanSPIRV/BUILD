@@ -28,6 +28,7 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+        "//iree/compiler/Dialect/HAL/Target:LegacyUtil",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/SPIRV/EmbeddedKernels",
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",

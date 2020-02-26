@@ -23,18 +23,34 @@ iree_cc_library(
     ExecutableTarget
   HDRS
     "ExecutableTarget.h"
-    "LegacyUtil.h"
   SRCS
     "ExecutableTarget.cpp"
-    "LegacyUtil.cpp"
   DEPS
     LLVMSupport
-    MLIRIR
-    MLIRStandardOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
-    iree::compiler::Utils
   ALWAYSLINK
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    LegacyUtil
+  HDRS
+    "LegacyUtil.h"
+  SRCS
+    "LegacyUtil.cpp"
+  DEPS
+    MLIRIR
+    MLIRPass
+    MLIRStandardOps
+    MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Utils
   PUBLIC
 )

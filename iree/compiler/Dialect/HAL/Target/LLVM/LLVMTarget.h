@@ -33,7 +33,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags();
 
 // Translates an executable to the LLVM backends with the given options.
 LogicalResult translateToLLVMExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions, LLVMTargetOptions targetOptions);
 
 }  // namespace HAL

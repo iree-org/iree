@@ -33,7 +33,7 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags();
 
 // Translates an executable to the Vulkan/SPIR-V backend with the given options.
 LogicalResult translateToVulkanSPIRVExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions,
     VulkanSPIRVTargetOptions targetOptions);
 

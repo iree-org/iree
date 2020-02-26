@@ -38,6 +38,8 @@ LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
     if (!existingOp) {
       auto clonedOp = cast<IREE::VM::ImportOp>(targetBuilder.clone(*importOp));
       clonedOp.setName(fullName);
+      SymbolTable::setSymbolVisibility(clonedOp,
+                                       SymbolTable::Visibility::Private);
     }
   });
   return success();

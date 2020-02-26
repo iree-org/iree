@@ -19,22 +19,31 @@ package(
 
 cc_library(
     name = "ExecutableTarget",
-    srcs = [
-        "ExecutableTarget.cpp",
-        "LegacyUtil.cpp",
-    ],
-    hdrs = [
-        "ExecutableTarget.h",
-        "LegacyUtil.h",
-    ],
+    srcs = ["ExecutableTarget.cpp"],
+    hdrs = ["ExecutableTarget.h"],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",
-        "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:StandardOps",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "LegacyUtil",
+    srcs = ["LegacyUtil.cpp"],
+    hdrs = ["LegacyUtil.h"],
+    deps = [
+        "//iree/compiler/Dialect/Flow/IR",
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/HAL/Transforms",
+        "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Utils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:Transforms",
+    ],
 )

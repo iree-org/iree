@@ -33,7 +33,7 @@ VMLATargetOptions getVMLATargetOptionsFromFlags();
 
 // Translates an executable to the VM/LA backend with the given options.
 LogicalResult translateToVMLAExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions, VMLATargetOptions targetOptions);
 
 }  // namespace HAL

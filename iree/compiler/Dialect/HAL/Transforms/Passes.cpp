@@ -29,13 +29,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    ExecutableTargetOptions executableOptions) {
   passManager.addPass(createCanonicalizerPass());
 
-  // TODO(benvanik): run symbol DCE pass.
-
+  passManager.addPass(createMaterializeInterfacesPass(executableOptions));
   passManager.addPass(createTranslateExecutablesPass(executableOptions));
   passManager.addPass(createConvertFlowToHALPass());
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
+
+  // TODO(benvanik): run symbol DCE when all symbols have visibility defined.
+  // passManager.addPass(createSymbolDCEPass());
 }
 
 static PassPipelineRegistration<> transformPassPipeline(

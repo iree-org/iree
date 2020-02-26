@@ -23,6 +23,7 @@ iree_cc_library(
     "LLVMTarget.cpp"
   DEPS
     LLVMCore
+    LLVMSupport
     MLIRIR
     MLIRLinalgOps
     MLIRLinalgTransforms
@@ -33,7 +34,9 @@ iree_cc_library(
     MLIRSupport
     MLIRTargetLLVMIR
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::HAL::Target::LegacyUtil
     iree::compiler::Translation::XLAToLinalg
     iree::schemas::llvmir_executable_def_cc_fbs
   ALWAYSLINK

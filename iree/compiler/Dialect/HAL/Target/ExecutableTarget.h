@@ -19,7 +19,6 @@
 #include <string>
 #include <vector>
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -39,11 +38,31 @@ struct ExecutableTargetOptions {
 // --iree-hal-target-* flags.
 ExecutableTargetOptions getExecutableTargetOptionsFromFlags();
 
-// Registered function that given a |sourceOp| flow.executable will produce one
-// or more serialized versions added to |targetOp|.
-using ExecutableTargetFn = std::function<LogicalResult(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
-    ExecutableTargetOptions executableOptions)>;
+// Registered function that given a template hal.executable op will produce one
+// or more serialized hal.executable.binary ops. The provided |executableOp|
+// will contain the hal.interfaces, hal.executable.entry_points, and the source
+// flow.executable nested within a hal.executable.source op.
+//
+// For example, as input:
+//   hal.executable @some_executable {
+//     hal.interface @main_io {
+//       hal.interface.binding @arg0, set=0, binding=0, ...
+//       hal.interface.binding @arg1, set=0, binding=1, ...
+//     }
+//     hal.executable.entry_point @main attributes {
+//       interface = @main_io,
+//       ordinal = 0 : i32,
+//       signature = (tensor<4xf32>) -> tensor<4xf32>,
+//       workgroup_size = dense<1> : vector<3xi32>
+//     }
+//     hal.executable.source {
+//       flow.executable ...
+//     }
+//   }
+
+using ExecutableTargetFn =
+    std::function<LogicalResult(IREE::HAL::ExecutableOp executableOp,
+                                ExecutableTargetOptions executableOptions)>;
 
 // Registers an executable translation function.
 struct ExecutableTargetRegistration {

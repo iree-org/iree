@@ -27,6 +27,7 @@
 #include "iree/compiler/Translation/Interpreter/Serialization/VMFunctionBuilder.h"
 #include "iree/compiler/Translation/Interpreter/Serialization/VMModuleBuilder.h"
 #include "iree/compiler/Translation/Interpreter/Transforms/Passes.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/IR/Builders.h"
@@ -184,13 +185,20 @@ static LogicalResult defineInterpreterFunction(
 }
 
 LogicalResult translateToLegacyInterpreterExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions,
     LegacyInterpreterTargetOptions targetOptions) {
   // Clone the module containing the things we want to translate. We do this so
   // that multiple targets can pull from the same source without conflicting.
-  auto moduleOp = sourceOp.getInnerModule().clone();
-  makeLegacyExecutableABI(sourceOp, moduleOp, targetOp);
+  auto sourceOp = executableOp.getSourceOp().clone();
+  auto sourceOpErase =
+      llvm::make_scope_exit([&sourceOp]() { sourceOp.erase(); });
+  auto flowExecutableOp =
+      *sourceOp.getInnerModule().getOps<IREE::Flow::ExecutableOp>().begin();
+  auto moduleOp = flowExecutableOp.getInnerModule();
+  if (failed(makeLegacyExecutableABI(sourceOp))) {
+    return failure();
+  }
 
   // Run all passes to go from input to the iree_ll_interp dialect.
   PassManager conversionPassManager(moduleOp.getContext());
@@ -232,23 +240,22 @@ LogicalResult translateToLegacyInterpreterExecutable(
   }
 
   // Add the binary data to the target executable.
-  OpBuilder targetBuilder(&targetOp.getBlock());
-  targetBuilder.setInsertionPoint(&targetOp.getBlock().back());
+  OpBuilder targetBuilder(&executableOp.getBlock());
+  targetBuilder.setInsertionPoint(&executableOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-      targetOp.getLoc(),
+      executableOp.getLoc(),
       static_cast<uint32_t>(IREE::HAL::ExecutableFormat::IreeBytecode),
       std::move(bytes));
-  binaryOp.getBlock().getOperations().insert(
-      Block::iterator(binaryOp.getBlock().back()), moduleOp);
+  OpBuilder binaryBuilder(&binaryOp.getBlock().back());
+  binaryBuilder.clone(*moduleOp.getOperation());
   return success();
 }
 
 static ExecutableTargetRegistration targetRegistration(
-    "interpreter-bytecode",
-    +[](IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
-        ExecutableTargetOptions executableOptions) {
+    "interpreter-bytecode", +[](IREE::HAL::ExecutableOp executableOp,
+                                ExecutableTargetOptions executableOptions) {
       return translateToLegacyInterpreterExecutable(
-          sourceOp, targetOp, std::move(executableOptions),
+          executableOp, std::move(executableOptions),
           getLegacyInterpreterTargetOptionsFromFlags());
     });
 

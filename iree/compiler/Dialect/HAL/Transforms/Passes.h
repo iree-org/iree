@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
 #define IREE_COMPILER_DIALECT_HAL_TRANSFORMS_PASSES_H_
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "llvm/ADT/StringMap.h"
@@ -50,10 +51,22 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 // Executable translation and optimization
 //===----------------------------------------------------------------------===//
 
+// Defines hal.executables and hal.interfaces for flow.executable ops based on
+// usage within the module.
+std::unique_ptr<OpPassBase<ModuleOp>> createMaterializeInterfacesPass(
+    ExecutableTargetOptions executableOptions);
+
 // Translates flow.executable ops to hal.executable ops using the provided
 // options.
 std::unique_ptr<OpPassBase<ModuleOp>> createTranslateExecutablesPass(
     ExecutableTargetOptions executableOptions);
+
+// Rewrites hal.interface IO shims to look like the legacy IREE
+// load_input/store_output form. This is incompatible with dynamic shapes and
+// advanced descriptor set usage and will be removed as soon as the existing
+// backends using it are ported to hal.interface.
+std::unique_ptr<OpPassBase<IREE::Flow::ExecutableOp>>
+createRewriteLegacyIOPass();
 
 }  // namespace HAL
 }  // namespace IREE

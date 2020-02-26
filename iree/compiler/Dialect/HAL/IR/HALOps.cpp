@@ -814,6 +814,12 @@ void DeviceAllocatorOp::getAsmResultNames(
 // hal.executable
 //===----------------------------------------------------------------------===//
 
+ExecutableSourceOp ExecutableOp::getSourceOp() {
+  auto ops = getBlock().getOps<ExecutableSourceOp>();
+  assert(!ops.empty() && "executables must contain source ops");
+  return *ops.begin();
+}
+
 void ExecutableOp::build(Builder *builder, OperationState &state,
                          StringRef name) {
   ensureTerminator(*state.addRegion(), *builder, state.location);
@@ -882,6 +888,37 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
 }
 
 //===----------------------------------------------------------------------===//
+// hal.executable.source
+//===----------------------------------------------------------------------===//
+
+void ExecutableSourceOp::build(Builder *builder, OperationState &state) {
+  ensureTerminator(*state.addRegion(), *builder, state.location);
+}
+
+static ParseResult parseExecutableSourceOp(OpAsmParser &parser,
+                                           OperationState *result) {
+  auto *body = result->addRegion();
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+      failed(parser.parseOptionalRegion(*body, llvm::None, llvm::None))) {
+    return failure();
+  }
+
+  // Ensure that this module has a valid terminator.
+  ExecutableSourceOp::ensureTerminator(*body, parser.getBuilder(),
+                                       result->location);
+  return success();
+}
+
+static void printExecutableSourceOp(OpAsmPrinter &p, ExecutableSourceOp op) {
+  p << op.getOperationName();
+  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  if (!op.body().empty()) {
+    p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                  /*printBlockTerminators=*/false);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable.binary
 //===----------------------------------------------------------------------===//
 
@@ -931,6 +968,101 @@ static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
 
   // TODO(benvanik): check export name conflicts.
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// hal.interface
+//===----------------------------------------------------------------------===//
+
+void InterfaceOp::build(Builder *builder, OperationState &state,
+                        StringRef name) {
+  ensureTerminator(*state.addRegion(), *builder, state.location);
+  state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
+                     builder->getStringAttr(name));
+}
+
+static ParseResult parseInterfaceOp(OpAsmParser &parser,
+                                    OperationState *result) {
+  StringAttr nameAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
+  // Parse the module body.
+  auto *body = result->addRegion();
+  if (failed(parser.parseRegion(*body, llvm::None, llvm::None))) {
+    return failure();
+  }
+
+  // Ensure that this module has a valid terminator.
+  InterfaceOp::ensureTerminator(*body, parser.getBuilder(), result->location);
+  return success();
+}
+
+static void printInterfaceOp(OpAsmPrinter &p, InterfaceOp op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
+  p.printOptionalAttrDictWithKeyword(
+      op.getAttrs(),
+      /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
+  p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
+                /*printBlockTerminators=*/false);
+}
+
+//===----------------------------------------------------------------------===//
+// hal.interface.binding
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
+                                           OperationState *result) {
+  StringAttr nameAttr;
+  IntegerAttr setAttr;
+  IntegerAttr bindingAttr;
+  if (failed(parser.parseSymbolName(nameAttr,
+                                    mlir::SymbolTable::getSymbolAttrName(),
+                                    result->attributes)) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("set")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(setAttr,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "set", result->attributes)) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("binding")) ||
+      failed(parser.parseEqual()) ||
+      failed(parser.parseAttribute(bindingAttr,
+                                   parser.getBuilder().getIntegerType(32),
+                                   "binding", result->attributes)) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("type")) ||
+      failed(parser.parseEqual()) ||
+      failed(parseEnumAttr<DescriptorType, symbolizeDescriptorType>(
+          parser, "type", result->attributes)) ||
+      failed(parser.parseComma()) || failed(parser.parseKeyword("access")) ||
+      failed(parser.parseEqual()) ||
+      failed(parseEnumAttr<MemoryAccessBitfield, symbolizeMemoryAccessBitfield>(
+          parser, "access", result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
+  p << op.getOperationName() << ' ';
+  p.printSymbolName(op.sym_name());
+  p << ", set=" << op.set();
+  p << ", binding=" << op.binding();
+  p << ", type=\"" << stringifyDescriptorType(op.type()) << "\"";
+  p << ", access=\"" << stringifyMemoryAccessBitfield(op.access()) << "\"";
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{
+                                         mlir::SymbolTable::getSymbolAttrName(),
+                                         "set",
+                                         "binding",
+                                         "type",
+                                         "access",
+                                     });
 }
 
 //===----------------------------------------------------------------------===//

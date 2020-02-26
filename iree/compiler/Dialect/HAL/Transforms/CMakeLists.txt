@@ -20,18 +20,23 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "MaterializeInterfaces.cpp"
     "Passes.cpp"
+    "RewriteLegacyIO.cpp"
     "TranslateExecutables.cpp"
   DEPS
     LLVMSupport
     MLIRIR
     MLIRPass
+    MLIRStandardOps
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

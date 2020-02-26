@@ -24,7 +24,7 @@ namespace HAL {
 
 // TODO(benvanik): add flags.
 // static llvm::cl::OptionCategory halVMLAOptionsCategory(
-//     "IREE VM/LA backend options");
+//     "IREE VMLA backend options");
 
 VMLATargetOptions getVMLATargetOptionsFromFlags() {
   VMLATargetOptions targetOptions;
@@ -33,17 +33,16 @@ VMLATargetOptions getVMLATargetOptionsFromFlags() {
 }
 
 LogicalResult translateToVMLAExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions,
     VMLATargetOptions targetOptions) {
   return success();
 }
 
 static ExecutableTargetRegistration targetRegistration(
-    "vm-la",
-    +[](IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
-        ExecutableTargetOptions executableOptions) {
-      return translateToVMLAExecutable(sourceOp, targetOp, executableOptions,
+    "vmla", +[](IREE::HAL::ExecutableOp executableOp,
+                ExecutableTargetOptions executableOptions) {
+      return translateToVMLAExecutable(executableOp, executableOptions,
                                        getVMLATargetOptionsFromFlags());
     });
 

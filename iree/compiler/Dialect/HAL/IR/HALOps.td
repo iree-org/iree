@@ -1274,6 +1274,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return body().front(); }
+    IREE::HAL::ExecutableSourceOp getSourceOp();
   }];
 
   let verifier = [{ return verifyExecutableOp(*this); }];
@@ -1297,11 +1298,50 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
   let arguments = (ins
     StrAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
-    HAL_WorkgroupSizeAttr:$workgroup_size
+    HAL_WorkgroupSizeAttr:$workgroup_size,
+    FlatSymbolRefAttr:$interface,
+    TypeAttr:$signature
   );
 }
 
-// TODO(benvanik): add HAL_ExecutableSourceOp for auto serialization.
+def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
+    IsolatedFromAbove,
+    HasParent<"IREE::HAL::ExecutableOp">,
+    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
+  ]> {
+  let summary = [{source executable IR}];
+  let description = [{
+    The source IR for the executable. This can be preserved for debugging but
+    is usually removed during transformation.
+  }];
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    Block& getBlock() { return body().front(); }
+
+    ::mlir::ModuleOp getInnerModule() {
+      auto moduleOps = getBlock().getOps<::mlir::ModuleOp>();
+      assert(!moduleOps.empty() && "source ops need inner modules");
+      return *moduleOps.begin();
+    }
+  }];
+}
+
+def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
+    HasParent<"IREE::HAL::ExecutableSourceOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the executable source op}];
+  let assemblyFormat = "attr-dict";
+}
 
 def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
     IsolatedFromAbove,
@@ -1352,6 +1392,157 @@ def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
   ]> {
   let summary = [{terminator pseudo-op for the executable binary op}];
   let assemblyFormat = "attr-dict";
+}
+
+//===----------------------------------------------------------------------===//
+// iree::hal::Executable Interfaces
+//===----------------------------------------------------------------------===//
+
+def HAL_InterfaceOp : HAL_Op<"interface", [
+    IsolatedFromAbove,
+    // HasParent<"IREE::HAL::ExecutableOp">,
+    SingleBlockImplicitTerminator<"IREE::HAL::InterfaceEndOp">,
+    Symbol,
+    SymbolTable,
+  ]> {
+  let summary = [{executable IO interface description}];
+  let description = [{
+    Defines a set of IO bindings and associated information required for the
+    scheduler to correctly dispatch the executable. Multiple executable binaries
+    can share the same interface to reduce the amount of scheduling code
+    generated, or a single executable binary can expose entry points with
+    multiple different interfaces to allow for runtime selection based on
+    supported device capabilities.
+
+    The design is modeled on the Vulkan binding model, which uses one or more
+    descriptor sets containing one or more bindings as part of its API. By using
+    the same representation here we can get toll-free lowering on the Vulkan and
+    SPIR-V side, and for other backends that may have simpler models the cost is
+    negligable (just an extra indirection during dispatch). For more information
+    on the Vulkan binding model see the documentation (which contains GLSL,
+    SPIR-V, and Vulkan API examples that directly map to our use here):
+    https://vulkan.lunarg.com/doc/view/1.0.33.0/linux/vkspec.chunked/ch13s02.html
+
+    For background as to how multiple descriptor sets are used by the scheduler
+    see: https://developer.nvidia.com/vulkan-shader-resource-binding
+  }];
+
+  let arguments = (ins
+    StrAttr:$sym_name
+  );
+
+  let regions = (region SizedRegion<1>:$body);
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, StringRef name
+    }]>,
+  ];
+
+  let extraClassDeclaration = [{
+    Block& getBlock() { return body().front(); }
+  }];
+}
+
+def HAL_InterfaceEndOp : HAL_Op<"interface_end", [
+    HasParent<"IREE::HAL::InterfaceOp">,
+    Terminator,
+  ]> {
+  let summary = [{terminator pseudo-op for the executable interface op}];
+  let assemblyFormat = "attr-dict";
+}
+
+def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
+    HasParent<"IREE::HAL::InterfaceOp">,
+    Symbol,
+  ]> {
+  let summary = [{executable IO binding description}];
+  let description = [{
+    Defines an IO binding used to pass buffers into the executable for loads and
+    stores. These bindings will be mapped into descriptor sets by the scheduler
+    based on device support and usage within the command buffer.
+
+    Bindings are typeless and only indicate a resource that is made available to
+    executables. The types that can be loaded-from and stored-into the binding
+    buffers are provided to backends by way of the `hal.interface.load.*` and
+    `hal.interface.store.*` ops.
+
+    Bindings do not need to correlate 1:1 with entry point arguments/results and
+    in many cases will not. For example, the same binding may be used with
+    different offsets if the arguments were packed into a ringbuffer/arena by
+    the scheduler.
+  }];
+
+  let arguments = (ins
+    StrAttr:$sym_name,
+    I32Attr:$set,
+    I32Attr:$binding,
+    HAL_DescriptorTypeAttr:$type,
+    HAL_MemoryAccessBitfieldAttr:$access
+  );
+}
+
+def HAL_InterfaceLoadTensorOp : HAL_PureOp<"interface.load.tensor"> {
+  let summary = [{loads a tensor from an executable IO binding}];
+  let description = [{
+    Loads a tensor value from an executable IO binding. This is a pseudo op
+    that can be used to tie SSA tensor values in the IR to the bindings that
+    contain those tensors.
+
+    Note that because there may not be a 1:1 mapping between original tensor
+    arguments to the entry point function and the bindings in the interface the
+    backend must use the offset provided on this op to properly compute the base
+    address of the tensor data. The offset is in bytes relative to the base
+    binding address, irrespective of the type of the tensor loaded by this
+    operation.
+
+    The offset provided, if non-zero, will have an alignment compatible with the
+    tensor type represented. For example, a `tensor<16xf32>` will be aligned on
+    at least a 4 byte boundary.
+  }];
+
+  let arguments = (ins
+    SymbolRefAttr:$binding,
+    HAL_DeviceSize:$offset
+  );
+  let results = (outs
+    AnyRankedTensor:$result
+  );
+
+  let assemblyFormat = [{
+    $binding `,` `offset` `=` $offset attr-dict `:` type($result)
+  }];
+}
+
+def HAL_InterfaceStoreTensorOp : HAL_Op<"interface.store.tensor"> {
+  let summary = [{stores a tensor in an executable IO binding}];
+  let description = [{
+    Stores a tensor value into an executable IO binding. This is a pseudo op
+    indicating that the value of the operand tensor should be stored into the
+    specified binding.
+
+    Note that because there may not be a 1:1 mapping between original tensor
+    arguments to the entry point function and the bindings in the interface the
+    backend must use the offset provided on this op to properly compute the base
+    address of the tensor data. The offset is in bytes relative to the base
+    binding address, irrespective of the type of the tensor loaded by this
+    operation.
+
+    The offset provided, if non-zero, will have an alignment compatible with the
+    tensor type represented. For example, a `tensor<16xf32>` will be aligned on
+    at least a 4 byte boundary.
+  }];
+
+  let arguments = (ins
+    AnyRankedTensor:$operand,
+    SymbolRefAttr:$binding,
+    HAL_DeviceSize:$offset
+  );
+
+  let assemblyFormat = [{
+    $operand `,` $binding `,` `offset` `=` $offset attr-dict `:` type($operand)
+  }];
 }
 
 //===----------------------------------------------------------------------===//

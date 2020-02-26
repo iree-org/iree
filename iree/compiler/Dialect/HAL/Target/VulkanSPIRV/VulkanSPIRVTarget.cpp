@@ -24,6 +24,7 @@
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
@@ -33,6 +34,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 
 namespace mlir {
@@ -130,18 +132,56 @@ static std::unique_ptr<iree::VkPipelineLayoutDefT> populatePipelineLayout(
   return pipelineLayoutDef;
 }
 
-/// Update the workgroup size in the targetOp.
-// TODO(ravishankarm): This is either to be deprecated or moved into a more
-// convenient place.
-static void propagateModifiedExecutableABI(IREE::Flow::ExecutableOp sourceOp,
-                                           ModuleOp moduleOp,
-                                           IREE::HAL::ExecutableOp targetOp) {
+// Returns an (x,y,z) workgroup size for the given |targetFuncOp|.
+// This is pure heuristics until we support dynamic/varying workgroup sizes.
+static std::array<int32_t, 3> guessWorkGroupSize(
+    IREE::Flow::DispatchEntryOp entryOp, FuncOp targetFuncOp) {
+  for (auto &block : targetFuncOp.getBlocks()) {
+    if (!block.getOps<xla_hlo::DotOp>().empty()) {
+      // A special dot kernel. This has a fixed workgroup size based on the
+      // hand-written shader.
+      return {16, 16, 1};
+    } else if (!block.getOps<xla_hlo::ConvOp>().empty()) {
+      // Matches hard-coded assumptions in the conv2d_nhwc hand-written
+      // shader.
+      return {1, 1, 1};
+    }
+  }
+  return {32, 1, 1};
+}
+
+// Applies the guessWorkGroupSize logic to each entry point to ensure we have
+// a compatible size set on entry.
+// TODO(b/150312935): remove this and just call guessWorkGroupSize (or whatever)
+// when you need the workgroup size.
+static void guessEntryWorkGroupSizes(IREE::Flow::ExecutableOp sourceOp,
+                                     ModuleOp moduleOp) {
+  Builder builder(sourceOp.getContext());
+  for (auto &op : sourceOp.getBlock()) {
+    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
+      auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
+      auto workGroupSizeAttr = DenseIntElementsAttr::get(
+          VectorType::get(3, builder.getIntegerType(32)),
+          guessWorkGroupSize(entryOp, funcOp));
+      funcOp.setAttr("iree.executable.workgroup_size", workGroupSizeAttr);
+    }
+  }
+}
+
+// Update the workgroup size in the executableOp.
+// TODO(b/150312935): remove this and just write the
+// IREE::HAL::ExecutableEntryPointOp attributes when you need them.
+static void propagateModifiedExecutableABI(
+    IREE::Flow::ExecutableOp sourceOp, ModuleOp moduleOp,
+    IREE::HAL::ExecutableOp executableOp) {
   for (auto &op : sourceOp.getBlock()) {
     if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
       auto targetEntryOp =
-          targetOp.lookupSymbol<IREE::HAL::ExecutableEntryPointOp>(
-              entryOp.sym_name());
+          executableOp.lookupSymbol<IREE::HAL::ExecutableEntryPointOp>(
+              entryOp.function_ref());
+      assert(targetEntryOp && "could not find HAL entry point");
       auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
+      assert(funcOp && "could not find target function for HAL entry point");
       auto workGroupSize = funcOp.getAttrOfType<DenseIntElementsAttr>(
           "iree.executable.workgroup_size");
       targetEntryOp.setAttr("workgroup_size", workGroupSize);
@@ -150,13 +190,21 @@ static void propagateModifiedExecutableABI(IREE::Flow::ExecutableOp sourceOp,
 }
 
 LogicalResult translateToVulkanSPIRVExecutable(
-    IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
+    IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions,
     VulkanSPIRVTargetOptions targetOptions) {
   // Clone the module containing the things we want to translate. We do this so
   // that multiple targets can pull from the same source without conflicting.
-  auto moduleOp = sourceOp.getInnerModule().clone();
-  makeLegacyExecutableABI(sourceOp, moduleOp, targetOp);
+  auto sourceOp = executableOp.getSourceOp().clone();
+  auto sourceOpErase =
+      llvm::make_scope_exit([&sourceOp]() { sourceOp.erase(); });
+  auto flowExecutableOp =
+      *sourceOp.getInnerModule().getOps<IREE::Flow::ExecutableOp>().begin();
+  auto moduleOp = flowExecutableOp.getInnerModule();
+  if (failed(makeLegacyExecutableABI(sourceOp))) {
+    return failure();
+  }
+  guessEntryWorkGroupSizes(flowExecutableOp, moduleOp);
 
   // Try first to match against an embedded kernel (such as matmul) and
   // otherwise fall back to generating the kernel.
@@ -170,7 +218,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
     // The sequencer and runtime use ordinals instead of names. We provide the
     // list of entry point names here that are then passed in
     // VkShaderModuleCreateInfo.
-    spirvExecutableDef.entry_points = populateEntryPointNames(sourceOp);
+    spirvExecutableDef.entry_points = populateEntryPointNames(flowExecutableOp);
 
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
@@ -185,9 +233,10 @@ LogicalResult translateToVulkanSPIRVExecutable(
     if (failed(conversionPassManager.run(moduleOp))) {
       return moduleOp.emitError() << "failed to run conversion passes";
     }
+
     // Drop the gpu.container_module attribute.
     moduleOp.removeAttr("gpu.container_module");
-    propagateModifiedExecutableABI(sourceOp, moduleOp, targetOp);
+    propagateModifiedExecutableABI(flowExecutableOp, moduleOp, executableOp);
     auto spvModuleOps = moduleOp.getOps<spirv::ModuleOp>();
     if (std::distance(spvModuleOps.begin(), spvModuleOps.end()) != 1) {
       return moduleOp.emitError()
@@ -237,23 +286,22 @@ LogicalResult translateToVulkanSPIRVExecutable(
   std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
 
   // Add the binary data to the target executable.
-  OpBuilder targetBuilder(&targetOp.getBlock());
-  targetBuilder.setInsertionPoint(&targetOp.getBlock().back());
+  OpBuilder targetBuilder(&executableOp.getBlock());
+  targetBuilder.setInsertionPoint(&executableOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-      targetOp.getLoc(),
+      executableOp.getLoc(),
       static_cast<uint32_t>(IREE::HAL::ExecutableFormat::SpirV),
       std::move(bytes));
-  binaryOp.getBlock().getOperations().insert(
-      Block::iterator(binaryOp.getBlock().back()), moduleOp);
+  OpBuilder binaryBuilder(&binaryOp.getBlock().back());
+  binaryBuilder.clone(*moduleOp.getOperation());
   return success();
 }
 
 static ExecutableTargetRegistration targetRegistration(
-    "vulkan-spirv",
-    +[](IREE::Flow::ExecutableOp sourceOp, IREE::HAL::ExecutableOp targetOp,
-        ExecutableTargetOptions executableOptions) {
+    "vulkan-spirv", +[](IREE::HAL::ExecutableOp executableOp,
+                        ExecutableTargetOptions executableOptions) {
       return translateToVulkanSPIRVExecutable(
-          sourceOp, targetOp, executableOptions,
+          executableOp, executableOptions,
           getVulkanSPIRVTargetOptionsFromFlags());
     });
 
