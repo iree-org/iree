@@ -33,44 +33,8 @@ FunctionType CallOp::getCalleeType() {
 }
 
 //===----------------------------------------------------------------------===//
-// iree_ll_interp.return
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 2> opInfo;
-  SmallVector<Type, 2> types;
-  llvm::SMLoc loc = parser.getCurrentLocation();
-  return failure(parser.parseOperandList(opInfo) ||
-                 (!opInfo.empty() && parser.parseColonTypeList(types)) ||
-                 parser.resolveOperands(opInfo, types, loc, state.operands));
-}
-
-static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
-  p << "iree_ll_interp.return";
-  if (op.getNumOperands() > 0) {
-    p << ' ';
-    p.printOperands(op.operand_begin(), op.operand_end());
-    p << " : ";
-    interleaveComma(op.getOperandTypes(), p);
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // iree_ll_interp.br
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
-  Block *dest;
-  SmallVector<Value, 4> destOperands;
-  if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
-  result.addSuccessor(dest, destOperands);
-  return success();
-}
-
-static void printBranchOp(OpAsmPrinter &p, BranchOp op) {
-  p << "iree_ll_interp.br ";
-  p.printSuccessorAndUseList(op.getOperation(), 0);
-}
 
 Block *BranchOp::getDest() { return getOperation()->getSuccessor(0); }
 

@@ -1018,6 +1018,12 @@ def HAL_CommandBufferBindDescriptorSetOp :
     Variadic<HAL_DeviceSize>:$dynamic_offsets
   );
 
+  let assemblyFormat = [{
+    $command_buffer `,` $executable_layout `,` `set` `=` $set `,`
+    $descriptor_set (`,` `offsets` `=` `[` $dynamic_offsets^ `]`)?
+    attr-dict-with-keyword
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -1162,6 +1168,10 @@ def HAL_DescriptorSetLayoutMakeBindingOp :
   let results = (outs
     HAL_DescriptorSetLayoutBinding:$result
   );
+
+  let assemblyFormat = [{
+    `binding` `=` $binding attr-dict-with-keyword `:` type($result)
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -1373,6 +1383,12 @@ def HAL_ExecutableLayoutCreateOp :
   let results = (outs
     HAL_ExecutableLayout:$result
   );
+
+  let assemblyFormat = [{
+    $device `,` `set_layouts` `=` `[` $set_layouts `]`
+    (`,` `push_constants` `=` $push_constants^)? attr-dict-with-keyword `:`
+    type($result)
+  }];
 }
 
 

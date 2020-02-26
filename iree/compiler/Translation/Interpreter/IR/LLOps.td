@@ -100,9 +100,6 @@ def IREEInterpLL_CallOp : IREEInterpLL_Op<"call"> {
     operand_iterator arg_operand_begin() { return operand_begin(); }
     operand_iterator arg_operand_end() { return operand_end(); }
   }];
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
 }
 
 def IREEInterpLL_ReturnOp : IREEInterpLL_Op<"return", [Terminator]> {
@@ -112,12 +109,13 @@ def IREEInterpLL_ReturnOp : IREEInterpLL_Op<"return", [Terminator]> {
     "Builder *b, OperationState &result", [{ build(b, result, llvm::None); }]
   >];
 
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
 }
 
 def IREEInterpLL_BranchOp : IREEInterpLL_Op<"br", [Terminator]> {
   let successors = (successor AnySuccessor:$dest);
+
+  let assemblyFormat = "$dest attr-dict";
 
   let builders = [OpBuilder<
     "Builder *, OperationState &result, Block *dest", [{
@@ -131,9 +129,6 @@ def IREEInterpLL_BranchOp : IREEInterpLL_Op<"br", [Terminator]> {
     /// Erase the operand at 'index' from the operand list.
     void eraseOperand(unsigned index);
   }];
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ return print$cppClass(p, *this); }];
 }
 
 def IREEInterpLL_CondBranchOp : IREEInterpLL_Op<"cond_br", [Terminator]> {

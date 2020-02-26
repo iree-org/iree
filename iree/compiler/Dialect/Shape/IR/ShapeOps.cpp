@@ -37,6 +37,18 @@ namespace mlir {
 namespace iree_compiler {
 namespace Shape {
 
+/// Make a range of the DimType for a RankedShapeType with the number of
+/// elements equal to the rank of the shaped type.
+static RepeatRange<Type> getDimTypeRange(RankedShapeType type) {
+  return make_repeated_range(type.getDimType(), type.getRank());
+}
+
+/// Make a range of the DimType for a RankedShapeType with the number of
+/// elements equal to the dynamic dimensions of the shaped type.
+static RepeatRange<Type> getDimTypeDynamicRange(RankedShapeType type) {
+  return make_repeated_range(type.getDimType(), type.getNumDynamicDims());
+}
+
 //===----------------------------------------------------------------------===//
 // Canonicalization
 //===----------------------------------------------------------------------===//
@@ -352,60 +364,6 @@ static LogicalResult verifyConstRankedShapeOp(ConstRankedShapeOp op) {
 // shape.make_ranked_shape
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseMakeRankedShapeOp(OpAsmParser &parser,
-                                          OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  SmallVector<Type, 4> operandTypes;
-  if (parser.parseOperandList(operands) ||
-      parser.parseOptionalArrowTypeList(state.types) ||
-      parser.parseOptionalAttrDict(state.attributes)) {
-    return failure();
-  }
-  if (state.types.empty()) {
-    return parser.emitError(parser.getNameLoc())
-           << "operation type is required";
-  }
-  auto rsType = state.types.front().dyn_cast<RankedShapeType>();
-  if (!rsType) {
-    return parser.emitError(parser.getNameLoc())
-           << "operation must have a ranked_shape result type";
-  }
-  operandTypes.resize(operands.size());
-  for (auto &operandType : operandTypes) {
-    operandType = rsType.getDimType();
-  }
-  if (parser.resolveOperands(operands, operandTypes, parser.getNameLoc(),
-                             state.operands)) {
-    return failure();
-  }
-  return success();
-}
-
-static void printMakeRankedShapeOp(OpAsmPrinter &p, MakeRankedShapeOp op) {
-  p << op.getOperationName() << " ";
-  // Note that the types of the operands is implied by the dim type of the
-  // shape.
-  p.printOperands(op.dynamic_dimensions());
-  p.printOptionalArrowTypeList(ArrayRef<Type>{op.shape().getType()});
-  p.printOptionalAttrDict(op.getOperation()->getAttrs());
-}
-
-static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
-  auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
-  if (!rsType || rsType.getNumDynamicDims() != op.dynamic_dimensions().size()) {
-    return op.emitOpError()
-           << "expected number of operands to match number of shape dynamic "
-           << "dims";
-  }
-  for (auto operand : op.dynamic_dimensions()) {
-    if (operand.getType() != rsType.getDimType()) {
-      return op.emitOpError()
-             << "expected operands to be of type " << rsType.getDimType();
-    }
-  }
-  return success();
-}
-
 void MakeRankedShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
   patterns.insert<IdentityMakeRankedShapePattern>(context);
@@ -493,46 +451,6 @@ void RankedDimsOp::build(Builder *builder, OperationState &result,
   for (int i = 0; i < rankedShapeType.getRank(); ++i) {
     result.types.push_back(rankedShapeType.getDimType());
   }
-}
-
-ParseResult parseRankedDimsOp(OpAsmParser &parser, OperationState &state) {
-  OpAsmParser::OperandType operand;
-  Type operandType;
-  if (parser.parseOperand(operand) || parser.parseColonType(operandType) ||
-      parser.resolveOperand(operand, operandType, state.operands)) {
-    return failure();
-  }
-
-  auto rsType = operandType.dyn_cast<RankedShapeType>();
-  if (!rsType) {
-    return parser.emitError(parser.getNameLoc());
-  }
-  for (int i = 0; i < rsType.getRank(); ++i) {
-    state.types.push_back(rsType.getDimType());
-  }
-  return success();
-}
-
-static void printRankedDimsOp(OpAsmPrinter &p, RankedDimsOp op) {
-  p << op.getOperationName() << " ";
-  p.printOperand(op.shape());
-  p << " : ";
-  p.printType(op.shape().getType());
-}
-
-static LogicalResult verifyRankedDimsOp(RankedDimsOp op) {
-  auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
-  for (auto result : op.getResults()) {
-    if (result.getType() != rsType.getDimType()) {
-      return op.emitOpError()
-             << "expected result of type " << rsType.getDimType();
-    }
-  }
-  if (op.getResults().size() != rsType.getRank()) {
-    return op.emitOpError()
-           << "expected " << rsType.getRank() << " returned dimensions";
-  }
-  return success();
 }
 
 void RankedDimsOp::getCanonicalizationPatterns(

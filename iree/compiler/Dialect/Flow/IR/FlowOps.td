@@ -313,6 +313,8 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
     Variadic<AnyType>:$operands
   );
 
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &result
@@ -529,7 +531,11 @@ def FLOW_TensorReshapeOp : FLOW_PureOp<"tensor.reshape", [
   let hasFolder = 1;
 }
 
-def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load"> {
+def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
+    TypesMatchWith<"value type matches element type of target operand",
+                   "source", "result",
+                   "$_self.cast<ShapedType>().getElementType()">,
+  ]> {
   let summary = [{loads a value from a tensor element}];
   let description = [{
     Returns the element at the given location from within the tensor.
@@ -543,11 +549,20 @@ def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load"> {
     AnyTypeOf<[FLOW_PrimitiveType, AnyVector]>:$result
   );
 
+  let assemblyFormat = [{
+    $source (`[` $indices^ `]`)? `:` type($source) attr-dict-with-keyword
+  }];
+
   // TODO(benvanik): canonicalize to slice+load if dims are known.
   let hasFolder = 1;
 }
 
-def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store"> {
+def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
+    AllTypesMatch<["target", "result"]>,
+    TypesMatchWith<"value type matches element type of target operand",
+                   "target", "value",
+                   "$_self.cast<ShapedType>().getElementType()">,
+  ]> {
   let summary = [{stores a value into a tensor element}];
   let description = [{
     Returns a tensor with the element at the given index set to the given value.
@@ -562,11 +577,19 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store"> {
     FLOW_Tensor:$result
   );
 
+  let assemblyFormat = [{
+    $value `,` $target (`[` $indices^ `]`)? `:` type($target)
+    attr-dict-with-keyword
+  }];
+
   let hasFolder = 1;
 }
 
 def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
     FLOW_StreamableOp,
+    TypesMatchWith<"value type matches element type of result",
+                   "result", "value",
+                   "$_self.cast<ShapedType>().getElementType()">,
   ]> {
   let summary = [{splats a value into a shaped tensor}];
   let description = [{
@@ -580,6 +603,8 @@ def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   let results = (outs
     FLOW_Tensor:$result
   );
+
+  let assemblyFormat = "$value `:` type($result) attr-dict-with-keyword";
 
   let extraClassDeclaration = [{
     // StreamableOpInterface:

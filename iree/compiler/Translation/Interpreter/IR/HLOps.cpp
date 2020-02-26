@@ -36,76 +36,8 @@ FunctionType CallOp::getCalleeType() {
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hl_interp.call_indirect
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseCallIndirectOp(OpAsmParser &parser,
-                                       OperationState &result) {
-  FunctionType calleeType;
-  OpAsmParser::OperandType callee;
-  llvm::SMLoc operandsLoc;
-  SmallVector<OpAsmParser::OperandType, 4> operands;
-  return failure(
-      parser.parseOperand(callee) || parser.getCurrentLocation(&operandsLoc) ||
-      parser.parseOperandList(operands, OpAsmParser::Delimiter::Paren) ||
-      parser.parseOptionalAttrDict(result.attributes) ||
-      parser.parseColonType(calleeType) ||
-      parser.resolveOperand(callee, calleeType, result.operands) ||
-      parser.resolveOperands(operands, calleeType.getInputs(), operandsLoc,
-                             result.operands) ||
-      parser.addTypesToList(calleeType.getResults(), result.types));
-}
-
-static void printCallIndirectOp(OpAsmPrinter &p, CallIndirectOp op) {
-  p << "iree_hl_interp.call_indirect ";
-  p.printOperand(op.getCallee());
-  p << '(';
-  auto operandRange = op.getOperands();
-  p.printOperands(++operandRange.begin(), operandRange.end());
-  p << ')';
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{"callee"});
-  p << " : " << op.getCallee().getType();
-}
-
-//===----------------------------------------------------------------------===//
-// iree_hl_interp.return
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseReturnOp(OpAsmParser &parser, OperationState &state) {
-  SmallVector<OpAsmParser::OperandType, 2> opInfo;
-  SmallVector<Type, 2> types;
-  llvm::SMLoc loc = parser.getCurrentLocation();
-  return failure(parser.parseOperandList(opInfo) ||
-                 (!opInfo.empty() && parser.parseColonTypeList(types)) ||
-                 parser.resolveOperands(opInfo, types, loc, state.operands));
-}
-
-static void printReturnOp(OpAsmPrinter &p, ReturnOp op) {
-  p << "iree_hl_interp.return";
-  if (op.getNumOperands() > 0) {
-    p << ' ';
-    p.printOperands(op.operand_begin(), op.operand_end());
-    p << " : ";
-    interleaveComma(op.getOperandTypes(), p);
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // iree_hl_interp.br
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseBranchOp(OpAsmParser &parser, OperationState &result) {
-  Block *dest;
-  SmallVector<Value, 4> destOperands;
-  if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
-  result.addSuccessor(dest, destOperands);
-  return success();
-}
-
-static void printBranchOp(OpAsmPrinter &p, BranchOp op) {
-  p << "iree_hl_interp.br ";
-  p.printSuccessorAndUseList(op.getOperation(), 0);
-}
 
 Block *BranchOp::getDest() { return getOperation()->getSuccessor(0); }
 

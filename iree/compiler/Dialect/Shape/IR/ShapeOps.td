@@ -168,7 +168,10 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape"> {
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape"> {
+def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape", [
+    TypesMatchWith<"dimensions type and rank to match Dim type of result",
+                   "shape", "dynamic_dimensions",
+                   "getDimTypeDynamicRange($_self.cast<RankedShapeType>())">]> {
   let summary = "Makes a ranked_shape from individual dims.";
   let description = [{
     Given a list of SSA values holding compatible dims, makes a corresponding
@@ -184,7 +187,7 @@ def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape"> {
   let arguments = (ins Variadic<Shape_DimType>:$dynamic_dimensions);
   let results = (outs Shape_RankedShape:$shape);
 
-  let verifier = [{ return verify$cppClass(*this); }];
+  let assemblyFormat = "$dynamic_dimensions `->` type($shape) attr-dict";
 
   let extraClassDeclaration = [{
     RankedShapeType getRankedShapeType() {
@@ -227,7 +230,10 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
   let hasCanonicalizer = 1;
 }
 
-def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
+def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims", [
+    TypesMatchWith<"result type and rank to match Dim type of shape operand",
+                   "shape", "result",
+                   "getDimTypeRange($_self.cast<RankedShapeType>())">]> {
   let summary = "Gets all dimension values from a ranked_shape.";
   let description = [{
     Static dimensions will fold to constants.
@@ -239,7 +245,8 @@ def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
 
   let arguments = (ins Shape_RankedShape:$shape);
   let results = (outs Variadic<Shape_DimType>:$result);
-  let verifier = [{ return verify$cppClass(*this); }];
+
+  let assemblyFormat = "$shape `:` type($shape) attr-dict";
 
   let builders = [
     OpBuilder<[{

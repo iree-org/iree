@@ -280,6 +280,7 @@ def HAL_DescriptorSet : DialectType<
   let typeDescription = [{
     Descriptor set.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::DescriptorSetType>()";
 }
 
 def HAL_DescriptorSetLayout : DialectType<
@@ -344,6 +345,7 @@ def HAL_ExecutableLayout : DialectType<
   let typeDescription = [{
     An executable layout describing the descriptor sets and push constants used.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::ExecutableLayoutType>()";
 }
 
 def HAL_Fence : DialectType<

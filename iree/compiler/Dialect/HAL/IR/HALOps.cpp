@@ -731,72 +731,6 @@ void CommandBufferBindDescriptorSetOp::build(Builder *builder,
   state.addOperands(dynamicOffsets);
 }
 
-static ParseResult parseCommandBufferBindDescriptorSetOp(
-    OpAsmParser &parser, OperationState *result) {
-  OpAsmParser::OperandType commandBuffer;
-  OpAsmParser::OperandType executable;
-  IntegerAttr setAttr;
-  OpAsmParser::OperandType descriptorSet;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseOperand(commandBuffer)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(executable)) ||
-      failed(parser.parseComma()) || failed(parser.parseKeyword("set")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(setAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "set", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseOperand(descriptorSet)) ||
-      failed(parser.resolveOperands(
-          ArrayRef<OpAsmParser::OperandType>{
-              commandBuffer,
-              executable,
-              descriptorSet,
-          },
-          ArrayRef<Type>{
-              CommandBufferType::get(result->getContext()),
-              ExecutableLayoutType::get(result->getContext()),
-              DescriptorSetType::get(result->getContext()),
-          },
-          operandsLoc, result->operands))) {
-    return failure();
-  }
-  SmallVector<OpAsmParser::OperandType, 4> dynamicOffsets;
-  if (succeeded(parser.parseOptionalComma())) {
-    if (failed(parser.parseKeyword("offsets")) || failed(parser.parseEqual()) ||
-        failed(parser.parseOperandList(dynamicOffsets,
-                                       OpAsmParser::Delimiter::Square)) ||
-        failed(parser.resolveOperands(dynamicOffsets,
-                                      parser.getBuilder().getIntegerType(32),
-                                      result->operands))) {
-      return failure();
-    }
-  }
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printCommandBufferBindDescriptorSetOp(
-    OpAsmPrinter &p, CommandBufferBindDescriptorSetOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.command_buffer());
-  p << ", ";
-  p.printOperand(op.executable_layout());
-  p << ", set=" << op.set() << ", ";
-  p.printOperand(op.descriptor_set());
-  if (!op.dynamic_offsets().empty()) {
-    p << ", offsets=[";
-    interleaveComma(op.dynamic_offsets(), p,
-                    [&](Value value) { p.printOperand(value); });
-    p << "]";
-  }
-  p.printOptionalAttrDict(op.getAttrs(), /*elidedAttrs=*/{
-                              "set",
-                          });
-}
-
 //===----------------------------------------------------------------------===//
 // hal.command_buffer.dispatch
 //===----------------------------------------------------------------------===//
@@ -856,54 +790,6 @@ void DescriptorSetLayoutMakeBindingOp::build(
 void DescriptorSetLayoutMakeBindingOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "binding");
-}
-
-static ParseResult parseDescriptorSetLayoutMakeBindingOp(
-    OpAsmParser &parser, OperationState *result) {
-  IntegerAttr bindingAttr;
-  OpAsmParser::OperandType buffer;
-  OpAsmParser::OperandType offset;
-  OpAsmParser::OperandType length;
-  llvm::SMLoc operandLoc;
-  Type resultType;
-  if (failed(parser.parseKeyword("binding")) || failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(bindingAttr,
-                                   parser.getBuilder().getIntegerType(32),
-                                   "binding", result->attributes)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(buffer)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(offset)) ||
-      failed(parser.parseComma()) || failed(parser.parseOperand(length)) ||
-      failed(parser.getCurrentLocation(&operandLoc)) ||
-      failed(parser.resolveOperands(
-          {
-              buffer,
-              offset,
-              length,
-          },
-          ArrayRef<Type>{
-              BufferType::get(result->getContext()),
-              getDeviceSizeType(parser),
-              getDeviceSizeType(parser),
-          },
-          operandLoc, result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printDescriptorSetLayoutMakeBindingOp(
-    OpAsmPrinter &p, DescriptorSetLayoutMakeBindingOp op) {
-  p << op.getOperationName() << ' ';
-  p << "binding=" << op.binding() << ", ";
-  p.printOperands(op.getOperation()->getOperands());
-  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
-                                     /*elidedAttrs=*/{"binding"});
-  p << " : ";
-  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -1054,57 +940,6 @@ static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
 void ExecutableLayoutCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "executable_layout");
-}
-
-static ParseResult parseExecutableLayoutCreateOp(OpAsmParser &parser,
-                                                 OperationState *result) {
-  OpAsmParser::OperandType device;
-  SmallVector<OpAsmParser::OperandType, 4> setLayouts;
-  IntegerAttr pushConstants;
-  Type resultType;
-  if (failed(parser.parseOperand(device)) ||
-      failed(parser.resolveOperand(
-          device, DeviceType::get(result->getContext()), result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseKeyword("set_layouts")) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseOperandList(setLayouts,
-                                     OpAsmParser::Delimiter::Square)) ||
-      failed(parser.resolveOperands(
-          setLayouts, DescriptorSetLayoutType::get(result->getContext()),
-          result->operands))) {
-    return failure();
-  }
-  if (succeeded(parser.parseOptionalComma())) {
-    if (failed(parser.parseKeyword("push_constants")) ||
-        failed(parser.parseEqual()) ||
-        failed(parser.parseAttribute(pushConstants, "push_constants",
-                                     result->attributes))) {
-      return failure();
-    }
-  }
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printExecutableLayoutCreateOp(OpAsmPrinter &p,
-                                          ExecutableLayoutCreateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", set_layouts=[";
-  p.printOperands(op.set_layouts());
-  p << "]";
-  if (op.push_constants()) {
-    p << ", push_constants=";
-    p.printAttribute(op.push_constantsAttr());
-  }
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
-  p << " : ";
-  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//

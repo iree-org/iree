@@ -1149,6 +1149,8 @@ def VM_BranchOp : VM_Op<"br", [
     AnySuccessor:$dest
   );
 
+  let assemblyFormat = "$dest attr-dict";
+
   let encoding = [
     VM_EncOpcode<VM_OPC_Branch>,
     VM_EncBranch<"dest", "getOperands", 0>,
@@ -1200,6 +1202,8 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     AnySuccessor:$trueDest,
     AnySuccessor:$falseDest
   );
+
+  let assemblyFormat = "$condition `,` $trueDest `,` $falseDest attr-dict";
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBranch>,
@@ -1447,6 +1451,8 @@ def VM_ReturnOp : VM_Op<"return", [
     Variadic<VM_AnyType>:$operands
   );
 
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+
   let encoding = [
     VM_EncOpcode<VM_OPC_Return>,
     VM_EncVariadicOperands<"operands">,
@@ -1480,6 +1486,8 @@ def VM_YieldOp : VM_Op<"yield", [
     Yields the fiber for some (likely short) amount of time. This can be used to
     perform cooperative scheduling and ensure fair (enough) execution.
   }];
+
+  let assemblyFormat = "attr-dict";
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Yield>,
@@ -1566,6 +1574,8 @@ def VM_BreakOp : VM_Op<"break", [
     AnySuccessor:$dest
   );
 
+  let assemblyFormat = "$dest attr-dict";
+
   let encoding = [
     VM_EncOpcode<VM_OPC_Break>,
     VM_EncBranch<"dest", "getOperands", 0>,
@@ -1611,6 +1621,8 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
   let successors = (successor
     AnySuccessor:$dest
   );
+
+  let assemblyFormat = "$condition `,` $dest attr-dict";
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBreak>,

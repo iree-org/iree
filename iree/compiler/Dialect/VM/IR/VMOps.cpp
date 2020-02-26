@@ -700,25 +700,6 @@ void ConstRefRodataOp::build(Builder *builder, OperationState &result,
 // Control flow
 //===----------------------------------------------------------------------===//
 
-static ParseResult parseBranchOp(OpAsmParser &parser, OperationState *result) {
-  Block *dest;
-  SmallVector<Value, 4> destOperands;
-  if (failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
-    return failure();
-  }
-  result->addSuccessor(dest, destOperands);
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return failure();
-  }
-  return success();
-}
-
-static void printBranchOp(OpAsmPrinter &p, BranchOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSuccessorAndUseList(op.getOperation(), 0);
-  p.printOptionalAttrDict(op.getAttrs());
-}
-
 Block *BranchOp::getDest() { return getOperation()->getSuccessor(0); }
 
 void BranchOp::setDest(Block *block) {
@@ -727,51 +708,6 @@ void BranchOp::setDest(Block *block) {
 
 void BranchOp::eraseOperand(unsigned index) {
   getOperation()->eraseSuccessorOperand(0, index);
-}
-
-static ParseResult parseCondBranchOp(OpAsmParser &parser,
-                                     OperationState *result) {
-  SmallVector<Value, 4> destOperands;
-  Block *dest;
-  OpAsmParser::OperandType condInfo;
-
-  // Parse the condition.
-  Type int32Ty = parser.getBuilder().getIntegerType(32);
-  if (failed(parser.parseOperand(condInfo)) || failed(parser.parseComma()) ||
-      failed(parser.resolveOperand(condInfo, int32Ty, result->operands))) {
-    return parser.emitError(parser.getNameLoc(),
-                            "expected condition type was boolean (i32)");
-  }
-
-  // Parse the true successor.
-  if (failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
-    return failure();
-  }
-  result->addSuccessor(dest, destOperands);
-
-  // Parse the false successor.
-  destOperands.clear();
-  if (failed(parser.parseComma()) ||
-      failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
-    return failure();
-  }
-  result->addSuccessor(dest, destOperands);
-
-  if (failed(parser.parseOptionalAttrDict(result->attributes))) {
-    return failure();
-  }
-
-  return success();
-}
-
-static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.getCondition());
-  p << ", ";
-  p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::trueIndex);
-  p << ", ";
-  p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::falseIndex);
-  p.printOptionalAttrDict(op.getAttrs());
 }
 
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,
@@ -931,57 +867,9 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
   }
 }
 
-static ParseResult parseReturnOp(OpAsmParser &parser, OperationState *result) {
-  SmallVector<OpAsmParser::OperandType, 2> opInfo;
-  SmallVector<Type, 2> types;
-  llvm::SMLoc loc = parser.getCurrentLocation();
-  return failure(parser.parseOperandList(opInfo) ||
-                 (!opInfo.empty() && parser.parseColonTypeList(types)) ||
-                 parser.resolveOperands(opInfo, types, loc, result->operands));
-}
-
-static void printReturnOp(OpAsmPrinter &p, ReturnOp &op) {
-  p << op.getOperationName();
-  if (op.getNumOperands() > 0) {
-    p << ' ';
-    p.printOperands(op.operand_begin(), op.operand_end());
-    p.printOptionalAttrDict(op.getAttrs());
-    p << " : ";
-    interleaveComma(op.getOperandTypes(), p);
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// Async/fiber ops
-//===----------------------------------------------------------------------===//
-
-static ParseResult parseYieldOp(OpAsmParser &parser, OperationState *result) {
-  return parser.parseOptionalAttrDict(result->attributes);
-}
-
-static void printYieldOp(OpAsmPrinter &p, YieldOp &op) {
-  p << op.getOperationName();
-  p.printOptionalAttrDict(op.getAttrs());
-}
-
 //===----------------------------------------------------------------------===//
 // Debugging
 //===----------------------------------------------------------------------===//
-
-static ParseResult parseBreakOp(OpAsmParser &parser, OperationState *result) {
-  Block *dest;
-  SmallVector<Value, 4> destOperands;
-  if (failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
-    return failure();
-  }
-  result->addSuccessor(dest, destOperands);
-  return success();
-}
-
-static void printBreakOp(OpAsmPrinter &p, BreakOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printSuccessorAndUseList(op.getOperation(), 0);
-}
 
 Block *BreakOp::getDest() { return getOperation()->getSuccessor(0); }
 
@@ -991,33 +879,6 @@ void BreakOp::setDest(Block *block) {
 
 void BreakOp::eraseOperand(unsigned index) {
   getOperation()->eraseSuccessorOperand(0, index);
-}
-
-static ParseResult parseCondBreakOp(OpAsmParser &parser,
-                                    OperationState *result) {
-  // Parse the condition.
-  OpAsmParser::OperandType condInfo;
-  Type int32Ty = parser.getBuilder().getIntegerType(32);
-  if (failed(parser.parseOperand(condInfo)) || failed(parser.parseComma()) ||
-      failed(parser.resolveOperand(condInfo, int32Ty, result->operands))) {
-    return parser.emitError(parser.getNameLoc(),
-                            "expected condition type was boolean (i32)");
-  }
-
-  Block *dest;
-  SmallVector<Value, 4> destOperands;
-  if (failed(parser.parseSuccessorAndUseList(dest, destOperands))) {
-    return failure();
-  }
-  result->addSuccessor(dest, destOperands);
-  return success();
-}
-
-static void printCondBreakOp(OpAsmPrinter &p, CondBreakOp &op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.condition());
-  p << ", ";
-  p.printSuccessorAndUseList(op.getOperation(), 0);
 }
 
 Block *CondBreakOp::getDest() { return getOperation()->getSuccessor(0); }
