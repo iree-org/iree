@@ -53,6 +53,34 @@ package(
     ]
 ]
 
+[
+    iree_py_test(
+        name = "keras_vision_model_" + model_name + "_test",
+        srcs = ["keras_vision_model_test.py"],
+        args = [
+            "--model=%s" % model_name,
+            "--target_backends=%s" % backends,
+        ],
+        main = "keras_vision_model_test.py",
+        python_version = "PY3",
+        # TODO(b/145815906) Get this running in OSS CI.
+        tags = [
+            "large",
+            "manual",
+            "nokokoro",
+        ],
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        ],
+    )
+    # TODO(b/150244105) update backends with "tf,iree_interpreter,iree_vulkan"
+    # and add other supported vision models
+    for model_name, backends in [
+        ("ResNet50", "tf"),
+        ("MobileNet", "tf"),
+    ]
+]
+
 iree_py_test(
     name = "vulkan_conv_test",
     srcs = ["vulkan_conv_test.py"],
