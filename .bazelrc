@@ -170,6 +170,9 @@ build:windows --define framework_shared_object=false
 build:windows --linkopt=/DEFAULTLIB:clang_rt.builtins-x86_64.lib
 build:windows --linkopt=/DEFAULTLIB:ws2_32.lib
 
+# Used in TensorFlow, so we have to enable it here as well.
+common --experimental_repo_remote_exec
+
 ###############################################################################
 
 # The user.bazelrc file is not checked in but available for local mods.

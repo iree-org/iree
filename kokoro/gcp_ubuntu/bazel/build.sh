@@ -26,6 +26,8 @@ export PS4='[$(date -u "+%T %Z")] '
 bazel --version
 python3 -V
 
+export CXX=clang++-6.0
+export CC=clang-6.0
 export PYTHON_BIN="$(which python3)"
 
 # Kokoro checks out the repository here.

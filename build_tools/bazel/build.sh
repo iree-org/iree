@@ -39,5 +39,8 @@ echo "Running with test env args: ${test_env_args[@]}"
 # want them built by CI unless they are excluded with "nokokoro".
 bazel query '//... except attr("tags", "nokokoro", //...)' | \
   xargs bazel test ${test_env_args[@]} --define=iree_tensorflow=true \
-    --config=rbe --config=rs \
     --keep_going --test_output=errors
+
+# Disable RBE until compatibility issues with the experimental_repo_remote_exec
+# flag are fixed.
+#   --config=rbe --config=rs \

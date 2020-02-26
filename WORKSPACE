@@ -54,8 +54,10 @@ http_archive(
     ],
 )
 
-load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
-rbe_autoconfig(name = "rbe_default")
+# Disable RBE until compatibility issues with the experimental_repo_remote_exec
+# flag are fixed.
+# load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
+# rbe_autoconfig(name = "rbe_default")
 
 ###############################################################################
 

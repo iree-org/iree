@@ -172,7 +172,7 @@ cc_library(
 cc_library(
     name = "TestSPIRV",
     srcs = glob([
-        "Dialect/SPIRV/*.cpp",
+        "lib/Dialect/SPIRV/*.cpp",
     ]),
     deps = [
         "@llvm-project//mlir:IR",
