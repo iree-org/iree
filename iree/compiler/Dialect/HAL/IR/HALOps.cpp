@@ -103,34 +103,6 @@ void MakeMemoryBarrierOp::getAsmResultNames(
   setNameFn(result(), "memory_barrier");
 }
 
-static ParseResult parseMakeMemoryBarrierOp(OpAsmParser &parser,
-                                            OperationState *result) {
-  Type memoryBarrierType;
-  if (failed(parseEnumAttr<AccessScopeBitfield, symbolizeAccessScopeBitfield>(
-          parser, "source_scope", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<AccessScopeBitfield, symbolizeAccessScopeBitfield>(
-          parser, "target_scope", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(memoryBarrierType))) {
-    return failure();
-  }
-  result->addTypes(memoryBarrierType);
-  return success();
-}
-
-static void printMakeMemoryBarrierOp(OpAsmPrinter &p, MakeMemoryBarrierOp op) {
-  p << op.getOperationName() << ' ';
-  p << "\"" << stringifyAccessScopeBitfield(op.source_scope()) << "\"";
-  p << ", ";
-  p << "\"" << stringifyAccessScopeBitfield(op.target_scope()) << "\"";
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"source_scope", "target_scope"});
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.make_buffer_barrier
 //===----------------------------------------------------------------------===//
@@ -150,48 +122,6 @@ void MakeBufferBarrierOp::build(Builder *builder, OperationState &state,
 void MakeBufferBarrierOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "buffer_barrier");
-}
-
-static ParseResult parseMakeBufferBarrierOp(OpAsmParser &parser,
-                                            OperationState *result) {
-  llvm::SMLoc operandLoc;
-  SmallVector<OpAsmParser::OperandType, 3> operands;
-  Type bufferBarrierType;
-  if (failed(parseEnumAttr<AccessScopeBitfield, symbolizeAccessScopeBitfield>(
-          parser, "source_scope", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<AccessScopeBitfield, symbolizeAccessScopeBitfield>(
-          parser, "target_scope", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseOperandList(operands, 3)) ||
-      failed(parser.getCurrentLocation(&operandLoc)) ||
-      failed(parser.resolveOperands(operands,
-                                    ArrayRef<Type>{
-                                        BufferType::get(result->getContext()),
-                                        getDeviceSizeType(parser),
-                                        getDeviceSizeType(parser),
-                                    },
-                                    operandLoc, result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(bufferBarrierType))) {
-    return failure();
-  }
-  result->addTypes(bufferBarrierType);
-  return success();
-}
-
-static void printMakeBufferBarrierOp(OpAsmPrinter &p, MakeBufferBarrierOp op) {
-  p << op.getOperationName() << ' ';
-  p << "\"" << stringifyAccessScopeBitfield(op.source_scope()) << "\"";
-  p << ", ";
-  p << "\"" << stringifyAccessScopeBitfield(op.target_scope()) << "\"";
-  p << ", ";
-  p.printOperands(op.getOperation()->getOperands());
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"source_scope", "target_scope"});
-  p << " : ";
-  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//
@@ -493,49 +423,6 @@ void AllocatorAllocateOp::getAsmResultNames(
   setNameFn(result(), "buffer");
 }
 
-static ParseResult parseAllocatorAllocateOp(OpAsmParser &parser,
-                                            OperationState *result) {
-  OpAsmParser::OperandType allocator;
-  OpAsmParser::OperandType allocationSize;
-  Type resultType;
-  if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(allocator,
-                                   AllocatorType::get(result->getContext()),
-                                   result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
-          parser, "memory_types", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<BufferUsageBitfield, symbolizeBufferUsageBitfield>(
-          parser, "buffer_usage", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parser.parseOperand(allocationSize)) ||
-      failed(parser.resolveOperand(allocationSize, getDeviceSizeType(parser),
-                                   result->operands)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printAllocatorAllocateOp(OpAsmPrinter &p, AllocatorAllocateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.allocator());
-  p << ", ";
-  p << "\"" << stringifyMemoryTypeBitfield(op.memory_types()) << "\"";
-  p << ", ";
-  p << "\"" << stringifyBufferUsageBitfield(op.buffer_usage()) << "\"";
-  p << ", ";
-  p.printOperand(op.allocation_size());
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"memory_types", "buffer_usage"});
-  p << " : ";
-  p.printType(op.result().getType());
-}
-
 //===----------------------------------------------------------------------===//
 // hal.allocator.allocate.const
 //===----------------------------------------------------------------------===//
@@ -557,48 +444,6 @@ void AllocatorAllocateConstOp::build(Builder *builder, OperationState &state,
 void AllocatorAllocateConstOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "cbuffer");
-}
-
-static ParseResult parseAllocatorAllocateConstOp(OpAsmParser &parser,
-                                                 OperationState *result) {
-  OpAsmParser::OperandType allocator;
-  ElementsAttr valueAttr;
-  Type resultType;
-  if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(allocator,
-                                   AllocatorType::get(result->getContext()),
-                                   result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
-          parser, "memory_types", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<BufferUsageBitfield, symbolizeBufferUsageBitfield>(
-          parser, "buffer_usage", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printAllocatorAllocateConstOp(OpAsmPrinter &p,
-                                          AllocatorAllocateConstOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.allocator());
-  p << ", ";
-  p << "\"" << stringifyMemoryTypeBitfield(op.memory_types()) << "\"";
-  p << ", ";
-  p << "\"" << stringifyBufferUsageBitfield(op.buffer_usage()) << "\"";
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"memory_types", "buffer_usage", "value"});
-  p << " : ";
-  p.printType(op.result().getType());
-  p << " = ";
-  p.printAttribute(op.value());
 }
 
 //===----------------------------------------------------------------------===//
@@ -646,47 +491,6 @@ void BufferViewConstOp::build(Builder *builder, OperationState &state,
 void BufferViewConstOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "view");
-}
-
-static ParseResult parseBufferViewConstOp(OpAsmParser &parser,
-                                          OperationState *result) {
-  OpAsmParser::OperandType allocator;
-  Type resultType;
-  ElementsAttr valueAttr;
-  if (failed(parser.parseOperand(allocator)) ||
-      failed(parser.resolveOperand(allocator,
-                                   AllocatorType::get(result->getContext()),
-                                   result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<MemoryTypeBitfield, symbolizeMemoryTypeBitfield>(
-          parser, "memory_types", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<BufferUsageBitfield, symbolizeBufferUsageBitfield>(
-          parser, "buffer_usage", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType)) ||
-      failed(parser.parseEqual()) ||
-      failed(parser.parseAttribute(valueAttr, "value", result->attributes))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printBufferViewConstOp(OpAsmPrinter &p, BufferViewConstOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.allocator());
-  p << ", ";
-  p << "\"" << stringifyMemoryTypeBitfield(op.memory_types()) << "\"";
-  p << ", ";
-  p << "\"" << stringifyBufferUsageBitfield(op.buffer_usage()) << "\"";
-  p << " : ";
-  p.printType(op.result().getType());
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"memory_types", "buffer_usage", "value"});
-  p << " = ";
-  p.printAttribute(op.value());
 }
 
 //===----------------------------------------------------------------------===//
@@ -801,45 +605,6 @@ void CommandBufferCreateOp::build(
 void CommandBufferCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "cmd");
-}
-
-static ParseResult parseCommandBufferCreateOp(OpAsmParser &parser,
-                                              OperationState *result) {
-  OpAsmParser::OperandType device;
-  Type resultType;
-  if (failed(parser.parseOperand(device)) ||
-      failed(parser.resolveOperand(
-          device, DeviceType::get(result->getContext()), result->operands)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<CommandBufferModeBitfield,
-                           symbolizeCommandBufferModeBitfield>(
-          parser, "modes", result->attributes)) ||
-      failed(parser.parseComma()) ||
-      failed(parseEnumAttr<CommandCategoryBitfield,
-                           symbolizeCommandCategoryBitfield>(
-          parser, "command_categories", result->attributes)) ||
-      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
-      failed(parser.parseColonType(resultType))) {
-    return failure();
-  }
-  result->addTypes(resultType);
-  return success();
-}
-
-static void printCommandBufferCreateOp(OpAsmPrinter &p,
-                                       CommandBufferCreateOp op) {
-  p << op.getOperationName() << ' ';
-  p.printOperand(op.device());
-  p << ", \"";
-  p << stringifyCommandBufferModeBitfield(op.modes());
-  p << "\", \"";
-  p << stringifyCommandCategoryBitfield(op.command_categories());
-  p << "\"";
-  p.printOptionalAttrDictWithKeyword(
-      op.getAttrs(),
-      /*elidedAttrs=*/{"modes", "command_categories"});
-  p << " : ";
-  p.printType(op.result().getType());
 }
 
 //===----------------------------------------------------------------------===//

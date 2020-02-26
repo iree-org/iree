@@ -123,6 +123,10 @@ def HAL_MakeMemoryBarrierOp : HAL_MakeTupleOp<"make_memory_barrier", [
     HAL_MemoryBarrier:$result
   );
 
+  let assemblyFormat = [{
+    $source_scope `,` $target_scope attr-dict-with-keyword `:` type($result)
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -152,6 +156,11 @@ def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
   let results = (outs
     HAL_BufferBarrier:$result
   );
+
+  let assemblyFormat = [{
+    $source_scope `,` $target_scope `,` operands attr-dict-with-keyword `:`
+    type($result)
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -438,6 +447,11 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
     HAL_Buffer:$result
   );
 
+  let assemblyFormat = [{
+    $allocator `,` $memory_types `,` $buffer_usage `,` $allocation_size
+    attr-dict-with-keyword `:` type($result)
+  }];
+
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
@@ -469,6 +483,11 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
   let results = (outs
     HAL_Buffer:$result
   );
+
+  let assemblyFormat = [{
+    $allocator `,` $memory_types `,` $buffer_usage attr-dict-with-keyword `:`
+    type($result) `=` $value
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -659,6 +678,11 @@ def HAL_BufferViewConstOp : HAL_PureOp<"buffer_view.const", [
   let results = (outs
     HAL_BufferView:$result
   );
+
+  let assemblyFormat = [{
+    $allocator `,` $memory_types `,` $buffer_usage `:` type($result)
+    attr-dict-with-keyword `=` $value
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
@@ -868,6 +892,11 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
   let results = (outs
     HAL_CommandBuffer:$result
   );
+
+  let assemblyFormat = [{
+    $device `,` $modes `,` $command_categories attr-dict-with-keyword `:`
+    type($result)
+  }];
 
   let skipDefaultBuilders = 1;
   let builders = [
