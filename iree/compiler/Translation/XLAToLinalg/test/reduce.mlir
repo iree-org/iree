@@ -16,7 +16,7 @@ module {
   // CHECK-NEXT: ^{{.+}}({{%.*}}, [[IDX:%.*]]: index, [[SRC:%.*]]: f32, [[INIT:%.*]]: f32, [[DST:%.*]]: f32):
   //      CHECK:   [[COND:%.*]] = cmpi
   // CHECK-NEXT:   [[OPERAND:%.*]] = select [[COND]], [[INIT]], [[DST]] : f32
-  // CHECK-NEXT:   [[RES:%.*]] = call @reduction_apply([[OPERAND]], [[SRC]]) : (f32, f32) -> f32
+  // CHECK-NEXT:   [[RES:%.*]] = addf [[OPERAND]], [[SRC]] : f32
   // CHECK-NEXT:   linalg.yield [[RES]] : f32
   // CHECK-NEXT: }: memref<5x4xf32>, memref<f32>, memref<4xf32>
   func @reduction_entry(memref<5x4xf32>, memref<f32>, memref<4xf32>)

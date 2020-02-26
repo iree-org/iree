@@ -82,9 +82,10 @@ struct ReductionApplyFnConversion final : ApplyFunctionConversion<FuncOp> {
 //===----------------------------------------------------------------------===//
 
 /// Adds a body with linalg ops for the reduction entry function `fn`. `fn` is
-/// assumed to be empty. The apply function and the dimension to reduce must be
-/// set as attributes on `fn`.
-static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn) {
+/// assumed to be empty. The dimension to reduce must be set as an attribute on
+/// `fn`.
+static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn,
+                                             FuncOp applyFn) {
   if (fn.getNumArguments() != 3) return failure();
 
   OpBuilder::InsertionGuard guard(builder);
@@ -144,13 +145,29 @@ static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn) {
   auto cond = builder.create<CmpIOp>(loc, CmpIPredicate::eq,
                                      block->getArgument(reductionDim),
                                      zero.getResult());
-  auto applyFn =
-      fn.getAttrOfType<FlatSymbolRefAttr>("iree.executable.reduction.apply");
   auto lhs = builder.create<SelectOp>(loc, cond, blockInitArg, blockDstArg);
   auto rhs = blockSrcArg;
-  auto result =
-      builder.create<CallOp>(loc, applyFn, elemType, ValueRange{lhs, rhs});
-  builder.create<linalg::YieldOp>(loc, result.getResult(0));
+
+  // Inline the function call into the region.
+  // TODO(hanchung): Use the MLIR inline pass. This requires to implement Linalg
+  // call interface.
+  BlockAndValueMapping mapper;
+  assert(applyFn.getNumArguments() == 2);
+  mapper.map(applyFn.getArgument(0), lhs);
+  mapper.map(applyFn.getArgument(1), rhs);
+  assert(mlir::has_single_element(applyFn.getBlocks()) &&
+         "apply function with multiple blocks is not support");
+  applyFn.getBody().cloneInto(block->getParent(), mapper);
+
+  Block &newBlock = *block->getParent()->getBlocks().rbegin();
+  block->getOperations().splice(block->end(), newBlock.getOperations());
+  newBlock.erase();
+
+  // Replace the terminator with linalg::YieldOp is required by linalg.generic
+  // op.
+  Operation *terminator = block->getTerminator();
+  builder.create<linalg::YieldOp>(loc, terminator->getOperands());
+  terminator->erase();
 
   builder.setInsertionPointAfter(linalgOp);
   builder.create<ReturnOp>(loc);
@@ -253,11 +270,17 @@ static LogicalResult lowerReductionApplyFnToLinalg(MLIRContext *context,
 
 static LogicalResult lowerReductionEntryFnToLinalg(MLIRContext *context,
                                                    ModuleOp module) {
+  OwningRewritePatternList patterns;
   OpBuilder builder(module.getBodyRegion());
+  SymbolTable table(module);
   for (auto fn : module.getOps<FuncOp>()) {
     if (!fn.getAttr("iree.executable.reduction") || !fn.empty()) continue;
-    if (failed(addReductionEntryFnBody(builder, fn))) return failure();
+    auto applyFnSymRef = fn.template getAttrOfType<FlatSymbolRefAttr>(
+        "iree.executable.reduction.apply");
+    auto applyFn = table.lookup<FuncOp>(applyFnSymRef.getValue());
+    if (failed(addReductionEntryFnBody(builder, fn, applyFn))) return failure();
   }
+
   return success();
 }
 
@@ -269,13 +292,13 @@ void HLOReductionToLinalgPass::runOnModule() {
   MLIRContext *context = &getContext();
   auto module = getModule();
 
-  if (failed(lowerReductionEntryFnToLinalg(context, module)))
-    return signalPassFailure();
-
   SmallVector<Operation *, 1> applyFns;
   if (failed(getApplyFunctions(module, applyFns))) return signalPassFailure();
 
   if (failed(lowerReductionApplyFnToLinalg(context, applyFns)))
+    return signalPassFailure();
+
+  if (failed(lowerReductionEntryFnToLinalg(context, module)))
     return signalPassFailure();
 }
 
