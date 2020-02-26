@@ -26,9 +26,8 @@ jobs:
       CXX: clang++
       CC: clang
       PYTHON_BIN: /usr/bin/python3
-      # Install a specific version of Bazel that is supported by TensorFlow
-      # (see https://www.tensorflow.org/install/source#install_bazel).
-      BAZEL_VERSION: 1.1.0
+      # Install the version of Bazel that is required by our .bazelversion file.
+      BAZEL_VERSION: 2.1.0
     steps:
       - name: Installing bazel
         run: |
