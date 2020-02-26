@@ -61,5 +61,6 @@ cc_library(
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:TransformUtils",
+        "@llvm-project//mlir:VectorOps",
     ],
 )

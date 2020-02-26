@@ -18,8 +18,10 @@
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Linalg/Passes.h"
+#include "mlir/Dialect/VectorOps/VectorOps.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Target/LLVMIR.h"
@@ -34,6 +36,18 @@ struct LLVMInitializer {
 static LLVMInitializer initializer;
 
 void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel) {
+  // Lower vector operations progressively into more elementary
+  // vector operations before running the regular compiler passes.
+  {
+    OwningRewritePatternList patterns;
+    vector::populateVectorSlicesLoweringPatterns(patterns,
+                                                 module->getContext());
+    vector::populateVectorContractLoweringPatterns(patterns,
+                                                   module->getContext());
+    mlir::applyPatternsGreedily(*module, patterns);
+  }
+
+  // Set up compiler passes.
   PassManager manager(module->getContext());
   manager.addPass(mlir::createConvertLinalgToLoopsPass());
   manager.addPass(mlir::createConvertLinalgToLLVMPass());
