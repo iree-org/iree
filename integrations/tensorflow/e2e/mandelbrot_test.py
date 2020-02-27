@@ -16,12 +16,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(silvasean): Get this working on IREE.
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 
 def complex_add(a_re, a_im, b_re, b_im):
@@ -98,7 +94,8 @@ class MandelbrotModule(tf.Module):
     return tf.reshape(in_the_set, shape=[view_pixels, view_pixels])
 
 
-@tf_test_utils.compile_modules(mandelbrot=MandelbrotModule)
+# TODO(silvasean): Get this working on IREE.
+@tf_test_utils.compile_modules(backends=["tf"], mandelbrot=MandelbrotModule)
 class MandelbrotTest(tf_test_utils.SavedModelTestCase):
 
   def test_mandelbrot(self):

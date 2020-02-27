@@ -57,3 +57,20 @@ TODO(silvasean): debugging miscompiles
 
 See `simple_arithmetic_test.py` for some examples of writing a test case that
 runs on multiple backends.
+
+### Limiting a test to only certain backends
+
+The `@tf_test_utils.compile_modules` decorator on tests takes a `backends=`
+keyword argument. This argument should be a Python list of backends, which
+accepts the same keys as the `--target_backends` flags.
+
+Example:
+
+```
+@tf_test_utils.compile_modules(backends=["tf"], mlp=(Mlp, ["predict"]))
+class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
+  ... the test case ...
+```
+
+Limiting this statically in the code can be useful for tests that are known to
+fail on certain backends but are still useful to have checked in.

@@ -14,13 +14,9 @@
 # limitations under the License.
 """Test matrix ops."""
 
-import os
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(b/147890602)
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 
 class MatrixOpsModule(tf.Module):
@@ -33,7 +29,9 @@ class MatrixOpsModule(tf.Module):
     return tf.matmul(x, y)
 
 
-@tf_test_utils.compile_modules(mat=(MatrixOpsModule, ["batch_matmul"]))
+# TODO(b/147890602)
+@tf_test_utils.compile_modules(
+    backends=["tf"], mat=(MatrixOpsModule, ["batch_matmul"]))
 class MatrixOpsTest(tf_test_utils.SavedModelTestCase):
 
   def test_batch_matmul(self):

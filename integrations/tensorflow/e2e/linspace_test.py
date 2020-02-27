@@ -12,15 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(jennik): Get this test working on IREE by implementing the linspace op in
-# MLIR.
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 
 class LinSpaceModule(tf.Module):
@@ -37,7 +31,9 @@ class LinSpaceModule(tf.Module):
     return tf.linspace(start, stop, num)
 
 
-@tf_test_utils.compile_modules(linspace=LinSpaceModule)
+# TODO(jennik): Get this test working on IREE by implementing the linspace op in
+# MLIR.
+@tf_test_utils.compile_modules(backends=["tf"], linspace=LinSpaceModule)
 class LinspaceTest(tf_test_utils.SavedModelTestCase):
 
   def test_linspace(self):

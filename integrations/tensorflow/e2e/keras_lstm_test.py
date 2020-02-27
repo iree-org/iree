@@ -13,13 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(silvasean): Get this test working on IREE.
-# Needs TensorList with current Keras implementation.
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 NUM_UNITS = 10
 NUM_TIMESTEPS = 24
@@ -38,7 +33,9 @@ class Lstm(tf.Module):
     return self.lstm(x)
 
 
-@tf_test_utils.compile_modules(lstm=(Lstm, ["predict"]))
+# TODO(silvasean): Get this test working on IREE.
+# Needs TensorList with current Keras implementation.
+@tf_test_utils.compile_modules(backends=["tf"], lstm=(Lstm, ["predict"]))
 class LstmTest(tf_test_utils.SavedModelTestCase):
 
   def test_lstm(self):

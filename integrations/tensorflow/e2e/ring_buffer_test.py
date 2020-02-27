@@ -13,13 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(b/148747011)
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 TIME_SIZE = 2
 FEATURE_SIZE = 2
@@ -181,7 +177,9 @@ class StatefulRingBufferM(tf.Module):
     return self.rb(x)
 
 
-@tf_test_utils.compile_modules(rb=(StatefulRingBufferM, ["predict"]))
+# TODO(b/148747011)
+@tf_test_utils.compile_modules(
+    backends=["tf"], rb=(StatefulRingBufferM, ["predict"]))
 class StatefulRingBufferTest(tf_test_utils.SavedModelTestCase):
 
   def test_statefulringbuffer(self):

@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(b/148495516)
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 TIME_SIZE = 3
 FEATURE_SIZE = 2
@@ -79,7 +75,9 @@ class SlidingWindowM(tf.Module):
     return self.sw(x)
 
 
-@tf_test_utils.compile_modules(sw=(SlidingWindowM, ["predict"]))
+# TODO(b/148495516)
+@tf_test_utils.compile_modules(
+    backends=["tf"], sw=(SlidingWindowM, ["predict"]))
 class SlidingWindowTest(tf_test_utils.SavedModelTestCase):
 
   def test_slidingwindow(self):

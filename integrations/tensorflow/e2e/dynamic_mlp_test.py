@@ -13,15 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
-
-# TODO(silvasean): Get this test working on IREE.
-# Needs TensorList with current Keras implementation.
-os.environ["IREE_TEST_BACKENDS"] = "tf"
 
 HIDDEN_1_DIM = 256
 HIDDEN_2_DIM = 256
@@ -68,7 +62,8 @@ class Mlp(tf.Module):
     return self.mlp(x)
 
 
-@tf_test_utils.compile_modules(mlp=(Mlp, ["predict"]))
+# TODO(silvasean): Get this test working on IREE.
+@tf_test_utils.compile_modules(backends=["tf"], mlp=(Mlp, ["predict"]))
 class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
 
   def test_dynamic_batch(self):
