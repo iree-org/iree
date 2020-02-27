@@ -42,6 +42,7 @@ package(
         "exported_names_test",
         "tensorlist_test",
         "keras_lstm_test",
+        "keras_lstm_static_test",
         "linspace_test",
         "mandelbrot_test",
         "math_test",
