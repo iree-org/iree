@@ -74,7 +74,6 @@ iree_cc_binary(
   DEPS
     ::dialect
     iree::tools::iree_opt_library
-    MLIRMlirOptMain
 )
 add_executable(check-opt ALIAS iree_modules_check_dialect_check-opt)
 

@@ -36,7 +36,6 @@ iree_cc_binary(
   OUT
     strings-opt
   DEPS
-    MLIRMlirOptMain
     iree::compiler::Dialect::Modules::Strings::IR::Dialect
     iree::tools::iree_opt_library
 )
