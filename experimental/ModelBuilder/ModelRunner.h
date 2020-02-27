@@ -69,8 +69,10 @@ class ModelRunner {
 
   // Compile the owned `module` into LLVMIR that can be passed to the buffer.
   // For now, the MLIR passes and transformations are kept to a minimum and only
-  // perform straightforward lowering to LLVMIR:
-  void compile(int llvmOptLevel, int llcOptLevel);
+  // perform straightforward lowering to LLVMIR. An optional shared runtime
+  // support library is passed to the execution engine.
+  void compile(int llvmOptLevel, int llcOptLevel,
+               const std::string &runtime = {});
 
   // Reference to the compiled module.
   mlir::OwningModuleRef &module;

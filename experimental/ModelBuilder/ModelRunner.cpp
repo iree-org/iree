@@ -35,7 +35,8 @@ struct LLVMInitializer {
 };
 static LLVMInitializer initializer;
 
-void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel) {
+void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel,
+                                const std::string& runtime) {
   // Lower vector operations progressively into more elementary
   // vector operations before running the regular compiler passes.
   {
@@ -72,9 +73,15 @@ void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel) {
       targetMachine.get(),
       /*optPassesInsertPos=*/0);
 
+  // Pass in runtime support library when specified.
+  SmallVector<StringRef, 4> libs;
+  if (!runtime.empty()) libs.push_back(runtime);
+
+  // Obtain the execution engine.
   auto created = mlir::ExecutionEngine::create(
-      *module, transformer, static_cast<llvm::CodeGenOpt::Level>(llcOptLevel));
-  llvm::handleAllErrors(created.takeError(), [](const llvm::ErrorInfoBase &b) {
+      *module, transformer, static_cast<llvm::CodeGenOpt::Level>(llcOptLevel),
+      libs);
+  llvm::handleAllErrors(created.takeError(), [](const llvm::ErrorInfoBase& b) {
     b.log(llvm::errs());
     assert(false);
   });

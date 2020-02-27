@@ -64,11 +64,13 @@ using edsc::intrinsics::linalg_yield;
 using edsc::ops::linalg_matmul;
 // From the Vector Dialect.
 using edsc::intrinsics::vector_contract;
+using edsc::intrinsics::vector_print;
 using edsc::ops::vector_contraction;
 using edsc::ops::vector_matmul;
 // From the Std Dialect.
 using edsc::intrinsics::std_alloc;
 using edsc::intrinsics::std_constant_float;
+using edsc::intrinsics::std_constant_index;
 using edsc::intrinsics::std_dealloc;
 using edsc::intrinsics::std_dim;
 using edsc::intrinsics::std_ret;
