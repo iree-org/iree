@@ -38,7 +38,6 @@ cc_binary(
     deps = [
         "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
         "//iree/tools:iree_opt_library",
-        "@llvm-project//mlir:MlirOptMain",
     ],
 )
 
