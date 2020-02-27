@@ -22,7 +22,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
-using namespace llvm;
 using namespace mlir;
 
 namespace mlir {
@@ -55,29 +54,29 @@ void registerTestVectorToLoopsPass();
 void registerVectorizerTestPass();
 } // namespace mlir
 
-static cl::opt<std::string>
-    inputFilename(cl::Positional, cl::desc("<input file>"), cl::init("-"));
+static llvm::cl::opt<std::string>
+    inputFilename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::init("-"));
 
-static cl::opt<std::string> outputFilename("o", cl::desc("Output filename"),
-                                           cl::value_desc("filename"),
-                                           cl::init("-"));
+static llvm::cl::opt<std::string> outputFilename("o", llvm::cl::desc("Output filename"),
+                                           llvm::cl::value_desc("filename"),
+                                           llvm::cl::init("-"));
 
-static cl::opt<bool>
+static llvm::cl::opt<bool>
     splitInputFile("split-input-file",
-                   cl::desc("Split the input file into pieces and process each "
+                   llvm::cl::desc("Split the input file into pieces and process each "
                             "chunk independently"),
-                   cl::init(false));
+                   llvm::cl::init(false));
 
-static cl::opt<bool>
+static llvm::cl::opt<bool>
     verifyDiagnostics("verify-diagnostics",
-                      cl::desc("Check that emitted diagnostics match "
+                      llvm::cl::desc("Check that emitted diagnostics match "
                                "expected-* lines on the corresponding line"),
-                      cl::init(false));
+                      llvm::cl::init(false));
 
-static cl::opt<bool>
+static llvm::cl::opt<bool>
     verifyPasses("verify-each",
-                 cl::desc("Run the verifier after each transformation pass"),
-                 cl::init(true));
+                 llvm::cl::desc("Run the verifier after each transformation pass"),
+                 llvm::cl::init(true));
 
 void registerTestPasses() {
   registerConvertToTargetEnvPass();
@@ -120,14 +119,14 @@ int main(int argc, char **argv) {
   registerAllDialects();
   registerAllPasses();
   registerTestPasses();
-  InitLLVM y(argc, argv);
+  llvm::InitLLVM y(argc, argv);
 
   // Register any pass manager command line options.
   registerPassManagerCLOptions();
   PassPipelineCLParser passPipeline("", "Compiler passes to run");
 
   // Parse pass names in main to ensure static initialization completed.
-  cl::ParseCommandLineOptions(argc, argv, "MLIR modular optimizer driver\n");
+  llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR modular optimizer driver\n");
 
   // Set up the input file.
   std::string errorMessage;
