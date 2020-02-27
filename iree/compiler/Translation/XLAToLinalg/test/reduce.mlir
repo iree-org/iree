@@ -27,3 +27,31 @@ module {
     return %0 : tensor<f32>
   }
 }
+
+// -----
+
+module {
+  //      CHECK:   [[COND:%.*]] = cmpf "olt", {{%.*}}, {{%.*}} : f32
+  // CHECK-NEXT:   {{%.*}} = select [[COND]], {{%.*}}, {{%.*}} : f32
+  func @reduction_entry(memref<5x4xf32>, memref<f32>, memref<4xf32>)
+  attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 1 : i32}
+
+  func @reduction_apply(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
+    %0 = xla_hlo.min %arg0, %arg1 : tensor<f32>
+    return %0 : tensor<f32>
+  }
+}
+
+// -----
+
+module {
+  //      CHECK:   [[COND:%.*]] = cmpf "ogt", {{%.*}}, {{%.*}} : f32
+  // CHECK-NEXT:   {{%.*}} = select [[COND]], {{%.*}}, {{%.*}} : f32
+  func @reduction_entry(memref<5x4xf32>, memref<f32>, memref<4xf32>)
+  attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 1 : i32}
+
+  func @reduction_apply(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
+    %0 = xla_hlo.max %arg0, %arg1 : tensor<f32>
+    return %0 : tensor<f32>
+  }
+}

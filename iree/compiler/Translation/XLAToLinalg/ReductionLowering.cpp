@@ -259,8 +259,10 @@ static LogicalResult lowerReductionApplyFnToLinalg(MLIRContext *context,
   });
 
   OwningRewritePatternList patterns;
-  patterns.insert<ReductionApplyFnConversion,
-                  ReductionOpConversion<xla_hlo::AddOp> >(context, converter);
+  patterns
+      .insert<ReductionApplyFnConversion, ReductionOpConversion<xla_hlo::AddOp>,
+              ReductionOpConversion<xla_hlo::MinOp>,
+              ReductionOpConversion<xla_hlo::MaxOp> >(context, converter);
   ConversionTarget target(*context);
   target.addLegalDialect<linalg::LinalgDialect, StandardOpsDialect>();
   target.addDynamicallyLegalOp<FuncOp>(
