@@ -22,8 +22,6 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 
-using namespace mlir;
-
 namespace mlir {
 // Defined in the test directory, no public header.
 void registerConvertToTargetEnvPass();
@@ -78,70 +76,72 @@ static llvm::cl::opt<bool>
                  llvm::cl::desc("Run the verifier after each transformation pass"),
                  llvm::cl::init(true));
 
+namespace mlir {
 void registerTestPasses() {
-  registerConvertToTargetEnvPass();
-  registerInliner();
-  registerMemRefBoundCheck();
-  registerPassManagerTestPass();
-  registerPatternsTestPass();
-  registerPrintOpAvailabilityPass();
-  registerSimpleParametricTilingPass();
-  registerSymbolTestPasses();
-  registerTestAffineDataCopyPass();
-  registerTestAllReduceLoweringPass();
-  registerTestCallGraphPass();
-  registerTestConstantFold();
-  registerTestFunc();
-  registerTestGpuMemoryPromotionPass();
-  registerTestLinalgTransforms();
-  registerTestLivenessPass();
-  registerTestLoopFusion();
-  registerTestLoopMappingPass();
-  registerTestMatchers();
-  registerTestMemRefDependenceCheck();
-  registerTestMemRefStrideCalculation();
-  registerTestOpaqueLoc();
-  registerTestParallelismDetection();
-  registerTestVectorConversions();
-  registerTestVectorToLoopsPass();
-  registerVectorizerTestPass();
+  mlir::registerConvertToTargetEnvPass();
+  mlir::registerInliner();
+  mlir::registerMemRefBoundCheck();
+  mlir::registerPassManagerTestPass();
+  mlir::registerPatternsTestPass();
+  mlir::registerPrintOpAvailabilityPass();
+  mlir::registerSimpleParametricTilingPass();
+  mlir::registerSymbolTestPasses();
+  mlir::registerTestAffineDataCopyPass();
+  mlir::registerTestAllReduceLoweringPass();
+  mlir::registerTestCallGraphPass();
+  mlir::registerTestConstantFold();
+  mlir::registerTestFunc();
+  mlir::registerTestGpuMemoryPromotionPass();
+  mlir::registerTestLinalgTransforms();
+  mlir::registerTestLivenessPass();
+  mlir::registerTestLoopFusion();
+  mlir::registerTestLoopMappingPass();
+  mlir::registerTestMatchers();
+  mlir::registerTestMemRefDependenceCheck();
+  mlir::registerTestMemRefStrideCalculation();
+  mlir::registerTestOpaqueLoc();
+  mlir::registerTestParallelismDetection();
+  mlir::registerTestVectorConversions();
+  mlir::registerTestVectorToLoopsPass();
+  mlir::registerVectorizerTestPass();
 
   // The following passes are using global initializers, just link them in.
   if (std::getenv("bar") != (char *)-1)
     return;
 
   // TODO: move these to the test folder.
-  createTestMemRefBoundCheckPass();
-  createTestMemRefDependenceCheckPass();
+  mlir::createTestMemRefBoundCheckPass();
+  mlir::createTestMemRefDependenceCheckPass();
 }
+} // namespace mlir
 
 int main(int argc, char **argv) {
-  registerAllDialects();
-  registerAllPasses();
-  registerTestPasses();
+  mlir::registerAllDialects();
+  mlir::registerAllPasses();
+  mlir::registerTestPasses();
   llvm::InitLLVM y(argc, argv);
 
   // Register any pass manager command line options.
-  registerPassManagerCLOptions();
-  PassPipelineCLParser passPipeline("", "Compiler passes to run");
+  mlir::registerPassManagerCLOptions();
+  mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
 
   // Parse pass names in main to ensure static initialization completed.
   llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR modular optimizer driver\n");
 
   // Set up the input file.
   std::string errorMessage;
-  auto file = openInputFile(inputFilename, &errorMessage);
+  auto file = mlir::openInputFile(inputFilename, &errorMessage);
   if (!file) {
     llvm::errs() << errorMessage << "\n";
     return 1;
   }
 
-  auto output = openOutputFile(outputFilename, &errorMessage);
+  auto output = mlir::openOutputFile(outputFilename, &errorMessage);
   if (!output) {
     llvm::errs() << errorMessage << "\n";
     exit(1);
   }
 
-  return failed(MlirOptMain(output->os(), std::move(file), passPipeline,
+  return failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
                             splitInputFile, verifyDiagnostics, verifyPasses));
 }
