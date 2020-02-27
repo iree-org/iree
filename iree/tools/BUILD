@@ -35,12 +35,15 @@ TARGET_COMPILER_BACKENDS = [
 ]
 
 # Driver modules that register themselves at link time.
-IREE_DRIVER_MODULES = [
+IREE_DEFAULT_DRIVER_MODULES = [
     "//iree/hal/interpreter:interpreter_driver_module",
     # TODO(b/142004903): enable when Dawn HAL implementation is functional
     # "//iree/hal/dawn:dawn_driver_module",
     "//iree/hal/vmla:vmla_driver_module",
     "//iree/hal/vulkan:vulkan_driver_module",
+]
+
+IREE_DRIVER_MODULES = IREE_DEFAULT_DRIVER_MODULES + [
     "//iree/hal/llvmjit:llvmjit_driver_module",
 ]
 
@@ -170,7 +173,10 @@ cc_binary(
         "//iree/base:status",
         "//iree/modules/hal",
         "//iree/vm:bytecode_module",
-    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + PLATFORM_VULKAN_DEPS + select({
+        "//tools/cc_target_os:android": IREE_DEFAULT_DRIVER_MODULES,
+        "//conditions:default": IREE_DRIVER_MODULES,
+    }),
 )
 
 cc_binary(
