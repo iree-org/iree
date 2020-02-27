@@ -12,19 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
-
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
   NAME
-    XlaHloShapeBuilder
-  HDRS
-    "XlaHloShapeBuilder.h"
+    lit
   SRCS
-    "XlaHloShapeBuilder.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_xla
-  PUBLIC
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )

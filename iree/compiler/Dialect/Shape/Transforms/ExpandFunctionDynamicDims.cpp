@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
@@ -70,15 +71,6 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
       ConversionPatternRewriter &rewriter) const override {
     auto fnType = fnOp.getType();
 
-    // TODO(laurenzo): Need to handle all terminators so conservatively
-    // limiting to single block functions until implemented.
-    if (fnOp.getBody().getBlocks().size() != 1) {
-      fnOp.emitWarning()
-          << "dynamic shape conversion only supported for single block "
-          << "functions (currently)";
-      return matchFailure();
-    }
-
     // Convert function arguments.
     TypeConverter::SignatureConversion signatureConverter(
         fnType.getNumInputs());
@@ -105,9 +97,19 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     rewriter.applySignatureConversion(&newFnOp.getBody(), signatureConverter);
     rewriter.eraseOp(fnOp);
 
-    // Rewrite the terminator to match the result type conversion that was
-    // performed.
-    auto terminator = newFnOp.getBody().front().getTerminator();
+    for (auto &block : newFnOp.getBody().getBlocks()) {
+      rewriteBlock(newFnOp, block, rewriter);
+    }
+
+    return matchSuccess();
+  }
+
+  void rewriteBlock(FuncOp newFnOp, Block &block,
+                    ConversionPatternRewriter &rewriter) const {
+    // Rewrite any function return terminators.
+    auto terminator = block.getTerminator();
+    if (!llvm::isa<ReturnOp>(terminator)) return;
+
     auto ip = rewriter.saveInsertionPoint();
     rewriter.setInsertionPoint(terminator);
     SmallVector<Value, 4> newTerminatorOperands;
@@ -141,7 +143,6 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     rewriter.eraseOp(terminator);
 
     rewriter.restoreInsertionPoint(ip);
-    return matchSuccess();
   }
 
  private:
@@ -178,6 +179,11 @@ bool isLegallyShapedFunction(FuncOp fnOp) {
     if (!isLegallyShapedSignatureType(type, nextType)) return false;
   }
   // Validate results.
+  for (unsigned i = 0, e = fnType.getNumResults(); i < e; ++i) {
+    Type type = fnType.getResult(i);
+    Type nextType = (i + 1 < e) ? fnType.getResult(i + 1) : nullptr;
+    if (!isLegallyShapedSignatureType(type, nextType)) return false;
+  }
   return true;
 }
 

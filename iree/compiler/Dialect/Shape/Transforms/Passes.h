@@ -21,7 +21,14 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
+
+class OpPassManager;
+
 namespace iree_compiler {
+
+// Populates a pass manager with the pipeline to expand functions to include
+// explicit shape calculations for all dynamic tensors.
+void populateMaterializeDynamicShapesPipeline(OpPassManager &pm);
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.

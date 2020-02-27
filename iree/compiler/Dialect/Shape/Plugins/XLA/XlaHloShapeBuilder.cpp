@@ -158,6 +158,39 @@ Value rewriteShapexRankedBroadcastInDim(RankedShapeType resultShape,
   return bidOp.result_shape();
 }
 
+Value rewriteTranspose(RankedShapeType resultShape, TransposeOp transposeOp,
+                       OpBuilder &builder) {
+  if (!transposeOp) return nullptr;
+  auto loc = transposeOp.getLoc();
+
+  auto operandType =
+      transposeOp.operand().getType().dyn_cast<RankedTensorType>();
+  if (!operandType) return nullptr;
+
+  auto dimType = resultShape.getDimType();
+  auto operandShapeValue = builder.create<GetRankedShapeOp>(
+      loc, RankedShapeType::get(operandType.getShape(), dimType),
+      transposeOp.operand());
+
+  SmallVector<int64_t, 4> perm;
+  for (auto permValue : transposeOp.permutation().getIntValues()) {
+    perm.push_back(permValue.getSExtValue());
+  }
+  assert(perm.size() == resultShape.getRank());
+
+  // Map the dynamic dims.
+  SmallVector<Value, 4> dynamicDims;
+  for (int64_t i = 0, e = resultShape.getRank(); i < e; ++i) {
+    if (!resultShape.isDimDynamic(i)) continue;
+    int64_t operandDim = perm[i];
+    auto dimValue = builder.create<RankedDimOp>(
+        loc, dimType, operandShapeValue, builder.getI64IntegerAttr(operandDim));
+    dynamicDims.push_back(dimValue);
+  }
+
+  return builder.create<MakeRankedShapeOp>(loc, resultShape, dynamicDims);
+}
+
 }  // namespace
 
 // Creates a custom op shape builder for XLA-HLO ops that are not otherwise
@@ -185,6 +218,7 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   b.insertOpRankedShapeBuilder<RankedBroadcastInDimOp>(
       rewriteShapexRankedBroadcastInDim);
   b.insertOpRankedShapeBuilder<ReduceOp>(rewriteReduce);
+  b.insertOpRankedShapeBuilder<TransposeOp>(rewriteTranspose);
 }
 
 }  // namespace xla_hlo

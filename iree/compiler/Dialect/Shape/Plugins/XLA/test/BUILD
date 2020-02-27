@@ -12,19 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(test)
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
-iree_cc_library(
-  NAME
-    XlaHloShapeBuilder
-  HDRS
-    "XlaHloShapeBuilder.h"
-  SRCS
-    "XlaHloShapeBuilder.cpp"
-  DEPS
-    LLVMSupport
-    MLIRIR
-    iree::compiler::Dialect::Shape::IR
-    tensorflow::mlir_xla
-  PUBLIC
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
 )

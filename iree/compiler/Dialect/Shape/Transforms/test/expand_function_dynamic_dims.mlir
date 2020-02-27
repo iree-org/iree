@@ -19,3 +19,20 @@ func @dynamicFunctionArgs(%arg0 : tensor<1x?x2x?xf32>) -> tensor<1x?x2x?xf32> {
   // CHECK-DAG: return %[[TIE_T]], %[[GET_SHAPE]] : tensor<1x?x2x?xf32>, !shapex.ranked_shape<[1,?,2,?]>
   return %arg0 : tensor<1x?x2x?xf32>
 }
+
+// -----
+// CHECK-LABEL: @dynamicReturnInBlock
+// CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<2x3xf32>
+// CHECK-SAME: -> (tensor<?x3xf32>, !shapex.ranked_shape<[?,3]>)
+// Should insert function shape argument and result.
+func @dynamicReturnInBlock(%arg0 : tensor<2x3xf32>) -> (tensor<?x3xf32>) {
+  %0 = addf %arg0, %arg0 : tensor<2x3xf32>
+  br ^bb1
+  // CHECK: ^bb1
+  ^bb1:
+  // CHECK: %[[RESULT:.+]] = "unknown_op"
+  %1 = "unknown_op"(%0) : (tensor<2x3xf32>) -> (tensor<?x3xf32>)
+  // CHECK: %[[SHAPE:.+]] = shapex.get_ranked_shape %[[RESULT]]
+  // CHECK: return %[[RESULT]], %[[SHAPE]] : tensor<?x3xf32>, !shapex.ranked_shape<[?,3]>
+  return %1 : tensor<?x3xf32>
+}

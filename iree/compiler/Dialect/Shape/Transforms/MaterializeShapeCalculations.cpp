@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Shape/Plugins/XLA/XlaHloShapeBuilder.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
@@ -143,13 +144,47 @@ class ExpandRankedBroadcastShapePattern
   }
 };
 
-class MaterializeRankedShapePattern
+class MaterializeRunTimeRankedShapePattern
     : public OpRewritePattern<Shape::GetRankedShapeOp> {
  public:
-  MaterializeRankedShapePattern(
+  MaterializeRunTimeRankedShapePattern(MLIRContext *context)
+      : OpRewritePattern(context, 1) {}
+
+  PatternMatchResult matchAndRewrite(GetRankedShapeOp getShapeOp,
+                                     PatternRewriter &rewriter) const override {
+    auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
+    SmallVector<Value, 4> dynamicDims;
+    for (int64_t i = 0, e = shapeType.getRank(); i < e; ++i) {
+      if (!shapeType.isDimDynamic(i)) continue;
+      dynamicDims.push_back(
+          rewriter.create<DimOp>(getShapeOp.getLoc(), getShapeOp.operand(), i));
+    }
+
+    // TODO(laurenzo): Remove once further along (it is fine to be unsupported
+    // as it will fall back to generic), but in these early phases, it is
+    // extremely useful to be chatty about this fallback.
+    auto inputOperation = getShapeOp.operand().getDefiningOp();
+    if (inputOperation) {
+      inputOperation->emitRemark()
+          << "unable to materialize shape calculation (unsupported op '"
+          << inputOperation->getName() << "'?): falling back to runtime "
+          << "resolution";
+    }
+
+    rewriter.replaceOpWithNewOp<MakeRankedShapeOp>(getShapeOp, shapeType,
+                                                   dynamicDims);
+    return matchSuccess();
+  }
+};
+
+class MaterializeCompileTimeRankedShapePattern
+    : public OpRewritePattern<Shape::GetRankedShapeOp> {
+ public:
+  MaterializeCompileTimeRankedShapePattern(
       const CustomOpShapeBuilderList *customOpShapeBuilder,
       MLIRContext *context)
-      : OpRewritePattern(context), customOpShapeBuilder(customOpShapeBuilder) {}
+      : OpRewritePattern(context, 10),
+        customOpShapeBuilder(customOpShapeBuilder) {}
 
   PatternMatchResult matchAndRewrite(GetRankedShapeOp getShapeOp,
                                      PatternRewriter &rewriter) const override {
@@ -162,9 +197,9 @@ class MaterializeRankedShapePattern
       return matchSuccess();
     }
 
-    // Check for input operation.
+    // Check for input operation (unless if a small set of shape ops).
     Operation *inputOperation = getShapeOp.operand().getDefiningOp();
-    if (inputOperation) {
+    if (inputOperation && !llvm::isa<TieShapeOp>(inputOperation)) {
       return rewriteInputOp(getShapeOp, inputOperation, rewriter);
     }
 
@@ -198,9 +233,6 @@ class MaterializeRankedShapePattern
       }
     }
 
-    inputOperation->emitWarning()
-        << "unable to materialize shape calculation (unsupported op '"
-        << inputOperation->getName() << "'?)";
     return matchFailure();
   }
 
@@ -245,10 +277,13 @@ class MaterializeShapeCalculationsPass
     MakeRankedShapeOp::getCanonicalizationPatterns(patterns, &getContext());
     RankedDimOp::getCanonicalizationPatterns(patterns, &getContext());
     TieShapeOp::getCanonicalizationPatterns(patterns, &getContext());
-    patterns.insert<MaterializeRankedShapePattern>(getCustomOpShapeBuilder(),
-                                                   &getContext());
     patterns.insert<ExpandRankedBroadcastShapePattern>(&getContext());
+    patterns.insert<MaterializeCompileTimeRankedShapePattern>(
+        getCustomOpShapeBuilder(), &getContext());
+    patterns.insert<MaterializeRunTimeRankedShapePattern>(&getContext());
     applyPatternsGreedily(getFunction(), patterns);
+
+    OwningRewritePatternList fallbackPatterns;
   }
 };
 

@@ -24,6 +24,7 @@ cc_library(
         "ConvertHLOToShapeDialect.cpp",
         "ExpandFunctionDynamicDims.cpp",
         "MaterializeShapeCalculations.cpp",
+        "Passes.cpp",
         "TieDynamicShapes.cpp",
     ],
     hdrs = [

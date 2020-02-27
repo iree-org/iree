@@ -24,6 +24,7 @@ iree_cc_library(
     "ConvertHLOToShapeDialect.cpp"
     "ExpandFunctionDynamicDims.cpp"
     "MaterializeShapeCalculations.cpp"
+    "Passes.cpp"
     "TieDynamicShapes.cpp"
   DEPS
     MLIRIR
