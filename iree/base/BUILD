@@ -133,6 +133,7 @@ cc_library(
         ":logging",
         ":platform_headers",
         ":status",
+        ":target_platform",
         ":tracing",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
