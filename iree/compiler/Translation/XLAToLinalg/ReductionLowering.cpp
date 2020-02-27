@@ -228,6 +228,7 @@ struct ReductionOpConversion final : public ApplyFunctionConversion<OpTy> {
 // Utils
 //===----------------------------------------------------------------------===//
 
+// Appends all the apply functions to `applyFns`.
 static LogicalResult getApplyFunctions(ModuleOp module,
                                        SmallVectorImpl<Operation *> &applyFns) {
   auto fns = module.getOps<FuncOp>();
@@ -300,6 +301,13 @@ void HLOReductionToLinalgPass::runOnModule() {
 
   if (failed(lowerReductionEntryFnToLinalg(context, module)))
     return signalPassFailure();
+
+  // Erase all the apply functions because they are already inlined into entry
+  // functions and there are no users.
+  applyFns.clear();
+  if (failed(getApplyFunctions(getModule(), applyFns)))
+    return signalPassFailure();
+  for (auto f : applyFns) f->erase();
 }
 
 static PassRegistration<HLOReductionToLinalgPass> pass(

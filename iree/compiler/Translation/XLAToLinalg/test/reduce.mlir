@@ -22,9 +22,6 @@ module {
   func @reduction_entry(memref<5x4xf32>, memref<f32>, memref<4xf32>)
   attributes {iree.executable.export, iree.executable.reduction, iree.executable.reduction.apply = @reduction_apply, iree.executable.reduction.dimension = 1 : i32, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.executable.workload = dense<[4, 5, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32}
 
-  // CHECK: reduction_apply([[ARG0:%.*]]: f32, [[ARG1:%.*]]: f32)
-  // CHECK: [[RES:%.*]] = addf [[ARG0]], [[ARG1]]
-  // CHECK: return [[RES]]
   func @reduction_apply(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
     %0 = xla_hlo.add %arg0, %arg1 : tensor<f32>
     return %0 : tensor<f32>

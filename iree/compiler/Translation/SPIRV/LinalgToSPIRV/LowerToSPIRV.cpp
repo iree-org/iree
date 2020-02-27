@@ -277,17 +277,17 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
         return signalPassFailure();
       }
       Block &block = body.front();
-      auto genericOps = block.getOps<linalg::GenericOp>();
-      if (!mlir::has_single_element(genericOps)) {
+      auto linalgOps = block.getOps<linalg::LinalgOp>();
+      if (!mlir::has_single_element(linalgOps)) {
         funcOp.emitError(
-            "unhandled SPIR-V code-generation with multiple generic ops in "
+            "unhandled SPIR-V code-generation with multiple linalg ops in "
             "dispatch region");
         return signalPassFailure();
       }
       // Find the number of leading parallel loops in the generic op
       unsigned numOuterParallelLoops = 0;
-      auto genericOp = *genericOps.begin();
-      for (auto iteratorType : genericOp.iterator_types()) {
+      auto linalgOp = *linalgOps.begin();
+      for (auto iteratorType : linalgOp.iterator_types()) {
         if (iteratorType.cast<StringAttr>().getValue() !=
             getParallelIteratorTypeName()) {
           break;
