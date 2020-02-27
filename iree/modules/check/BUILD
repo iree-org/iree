@@ -13,21 +13,12 @@
 # limitations under the License.
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
-load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_DEPS")
+load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES", "PLATFORM_VULKAN_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
-
-# Driver modules that register themselves at link time.
-IREE_DRIVER_MODULES = [
-    "//iree/hal/interpreter:interpreter_driver_module",
-    # TODO(b/142004903): enable when Dawn HAL implementation is functional
-    # "//iree/hal/dawn:dawn_driver_module",
-    "//iree/hal/vmla:vmla_driver_module",
-    "//iree/hal/vulkan:vulkan_driver_module",
-]
 
 iree_bytecode_module(
     name = "check_test_module",

@@ -60,6 +60,16 @@ PLATFORM_VULKAN_TEST_DEPS = [
     "//iree/testing:gtest_main",
 ]
 
+# Driver modules that register themselves at link time.
+IREE_DRIVER_MODULES = [
+    "//iree/hal/interpreter:interpreter_driver_module",
+    # TODO(b/142004903): enable when Dawn HAL implementation is functional
+    # "//iree/hal/dawn:dawn_driver_module",
+    "//iree/hal/vmla:vmla_driver_module",
+    "//iree/hal/vulkan:vulkan_driver_module",
+    "//iree/hal/llvmjit:llvmjit_driver_module",
+]
+
 # Aliases to the Starlark cc rules.
 cc_library = _cc_library
 cc_binary = _cc_binary

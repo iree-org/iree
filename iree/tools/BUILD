@@ -15,7 +15,7 @@
 # Misc tools used to optimize, translate, and evaluate IREE.
 # Most of these are not designed to run on-device.
 
-load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_DEPS")
+load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES", "PLATFORM_VULKAN_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -32,16 +32,6 @@ TARGET_COMPILER_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     "//iree/compiler/Dialect/HAL/Target/LLVM",
-]
-
-# Driver modules that register themselves at link time.
-IREE_DRIVER_MODULES = [
-    "//iree/hal/interpreter:interpreter_driver_module",
-    # TODO(b/142004903): enable when Dawn HAL implementation is functional
-    # "//iree/hal/dawn:dawn_driver_module",
-    "//iree/hal/vmla:vmla_driver_module",
-    "//iree/hal/vulkan:vulkan_driver_module",
-    "//iree/hal/llvmjit:llvmjit_driver_module",
 ]
 
 cc_binary(

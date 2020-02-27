@@ -101,6 +101,14 @@ class BuildFileFunctions(object):
     self.PLATFORM_VULKAN_TEST_DEPS = ["//iree/testing:gtest_main"]
     self.FLATBUFFER_SUPPORTS_REFLECTIONS = False
     self.PLATFORM_VULKAN_LOADER_COPTS = []
+    self.IREE_DRIVER_MODULES = [
+        "//iree/hal/interpreter:interpreter_driver_module",
+        # TODO(b/142004903): enable when Dawn HAL implementation is functional
+        # "//iree/hal/dawn:dawn_driver_module",
+        "//iree/hal/vmla:vmla_driver_module",
+        "//iree/hal/vulkan:vulkan_driver_module",
+        "//iree/hal/llvmjit:llvmjit_driver_module",
+    ]
 
   # ------------------------------------------------------------------------- #
   # Conversion utilities, written to reduce boilerplate and allow for reuse   #
