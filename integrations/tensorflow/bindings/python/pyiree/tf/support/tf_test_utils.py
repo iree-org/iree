@@ -16,6 +16,7 @@
 
 # pylint: disable=not-callable
 # pylint: disable=invalid-name
+# pylint: disable=missing-docstring
 # pylint: disable=protected-access
 
 import collections
@@ -34,9 +35,16 @@ flags.DEFINE_string(
     "target_backends", None,
     "Explicit comma-delimited list of target backends. "
     "(Overrides environment variables and auto detection)")
+flags.DEFINE_string(
+    "debug_dir", None,
+    "Specifies a directory to dump debug artifacts to. Defaults to "
+    "--test_tmpdir")
 FLAGS = flags.FLAGS
 
 ORIGNAL_SAVED_MODEL_PATH_ATTR = "_ORIGINAL_SAVED_MODEL_PATH"
+
+# Per test directory where debug artifacts are dumped.
+global_debug_dir = None
 
 
 def save_and_compile_tf_module(tf_module, exported_names=(),
@@ -59,11 +67,42 @@ def save_and_compile_tf_module(tf_module, exported_names=(),
 
   def compile_from_path(sm_path):
     compiler_context = compiler.Context()
+    # Break up the compilation so we can save debug artifacts.
     compiler_module = compiler.tf_load_saved_model(
         sm_path,
         exported_names=exported_names,
-        compiler_context=compiler_context)
-    return compiler_module.compile(target_backends=target_backends)
+        compiler_context=compiler_context,
+        pass_pipeline=())
+
+    # Save the input MLIR module.
+    flattened_target_backends = re.sub("[^0-9a-zA-Z]+", "_",
+                                       "__".join(target_backends))
+    if global_debug_dir:
+      mlir_path = os.path.join(global_debug_dir,
+                               "raw_%s.mlir" % flattened_target_backends)
+      logging.info("Saving raw TF input MLIR to: %s", mlir_path)
+      with open(mlir_path, "w") as f:
+        f.write(compiler_module.to_asm())
+
+    # Now run the passes manually that tf_load_saved_model would usually do.
+    compiler_module.run_pass_pipeline(compiler.TF_IMPORT_PASS_PIPELINE)
+
+    if global_debug_dir:
+      mlir_path = os.path.join(global_debug_dir,
+                               "input_%s.mlir" % flattened_target_backends)
+      logging.info("Saving IREE input MLIR to: %s", mlir_path)
+      with open(mlir_path, "w") as f:
+        f.write(compiler_module.to_asm())
+
+    compiled_module = compiler_module.compile(target_backends=target_backends)
+    if global_debug_dir:
+      compiled_path = os.path.join(
+          global_debug_dir, "compiled_%s.vmfb" % flattened_target_backends)
+      logging.info("Saving compiled IREE module to: %s", compiled_path)
+      with open(compiled_path, "wb") as f:
+        f.write(compiled_module)
+
+    return compiled_module
 
   if hasattr(tf_module, ORIGNAL_SAVED_MODEL_PATH_ATTR):
     # Compile directly from the original path.
@@ -503,15 +542,25 @@ class SavedModelTestCase(tf.test.TestCase):
     if cls._modules_to_compile:
       for name, (ctor, exported_names,
                  backends) in cls._modules_to_compile.items():
-        # Setup crash reproducer
-        crash_reproducer_path = os.path.join(FLAGS.test_tmpdir, cls.__name__,
-                                             name + ".mlir")
+
+        # Setup the debug directory.
+        debug_parent_dir = FLAGS.debug_dir
+        if not debug_parent_dir:
+          debug_parent_dir = FLAGS.test_tmpdir
+        debug_parent_dir = os.path.join(debug_parent_dir, cls.__name__)
+
         try:
-          os.makedirs(os.path.dirname(crash_reproducer_path))
+          os.makedirs(debug_parent_dir)
         except IOError:
           logging.exception("Error creating crash reproducer dir for: %s",
-                            crash_reproducer_path)
+                            debug_parent_dir)
+
+        # Setup crash reproducer and global debug dir.
+        crash_reproducer_path = os.path.join(debug_parent_dir,
+                                             name + "_reproducer.mlir")
         compiler.Context.default_crash_reproducer_path = crash_reproducer_path
+        global global_debug_dir
+        global_debug_dir = debug_parent_dir
 
         try:
           # Compile.
@@ -526,6 +575,7 @@ class SavedModelTestCase(tf.test.TestCase):
           # Disable crash reproducer (to avoid inadvertently overwriting this
           # path on a subsequent interaction).
           compiler.Context.default_crash_reproducer_path = None
+          global_debug_dir = None
 
   @classmethod
   def tearDownClass(cls):
