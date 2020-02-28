@@ -74,6 +74,9 @@ using edsc::intrinsics::std_constant_index;
 using edsc::intrinsics::std_dealloc;
 using edsc::intrinsics::std_dim;
 using edsc::intrinsics::std_ret;
+using edsc::intrinsics::StdIndexedValue;
+// From the Affine Dialect.
+using edsc::intrinsics::AffineIndexedValue;
 // -----------------------------------------------------------------------------
 
 // Entry point class to build a whole model declaratively with C++ EDSCs.

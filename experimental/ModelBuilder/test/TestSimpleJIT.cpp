@@ -24,12 +24,91 @@
 
 using namespace mlir;  // NOLINT
 
-void testMatmulOnVectors() {
-  constexpr unsigned K = 16, M = 4, N = 8;
+// Flush the different output streams. Needed to ensure FileCheck
+// sees the various buffered streams in a reasonable order.
+static void flush() {
+  fflush(stderr);
+  fflush(stdout);
+  llvm::errs().flush();
+  llvm::outs().flush();
+}
 
+template <unsigned M, unsigned N>
+void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
   ModelBuilder modelBuilder;
-  // Build a func "test_vector_matmul".
-  constexpr StringLiteral funcName = "test_vector_matmul";
+
+  auto f32 = modelBuilder.f32;
+  auto mkVectorType = modelBuilder.getVectorType({M, N}, f32);
+  auto typeA = modelBuilder.getMemRefType({kNumElements}, mkVectorType);
+  auto knVectorType = modelBuilder.getVectorType({M, N}, f32);
+  auto typeB = modelBuilder.getMemRefType({kNumElements}, knVectorType);
+  auto mnVectorType = modelBuilder.getVectorType({M, N}, f32);
+  auto typeC = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
+
+  // 1. Build a simple vector_add.
+  {
+    auto f = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC});
+    OpBuilder b(&f.getBody());
+    ScopedContext scope(b, f.getLoc());
+
+    StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
+        C(f.getArgument(2));
+    auto last = std_constant_index(kNumElements - 1);
+    C(last) = A(last) + B(last);
+
+    // TODO(ntv, ajcbik): activate
+    // (vector_print(*C(last)));
+
+    std_ret();
+  }
+
+  modelBuilder.getModuleRef()->dump();
+  flush();
+
+  // 2. Compile the function, pass in runtime support library
+  //    to the execution engine for vector.print.
+  ModelRunner runner(modelBuilder.getModuleRef());
+  runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3);
+
+  // 3. Allocate data within data structures that interoperate with the MLIR ABI
+  // conventions used by codegen.
+  auto oneInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
+    float *p = reinterpret_cast<float *>(ptr + idx);
+    for (unsigned i = 0; i < M * N; ++i) *(p + i) = 1.0f;
+  };
+  auto zeroInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
+    float *p = reinterpret_cast<float *>(ptr + idx);
+    for (unsigned i = 0; i < M * N; ++i) *(p + i) = 0.0f;
+  };
+  auto A = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
+      {1}, oneInit);
+  auto B = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
+      {1}, oneInit);
+  auto C = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
+      {1}, zeroInit);
+
+  // 5. Call the funcOp named `funcName`.
+  const std::string kFuncAdapterName =
+      (llvm::Twine("_mlir_ciface_") + funcName).str();
+  auto *bufferA = A.get();
+  auto *bufferB = B.get();
+  auto *bufferC = C.get();
+  void *args[3] = {&bufferA, &bufferB, &bufferC};
+
+  auto err =
+      runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
+  flush();
+
+  if (err) llvm_unreachable("Error running function.");
+
+  llvm::outs() << "\nSUCCESS\n\n";
+  flush();
+}
+
+template <unsigned M, unsigned N, unsigned K>
+void testMatmulOnVectors(StringLiteral funcName) {
+  ModelBuilder modelBuilder;
+
   auto f32 = modelBuilder.f32;
   auto mkVectorType = modelBuilder.getVectorType({M, K}, f32);
   auto typeA = modelBuilder.getMemRefType({-1, -1}, mkVectorType);
@@ -38,10 +117,6 @@ void testMatmulOnVectors() {
   auto mnVectorType = modelBuilder.getVectorType({M, N}, f32);
   auto typeC = modelBuilder.getMemRefType({-1, -1}, mnVectorType);
 
-  // CHECK-LABEL: func @test_vector_matmul(
-  //  CHECK-SAME:   %[[A:.*]]: memref<?x?xvector<4x16xf32>>,
-  //  CHECK-SAME:   %[[B:.*]]: memref<?x?xvector<16x8xf32>>,
-  //  CHECK-SAME:   %[[C:.*]]: memref<?x?xvector<4x8xf32>>)
   auto func = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC});
 
   OpBuilder b(&func.getBody());
@@ -53,14 +128,33 @@ void testMatmulOnVectors() {
     (linalg_yield(vector_matmul(args[0], args[1], args[2])));
   };
 
-  // Fill its body.
-  //      CHECK:   linalg.generic {{.*}} %[[A]], %[[B]], %[[C]]
-  //      CHECK:     vector.contract {{.*}} : vector<4x16xf32>, vector<16x8xf32>
-  // CHECK-SAME:       into vector<4x8xf32>
   linalg_matmul(A, B, C, contractionBuilder);
   std_ret();
 
   modelBuilder.getModuleRef()->dump();
+  flush();
 }
 
-int main() { testMatmulOnVectors(); }
+int main() {
+  // CHECK-LABEL: func @test_vector_add_4_4
+  // CHECK: SUCCESS
+  testVectorAdd<4, 4>("test_vector_add_4_4", /*kNumElements=*/13);
+
+  // CHECK-LABEL: func @test_vector_add_9_7
+  // CHECK: SUCCESS
+  testVectorAdd<9, 7>("test_vector_add_9_7", /*kNumElements=*/5);
+
+  // CHECK-LABEL: func @test_vector_add_17_19
+  // CHECK: SUCCESS
+  testVectorAdd<17, 19>("test_vector_add_17_19", /*kNumElements=*/3);
+
+  // CHECK-LABEL: func @test_vector_matmul(
+  //  CHECK-SAME:   %[[A:.*]]: memref<?x?xvector<4x16xf32>>,
+  //  CHECK-SAME:   %[[B:.*]]: memref<?x?xvector<16x8xf32>>,
+  //  CHECK-SAME:   %[[C:.*]]: memref<?x?xvector<4x8xf32>>)
+  // Fill its body.
+  //      CHECK:   linalg.generic {{.*}} %[[A]], %[[B]], %[[C]]
+  //      CHECK:     vector.contract {{.*}} : vector<4x16xf32>, vector<16x8xf32>
+  // CHECK-SAME:       into vector<4x8xf32>
+  testMatmulOnVectors<4, 8, 16>("test_vector_matmul");
+}
