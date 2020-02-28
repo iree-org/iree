@@ -80,7 +80,7 @@ do
   full_command="${command//\%s/$1}"
 
   # Run it.
-  export PATH="$SUBPATH"
+  export PATH="$SUBPATH:$PATH"
   echo "RUNNING TEST: $full_command"
   echo "----------------"
   if eval "$full_command"; then
