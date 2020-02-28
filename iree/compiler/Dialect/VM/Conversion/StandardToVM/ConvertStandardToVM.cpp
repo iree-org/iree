@@ -69,8 +69,9 @@ class ModuleTerminatorOpConversion
 };
 
 // Whitelist of function attributes to retain when converting to vm.func.
-constexpr std::array<const char *, 1> kRetainedAttributes = {
+constexpr const char *kRetainedAttributes[] = {
     "iree.reflection",
+    "sym_visibility",
 };
 
 class FuncOpConversion : public OpConversionPattern<FuncOp> {
@@ -110,7 +111,10 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
                                 newFuncOp.end());
 
     // Retain function attributes in the whitelist.
-    for (auto retainAttrName : kRetainedAttributes) {
+    auto retainedAttributes = ArrayRef<const char *>(
+        kRetainedAttributes,
+        sizeof(kRetainedAttributes) / sizeof(kRetainedAttributes[0]));
+    for (auto retainAttrName : retainedAttributes) {
       StringRef attrName(retainAttrName);
       Attribute attr = srcOp.getAttr(attrName);
       if (attr) {

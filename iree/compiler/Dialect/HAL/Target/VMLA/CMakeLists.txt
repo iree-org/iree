@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+add_subdirectory(test)
+
 iree_cc_library(
   NAME
     VMLA
@@ -21,8 +23,17 @@ iree_cc_library(
     "VMLATarget.cpp"
   DEPS
     LLVMSupport
+    MLIRIR
+    MLIRPass
     MLIRSupport
+    flatbuffers
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::Target::Bytecode
+    iree::compiler::Dialect::VM::Transforms
+    iree::compiler::Dialect::VMLA::Transforms
+    iree::schemas::vmla_executable_def_cc_fbs
   ALWAYSLINK
   PUBLIC
 )

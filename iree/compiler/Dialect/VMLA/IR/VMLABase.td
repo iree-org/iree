@@ -90,6 +90,15 @@ def VMLA_Buffer : DialectType<
   }];
 }
 
+def VMLA_Interface : DialectType<
+    VMLA_Dialect,
+    CPred<"$_self.isa<IREE::VMLA::InterfaceType>()">,
+    "interface"> {
+  let typeDescription = [{
+    Binding and parameter interface (derived from `hal.interface`).
+  }];
+}
+
 // TODO(benvanik): figure out how to get constraints to work.
 // def VMLA_AnyTypeAttr : Confined<TypeAttr, [I8Attr, I16Attr, I32Attr, F32Attr]> {
 //   let constBuilderCall = ?;

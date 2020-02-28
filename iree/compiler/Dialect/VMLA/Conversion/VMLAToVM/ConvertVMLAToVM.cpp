@@ -151,6 +151,7 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   VMLA_IMPORT_OP(IREE::VMLA::BufferConstOp, "vmla.buffer.const");
   VMLA_IMPORT_OP(IREE::VMLA::BufferAllocOp, "vmla.buffer.alloc");
   VMLA_IMPORT_OP(IREE::VMLA::BufferCloneOp, "vmla.buffer.clone");
+  VMLA_IMPORT_OP(IREE::VMLA::BufferByteLengthOp, "vmla.buffer.byte_length");
   VMLA_IMPORT_OP(IREE::VMLA::BufferViewOp, "vmla.buffer.view");
   VMLA_IMPORT_OP(IREE::VMLA::BufferCopyOp, "vmla.buffer.copy");
   VMLA_IMPORT_OP(IREE::VMLA::BufferFillOp, "vmla.buffer.fill");
@@ -203,6 +204,8 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceSumOp, "vmla.reduce.sum");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMinOp, "vmla.reduce.min");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMaxOp, "vmla.reduce.max");
+
+  VMLA_IMPORT_OP(IREE::VMLA::InterfaceBindingOp, "vmla.interface.binding");
 }
 
 namespace {

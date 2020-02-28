@@ -17,6 +17,10 @@
 // of adding a my_batch_copy method.
 vm.module @vmla {
 
+//===----------------------------------------------------------------------===//
+// VMLA Ops: buffer manipulation
+//===----------------------------------------------------------------------===//
+
 vm.import @buffer.const(
   %value : !vm.ref<!iree.byte_buffer>
 ) -> !vm.ref<!vmla.buffer>
@@ -30,6 +34,11 @@ attributes {nosideeffects}
 vm.import @buffer.clone(
   %src : !vm.ref<!vmla.buffer>
 ) -> !vm.ref<!vmla.buffer>
+attributes {nosideeffects}
+
+vm.import @buffer.byte_length(
+  %value : !vm.ref<!vmla.buffer>
+) -> i32
 attributes {nosideeffects}
 
 vm.import @buffer.view(
@@ -56,6 +65,10 @@ vm.import @buffer.load.i32(
 ) -> i32
 attributes {nosideeffects}
 
+//===----------------------------------------------------------------------===//
+// VMLA Ops: comparison
+//===----------------------------------------------------------------------===//
+
 vm.import @cmp.i8(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @cmp.i16(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @cmp.i32(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
@@ -64,6 +77,10 @@ vm.import @cmp.f32(%predicate : i32, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.re
 vm.import @select.x8(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @select.x16(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @select.x32(%cond : !vm.ref<!vmla.buffer>, %lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
+
+//===----------------------------------------------------------------------===//
+// VMLA Ops: shape/structure
+//===----------------------------------------------------------------------===//
 
 // TODO(benvanik): do the copies with buffer.copy instead and leave the offset
 // calculations in the IR for the compiler to simplify.
@@ -164,6 +181,10 @@ vm.import @tile.x32(
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
+//===----------------------------------------------------------------------===//
+// VMLA Ops: bit manipulation
+//===----------------------------------------------------------------------===//
+
 vm.import @not.x8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @not.x16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @not.x32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
@@ -185,6 +206,10 @@ vm.import @shr.u32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %
 vm.import @shr.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @shr.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @shr.i32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
+
+//===----------------------------------------------------------------------===//
+// VMLA Ops: arithmetic
+//===----------------------------------------------------------------------===//
 
 vm.import @add.i8(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @add.i16(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
@@ -245,6 +270,10 @@ vm.import @clamp.f32(%min : !vm.ref<!vmla.buffer>, %value : !vm.ref<!vmla.buffer
 vm.import @floor.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @ceil.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 
+//===----------------------------------------------------------------------===//
+// VMLA Ops: conversion
+//===----------------------------------------------------------------------===//
+
 vm.import @convert.i8.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @convert.i8.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @convert.i8.f32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
@@ -258,11 +287,19 @@ vm.import @convert.f32.i8(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buf
 vm.import @convert.f32.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 vm.import @convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 
+//===----------------------------------------------------------------------===//
+// VMLA Ops: GEMM/GEMV
+//===----------------------------------------------------------------------===//
+
 vm.import @matmul.f32f32.f32(
   %lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ...,
   %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
+
+//===----------------------------------------------------------------------===//
+// VMLA Ops: reduction
+//===----------------------------------------------------------------------===//
 
 vm.import @reduce.sum.i8(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
@@ -338,5 +375,15 @@ vm.import @reduce.max.f32(
   %dimension : i32,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
+
+//===----------------------------------------------------------------------===//
+// VMLA Ops: ABI
+//===----------------------------------------------------------------------===//
+
+vm.import @interface.binding(
+  %interface : !vm.ref<!vmla.interface>,
+  %set : i32,
+  %binding : i32
+) -> !vm.ref<!vmla.buffer>
 
 }  // module

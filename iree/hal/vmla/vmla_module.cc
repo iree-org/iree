@@ -31,6 +31,10 @@ namespace {
 using iree_vmla_size_t = uint32_t;
 using iree_vmla_shape_t = absl::Span<const int32_t>;
 
+// Sentinel indicating that the remaining buffer after any offset has been
+// applied should be used as the length.
+constexpr iree_vmla_size_t kVMLAWholeBuffer = -1;
+
 // A lightweight buffer lifetime management type.
 // This is exported to modules as `vmla.buffer`. It can be used to provide
 // views into existing rdata buffers (by specifying IREE_ALLOCATOR_NULL),
@@ -107,6 +111,9 @@ struct iree_vmla_buffer final : public RefObject<iree_vmla_buffer> {
  private:
   StatusOr<absl::Span<uint8_t>> MakeRange(iree_vmla_size_t byte_offset,
                                           iree_vmla_size_t byte_length) {
+    if (byte_length == kVMLAWholeBuffer) {
+      byte_length = size() - byte_offset;
+    }
     if (byte_offset > size()) {
       return OutOfRangeErrorBuilder(IREE_LOC)
              << "Attempted to access an address off the end of the valid "
@@ -226,10 +233,20 @@ class VMLAModuleState final {
     return std::move(dst);
   }
 
+  StatusOr<iree_vmla_size_t> BufferByteLength(
+      vm::ref<iree_vmla_buffer_t> buffer) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::BufferByteLength");
+    return buffer->size();
+  }
+
   StatusOr<vm::ref<iree_vmla_buffer_t>> BufferView(
       vm::ref<iree_vmla_buffer_t> src, iree_vmla_size_t byte_offset,
       iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferView");
+
+    if (byte_length == kVMLAWholeBuffer) {
+      byte_length = src->size() - byte_offset;
+    }
 
     if (byte_offset == 0 && byte_length == src->size()) {
       // Asking for the same buffer.
@@ -267,6 +284,9 @@ class VMLAModuleState final {
                     iree_vmla_size_t dst_byte_offset,
                     iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferCopy");
+    if (byte_length == kVMLAWholeBuffer) {
+      byte_length = src->size() - src_byte_offset;
+    }
     ASSIGN_OR_RETURN(auto src_bytes,
                      src->RangeAs<const uint8_t>(src_byte_offset, byte_length));
     ASSIGN_OR_RETURN(auto dst_bytes,

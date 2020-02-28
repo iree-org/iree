@@ -18,30 +18,23 @@ package(
 )
 
 cc_library(
-    name = "Transforms",
+    name = "HALToVMLA",
     srcs = [
-        "Conversion.cpp",
-        "Passes.cpp",
+        "ConvertHALToVMLA.cpp",
     ],
     hdrs = [
-        "Passes.h",
+        "ConvertHALToVMLA.h",
     ],
     deps = [
-        "//iree/compiler/Dialect/HAL/IR:HALDialect",
-        "//iree/compiler/Dialect/IREE/Transforms",
-        "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/VMLA/Conversion",
-        "//iree/compiler/Dialect/VMLA/Conversion/HALToVMLA",
-        "//iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA",
-        "//iree/compiler/Dialect/VMLA/Conversion/StandardToVMLA",
         "//iree/compiler/Dialect/VMLA/IR",
-        "@llvm-project//llvm:support",
+        "//iree/compiler/Dialect/VMLA/IR:VMLADialect",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
     alwayslink = 1,
 )

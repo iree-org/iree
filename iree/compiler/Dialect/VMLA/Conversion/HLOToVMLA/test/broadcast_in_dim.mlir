@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @broadcast_in_dim_2D_3D
-func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> {
+func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> attributes { sym_visibility = "private" } {
   // CHECK-DAG: [[SRC:%.+]] = "vmla.constant"
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[2,4],i32>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4],i32>
@@ -17,7 +17,7 @@ func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> {
 // -----
 
 // CHECK-LABEL: @broadcast_in_dim_3D_scalar
-func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> {
+func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> attributes { sym_visibility = "private" } {
   // CHECK-DAG: [[SRC:%.+]] = "vmla.constant"
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[],i32>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4],i32>

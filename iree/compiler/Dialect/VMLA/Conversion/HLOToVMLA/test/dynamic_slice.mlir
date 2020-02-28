@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @slice_whole_buffer
 // CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
-func @slice_whole_buffer(%src_indices : tensor<2xi64>) -> tensor<3x4xi32> {
+func @slice_whole_buffer(%src_indices : tensor<2xi64>) -> tensor<3x4xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],
@@ -30,7 +30,7 @@ func @slice_whole_buffer(%src_indices : tensor<2xi64>) -> tensor<3x4xi32> {
 
 // CHECK-LABEL: @slice_whole_stride
 // CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
-func @slice_whole_stride(%src_indices : tensor<2xi64>) -> tensor<1x4xi32> {
+func @slice_whole_stride(%src_indices : tensor<2xi64>) -> tensor<1x4xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],
@@ -58,7 +58,7 @@ func @slice_whole_stride(%src_indices : tensor<2xi64>) -> tensor<1x4xi32> {
 
 // CHECK-LABEL: @slice_stride_part
 // CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
-func @slice_stride_part(%src_indices : tensor<2xi64>) -> tensor<1x2xi32> {
+func @slice_stride_part(%src_indices : tensor<2xi64>) -> tensor<1x2xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],
@@ -86,7 +86,7 @@ func @slice_stride_part(%src_indices : tensor<2xi64>) -> tensor<1x2xi32> {
 
 // CHECK-LABEL: @slice_multi_stride
 // CHECK-SAME: [[SRC_INDICES:%.+]]: !vmla.buffer
-func @slice_multi_stride(%src_indices : tensor<2xi64>) -> tensor<2x4xi32> {
+func @slice_multi_stride(%src_indices : tensor<2xi64>) -> tensor<2x4xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],

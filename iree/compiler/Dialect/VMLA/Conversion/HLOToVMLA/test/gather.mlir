@@ -3,7 +3,7 @@
 // CHECK-LABEL: @gather_scalar_indices
 // CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
 // CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
-func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<i64>) -> tensor<1x5xi32> {
+func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<i64>) -> tensor<1x5xi32> attributes { sym_visibility = "private" } {
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,1,5],i32>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,5],i32>
   // CHECK-DAG: [[INDEX0:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0_i32)
@@ -31,7 +31,7 @@ func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<
 // CHECK-LABEL: @gather_fully_specified_indices
 // CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
 // CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
-func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices : tensor<3xi64>) -> tensor<2x3xf32> {
+func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices : tensor<3xi64>) -> tensor<2x3xf32> attributes { sym_visibility = "private" } {
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,2,3],i32>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[2,3],i32>
   // CHECK-DAG: [[INDEX0:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0_i32)
@@ -59,7 +59,7 @@ func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices 
 // -----
 
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
-func @gather_not_lowered_axis_1(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) {
+func @gather_not_lowered_axis_1(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
   // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
   %0 = "xla_hlo.gather"(%input, %start_indices) {
@@ -77,7 +77,7 @@ func @gather_not_lowered_axis_1(%input : tensor<5x2x3xf32>, %start_indices : ten
 // -----
 
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
-func @gather_not_lowered_collapse(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) {
+func @gather_not_lowered_collapse(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
   // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
   %0 = "xla_hlo.gather"(%input, %start_indices) {
@@ -95,7 +95,7 @@ func @gather_not_lowered_collapse(%input : tensor<5x2x3xf32>, %start_indices : t
 // -----
 
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
-func @gather_not_lowered_transposes(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) {
+func @gather_not_lowered_transposes(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
   // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
   %0 = "xla_hlo.gather"(%input, %start_indices) {
@@ -113,7 +113,7 @@ func @gather_not_lowered_transposes(%input : tensor<5x2x3xf32>, %start_indices :
 // -----
 
 // expected-error@-3 {{conversion to the VMLA dialect failed}}
-func @gather_not_lowered_batch_dims(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) {
+func @gather_not_lowered_batch_dims(%input : tensor<5x2x3xf32>, %start_indices : tensor<2x2xi64>) attributes { sym_visibility = "private" } {
   // expected-remark@+2 {{couldn't lower gather}}
   // expected-error@+1 {{failed to legalize operation 'xla_hlo.gather' that was explicitly marked illegal}}
   %0 = "xla_hlo.gather"(%input, %start_indices) {

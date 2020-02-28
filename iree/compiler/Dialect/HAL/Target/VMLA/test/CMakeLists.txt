@@ -12,27 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(HALToVMLA)
-add_subdirectory(HLOToVMLA)
-add_subdirectory(StandardToVMLA)
-add_subdirectory(VMLAToVM)
-
-iree_cc_library(
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
   NAME
-    Conversion
-  HDRS
-    "ConversionTarget.h"
-    "TypeConverter.h"
+    lit
   SRCS
-    "ConversionTarget.cpp"
-    "TypeConverter.cpp"
-  DEPS
-    MLIRIR
-    MLIRStandardOps
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Dialect::VMLA::IR::VMLADialect
-  PUBLIC
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )

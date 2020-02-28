@@ -74,6 +74,15 @@ def VMLA_BufferCloneOp : VMLA_PureOp<"buffer.clone"> {
   );
 }
 
+def VMLA_BufferByteLengthOp : VMLA_PureOp<"buffer.byte_length"> {
+  let arguments = (ins
+    VMLA_Buffer:$value
+  );
+  let results = (outs
+    VMLA_DeviceSize:$result
+  );
+}
+
 def VMLA_BufferViewOp : VMLA_PureOp<"buffer.view"> {
   let arguments = (ins
     VMLA_Buffer:$src,
@@ -318,5 +327,21 @@ class VMLA_ReduceOp<string mnemonic, list<OpTrait> traits = []> :
 def VMLA_ReduceSumOp : VMLA_ReduceOp<"reduce.sum">;
 def VMLA_ReduceMinOp : VMLA_ReduceOp<"reduce.min">;
 def VMLA_ReduceMaxOp : VMLA_ReduceOp<"reduce.max">;
+
+//===----------------------------------------------------------------------===//
+// VMLA Ops: ABI
+//===----------------------------------------------------------------------===//
+
+def VMLA_InterfaceBindingOp :
+    VMLA_PureOp<"interface.binding", [VMLA_OpInterface]> {
+  let arguments = (ins
+    VMLA_Interface:$interface,
+    I32Attr:$set,
+    I32Attr:$binding
+  );
+  let results = (outs
+    VMLA_Buffer:$result
+  );
+}
 
 #endif  // IREE_DIALECT_VMLA_OPS

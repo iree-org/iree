@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @slice_whole_buffer
-func @slice_whole_buffer() -> tensor<3x4xi32> {
+func @slice_whole_buffer() -> tensor<3x4xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],
@@ -28,7 +28,7 @@ func @slice_whole_buffer() -> tensor<3x4xi32> {
 // -----
 
 // CHECK-LABEL: @slice_whole_stride
-func @slice_whole_stride() -> tensor<1x4xi32> {
+func @slice_whole_stride() -> tensor<1x4xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],
@@ -55,7 +55,7 @@ func @slice_whole_stride() -> tensor<1x4xi32> {
 // -----
 
 // CHECK-LABEL: @slice_stride_part
-func @slice_stride_part() -> tensor<1x2xi32> {
+func @slice_stride_part() -> tensor<1x2xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],
@@ -82,7 +82,7 @@ func @slice_stride_part() -> tensor<1x2xi32> {
 // -----
 
 // CHECK-LABEL: @slice_multi_stride
-func @slice_multi_stride() -> tensor<2x4xi32> {
+func @slice_multi_stride() -> tensor<2x4xi32> attributes { sym_visibility = "private" } {
   // CHECK: [[SRC:%.+]] = "vmla.constant"()
   %input = constant dense<[
     [01, 02, 03, 04],

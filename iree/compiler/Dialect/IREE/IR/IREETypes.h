@@ -108,6 +108,7 @@ namespace VMLA {
 namespace TypeKind {
 enum Kind {
   Buffer = IREE::TypeKind::FIRST_VMLA_TYPE,
+  Interface,
 };
 }  // namespace TypeKind
 }  // namespace VMLA

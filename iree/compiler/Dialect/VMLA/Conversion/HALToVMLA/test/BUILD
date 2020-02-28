@@ -12,27 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(HALToVMLA)
-add_subdirectory(HLOToVMLA)
-add_subdirectory(StandardToVMLA)
-add_subdirectory(VMLAToVM)
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
-iree_cc_library(
-  NAME
-    Conversion
-  HDRS
-    "ConversionTarget.h"
-    "TypeConverter.h"
-  SRCS
-    "ConversionTarget.cpp"
-    "TypeConverter.cpp"
-  DEPS
-    MLIRIR
-    MLIRStandardOps
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::VMLA::IR
-    iree::compiler::Dialect::VMLA::IR::VMLADialect
-  PUBLIC
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
+    ],
 )

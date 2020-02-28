@@ -57,7 +57,7 @@ VMLADialect::VMLADialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
   addInterfaces<VMLAToVMConversionInterface>();
 
-  addTypes<BufferType>();
+  addTypes<BufferType, InterfaceType>();
 
 #define GET_OP_LIST
   addOperations<
@@ -74,6 +74,7 @@ Type VMLADialect::parseType(DialectAsmParser &parser) const {
   if (parser.parseKeyword(&typeName)) return Type();
   auto type = llvm::StringSwitch<Type>(typeName)
                   .Case("buffer", BufferType::get(getContext()))
+                  .Case("interface", InterfaceType::get(getContext()))
                   .Default(nullptr);
   if (!type) {
     parser.emitError(parser.getCurrentLocation())
@@ -85,6 +86,8 @@ Type VMLADialect::parseType(DialectAsmParser &parser) const {
 void VMLADialect::printType(Type type, DialectAsmPrinter &p) const {
   if (type.isa<BufferType>()) {
     p << "buffer";
+  } else if (type.isa<InterfaceType>()) {
+    p << "interface";
   } else {
     llvm_unreachable("unknown VMLA type");
   }

@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s | IreeFileCheck %s
 
 // CHECK-LABEL: @cmp_i
-func @cmp_i(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi1> {
+func @cmp_i(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi1> attributes { sym_visibility = "private" } {
   // CHECK: [[BUF_SZ:%.+]] = constant 4
   // CHECK-NEXT: [[BUF:%.+]] = "vmla.buffer.alloc"([[BUF_SZ]])
   // CHECK-NEXT: "vmla.cmp"(%arg0, %arg1, [[BUF]]) {element_type = i32, predicate = 5 : i32}
@@ -13,7 +13,7 @@ func @cmp_i(%arg0 : tensor<4xi32>, %arg1 : tensor<4xi32>) -> tensor<4xi1> {
 // -----
 
 // CHECK-LABEL: @cmp_f
-func @cmp_f(%arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>) -> tensor<4xi1> {
+func @cmp_f(%arg0 : tensor<4xf32>, %arg1 : tensor<4xf32>) -> tensor<4xi1> attributes { sym_visibility = "private" } {
   // CHECK: [[BUF_SZ:%.+]] = constant 4
   // CHECK-NEXT: [[BUF:%.+]] = "vmla.buffer.alloc"([[BUF_SZ]])
   // CHECK-NEXT: "vmla.cmp"(%arg0, %arg1, [[BUF]]) {element_type = f32, predicate = 5 : i32}

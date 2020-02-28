@@ -16,28 +16,21 @@ add_subdirectory(test)
 
 iree_cc_library(
   NAME
-    Transforms
+    HALToVMLA
   HDRS
-    "Passes.h"
+    "ConvertHALToVMLA.h"
   SRCS
-    "Conversion.cpp"
-    "Passes.cpp"
+    "ConvertHALToVMLA.cpp"
   DEPS
-    LLVMSupport
     MLIRIR
     MLIRPass
     MLIRStandardOps
-    MLIRSupport
     MLIRTransforms
-    iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::IREE::Transforms
-    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VMLA::Conversion
-    iree::compiler::Dialect::VMLA::Conversion::HALToVMLA
-    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
-    iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
     iree::compiler::Dialect::VMLA::IR
-    tensorflow::mlir_xla
+    iree::compiler::Dialect::VMLA::IR::VMLADialect
   ALWAYSLINK
   PUBLIC
 )
