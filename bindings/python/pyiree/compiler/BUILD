@@ -40,6 +40,7 @@ COMPILER_DEPS = [
     # Targets.
     "//iree/compiler/Dialect/HAL/Target/LegacyInterpreter",
     "//iree/compiler/Dialect/HAL/Target/VMLA",
+    "//iree/compiler/Dialect/HAL/Target/LLVM",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     "//iree/compiler/Dialect/VM/Target/Bytecode",
 ]
