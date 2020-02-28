@@ -45,6 +45,9 @@ OutputFormat = binding.OutputFormat
 # Pass pipeline that should run to lower a TF saved_model to a form suitable
 # for input to the IREE compiler.
 TF_IMPORT_PASS_PIPELINE = (
+    # Unroll batchmatmul and lower it to matmul
+    "tf-unroll-batch-matmul",
+
     # Clean up tf_executor and extraneous unused functions.
     "tf-saved-model-mark-func-visibility",
     "symbol-dce",
