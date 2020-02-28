@@ -537,7 +537,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_write_data(
 // Maps the buffer to be accessed as a host pointer into |out_mapped_memory|.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_buffer_map(
     iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
-    iree_device_size_t element_offset, iree_device_size_t element_length,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_mapped_memory_t* out_mapped_memory);
 
 // Unmaps the buffer as was previously mapped to |mapped_memory|.

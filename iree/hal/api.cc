@@ -384,7 +384,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_write_data(
 
 IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
     iree_hal_buffer_t* buffer, iree_hal_memory_access_t memory_access,
-    iree_device_size_t element_offset, iree_device_size_t element_length,
+    iree_device_size_t byte_offset, iree_device_size_t byte_length,
     iree_hal_mapped_memory_t* out_mapped_memory) {
   IREE_TRACE_SCOPE0("iree_hal_buffer_map");
 
@@ -403,7 +403,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_map(
   IREE_API_ASSIGN_OR_RETURN(
       auto mapping, buffer_handle->MapMemory<uint8_t>(
                         static_cast<MemoryAccessBitfield>(memory_access),
-                        element_offset, element_length));
+                        byte_offset, byte_length));
 
   static_assert(sizeof(iree_hal_mapped_memory_t::reserved) >=
                     sizeof(MappedMemory<uint8_t>),
