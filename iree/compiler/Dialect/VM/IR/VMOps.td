@@ -24,7 +24,7 @@ include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 def VM_ModuleOp : VM_Op<"module", [
     IsolatedFromAbove,
-    SingleBlockImplicitTerminator<"IREE::VM::ModuleEndOp">,
+    SingleBlockImplicitTerminator<"IREE::VM::ModuleTerminatorOp">,
     NativeOpTrait<"SymbolTable">,
     Symbol,
   ]> {
@@ -58,7 +58,7 @@ def VM_ModuleOp : VM_Op<"module", [
   let verifier = [{ return verifyModuleOp(*this); }];
 }
 
-def VM_ModuleEndOp : VM_Op<"module_end", [
+def VM_ModuleTerminatorOp : VM_Op<"module_terminator", [
     HasParent<"IREE::VM::ModuleOp">,
     Terminator,
   ]> {

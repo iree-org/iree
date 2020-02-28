@@ -63,7 +63,7 @@ class ModuleTerminatorOpConversion
     if (!isa<IREE::VM::ModuleOp>(srcOp.getParentOp())) {
       return matchFailure();
     }
-    rewriter.replaceOpWithNewOp<IREE::VM::ModuleEndOp>(srcOp);
+    rewriter.replaceOpWithNewOp<IREE::VM::ModuleTerminatorOp>(srcOp);
     return matchSuccess();
   }
 };
