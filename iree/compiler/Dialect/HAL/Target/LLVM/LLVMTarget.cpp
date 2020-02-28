@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Translation/XLAToLinalg/Passes.h"
+#include "iree/compiler/Translation/XLAToLinalg/ReductionLowering.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/Module.h"
@@ -61,6 +62,9 @@ static std::vector<std::string> populateEntryPointNames(
 void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   // HLO -> Linalg.
   pm.addPass(createXLAToLinalgPass());
+
+  // HLO reduction -> Linalg.
+  pm.addPass(createHLOReductionToLinalgPass());
 
   // Linalg generic op fussion.
   pm.addPass(createLinalgFusionPass());
