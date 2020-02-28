@@ -16,8 +16,6 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-DAG:   hal.executable.binary attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = 1280071245 : i32} {
-// CHECK:      module {
-// CHECK-NEXT:   llvm.func @simpleMath_rgn_dispatch_0(
-// CHECK-SAME:   %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64,
-// CHECK-SAME:   %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm<"float*">, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64, %{{[a-zA-Z0-9_]*}}: !llvm.i64)
-// CHECK-SAME:   attributes {iree.executable.export} {
+// CHECK-NEXT:     module {
+// CHECK-NEXT:       llvm.func @simpleMath_rgn_dispatch_0(
+// CHECK-SAME: {{%.*}}: !llvm<"float*">, {{%.*}}: !llvm<"float*">)

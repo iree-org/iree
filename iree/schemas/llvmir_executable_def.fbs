@@ -22,6 +22,9 @@ file_extension "ll";
 // Machine independent LLVMIR executable module.
 // This exeuctable will be compiled with the target machine later on.
 table LLVMIRExecutableDef {
+  // A map of entry points to string names with the same order as in the executable op.
+  entry_points:[string];
+  // A serialized llvm::Module object.
   llvmir_module:[byte];
 }
 

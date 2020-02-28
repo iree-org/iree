@@ -18,6 +18,7 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
 
 namespace iree {
 namespace hal {
@@ -25,7 +26,8 @@ namespace llvmjit {
 
 class LLVMJITExecutableCache final : public ExecutableCache {
  public:
-  explicit LLVMJITExecutableCache(hal::Allocator* allocator);
+  explicit LLVMJITExecutableCache(hal::Allocator* allocator,
+                                  llvm::orc::LLJIT* execution_engine);
   ~LLVMJITExecutableCache() override;
 
   bool CanPrepareFormat(ExecutableFormat format) const override;
@@ -35,6 +37,7 @@ class LLVMJITExecutableCache final : public ExecutableCache {
 
  private:
   hal::Allocator* allocator_;
+  llvm::orc::LLJIT* execution_engine_;
 };
 }  // namespace llvmjit
 }  // namespace hal

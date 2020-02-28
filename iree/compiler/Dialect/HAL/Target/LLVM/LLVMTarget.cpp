@@ -41,6 +41,21 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   return targetOptions;
 }
 
+// TODO(ataei) Move this to utils ?
+// Returns a list of entry point names matching the expected export ordinals.
+static std::vector<std::string> populateEntryPointNames(
+    IREE::Flow::ExecutableOp executableOp) {
+  std::vector<std::string> entryPointNames;
+  for (auto& op : executableOp.getBlock().getOperations()) {
+    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
+      entryPointNames.push_back(std::string(entryOp.function_ref()));
+    } else if (auto entryOp = dyn_cast<IREE::Flow::ReductionEntryOp>(op)) {
+      entryPointNames.push_back(std::string(entryOp.function_ref()));
+    }
+  }
+  return entryPointNames;
+}
+
 // Adds a sequence of passess to a given pass manager that progressively lower
 // from HLO to LLVM throught linalg dialect.
 void buildLLVMTransformPassPipeline(OpPassManager& pm) {
@@ -61,7 +76,8 @@ void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   pm.addPass(createCSEPass());
 
   // STD -> LLVM
-  pm.addPass(createLowerToLLVMPass());
+  pm.addPass(
+      createLowerToLLVMPass(/*useAlloca*/ false, /*emitCWrappers*/ true));
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 }
@@ -103,6 +119,7 @@ LogicalResult translateToLLVMExecutable(
   iree::LLVMIRExecutableDefT llvmIrExecutableDef;
   llvmIrExecutableDef.llvmir_module = {bufferString.begin(),
                                        bufferString.end()};
+  llvmIrExecutableDef.entry_points = populateEntryPointNames(flowExecutableOp);
   ::flatbuffers::FlatBufferBuilder fbb;
   auto executableOffset =
       iree::LLVMIRExecutableDef::Pack(fbb, &llvmIrExecutableDef);

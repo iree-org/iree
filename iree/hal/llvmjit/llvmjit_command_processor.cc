@@ -14,8 +14,19 @@
 //
 #include "iree/hal/llvmjit/llvmjit_command_processor.h"
 
+#include <memory>
+#include <vector>
+
 #include "iree/base/tracing.h"
+#include "iree/hal/buffer.h"
 #include "iree/hal/llvmjit/llvmjit_executable.h"
+#include "iree/hal/llvmjit/memref_runtime.h"
+#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/Error.h"
 
 namespace iree {
 namespace hal {
@@ -31,7 +42,31 @@ LLVMJITCommandProcessor::~LLVMJITCommandProcessor() = default;
 Status LLVMJITCommandProcessor::Dispatch(
     const DispatchRequest& dispatch_request) {
   IREE_TRACE_SCOPE0("LLVMJITCommandProcessor::Dispatch");
-  return OkStatus();
+  auto* executable =
+      static_cast<LLVMJITExecutable*>(dispatch_request.executable);
+
+  std::vector<UnrankedMemRefType<uint32_t>*> descriptors(
+      dispatch_request.bindings.size());
+  llvm::SmallVector<void*, 4> args(dispatch_request.bindings.size());
+  for (size_t i = 0; i < dispatch_request.bindings.size(); ++i) {
+    ASSIGN_OR_RETURN(
+        auto memory,
+        dispatch_request.bindings.at(i).buffer->MapMemory<uint32_t>(
+            MemoryAccessBitfield::kWrite));
+    auto data = memory.mutable_data();
+    const std::vector<int64_t> shape(
+        dispatch_request.bindings.at(i).shape.begin(),
+        dispatch_request.bindings.at(i).shape.end());
+    descriptors[i] = allocUnrankedDescriptor<uint32_t>(data, shape);
+    args[i] = descriptors[i]->descriptor;
+  }
+  auto status = executable->Invoke(dispatch_request.entry_point, args);
+
+  for (int i = 0; i < descriptors.size(); ++i) {
+    freeUnrankedDescriptor(descriptors[i]);
+  }
+
+  return status;
 }
 }  // namespace llvmjit
 }  // namespace hal

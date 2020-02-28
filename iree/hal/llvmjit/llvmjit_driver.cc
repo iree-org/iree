@@ -18,6 +18,7 @@
 
 #include "iree/hal/device_info.h"
 #include "iree/hal/llvmjit/llvmjit_device.h"
+#include "llvm/IR/LLVMContext.h"
 
 namespace iree {
 namespace hal {
@@ -37,7 +38,7 @@ DeviceInfo GetDefaultDeviceInfo() {
 
 }  // namespace
 
-LLVMJITDriver::LLVMJITDriver() : Driver("interpreter") {}
+LLVMJITDriver::LLVMJITDriver() : Driver("llvmjit") {}
 
 LLVMJITDriver::~LLVMJITDriver() = default;
 
@@ -53,8 +54,7 @@ StatusOr<ref_ptr<Device>> LLVMJITDriver::CreateDefaultDevice() {
 
 StatusOr<ref_ptr<Device>> LLVMJITDriver::CreateDevice(
     DriverDeviceID device_id) {
-  auto device = make_ref<LLVMJITDevice>(GetDefaultDeviceInfo());
-  return device;
+  return LLVMJITDevice::CreateLLVMJITDevice(GetDefaultDeviceInfo());
 }
 }  // namespace llvmjit
 }  // namespace hal

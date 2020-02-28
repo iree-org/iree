@@ -22,23 +22,38 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_spec.h"
+#include "iree/schemas/llvmir_executable_def_generated.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ExecutionEngine/GenericValue.h"
+#include "llvm/ExecutionEngine/JITSymbol.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 
 namespace iree {
 namespace hal {
 namespace llvmjit {
 
+struct MemrefType;
+
 class LLVMJITExecutable final : public Executable {
  public:
-  static StatusOr<ref_ptr<LLVMJITExecutable>> Load(hal::Allocator* allocator,
-                                                   ExecutableSpec spec,
-                                                   bool allow_aliasing_data);
+  static StatusOr<ref_ptr<LLVMJITExecutable>> Load(
+      hal::Allocator* allocator, ExecutableSpec spec,
+      llvm::orc::LLJIT* execution_engine, bool allow_aliasing_data);
   LLVMJITExecutable(hal::Allocator* allocator, ExecutableSpec spec,
                     bool allow_aliasing_data);
   ~LLVMJITExecutable() override;
 
   bool supports_debugging() const override { return false; }
 
+  // Invokes jitted function with args.
+  Status Invoke(int func_id, llvm::MutableArrayRef<void*> args);
+
+  void InsertSymbol(llvm::JITEvaluatedSymbol symbol);
+
  private:
+  llvm::SmallVector<llvm::JITEvaluatedSymbol, 4> symbols_;
   ExecutableSpec spec_;
   std::vector<uint8_t> cloned_executable_data_;
 };

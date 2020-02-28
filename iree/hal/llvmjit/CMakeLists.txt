@@ -20,11 +20,18 @@ iree_cc_library(
   SRCS
     "llvmjit_executable.cc"
   DEPS
+    LLVMAsmParser
+    LLVMCore
+    LLVMExecutionEngine
+    LLVMOrcJIT
+    LLVMSupport
     absl::span
+    flatbuffers
     iree::base::status
     iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_spec
+    iree::schemas::llvmir_executable_def_cc_fbs
   PUBLIC
 )
 
@@ -37,7 +44,13 @@ iree_cc_library(
     "llvmjit_command_processor.cc"
   DEPS
     ::llvmjit_executable
+    ::memref_runtime
+    LLVMCore
+    LLVMExecutionEngine
+    LLVMOrcJIT
+    LLVMSupport
     iree::base::tracing
+    iree::hal::buffer
     iree::hal::host::host_local_command_processor
   PUBLIC
 )
@@ -51,6 +64,8 @@ iree_cc_library(
     "llvmjit_executable_cache.cc"
   DEPS
     ::llvmjit_executable
+    LLVMCore
+    LLVMOrcJIT
     iree::base::source_location
     iree::base::status
     iree::base::tracing
@@ -71,6 +86,8 @@ iree_cc_library(
   DEPS
     ::llvmjit_command_processor
     ::llvmjit_executable_cache
+    LLVMCore
+    LLVMOrcJIT
     absl::inlined_vector
     absl::memory
     absl::span
@@ -98,6 +115,8 @@ iree_cc_library(
     "llvmjit_driver.cc"
   DEPS
     ::llvmjit_device
+    LLVMCore
+    LLVMExecutionEngine
     iree::hal::device_info
     iree::hal::driver
   PUBLIC
@@ -110,6 +129,8 @@ iree_cc_library(
     "llvmjit_driver_module.cc"
   DEPS
     ::llvmjit_driver
+    LLVMSupport
+    LLVMX86CodeGen
     iree::base::init
     iree::base::status
     iree::hal::driver_registry

@@ -18,12 +18,15 @@
 #include "iree/base/status.h"
 #include "iree/hal/driver_registry.h"
 #include "iree/hal/llvmjit/llvmjit_driver.h"
+#include "llvm/Support/TargetSelect.h"
 
 namespace iree {
 namespace hal {
 namespace llvmjit {
 
 static StatusOr<ref_ptr<Driver>> CreateLLVMJITDriver() {
+  llvm::InitializeNativeTarget();
+  llvm::InitializeNativeTargetAsmPrinter();
   return make_ref<LLVMJITDriver>();
 }
 }  // namespace llvmjit

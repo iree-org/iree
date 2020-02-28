@@ -29,9 +29,9 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//llvm:core": ["LLVMCore"],
     "@llvm-project//llvm:execution_engine": ["LLVMExecutionEngine"],
     "@llvm-project//llvm:support": ["LLVMSupport"],
-    "@llvm-project//llvm:orcjit": ["LLVMOrcJIT"],
+    "@llvm-project//llvm:orc_jit": ["LLVMOrcJIT"],
     "@llvm-project//llvm:tablegen": ["LLVMTableGen"],
-    "@llvm-project//llvm:x86_target": ["LLVMX86CodeGen"],
+    "@llvm-project//llvm:x86_code_gen": ["LLVMX86CodeGen"],
     # MLIR
     "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [

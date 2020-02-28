@@ -20,6 +20,8 @@
 #include "iree/base/memory.h"
 #include "iree/hal/device.h"
 #include "iree/hal/host/host_local_allocator.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/IR/LLVMContext.h"
 
 namespace iree {
 namespace hal {
@@ -27,7 +29,10 @@ namespace llvmjit {
 
 class LLVMJITDevice final : public Device {
  public:
-  explicit LLVMJITDevice(DeviceInfo device_info);
+  static StatusOr<ref_ptr<LLVMJITDevice>> CreateLLVMJITDevice(
+      DeviceInfo device_info);
+  explicit LLVMJITDevice(DeviceInfo device_info,
+                         std::unique_ptr<llvm::orc::LLJIT> execution_engine);
   ~LLVMJITDevice() override;
 
   Allocator* allocator() const override { return &allocator_; }
@@ -45,7 +50,6 @@ class LLVMJITDevice final : public Device {
   StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
       CommandBufferModeBitfield mode,
       CommandCategoryBitfield command_categories) override;
-
   StatusOr<ref_ptr<Event>> CreateEvent() override;
 
   StatusOr<ref_ptr<BinarySemaphore>> CreateBinarySemaphore(
@@ -62,6 +66,7 @@ class LLVMJITDevice final : public Device {
   Status WaitIdle(absl::Time deadline) override;
 
  private:
+  std::unique_ptr<llvm::orc::LLJIT> execution_engine_;
   mutable HostLocalAllocator allocator_;
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;
 };
