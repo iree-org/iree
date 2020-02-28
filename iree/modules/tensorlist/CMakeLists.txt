@@ -35,6 +35,8 @@ iree_cc_test(
     ::native_module
     ::tensorlist_test_module_cc
     absl::core_headers
+    absl::inlined_vector
+    absl::span
     absl::strings
     iree::base::api
     iree::base::logging
@@ -45,6 +47,7 @@ iree_cc_test(
     iree::vm
     iree::vm::bytecode_module
     iree::vm::ref
+    iree::vm::ref_cc
     iree::vm::variant_list
 )
 
@@ -56,6 +59,8 @@ iree_cc_library(
   SRCS
     "native_module.cc"
   DEPS
+    absl::inlined_vector
+    absl::span
     iree::base::api
     iree::base::api_util
     iree::base::ref_ptr
