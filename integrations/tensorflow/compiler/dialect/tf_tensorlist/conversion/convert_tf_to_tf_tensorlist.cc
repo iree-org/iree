@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_dialect.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -56,9 +57,13 @@ void ConvertTfToTfTensorList::runOnOperation() {
   populateWithGenerated(&getContext(), &patterns);
   ConversionTarget target(getContext());
   target.addLegalDialect<TfTensorListDialect>();
+  target.addLegalDialect<TF::TensorFlowDialect>();
+  target.addLegalDialect<StandardOpsDialect>();
   target.addIllegalOp<TF::TensorListReserveOp>();
   target.addIllegalOp<TF::TensorListGetItemOp>();
   target.addIllegalOp<TF::TensorListSetItemOp>();
+  target.addIllegalOp<TF::TensorListFromTensorOp>();
+  target.addIllegalOp<TF::TensorListStackOp>();
 
   if (failed(applyPartialConversion(func, target, patterns))) {
     func.emitError() << "unable to lower to tf_tensorlist dialect";

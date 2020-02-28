@@ -89,4 +89,53 @@ def TfTensorList_SetItem : TfTensorList_Op<"SetItem"> {
     TfTensorList_TensorList:$new_list
   );
 }
+
+def TfTensorList_FromTensor : TfTensorList_Op<"FromTensor"> {
+  let summary = [{
+    Creates a TensorList which, when stacked, has the value of `tensor`.
+  }];
+
+  let description = [{
+    Each tensor in the result list corresponds to one row of the input tensor.
+
+    tensor: The input tensor.
+    list: The list.
+  }];
+
+  let arguments = (ins
+    TF_Tensor:$tensor,
+    I32Tensor:$element_shape
+  );
+
+  let results = (outs
+    TfTensorList_TensorList:$list
+  );
+}
+
+def TfTensorList_Stack : TfTensorList_Op<"Stack"> {
+  let summary = "Stacks all tensors in the list.";
+
+  let description = [{
+    Requires that all tensors have the same shape.
+
+    list: the input list
+    tensor: the gathered result
+    num_elements: optional. If not -1, the number of elements in the list.
+  }];
+
+  let arguments = (ins
+    TfTensorList_TensorList:$list,
+    I32Tensor:$element_shape,
+    // TODO(silvasean): Properly handle IREE's blind truncation to 32-bit.
+    // This is logically `index` type, but coming from TensorFlow it
+    // comes in as i64. IREE then proceeds to blindly truncate it to I32
+    // in-place. So relax this from I64Tensor to I32Or64Tensor.
+    TF_I32OrI64Tensor:$num_elements
+  );
+
+  let results = (outs
+    TF_Tensor:$tensor
+  );
+}
+
 #endif // IREE_INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TF_TENSORLIST_IR_TF_TENSORLIST_OPS_TD

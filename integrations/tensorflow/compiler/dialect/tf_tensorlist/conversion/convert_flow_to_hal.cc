@@ -37,6 +37,12 @@ void populateTensorListToHALPatterns(MLIRContext *context,
   patterns.insert<
       HALOpConversion<tf_tensorlist::SetItem, IREE::TensorList::SetItem>>(
       context, typeConverter);
+  patterns.insert<
+      HALOpConversion<tf_tensorlist::FromTensor, IREE::TensorList::FromTensor>>(
+      context, typeConverter);
+  patterns
+      .insert<HALOpConversion<tf_tensorlist::Stack, IREE::TensorList::Stack>>(
+          context, typeConverter);
 }
 
 }  // namespace iree_compiler

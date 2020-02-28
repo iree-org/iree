@@ -76,4 +76,39 @@ def TensorList_SetItem : Op<TensorList_Dialect, "SetItem"> {
   );
 }
 
+def TensorList_FromTensor : Op<TensorList_Dialect, "FromTensor"> {
+  let summary = "Creates a tensorlist by slicing along the first dimension";
+  let description = [{
+    The tensor `tensor` will be sliced along its first dimension, resulting in
+    a tensorlist `list` of length equal to `tensor`'s leading dimension.
+  }];
+  let arguments = (ins
+    HAL_BufferView:$tensor,
+    // TODO(silvasean): Do we need element_shape?
+    HAL_BufferView:$element_shape
+  );
+  let results = (outs
+    TensorList_TensorList:$list
+  );
+}
+
+def TensorList_Stack : Op<TensorList_Dialect, "Stack"> {
+  let summary = "Creates a tensor by stacking the tensors in the tensorlist";
+  let description = [{
+    Creates a new tensor `tensor` by stacking the tensors in `list`.
+    The resulting tensor has a leading dimension equal to the length of `list`.
+
+    Requires the list to be non-empty.
+    Requires all tensors contained in `list` to be the same shape.
+  }];
+  let arguments = (ins
+    TensorList_TensorList:$list,
+    HAL_BufferView:$element_shape,
+    HAL_BufferView:$num_elements
+  );
+  let results = (outs
+    HAL_BufferView:$tensor
+  );
+}
+
 #endif  // IREE_DIALECT_MODULES_TENSORLIST_OPS

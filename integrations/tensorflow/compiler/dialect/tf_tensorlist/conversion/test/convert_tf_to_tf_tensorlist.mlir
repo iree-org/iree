@@ -14,6 +14,18 @@ func @basic(%arg0: tensor<f32>, %num_elements: tensor<i32>, %element_shape: tens
   return %t : tensor<f32>
 }
 
+// CHECK-LABEL: func @stack
+func @stack(%arg0: tensor<?xf32>, %element_shape: tensor<0xi32>) -> tensor<?xf32> {
+  // CHECK-NEXT: [[LIST0:%.+]] = "tf_tensorlist.FromTensor"(%arg0, %arg1) : (tensor<?xf32>, tensor<0xi32>) -> !tf_tensorlist.list
+  // CHECK-NEXT: [[CONST:%.+]] = constant dense<-1> : tensor<i64>
+  // CHECK-NEXT: [[T:%.+]] = "tf_tensorlist.Stack"([[LIST0]], %arg1, [[CONST]]) : (!tf_tensorlist.list, tensor<0xi32>, tensor<i64>) -> tensor<?xf32>
+  // CHECK-NEXT: return [[T]]
+
+  %list0 = "tf.TensorListFromTensor"(%arg0, %element_shape) : (tensor<?xf32>, tensor<0xi32>) -> tensor<!tf.variant<tensor<f32>>>
+  %t = "tf.TensorListStack"(%list0, %element_shape) : (tensor<!tf.variant<tensor<f32>>>, tensor<0xi32>) -> tensor<?xf32>
+  return %t : tensor<?xf32>
+}
+
 // CHECK-LABEL: func @control_flow_simple
 func @control_flow_simple(%arg0: tensor<f32>, %num_elements: tensor<i32>, %element_shape: tensor<0xi32>, %index: tensor<i32>, %item: tensor<f32>) {
   // CHECK-NEXT: tf_tensorlist.Reserve

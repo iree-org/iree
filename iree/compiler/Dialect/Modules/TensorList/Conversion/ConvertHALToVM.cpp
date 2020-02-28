@@ -32,6 +32,10 @@ void populateTensorListToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "tensorlist.get_item");
   patterns.insert<VMImportOpConversion<IREE::TensorList::SetItem>>(
       context, importSymbols, typeConverter, "tensorlist.set_item");
+  patterns.insert<VMImportOpConversion<IREE::TensorList::FromTensor>>(
+      context, importSymbols, typeConverter, "tensorlist.from_tensor");
+  patterns.insert<VMImportOpConversion<IREE::TensorList::Stack>>(
+      context, importSymbols, typeConverter, "tensorlist.stack");
 }
 
 }  // namespace TensorList

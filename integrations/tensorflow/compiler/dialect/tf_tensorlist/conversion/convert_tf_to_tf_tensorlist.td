@@ -29,3 +29,14 @@ def : Pat<(TF_TensorListGetItemOp $input_handle, $index, $element_shape),
 def : Pat<(TF_TensorListSetItemOp $input_handle, $index, $item),
           (TfTensorList_SetItem $input_handle, $index, $item)>;
 
+def : Pat<(TF_TensorListFromTensorOp $tensor, $element_shape),
+          (TfTensorList_FromTensor $tensor, $element_shape)>;
+
+def WrapScalarI64InTensor : NativeCodeCall<
+    "DenseElementsAttr::get(RankedTensorType::get({}, $_builder.getIntegerType(64)), {$_self.getValue()})">;
+def : Pat<(TF_TensorListStackOp $input_handle, $element_shape, $num_elements),
+          (TfTensorList_Stack
+            $input_handle,
+            $element_shape,
+            (ConstantOp WrapScalarI64InTensor:$num_elements))>;
+

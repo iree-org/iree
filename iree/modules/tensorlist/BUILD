@@ -42,9 +42,12 @@ cc_test(
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:ref",
+        "//iree/vm:ref_cc",
         "//iree/vm:variant_list",
         "@com_google_absl//absl/base:core_headers",
+        "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:span",
     ],
 )
 
@@ -61,5 +64,7 @@ cc_library(
         "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:module_abi_cc",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
     ],
 )

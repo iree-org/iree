@@ -37,4 +37,19 @@ vm.import @set_item(
 ) -> !vm.ref<!tensorlist.list>
 attributes {nosideeffects}
 
+// Maps to IREE:TensorList::FromTensor
+vm.import @from_tensor(
+  %tensor : !vm.ref<!hal.buffer_view>,
+  %element_shape : !vm.ref<!hal.buffer_view>
+) -> !vm.ref<!tensorlist.list>
+attributes {nosideeffects}
+
+// Maps to IREE:TensorList::Stack
+vm.import @stack(
+  %list : !vm.ref<!tensorlist.list>,
+  %element_shape : !vm.ref<!hal.buffer_view>,
+  %num_elements : !vm.ref<!hal.buffer_view>
+) -> !vm.ref<!hal.buffer_view>
+attributes {nosideeffects}
+
 }  // vm.module
