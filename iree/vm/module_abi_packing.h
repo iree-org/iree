@@ -139,9 +139,28 @@ struct ParamUnpack<opaque_ref> {
   using storage_type = opaque_ref;
   static void Load(ParamUnpackState* param_state, storage_type& out_param) {
     ++param_state->varargs_ordinal;
-    iree_vm_ref_move(
-        &param_state->frame->registers.ref[param_state->ref_ordinal++],
-        &out_param.value);
+    auto* reg = &param_state->frame->registers.ref[param_state->ref_ordinal++];
+    if (iree_vm_ref_is_null(reg)) {
+      param_state->status = InvalidArgumentErrorBuilder(IREE_LOC)
+                            << "argument " << (param_state->varargs_ordinal - 1)
+                            << " (" << typeid(storage_type).name() << ")"
+                            << " must not be a null";
+    } else {
+      iree_vm_ref_move(reg, &out_param);
+    }
+  }
+};
+
+template <>
+struct ParamUnpack<absl::optional<opaque_ref>> {
+  using storage_type = absl::optional<opaque_ref>;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
+    ++param_state->varargs_ordinal;
+    auto* reg = &param_state->frame->registers.ref[param_state->ref_ordinal++];
+    if (!iree_vm_ref_is_null(reg)) {
+      out_param = {opaque_ref()};
+      iree_vm_ref_move(reg, &out_param.value());
+    }
   }
 };
 
@@ -159,12 +178,43 @@ struct ParamUnpack<ref<T>> {
     } else if (ref_storage.type != IREE_VM_REF_TYPE_NULL) {
       param_state->status =
           InvalidArgumentErrorBuilder(IREE_LOC)
-          << "Parameter contains a reference to the wrong type; have "
+          << "Parameter " << (param_state->varargs_ordinal - 1)
+          << " contains a reference to the wrong type; have "
           << iree_vm_ref_type_name(ref_storage.type).data << " but expected "
           << ref_type_descriptor<T>::get()->type_name.data << " ("
           << typeid(storage_type).name() << ")";
+    } else {
+      param_state->status =
+          InvalidArgumentErrorBuilder(IREE_LOC)
+          << "Parameter " << (param_state->varargs_ordinal - 1) << "("
+          << typeid(storage_type).name() << ") must not be null";
     }
-    // NOTE: null is allowed here!
+  }
+};
+
+template <typename T>
+struct ParamUnpack<absl::optional<ref<T>>> {
+  using storage_type = absl::optional<ref<T>>;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
+    ++param_state->varargs_ordinal;
+    auto& ref_storage =
+        param_state->frame->registers.ref[param_state->ref_ordinal++];
+    if (ref_storage.type == ref_type_descriptor<T>::get()->type) {
+      // Move semantics.
+      out_param = ref<T>{reinterpret_cast<T*>(ref_storage.ptr)};
+      std::memset(&ref_storage, 0, sizeof(ref_storage));
+    } else if (ref_storage.type != IREE_VM_REF_TYPE_NULL) {
+      param_state->status =
+          InvalidArgumentErrorBuilder(IREE_LOC)
+          << "Parameter " << (param_state->varargs_ordinal - 1)
+          << " contains a reference to the wrong type; have "
+          << iree_vm_ref_type_name(ref_storage.type).data << " but expected "
+          << ref_type_descriptor<T>::get()->type_name.data << " ("
+          << typeid(storage_type).name() << ")";
+    } else {
+      // NOTE: null is allowed here!
+      out_param = {};
+    }
   }
 };
 
@@ -259,10 +309,29 @@ struct ResultPack {
 template <typename T>
 struct ResultPack<ref<T>> {
   static void Store(ResultPackState* result_state, ref<T> value) {
+    if (!value) {
+      result_state->status = InvalidArgumentErrorBuilder(IREE_LOC)
+                             << "Result (" << typeid(ref<T>).name()
+                             << ") must not be null";
+      return;
+    }
     auto* reg_ptr =
         &result_state->frame->registers.ref[result_state->ref_ordinal++];
     std::memset(reg_ptr, 0, sizeof(*reg_ptr));
     iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
+  }
+};
+
+template <typename T>
+struct ResultPack<absl::optional<ref<T>>> {
+  static void Store(ResultPackState* result_state,
+                    absl::optional<ref<T>> value) {
+    auto* reg_ptr =
+        &result_state->frame->registers.ref[result_state->ref_ordinal++];
+    std::memset(reg_ptr, 0, sizeof(*reg_ptr));
+    if (value.has_value()) {
+      iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
+    }
   }
 };
 

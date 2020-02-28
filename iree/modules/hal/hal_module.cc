@@ -128,7 +128,7 @@ class HALModuleState final {
                        int32_t ordinal, vm::ref<iree_hal_buffer_t> buffer,
                        absl::Span<const int32_t> shape,
                        iree_hal_element_type_t element_type);
-  Status ExDeferRelease(vm::opaque_ref operand);
+  Status ExDeferRelease(absl::optional<vm::opaque_ref> operand);
   Status ExSubmitAndWait(vm::ref<iree_hal_device_t> device,
                          vm::ref<iree_hal_command_buffer_t> command_buffer);
 
@@ -272,7 +272,6 @@ StatusOr<vm::ref<iree_hal_device_t>> HALModuleState::ExSharedDevice() {
 StatusOr<int32_t> HALModuleState::ExMatchSupportedExecutableFormat(
     vm::ref<iree_hal_device_t> device,
     absl::Span<const ExecutableFormat> available_formats) {
-  IREE_RETURN_IF_NULL(device);
   ExecutableFormat matched_format = 0;
   for (ExecutableFormat format : available_formats) {
     if (executable_cache_->CanPrepareFormat(format)) {
@@ -287,9 +286,6 @@ StatusOr<vm::ref<iree_hal_executable_t>> HALModuleState::ExCacheExecutable(
     vm::ref<iree_hal_device_t> device, ExecutableFormat executable_format,
     vm::ref<iree_vm_ro_byte_buffer_t> executable_data) {
   IREE_TRACE_SCOPE0("HALModuleState::ExCacheExecutable");
-
-  IREE_RETURN_IF_NULL(device);
-  IREE_RETURN_IF_NULL(executable_data);
 
   ExecutableSpec spec;
   spec.format = executable_format;
@@ -306,8 +302,6 @@ Status HALModuleState::ExPushBinding(
     vm::ref<iree_hal_command_buffer_t> command_buffer, int32_t ordinal,
     vm::ref<iree_hal_buffer_t> buffer, absl::Span<const int32_t> shape,
     iree_hal_element_type_t element_type) {
-  IREE_RETURN_IF_NULL(command_buffer);
-  IREE_RETURN_IF_NULL(buffer);
   if (ordinal >= bindings_.size()) {
     bindings_.resize(ordinal + 1);
   }
@@ -319,10 +313,10 @@ Status HALModuleState::ExPushBinding(
   return OkStatus();
 }
 
-Status HALModuleState::ExDeferRelease(vm::opaque_ref operand) {
-  if (!iree_vm_ref_is_null(&operand.value)) {
+Status HALModuleState::ExDeferRelease(absl::optional<vm::opaque_ref> operand) {
+  if (operand.has_value()) {
     deferred_releases_.push_back({0});
-    iree_vm_ref_move(&operand.value, &deferred_releases_.back());
+    iree_vm_ref_move(&operand.value(), &deferred_releases_.back());
   }
   return OkStatus();
 }
@@ -331,8 +325,6 @@ Status HALModuleState::ExSubmitAndWait(
     vm::ref<iree_hal_device_t> device,
     vm::ref<iree_hal_command_buffer_t> command_buffer) {
   IREE_TRACE_SCOPE0("HALModuleState::ExSubmitAndWait");
-  IREE_RETURN_IF_NULL(device);
-  IREE_RETURN_IF_NULL(command_buffer);
 
   auto* device_ptr = reinterpret_cast<Device*>(device.get());
   auto* queue = device_ptr->dispatch_queues().front();
@@ -360,7 +352,6 @@ Status HALModuleState::ExSubmitAndWait(
 StatusOr<int32_t> HALModuleState::AllocatorComputeSize(
     vm::ref<iree_hal_allocator_t> allocator, absl::Span<const int32_t> shape,
     iree_hal_element_type_t element_type) {
-  IREE_RETURN_IF_NULL(allocator);
   iree_device_size_t allocation_size = 0;
   RETURN_IF_ERROR(FromApiStatus(iree_hal_allocator_compute_size(
                                     allocator.get(), shape.data(), shape.size(),
@@ -372,7 +363,6 @@ StatusOr<int32_t> HALModuleState::AllocatorComputeSize(
 StatusOr<int32_t> HALModuleState::AllocatorComputeOffset(
     vm::ref<iree_hal_allocator_t> allocator, absl::Span<const int32_t> shape,
     iree_hal_element_type_t element_type, absl::Span<const int32_t> indices) {
-  IREE_RETURN_IF_NULL(allocator);
   iree_device_size_t offset = 0;
   RETURN_IF_ERROR(
       FromApiStatus(iree_hal_allocator_compute_offset(
@@ -387,7 +377,6 @@ StatusOr<std::tuple<int32_t, int32_t>> HALModuleState::AllocatorComputeRange(
     iree_hal_element_type_t element_type,
     absl::Span<const int32_t> start_indices,
     absl::Span<const int32_t> lengths) {
-  IREE_RETURN_IF_NULL(allocator);
   iree_device_size_t offset = 0;
   iree_device_size_t length = 0;
   RETURN_IF_ERROR(FromApiStatus(
@@ -405,7 +394,6 @@ StatusOr<vm::ref<iree_hal_buffer_t>> HALModuleState::AllocatorAllocate(
     iree_hal_memory_type_t memory_types, iree_hal_buffer_usage_t buffer_usage,
     int32_t allocation_size) {
   IREE_TRACE_SCOPE0("HALModuleState::AllocatorAllocate");
-  IREE_RETURN_IF_NULL(allocator);
   vm::ref<iree_hal_buffer_t> buffer;
   RETURN_IF_ERROR(FromApiStatus(iree_hal_allocator_allocate_buffer(
                                     allocator.get(), memory_types, buffer_usage,
@@ -420,8 +408,6 @@ StatusOr<vm::ref<iree_hal_buffer_t>> HALModuleState::AllocatorAllocateConst(
     absl::Span<const int32_t> shape, iree_hal_element_type_t element_type,
     vm::ref<iree_vm_ro_byte_buffer_t> value) {
   IREE_TRACE_SCOPE0("HALModuleState::AllocatorAllocateConst");
-  IREE_RETURN_IF_NULL(allocator);
-  IREE_RETURN_IF_NULL(value);
 
   iree_device_size_t allocation_size = 0;
   RETURN_IF_ERROR(FromApiStatus(iree_hal_allocator_compute_size(
@@ -455,7 +441,6 @@ StatusOr<vm::ref<iree_hal_buffer_t>> HALModuleState::AllocatorAllocateConst(
 
 StatusOr<vm::ref<iree_hal_allocator_t>> HALModuleState::BufferAllocator(
     vm::ref<iree_hal_buffer_t> buffer) {
-  IREE_RETURN_IF_NULL(buffer);
   return vm::retain_ref(iree_hal_buffer_allocator(buffer.get()));
 }
 
@@ -463,7 +448,6 @@ StatusOr<vm::ref<iree_hal_buffer_t>> HALModuleState::BufferSubspan(
     vm::ref<iree_hal_buffer_t> source_buffer, int32_t source_offset,
     int32_t length) {
   IREE_TRACE_SCOPE0("HALModuleState::BufferSubspan");
-  IREE_RETURN_IF_NULL(source_buffer);
   return UnimplementedErrorBuilder(IREE_LOC) << "BufferSubspan";
 }
 
@@ -471,7 +455,6 @@ Status HALModuleState::BufferFill(vm::ref<iree_hal_buffer_t> target_buffer,
                                   int32_t target_offset, int32_t length,
                                   int32_t pattern) {
   IREE_TRACE_SCOPE0("HALModuleState::BufferFill");
-  IREE_RETURN_IF_NULL(target_buffer);
   return UnimplementedErrorBuilder(IREE_LOC) << "BufferFill";
 }
 
@@ -480,8 +463,6 @@ Status HALModuleState::BufferReadData(
     vm::ref<iree_vm_rw_byte_buffer_t> target_buffer, int32_t target_offset,
     int32_t length) {
   IREE_TRACE_SCOPE0("HALModuleState::BufferReadData");
-  IREE_RETURN_IF_NULL(source_buffer);
-  IREE_RETURN_IF_NULL(target_buffer);
   return UnimplementedErrorBuilder(IREE_LOC) << "BufferReadData";
 }
 
@@ -490,8 +471,6 @@ Status HALModuleState::BufferWriteData(
     vm::ref<iree_vm_ro_byte_buffer_t> source_buffer, int32_t source_offset,
     int32_t length) {
   IREE_TRACE_SCOPE0("HALModuleState::BufferWriteData");
-  IREE_RETURN_IF_NULL(target_buffer);
-  IREE_RETURN_IF_NULL(source_buffer);
   return UnimplementedErrorBuilder(IREE_LOC) << "BufferWriteData";
 }
 
@@ -500,8 +479,6 @@ Status HALModuleState::BufferCopyData(vm::ref<iree_hal_buffer_t> source_buffer,
                                       vm::ref<iree_hal_buffer_t> target_buffer,
                                       int32_t target_offset, int32_t length) {
   IREE_TRACE_SCOPE0("HALModuleState::BufferCopyData");
-  IREE_RETURN_IF_NULL(source_buffer);
-  IREE_RETURN_IF_NULL(target_buffer);
   return UnimplementedErrorBuilder(IREE_LOC) << "BufferCopyData";
 }
 
@@ -509,7 +486,6 @@ StatusOr<int32_t> HALModuleState::BufferLoad(
     vm::ref<iree_hal_buffer_t> source_buffer, int32_t source_offset,
     int32_t length) {
   IREE_TRACE_SCOPE0("HALModuleState::BufferLoad");
-  IREE_RETURN_IF_NULL(source_buffer);
 
   uint32_t target_buffer = 0;
   if (length > sizeof(target_buffer)) {
@@ -529,7 +505,6 @@ Status HALModuleState::BufferStore(int32_t value,
                                    vm::ref<iree_hal_buffer_t> target_buffer,
                                    int32_t target_offset, int32_t length) {
   IREE_TRACE_SCOPE0("HALModuleState::BufferStore");
-  IREE_RETURN_IF_NULL(target_buffer);
 
   if (target_offset + length >
       iree_hal_buffer_byte_length(target_buffer.get())) {
@@ -554,7 +529,6 @@ Status HALModuleState::BufferStore(int32_t value,
 StatusOr<vm::ref<iree_hal_buffer_view_t>> HALModuleState::BufferViewCreate(
     vm::ref<iree_hal_buffer_t> buffer, absl::Span<const int32_t> shape,
     iree_hal_element_type_t element_type) {
-  IREE_RETURN_IF_NULL(buffer);
   vm::ref<iree_hal_buffer_view_t> buffer_view;
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
@@ -567,7 +541,6 @@ StatusOr<vm::ref<iree_hal_buffer_view_t>> HALModuleState::BufferViewCreate(
 StatusOr<vm::ref<iree_hal_buffer_view_t>> HALModuleState::BufferViewSubview(
     vm::ref<iree_hal_buffer_view_t> buffer_view,
     absl::Span<const int32_t> indices, absl::Span<const int32_t> lengths) {
-  IREE_RETURN_IF_NULL(buffer_view);
   vm::ref<iree_hal_buffer_view_t> new_buffer_view;
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_buffer_view_subview(
@@ -580,20 +553,17 @@ StatusOr<vm::ref<iree_hal_buffer_view_t>> HALModuleState::BufferViewSubview(
 
 StatusOr<vm::ref<iree_hal_buffer_t>> HALModuleState::BufferViewBuffer(
     vm::ref<iree_hal_buffer_view_t> buffer_view) {
-  IREE_RETURN_IF_NULL(buffer_view);
   return vm::retain_ref(iree_hal_buffer_view_buffer(buffer_view.get()));
 }
 
 StatusOr<int32_t> HALModuleState::BufferViewByteLength(
     vm::ref<iree_hal_buffer_view_t> buffer_view) {
-  IREE_RETURN_IF_NULL(buffer_view);
   return iree_hal_buffer_view_byte_length(buffer_view.get());
 }
 
 StatusOr<int32_t> HALModuleState::BufferViewComputeOffset(
     vm::ref<iree_hal_buffer_view_t> buffer_view,
     absl::Span<const int32_t> indices) {
-  IREE_RETURN_IF_NULL(buffer_view);
   iree_device_size_t offset = 0;
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_buffer_view_compute_offset(buffer_view.get(), indices.data(),
@@ -606,7 +576,6 @@ StatusOr<std::tuple<int32_t, int32_t>> HALModuleState::BufferViewComputeRange(
     vm::ref<iree_hal_buffer_view_t> buffer_view,
     absl::Span<const int32_t> start_indices,
     absl::Span<const int32_t> lengths) {
-  IREE_RETURN_IF_NULL(buffer_view);
   iree_device_size_t start_offset = 0;
   iree_device_size_t subspan_length = 0;
   RETURN_IF_ERROR(FromApiStatus(
@@ -626,7 +595,6 @@ HALModuleState::CommandBufferCreate(
     vm::ref<iree_hal_device_t> device, iree_hal_command_buffer_mode_t modes,
     iree_hal_command_category_t command_categories) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferCreate");
-  IREE_RETURN_IF_NULL(device);
 
   vm::ref<iree_hal_command_buffer_t> command_buffer;
   RETURN_IF_ERROR(FromApiStatus(
@@ -640,7 +608,6 @@ HALModuleState::CommandBufferCreate(
 Status HALModuleState::CommandBufferBegin(
     vm::ref<iree_hal_command_buffer_t> command_buffer) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferBegin");
-  IREE_RETURN_IF_NULL(command_buffer);
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_command_buffer_begin(command_buffer.get()), IREE_LOC))
       << "Failed to begin command buffer recording";
@@ -650,7 +617,6 @@ Status HALModuleState::CommandBufferBegin(
 Status HALModuleState::CommandBufferEnd(
     vm::ref<iree_hal_command_buffer_t> command_buffer) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferEnd");
-  IREE_RETURN_IF_NULL(command_buffer);
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_command_buffer_end(command_buffer.get()), IREE_LOC))
       << "Failed to end command buffer recording";
@@ -664,7 +630,6 @@ Status HALModuleState::CommandBufferExecutionBarrier(
     absl::Span<const int32_t> memory_barriers,
     absl::Span<const int32_t> buffer_barriers) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferExecutionBarrier");
-  IREE_RETURN_IF_NULL(command_buffer);
 
   // TODO(benvanik): decode barriers.
   iree_hal_memory_barrier_t global_barrier;
@@ -683,8 +648,6 @@ Status HALModuleState::CommandBufferFillBuffer(
     vm::ref<iree_hal_buffer_t> target_buffer, int32_t target_offset,
     int32_t length, uint32_t pattern) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferFillBuffer");
-  IREE_RETURN_IF_NULL(command_buffer);
-  IREE_RETURN_IF_NULL(target_buffer);
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_command_buffer_fill_buffer(command_buffer.get(),
                                           target_buffer.get(), target_offset,
@@ -699,9 +662,6 @@ Status HALModuleState::CommandBufferCopyBuffer(
     vm::ref<iree_hal_buffer_t> target_buffer, int32_t target_offset,
     int32_t length) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferCopyBuffer");
-  IREE_RETURN_IF_NULL(command_buffer);
-  IREE_RETURN_IF_NULL(source_buffer);
-  IREE_RETURN_IF_NULL(target_buffer);
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_command_buffer_copy_buffer(
           command_buffer.get(), source_buffer.get(), source_offset,
@@ -716,9 +676,6 @@ Status HALModuleState::CommandBufferBindDescriptorSet(
     vm::ref<iree_hal_descriptor_set_t> descriptor_set,
     absl::Span<const int32_t> dynamic_offsets) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferBindDescriptorSet");
-  IREE_RETURN_IF_NULL(command_buffer);
-  IREE_RETURN_IF_NULL(executable_layout);
-  IREE_RETURN_IF_NULL(descriptor_set);
   absl::InlinedVector<iree_device_size_t, 4> dynamic_offset_values(
       dynamic_offsets.size());
   for (int i = 0; i < dynamic_offsets.size(); ++i) {
@@ -739,8 +696,6 @@ Status HALModuleState::CommandBufferDispatch(
     vm::ref<iree_hal_executable_t> executable, int32_t entry_point,
     int32_t workgroup_x, int32_t workgroup_y, int32_t workgroup_z) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferDispatch");
-  IREE_RETURN_IF_NULL(command_buffer);
-  IREE_RETURN_IF_NULL(executable);
 
   DispatchRequest dispatch_request;
   dispatch_request.executable = reinterpret_cast<Executable*>(executable.get());
@@ -760,9 +715,6 @@ Status HALModuleState::CommandBufferDispatchIndirect(
     vm::ref<iree_hal_executable_t> executable, int32_t entry_point,
     vm::ref<iree_hal_buffer_t> workgroups_buffer, int32_t workgroups_offset) {
   IREE_TRACE_SCOPE0("HALModuleState::CommandBufferDispatchIndirect");
-  IREE_RETURN_IF_NULL(command_buffer);
-  IREE_RETURN_IF_NULL(executable);
-  IREE_RETURN_IF_NULL(workgroups_buffer);
   return UnimplementedErrorBuilder(IREE_LOC) << "CommandBufferDispatchIndirect";
 }
 
@@ -778,8 +730,6 @@ HALModuleState::DescriptorSetCreate(
         const std::tuple<int32_t, vm::ref<iree_hal_buffer_t>, int32_t, int32_t>>
         bindings) {
   IREE_TRACE_SCOPE0("HALModuleState::DescriptorSetCreate");
-  IREE_RETURN_IF_NULL(device);
-  IREE_RETURN_IF_NULL(set_layout);
   // TODO(benvanik): custom packing logic for the structs so that we marshal
   // the VM args directly into them instead of needing this temporary array.
   absl::InlinedVector<iree_hal_descriptor_set_binding_t, 4> binding_structs(
@@ -810,7 +760,6 @@ HALModuleState::DescriptorSetLayoutCreate(
                                 iree_hal_memory_access_t>>
         bindings) {
   IREE_TRACE_SCOPE0("HALModuleState::DescriptorSetLayoutCreate");
-  IREE_RETURN_IF_NULL(device);
   // TODO(benvanik): custom marshaling for the structs.
   absl::InlinedVector<iree_hal_descriptor_set_layout_binding_t, 4>
       binding_structs(bindings.size());
@@ -833,7 +782,6 @@ HALModuleState::DescriptorSetLayoutCreate(
 
 StatusOr<vm::ref<iree_hal_allocator_t>> HALModuleState::DeviceAllocator(
     vm::ref<iree_hal_device_t> device) {
-  IREE_RETURN_IF_NULL(device);
   return vm::retain_ref(iree_hal_device_allocator(device.get()));
 }
 
@@ -847,7 +795,6 @@ HALModuleState::ExecutableLayoutCreate(
     absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts,
     size_t push_constants) {
   IREE_TRACE_SCOPE0("HALModuleState::ExecutableLayoutCreate");
-  IREE_RETURN_IF_NULL(device);
   vm::ref<iree_hal_executable_layout_t> executable_layout;
   RETURN_IF_ERROR(FromApiStatus(
       iree_hal_executable_layout_create(

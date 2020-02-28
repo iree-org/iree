@@ -275,19 +275,31 @@ void swap(ref<T>& lhs, ref<T>& rhs) {
 // An opaque reference that does not make any assertions about the type of the
 // ref contained. This can be used to accept arbitrary ref objects that are then
 // dynamically handled based on type.
-struct opaque_ref {
-  iree_vm_ref_t value = {0};
+class opaque_ref {
+ public:
   opaque_ref() = default;
   opaque_ref(const opaque_ref&) = delete;
   opaque_ref& operator=(const opaque_ref&) = delete;
   opaque_ref(opaque_ref&& rhs) noexcept {
-    iree_vm_ref_move(&rhs.value, &value);
+    iree_vm_ref_move(&rhs.value_, &value_);
   }
   opaque_ref& operator=(opaque_ref&& rhs) noexcept {
-    iree_vm_ref_move(&rhs.value, &value);
+    iree_vm_ref_move(&rhs.value_, &value_);
     return *this;
   }
-  ~opaque_ref() { iree_vm_ref_release(&value); }
+  ~opaque_ref() { iree_vm_ref_release(&value_); }
+
+  constexpr iree_vm_ref_t* get() const noexcept { return &value_; }
+  constexpr operator iree_vm_ref_t*() const noexcept { return &value_; }
+  constexpr bool operator!() const noexcept { return !value_.ptr; }
+
+  // Returns a pointer to the inner pointer storage.
+  // This allows passing a pointer to the ref as an output argument to C-style
+  // creation functions.
+  constexpr iree_vm_ref_t* operator&() noexcept { return &value_; }  // NOLINT
+
+ private:
+  mutable iree_vm_ref_t value_ = {0};
 };
 
 }  // namespace vm

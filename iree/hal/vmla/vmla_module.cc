@@ -201,7 +201,6 @@ class VMLAModuleState final {
   StatusOr<vm::ref<iree_vmla_buffer_t>> BufferConst(
       vm::ref<iree_vm_ro_byte_buffer_t> value) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferConst");
-    IREE_RETURN_IF_NULL(value);
     iree_allocator_t external_allocator = {0};
     external_allocator.self = vm::retain_ref(value).release();
     external_allocator.free = +[](void* self, void* ptr) -> iree_status_t {
@@ -221,7 +220,6 @@ class VMLAModuleState final {
   StatusOr<vm::ref<iree_vmla_buffer_t>> BufferClone(
       vm::ref<iree_vmla_buffer_t> src) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferClone");
-    IREE_RETURN_IF_NULL(src);
     ASSIGN_OR_RETURN(auto dst,
                      iree_vmla_buffer_t::Allocate(src->size(), allocator_));
     std::memcpy(dst->data(), src->data(), dst->size());
@@ -232,7 +230,6 @@ class VMLAModuleState final {
       vm::ref<iree_vmla_buffer_t> src, iree_vmla_size_t byte_offset,
       iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferView");
-    IREE_RETURN_IF_NULL(src);
 
     if (byte_offset == 0 && byte_length == src->size()) {
       // Asking for the same buffer.
@@ -270,8 +267,6 @@ class VMLAModuleState final {
                     iree_vmla_size_t dst_byte_offset,
                     iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferCopy");
-    IREE_RETURN_IF_NULL(src);
-    IREE_RETURN_IF_NULL(dst);
     ASSIGN_OR_RETURN(auto src_bytes,
                      src->RangeAs<const uint8_t>(src_byte_offset, byte_length));
     ASSIGN_OR_RETURN(auto dst_bytes,
@@ -283,8 +278,6 @@ class VMLAModuleState final {
   Status BufferFill(vm::ref<iree_vmla_buffer_t> value,
                     vm::ref<iree_vmla_buffer_t> dst) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferFill");
-    IREE_RETURN_IF_NULL(value);
-    IREE_RETURN_IF_NULL(dst);
     if (value->size() == 1) {
       // Fast-path for single-byte memset values.
       std::memset(dst->data(), value->As<uint8_t>()[0], dst->size());
@@ -306,7 +299,6 @@ class VMLAModuleState final {
   StatusOr<int32_t> BufferLoadI32(vm::ref<iree_vmla_buffer_t> src,
                                   iree_vmla_size_t byte_offset) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferLoadI32");
-    IREE_RETURN_IF_NULL(src);
     ASSIGN_OR_RETURN(auto data,
                      src->RangeAs<int32_t>(byte_offset, sizeof(int32_t)));
     return data[0];

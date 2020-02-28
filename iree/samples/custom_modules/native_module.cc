@@ -142,7 +142,6 @@ class CustomModuleState final {
   // custom.buffer_to_message(%buffer_view) -> %result
   StatusOr<vm::ref<iree_custom_message_t>> BufferToMessage(
       vm::ref<iree_hal_buffer_view_t> buffer_view) {
-    IREE_RETURN_IF_NULL(buffer_view);
     iree_hal_buffer_t* buffer = iree_hal_buffer_view_buffer(buffer_view.get());
 
     // Map the buffer memory so we can read it back.
@@ -198,8 +197,6 @@ class CustomModuleState final {
   // custom.message_to_buffer(%message) -> %buffer_view
   StatusOr<vm::ref<iree_hal_buffer_view_t>> MessageToBuffer(
       vm::ref<iree_custom_message_t> message) {
-    IREE_RETURN_IF_NULL(message);
-
     // NOTE: these old-style parsing routines need to be updated for the new
     // type system. They use different types, different shapes, etc.
     auto str_parts = BufferStringParts::ExtractFrom(
