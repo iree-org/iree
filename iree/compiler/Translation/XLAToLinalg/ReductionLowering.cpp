@@ -115,6 +115,8 @@ static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn,
     if (i == reductionDim) continue;
     exprs.push_back(builder.getAffineDimExpr(i));
   }
+
+  if (exprs.empty()) exprs.push_back(builder.getAffineConstantExpr(0));
   indexingMaps.emplace_back(
       AffineMapAttr::get(AffineMap::get(nInputRank, /*symbolCount=*/0, exprs)));
 
