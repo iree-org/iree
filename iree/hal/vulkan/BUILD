@@ -157,10 +157,8 @@ cc_library(
         "dynamic_symbols.h",
     ],
     copts = PLATFORM_VULKAN_LOADER_COPTS,
-    linkopts = [
-        "-ldl",
-    ],
     deps = [
+        "//iree/base:dynamic_library",
         "//iree/base:file_path",
         "//iree/base:platform_headers",
         "//iree/base:ref_ptr",
@@ -170,6 +168,7 @@ cc_library(
         "//iree/base:tracing",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
         "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
@@ -307,13 +306,14 @@ cc_library(
     name = "renderdoc_capture_manager",
     srcs = ["renderdoc_capture_manager.cc"],
     hdrs = ["renderdoc_capture_manager.h"],
-    linkopts = ["-ldl"],
     deps = [
+        "//iree/base:dynamic_library",
         "//iree/base:logging",
         "//iree/base:platform_headers",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:debug_capture_manager",
+        "@com_google_absl//absl/types:span",
         "@renderdoc_api//:renderdoc_app",
     ],
 )

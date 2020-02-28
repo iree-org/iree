@@ -20,6 +20,7 @@
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
 #include "absl/memory/memory.h"
+#include "absl/types/span.h"
 #include "iree/base/file_path.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/source_location.h"
@@ -27,11 +28,6 @@
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vulkan/dynamic_symbol_tables.h"
-
-#if defined(IREE_PLATFORM_WINDOWS)
-#else
-#include <dlfcn.h>
-#endif  // IREE_PLATFORM_WINDOWS
 
 namespace iree {
 namespace hal {
@@ -80,15 +76,16 @@ static constexpr const FunctionPtrInfo kDynamicFunctionPtrInfos[] = {
     IREE_VULKAN_DYNAMIC_SYMBOL_TABLES(INS_PFN_FUNCTION_PTR,
                                       DEV_PFN_FUNCTION_PTR)};
 
-}  // namespace
+static const char* kVulkanLoaderSearchNames[] = {
+#if defined(IREE_PLATFORM_WINDOWS)
+    "vulkan-1.dll",
+#else
+    "libvulkan.so.1",
+#endif  // IREE_PLATFORM_WINDOWS
+};
 
-// static
-StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
-    const GetProcAddrFn& get_proc_addr) {
-  IREE_TRACE_SCOPE0("DynamicSymbols::Create");
-
-  auto syms = make_ref<DynamicSymbols>();
-
+Status ResolveFunctions(DynamicSymbols* syms,
+                        const DynamicSymbols::GetProcAddrFn& get_proc_addr) {
   // Resolve the method the shared object uses to resolve other functions.
   // Some libraries will export all symbols while others will only export this
   // single function.
@@ -106,7 +103,7 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
   for (int i = 0; i < ABSL_ARRAYSIZE(kInstancelessFunctionPtrInfos); ++i) {
     const auto& function_ptr = kInstancelessFunctionPtrInfos[i];
     auto* member_ptr = reinterpret_cast<PFN_vkVoidFunction*>(
-        reinterpret_cast<uint8_t*>(syms.get()) + function_ptr.member_offset);
+        reinterpret_cast<uint8_t*>(syms) + function_ptr.member_offset);
     *member_ptr =
         syms->vkGetInstanceProcAddr(VK_NULL_HANDLE, function_ptr.function_name);
     if (*member_ptr == nullptr) {
@@ -116,6 +113,18 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
     }
   }
 
+  return OkStatus();
+}
+
+}  // namespace
+
+// static
+StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
+    const GetProcAddrFn& get_proc_addr) {
+  IREE_TRACE_SCOPE0("DynamicSymbols::Create");
+
+  auto syms = make_ref<DynamicSymbols>();
+  RETURN_IF_ERROR(ResolveFunctions(syms.get(), get_proc_addr));
   return syms;
 }
 
@@ -139,44 +148,18 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   // discover ICDs.
 #endif  // IREE_VK_ICD_FILENAMES
 
-// NOTE: we could factor this out into base, but this is the only place we use
-// it right now so it's fine.
-#if defined(IREE_PLATFORM_WINDOWS)
-  HMODULE library = ::LoadLibraryA("vulkan-1.dll");
-  if (!library) {
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open vulkan-1.dll; driver not installed/on PATH";
-  }
-  ASSIGN_OR_RETURN(auto syms, Create([library](const char* function_name) {
-                     return reinterpret_cast<PFN_vkVoidFunction>(
-                         ::GetProcAddress(library, function_name));
-                   }));
-  syms->close_fn_ = [library]() {
-    // TODO(benvanik): disable if we want to get profiling results. Sometimes
-    // closing the library can prevent proper symbolization on crashes or
-    // in sampling profilers.
-    ::FreeLibrary(library);
-  };
+  ASSIGN_OR_RETURN(
+      auto loader_library,
+      DynamicLibrary::Load(absl::MakeSpan(kVulkanLoaderSearchNames)));
+  auto syms = make_ref<DynamicSymbols>();
+  syms->loader_library_ = std::move(loader_library);
+
+  auto* loader_library_ptr = syms->loader_library_.get();
+  RETURN_IF_ERROR(ResolveFunctions(
+      syms.get(), [loader_library_ptr](const char* function_name) {
+        return loader_library_ptr->GetSymbol<PFN_vkVoidFunction>(function_name);
+      }));
   return syms;
-#else
-  void* library = ::dlopen("libvulkan.so.1", RTLD_LAZY | RTLD_LOCAL);
-  if (!library) {
-    return UnavailableErrorBuilder(IREE_LOC)
-           << "Unable to open libvulkan.so; driver not installed/on "
-              "LD_LIBRARY_PATH";
-  }
-  ASSIGN_OR_RETURN(auto syms, Create([library](const char* function_name) {
-                     return reinterpret_cast<PFN_vkVoidFunction>(
-                         ::dlsym(library, function_name));
-                   }));
-  syms->close_fn_ = [library]() {
-    // TODO(benvanik): disable if we want to get profiling results. Sometimes
-    // closing the library can prevent proper symbolization on crashes or
-    // in sampling profilers.
-    ::dlclose(library);
-  };
-  return syms;
-#endif  // IREE_PLATFORM_WINDOWS
 }
 
 Status DynamicSymbols::LoadFromInstance(VkInstance instance) {
@@ -227,11 +210,7 @@ Status DynamicSymbols::LoadFromDevice(VkInstance instance, VkDevice device) {
 
 DynamicSymbols::DynamicSymbols() = default;
 
-DynamicSymbols::~DynamicSymbols() {
-  if (close_fn_) {
-    close_fn_();
-  }
-}
+DynamicSymbols::~DynamicSymbols() = default;
 
 }  // namespace vulkan
 }  // namespace hal

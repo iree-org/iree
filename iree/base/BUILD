@@ -122,6 +122,25 @@ cc_test(
 )
 
 cc_library(
+    name = "dynamic_library",
+    srcs = [
+        "dynamic_library_posix.cc",
+        "dynamic_library_win32.cc",
+    ],
+    hdrs = ["dynamic_library.h"],
+    linkopts = ["-ldl"],
+    deps = [
+        ":logging",
+        ":platform_headers",
+        ":status",
+        ":target_platform",
+        ":tracing",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/types:span",
+    ],
+)
+
+cc_library(
     name = "file_io",
     hdrs = ["file_io.h"],
     deps = [

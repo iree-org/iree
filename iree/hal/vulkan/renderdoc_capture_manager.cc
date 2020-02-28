@@ -14,6 +14,7 @@
 
 #include "iree/hal/vulkan/renderdoc_capture_manager.h"
 
+#include "absl/types/span.h"
 #include "iree/base/logging.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/tracing.h"
@@ -27,8 +28,17 @@ namespace iree {
 namespace hal {
 namespace vulkan {
 
-// TODO(scotttodd): absl flag for RTLD_NOLOAD / RTLD_NOW?
-//     https://renderdoc.org/docs/in_application_api.html suggests RTLD_NOLOAD
+namespace {
+
+static const char* kRenderDocSearchNames[] = {
+#if defined(IREE_PLATFORM_WINDOWS)
+    "renderdoc.dll",
+#else
+    "librenderdoc.so",
+#endif  // IREE_PLATFORM_WINDOWS
+};
+
+}  // namespace
 
 RenderDocCaptureManager::RenderDocCaptureManager() {}
 
@@ -44,22 +54,13 @@ Status RenderDocCaptureManager::Connect() {
     return OkStatus();
   }
 
-// Load RenderDoc's library object.
-#if defined(IREE_PLATFORM_WINDOWS)
-  // TODO(scotttodd): Windows, ::LoadLibraryA()
-  return UnimplementedErrorBuilder(IREE_LOC);
-#else
-  renderdoc_library_ = ::dlopen("librenderdoc.so", RTLD_NOW);
-  if (renderdoc_library_ == nullptr) {
-    return NotFoundErrorBuilder(IREE_LOC)
-           << "Could not load librenderdoc.so. Is it on LD_LIBRARY_PATH?";
-  }
+  ASSIGN_OR_RETURN(renderdoc_library_,
+                   DynamicLibrary::Load(absl::MakeSpan(kRenderDocSearchNames)));
 
-  // Fetch the API object from the loaded library.
-  pRENDERDOC_GetAPI RENDERDOC_GetAPI =
-      (pRENDERDOC_GetAPI)::dlsym(renderdoc_library_, "RENDERDOC_GetAPI");
-  int ret =
-      RENDERDOC_GetAPI(eRENDERDOC_API_Version_1_4_0, (void**)&renderdoc_api_);
+  auto renderdoc_get_api_fn =
+      renderdoc_library_->GetSymbol<pRENDERDOC_GetAPI>("RENDERDOC_GetAPI");
+  int ret = renderdoc_get_api_fn(eRENDERDOC_API_Version_1_4_0,
+                                 (void**)&renderdoc_api_);
   if (ret != 1) {
     renderdoc_api_ = nullptr;
     return InternalErrorBuilder(IREE_LOC)
@@ -69,7 +70,6 @@ Status RenderDocCaptureManager::Connect() {
   LOG(INFO) << "Connected to RenderDoc's API";
 
   return OkStatus();
-#endif
 }
 
 void RenderDocCaptureManager::Disconnect() {
@@ -84,13 +84,7 @@ void RenderDocCaptureManager::Disconnect() {
   }
 
   renderdoc_api_ = nullptr;
-
-#if defined(IREE_PLATFORM_WINDOWS)
-// TODO(scotttodd): Windows, ::FreeLibrary()
-#else
-  ::dlclose(renderdoc_library_);
-  renderdoc_library_ = nullptr;
-#endif
+  renderdoc_library_.reset();
 }
 
 void RenderDocCaptureManager::StartCapture() {

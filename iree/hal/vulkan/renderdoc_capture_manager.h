@@ -15,6 +15,7 @@
 #ifndef IREE_HAL_VULKAN_RENDERDOC_CAPTURE_MANAGER_H_
 #define IREE_HAL_VULKAN_RENDERDOC_CAPTURE_MANAGER_H_
 
+#include "iree/base/dynamic_library.h"
 #include "iree/base/status.h"
 #include "iree/hal/debug_capture_manager.h"
 #include "third_party/renderdoc_api/app/renderdoc_app.h"
@@ -45,7 +46,7 @@ class RenderDocCaptureManager final : public DebugCaptureManager {
   bool is_capturing() const override;
 
  private:
-  void* renderdoc_library_ = nullptr;
+  std::unique_ptr<DynamicLibrary> renderdoc_library_;
   RENDERDOC_API_1_4_0* renderdoc_api_ = nullptr;
 };
 

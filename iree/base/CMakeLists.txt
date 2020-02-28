@@ -131,6 +131,32 @@ iree_cc_test(
     absl::strings
 )
 
+iree_select_compiler_opts(_DYNAMIC_LIBRARY_LINKOPTS
+  CLANG_OR_GCC
+    "-ldl"
+)
+
+iree_cc_library(
+  NAME
+    "dynamic_library"
+  SRCS
+    "dynamic_library_posix.cc"
+    "dynamic_library_win32.cc"
+  HDRS
+    "dynamic_library.h"
+  LINKOPTS
+    ${_DYNAMIC_LIBRARY_LINKOPTS}
+  DEPS
+    absl::memory
+    absl::span
+    iree::base::logging
+    iree::base::platform_headers
+    iree::base::status
+    iree::base::target_platform
+    iree::base::tracing
+  PUBLIC
+)
+
 iree_cc_library(
   NAME
     file_io
