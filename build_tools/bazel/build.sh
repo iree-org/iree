@@ -29,8 +29,8 @@ test_env_args=(
 )
 echo "Running with test env args: ${test_env_args[@]}"
 
-# Build and test everything not explicitly marked as excluded from CI (using the
-# tag "nokokoro").
+# Build and test everything in supported directories not explicitly marked as
+# excluded from CI (using the tag "nokokoro").
 # Note that somewhat contrary to its name `bazel test` will also build
 # any non-test targets specified.
 # We use `bazel query //...` piped to `bazel test` rather than the simpler
