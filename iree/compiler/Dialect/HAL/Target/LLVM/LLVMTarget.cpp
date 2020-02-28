@@ -62,6 +62,9 @@ void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   // HLO -> Linalg.
   pm.addPass(createXLAToLinalgPass());
 
+  // Linalg generic op fussion.
+  pm.addPass(createLinalgFusionPass());
+
   // Convert Tensors to memrefs.
   pm.addPass(createLinalgTensorToBufferConversionPass());
 
