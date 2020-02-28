@@ -29,36 +29,6 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
 
-namespace mlir {
-// Defined in the test directory, no public header.
-void registerConvertToTargetEnvPass();
-void registerInliner();
-void registerMemRefBoundCheck();
-void registerPassManagerTestPass();
-void registerPatternsTestPass();
-void registerPrintOpAvailabilityPass();
-void registerSimpleParametricTilingPass();
-void registerSymbolTestPasses();
-void registerTestAffineDataCopyPass();
-void registerTestAllReduceLoweringPass();
-void registerTestCallGraphPass();
-void registerTestConstantFold();
-void registerTestFunc();
-void registerTestGpuMemoryPromotionPass();
-void registerTestLinalgTransforms();
-void registerTestLivenessPass();
-void registerTestLoopFusion();
-void registerTestLoopMappingPass();
-void registerTestMatchers();
-void registerTestMemRefDependenceCheck();
-void registerTestMemRefStrideCalculation();
-void registerTestOpaqueLoc();
-void registerTestParallelismDetection();
-void registerTestVectorConversions();
-void registerTestVectorToLoopsPass();
-void registerVectorizerTestPass();
-}  // namespace mlir
-
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
                                                 llvm::cl::init("-"));
@@ -84,48 +54,9 @@ static llvm::cl::opt<bool> verifyPasses(
     llvm::cl::desc("Run the verifier after each transformation pass"),
     llvm::cl::init(true));
 
-namespace mlir {
-void registerTestPasses() {
-  mlir::registerConvertToTargetEnvPass();
-  mlir::registerInliner();
-  mlir::registerMemRefBoundCheck();
-  mlir::registerPassManagerTestPass();
-  mlir::registerPatternsTestPass();
-  mlir::registerPrintOpAvailabilityPass();
-  mlir::registerSimpleParametricTilingPass();
-  mlir::registerSymbolTestPasses();
-  mlir::registerTestAffineDataCopyPass();
-  mlir::registerTestAllReduceLoweringPass();
-  mlir::registerTestCallGraphPass();
-  mlir::registerTestConstantFold();
-  mlir::registerTestFunc();
-  mlir::registerTestGpuMemoryPromotionPass();
-  mlir::registerTestLinalgTransforms();
-  mlir::registerTestLivenessPass();
-  mlir::registerTestLoopFusion();
-  mlir::registerTestLoopMappingPass();
-  mlir::registerTestMatchers();
-  mlir::registerTestMemRefDependenceCheck();
-  mlir::registerTestMemRefStrideCalculation();
-  mlir::registerTestOpaqueLoc();
-  mlir::registerTestParallelismDetection();
-  mlir::registerTestVectorConversions();
-  mlir::registerTestVectorToLoopsPass();
-  mlir::registerVectorizerTestPass();
-
-  // The following passes are using global initializers, just link them in.
-  if (std::getenv("bar") != (char *)-1) return;
-
-  // TODO: move these to the test folder.
-  mlir::createTestMemRefBoundCheckPass();
-  mlir::createTestMemRefDependenceCheckPass();
-}
-}  // namespace mlir
-
 int main(int argc, char **argv) {
   mlir::registerAllDialects();
   mlir::registerAllPasses();
-  mlir::registerTestPasses();
   llvm::InitLLVM y(argc, argv);
 
   // Register any pass manager command line options.
