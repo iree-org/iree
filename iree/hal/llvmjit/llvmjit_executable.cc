@@ -23,6 +23,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/AsmParser/Parser.h"
+#include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/LLVMContext.h"
@@ -82,7 +83,9 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   auto llvm_context = std::make_unique<llvm::LLVMContext>();
   llvm::SMDiagnostic sm_diagnostic;
   auto module = llvm::parseAssembly(*mem_buffer, sm_diagnostic, *llvm_context);
-
+  if (!module)
+    return InvalidArgumentErrorBuilder(IREE_LOC) << "Can't parse LLVMIR Module";
+  auto dataLayout = module->getDataLayout();
   const auto entry_points = module_def->entry_points();
   // Create an invocation function for each entry point.
   for (const auto func_name : *entry_points) {
@@ -95,6 +98,17 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   if (err)
     return InvalidArgumentErrorBuilder(IREE_LOC)
            << "Can't add executable module to execution engine";
+
+  auto dylib_serarch_generator =
+      llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
+          dataLayout.getGlobalPrefix());
+
+  if (!dylib_serarch_generator.get())
+    return UnavailableErrorBuilder(IREE_LOC)
+           << "Can't resolve symbols in current process";
+
+  auto& main_jitdylib = execution_engine->getMainJITDylib();
+  main_jitdylib.addGenerator(std::move(dylib_serarch_generator.get()));
 
   auto executable =
       make_ref<LLVMJITExecutable>(allocator, spec, allow_aliasing_data);
