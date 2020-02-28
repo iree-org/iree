@@ -435,21 +435,7 @@ def compile_modules(backends=None, **kwargs):
       exported_names = ()
       if isinstance(ctor, tuple):
         ctor, exported_names = ctor
-
-      # Expand backend names to BackendInfo objects.
-      def _resolve(backend_spec):
-        if isinstance(backend_spec, BackendInfo):
-          return backend_spec
-        # Handle the string form.
-        return BackendInfo.ALL[backend_spec]
-
-      if not backends:
-        # Indicates that no backends are explicitly selected.
-        resolved_backends = None
-      else:
-        resolved_backends = [_resolve(backend) for backend in backends]
-
-      cls._modules_to_compile[name] = (ctor, exported_names, resolved_backends)
+      cls._modules_to_compile[name] = (ctor, exported_names, backends)
 
     return cls
 
@@ -488,11 +474,12 @@ BackendInfo.add(
     iree_compiler_targets=["vulkan-*"])
 
 
-def get_default_test_backends():
-  """Gets the default sequence of BackendInfo instances to test against.
+def get_override_backends():
+  """Gets the BackendInfo instances to test, as overridden by the user.
 
   Returns:
-    Sequence of BackendInfo that should be included by default.
+    Sequence of BackendInfo that should be used, or None if there is no
+    override.
   """
 
   if FLAGS.target_backends is not None:
@@ -514,8 +501,8 @@ def get_default_test_backends():
                          (backend_name))
     return backends
   else:
-    logging.info("Using default backends")
-    return BackendInfo.ALL.values()
+    logging.info("No backend overrides.")
+    return None
 
 
 class SavedModelTestCase(tf.test.TestCase):
@@ -564,8 +551,19 @@ class SavedModelTestCase(tf.test.TestCase):
 
         try:
           # Compile.
-          if backends is None:
-            backends = get_default_test_backends()
+          # Expand backend names to BackendInfo objects.
+          def _resolve(backend_spec):
+            if isinstance(backend_spec, BackendInfo):
+              return backend_spec
+            # Handle the string form.
+            return BackendInfo.ALL[backend_spec]
+
+          override_backends = get_override_backends()
+          if override_backends is not None:
+            backends = override_backends
+          elif backends is None:
+            backends = BackendInfo.ALL.values()  # Test all backends.
+          backends = [_resolve(backend) for backend in backends]
           cls.compiled_modules[name] = dict([
               (backend.name, CompiledModule.create(ctor, exported_names,
                                                    backend))
