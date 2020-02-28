@@ -158,6 +158,7 @@ std::pair<void *, void *> allocAligned(size_t nElements,
   auto size = nElements * sizeof(T);
   auto desiredAlignment = pow2msb(sizeof(T));
   assert((desiredAlignment & (desiredAlignment - 1)) == 0);
+  assert(desiredAlignment >= sizeof(T));
   void *data = alloc(size + desiredAlignment);
   uintptr_t addr = reinterpret_cast<uintptr_t>(data);
   uintptr_t rem = addr % desiredAlignment;
@@ -181,7 +182,7 @@ auto makeInitializedUnrankedDescriptor(const std::array<int64_t, N> &shape,
   auto allocated = allocAligned<T>(nElements, alloc);
   auto *data = static_cast<T *>(allocated.first);
   auto *alignedData = static_cast<T *>(allocated.second);
-  for (unsigned i = 0; i < nElements; ++i) init(i, alignedData + i);
+  for (unsigned i = 0; i < nElements; ++i) init(i, alignedData);
   return std::unique_ptr<::UnrankedMemRefType<float>, FreeFunType>(
       detail::allocUnrankedDescriptor<T, N>(data, alignedData, shape), freeFun);
 }
@@ -199,7 +200,7 @@ auto makeInitializedStridedMemRefDescriptor(const std::array<int64_t, N> &shape,
   auto allocated = allocAligned<T>(nElements, alloc);
   auto *data = static_cast<T *>(allocated.first);
   auto *alignedData = static_cast<T *>(allocated.second);
-  for (unsigned i = 0; i < nElements; ++i) init(i, alignedData + i);
+  for (unsigned i = 0; i < nElements; ++i) init(i, alignedData);
   return std::unique_ptr<StridedMemRefType<T, N>, FreeFunType>(
       detail::makeStridedMemRefDescriptor<T, N>(data, alignedData, shape,
                                                 alloc),

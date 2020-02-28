@@ -172,11 +172,13 @@ int main() {
 
   // 4. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
-  auto inputLinearInit = [](unsigned idx, float *ptr) { *ptr = 0.032460f; };
+  auto inputLinearInit = [](unsigned idx, float *ptr) {
+    *(ptr + idx) = 0.032460f;
+  };
   // Exercise the ranked strided memref descriptor.
   auto inputBuffer = makeInitializedStridedMemRefDescriptor<float, 2>(
       {B, W0}, inputLinearInit);
-  auto outputLinearInit = [](unsigned idx, float *ptr) { *ptr = 0.0f; };
+  auto outputLinearInit = [](unsigned idx, float *ptr) { *(ptr + idx) = 0.0f; };
   // Exercise the unranked memref descriptor, with extra level of indirection.
   auto outputBuffer =
       makeInitializedUnrankedDescriptor<float, 2>({B, W3}, outputLinearInit);

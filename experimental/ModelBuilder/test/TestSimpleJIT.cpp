@@ -81,11 +81,11 @@ void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
     for (unsigned i = 0; i < M * N; ++i) *(p + i) = 0.0f;
   };
   auto A = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
-      {1}, oneInit);
+      {kNumElements}, oneInit);
   auto B = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
-      {1}, oneInit);
+      {kNumElements}, oneInit);
   auto C = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
-      {1}, zeroInit);
+      {kNumElements}, zeroInit);
 
   // 5. Call the funcOp named `funcName`.
   const std::string kFuncAdapterName =
