@@ -38,7 +38,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
       ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module.
     // This mechanism can only support rewriting non top-level modules.
-    if (!srcOp.getParentOp()) {
+    if (!srcOp.getParentOp() || !isa<ModuleOp>(srcOp.getParentOp())) {
       return matchFailure();
     }
 
@@ -46,14 +46,24 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
     auto newModuleOp =
         rewriter.create<IREE::VM::ModuleOp>(srcOp.getLoc(), name);
     newModuleOp.getBodyRegion().takeBody(srcOp.getBodyRegion());
+    rewriter.replaceOp(srcOp, {});
+    return matchSuccess();
+  }
+};
 
-    // Replace the terminator.
-    Operation *srcTerminator =
-        newModuleOp.getBodyRegion().back().getTerminator();
-    rewriter.setInsertionPointToEnd(&newModuleOp.getBodyRegion().back());
-    rewriter.replaceOpWithNewOp<IREE::VM::ModuleEndOp>(srcTerminator);
+class ModuleTerminatorOpConversion
+    : public OpConversionPattern<ModuleTerminatorOp> {
+  using OpConversionPattern::OpConversionPattern;
 
-    rewriter.eraseOp(srcOp);
+  PatternMatchResult matchAndRewrite(
+      ModuleTerminatorOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // Do not attempt to convert the top level module's terminator.
+    // This mechanism can only support rewriting non top-level modules.
+    if (!isa<IREE::VM::ModuleOp>(srcOp.getParentOp())) {
+      return matchFailure();
+    }
+    rewriter.replaceOpWithNewOp<IREE::VM::ModuleEndOp>(srcOp);
     return matchSuccess();
   }
 };
@@ -337,11 +347,11 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 
 void populateStandardToVMPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns) {
-  patterns
-      .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-              CondBranchOpConversion, ConstantOpConversion, ModuleOpConversion,
-              FuncOpConversion, ReturnOpConversion, SelectI32OpConversion>(
-          context);
+  patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
+                  CondBranchOpConversion, ConstantOpConversion,
+                  ModuleOpConversion, ModuleTerminatorOpConversion,
+                  FuncOpConversion, ReturnOpConversion, SelectI32OpConversion>(
+      context);
 
   // Binary arithmetic ops
   patterns

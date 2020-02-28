@@ -40,3 +40,22 @@ module {
 }
 
 }
+
+// -----
+
+// CHECK: module
+module {
+  // CHECK: module
+  module {
+    // CHECK: module
+    module {
+      // CHECK-LABEL: vm.module @deeplyNested
+      module @deeplyNested {
+        // CHECK: vm.func @foo
+        func @foo() {
+          return
+        }
+      }
+    }
+  }
+}

@@ -39,11 +39,12 @@ VMConversionTarget::VMConversionTarget(MLIRContext *context)
 
   // NOTE: we need to allow the outermost std.module to be legal to support the
   // double-nesting (module { vm.module { ... } }).
-  addDynamicallyLegalOp<mlir::ModuleOp>(
-      +[](mlir::ModuleOp op) { return op.getParentOp() == nullptr; });
+  addDynamicallyLegalOp<mlir::ModuleOp>(+[](mlir::ModuleOp op) {
+    return !op.getParentOp() || !isa<ModuleOp>(op.getParentOp());
+  });
   addDynamicallyLegalOp<mlir::ModuleTerminatorOp>(
       +[](mlir::ModuleTerminatorOp op) {
-        return op.getParentOp()->getParentOp() == nullptr;
+        return !isa<IREE::VM::ModuleOp>(op.getParentOp());
       });
 }
 
