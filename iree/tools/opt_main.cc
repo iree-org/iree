@@ -10,6 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Analysis/Passes.h"
 #include "mlir/InitAllDialects.h"
 #include "mlir/InitAllPasses.h"
@@ -17,10 +21,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/SourceMgr.h"
-#include "llvm/Support/ToolOutputFile.h"
 
 namespace mlir {
 // Defined in the test directory, no public header.
@@ -50,31 +50,32 @@ void registerTestParallelismDetection();
 void registerTestVectorConversions();
 void registerTestVectorToLoopsPass();
 void registerVectorizerTestPass();
-} // namespace mlir
+}  // namespace mlir
 
-static llvm::cl::opt<std::string>
-    inputFilename(llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::init("-"));
+static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
+                                                llvm::cl::desc("<input file>"),
+                                                llvm::cl::init("-"));
 
-static llvm::cl::opt<std::string> outputFilename("o", llvm::cl::desc("Output filename"),
-                                           llvm::cl::value_desc("filename"),
-                                           llvm::cl::init("-"));
+static llvm::cl::opt<std::string> outputFilename(
+    "o", llvm::cl::desc("Output filename"), llvm::cl::value_desc("filename"),
+    llvm::cl::init("-"));
 
-static llvm::cl::opt<bool>
-    splitInputFile("split-input-file",
-                   llvm::cl::desc("Split the input file into pieces and process each "
-                            "chunk independently"),
-                   llvm::cl::init(false));
+static llvm::cl::opt<bool> splitInputFile(
+    "split-input-file",
+    llvm::cl::desc("Split the input file into pieces and process each "
+                   "chunk independently"),
+    llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-    verifyDiagnostics("verify-diagnostics",
-                      llvm::cl::desc("Check that emitted diagnostics match "
-                               "expected-* lines on the corresponding line"),
-                      llvm::cl::init(false));
+static llvm::cl::opt<bool> verifyDiagnostics(
+    "verify-diagnostics",
+    llvm::cl::desc("Check that emitted diagnostics match "
+                   "expected-* lines on the corresponding line"),
+    llvm::cl::init(false));
 
-static llvm::cl::opt<bool>
-    verifyPasses("verify-each",
-                 llvm::cl::desc("Run the verifier after each transformation pass"),
-                 llvm::cl::init(true));
+static llvm::cl::opt<bool> verifyPasses(
+    "verify-each",
+    llvm::cl::desc("Run the verifier after each transformation pass"),
+    llvm::cl::init(true));
 
 namespace mlir {
 void registerTestPasses() {
@@ -106,14 +107,13 @@ void registerTestPasses() {
   mlir::registerVectorizerTestPass();
 
   // The following passes are using global initializers, just link them in.
-  if (std::getenv("bar") != (char *)-1)
-    return;
+  if (std::getenv("bar") != (char *)-1) return;
 
   // TODO: move these to the test folder.
   mlir::createTestMemRefBoundCheckPass();
   mlir::createTestMemRefDependenceCheckPass();
 }
-} // namespace mlir
+}  // namespace mlir
 
 int main(int argc, char **argv) {
   mlir::registerAllDialects();
@@ -126,7 +126,8 @@ int main(int argc, char **argv) {
   mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
 
   // Parse pass names in main to ensure static initialization completed.
-  llvm::cl::ParseCommandLineOptions(argc, argv, "MLIR modular optimizer driver\n");
+  llvm::cl::ParseCommandLineOptions(argc, argv,
+                                    "MLIR modular optimizer driver\n");
 
   // Set up the input file.
   std::string errorMessage;
@@ -143,5 +144,6 @@ int main(int argc, char **argv) {
   }
 
   return failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
-                            splitInputFile, verifyDiagnostics, verifyPasses));
+                                  splitInputFile, verifyDiagnostics,
+                                  verifyPasses));
 }
