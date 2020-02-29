@@ -25,13 +25,13 @@ list(APPEND IREE_HAL_DRIVER_MODULES
     "iree::hal::vulkan::vulkan_driver_module")
 
 set(IREE_COMPILER_TARGET_BACKENDS)
-list(APPEND IREE_HAL_DRIVER_MODULES
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
     "iree::compiler::Dialect::HAL::Target::LegacyInterpreter")
-list(APPEND IREE_HAL_DRIVER_MODULES
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
     "iree::compiler::Dialect::HAL::Target::LLVM")
-list(APPEND IREE_HAL_DRIVER_MODULES
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
     "iree::compiler::Dialect::HAL::Target::VMLA")
-list(APPEND IREE_HAL_DRIVER_MODULES
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
     "iree::compiler::Dialect::HAL::Target::VulkanSPIRV")
 
 iree_cc_binary(

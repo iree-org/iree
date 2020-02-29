@@ -18,6 +18,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/base/atomics.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -93,7 +94,7 @@ typedef struct {
 // TODO(benvanik): version this interface.
 typedef struct iree_vm_module {
   void* self;
-  _Atomic intptr_t ref_count;
+  iree_atomic_intptr_t ref_count;
 
   // Destroys |self| when all references to the module have been released.
   iree_status_t(IREE_API_PTR* destroy)(void* self);

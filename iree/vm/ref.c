@@ -15,19 +15,17 @@
 #include "iree/vm/ref.h"
 
 #include <assert.h>
-#include <stdatomic.h>
 #include <string.h>
 
-#if ATOMIC_POINTER_LOCK_FREE != 2
-#error "Your compiler does not ensure lock-free atomic ops"
-#endif  // ATOMIC_POINTER_LOCK_FREE
+#include "iree/base/atomics.h"
 
 #define IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor) \
-  ((volatile atomic_intptr_t*)(((uintptr_t)ptr) +      \
-                               type_descriptor->offsetof_counter))
+  ((volatile iree_atomic_intptr_t*)(((uintptr_t)ptr) + \
+                                    type_descriptor->offsetof_counter))
 
-#define IREE_GET_REF_COUNTER_PTR(ref) \
-  ((volatile atomic_intptr_t*)(((uintptr_t)ref->ptr) + ref->offsetof_counter))
+#define IREE_GET_REF_COUNTER_PTR(ref)                       \
+  ((volatile iree_atomic_intptr_t*)(((uintptr_t)ref->ptr) + \
+                                    ref->offsetof_counter))
 
 // TODO(benvanik): dynamic, if we care - otherwise keep small.
 #define IREE_VM_MAX_TYPE_ID 64
@@ -35,17 +33,17 @@
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_retain(
     void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
   if (!ptr) return;
-  volatile atomic_intptr_t* counter =
+  volatile iree_atomic_intptr_t* counter =
       IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor);
-  atomic_fetch_add(counter, 1);
+  iree_atomic_fetch_add(counter, 1);
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_object_release(
     void* ptr, const iree_vm_ref_type_descriptor_t* type_descriptor) {
   if (!ptr) return;
-  volatile atomic_intptr_t* counter =
+  volatile iree_atomic_intptr_t* counter =
       IREE_GET_RAW_COUNTER_PTR(ptr, type_descriptor);
-  if (atomic_fetch_sub(counter, 1) == 1) {
+  if (iree_atomic_fetch_sub(counter, 1) == 1) {
     if (type_descriptor->destroy) {
       // NOTE: this makes us not re-entrant, but I think that's OK.
       type_descriptor->destroy(ptr);
@@ -133,8 +131,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_wrap_retain(
     void* ptr, iree_vm_ref_type_t type, iree_vm_ref_t* out_ref) {
   IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(ptr, type, out_ref));
   if (out_ref->ptr) {
-    volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
-    atomic_fetch_add(counter, 1);
+    volatile iree_atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
+    iree_atomic_fetch_add(counter, 1);
   }
   return IREE_STATUS_OK;
 }
@@ -156,8 +154,8 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain(iree_vm_ref_t* ref,
   // Assign ref to out_ref and increment the counter.
   memcpy(out_ref, ref, sizeof(*out_ref));
   if (out_ref->ptr) {
-    volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
-    atomic_fetch_add(counter, 1);
+    volatile iree_atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
+    iree_atomic_fetch_add(counter, 1);
   }
 }
 
@@ -184,8 +182,8 @@ IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_retain_or_move(
   memcpy(out_ref, ref, sizeof(*out_ref));
   if (out_ref->ptr && !is_move) {
     // Retain by incrementing counter and preserving the source ref.
-    volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
-    atomic_fetch_add(counter, 1);
+    volatile iree_atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(out_ref);
+    iree_atomic_fetch_add(counter, 1);
   } else if (ref != out_ref) {
     // Move by not changing counter and clearing the source ref.
     memset(ref, 0, sizeof(*ref));
@@ -206,8 +204,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_or_move_checked(
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_release(iree_vm_ref_t* ref) {
   if (ref->ptr == NULL) return;
 
-  volatile atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(ref);
-  if (atomic_fetch_sub(counter, 1) == 1) {
+  volatile iree_atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(ref);
+  if (iree_atomic_fetch_sub(counter, 1) == 1) {
     const iree_vm_ref_type_descriptor_t* type_descriptor =
         iree_vm_ref_get_type_descriptor(ref->type);
     if (type_descriptor->destroy) {
