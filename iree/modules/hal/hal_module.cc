@@ -439,7 +439,9 @@ class HALModuleState final {
             buffer_view.get(), start_indices.data(), start_indices.size(),
             lengths.data(), lengths.size(), &start_offset, &subspan_length),
         IREE_LOC));
-    return std::make_tuple<int32_t, int32_t>(start_offset, subspan_length);
+    return std::make_tuple<int32_t, int32_t>(
+        static_cast<int32_t>(start_offset),
+        static_cast<int32_t>(subspan_length));
   }
 
   //===--------------------------------------------------------------------===//

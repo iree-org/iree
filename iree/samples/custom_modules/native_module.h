@@ -25,7 +25,6 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct iree_custom_message iree_custom_message_t;
-IREE_VM_DECLARE_TYPE_ADAPTERS(iree_custom_message, iree_custom_message_t);
 
 // Creates a new !custom.message object with a copy of the given |value|.
 iree_status_t iree_custom_message_create(iree_string_view_t value,
@@ -56,5 +55,7 @@ iree_status_t iree_custom_native_module_create(iree_allocator_t allocator,
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_custom_message, iree_custom_message_t);
 
 #endif  // IREE_SAMPLES_CUSTOM_MODULES_NATIVE_MODULE_H_

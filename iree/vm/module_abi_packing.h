@@ -388,9 +388,10 @@ struct DispatchFunctor {
 
     static const int kLeafCount = impl::LeafCount<Results>::value;
     static const auto kResultList = TupleToArray(
-        std::tuple_cat(std::make_tuple<uint8_t>(kLeafCount),
-                       ConstTupleOr<Results>(
-                           std::make_integer_sequence<uint8_t, kLeafCount>())),
+        std::tuple_cat(
+            std::make_tuple<uint8_t>(static_cast<uint8_t>(kLeafCount)),
+            ConstTupleOr<Results>(
+                std::make_integer_sequence<uint8_t, kLeafCount>())),
         std::make_index_sequence<1 + kLeafCount>());
     frame->return_registers =
         reinterpret_cast<const iree_vm_register_list_t*>(kResultList.data());

@@ -82,6 +82,7 @@ typedef struct {
   // - yield (yield instruction)
   // - await (with 1+ wait handles)
   // - break
+  int reserved;
 } iree_vm_execution_result_t;
 
 // Defines an interface that can be used to reflect and execute functions on a
