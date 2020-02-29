@@ -60,7 +60,7 @@ iree_status_t iree_custom_message_create(iree_string_view_t value,
   iree_custom_message_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_message_t) + value.size, (void**)&message));
-  message->ref_object.counter = 1;
+  message->ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
   message->allocator = allocator;
   message->value.data = ((const char*)message) + sizeof(iree_custom_message_t);
   message->value.size = value.size;
@@ -75,7 +75,7 @@ iree_status_t iree_custom_message_wrap(iree_string_view_t value,
   iree_custom_message_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_custom_message_t), (void**)&message));
-  message->ref_object.counter = 1;
+  message->ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
   message->allocator = allocator;
   message->value = value;  // Unowned.
   *out_message = message;

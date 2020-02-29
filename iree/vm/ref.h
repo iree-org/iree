@@ -153,7 +153,7 @@ iree_vm_ref_lookup_registered_type(iree_string_view_t full_name);
 //
 // Usage (C):
 //  my_type_t* my_type = (my_type_t*)malloc(sizeof(my_type_t));
-//  my_type.ref_object.counter = 1;
+//  my_type.ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
 //  iree_vm_ref_t my_ref;
 //  iree_vm_ref_wrap_assign(my_type, IREE_VM_REF_TYPE_MY_TYPE, &my_ref);
 //  iree_vm_ref_release(&my_ref);

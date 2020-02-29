@@ -46,7 +46,7 @@ iree_status_t vmstring_create(iree_string_view_t value,
   vmstring_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(vmstring_t) + value.size, (void**)&message));
-  message->ref_object.counter = 1;
+  message->ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
   message->allocator = allocator;
   message->value.data = ((const char*)message) + sizeof(vmstring_t);
   message->value.size = value.size;
