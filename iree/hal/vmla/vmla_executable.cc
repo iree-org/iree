@@ -16,6 +16,7 @@
 
 #include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
+#include "iree/schemas/vmla_executable_def_generated.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/module.h"
 
@@ -55,15 +56,32 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
                                   iree_vm_module_t* vmla_module) {
   IREE_TRACE_SCOPE0("VMLAExecutable::Initialize");
 
+  if (spec_.executable_data.size() < 16) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Flatbuffer data is not present or less than 16 bytes";
+  } else if (!iree::VMLAExecutableDefBufferHasIdentifier(
+                 spec_.executable_data.data())) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Flatbuffer data does not have bytecode module identifier";
+  }
+
+  const auto* executable_def = ::flatbuffers::GetRoot<iree::VMLAExecutableDef>(
+      spec_.executable_data.data());
+  if (!executable_def || !executable_def->bytecode_module()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Failed getting root from flatbuffer data";
+  }
+
   // Load bytecode module from the executable spec.
   iree_vm_module_t* bytecode_module = nullptr;
   RETURN_IF_ERROR(FromApiStatus(
       iree_vm_bytecode_module_create(
-          iree_const_byte_span_t{spec_.executable_data.data(),
-                                 spec_.executable_data.size()},
+          iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(
+                                     executable_def->bytecode_module()->data()),
+                                 executable_def->bytecode_module()->size()},
           IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module),
       IREE_LOC))
-      << "failed to load executable bytecode module";
+      << "Failed to load executable bytecode module";
 
   entry_functions_.resize(
       iree_vm_module_signature(bytecode_module).export_function_count);
@@ -79,7 +97,7 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
                                   IREE_ALLOCATOR_SYSTEM, &context_),
                               IREE_LOC);
   if (!result.ok()) {
-    result = Annotate(result, "failed resolving imports for executable module");
+    result = Annotate(result, "Failed resolving imports for executable module");
   }
   iree_vm_module_release(bytecode_module);
 
