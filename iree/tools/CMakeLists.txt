@@ -14,26 +14,28 @@
 
 add_subdirectory(test)
 
-iree_cc_binary(
-  NAME
-    iree-dump-module
-  OUT
-    iree-dump-module
-  SRCS
-    "dump_module_main.cc"
-  DEPS
-    iree::base::file_io
-    iree::base::flatbuffer_util
-    iree::base::init
-    iree::schemas::bytecode_module_def_cc_fbs
-    flatbuffers
-)
-add_executable(iree-dump-module ALIAS iree_tools_iree-dump-module)
+set(IREE_HAL_DRIVER_MODULES)
+list(APPEND IREE_HAL_DRIVER_MODULES
+    "iree::hal::interpreter::interpreter_driver_module")
+list(APPEND IREE_HAL_DRIVER_MODULES
+    "iree::hal::llvmjit::llvmjit_driver_module")
+list(APPEND IREE_HAL_DRIVER_MODULES
+    "iree::hal::vmla::vmla_driver_module")
+list(APPEND IREE_HAL_DRIVER_MODULES
+    "iree::hal::vulkan::vulkan_driver_module")
+
+set(IREE_COMPILER_TARGET_BACKENDS)
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
+    "iree::compiler::Dialect::HAL::Target::LegacyInterpreter")
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
+    "iree::compiler::Dialect::HAL::Target::LLVM")
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
+    "iree::compiler::Dialect::HAL::Target::VMLA")
+list(APPEND IREE_COMPILER_TARGET_BACKENDS
+    "iree::compiler::Dialect::HAL::Target::VulkanSPIRV")
 
 iree_cc_binary(
   NAME
-    iree-benchmark-module
-  OUT
     iree-benchmark-module
   SRCS
     "benchmark_module_main.cc"
@@ -47,35 +49,57 @@ iree_cc_binary(
     iree::base::source_location
     iree::base::status
     iree::modules::hal
-    iree::vm::bytecode_module
     iree::testing::benchmark_main
-    # TODO(marbre): Add PLATFORM_VULKAN_DEPS
-    iree::hal::interpreter::interpreter_driver_module
-    # TODO(b/142004903): enable when Dawn HAL implementation is functional
-    # iree::hal::dawn::dawn_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
+    iree::vm::bytecode_module
+    ${IREE_HAL_DRIVER_MODULES}
 )
-add_executable(iree-benchmark-module ALIAS iree_tools_iree-benchmark-module)
+
+iree_cc_binary(
+  NAME
+    iree-dump-module
+  SRCS
+    "dump_module_main.cc"
+  DEPS
+    flatbuffers
+    iree::base::file_io
+    iree::base::flatbuffer_util
+    iree::base::init
+    iree::schemas::bytecode_module_def_cc_fbs
+)
+
+iree_cc_binary(
+  NAME
+    iree-run-module
+  SRCS
+    "run_module_main.cc"
+  DEPS
+    ::vm_util
+    absl::flags
+    absl::strings
+    iree::base::api_util
+    iree::base::file_io
+    iree::base::init
+    iree::base::source_location
+    iree::base::status
+    iree::modules::hal
+    iree::vm::bytecode_module
+    ${IREE_HAL_DRIVER_MODULES}
+)
 
 if (${IREE_ENABLE_LLVM})
   iree_cc_binary(
     NAME
-      iree-tblgen
-    OUT
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
     DEPS
       iree::compiler::Dialect::VM::Tools
       LLVMMLIRTableGen
-      MLIRSupport
       LLVMTableGen
+      MLIRSupport
     LINKOPTS
       "-lpthread"
   )
-  add_executable(iree-tblgen ALIAS iree_tools_iree-tblgen)
 endif()
 
 iree_cc_library(
@@ -86,6 +110,7 @@ iree_cc_library(
   SRCS
     "vm_util.cc"
   DEPS
+    absl::span
     iree::base::api_util
     iree::base::buffer_string_util
     iree::base::shape
@@ -99,7 +124,6 @@ iree_cc_library(
     iree::vm::bytecode_module
     iree::vm::module
     iree::vm::variant_list
-    absl::span
 )
 
 iree_cc_test(
@@ -108,19 +132,18 @@ iree_cc_test(
   SRCS
     "vm_util_test.cc"
   DEPS
-    iree::tools::vm_util
     iree::base::api
     iree::hal::api
     iree::hal::interpreter::interpreter_driver_module
     iree::modules::hal
     iree::testing::gtest_main
+    iree::tools::vm_util
     iree::vm
     iree::vm::value
     iree::vm::variant_list
 )
 
 if(${IREE_BUILD_COMPILER})
-
   # Logic to identify targets_to_link adopted from MLIR:
   # Manually expand the target library, since our MLIR libraries
   # aren't plugged into the LLVM dependency tracking. If we don't
@@ -128,9 +151,9 @@ if(${IREE_BUILD_COMPILER})
   llvm_expand_pseudo_components(TARGET_LIBS AllTargetsCodeGens)
   # Prepend LLVM in front of every target, this is how the library
   # are named with CMake
-  set(targets_to_link)
+  set(_LLVM_LINK_TARGETS)
   foreach(t ${TARGET_LIBS})
-    list(APPEND targets_to_link "LLVM${t}")
+    list(APPEND _LLVM_LINK_TARGETS "LLVM${t}")
   endforeach(t)
 
   iree_cc_library(
@@ -184,30 +207,21 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVTestPasses
       MLIRTranslation
       tensorflow::mlir_xla
-      # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
-      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
-      iree::compiler::Dialect::HAL::Target::VMLA
-      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
-      iree::compiler::Dialect::HAL::Target::LLVM
-      ${targets_to_link}
+      ${_LLVM_LINK_TARGETS}
+      ${IREE_COMPILER_TARGET_BACKENDS}
     ALWAYSLINK
   )
 
   iree_cc_binary(
     NAME
       iree-opt
-    OUT
-      iree-opt
     DEPS
       iree::tools::iree_opt_library
       MLIRMlirOptMain
   )
-  add_executable(iree-opt ALIAS iree_tools_iree-opt)
 
   iree_cc_binary(
     NAME
-      iree-run-mlir
-    OUT
       iree-run-mlir
     SRCS
       "run_mlir_main.cc"
@@ -218,10 +232,12 @@ if(${IREE_BUILD_COMPILER})
       absl::span
       iree::base::api
       iree::base::api_util
+      iree::base::init
       iree::base::shaped_buffer
       iree::base::shaped_buffer_string_util
       iree::base::signature_mangle
       iree::base::source_location
+      iree::base::status
       iree::compiler::Dialect::Flow::Conversion
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::Conversion
@@ -229,7 +245,10 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Dialect::VM::Transforms
+      iree::compiler::Translation::IREEVM
       iree::hal::api
+      iree::hal::buffer_view_string_util
+      iree::hal::driver_registry
       iree::modules::hal
       iree::vm
       iree::vm::bytecode_module
@@ -242,53 +261,9 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRVSerialization
       MLIRSPIRVTransforms
       MLIRSupport
-      iree::base::init
-      iree::base::status
-      iree::compiler::Translation::IREEVM
-      iree::hal::buffer_view_string_util
-      iree::hal::driver_registry
-      # TODO(marbre): Add PLATFORM_VULKAN_DEPS
-      # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
-      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
-      iree::compiler::Dialect::HAL::Target::VMLA
-      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
-      iree::compiler::Dialect::HAL::Target::LLVM
-      iree::hal::interpreter::interpreter_driver_module
-      # TODO(b/142004903): enable when Dawn HAL implementation is functional
-      # iree::hal::dawn::dawn_driver_module
-      iree::hal::vmla::vmla_driver_module
-      iree::hal::vulkan::vulkan_driver_module
-      iree::hal::llvmjit::llvmjit_driver_module
+      ${IREE_COMPILER_TARGET_BACKENDS}
+      ${IREE_HAL_DRIVER_MODULES}
   )
-  add_executable(iree-run-mlir ALIAS iree_tools_iree-run-mlir)
-
-  iree_cc_binary(
-    NAME
-      iree-run-module
-    OUT
-      iree-run-module
-    SRCS
-      "run_module_main.cc"
-    DEPS
-      ::vm_util
-      absl::flags
-      absl::strings
-      iree::base::api_util
-      iree::base::file_io
-      iree::base::init
-      iree::base::source_location
-      iree::base::status
-      iree::modules::hal
-      iree::vm::bytecode_module
-      # TODO(marbre): Add PLATFORM_VULKAN_DEPS
-      iree::hal::interpreter::interpreter_driver_module
-      # TODO(b/142004903): enable when Dawn HAL implementation is functional
-      # iree::hal::dawn::dawn_driver_module
-      iree::hal::vmla::vmla_driver_module
-      iree::hal::vulkan::vulkan_driver_module
-      iree::hal::llvmjit::llvmjit_driver_module
-  )
-  add_executable(iree-run-module ALIAS iree_tools_iree-run-module)
 
   iree_cc_library(
     NAME
@@ -315,23 +290,16 @@ if(${IREE_BUILD_COMPILER})
       MLIRTranslateClParser
       MLIRTranslation
       tensorflow::mlir_xla
-      # TODO(marbre): Move the HAL::Target deps to TARGET_COMPILER_BACKENDS
-      iree::compiler::Dialect::HAL::Target::LegacyInterpreter
-      iree::compiler::Dialect::HAL::Target::VMLA
-      iree::compiler::Dialect::HAL::Target::VulkanSPIRV
-      iree::compiler::Dialect::HAL::Target::LLVM
+      ${IREE_COMPILER_TARGET_BACKENDS}
     ALWAYSLINK
   )
 
   iree_cc_binary(
     NAME
       iree-translate
-    OUT
-      iree-translate
     DEPS
       iree::tools::iree_translate_library
   )
-  add_executable(iree-translate ALIAS iree_tools_iree-translate)
 
   if(${IREE_BUILD_TESTS})
     add_custom_target(IreeFileCheck ALL

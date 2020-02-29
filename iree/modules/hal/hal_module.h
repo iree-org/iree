@@ -21,10 +21,6 @@
 #include "iree/hal/api.h"
 #include "iree/vm/api.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_allocator, iree_hal_allocator_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_buffer, iree_hal_buffer_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_buffer_view, iree_hal_buffer_view_t);
@@ -38,6 +34,10 @@ IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_device, iree_hal_device_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_executable, iree_hal_executable_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(iree_hal_executable_layout,
                               iree_hal_executable_layout_t);
+
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
 
 // Registers the custom types used by the HAL module.
 // WARNING: not thread-safe; call at startup before using.

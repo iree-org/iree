@@ -20,6 +20,7 @@
 #include <stdint.h>
 
 #include "iree/base/api.h"
+#include "iree/base/atomics.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,11 +61,8 @@ typedef enum {
 // Usage (C++):
 //  Prefer using RefObject as a base type.
 typedef struct {
-  // TODO(benvanik): configuration for single-threaded mode to disable atomics.
-  _Atomic intptr_t counter;
+  iree_atomic_intptr_t counter;
 } iree_vm_ref_object_t;
-static_assert(sizeof(_Atomic intptr_t) == sizeof(intptr_t),
-              "Atomic intptr_t must be an intptr_t");
 
 // A pointer reference to a reference-counted object.
 // The counter is stored within the target object itself ala intrusive_ptr.

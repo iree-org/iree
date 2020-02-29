@@ -132,6 +132,7 @@ iree_cc_library(
     ::module
     ::stack
     iree::base::api
+    iree::base::atomics
   PUBLIC
 )
 
@@ -145,6 +146,7 @@ iree_cc_library(
   DEPS
     ::types
     iree::base::api
+    iree::base::atomics
   PUBLIC
 )
 
@@ -172,6 +174,7 @@ iree_cc_library(
     "module.c"
   DEPS
     iree::base::api
+    iree::base::atomics
   PUBLIC
 )
 
@@ -205,6 +208,7 @@ iree_cc_library(
     "ref.c"
   DEPS
     iree::base::api
+    iree::base::atomics
   PUBLIC
 )
 

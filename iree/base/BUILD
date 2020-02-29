@@ -75,6 +75,15 @@ cc_test(
 )
 
 cc_library(
+    name = "atomics",
+    hdrs = ["atomics.h"],
+    deps = [
+        ":platform_headers",
+        ":target_platform",
+    ],
+)
+
+cc_library(
     name = "bitfield",
     hdrs = ["bitfield.h"],
     deps = [

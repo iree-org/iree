@@ -80,6 +80,17 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    atomics
+  HDRS
+    "atomics.h"
+  DEPS
+    iree::base::platform_headers
+    iree::base::target_platform
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     bitfield
   HDRS
     "bitfield.h"

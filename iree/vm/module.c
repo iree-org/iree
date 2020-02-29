@@ -14,28 +14,29 @@
 
 #include "iree/vm/module.h"
 
-#include <stdatomic.h>
 #include <string.h>
+
+#include "iree/base/atomics.h"
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_init(iree_vm_module_t* module, void* self) {
   memset(module, 0, sizeof(iree_vm_module_t));
   module->self = self;
-  atomic_store(&module->ref_count, 1);
+  iree_atomic_store(&module->ref_count, 1);
   return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_retain(iree_vm_module_t* module) {
   if (!module) return IREE_STATUS_INVALID_ARGUMENT;
-  atomic_fetch_add(&module->ref_count, 1);
+  iree_atomic_fetch_add(&module->ref_count, 1);
   return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_release(iree_vm_module_t* module) {
   if (module) {
-    if (atomic_fetch_sub(&module->ref_count, 1) == 1) {
+    if (iree_atomic_fetch_sub(&module->ref_count, 1) == 1) {
       return module->destroy(module->self);
     }
   }

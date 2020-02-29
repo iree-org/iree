@@ -23,7 +23,6 @@ extern "C" {
 #endif  // __cplusplus
 
 typedef struct vmstring vmstring_t;
-IREE_VM_DECLARE_TYPE_ADAPTERS(vmstring, vmstring_t);
 
 // Registers the custom types used by the strings module.
 // WARNING: Not threadsafe; call at startup before using..
@@ -38,5 +37,7 @@ iree_status_t strings_module_create(iree_allocator_t allocator,
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(vmstring, vmstring_t);
 
 #endif  // IREE_MODULES_STRINGS_STRINGS_MODULE_H_

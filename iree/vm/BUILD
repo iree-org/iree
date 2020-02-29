@@ -114,6 +114,7 @@ cc_library(
         ":module",
         ":stack",
         "//iree/base:api",
+        "//iree/base:atomics",
     ],
 )
 
@@ -124,6 +125,7 @@ cc_library(
     deps = [
         ":types",
         "//iree/base:api",
+        "//iree/base:atomics",
     ],
 )
 
@@ -145,6 +147,7 @@ cc_library(
     hdrs = ["module.h"],
     deps = [
         "//iree/base:api",
+        "//iree/base:atomics",
     ],
 )
 
@@ -175,6 +178,7 @@ cc_library(
     hdrs = ["ref.h"],
     deps = [
         "//iree/base:api",
+        "//iree/base:atomics",
     ],
 )
 

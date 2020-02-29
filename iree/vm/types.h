@@ -113,9 +113,6 @@ typedef struct {
   iree_vm_ref_destroy_t destroy;
 } iree_vm_rw_byte_buffer_t;
 
-IREE_VM_DECLARE_TYPE_ADAPTERS(iree_vm_ro_byte_buffer, iree_vm_ro_byte_buffer_t);
-IREE_VM_DECLARE_TYPE_ADAPTERS(iree_vm_rw_byte_buffer, iree_vm_rw_byte_buffer_t);
-
 // Registers the builtin VM types. This must be called on startup. Safe to call
 // multiple times.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types();
@@ -123,5 +120,8 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_register_builtin_types();
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_vm_ro_byte_buffer, iree_vm_ro_byte_buffer_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(iree_vm_rw_byte_buffer, iree_vm_rw_byte_buffer_t);
 
 #endif  // IREE_VM_TYPES_H_

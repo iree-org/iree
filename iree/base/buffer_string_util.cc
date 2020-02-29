@@ -359,6 +359,10 @@ StatusOr<std::string> MakeBufferTypeString(int element_size,
       return absl::StrCat("u", element_size * 8);
     case BufferDataPrintMode::kFloatingPoint:
       return absl::StrCat("f", element_size * 8);
+    default:
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Unsupported print mode (" << static_cast<int>(print_mode)
+             << ")";
   }
 }
 

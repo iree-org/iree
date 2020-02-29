@@ -15,15 +15,16 @@
 #include "iree/vm/context.h"
 
 #include <assert.h>
-#include <stdatomic.h>
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "iree/base/atomics.h"
+
 struct iree_vm_context {
-  atomic_intptr_t ref_count;
+  iree_atomic_intptr_t ref_count;
   iree_vm_instance_t* instance;
   iree_allocator_t allocator;
-  int32_t context_id;
+  intptr_t context_id;
 
   bool is_static;
   struct {
@@ -175,13 +176,13 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_context_create_with_modules(
   iree_vm_context_t* context = NULL;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, context_size, (void**)&context));
-  atomic_store(&context->ref_count, 1);
+  iree_atomic_store(&context->ref_count, 1);
   context->instance = instance;
   iree_vm_instance_retain(context->instance);
   context->allocator = allocator;
 
-  static atomic_int next_context_id = 0;
-  context->context_id = atomic_fetch_add(&next_context_id, 1);
+  static iree_atomic_intptr_t next_context_id = IREE_ATOMIC_VAR_INIT(1);
+  context->context_id = iree_atomic_fetch_add(&next_context_id, 1);
 
   uint8_t* p = (uint8_t*)context + sizeof(iree_vm_context_t);
   context->list.modules = (iree_vm_module_t**)p;
@@ -247,14 +248,14 @@ static iree_status_t iree_vm_context_destroy(iree_vm_context_t* context) {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_context_retain(iree_vm_context_t* context) {
   if (!context) return IREE_STATUS_INVALID_ARGUMENT;
-  atomic_fetch_add(&context->ref_count, 1);
+  iree_atomic_fetch_add(&context->ref_count, 1);
   return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_context_release(iree_vm_context_t* context) {
   if (context) {
-    if (atomic_fetch_sub(&context->ref_count, 1) == 1) {
+    if (iree_atomic_fetch_sub(&context->ref_count, 1) == 1) {
       return iree_vm_context_destroy(context);
     }
   }

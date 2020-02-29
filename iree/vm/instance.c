@@ -14,12 +14,11 @@
 
 #include "iree/vm/instance.h"
 
-#include <stdatomic.h>
-
+#include "iree/base/atomics.h"
 #include "iree/vm/types.h"
 
 struct iree_vm_instance {
-  atomic_intptr_t ref_count;
+  iree_atomic_intptr_t ref_count;
   iree_allocator_t allocator;
 };
 
@@ -36,7 +35,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_instance_create(
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       allocator, sizeof(iree_vm_instance_t), (void**)&instance));
   instance->allocator = allocator;
-  atomic_store(&instance->ref_count, 1);
+  iree_atomic_store(&instance->ref_count, 1);
 
   *out_instance = instance;
   return IREE_STATUS_OK;
@@ -50,14 +49,14 @@ static iree_status_t iree_vm_instance_destroy(iree_vm_instance_t* instance) {
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_instance_retain(iree_vm_instance_t* instance) {
   if (!instance) return IREE_STATUS_INVALID_ARGUMENT;
-  atomic_fetch_add(&instance->ref_count, 1);
+  iree_atomic_fetch_add(&instance->ref_count, 1);
   return IREE_STATUS_OK;
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_instance_release(iree_vm_instance_t* instance) {
   if (instance) {
-    if (atomic_fetch_sub(&instance->ref_count, 1) == 1) {
+    if (iree_atomic_fetch_sub(&instance->ref_count, 1) == 1) {
       return iree_vm_instance_destroy(instance);
     }
   }

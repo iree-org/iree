@@ -462,7 +462,7 @@ static iree_status_t iree_vm_bytecode_module_alloc_state(
     const iree::vm::RodataSegmentDef* segment =
         module_def->rodata_segments()->Get(i);
     iree_vm_ro_byte_buffer_t* ref = &state->rodata_ref_table[i];
-    ref->ref_object.counter = 1;
+    iree_atomic_store(&ref->ref_object.counter, 1);
     ref->data.data = segment->data()->Data();
     ref->data.data_length = segment->data()->size();
   }
