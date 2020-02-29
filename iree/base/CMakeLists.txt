@@ -16,6 +16,17 @@ add_subdirectory(internal)
 
 iree_cc_library(
   NAME
+    alignment
+  HDRS
+    "alignment.h"
+  DEPS
+    iree::base::platform_headers
+    iree::base::target_platform
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     api
   HDRS
     "api.h"

@@ -22,6 +22,15 @@ package(
 )
 
 cc_library(
+    name = "alignment",
+    hdrs = ["alignment.h"],
+    deps = [
+        ":platform_headers",
+        ":target_platform",
+    ],
+)
+
+cc_library(
     name = "api",
     srcs = ["api.cc"],
     hdrs = ["api.h"],

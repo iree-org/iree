@@ -254,11 +254,11 @@ Status EvaluateFunction(iree_vm_context_t* context,
             << absl::string_view(function_name.data, function_name.size)
             << std::endl;
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
-  ASSIGN_OR_RETURN(
-      auto* input_list,
-      ParseToVariantList(input_descs, allocator,
-                         absl::MakeConstSpan(&input_values_flag.front(),
-                                             input_values_flag.size())));
+  auto input_values_list = absl::MakeConstSpan(
+      input_values_flag.empty() ? nullptr : &input_values_flag.front(),
+      input_values_flag.size());
+  ASSIGN_OR_RETURN(auto* input_list, ParseToVariantList(input_descs, allocator,
+                                                        input_values_list));
 
   ASSIGN_OR_RETURN(auto output_descs, ParseOutputSignature(function));
   // Prepare outputs list to accept the results from the invocation.

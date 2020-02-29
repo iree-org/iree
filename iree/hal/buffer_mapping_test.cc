@@ -41,7 +41,7 @@ static void* const kValidPtr = reinterpret_cast<void*>(0xBEEFCAFEF00D1234ull);
 
 class MockBuffer : public Buffer {
  public:
-  using Buffer::MappingMode;
+  using MappingMode = Buffer::MappingMode;
 
   MockBuffer(Allocator* allocator, MemoryTypeBitfield memory_type,
              MemoryAccessBitfield allowed_access, BufferUsageBitfield usage,
