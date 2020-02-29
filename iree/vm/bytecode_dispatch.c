@@ -28,8 +28,11 @@
 #include <stdio.h>
 #define IREE_DISPATCH_LOG_OPCODE(op_name) \
   fprintf(stderr, "DISPATCH %d %s\n", (int)offset, op_name)
+#define IREE_DISPATCH_LOG_CALL(target_function) \
+  fprintf(stderr, "CALL -> %s\n", iree_vm_function_name(&target_function).data);
 #else
 #define IREE_DISPATCH_LOG_OPCODE(...)
+#define IREE_DISPATCH_LOG_CALL(...)
 #endif  // IREE_DISPATCH_LOGGING
 
 #if defined(IREE_COMPILER_MSVC) && !defined(IREE_COMPILER_CLANG)
@@ -714,10 +717,7 @@ iree_status_t iree_vm_bytecode_dispatch(
         target_function.ordinal = function_ordinal;
       }
 
-#if IREE_DISPATCH_LOGGING
-      iree_string_view_t target_name = iree_vm_function_name(&target_function);
-      fprintf(stderr, "CALL -> %s\n", target_name.data);
-#endif  // IREE_DISPATCH_LOGGING
+      IREE_DISPATCH_LOG_CALL(target_function);
 
       // Remap registers from caller to callee.
       iree_vm_stack_frame_t* callee_frame = NULL;
@@ -803,10 +803,7 @@ iree_status_t iree_vm_bytecode_dispatch(
       target_function =
           module_state->import_table[function_ordinal & 0x7FFFFFFFu];
 
-#if IREE_DISPATCH_LOGGING
-      iree_string_view_t target_name = iree_vm_function_name(&target_function);
-      fprintf(stderr, "VCALL -> %s\n", target_name.data);
-#endif  // IREE_DISPATCH_LOGGING
+      IREE_DISPATCH_LOG_CALL(target_function);
 
       // Remap registers from caller to callee.
       iree_vm_stack_frame_t* callee_frame = NULL;
