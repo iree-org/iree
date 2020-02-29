@@ -14,178 +14,146 @@
 
 #include "iree/hal/vmla/vmla_module.h"
 
-#include "absl/types/span.h"
-#include "iree/base/memory.h"
-#include "iree/base/ref_ptr.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vmla/op_kernels.h"
-#include "iree/vm/module_abi_cc.h"
 #include "iree/vm/module_abi_packing.h"
-#include "iree/vm/types.h"
-
-namespace iree {
-namespace hal {
-namespace vmla {
-namespace {
-
-using iree_vmla_size_t = uint32_t;
-using iree_vmla_shape_t = absl::Span<const int32_t>;
-
-// Sentinel indicating that the remaining buffer after any offset has been
-// applied should be used as the length.
-constexpr iree_vmla_size_t kVMLAWholeBuffer = -1;
-
-// A lightweight buffer lifetime management type.
-// This is exported to modules as `vmla.buffer`. It can be used to provide
-// views into existing rdata buffers (by specifying IREE_ALLOCATOR_NULL),
-// views into parent buffers (parents retained via a reference), or dedicated
-// allocations from an allocator.
-//
-// The provided data pointer and length is always for the buffer itself; it'll
-// already be offset/clamped to parent buffer bounds when a view.
-struct iree_vmla_buffer final : public RefObject<iree_vmla_buffer> {
-  static StatusOr<vm::ref<iree_vmla_buffer>> Allocate(
-      size_t byte_length, iree_allocator_t allocator) {
-    void* data = nullptr;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_allocator_malloc(allocator, byte_length, &data), IREE_LOC))
-        << "Failed to allocate buffer of size " << byte_length;
-
-    auto buffer = vm::assign_ref(new iree_vmla_buffer());
-    buffer->data_ = data;
-    buffer->data_length_ = byte_length;
-    buffer->allocator_ = allocator;
-    return std::move(buffer);
-  }
-
-  static StatusOr<vm::ref<iree_vmla_buffer>> Wrap(const void* data,
-                                                  size_t data_length,
-                                                  iree_allocator_t allocator) {
-    auto buffer = vm::assign_ref(new iree_vmla_buffer());
-    buffer->data_ = const_cast<void*>(data);
-    buffer->data_length_ = data_length;
-    buffer->allocator_ = allocator;
-    return std::move(buffer);
-  }
-
-  static StatusOr<vm::ref<iree_vmla_buffer>> WrapMutable(
-      void* data, size_t data_length, iree_allocator_t allocator) {
-    auto buffer = vm::assign_ref(new iree_vmla_buffer());
-    buffer->data_ = data;
-    buffer->data_length_ = data_length;
-    buffer->allocator_ = allocator;
-    return std::move(buffer);
-  }
-
-  ~iree_vmla_buffer() {
-    if (!parent_) {
-      iree_allocator_free(allocator_, data_);
-      data_ = nullptr;
-    }
-    parent_.reset();
-  }
-
-  constexpr const void* data() const { return data_; }
-  constexpr void* data() { return data_; }
-  constexpr size_t size() const { return data_length_; }
-
-  template <typename T>
-  absl::Span<const T> As() const {
-    return absl::MakeConstSpan(reinterpret_cast<const T*>(data_),
-                               data_length_ / sizeof(T));
-  }
-
-  template <typename T>
-  absl::Span<T> As() {
-    return absl::MakeSpan(reinterpret_cast<T*>(data_),
-                          data_length_ / sizeof(T));
-  }
-
-  template <typename T>
-  StatusOr<absl::Span<T>> RangeAs(iree_vmla_size_t byte_offset,
-                                  iree_vmla_size_t byte_length) {
-    ASSIGN_OR_RETURN(auto byte_range, MakeRange(byte_offset, byte_length));
-    return ReinterpretSpan<T>(byte_range);
-  }
-
- private:
-  StatusOr<absl::Span<uint8_t>> MakeRange(iree_vmla_size_t byte_offset,
-                                          iree_vmla_size_t byte_length) {
-    if (byte_length == kVMLAWholeBuffer) {
-      byte_length = size() - byte_offset;
-    }
-    if (byte_offset > size()) {
-      return OutOfRangeErrorBuilder(IREE_LOC)
-             << "Attempted to access an address off the end of the valid "
-                "buffer range (offset="
-             << byte_offset << ", length=" << byte_length
-             << ", buffer byte_length=" << size() << ")";
-    }
-    size_t end = byte_offset + byte_length - 1;
-    if (end >= size()) {
-      return OutOfRangeErrorBuilder(IREE_LOC)
-             << "Attempted to access an address outside of the valid buffer "
-                "range (offset="
-             << byte_offset << ", length=" << byte_length << ", end=" << end
-             << ", buffer byte_length=" << size() << ")";
-    }
-    uint8_t* data = reinterpret_cast<uint8_t*>(data_) + byte_offset;
-    size_t data_length = byte_length;
-    return absl::MakeSpan(data, data_length);
-  }
-
-  vm::ref<iree_vmla_buffer> parent_;
-  void* data_ = nullptr;
-  size_t data_length_ = 0;
-  iree_allocator_t allocator_;
-};
-
-}  // namespace
-}  // namespace vmla
-}  // namespace hal
-}  // namespace iree
-
-typedef struct iree::hal::vmla::iree_vmla_buffer iree_vmla_buffer_t;
-
-IREE_VM_DECLARE_TYPE_ADAPTERS(iree_vmla_buffer, iree_vmla_buffer_t);
-
-namespace iree {
-namespace hal {
-namespace vmla {
-namespace {
 
 //===----------------------------------------------------------------------===//
 // Type registration
 //===----------------------------------------------------------------------===//
 
-static iree_vm_ref_type_descriptor_t iree_vmla_buffer_descriptor = {0};
+static iree_vm_ref_type_descriptor_t Buffer_descriptor = {0};
+static iree_vm_ref_type_descriptor_t Interface_descriptor = {0};
 
-#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor) \
-  descriptor.type_name = iree_make_cstring_view(name);     \
-  descriptor.offsetof_counter = type::offsetof_counter();  \
-  descriptor.destroy = type::DirectDestroy;                \
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&descriptor));
+IREE_VM_DEFINE_TYPE_ADAPTERS(Buffer, iree::hal::vmla::Buffer);
+IREE_VM_DEFINE_TYPE_ADAPTERS(Interface, iree::hal::vmla::Interface);
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vmla_module_register_types() {
+#define IREE_VMLA_REGISTER_CC_TYPE(type, name, descriptor)             \
+  descriptor.type_name = iree_make_cstring_view(name);                 \
+  descriptor.offsetof_counter = type::offsetof_counter();              \
+  descriptor.destroy = type::DirectDestroy;                            \
+  RETURN_IF_ERROR(                                                     \
+      FromApiStatus(iree_vm_ref_register_type(&descriptor), IREE_LOC)) \
+      << "Failed to register type " << name;
+
+namespace iree {
+namespace hal {
+namespace vmla {
+
+Status ModuleRegisterTypes() {
   static bool has_registered = false;
-  if (has_registered) return IREE_STATUS_OK;
+  if (has_registered) return OkStatus();
 
-  IREE_VMLA_REGISTER_CC_TYPE(iree_vmla_buffer, "vmla.buffer",
-                             iree_vmla_buffer_descriptor);
+  IREE_VMLA_REGISTER_CC_TYPE(Buffer, "vmla.buffer", Buffer_descriptor);
+  IREE_VMLA_REGISTER_CC_TYPE(Interface, "vmla.interface", Interface_descriptor);
 
   has_registered = true;
-  return IREE_STATUS_OK;
+  return OkStatus();
 }
 
 //===----------------------------------------------------------------------===//
-// Type wrappers
+// API type implementations
 //===----------------------------------------------------------------------===//
 
-IREE_VM_DEFINE_TYPE_ADAPTERS(iree_vmla_buffer, iree_vmla_buffer_t);
+// static
+StatusOr<vm::ref<Buffer>> Buffer::Allocate(size_t byte_length,
+                                           iree_allocator_t allocator) {
+  void* data = nullptr;
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_allocator_malloc(allocator, byte_length, &data), IREE_LOC))
+      << "Failed to allocate buffer of size " << byte_length;
+
+  auto buffer = vm::assign_ref(new Buffer());
+  buffer->data_ = data;
+  buffer->data_length_ = byte_length;
+  buffer->allocator_ = allocator;
+  return std::move(buffer);
+}
+
+// static
+StatusOr<vm::ref<Buffer>> Buffer::Wrap(const void* data, size_t data_length,
+                                       iree_allocator_t allocator) {
+  auto buffer = vm::assign_ref(new Buffer());
+  buffer->data_ = const_cast<void*>(data);
+  buffer->data_length_ = data_length;
+  buffer->allocator_ = allocator;
+  return std::move(buffer);
+}
+
+// static
+StatusOr<vm::ref<Buffer>> Buffer::WrapMutable(void* data, size_t data_length,
+                                              iree_allocator_t allocator) {
+  auto buffer = vm::assign_ref(new Buffer());
+  buffer->data_ = data;
+  buffer->data_length_ = data_length;
+  buffer->allocator_ = allocator;
+  return std::move(buffer);
+}
+
+Buffer::~Buffer() {
+  if (!parent_) {
+    iree_allocator_free(allocator_, data_);
+    data_ = nullptr;
+  }
+  parent_.reset();
+}
+
+StatusOr<absl::Span<uint8_t>> Buffer::MakeRange(
+    iree_vmla_size_t byte_offset, iree_vmla_size_t byte_length) const {
+  if (byte_length == kVMLAWholeBuffer) {
+    byte_length = size() - byte_offset;
+  }
+  if (byte_offset > size()) {
+    return OutOfRangeErrorBuilder(IREE_LOC)
+           << "Attempted to access an address off the end of the valid "
+              "buffer range (offset="
+           << byte_offset << ", length=" << byte_length
+           << ", buffer byte_length=" << size() << ")";
+  }
+  size_t end = byte_offset + byte_length - 1;
+  if (end >= size()) {
+    return OutOfRangeErrorBuilder(IREE_LOC)
+           << "Attempted to access an address outside of the valid buffer "
+              "range (offset="
+           << byte_offset << ", length=" << byte_length << ", end=" << end
+           << ", buffer byte_length=" << size() << ")";
+  }
+  uint8_t* data = reinterpret_cast<uint8_t*>(data_) + byte_offset;
+  size_t data_length = byte_length;
+  return absl::MakeSpan(data, data_length);
+}
+
+void Interface::Reset() {
+  for (int i = 0; i < bindings_.size(); ++i) {
+    for (int j = 0; j < bindings_[i].size(); ++j) {
+      bindings_[i][j] = {};
+    }
+  }
+}
+
+StatusOr<const Interface::Binding> Interface::GetBinding(
+    int32_t set, int32_t binding) const {
+  if (set < 0 || set > kMaxSets || binding < 0 || binding > kMaxBindings) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid binding set=" << set << ", binding=" << binding;
+  }
+  return bindings_[set][binding];
+}
+
+Status Interface::SetBinding(int32_t set, int32_t binding, Binding value) {
+  if (set < 0 || set > kMaxSets || binding < 0 || binding > kMaxBindings) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid binding set=" << set << ", binding=" << binding;
+  }
+  bindings_[set][binding] = std::move(value);
+  return OkStatus();
+}
 
 //===----------------------------------------------------------------------===//
 // Module state and method implementation
 //===----------------------------------------------------------------------===//
+
+namespace {
 
 // Per-executable VMLA module state.
 // This provides the exported kernel functions to the VM and is instantiated
@@ -197,15 +165,32 @@ class VMLAModuleState final {
  public:
   VMLAModuleState(iree_allocator_t allocator,
                   kernels::RuntimeState* kernel_state)
-      : allocator_(allocator), kernel_state_(kernel_state) {}
+      : allocator_(allocator),
+        interface_(vm::assign_ref(new Interface())),
+        kernel_state_(kernel_state) {}
 
   ~VMLAModuleState() = default;
+
+  //===--------------------------------------------------------------------===//
+  // vmla.interface.*
+  //===--------------------------------------------------------------------===//
+
+  StatusOr<vm::ref<Interface>> InterfaceCurrent() {
+    return vm::retain_ref(interface_);
+  }
+
+  StatusOr<vm::ref<Buffer>> InterfaceBinding(vm::ref<Interface> interface,
+                                             int32_t set, int32_t binding) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::InterfaceBinding");
+    ASSIGN_OR_RETURN(const auto& value, interface->GetBinding(set, binding));
+    return vm::retain_ref(value.buffer);
+  }
 
   //===--------------------------------------------------------------------===//
   // vmla.buffer.*
   //===--------------------------------------------------------------------===//
 
-  StatusOr<vm::ref<iree_vmla_buffer_t>> BufferConst(
+  StatusOr<vm::ref<Buffer>> BufferConst(
       vm::ref<iree_vm_ro_byte_buffer_t> value) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferConst");
     iree_allocator_t external_allocator = {0};
@@ -214,34 +199,30 @@ class VMLAModuleState final {
       vm::assign_ref(reinterpret_cast<iree_vm_ro_byte_buffer_t*>(self)).reset();
       return IREE_STATUS_OK;
     };
-    return iree_vmla_buffer_t::Wrap(value->data.data, value->data.data_length,
-                                    external_allocator);
+    return Buffer::Wrap(value->data.data, value->data.data_length,
+                        external_allocator);
   }
 
-  StatusOr<vm::ref<iree_vmla_buffer_t>> BufferAlloc(
-      iree_vmla_size_t byte_length) {
+  StatusOr<vm::ref<Buffer>> BufferAlloc(iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferAlloc");
-    return iree_vmla_buffer_t::Allocate(byte_length, allocator_);
+    return Buffer::Allocate(byte_length, allocator_);
   }
 
-  StatusOr<vm::ref<iree_vmla_buffer_t>> BufferClone(
-      vm::ref<iree_vmla_buffer_t> src) {
+  StatusOr<vm::ref<Buffer>> BufferClone(vm::ref<Buffer> src) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferClone");
-    ASSIGN_OR_RETURN(auto dst,
-                     iree_vmla_buffer_t::Allocate(src->size(), allocator_));
+    ASSIGN_OR_RETURN(auto dst, Buffer::Allocate(src->size(), allocator_));
     std::memcpy(dst->data(), src->data(), dst->size());
     return std::move(dst);
   }
 
-  StatusOr<iree_vmla_size_t> BufferByteLength(
-      vm::ref<iree_vmla_buffer_t> buffer) {
+  StatusOr<iree_vmla_size_t> BufferByteLength(vm::ref<Buffer> buffer) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferByteLength");
     return buffer->size();
   }
 
-  StatusOr<vm::ref<iree_vmla_buffer_t>> BufferView(
-      vm::ref<iree_vmla_buffer_t> src, iree_vmla_size_t byte_offset,
-      iree_vmla_size_t byte_length) {
+  StatusOr<vm::ref<Buffer>> BufferView(vm::ref<Buffer> src,
+                                       iree_vmla_size_t byte_offset,
+                                       iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferView");
 
     if (byte_length == kVMLAWholeBuffer) {
@@ -272,16 +253,14 @@ class VMLAModuleState final {
     iree_allocator_t external_allocator = {0};
     external_allocator.self = vm::retain_ref(src).release();
     external_allocator.free = +[](void* self, void* ptr) -> iree_status_t {
-      vm::assign_ref(reinterpret_cast<iree_vmla_buffer_t*>(self)).reset();
+      vm::assign_ref(reinterpret_cast<Buffer*>(self)).reset();
       return IREE_STATUS_OK;
     };
-    return iree_vmla_buffer_t::Wrap(data, data_length, external_allocator);
+    return Buffer::Wrap(data, data_length, external_allocator);
   }
 
-  Status BufferCopy(vm::ref<iree_vmla_buffer_t> src,
-                    iree_vmla_size_t src_byte_offset,
-                    vm::ref<iree_vmla_buffer_t> dst,
-                    iree_vmla_size_t dst_byte_offset,
+  Status BufferCopy(vm::ref<Buffer> src, iree_vmla_size_t src_byte_offset,
+                    vm::ref<Buffer> dst, iree_vmla_size_t dst_byte_offset,
                     iree_vmla_size_t byte_length) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferCopy");
     if (byte_length == kVMLAWholeBuffer) {
@@ -295,8 +274,7 @@ class VMLAModuleState final {
     return OkStatus();
   }
 
-  Status BufferFill(vm::ref<iree_vmla_buffer_t> value,
-                    vm::ref<iree_vmla_buffer_t> dst) {
+  Status BufferFill(vm::ref<Buffer> value, vm::ref<Buffer> dst) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferFill");
     if (value->size() == 1) {
       // Fast-path for single-byte memset values.
@@ -316,7 +294,7 @@ class VMLAModuleState final {
     return OkStatus();
   }
 
-  StatusOr<int32_t> BufferLoadI32(vm::ref<iree_vmla_buffer_t> src,
+  StatusOr<int32_t> BufferLoadI32(vm::ref<Buffer> src,
                                   iree_vmla_size_t byte_offset) {
     IREE_TRACE_SCOPE0("VMLAModuleState::BufferLoadI32");
     ASSIGN_OR_RETURN(auto data,
@@ -329,25 +307,21 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
 
 #define IREE_VMLA_UNARY_OP(name, kernel, type)                      \
-  Status name(vm::ref<iree_vmla_buffer_t> src,                      \
-              vm::ref<iree_vmla_buffer_t> dst) {                    \
+  Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {           \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                   \
     return kernel::Execute<type>(src->As<type>(), dst->As<type>()); \
   }
 
-#define IREE_VMLA_BINARY_OP(name, kernel, type)                    \
-  Status name(vm::ref<iree_vmla_buffer_t> lhs,                     \
-              vm::ref<iree_vmla_buffer_t> rhs,                     \
-              vm::ref<iree_vmla_buffer_t> dst) {                   \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                  \
-    return kernel::Execute<type>(lhs->As<type>(), rhs->As<type>(), \
-                                 dst->As<type>());                 \
+#define IREE_VMLA_BINARY_OP(name, kernel, type)                                \
+  Status name(vm::ref<Buffer> lhs, vm::ref<Buffer> rhs, vm::ref<Buffer> dst) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernel::Execute<type>(lhs->As<type>(), rhs->As<type>(),             \
+                                 dst->As<type>());                             \
   }
 
 #define IREE_VMLA_TERNARY_OP(name, kernel, type)                              \
-  Status name(vm::ref<iree_vmla_buffer_t> a, vm::ref<iree_vmla_buffer_t> b,   \
-              vm::ref<iree_vmla_buffer_t> c,                                  \
-              vm::ref<iree_vmla_buffer_t> dst) {                              \
+  Status name(vm::ref<Buffer> a, vm::ref<Buffer> b, vm::ref<Buffer> c,        \
+              vm::ref<Buffer> dst) {                                          \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
     return kernel::Execute<type>(a->As<type>(), b->As<type>(), c->As<type>(), \
                                  dst->As<type>());                            \
@@ -366,48 +340,46 @@ class VMLAModuleState final {
     kGE = 5,
   };
 
-#define IREE_VMLA_COMPARE_OP(name, type)                           \
-  Status name(int32_t predicate, vm::ref<iree_vmla_buffer_t> lhs,  \
-              vm::ref<iree_vmla_buffer_t> rhs,                     \
-              vm::ref<iree_vmla_buffer_t> dst) {                   \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                  \
-    switch (static_cast<CmpPredicate>(predicate)) {                \
-      case CmpPredicate::kEQ:                                      \
-        return kernels::CompareEQ::Execute<type>(                  \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>()); \
-      case CmpPredicate::kNE:                                      \
-        return kernels::CompareNE::Execute<type>(                  \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>()); \
-      case CmpPredicate::kLT:                                      \
-        return kernels::CompareLT::Execute<type>(                  \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>()); \
-      case CmpPredicate::kLE:                                      \
-        return kernels::CompareLE::Execute<type>(                  \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>()); \
-      case CmpPredicate::kGT:                                      \
-        return kernels::CompareGT::Execute<type>(                  \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>()); \
-      case CmpPredicate::kGE:                                      \
-        return kernels::CompareGE::Execute<type>(                  \
-            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>()); \
-      default:                                                     \
-        return InvalidArgumentErrorBuilder(IREE_LOC)               \
-               << "Unsupported predicate " << predicate;           \
-    }                                                              \
+#define IREE_VMLA_COMPARE_OP(name, type)                                   \
+  Status name(int32_t predicate, vm::ref<Buffer> lhs, vm::ref<Buffer> rhs, \
+              vm::ref<Buffer> dst) {                                       \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                          \
+    switch (static_cast<CmpPredicate>(predicate)) {                        \
+      case CmpPredicate::kEQ:                                              \
+        return kernels::CompareEQ::Execute<type>(                          \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
+      case CmpPredicate::kNE:                                              \
+        return kernels::CompareNE::Execute<type>(                          \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
+      case CmpPredicate::kLT:                                              \
+        return kernels::CompareLT::Execute<type>(                          \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
+      case CmpPredicate::kLE:                                              \
+        return kernels::CompareLE::Execute<type>(                          \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
+      case CmpPredicate::kGT:                                              \
+        return kernels::CompareGT::Execute<type>(                          \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
+      case CmpPredicate::kGE:                                              \
+        return kernels::CompareGE::Execute<type>(                          \
+            lhs->As<type>(), rhs->As<type>(), dst->As<uint8_t>());         \
+      default:                                                             \
+        return InvalidArgumentErrorBuilder(IREE_LOC)                       \
+               << "Unsupported predicate " << predicate;                   \
+    }                                                                      \
   }
   IREE_VMLA_COMPARE_OP(CmpI8, int8_t);
   IREE_VMLA_COMPARE_OP(CmpI16, int16_t);
   IREE_VMLA_COMPARE_OP(CmpI32, int32_t);
   IREE_VMLA_COMPARE_OP(CmpF32, float);
 
-#define IREE_VMLA_SELECT_OP(name, type)                                     \
-  Status name(                                                              \
-      vm::ref<iree_vmla_buffer_t> cond, vm::ref<iree_vmla_buffer_t> lhs,    \
-      vm::ref<iree_vmla_buffer_t> rhs, vm::ref<iree_vmla_buffer_t> dst) {   \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                           \
-    return kernels::Select::Execute<type>(cond->As<uint8_t>(),              \
-                                          lhs->As<type>(), rhs->As<type>(), \
-                                          dst->As<type>());                 \
+#define IREE_VMLA_SELECT_OP(name, type)                                       \
+  Status name(vm::ref<Buffer> cond, vm::ref<Buffer> lhs, vm::ref<Buffer> rhs, \
+              vm::ref<Buffer> dst) {                                          \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
+    return kernels::Select::Execute<type>(cond->As<uint8_t>(),                \
+                                          lhs->As<type>(), rhs->As<type>(),   \
+                                          dst->As<type>());                   \
   }
   IREE_VMLA_SELECT_OP(SelectX8, uint8_t);
   IREE_VMLA_SELECT_OP(SelectX16, uint16_t);
@@ -418,9 +390,9 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
 
 #define IREE_VMLA_COPY_OP(name, size)                                          \
-  Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,    \
-              absl::Span<const int32_t> src_indices,                           \
-              vm::ref<iree_vmla_buffer_t> dst, iree_vmla_shape_t dst_shape,    \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
+              absl::Span<const int32_t> src_indices, vm::ref<Buffer> dst,      \
+              iree_vmla_shape_t dst_shape,                                     \
               absl::Span<const int32_t> dst_indices,                           \
               absl::Span<const int32_t> lengths) {                             \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
@@ -433,9 +405,9 @@ class VMLAModuleState final {
   IREE_VMLA_COPY_OP(CopyX32, sizeof(uint32_t));
 
 #define IREE_VMLA_TRANSPOSE_OP(name, type)                                     \
-  Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,    \
-              absl::Span<const int32_t> permutation,                           \
-              vm::ref<iree_vmla_buffer_t> dst, iree_vmla_shape_t dst_shape) {  \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
+              absl::Span<const int32_t> permutation, vm::ref<Buffer> dst,      \
+              iree_vmla_shape_t dst_shape) {                                   \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernels::Transpose::Execute<type>(src->As<type>(), dst->As<type>(), \
                                              Shape(src_shape), permutation);   \
@@ -444,53 +416,52 @@ class VMLAModuleState final {
   IREE_VMLA_TRANSPOSE_OP(TransposeX16, uint16_t);
   IREE_VMLA_TRANSPOSE_OP(TransposeX32, uint32_t);
 
-#define IREE_VMLA_REVERSE_OP(name, type)                                       \
-  Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,    \
-              absl::Span<const int32_t> dims, vm::ref<iree_vmla_buffer_t> dst, \
-              iree_vmla_shape_t dst_shape) {                                   \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
-    return kernels::Reverse::Execute<type>(src->As<type>(), dst->As<type>(),   \
-                                           Shape(src_shape), dims);            \
+#define IREE_VMLA_REVERSE_OP(name, type)                                     \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,              \
+              absl::Span<const int32_t> dims, vm::ref<Buffer> dst,           \
+              iree_vmla_shape_t dst_shape) {                                 \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
+    return kernels::Reverse::Execute<type>(src->As<type>(), dst->As<type>(), \
+                                           Shape(src_shape), dims);          \
   }
   IREE_VMLA_REVERSE_OP(ReverseX8, uint8_t);
   IREE_VMLA_REVERSE_OP(ReverseX16, uint16_t);
   IREE_VMLA_REVERSE_OP(ReverseX32, uint32_t);
 
-#define IREE_VMLA_PAD_OP(name, type)                                          \
-  Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,   \
-              vm::ref<iree_vmla_buffer_t> value,                              \
-              iree_vmla_shape_t value_shape, vm::ref<iree_vmla_buffer_t> dst, \
-              iree_vmla_shape_t dst_shape,                                    \
-              absl::Span<const int32_t> edge_padding_low,                     \
-              absl::Span<const int32_t> edge_padding_high,                    \
-              absl::Span<const int32_t> interior_padding) {                   \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
-    return kernels::Pad::Execute<type>(src->As<type>(), value->As<type>(),    \
-                                       dst->As<type>(), Shape(src_shape),     \
-                                       Shape(dst_shape), edge_padding_low,    \
-                                       edge_padding_high, interior_padding);  \
+#define IREE_VMLA_PAD_OP(name, type)                                         \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,              \
+              vm::ref<Buffer> value, iree_vmla_shape_t value_shape,          \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,              \
+              absl::Span<const int32_t> edge_padding_low,                    \
+              absl::Span<const int32_t> edge_padding_high,                   \
+              absl::Span<const int32_t> interior_padding) {                  \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
+    return kernels::Pad::Execute<type>(src->As<type>(), value->As<type>(),   \
+                                       dst->As<type>(), Shape(src_shape),    \
+                                       Shape(dst_shape), edge_padding_low,   \
+                                       edge_padding_high, interior_padding); \
   }
   IREE_VMLA_PAD_OP(PadX8, uint8_t);
   IREE_VMLA_PAD_OP(PadX16, uint16_t);
   IREE_VMLA_PAD_OP(PadX32, uint32_t);
 
-#define IREE_VMLA_BROADCAST_OP(name, type)                                    \
-  Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,   \
-              vm::ref<iree_vmla_buffer_t> dst, iree_vmla_shape_t dst_shape) { \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
-    return kernels::Broadcast::Execute<type>(src->As<type>(),                 \
-                                             dst->As<type>());                \
+#define IREE_VMLA_BROADCAST_OP(name, type)                        \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,   \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) { \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                 \
+    return kernels::Broadcast::Execute<type>(src->As<type>(),     \
+                                             dst->As<type>());    \
   }
   IREE_VMLA_BROADCAST_OP(BroadcastX8, uint8_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX16, uint16_t);
   IREE_VMLA_BROADCAST_OP(BroadcastX32, uint32_t);
 
-#define IREE_VMLA_TILE_OP(name, type)                                         \
-  Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,   \
-              vm::ref<iree_vmla_buffer_t> dst, iree_vmla_shape_t dst_shape) { \
-    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
-    return kernels::Tile::Execute<type>(src->As<type>(), dst->As<type>(),     \
-                                        Shape(src_shape), Shape(dst_shape));  \
+#define IREE_VMLA_TILE_OP(name, type)                                        \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,              \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {            \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                            \
+    return kernels::Tile::Execute<type>(src->As<type>(), dst->As<type>(),    \
+                                        Shape(src_shape), Shape(dst_shape)); \
   }
   IREE_VMLA_TILE_OP(TileX8, uint8_t);
   IREE_VMLA_TILE_OP(TileX16, uint16_t);
@@ -590,8 +561,7 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
 
 #define IREE_VMLA_CONVERSION_OP(name, src_type, dst_type)                      \
-  Status name(vm::ref<iree_vmla_buffer_t> src,                                 \
-              vm::ref<iree_vmla_buffer_t> dst) {                               \
+  Status name(vm::ref<Buffer> src, vm::ref<Buffer> dst) {                      \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernels::Convert::Execute<src_type, dst_type>(src->As<src_type>(),  \
                                                          dst->As<dst_type>()); \
@@ -613,12 +583,9 @@ class VMLAModuleState final {
   // VMLA Ops: GEMM/GEMV
   //===--------------------------------------------------------------------===//
 
-  Status MatMulF32F32F32(vm::ref<iree_vmla_buffer_t> lhs,
-                         iree_vmla_shape_t lhs_shape,
-                         vm::ref<iree_vmla_buffer_t> rhs,
-                         iree_vmla_shape_t rhs_shape,
-                         vm::ref<iree_vmla_buffer_t> dst,
-                         iree_vmla_shape_t dst_shape) {
+  Status MatMulF32F32F32(vm::ref<Buffer> lhs, iree_vmla_shape_t lhs_shape,
+                         vm::ref<Buffer> rhs, iree_vmla_shape_t rhs_shape,
+                         vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {
     IREE_TRACE_SCOPE0("VMLAModuleState::MatMulF32F32F32");
     kernels::MatMul::Buffers<float, float> buffers;
     buffers.lhs_buffer = lhs->As<float>();
@@ -636,9 +603,9 @@ class VMLAModuleState final {
   //===--------------------------------------------------------------------===//
 
 #define IREE_VMLA_REDUCTION_OP(name, kernel, type)                             \
-  Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,    \
-              vm::ref<iree_vmla_buffer_t> init, iree_vmla_shape_t init_shape,  \
-              int32_t dimension, vm::ref<iree_vmla_buffer_t> dst,              \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
+              vm::ref<Buffer> init, iree_vmla_shape_t init_shape,              \
+              int32_t dimension, vm::ref<Buffer> dst,                          \
               iree_vmla_shape_t dst_shape) {                                   \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernel::Execute<type>(src->As<type>(), init->As<type>(),            \
@@ -661,6 +628,10 @@ class VMLAModuleState final {
  private:
   iree_allocator_t allocator_;
 
+  // Shared interface that the command processor uses to pass bindings in during
+  // execution.
+  vm::ref<Interface> interface_;
+
   // NOTE: kernel state must be externally synchronized as it is shared across
   // all contexts using the VMLA module. This is fine in our current design as
   // we only ever execute a single context at a time but if we start to allow
@@ -673,6 +644,11 @@ class VMLAModuleState final {
 //===----------------------------------------------------------------------===//
 
 static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
+    vm::MakeNativeFunction("interface.current",
+                           &VMLAModuleState::InterfaceCurrent),
+    vm::MakeNativeFunction("interface.binding",
+                           &VMLAModuleState::InterfaceBinding),
+
     vm::MakeNativeFunction("buffer.const", &VMLAModuleState::BufferConst),
     vm::MakeNativeFunction("buffer.alloc", &VMLAModuleState::BufferAlloc),
     vm::MakeNativeFunction("buffer.clone", &VMLAModuleState::BufferClone),
@@ -841,17 +817,20 @@ class VMLAModule final : public vm::NativeModule<VMLAModuleState> {
   kernels::RuntimeState kernel_state_;
 };
 
-IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vmla_module_create(
-    iree_allocator_t allocator, iree_vm_module_t** out_module) {
-  if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
+}  // namespace
+
+Status ModuleCreate(iree_allocator_t allocator, iree_vm_module_t** out_module) {
+  if (!out_module) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "out_module must not be null";
+  }
   *out_module = nullptr;
   auto module = std::make_unique<VMLAModule>(allocator);
-  IREE_API_RETURN_IF_ERROR(module->Initialize());
+  RETURN_IF_ERROR(module->Initialize());
   *out_module = module.release()->interface();
-  return IREE_STATUS_OK;
+  return OkStatus();
 }
 
-}  // namespace
 }  // namespace vmla
 }  // namespace hal
 }  // namespace iree

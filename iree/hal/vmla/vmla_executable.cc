@@ -16,9 +16,12 @@
 
 #include "iree/base/api_util.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/vmla/vmla_module.h"
 #include "iree/schemas/vmla_executable_def_generated.h"
 #include "iree/vm/bytecode_module.h"
+#include "iree/vm/invocation.h"
 #include "iree/vm/module.h"
+#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace hal {
@@ -48,6 +51,7 @@ VMLAExecutable::VMLAExecutable(ExecutableSpec spec, bool allow_aliasing_data)
 
 VMLAExecutable::~VMLAExecutable() {
   IREE_TRACE_SCOPE0("VMLAExecutable::dtor");
+  iree_vm_variant_list_free(interface_inputs_);
   iree_vm_context_release(context_);
   context_ = nullptr;
 }
@@ -86,11 +90,15 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
   entry_functions_.resize(
       iree_vm_module_signature(bytecode_module).export_function_count);
   for (int i = 0; i < entry_functions_.size(); ++i) {
-    iree_vm_module_lookup_function_by_ordinal(bytecode_module,
-                                              IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                                              i, &entry_functions_[i]);
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
+                          bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
+                          &entry_functions_[i]),
+                      IREE_LOC));
   }
 
+  // Create context and initialize shared state. Note that each executable here
+  // has its own context (and thus its own vmla.interface instance).
   std::array<iree_vm_module_t*, 2> modules = {vmla_module, bytecode_module};
   auto result = FromApiStatus(iree_vm_context_create_with_modules(
                                   instance, modules.data(), modules.size(),
@@ -100,8 +108,29 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
     result = Annotate(result, "Failed resolving imports for executable module");
   }
   iree_vm_module_release(bytecode_module);
+  RETURN_IF_ERROR(result);
 
-  return result;
+  // Query the Interface block we'll use to set bindings during invocation.
+  iree_vm_function_t current_function;
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_module_lookup_function_by_name(
+          vmla_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+          iree_make_cstring_view("interface.current"), &current_function),
+      IREE_LOC));
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &interface_inputs_),
+      IREE_LOC));
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_vm_invoke(context(), current_function,
+                     /*policy=*/nullptr, /*inputs=*/nullptr,
+                     /*outputs=*/interface_inputs_, IREE_ALLOCATOR_SYSTEM),
+      IREE_LOC));
+  auto* output = iree_vm_variant_list_get(interface_inputs_, 0);
+  interface_ = Interface_deref(&output->ref);
+  // NOTE: we reuse the output list as the entry point interface inputs for all
+  // invocations into the executable.
+
+  return OkStatus();
 }
 
 }  // namespace vmla

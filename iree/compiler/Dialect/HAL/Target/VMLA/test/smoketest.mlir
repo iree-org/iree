@@ -33,9 +33,9 @@ flow.executable @simpleMath_ex_dispatch_0 {
 //  CHECK-NEXT:         vm.return
 //  CHECK-NEXT:       }
 //  CHECK-NEXT:       vm.export @simpleMath_rgn_dispatch_0 attributes {ordinal = 0 : i32}
-//  CHECK-NEXT:       vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 0 : i32, sym_visibility = "private"}
-//  CHECK-NEXT:       vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {ordinal = 1 : i32, sym_visibility = "private"}
-//  CHECK-NEXT:       vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {ordinal = 2 : i32, sym_visibility = "private"}
+//  CHECK-NEXT:       vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 0 : i32, sym_visibility = "private"}
+//  CHECK-NEXT:       vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 1 : i32, sym_visibility = "private"}
+//  CHECK-NEXT:       vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {ordinal = 2 : i32, sym_visibility = "private"}
 //  CHECK-NEXT:     }
 //  CHECK-NEXT:   }
 //  CHECK-NEXT: }
