@@ -14,25 +14,25 @@
 
 add_subdirectory(test)
 
-set(IREE_HAL_DRIVER_MODULES)
-list(APPEND IREE_HAL_DRIVER_MODULES
-    "iree::hal::interpreter::interpreter_driver_module")
-list(APPEND IREE_HAL_DRIVER_MODULES
-    "iree::hal::llvmjit::llvmjit_driver_module")
-list(APPEND IREE_HAL_DRIVER_MODULES
-    "iree::hal::vmla::vmla_driver_module")
-list(APPEND IREE_HAL_DRIVER_MODULES
-    "iree::hal::vulkan::vulkan_driver_module")
+# TODO: iree_select_target_platform macros.
+# TODO: skip targets disabled by options.
+iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
+  ALL
+    "iree::hal::vmla::vmla_driver_module"
+    "iree::hal::vulkan::vulkan_driver_module"
+  CLANG_OR_GCC
+    "iree::hal::interpreter::interpreter_driver_module"
+    "iree::hal::llvmjit::llvmjit_driver_module"
+)
 
-set(IREE_COMPILER_TARGET_BACKENDS)
-list(APPEND IREE_COMPILER_TARGET_BACKENDS
-    "iree::compiler::Dialect::HAL::Target::LegacyInterpreter")
-list(APPEND IREE_COMPILER_TARGET_BACKENDS
-    "iree::compiler::Dialect::HAL::Target::LLVM")
-list(APPEND IREE_COMPILER_TARGET_BACKENDS
-    "iree::compiler::Dialect::HAL::Target::VMLA")
-list(APPEND IREE_COMPILER_TARGET_BACKENDS
-    "iree::compiler::Dialect::HAL::Target::VulkanSPIRV")
+iree_select_compiler_opts(IREE_COMPILER_TARGET_BACKENDS
+  ALL
+    "iree::compiler::Dialect::HAL::Target::VMLA"
+    "iree::compiler::Dialect::HAL::Target::VulkanSPIRV"
+  CLANG_OR_GCC
+    "iree::compiler::Dialect::HAL::Target::LegacyInterpreter"
+    "iree::compiler::Dialect::HAL::Target::LLVM"
+)
 
 iree_cc_binary(
   NAME
