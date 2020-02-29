@@ -76,7 +76,7 @@ bool GenerateHeader(const std::string& header_file,
   GenerateNamespaceOpen(f);
   f << "extern const struct ::iree::FileToc* "
     << absl::GetFlag(FLAGS_identifier) << "_create();\n";
-  f << "static std::size_t " << absl::GetFlag(FLAGS_identifier)
+  f << "static inline std::size_t " << absl::GetFlag(FLAGS_identifier)
     << "_size() { \n";
   f << "  return " << toc_files.size() << ";\n";
   f << "}\n";
@@ -117,14 +117,20 @@ bool GenerateImpl(const std::string& impl_file,
   assert(input_files.size() == toc_files.size());
   for (size_t i = 0, e = input_files.size(); i < e; ++i) {
     f << "  {";
-    f << "\"" << absl::CEscape(toc_files[i]) << "\", ";
+    f << "\"" << absl::CEscape(toc_files[i]) << "\",\n";
     std::string contents;
     if (!SlurpFile(input_files[i], &contents)) {
       std::cerr << "Error reading file " << input_files[i] << "\n";
       return false;
     }
-    f << "\"" << absl::CHexEscape(contents) << "\\0\", ";
-    f << contents.size() << "},\n";
+    absl::string_view remaining_contents = contents;
+    constexpr int kMaxBytesPerLine = 1024;
+    while (!remaining_contents.empty()) {
+      auto line = remaining_contents.substr(0, kMaxBytesPerLine);
+      f << "\"" << absl::CHexEscape(line) << "\"\n";
+      remaining_contents = remaining_contents.substr(line.size());
+    }
+    f << "\"\\0\", " << contents.size() << "},\n";
   }
   f << "  {nullptr, nullptr, 0},\n";
   f << "};\n";
