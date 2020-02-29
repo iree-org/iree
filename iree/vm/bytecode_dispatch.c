@@ -15,6 +15,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/target_platform.h"
 #include "iree/vm/bytecode_module_impl.h"
 #include "iree/vm/bytecode_op_table.h"
@@ -117,7 +118,7 @@ typedef struct {
     uint8_t dst_reg;
   } pairs[];
 } iree_vm_register_remap_list_t;
-static_assert(alignof(iree_vm_register_remap_list_t) == 1,
+static_assert(iree_alignof(iree_vm_register_remap_list_t) == 1,
               "Expecting byte alignment (to avoid padding)");
 static_assert(offsetof(iree_vm_register_remap_list_t, pairs) == 1,
               "Expect no padding in the struct");

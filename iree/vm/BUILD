@@ -49,6 +49,7 @@ cc_library(
         ":stack",
         ":types",
         ":value",
+        "//iree/base:alignment",
         "//iree/base:api",
         "//iree/base:flatbuffer_util",
         "//iree/base:target_platform",
@@ -211,6 +212,7 @@ cc_library(
     deps = [
         ":module",
         ":ref",
+        "//iree/base:alignment",
         "//iree/base:api",
     ],
 )

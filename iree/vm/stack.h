@@ -15,10 +15,10 @@
 #ifndef IREE_VM_STACK_H_
 #define IREE_VM_STACK_H_
 
-#include <stdalign.h>
 #include <stddef.h>
 #include <stdint.h>
 
+#include "iree/base/alignment.h"
 #include "iree/base/api.h"
 #include "iree/vm/module.h"
 #include "iree/vm/ref.h"
@@ -50,7 +50,7 @@ typedef int64_t iree_vm_source_offset_t;
 // Register banks for use within a stack frame.
 typedef struct {
   // Integer registers.
-  IREE_ALIGNAS(16) int32_t i32[IREE_I32_REGISTER_COUNT];
+  iree_alignas(16) int32_t i32[IREE_I32_REGISTER_COUNT];
   // Reference counted registers.
   iree_vm_ref_t ref[IREE_REF_REGISTER_COUNT];
   // Total number of valid ref registers used by the function.
@@ -66,7 +66,7 @@ typedef struct {
   uint8_t size;
   uint8_t registers[];
 } iree_vm_register_list_t;
-static_assert(alignof(iree_vm_register_list_t) == 1,
+static_assert(iree_alignof(iree_vm_register_list_t) == 1,
               "Expecting byte alignment (to avoid padding)");
 static_assert(offsetof(iree_vm_register_list_t, registers) == 1,
               "Expect no padding in the struct");

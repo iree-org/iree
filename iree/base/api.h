@@ -96,12 +96,6 @@ extern "C" {
 #define IREE_API_PTR
 #endif  // _WIN32
 
-#if defined(_MSC_VER)
-#define IREE_ALIGNAS(x) __declspec(align(x))
-#else
-#define IREE_ALIGNAS(x) __attribute__((aligned(x)))
-#endif  // _MSC_VER
-
 #if (defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && \
      __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__)
 #define IREE_IS_LITTLE_ENDIAN 1

@@ -60,6 +60,7 @@ iree_cc_library(
     ::types
     ::value
     flatbuffers
+    iree::base::alignment
     iree::base::api
     iree::base::flatbuffer_util
     iree::base::target_platform
@@ -247,6 +248,7 @@ iree_cc_library(
   DEPS
     ::module
     ::ref
+    iree::base::alignment
     iree::base::api
   PUBLIC
 )
