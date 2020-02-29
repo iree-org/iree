@@ -47,6 +47,8 @@ cc_binary(
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
+        "@llvm-project//mlir:mlir_runner_utils",
+        "@llvm-project//mlir:mlir_runner_utils_header",
     ],
 )
 

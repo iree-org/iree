@@ -40,9 +40,10 @@
 
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <memory>
 
-#include "experimental/ModelBuilder/MLIRRunnerUtils.h"
+#include "mlir/ExecutionEngine/RunnerUtils.h"
 
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_

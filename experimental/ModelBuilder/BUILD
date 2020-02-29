@@ -39,7 +39,6 @@ cc_library(
     name = "ModelRunner",
     srcs = ["ModelRunner.cpp"],
     hdrs = [
-        "MLIRRunnerUtils.h",
         "MemRefUtils.h",
         "ModelRunner.h",
     ],
@@ -62,5 +61,6 @@ cc_library(
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:mlir_runner_utils_header",
     ],
 )
