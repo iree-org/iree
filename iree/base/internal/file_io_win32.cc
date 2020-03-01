@@ -53,8 +53,14 @@ StatusOr<std::string> GetFileContents(const std::string& path) {
 }
 
 Status SetFileContents(const std::string& path, const std::string& content) {
-  return UnimplementedErrorBuilder(IREE_LOC)
-         << "SetFileContents unimplemented on Windows";
+  ASSIGN_OR_RETURN(auto file, FileHandle::OpenWrite(std::move(path), 0));
+  if (::WriteFile(file->handle(), content.data(), content.size(), NULL, NULL) ==
+      FALSE) {
+    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
+           << "Unable to write file span of " << content.size() << " bytes to '"
+           << path << "'";
+  }
+  return OkStatus();
 }
 
 Status DeleteFile(const std::string& path) {

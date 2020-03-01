@@ -47,6 +47,22 @@ StatusOr<std::unique_ptr<FileHandle>> FileHandle::OpenRead(std::string path,
   return absl::make_unique<FileHandle>(handle, file_size);
 }
 
+// static
+StatusOr<std::unique_ptr<FileHandle>> FileHandle::OpenWrite(std::string path,
+                                                            DWORD file_flags) {
+  HANDLE handle = ::CreateFileA(
+      /*lpFileName=*/path.c_str(), /*dwDesiredAccess=*/GENERIC_WRITE,
+      /*dwShareMode=*/FILE_SHARE_DELETE, /*lpSecurityAttributes=*/nullptr,
+      /*dwCreationDisposition=*/CREATE_ALWAYS,
+      /*dwFlagsAndAttributes=*/FILE_ATTRIBUTE_NORMAL | file_flags,
+      /*hTemplateFile=*/nullptr);
+  if (handle == INVALID_HANDLE_VALUE) {
+    return Win32ErrorToCanonicalStatusBuilder(GetLastError(), IREE_LOC)
+           << "Unable to open file " << path;
+  }
+  return absl::make_unique<FileHandle>(handle, 0);
+}
+
 FileHandle::~FileHandle() { ::CloseHandle(handle_); }
 
 }  // namespace iree
