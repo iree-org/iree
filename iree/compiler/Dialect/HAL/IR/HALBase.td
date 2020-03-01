@@ -397,17 +397,19 @@ def HAL_ObjectType : AnyTypeOf<[
   HAL_Semaphore,
 ]>;
 
-def HAL_OrdinalAttr : IntegerAttrBase<I32, "32-bit integer ordinal attribute">;
+def HAL_OrdinalAttr : SignlessIntegerAttrBase<
+  I32, "32-bit integer ordinal attribute">;
 
-def HAL_ExecutableDataAttr : IntElementsAttr<8>;
+def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 
-def HAL_ElementTypeAttr : IntegerAttrBase<I32, "element type attribute">;
+def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
+  I32, "element type attribute">;
 
 def HAL_DeviceSize : TypeAlias<I32>;
-def HAL_DeviceSizeAttr : IntegerAttrBase<I32, "device_size_t">;
+def HAL_DeviceSizeAttr : SignlessIntegerAttrBase<I32, "device_size_t">;
 
 def HAL_HostSize : TypeAlias<I32>;
-def HAL_HostSizeAttr : IntegerAttrBase<I32, "size_t">;
+def HAL_HostSizeAttr : SignlessIntegerAttrBase<I32, "size_t">;
 
 def HAL_TimelineValue : TypeAlias<I32>;
 
@@ -454,7 +456,7 @@ def HAL_HostBuffer : AnyTypeOf<[
   MutableByteBufferType,
 ]>;
 
-def HAL_CommandQueueAffinityAttr : IntElementsAttr<32> {
+def HAL_CommandQueueAffinityAttr : SignlessIntElementsAttr<32> {
   // TODO(b/143184519): add typeDescription support to other things.
   // let typeDescription = [{
   //   A bitmask defining which queues an operation is allowed to execute on.
@@ -464,7 +466,7 @@ def HAL_CommandQueueAffinityAttr : IntElementsAttr<32> {
   // }];
 }
 
-def HAL_DurationMillisAttr : IntElementsAttr<32> {
+def HAL_DurationMillisAttr : SignlessIntElementsAttr<32> {
   // TODO(b/143184519): add typeDescription support to other things.
   // let typeDescription = [{
   //   A duration to wait in milliseconds. 0 indicates that the operation should

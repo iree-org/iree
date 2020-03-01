@@ -55,10 +55,7 @@ class VK_IsKnownStrEnumCaseFor<string name> :
 class VK_I32EnumAttr<string name, string description,
                       list<I32EnumAttrCase> cases> :
     I32EnumAttr<name, description, cases> {
-  let predicate = And<[
-    IntegerAttrBase<I32, "">.predicate,
-    VK_IsKnownIntEnumCaseFor<name>,
-  ]>;
+  let predicate = And<[I32Attr.predicate, VK_IsKnownIntEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 
@@ -66,10 +63,7 @@ class VK_I32EnumAttr<string name, string description,
 class VK_StrEnumAttr<string name, string description,
                       list<StrEnumAttrCase> cases> :
     StrEnumAttr<name, description, cases> {
-  let predicate = And<[
-    StrAttr.predicate,
-    VK_IsKnownStrEnumCaseFor<name>,
-  ]>;
+  let predicate = And<[StrAttr.predicate, VK_IsKnownStrEnumCaseFor<name>]>;
   let cppNamespace = "::mlir::iree_compiler::IREE::Vulkan";
 }
 

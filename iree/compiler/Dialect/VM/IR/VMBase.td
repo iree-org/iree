@@ -398,7 +398,7 @@ class VM_RefOf<Type type> :
 def VM_GlobalRefAttr : AliasedSymbolRefAttr;
 def VM_FuncRefAttr : AliasedSymbolRefAttr;
 
-def VM_Ordinal : IntegerAttrBase<I32, "ordinal value">;
+def VM_Ordinal : SignlessIntegerAttrBase<I32, "ordinal value">;
 
 def VM_Ptr : I<32>;
 
@@ -417,8 +417,9 @@ def VM_AnyType : AnyTypeOf<[
 
 class VM_ConstIntValueAttr<I type> : Attr<
     Or<[
-      IntegerAttrBase<type, type.bitwidth # "-bit integer value">.predicate,
-      IntElementsAttr<type.bitwidth>.predicate,
+      SignlessIntegerAttrBase<type,
+                              type.bitwidth # "-bit integer value">.predicate,
+      SignlessIntElementsAttr<type.bitwidth>.predicate,
     ]>> {
   let storageType = "Attribute";
   let returnType = "Attribute";
