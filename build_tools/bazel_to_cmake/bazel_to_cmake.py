@@ -26,14 +26,19 @@
 # For usage, see:
 #   python3 build_tools/bazel_to_cmake/bazel_to_cmake.py --help
 
+# pylint: disable=missing-docstring
+# pylint: disable=invalid-name
+# pylint: disable=unused-argument
+# pylint: disable=exec-used
+
 import argparse
-import bazel_to_cmake_targets
 import datetime
+import itertools
 import os
-import textwrap
-from itertools import repeat, chain
-import glob
 import re
+import textwrap
+
+import bazel_to_cmake_targets
 
 repo_root = None
 
@@ -250,7 +255,7 @@ class BuildFileFunctions(object):
     #    package2::target
     targets = [self._convert_target(t) for t in targets]
     # Flatten lists
-    targets = list(chain.from_iterable(targets))
+    targets = list(itertools.chain.from_iterable(targets))
     # Remove duplicates
     targets = set(targets)
     # Remove Falsey (None and empty string) values
@@ -308,10 +313,10 @@ class BuildFileFunctions(object):
     # attribute and pass them along to any targets that depend on the filegroup.
     # Cross-package dependencies and complicated globs could be hard to handle.
 
-    # We have a bunch of filegroups that just contain TD files. CMake doesn't model
-    # this at all, so we'll just hardcode this special case.
+    # We have a bunch of filegroups that just contain TD files. CMake doesn't
+    # model this at all, so we'll just hardcode this special case.
     # TODO(gcmn): Handle this robustly
-    if (name == "td_files"):
+    if name == "td_files":
       return
 
     self._convert_unimplemented_function("filegroup", name)
@@ -323,11 +328,11 @@ class BuildFileFunctions(object):
     # No mapping to CMake, ignore.
     pass
 
-  def glob(self, include, exclude=[], exclude_directories=1):
-    # Rather than converting bazel globs into CMake globs, we evaluate the glob at
-    # conversion time. This avoids issues with different glob semantics and dire
-    # warnings about not knowing when to reevaluate the glob.
-    # See https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
+  def glob(self, include, exclude=None, exclude_directories=1):
+    # Rather than converting bazel globs into CMake globs, we evaluate the glob
+    # at conversion time. This avoids issues with different glob semantics and
+    # dire warnings about not knowing when to reevaluate the glob. See
+    # https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
 
     if exclude_directories != 1:
       self._convert_unimplemented_function("glob", "with exclude")
@@ -337,9 +342,9 @@ class BuildFileFunctions(object):
     glob_vars = []
     for pattern in include:
       if "**" in pattern:
-        # bazel's glob has some specific restrictions about crossing package boundaries.
-        # We have no uses of recursive globs. Rather than try to emulate them or
-        # silently give different behavior, just error out.
+        # bazel's glob has some specific restrictions about crossing package
+        # boundaries. We have no uses of recursive globs. Rather than try to
+        # emulate them or silently give different behavior, just error out.
         # See https://docs.bazel.build/versions/master/be/functions.html#glob
         raise NotImplementedError("Recursive globs not supported")
       # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
@@ -366,10 +371,10 @@ class BuildFileFunctions(object):
 
   def cc_library(self,
                  name,
-                 hdrs=[],
-                 textual_hdrs=[],
-                 srcs=[],
-                 deps=[],
+                 hdrs=None,
+                 textual_hdrs=None,
+                 srcs=None,
+                 deps=None,
                  alwayslink=False,
                  testonly=False,
                  **kwargs):
@@ -393,7 +398,7 @@ class BuildFileFunctions(object):
     "testonly_block": testonly_block,
     }
 
-  def cc_test(self, name, hdrs=[], srcs=[], deps=[], **kwargs):
+  def cc_test(self, name, hdrs=None, srcs=None, deps=None, **kwargs):
     name_block = self._convert_name_block(name)
     hdrs_block = self._convert_hdrs_block(hdrs)
     srcs_block = self._convert_srcs_block(srcs)
@@ -407,7 +412,7 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
-  def cc_binary(self, name, srcs=[], deps=[], **kwargs):
+  def cc_binary(self, name, srcs=None, deps=None, **kwargs):
     name_block = self._convert_name_block(name)
     out_block = self._convert_out_block(name)
     srcs_block = self._convert_srcs_block(srcs)
@@ -482,7 +487,7 @@ class BuildFileFunctions(object):
     "translation_block": translation_block,
     }
 
-  def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=[]):
+  def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=None):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     flatc_args_block = self._convert_flatc_args_block(flatc_args)
@@ -499,8 +504,8 @@ class BuildFileFunctions(object):
              tblgen,
              td_file,
              tbl_outs,
-             td_srcs=[],
-             td_includes=[],
+             td_srcs=None,
+             td_includes=None,
              strip_include_prefix=None,
              test=False):
     name_block = self._convert_name_block(name)
@@ -543,10 +548,10 @@ class Converter(object):
   def convert(self, copyright_line):
     # One `add_subdirectory(name)` per subdirectory.
     add_subdir_commands = []
-    for root, dirs, file_names in os.walk(self.directory_path):
-      for dir in sorted(dirs):
-        if os.path.isfile(os.path.join(root, dir, "CMakeLists.txt")):
-          add_subdir_commands.append("add_subdirectory(%s)" % (dir,))
+    for root, dirs, _ in os.walk(self.directory_path):
+      for d in sorted(dirs):
+        if os.path.isfile(os.path.join(root, d, "CMakeLists.txt")):
+          add_subdir_commands.append("add_subdirectory(%s)" % (d,))
       # Stop walk, only add direct subdirectories.
       break
 
@@ -595,7 +600,7 @@ def convert_directory_tree(root_directory_path, write_files, strict):
   print("convert_directory_tree: %s" % (root_directory_path,))
   # Process directories starting at leaves so we can skip add_directory on
   # subdirs without a CMakeLists file.
-  for root, dirs, file_names in os.walk(root_directory_path, topdown=False):
+  for root, _, _ in os.walk(root_directory_path, topdown=False):
     convert_directory(root, write_files, strict)
 
 
@@ -649,7 +654,7 @@ def convert_directory(directory_path, write_files, strict):
       exec(build_file_code, GetDict(BuildFileFunctions(converter)))
       converted_text = converter.convert(copyright_line)
       if strict and converter.first_error:
-        raise converter.first_error
+        raise converter.first_error  # pylint: disable=raising-bad-type
       if write_allowed:
         with open(cmakelists_file_path, "wt") as cmakelists_file:
           cmakelists_file.write(converted_text)
