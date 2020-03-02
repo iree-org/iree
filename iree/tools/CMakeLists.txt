@@ -181,6 +181,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VM::Conversion::StandardToVM
       iree::compiler::Dialect::VM::IR
       iree::compiler::Dialect::VM::Transforms
+      iree::compiler::Dialect::Vulkan::IR
       iree::compiler::Translation::Interpreter::Transforms
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::LinalgToSPIRV

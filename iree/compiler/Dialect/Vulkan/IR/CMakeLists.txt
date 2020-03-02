@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,33 +19,42 @@ iree_cc_library(
   NAME
     IR
   HDRS
-    "IREEAttributes.h"
-    "IREEDialect.h"
-    "IREEOps.h"
-    "IREEOps.h.inc"
-    "IREETraits.h"
-    "IREETypes.h"
+    "VulkanAttributes.h"
+    "VulkanAttributes.h.inc"
+    "VulkanDialect.h"
+    "VulkanEnums.h.inc"
+    "VulkanTypes.h"
   SRCS
-    "IREEDialect.cpp"
-    "IREEOps.cpp"
-    "IREEOps.cpp.inc"
-    "IREETypes.cpp"
+    "VulkanAttributes.cpp"
+    "VulkanAttributes.cpp.inc"
+    "VulkanDialect.cpp"
+    "VulkanEnums.cpp.inc"
+    "VulkanTypes.cpp"
   DEPS
     LLVMSupport
     MLIRIR
-    MLIRParser
-    MLIRStandardOps
     MLIRSupport
+    iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC
 )
 
 iree_tablegen_library(
   NAME
-    IREEOpsGen
+    VulkanAttrsGen
   TD_FILE
-    "IREEOps.td"
+    "VulkanAttributes.td"
   OUTS
-    -gen-op-decls IREEOps.h.inc
-    -gen-op-defs IREEOps.cpp.inc
+    -gen-struct-attr-decls VulkanAttributes.h.inc
+    -gen-struct-attr-defs VulkanAttributes.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    VulkanEnumsGen
+  TD_FILE
+    "VulkanBase.td"
+  OUTS
+    -gen-enum-decls VulkanEnums.h.inc
+    -gen-enum-defs VulkanEnums.cpp.inc
 )

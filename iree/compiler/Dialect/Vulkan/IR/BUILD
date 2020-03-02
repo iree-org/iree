@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-exports_files(["IREEBase.td"])
-
 filegroup(
     name = "td_files",
     srcs = glob(["*.td"]),
@@ -29,38 +27,52 @@ filegroup(
 cc_library(
     name = "IR",
     srcs = [
-        "IREEDialect.cpp",
-        "IREEOps.cpp",
-        "IREEOps.cpp.inc",
-        "IREETypes.cpp",
+        "VulkanAttributes.cpp",
+        "VulkanAttributes.cpp.inc",
+        "VulkanDialect.cpp",
+        "VulkanEnums.cpp.inc",
+        "VulkanTypes.cpp",
     ],
     hdrs = [
-        "IREEAttributes.h",
-        "IREEDialect.h",
-        "IREEOps.h",
-        "IREEOps.h.inc",
-        "IREETraits.h",
-        "IREETypes.h",
+        "VulkanAttributes.h",
+        "VulkanAttributes.h.inc",
+        "VulkanDialect.h",
+        "VulkanEnums.h.inc",
+        "VulkanTypes.h",
     ],
     deps = [
-        ":IREEOpsGen",
+        ":VulkanAttrsGen",
+        ":VulkanEnumsGen",
+        "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
     ],
     alwayslink = 1,
 )
 
 gentbl(
-    name = "IREEOpsGen",
+    name = "VulkanAttrsGen",
     tbl_outs = [
-        ("-gen-op-decls", "IREEOps.h.inc"),
-        ("-gen-op-defs", "IREEOps.cpp.inc"),
+        ("-gen-struct-attr-decls", "VulkanAttributes.h.inc"),
+        ("-gen-struct-attr-defs", "VulkanAttributes.cpp.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "IREEOps.td",
+    td_file = "VulkanAttributes.td",
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+gentbl(
+    name = "VulkanEnumsGen",
+    tbl_outs = [
+        ("-gen-enum-decls", "VulkanEnums.h.inc"),
+        ("-gen-enum-defs", "VulkanEnums.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VulkanBase.td",
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",

@@ -89,6 +89,7 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/Conversion/VMLAToVM",
         "//iree/compiler/Dialect/VMLA/IR",
         "//iree/compiler/Dialect/VMLA/Transforms",
+        "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Translation/Interpreter/Transforms",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/XLAToLinalg",
