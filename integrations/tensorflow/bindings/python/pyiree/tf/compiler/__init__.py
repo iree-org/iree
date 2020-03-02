@@ -52,6 +52,9 @@ TF_IMPORT_PASS_PIPELINE = (
     "tf-standard-pipeline",
     "canonicalize",
 
+    # Unroll batchmatmul and lower it to matmul
+    "tf-unroll-batch-matmul",
+
     # Clean up control flow
     "tf-functional-control-flow-to-cfg",
     "inline",

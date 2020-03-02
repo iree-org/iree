@@ -29,7 +29,6 @@ class MatrixOpsModule(tf.Module):
     return tf.matmul(x, y)
 
 
-# TODO(b/147890602)
 @tf_test_utils.compile_modules(
     backends=["tf"], mat=(MatrixOpsModule, ["batch_matmul"]))
 class MatrixOpsTest(tf_test_utils.SavedModelTestCase):
