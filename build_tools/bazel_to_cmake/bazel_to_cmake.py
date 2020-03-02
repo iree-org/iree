@@ -377,7 +377,10 @@ class BuildFileFunctions(object):
                  deps=None,
                  alwayslink=False,
                  testonly=False,
+                 linkopts=None,
                  **kwargs):
+    if linkopts:
+      self._convert_unimplemented_function("linkopts")
     name_block = self._convert_name_block(name)
     hdrs_block = self._convert_hdrs_block(hdrs)
     textual_hdrs_block = self._convert_textual_hdrs_block(textual_hdrs)
@@ -412,7 +415,9 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
-  def cc_binary(self, name, srcs=None, deps=None, **kwargs):
+  def cc_binary(self, name, srcs=None, deps=None, linkopts=None, **kwargs):
+    if linkopts:
+      self._convert_unimplemented_function("linkopts")
     name_block = self._convert_name_block(name)
     out_block = self._convert_out_block(name)
     srcs_block = self._convert_srcs_block(srcs)
