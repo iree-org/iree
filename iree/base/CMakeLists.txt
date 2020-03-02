@@ -20,8 +20,8 @@ iree_cc_library(
   HDRS
     "alignment.h"
   DEPS
-    iree::base::platform_headers
-    iree::base::target_platform
+    ::platform_headers
+    ::target_platform
   PUBLIC
 )
 
@@ -33,11 +33,11 @@ iree_cc_library(
   SRCS
     "api.cc"
   DEPS
-    iree::base::api_hdrs
-    iree::base::api_util
-    iree::base::file_mapping
-    iree::base::init
-    iree::base::tracing
+    ::api_hdrs
+    ::api_util
+    ::file_mapping
+    ::init
+    ::tracing
   PUBLIC
 )
 
@@ -55,13 +55,13 @@ iree_cc_library(
   HDRS
     "api_util.h"
   DEPS
-    absl::base
-    absl::container
+    ::api_hdrs
+    ::logging
+    ::shape
+    ::status
+    absl::core_headers
+    absl::inlined_vector
     absl::time
-    iree::base::api_hdrs
-    iree::base::logging
-    iree::base::shape
-    iree::base::status
   PUBLIC
 )
 
@@ -73,9 +73,9 @@ iree_cc_library(
   SRCS
     "arena.cc"
   DEPS
-    absl::base
+    ::logging
+    absl::core_headers
     absl::span
-    iree::base::logging
   PUBLIC
 )
 
@@ -85,8 +85,8 @@ iree_cc_test(
   SRCS
     "arena_test.cc"
   DEPS
+    ::arena
     iree::testing::gtest_main
-    iree::base::arena
 )
 
 iree_cc_library(
@@ -95,8 +95,8 @@ iree_cc_library(
   HDRS
     "atomics.h"
   DEPS
-    iree::base::platform_headers
-    iree::base::target_platform
+    ::platform_headers
+    ::target_platform
   PUBLIC
 )
 
@@ -116,41 +116,42 @@ iree_cc_test(
   SRCS
     "bitfield_test.cc"
   DEPS
+    ::bitfield
     absl::core_headers
     iree::testing::gtest_main
-    iree::base::bitfield
 )
 
 iree_cc_library(
   NAME
-    "buffer_string_util"
-  SRCS
-    "buffer_string_util.cc"
+    buffer_string_util
   HDRS
     "buffer_string_util.h"
+  SRCS
+    "buffer_string_util.cc"
   DEPS
+    ::memory
+    ::shape
+    ::source_location
+    ::status
     absl::flat_hash_map
-    absl::strings
     absl::optional
     absl::span
-    iree::base::memory
-    iree::base::shape
-    iree::base::source_location
-    iree::base::status
+    absl::strings
+  PUBLIC
 )
 
 iree_cc_test(
   NAME
-    "buffer_string_util_test"
+    buffer_string_util_test
   SRCS
     "buffer_string_util_test.cc"
   DEPS
-    iree::testing::gtest_main
-    iree::base::buffer_string_util
-    iree::base::memory
-    iree::base::status
-    iree::base::status_matchers
+    ::buffer_string_util
+    ::memory
+    ::status
+    ::status_matchers
     absl::strings
+    iree::testing::gtest_main
 )
 
 iree_select_compiler_opts(_DYNAMIC_LIBRARY_LINKOPTS
@@ -160,22 +161,22 @@ iree_select_compiler_opts(_DYNAMIC_LIBRARY_LINKOPTS
 
 iree_cc_library(
   NAME
-    "dynamic_library"
+    dynamic_library
+  HDRS
+    "dynamic_library.h"
   SRCS
     "dynamic_library_posix.cc"
     "dynamic_library_win32.cc"
-  HDRS
-    "dynamic_library.h"
   LINKOPTS
     ${_DYNAMIC_LIBRARY_LINKOPTS}
-  DEPS
+DEPS
+    ::logging
+    ::platform_headers
+    ::status
+    ::target_platform
+    ::tracing
     absl::memory
     absl::span
-    iree::base::logging
-    iree::base::platform_headers
-    iree::base::status
-    iree::base::target_platform
-    iree::base::tracing
   PUBLIC
 )
 
@@ -185,11 +186,11 @@ iree_cc_library(
   HDRS
     "file_io.h"
   DEPS
+    ::status
+    ::target_platform
     absl::memory
-    absl::strings
     absl::span
-    iree::base::status
-    iree::base::target_platform
+    absl::strings
     iree::base::internal::file_io_internal
   PUBLIC
 )
@@ -200,7 +201,8 @@ iree_cc_library(
   HDRS
     "file_io.h"
   DEPS
-    iree::base::status
+    ::status
+  PUBLIC
 )
 
 iree_cc_test(
@@ -224,11 +226,11 @@ iree_cc_library(
   HDRS
     "file_mapping.h"
   DEPS
+    ::ref_ptr
+    ::status
     absl::memory
-    absl::strings
     absl::span
-    iree::base::ref_ptr
-    iree::base::status
+    absl::strings
     iree::base::internal::file_mapping_internal
   PUBLIC
 )
@@ -239,18 +241,19 @@ iree_cc_library(
   HDRS
     "file_mapping.h"
   DEPS
+    ::ref_ptr
+    ::status
     absl::span
-    iree::base::ref_ptr
-    iree::base::status
+  PUBLIC
 )
 
 iree_cc_library(
   NAME
     file_path
-  SRCS
-    "file_path.cc"
   HDRS
     "file_path.h"
+  SRCS
+    "file_path.cc"
   DEPS
     absl::strings
   PUBLIC
@@ -262,7 +265,7 @@ iree_cc_test(
   SRCS
     "file_path_test.cc"
   DEPS
-    iree::base::file_path
+    ::file_path
     iree::testing::gtest_main
 )
 
@@ -274,17 +277,17 @@ iree_cc_library(
   SRCS
     "flatbuffer_util.cc"
   DEPS
+    ::file_mapping
+    ::memory
+    ::ref_ptr
+    ::source_location
+    ::status
+    ::tracing
     absl::memory
     absl::optional
     absl::span
     absl::strings
     flatbuffers
-    iree::base::file_mapping
-    iree::base::memory
-    iree::base::ref_ptr
-    iree::base::source_location
-    iree::base::status
-    iree::base::tracing
   PUBLIC
 )
 
@@ -306,7 +309,7 @@ iree_cc_library(
   SRCS
     "initializer.cc"
   DEPS
-    iree::base::target_platform
+    ::target_platform
   PUBLIC
 )
 
@@ -318,8 +321,8 @@ iree_cc_library(
     "intrusive_list_ref_ptr.inc"
     "intrusive_list_unique_ptr.inc"
   DEPS
-    iree::base::logging
-    iree::base::ref_ptr
+    ::logging
+    ::ref_ptr
   PUBLIC
 )
 
@@ -331,9 +334,9 @@ iree_cc_test(
     "intrusive_list_test.cc"
     "intrusive_list_unique_ptr_test.cc"
   DEPS
+    ::intrusive_list
     absl::memory
     iree::testing::gtest_main
-    iree::base::intrusive_list
 )
 
 iree_cc_library(
@@ -372,7 +375,7 @@ iree_cc_library(
   HDRS
     "platform_headers.h"
   DEPS
-    iree::base::target_platform
+    ::target_platform
   PUBLIC
 )
 
@@ -382,8 +385,8 @@ iree_cc_library(
   HDRS
     "ref_ptr.h"
   DEPS
-    absl::base
-    iree::base::logging
+    ::logging
+    absl::core_headers
   PUBLIC
 )
 
@@ -393,8 +396,8 @@ iree_cc_test(
   SRCS
     "ref_ptr_test.cc"
   DEPS
+    ::ref_ptr
     iree::testing::gtest_main
-    iree::base::ref_ptr
 )
 
 iree_cc_library(
@@ -405,12 +408,12 @@ iree_cc_library(
   SRCS
     "shape.cc"
   DEPS
+    ::logging
+    ::source_location
+    ::status
     absl::span
     absl::strings
     absl::type_traits
-    iree::base::logging
-    iree::base::source_location
-    iree::base::status
   PUBLIC
 )
 
@@ -420,9 +423,9 @@ iree_cc_test(
   SRCS
     "shape_test.cc"
   DEPS
-    iree::base::shape
-    iree::base::status
-    iree::base::status_matchers
+    ::shape
+    ::status
+    ::status_matchers
     iree::testing::gtest_main
 )
 
@@ -432,31 +435,33 @@ iree_cc_library(
   HDRS
     "shaped_buffer.h"
   DEPS
+    ::logging
+    ::memory
+    ::shape
     absl::fixed_array
     absl::span
-    iree::base::logging
-    iree::base::memory
-    iree::base::shape
+  PUBLIC
 )
 
 iree_cc_library(
   NAME
     shaped_buffer_string_util
-  SRCS
-    "shaped_buffer_string_util.cc"
   HDRS
     "shaped_buffer_string_util.h"
+  SRCS
+    "shaped_buffer_string_util.cc"
   DEPS
+    ::buffer_string_util
+    ::memory
+    ::shape
+    ::shaped_buffer
+    ::source_location
+    ::status
     absl::fixed_array
-    absl::strings
     absl::optional
     absl::span
-    iree::base::buffer_string_util
-    iree::base::memory
-    iree::base::shape
-    iree::base::shaped_buffer
-    iree::base::source_location
-    iree::base::status
+    absl::strings
+  PUBLIC
 )
 
 iree_cc_test(
@@ -465,13 +470,13 @@ iree_cc_test(
   SRCS
     "shaped_buffer_string_util_test.cc"
   DEPS
+    ::buffer_string_util
+    ::memory
+    ::shaped_buffer
+    ::shaped_buffer_string_util
+    ::status
+    ::status_matchers
     absl::strings
-    iree::base::buffer_string_util
-    iree::base::memory
-    iree::base::shaped_buffer
-    iree::base::shaped_buffer_string_util
-    iree::base::status
-    iree::base::status_matchers
     iree::testing::gtest_main
 )
 
@@ -483,12 +488,12 @@ iree_cc_library(
   SRCS
     "signature_mangle.cc"
   DEPS
-    absl::container
+    ::status
+    absl::inlined_vector
     absl::memory
     absl::optional
     absl::span
     absl::strings
-    iree::base::status
   PUBLIC
 )
 
@@ -498,8 +503,8 @@ iree_cc_test(
   SRCS
     "signature_mangle_test.cc"
   DEPS
+    ::signature_mangle
     iree::testing::gtest_main
-    iree::base::signature_mangle
 )
 
 iree_cc_library(
@@ -518,7 +523,7 @@ iree_cc_library(
   HDRS
     "status.h"
   DEPS
-    iree::base::source_location
+    ::source_location
     iree::base::internal::status_internal
   PUBLIC
 )
