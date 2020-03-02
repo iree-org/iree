@@ -45,11 +45,12 @@ cc_binary(
         "@com_google_benchmark//:benchmark",
         "//iree/base:api_util",
         "//iree/base:file_io",
+        "//iree/base:localfile",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/modules/hal",
-        "//iree/vm:bytecode_module",
         "//iree/testing:benchmark_main",
+        "//iree/vm:bytecode_module",
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
 )
 
@@ -60,6 +61,7 @@ cc_binary(
         "//iree/base:file_io",  # build-cleaner: keep
         "//iree/base:flatbuffer_util",
         "//iree/base:init",
+        "//iree/base:localfile",
         "//iree/schemas:bytecode_module_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
     ],
@@ -156,6 +158,7 @@ cc_binary(
         "//iree/base:api_util",
         "//iree/base:file_io",
         "//iree/base:init",
+        "//iree/base:localfile",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/modules/hal",

@@ -293,6 +293,13 @@ cc_test(
     ],
 )
 
+# This library is a no-op in OSS, but exists for upstream compatibility
+cc_library(
+    name = "localfile",
+    deps = platform_trampoline_deps("localfile"),
+    alwayslink = 1,
+)
+
 cc_library(
     name = "logging",
     hdrs = ["logging.h"],

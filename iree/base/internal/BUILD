@@ -90,6 +90,11 @@ cc_library(
     ],
 )
 
+# This library is a no-op in OSS, but exists for upstream compatibility
+cc_library(
+    name = "localfile_internal",
+)
+
 cc_library(
     name = "ostringstream",
     srcs = ["ostringstream.cc"],

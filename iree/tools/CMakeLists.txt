@@ -46,6 +46,7 @@ iree_cc_binary(
     benchmark
     iree::base::api_util
     iree::base::file_io
+    iree::base::localfile
     iree::base::source_location
     iree::base::status
     iree::modules::hal
@@ -64,6 +65,7 @@ iree_cc_binary(
     iree::base::file_io
     iree::base::flatbuffer_util
     iree::base::init
+    iree::base::localfile
     iree::schemas::bytecode_module_def_cc_fbs
 )
 
@@ -79,6 +81,7 @@ iree_cc_binary(
     iree::base::api_util
     iree::base::file_io
     iree::base::init
+    iree::base::localfile
     iree::base::source_location
     iree::base::status
     iree::modules::hal
