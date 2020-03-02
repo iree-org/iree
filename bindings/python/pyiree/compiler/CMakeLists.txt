@@ -53,6 +53,7 @@ iree_pybind_cc_library(
     # Targets. Adopted from the Bazel variable COMPILER_DEPS.
     iree::compiler::Dialect::HAL::Target::LegacyInterpreter
     iree::compiler::Dialect::HAL::Target::VMLA
+    iree::compiler::Dialect::HAL::Target::LLVM
     iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
     bindings::python::pyiree::common
