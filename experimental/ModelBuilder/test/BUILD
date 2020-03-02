@@ -25,6 +25,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.cpp"]),
     data = [
+        ":runtime-support.so",
         ":test-mnist-jit",
         ":test-simple-jit",
         "//iree/tools:IreeFileCheck",
@@ -61,9 +62,19 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//llvm:support",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
+    ],
+)
+
+cc_binary(
+    name = "runtime-support.so",
+    linkshared = True,
+    linkstatic = False,
+    deps = [
+        "@llvm-project//mlir:mlir_c_runner_utils",
     ],
 )

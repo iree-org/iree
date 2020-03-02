@@ -12,17 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: test-simple-jit 2>&1 | IreeFileCheck %s
+// clang-format off
+
+// NOLINTNEXTLINE
+// RUN: test-simple-jit -runtime-support=$(dirname %s)/runtime-support.so 2>&1 | IreeFileCheck %s
+
+// clang-format on
 
 #include "experimental/ModelBuilder/MemRefUtils.h"
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/InitLLVM.h"
 #include "mlir/EDSC/Builders.h"
 #include "mlir/EDSC/Intrinsics.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/StandardTypes.h"
 
 using namespace mlir;  // NOLINT
+
+static llvm::cl::opt<std::string> runtimeSupport(
+    "runtime-support", llvm::cl::desc("Runtime support library filename"),
+    llvm::cl::value_desc("filename"), llvm::cl::init("-"));
 
 // Flush the different output streams. Needed to ensure FileCheck
 // sees the various buffered streams in a reasonable order.
@@ -38,11 +49,9 @@ void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
   ModelBuilder modelBuilder;
 
   auto f32 = modelBuilder.f32;
-  auto mkVectorType = modelBuilder.getVectorType({M, N}, f32);
-  auto typeA = modelBuilder.getMemRefType({kNumElements}, mkVectorType);
-  auto knVectorType = modelBuilder.getVectorType({M, N}, f32);
-  auto typeB = modelBuilder.getMemRefType({kNumElements}, knVectorType);
   auto mnVectorType = modelBuilder.getVectorType({M, N}, f32);
+  auto typeA = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
+  auto typeB = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
   auto typeC = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
 
   // 1. Build a simple vector_add.
@@ -56,8 +65,9 @@ void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
     auto last = std_constant_index(kNumElements - 1);
     C(last) = A(last) + B(last);
 
-    // TODO(ntv, ajcbik): activate
-    // (vector_print(*C(last)));
+    (vector_print(*A(last)));
+    (vector_print(*B(last)));
+    (vector_print(*C(last)));
 
     std_ret();
   }
@@ -68,22 +78,26 @@ void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
   // 2. Compile the function, pass in runtime support library
   //    to the execution engine for vector.print.
   ModelRunner runner(modelBuilder.getModuleRef());
-  runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3);
+  runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3, runtimeSupport);
 
   // 3. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
   auto oneInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
     float *p = reinterpret_cast<float *>(ptr + idx);
-    for (unsigned i = 0; i < M * N; ++i) *(p + i) = 1.0f;
+    for (unsigned i = 0; i < M * N; ++i) p[i] = 1.0f;
+  };
+  auto incInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
+    float *p = reinterpret_cast<float *>(ptr + idx);
+    for (unsigned i = 0; i < M * N; ++i) p[i] = 1.0f + i;
   };
   auto zeroInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
     float *p = reinterpret_cast<float *>(ptr + idx);
-    for (unsigned i = 0; i < M * N; ++i) *(p + i) = 0.0f;
+    for (unsigned i = 0; i < M * N; ++i) p[i] = 0.0f;
   };
   auto A = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
       {kNumElements}, oneInit);
   auto B = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
-      {kNumElements}, oneInit);
+      {kNumElements}, incInit);
   auto C = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
       {kNumElements}, zeroInit);
 
@@ -98,7 +112,6 @@ void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
   auto err =
       runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
   flush();
-
   if (err) llvm_unreachable("Error running function.");
 
   llvm::outs() << "\nSUCCESS\n\n";
@@ -135,17 +148,30 @@ void testMatmulOnVectors(StringLiteral funcName) {
   flush();
 }
 
-int main() {
+int main(int argc, char **argv) {
+  // Allow LLVM setup through command line and parse the
+  // test specific option for a runtime support library.
+  llvm::InitLLVM y(argc, argv);
+  llvm::cl::ParseCommandLineOptions(argc, argv, "TestSimpleJIT\n");
+
   // CHECK-LABEL: func @test_vector_add_4_4
-  // CHECK: SUCCESS
+  //      CHECK: ( ( 1, 1, 1, 1 ), ( 1, 1, 1, 1 ), ( 1, 1, 1, 1 ),
+  // CHECK-SAME: ( 1, 1, 1, 1 ) )
+  //      CHECK: ( ( 1, 2, 3, 4 ), ( 5, 6, 7, 8 ), ( 9, 10, 11, 12 ),
+  // CHECK-SAME: ( 13, 14, 15, 16 ) )
+  //      CHECK: ( ( 2, 3, 4, 5 ), ( 6, 7, 8, 9 ), ( 10, 11, 12, 13 ),
+  // CHECK-SAME: ( 14, 15, 16, 17 ) )
+  //      CHECK: SUCCESS
   testVectorAdd<4, 4>("test_vector_add_4_4", /*kNumElements=*/13);
 
   // CHECK-LABEL: func @test_vector_add_9_7
   // CHECK: SUCCESS
+  // TODO(ntv): fix padding?
   testVectorAdd<9, 7>("test_vector_add_9_7", /*kNumElements=*/5);
 
   // CHECK-LABEL: func @test_vector_add_17_19
   // CHECK: SUCCESS
+  // TODO(ntv): fix padding?
   testVectorAdd<17, 19>("test_vector_add_17_19", /*kNumElements=*/3);
 
   // CHECK-LABEL: func @test_vector_matmul(
