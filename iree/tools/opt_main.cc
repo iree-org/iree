@@ -14,7 +14,8 @@
 
 // Main entry function for iree-opt and derived binaries.
 //
-// Based on mlir-opt but without registering passes and dialects we don't care about.
+// Based on mlir-opt but without registering passes and dialects we don't care
+// about.
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
