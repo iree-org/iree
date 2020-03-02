@@ -268,7 +268,7 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
-      iree_translate_library
+      iree_translate_main
     SRCS
       "translate_main.cc"
     DEPS
@@ -299,7 +299,7 @@ if(${IREE_BUILD_COMPILER})
     NAME
       iree-translate
     DEPS
-      iree::tools::iree_translate_library
+      iree::tools::iree_translate_main
   )
 
   # TODO(*): define these with a rule instead (like iree_sh_binary).

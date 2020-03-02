@@ -88,6 +88,6 @@ cc_binary(
     name = "check-translate",
     deps = [
         ":dialect",
-        "//iree/tools:iree_translate_library",
+        "//iree/tools:iree_translate_main",
     ],
 )
