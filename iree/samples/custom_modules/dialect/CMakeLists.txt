@@ -74,7 +74,7 @@ iree_cc_binary(
     custom-opt
   DEPS
     ::dialect
-    iree::tools::iree_opt_library
+    iree::tools::iree_opt_main
 )
 
 iree_cc_binary(

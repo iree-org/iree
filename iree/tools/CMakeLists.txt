@@ -161,7 +161,7 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
-      iree_opt_library
+      iree_opt_main
     SRCS
       "opt_main.cc"
     DEPS
@@ -218,7 +218,7 @@ if(${IREE_BUILD_COMPILER})
     NAME
       iree-opt
     DEPS
-      iree::tools::iree_opt_library
+      iree::tools::iree_opt_main
   )
 
   iree_cc_binary(

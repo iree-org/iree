@@ -80,7 +80,7 @@ cc_binary(
     name = "check-opt",
     deps = [
         ":dialect",
-        "//iree/tools:iree_opt_library",
+        "//iree/tools:iree_opt_main",
     ],
 )
 
