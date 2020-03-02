@@ -434,11 +434,11 @@ class VMLAModuleState final {
 
 #define IREE_VMLA_TRANSPOSE_OP(name, type)                                     \
   Status name(vm::ref<iree_vmla_buffer_t> src, iree_vmla_shape_t src_shape,    \
-              absl::Span<const int32_t> dims, vm::ref<iree_vmla_buffer_t> dst, \
-              iree_vmla_shape_t dst_shape) {                                   \
+              absl::Span<const int32_t> permutation,                           \
+              vm::ref<iree_vmla_buffer_t> dst, iree_vmla_shape_t dst_shape) {  \
     IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
     return kernels::Transpose::Execute<type>(src->As<type>(), dst->As<type>(), \
-                                             Shape(src_shape), dims);          \
+                                             Shape(src_shape), permutation);   \
   }
   IREE_VMLA_TRANSPOSE_OP(TransposeX8, uint8_t);
   IREE_VMLA_TRANSPOSE_OP(TransposeX16, uint16_t);

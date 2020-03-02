@@ -102,17 +102,17 @@ vm.import @copy.x32(
 
 vm.import @transpose.x8(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dimensions : i32 ...,
+  %permutation : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @transpose.x16(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dimensions : i32 ...,
+  %permutation : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 vm.import @transpose.x32(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
-  %dimensions : i32 ...,
+  %permutation : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 

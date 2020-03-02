@@ -169,7 +169,7 @@ def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_Buffer:$src,
     VMLA_Shape:$src_shape,
-    ElementsAttr:$dimensions,
+    ElementsAttr:$permutation,
     VMLA_Buffer:$dst,
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type

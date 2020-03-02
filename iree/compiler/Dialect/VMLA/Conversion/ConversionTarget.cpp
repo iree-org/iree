@@ -123,6 +123,14 @@ LogicalResult VMLAConversionTarget::applyDefaultBufferRewrite(
       }
       state.addOperands({dstBuffer});
       allocatedBuffers.push_back(dstBuffer);
+      if (dstOperation->hasTrait<OpTrait::IREE::VMLA::IncludeShapes>()) {
+        Value resultShape =
+            getTensorShape(srcOp->getLoc(), srcResult, typeConverter, rewriter);
+        if (!resultShape) {
+          return srcOp->emitError() << "failed to get operand tensor shape";
+        }
+        state.addOperands({resultShape});
+      }
     } else {
       // Normal pass-through result.
       state.addTypes({srcResult.getType()});
