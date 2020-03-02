@@ -41,6 +41,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <functional>
 #include <memory>
 
 #include "mlir/ExecutionEngine/RunnerUtils.h"
@@ -174,10 +175,11 @@ std::pair<void *, void *> allocAligned(size_t nElements,
 // of type PointwiseInitializer. Can optionally take specific `alloc` and `free`
 // functions.
 template <typename T, int N, typename FreeFunType = decltype(&::free)>
-auto makeInitializedUnrankedDescriptor(const std::array<int64_t, N> &shape,
-                                       LinearInitializer<T> init,
-                                       AllocFunType alloc = &::malloc,
-                                       FreeFunType freeFun = &::free) {
+std::unique_ptr<::UnrankedMemRefType<float>, FreeFunType>
+makeInitializedUnrankedDescriptor(const std::array<int64_t, N> &shape,
+                                  LinearInitializer<T> init,
+                                  AllocFunType alloc = &::malloc,
+                                  FreeFunType freeFun = &::free) {
   int64_t nElements = 1;
   for (int64_t s : shape) nElements *= s;
   auto allocated = allocAligned<T>(nElements, alloc);
@@ -192,10 +194,11 @@ auto makeInitializedUnrankedDescriptor(const std::array<int64_t, N> &shape,
 // of type PointwiseInitializer. Can optionally take specific `alloc` and `free`
 // functions.
 template <typename T, int N, typename FreeFunType = decltype(&::free)>
-auto makeInitializedStridedMemRefDescriptor(const std::array<int64_t, N> &shape,
-                                            LinearInitializer<T> init,
-                                            AllocFunType alloc = &::malloc,
-                                            FreeFunType freeFun = &::free) {
+std::unique_ptr<StridedMemRefType<T, N>, FreeFunType>
+makeInitializedStridedMemRefDescriptor(const std::array<int64_t, N> &shape,
+                                       LinearInitializer<T> init,
+                                       AllocFunType alloc = &::malloc,
+                                       FreeFunType freeFun = &::free) {
   int64_t nElements = 1;
   for (int64_t s : shape) nElements *= s;
   auto allocated = allocAligned<T>(nElements, alloc);
