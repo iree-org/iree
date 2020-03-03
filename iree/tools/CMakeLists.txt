@@ -184,6 +184,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "opt_main.cc"
     DEPS
+      ::PassesAndDialects
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::Flow::Analysis
@@ -210,27 +211,14 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::XLAToLinalg
       iree::compiler::Translation::XLAToLinalg::ReductionLowering
       LLVMSupport
-      MLIRAffineOps
-      MLIRLinalgOps
-      MLIRGPUtoCUDATransforms
-      MLIRGPUtoNVVMTransforms
-      MLIRGPUtoROCDLTransforms
-      MLIRGPUtoVulkanTransforms
-      MLIRQuantizerTransforms
-      MLIRLinalgToSPIRVTransforms
-      MLIRLinalgToLLVM
       MLIRLinalgUtils
-      MLIRLoopOpsTransforms
       MLIROptLib
-      MLIRStandardOps
       MLIRSPIRV
       MLIRSPIRVSerialization
-      MLIRSPIRVTransforms
       MLIRTranslation
       tensorflow::mlir_xla
       ${_LLVM_LINK_TARGETS}
       ${IREE_COMPILER_TARGET_BACKENDS}
-    ALWAYSLINK
   )
 
   iree_cc_binary(

@@ -91,6 +91,7 @@ cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [
+        ":PassesAndDialects",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Flow/Analysis",
@@ -116,8 +117,6 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
@@ -126,7 +125,6 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
     ] + TARGET_COMPILER_BACKENDS,
-    alwayslink = 1,
 )
 
 cc_binary(

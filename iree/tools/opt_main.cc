@@ -28,6 +28,8 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
+#include "init_passes.h"
+#include "init_dialects.h"
 
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
@@ -55,8 +57,8 @@ static llvm::cl::opt<bool> verifyPasses(
     llvm::cl::init(true));
 
 int main(int argc, char **argv) {
-  mlir::registerAllDialects();
-  mlir::registerAllPasses();
+  mlir::registerMlirDialects();
+  mlir::registerMlirPasses();
   llvm::InitLLVM y(argc, argv);
 
   // Register any pass manager command line options.
