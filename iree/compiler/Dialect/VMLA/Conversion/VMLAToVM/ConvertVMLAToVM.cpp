@@ -121,6 +121,52 @@ class VMLATypedImportOpConversion : public VMLAImportOpConversion<T> {
   patterns.insert<VMLATypedImportOpConversion<op_type>>( \
       context, importSymbols, typeConverter, op_mnemonic);
 
+class VMLAConstantOpConversion
+    : public OpConversionPattern<IREE::VMLA::ConstantOp> {
+ public:
+  VMLAConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  PatternMatchResult matchAndRewrite(
+      IREE::VMLA::ConstantOp op, llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // Encode constant data into a rodata segment. These will eventually get
+    // deduped and combined.
+    auto ip = rewriter.saveInsertionPoint();
+    auto parentFuncOp = op.getParentOfType<IREE::VM::FuncOp>();
+    rewriter.setInsertionPoint(parentFuncOp);
+    auto constName = (parentFuncOp.getName() + "_const_" +
+                      std::to_string(allocateUniqueId(parentFuncOp)))
+                         .str();
+    auto rodataOp =
+        rewriter.create<IREE::VM::RodataOp>(op.getLoc(), constName, op.value());
+    rewriter.restoreInsertionPoint(ip);
+    auto loadRodataOp =
+        rewriter.create<IREE::VM::ConstRefRodataOp>(op.getLoc(), rodataOp);
+
+    // Dereference constant data.
+    rewriter.replaceOpWithNewOp<IREE::VMLA::BufferConstOp>(
+        op, IREE::VMLA::BufferType::get(op.getContext()),
+        loadRodataOp.getResult());
+    return matchSuccess();
+  }
+
+ private:
+  TypeConverter &typeConverter;
+
+  // TODO(b/145839814): find a name that's unique or make the rewriter support
+  // assigning unique names.
+  int allocateUniqueId(Operation *context) const {
+    if (uniqueContext != context) {
+      uniqueContext = context;
+      uniqueCounter = 0;
+    }
+    return uniqueCounter++;
+  }
+  mutable Operation *uniqueContext = nullptr;
+  mutable int uniqueCounter = 0;
+};
+
 class VMLAConvertImportOpConversion
     : public VMLAImportOpConversion<IREE::VMLA::ConvertOp> {
  public:
@@ -148,6 +194,8 @@ class VMLAMatMulImportOpConversion
 void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                               OwningRewritePatternList &patterns,
                               TypeConverter &typeConverter) {
+  patterns.insert<VMLAConstantOpConversion>(context, typeConverter);
+
   VMLA_IMPORT_OP(IREE::VMLA::BufferConstOp, "vmla.buffer.const");
   VMLA_IMPORT_OP(IREE::VMLA::BufferAllocOp, "vmla.buffer.alloc");
   VMLA_IMPORT_OP(IREE::VMLA::BufferCloneOp, "vmla.buffer.clone");
