@@ -40,6 +40,9 @@ std::unique_ptr<OpPassBase<FuncOp>> createLinalgTensorToBufferConversionPass();
 // Creates XLAHLO to linalg transformation pass.
 std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgPass();
 
+// Creates XLAHLO to linalg named ops transformation pass.
+std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgOpsOnBufferPass();
+
 /// Populates patterns to convert a linalg.generic operation on tensors to a
 /// linalg.generic operation on memrefs. To be used only if the entire dispatch
 /// region becomes a single linalg.generic op after conversion from xla to

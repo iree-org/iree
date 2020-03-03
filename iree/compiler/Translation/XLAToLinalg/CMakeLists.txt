@@ -23,6 +23,7 @@ iree_cc_library(
     "LinalgFusion.cpp"
     "LinalgTensorToBuffer.cpp"
     "XLAToLinalg.cpp"
+    "XLAToLinalgOpsOnBuffers.cpp"
   DEPS
     LLVMSupport
     MLIRIR
