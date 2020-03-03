@@ -95,6 +95,7 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:MlirOptLib",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
