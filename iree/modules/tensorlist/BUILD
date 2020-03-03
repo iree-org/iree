@@ -24,7 +24,7 @@ iree_bytecode_module(
     src = "tensorlist_test.mlir",
     cc_namespace = "iree::modules::tensorlist",
     translate_tool = "//iree/compiler/Dialect/Modules/TensorList:tensorlist-translate",
-    translation = "-iree-mlir-to-vm-bytecode-module",
+    translations = ["-iree-mlir-to-vm-bytecode-module"],
 )
 
 cc_test(

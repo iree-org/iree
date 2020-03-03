@@ -21,7 +21,7 @@ iree_bytecode_module(
     "iree::samples"
   TRANSLATE_TOOL
     iree_tools_iree-translate
-  TRANSLATION
+  TRANSLATIONS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
 )
