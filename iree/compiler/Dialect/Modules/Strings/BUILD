@@ -33,7 +33,6 @@ cc_binary(
     deps = [
         "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
         "//iree/tools:iree_opt_library",
-        "@llvm-project//mlir:MlirOptMain",
     ],
 )
 

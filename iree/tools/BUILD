@@ -69,6 +69,7 @@ cc_binary(
 
 cc_library(
     name = "iree_opt_library",
+    srcs = ["opt_main.cc"],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/IREE/Transforms",
@@ -77,7 +78,6 @@ cc_library(
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
         "//iree/compiler/Dialect/HAL/Conversion/HALToVM",
-        "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
@@ -87,7 +87,6 @@ cc_library(
         "//iree/compiler/Dialect/VM/Transforms",
         "//iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA",
         "//iree/compiler/Dialect/VMLA/Conversion/VMLAToVM",
-        "//iree/compiler/Dialect/VMLA/IR",
         "//iree/compiler/Dialect/VMLA/Transforms",
         "//iree/compiler/Dialect/Vulkan/IR",
         "//iree/compiler/Translation/Interpreter/Transforms",
@@ -97,8 +96,11 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:MlirOptLib",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
@@ -111,7 +113,6 @@ cc_binary(
     name = "iree-opt",
     deps = [
         ":iree_opt_library",
-        "@llvm-project//mlir:MlirOptMain",
     ],
 )
 

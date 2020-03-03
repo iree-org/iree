@@ -162,6 +162,8 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_library(
     NAME
       iree_opt_library
+    SRCS
+      "opt_main.cc"
     DEPS
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
@@ -221,7 +223,6 @@ if(${IREE_BUILD_COMPILER})
       iree-opt
     DEPS
       iree::tools::iree_opt_library
-      MLIRMlirOptMain
   )
 
   iree_cc_binary(
