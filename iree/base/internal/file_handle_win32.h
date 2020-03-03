@@ -32,6 +32,8 @@ class FileHandle {
  public:
   static StatusOr<std::unique_ptr<FileHandle>> OpenRead(std::string path,
                                                         DWORD file_flags);
+  static StatusOr<std::unique_ptr<FileHandle>> OpenWrite(std::string path,
+                                                         DWORD file_flags);
 
   FileHandle(HANDLE handle, size_t size) : handle_(handle), size_(size) {}
   ~FileHandle();

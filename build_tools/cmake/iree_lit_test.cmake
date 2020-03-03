@@ -45,13 +45,38 @@ function(iree_lit_test)
 
   get_filename_component(_TEST_FILE_PATH ${_RULE_TEST_FILE} ABSOLUTE)
 
+  set(_DATA_DEP_PATHS)
+  foreach(_DATA_DEP ${_RULE_DATA})
+    string(REPLACE "::" "_" _DATA_DEP_NAME ${_DATA_DEP})
+    # TODO(*): iree_sh_binary so we can avoid this.
+    if("${_DATA_DEP_NAME}" STREQUAL "iree_tools_IreeFileCheck")
+      list(APPEND _DATA_DEP_PATHS "${CMAKE_SOURCE_DIR}/iree/tools/IreeFileCheck.bat")
+    else()
+      list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP_NAME}>)
+    endif()
+  endforeach(_DATA_DEP)
+
+  # We run all our tests through a custom test runner to allow setup and teardown.
   add_test(
-    NAME ${_NAME}
-    # We run all our tests through a custom test runner to allow setup and teardown.
-    COMMAND ${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.sh ${CMAKE_SOURCE_DIR}/iree/tools/run_lit.sh ${_TEST_FILE_PATH}
-    WORKING_DIRECTORY "${CMAKE_BINARY_DIR}" # Make sure the lit runner can find all the binaries
+    NAME
+      ${_NAME}
+    COMMAND
+      "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
+      "${CMAKE_SOURCE_DIR}/iree/tools/run_lit.${IREE_HOST_SCRIPT_EXT}"
+      ${_TEST_FILE_PATH}
+      ${_DATA_DEP_PATHS}
+    WORKING_DIRECTORY
+      "${CMAKE_BINARY_DIR}"
   )
-  set_property(TEST ${_NAME} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
+  set_property(
+    TEST
+      ${_NAME}
+    PROPERTY
+      ENVIRONMENT
+        "TEST_TMPDIR=${_NAME}_test_tmpdir"
+      REQUIRED_FILES
+        "${_TEST_FILE_PATH}"
+  )
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()
 

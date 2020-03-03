@@ -305,6 +305,9 @@ if(${IREE_BUILD_COMPILER})
       iree::tools::iree_translate_library
   )
 
+  # TODO(*): define these with a rule instead (like iree_sh_binary).
+  # We want them to have the same package namespacing so we can reference them
+  # as if they were binaries (iree::tools::IreeFileCheck, etc).
   if(${IREE_BUILD_TESTS})
     add_custom_target(IreeFileCheck ALL
       COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
