@@ -44,9 +44,9 @@ struct HLOReductionToLinalgPass : public ModulePass<HLOReductionToLinalgPass> {
 /// are "parallel" except the `reductionDim`-th element.
 // TODO(hanchung): Use helpers in StructuredOpsUtils.h instead of hardcoded
 // strings once the build system is set up.
-ArrayAttr getNLoopsAttrs(Builder b, unsigned nLoops, int reductionDim) {
+ArrayAttr getInnermostReductionIterAttrs(Builder b, unsigned nLoops) {
   SmallVector<Attribute, 3> attrs(nLoops, b.getStringAttr("parallel"));
-  attrs[reductionDim] = b.getStringAttr("reduction");
+  attrs.back() = b.getStringAttr("reduction");
   return b.getArrayAttr(attrs);
 }
 
@@ -77,6 +77,18 @@ struct ReductionApplyFnConversion final : ApplyFunctionConversion<FuncOp> {
 
 }  // namespace
 
+// Returns a permutation AffineMap that puts `reductionDim` to the last. The
+// order of the first (`rank` - 1) can be unsorted. E.g., if `rank` is 4 and
+// `reductionDim` is 1, then "(d0, d1, d2, d3) -> (d0, d3, d2, d1)" can be
+// returned.
+static AffineMap getTransposeMapForReduction(OpBuilder &builder, int rank,
+                                             int reductionDim) {
+  SmallVector<unsigned, 4> permutation;
+  for (int i = 0; i < rank; ++i) permutation.push_back(i);
+  std::swap(permutation[reductionDim], permutation[rank - 1]);
+  return AffineMap::getPermutationMap(permutation, builder.getContext());
+}
+
 //===----------------------------------------------------------------------===//
 // Reduction entry function body
 //===----------------------------------------------------------------------===//
@@ -105,17 +117,18 @@ static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn,
 
   // Prepare indexing maps for linalg generic op. The elements are for src,
   // initial value and dst, respectively.
-  SmallVector<Attribute, 2> indexingMaps;
-  indexingMaps.emplace_back(
-      AffineMapAttr::get(builder.getMultiDimIdentityMap(nInputRank)));
+  // Transpose `src` to make the reduction loop be the innermost, because it's
+  // easier to fully utilize processors.
+  SmallVector<Attribute, 3> indexingMaps;
+  indexingMaps.emplace_back(AffineMapAttr::get(
+      getTransposeMapForReduction(builder, nInputRank, reductionDim)));
   indexingMaps.emplace_back(AffineMapAttr::get(AffineMap::get(
       nInputRank, /*symbolCount=*/0, {builder.getAffineConstantExpr(0)})));
+  // Since the reduction loop now is the innermost, the indexing map of `dst`
+  // should drop the latest dimension, e.g., (d0, d1, d2) -> (d0, d1).
   SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0; i < nInputRank; i++) {
-    if (i == reductionDim) continue;
+  for (int i = 0; i < nInputRank - 1; ++i)
     exprs.push_back(builder.getAffineDimExpr(i));
-  }
-
   if (exprs.empty()) exprs.push_back(builder.getAffineConstantExpr(0));
   indexingMaps.emplace_back(
       AffineMapAttr::get(AffineMap::get(nInputRank, /*symbolCount=*/0, exprs)));
@@ -127,7 +140,7 @@ static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn,
       builder.getI64IntegerAttr(2),  // args_in
       builder.getI64IntegerAttr(1),  // args_out
       builder.getArrayAttr(indexingMaps),
-      getNLoopsAttrs(builder, nInputRank, reductionDim),
+      getInnermostReductionIterAttrs(builder, nInputRank),
       /*doc=*/nullptr, /*fun=*/nullptr, /*library_call=*/nullptr);
 
   // Add a block to the region.
@@ -144,8 +157,10 @@ static LogicalResult addReductionEntryFnBody(OpBuilder &builder, FuncOp fn,
   auto blockDstArg = block->getArgument(numArgs - 1);
   auto zero = builder.create<ConstantOp>(loc, indexType,
                                          builder.getIntegerAttr(indexType, 0));
+  // The reduction dimension is the innermost loop now, so compare the innermost
+  // index to zero.
   auto cond = builder.create<CmpIOp>(loc, CmpIPredicate::eq,
-                                     block->getArgument(reductionDim),
+                                     block->getArgument(nInputRank - 1),
                                      zero.getResult());
   auto lhs = builder.create<SelectOp>(loc, cond, blockInitArg, blockDstArg);
   auto rhs = blockSrcArg;
