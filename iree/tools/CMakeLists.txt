@@ -193,9 +193,6 @@ if(${IREE_BUILD_COMPILER})
       LLVMSupport
       MLIRAffineOps
       MLIRLinalgOps
-      MLIRTestIR
-      MLIRTestPass
-      MLIRTestTransforms
       MLIRGPUtoCUDATransforms
       MLIRGPUtoNVVMTransforms
       MLIRGPUtoROCDLTransforms
@@ -210,7 +207,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRSPIRV
       MLIRSPIRVSerialization
       MLIRSPIRVTransforms
-      MLIRSPIRVTestPasses
       MLIRTranslation
       tensorflow::mlir_xla
       ${_LLVM_LINK_TARGETS}

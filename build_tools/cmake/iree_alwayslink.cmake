@@ -60,13 +60,9 @@ function(set_alwayslink_mlir_libs)
     MLIRSPIRVSerialization
     # Required IR targets
     MLIRIR
-    MLIRTestIR
     # Required passes
     MLIRPass
-    MLIRTestPass
-    MLIRSPIRVTestPasses
     # Required transforms
-    MLIRTestTransforms
     MLIRGPUtoCUDATransforms
     MLIRGPUtoNVVMTransforms
     MLIRGPUtoROCDLTransforms
