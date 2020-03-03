@@ -217,6 +217,9 @@ def FLOW_ReductionRegionOp : FLOW_PureOp<"reduction.region", [
     of work. Parititoning first isolates reduction regions prior to dispatch
     regions so that such semantics can be identified for folding.
 
+    The `dispatch` region contains the original reduction operation and the
+    `invocation` region contains the outlined per-invocation operation.
+
     This operation follows the XLA Reduce semantics:
     https://www.tensorflow.org/xla/operation_semantics#reduce
   }];
@@ -232,12 +235,16 @@ def FLOW_ReductionRegionOp : FLOW_PureOp<"reduction.region", [
     Variadic<AnyType>:$results
   );
 
-  let regions = (region AnyRegion:$body);
+  let regions = (region
+    AnyRegion:$dispatch,
+    AnyRegion:$invocation
+  );
 
   let extraClassDeclaration = [{
     unsigned getNumReductionOperands() {
       return std::distance(operands().begin(), operands().end());
     }
+    FunctionType getInvocationType();
   }];
 
   let skipDefaultBuilders = 1;
@@ -263,6 +270,9 @@ def FLOW_WindowedReductionRegionOp : FLOW_PureOp<"windowed_reduction.region", [
     of work. Parititoning first isolates reduction regions prior to dispatch
     regions so that such semantics can be identified for folding.
 
+    The `dispatch` region contains the original reduction operation and the
+    `invocation` region contains the outlined per-invocation operation.
+
     This operation follows the XLA ReduceWindow semantics:
     https://www.tensorflow.org/xla/operation_semantics#reducewindow
   }];
@@ -282,12 +292,16 @@ def FLOW_WindowedReductionRegionOp : FLOW_PureOp<"windowed_reduction.region", [
     Variadic<FLOW_Tensor>:$results
   );
 
-  let regions = (region AnyRegion:$body);
+  let regions = (region
+    AnyRegion:$dispatch,
+    AnyRegion:$invocation
+  );
 
   let extraClassDeclaration = [{
     unsigned getNumReductionOperands() {
       return std::distance(operands().begin(), operands().end());
     }
+    FunctionType getInvocationType();
   }];
 
   let skipDefaultBuilders = 1;

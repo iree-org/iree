@@ -157,49 +157,32 @@ LogicalResult findReachableFunctions(
 
 }  // namespace
 
-std::pair<IREE::Flow::ExecutableOp, FuncOp> createRegionExecutable(
-    Operation *op, FunctionType functionType, StringRef symbolSuffix,
-    llvm::StringMap<FuncOp> &dispatchableFuncOps) {
-  // Create the function and take the region body directly.
-  // NOTE: this will get uniquified if we have multiple in the same block.
-  auto parentFunc = op->getParentOfType<FuncOp>();
-  std::string functionName =
-      (parentFunc.getName().str() + "_rgn" + symbolSuffix).str();
-  auto outlinedFunc = FuncOp::create(op->getLoc(), functionName, functionType);
-  BlockAndValueMapping mapping;
-  op->getRegion(0).cloneInto(&outlinedFunc.getBody(), mapping);
-
-  // Replace flow.return with std.return.
-  for (auto &block : outlinedFunc.getBlocks()) {
-    if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
-      OpBuilder builder(returnOp);
-      builder.create<mlir::ReturnOp>(
-          returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
-      returnOp.erase();
-    }
-  }
+ExecutableOp createExecutable(Location loc, StringRef executableName,
+                              ArrayRef<FuncOp> funcOps, ModuleOp parentModuleOp,
+                              llvm::StringMap<FuncOp> &dispatchableFuncOps) {
+  assert(!funcOps.empty() && "must have at least one entry function");
 
   // Gather all reachable functions.
   llvm::SetVector<FuncOp> reachableFuncs;
-  findReachableFunctions(outlinedFunc, reachableFuncs, dispatchableFuncOps);
+  for (auto funcOp : funcOps) {
+    findReachableFunctions(funcOp, reachableFuncs, dispatchableFuncOps);
+  }
 
   // Create the executable that will contain the outlined region.
   // NOTE: this will get uniquified if we have multiple in the same block.
-  auto parentModule = parentFunc.getParentOfType<ModuleOp>();
-  OpBuilder parentModuleBuilder(parentModule);
-  parentModuleBuilder.setInsertionPoint(parentFunc);
-  std::string executableName =
-      (parentFunc.getName().str() + "_ex" + symbolSuffix).str();
-  auto executableOp = parentModuleBuilder.create<IREE::Flow::ExecutableOp>(
-      outlinedFunc.getLoc(), executableName);
+  OpBuilder parentModuleBuilder(&parentModuleOp.getBody()->back());
+  auto executableOp =
+      parentModuleBuilder.create<IREE::Flow::ExecutableOp>(loc, executableName);
 
   // Create the inner ModuleOp that contains the original functions. We need
   // to provide this shim as some ops (like std.call) look for the
   // containing module to provide symbol resolution.
   OpBuilder executableBuilder(executableOp);
   executableBuilder.setInsertionPointToStart(&executableOp.getBlock());
-  auto innerModule = executableBuilder.create<ModuleOp>(outlinedFunc.getLoc());
-  innerModule.push_back(outlinedFunc);
+  auto innerModule = executableBuilder.create<ModuleOp>(loc);
+  for (auto funcOp : funcOps) {
+    innerModule.push_back(funcOp);
+  }
 
   // Copy all reachable functions into the executable.
   // Linker passes may dedupe these later on.
@@ -210,7 +193,43 @@ std::pair<IREE::Flow::ExecutableOp, FuncOp> createRegionExecutable(
     innerModuleBuilder.clone(*reachableFunc);
   }
 
-  return std::make_pair(executableOp, outlinedFunc);
+  return executableOp;
+}
+
+FuncOp createRegionFunction(Location loc, StringRef functionName,
+                            Region &region) {
+  // Build function type matching 1:1 with the region signature.
+  SmallVector<Type, 4> operandTypes;
+  SmallVector<Type, 4> resultTypes;
+  auto &entryBlock = region.front();
+  for (auto &operand : entryBlock.getArguments()) {
+    operandTypes.push_back(operand.getType());
+  }
+  for (auto &block : region.getBlocks()) {
+    if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
+      resultTypes = llvm::to_vector<4>(returnOp.getOperandTypes());
+      break;
+    }
+  }
+  auto functionType =
+      FunctionType::get(operandTypes, resultTypes, region.getContext());
+
+  // Clone region into the function body.
+  auto funcOp = FuncOp::create(loc, functionName, functionType);
+  BlockAndValueMapping mapping;
+  region.cloneInto(&funcOp.getBody(), mapping);
+
+  // Replace flow.return with std.return.
+  for (auto &block : funcOp.getBlocks()) {
+    if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
+      OpBuilder builder(returnOp);
+      builder.create<mlir::ReturnOp>(
+          returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
+      returnOp.erase();
+    }
+  }
+
+  return funcOp;
 }
 
 }  // namespace Flow

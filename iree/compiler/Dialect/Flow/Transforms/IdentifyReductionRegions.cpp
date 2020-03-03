@@ -50,37 +50,57 @@ namespace {
 // All |invocationRegion| ops must be compatible with the |workload| specified
 // as they will all be dispatched with the same workgroup structure. The
 // |invocationRegion| will not be modified.
-LogicalResult buildReductionRegion(Operation *originalOp,
+LogicalResult buildReductionRegion(Operation *dispatchOp,
                                    ArrayRef<Value> operands,
                                    ArrayRef<Value> initialValues,
                                    ArrayRef<int32_t> dimensions,
                                    Region &invocationRegion) {
-  OpBuilder parentBuilder(originalOp);
+  OpBuilder parentBuilder(dispatchOp);
 
   // Compute the workload based on the output shape.
   // When variadic all output shapes match so we can just take the first.
-  auto workload = calculateWorkload(originalOp, originalOp->getResult(0));
+  auto workload = calculateWorkload(dispatchOp, dispatchOp->getResult(0));
 
   // Build the region op and add it to the parent block.
   auto reductionRegionOp = parentBuilder.create<ReductionRegionOp>(
-      originalOp->getLoc(), originalOp->getResultTypes(), workload, operands,
+      dispatchOp->getLoc(), dispatchOp->getResultTypes(), workload, operands,
       initialValues, dimensions);
 
+  // Clone the dispatch op (xla_hlo.reduce, etc) into the dispatch region. This
+  // way we preserve the original op all the way through the pipeline while
+  // still exposing it with standardized attributes for the later scheduler
+  // passes.
+  OpBuilder dispatchBuilder(dispatchOp->getContext());
+  auto *dispatchBlock =
+      dispatchBuilder.createBlock(&reductionRegionOp.dispatch());
+  BlockAndValueMapping dispatchMapping;
+  for (auto operand : operands) {
+    dispatchMapping.map(operand, dispatchBlock->addArgument(operand.getType()));
+  }
+  for (auto initialValue : initialValues) {
+    dispatchMapping.map(initialValue,
+                        dispatchBlock->addArgument(initialValue.getType()));
+  }
+  auto *clonedOp = dispatchBuilder.clone(*dispatchOp, dispatchMapping);
+  dispatchBuilder.create<ReturnOp>(dispatchOp->getLoc(),
+                                   clonedOp->getResults());
+
   // Create the block and setup the arg mapping for captured values.
-  BlockAndValueMapping mapping;
-  invocationRegion.cloneInto(&reductionRegionOp.body(), mapping);
+  BlockAndValueMapping invocationMapping;
+  invocationRegion.cloneInto(&reductionRegionOp.invocation(),
+                             invocationMapping);
 
   // Replace xla_hlo.return -> flow.return.
-  OpBuilder regionBuilder(reductionRegionOp.body());
-  reductionRegionOp.walk([&](xla_hlo::ReturnOp returnOp) {
+  OpBuilder regionBuilder(reductionRegionOp.invocation());
+  reductionRegionOp.invocation().walk([&](xla_hlo::ReturnOp returnOp) {
     regionBuilder.setInsertionPoint(returnOp);
     regionBuilder.create<ReturnOp>(returnOp.getLoc(), returnOp.getOperands());
     returnOp.erase();
   });
 
   // Replace usage of values with the results of the region.
-  for (int i = 0; i < originalOp->getNumResults(); ++i) {
-    originalOp->getResult(i).replaceAllUsesWith(reductionRegionOp.getResult(i));
+  for (int i = 0; i < dispatchOp->getNumResults(); ++i) {
+    dispatchOp->getResult(i).replaceAllUsesWith(reductionRegionOp.getResult(i));
   }
 
   return success();

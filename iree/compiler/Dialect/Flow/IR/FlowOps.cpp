@@ -254,11 +254,11 @@ static LogicalResult verifyVariableStoreIndirectOp(
 
 void DispatchRegionOp::build(Builder *builder, OperationState &state,
                              ArrayRef<Type> resultTypes, Value workload,
-                             ValueRange operands,
+                             ValueRange args,
                              ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);
   state.addOperands({workload});
-  state.addOperands(operands);
+  state.addOperands(args);
   state.addAttributes(attributes);
   state.addRegion();
   state.setOperandListToResizable();
@@ -374,6 +374,7 @@ void ReductionRegionOp::build(Builder *builder, OperationState &state,
           dimensions));
   state.addAttributes(attributes);
   state.addRegion();
+  state.addRegion();
   state.setOperandListToResizable();
 }
 
@@ -390,25 +391,41 @@ ParseResult parseReductionRegionOp(OpAsmParser &parser,
     return failure();
   }
 
-  SmallVector<OpAsmParser::OperandType, 8> reductionOperands;
-  Type reductionType;
-  auto operandsLoc = parser.getCurrentLocation();
-  if (failed(parser.parseLParen()) ||
-      failed(parser.parseOperandList(reductionOperands)) ||
-      failed(parser.parseRParen()) ||
-      failed(parser.parseColonType(reductionType)) ||
-      failed(parser.resolveOperands(
-          reductionOperands, reductionType.cast<FunctionType>().getInputs(),
-          operandsLoc, result->operands))) {
+  if (failed(parser.parseLParen())) {
     return failure();
   }
-  for (auto type : reductionType.cast<FunctionType>().getResults()) {
-    result->types.push_back(type);
+  SmallVector<OpAsmParser::OperandType, 8> regionArgs;
+  SmallVector<OpAsmParser::OperandType, 8> reductionOperands;
+  SmallVector<Type, 8> reductionOperandTypes;
+  auto operandsLoc = parser.getCurrentLocation();
+  do {
+    // Reserve entries in the lists.
+    regionArgs.emplace_back();
+    reductionOperands.emplace_back();
+    reductionOperandTypes.emplace_back();
+    if (failed(parser.parseRegionArgument(regionArgs.back())) ||
+        failed(parser.parseEqual()) ||
+        failed(parser.parseOperand(reductionOperands.back())) ||
+        failed(parser.parseColonType(reductionOperandTypes.back()))) {
+      return failure();
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  if (failed(parser.parseRParen()) ||
+      failed(parser.parseArrowTypeList(result->types)) ||
+      failed(parser.resolveOperands(reductionOperands, reductionOperandTypes,
+                                    operandsLoc, result->operands))) {
+    return failure();
   }
   result->setOperandListToResizable();
 
-  SmallVector<OpAsmParser::OperandType, 8> regionArgs;
-  SmallVector<Type, 8> regionArgTypes;
+  Region *dispatchRegion = result->addRegion();
+  if (failed(parser.parseRegion(*dispatchRegion, regionArgs,
+                                reductionOperandTypes))) {
+    return failure();
+  }
+
+  SmallVector<OpAsmParser::OperandType, 4> invocationRegionArgs;
+  SmallVector<Type, 4> invocationRegionArgTypes;
   if (failed(parser.parseKeyword("invocation")) ||
       failed(parser.parseLParen())) {
     return failure();
@@ -416,28 +433,27 @@ ParseResult parseReductionRegionOp(OpAsmParser &parser,
   do {
     Type argType;
     SmallVector<OpAsmParser::OperandType, 2> reductionRegionArgs;
-    OpAsmParser::OperandType initialValue;
     if (failed(parser.parseLParen()) ||
         failed(parser.parseOperandList(reductionRegionArgs, 2)) ||
-        failed(parser.parseRParen()) || failed(parser.parseEqual()) ||
-        failed(parser.parseOperand(initialValue)) ||
-        failed(parser.parseColonType(argType)) ||
-        failed(
-            parser.resolveOperand(initialValue, argType, result->operands))) {
+        failed(parser.parseRParen()) ||
+        failed(parser.parseColonType(argType))) {
       return failure();
     }
-    regionArgs.push_back(reductionRegionArgs[0]);
-    regionArgTypes.push_back(argType);
-    regionArgs.push_back(reductionRegionArgs[1]);
-    regionArgTypes.push_back(argType);
+    invocationRegionArgs.push_back(reductionRegionArgs[0]);
+    invocationRegionArgTypes.push_back(argType);
+    invocationRegionArgs.push_back(reductionRegionArgs[1]);
+    invocationRegionArgTypes.push_back(argType);
   } while (succeeded(parser.parseOptionalComma()));
-  if (failed(parser.parseRParen())) {
+  SmallVector<Type, 4> invocationResultTypes;
+  if (failed(parser.parseRParen()) ||
+      failed(parser.parseArrowTypeList(invocationResultTypes))) {
     return failure();
   }
 
-  // Parse region body.
-  Region *body = result->addRegion();
-  if (failed(parser.parseRegion(*body, regionArgs, regionArgTypes)) ||
+  // Parse invocation body.
+  Region *invocationRegion = result->addRegion();
+  if (failed(parser.parseRegion(*invocationRegion, invocationRegionArgs,
+                                invocationRegionArgTypes)) ||
       failed(parser.parseOptionalAttrDict(result->attributes))) {
     return failure();
   }
@@ -455,39 +471,56 @@ void printReductionRegionOp(OpAsmPrinter &p, ReductionRegionOp op) {
   p.printType(op.workload().getType());
   p << "]";
 
+  auto &dispatchBlock = op.dispatch().front();
   p << "(";
-  p.printOperands(op.operands());
+  interleaveComma(llvm::zip(dispatchBlock.getArguments(), op.operands()), p,
+                  [&](std::tuple<BlockArgument, Value> it) {
+                    p << std::get<0>(it) << " = " << std::get<1>(it);
+                    p << " : ";
+                    p << std::get<1>(it).getType();
+                  });
+  p << ", ";
+  interleaveComma(
+      llvm::zip(dispatchBlock.getArguments().slice(op.operands().size()),
+                op.initial_values()),
+      p, [&](std::tuple<BlockArgument, Value> it) {
+        p << std::get<0>(it) << " = " << std::get<1>(it);
+        p << " : ";
+        p << std::get<1>(it).getType();
+      });
   p << ")";
   if (op.getNumResults() > 0) {
-    p << " : (";
-    interleaveComma(op.operands(), p,
-                    [&](Value operand) { p.printType(operand.getType()); });
-    p << ")";
     p << " -> ";
     if (op.getNumResults() > 1) p << "(";
     interleaveComma(op.getResultTypes(), p);
     if (op.getNumResults() > 1) p << ")";
   }
-  p << "\n";
+  p.printRegion(op.dispatch(), /*printEntryBlockArgs=*/false);
 
-  p << "      invocation(";
-  auto &entryBlock = op.body().getBlocks().front();
+  p << " invocation(";
+  auto invocationType = op.getInvocationType();
+  auto &entryBlock = op.invocation().getBlocks().front();
   int regionArgIndex = 0;
-  interleaveComma(op.initial_values(), p, [&](Value operand) {
+  interleaveComma(invocationType.getInputs(), p, [&](Type operandType) {
     p << "(";
     p.printOperand(entryBlock.getArgument(regionArgIndex++));
     p << ", ";
     p.printOperand(entryBlock.getArgument(regionArgIndex++));
-    p << ") = ";
-    p.printOperand(operand);
-    p << " : ";
-    p.printType(operand.getType());
+    p << ") : ";
+    p.printType(operandType);
   });
-  p << ") ";
+  p << ")";
+  p.printArrowTypeList(invocationType.getResults());
+  p.printRegion(op.invocation(), /*printEntryBlockArgs=*/false);
 
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
   p.printOptionalAttrDict(op.getAttrs(),
                           /*elidedAttrs=*/{});
+}
+
+FunctionType ReductionRegionOp::getInvocationType() {
+  return FunctionType::get(llvm::to_vector<4>(initial_values().getTypes()),
+                           llvm::to_vector<4>(initial_values().getTypes()),
+                           getContext());
 }
 
 //===----------------------------------------------------------------------===//
@@ -532,6 +565,7 @@ void WindowedReductionRegionOp::build(
                                          static_cast<int32_t>(paddingMode)));
   state.addAttributes(attributes);
   state.addRegion();
+  state.addRegion();
   state.setOperandListToResizable();
 }
 
@@ -553,36 +587,41 @@ void printWindowedReductionRegionOp(OpAsmPrinter &p,
 
   p << "(";
   p.printOperands(op.operands());
+  p << ", ";
+  p.printOperands(op.initial_values());
   p << ")";
   if (op.getNumResults() > 0) {
-    p << " : (";
-    interleaveComma(op.operands(), p,
-                    [&](Value operand) { p.printType(operand.getType()); });
-    p << ")";
-    p << " -> (";
+    p << " -> ";
+    if (op.getNumResults() > 1) p << "(";
     interleaveComma(op.getResultTypes(), p);
-    p << ")";
+    if (op.getNumResults() > 1) p << ")";
   }
-  p << "\n";
+  p.printRegion(op.dispatch(), /*printEntryBlockArgs=*/false);
 
-  p << "      invocation(";
-  auto &entryBlock = op.body().getBlocks().front();
+  p << " invocation(";
+  auto invocationType = op.getInvocationType();
+  auto &entryBlock = op.invocation().getBlocks().front();
   int regionArgIndex = 0;
-  interleaveComma(op.initial_values(), p, [&](Value operand) {
+  interleaveComma(invocationType.getInputs(), p, [&](Type operandType) {
     p << "(";
     p.printOperand(entryBlock.getArgument(regionArgIndex++));
     p << ", ";
     p.printOperand(entryBlock.getArgument(regionArgIndex++));
-    p << ") = ";
-    p.printOperand(operand);
-    p << " : ";
-    p.printType(operand.getType());
+    p << ") : ";
+    p.printType(operandType);
   });
-  p << ") ";
+  p << ")";
+  p.printArrowTypeList(invocationType.getResults());
+  p.printRegion(op.invocation(), /*printEntryBlockArgs=*/false);
 
-  p.printRegion(op.body(), /*printEntryBlockArgs=*/false);
   p.printOptionalAttrDict(op.getAttrs(),
                           /*elidedAttrs=*/{});
+}
+
+FunctionType WindowedReductionRegionOp::getInvocationType() {
+  return FunctionType::get(llvm::to_vector<4>(initial_values().getTypes()),
+                           llvm::to_vector<4>(initial_values().getTypes()),
+                           getContext());
 }
 
 //===----------------------------------------------------------------------===//

@@ -56,29 +56,28 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
 LogicalResult outlineDispatchRegion(
     DispatchRegionOp regionOp, int outlinedRegionOrdinal,
     llvm::StringMap<FuncOp> &dispatchableFuncOps) {
-  // Build function type matching 1:1 with the region signature.
-  SmallVector<Type, 8> operandTypes(
-      Operation::operand_type_range{regionOp.args()});
-  auto functionType = FunctionType::get(operandTypes, regionOp.getResultTypes(),
-                                        regionOp.getContext());
+  // Create the dispatch function.
+  auto parentFuncOp = regionOp.getParentOfType<FuncOp>();
+  std::string namePrefix = parentFuncOp.getName().str() + "_ex_dispatch_" +
+                           std::to_string(outlinedRegionOrdinal);
+  auto dispatchFuncOp =
+      createRegionFunction(regionOp.getLoc(), namePrefix, regionOp.body());
 
   // Create the executable with the region cloned into it.
-  ExecutableOp executableOp;
-  FuncOp outlinedFuncOp;
-  std::tie(executableOp, outlinedFuncOp) = createRegionExecutable(
-      regionOp, functionType,
-      "_dispatch_" + std::to_string(outlinedRegionOrdinal),
-      dispatchableFuncOps);
+  auto executableOp = createExecutable(
+      regionOp.getLoc(), namePrefix, {dispatchFuncOp},
+      parentFuncOp.getParentOfType<ModuleOp>(), dispatchableFuncOps);
+  executableOp.getOperation()->moveBefore(parentFuncOp);
 
   // Add dispatch export pointing at the function.
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<DispatchEntryOp>(
-      regionOp.getLoc(), builder.getStringAttr(outlinedFuncOp.getName()),
-      builder.getSymbolRefAttr(outlinedFuncOp), DenseIntElementsAttr{});
+      regionOp.getLoc(), builder.getStringAttr(dispatchFuncOp.getName()),
+      builder.getSymbolRefAttr(dispatchFuncOp), DenseIntElementsAttr{});
 
   // Finally convert the dispatch region into a dispatch to the outlined func.
   return convertToDispatchOp(regionOp, executableOp, entryPointOp,
-                             outlinedFuncOp);
+                             dispatchFuncOp);
 }
 
 }  // namespace

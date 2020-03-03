@@ -108,6 +108,10 @@ static void makeLegacyExecutableReductionABI(
                  IntegerAttr::get(IntegerType::get(32, context),
                                   reductionEntryOp.dimension()));
 
+  // Remove any blocks that may exist within the implementation function as the
+  // backend will be replacing the body with its own implementation.
+  implOp.getBlocks().clear();
+
   // Destroy the IO op and replace with the original entry.
   SymbolTable::setSymbolVisibility(implOp, SymbolTable::Visibility::Public);
   auto originalName = thunkOp.getName();

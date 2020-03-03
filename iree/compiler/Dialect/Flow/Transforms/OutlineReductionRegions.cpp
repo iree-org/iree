@@ -80,29 +80,8 @@ std::pair<ExecutableOp, ReductionEntryOp> createReductionExecutable(
     int separatedReductionIndex, int reductionDimension,
     SmallVector<Value, 4> initialValues, SmallVector<Value, 4> inputs,
     llvm::StringMap<FuncOp> &dispatchableFuncOps) {
-  // Build function type matching 1:1 with the region signature.
-  SmallVector<Type, 8> elementalOperandTypes;
-  SmallVector<Type, 8> elementalResultTypes;
-  for (auto arg : regionOp.initial_values()) {
-    // (in0, in1) -> out0
-    elementalOperandTypes.push_back(arg.getType());
-    elementalOperandTypes.push_back(arg.getType());
-    elementalResultTypes.push_back(arg.getType());
-  }
-  auto elementalFunctionType = FunctionType::get(
-      elementalOperandTypes, elementalResultTypes, regionOp.getContext());
-
-  // Create the executable with the region cloned into it.
-  ExecutableOp executableOp;
-  FuncOp elementalFuncOp;
-  std::tie(executableOp, elementalFuncOp) = createRegionExecutable(
-      regionOp, elementalFunctionType,
-      "_reduce_" + std::to_string(outlinedRegionOrdinal) + "_dim_" +
-          std::to_string(separatedReductionIndex),
-      dispatchableFuncOps);
-
   // Create a new entry point that we can use with the signature for this
-  // dimension.
+  // single dimension we are operating on.
   SmallVector<Type, 8> allOperandTypes;
   auto inputTypes =
       llvm::map_range(inputs, [](Value value) { return value.getType(); });
@@ -118,20 +97,33 @@ std::pair<ExecutableOp, ReductionEntryOp> createReductionExecutable(
         shapedType.getElementType());
     resultTypes.push_back(reducedType);
   }
-  auto entryFuncType =
+  auto dispatchFuncType =
       FunctionType::get(allOperandTypes, resultTypes, regionOp.getContext());
-  auto entryFuncOp = FuncOp::create(
-      regionOp.getLoc(), (elementalFuncOp.getName() + "_entry").str(),
-      entryFuncType);
-  elementalFuncOp.getOperation()->getBlock()->push_back(entryFuncOp);
-  entryFuncOp.getOperation()->moveBefore(elementalFuncOp);
+
+  // Create the dispatch and invocation functions.
+  auto parentFuncOp = regionOp.getParentOfType<FuncOp>();
+  std::string namePrefix = parentFuncOp.getName().str() + "_reduce_" +
+                           std::to_string(outlinedRegionOrdinal) + "_dim_" +
+                           std::to_string(separatedReductionIndex);
+  std::string dispatchFuncName = namePrefix + "_dispatch";
+  auto dispatchFuncOp =
+      FuncOp::create(regionOp.getLoc(), dispatchFuncName, dispatchFuncType);
+  std::string invocationFuncName = namePrefix + "_invocation";
+  auto invocationFuncOp = createRegionFunction(
+      regionOp.getLoc(), invocationFuncName, regionOp.invocation());
+
+  // Create the executable with the region cloned into it.
+  auto executableOp = createExecutable(
+      regionOp.getLoc(), namePrefix, {dispatchFuncOp, invocationFuncOp},
+      parentFuncOp.getParentOfType<ModuleOp>(), dispatchableFuncOps);
+  executableOp.getOperation()->moveBefore(parentFuncOp);
 
   // Add dispatch export pointing at the function.
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<ReductionEntryOp>(
-      regionOp.getLoc(), builder.getStringAttr(entryFuncOp.getName()),
-      builder.getSymbolRefAttr(entryFuncOp),
-      builder.getSymbolRefAttr(elementalFuncOp),
+      regionOp.getLoc(), builder.getStringAttr(dispatchFuncOp.getName()),
+      builder.getSymbolRefAttr(dispatchFuncOp),
+      builder.getSymbolRefAttr(invocationFuncOp),
       builder.getI32IntegerAttr(reductionDimension));
 
   return {executableOp, entryPointOp};
@@ -200,58 +192,30 @@ createWindowedReductionExecutable(
     int32_t baseDilation, int32_t windowDilation,
     SmallVector<Value, 4> initialValues, SmallVector<Value, 4> inputs,
     llvm::StringMap<FuncOp> &dispatchableFuncOps) {
-  // Build function type matching 1:1 with the region signature.
-  SmallVector<Type, 8> elementalOperandTypes;
-  SmallVector<Type, 8> elementalResultTypes;
-  for (auto arg : regionOp.initial_values()) {
-    // (in0, in1) -> out0
-    elementalOperandTypes.push_back(arg.getType());
-    elementalOperandTypes.push_back(arg.getType());
-    elementalResultTypes.push_back(arg.getType());
-  }
-  auto elementalFunctionType = FunctionType::get(
-      elementalOperandTypes, elementalResultTypes, regionOp.getContext());
+  // Create the dispatch and invocation functions.
+  auto parentFuncOp = regionOp.getParentOfType<FuncOp>();
+  std::string namePrefix = parentFuncOp.getName().str() + "_reduce_" +
+                           std::to_string(outlinedRegionOrdinal) + "_dim_" +
+                           std::to_string(separatedReductionIndex);
+  std::string dispatchFuncName = namePrefix + "_dispatch";
+  auto dispatchFuncOp = createRegionFunction(
+      regionOp.getLoc(), dispatchFuncName, regionOp.dispatch());
+  std::string invocationFuncName = namePrefix + "_invocation";
+  auto invocationFuncOp = createRegionFunction(
+      regionOp.getLoc(), invocationFuncName, regionOp.invocation());
 
   // Create the executable with the region cloned into it.
-  ExecutableOp executableOp;
-  FuncOp elementalFuncOp;
-  std::tie(executableOp, elementalFuncOp) = createRegionExecutable(
-      regionOp, elementalFunctionType,
-      "_reduce_" + std::to_string(outlinedRegionOrdinal) + "_dim_" +
-          std::to_string(separatedReductionIndex),
-      dispatchableFuncOps);
-
-  // Create a new entry point that we can use with the signature for this
-  // dimension.
-  SmallVector<Type, 8> allOperandTypes;
-  auto inputTypes =
-      llvm::map_range(inputs, [](Value value) { return value.getType(); });
-  allOperandTypes.append(inputTypes.begin(), inputTypes.end());
-  auto initialValueTypes = llvm::map_range(
-      initialValues, [](Value value) { return value.getType(); });
-  allOperandTypes.append(initialValueTypes.begin(), initialValueTypes.end());
-  SmallVector<Type, 4> resultTypes;
-  for (auto resultType : llvm::enumerate(regionOp.getResultTypes())) {
-    auto shapedType = resultType.value().cast<ShapedType>();
-    auto reducedType = RankedTensorType::get(
-        calculateResultShape(inputs[resultType.index()], windowDimension),
-        shapedType.getElementType());
-    resultTypes.push_back(reducedType);
-  }
-  auto entryFuncType =
-      FunctionType::get(allOperandTypes, resultTypes, regionOp.getContext());
-  auto entryFuncOp = FuncOp::create(
-      regionOp.getLoc(), (elementalFuncOp.getName() + "_entry").str(),
-      entryFuncType);
-  elementalFuncOp.getOperation()->getBlock()->push_back(entryFuncOp);
-  entryFuncOp.getOperation()->moveBefore(elementalFuncOp);
+  auto executableOp = createExecutable(
+      regionOp.getLoc(), namePrefix, {dispatchFuncOp, invocationFuncOp},
+      parentFuncOp.getParentOfType<ModuleOp>(), dispatchableFuncOps);
+  executableOp.getOperation()->moveBefore(parentFuncOp);
 
   // Add dispatch export pointing at the function.
   OpBuilder builder(executableOp.body());
   auto entryPointOp = builder.create<WindowedReductionEntryOp>(
-      regionOp.getLoc(), builder.getStringAttr(entryFuncOp.getName()),
-      builder.getSymbolRefAttr(entryFuncOp),
-      builder.getSymbolRefAttr(elementalFuncOp),
+      regionOp.getLoc(), builder.getStringAttr(dispatchFuncOp.getName()),
+      builder.getSymbolRefAttr(dispatchFuncOp),
+      builder.getSymbolRefAttr(invocationFuncOp),
       builder.getI32IntegerAttr(windowDimension),
       builder.getI32IntegerAttr(windowStride),
       builder.getI32IntegerAttr(baseDilation),

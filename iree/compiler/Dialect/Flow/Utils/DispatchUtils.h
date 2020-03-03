@@ -47,13 +47,17 @@ bool isOpOfKnownDialect(Operation *op);
 LogicalResult buildDispatchRegion(Block *parentBlock, Value workload,
                                   ArrayRef<Operation *> ops);
 
-// Creates an executable containing exported function containing the body region
-// of |op|. Created executables will be named for their original function
-// concatenated with |symbolSuffix|. All functions reachable by the region will
-// be added to the executable by looking them up in |dispatchableFuncOps|.
-std::pair<IREE::Flow::ExecutableOp, FuncOp> createRegionExecutable(
-    Operation *op, FunctionType functionType, StringRef symbolSuffix,
-    llvm::StringMap<FuncOp> &dispatchableFuncOps);
+// Creates a flow.executable out of a set of functions, pulling in all other
+// functions reachable by the provided functions.
+ExecutableOp createExecutable(Location loc, StringRef executableName,
+                              ArrayRef<FuncOp> funcOps, ModuleOp parentModuleOp,
+                              llvm::StringMap<FuncOp> &dispatchableFuncOps);
+
+// Converts a region body to a function.
+// The region entry block args and return terminators are used to derive the
+// function type.
+FuncOp createRegionFunction(Location loc, StringRef functionName,
+                            Region &region);
 
 }  // namespace Flow
 }  // namespace IREE
