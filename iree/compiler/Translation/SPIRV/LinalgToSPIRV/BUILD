@@ -30,7 +30,7 @@ cc_library(
         "//iree/compiler/Translation/CodegenUtils",
         "//iree/compiler/Translation/XLAToLinalg",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:GPUDialect",

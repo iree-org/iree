@@ -39,7 +39,7 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/Passes",
         "//iree/compiler/Translation/SPIRV/ReductionCodegen",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:AffineDialect",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
