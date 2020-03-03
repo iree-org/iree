@@ -68,6 +68,26 @@ cc_binary(
 )
 
 cc_library(
+    name = "PassesAndDialects",
+    hdrs = [
+        "init_passes.h",
+        "init_dialects.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:GPUToVulkanTransforms",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgToLLVM",
+        "@llvm-project//mlir:LinalgToSPIRV",
+        "@llvm-project//mlir:LoopOpsTransforms",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:QuantizerTransforms",
+    ],
+)
+
+cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [

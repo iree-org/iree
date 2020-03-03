@@ -147,6 +147,25 @@ iree_cc_test(
 )
 
 if(${IREE_BUILD_COMPILER})
+
+  iree_cc_library(
+    NAME
+      PassesAndDialects
+    HDRS
+      "init_passes.h"
+      "init_dialects.h"
+    DEPS
+      MLIRAffineOps
+      MLIRGPUtoVulkanTransforms
+      MLIRLinalgOps
+      MLIRLinalgToLLVM
+      MLIRLinalgToSPIRVTransforms
+      MLIRLoopOpsTransforms
+      MLIRSPIRVTransforms
+      MLIRStandardOps
+      MLIRQuantizerTransforms
+  )
+
   # Logic to identify targets_to_link adopted from MLIR:
   # Manually expand the target library, since our MLIR libraries
   # aren't plugged into the LLVM dependency tracking. If we don't
