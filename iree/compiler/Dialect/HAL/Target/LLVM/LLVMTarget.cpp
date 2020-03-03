@@ -69,6 +69,9 @@ void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   // HLO reduction -> Linalg.
   pm.addPass(createHLOReductionToLinalgPass());
 
+  // HLO -> Linalg named ops.
+  pm.addPass(createXLAToLinalgOpsOnBufferPass());
+
   // Linalg Tensors -> memrefs pass.
   pm.addPass(createLinalgTensorToBufferConversionPass());
 
