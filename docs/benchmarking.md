@@ -17,7 +17,7 @@ many different variables, like an integration test. For finer-grained
 measurements more akin to unit tests, see [Microbenchmarks](#microbenchmarks)
 and [Tracing](#tracing).
 
-To use `iree-benchmark-module` generate an IREE module for the target backend:
+To use `iree-benchmark-module`, generate an IREE module for the target backend:
 
 ```shell
 $ bazel run //iree/tools:iree-translate -- \
@@ -59,30 +59,20 @@ BM_RunModule/process_time/real_time     218193 ns       231884 ns         3356
 Notice that there are a few warnings in there (you may not see all of these).
 The benchmark library helpfully warns about some common issues that will affect
 benchmark timing. When trying to obtain real benchmark numbers, you should
-generally build an optimized build (`-c opt` in Bazel) and disable CPU scaling.
-
-Another thing to consider is that depending on where you are running the
-benchmark you might want to avoid additional programs running at the same time.
-Bazel itself runs a server even when it's not being actively invoked that can be
-quite a memory hog, so we'll instead invoke the binary directly. First make sure
-that you've built an optimized binary.
+generally build an optimized build (`-c opt` in Bazel) and
+[disable CPU scaling](#cpu-configuration).
 
 ```shell
 $ bazel build -c opt //iree/tools:iree-benchmark-module
 ```
 
-Disable CPU scaling. On Linux, benchmark provides some
-[instructions](https://github.com/google/benchmark#disabling-cpu-frequency-scaling):
-
-Use your favorite process manager (e.g. [htop](https://hisham.hm/htop/) or
+Another thing to consider is that depending on where you are running the
+benchmark you might want to avoid additional programs running at the same time.
+Bazel itself runs a server even when it's not being actively invoked that can be
+quite a memory hog, so we'll instead invoke the binary directly. Use your
+favorite process manager (e.g. [htop](https://hisham.hm/htop/) or
 [pkill](https://en.wikipedia.org/wiki/Pkill) on Linux) to kill heavy-weight
 programs such as Chrome and Bazel.
-
-```shell
-$ sudo cpupower frequency-set --governor performance
-```
-
-TODO(scotttodd): Windows instructions
 
 Now we'll actually invoke the binary:
 
@@ -108,11 +98,7 @@ Benchmark                                    Time             CPU   Iterations
 BM_RunModule/process_time/real_time      11416 ns        14202 ns        61654
 ```
 
-Remember to restore cpu scaling when you're done:
-
-```shell
-$ sudo cpupower frequency-set --governor powersave
-```
+Remember to [restore cpu scaling](#cpu-configuration) when you're done.
 
 ## Microbenchmarks
 
@@ -130,3 +116,67 @@ IREE is instrumented with the C++ bindings from the
 [Google Web Tracing Framework](https://github.com/google/tracing-framework).
 
 TODO(benvanik): Talk about WTF
+
+## CPU Configuration
+
+When benchmarking, it's important to consider the configuration of your CPUs.
+Most notably, CPU scaling can give variable results, so you'll usually want to
+disable it. This can get pretty complex, but the most basic thing to do is to
+run all CPUs at maximum frequency.
+
+### Linux
+
+Google benchmark provides some
+[instructions](https://github.com/google/benchmark#disabling-cpu-frequency-scaling):
+
+Before benchmarking:
+
+```shell
+$ sudo cpupower frequency-set --governor performance
+```
+
+```shell
+$ sudo cpupower frequency-set --governor powersave
+```
+
+### Android
+
+Android doesn't give us quite as nice tooling, but the principle is basically
+the same. You will likely need to be root (use `su` or `adb root`). The commands
+will depend on your exact phone and number of cores. First play around and make
+sure you understand what everything means.
+
+Some useful commands:
+
+```shell
+$ cat /proc/cpuinfo
+$ cat /sys/devices/system/cpu/possible
+$ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_governors
+$ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor
+$ cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_available_frequencies
+$ cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_max_freq
+$ cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_min_freq
+$ cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq
+$ cat /sys/devices/system/cpu/cpu0/cpufreq/affected_cpus
+$ cat /sys/devices/system/cpu/cpu0/online
+```
+
+One common case is if you want to set the quota governor of 8 CPUs for
+performance. Make sure to check their current settings first so you can put them
+back when you're done.
+
+```shell
+$ for i in `seq 0 7`; do cat "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; done
+```
+
+```shell
+$ for i in `seq 0 7`; do echo performance > "/sys/devices/system/cpu/cpu${i?}/cpufreq/scaling_governor"; done
+```
+
+and then double check that all CPUs are now at their maximum frequency
+
+```shell
+$ for i in `seq 0 7`; do paste "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_cur_freq" "/sys/devices/system/cpu/cpu${i?}/cpufreq/cpuinfo_max_freq"; done
+```
+
+TODO(scotttodd): Windows instructions
