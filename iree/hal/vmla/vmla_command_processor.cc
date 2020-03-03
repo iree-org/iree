@@ -17,7 +17,9 @@
 #include "iree/base/api_util.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/host/host_buffer.h"
 #include "iree/hal/vmla/vmla_executable.h"
+#include "iree/hal/vmla/vmla_module.h"
 #include "iree/vm/invocation.h"
 #include "iree/vm/variant_list.h"
 
@@ -27,22 +29,23 @@ namespace vmla {
 
 namespace {
 
-using UniqueVariantList =
-    std::unique_ptr<iree_vm_variant_list_t, void (*)(iree_vm_variant_list_t*)>;
+Status MarshalIO(Interface* interface,
+                 const DispatchRequest& dispatch_request) {
+  IREE_TRACE_SCOPE0("VMLACommandProcessor::MarshalIO");
 
-StatusOr<UniqueVariantList> MarshalIO(const DispatchRequest& dispatch_request) {
-  iree_vm_variant_list_t* io_list_ptr = nullptr;
-  RETURN_IF_ERROR(FromApiStatus(
-      iree_vm_variant_list_alloc(dispatch_request.bindings.size(),
-                                 IREE_ALLOCATOR_SYSTEM, &io_list_ptr),
-      IREE_LOC));
-  auto io_list = UniqueVariantList(
-      io_list_ptr,
-      [](iree_vm_variant_list_t* ptr) { iree_vm_variant_list_free(ptr); });
+  for (int i = 0; i < dispatch_request.bindings.size(); ++i) {
+    const auto& binding = dispatch_request.bindings[i];
+    void* data = static_cast<HostBuffer*>(binding.buffer->allocated_buffer())
+                     ->mutable_data();
+    data = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(data) +
+                                   binding.buffer->byte_offset());
+    ASSIGN_OR_RETURN(auto buffer,
+                     Buffer::WrapMutable(data, binding.buffer->byte_length(),
+                                         IREE_ALLOCATOR_NULL));
+    RETURN_IF_ERROR(interface->SetBinding(0, i, {std::move(buffer)}));
+  }
 
-  // TODO(benvanik): marshal buffers into byte buffers.
-
-  return std::move(io_list);
+  return OkStatus();
 }
 
 }  // namespace
@@ -63,13 +66,13 @@ Status VMLACommandProcessor::Dispatch(const DispatchRequest& dispatch_request) {
            << "Invalid entry point ordinal " << dispatch_request.entry_point;
   }
 
-  ASSIGN_OR_RETURN(UniqueVariantList io_list, MarshalIO(dispatch_request));
+  RETURN_IF_ERROR(MarshalIO(executable->interface(), dispatch_request));
   return FromApiStatus(
       iree_vm_invoke(
           executable->context(),
           executable->entry_functions()[dispatch_request.entry_point],
-          /*policy=*/nullptr, io_list.get(), /*outputs=*/nullptr,
-          IREE_ALLOCATOR_SYSTEM),
+          /*policy=*/nullptr, executable->interface_inputs(),
+          /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
       IREE_LOC);
 }
 

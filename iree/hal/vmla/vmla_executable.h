@@ -26,10 +26,13 @@
 #include "iree/vm/context.h"
 #include "iree/vm/instance.h"
 #include "iree/vm/module.h"
+#include "iree/vm/variant_list.h"
 
 namespace iree {
 namespace hal {
 namespace vmla {
+
+class Interface;
 
 class VMLAExecutable final : public Executable {
  public:
@@ -56,6 +59,12 @@ class VMLAExecutable final : public Executable {
     return absl::MakeConstSpan(entry_functions_);
   }
 
+  // ABI vmla.interface binding block.
+  Interface* interface() const { return interface_; }
+
+  // Entry point inputs list of a single vmla.interface.
+  iree_vm_variant_list_t* interface_inputs() const { return interface_inputs_; }
+
  private:
   Status Initialize(iree_vm_instance_t* instance,
                     iree_vm_module_t* vmla_module);
@@ -65,6 +74,8 @@ class VMLAExecutable final : public Executable {
 
   iree_vm_context_t* context_ = nullptr;
   absl::InlinedVector<iree_vm_function_t, 4> entry_functions_;
+  Interface* interface_ = nullptr;
+  iree_vm_variant_list_t* interface_inputs_ = nullptr;
 };
 
 }  // namespace vmla

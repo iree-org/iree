@@ -76,9 +76,11 @@ iree_cc_library(
     "vmla_command_processor.cc"
   DEPS
     ::vmla_executable
+    ::vmla_module
     iree::base::api_util
     iree::base::status
     iree::base::tracing
+    iree::hal::host::host_buffer
     iree::hal::host::host_local_command_processor
     iree::vm::invocation
     iree::vm::variant_list
@@ -156,6 +158,7 @@ iree_cc_library(
   SRCS
     "vmla_executable.cc"
   DEPS
+    ::vmla_module
     absl::inlined_vector
     absl::span
     iree::base::api_util
@@ -164,10 +167,13 @@ iree_cc_library(
     iree::hal::allocator
     iree::hal::executable
     iree::hal::executable_spec
+    iree::schemas::vmla_executable_def_cc_fbs
     iree::vm::bytecode_module
     iree::vm::context
     iree::vm::instance
+    iree::vm::invocation
     iree::vm::module
+    iree::vm::variant_list
   PUBLIC
 )
 
@@ -184,6 +190,7 @@ iree_cc_library(
     iree::base::api
     iree::base::memory
     iree::base::ref_ptr
+    iree::base::status
     iree::base::tracing
     iree::vm
     iree::vm::module_abi_cc

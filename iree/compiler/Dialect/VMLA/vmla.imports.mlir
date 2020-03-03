@@ -18,6 +18,20 @@
 vm.module @vmla {
 
 //===----------------------------------------------------------------------===//
+// VMLA Ops: ABI
+//===----------------------------------------------------------------------===//
+
+vm.import @interface.current() -> !vm.ref<!vmla.interface>
+attributes {nosideeffects}
+
+vm.import @interface.binding(
+  %interface : !vm.ref<!vmla.interface>,
+  %set : i32,
+  %binding : i32
+) -> !vm.ref<!vmla.buffer>
+attributes {nosideeffects}
+
+//===----------------------------------------------------------------------===//
 // VMLA Ops: buffer manipulation
 //===----------------------------------------------------------------------===//
 
@@ -375,15 +389,5 @@ vm.import @reduce.max.f32(
   %dimension : i32,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
-
-//===----------------------------------------------------------------------===//
-// VMLA Ops: ABI
-//===----------------------------------------------------------------------===//
-
-vm.import @interface.binding(
-  %interface : !vm.ref<!vmla.interface>,
-  %set : i32,
-  %binding : i32
-) -> !vm.ref<!vmla.buffer>
 
 }  // module

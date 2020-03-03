@@ -34,6 +34,9 @@ class HostBuffer : public Buffer {
 
   ~HostBuffer() override;
 
+  const void* data() const { return data_; }
+  void* mutable_data() { return data_; }
+
  protected:
   Status FillImpl(device_size_t byte_offset, device_size_t byte_length,
                   const void* pattern, device_size_t pattern_length) override;
