@@ -43,6 +43,8 @@ function(iree_bytecode_module)
     ${ARGN}
   )
 
+string(REPLACE " " ";" _RULE_TRANSLATION ${_RULE_TRANSLATION})
+
   if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
     # Set defaults for TRANSLATION and TRANSLATE_TOOL
     if(DEFINED _RULE_TRANSLATION)
