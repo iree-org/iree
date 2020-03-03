@@ -1,4 +1,4 @@
-# Copyright 2020 Google LLC
+# Copyright 2019 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,5 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(IR)
-add_subdirectory(Utils)
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+cc_library(
+    name = "Utils",
+    srcs = [
+        "TargetEnvUtils.cpp",
+    ],
+    hdrs = [
+        "TargetEnvUtils.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/Vulkan/IR",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:Support",
+    ],
+    alwayslink = 1,
+)

@@ -94,8 +94,8 @@ ArrayAttr TargetEnvAttr::getExtensionsAttr() {
   return getImpl()->extensions.cast<ArrayAttr>();
 }
 
-DictionaryAttr TargetEnvAttr::getCore10Properties() {
-  return getImpl()->core10Properties.cast<DictionaryAttr>();
+Core10PropertiesAttr TargetEnvAttr::getCore10Properties() {
+  return getImpl()->core10Properties.cast<Core10PropertiesAttr>();
 }
 
 LogicalResult TargetEnvAttr::verifyConstructionInvariants(

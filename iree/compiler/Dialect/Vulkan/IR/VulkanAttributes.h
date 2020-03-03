@@ -68,7 +68,7 @@ class TargetEnvAttr
   ArrayAttr getExtensionsAttr();
 
   /// Returns the Vulkan 1.0 core properties.
-  DictionaryAttr getCore10Properties();
+  Core10PropertiesAttr getCore10Properties();
 
   static bool kindof(unsigned kind) { return kind == AttrKind::TargetEnv; }
 

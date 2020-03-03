@@ -46,7 +46,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32} {
-// VKSPV-NEXT:     module {
+// VKSPV-NEXT:     module attributes {spv.target_env = #spv.target_env<V_1_3, [], [], {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[64, 4, 4]> : vector<3xi32>}>} {
 // VKSPV-NEXT:       spv.module "Logical" "GLSL450" {
 //  VKSPV-DAG:         spv.globalVariable [[GLOBALID:@.*]] built_in("GlobalInvocationId")
 //  VKSPV-DAG:         spv.globalVariable [[NUMWORKGROUPS:@.*]] built_in("NumWorkgroups")

@@ -15,7 +15,10 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_VULKANSPIRV_VULKANSPIRVTARGET_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_VULKANSPIRV_VULKANSPIRVTARGET_H_
 
+#include <string>
+
 #include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -24,11 +27,16 @@ namespace HAL {
 
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
-  // TODO(benvanik): target configuration.
+  // Use the XLA HLO to Linalg to SPIR-V pass pipeline.
+  bool useLinalgToSPIRVPath = false;
+  // Workgroup size to use for XLA HLO to Linalg to SPIR-V path.
+  SmallVector<int64_t, 3> linalgToSPIRVWorkgroupSize;
+  // Vulkan target environment as #vk.target_env attribute assembly.
+  std::string vulkanTargetEnv;
 };
 
-// Returns a VulkanSPIRVTargetOptions struct initialized with the
-// --iree-hal-vulkan-spirv-* flags.
+// Returns a VulkanSPIRVTargetOptions struct initialized with Vulkan/SPIR-V
+// related command-line flags.
 VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags();
 
 // Translates an executable to the Vulkan/SPIR-V backend with the given options.

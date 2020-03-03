@@ -19,6 +19,8 @@
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
+#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
+#include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels/EmbeddedKernels.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
@@ -29,8 +31,10 @@
 #include "mlir/Dialect/SPIRV/Passes.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/Serialization.h"
+#include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Module.h"
+#include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
@@ -42,28 +46,51 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// TODO(benvanik): add flags.
+// TODO(antiagainst): Enable option categories once the following bug is fixed:
+// https://bugs.llvm.org/show_bug.cgi?id=44223
 // static llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
 //     "IREE Vulkan/SPIR-V backend options");
 
 // TODO(ravishankarm): Flags to test the Linalg To SPIR-V path. Need a better
 // way to handle these options.
-#define USE_LINALG_TO_SPIRV "iree-use-linalg-to-spirv-path"
-
-static llvm::cl::opt<bool> useLinalgPathForCodegen(
-    USE_LINALG_TO_SPIRV,
-    llvm::cl::desc(
-        "Flag to use the XLA-HLO to Linalg To SPIR-V pass pipeline."),
+static llvm::cl::opt<bool> clUseLinalgPath(
+    "iree-use-linalg-to-spirv-path",
+    llvm::cl::desc("Use the XLA-HLO to Linalg To SPIR-V pass pipeline"),
     llvm::cl::init(false));
-static llvm::cl::list<unsigned> clLinalgToSPIRVWorkGroupSize(
+
+static llvm::cl::list<unsigned> clLinalgPathWorkgroupSize(
     "iree-linalg-to-spirv-workgroup-size",
-    llvm::cl::desc("Workgroup size to use for XLA to Linalg to SPIRV path"),
+    llvm::cl::desc(
+        "Workgroup size to use for XLA-HLO to Linalg to SPIR-V path"),
     llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
+
+static llvm::cl::opt<std::string> clVulkanTargetEnv(
+    "iree-vulkan-target-env",
+    llvm::cl::desc(
+        "Vulkan target environment as #vk.target_env attribute assembly"),
+    llvm::cl::init(Vulkan::swiftShaderTargetEnvAssembly));
 
 VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   VulkanSPIRVTargetOptions targetOptions;
-  // TODO(benvanik): flags.
+
+  targetOptions.useLinalgToSPIRVPath = clUseLinalgPath;
+  for (unsigned dim : clLinalgPathWorkgroupSize)
+    targetOptions.linalgToSPIRVWorkgroupSize.push_back(dim);
+  targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
+
   return targetOptions;
+}
+
+// Returns the Vulkan target environment for conversion.
+static spirv::TargetEnvAttr getSPIRVTargetEnv(
+    const std::string &vulkanTargetEnv, MLIRContext *context) {
+  if (auto attr = mlir::parseAttribute(vulkanTargetEnv, context))
+    if (auto vkTargetEnv = attr.dyn_cast<Vulkan::TargetEnvAttr>())
+      return convertTargetEnv(vkTargetEnv);
+
+  emitError(Builder(context).getUnknownLoc())
+      << "cannot parse vulkan target environment as #vk.target_env attribute";
+  return {};
 }
 
 // Returns a list of entry point names matching the expected export ordinals.
@@ -206,6 +233,11 @@ LogicalResult translateToVulkanSPIRVExecutable(
   }
   guessEntryWorkGroupSizes(flowExecutableOp, moduleOp);
 
+  // Attach SPIR-V target environment.
+  spirv::TargetEnvAttr spvTargetEnv =
+      getSPIRVTargetEnv(targetOptions.vulkanTargetEnv, moduleOp.getContext());
+  moduleOp.setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
+
   // Try first to match against an embedded kernel (such as matmul) and
   // otherwise fall back to generating the kernel.
   iree::SpirVExecutableDefT spirvExecutableDef;
@@ -222,11 +254,9 @@ LogicalResult translateToVulkanSPIRVExecutable(
 
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
-    if (useLinalgPathForCodegen) {
-      SmallVector<int64_t, 3> workGroupSizes(
-          clLinalgToSPIRVWorkGroupSize.begin(),
-          clLinalgToSPIRVWorkGroupSize.end());
-      addLowerToSPIRVPasses(conversionPassManager, workGroupSizes);
+    if (targetOptions.useLinalgToSPIRVPath) {
+      addLowerToSPIRVPasses(conversionPassManager,
+                            targetOptions.linalgToSPIRVWorkgroupSize);
     } else {
       addIREEToSPIRVPasses(conversionPassManager);
     }
