@@ -18,8 +18,8 @@ iree_cc_library(
   HDRS
     "gtest_internal.h"
   DEPS
-    gtest
     gmock
+    gtest
   TESTONLY
   PUBLIC
 )
@@ -32,8 +32,8 @@ iree_cc_library(
   SRCS
     "gtest_main_internal.cc"
   DEPS
-    gtest
     gmock
+    gtest
     iree::base::init
   TESTONLY
   PUBLIC
