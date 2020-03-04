@@ -23,6 +23,7 @@ cc_library(
         "CleanupPlaceholders.cpp",
         "ConvertHLOToShapeDialect.cpp",
         "ExpandFunctionDynamicDims.cpp",
+        "HoistShapeCalculations.cpp",
         "MaterializeShapeCalculations.cpp",
         "Passes.cpp",
         "TieDynamicShapes.cpp",
@@ -33,6 +34,7 @@ cc_library(
     deps = [
         "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Dialect/Shape/Plugins/XLA:XlaHloShapeBuilder",
+        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",

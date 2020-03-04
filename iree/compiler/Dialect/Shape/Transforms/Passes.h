@@ -49,6 +49,10 @@ std::unique_ptr<OpPassBase<FuncOp>> createCleanupShapePlaceholdersPass();
 // dialect.
 std::unique_ptr<OpPassBase<FuncOp>> createConvertHLOToShapePass();
 
+// Best-effort hoisting of shape calculations to attempt to establish the
+// invariant that shape.tie_shape second operand dominates the first operand.
+std::unique_ptr<OpPassBase<FuncOp>> createHoistShapeCalculationsPass();
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

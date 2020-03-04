@@ -23,10 +23,12 @@ iree_cc_library(
     "CleanupPlaceholders.cpp"
     "ConvertHLOToShapeDialect.cpp"
     "ExpandFunctionDynamicDims.cpp"
+    "HoistShapeCalculations.cpp"
     "MaterializeShapeCalculations.cpp"
     "Passes.cpp"
     "TieDynamicShapes.cpp"
   DEPS
+    MLIRAnalysis
     MLIRIR
     MLIRPass
     MLIRStandardOps
