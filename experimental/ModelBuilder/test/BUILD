@@ -70,6 +70,27 @@ cc_binary(
     ],
 )
 
+# Benchmarks.
+
+cc_test(
+    name = "bench-matmul-vector-jit",
+    srcs = ["BenchMatMulVectorJIT.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@com_google_benchmark//:benchmark:benchmark_main",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
+    ],
+)
+
+# Runtime support library (for printing vectors).
+
 cc_binary(
     name = "runtime-support.so",
     linkshared = True,
