@@ -25,6 +25,10 @@ iree_bytecode_module(
     name = "simple_mul_bytecode_module",
     src = "simple_mul.mlir",
     cc_namespace = "iree::samples::vulkan",
+    flags = [
+        "-iree-mlir-to-vm-bytecode-module",
+        "-iree-hal-target-backends=vulkan-spirv",
+    ],
 )
 
 cc_binary(

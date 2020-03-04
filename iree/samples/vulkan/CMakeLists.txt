@@ -19,6 +19,9 @@ iree_bytecode_module(
     "simple_mul.mlir"
   CC_NAMESPACE
     "iree::samples::vulkan"
+  FLAGS
+    "-iree-mlir-to-vm-bytecode-module"
+    "-iree-hal-target-backends=vulkan-spirv"
 )
 
 # bazel_to_cmake: DO NOT EDIT
