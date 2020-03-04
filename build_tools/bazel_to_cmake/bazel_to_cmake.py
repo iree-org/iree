@@ -416,20 +416,28 @@ class BuildFileFunctions(object):
     "deps_block": deps_block,
     }
 
-  def cc_binary(self, name, srcs=None, deps=None, linkopts=None, **kwargs):
+  def cc_binary(self,
+                name,
+                srcs=None,
+                deps=None,
+                linkopts=None,
+                testonly=False,
+                **kwargs):
     if linkopts:
       self._convert_unimplemented_function("linkopts")
     name_block = self._convert_name_block(name)
     out_block = self._convert_out_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     deps_block = self._convert_deps_block(deps)
+    testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += """iree_cc_binary(
-%(name_block)s%(out_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
+%(name_block)s%(out_block)s%(srcs_block)s%(deps_block)s%(testonly_block)s)\n\n""" % {
     "name_block": name_block,
     "out_block": out_block,
     "srcs_block": srcs_block,
     "deps_block": deps_block,
+    "testonly_block": testonly_block,
     }
 
   def cc_embed_data(self,
