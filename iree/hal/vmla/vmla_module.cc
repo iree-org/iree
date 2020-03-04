@@ -665,6 +665,9 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("select.x16", &VMLAModuleState::SelectX16),
     vm::MakeNativeFunction("select.x32", &VMLAModuleState::SelectX32),
 
+    vm::MakeNativeFunction("broadcast.x8", &VMLAModuleState::BroadcastX8),
+    vm::MakeNativeFunction("broadcast.x16", &VMLAModuleState::BroadcastX16),
+    vm::MakeNativeFunction("broadcast.x32", &VMLAModuleState::BroadcastX32),
     vm::MakeNativeFunction("copy.x8", &VMLAModuleState::CopyX8),
     vm::MakeNativeFunction("copy.x16", &VMLAModuleState::CopyX16),
     vm::MakeNativeFunction("copy.x32", &VMLAModuleState::CopyX32),

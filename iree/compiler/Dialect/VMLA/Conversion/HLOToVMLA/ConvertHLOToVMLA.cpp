@@ -401,8 +401,6 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::XorOp, IREE::VMLA::XorOp>>(
       context, typeConverter);
-  patterns.insert<VMLAOpConversion<xla_hlo::CopyOp, IREE::VMLA::BufferCloneOp>>(
-      context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::ExpOp, IREE::VMLA::ExpOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::LogOp, IREE::VMLA::LogOp>>(
@@ -449,6 +447,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // Ops that are only used for type information that we erase. We can elide
   // these entirely by just passing on their input values.
   patterns.insert<IdentityOpConversion<xla_hlo::BitcastConvertOp>>(context);
+  patterns.insert<IdentityOpConversion<xla_hlo::CopyOp>>(context);
   patterns.insert<IdentityOpConversion<xla_hlo::ReshapeOp>>(context);
 
   // Conversions that don't have a 1:1 mapping, mostly involving buffer views

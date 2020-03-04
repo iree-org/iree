@@ -90,7 +90,12 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
   virtual std::string getImportSuffix(T op) const { return ""; }
 
   std::string getSizedTypeStr(Type elementType) const {
-    return "x" + std::to_string(elementType.getIntOrFloatBitWidth());
+    int bitWidth = elementType.getIntOrFloatBitWidth();
+    // Widen i1 -> i8 to match the VM type conversion.
+    if (bitWidth == 1) {
+      bitWidth = 8;
+    }
+    return "x" + std::to_string(bitWidth);
   }
 
   std::string getTypedTypeStr(Type type, bool forceUnsigned = false) const {
@@ -106,7 +111,13 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
     } else if (elementType.isSignlessInteger()) {
       typePrefix = forceUnsigned ? "u" : "i";
     }
-    return typePrefix + std::to_string(elementType.getIntOrFloatBitWidth());
+
+    int bitWidth = elementType.getIntOrFloatBitWidth();
+    // Widen i1 -> i8 to match the VM type conversion.
+    if (bitWidth == 1) {
+      bitWidth = 8;
+    }
+    return typePrefix + std::to_string(bitWidth);
   }
 
  private:
