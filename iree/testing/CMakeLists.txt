@@ -48,3 +48,16 @@ iree_cc_library(
   TESTONLY
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    some_test_util
+  HDRS
+    "some_test_util.h"
+  SRCS
+    "some_test_util.cc"
+  DEPS
+    ::gtest
+  TESTONLY
+  PUBLIC
+)
