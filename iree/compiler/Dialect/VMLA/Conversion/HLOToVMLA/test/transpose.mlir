@@ -11,7 +11,7 @@ func @transpose() -> tensor<24x7x10xf32> attributes { sym_visibility = "private"
   // CHECK-NEXT: "vmla.transpose"(
   // CHECK-SAME:   [[SRC]], [[SRC_SHAPE]],
   // CHECK-SAME:   [[DST]], [[DST_SHAPE]]
-  // CHECK-SAME: ) {element_type = f32, permutation = dense<[1, 0, 2]> : tensor<3xi64>}
+  // CHECK-SAME: ) {element_type = f32, permutation = dense<[1, 0, 2]> : tensor<3xi32>}
   %0 = "xla_hlo.transpose"(%input) {permutation = dense<[1, 0, 2]> : tensor<3xi64>} : (tensor<7x24x10xf32>) -> tensor<24x7x10xf32>
   // CHECK-NEXT: return [[DST]]
   return %0 : tensor<24x7x10xf32>

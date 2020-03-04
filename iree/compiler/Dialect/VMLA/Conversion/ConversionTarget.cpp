@@ -58,13 +58,42 @@ bool VMLAConversionTarget::isDynamicallyLegal(Operation *op) const {
            llvm::any_of(op->getResultTypes(), isTypeIllegal));
 }
 
+static Attribute convertAttribute(Attribute srcAttribute) {
+  auto *context = srcAttribute.getContext();
+  Type attrType = srcAttribute.getType();
+  auto elementsAttr = srcAttribute.dyn_cast<ElementsAttr>();
+  auto tensorType = attrType.dyn_cast<RankedTensorType>();
+  auto indexType = IndexType::get(context);
+  auto i64Type = IntegerType::get(64, context);
+  // Detect and convert index and i64 tensor attributes to i32 since these
+  // invariably must be imported as some kind of VM constant, and the VM is
+  // 32bit only.
+  // TODO(laurenzo): Remove the i64 match once the HLO ops are defined in terms
+  // of index for shape components (vs i64).
+  if (elementsAttr && tensorType &&
+      (tensorType.getElementType() == i64Type ||
+       tensorType.getElementType() == indexType)) {
+    auto i32Type = IntegerType::get(32, context);
+    using func_type = APInt(const APInt &);
+    return elementsAttr.mapValues(
+        i32Type, llvm::function_ref<func_type>([](const APInt &in) -> APInt {
+          int64_t inValue = in.getSExtValue();
+          return APInt(32, inValue, true);
+        }));
+  }
+
+  return srcAttribute;
+}
+
 // static
 LogicalResult VMLAConversionTarget::applyDefaultBufferRewrite(
     Operation *srcOp, ArrayRef<Value> operands, VMLAOpSemantics semantics,
     StringRef dstOpName, TypeConverter &typeConverter,
     ConversionPatternRewriter &rewriter) {
   OperationState state{srcOp->getLoc(), dstOpName};
-  state.addAttributes(srcOp->getAttrs());
+  for (auto srcAttrPair : srcOp->getAttrs()) {
+    state.addAttribute(srcAttrPair.first, convertAttribute(srcAttrPair.second));
+  }
 
   auto *dstOperation = state.name.getAbstractOperation();
   auto *opInterface = dstOperation->getInterface<IREE::VMLA::VMLAOp>();
