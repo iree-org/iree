@@ -44,8 +44,77 @@ static void flush() {
   llvm::outs().flush();
 }
 
+template <unsigned M>
+void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
+  ModelBuilder modelBuilder;
+
+  auto f32 = modelBuilder.f32;
+  auto mnVectorType = modelBuilder.getVectorType({M}, f32);
+  auto typeA = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
+  auto typeB = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
+  auto typeC = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
+
+  // 1. Build a simple vector_add.
+  {
+    auto f = modelBuilder.makeFunction(funcName, {}, {typeA, typeB, typeC});
+    OpBuilder b(&f.getBody());
+    ScopedContext scope(b, f.getLoc());
+
+    StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
+        C(f.getArgument(2));
+    auto last = std_constant_index(kNumElements - 1);
+    C(last) = A(last) + B(last);
+
+    (vector_print(*A(last)));
+    (vector_print(*B(last)));
+    (vector_print(*C(last)));
+
+    std_ret();
+  }
+
+  modelBuilder.getModuleRef()->dump();
+  flush();
+
+  // 2. Compile the function, pass in runtime support library
+  //    to the execution engine for vector.print.
+  ModelRunner runner(modelBuilder.getModuleRef());
+  runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3, runtimeSupport);
+
+  // 3. Allocate data within data structures that interoperate with the MLIR ABI
+  // conventions used by codegen.
+  auto oneInit = [](unsigned idx, Vector1D<M, float> *ptr) {
+    for (unsigned i = 0; i < M; ++i) ptr[idx][i] = 1.0f;
+  };
+  auto incInit = [](unsigned idx, Vector1D<M, float> *ptr) {
+    for (unsigned i = 0; i < M; ++i) ptr[idx][i] = 1.0f + idx * M + i;
+  };
+  auto zeroInit = [](unsigned idx, Vector1D<M, float> *ptr) {
+    for (unsigned i = 0; i < M; ++i) ptr[idx][i] = 0.0f;
+  };
+  auto A = makeInitializedStridedMemRefDescriptor<Vector1D<M, float>, 1>(
+      {kNumElements}, oneInit);
+  auto B = makeInitializedStridedMemRefDescriptor<Vector1D<M, float>, 1>(
+      {kNumElements}, incInit);
+  auto C = makeInitializedStridedMemRefDescriptor<Vector1D<M, float>, 1>(
+      {kNumElements}, zeroInit);
+
+  // 5. Call the funcOp named `funcName`.
+  const std::string kFuncAdapterName =
+      (llvm::Twine("_mlir_ciface_") + funcName).str();
+  auto *bufferA = A.get();
+  auto *bufferB = B.get();
+  auto *bufferC = C.get();
+  void *args[3] = {&bufferA, &bufferB, &bufferC};
+
+  auto err =
+      runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
+  flush();
+
+  if (err) llvm_unreachable("Error running function.");
+}
+
 template <unsigned M, unsigned N>
-void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
+void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
   ModelBuilder modelBuilder;
 
   auto f32 = modelBuilder.f32;
@@ -83,16 +152,17 @@ void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
   // 3. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
   auto oneInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
-    float *p = reinterpret_cast<float *>(ptr + idx);
-    for (unsigned i = 0; i < M * N; ++i) p[i] = 1.0f;
+    for (unsigned i = 0; i < M; ++i)
+      for (unsigned j = 0; j < N; ++j) ptr[idx][i][j] = 1.0f;
   };
   auto incInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
-    float *p = reinterpret_cast<float *>(ptr + idx);
-    for (unsigned i = 0; i < M * N; ++i) p[i] = 1.0f + i;
+    for (unsigned i = 0; i < M; ++i)
+      for (unsigned j = 0; j < N; ++j)
+        ptr[idx][i][j] = 1.0f + idx * M * N + i * N + j;
   };
   auto zeroInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
-    float *p = reinterpret_cast<float *>(ptr + idx);
-    for (unsigned i = 0; i < M * N; ++i) p[i] = 0.0f;
+    for (unsigned i = 0; i < M; ++i)
+      for (unsigned j = 0; j < N; ++j) ptr[idx][i][j] = 0.0f;
   };
   auto A = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
       {kNumElements}, oneInit);
@@ -113,9 +183,6 @@ void testVectorAdd(StringLiteral funcName, unsigned kNumElements) {
       runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
   flush();
   if (err) llvm_unreachable("Error running function.");
-
-  llvm::outs() << "\nSUCCESS\n\n";
-  flush();
 }
 
 template <unsigned M, unsigned N, unsigned K>
@@ -154,25 +221,35 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "TestSimpleJIT\n");
 
-  // CHECK-LABEL: func @test_vector_add_4_4
-  //      CHECK: ( ( 1, 1, 1, 1 ), ( 1, 1, 1, 1 ), ( 1, 1, 1, 1 ),
-  // CHECK-SAME: ( 1, 1, 1, 1 ) )
-  //      CHECK: ( ( 1, 2, 3, 4 ), ( 5, 6, 7, 8 ), ( 9, 10, 11, 12 ),
-  // CHECK-SAME: ( 13, 14, 15, 16 ) )
-  //      CHECK: ( ( 2, 3, 4, 5 ), ( 6, 7, 8, 9 ), ( 10, 11, 12, 13 ),
-  // CHECK-SAME: ( 14, 15, 16, 17 ) )
-  //      CHECK: SUCCESS
-  testVectorAdd<4, 4>("test_vector_add_4_4", /*kNumElements=*/13);
+  // CHECK-LABEL: func @test_vector_add_1d_1x3f32
+  //       CHECK: ( 1, 1, 1 )
+  //       CHECK: ( 1, 2, 3 )
+  //       CHECK: ( 2, 3, 4 )
+  testVectorAdd1d<3>("test_vector_add_1d_1x3f32", /*kNumElements=*/1);
 
-  // CHECK-LABEL: func @test_vector_add_9_7
-  // CHECK: SUCCESS
-  // TODO(ntv): fix padding?
-  testVectorAdd<9, 7>("test_vector_add_9_7", /*kNumElements=*/5);
+  // CHECK-LABEL: func @test_vector_add_1d_2x3f32
+  //       CHECK: ( 1, 1, 1 )
+  //       CHECK: ( 4, 5, 6 )
+  //       CHECK: ( 5, 6, 7 )
+  testVectorAdd1d<3>("test_vector_add_1d_2x3f32", /*kNumElements=*/2);
 
-  // CHECK-LABEL: func @test_vector_add_17_19
-  // CHECK: SUCCESS
-  // TODO(ntv): fix padding?
-  testVectorAdd<17, 19>("test_vector_add_17_19", /*kNumElements=*/3);
+  // CHECK-LABEL: func @test_vector_add_1d_2x5f32
+  //       CHECK: ( 1, 1, 1, 1, 1 )
+  //       CHECK: ( 6, 7, 8, 9, 10 )
+  //       CHECK: ( 7, 8, 9, 10, 11 )
+  testVectorAdd1d<5>("test_vector_add_1d_2x5f32", /*kNumElements=*/2);
+
+  // CHECK-LABEL: func @test_vector_add_2d_1x2_3f32
+  //       CHECK: ( ( 1, 1, 1 ), ( 1, 1, 1 ) )
+  //       CHECK: ( ( 1, 2, 3 ), ( 4, 5, 6 ) )
+  //       CHECK: ( ( 2, 3, 4 ), ( 5, 6, 7 ) )
+  testVectorAdd2d<2, 3>("test_vector_add_2d_1x2_3f32", /*kNumElements=*/1);
+
+  // CHECK-LABEL: func @test_vector_add_2d_3x3_5f32
+  // CHECK: ( ( 1, 1, 1, 1, 1 ), ( 1, 1, 1, 1, 1 ), ( 1, 1, 1, 1, 1 ) )
+  // CHECK: ( ( 31, 32, 33, 34, 35 ), ( 36{{.*}}40 ), ( 41, 42, 43, 44, 45 ) )
+  // CHECK: ( ( 32, 33, 34, 35, 36 ), ( 37{{.*}}41 ), ( 42, 43, 44, 45, 46 ) )
+  testVectorAdd2d<3, 5>("test_vector_add_2d_3x3_5f32", /*kNumElements=*/3);
 
   // CHECK-LABEL: func @test_vector_matmul(
   //  CHECK-SAME:   %[[A:.*]]: memref<?x?xvector<4x16xf32>>,

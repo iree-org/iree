@@ -44,7 +44,7 @@
 #include <functional>
 #include <memory>
 
-#include "mlir/ExecutionEngine/RunnerUtils.h"
+#include "mlir/ExecutionEngine/CRunnerUtils.h"
 
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MEMREFUTILS_H_

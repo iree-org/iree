@@ -17,6 +17,7 @@
 #include "experimental/ModelBuilder/MemRefUtils.h"
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
+// RunnerUtils.h with iostream needed for printMemRef atm
 #include "mlir/ExecutionEngine/RunnerUtils.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/StandardTypes.h"

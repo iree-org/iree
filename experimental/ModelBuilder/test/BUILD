@@ -48,8 +48,8 @@ cc_binary(
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
+        # mlir_runner_utils with iostream needed for printMemRef atm
         "@llvm-project//mlir:mlir_runner_utils",
-        "@llvm-project//mlir:mlir_runner_utils_header",
     ],
 )
 
