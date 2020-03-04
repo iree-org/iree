@@ -75,6 +75,9 @@ PatternMatchResult LinalgTensorToBufferConverter::matchAndRewrite(
       return matchFailure();
     }
     auto resultUser = dyn_cast<IREE::StoreOutputOp>(*result.user_begin());
+    if (!resultUser) {
+      return matchFailure();
+    }
     memrefArgs.push_back(resultUser.dst());
   }
 
