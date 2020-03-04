@@ -28,7 +28,7 @@ iree_bytecode_module(
     name = "bytecode_dispatch_test_module",
     src = "bytecode_dispatch_test.mlir",
     cc_namespace = "iree::vm",
-    translation = "-iree-vm-ir-to-bytecode-module",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 cc_library(
@@ -79,7 +79,7 @@ iree_bytecode_module(
     name = "bytecode_module_benchmark_module",
     src = "bytecode_module_benchmark.mlir",
     cc_namespace = "iree::vm",
-    translation = "-iree-vm-ir-to-bytecode-module",
+    flags = ["-iree-vm-ir-to-bytecode-module"],
 )
 
 cc_test(

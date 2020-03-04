@@ -23,8 +23,8 @@ iree_bytecode_module(
     name = "custom_modules_test_module",
     src = "custom_modules_test.mlir",
     cc_namespace = "iree::samples::custom_modules",
+    flags = ["-iree-mlir-to-vm-bytecode-module"],
     translate_tool = "//iree/samples/custom_modules/dialect:custom-translate",
-    translation = "-iree-mlir-to-vm-bytecode-module",
 )
 
 cc_test(

@@ -21,7 +21,7 @@ iree_bytecode_module(
     "iree::modules::tensorlist"
   TRANSLATE_TOOL
     iree_compiler_Dialect_Modules_TensorList_tensorlist-translate
-  TRANSLATION
+  FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
 )

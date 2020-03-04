@@ -24,8 +24,8 @@ iree_bytecode_module(
     name = "check_test_module",
     src = "check_test.mlir",
     cc_namespace = "iree::check",
+    flags = ["-iree-mlir-to-vm-bytecode-module"],
     translate_tool = "//iree/modules/check/dialect:check-translate",
-    translation = "-iree-mlir-to-vm-bytecode-module",
 )
 
 cc_test(

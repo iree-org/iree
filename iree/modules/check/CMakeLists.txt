@@ -24,7 +24,7 @@ iree_bytecode_module(
     "iree::check"
   TRANSLATE_TOOL
     iree_modules_check_dialect_check-translate
-  TRANSLATION
+  FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
 )

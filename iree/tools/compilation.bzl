@@ -20,7 +20,7 @@ load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 def iree_bytecode_module(
         name,
         src,
-        translation = "-iree-mlir-to-vm-bytecode-module",
+        flags = ["-iree-mlir-to-vm-bytecode-module"],
         translate_tool = "//iree/tools:iree-translate",
         cc_namespace = None,
         visibility = None):
@@ -33,7 +33,7 @@ def iree_bytecode_module(
         cmd = " && ".join([
             " ".join([
                 "$(location %s)" % (translate_tool),
-                translation,
+                " ".join(flags),
                 "-o $(location %s.module)" % (name),
                 "$(location %s)" % (src),
             ]),

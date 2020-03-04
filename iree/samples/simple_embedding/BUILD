@@ -24,7 +24,7 @@ iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
     cc_namespace = "iree::samples",
-    translation = "-iree-mlir-to-vm-bytecode-module",
+    flags = ["-iree-mlir-to-vm-bytecode-module"],
 )
 
 cc_test(

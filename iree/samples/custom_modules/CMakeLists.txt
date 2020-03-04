@@ -23,7 +23,7 @@ iree_bytecode_module(
     "iree::samples::custom_modules"
   TRANSLATE_TOOL
     iree_samples_custom_modules_dialect_custom-translate
-  TRANSLATION
+  FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
 )

@@ -144,8 +144,9 @@ class BuildFileFunctions(object):
     #    "cpp_namespace"
     return "  CPP_NAMESPACE\n    \"%s\"\n" % (cpp_namespace)
 
-  def _convert_translation_block(self, translation):
-    return "  TRANSLATION\n    \"%s\"\n" % (translation)
+  def _convert_flags_block(self, flags):
+    flags_list = "\n".join(["    \"%s\"" % (flag) for flag in flags])
+    return "  FLAGS\n%s\n" % (flags_list)
 
   def _convert_translate_tool_block(self, translate_tool):
     if translate_tool:
@@ -474,22 +475,22 @@ class BuildFileFunctions(object):
   def iree_bytecode_module(self,
                            name,
                            src,
-                           translation="-iree-mlir-to-vm-bytecode-module",
+                           flags=["-iree-mlir-to-vm-bytecode-module"],
                            translate_tool="//iree/tools:iree-translate",
                            cc_namespace=None):
     name_block = self._convert_name_block(name)
     src_block = self._convert_src_block(src)
     namespace_block = self._convert_cc_namespace_block(cc_namespace)
     translate_tool_block = self._convert_translate_tool_block(translate_tool)
-    translation_block = self._convert_translation_block(translation)
+    flags_block = self._convert_flags_block(flags)
 
     self.converter.body += """iree_bytecode_module(
-%(name_block)s%(src_block)s%(namespace_block)s%(translate_tool_block)s%(translation_block)s  PUBLIC\n)\n\n""" % {
+%(name_block)s%(src_block)s%(namespace_block)s%(translate_tool_block)s%(flags_block)s  PUBLIC\n)\n\n""" % {
     "name_block": name_block,
     "src_block": src_block,
     "namespace_block": namespace_block,
     "translate_tool_block": translate_tool_block,
-    "translation_block": translation_block,
+    "flags_block": flags_block,
     }
 
   def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=None):

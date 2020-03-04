@@ -38,7 +38,7 @@ iree_bytecode_module(
     "iree::vm"
   TRANSLATE_TOOL
     iree_tools_iree-translate
-  TRANSLATION
+  FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )
@@ -95,7 +95,7 @@ iree_bytecode_module(
     "iree::vm"
   TRANSLATE_TOOL
     iree_tools_iree-translate
-  TRANSLATION
+  FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
 )

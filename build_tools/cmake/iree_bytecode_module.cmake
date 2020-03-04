@@ -21,12 +21,12 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
-# TRANSLATION: Translation option to pass to the translation tool (string).
+# FLAGS: Flags to pass to the translation tool (list of strings).
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target).
 # CC_NAMESPACE: Wraps everything in a C++ namespace.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
-# Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC will be
-# in ${PACKAGE}/internal.
+#     Also in IDE, target will appear in ${PACKAGE} folder while non PUBLIC
+#     will be in ${PACKAGE}/internal.
 # TESTONLY: When added, this target will only be built if user passes
 #    -DIREE_BUILD_TESTS=ON to CMake.
 #
@@ -38,17 +38,17 @@ function(iree_bytecode_module)
   cmake_parse_arguments(
     _RULE
     "PUBLIC;TESTONLY"
-    "NAME;SRC;TRANSLATION;TRANSLATE_TOOL;CC_NAMESPACE"
-    ""
+    "NAME;SRC;TRANSLATE_TOOL;CC_NAMESPACE"
+    "FLAGS"
     ${ARGN}
   )
 
   if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    # Set defaults for TRANSLATION and TRANSLATE_TOOL
-    if(DEFINED _RULE_TRANSLATION)
-      set(_TRANSLATION ${_RULE_TRANSLATION})
+    # Set defaults for FLAGS and TRANSLATE_TOOL
+    if(DEFINED _RULE_FLAGS)
+      set(_FLAGS ${_RULE_FLAGS})
     else()
-      set(_TRANSLATION "-iree-mlir-to-vm-bytecode-module")
+      set(_FLAGS "-iree-mlir-to-vm-bytecode-module")
     endif()
     if(DEFINED _RULE_TRANSLATE_TOOL)
       set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
@@ -59,7 +59,7 @@ function(iree_bytecode_module)
     # Resolve the executable binary path from the target name.
     set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
 
-    set(_ARGS "${_TRANSLATION}")
+    set(_ARGS "${_FLAGS}")
     list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
     list(APPEND _ARGS "-o")
     list(APPEND _ARGS "${_RULE_NAME}.module")

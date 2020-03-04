@@ -68,7 +68,7 @@ iree_bytecode_module(
     "iree::strings_module_test"
   TRANSLATE_TOOL
     iree_compiler_Dialect_Modules_Strings_strings-translate
-  TRANSLATION
+  FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC
 )
