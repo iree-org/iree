@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VMLA/Conversion/VMLAToVM/ConvertVMLAToVM.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
@@ -29,12 +30,29 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace {
+
+// Erases an op. This should only be used for ops that are legalized away
+// as part of lowering (i.e. tagging or metadata ops that are unrepresentable
+// in the VM dialect).
+class EraseNonVMOp : public ConversionPattern {
+ public:
+  EraseNonVMOp(StringRef rootName, MLIRContext *ctx)
+      : ConversionPattern(rootName, 0, ctx) {}
+
+  PatternMatchResult matchAndRewrite(
+      Operation *op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.eraseOp(op);
+    return matchSuccess();
+  }
+};
 
 // VMLA -> VM import conversion base for generic ops.
 // Handles signatures with integers, VM types, or simple buffers.
@@ -67,8 +85,13 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
     return "x" + std::to_string(elementType.getIntOrFloatBitWidth());
   }
 
-  std::string getTypedTypeStr(Type elementType,
-                              bool forceUnsigned = false) const {
+  std::string getTypedTypeStr(Type type, bool forceUnsigned = false) const {
+    Type elementType = type;
+    auto shapedType = type.dyn_cast<ShapedType>();
+    if (shapedType) {
+      elementType = shapedType.getElementType();
+    }
+
     std::string typePrefix = "x";
     if (elementType.isa<FloatType>()) {
       typePrefix = "f";
@@ -195,6 +218,8 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                               OwningRewritePatternList &patterns,
                               TypeConverter &typeConverter) {
   patterns.insert<VMLAConstantOpConversion>(context, typeConverter);
+  patterns.insert<EraseNonVMOp>(Shape::ConstRankedShapeOp::getOperationName(),
+                                context);
 
   VMLA_IMPORT_OP(IREE::VMLA::BufferConstOp, "vmla.buffer.const");
   VMLA_IMPORT_OP(IREE::VMLA::BufferAllocOp, "vmla.buffer.alloc");
