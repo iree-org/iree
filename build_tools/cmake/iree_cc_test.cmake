@@ -79,8 +79,6 @@ function(iree_cc_test)
   target_include_directories(${_NAME}
     PUBLIC
       ${IREE_COMMON_INCLUDE_DIRS}
-    PRIVATE
-      ${GTEST_INCLUDE_DIRS}
   )
   target_compile_definitions(${_NAME}
     PUBLIC
