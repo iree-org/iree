@@ -23,6 +23,7 @@
 #include "iree/base/buffer_string_util.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
+#include "iree/testing/gtest.h"
 #include "iree/vm/module_abi_cc.h"
 
 //===----------------------------------------------------------------------===//
@@ -45,9 +46,7 @@ class CheckModuleState final {
   ~CheckModuleState() = default;
 
   Status ExpectTrue(int32_t val) {
-    if (val == 0)
-      return Status(StatusCode::kInvalidArgument,
-                    absl::StrCat("Expected ", val, " to be non-zero."));
+    EXPECT_TRUE(val) << "Expected " << val << " to be nonzero.";
     return OkStatus();
   }
 

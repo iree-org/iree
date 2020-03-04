@@ -21,4 +21,5 @@ iree_lit_test_suite(
   DATA
     iree::modules::check::dialect::check-translate
     iree::modules::check::iree-check-module
+    iree::tools::IreeFileCheck
 )

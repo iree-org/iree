@@ -98,10 +98,10 @@ TEST_F(CheckTest, ExpectTrueFailure) {
   IREE_ASSERT_OK(
       iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs_));
   IREE_ASSERT_OK(iree_vm_variant_list_append_value(inputs_, arg));
-  auto status = iree_vm_invoke(context_, LookupFunction("expectTrue"),
-                               /*policy=*/nullptr, inputs_, outputs_,
-                               IREE_ALLOCATOR_SYSTEM);
-  ASSERT_NE(IREE_STATUS_OK, status);
+  EXPECT_NONFATAL_FAILURE(
+      IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("expectTrue"),
+                                    /*policy=*/nullptr, inputs_, outputs_,
+                                    IREE_ALLOCATOR_SYSTEM)),
+      "Expected 0 to be nonzero");
 }
-
 }  // namespace

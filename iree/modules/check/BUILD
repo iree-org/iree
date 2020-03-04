@@ -49,6 +49,7 @@ cc_test(
 
 cc_binary(
     name = "iree-check-module",
+    testonly = True,
     srcs = ["check_module_main.cc"],
     deps = [
         ":native_module",
@@ -62,6 +63,7 @@ cc_binary(
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/modules/hal",
+        "//iree/testing:gtest",
         "//iree/tools:vm_util",
         "//iree/vm:bytecode_module",
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
@@ -69,6 +71,7 @@ cc_binary(
 
 cc_library(
     name = "native_module",
+    testonly = True,
     srcs = ["native_module.cc"],
     hdrs = ["native_module.h"],
     deps = [
@@ -77,6 +80,7 @@ cc_library(
         "//iree/base:buffer_string_util",
         "//iree/hal:api",
         "//iree/modules/hal",
+        "//iree/testing:gtest",
         "//iree/vm",
         "//iree/vm:module_abi_cc",
         "@com_google_absl//absl/strings",

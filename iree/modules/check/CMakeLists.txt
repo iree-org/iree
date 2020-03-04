@@ -72,8 +72,10 @@ iree_cc_binary(
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
     iree::modules::hal
+    iree::testing::gtest
     iree::tools::vm_util
     iree::vm::bytecode_module
+  TESTONLY
 )
 
 iree_cc_library(
@@ -90,7 +92,9 @@ iree_cc_library(
     iree::base::buffer_string_util
     iree::hal::api
     iree::modules::hal
+    iree::testing::gtest
     iree::vm
     iree::vm::module_abi_cc
+  TESTONLY
   PUBLIC
 )

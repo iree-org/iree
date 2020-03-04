@@ -25,5 +25,6 @@ iree_lit_test_suite(
     data = [
         "//iree/modules/check:iree-check-module",
         "//iree/modules/check/dialect:check-translate",
+        "//iree/tools:IreeFileCheck",
     ],
 )

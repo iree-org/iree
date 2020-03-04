@@ -15,7 +15,8 @@
 #ifndef IREE_TESTING_INTERNAL_GTEST_INTERNAL_H_
 #define IREE_TESTING_INTERNAL_GTEST_INTERNAL_H_
 
-#include "gmock/gmock.h"  // IWYU pragma: export
-#include "gtest/gtest.h"  // IWYU pragma: export
+#include "gmock/gmock.h"      // IWYU pragma: export
+#include "gtest/gtest-spi.h"  // IWYU pragma: export
+#include "gtest/gtest.h"      // IWYU pragma: export
 
 #endif  // IREE_TESTING_INTERNAL_GTEST_INTERNAL_H_
