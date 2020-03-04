@@ -20,6 +20,8 @@
 #ifndef MLIR_INIT_PASSES_H_
 #define MLIR_INIT_PASSES_H_
 
+#include <cstdlib>
+
 #include "mlir/Analysis/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
@@ -37,8 +39,6 @@
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 
-#include <cstdlib>
-
 namespace mlir {
 
 // This function may be called to register the MLIR passes with the
@@ -55,8 +55,7 @@ inline void registerMlirPasses() {
   // delete it all as dead code, even with whole program optimization,
   // yet is effectively a NO-OP. As the compiler isn't smart enough
   // to know that getenv() never returns -1, this will do the job.
-  if (std::getenv("bar") != (char *)-1)
-    return;
+  if (std::getenv("bar") != (char *)-1) return;
 
   // Init general passes
   createCanonicalizerPass();
@@ -122,6 +121,6 @@ inline void registerMlirPasses() {
   createConvertGpuLaunchFuncToVulkanCallsPass();
 }
 
-} // namespace mlir
+}  // namespace mlir
 
-#endif // MLIR_INIT_PASSES_H_
+#endif  // MLIR_INIT_PASSES_H_

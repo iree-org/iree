@@ -15,7 +15,7 @@
 // This files defines a helper to trigger the registration of dialects and
 // passes to the system.
 //
-// Based on MLIR's InitAllPasses but without passes we don't care about.
+// Based on MLIR's InitAllDialects but without dialects we don't care about.
 
 #ifndef MLIR_INIT_DIALECTS_H_
 #define MLIR_INIT_DIALECTS_H_
@@ -54,6 +54,6 @@ inline void registerMlirDialects() {
   }();
   (void)init_once;
 }
-} // namespace mlir
+}  // namespace mlir
 
-#endif // MLIR_INIT_DIALECTS_H_
+#endif  // MLIR_INIT_DIALECTS_H_
