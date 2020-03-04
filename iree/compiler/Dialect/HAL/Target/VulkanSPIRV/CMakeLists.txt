@@ -40,6 +40,7 @@ iree_cc_library(
     iree::compiler::Translation::SPIRV::EmbeddedKernels
     iree::compiler::Translation::SPIRV::LinalgToSPIRV
     iree::compiler::Translation::SPIRV::XLAToSPIRV
+    iree::compiler::Translation::XLAToLinalg
     iree::schemas::spirv_executable_def_cc_fbs
     tensorflow::mlir_xla
   ALWAYSLINK

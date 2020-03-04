@@ -24,6 +24,10 @@ namespace iree_compiler {
 void addLowerToSPIRVPasses(OpPassManager &pm,
                            ArrayRef<int64_t> workGroupSize = {});
 
+/// Populates passes needed to lower a linalg op (on buffers) to SPIR-V dialect.
+void addLinalgToSPIRVPasses(OpPassManager &pm,
+                            ArrayRef<int64_t> workGroupSize = {});
+
 }  // namespace iree_compiler
 }  // namespace mlir
 

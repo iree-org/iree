@@ -11,6 +11,8 @@ func @dot_passthrough() -> tensor<1x3xf32> {
 
 // CHECK: 1x3xf32=[0.23 0.31 0.39]
 
+// -----
+
 // CHECK-LABEL: EXEC @dot_general_lower
 func @dot_general_lower() -> tensor<1x1x3xf32> {
   %lhs = iree.unfoldable_constant dense<[[[0.3, 0.5]]]> : tensor<1x1x2xf32>
@@ -22,6 +24,8 @@ func @dot_general_lower() -> tensor<1x1x3xf32> {
 // CHECK:      1x1x3xf32=[
 // CHECK-SAME:   [0.23 0.31 0.39]
 // CHECK-SAME: ]
+
+// -----
 
 // CHECK-LABEL: EXEC @dot_general_lower_swapped
 func @dot_general_lower_swapped() -> tensor<3x1x1xf32> {

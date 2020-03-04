@@ -24,6 +24,7 @@
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels/EmbeddedKernels.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
+#include "iree/compiler/Translation/XLAToLinalg/Passes.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -216,6 +217,30 @@ static void propagateModifiedExecutableABI(
   }
 }
 
+/// Returns true if the linalg on buffers path is to be used for compilation.
+/// This pipeline is used for cases where, dispatch function contains a single
+/// xla_hlo operation that can be converted to linalg on buffers, converted to
+/// loops and lowered to SPIR-V.
+static bool useLinalgOnBuffers(ModuleOp moduleOp) {
+  // This is supported in createXLAToLinalgNamedOpsPass().
+  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+    for (auto &block : funcOp) {
+      if (!block.getOps<xla_hlo::DotOp>().empty()) return true;
+    }
+  }
+  return false;
+}
+
+/// Returns true if the linalg on tensors path is to be used for compilation.
+/// This pipeline is avoided if the dispatch function has any ops not supported
+/// on this path.
+static bool useLinalgOnTensors(ModuleOp moduleOp,
+                               VulkanSPIRVTargetOptions const &targetOptions) {
+  /// TODO(ravishankarm): For now just rely on the command line flag, but
+  /// eventually look at the ops in the dispatch function.
+  return targetOptions.useLinalgToSPIRVPath;
+}
+
 LogicalResult translateToVulkanSPIRVExecutable(
     IREE::HAL::ExecutableOp executableOp,
     ExecutableTargetOptions executableOptions,
@@ -254,10 +279,14 @@ LogicalResult translateToVulkanSPIRVExecutable(
 
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
-    if (targetOptions.useLinalgToSPIRVPath) {
+    if (useLinalgOnBuffers(moduleOp)) {
+      conversionPassManager.addPass(createXLAToLinalgOpsOnBufferPass());
+      addLinalgToSPIRVPasses(conversionPassManager);
+    } else if (useLinalgOnTensors(moduleOp, targetOptions)) {
       addLowerToSPIRVPasses(conversionPassManager,
                             targetOptions.linalgToSPIRVWorkgroupSize);
     } else {
+      // Use the Index computation path as fallback.
       addIREEToSPIRVPasses(conversionPassManager);
     }
     if (failed(conversionPassManager.run(moduleOp))) {

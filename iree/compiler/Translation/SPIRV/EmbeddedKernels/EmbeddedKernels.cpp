@@ -319,12 +319,6 @@ bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
             return false;
           }
           return true;
-        } else if (auto dotOp = dyn_cast_or_null<xla_hlo::DotOp>(&op)) {
-          if (failed(buildMatMulExecutable(moduleOp, funcOp, dotOp, outDef))) {
-            moduleOp.emitOpError() << "failed to splat in the matmul kernel";
-            return false;
-          }
-          return true;
         }
       }
     }

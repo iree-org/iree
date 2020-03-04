@@ -18,6 +18,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
+
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/XLAToLinalg/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
@@ -322,8 +324,10 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
 };
 }  // namespace
 
-static void addLinalgToSPIRVPasses(OpPassManager &pm) {
+void addLinalgToSPIRVPasses(OpPassManager &pm,
+                            ArrayRef<int64_t> workGroupSize) {
   // Linalg to loops.
+  pm.addPass(std::make_unique<UpdateWorkGroupSizePass>(workGroupSize));
   pm.addPass(std::make_unique<IREETileLinalgPass>());
   pm.addPass(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
@@ -353,9 +357,18 @@ void addLowerToSPIRVPasses(OpPassManager &pm, ArrayRef<int64_t> workGroupSize) {
   pm.addPass(createXLAToLinalgPass());
   pm.addPass(createLinalgFusionPass());
   pm.addPass(createLinalgTensorToBufferConversionPass());
-  pm.addPass(std::make_unique<UpdateWorkGroupSizePass>(workGroupSize));
   addLinalgToSPIRVPasses(pm);
 }
+
+static PassPipelineRegistration<WorkGroupOptions> linalgToSPIRVPipeline(
+    "iree-linalg-to-spirv",
+    "Runs the progressive lowering pipeline from Linalg to SPIR-V",
+    [](OpPassManager &passManager, const WorkGroupOptions &options) {
+      SmallVector<int64_t, 2> workGroupSize;
+      workGroupSize.assign(options.workGroupSize.begin(),
+                           options.workGroupSize.end());
+      addLinalgToSPIRVPasses(passManager, workGroupSize);
+    });
 
 static PassPipelineRegistration<WorkGroupOptions> xlaToLinalgSPIRVPipeline(
     "iree-xla-to-linalg-to-spirv",
