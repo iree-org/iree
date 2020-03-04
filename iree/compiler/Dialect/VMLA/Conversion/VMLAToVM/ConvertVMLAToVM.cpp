@@ -208,8 +208,8 @@ class VMLAMatMulImportOpConversion
 
   std::string getImportSuffix(IREE::VMLA::MatMulOp op) const override {
     return std::string(".") + getTypedTypeStr(op.lhs_type()) +
-           getTypedTypeStr(op.rhs_type()) + std::string(".") +
-           getTypedTypeStr(op.dst_type());
+           std::string(".") + getTypedTypeStr(op.rhs_type()) +
+           std::string(".") + getTypedTypeStr(op.dst_type());
   }
 };
 }  // namespace
