@@ -38,7 +38,7 @@ iree_cc_binary(
     tensorlist-opt
   DEPS
     iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
-    iree::tools::iree_opt_library
+    iree::tools::iree_opt_main
 )
 
 iree_cc_binary(

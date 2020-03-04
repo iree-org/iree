@@ -53,7 +53,7 @@ cc_binary(
     name = "iree-tf-opt",
     deps = [
         ":tensorflow",
-        "//iree/tools:iree_opt_library",
+        "//iree/tools:iree_opt_main",
         "@llvm-project//mlir:MlirOptMain",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",

@@ -37,7 +37,7 @@ cc_binary(
     name = "tensorlist-opt",
     deps = [
         "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
-        "//iree/tools:iree_opt_library",
+        "//iree/tools:iree_opt_main",
     ],
 )
 

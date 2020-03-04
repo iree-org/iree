@@ -83,7 +83,7 @@ cc_binary(
     name = "custom-opt",
     deps = [
         ":dialect",
-        "//iree/tools:iree_opt_library",
+        "//iree/tools:iree_opt_main",
     ],
 )
 

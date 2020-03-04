@@ -68,7 +68,7 @@ cc_binary(
 )
 
 cc_library(
-    name = "iree_opt_library",
+    name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
@@ -112,7 +112,7 @@ cc_library(
 cc_binary(
     name = "iree-opt",
     deps = [
-        ":iree_opt_library",
+        ":iree_opt_main",
     ],
 )
 
