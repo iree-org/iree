@@ -59,6 +59,8 @@ class EraseNonVMOp : public ConversionPattern {
 template <typename T, typename Adaptor = typename T::OperandAdaptor>
 class VMLAImportOpConversion : public OpConversionPattern<T> {
  public:
+  using OpConversionPattern<T>::matchFailure;
+
   VMLAImportOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                          TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern<T>(context),
@@ -69,8 +71,14 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
   PatternMatchResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto importOp = importSymbols.template lookup<IREE::VM::ImportOp>(
-        importName + getImportSuffix(op));
+    std::string importFqName = importName + getImportSuffix(op);
+    auto importOp =
+        importSymbols.template lookup<IREE::VM::ImportOp>(importFqName);
+    if (!importOp) {
+      op.emitError() << "failed to resolve VM function import for "
+                     << importFqName;
+      return matchFailure();
+    }
     assert(importOp);
     return succeeded(rewriteToCall(op, Adaptor{operands}, importOp,
                                    typeConverter, rewriter))

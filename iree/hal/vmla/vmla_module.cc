@@ -783,6 +783,9 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("reduce.max.i16", &VMLAModuleState::ReduceMaxI16),
     vm::MakeNativeFunction("reduce.max.i32", &VMLAModuleState::ReduceMaxI32),
     vm::MakeNativeFunction("reduce.max.f32", &VMLAModuleState::ReduceMaxF32),
+
+    vm::MakeNativeFunction("matmul.f32f32.f32",
+                           &VMLAModuleState::MatMulF32F32F32),
 };
 
 // Per-device VMLA module.
