@@ -32,7 +32,7 @@ from pyiree.tf import compiler
 import tensorflow.compat.v2 as tf
 
 flags.DEFINE_string(
-    "target_backends", None,
+    "override_backends", None,
     "Explicit comma-delimited list of target backends. "
     "(Overrides environment variables and auto detection)")
 flags.DEFINE_string(
@@ -474,6 +474,19 @@ BackendInfo.add(
     iree_compiler_targets=["vulkan-*"])
 
 
+def _backend_spec_string_to_backends(backend_spec):
+  """Decodes a comma-delimited string of backends into BackendInfo objects."""
+  backends = []
+  for backend_name in backend_spec.split(","):
+    if backend_name not in BackendInfo.ALL.keys():
+      raise ValueError(
+          "Invalid backend specification string '{}', unexpected name '{}';"
+          " valid names are '{}'".format(backend_spec, backend_name,
+                                         BackendInfo.ALL.keys()))
+    backends.append(BackendInfo.ALL[backend_name])
+  return backends
+
+
 def get_override_backends():
   """Gets the BackendInfo instances to test, as overridden by the user.
 
@@ -482,27 +495,28 @@ def get_override_backends():
     override.
   """
 
-  if FLAGS.target_backends is not None:
-    backends_env = FLAGS.target_backends
-    logging.info("Using backends from command line: %s", backends_env)
+  if FLAGS.override_backends is not None:
+    backends_spec = FLAGS.override_backends
+    logging.info("Using backends from command line: %s", backends_spec)
   else:
-    backends_env = os.environ.get("IREE_TEST_BACKENDS")
-    if backends_env is not None:
-      logging.info("Using backends from environment IREE_TEST_BACKENDS: %s",
-                   backends_env)
+    backends_spec = os.environ.get("IREE_OVERRIDE_BACKENDS")
+    if backends_spec is not None:
+      logging.info("Using backends from environment IREE_OVERRIDE_BACKENDS: %s",
+                   backends_spec)
 
-  if backends_env:
-    backends = []
-    for backend_name in backends_env.split(","):
-      try:
-        backends.append(BackendInfo.ALL[backend_name])
-      except IndexError:
-        raise ValueError("In 'IREE_TEST_BACKENDS' env var, unexpected name %s" %
-                         (backend_name))
-    return backends
+  if backends_spec:
+    return _backend_spec_string_to_backends(backends_spec)
   else:
     logging.info("No backend overrides.")
     return None
+
+
+def get_default_backends():
+  """Gets the BackendInfo instances to use by default."""
+  backend_spec = os.environ.get("IREE_DEFAULT_BACKENDS")
+  if backend_spec is None:
+    return BackendInfo.ALL.values()
+  return _backend_spec_string_to_backends(backend_spec)
 
 
 class SavedModelTestCase(tf.test.TestCase):
@@ -562,7 +576,7 @@ class SavedModelTestCase(tf.test.TestCase):
           if override_backends is not None:
             backends = override_backends
           elif backends is None:
-            backends = BackendInfo.ALL.values()  # Test all backends.
+            backends = get_default_backends()
           backends = [_resolve(backend) for backend in backends]
           cls.compiled_modules[name] = dict([
               (backend.name, CompiledModule.create(ctor, exported_names,
