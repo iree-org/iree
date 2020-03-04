@@ -12,14 +12,14 @@ As with other VM modules, VMLA ops are declared in
 [vmla.imports.mlir](/iree/compiler/Dialect/VMLA/vmla.imports.mlir). These
 declarations are what enable the compiler and runtime side to talk to each
 other. It's helpful to start here to think about the information you need to
-communicate to the runtime prior to writing conversions. As a general rule try
-to avoid communicating anything not strictly required to provide a correct
-implementation and perform more work on the compiler side if it allows simpler
-ops to be implemented at runtime. For example, if there's an attribute on the op
-that selects between two different implementations instead of plumbing that
-attribute through to runtime and switching there instead have the conversion
-lower to one of two ops. This makes it easier to reduce binary sizes, get
-accurate profiles at runtime, etc.
+communicate to the runtime prior to writing conversions. As a general rule, try
+to avoid communicating anything not strictly required for a correct
+implementation; instead, perform more work on the compiler side if it allows
+simpler ops to be implemented at runtime. For example, if there's an attribute
+on the op that selects between two different implementations, instead of
+plumbing that attribute through to runtime and switching there, one should
+implement the conversion to lower it into two ops. This makes it easier to
+reduce binary sizes, get accurate profiles at runtime, etc.
 
 TLDR:
 
@@ -62,7 +62,7 @@ example: `vm.import @transpose.x8(%src : !vm.ref<!vmla.buffer>, %src_shape : i32
 
 ### Adding the Op Tablegen Description
 
-Once the op is defined you can add the tablegen op def in
+Once the op is declared you can add the tablegen op def in
 [VMLAOps.td](/iree/compiler/Dialect/VMLA/IR/VMLAOps.td). Match the order and
 grouping in this file with the `vmla.imports.mlir` file to make moving between
 the two easier.
@@ -72,9 +72,9 @@ the `vm.import` declarations. Make sure the names of all argument values and
 attributes match those in the declaration.
 
 Many ops can be expressed with `VMLA_UnaryOp`/`VMLA_BinaryOp`/etc classes such
-as `VMLA_AddOp`. These will automatically get their lhs/rhs/dst and fan out to
-the given type group. For example, defining `VMLA_AnyTypeAttr` will allow both
-integers and floats of various bit depths while `VMLA_FloatTypeAttr` will only
+as `VMLA_AddOp`. These will automatically get their `lhs`/`rhs`/`dst` and fan
+out to the given type group. For example, use `VMLA_AnyTypeAttr` will allow both
+integers and floats of various bit depths, while `VMLA_FloatTypeAttr` will only
 allow floating-point values. These should match to which suffixes you defined in
 the import; for example if you only have `foo.f32` declared to indicate that the
 op only operates on floating-point values then use `VMLA_FloatTypeAttr`).
@@ -129,8 +129,8 @@ to do so particularly if not using the `VMLA_*_IMPORT_OP` macros.
 
 ### Add the Runtime Kernel
 
-[vmla_module.cc](/iree/hal/vmla/vmla_module.cc) contains the runtime-half of the
-`vmla.imports.mlir` file mapping from the VM calls to C++. Again add your
+[vmla_module.cc](/iree/hal/vmla/vmla_module.cc) contains the runtime companion
+of the `vmla.imports.mlir` file mapping from the VM calls to C++. Again add your
 function in here in the same place as you did in the other files. Follow the
 example of other functions in the file for how to declare arguments, how to add
 the `IREE_TRACE_SCOPE` line, etc.
@@ -147,7 +147,7 @@ pass them to these functions.
 Declare your new kernel in the header without its implementation. If your kernel
 needs to keep state at runtime you can follow what `MatMul` does with the
 `RuntimeState` struct, however it is strongly discouraged and almost never
-required so avoid if possible. One way to avoid it is to make your op take any
+required, so avoid if possible. One way to avoid it is to make your op take any
 scratch memory it may require as an argument and generate the IR during
 conversion. This ensures that we can optimize things on the compiler-side
 instead of forcing the runtime to deal with things.
