@@ -21,8 +21,7 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: Name of target (see Note).
 # SRC: Source file to compile into a bytecode module.
-# TRANSLATIONS: Translation options to pass to the translation tool (list of
-#     strings).
+# FLAGS: Flags to pass to the translation tool (list of strings).
 # TRANSLATE_TOOL: Translation tool to invoke (CMake target).
 # CC_NAMESPACE: Wraps everything in a C++ namespace.
 # PUBLIC: Add this so that this library will be exported under ${PACKAGE}::
@@ -40,16 +39,16 @@ function(iree_bytecode_module)
     _RULE
     "PUBLIC;TESTONLY"
     "NAME;SRC;TRANSLATE_TOOL;CC_NAMESPACE"
-    "TRANSLATIONS"
+    "FLAGS"
     ${ARGN}
   )
 
   if(NOT _RULE_TESTONLY OR IREE_BUILD_TESTS)
-    # Set defaults for TRANSLATIONS and TRANSLATE_TOOL
-    if(DEFINED _RULE_TRANSLATION)
-      set(_TRANSLATIONS ${_RULE_TRANSLATIONS})
+    # Set defaults for FLAGS and TRANSLATE_TOOL
+    if(DEFINED _RULE_FLAGS)
+      set(_FLAGS ${_RULE_FLAGS})
     else()
-      set(_TRANSLATIONS "-iree-mlir-to-vm-bytecode-module")
+      set(_FLAGS "-iree-mlir-to-vm-bytecode-module")
     endif()
     if(DEFINED _RULE_TRANSLATE_TOOL)
       set(_TRANSLATE_TOOL ${_RULE_TRANSLATE_TOOL})
@@ -60,7 +59,7 @@ function(iree_bytecode_module)
     # Resolve the executable binary path from the target name.
     set(_TRANSLATE_TOOL_EXECUTABLE $<TARGET_FILE:${_TRANSLATE_TOOL}>)
 
-    set(_ARGS "${_TRANSLATIONS}")
+    set(_ARGS "${_FLAGS}")
     list(APPEND _ARGS "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRC}")
     list(APPEND _ARGS "-o")
     list(APPEND _ARGS "${_RULE_NAME}.module")

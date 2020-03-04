@@ -53,5 +53,5 @@ iree_bytecode_module(
     src = "strings_module_test.mlir",
     cc_namespace = "iree::strings_module_test",
     translate_tool = "//iree/compiler/Dialect/Modules/Strings:strings-translate",
-    translations = ["-iree-mlir-to-vm-bytecode-module"],
+    flags = ["-iree-mlir-to-vm-bytecode-module"],
 )
