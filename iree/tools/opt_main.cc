@@ -17,6 +17,8 @@
 // Based on mlir-opt but without registering passes and dialects we don't care
 // about.
 
+#include "init_dialects.h"
+#include "init_passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
@@ -26,8 +28,6 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/MlirOptMain.h"
-#include "init_passes.h"
-#include "init_dialects.h"
 
 static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
                                                 llvm::cl::desc("<input file>"),
