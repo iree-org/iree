@@ -65,7 +65,7 @@ func @i1_arg(%a : memref<1xi1>, %dst : memref<1xi1>) {
 // -----
 
 func @not_int(%a : memref<1xf32>, %dst : memref<f32>) {
-  // expected-error@+1 {{32-bit integer values}}
+  // expected-error@+1 {{32-bit signless integer values}}
   "iree_ll_interp.length"(%a, %dst) : (memref<1xf32>, memref<f32>) -> ()
   return
 }
@@ -73,7 +73,7 @@ func @not_int(%a : memref<1xf32>, %dst : memref<f32>) {
 // -----
 
 func @wrong_int(%a : memref<1xf32>, %dst : memref<i8>) {
-  // expected-error@+1 {{32-bit integer values}}
+  // expected-error@+1 {{32-bit signless integer values}}
   "iree_ll_interp.length"(%a, %dst) : (memref<1xf32>, memref<i8>) -> ()
   return
 }

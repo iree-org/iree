@@ -1390,7 +1390,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
   let arguments = (ins
     VM_FuncRefAttr:$callee,
-    IntElementsAttr<8>:$segment_sizes,
+    SignlessIntElementsAttr<8>:$segment_sizes,
     TypeArrayAttr:$segment_types,
     Variadic<VM_AnyType>:$operands
   );
