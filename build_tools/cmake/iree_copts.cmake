@@ -111,10 +111,6 @@ set(ENABLE_CTEST OFF CACHE BOOL "" FORCE)
 #-------------------------------------------------------------------------------
 
 set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
-set(GTEST_INCLUDE_DIRS
-  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest/include/"
-  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/googlemock/include/"
-)
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
 #-------------------------------------------------------------------------------
