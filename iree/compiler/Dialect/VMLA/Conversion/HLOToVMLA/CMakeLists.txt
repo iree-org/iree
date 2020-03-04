@@ -21,6 +21,7 @@ iree_cc_library(
     "ConvertHLOToVMLA.h"
   SRCS
     "ConvertHLOToVMLA.cpp"
+    "ConvertReductionOps.cpp"
   DEPS
     MLIRIR
     MLIRPass

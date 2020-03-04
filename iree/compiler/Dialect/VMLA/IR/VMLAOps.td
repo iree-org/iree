@@ -56,7 +56,7 @@ def VMLA_BufferConstOp : VMLA_PureOp<"buffer.const"> {
   );
 }
 
-def VMLA_BufferAllocOp : VMLA_PureOp<"buffer.alloc"> {
+def VMLA_BufferAllocOp : VMLA_Op<"buffer.alloc"> {
   let arguments = (ins
     VMLA_DeviceSize:$byte_length
   );
@@ -65,7 +65,7 @@ def VMLA_BufferAllocOp : VMLA_PureOp<"buffer.alloc"> {
   );
 }
 
-def VMLA_BufferCloneOp : VMLA_PureOp<"buffer.clone"> {
+def VMLA_BufferCloneOp : VMLA_Op<"buffer.clone"> {
   let arguments = (ins
     VMLA_Buffer:$src
   );

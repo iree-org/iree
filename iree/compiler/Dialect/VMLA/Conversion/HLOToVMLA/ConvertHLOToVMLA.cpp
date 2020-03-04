@@ -35,6 +35,10 @@
 namespace mlir {
 namespace iree_compiler {
 
+void populateHLOReductionToVMLAPatterns(MLIRContext *context,
+                                        OwningRewritePatternList &patterns,
+                                        TypeConverter &typeConverter);
+
 namespace {
 
 // Clones operand[0] and returns the result.
@@ -371,6 +375,9 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // for standalone conversion testing).
   xla_hlo::PopulateXlaToStdPatterns(&patterns, context);
   xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
+
+  // xla_hlo.reduce and xla_hlo.reduce_window.
+  populateHLOReductionToVMLAPatterns(context, patterns, typeConverter);
 
   // Simple 1:1 conversion patterns using the automated trait-based converter.
   // Used for HLO ops that have equivalent VMLA ops such as most arithmetic ops.

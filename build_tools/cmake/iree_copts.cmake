@@ -43,6 +43,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-undef"
   MSVC_OR_CLANG_CL
     "/DWIN32_LEAN_AND_MEAN"
+    "/wd4624"
     # TODO(benvanik): figure out if really required or accidentally enabled.
     "/EHsc"
 )
