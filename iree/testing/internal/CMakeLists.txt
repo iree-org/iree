@@ -19,6 +19,7 @@ iree_cc_library(
     "gtest_internal.h"
   DEPS
     gtest
+    gmock
   TESTONLY
   PUBLIC
 )
@@ -32,6 +33,7 @@ iree_cc_library(
     "gtest_main_internal.cc"
   DEPS
     gtest
+    gmock
     iree::base::init
   TESTONLY
   PUBLIC
