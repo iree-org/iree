@@ -165,22 +165,12 @@ git submodule update $IREE_CLONE_ARGS --recursive
 ### Build
 
 ```shell
-# TODO: Add more things as they come online.
-# Unit tests.
-bazel test --config=windows //iree/compiler/...
-
-# Sample computation on the interpreter.
-bazel run --config=windows iree/tools/iree-run-mlir -- \
-    $(pwd)/iree/samples/hal/simple_compute_test.mlir \
-    --input_values="4xf32=1.0 2.0 3.0 4.0\n4xf32=2.0 4.0 6.0 8.0" \
-    --target_backends=interpreter-bytecode
-
-# Sample computation via vulkan/spirv.
-bazel run --config=windows iree/tools/iree-run-mlir -- \
-    $(pwd)/iree/samples/hal/simple_compute_test.mlir \
-    --input_values="4xf32=1.0 2.0 3.0 4.0\n4xf32=2.0 4.0 6.0 8.0" \
-    --target_backends=vulkan
+# Run all core tests
+bazel test -k --config=windows iree/...
 ```
+
+In general, build artifacts will be under the `bazel-bin` directory at the top
+level.
 
 ## Recommended user.bazelrc
 

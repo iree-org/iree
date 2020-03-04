@@ -53,9 +53,7 @@ logging during the loader initialization. This is especially useful when trying
 to verify expected paths are being searched for layers or driver JSON manifests.
 
 The simplest test for ensuring that The Vulkan loader and IREE are correctly
-configured together is //iree/hal/vulkan:dynamic_symbols_test. Once that works,
-you should also be able to run //iree/samples/hal:simple_compute_test and see
-the Vulkan HAL in action.
+configured together is //iree/hal/vulkan:dynamic_symbols_test.
 
 #### Enabling Validation Layers
 
