@@ -79,6 +79,7 @@ package(
     for model_name, backends in [
         ("ResNet50", "tf"),
         ("MobileNet", "tf"),
+        ("MobileNetV2", "tf"),
     ]
 ]
 
