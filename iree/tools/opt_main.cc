@@ -17,13 +17,13 @@
 // Based on mlir-opt but without registering passes and dialects we don't care
 // about.
 
+#include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Analysis/Passes.h"
-#include "mlir/InitAllDialects.h"
-#include "mlir/InitAllPasses.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
@@ -55,8 +55,8 @@ static llvm::cl::opt<bool> verifyPasses(
     llvm::cl::init(true));
 
 int main(int argc, char **argv) {
-  mlir::registerAllDialects();
-  mlir::registerAllPasses();
+  mlir::registerMlirDialects();
+  mlir::registerMlirPasses();
   llvm::InitLLVM y(argc, argv);
 
   // Register any pass manager command line options.
