@@ -107,7 +107,6 @@ inline void registerMlirPasses() {
   quantizer::registerInferQuantizedTypesPass();
 
   // SPIR-V
-  spirv::createDecorateSPIRVCompositeTypeLayoutPass();
   spirv::createLowerABIAttributesPass();
   createConvertGPUToSPIRVPass();
   createConvertStandardToSPIRVPass();
