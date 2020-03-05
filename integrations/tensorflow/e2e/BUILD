@@ -60,7 +60,7 @@ package(
         srcs = ["keras_vision_model_test.py"],
         args = [
             "--model=%s" % model_name,
-            "--override_backends=%s" % backends,
+            "--target_backends=%s" % backends,
         ],
         main = "keras_vision_model_test.py",
         python_version = "PY3",
