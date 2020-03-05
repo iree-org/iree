@@ -47,7 +47,6 @@ cc_library(
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
     ],
 )

@@ -27,7 +27,6 @@ iree_cc_library(
     "IREEVM.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIRIR
     MLIRPass
     MLIRSupport

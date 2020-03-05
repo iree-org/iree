@@ -21,7 +21,6 @@ iree_cc_library(
     "VulkanSPIRVTarget.cpp"
   DEPS
     LLVMSupport
-    MLIRAllDialects
     MLIRIR
     MLIRParser
     MLIRPass

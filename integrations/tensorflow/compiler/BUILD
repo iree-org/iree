@@ -43,18 +43,24 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
-        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
     ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "dialect_registration",
+    srcs = ["DialectRegistration.cpp"],
+    deps = ["@org_tensorflow//tensorflow/compiler/mlir/tensorflow"],
     alwayslink = 1,
 )
 
 cc_binary(
     name = "iree-tf-opt",
     deps = [
+        ":dialect_registration",
         ":tensorflow",
         "//iree/tools:iree_opt_main",
-        "@llvm-project//mlir:MlirOptMain",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],

@@ -39,7 +39,6 @@ cc_library(
         "//iree/schemas:spirv_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
