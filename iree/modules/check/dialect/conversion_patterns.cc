@@ -29,6 +29,8 @@ void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                                TypeConverter &typeConverter) {
   patterns.insert<VMImportOpConversion<IREE::Check::ExpectTrueOp>>(
       context, importSymbols, typeConverter, "check.expect_true");
+  patterns.insert<VMImportOpConversion<IREE::Check::ExpectFalseOp>>(
+      context, importSymbols, typeConverter, "check.expect_false");
 }
 
 }  // namespace Check

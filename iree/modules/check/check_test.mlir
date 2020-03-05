@@ -16,3 +16,8 @@ func @expectTrue(%arg : i32) attributes { iree.module.export } {
   check.expect_true(%arg) : i32
   return
 }
+
+func @expectFalse(%arg : i32) attributes { iree.module.export } {
+  check.expect_false(%arg) : i32
+  return
+}

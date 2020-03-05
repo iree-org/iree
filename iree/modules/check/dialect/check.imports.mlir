@@ -18,4 +18,9 @@ vm.import @expect_true(
   %arg : i32
 )
 
+vm.import @expect_false(
+  %arg : i32
+)
+
+
 }  // vm.module

@@ -50,6 +50,11 @@ class CheckModuleState final {
     return OkStatus();
   }
 
+  Status ExpectFalse(int32_t val) {
+    EXPECT_FALSE(val) << "Expected " << val << " to be zero.";
+    return OkStatus();
+  }
+
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
@@ -61,6 +66,7 @@ class CheckModuleState final {
 // check.imports.mlir file.
 static const vm::NativeFunction<CheckModuleState> kCheckModuleFunctions[] = {
     vm::MakeNativeFunction("expect_true", &CheckModuleState::ExpectTrue),
+    vm::MakeNativeFunction("expect_false", &CheckModuleState::ExpectFalse),
 };
 
 // The module instance that will be allocated and reused across contexts.

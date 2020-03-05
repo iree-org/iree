@@ -40,4 +40,20 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
   let printer = [{ print$cppClass(p, *this); }];
 }
 
+
+def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
+  let summary = [{Checks that the operand is false}];
+  let description = [{
+    Verifies that the operand represents a false value, which is represented by
+    zero.
+  }];
+
+  let arguments = (ins AnySignlessInteger:$operand);
+
+  let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
+
+  let parser = [{ return parse$cppClass(parser, result); }];
+  let printer = [{ print$cppClass(p, *this); }];
+}
+
 #endif  // IREE_MODULES_CHECK_DIALECT_CHECK_OPS

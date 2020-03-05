@@ -24,3 +24,14 @@ func @expect_true() {
   check.expect_true(%c) : i32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @expect_false
+func @expect_false() {
+  // CHECK: [[C:%.+]] = constant
+  %c = constant 1 : i32
+  // CHECK: check.expect_false([[C]]) : i32
+  check.expect_false(%c) : i32
+  return
+}
