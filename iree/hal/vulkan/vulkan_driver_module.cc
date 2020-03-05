@@ -30,6 +30,8 @@ ABSL_FLAG(bool, vulkan_debug_report, false,
           "Enables VK_EXT_debug_report and logs errors.");
 ABSL_FLAG(bool, vulkan_push_descriptors, true,
           "Enables use of vkCmdPushDescriptorSetKHR, if available.");
+ABSL_FLAG(bool, vulkan_timeline_semaphores, true,
+          "Enables VK_KHR_timeline_semaphore extension, if available.");
 
 namespace iree {
 namespace hal {
@@ -77,11 +79,24 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
         VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
 
-  if (absl::GetFlag(FLAGS_vulkan_push_descriptors)) {
+  // Multiple extensions depend on VK_KHR_get_physical_device_properties2.
+  if (absl::GetFlag(FLAGS_vulkan_push_descriptors) ||
+      absl::GetFlag(FLAGS_vulkan_timeline_semaphores)) {
     options.instance_extensibility.optional_extensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+  }
+
+  if (absl::GetFlag(FLAGS_vulkan_push_descriptors)) {
     options.device_extensibility.optional_extensions.push_back(
         VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+  }
+
+  if (absl::GetFlag(FLAGS_vulkan_timeline_semaphores)) {
+    // Polyfill layer - enable if present.
+    options.instance_extensibility.optional_layers.push_back(
+        "VK_LAYER_KHRONOS_timeline_semaphore");
+    options.device_extensibility.optional_extensions.push_back(
+        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
   }
 
   // Create the driver and VkInstance.
