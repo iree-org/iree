@@ -32,6 +32,12 @@ namespace {
 Status MarshalIO(Interface* interface,
                  const DispatchRequest& dispatch_request) {
   IREE_TRACE_SCOPE0("VMLACommandProcessor::MarshalIO");
+  if (dispatch_request.bindings.size() >= Interface::kMaxBindings) {
+    return OutOfRangeErrorBuilder(IREE_LOC)
+           << "Too many bindings requested; wanted "
+           << dispatch_request.bindings.size() << " but have a maximum of "
+           << Interface::kMaxBindings;
+  }
 
   for (int i = 0; i < dispatch_request.bindings.size(); ++i) {
     const auto& binding = dispatch_request.bindings[i];

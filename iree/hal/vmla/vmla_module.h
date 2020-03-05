@@ -98,7 +98,7 @@ class Buffer final : public RefObject<Buffer> {
 class Interface final : public RefObject<Interface> {
  public:
   static constexpr int kMaxSets = 4;
-  static constexpr int kMaxBindings = 8;
+  static constexpr int kMaxBindings = 32;
 
   struct Binding {
     vm::ref<Buffer> buffer;
