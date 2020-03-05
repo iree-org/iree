@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This files defines a helper to trigger the registration of dialects and
-// passes to the system.
+// This files defines a helper to trigger the registration of dialects to
+// the system.
 //
 // Based on MLIR's InitAllDialects but without dialects we don't care about.
 
-#ifndef MLIR_INIT_DIALECTS_H_
-#define MLIR_INIT_DIALECTS_H_
+#ifndef IREE_TOOLS_INIT_DIALECTS_H_
+#define IREE_TOOLS_INIT_DIALECTS_H_
 
 #include "mlir/Dialect/AffineOps/AffineOps.h"
 #include "mlir/Dialect/FxpMathOps/FxpMathOps.h"
@@ -56,4 +56,4 @@ inline void registerMlirDialects() {
 }
 }  // namespace mlir
 
-#endif  // MLIR_INIT_DIALECTS_H_
+#endif  // IREE_TOOLS_INIT_DIALECTS_H_

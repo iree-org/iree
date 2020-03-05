@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// This file defines a helper to trigger the registration of dialects and
-// passes to the system.
+// This file defines a helper to trigger the registration of passes to
+// the system.
 //
 // Based on MLIR's InitAllPasses but without passes we don't care about.
 
-#ifndef MLIR_INIT_PASSES_H_
-#define MLIR_INIT_PASSES_H_
+#ifndef IREE_TOOLS_INIT_PASSES_H_
+#define IREE_TOOLS_INIT_PASSES_H_
 
 #include <cstdlib>
 
@@ -123,4 +123,4 @@ inline void registerMlirPasses() {
 
 }  // namespace mlir
 
-#endif  // MLIR_INIT_PASSES_H_
+#endif  // IREE_TOOLS_INIT_PASSES_H_
