@@ -21,6 +21,7 @@ cc_library(
     name = "HLOToVMLA",
     srcs = [
         "ConvertHLOToVMLA.cpp",
+        "ConvertReductionOps.cpp",
     ],
     hdrs = [
         "ConvertHLOToVMLA.h",

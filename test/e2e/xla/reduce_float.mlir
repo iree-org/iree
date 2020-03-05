@@ -1,4 +1,5 @@
 // RUN: iree-run-mlir %s -iree-hal-target-backends=interpreter-bytecode | IreeFileCheck %s
+// RUN: iree-run-mlir -iree-hal-target-backends=vmla -iree-flow-experimental-dispatch-reduce %s | IreeFileCheck %s
 // TODO(b/142903911): figure out swiftshader+asan crash:
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=vulkan-spirv --run=false)
 

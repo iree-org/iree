@@ -1,4 +1,5 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: iree-run-mlir -iree-hal-target-backends=vmla -iree-flow-experimental-dispatch-reduce %s | IreeFileCheck %s
 // TODO(b/146030213): This test fails cause the initialization isn't done
 // correctly within the vulkan backend. Enable this test once that is done.
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv --run=false %s)

@@ -151,7 +151,8 @@ LogicalResult outlineReductionRegion(
   for (uint32_t i = 0; i < dimensions.getNumElements(); ++i) {
     sortedDimensions.push_back(dimensions.getValue<IntegerAttr>({i}).getInt());
   }
-  llvm::sort(sortedDimensions, [](int32_t a, int32_t b) { return a - b; });
+  llvm::sort(sortedDimensions,
+             [](int32_t a, int32_t b) { return (a - b) > 0; });
   for (auto dimension : llvm::enumerate(sortedDimensions)) {
     // Create the executable with the region cloned into it.
     ExecutableOp executableOp;
