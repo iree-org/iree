@@ -33,7 +33,7 @@ func @bad_bool(%a : memref<1xf32>) {
 // -----
 
 func @not_scalar(%a : memref<2xf32>) {
-  // expected-error@+1 {{0D memref of integer values}}
+  // expected-error@+1 {{0D memref of signless integer values}}
   "iree_hl_interp.length"(%a) : (memref<2xf32>) -> memref<2xi32>
   return
 }
@@ -41,7 +41,7 @@ func @not_scalar(%a : memref<2xf32>) {
 // -----
 
 func @not_scalar_int(%a : memref<1xf32>) {
-  // expected-error@+1 {{0D memref of integer values}}
+  // expected-error@+1 {{0D memref of signless integer values}}
   "iree_hl_interp.length"(%a) : (memref<1xf32>) -> memref<f32>
   return
 }

@@ -67,10 +67,10 @@ def VMLA_CmpPredicateAttr :
 //===----------------------------------------------------------------------===//
 
 def VMLA_DeviceSize : TypeAlias<I32>;
-def VMLA_DeviceSizeAttr : IntegerAttrBase<I32, "device_size_t">;
+def VMLA_DeviceSizeAttr : SignlessIntegerAttrBase<I32, "device_size_t">;
 
 def VMLA_HostSize : TypeAlias<I32>;
-def VMLA_HostSizeAttr : IntegerAttrBase<I32, "size_t">;
+def VMLA_HostSizeAttr : SignlessIntegerAttrBase<I32, "size_t">;
 
 def VMLA_Index : TypeAlias<I32>;
 
