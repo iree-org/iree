@@ -24,7 +24,6 @@
 
 #include "mlir/Analysis/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
-#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
@@ -116,9 +115,6 @@ inline void registerMlirPasses() {
   createConvertStandardToSPIRVPass();
   createLegalizeStdOpsForSPIRVLoweringPass();
   createLinalgToSPIRVPass();
-
-  // Vulkan
-  createConvertGpuLaunchFuncToVulkanCallsPass();
 }
 
 }  // namespace mlir

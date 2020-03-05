@@ -156,7 +156,6 @@ if(${IREE_BUILD_COMPILER})
       "init_dialects.h"
     DEPS
       MLIRAffineOps
-      MLIRGPUtoVulkanTransforms
       MLIRLinalgOps
       MLIRLinalgToLLVM
       MLIRLinalgToSPIRVTransforms

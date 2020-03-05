@@ -79,7 +79,6 @@ cc_library(
         "@llvm-project//mlir:FxpMathOps",
         "@llvm-project//mlir:GPUDialect",
         "@llvm-project//mlir:GPUToSPIRVTransforms",
-        "@llvm-project//mlir:GPUToVulkanTransforms",
         "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LLVMDialect",
