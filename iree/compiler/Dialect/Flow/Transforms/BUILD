@@ -35,6 +35,7 @@ cc_library(
         "Passes.cpp",
         "PrePostPartitioningConversion.cpp",
         "RematerializeDispatchConstants.cpp",
+        "UnrollReductions.cpp",
     ],
     hdrs = [
         "Passes.h",
