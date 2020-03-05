@@ -441,6 +441,23 @@ struct AdjustIntegerArithmeticOperations : public OpRewritePattern<OpTy> {
   }
 };
 
+/// Rewrite SelectOp so that result is a 32-bit integer.
+struct AdjustSelectOp : public OpRewritePattern<spirv::SelectOp> {
+  using OpRewritePattern<spirv::SelectOp>::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(spirv::SelectOp op,
+                                     PatternRewriter &rewriter) const {
+    Type resultType = op.result().getType();
+    if (!hasSupportedIntegerType(resultType)) {
+      return Pattern::matchFailure();
+    }
+    Type newType = legalizeIntegerType(op.getResult().getType());
+    ValueRange operands(op.getOperation()->getOperands());
+    rewriter.replaceOpWithNewOp<spirv::SelectOp>(op, newType, operands,
+                                                 op.getAttrs());
+    return Pattern::matchSuccess();
+  }
+};
+
 void AdjustIntegerWidthPass::runOnOperation() {
   OwningRewritePatternList patterns;
   patterns.insert<
@@ -457,6 +474,8 @@ void AdjustIntegerWidthPass::runOnOperation() {
       AdjustIntegerArithmeticOperations<spirv::SRemOp>,
       AdjustIntegerArithmeticOperations<spirv::UDivOp>,
       AdjustIntegerArithmeticOperations<spirv::UModOp>,
+      // Control flow ops:
+      AdjustSelectOp,
       // Structure ops:
       AdjustConstantOp,
       // Others:

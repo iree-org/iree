@@ -272,4 +272,24 @@ module{
       spv.Return
     }
   }
+
+  spv.module "Logical" "GLSL450" {
+    spv.globalVariable @globalInvocationID built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
+    spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
+    spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+    spv.func @select(%arg0 : i1, %arg1 : i8) -> () "None" {
+      %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
+      %1 = spv.constant 0 : i32
+      %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
+      %3 = spv.Load "StorageBuffer" %2 : i1
+      %4 = spv.constant 0 : i8
+      %5 = spv.constant 1 : i8
+      // CHECK: spv.Select {{.*}} : i1, i32
+      %6 = spv.Select %3, %5, %4 : i1, i8
+      %7 = spv._address_of @constant_arg_1 : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+      %8 = spv.AccessChain %7[%1] : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
+      spv.Store "StorageBuffer" %8, %6 : i8
+      spv.Return
+    }
+  }
 }
