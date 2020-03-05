@@ -62,27 +62,16 @@ function(set_alwayslink_mlir_libs)
     MLIRIR
     # Required passes
     MLIRPass
-    # Required transforms
-    MLIRGPUtoCUDATransforms
-    MLIRGPUtoNVVMTransforms
-    MLIRGPUtoROCDLTransforms
-    MLIRGPUtoVulkanTransforms
-    MLIRQuantizerTransforms
-    MLIRLinalgToLLVM # createConvertLinalgToLLVMPass()
-    MLIRLinalgToSPIRVTransforms
-    MLIRLoopOpsTransforms
     # TODO(marbre): Check the previously added libs
     MLIRAnalysis
     MLIREDSC
     MLIRLoopToStandard
     MLIRParser
-    MLIRSPIRVTransforms
     MLIRStandardToLLVM
     MLIRTargetLLVMIR
     MLIRTransforms
     MLIRTranslation
     MLIRSupport
-    MLIROptLib
   )
 
   set_alwayslink_property(

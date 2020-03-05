@@ -68,9 +68,44 @@ cc_binary(
 )
 
 cc_library(
+    name = "PassesAndDialects",
+    hdrs = [
+        "init_dialects.h",
+        "init_passes.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:FxpMathOps",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUToSPIRVTransforms",
+        "@llvm-project//mlir:GPUTransforms",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LLVMDialect",
+        "@llvm-project//mlir:LinalgOps",
+        "@llvm-project//mlir:LinalgToLLVM",
+        "@llvm-project//mlir:LinalgToSPIRV",
+        "@llvm-project//mlir:LinalgTransforms",
+        "@llvm-project//mlir:LoopOps",
+        "@llvm-project//mlir:LoopOpsTransforms",
+        "@llvm-project//mlir:LoopsToGPUPass",
+        "@llvm-project//mlir:QuantOps",
+        "@llvm-project//mlir:QuantizerTransforms",
+        "@llvm-project//mlir:SDBM",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVLowering",
+        "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:StandardToSPIRVConversions",
+        "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:VectorOps",
+    ],
+)
+
+cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [
+        ":PassesAndDialects",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Flow/Analysis",
@@ -96,8 +131,6 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
-        "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
@@ -106,7 +139,6 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
     ] + TARGET_COMPILER_BACKENDS,
-    alwayslink = 1,
 )
 
 cc_binary(
