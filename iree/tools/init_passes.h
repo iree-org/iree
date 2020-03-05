@@ -72,8 +72,6 @@ inline void registerMlirPasses() {
   createLoopCoalescingPass();
   createAffineDataCopyGenerationPass(0, 0);
   createMemRefDataFlowOptPass();
-  createStripDebugInfoPass();
-  createPrintOpStatsPass();
   createInlinerPass();
   createSymbolDCEPass();
   createLocationSnapshotPass({});
