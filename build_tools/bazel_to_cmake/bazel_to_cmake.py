@@ -57,6 +57,7 @@ def parse_arguments():
       help="Prints results instead of writing files",
       action="store_true",
       default=False)
+  # TODO(b/149926655): Invert the default to be strict and rename this flag.
   parser.add_argument(
       "--strict",
       help="Does not try to generate files where it cannot convert completely",
@@ -289,7 +290,12 @@ class BuildFileFunctions(object):
     }
     if not self.converter.first_error:
       self.converter.first_error = NotImplementedError(message)
-    self.converter.body += "# %s\n" % (message,)
+    # Avoid submitting the raw results from non-strict runs. These are still
+    # useful but are generally not safe to submit as-is. An upstream check
+    # prevents changes with this phrase from being submitted.
+    # Written as separate literals to avoid the check triggering here.
+    submit_blocker = "DO" + " NOT" + " SUBMIT."
+    self.converter.body += "# %s %s\n" % (submit_blocker, message)
 
   # ------------------------------------------------------------------------- #
   # Function handlers that convert BUILD definitions to CMake definitions.    #
