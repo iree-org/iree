@@ -109,6 +109,46 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_binary(
+  NAME
+    iree-run-module
+  OUT
+    iree-run-module
+  SRCS
+    "run_module_main.cc"
+  DEPS
+    ::vm_util
+    absl::flags
+    absl::strings
+    iree::base::api_util
+    iree::base::file_io
+    iree::base::init
+    iree::base::localfile
+    iree::base::source_location
+    iree::base::status
+    iree::modules::hal
+    iree::vm::bytecode_module
+    ${IREE_HAL_DRIVER_MODULES}
+)
+
+if(${IREE_ENABLE_LLVM})
+  iree_cc_binary(
+    NAME
+      iree-tblgen
+    SRCS
+      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+    OUT
+      iree-tblgen
+    DEPS
+      LLVMMLIRTableGen
+      MLIRSupport
+      MLIRTableGen
+      iree::compiler::Dialect::VM::Tools
+    LINKOPTS
+      "-lpthread"
+  )
+endif()
+
 iree_cc_library(
   NAME
     iree_opt_main
@@ -196,46 +236,6 @@ iree_cc_binary(
     ${IREE_COMPILER_TARGET_BACKENDS}
     ${IREE_HAL_DRIVER_MODULES}
 )
-
-iree_cc_binary(
-  NAME
-    iree-run-module
-  OUT
-    iree-run-module
-  SRCS
-    "run_module_main.cc"
-  DEPS
-    ::vm_util
-    absl::flags
-    absl::strings
-    iree::base::api_util
-    iree::base::file_io
-    iree::base::init
-    iree::base::localfile
-    iree::base::source_location
-    iree::base::status
-    iree::modules::hal
-    iree::vm::bytecode_module
-    ${IREE_HAL_DRIVER_MODULES}
-)
-
-if(${IREE_ENABLE_LLVM})
-  iree_cc_binary(
-    NAME
-      iree-tblgen
-    SRCS
-      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-    OUT
-      iree-tblgen
-    DEPS
-      LLVMMLIRTableGen
-      MLIRSupport
-      MLIRTableGen
-      iree::compiler::Dialect::VM::Tools
-    LINKOPTS
-      "-lpthread"
-  )
-endif()
 
 iree_cc_library(
   NAME
