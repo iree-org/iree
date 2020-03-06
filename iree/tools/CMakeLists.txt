@@ -70,10 +70,12 @@ iree_cc_library(
     MLIRGPU
     MLIRGPUtoSPIRVTransforms
     MLIRIR
-    MLIRLLVMDialect
+    MLIRLLVMIR
+    MLIRNVVMIR
+    MLIRROCDLIR
     MLIRLinalgOps
     MLIRLinalgToLLVM
-    MLIRLinalgToSPIRV
+    MLIRLinalgToSPIRVTransforms
     MLIRLinalgTransforms
     MLIRLoopOps
     MLIRLoopOpsTransforms
@@ -150,9 +152,9 @@ iree_cc_binary(
   SRCS
     "run_mlir_main.cc"
   DEPS
+    ::PassesAndDialects
     ::vm_util
     LLVMSupport
-    MLIRAllDialects
     MLIRIR
     MLIRLoopOpsTransforms
     MLIRParser
@@ -216,6 +218,8 @@ iree_cc_binary(
 iree_cc_binary(
   NAME
     iree-tblgen
+  SRCS
+    "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
   OUT
     iree-tblgen
   DEPS
@@ -231,8 +235,8 @@ iree_cc_library(
   SRCS
     "translate_main.cc"
   DEPS
+    ::PassesAndDialects
     LLVMSupport
-    MLIRAllDialects
     MLIRIR
     MLIRLoopOpsTransforms
     MLIRPass
@@ -302,3 +306,12 @@ iree_cc_test(
     iree::vm::value
     iree::vm::variant_list
 )
+
+add_custom_target(IreeFileCheck ALL
+  COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/IreeFileCheck.sh IreeFileCheck
+)
+add_custom_target(LLVMFileCheck ALL
+  COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
+  DEPENDS FileCheck
+)
+
