@@ -55,6 +55,7 @@ iree_pybind_cc_library(
     iree::compiler::Dialect::HAL::Target::LLVM
     iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
+    iree::tools::PassesAndDialects
     bindings::python::pyiree::common
     LLVMSupport
     MLIRIR
