@@ -99,9 +99,9 @@ void ConvertTfToTfTensorList::runOnOperation() {
       }
       // If a user is just a terminator passing the value through a successor
       // operand, propagate through the successor operand.
-      if (owner->isKnownTerminator()) {
+      if (BranchOpInterface branchOp = dyn_cast<BranchOpInterface>(owner)) {
         if (auto arg =
-                owner->getSuccessorBlockArgument(use.getOperandNumber())) {
+                branchOp.getSuccessorBlockArgument(use.getOperandNumber())) {
           if (!arg->getType().isa<TensorListType>()) {
             arg->setType(tensorListType);
             typeConversionWorklist.push_back(*arg);

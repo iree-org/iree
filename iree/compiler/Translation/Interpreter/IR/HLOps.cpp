@@ -46,8 +46,15 @@ void BranchOp::setDest(Block *block) {
 }
 
 void BranchOp::eraseOperand(unsigned index) {
-  getOperation()->eraseSuccessorOperand(0, index);
+  getOperation()->eraseOperand(index);
 }
+
+Optional<OperandRange> BranchOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  return getOperands();
+}
+
+bool BranchOp::canEraseSuccessorOperand() { return true; }
 
 //===----------------------------------------------------------------------===//
 // iree_hl_interp.cond_br
@@ -68,15 +75,24 @@ static ParseResult parseCondBranchOp(OpAsmParser &parser,
   }
 
   // Parse the true successor.
-  if (parser.parseSuccessorAndUseList(dest, destOperands)) return failure();
-  result.addSuccessor(dest, destOperands);
+  SmallVector<Value, 4> trueOperands;
+  if (parser.parseComma() ||
+      parser.parseSuccessorAndUseList(dest, trueOperands))
+    return failure();
+  result.addSuccessors(dest);
+  result.addOperands(trueOperands);
 
   // Parse the false successor.
-  destOperands.clear();
+  SmallVector<Value, 4> falseOperands;
   if (parser.parseComma() ||
-      parser.parseSuccessorAndUseList(dest, destOperands))
+      parser.parseSuccessorAndUseList(dest, falseOperands))
     return failure();
-  result.addSuccessor(dest, destOperands);
+  result.addSuccessors(dest);
+  result.addOperands(falseOperands);
+  result.addAttribute(CondBranchOp::getOperandSegmentSizeAttr(),
+                      parser.getBuilder().getI32VectorAttr(
+                          {1, static_cast<int32_t>(trueOperands.size()),
+                           static_cast<int32_t>(falseOperands.size())}));
 
   return success();
 }
@@ -85,10 +101,17 @@ static void printCondBranchOp(OpAsmPrinter &p, CondBranchOp op) {
   p << "iree_hl_interp.cond_br ";
   p.printOperand(op.getCondition());
   p << ", ";
-  p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::trueIndex);
+  p.printSuccessorAndUseList(op.trueDest(), op.trueDestOperands());
   p << ", ";
-  p.printSuccessorAndUseList(op.getOperation(), CondBranchOp::falseIndex);
+  p.printSuccessorAndUseList(op.falseDest(), op.falseDestOperands());
 }
+
+Optional<OperandRange> CondBranchOp::getSuccessorOperands(unsigned index) {
+  assert(index < getNumSuccessors() && "invalid successor index");
+  return index == trueIndex ? getTrueOperands() : getFalseOperands();
+}
+
+bool CondBranchOp::canEraseSuccessorOperand() { return true; }
 
 //===----------------------------------------------------------------------===//
 // iree_hl_interp.clone

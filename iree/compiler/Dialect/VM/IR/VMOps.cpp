@@ -707,8 +707,15 @@ void BranchOp::setDest(Block *block) {
 }
 
 void BranchOp::eraseOperand(unsigned index) {
-  getOperation()->eraseSuccessorOperand(0, index);
+  getOperation()->eraseOperand(index);
 }
+
+Optional<OperandRange> BranchOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  return getOperands();
+}
+
+bool BranchOp::canEraseSuccessorOperand() { return true; }
 
 static ParseResult parseCallVariadicOp(OpAsmParser &parser,
                                        OperationState *result) {
@@ -867,6 +874,13 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
   }
 }
 
+Optional<OperandRange> CondBranchOp::getSuccessorOperands(unsigned index) {
+  assert(index < getNumSuccessors() && "invalid successor index");
+  return index == trueIndex ? getTrueOperands() : getFalseOperands();
+}
+
+bool CondBranchOp::canEraseSuccessorOperand() { return true; }
+
 //===----------------------------------------------------------------------===//
 // Debugging
 //===----------------------------------------------------------------------===//
@@ -878,8 +892,15 @@ void BreakOp::setDest(Block *block) {
 }
 
 void BreakOp::eraseOperand(unsigned index) {
-  getOperation()->eraseSuccessorOperand(0, index);
+  getOperation()->eraseOperand(index);
 }
+
+Optional<OperandRange> BreakOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  return getOperands();
+}
+
+bool BreakOp::canEraseSuccessorOperand() { return true; }
 
 Block *CondBreakOp::getDest() { return getOperation()->getSuccessor(0); }
 
@@ -888,8 +909,15 @@ void CondBreakOp::setDest(Block *block) {
 }
 
 void CondBreakOp::eraseOperand(unsigned index) {
-  getOperation()->eraseSuccessorOperand(0, index);
+  getOperation()->eraseOperand(index);
 }
+
+Optional<OperandRange> CondBreakOp::getSuccessorOperands(unsigned index) {
+  assert(index == 0 && "invalid successor index");
+  return destOperands();
+}
+
+bool CondBreakOp::canEraseSuccessorOperand() { return true; }
 
 //===----------------------------------------------------------------------===//
 // TableGen definitions (intentionally last)

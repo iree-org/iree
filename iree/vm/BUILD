@@ -103,6 +103,7 @@ gentbl(
         "//iree/compiler/Dialect/VM/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Analysis/ControlFlowInterfaces.td",
     ],
 )
 

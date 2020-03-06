@@ -77,6 +77,7 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Analysis/ControlFlowInterfaces.td",
     ],
 )
 
@@ -93,6 +94,7 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Analysis/ControlFlowInterfaces.td",
     ],
 )
 
@@ -108,6 +110,7 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Analysis/ControlFlowInterfaces.td",
     ],
 )
 
@@ -124,5 +127,6 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Analysis/ControlFlowInterfaces.td",
     ],
 )

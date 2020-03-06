@@ -109,6 +109,7 @@ gentbl(
     td_file = "HLOps.td",
     td_srcs = [
         ":td_files",
+        "@llvm-project//mlir:include/mlir/Analysis/ControlFlowInterfaces.td",
         "@llvm-project//mlir:include/mlir/IR/OpBase.td",
         "//iree/compiler/Dialect/IREE/IR:IREEBase.td",
     ],
@@ -124,6 +125,7 @@ gentbl(
     td_file = "LLOps.td",
     td_srcs = [
         ":td_files",
+        "@llvm-project//mlir:include/mlir/Analysis/ControlFlowInterfaces.td",
         "@llvm-project//mlir:include/mlir/IR/OpBase.td",
         "//iree/compiler/Dialect/IREE/IR:IREEBase.td",
     ],

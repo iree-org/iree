@@ -70,11 +70,10 @@ struct BranchOpLowering : public OpConversionPattern<BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      BranchOp op, ArrayRef<Value> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
+      BranchOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREEInterp::HL::BranchOp>(op, destinations[0],
-                                                          operands[0]);
+    rewriter.replaceOpWithNewOp<IREEInterp::HL::BranchOp>(op, op.getDest(),
+                                                          operands);
     return this->matchSuccess();
   }
 };
@@ -83,15 +82,13 @@ struct CondBranchOpLowering : public OpConversionPattern<CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CondBranchOp op, ArrayRef<Value> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
+      CondBranchOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto condValue = loadAccessValue(op.getLoc(), properOperands[0], rewriter);
+    auto condValue = loadAccessValue(op.getLoc(), operands[0], rewriter);
+    Block *trueDest = op.getTrueDest();
     rewriter.replaceOpWithNewOp<IREEInterp::HL::CondBranchOp>(
-        op, condValue, destinations[IREEInterp::HL::CondBranchOp::trueIndex],
-        operands[IREEInterp::HL::CondBranchOp::trueIndex],
-        destinations[IREEInterp::HL::CondBranchOp::falseIndex],
-        operands[IREEInterp::HL::CondBranchOp::falseIndex]);
+        op, condValue, trueDest, operands.slice(1, trueDest->getNumArguments()),
+        op.getFalseDest(), operands.slice(1 + trueDest->getNumArguments()));
     return this->matchSuccess();
   }
 };

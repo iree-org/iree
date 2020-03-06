@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMTraits.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
 #include "mlir/Analysis/CallInterfaces.h"
+#include "mlir/Analysis/ControlFlowInterfaces.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/FunctionSupport.h"

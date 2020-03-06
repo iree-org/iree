@@ -100,30 +100,13 @@ LogicalResult convertOperation(Operation *oldOp,
     state.attributes = llvm::to_vector<4>(oldOp->getAttrs());
   }
 
-  if (oldOp->getNumSuccessors() == 0) {
-    // Non-branching operations can just add all the operands.
-    for (auto oldOperand : oldOp->getOperands()) {
-      state.operands.push_back(mapping.lookup(oldOperand));
-    }
-  } else {
-    // We add the operands separated by nullptr's for each successor.
-    unsigned firstSuccOperand = oldOp->getNumSuccessors()
-                                    ? oldOp->getSuccessorOperandIndex(0)
-                                    : oldOp->getNumOperands();
-    auto oldOperands = oldOp->getOpOperands();
-    for (unsigned i = 0; i != firstSuccOperand; ++i) {
-      state.operands.push_back(mapping.lookup(oldOperands[i].get()));
-    }
-    for (unsigned succ = 0, e = oldOp->getNumSuccessors(); succ != e; ++succ) {
-      state.successors.push_back(
-          mapping.lookupOrDefault(oldOp->getSuccessor(succ)));
-      // Add sentinel to delineate successor operands.
-      state.operands.push_back(nullptr);
-      // Remap the successors operands.
-      for (auto operand : oldOp->getSuccessorOperands(succ)) {
-        state.operands.push_back(mapping.lookup(operand));
-      }
-    }
+  for (auto oldOperand : oldOp->getOperands()) {
+    state.operands.push_back(mapping.lookup(oldOperand));
+  }
+
+  for (unsigned succ = 0, e = oldOp->getNumSuccessors(); succ != e; ++succ) {
+    state.successors.push_back(
+        mapping.lookupOrDefault(oldOp->getSuccessor(succ)));
   }
 
   for (auto &oldRegion : oldOp->getRegions()) {

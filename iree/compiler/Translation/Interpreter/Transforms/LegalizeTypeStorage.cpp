@@ -32,32 +32,15 @@ namespace {
 bool convertOperation(Operation *oldOp, OpBuilder &builder,
                       BlockAndValueMapping *mapping) {
   OperationState state(oldOp->getLoc(), oldOp->getName());
-  if (oldOp->getNumSuccessors() == 0) {
-    // Non-branching operations can just add all the operands.
-    for (auto oldOperand : oldOp->getOperands()) {
-      state.operands.push_back(mapping->lookupOrDefault(oldOperand));
-    }
-  } else {
-    // We add the operands separated by nullptr's for each successor.
-    unsigned firstSuccOperand = oldOp->getNumSuccessors()
-                                    ? oldOp->getSuccessorOperandIndex(0)
-                                    : oldOp->getNumOperands();
-    auto opOperands = oldOp->getOpOperands();
-    unsigned i = 0;
-    for (; i != firstSuccOperand; ++i) {
-      state.operands.push_back(mapping->lookupOrDefault(opOperands[i].get()));
-    }
-    for (unsigned succ = 0, e = oldOp->getNumSuccessors(); succ != e; ++succ) {
-      state.successors.push_back(
-          mapping->lookupOrDefault(oldOp->getSuccessor(succ)));
-      // Add sentinel to delineate successor operands.
-      state.operands.push_back(nullptr);
-      // Remap the successors operands.
-      for (auto operand : oldOp->getSuccessorOperands(succ)) {
-        state.operands.push_back(mapping->lookupOrDefault(operand));
-      }
-    }
+  for (auto oldOperand : oldOp->getOperands()) {
+    state.operands.push_back(mapping->lookupOrDefault(oldOperand));
   }
+
+  for (unsigned succ = 0, e = oldOp->getNumSuccessors(); succ != e; ++succ) {
+    state.successors.push_back(
+        mapping->lookupOrDefault(oldOp->getSuccessor(succ)));
+  }
+
   for (const auto &oldType : oldOp->getResultTypes()) {
     state.types.push_back(legalizeLegacyType(oldType));
   }

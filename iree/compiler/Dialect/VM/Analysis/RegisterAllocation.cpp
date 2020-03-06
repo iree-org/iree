@@ -493,8 +493,9 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
   // possible to evaluate as a direct remapping.
   SmallVector<std::pair<uint8_t, uint8_t>, 8> srcDstRegs;
   auto *targetBlock = op->getSuccessor(successorIndex);
-  auto operands = op->getSuccessorOperands(successorIndex);
-  for (auto it : llvm::enumerate(operands)) {
+  auto operands =
+      cast<BranchOpInterface>(op).getSuccessorOperands(successorIndex);
+  for (auto it : llvm::enumerate(*operands)) {
     uint8_t srcReg = mapToRegister(it.value());
     BlockArgument targetArg = targetBlock->getArgument(it.index());
     uint8_t dstReg = mapToRegister(targetArg);

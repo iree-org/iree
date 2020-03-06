@@ -16,6 +16,7 @@
 #define IREE_DIALECT_VM_OPS
 
 include "mlir/Analysis/CallInterfaces.td"
+include "mlir/Analysis/ControlFlowInterfaces.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 //===----------------------------------------------------------------------===//
@@ -1129,6 +1130,7 @@ def VM_CmpNZRefOp :
 //===----------------------------------------------------------------------===//
 
 def VM_BranchOp : VM_Op<"br", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
   ]> {
@@ -1145,11 +1147,17 @@ def VM_BranchOp : VM_Op<"br", [
    ```
   }];
 
+  let arguments = (ins
+    Variadic<VM_AnyType>:$destOperands
+  );
+
   let successors = (successor
     AnySuccessor:$dest
   );
 
-  let assemblyFormat = "$dest attr-dict";
+  let assemblyFormat = [{
+    $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Branch>,
@@ -1158,11 +1166,12 @@ def VM_BranchOp : VM_Op<"br", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Block *dest
+      Builder *, OperationState &result, Block *dest,
+      ValueRange destOperands = {}
     }], [{
-      result.addSuccessor(dest, llvm::None);
-    }]>,
-   ];
+      result.addSuccessors(dest);
+      result.addOperands(destOperands);
+  }]>];
 
   let extraClassDeclaration = [{
     Block *getDest();
@@ -1176,6 +1185,8 @@ def VM_BranchOp : VM_Op<"br", [
 }
 
 def VM_CondBranchOp : VM_Op<"cond_br", [
+    AttrSizedOperandSegments,
+    DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
   ]> {
@@ -1195,7 +1206,9 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
   }];
 
   let arguments = (ins
-    VM_CondValue:$condition
+    VM_CondValue:$condition,
+    Variadic<VM_AnyType>:$trueDestOperands,
+    Variadic<VM_AnyType>:$falseDestOperands
   );
 
   let successors = (successor
@@ -1203,13 +1216,35 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
     AnySuccessor:$falseDest
   );
 
-  let assemblyFormat = "$condition `,` $trueDest `,` $falseDest attr-dict";
+  let assemblyFormat = [{
+    $condition `,`
+    $trueDest (`(` $trueDestOperands^ `:` type($trueDestOperands) `)`)? `,`
+    $falseDest (`(` $falseDestOperands^ `:` type($falseDestOperands) `)`)?
+    attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBranch>,
     VM_EncOperand<"condition", 0>,
     VM_EncBranch<"getTrueDest", "getTrueOperands", 0>,
     VM_EncBranch<"getFalseDest", "getFalseOperands", 1>,
+  ];
+
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Value condition,
+      Block *trueDest, ValueRange trueOperands,
+      Block *falseDest, ValueRange falseOperands
+    }], [{
+      build(builder, result, condition, trueOperands, falseOperands, trueDest,
+            falseDest);
+    }]>, OpBuilder<[{
+      Builder *builder, OperationState &result, Value condition,
+      Block *trueDest, Block *falseDest, ValueRange falseOperands = {}
+    }], [{
+      build(builder, result, condition, trueDest, ValueRange(), falseDest,
+            falseOperands);
+    }]>
   ];
 
   let extraClassDeclaration = [{
@@ -1240,23 +1275,13 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
       setOperand(getTrueDestOperandIndex() + idx, value);
     }
 
-    operand_iterator true_operand_begin() {
-      return operand_begin() + getTrueDestOperandIndex();
-    }
-    operand_iterator true_operand_end() {
-      return true_operand_begin() + getNumTrueOperands();
-    }
-    operand_range getTrueOperands() {
-      return {true_operand_begin(), true_operand_end()};
-    }
+    operand_range getTrueOperands() { return trueDestOperands(); }
 
-    unsigned getNumTrueOperands()  {
-      return getOperation()->getNumSuccessorOperands(trueIndex);
-    }
+    unsigned getNumTrueOperands()  { return getTrueOperands().size(); }
 
     /// Erase the operand at 'index' from the true operand list.
     void eraseTrueOperand(unsigned index)  {
-      getOperation()->eraseSuccessorOperand(trueIndex, index);
+      eraseSuccessorOperand(trueIndex, index);
     }
 
     /// Accessors for operands to the 'false' destination.
@@ -1269,21 +1294,13 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
       setOperand(getFalseDestOperandIndex() + idx, value);
     }
 
-    operand_iterator false_operand_begin() { return true_operand_end(); }
-    operand_iterator false_operand_end() {
-      return false_operand_begin() + getNumFalseOperands();
-    }
-    operand_range getFalseOperands() {
-      return {false_operand_begin(), false_operand_end()};
-    }
+    operand_range getFalseOperands() { return falseDestOperands(); }
 
-    unsigned getNumFalseOperands() {
-      return getOperation()->getNumSuccessorOperands(falseIndex);
-    }
+    unsigned getNumFalseOperands() { return getFalseOperands().size(); }
 
     /// Erase the operand at 'index' from the false operand list.
     void eraseFalseOperand(unsigned index) {
-      getOperation()->eraseSuccessorOperand(falseIndex, index);
+      eraseSuccessorOperand(falseIndex, index);
     }
 
   private:
@@ -1557,6 +1574,7 @@ def VM_PrintOp : VM_Op<"print", [
 }
 
 def VM_BreakOp : VM_Op<"break", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
     YieldPoint,
@@ -1570,11 +1588,17 @@ def VM_BreakOp : VM_Op<"break", [
     target block.
   }];
 
+  let arguments = (ins
+    Variadic<VM_AnyType>:$destOperands
+  );
+
   let successors = (successor
     AnySuccessor:$dest
   );
 
-  let assemblyFormat = "$dest attr-dict";
+  let assemblyFormat = [{
+    $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_Break>,
@@ -1583,11 +1607,12 @@ def VM_BreakOp : VM_Op<"break", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Block *dest
+      Builder *, OperationState &result, Block *dest,
+      ValueRange destOperands = {}
     }], [{
-      result.addSuccessor(dest, llvm::None);
-    }]>,
-  ];
+      result.addSuccessors(dest);
+      result.addOperands(destOperands);
+  }]>];
 
   let extraClassDeclaration = [{
     Block *getDest();
@@ -1601,6 +1626,7 @@ def VM_BreakOp : VM_Op<"break", [
 }
 
 def VM_CondBreakOp : VM_Op<"cond_break", [
+    DeclareOpInterfaceMethods<BranchOpInterface>,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     Terminator,
     YieldPoint,
@@ -1615,14 +1641,18 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
   }];
 
   let arguments = (ins
-    VM_CondValue:$condition
+    VM_CondValue:$condition,
+    Variadic<VM_AnyType>:$destOperands
   );
 
   let successors = (successor
     AnySuccessor:$dest
   );
 
-  let assemblyFormat = "$condition `,` $dest attr-dict";
+  let assemblyFormat = [{
+    $condition `,` $dest (`(` $destOperands^ `:` type($destOperands) `)`)?
+    attr-dict
+  }];
 
   let encoding = [
     VM_EncOpcode<VM_OPC_CondBreak>,
@@ -1631,10 +1661,12 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Value condition, Block *dest
+      Builder *, OperationState &result, Value condition, Block *dest,
+      ValueRange destOperands = {}
     }], [{
       result.addOperands({condition});
-      result.addSuccessor(dest, llvm::None);
+      result.addOperands(destOperands);
+      result.addSuccessors(dest);
     }]>,
   ];
 

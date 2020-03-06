@@ -296,12 +296,10 @@ class BranchOpConversion : public OpConversionPattern<BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      BranchOp srcOp, ArrayRef<Value> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
+      BranchOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    assert(destinations.size() == 1 && operands.size() == 1);
-    rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(srcOp, destinations[0],
-                                                    operands[0]);
+    rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(srcOp, srcOp.getDest(),
+                                                    operands);
     return matchSuccess();
   }
 };
@@ -310,14 +308,13 @@ class CondBranchOpConversion : public OpConversionPattern<CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
   PatternMatchResult matchAndRewrite(
-      CondBranchOp srcOp, ArrayRef<Value> properOperands,
-      ArrayRef<Block *> destinations, ArrayRef<ArrayRef<Value>> operands,
+      CondBranchOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    assert(destinations.size() == 2 && operands.size() == 2);
-    CondBranchOpOperandAdaptor srcAdaptor(properOperands);
+    Block *trueDest = srcOp.getTrueDest();
     rewriter.replaceOpWithNewOp<IREE::VM::CondBranchOp>(
-        srcOp, srcAdaptor.condition(), destinations[0], operands[0],  // true
-        destinations[1], operands[1]);                                // false;
+        srcOp, operands[0], trueDest,
+        operands.slice(1, trueDest->getNumArguments()), srcOp.getFalseDest(),
+        operands.slice(1 + trueDest->getNumArguments()));
     return matchSuccess();
   }
 };

@@ -28,6 +28,7 @@
 #define IREE_INTERPRETER_HL_OPS
 
 include "iree/compiler/Translation/Interpreter/IR/CommonBase.td"
+include "mlir/Analysis/ControlFlowInterfaces.td"
 
 def IREEInterpHL_Dialect : Dialect {
   let name = "iree_hl_interp";
@@ -95,14 +96,24 @@ def IREEInterpHL_ReturnOp : IREEInterpHL_Op<"return", [Terminator]> {
   >];
 }
 
-def IREEInterpHL_BranchOp : IREEInterpHL_Op<"br", [Terminator]> {
+def IREEInterpHL_BranchOp : IREEInterpHL_Op<"br", [
+    DeclareOpInterfaceMethods<BranchOpInterface>, Terminator
+  ]> {
+  let arguments = (ins Variadic<AnyType>:$destOperands);
+
   let successors = (successor AnySuccessor:$dest);
 
-  let assemblyFormat = "$dest attr-dict";
+  let assemblyFormat = [{
+    $dest (`(` $destOperands^ `:` type($destOperands) `)`)? attr-dict
+  }];
 
-  let builders = [OpBuilder<
-    "Builder *, OperationState &result, Block *dest", [{
-      result.addSuccessor(dest, llvm::None);
+  let builders = [
+    OpBuilder<[{
+      Builder *, OperationState &result, Block *dest,
+      ValueRange destOperands = {}
+    }], [{
+      result.addSuccessors(dest);
+      result.addOperands(destOperands);
   }]>];
 
   let extraClassDeclaration = [{
@@ -114,16 +125,40 @@ def IREEInterpHL_BranchOp : IREEInterpHL_Op<"br", [Terminator]> {
   }];
 }
 
-def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
-  let arguments = (ins IREEHL_BoolScalar:$condition);
+def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [
+    AttrSizedOperandSegments, DeclareOpInterfaceMethods<BranchOpInterface>,
+    Terminator
+  ]> {
+  let arguments = (ins
+    IREELL_BoolScalar:$condition,
+    Variadic<AnyType>:$trueDestOperands,
+    Variadic<AnyType>:$falseDestOperands
+  );
 
   let successors = (successor AnySuccessor:$trueDest, AnySuccessor:$falseDest);
 
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Value condition,
+      Block *trueDest, ValueRange trueOperands,
+      Block *falseDest, ValueRange falseOperands
+    }], [{
+      build(builder, result, condition, trueOperands, falseOperands, trueDest,
+            falseDest);
+    }]>, OpBuilder<[{
+      Builder *builder, OperationState &result, Value condition,
+      Block *trueDest, Block *falseDest, ValueRange falseOperands = {}
+    }], [{
+      build(builder, result, condition, trueDest, ValueRange(), falseDest,
+            falseOperands);
+    }]>
+  ];
+
   let extraClassDeclaration = [{
-    // These are the indices into the dests list.
+    /// These are the indices into the dests list.
     enum { trueIndex = 0, falseIndex = 1 };
 
-    // The condition operand is the first operand in the list.
+    /// The condition operand is the first operand in the list.
     Value getCondition() { return getOperand(0); }
 
     /// Return the destination if the condition is true.
@@ -136,7 +171,7 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
       return getOperation()->getSuccessor(falseIndex);
     }
 
-    // Accessors for operands to the 'true' destination.
+    /// Accessors for operands to the 'true' destination.
     Value getTrueOperand(unsigned idx) {
       assert(idx < getNumTrueOperands());
       return getOperand(getTrueDestOperandIndex() + idx);
@@ -147,26 +182,16 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
       setOperand(getTrueDestOperandIndex() + idx, value);
     }
 
-    operand_iterator true_operand_begin() {
-      return operand_begin() + getTrueDestOperandIndex();
-    }
-    operand_iterator true_operand_end() {
-      return true_operand_begin() + getNumTrueOperands();
-    }
-    operand_range getTrueOperands() {
-      return {true_operand_begin(), true_operand_end()};
-    }
+    operand_range getTrueOperands() { return trueDestOperands(); }
 
-    unsigned getNumTrueOperands()  {
-      return getOperation()->getNumSuccessorOperands(trueIndex);
-    }
+    unsigned getNumTrueOperands()  { return getTrueOperands().size(); }
 
     /// Erase the operand at 'index' from the true operand list.
     void eraseTrueOperand(unsigned index)  {
-      getOperation()->eraseSuccessorOperand(trueIndex, index);
+      eraseSuccessorOperand(trueIndex, index);
     }
 
-    // Accessors for operands to the 'false' destination.
+    /// Accessors for operands to the 'false' destination.
     Value getFalseOperand(unsigned idx) {
       assert(idx < getNumFalseOperands());
       return getOperand(getFalseDestOperandIndex() + idx);
@@ -176,21 +201,13 @@ def IREEInterpHL_CondBranchOp : IREEInterpHL_Op<"cond_br", [Terminator]> {
       setOperand(getFalseDestOperandIndex() + idx, value);
     }
 
-    operand_iterator false_operand_begin() { return true_operand_end(); }
-    operand_iterator false_operand_end() {
-      return false_operand_begin() + getNumFalseOperands();
-    }
-    operand_range getFalseOperands() {
-      return {false_operand_begin(), false_operand_end()};
-    }
+    operand_range getFalseOperands() { return falseDestOperands(); }
 
-    unsigned getNumFalseOperands() {
-      return getOperation()->getNumSuccessorOperands(falseIndex);
-    }
+    unsigned getNumFalseOperands() { return getFalseOperands().size(); }
 
     /// Erase the operand at 'index' from the false operand list.
     void eraseFalseOperand(unsigned index) {
-      getOperation()->eraseSuccessorOperand(falseIndex, index);
+      eraseSuccessorOperand(falseIndex, index);
     }
 
   private:

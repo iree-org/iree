@@ -118,9 +118,9 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
         // This would require calculating a common type.
         // This won't be a problem unless we see IR that effectively phi's
         // together different resources, which I don't think tensorflow does.
-        if (owner->isKnownTerminator()) {
+        if (BranchOpInterface branchOp = dyn_cast<BranchOpInterface>(owner)) {
           if (auto arg =
-                  owner->getSuccessorBlockArgument(use.getOperandNumber())) {
+                  branchOp.getSuccessorBlockArgument(use.getOperandNumber())) {
             if (arg->getType() != desiredType) {
               arg->setType(desiredType);
               typeConversionWorklist.push_back(*arg);

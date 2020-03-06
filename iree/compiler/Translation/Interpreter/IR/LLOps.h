@@ -15,6 +15,7 @@
 #ifndef IREE_COMPILER_IR_INTERPRETER_LLOPS_H_
 #define IREE_COMPILER_IR_INTERPRETER_LLOPS_H_
 
+#include "mlir/Analysis/ControlFlowInterfaces.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Dialect.h"
