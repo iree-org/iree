@@ -41,6 +41,63 @@ Value buildCastInputsToResultShape(Location loc,
                                                inputShapes);
 }
 
+Value buildDegenerateBroadcastRankedShape(
+    Value srcShape, int dstRank, SmallVectorImpl<int64_t> &broadcastDims,
+    OpBuilder &builder) {
+  RankedShapeType srcRsType = srcShape.getType().dyn_cast<RankedShapeType>();
+  if (!srcRsType) {
+    return nullptr;
+  }
+
+  // Map output dims to input dims.
+  SmallVector<int, 4> outputDimMap;  // Input dimension or -1 for expand.
+  outputDimMap.resize(dstRank, -1);
+  if (broadcastDims.empty()) {
+    // Right align the broadcast dims.
+    int leftPadding = dstRank - srcRsType.getRank();
+    assert(leftPadding >= 0);
+    for (int i = 0, e = srcRsType.getRank(); i < e; ++i) {
+      outputDimMap[leftPadding + i] = i;
+    }
+  } else {
+    // Explicitly provided broadcast dimensions.
+    assert(broadcastDims.size() == srcRsType.getRank());
+    for (int i = 0, e = broadcastDims.size(); i < e; ++i) {
+      auto outputDimIndex = broadcastDims[i];
+      assert(outputDimIndex < outputDimMap.size());
+      outputDimMap[outputDimIndex] = i;
+    }
+  }
+
+  // Compute dims for the new output ranked shape.
+  SmallVector<int64_t, 4> outputAllDims;
+  SmallVector<Value, 4> outputDynamicDims;
+  for (int i = 0, e = outputDimMap.size(); i < e; ++i) {
+    int inputDimIndex = outputDimMap[i];
+    if (inputDimIndex < 0) {
+      // Expand with 1-dim.
+      outputAllDims.push_back(1);
+    } else if (srcRsType.isDimDynamic(inputDimIndex)) {
+      // Append dynamic source dim.
+      outputAllDims.push_back(-1);
+      auto dim = builder.create<RankedDimOp>(srcShape.getLoc(), srcShape,
+                                             inputDimIndex);
+      outputDynamicDims.push_back(dim);
+    } else {
+      // Append static source dim.
+      outputAllDims.push_back(srcRsType.getStaticDim(inputDimIndex));
+    }
+  }
+
+  auto dstRsType = RankedShapeType::get(outputAllDims, srcRsType.getDimType());
+  if (outputDynamicDims.empty()) {
+    return builder.create<ConstRankedShapeOp>(srcShape.getLoc(), dstRsType);
+  } else {
+    return builder.create<MakeRankedShapeOp>(srcShape.getLoc(), dstRsType,
+                                             outputDynamicDims);
+  }
+}
+
 }  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -33,6 +33,22 @@ Value buildCastInputsToResultShape(Location loc,
                                    RankedShapeType resultShapeType,
                                    ArrayRef<Value> inputs, OpBuilder &builder);
 
+// Given a src ranked_shape value and a destination rank, broadcasts the
+// src shape to the given rank by adding degenerate '1' dimensions for any
+// dimensions not mapped by broadcastDims (which has the same semantics as
+// the XLA broadcast_in_dim op).
+// Note specifically that this does not do a full broadcast to a final
+// shape since '1' dims are inserted for expanded dimensions. Such an
+// intermediate can typically be passed to some form of 'tile' op to arrive
+// at a fully broadcasted value.
+// If broadcastDims is empty, then degenerate dimensions are added on the left
+// up to the dstRank.
+// The srcShape must have a type of ranked_shape and nullptr will be returned
+// if violated.
+Value buildDegenerateBroadcastRankedShape(
+    Value srcShape, int dstRank, SmallVectorImpl<int64_t> &broadcastDims,
+    OpBuilder &builder);
+
 }  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

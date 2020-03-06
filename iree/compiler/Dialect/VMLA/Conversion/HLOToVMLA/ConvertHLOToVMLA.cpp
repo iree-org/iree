@@ -15,7 +15,9 @@
 #include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLAOps.h"
@@ -91,9 +93,29 @@ struct BroadcastInDimOpConversion
           srcOp.getLoc(), operands[0], srcShape, dst, dstShape,
           TypeAttr::get(tensorType.getElementType()));
     } else {
-      // Tiling a non-scalar value.
+      // Tiling a non-scalar value by first broadcasting the shape to
+      // include degenerate dimensions that tile will duplicate.
+      auto dstRsType = dstShape.getType().dyn_cast<Shape::RankedShapeType>();
+      if (!dstRsType) {
+        srcOp.emitWarning() << "currently only operates on ranked tensors";
+        return matchFailure();
+      }
+      SmallVector<int64_t, 4> broadcastDims;
+      if (srcOp.broadcast_dimensions()) {
+        auto srcBroadcastDims = *srcOp.broadcast_dimensions();
+        for (auto broadcastDim : srcBroadcastDims) {
+          broadcastDims.push_back(broadcastDim.getSExtValue());
+        }
+      }
+
+      auto broadcastedShape = Shape::buildDegenerateBroadcastRankedShape(
+          srcShape, dstRsType.getRank(), broadcastDims, rewriter);
+      if (!broadcastedShape) {
+        srcOp.emitWarning("unsupported shape type for degenerate broadcast");
+        return matchFailure();
+      }
       rewriter.create<IREE::VMLA::TileOp>(
-          srcOp.getLoc(), operands[0], srcShape, dst, dstShape,
+          srcOp.getLoc(), operands[0], broadcastedShape, dst, dstShape,
           TypeAttr::get(tensorType.getElementType()));
     }
 
@@ -222,6 +244,22 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
         gatherOp.getLoc(), gatherOp.operand(), typeConverter, rewriter);
     auto dstShape = VMLAConversionTarget::getTensorShape(
         gatherOp.getLoc(), gatherOp.getResult(), typeConverter, rewriter);
+
+    auto srcRsType = srcShape.getType().dyn_cast<Shape::RankedShapeType>();
+    if (!srcRsType) {
+      gatherOp.emitWarning() << "currently only operates on ranked tensors";
+      return matchFailure();
+    }
+
+    // Broadcast the dst shape to the src rank by prepending degenerate
+    // dimensions.
+    SmallVector<int64_t, 1> emptyBroadcastDims;
+    dstShape = Shape::buildDegenerateBroadcastRankedShape(
+        dstShape, srcRsType.getRank(), emptyBroadcastDims, rewriter);
+    if (!dstShape) {
+      gatherOp.emitWarning("unsupported shape type for degenerate broadcast");
+      return matchFailure();
+    }
 
     auto inputType = gatherOp.operand().getType().cast<RankedTensorType>();
     auto startIndicesType =
