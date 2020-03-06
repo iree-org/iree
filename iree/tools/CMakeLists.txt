@@ -71,8 +71,6 @@ iree_cc_library(
     MLIRGPUtoSPIRVTransforms
     MLIRIR
     MLIRLLVMIR
-    MLIRNVVMIR
-    MLIRROCDLIR
     MLIRLinalgOps
     MLIRLinalgToLLVM
     MLIRLinalgToSPIRVTransforms

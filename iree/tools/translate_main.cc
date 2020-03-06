@@ -17,13 +17,13 @@
 // We need this entry function because we want to register PassManager CLI
 // options, which is missing in MLIR's translation main entry function.
 
+#include "iree/tools/init_dialects.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
-#include "mlir/InitAllDialects.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LogicalResult.h"
@@ -47,7 +47,7 @@ static llvm::cl::opt<bool> splitInputFile(
 int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
-  mlir::registerAllDialects();
+  mlir::registerMlirDialects();
   mlir::registerPassManagerCLOptions();
 
   // Add flags for all the registered translations.
