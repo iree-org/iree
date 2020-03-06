@@ -219,21 +219,23 @@ iree_cc_binary(
     ${IREE_HAL_DRIVER_MODULES}
 )
 
-iree_cc_binary(
-  NAME
-    iree-tblgen
-  SRCS
-    "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-  OUT
-    iree-tblgen
-  DEPS
-    LLVMMLIRTableGen
-    MLIRSupport
-    MLIRTableGen
-    iree::compiler::Dialect::VM::Tools
-  LINKOPTS
-    "-lpthread"
-)
+if(${IREE_ENABLE_LLVM})
+  iree_cc_binary(
+    NAME
+      iree-tblgen
+    SRCS
+      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+    OUT
+      iree-tblgen
+    DEPS
+      LLVMMLIRTableGen
+      MLIRSupport
+      MLIRTableGen
+      iree::compiler::Dialect::VM::Tools
+    LINKOPTS
+      "-lpthread"
+  )
+endif()
 
 iree_cc_library(
   NAME
