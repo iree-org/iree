@@ -214,7 +214,6 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-# Unimplemented linkopts:
 iree_cc_binary(
   NAME
     iree-tblgen
@@ -227,6 +226,8 @@ iree_cc_binary(
     MLIRSupport
     MLIRTableGen
     iree::compiler::Dialect::VM::Tools
+  LINKOPTS
+    "-lpthread"
 )
 
 iree_cc_library(
