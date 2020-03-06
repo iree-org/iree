@@ -49,6 +49,16 @@ Value buildDegenerateBroadcastRankedShape(
     Value srcShape, int dstRank, SmallVectorImpl<int64_t> &broadcastDims,
     OpBuilder &builder);
 
+// Given a value representing a ShapedType (i.e. tensor or otherwise), attempts
+// to locate a computed RankedShape for it by examining uses for a corresponding
+// tie_shape op, returning the associated RankedShape.
+// In the case of a static shape, a const_ranked_shape will be created and
+// returned. If dimType is provided, then any returned shape will have the
+// given dimType (defaults to IndexType), returning nullptr if this is not
+// possible.
+Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
+                                     OpBuilder &builder);
+
 }  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

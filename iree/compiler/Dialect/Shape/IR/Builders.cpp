@@ -16,10 +16,33 @@
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "mlir/IR/Diagnostics.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace Shape {
+
+namespace {
+
+Value getRankedShapeFromOp(Operation *op) {
+  auto tieOp = llvm::dyn_cast_or_null<TieShapeOp>(op);
+  if (!tieOp) return nullptr;
+  auto shape = tieOp.shape();
+  if (!shape.getType().isa<RankedShapeType>()) return nullptr;
+  return shape;
+}
+
+Value findRankedShapeFromUse(Value value) {
+  Value rs = getRankedShapeFromOp(value.getDefiningOp());
+  if (rs) return rs;
+  for (auto &use : value.getUses()) {
+    rs = getRankedShapeFromOp(use.getOwner());
+    if (rs) return rs;
+  }
+  return nullptr;
+}
+
+}  // namespace
 
 Value buildCastInputsToResultShape(Location loc,
                                    RankedShapeType resultShapeType,
@@ -96,6 +119,49 @@ Value buildDegenerateBroadcastRankedShape(
     return builder.create<MakeRankedShapeOp>(srcShape.getLoc(), dstRsType,
                                              outputDynamicDims);
   }
+}
+
+Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
+                                     OpBuilder &builder) {
+  if (!dimType) dimType = builder.getIndexType();
+  auto valueSt = value.getType().dyn_cast<ShapedType>();
+  if (!valueSt) {
+    builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
+        << "cannot construct shape for non shaped value: " << value.getType();
+    return nullptr;
+  }
+  if (valueSt.hasStaticShape()) {
+    auto rsType = RankedShapeType::get(valueSt.getShape(), dimType);
+    return builder.createOrFold<ConstRankedShapeOp>(loc, rsType);
+  }
+
+  // Dynamic - walk the uses to find a tie_shape op (either this op or an
+  // immediate use).
+  Value rs = findRankedShapeFromUse(value);
+  if (!rs) {
+    builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
+        << "dynamically shaped value is missing a shape association via "
+        << "tie_shape";
+    return nullptr;
+  }
+
+  auto rsType = rs.getType().dyn_cast<RankedShapeType>();
+  if (!rsType) {
+    builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
+        << "dynamically shaped value is not ranked (which is not yet "
+        << "supported)";
+    return nullptr;
+  }
+
+  if (rsType.getDimType() != dimType) {
+    // TODO(laurenzo): Emit a cast.
+    builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
+        << "dynamically shaped shape has the wrong dimension type: "
+        << rsType.getDimType();
+    return nullptr;
+  }
+
+  return rs;
 }
 
 }  // namespace Shape
