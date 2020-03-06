@@ -15,14 +15,10 @@ instructions.
 
 ## Vulkan setup
 
-By default, tests run on TensorFlow and the IREE CPU interpreter, as it never
-needs additional environment setup. If you have your environment setup to use
-IREE with Vulkan (see [the doc](../../../docs/vulkan_and_spirv.md)), then you
-can enable the backends by setting the environment variable
-`IREE_TEST_BACKENDS=tf,iree_interpreter,iree_vulkan`.
-
-You can also pass this as a command line argument when running individual tests:
-`--target_backends=tf,iree_interpreter,iree_vulkan`.
+If you do not have your environment setup to use IREE with Vulkan (see
+[the doc](../../../docs/vulkan_and_spirv.md)), then you can run the tests with
+`IREE_DEFAULT_BACKENDS=tf,iree_interpreter` (that is, by omitting `iree_vulkan`
+from the list of backends to use).
 
 ## Running tests
 
@@ -35,10 +31,10 @@ bazel test simple_arithmetic_test --test_output=streamed
 
 # Run tests with an altered list of backends.
 bazel test ... --test_output=errors -- \
-    --target_backends=tf,iree_interpreter,iree_vulkan
+    --override_backends=tf,iree_interpreter,iree_vulkan
 
 # (alternative) Run tests with an altered list of backends.
-bazel test ... --test_env=IREE_TEST_BACKENDS=tf,iree_interpreter,iree_vulkan \
+bazel test ... --test_env=IREE_OVERRIDE_BACKENDS=tf,iree_interpreter,iree_vulkan \
     --test_output=errors
 ```
 
@@ -62,7 +58,7 @@ runs on multiple backends.
 
 The `@tf_test_utils.compile_modules` decorator on tests takes a `backends=`
 keyword argument. This argument should be a Python list of backends, which
-accepts the same keys as the `--target_backends` flags.
+accepts the same keys as the `--override_backends` flags.
 
 Example:
 
@@ -74,3 +70,15 @@ class DynamicMlpTest(tf_test_utils.SavedModelTestCase):
 
 Limiting this statically in the code can be useful for tests that are known to
 fail on certain backends but are still useful to have checked in.
+
+The priority order for which backends are ultimately used is:
+
+1.  The backends specified in `--override_backends`.
+
+2.  The backends specified in `IREE_OVERRIDE_BACKENDS`.
+
+3.  The backends specified in the `tf_test_utils.compile_modules` decorator.
+
+4.  The backends specified in `IREE_DEFAULT_BACKENDS`.
+
+5.  All known backends.
