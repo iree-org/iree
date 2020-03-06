@@ -14,6 +14,26 @@
 
 add_subdirectory(test)
 
+# TODO: iree_select_target_platform macros.
+# TODO: skip targets disabled by options.
+iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
+  ALL
+    "iree::hal::vmla::vmla_driver_module"
+    "iree::hal::vulkan::vulkan_driver_module"
+  CLANG_OR_GCC
+    "iree::hal::interpreter::interpreter_driver_module"
+    "iree::hal::llvmjit::llvmjit_driver_module"
+)
+
+iree_select_compiler_opts(IREE_COMPILER_TARGET_BACKENDS
+  ALL
+    "iree::compiler::Dialect::HAL::Target::VMLA"
+    "iree::compiler::Dialect::HAL::Target::VulkanSPIRV"
+  CLANG_OR_GCC
+    "iree::compiler::Dialect::HAL::Target::LegacyInterpreter"
+    "iree::compiler::Dialect::HAL::Target::LLVM"
+)
+
 iree_cc_binary(
   NAME
     iree-benchmark-module
@@ -31,13 +51,10 @@ iree_cc_binary(
     iree::base::localfile
     iree::base::source_location
     iree::base::status
-    iree::hal::interpreter::interpreter_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
     iree::modules::hal
     iree::testing::benchmark_main
     iree::vm::bytecode_module
+    ${IREE_HAL_DRIVER_MODULES}
   TESTONLY
 )
 
@@ -90,103 +107,6 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    iree_opt_main
-  SRCS
-    "opt_main.cc"
-  DEPS
-    ::PassesAndDialects
-    LLVMSupport
-    MLIROptLib
-    MLIRPass
-    MLIRSupport
-    iree::compiler::Dialect::Flow::Analysis
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Conversion::FlowToHAL
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
-    iree::compiler::Dialect::HAL::Target::LLVM
-    iree::compiler::Dialect::HAL::Target::LegacyInterpreter
-    iree::compiler::Dialect::HAL::Target::VMLA
-    iree::compiler::Dialect::HAL::Target::VulkanSPIRV
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::IREE::IR
-    iree::compiler::Dialect::IREE::Transforms
-    iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Transforms
-    iree::compiler::Dialect::VM::Analysis
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
-    iree::compiler::Dialect::VM::IR
-    iree::compiler::Dialect::VM::Transforms
-    iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
-    iree::compiler::Dialect::VMLA::Conversion::VMLAToVM
-    iree::compiler::Dialect::VMLA::Transforms
-    iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::Translation::IREEVM
-    iree::compiler::Translation::Interpreter::Transforms
-    iree::compiler::Translation::SPIRV::LinalgToSPIRV
-    iree::compiler::Translation::SPIRV::XLAToSPIRV
-    iree::compiler::Translation::XLAToLinalg
-    iree::compiler::Translation::XLAToLinalg::ReductionLowering
-    tensorflow::mlir_xla
-  PUBLIC
-)
-
-iree_cc_binary(
-  NAME
-    iree-opt
-  OUT
-    iree-opt
-  DEPS
-    ::iree_opt_main
-)
-
-iree_cc_binary(
-  NAME
-    iree-run-mlir
-  OUT
-    iree-run-mlir
-  SRCS
-    "run_mlir_main.cc"
-  DEPS
-    ::PassesAndDialects
-    ::vm_util
-    LLVMSupport
-    MLIRIR
-    MLIRLoopOpsTransforms
-    MLIRParser
-    MLIRPass
-    MLIRSupport
-    absl::flags
-    absl::span
-    absl::strings
-    iree::base::api
-    iree::base::api_util
-    iree::base::init
-    iree::base::source_location
-    iree::base::status
-    iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::HAL::Target::LLVM
-    iree::compiler::Dialect::HAL::Target::LegacyInterpreter
-    iree::compiler::Dialect::HAL::Target::VMLA
-    iree::compiler::Dialect::HAL::Target::VulkanSPIRV
-    iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::IREE::Transforms
-    iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Dialect::VM::Transforms
-    iree::compiler::Translation::IREEVM
-    iree::hal::api
-    iree::hal::interpreter::interpreter_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
-    iree::modules::hal
-    iree::vm
-    iree::vm::bytecode_module
-    iree::vm::value
-)
-
 iree_cc_binary(
   NAME
     iree-run-module
@@ -204,65 +124,151 @@ iree_cc_binary(
     iree::base::localfile
     iree::base::source_location
     iree::base::status
-    iree::hal::interpreter::interpreter_driver_module
-    iree::hal::llvmjit::llvmjit_driver_module
-    iree::hal::vmla::vmla_driver_module
-    iree::hal::vulkan::vulkan_driver_module
     iree::modules::hal
     iree::vm::bytecode_module
+    ${IREE_HAL_DRIVER_MODULES}
 )
 
-# Unimplemented linkopts:
-iree_cc_binary(
-  NAME
-    iree-tblgen
-  SRCS
-    "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-  OUT
-    iree-tblgen
-  DEPS
-    LLVMMLIRTableGen
-    MLIRSupport
-    MLIRTableGen
-    iree::compiler::Dialect::VM::Tools
-)
+if(${IREE_ENABLE_LLVM})
+  iree_cc_binary(
+    NAME
+      iree-tblgen
+    SRCS
+      "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
+    OUT
+      iree-tblgen
+    DEPS
+      LLVMMLIRTableGen
+      MLIRSupport
+      MLIRTableGen
+      iree::compiler::Dialect::VM::Tools
+    LINKOPTS
+      "-lpthread"
+  )
+endif()
 
-iree_cc_library(
-  NAME
-    iree_translate_main
-  SRCS
-    "translate_main.cc"
-  DEPS
-    ::PassesAndDialects
-    LLVMSupport
-    MLIRIR
-    MLIRLoopOpsTransforms
-    MLIRPass
-    MLIRSupport
-    MLIRTranslateClParser
-    MLIRTranslation
-    iree::compiler::Dialect::HAL::Target::LLVM
-    iree::compiler::Dialect::HAL::Target::LegacyInterpreter
-    iree::compiler::Dialect::HAL::Target::VMLA
-    iree::compiler::Dialect::HAL::Target::VulkanSPIRV
-    iree::compiler::Dialect::VM::Target::Bytecode
-    iree::compiler::Translation::IREEVM
-    iree::compiler::Translation::SPIRV::XLAToSPIRV
-    tensorflow::mlir_xla
-  ALWAYSLINK
-  PUBLIC
-)
+if(${IREE_BUILD_COMPILER})
+  iree_cc_library(
+    NAME
+      iree_opt_main
+    SRCS
+      "opt_main.cc"
+    DEPS
+      ::PassesAndDialects
+      LLVMSupport
+      MLIROptLib
+      MLIRPass
+      MLIRSupport
+      iree::compiler::Dialect::Flow::Analysis
+      iree::compiler::Dialect::Flow::IR
+      iree::compiler::Dialect::Flow::Transforms
+      iree::compiler::Dialect::HAL::Conversion::FlowToHAL
+      iree::compiler::Dialect::HAL::Conversion::HALToVM
+      iree::compiler::Dialect::HAL::Transforms
+      iree::compiler::Dialect::IREE::IR
+      iree::compiler::Dialect::IREE::Transforms
+      iree::compiler::Dialect::Shape::IR
+      iree::compiler::Dialect::Shape::Transforms
+      iree::compiler::Dialect::VM::Analysis
+      iree::compiler::Dialect::VM::Conversion::StandardToVM
+      iree::compiler::Dialect::VM::IR
+      iree::compiler::Dialect::VM::Transforms
+      iree::compiler::Dialect::VMLA::Conversion::HLOToVMLA
+      iree::compiler::Dialect::VMLA::Conversion::VMLAToVM
+      iree::compiler::Dialect::VMLA::Transforms
+      iree::compiler::Dialect::Vulkan::IR
+      iree::compiler::Translation::IREEVM
+      iree::compiler::Translation::Interpreter::Transforms
+      iree::compiler::Translation::SPIRV::LinalgToSPIRV
+      iree::compiler::Translation::SPIRV::XLAToSPIRV
+      iree::compiler::Translation::XLAToLinalg
+      iree::compiler::Translation::XLAToLinalg::ReductionLowering
+      tensorflow::mlir_xla
+      ${IREE_COMPILER_TARGET_BACKENDS}
+    PUBLIC
+  )
 
-iree_cc_binary(
-  NAME
-    iree-translate
-  OUT
-    iree-translate
-  DEPS
-    ::iree_translate_main
-)
+  iree_cc_binary(
+    NAME
+      iree-opt
+    OUT
+      iree-opt
+    DEPS
+      ::iree_opt_main
+  )
 
-# Unimplemented sh_binary: IreeFileCheck
+  iree_cc_binary(
+    NAME
+      iree-run-mlir
+    OUT
+      iree-run-mlir
+    SRCS
+      "run_mlir_main.cc"
+    DEPS
+      ::PassesAndDialects
+      ::vm_util
+      LLVMSupport
+      MLIRIR
+      MLIRLoopOpsTransforms
+      MLIRParser
+      MLIRPass
+      MLIRSupport
+      absl::flags
+      absl::span
+      absl::strings
+      iree::base::api
+      iree::base::api_util
+      iree::base::init
+      iree::base::source_location
+      iree::base::status
+      iree::compiler::Dialect::Flow::Transforms
+      iree::compiler::Dialect::HAL::Transforms
+      iree::compiler::Dialect::IREE::Transforms
+      iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Dialect::VM::Transforms
+      iree::compiler::Translation::IREEVM
+      iree::hal::api
+      iree::modules::hal
+      iree::vm
+      iree::vm::bytecode_module
+      iree::vm::value
+      ${IREE_COMPILER_TARGET_BACKENDS}
+      ${IREE_HAL_DRIVER_MODULES}
+  )
+
+  iree_cc_library(
+    NAME
+      iree_translate_main
+    SRCS
+      "translate_main.cc"
+    DEPS
+      ::PassesAndDialects
+      LLVMSupport
+      MLIRIR
+      MLIRLoopOpsTransforms
+      MLIRPass
+      MLIRSupport
+      MLIRTranslateClParser
+      MLIRTranslation
+      iree::compiler::Dialect::VM::Target::Bytecode
+      iree::compiler::Translation::IREEVM
+      iree::compiler::Translation::SPIRV::XLAToSPIRV
+      tensorflow::mlir_xla
+      ${IREE_COMPILER_TARGET_BACKENDS}
+    ALWAYSLINK
+    PUBLIC
+  )
+
+  iree_cc_binary(
+    NAME
+      iree-translate
+    OUT
+      iree-translate
+    DEPS
+      ::iree_translate_main
+  )
+endif()
+
 iree_cc_library(
   NAME
     vm_util
@@ -312,4 +318,3 @@ add_custom_target(LLVMFileCheck ALL
   COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
   DEPENDS FileCheck
 )
-
