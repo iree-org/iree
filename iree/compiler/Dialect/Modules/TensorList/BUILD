@@ -45,6 +45,6 @@ cc_binary(
     name = "tensorlist-translate",
     deps = [
         "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
-        "//iree/tools:iree_translate_library",
+        "//iree/tools:iree_translate_main",
     ],
 )

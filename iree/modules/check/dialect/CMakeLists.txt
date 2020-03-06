@@ -84,6 +84,6 @@ iree_cc_binary(
     check-translate
   DEPS
     ::dialect
-    iree::tools::iree_translate_library
+    iree::tools::iree_translate_main
 )
 add_executable(check-translate ALIAS iree_modules_check_dialect_check-translate)

@@ -40,6 +40,6 @@ cc_binary(
     name = "strings-translate",
     deps = [
         "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "//iree/tools:iree_translate_library",
+        "//iree/tools:iree_translate_main",
     ],
 )

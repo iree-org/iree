@@ -47,5 +47,5 @@ iree_cc_binary(
     strings-translate
   DEPS
     iree::compiler::Dialect::Modules::Strings::IR::Dialect
-    iree::tools::iree_translate_library
+    iree::tools::iree_translate_main
 )

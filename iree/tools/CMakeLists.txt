@@ -214,7 +214,7 @@ iree_cc_binary(
     iree::vm::bytecode_module
 )
 
-# Unimplemented linkopts: 
+# Unimplemented linkopts:
 iree_cc_binary(
   NAME
     iree-tblgen
@@ -231,7 +231,7 @@ iree_cc_binary(
 
 iree_cc_library(
   NAME
-    iree_translate_library
+    iree_translate_main
   SRCS
     "translate_main.cc"
   DEPS
@@ -261,7 +261,7 @@ iree_cc_binary(
   OUT
     iree-translate
   DEPS
-    ::iree_translate_library
+    ::iree_translate_main
 )
 
 # Unimplemented sh_binary: IreeFileCheck

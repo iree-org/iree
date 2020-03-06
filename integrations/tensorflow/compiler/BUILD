@@ -70,6 +70,6 @@ cc_binary(
     name = "iree-tf-translate",
     deps = [
         ":tensorflow",
-        "//iree/tools:iree_translate_library",
+        "//iree/tools:iree_translate_main",
     ],
 )

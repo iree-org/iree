@@ -214,7 +214,7 @@ cc_binary(
 )
 
 cc_library(
-    name = "iree_translate_library",
+    name = "iree_translate_main",
     srcs = ["translate_main.cc"],
     deps = [
         "//iree/compiler/Dialect/VM/Target/Bytecode",
@@ -236,7 +236,7 @@ cc_library(
 cc_binary(
     name = "iree-translate",
     deps = [
-        ":iree_translate_library",
+        ":iree_translate_main",
     ],
 )
 
