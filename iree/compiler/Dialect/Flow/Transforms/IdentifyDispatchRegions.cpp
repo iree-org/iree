@@ -25,6 +25,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -38,6 +39,8 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Utils.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
+
+#define DEBUG_TYPE "iree-dispatch"
 
 namespace mlir {
 namespace iree_compiler {
@@ -54,31 +57,48 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
   if (FlowDialect::isDialectOp(op)) {
     // Ignore things we've already produced as they should only relate to
     // sequencer operations.
+    LLVM_DEBUG(llvm::dbgs()
+               << "NOT DISPATCHABLE (Flow Dialect): " << op->getName() << "\n");
     return false;
   } else if (op->isKnownTerminator()) {
     // Currently we skip all terminators as we want to leave them in the block
     // to keep it valid. Future folding passes may take care of them if they are
     // worth bringing into the dispatch region.
+    LLVM_DEBUG(llvm::dbgs() << "NOT DISPATCHABLE (Known Terminator): "
+                            << op->getName() << "\n");
     return false;
   } else if (auto callOp = dyn_cast<CallOp>(op)) {
-    return dispatchability.isDispatchable(callOp.getCallee());
+    bool dispatchable = dispatchability.isDispatchable(callOp.getCallee());
+    LLVM_DEBUG(llvm::dbgs()
+               << (dispatchable ? "" : "NOT ")
+               << "DISPATCHABLE (Call): " << op->getName() << "\n");
+    return dispatchable;
   } else if (isa<CallIndirectOp>(op)) {
     // Indirect calls are not supported in dispatch code.
+    LLVM_DEBUG(llvm::dbgs() << "NOT DISPATCHABLE (Call Indirect): "
+                            << op->getName() << "\n");
     return false;
   } else if (isa<ConstantOp>(op)) {
     // Constants are handled in the RematerializeDispatchConstants pass.
     // We do that independently so that we can more easily see the use of
     // constants across all dispatches instead of just on an individual basis
     // as we do here.
+    LLVM_DEBUG(llvm::dbgs()
+               << "NOT DISPATCHABLE (Constant): " << op->getName() << "\n");
     return false;
   } else if (op->getNumResults() &&
              !op->getResult(0).getType().isa<ShapedType>()) {
     // We don't put scalar manipulation into dispatch regions.
+    LLVM_DEBUG(llvm::dbgs()
+               << "NOT DISPATCHABLE (Non Shaped): " << op->getName() << "\n");
     return false;
   } else if (!isOpOfKnownDialect(op)) {
     // Probably a custom op.
+    LLVM_DEBUG(llvm::dbgs() << "NOT DISPATCHABLE (Unknown Dialect): "
+                            << op->getName() << "\n");
     return false;
   }
+  LLVM_DEBUG(llvm::dbgs() << "DISPATCHABLE: " << op->getName() << "\n");
   return true;
 }
 
