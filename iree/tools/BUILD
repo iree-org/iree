@@ -152,6 +152,7 @@ cc_binary(
     name = "iree-run-mlir",
     srcs = ["run_mlir_main.cc"],
     deps = [
+        ":PassesAndDialects",
         ":vm_util",
         "@com_google_absl//absl/flags:flag",
         "@com_google_absl//absl/strings",
@@ -170,7 +171,6 @@ cc_binary(
         "//iree/vm:bytecode_module",
         "//iree/vm:value",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
         "@llvm-project//mlir:Parser",
@@ -217,11 +217,11 @@ cc_library(
     name = "iree_translate_main",
     srcs = ["translate_main.cc"],
     deps = [
+        ":PassesAndDialects",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
         "@llvm-project//mlir:Pass",
