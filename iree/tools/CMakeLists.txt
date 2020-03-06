@@ -271,7 +271,6 @@ if(${IREE_BUILD_COMPILER})
   )
 endif()
 
-# Unimplemented sh_binary: IreeFileCheck
 iree_cc_library(
   NAME
     vm_util
@@ -321,4 +320,3 @@ add_custom_target(LLVMFileCheck ALL
   COMMAND ${CMAKE_COMMAND} -E create_symlink $<TARGET_FILE:FileCheck> FileCheck
   DEPENDS FileCheck
 )
-
