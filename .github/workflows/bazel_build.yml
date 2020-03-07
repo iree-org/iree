@@ -60,4 +60,4 @@ jobs:
           # tagged "manual". The "manual" tag allows targets to be excluded from
           # human wildcard builds, but we want them built by CI unless they are
           # excluded with "noga".
-          bazel query '//... except attr("tags", "noga", //...)' | xargs bazel test --test_env=IREE_VULKAN_DISABLE=1 --test_env=IREE_TEST_BACKENDS="tf,iree_interpreter" --define=iree_tensorflow=true --test_output=errors --keep_going
+          bazel query '//... except attr("tags", "noga", //...)' | xargs bazel test --test_env=IREE_VULKAN_DISABLE=1 --test_env=IREE_DEFAULT_BACKENDS="tf,iree_interpreter" --define=iree_tensorflow=true --test_output=errors --keep_going
