@@ -61,7 +61,7 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
     }
   }
 
-  SmallVector<uint8_t, 4> segmentSizes;
+  SmallVector<uint16_t, 4> segmentSizes;
   int inputSetIndex = 0;
   for (auto input : llvm::enumerate(importType.getInputs())) {
     auto inputType = input.value();
@@ -130,7 +130,7 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
         "segment_sizes",
         DenseIntElementsAttr::get(
             VectorType::get({static_cast<int64_t>(segmentSizes.size())},
-                            rewriter.getIntegerType(8)),
+                            rewriter.getIntegerType(16)),
             segmentSizes));
     state.addAttribute("segment_types",
                        rewriter.getArrayAttr(llvm::to_vector<4>(llvm::map_range(

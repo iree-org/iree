@@ -110,8 +110,8 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeIntArrayAttr(DenseIntElementsAttr value) override {
-    if (value.getNumElements() > UINT8_MAX ||
-        failed(writeUint8(value.getNumElements()))) {
+    if (value.getNumElements() > UINT16_MAX ||
+        failed(writeUint16(value.getNumElements()))) {
       return currentOp_->emitOpError() << "integer array size out of bounds";
     }
     for (auto el : value.getAttributeValues()) {
@@ -146,10 +146,10 @@ class V0BytecodeEncoder : public BytecodeEncoder {
     // this list is small :)
     auto srcDstRegs = registerAllocation_->remapSuccessorRegisters(
         currentOp_, successorIndex);
-    writeUint8(srcDstRegs.size());
+    writeUint16(srcDstRegs.size());
     for (auto srcDstReg : srcDstRegs) {
-      if (failed(writeUint8(srcDstReg.first)) ||
-          failed(writeUint8(srcDstReg.second))) {
+      if (failed(writeUint16(srcDstReg.first)) ||
+          failed(writeUint16(srcDstReg.second))) {
         return failure();
       }
     }
@@ -158,17 +158,17 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeOperand(Value value, int ordinal) override {
-    uint8_t reg =
+    uint16_t reg =
         registerAllocation_->mapUseToRegister(value, currentOp_, ordinal);
-    return writeUint8(reg);
+    return writeUint16(reg);
   }
 
   LogicalResult encodeOperands(Operation::operand_range values) override {
-    writeUint8(std::distance(values.begin(), values.end()));
+    writeUint16(std::distance(values.begin(), values.end()));
     for (auto it : llvm::enumerate(values)) {
-      uint8_t reg = registerAllocation_->mapUseToRegister(
+      uint16_t reg = registerAllocation_->mapUseToRegister(
           it.value(), currentOp_, it.index());
-      if (failed(writeUint8(reg))) {
+      if (failed(writeUint16(reg))) {
         return failure();
       }
     }
@@ -176,15 +176,15 @@ class V0BytecodeEncoder : public BytecodeEncoder {
   }
 
   LogicalResult encodeResult(Value value) override {
-    uint8_t reg = registerAllocation_->mapUseToRegister(value, currentOp_, 0);
-    return writeUint8(reg);
+    uint16_t reg = registerAllocation_->mapUseToRegister(value, currentOp_, 0);
+    return writeUint16(reg);
   }
 
   LogicalResult encodeResults(Operation::result_range values) override {
-    writeUint8(std::distance(values.begin(), values.end()));
+    writeUint16(std::distance(values.begin(), values.end()));
     for (auto value : values) {
-      uint8_t reg = registerAllocation_->mapToRegister(value);
-      if (failed(writeUint8(reg))) {
+      uint16_t reg = registerAllocation_->mapToRegister(value);
+      if (failed(writeUint16(reg))) {
         return failure();
       }
     }

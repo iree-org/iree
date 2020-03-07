@@ -46,7 +46,7 @@ static iree_status_t iree_vm_marshal_outputs(
   const iree_vm_register_list_t* return_registers =
       callee_frame->return_registers;
   for (int i = 0; i < return_registers->size; ++i) {
-    uint8_t reg = return_registers->registers[i];
+    uint16_t reg = return_registers->registers[i];
     if (reg & IREE_REF_REGISTER_TYPE_BIT) {
       if (reg & IREE_REF_REGISTER_MOVE_BIT) {
         IREE_RETURN_IF_ERROR(iree_vm_variant_list_append_ref_move(

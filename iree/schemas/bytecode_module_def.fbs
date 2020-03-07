@@ -118,9 +118,9 @@ struct FunctionDescriptor {
   bytecode_offset:int32;
   bytecode_length:int32;
   // Total number of i32 registers used by the function.
-  i32_register_count:int8;
+  i32_register_count:int16;
   // Total number of ref_ptr registers used by the function.
-  ref_register_count:int8;
+  ref_register_count:int16;
 }
 
 // Defines a bytecode module containing the information required to serve the

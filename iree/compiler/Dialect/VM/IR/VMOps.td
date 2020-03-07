@@ -1407,7 +1407,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
 
   let arguments = (ins
     VM_FuncRefAttr:$callee,
-    SignlessIntElementsAttr<8>:$segment_sizes,
+    SignlessIntElementsAttr<16>:$segment_sizes,
     TypeArrayAttr:$segment_types,
     Variadic<VM_AnyType>:$operands
   );
@@ -1418,7 +1418,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
   let encoding = [
     VM_EncOpcode<VM_OPC_CallVariadic>,
     VM_EncFuncAttr<"callee">,
-    VM_EncIntArrayAttr<"segment_sizes", 8>,
+    VM_EncIntArrayAttr<"segment_sizes", 16>,
     VM_EncVariadicOperands<"operands">,
     VM_EncVariadicResults<"results">,
   ];
@@ -1427,14 +1427,14 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
   let builders = [
     OpBuilder<[{
       Builder *builder, OperationState &result, FlatSymbolRefAttr callee,
-      ArrayRef<Type> resultTypes, ArrayRef<int8_t> segmentSizes = {},
+      ArrayRef<Type> resultTypes, ArrayRef<int16_t> segmentSizes = {},
       ArrayRef<Type> segmentTypes = {}, ValueRange operands = {}
     }], [{
       result.addAttribute("callee", callee);
       result.addAttribute("segment_sizes",
           DenseIntElementsAttr::get(
               VectorType::get({static_cast<int64_t>(segmentSizes.size())},
-                              builder->getIntegerType(8)),
+                              builder->getIntegerType(16)),
               segmentSizes));
       result.addAttribute("segment_types", builder->getArrayAttr(
           llvm::to_vector<4>(llvm::map_range(segmentTypes, [&](Type type) {

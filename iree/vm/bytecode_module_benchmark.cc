@@ -33,7 +33,7 @@ static iree_status_t IREE_API_CALL SimpleAddExecute(
 
   // TODO(benvanik): replace with macro? helper for none/i32/etc
   static const union {
-    uint8_t reserved[2];
+    uint16_t reserved[2];
     iree_vm_register_list_t list;
   } return_registers = {{1, 0}};
   frame->return_registers = &return_registers.list;
@@ -243,14 +243,14 @@ static void BM_CallImportedFuncReference(benchmark::State& state) {
   benchmark::DoNotOptimize(module_ptr);
 
   auto stack = std::make_unique<iree_vm_stack_t>();
-  iree_vm_stack_frame_t frame;
+  iree_vm_stack_frame_t* frame = &stack->frames[0];
   iree_vm_execution_result_t result;
   while (state.KeepRunningBatch(10)) {
     int value = 100;
     for (int i = 0; i < 10; ++i) {
-      frame.registers.i32[0] = value;
-      module_ptr->execute(module_ptr->self, stack.get(), &frame, &result);
-      value = frame.registers.i32[0];
+      frame->registers.i32[0] = value;
+      module_ptr->execute(module_ptr->self, stack.get(), frame, &result);
+      value = frame->registers.i32[0];
       benchmark::DoNotOptimize(value);
       benchmark::ClobberMemory();
     }

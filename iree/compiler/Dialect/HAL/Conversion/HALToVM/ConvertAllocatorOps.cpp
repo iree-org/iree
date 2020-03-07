@@ -68,11 +68,11 @@ class AllocatorAllocateConstOpConversion
         op.getLoc(),
         IREE::HAL::getElementTypeAttr(op.value().getType().getElementType())));
     callOperands.push_back(loadRodataOp.getResult());
-    SmallVector<int8_t, 6> segmentSizes = {
+    SmallVector<int16_t, 6> segmentSizes = {
         /*allocator=*/-1,
         /*memory_types=*/-1,
         /*buffer_usage=*/-1,
-        /*shape=*/static_cast<int8_t>(shape.size()),
+        /*shape=*/static_cast<int16_t>(shape.size()),
         /*element_type=*/-1,
         /*value=*/-1,
     };

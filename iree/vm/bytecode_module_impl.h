@@ -42,8 +42,8 @@ typedef struct {
 typedef struct {
   int32_t bytecode_offset;
   int32_t bytecode_length;
-  int8_t i32_register_count;
-  int8_t ref_register_count;
+  uint16_t i32_register_count;
+  uint16_t ref_register_count;
 } iree_vm_function_descriptor_t;
 
 // A loaded bytecode module.

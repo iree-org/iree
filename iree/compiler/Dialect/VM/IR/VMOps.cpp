@@ -727,7 +727,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
   }
 
   SmallVector<OpAsmParser::OperandType, 4> flatOperands;
-  SmallVector<int8_t, 4> segmentSizes;
+  SmallVector<int16_t, 4> segmentSizes;
   while (failed(parser.parseOptionalRParen())) {
     if (succeeded(parser.parseOptionalLSquare())) {
       // Variadic list.
@@ -810,7 +810,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
       "segment_sizes",
       DenseIntElementsAttr::get(
           VectorType::get({static_cast<int64_t>(segmentSizes.size())},
-                          parser.getBuilder().getIntegerType(8)),
+                          parser.getBuilder().getIntegerType(16)),
           segmentSizes));
   result->addAttribute("segment_types",
                        parser.getBuilder().getArrayAttr(llvm::to_vector<4>(

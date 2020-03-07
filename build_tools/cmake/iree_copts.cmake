@@ -46,6 +46,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "/wd4624"
     # TODO(benvanik): figure out if really required or accidentally enabled.
     "/EHsc"
+    "/bigobj"
 )
 set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")

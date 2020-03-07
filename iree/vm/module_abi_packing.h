@@ -260,8 +260,8 @@ struct ParamUnpack<absl::Span<U>> {
   using element_type = typename impl::remove_cvref<U>::type;
   using storage_type = std::vector<element_type>;
   static void Load(ParamUnpackState* param_state, storage_type& out_param) {
-    const uint8_t count = param_state->frame->return_registers
-                              ->registers[param_state->varargs_ordinal++];
+    const uint16_t count = param_state->frame->return_registers
+                               ->registers[param_state->varargs_ordinal++];
     int32_t original_varargs_ordinal = param_state->varargs_ordinal;
     out_param.resize(count);
     for (int i = 0; i < count; ++i) {
@@ -284,12 +284,12 @@ struct ResultPackState {
 
 template <typename T>
 struct ResultRegister {
-  constexpr static auto value = std::make_tuple<uint8_t>(0);
+  constexpr static auto value = std::make_tuple<uint16_t>(0);
 };
 
 template <typename T>
 struct ResultRegister<ref<T>> {
-  constexpr static auto value = std::make_tuple<uint8_t>(
+  constexpr static auto value = std::make_tuple<uint16_t>(
       IREE_REF_REGISTER_TYPE_BIT | IREE_REF_REGISTER_MOVE_BIT);
 };
 
@@ -359,15 +359,15 @@ template <typename Owner, typename Results, typename... Params>
 struct DispatchFunctor {
   using FnPtr = StatusOr<Results> (Owner::*)(Params...);
 
-  template <typename T, uint8_t... I>
-  static constexpr auto ConstTupleOr(std::integer_sequence<uint8_t, I...>) {
+  template <typename T, uint16_t... I>
+  static constexpr auto ConstTupleOr(std::integer_sequence<uint16_t, I...>) {
     return std::make_tuple(
-        (static_cast<uint8_t>(std::get<I>(ResultRegister<T>::value) | I))...);
+        (static_cast<uint16_t>(std::get<I>(ResultRegister<T>::value) | I))...);
   }
 
   template <typename T, size_t... I>
   static constexpr auto TupleToArray(const T& t, std::index_sequence<I...>) {
-    return std::array<uint8_t, std::tuple_size<T>::value>{std::get<I>(t)...};
+    return std::array<uint16_t, std::tuple_size<T>::value>{std::get<I>(t)...};
   }
 
   static Status Call(void (Owner::*ptr)(), Owner* self, iree_vm_stack_t* stack,
@@ -389,9 +389,9 @@ struct DispatchFunctor {
     static const int kLeafCount = impl::LeafCount<Results>::value;
     static const auto kResultList = TupleToArray(
         std::tuple_cat(
-            std::make_tuple<uint8_t>(static_cast<uint8_t>(kLeafCount)),
+            std::make_tuple<uint16_t>(static_cast<uint16_t>(kLeafCount)),
             ConstTupleOr<Results>(
-                std::make_integer_sequence<uint8_t, kLeafCount>())),
+                std::make_integer_sequence<uint16_t, kLeafCount>())),
         std::make_index_sequence<1 + kLeafCount>());
     frame->return_registers =
         reinterpret_cast<const iree_vm_register_list_t*>(kResultList.data());
