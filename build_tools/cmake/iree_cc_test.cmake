@@ -21,7 +21,7 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: name of target (see Usage below)
 # SRCS: List of source files for the binary
-# DATA: List of other targets to be built with this binary
+# DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
@@ -96,7 +96,7 @@ function(iree_cc_test)
     PRIVATE
       ${_RULE_LINKOPTS}
   )
-  iree_data(NAME ${_NAME} DATA ${_RULE_DATA})
+  iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
   # Add all IREE targets to a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
 

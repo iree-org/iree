@@ -25,7 +25,7 @@ endif()
 # Parameters:
 # NAME: name of target (see Usage below)
 # SRCS: List of source files for the binary
-# DATA: List of other targets to be built with this binary
+# DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
@@ -101,7 +101,7 @@ function(iree_cc_binary)
       PRIVATE
         ${_RULE_COPTS}
     )
-    iree_data(NAME ${_NAME} DATA ${_RULE_DATA})
+    iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
 
     iree_package_ns(_PACKAGE_NS)
     # Replace dependencies passed by ::name with ::iree::package::name

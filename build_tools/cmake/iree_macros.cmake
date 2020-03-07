@@ -134,7 +134,7 @@ endfunction()
 # NAME: name of the target to add data dependencies to
 # DATA: List of targets and/or files in the source tree. Files should use the
 #       same format as targets (i.e. iree::package::subpackage::file.txt)
-function(iree_data)
+function(iree_add_data_dependencies)
   cmake_parse_arguments(
     _RULE
     ""
