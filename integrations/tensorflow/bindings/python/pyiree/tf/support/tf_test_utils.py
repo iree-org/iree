@@ -468,6 +468,11 @@ BackendInfo.add(
     iree_driver="interpreter",
     iree_compiler_targets=["interpreter-*"])
 BackendInfo.add(
+    name="iree_vmla",
+    CompiledModule=IreeCompiledModule,
+    iree_driver="vmla",
+    iree_compiler_targets=["vmla"])
+BackendInfo.add(
     name="iree_vulkan",
     CompiledModule=IreeCompiledModule,
     iree_driver="vulkan",
