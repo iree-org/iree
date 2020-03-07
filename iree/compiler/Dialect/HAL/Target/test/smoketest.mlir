@@ -108,7 +108,7 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
 // VKSPV-SAME:     interface = @legacy_io,
 // VKSPV-SAME:     ordinal = 0 : i32,
 // VKSPV-SAME:     signature = (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>,
-// VKSPV-SAME:     workgroup_size = dense<1> : vector<3xi32>
+// VKSPV-SAME:     workgroup_size = dense<[32, 1, 1]> : vector<3xi32>
 // VKSPV-SAME:   }
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense

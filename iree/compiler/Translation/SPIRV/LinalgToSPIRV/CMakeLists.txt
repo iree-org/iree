@@ -19,7 +19,9 @@ iree_cc_library(
     LinalgToSPIRV
   HDRS
     "LowerToSPIRV.h"
+    "Passes.h"
   SRCS
+    "GPUKernelOutlining.cpp"
     "LowerToSPIRV.cpp"
   DEPS
     LLVMSupport

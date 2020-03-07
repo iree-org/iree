@@ -21,6 +21,7 @@
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
 
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
+#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
 #include "iree/compiler/Translation/XLAToLinalg/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPU.h"
@@ -87,6 +88,20 @@ static void createConstantsInFunc(FuncOp funcOp, ArrayRef<int64_t> intVal,
   }
 }
 
+/// Gets the number of outer parallel loops in a linalg operation.
+unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
+  // Find the number of leading parallel loops in the generic op
+  unsigned numOuterParallelLoops = 0;
+  for (auto iteratorType : linalgOp.iterator_types()) {
+    if (iteratorType.cast<StringAttr>().getValue() !=
+        getParallelIteratorTypeName()) {
+      break;
+    }
+    numOuterParallelLoops++;
+  }
+  return numOuterParallelLoops;
+}
+
 namespace {
 
 /// To be able to use the workgroup size from the dispatch function attribute
@@ -123,20 +138,40 @@ struct IREETileLinalgPass : public FunctionPass<IREETileLinalgPass> {
       return signalPassFailure();
     }
 
+    unsigned numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
+    if (!numOuterParallelLoops) {
+      // There are no outer parallel loops to partition. So just create dummy
+      // 1-trip loops that will be "split" across workgroups and workitems.
+      builder.setInsertionPoint(linalgOp);
+      auto indexType = builder.getIndexType();
+      auto loc = linalgOp.getLoc();
+      auto zero =
+          builder.create<ConstantOp>(loc, builder.getIntegerAttr(indexType, 0));
+      auto one =
+          builder.create<ConstantOp>(loc, builder.getIntegerAttr(indexType, 1));
+      auto outerLoop = builder.create<loop::ForOp>(loc, zero, one, one);
+      OpBuilder outerLoopBuilder = outerLoop.getBodyBuilder();
+      auto innerLoop =
+          outerLoopBuilder.create<loop::ForOp>(loc, zero, one, one);
+      OpBuilder innerLoopBuilder = innerLoop.getBodyBuilder();
+      innerLoopBuilder.clone(*linalgOp.getOperation());
+      linalgOp.erase();
+      return;
+    }
+
     // Tile sizes to use are reverse of the workGroupSize.
     SmallVector<int64_t, 3> tileSizes(reverse(workGroupSize));
     // Linalg convention is to use 0 for no tiling. If the workgroup size is
     // 1, then dont tile along that dimension. So overriding 1 to 0.
     for (auto &tileSize : tileSizes)
       if (tileSize == 1) tileSize = 0;
-    tileSizes.resize(linalgOp.getNumLoops(), 0);
-    auto tiledOp =
-        linalg::tileLinalgOp(builder, linalgOp, tileSizes, {}, &folder);
-    if (!tiledOp) {
-      linalgOp.emitError("unable to tile linalg op for SPIR-V code generation");
-      return signalPassFailure();
+    tileSizes.resize(numOuterParallelLoops, 0);
+    if (linalg::tileLinalgOp(builder, linalgOp, tileSizes, {}, &folder)) {
+      linalgOp.erase();
+      return;
     }
-    linalgOp.erase();
+    linalgOp.emitError("unable to tile linalg op for SPIR-V code generation");
+    return signalPassFailure();
   }
 };
 
@@ -184,6 +219,10 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
   void runOnModule() {
     MLIRContext *context = &getContext();
     ModuleOp moduleOp = getModule();
+
+    // Need to get the workgroup size from the original function.
+    // TODO(b/150312935): When the usage of attributes on the function is
+    // dropped we might not need to do this.
     FuncOp funcOp = nullptr;
     auto walkResult = moduleOp.walk([&funcOp](FuncOp fOp) -> WalkResult {
       if (isDispatchFunction(fOp)) {
@@ -196,48 +235,17 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
       moduleOp.emitError("expected a single dispatch function within module");
       return signalPassFailure();
     }
-    SmallVector<Operation *, 1> kernelModules;
-    OpBuilder builder(context);
-    builder.setInsertionPoint(funcOp.getOperation());
-    StringRef fnName = SymbolTable::getSymbolName(funcOp);
-
-    auto funcWalkResult =
-        funcOp.walk([&builder, &moduleOp, &kernelModules,
-                     &fnName](gpu::LaunchFuncOp gpuLaunchOp) -> WalkResult {
-          auto kernelModuleName = gpuLaunchOp.getKernelModuleName();
-          auto gpuModuleOp =
-              moduleOp.lookupSymbol<gpu::GPUModuleOp>(kernelModuleName);
-          if (!gpuModuleOp) return WalkResult::interrupt();
-
-          // Clone the GPU module into the funcop to convert into a SPIR-V
-          // module.
-          auto cloneModuleOp = cast<gpu::GPUModuleOp>(
-              builder.clone(*gpuModuleOp.getOperation()));
-          // This is a dirty hack to make the gpu.func the same name as the
-          // dispatch function (GPU outlining pass changed the name, and its
-          // easiest to change it here to what is expected in IREE)
-          auto gpuFuncOps =
-              cloneModuleOp.body().front().getOps<gpu::GPUFuncOp>();
-          if (!mlir::has_single_element(gpuFuncOps))
-            return WalkResult::interrupt();
-          gpu::GPUFuncOp gpuFuncOp = *gpuFuncOps.begin();
-          SymbolTable::setSymbolName(gpuFuncOp, fnName);
-          kernelModules.push_back(cloneModuleOp);
-          return WalkResult::advance();
-        });
-    if (funcWalkResult.wasInterrupted()) {
-      funcOp.emitError(
-          "expected gpu.func operation within gpu.module operation while "
-          "lowering to SPIR-V");
-      return signalPassFailure();
-    }
-    SPIRVTypeConverter typeConverter;
-    OwningRewritePatternList patterns;
     SmallVector<int32_t, 3> workGroupSize;
     if (failed(getWorkGroupSize(funcOp, workGroupSize))) return;
 
+    auto kernelModules = moduleOp.getOps<gpu::GPUModuleOp>();
+    SPIRVTypeConverter typeConverter;
+    OwningRewritePatternList patterns;
+
     // Set spv.entry_point_abi on each kernel functions to drive SPIR-V CodeGen.
     // This is required because SPIR-V CodeGen's contract.
+    // TODO(ravishankarm/antiagainst) : When there is a mirror of the
+    // workgroup-size attribute in gpu dialect use that instad.
     StringRef abiAttrName = spirv::getEntryPointABIAttrName();
     auto abiAttr = spirv::getEntryPointABIAttr(workGroupSize, context);
     for (Operation *gpuModule : kernelModules)
@@ -255,7 +263,9 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
       return typeConverter.isSignatureLegal(op.getType());
     });
 
-    if (failed(applyFullConversion(kernelModules, *target, patterns,
+    SmallVector<Operation *, 1> targetOps(kernelModules.begin(),
+                                          kernelModules.end());
+    if (failed(applyFullConversion(targetOps, *target, patterns,
                                    &typeConverter))) {
       return signalPassFailure();
     }
@@ -287,15 +297,8 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
         return signalPassFailure();
       }
       // Find the number of leading parallel loops in the generic op
-      unsigned numOuterParallelLoops = 0;
-      auto linalgOp = *linalgOps.begin();
-      for (auto iteratorType : linalgOp.iterator_types()) {
-        if (iteratorType.cast<StringAttr>().getValue() !=
-            getParallelIteratorTypeName()) {
-          break;
-        }
-        numOuterParallelLoops++;
-      }
+      unsigned numOuterParallelLoops =
+          getNumOuterParallelLoops(*linalgOps.begin());
       workGroupSize.resize(3, 1);
       if (numOuterParallelLoops > 0) {
         workGroupSize[0] = 32;
@@ -335,7 +338,7 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   pm.addPass(createCSEPass());
 
   pm.addPass(std::make_unique<LoopsToGPUPass>());
-  pm.addPass(createGpuKernelOutliningPass());
+  pm.addPass(createIREEGpuKernelOutliningPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
   pm.addPass(createLowerAffinePass());

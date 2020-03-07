@@ -303,14 +303,6 @@ LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
 bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
                               iree::SpirVExecutableDefT *outDef) {
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-    if (funcOp.getAttr("iree.executable.reduction")) {
-      if (failed(buildReductionExecutable(moduleOp, funcOp, outDef))) {
-        moduleOp.emitOpError() << "failed to splat in the reduction kernel";
-        return false;
-      }
-      return true;
-    }
-
     for (auto &block : funcOp) {
       for (auto &op : block) {
         if (auto convOp = dyn_cast_or_null<xla_hlo::ConvOp>(&op)) {

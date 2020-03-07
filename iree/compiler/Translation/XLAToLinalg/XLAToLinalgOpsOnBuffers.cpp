@@ -125,6 +125,19 @@ struct XLAToLinalgOpsOnBufferConversionPass
   void runOnFunction() override {
     auto func = getFunction();
     OwningRewritePatternList patterns;
+
+    // Only run this pass for dispatch regions with single xla_hlo op of those
+    // converted here.
+
+    // TODO(ravishankarm): There is some cleanup needed here. This pass, the
+    // ReductionLowering.cpp pass and the LinalgTensorToBuffer are all doing
+    // some things. Make them one pass. Combining them all will make the
+    // following check unnecessary.
+    if (!mlir::has_single_element(func.getBlocks()) ||
+        (!mlir::has_single_element(func.front().getOps<xla_hlo::ConvOp>()) &&
+         !mlir::has_single_element(func.front().getOps<xla_hlo::DotOp>())))
+      return;
+
     MLIRContext* context = &getContext();
     ConversionTarget target(*context);
     target.addLegalOp<FuncOp>();

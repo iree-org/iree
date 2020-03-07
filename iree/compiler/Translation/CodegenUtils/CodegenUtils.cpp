@@ -117,7 +117,7 @@ LogicalResult getLaunchSize(FuncOp funcOp,
 template <typename intType>
 LogicalResult getWorkGroupSize(FuncOp funcOp,
                                SmallVectorImpl<intType> &workGroupSize) {
-  if (!funcOp.getAttr("iree.executable.export")) {
+  if (!isDispatchFunction(funcOp)) {
     return funcOp.emitError(
         "expected operation to be in dispatch function to get launch size");
   }
