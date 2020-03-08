@@ -14,7 +14,7 @@
 
 # Run all(ish) IREE tests with CTest. Designed for CI, but can be run manually.
 # Assumes that the project has already been built at ${REPO_ROOT}/build (e.g.
-# with build_tools/cmake/build.sh)
+# with build_tools/cmake/clean_build.sh)
 
 set -x
 set -e
