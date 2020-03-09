@@ -26,6 +26,7 @@ include(CMakeParseArguments)
 # ROOT: Path to the source root where files are found
 # HDRS: List of public header files for the library
 # SRCS: List of source files for the library
+# DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
@@ -80,7 +81,7 @@ function(external_cc_library)
   cmake_parse_arguments(_RULE
     "PUBLIC;ALWAYSLINK;TESTONLY"
     "PACKAGE;NAME;ROOT"
-    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS;INCLUDES"
+    "HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
   )
 
@@ -137,6 +138,7 @@ function(external_cc_library)
         PUBLIC
           ${_RULE_DEFINES}
       )
+      iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
 
       if(DEFINED _RULE_ALWAYSLINK)
         set_property(TARGET ${_NAME} PROPERTY ALWAYSLINK 1)
@@ -173,6 +175,7 @@ function(external_cc_library)
           ${_RULE_LINKOPTS}
           ${IREE_DEFAULT_LINKOPTS}
       )
+      iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
       target_compile_definitions(${_NAME}
         INTERFACE
           ${_RULE_DEFINES}
