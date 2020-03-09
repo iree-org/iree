@@ -28,6 +28,7 @@ iree_lit_test_suite(
         ":runtime-support.so",
         ":test-mnist-jit",
         ":test-simple-jit",
+        ":test-simple-mlir",
         "//iree/tools:IreeFileCheck",
     ],
     tags = [
@@ -67,6 +68,19 @@ cc_binary(
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
+    ],
+)
+
+cc_binary(
+    name = "test-simple-mlir",
+    srcs = ["TestSimpleMLIR.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//mlir:AllPassesAndDialects",
     ],
 )
 
