@@ -40,7 +40,7 @@ echo "Initializing submodules"
 # so a build failure only prevents building/testing things that depend on it and
 # we can still run the other tests.
 echo "Building with cmake"
-./build_tools/cmake/build.sh
+./build_tools/cmake/clean_build.sh
 
 echo "Testing with ctest"
 ./build_tools/cmake/test.sh

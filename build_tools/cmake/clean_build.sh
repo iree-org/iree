@@ -13,20 +13,14 @@
 # limitations under the License.
 
 # Build the IREE project with CMake. Designed for CI, but can be run manually.
+# This is equivalent to the build_tools/cmake/rebuild.sh script except it
+# first deletes the build directory to deal with any faulty caching.
 
 set -x
 set -e
 
 ROOT_DIR=$(git rev-parse --show-toplevel)
 
-CMAKE_BIN=${CMAKE_BIN:-$(which cmake)}
-
-"$CMAKE_BIN" --version
-ninja --version
-
 cd ${ROOT_DIR?}
 rm -rf build/
-mkdir build && cd build
-"$CMAKE_BIN" -G Ninja -DCMAKE_BUILD_TYPE=FastBuild -DIREE_BUILD_COMPILER=ON -DIREE_BUILD_TESTS=ON -DIREE_BUILD_SAMPLES=OFF -DIREE_BUILD_DEBUGGER=OFF ..
-"$CMAKE_BIN" --build .
-
+./build_tools/cmake/rebuild.sh
