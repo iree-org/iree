@@ -21,6 +21,7 @@
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/Module.h"
+#include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -84,6 +85,9 @@ void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   pm.addPass(createLowerToCFGPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
+
+  // Affine -> STD
+  pm.addPass(createLowerAffinePass());
 
   // STD -> LLVM
   pm.addPass(
