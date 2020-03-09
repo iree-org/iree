@@ -37,7 +37,6 @@ cc_library(
         "//iree/compiler/Translation/CodegenUtils",
         "//iree/compiler/Translation/SPIRV/IndexComputation",
         "//iree/compiler/Translation/SPIRV/Passes",
-        "//iree/compiler/Translation/SPIRV/ReductionCodegen",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineOps",
         "@llvm-project//mlir:AffineToStandardTransforms",

@@ -21,7 +21,6 @@
 
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationPass.h"
 #include "iree/compiler/Translation/SPIRV/Passes/Passes.h"
-#include "iree/compiler/Translation/SPIRV/ReductionCodegen/ReductionCodegenPasses.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRV.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/XLAToSPIRV.h"
 #include "llvm/ADT/StringSet.h"
@@ -51,42 +50,6 @@ class IREEToSPIRVPass : public ModulePass<IREEToSPIRVPass> {
 };
 }  // namespace
 
-/// Generates the reduction apply function within the SPIR-V module.
-template <typename operation_range>
-static LogicalResult generateReductionApplyFns(spirv::ModuleOp spvModule,
-                                               ModuleOp module,
-                                               OpBuilder &builder,
-                                               operation_range fns) {
-  OpBuilder::InsertionGuard guard(builder);
-  builder.setInsertionPointToStart(&spvModule.getBlock());
-
-  SymbolTable table(module);
-  llvm::StringSet<> reductionApplyFnSymRefs;
-  SmallVector<Operation *, 1> clonedReductionFns;
-  for (auto funcOp : fns) {
-    if (!funcOp.getAttr("iree.executable.reduction")) {
-      continue;
-    }
-
-    auto applyFnSymRef = funcOp.template getAttrOfType<FlatSymbolRefAttr>(
-        "iree.executable.reduction.apply");
-    if (reductionApplyFnSymRefs.count(applyFnSymRef.getValue())) {
-      continue;
-    }
-    auto applyFn = table.lookup<FuncOp>(applyFnSymRef.getValue());
-    if (!applyFn) {
-      return emitError(funcOp.getLoc(), "unable to find fn ")
-             << applyFnSymRef << " which is the apply function for "
-             << funcOp.getName();
-    }
-    // Clone the reduction apply fns into the spirv module for legalization.
-    clonedReductionFns.push_back(builder.clone(*applyFn.getOperation()));
-  }
-
-  return lowerReductionApplyFunction(spvModule.getContext(),
-                                     clonedReductionFns);
-}
-
 /// Generates the entry function within the SPIR-V module for dispatch function.
 template <typename operation_range>
 static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
@@ -96,7 +59,6 @@ static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
       ConstantOpSPIRVLowering, ReturnOpSPIRVLowering,
       // IREE-specific ops:
       IREELoadOpSPIRVLowering, IREEStoreOpSPIRVLowering,
-      IREEStoreReduceOpSPIRVLowering,
       // Standard dialect unary elementwise ops:
       // Standard dialect binary elementwise ops:
       SPIRVPwOpLowering<AddFOp, spirv::FAddOp>,
@@ -206,11 +168,6 @@ void IREEToSPIRVPass::runOnModule() {
 
   auto fns = module.getOps<FuncOp>();
 
-  // Generate the SPIR-V functions for any reduction apply functions.
-  if (failed(generateReductionApplyFns(spvModule, module, builder, fns))) {
-    return signalPassFailure();
-  }
-
   // Generate the SPIR-V entry function for the dispatch function
   if (failed(generateEntryFunction(spvModule, fns))) {
     return signalPassFailure();
@@ -235,7 +192,6 @@ void addIREEToSPIRVPasses(PassManager &conversionPassManager) {
   // TODO(laurenzo): createLegalizeToStdPass should probably be refactored
   // in terms of conversion patterns and added to above.
   conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());
-  conversionPassManager.addPass(createPrepareReductionDispatchPass());
   conversionPassManager.addPass(createIndexComputationPass());
   conversionPassManager.addPass(createIREEToSPIRVPass());
 

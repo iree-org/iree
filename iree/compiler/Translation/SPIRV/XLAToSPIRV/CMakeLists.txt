@@ -44,7 +44,6 @@ iree_cc_library(
     iree::compiler::Translation::CodegenUtils
     iree::compiler::Translation::SPIRV::IndexComputation
     iree::compiler::Translation::SPIRV::Passes
-    iree::compiler::Translation::SPIRV::ReductionCodegen
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

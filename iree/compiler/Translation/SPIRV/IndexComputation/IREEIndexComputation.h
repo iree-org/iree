@@ -54,20 +54,6 @@ class IREEStoreIndexPropagation final
   LogicalResult propagateIndexMap(Operation *operation) const override;
 };
 
-/// Index propagation for iree.store_reduce operation. THe launch size is
-/// assumed to match the shape of the input tensor that is being stored, and
-/// acts as a seed for the index propagation. Each workitem is assumed to
-/// compute a single element of this tensor. Also seeds the index propagation of
-/// the output tensor. Multiple workitems update the same element of the output
-/// tensor depending on the reduction dimension.
-class IREEStoreReduceIndexPropagation final
-    : public IndexPropagationOp<IREE::StoreReduceOp> {
- public:
-  using IndexPropagationOp<IREE::StoreReduceOp>::IndexPropagationOp;
-
-  LogicalResult propagateIndexMap(Operation *operation) const override;
-};
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

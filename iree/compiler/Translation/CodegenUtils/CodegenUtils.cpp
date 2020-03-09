@@ -52,9 +52,9 @@ static bool areShapesEqual(ArrayRef<int64_t> lhs, ArrayRef<int64_t> rhs) {
 /// value.
 // TODO(ravishankarm) : Modify this to return the Values to use for the extent
 // to handle dynamic shapes.
-static LogicalResult getExtentFromStoreOpSrc(Operation *storeOp,
+static LogicalResult getExtentFromStoreOpSrc(IREE::StoreOutputOp storeOp,
                                              SmallVectorImpl<int64_t> &extent) {
-  Value srcVal = storeOp->getOperand(0);
+  Value srcVal = storeOp.src();
   if (srcVal.getType().isSignlessIntOrFloat()) {
     extent.clear();
     extent.push_back(1);
@@ -71,7 +71,7 @@ static LogicalResult getExtentFromStoreOpSrc(Operation *storeOp,
       return success();
     }
   }
-  return storeOp->emitError(
+  return storeOp.emitError(
       "unable to extract domain size from store operation");
 }
 
@@ -84,30 +84,25 @@ LogicalResult getLaunchSize(FuncOp funcOp,
     return funcOp.emitError(
         "unhandled multiple blocks within dispatch function");
   }
-  SmallVector<Operation *, 1> storeOperations;
   auto storeOps = body.front().getOps<IREE::StoreOutputOp>();
-  storeOperations.assign(storeOps.begin(), storeOps.end());
-  auto storeReduceOps = body.front().getOps<IREE::StoreReduceOp>();
-  storeOperations.append(storeReduceOps.begin(), storeReduceOps.end());
-  if (storeOperations.begin() == storeOperations.end()) {
+  if (storeOps.empty())
     return funcOp.emitError(
         "expected dispatch function to have at least one iree.store_output "
         "instruction");
-  }
 
-  Operation *firstStoreOp = *storeOperations.begin();
+  IREE::StoreOutputOp firstStoreOp = *storeOps.begin();
   if (failed(getExtentFromStoreOpSrc(firstStoreOp, launchSize))) {
-    return firstStoreOp->emitError("unhandled type of the output tensor");
+    return firstStoreOp.emitError("unhandled type of the output tensor");
   }
-  for (auto it = std::next(storeOperations.begin()), ie = storeOperations.end();
-       it != ie; ++it) {
+  for (auto it = std::next(storeOps.begin()), ie = storeOps.end(); it != ie;
+       ++it) {
     SmallVector<int64_t, 3> checkShape;
-    Operation *storeOp = *it;
+    IREE::StoreOutputOp storeOp = *it;
     if (failed(getExtentFromStoreOpSrc(storeOp, checkShape))) {
-      return storeOp->emitError("unhandled type of the output tensor");
+      return storeOp.emitError("unhandled type of the output tensor");
     }
     if (!areShapesEqual(launchSize, checkShape)) {
-      return storeOp->emitError("mismatch in shapes of the output tensors");
+      return storeOp.emitError("mismatch in shapes of the output tensors");
     }
   }
   return success();

@@ -195,7 +195,8 @@ bool isDispatchRegionMergable(DispatchRegionOp &regionOp) {
   for (auto &block : regionOp.body().getBlocks()) {
     for (auto &op : block) {
       // TODO(b/144530470): replace with tablegen attributes/interfaces.
-      if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op)) {
+      if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::DotOp>(op) ||
+          isa<xla_hlo::ConvOp>(op)) {
         return false;
       }
     }

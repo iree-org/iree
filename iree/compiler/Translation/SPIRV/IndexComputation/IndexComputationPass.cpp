@@ -41,7 +41,6 @@ void IndexComputationPass::runOnFunction() {
       IndexPropagationOp<ReturnOp>,
       // IREE-specific ops:
       IREELoadIndexPropagation, IREEStoreIndexPropagation,
-      IREEStoreReduceIndexPropagation,
       // Standard dialect unary elementwise ops:
       NoBroadcastPwOpIndexPropagation<SIToFPOp>,
       NoBroadcastPwOpIndexPropagation<SignExtendIOp>,

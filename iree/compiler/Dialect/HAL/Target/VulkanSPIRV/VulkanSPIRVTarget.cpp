@@ -235,20 +235,14 @@ static void propagateModifiedExecutableABI(
 static bool useLinalgOnBuffers(ModuleOp moduleOp) {
   auto funcs = moduleOp.getOps<FuncOp>();
 
-  // TODO(ravishankarm): THis attribute is to be deprecated. This is just a
-  // temporary WAR that shold be cleaned up soon.
-  if (llvm::any_of(funcs, [](FuncOp fn) {
-        return static_cast<bool>(fn.getAttr("iree.executable.reduction"));
-      }))
-    return true;
-
   if (!mlir::has_single_element(funcs)) return false;
   FuncOp fn = *funcs.begin();
   // For now expect only IREE::LoadInputOp and IREE::StoreOutputOp with
   // xla_reduce op. For now just checking that has a reduce. It is expected that
   // this is the only op in the dispatch region.
   auto walkResult = fn.walk([](Operation *op) -> WalkResult {
-    if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op))
+    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::DotOp>(op) ||
+        isa<xla_hlo::ConvOp>(op))
       return WalkResult::interrupt();
     return WalkResult::advance();
   });

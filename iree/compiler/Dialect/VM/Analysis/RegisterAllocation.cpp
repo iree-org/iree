@@ -518,8 +518,8 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
     return feedbackArcSet.acyclicEdges;
   }
 
-  assert(feedbackArcSet.feedbackEdges.size() == 1 &&
-         "liveness tracking of scratch registers not yet implemented");
+  // assert(feedbackArcSet.feedbackEdges.size() == 1 &&
+  //        "liveness tracking of scratch registers not yet implemented");
 
   // The last register in each bank is reserved for swapping, when required.
   uint8_t scratchI32Reg = maxI32RegisterOrdinal_;

@@ -49,18 +49,6 @@ class IREEStoreOpSPIRVLowering final
       TensorIndexToScalarValueMap &valueCache) const override;
 };
 
-/// Translation of iree.store_reduce operation. It is converted to a call to the
-/// "reduction.apply" function which does the atomically updates the output.
-class IREEStoreReduceOpSPIRVLowering final
-    : public SPIRVOpLowering<IREE::StoreReduceOp> {
- public:
-  using SPIRVOpLowering<IREE::StoreReduceOp>::SPIRVOpLowering;
-
-  LogicalResult lowerOperation(
-      Operation *op, OpBuilder &builder,
-      TensorIndexToScalarValueMap &valueCache) const override;
-};
-
 }  // namespace iree_compiler
 }  // namespace mlir
 

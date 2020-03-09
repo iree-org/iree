@@ -114,7 +114,8 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
 // Preconditions: isDispatchableOp(op) == true.
 bool isFusionRootOp(Operation *op) {
   // TODO(b/144530470): replace with tablegen attributes/interfaces.
-  if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op)) {
+  if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op) ||
+      isa<xla_hlo::ReduceOp>(op)) {
     // We have hand-written kernels for these right now we want to stand alone.
     // When we do a bit more magic we should allow these ops to fold.
     return false;

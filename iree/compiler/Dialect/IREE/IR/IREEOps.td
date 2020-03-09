@@ -51,19 +51,6 @@ def IREE_StoreOutputOp : IREE_Op<"store_output"> {
   }];
 }
 
-def IREE_StoreReduceOp : IREE_Op<"store_reduce"> {
-  let arguments = (ins
-    AnyType:$src,
-    IREE_MemRef:$dst,
-    FlatSymbolRefAttr:$reduction_fn
-  );
-
-  let assemblyFormat = [{
-    `(` $src `:` type($src) `,` $dst `:` type($dst) `,` $reduction_fn `)`
-    attr-dict
-  }];
-}
-
 //===----------------------------------------------------------------------===//
 // Compiler hints
 //===----------------------------------------------------------------------===//

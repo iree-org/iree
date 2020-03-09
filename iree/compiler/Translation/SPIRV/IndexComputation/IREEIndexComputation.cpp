@@ -117,43 +117,5 @@ LogicalResult IREEStoreIndexPropagation::propagateIndexMap(
   return initIndexPropagation(storeOp.getLoc(), funcOp, storeOp.src());
 }
 
-//===----------------------------------------------------------------------===//
-// IREEStoreReduceOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult IREEStoreReduceIndexPropagation::propagateIndexMap(
-    Operation *operation) const {
-  auto storeReduceOp = cast<IREE::StoreReduceOp>(operation);
-  auto funcOp = operation->getParentOfType<FuncOp>();
-  if (!funcOp) {
-    return operation->emitError(
-        "expected operation to be in dispatch function to get launch size");
-  }
-  if (failed(initIndexPropagation(storeReduceOp.getLoc(), funcOp,
-                                  storeReduceOp.src()))) {
-    return failure();
-  }
-
-  // Set the index of the output as well based on which dimensions are reduced.
-  SmallVector<AffineMap, 1> inputMap;
-  getIndexMapsForValue(storeReduceOp.src(), inputMap);
-  assert(inputMap.size() == 1);
-  SmallVector<AffineExpr, 2> exprs;
-  auto reductionDim =
-      funcOp.getAttrOfType<IntegerAttr>("iree.executable.reduction.dimension")
-          .getInt();
-  for (auto dim : enumerate(inputMap[0].getResults())) {
-    if (dim.index() == reductionDim) {
-      continue;
-    }
-    exprs.push_back(dim.value());
-  }
-  if (exprs.empty()) {
-    exprs.push_back(getAffineConstantExpr(0, operation->getContext()));
-  }
-  addNewIndexMapForValue(storeReduceOp.dst(), getAffineMap(funcOp, exprs));
-  return success();
-}
-
 }  // namespace iree_compiler
 }  // namespace mlir
