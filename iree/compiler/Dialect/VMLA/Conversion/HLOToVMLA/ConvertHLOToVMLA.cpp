@@ -126,6 +126,33 @@ struct BroadcastInDimOpConversion
   TypeConverter &typeConverter;
 };
 
+struct CanonicalizeBroadcastOp : public OpRewritePattern<xla_hlo::BroadcastOp> {
+  using OpRewritePattern::OpRewritePattern;
+  PatternMatchResult matchAndRewrite(xla_hlo::BroadcastOp op,
+                                     PatternRewriter &rewriter) const override {
+    SmallVector<int64_t, 6> broadcastDimensions;
+    RankedTensorType inputType =
+        op.getOperand().getType().cast<RankedTensorType>();
+    RankedTensorType outputType =
+        op.getResult().getType().cast<RankedTensorType>();
+    for (int outputDim = outputType.getRank() - inputType.getRank(),
+             outputRank = outputType.getRank();
+         outputDim < outputRank; outputDim++) {
+      broadcastDimensions.push_back(outputDim);
+    }
+    // TODO(silvasean): move this helper to DenseIntElementsAttr.
+    auto make1DElementsAttr = [&rewriter](ArrayRef<int64_t> integers) {
+      auto type = RankedTensorType::get({static_cast<int64_t>(integers.size())},
+                                        rewriter.getIntegerType(64));
+      return DenseIntElementsAttr::get(type, integers);
+    };
+    rewriter.replaceOpWithNewOp<xla_hlo::BroadcastInDimOp>(
+        op, op.getType(), op.getOperand(),
+        make1DElementsAttr(broadcastDimensions));
+    return matchSuccess();
+  }
+};
+
 // Converts a concat into a set of copies into the destination buffer.
 struct ConcatenateOpConversion
     : public OpConversionPattern<xla_hlo::ConcatenateOp> {
@@ -475,9 +502,6 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
           context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::PadOp, IREE::VMLA::PadOp>>(
       context, typeConverter);
-  patterns
-      .insert<VMLAOpConversion<xla_hlo::BroadcastOp, IREE::VMLA::BroadcastOp>>(
-          context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::AbsOp, IREE::VMLA::AbsOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::MaxOp, IREE::VMLA::MaxOp>>(
@@ -502,6 +526,10 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   patterns.insert<GatherOpConversion>(context, typeConverter);
   patterns.insert<SliceOpConversion>(context, typeConverter);
   patterns.insert<DynamicSliceOpConversion>(context, typeConverter);
+
+  // Tensor-level canonicalizations to reduce the op surface area of the
+  // runtime.
+  patterns.insert<CanonicalizeBroadcastOp>(context);
 
   // TODO(benvanik): add missing ops:
   // - ConvOp
