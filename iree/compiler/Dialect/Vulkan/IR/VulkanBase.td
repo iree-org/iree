@@ -78,13 +78,15 @@ def VK_V_1_2 : I32EnumAttrCase<"V_1_2", 2, "v1.2">;
 def VK_VersionAttr : VK_I32EnumAttr<"Version", "valid Vulkan version", [
     VK_V_1_0, VK_V_1_1, VK_V_1_2]>;
 
+def VK_KHR_shader_float16_int8 : StrEnumAttrCase<"VK_KHR_shader_float16_int8">;
 def VK_KHR_spirv_1_4 : StrEnumAttrCase<"VK_KHR_spirv_1_4">;
 def VK_KHR_storage_buffer_storage_class : StrEnumAttrCase<
     "VK_KHR_storage_buffer_storage_class">;
 
-def VK_ExtensionnAttr :
+def VK_ExtensionAttr :
     VK_StrEnumAttr<"Extension", "supported Vulkan extension", [
-      VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class
+      VK_KHR_shader_float16_int8, VK_KHR_spirv_1_4,
+      VK_KHR_storage_buffer_storage_class
     ]>;
 
 #endif  // IREE_DIALECT_VULKAN_BASE

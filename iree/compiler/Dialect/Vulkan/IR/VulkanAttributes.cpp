@@ -33,16 +33,15 @@ struct TargetEnvAttributeStorage : public AttributeStorage {
   using KeyTy = std::tuple<Attribute, Attribute, Attribute, Attribute>;
 
   TargetEnvAttributeStorage(Attribute version, Attribute revision,
-                            Attribute extensions, Attribute core10Properties)
+                            Attribute extensions, Attribute capabilities)
       : version(version),
         revision(revision),
         extensions(extensions),
-        core10Properties(core10Properties) {}
+        capabilities(capabilities) {}
 
   bool operator==(const KeyTy &key) const {
     return std::get<0>(key) == version && std::get<1>(key) == revision &&
-           std::get<2>(key) == extensions &&
-           std::get<3>(key) == core10Properties;
+           std::get<2>(key) == extensions && std::get<3>(key) == capabilities;
   }
 
   static TargetEnvAttributeStorage *construct(
@@ -55,17 +54,17 @@ struct TargetEnvAttributeStorage : public AttributeStorage {
   Attribute version;
   Attribute revision;
   Attribute extensions;
-  Attribute core10Properties;
+  Attribute capabilities;
 };
 }  // namespace detail
 
 TargetEnvAttr TargetEnvAttr::get(IntegerAttr version, IntegerAttr revision,
                                  ArrayAttr extensions,
-                                 DictionaryAttr core10Properties) {
-  assert(version && revision && extensions && core10Properties);
+                                 DictionaryAttr capabilities) {
+  assert(version && revision && extensions && capabilities);
   MLIRContext *context = version.getContext();
   return Base::get(context, AttrKind::TargetEnv, version, revision, extensions,
-                   core10Properties);
+                   capabilities);
 }
 
 StringRef TargetEnvAttr::getKindName() { return "target_env"; }
@@ -94,13 +93,13 @@ ArrayAttr TargetEnvAttr::getExtensionsAttr() {
   return getImpl()->extensions.cast<ArrayAttr>();
 }
 
-Core10PropertiesAttr TargetEnvAttr::getCore10Properties() {
-  return getImpl()->core10Properties.cast<Core10PropertiesAttr>();
+CapabilitiesAttr TargetEnvAttr::getCapabilitiesAttr() {
+  return getImpl()->capabilities.cast<CapabilitiesAttr>();
 }
 
 LogicalResult TargetEnvAttr::verifyConstructionInvariants(
     Location loc, IntegerAttr version, IntegerAttr revision,
-    ArrayAttr extensions, DictionaryAttr core10Properties) {
+    ArrayAttr extensions, DictionaryAttr capabilities) {
   if (!version.getType().isInteger(32))
     return emitError(loc) << "expected 32-bit integer for version";
 
@@ -114,9 +113,9 @@ LogicalResult TargetEnvAttr::verifyConstructionInvariants(
       }))
     return emitError(loc) << "unknown extension in extension list";
 
-  if (!core10Properties.isa<Core10PropertiesAttr>())
+  if (!capabilities.isa<CapabilitiesAttr>())
     return emitError(loc)
-           << "expected vulkan::Core10PropertiesAttr for core10Properties";
+           << "expected vulkan::CapabilitiesAttr for capabilities";
 
   return success();
 }

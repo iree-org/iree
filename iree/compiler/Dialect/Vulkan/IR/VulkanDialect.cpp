@@ -118,15 +118,15 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
     extensionsAttr = builder.getArrayAttr(extensions);
   }
 
-  DictionaryAttr core10PropertiesAttr;
+  DictionaryAttr capabilities;
   {
     auto loc = parser.getCurrentLocation();
-    if (parser.parseAttribute(core10PropertiesAttr)) return {};
+    if (parser.parseAttribute(capabilities)) return {};
 
-    if (!core10PropertiesAttr.isa<Core10PropertiesAttr>()) {
+    if (!capabilities.isa<CapabilitiesAttr>()) {
       parser.emitError(loc,
-                       "core10Properties must be a "
-                       "vulkan::Core10PropertiesAttr dictionary attribute");
+                       "capabilities must be a vulkan::CapabilitiesAttr "
+                       "dictionary attribute");
       return {};
     }
   }
@@ -134,7 +134,7 @@ Attribute parseTargetAttr(DialectAsmParser &parser) {
   if (parser.parseGreater()) return {};
 
   return TargetEnvAttr::get(versionAttr, revisionAttr, extensionsAttr,
-                            core10PropertiesAttr);
+                            capabilities);
 }
 }  // anonymous namespace
 
@@ -170,7 +170,7 @@ void print(TargetEnvAttr targetEnv, DialectAsmPrinter &printer) {
   interleaveComma(targetEnv.getExtensionsAttr(), os, [&](Attribute attr) {
     os << attr.cast<StringAttr>().getValue();
   });
-  printer << "], " << targetEnv.getCore10Properties() << ">";
+  printer << "], " << targetEnv.getCapabilitiesAttr() << ">";
 }
 }  // anonymous namespace
 

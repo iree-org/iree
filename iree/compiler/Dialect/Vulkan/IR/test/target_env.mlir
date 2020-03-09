@@ -25,6 +25,16 @@
   }>
 } : () -> ()
 
+"vk_configure_op"() {
+  // CHECK:      shaderFloat64
+  // CHECK-SAME: shaderInt16
+  target_env = #vk.target_env<v1.1, r(120), [VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class], {
+    maxComputeWorkGroupInvocations = 1024: i32,
+    maxComputeWorkGroupSize = dense<[128, 8, 4]>: vector<3xi32>,
+    shaderFloat64, shaderInt16
+  }>
+} : () -> ()
+
 // -----
 
 "unknown_vulkan_version"() {
@@ -48,7 +58,7 @@
 // -----
 
 "missing_core_1_1_properties_field"() {
-  // expected-error @+1 {{core10Properties must be a vulkan::Core10PropertiesAttr dictionary attribute}}
+  // expected-error @+1 {{capabilities must be a vulkan::CapabilitiesAttr dictionary attribute}}
   target_env = #vk.target_env<v1.0, r(10), [], {
     maxComputeWorkGroupInvocations = 128: i32
   }>
@@ -57,7 +67,7 @@
 // -----
 
 "unknown_core_1_1_properties_field"() {
-  // expected-error @+1 {{core10Properties must be a vulkan::Core10PropertiesAttr dictionary attribute}}
+  // expected-error @+1 {{capabilities must be a vulkan::CapabilitiesAttr dictionary attribute}}
   target_env = #vk.target_env<v1.0, r(10), [], {
     maxComputeWorkGroupInvocations = 128: i32,
     maxComputeWorkGroupSize = dense<[64, 4, 4]>: vector<3xi32>,

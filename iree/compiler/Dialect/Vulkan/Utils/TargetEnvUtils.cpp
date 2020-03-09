@@ -55,6 +55,9 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
 
   for (Extension ext : vkTargetEnv.getExtensions()) {
     switch (ext) {
+      case Extension::VK_KHR_shader_float16_int8:
+        // This extension allows using certain SPIR-V capabilities.
+        break;
       case Extension::VK_KHR_spirv_1_4:
         // This extension only affects SPIR-V version.
         break;
@@ -66,15 +69,39 @@ void convertExtensions(Vulkan::TargetEnvAttr vkTargetEnv,
   }
 }
 
+/// Gets the corresponding SPIR-V capabilities for the given Vulkan target
+/// environment.
+void convertCapabilities(Vulkan::TargetEnvAttr vkTargetEnv,
+                         SmallVectorImpl<spirv::Capability> &capabilities) {
+  // Add unconditionally supported capabilities.
+  // Note that "Table 54. List of SPIR-V Capabilities and enabling features or
+  // extensions" in the Vulkan spec contains the full list. Right now omit those
+  // implicitly declared or not useful for us.
+  capabilities.assign({spirv::Capability::Shader});
+
+  auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
+
+#define MAP_PRIMITIVE_TYPE(type)     \
+  if (vkCapabilities.shader##type()) \
+  capabilities.push_back(spirv::Capability::type)
+
+  MAP_PRIMITIVE_TYPE(Float64);
+  MAP_PRIMITIVE_TYPE(Float16);
+  MAP_PRIMITIVE_TYPE(Int64);
+  MAP_PRIMITIVE_TYPE(Int16);
+  MAP_PRIMITIVE_TYPE(Int8);
+#undef MAP_PRIMITIVE_TYPE
+}
+
 /// Gets the corresponding SPIR-V resource limits for the given Vulkan target
 /// environment.
 spirv::ResourceLimitsAttr convertResourceLimits(
     Vulkan::TargetEnvAttr vkTargetEnv) {
   MLIRContext *context = vkTargetEnv.getContext();
-  auto core10 = vkTargetEnv.getCore10Properties();
-  return spirv::ResourceLimitsAttr::get(core10.maxComputeWorkGroupInvocations(),
-                                        core10.maxComputeWorkGroupSize(),
-                                        context);
+  auto vkCapabilities = vkTargetEnv.getCapabilitiesAttr();
+  return spirv::ResourceLimitsAttr::get(
+      vkCapabilities.maxComputeWorkGroupInvocations(),
+      vkCapabilities.maxComputeWorkGroupSize(), context);
 }
 
 // TODO(antiagainst): move this into MLIR core as spirv::TargetEnvAttr::get().
@@ -101,11 +128,11 @@ spirv::TargetEnvAttr getSpirvTargetEnv(spirv::Version version,
 }
 }  // anonymous namespace
 
-// TODO(antiagainst): change this to the real SwiftShader target environment.
+// TODO(antiagainst): register more SwiftShader extensions.
 const char *swiftShaderTargetEnvAssembly =
-    "#vk.target_env<v1.1, r(130), [], {"
+    "#vk.target_env<v1.1, r(0), [VK_KHR_storage_buffer_storage_class], {"
     "maxComputeWorkGroupInvocations = 128: i32, "
-    "maxComputeWorkGroupSize = dense<[64, 4, 4]>: vector<3xi32>"
+    "maxComputeWorkGroupSize = dense<[128, 128, 64]>: vector<3xi32>"
     "}>";
 
 spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
@@ -115,6 +142,7 @@ spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
   convertExtensions(vkTargetEnv, spvExtensions);
 
   SmallVector<spirv::Capability, 8> spvCapabilities;
+  convertCapabilities(vkTargetEnv, spvCapabilities);
 
   auto spvLimits = convertResourceLimits(vkTargetEnv);
 

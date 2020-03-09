@@ -42,8 +42,7 @@ class TargetEnvAttr
   // TODO(antiagainst): support other physical device core properties, physical
   // device core features and per-extension features.
   static TargetEnvAttr get(IntegerAttr version, IntegerAttr revision,
-                           ArrayAttr extensions,
-                           DictionaryAttr core10Properties);
+                           ArrayAttr extensions, DictionaryAttr capabilities);
 
   /// Returns the attribute kind's name (without the 'vk.' prefix).
   static StringRef getKindName();
@@ -67,14 +66,15 @@ class TargetEnvAttr
   /// array attribute.
   ArrayAttr getExtensionsAttr();
 
-  /// Returns the Vulkan 1.0 core properties.
-  Core10PropertiesAttr getCore10Properties();
+  /// Returns the dictionary attribute containing various Vulkan capabilities
+  /// bits.
+  CapabilitiesAttr getCapabilitiesAttr();
 
   static bool kindof(unsigned kind) { return kind == AttrKind::TargetEnv; }
 
   static LogicalResult verifyConstructionInvariants(
       Location loc, IntegerAttr version, IntegerAttr revision,
-      ArrayAttr extensions, DictionaryAttr core10Properties);
+      ArrayAttr extensions, DictionaryAttr capabilities);
 };
 
 }  // namespace Vulkan
