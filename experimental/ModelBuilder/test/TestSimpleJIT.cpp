@@ -35,24 +35,15 @@ static llvm::cl::opt<std::string> runtimeSupport(
     "runtime-support", llvm::cl::desc("Runtime support library filename"),
     llvm::cl::value_desc("filename"), llvm::cl::init("-"));
 
-// Flush the different output streams. Needed to ensure FileCheck
-// sees the various buffered streams in a reasonable order.
-static void flush() {
-  fflush(stderr);
-  fflush(stdout);
-  llvm::errs().flush();
-  llvm::outs().flush();
-}
-
 template <unsigned M>
 void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
   ModelBuilder modelBuilder;
 
   auto f32 = modelBuilder.f32;
-  auto mnVectorType = modelBuilder.getVectorType({M}, f32);
-  auto typeA = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
-  auto typeB = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
-  auto typeC = modelBuilder.getMemRefType({kNumElements}, mnVectorType);
+  auto mVectorType = modelBuilder.getVectorType({M}, f32);
+  auto typeA = modelBuilder.getMemRefType({kNumElements}, mVectorType);
+  auto typeB = modelBuilder.getMemRefType({kNumElements}, mVectorType);
+  auto typeC = modelBuilder.getMemRefType({kNumElements}, mVectorType);
 
   // 1. Build a simple vector_add.
   {
@@ -71,9 +62,6 @@ void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
 
     std_ret();
   }
-
-  modelBuilder.getModuleRef()->dump();
-  flush();
 
   // 2. Compile the function, pass in runtime support library
   //    to the execution engine for vector.print.
@@ -98,7 +86,7 @@ void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
   auto C = makeInitializedStridedMemRefDescriptor<Vector1D<M, float>, 1>(
       {kNumElements}, zeroInit);
 
-  // 5. Call the funcOp named `funcName`.
+  // 4. Call the funcOp named `funcName`.
   const std::string kFuncAdapterName =
       (llvm::Twine("_mlir_ciface_") + funcName).str();
   auto *bufferA = A.get();
@@ -108,8 +96,6 @@ void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
 
   auto err =
       runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
-  flush();
-
   if (err) llvm_unreachable("Error running function.");
 }
 
@@ -141,9 +127,6 @@ void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
     std_ret();
   }
 
-  modelBuilder.getModuleRef()->dump();
-  flush();
-
   // 2. Compile the function, pass in runtime support library
   //    to the execution engine for vector.print.
   ModelRunner runner(modelBuilder.getModuleRef());
@@ -171,7 +154,7 @@ void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
   auto C = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
       {kNumElements}, zeroInit);
 
-  // 5. Call the funcOp named `funcName`.
+  // 4. Call the funcOp named `funcName`.
   const std::string kFuncAdapterName =
       (llvm::Twine("_mlir_ciface_") + funcName).str();
   auto *bufferA = A.get();
@@ -181,7 +164,6 @@ void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
 
   auto err =
       runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
-  flush();
   if (err) llvm_unreachable("Error running function.");
 }
 
@@ -210,9 +192,6 @@ void testMatmulOnVectors(StringLiteral funcName) {
 
   linalg_matmul(A, B, C, contractionBuilder);
   std_ret();
-
-  modelBuilder.getModuleRef()->dump();
-  flush();
 }
 
 int main(int argc, char **argv) {
@@ -221,43 +200,31 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "TestSimpleJIT\n");
 
-  // CHECK-LABEL: func @test_vector_add_1d_1x3f32
-  //       CHECK: ( 1, 1, 1 )
-  //       CHECK: ( 1, 2, 3 )
-  //       CHECK: ( 2, 3, 4 )
+  // CHECK: ( 1, 1, 1 )
+  // CHECK: ( 1, 2, 3 )
+  // CHECK: ( 2, 3, 4 )
   testVectorAdd1d<3>("test_vector_add_1d_1x3f32", /*kNumElements=*/1);
 
-  // CHECK-LABEL: func @test_vector_add_1d_2x3f32
-  //       CHECK: ( 1, 1, 1 )
-  //       CHECK: ( 4, 5, 6 )
-  //       CHECK: ( 5, 6, 7 )
+  // CHECK: ( 1, 1, 1 )
+  // CHECK: ( 4, 5, 6 )
+  // CHECK: ( 5, 6, 7 )
   testVectorAdd1d<3>("test_vector_add_1d_2x3f32", /*kNumElements=*/2);
 
-  // CHECK-LABEL: func @test_vector_add_1d_2x5f32
-  //       CHECK: ( 1, 1, 1, 1, 1 )
-  //       CHECK: ( 6, 7, 8, 9, 10 )
-  //       CHECK: ( 7, 8, 9, 10, 11 )
+  // CHECK: ( 1, 1, 1, 1, 1 )
+  // CHECK: ( 6, 7, 8, 9, 10 )
+  // CHECK: ( 7, 8, 9, 10, 11 )
   testVectorAdd1d<5>("test_vector_add_1d_2x5f32", /*kNumElements=*/2);
 
-  // CHECK-LABEL: func @test_vector_add_2d_1x2_3f32
-  //       CHECK: ( ( 1, 1, 1 ), ( 1, 1, 1 ) )
-  //       CHECK: ( ( 1, 2, 3 ), ( 4, 5, 6 ) )
-  //       CHECK: ( ( 2, 3, 4 ), ( 5, 6, 7 ) )
+  // CHECK: ( ( 1, 1, 1 ), ( 1, 1, 1 ) )
+  // CHECK: ( ( 1, 2, 3 ), ( 4, 5, 6 ) )
+  // CHECK: ( ( 2, 3, 4 ), ( 5, 6, 7 ) )
   testVectorAdd2d<2, 3>("test_vector_add_2d_1x2_3f32", /*kNumElements=*/1);
 
-  // CHECK-LABEL: func @test_vector_add_2d_3x3_5f32
   // CHECK: ( ( 1, 1, 1, 1, 1 ), ( 1, 1, 1, 1, 1 ), ( 1, 1, 1, 1, 1 ) )
   // CHECK: ( ( 31, 32, 33, 34, 35 ), ( 36{{.*}}40 ), ( 41, 42, 43, 44, 45 ) )
   // CHECK: ( ( 32, 33, 34, 35, 36 ), ( 37{{.*}}41 ), ( 42, 43, 44, 45, 46 ) )
   testVectorAdd2d<3, 5>("test_vector_add_2d_3x3_5f32", /*kNumElements=*/3);
 
-  // CHECK-LABEL: func @test_vector_matmul(
-  //  CHECK-SAME:   %[[A:.*]]: memref<?x?xvector<4x16xf32>>,
-  //  CHECK-SAME:   %[[B:.*]]: memref<?x?xvector<16x8xf32>>,
-  //  CHECK-SAME:   %[[C:.*]]: memref<?x?xvector<4x8xf32>>)
-  // Fill its body.
-  //      CHECK:   linalg.generic {{.*}} %[[A]], %[[B]], %[[C]]
-  //      CHECK:     vector.contract {{.*}} : vector<4x16xf32>, vector<16x8xf32>
-  // CHECK-SAME:       into vector<4x8xf32>
+  // TBD.
   testMatmulOnVectors<4, 8, 16>("test_vector_matmul");
 }
