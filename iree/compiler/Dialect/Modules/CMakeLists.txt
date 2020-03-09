@@ -12,5 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Strings)
-add_subdirectory(TensorList)
+iree_add_all_subdirs()

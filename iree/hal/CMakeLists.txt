@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(cts)
-add_subdirectory(host)
-add_subdirectory(interpreter)
-add_subdirectory(llvmjit)
-add_subdirectory(testing)
-add_subdirectory(vmla)
-add_subdirectory(vulkan)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME

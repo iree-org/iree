@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(dialect)
-add_subdirectory(test)
+iree_add_all_subdirs()
 
 iree_bytecode_module(
   NAME

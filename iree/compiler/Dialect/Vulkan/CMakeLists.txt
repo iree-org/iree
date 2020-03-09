@@ -12,5 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(IR)
-add_subdirectory(Utils)
+iree_add_all_subdirs()

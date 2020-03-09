@@ -12,7 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(check)
-add_subdirectory(hal)
-add_subdirectory(strings)
-add_subdirectory(tensorlist)
+iree_add_all_subdirs()

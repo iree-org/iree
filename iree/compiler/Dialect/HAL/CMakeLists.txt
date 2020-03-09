@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(Conversion)
-add_subdirectory(IR)
-add_subdirectory(Target)
-add_subdirectory(Transforms)
-add_subdirectory(Utils)
+iree_add_all_subdirs()
 
 iree_cc_embed_data(
   NAME

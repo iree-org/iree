@@ -12,8 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(EmbeddedKernels)
-add_subdirectory(IndexComputation)
-add_subdirectory(LinalgToSPIRV)
-add_subdirectory(Passes)
-add_subdirectory(XLAToSPIRV)
+iree_add_all_subdirs()

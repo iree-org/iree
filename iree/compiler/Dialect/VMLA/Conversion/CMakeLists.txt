@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(HALToVMLA)
-add_subdirectory(HLOToVMLA)
-add_subdirectory(StandardToVMLA)
-add_subdirectory(VMLAToVM)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME

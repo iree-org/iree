@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(LLVM)
-add_subdirectory(LegacyInterpreter)
-add_subdirectory(VMLA)
-add_subdirectory(VulkanSPIRV)
-add_subdirectory(test)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
