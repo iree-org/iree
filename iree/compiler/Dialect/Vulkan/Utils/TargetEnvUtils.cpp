@@ -103,29 +103,6 @@ spirv::ResourceLimitsAttr convertResourceLimits(
       vkCapabilities.maxComputeWorkGroupInvocations(),
       vkCapabilities.maxComputeWorkGroupSize(), context);
 }
-
-// TODO(antiagainst): move this into MLIR core as spirv::TargetEnvAttr::get().
-spirv::TargetEnvAttr getSpirvTargetEnv(spirv::Version version,
-                                       ArrayRef<spirv::Extension> extensions,
-                                       ArrayRef<spirv::Capability> capabilities,
-                                       DictionaryAttr limits) {
-  Builder b(limits.getContext());
-
-  auto versionAttr = b.getI32IntegerAttr(static_cast<uint32_t>(version));
-
-  SmallVector<Attribute, 4> extAttrs;
-  extAttrs.reserve(extensions.size());
-  for (spirv::Extension ext : extensions)
-    extAttrs.push_back(b.getStringAttr(spirv::stringifyExtension(ext)));
-
-  SmallVector<Attribute, 4> capAttrs;
-  capAttrs.reserve(capabilities.size());
-  for (spirv::Capability cap : capabilities)
-    capAttrs.push_back(b.getI32IntegerAttr(static_cast<uint32_t>(cap)));
-
-  return spirv::TargetEnvAttr::get(versionAttr, b.getArrayAttr(extAttrs),
-                                   b.getArrayAttr(capAttrs), limits);
-}
 }  // anonymous namespace
 
 // TODO(antiagainst): register more SwiftShader extensions.
@@ -146,8 +123,9 @@ spirv::TargetEnvAttr convertTargetEnv(Vulkan::TargetEnvAttr vkTargetEnv) {
 
   auto spvLimits = convertResourceLimits(vkTargetEnv);
 
-  return getSpirvTargetEnv(spvVersion, spvExtensions, spvCapabilities,
-                           spvLimits);
+  auto triple = spirv::VerCapExtAttr::get(
+      spvVersion, spvCapabilities, spvExtensions, vkTargetEnv.getContext());
+  return spirv::TargetEnvAttr::get(triple, spvLimits);
 }
 
 }  // namespace Vulkan

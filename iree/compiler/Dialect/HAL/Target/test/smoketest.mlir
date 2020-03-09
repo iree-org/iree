@@ -21,15 +21,13 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense
 // VKSPV-SAME:     format = 1397773893 : i32} {
-// VKSPV-NEXT:     module attributes {spv.target_env = #spv.target_env<V_1_3, [SPV_KHR_storage_buffer_storage_class], [Shader], {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-// VKSPV-NEXT:       spv.module "Logical" "GLSL450" {
+// VKSPV-NEXT:     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
+// VKSPV-NEXT:       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
 //  VKSPV-DAG:         spv.globalVariable [[GLOBALID:@.*]] built_in("GlobalInvocationId")
 //  VKSPV-DAG:         spv.globalVariable [[NUMWORKGROUPS:@.*]] built_in("NumWorkgroups")
 //      VKSPV:         spv.EntryPoint "GLCompute" @simpleMath_rgn_dispatch_0, [[GLOBALID]], [[NUMWORKGROUPS]]
 // VKSPV-NEXT:         spv.ExecutionMode @simpleMath_rgn_dispatch_0 "LocalSize", 32, 1, 1
-// VKSPV-NEXT:       } attributes {
-// VKSPV-SAME:         capabilities = ["Shader"],
-// VKSPV-SAME:         extensions = ["SPV_KHR_storage_buffer_storage_class"]}
+// VKSPV-NEXT:       }
 // VKSPV-NEXT:     }
 // VKSPV-NEXT:   }
 // VKSPV-NEXT: }
