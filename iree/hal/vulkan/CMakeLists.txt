@@ -233,25 +233,6 @@ iree_cc_library(
   PUBLIC
 )
 
-if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
-  iree_cc_library(
-    NAME
-      layer_khronos_timeline_semaphore
-    DATA
-      # Polyfill layer does not build on Windows.
-    PUBLIC
-  )
-else()
-  iree_cc_library(
-    NAME
-      layer_khronos_timeline_semaphore
-    DATA
-      VkLayer_khronos_timeline_semaphore
-      VkLayer_khronos_timeline_semaphore-json
-    PUBLIC
-  )
-endif()
-
 iree_cc_library(
   NAME
     legacy_fence
@@ -510,7 +491,8 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::driver_registry
     iree::hal::vulkan::dynamic_symbols
-    iree::hal::vulkan::layer_khronos_timeline_semaphore
     iree::hal::vulkan::vulkan_driver
+  DATA
+    vk_layer_khronos_timeline_semaphore
   PUBLIC
 )
