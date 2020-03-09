@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(CodegenUtils)
-add_subdirectory(Interpreter)
-add_subdirectory(SPIRV)
-add_subdirectory(XLAToLinalg)
-add_subdirectory(test)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME

@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(FlowToHAL)
-add_subdirectory(HALToVM)
+iree_add_all_subdirs()
 
 iree_cc_library(
   NAME

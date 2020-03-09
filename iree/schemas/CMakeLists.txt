@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(bytecode)
+iree_add_all_subdirs()
 
 flatbuffer_cc_library(
   NAME

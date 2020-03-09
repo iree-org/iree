@@ -12,6 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-add_subdirectory(custom_modules)
-add_subdirectory(simple_embedding)
-add_subdirectory(vulkan)
+iree_add_all_subdirs()

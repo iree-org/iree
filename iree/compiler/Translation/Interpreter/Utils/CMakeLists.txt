@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_add_all_subdirs()
+
 iree_cc_library(
   NAME
     Utils

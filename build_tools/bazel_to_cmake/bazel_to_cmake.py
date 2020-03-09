@@ -574,18 +574,9 @@ class Converter(object):
     self.first_error = None
 
   def convert(self, copyright_line):
-    # One `add_subdirectory(name)` per subdirectory.
-    add_subdir_commands = []
-    for root, dirs, _ in os.walk(self.directory_path):
-      for d in sorted(dirs):
-        if os.path.isfile(os.path.join(root, d, "CMakeLists.txt")):
-          add_subdir_commands.append("add_subdirectory(%s)" % (d,))
-      # Stop walk, only add direct subdirectories.
-      break
-
     converted_file = self.template % {
         "copyright_line": copyright_line,
-        "add_subdirectories": "\n".join(add_subdir_commands),
+        "add_subdirectories": "iree_add_all_subdirs()",
         "body": self.body,
     }
 
@@ -626,9 +617,7 @@ def GetDict(obj):
 
 def convert_directory_tree(root_directory_path, write_files, strict):
   print("convert_directory_tree: %s" % (root_directory_path,))
-  # Process directories starting at leaves so we can skip add_directory on
-  # subdirs without a CMakeLists file.
-  for root, _, _ in os.walk(root_directory_path, topdown=False):
+  for root, _, _ in os.walk(root_directory_path):
     convert_directory(root, write_files, strict)
 
 

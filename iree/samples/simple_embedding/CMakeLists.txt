@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+iree_add_all_subdirs()
+
 iree_bytecode_module(
   NAME
     simple_embedding_test_bytecode_module
