@@ -36,10 +36,8 @@ cc_binary(
     srcs = ["vulkan_inference_gui.cc"],
     tags = [
         "manual",
-        "nobuilder",
         "noga",
         "nokokoro",
-        "notap",
     ],
     deps = [
         ":simple_mul_bytecode_module_cc",
