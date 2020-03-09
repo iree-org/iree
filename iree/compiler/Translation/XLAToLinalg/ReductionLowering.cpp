@@ -222,16 +222,19 @@ PatternMatchResult ReduceOpConversion::matchAndRewrite(
   indexingMaps.emplace_back(AffineMapAttr::get(
       getTransposeMapForReduction(rewriter, nInputRank, reductionDim)));
   if (!initConstVal.hasValue())
-    indexingMaps.emplace_back(AffineMapAttr::get(AffineMap::get(
-        nInputRank, /*symbolCount=*/0, {rewriter.getAffineConstantExpr(0)})));
+    indexingMaps.emplace_back(
+        AffineMapAttr::get(AffineMap::get(rewriter.getContext(), nInputRank)));
   // Since the reduction loop now is the innermost, the indexing map of `dst`
   // should drop the latest dimension, e.g., (d0, d1, d2) -> (d0, d1).
   SmallVector<AffineExpr, 4> exprs;
   for (int i = 0; i < nInputRank - 1; ++i)
     exprs.push_back(rewriter.getAffineDimExpr(i));
-  if (exprs.empty()) exprs.push_back(rewriter.getAffineConstantExpr(0));
-  indexingMaps.emplace_back(
-      AffineMapAttr::get(AffineMap::get(nInputRank, /*symbolCount=*/0, exprs)));
+  if (exprs.empty())
+    indexingMaps.emplace_back(
+        AffineMapAttr::get(AffineMap::get(rewriter.getContext(), nInputRank)));
+  else
+    indexingMaps.emplace_back(AffineMapAttr::get(
+        AffineMap::get(nInputRank, /*symbolCount=*/0, exprs)));
 
   SmallVector<Type, 2> resultTypes = {};
   SmallVector<Value, 2> linalgOpArgs = {src};
