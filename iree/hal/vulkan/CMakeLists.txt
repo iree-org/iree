@@ -167,6 +167,7 @@ iree_cc_library(
     "dynamic_symbols.cc"
   COPTS
     "-DVK_NO_PROTOTYPES"
+    "-DIREE_VK_LAYER_PATH_EXTRAS=${CMAKE_BINARY_DIR}/third_party/vulkan_extensionlayer/layers"
   DEPS
     absl::core_headers
     absl::memory
@@ -231,6 +232,25 @@ iree_cc_library(
     Vulkan::Headers
   PUBLIC
 )
+
+if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
+  iree_cc_library(
+    NAME
+      layer_khronos_timeline_semaphore
+    DATA
+      # Polyfill layer does not build on Windows.
+    PUBLIC
+  )
+else()
+  iree_cc_library(
+    NAME
+      layer_khronos_timeline_semaphore
+    DATA
+      VkLayer_khronos_timeline_semaphore
+      VkLayer_khronos_timeline_semaphore-json
+    PUBLIC
+  )
+endif()
 
 iree_cc_library(
   NAME
@@ -490,6 +510,7 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::driver_registry
     iree::hal::vulkan::dynamic_symbols
+    iree::hal::vulkan::layer_khronos_timeline_semaphore
     iree::hal::vulkan::vulkan_driver
   PUBLIC
 )
