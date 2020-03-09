@@ -23,6 +23,7 @@ include(CMakeParseArguments)
 # HDRS: List of public header files for the library
 # TEXTUAL_HDRS: List of public header files that cannot be compiled on their own
 # SRCS: List of source files for the library
+# DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
@@ -68,7 +69,7 @@ function(iree_cc_library)
     _RULE
     "PUBLIC;ALWAYSLINK;TESTONLY"
     "NAME"
-    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DEPS;INCLUDES"
+    "HDRS;TEXTUAL_HDRS;SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;INCLUDES"
     ${ARGN}
   )
 
@@ -123,6 +124,7 @@ function(iree_cc_library)
           ${_RULE_LINKOPTS}
           ${IREE_DEFAULT_LINKOPTS}
       )
+      iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
       target_compile_definitions(${_NAME}
         PUBLIC
           ${_RULE_DEFINES}
@@ -162,6 +164,7 @@ function(iree_cc_library)
           ${_RULE_LINKOPTS}
           ${IREE_DEFAULT_LINKOPTS}
       )
+      iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
       target_compile_definitions(${_NAME}
         INTERFACE
           ${_RULE_DEFINES}

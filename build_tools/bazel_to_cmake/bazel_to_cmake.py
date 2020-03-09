@@ -381,6 +381,7 @@ class BuildFileFunctions(object):
                  hdrs=None,
                  textual_hdrs=None,
                  srcs=None,
+                 data=None,
                  deps=None,
                  alwayslink=False,
                  testonly=False,
@@ -392,39 +393,44 @@ class BuildFileFunctions(object):
     hdrs_block = self._convert_hdrs_block(hdrs)
     textual_hdrs_block = self._convert_textual_hdrs_block(textual_hdrs)
     srcs_block = self._convert_srcs_block(srcs)
+    data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
     alwayslink_block = self._convert_alwayslink_block(alwayslink)
     testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += """iree_cc_library(
-%(name_block)s%(hdrs_block)s%(textual_hdrs_block)s%(srcs_block)s%(deps_block)s%(alwayslink_block)s%(testonly_block)s  PUBLIC
+%(name_block)s%(hdrs_block)s%(textual_hdrs_block)s%(srcs_block)s%(data_block)s%(deps_block)s%(alwayslink_block)s%(testonly_block)s  PUBLIC
 )\n\n""" % {
     "name_block": name_block,
     "hdrs_block": hdrs_block,
     "textual_hdrs_block": textual_hdrs_block,
     "srcs_block": srcs_block,
+    "data_block": data_block,
     "deps_block": deps_block,
     "alwayslink_block": alwayslink_block,
     "testonly_block": testonly_block,
     }
 
-  def cc_test(self, name, hdrs=None, srcs=None, deps=None, **kwargs):
+  def cc_test(self, name, hdrs=None, srcs=None, data=None, deps=None, **kwargs):
     name_block = self._convert_name_block(name)
     hdrs_block = self._convert_hdrs_block(hdrs)
     srcs_block = self._convert_srcs_block(srcs)
+    data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
 
     self.converter.body += """iree_cc_test(
-%(name_block)s%(hdrs_block)s%(srcs_block)s%(deps_block)s)\n\n""" % {
+%(name_block)s%(hdrs_block)s%(srcs_block)s%(data_block)s%(deps_block)s)\n\n""" % {
     "name_block": name_block,
     "hdrs_block": hdrs_block,
     "srcs_block": srcs_block,
+    "data_block": data_block,
     "deps_block": deps_block,
     }
 
   def cc_binary(self,
                 name,
                 srcs=None,
+                data=None,
                 deps=None,
                 linkopts=None,
                 testonly=False,
@@ -434,14 +440,16 @@ class BuildFileFunctions(object):
     name_block = self._convert_name_block(name)
     out_block = self._convert_out_block(name)
     srcs_block = self._convert_srcs_block(srcs)
+    data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
     testonly_block = self._convert_testonly_block(testonly)
 
     self.converter.body += """iree_cc_binary(
-%(name_block)s%(out_block)s%(srcs_block)s%(deps_block)s%(testonly_block)s)\n\n""" % {
+%(name_block)s%(out_block)s%(srcs_block)s%(data_block)s%(deps_block)s%(testonly_block)s)\n\n""" % {
     "name_block": name_block,
     "out_block": out_block,
     "srcs_block": srcs_block,
+    "data_block": data_block,
     "deps_block": deps_block,
     "testonly_block": testonly_block,
     }

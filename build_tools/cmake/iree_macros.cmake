@@ -123,3 +123,49 @@ function(iree_select_compiler_opts OPTS)
   endif()
   set(${OPTS} ${_OPTS} PARENT_SCOPE)
 endfunction()
+
+#-------------------------------------------------------------------------------
+# Data dependencies
+#-------------------------------------------------------------------------------
+
+# Adds 'data' dependencies to a target.
+#
+# Parameters:
+# NAME: name of the target to add data dependencies to
+# DATA: List of targets and/or files in the source tree. Files should use the
+#       same format as targets (i.e. iree::package::subpackage::file.txt)
+function(iree_add_data_dependencies)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME"
+    "DATA"
+    ${ARGN}
+  )
+
+  if(NOT _RULE_DATA)
+    return()
+  endif()
+
+  foreach(_DATA_LABEL ${_RULE_DATA})
+    if(TARGET ${_DATA_LABEL})
+      add_dependencies(${_RULE_NAME} ${_DATA_LABEL})
+    else()
+      # Not a target, assume to be a file instead.
+      string(REPLACE "::" "/" _FILE_PATH ${_DATA_LABEL})
+
+      # Create a target which copies the data file into the build directory.
+      # If this file is included in multiple rules, only create the target once.
+      string(REPLACE "::" "_" _DATA_TARGET ${_DATA_LABEL})
+      if(NOT TARGET ${_DATA_TARGET})
+        set(_INPUT_PATH "${CMAKE_SOURCE_DIR}/${_FILE_PATH}")
+        set(_OUTPUT_PATH "${CMAKE_BINARY_DIR}/${_FILE_PATH}")
+        add_custom_target(${_DATA_TARGET}
+          COMMAND ${CMAKE_COMMAND} -E copy ${_INPUT_PATH} ${_OUTPUT_PATH}
+        )
+      endif()
+
+      add_dependencies(${_RULE_NAME} ${_DATA_TARGET})
+    endif()
+  endforeach()
+endfunction()

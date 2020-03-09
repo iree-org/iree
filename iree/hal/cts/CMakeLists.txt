@@ -17,6 +17,8 @@ iree_cc_library(
     cts_test_base
   HDRS
     "cts_test_base.h"
+  DATA
+    iree::tools::sanitizer_suppressions.txt
   DEPS
     iree::base::status
     iree::base::status_matchers

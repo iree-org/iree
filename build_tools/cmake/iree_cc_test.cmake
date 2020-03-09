@@ -21,6 +21,7 @@ include(CMakeParseArguments)
 # Parameters:
 # NAME: name of target (see Usage below)
 # SRCS: List of source files for the binary
+# DATA: List of other targets and files required for this binary
 # DEPS: List of other libraries to be linked in to the binary targets
 # COPTS: List of private compile options
 # DEFINES: List of public defines
@@ -59,14 +60,14 @@ function(iree_cc_test)
     _RULE
     ""
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DEPS"
+    "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
     ${ARGN}
   )
 
   iree_package_ns(_PACKAGE_NS)
   # Replace dependencies passed by ::name with ::iree::package::name
   list(TRANSFORM _RULE_DEPS REPLACE "^::" "${_PACKAGE_NS}::")
-  
+
   # Prefix the library with the package name, so we get: iree_package_name
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
@@ -95,6 +96,7 @@ function(iree_cc_test)
     PRIVATE
       ${_RULE_LINKOPTS}
   )
+  iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
   # Add all IREE targets to a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
 
