@@ -90,12 +90,23 @@ ExtensibilitySpec GetInstanceExtensibilitySpec(
     const iree_hal_vulkan_features_t& features) {
   ExtensibilitySpec spec;
 
+  if (features & IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS) {
+    spec.optional_layers.push_back("VK_LAYER_LUNARG_standard_validation");
+  }
+
   if (features & IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS) {
     spec.optional_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
-  if (features & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
+
+  if (features & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS ||
+      features & IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES) {
     spec.optional_extensions.push_back(
         VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+  }
+
+  if (features & IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES) {
+    // Polyfill layer - enable if present.
+    spec.optional_layers.push_back("VK_LAYER_KHRONOS_timeline_semaphore");
   }
 
   return spec;
@@ -112,6 +123,11 @@ ExtensibilitySpec GetDeviceExtensibilitySpec(
 
   if (features & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
     spec.optional_extensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
+  }
+
+  if (features & IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES) {
+    spec.optional_extensions.push_back(
+        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
   }
 
   return spec;
@@ -149,6 +165,44 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
       is_required ? spec.required_extensions : spec.optional_extensions;
   for (int i = 0; i < extensions.size(); ++i) {
     out_extensions[i] = extensions[i];
+  }
+
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_layers(
+    iree_hal_vulkan_extensibility_set_t extensibility_set,
+    iree_hal_vulkan_features_t features, iree_host_size_t layers_capacity,
+    const char** out_layers, iree_host_size_t* out_layers_count) {
+  if (!out_layers_count) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_layers_count = 0;
+
+  // Device layers are deprecated and unsupported here.
+  if (!(extensibility_set & IREE_HAL_VULKAN_INSTANCE_BIT)) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  bool is_required = extensibility_set & IREE_HAL_VULKAN_REQUIRED_BIT;
+
+  ExtensibilitySpec spec = GetInstanceExtensibilitySpec(features);
+  *out_layers_count =
+      is_required ? spec.required_layers.size() : spec.optional_layers.size();
+
+  // Return early if only querying number of layers in this configuration.
+  if (!out_layers) {
+    return IREE_STATUS_OK;
+  }
+
+  if (layers_capacity < *out_layers_count) {
+    return IREE_STATUS_OUT_OF_RANGE;
+  }
+
+  const std::vector<const char*>& layers =
+      is_required ? spec.required_layers : spec.optional_layers;
+  for (int i = 0; i < layers.size(); ++i) {
+    out_layers[i] = layers[i];
   }
 
   return IREE_STATUS_OK;

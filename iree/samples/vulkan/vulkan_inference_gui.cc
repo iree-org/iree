@@ -73,6 +73,61 @@ static void check_vk_result(VkResult err) {
 
 #define CHECK_IREE_OK(status) CHECK_EQ(IREE_STATUS_OK, (status))
 
+static std::vector<const char*> GetIreeLayers(
+    iree_hal_vulkan_extensibility_set_t extensibility_set,
+    iree_hal_vulkan_features_t features) {
+  iree_host_size_t required_count;
+  iree_hal_vulkan_get_layers(extensibility_set, features, 0, NULL,
+                             &required_count);
+  std::vector<const char*> layers(required_count);
+  iree_hal_vulkan_get_layers(extensibility_set, features, layers.size(),
+                             layers.data(), &required_count);
+  return layers;
+}
+
+static std::vector<const char*> GetInstanceLayers(
+    iree_hal_vulkan_features_t vulkan_features) {
+  // Query the layers that IREE wants / needs.
+  std::vector<const char*> required_layers =
+      GetIreeLayers(IREE_HAL_VULKAN_INSTANCE_REQUIRED, vulkan_features);
+  std::vector<const char*> optional_layers =
+      GetIreeLayers(IREE_HAL_VULKAN_INSTANCE_OPTIONAL, vulkan_features);
+
+  // Query the layers that are available on the Vulkan ICD.
+  uint32_t layer_property_count = 0;
+  check_vk_result(
+      vkEnumerateInstanceLayerProperties(&layer_property_count, NULL));
+  std::vector<VkLayerProperties> layer_properties(layer_property_count);
+  check_vk_result(vkEnumerateInstanceLayerProperties(&layer_property_count,
+                                                     layer_properties.data()));
+
+  // Match between optional/required and available layers.
+  std::vector<const char*> layers;
+  for (const char* layer_name : required_layers) {
+    bool found = false;
+    for (const auto& layer_property : layer_properties) {
+      if (std::strcmp(layer_name, layer_property.layerName) == 0) {
+        found = true;
+        layers.push_back(layer_name);
+        break;
+      }
+    }
+    if (!found) {
+      LOG(FATAL) << "Required layer " << layer_name << " not available";
+    }
+  }
+  for (const char* layer_name : optional_layers) {
+    for (const auto& layer_property : layer_properties) {
+      if (std::strcmp(layer_name, layer_property.layerName) == 0) {
+        layers.push_back(layer_name);
+        break;
+      }
+    }
+  }
+
+  return layers;
+}
+
 std::vector<const char*> GetIreeExtensions(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features) {
@@ -390,16 +445,17 @@ extern "C" int main(int argc, char** argv) {
       SDL_WINDOWPOS_CENTERED, 1280, 720, window_flags);
 
   // Setup Vulkan
-  int layers_count = 1;
-  const char* layers[] = {"VK_LAYER_LUNARG_standard_validation"};
   iree_hal_vulkan_features_t iree_vulkan_features =
       static_cast<iree_hal_vulkan_features_t>(
+          IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS |
           IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
+          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS |
+          IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES);
+  std::vector<const char*> layers = GetInstanceLayers(iree_vulkan_features);
   std::vector<const char*> extensions =
       GetInstanceExtensions(window, iree_vulkan_features);
-  SetupVulkan(iree_vulkan_features, layers, layers_count, extensions.data(),
-              extensions.size());
+  SetupVulkan(iree_vulkan_features, layers.data(), layers.size(),
+              extensions.data(), extensions.size());
 
   // Create Window Surface
   VkSurfaceKHR surface;

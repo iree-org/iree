@@ -48,11 +48,17 @@ typedef enum {
 
 // Bitfield that defines sets of Vulkan features.
 typedef enum {
+  // Use VK_LAYER_LUNARG_standard_validation.
+  IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS = 1 << 0,
+
   // Use VK_EXT_debug_utils, record markers, and log errors.
-  IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS = 1 << 0,
+  IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS = 1 << 1,
 
   // Use vkCmdPushDescriptorSetKHR.
-  IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS = 1 << 1,
+  IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS = 1 << 2,
+
+  // Use VK_KHR_timeline_semaphore.
+  IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES = 1 << 3,
 } iree_hal_vulkan_features_t;
 
 // Vulkan driver creation options.
@@ -134,6 +140,25 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_extensions(
     iree_hal_vulkan_extensibility_set_t extensibility_set,
     iree_hal_vulkan_features_t features, iree_host_size_t extensions_capacity,
     const char** out_extensions, iree_host_size_t* out_extensions_count);
+
+// Gets the names of the Vulkan layers used for a given set of |features|.
+//
+// Instance layers should be enabled on VkInstances passed to
+// |iree_hal_vulkan_driver_create_using_instance|. Device layers are deprecated
+// and unsupported here.
+//
+// |layers_capacity| defines the number of elements available in |out_layers|
+// and |out_layers_count| will be set with the actual number of layers returned.
+// If |layers_capacity| is too small IREE_STATUS_OUT_OF_RANGE will be returned
+// with the required capacity in |out_layers_count|. To only query the required
+// capacity |out_layers| may be passed as nullptr.
+//
+// Layer string lifetime is tied to the loader shared object or instance,
+// depending on where they came from.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_vulkan_get_layers(
+    iree_hal_vulkan_extensibility_set_t extensibility_set,
+    iree_hal_vulkan_features_t features, iree_host_size_t layers_capacity,
+    const char** out_layers, iree_host_size_t* out_layers_count);
 
 #endif  // IREE_API_NO_PROTOTYPES
 
