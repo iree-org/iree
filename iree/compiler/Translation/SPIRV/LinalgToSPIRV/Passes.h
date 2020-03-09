@@ -21,7 +21,7 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Pass to get gpu.module from a gpu.launch operation.
-std::unique_ptr<OpPassBase<FuncOp>> createIREEGpuKernelOutliningPass();
+std::unique_ptr<OpPassBase<ModuleOp>> createIREEGpuKernelOutliningPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir
