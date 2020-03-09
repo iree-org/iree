@@ -160,11 +160,9 @@ function(iree_add_data_dependencies)
       if(NOT TARGET ${_DATA_TARGET})
         set(_INPUT_PATH "${CMAKE_SOURCE_DIR}/${_FILE_PATH}")
         set(_OUTPUT_PATH "${CMAKE_BINARY_DIR}/${_FILE_PATH}")
-        add_custom_command(
-          OUTPUT ${_OUTPUT_PATH}
+        add_custom_target(${_DATA_TARGET}
           COMMAND ${CMAKE_COMMAND} -E copy ${_INPUT_PATH} ${_OUTPUT_PATH}
         )
-        add_custom_target(${_DATA_TARGET} DEPENDS ${_OUTPUT_PATH})
       endif()
 
       add_dependencies(${_RULE_NAME} ${_DATA_TARGET})
