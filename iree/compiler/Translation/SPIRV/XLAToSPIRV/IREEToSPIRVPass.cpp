@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
 
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationPass.h"
 #include "iree/compiler/Translation/SPIRV/Passes/Passes.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRV.h"
@@ -32,7 +33,6 @@
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
 #include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
@@ -52,8 +52,8 @@ class IREEToSPIRVPass : public ModulePass<IREEToSPIRVPass> {
 
 /// Generates the entry function within the SPIR-V module for dispatch function.
 template <typename operation_range>
-static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
-                                           operation_range fns) {
+static LogicalResult lowerEntryFunctions(spirv::ModuleOp spvModule,
+                                         operation_range fns) {
   // Initialize the spir-v codegenerator.
   SPIRVCodegen<
       ConstantOpSPIRVLowering, ReturnOpSPIRVLowering,
@@ -113,10 +113,6 @@ static LogicalResult generateEntryFunction(spirv::ModuleOp spvModule,
       spirvCodegen;
 
   for (auto funcOp : fns) {
-    // TODO(ravishankarm): FuncOps in executable that are not dispatch functions
-    // are not lowered to SPIR-V. Fix this limitation.
-    if (!funcOp.getAttr("iree.executable.export")) continue;
-
     if (failed(spirvCodegen.codegen(spvModule, funcOp))) {
       return failure();
     }
@@ -160,16 +156,30 @@ void IREEToSPIRVPass::runOnModule() {
   OpBuilder builder(module.getBodyRegion());
   auto *context = &getContext();
 
+  // Check if there are any dispatch functions.
+  SmallVector<FuncOp, 1> fns;
+  module.walk([&fns](FuncOp funcOp) {
+    if (isDispatchFunction(funcOp)) {
+      // If there are not iree.store_output operations, just return as nothing
+      // to do.
+      auto walkResult = funcOp.walk([](IREE::StoreOutputOp op) -> WalkResult {
+        return WalkResult::interrupt();
+      });
+      if (!walkResult.wasInterrupted()) return;
+
+      fns.push_back(funcOp);
+    }
+  });
+  if (fns.size() != 1) return;
+
   // Create a spirv.module Op.
   auto spvModule = builder.create<spirv::ModuleOp>(
       module.getLoc(), spirv::AddressingModel::Logical,
       spirv::MemoryModel::GLSL450, spirv::Capability::Shader,
       spirv::Extension::SPV_KHR_storage_buffer_storage_class);
 
-  auto fns = module.getOps<FuncOp>();
-
   // Generate the SPIR-V entry function for the dispatch function
-  if (failed(generateEntryFunction(spvModule, fns))) {
+  if (failed(lowerEntryFunctions(spvModule, fns))) {
     return signalPassFailure();
   }
 
@@ -197,7 +207,6 @@ void addIREEToSPIRVPasses(PassManager &conversionPassManager) {
 
   OpPassManager &spirvPasses = conversionPassManager.nest<spirv::ModuleOp>();
   spirvPasses.addPass(spirv::createLowerABIAttributesPass());
-  spirvPasses.addPass(createInlinerPass());
   spirvPasses.addPass(createAdjustIntegerWidthPass());
 }
 

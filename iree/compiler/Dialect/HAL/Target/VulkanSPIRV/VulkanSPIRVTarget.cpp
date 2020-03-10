@@ -21,11 +21,11 @@
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvUtils.h"
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/EmbeddedKernels/EmbeddedKernels.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
-#include "iree/compiler/Translation/XLAToLinalg/Passes.h"
-#include "iree/compiler/Translation/XLAToLinalg/ReductionLowering.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -226,37 +226,27 @@ static void propagateModifiedExecutableABI(
   }
 }
 
-/// Returns true if the linalg on buffers path is to be used for
-/// compilation. This pipeline is used for cases where, dispatch function
-/// contains a single xla_hlo operation that can be converted to linalg on
-/// buffers, converted to loops and lowered to SPIR-V.
-/// TODO(ravishankarm): Deprecate this function after reordering the passes to
-/// do a more sane lowering.
-static bool useLinalgOnBuffers(ModuleOp moduleOp) {
-  auto funcs = moduleOp.getOps<FuncOp>();
+/// Returns true if the linalg on tensors path is to be used for
+/// compilation. This pipeline is avoided if the dispatch function has any ops
+/// not supported on this path.
+static bool useLinalgPath(ModuleOp moduleOp,
+                          VulkanSPIRVTargetOptions const &targetOptions) {
+  /// TODO(ravishankarm): For now just rely on the command line flag, but
+  /// eventually look at the ops in the dispatch function.
+  if (targetOptions.useLinalgToSPIRVPath) return true;
 
-  if (!mlir::has_single_element(funcs)) return false;
-  FuncOp fn = *funcs.begin();
-  // For now expect only IREE::LoadInputOp and IREE::StoreOutputOp with
-  // xla_reduce op. For now just checking that has a reduce. It is expected that
-  // this is the only op in the dispatch region.
-  auto walkResult = fn.walk([](Operation *op) -> WalkResult {
-    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::DotOp>(op) ||
-        isa<xla_hlo::ConvOp>(op))
+  SmallVector<FuncOp, 1> dispatchFn;
+  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
+    if (isDispatchFunction(funcOp)) dispatchFn.push_back(funcOp);
+  }
+  if (dispatchFn.size() != 1) return false;
+  auto walkResult = dispatchFn[0].walk([](Operation *op) -> WalkResult {
+    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ConvOp>(op) ||
+        isa<xla_hlo::DotOp>(op))
       return WalkResult::interrupt();
     return WalkResult::advance();
   });
   return walkResult.wasInterrupted();
-}
-
-/// Returns true if the linalg on tensors path is to be used for
-/// compilation. This pipeline is avoided if the dispatch function has any ops
-/// not supported on this path.
-static bool useLinalgOnTensors(ModuleOp moduleOp,
-                               VulkanSPIRVTargetOptions const &targetOptions) {
-  /// TODO(ravishankarm): For now just rely on the command line flag, but
-  /// eventually look at the ops in the dispatch function.
-  return targetOptions.useLinalgToSPIRVPath;
 }
 
 LogicalResult translateToVulkanSPIRVExecutable(
@@ -297,11 +287,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
 
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
-    if (useLinalgOnBuffers(moduleOp)) {
-      conversionPassManager.addPass(createHLOReductionToLinalgPass());
-      conversionPassManager.addPass(createXLAToLinalgOpsOnBufferPass());
-      addLinalgToSPIRVPasses(conversionPassManager);
-    } else if (useLinalgOnTensors(moduleOp, targetOptions)) {
+    if (useLinalgPath(moduleOp, targetOptions)) {
       addLowerToSPIRVPasses(conversionPassManager,
                             targetOptions.linalgToSPIRVWorkgroupSize);
     } else {

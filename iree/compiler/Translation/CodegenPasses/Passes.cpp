@@ -12,25 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- ReductionLowering.h --------------------------------------*-C++//-*-===//
-//
-// Lower reduction dispatch regions to Linalg.
-//
-//===----------------------------------------------------------------------===//
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
 
-#ifndef IREE_COMPILER_TRANSLATION_XLATOLINALG_REDUCTIONLOWERING_H_
-#define IREE_COMPILER_TRANSLATION_XLATOLINALG_REDUCTIONLOWERING_H_
-
-#include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir {
 namespace iree_compiler {
 
-// Creates a pass to lower reduction dispatch functions to Linalg.
-std::unique_ptr<Pass> createHLOReductionToLinalgPass();
+void addXLAToLinalgOnBuffersPasses(OpPassManager &pm) {
+  pm.addPass(createXLAToLinalgOnTensorsPass());
+  pm.addPass(createLinalgFusionPass());
+  pm.addPass(createXLAToLinalgOnBuffersPass());
+}
 
 }  // namespace iree_compiler
 }  // namespace mlir
-
-#endif  // IREE_COMPILER_TRANSLATION_XLATOLINALG_REDUCTIONLOWERING_H_

@@ -18,7 +18,7 @@
 // operation.
 //
 //===----------------------------------------------------------------------===//
-#include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/Builders.h"

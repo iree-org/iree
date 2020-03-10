@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-hlo-to-named-linalg %s | IreeFileCheck %s
+// RUN: iree-opt -iree-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
 
 // CHECK: func @dot
 func @dot(%arg0: memref<2x3xf32>, %arg1: memref<3x2xf32>, %arg2: memref<2x2xf32>) {

@@ -16,8 +16,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
-#include "iree/compiler/Translation/XLAToLinalg/Passes.h"
-#include "iree/compiler/Translation/XLAToLinalg/ReductionLowering.h"
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/Module.h"
@@ -60,20 +59,8 @@ static std::vector<std::string> populateEntryPointNames(
 // Adds a sequence of passess to a given pass manager that progressively lower
 // from HLO to LLVM throught linalg dialect.
 void buildLLVMTransformPassPipeline(OpPassManager& pm) {
-  // HLO -> Linalg.
-  pm.addPass(createXLAToLinalgPass());
-
-  // Linalg generic op fussion.
-  pm.addPass(createLinalgFusionPass());
-
-  // HLO reduction -> Linalg.
-  pm.addPass(createHLOReductionToLinalgPass());
-
-  // HLO -> Linalg named ops.
-  pm.addPass(createXLAToLinalgOpsOnBufferPass());
-
-  // Linalg Tensors -> memrefs pass.
-  pm.addPass(createLinalgTensorToBufferConversionPass());
+  // HLO -> Linalg on buffers.
+  addXLAToLinalgOnBuffersPasses(pm);
 
   // Linalg -> Loops
   pm.addPass(createConvertLinalgToLoopsPass());

@@ -43,8 +43,8 @@ iree_cc_library(
     MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::CodegenPasses
     iree::compiler::Translation::CodegenUtils
-    iree::compiler::Translation::XLAToLinalg
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

@@ -29,8 +29,8 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Translation/CodegenPasses",
         "//iree/compiler/Translation/CodegenUtils",
-        "//iree/compiler/Translation/XLAToLinalg",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AffineOps",
         "@llvm-project//mlir:AffineToStandardTransforms",

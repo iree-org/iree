@@ -20,9 +20,9 @@
 
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
 
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
-#include "iree/compiler/Translation/XLAToLinalg/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPU.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
@@ -125,9 +125,13 @@ struct IREETileLinalgPass : public FunctionPass<IREETileLinalgPass> {
       return signalPassFailure();
     }
     auto linalgOps = body.front().getOps<linalg::LinalgOp>();
+    if (linalgOps.empty()) {
+      // Nothing to do. Return.
+      return;
+    }
     if (!mlir::has_single_element(linalgOps)) {
       funcOp.emitError(
-          "unhandled SPIR-V code generation with multiple linalg operations");
+          "unhandled tiling multiple linalg ops in one dispatch function");
       return signalPassFailure();
     }
     linalg::LinalgOp linalgOp = *linalgOps.begin();
@@ -220,52 +224,28 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
     MLIRContext *context = &getContext();
     ModuleOp moduleOp = getModule();
 
-    // Need to get the workgroup size from the original function.
-    // TODO(b/150312935): When the usage of attributes on the function is
-    // dropped we might not need to do this.
-    FuncOp funcOp = nullptr;
-    auto walkResult = moduleOp.walk([&funcOp](FuncOp fOp) -> WalkResult {
-      if (isDispatchFunction(fOp)) {
-        if (funcOp) return WalkResult::interrupt();
-        funcOp = fOp;
-      }
-      return WalkResult::advance();
-    });
-    if (!funcOp || walkResult.wasInterrupted()) {
-      moduleOp.emitError("expected a single dispatch function within module");
+    auto kernelModules = moduleOp.getOps<gpu::GPUModuleOp>();
+    if (kernelModules.empty()) return;
+    if (!mlir::has_single_element(kernelModules)) {
+      moduleOp.emitError(
+          "unhandled multiple gpu modules within a dispatch module");
       return signalPassFailure();
     }
-    SmallVector<int32_t, 3> workGroupSize;
-    if (failed(getWorkGroupSize(funcOp, workGroupSize))) return;
-
-    auto kernelModules = moduleOp.getOps<gpu::GPUModuleOp>();
+    gpu::GPUModuleOp gpuModule = *kernelModules.begin();
     SPIRVTypeConverter typeConverter;
     OwningRewritePatternList patterns;
-
-    // Set spv.entry_point_abi on each kernel functions to drive SPIR-V CodeGen.
-    // This is required because SPIR-V CodeGen's contract.
-    // TODO(ravishankarm/antiagainst) : When there is a mirror of the
-    // workgroup-size attribute in gpu dialect use that instad.
-    StringRef abiAttrName = spirv::getEntryPointABIAttrName();
-    auto abiAttr = spirv::getEntryPointABIAttr(workGroupSize, context);
-    for (Operation *gpuModule : kernelModules)
-      gpuModule->walk([abiAttrName, abiAttr](gpu::GPUFuncOp gpuFunc) {
-        gpuFunc.setAttr(abiAttrName, abiAttr);
-      });
 
     populateGPUToSPIRVPatterns(context, typeConverter, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
 
     std::unique_ptr<ConversionTarget> target =
         spirv::SPIRVConversionTarget::get(
-            spirv::lookupTargetEnvOrDefault(funcOp), context);
+            spirv::lookupTargetEnvOrDefault(gpuModule), context);
     target->addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());
     });
 
-    SmallVector<Operation *, 1> targetOps(kernelModules.begin(),
-                                          kernelModules.end());
-    if (failed(applyFullConversion(targetOps, *target, patterns,
+    if (failed(applyFullConversion(gpuModule, *target, patterns,
                                    &typeConverter))) {
       return signalPassFailure();
     }
@@ -290,10 +270,14 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
       }
       Block &block = body.front();
       auto linalgOps = block.getOps<linalg::LinalgOp>();
+      if (linalgOps.empty()) {
+        // Nothing to update. Return.
+        return;
+      }
       if (!mlir::has_single_element(linalgOps)) {
         funcOp.emitError(
-            "unhandled SPIR-V code-generation with multiple linalg ops in "
-            "dispatch region");
+            "unhandled updating workgroup size of dispatch function with "
+            "multiple linalg ops");
         return signalPassFailure();
       }
       // Find the number of leading parallel loops in the generic op
@@ -357,10 +341,8 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
 }
 
 void addLowerToSPIRVPasses(OpPassManager &pm, ArrayRef<int64_t> workGroupSize) {
-  pm.addPass(createXLAToLinalgPass());
-  pm.addPass(createLinalgFusionPass());
-  pm.addPass(createLinalgTensorToBufferConversionPass());
-  addLinalgToSPIRVPasses(pm);
+  addXLAToLinalgOnBuffersPasses(pm);
+  addLinalgToSPIRVPasses(pm, workGroupSize);
 }
 
 static PassPipelineRegistration<WorkGroupOptions> linalgToSPIRVPipeline(

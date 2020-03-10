@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hlo-reduction-to-linalg %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
 
 // CHECK: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: [[MAP1:#.*]] = affine_map<(d0, d1) -> (0)>

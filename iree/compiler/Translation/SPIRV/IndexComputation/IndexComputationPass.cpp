@@ -17,6 +17,7 @@
 // Pass to perform index propagation in iree dispatch functions
 //
 //===----------------------------------------------------------------------===//
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IREEIndexComputation.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVTypes.h"
@@ -102,7 +103,13 @@ void IndexComputationPass::runOnFunction() {
       indexPropagation;
 
   auto funcOp = getFunction();
-  if (!funcOp.getAttr("iree.executable.export")) return;
+  if (!isDispatchFunction(funcOp)) return;
+  // If there are not iree.store_output operations, just return as nothing to
+  // do.
+  auto walkResult = funcOp.walk([](IREE::StoreOutputOp op) -> WalkResult {
+    return WalkResult::interrupt();
+  });
+  if (!walkResult.wasInterrupted()) return;
   if (failed(indexPropagation.propagate(funcOp.getBody()))) {
     return signalPassFailure();
   }

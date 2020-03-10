@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-hlo-to-named-linalg %s | IreeFileCheck %s
+// RUN: iree-opt -iree-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
 
 // CHECK: func @conv
 func @conv(%arg0: memref<3x5x5x3xf32>, %arg1: memref<2x2x3x4xf32>, %arg2: memref<3x5x5x4xf32>) {

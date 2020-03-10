@@ -1,4 +1,4 @@
-// RUN: iree-opt -iree-hlo-to-linalg %s | IreeFileCheck %s
+// RUN: iree-opt -iree-hlo-to-linalg-on-tensors %s | IreeFileCheck %s
 
 // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0) -> (d0)>
 // CHECK: func @const

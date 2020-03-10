@@ -39,7 +39,6 @@ iree_cc_library(
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRSupport
-    MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::CodegenUtils
     iree::compiler::Translation::SPIRV::IndexComputation

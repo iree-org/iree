@@ -1,4 +1,4 @@
-// Copyright 2019 Google LLC
+// Copyright 2020 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,9 +11,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+//===- XLAToLinalgOnTensors.cpp - Pass to convert XLA to Linalg on tensors-===//
+//
+// Pass to convert from XLA to linalg on tensers. Uses the patterns from
+// tensorflow/compiler/mlir/xla/transforms/xla_legalize_to_linalg.cc along with
+// some IREE specific patterns.
+//
+//===----------------------------------------------------------------------===//
 #include <memory>
 
-#include "iree/compiler/Translation/XLAToLinalg/Passes.h"
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -101,7 +109,7 @@ struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
     });
 
     auto func = getFunction();
-    populateXlaToLinalgConversionPattern(func.getContext(), &patterns);
+    populateXLAToLinalgOnTensorsConversionPatterns(func.getContext(), patterns);
     if (failed(applyPartialConversion(func, target, patterns, nullptr))) {
       signalPassFailure();
     }
@@ -110,18 +118,19 @@ struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
 
 }  // namespace
 
-void populateXlaToLinalgConversionPattern(MLIRContext* context,
-                                          OwningRewritePatternList* patterns) {
-  xla_hlo::populateHLOToLinalgConversionPattern(context, patterns);
-  patterns->insert<SplatConstConverter>(context);
+void populateXLAToLinalgOnTensorsConversionPatterns(
+    MLIRContext* context, OwningRewritePatternList& patterns) {
+  xla_hlo::populateHLOToLinalgConversionPattern(context, &patterns);
+  patterns.insert<SplatConstConverter>(context);
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgPass() {
+std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgOnTensorsPass() {
   return std::make_unique<XlaLegalizeToLinalg>();
 }
 
 static PassRegistration<XlaLegalizeToLinalg> legalize_pass(
-    "iree-hlo-to-linalg", "Legalize from HLO dialect to Linalg dialect");
+    "iree-hlo-to-linalg-on-tensors",
+    "Legalize from HLO dialect to Linalg dialect");
 
 }  // namespace iree_compiler
 }  // namespace mlir

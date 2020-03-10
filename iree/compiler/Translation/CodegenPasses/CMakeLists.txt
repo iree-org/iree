@@ -16,14 +16,14 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    XLAToLinalg
+    CodegenPasses
   HDRS
     "Passes.h"
   SRCS
     "LinalgFusion.cpp"
-    "LinalgTensorToBuffer.cpp"
-    "XLAToLinalg.cpp"
-    "XLAToLinalgOpsOnBuffers.cpp"
+    "Passes.cpp"
+    "XLAToLinalgOnBuffers.cpp"
+    "XLAToLinalgOnTensors.cpp"
   DEPS
     LLVMSupport
     MLIRIR
@@ -32,25 +32,6 @@ iree_cc_library(
     MLIRPass
     MLIRStandardOps
     MLIRSupport
-    MLIRTransforms
-    iree::compiler::Dialect::IREE::IR
-    tensorflow::mlir_xla
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    ReductionLowering
-  HDRS
-    "ReductionLowering.h"
-  SRCS
-    "ReductionLowering.cpp"
-  DEPS
-    MLIRIR
-    MLIRLinalgOps
-    MLIRPass
-    MLIRStandardOps
     MLIRTransforms
     iree::compiler::Dialect::IREE::IR
     tensorflow::mlir_xla

@@ -25,6 +25,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/GPU/Utils.h"
+#include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Function.h"
@@ -56,7 +57,8 @@ PatternMatchResult ConvertToGPUFuncOp::matchAndRewrite(
     gpu::LaunchOp launchOp, PatternRewriter &rewriter) const {
   OpBuilder::InsertionGuard guard(rewriter);
   auto funcOp = launchOp.getParentOfType<FuncOp>();
-  if (!isDispatchFunction(funcOp)) return matchFailure();
+  SmallVector<int32_t, 3> workGroupSize;
+  if (failed(getWorkGroupSize(funcOp, workGroupSize))) return matchFailure();
 
   if (failed(sinkOperationsIntoLaunchOp(launchOp))) return matchFailure();
 
@@ -65,6 +67,15 @@ PatternMatchResult ConvertToGPUFuncOp::matchAndRewrite(
   SmallVector<Value, 4> arguments(funcOp.args_begin(), funcOp.args_end());
   gpu::GPUFuncOp gpuFuncOp =
       outlineKernelFunc(launchOp, funcOp.getName(), arguments);
+
+  // Add the SPIR-V ABI attr here since it is needed for the SPIR-V lowering.
+  // TODO(ravishankarm/antiagainst) : When there is a mirror of the
+  // workgroup-size attribute in gpu dialect use that instad.
+  StringRef abiAttrName = spirv::getEntryPointABIAttrName();
+  auto abiAttr =
+      spirv::getEntryPointABIAttr(workGroupSize, rewriter.getContext());
+  gpuFuncOp.setAttr(abiAttrName, abiAttr);
+
   // If any additional arguments are needed, then the launch op cannot be
   // converted.
   if (arguments.size() != gpuFuncOp.getNumArguments()) return matchFailure();
@@ -76,6 +87,11 @@ PatternMatchResult ConvertToGPUFuncOp::matchAndRewrite(
       rewriter.create<gpu::GPUModuleOp>(funcOp.getLoc(), moduleName);
   SymbolTable symbolTable(kernelModule);
   symbolTable.insert(gpuFuncOp);
+
+  // Set the conversion target attributes on the GPU module.
+  auto targetEnvAttrName = spirv::getTargetEnvAttrName();
+  kernelModule.setAttr(targetEnvAttrName,
+                       spirv::lookupTargetEnvOrDefault(funcOp));
 
   rewriter.eraseOp(launchOp);
   return matchSuccess();
