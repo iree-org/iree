@@ -95,6 +95,7 @@ LogicalResult translateToLLVMExecutable(
 
   // Lower module to LLVM Dialect.
   PassManager conversionPassManager(moduleOp.getContext());
+  mlir::applyPassManagerCLOptions(conversionPassManager);
   buildLLVMTransformPassPipeline(conversionPassManager);
   if (failed(conversionPassManager.run(moduleOp)))
     return moduleOp.emitError()
