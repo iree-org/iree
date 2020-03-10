@@ -38,9 +38,6 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
   let arguments = (ins AnySignlessInteger:$operand);
 
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ print$cppClass(p, *this); }];
 }
 
 
@@ -56,9 +53,6 @@ def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
   let arguments = (ins AnySignlessInteger:$operand);
 
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ print$cppClass(p, *this); }];
 }
 
 def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
@@ -73,9 +67,6 @@ def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
   let arguments = (ins AnyTypeOf<[HAL_BufferView, AnyTensor]>:$operand);
 
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
-
-  let parser = [{ return parse$cppClass(parser, result); }];
-  let printer = [{ print$cppClass(p, *this); }];
 }
 
 #endif  // IREE_MODULES_CHECK_DIALECT_CHECK_OPS
