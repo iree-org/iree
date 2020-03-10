@@ -37,36 +37,36 @@ namespace iree_compiler {
 // the receiving op/call. This allows reference count increment elision, though
 // the VM is free to ignore this if it so chooses.
 
-constexpr int kIntRegisterCount = 128;
-constexpr int kRefRegisterCount = 64;
-constexpr uint8_t kRefRegisterTypeBit = 0x80;
-constexpr uint8_t kRefRegisterMoveBit = 0x40;
+constexpr int kIntRegisterCount = 0x7FFF;
+constexpr int kRefRegisterCount = 0x3FFF;
+constexpr uint16_t kRefRegisterTypeBit = 0x8000;
+constexpr uint16_t kRefRegisterMoveBit = 0x4000;
 
 // Returns true if |reg| is a register in the ref_ptr bank.
-constexpr bool isRefRegister(uint8_t reg) {
+constexpr bool isRefRegister(uint16_t reg) {
   return (reg & kRefRegisterTypeBit) == kRefRegisterTypeBit;
 }
 
 // Returns true if the ref_ptr |reg| denotes a move operation.
-constexpr bool isRefMove(uint8_t reg) {
+constexpr bool isRefMove(uint16_t reg) {
   return (reg & kRefRegisterMoveBit) == kRefRegisterMoveBit;
 }
 
 // Returns the register 0-based ordinal within its set.
-constexpr uint8_t getRegisterOrdinal(uint8_t reg) {
+constexpr uint16_t getRegisterOrdinal(uint16_t reg) {
   return isRefRegister(reg)
              ? (reg & ~(kRefRegisterTypeBit | kRefRegisterMoveBit))
              : reg;
 }
 
 // Returns the register ID without the move bit.
-constexpr uint8_t getBaseRegister(uint8_t reg) {
+constexpr uint16_t getBaseRegister(uint16_t reg) {
   return isRefRegister(reg) ? (reg & ~kRefRegisterMoveBit) : reg;
 }
 
 // Compares whether two register bytes are equal to each other, ignoring any
 // move semantics on ref_ptr registers.
-constexpr bool compareRegistersEqual(uint8_t a, uint8_t b) {
+constexpr bool compareRegistersEqual(uint16_t a, uint16_t b) {
   return getBaseRegister(a) == getBaseRegister(b);
 }
 
@@ -94,21 +94,21 @@ class RegisterAllocation {
 
   // Maximum allocated register ordinals.
   // May be -1 if no registers of the specific type were allocated.
-  int8_t getMaxI32RegisterOrdinal() { return maxI32RegisterOrdinal_; }
-  int8_t getMaxRefRegisterOrdinal() { return maxRefRegisterOrdinal_; }
+  uint16_t getMaxI32RegisterOrdinal() { return maxI32RegisterOrdinal_; }
+  uint16_t getMaxRefRegisterOrdinal() { return maxRefRegisterOrdinal_; }
 
   // Maps a |value| to a register with no move bit set.
   // Prefer mapUseToRegister when a move is desired.
-  uint8_t mapToRegister(Value value);
+  uint16_t mapToRegister(Value value);
 
   // Maps a |value| to a register as calculated during allocation. The returned
   // register will have the proper type and move bits set.
-  uint8_t mapUseToRegister(Value value, Operation *useOp, int operandIndex);
+  uint16_t mapUseToRegister(Value value, Operation *useOp, int operandIndex);
 
   // Remaps branch successor operands to the target block argument registers.
   // Returns a list of source to target register mappings. Source ref registers
   // may have their move bit set.
-  SmallVector<std::pair<uint8_t, uint8_t>, 8> remapSuccessorRegisters(
+  SmallVector<std::pair<uint16_t, uint16_t>, 8> remapSuccessorRegisters(
       Operation *op, int successorIndex);
 
  private:
@@ -119,7 +119,7 @@ class RegisterAllocation {
   ValueLiveness liveness_;
 
   // Mapping from all values within the operation to registers.
-  llvm::DenseMap<Value, uint8_t> map_;
+  llvm::DenseMap<Value, uint16_t> map_;
 };
 
 }  // namespace iree_compiler

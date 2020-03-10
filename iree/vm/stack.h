@@ -32,14 +32,14 @@ extern "C" {
 
 // Maximum register count per bank.
 // This determines the bits required to reference registers in the VM bytecode.
-#define IREE_I32_REGISTER_COUNT 128
-#define IREE_REF_REGISTER_COUNT 64
+#define IREE_I32_REGISTER_COUNT 0x7FFF
+#define IREE_REF_REGISTER_COUNT 0x7FFF
 
-#define IREE_I32_REGISTER_MASK 0x7F
+#define IREE_I32_REGISTER_MASK 0x7FFF
 
-#define IREE_REF_REGISTER_TYPE_BIT 0x80
-#define IREE_REF_REGISTER_MOVE_BIT 0x40
-#define IREE_REF_REGISTER_MASK 0x3F
+#define IREE_REF_REGISTER_TYPE_BIT 0x8000
+#define IREE_REF_REGISTER_MOVE_BIT 0x4000
+#define IREE_REF_REGISTER_MASK 0x3FFF
 
 // An opaque offset into a source map that a source resolver can calculate.
 // Do not assume that iree_vm_source_offset_t+1 means the next byte offset as
@@ -55,7 +55,7 @@ typedef struct {
   iree_vm_ref_t ref[IREE_REF_REGISTER_COUNT];
   // Total number of valid ref registers used by the function.
   // TODO(benvanik): make the above dynamic and include i32 count.
-  int8_t ref_register_count;
+  uint16_t ref_register_count;
 } iree_vm_registers_t;
 
 // A variable-length list of registers.
@@ -63,12 +63,12 @@ typedef struct {
 // This structure is an overlay for the bytecode that is serialized in a
 // matching format, though it can be stack allocated as needed.
 typedef struct {
-  uint8_t size;
-  uint8_t registers[];
+  uint16_t size;
+  uint16_t registers[];
 } iree_vm_register_list_t;
-static_assert(iree_alignof(iree_vm_register_list_t) == 1,
+static_assert(iree_alignof(iree_vm_register_list_t) == 2,
               "Expecting byte alignment (to avoid padding)");
-static_assert(offsetof(iree_vm_register_list_t, registers) == 1,
+static_assert(offsetof(iree_vm_register_list_t, registers) == 2,
               "Expect no padding in the struct");
 
 // A single stack frame within the VM.

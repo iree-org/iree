@@ -141,7 +141,7 @@ class ExecutableOpConversion
         funcBuilder.getSymbolRefAttr(
             "hal.ex.match_supported_executable_format"),
         ArrayRef<Type>({funcBuilder.getIntegerType(32)}),
-        ArrayRef<int8_t>({-1, static_cast<int8_t>(rodataOps.size())}),
+        ArrayRef<int16_t>({-1, static_cast<int16_t>(rodataOps.size())}),
         ArrayRef<Type>({IREE::VM::RefType::get(
                             IREE::HAL::DeviceType::get(funcOp.getContext())),
                         funcBuilder.getIntegerType(32)}),

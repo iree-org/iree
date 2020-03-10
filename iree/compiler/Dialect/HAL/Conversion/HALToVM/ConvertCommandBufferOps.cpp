@@ -61,16 +61,16 @@ class CommandBufferExecutionBarrierOpConversion
             op.getLoc(), rewriter.getI32IntegerAttr(
                              static_cast<int32_t>(op.target_stage_mask()))),
     };
-    SmallVector<int8_t, 5> segmentSizes = {
+    SmallVector<int16_t, 5> segmentSizes = {
         /*command_buffer=*/-1,
         /*source_stage_mask=*/-1,
         /*target_stage_mask=*/-1,
         /*memory_barriers=*/
-        static_cast<int8_t>(std::distance(op.memory_barriers().begin(),
-                                          op.memory_barriers().end())),
+        static_cast<int16_t>(std::distance(op.memory_barriers().begin(),
+                                           op.memory_barriers().end())),
         /*buffer_barriers=*/
-        static_cast<int8_t>(std::distance(op.buffer_barriers().begin(),
-                                          op.buffer_barriers().end())),
+        static_cast<int16_t>(std::distance(op.buffer_barriers().begin(),
+                                           op.buffer_barriers().end())),
     };
     if (!op.buffer_barriers().empty()) {
       op.emitOpError()

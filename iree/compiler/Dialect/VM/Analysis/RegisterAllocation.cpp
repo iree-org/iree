@@ -50,7 +50,7 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
     SmallVector<std::string, 8> blockRegStrs;
     blockRegStrs.reserve(block.getNumArguments());
     for (auto blockArg : block.getArguments()) {
-      uint8_t reg = registerAllocation.map_[blockArg];
+      uint16_t reg = registerAllocation.map_[blockArg];
       blockRegStrs.push_back(std::to_string(reg));
     }
     block.front().setAttr("block_registers",
@@ -61,7 +61,7 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
       SmallVector<std::string, 8> regStrs;
       regStrs.reserve(op.getNumResults());
       for (auto result : op.getResults()) {
-        uint8_t reg = registerAllocation.map_[result];
+        uint16_t reg = registerAllocation.map_[result];
         regStrs.push_back(std::to_string(reg));
       }
       op.setAttr("result_registers", getStrArrayAttr(builder, regStrs));
@@ -92,7 +92,7 @@ LogicalResult RegisterAllocation::annotateIR(IREE::VM::FuncOp funcOp) {
 
 // Forms a register reference byte as interpreted by the VM.
 // Assumes that the ordinal has been constructed in the valid range.
-static uint8_t makeRegisterByte(Type type, int ordinal, bool isMove) {
+static uint16_t makeRegisterByte(Type type, int ordinal, bool isMove) {
   if (type.isSignlessIntOrIndexOrFloat()) {
     assert(ordinal < kIntRegisterCount);
     return ordinal;
@@ -116,7 +116,7 @@ struct RegisterUsage {
     maxRefRegisterOrdinal = -1;
   }
 
-  Optional<uint8_t> allocateRegister(Type type) {
+  Optional<uint16_t> allocateRegister(Type type) {
     if (type.isSignlessIntOrIndexOrFloat()) {
       int ordinal = intRegisters.find_first_unset();
       if (ordinal >= kIntRegisterCount) {
@@ -136,7 +136,7 @@ struct RegisterUsage {
     }
   }
 
-  void markRegisterUsed(uint8_t reg) {
+  void markRegisterUsed(uint16_t reg) {
     int ordinal = getRegisterOrdinal(reg);
     if (isRefRegister(reg)) {
       refRegisters.set(ordinal);
@@ -147,7 +147,7 @@ struct RegisterUsage {
     }
   }
 
-  void releaseRegister(uint8_t reg) {
+  void releaseRegister(uint16_t reg) {
     if (isRefRegister(reg)) {
       refRegisters.reset(reg & 0x3F);
     } else {
@@ -284,15 +284,15 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
   return success();
 }
 
-uint8_t RegisterAllocation::mapToRegister(Value value) {
+uint16_t RegisterAllocation::mapToRegister(Value value) {
   auto it = map_.find(value);
   assert(it != map_.end());
   return it->getSecond();
 }
 
-uint8_t RegisterAllocation::mapUseToRegister(Value value, Operation *useOp,
-                                             int operandIndex) {
-  uint8_t reg = mapToRegister(value);
+uint16_t RegisterAllocation::mapUseToRegister(Value value, Operation *useOp,
+                                              int operandIndex) {
+  uint16_t reg = mapToRegister(value);
   if (isRefRegister(reg) &&
       liveness_.isLastValueUse(value, useOp, operandIndex)) {
     reg |= kRefRegisterMoveBit;
@@ -303,7 +303,7 @@ uint8_t RegisterAllocation::mapUseToRegister(Value value, Operation *useOp,
 // A feedback arc set containing the minimal list of cycle-causing edges.
 // https://en.wikipedia.org/wiki/Feedback_arc_set
 struct FeedbackArcSet {
-  using NodeID = uint8_t;
+  using NodeID = uint16_t;
   using Edge = std::pair<NodeID, NodeID>;
 
   // Edges making up a DAG (inputEdges - feedbackEdges).
@@ -486,19 +486,19 @@ struct FeedbackArcSet {
   }
 };
 
-SmallVector<std::pair<uint8_t, uint8_t>, 8>
+SmallVector<std::pair<uint16_t, uint16_t>, 8>
 RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
   // Compute the initial directed graph of register movements.
   // This may contain cycles ([reg 0->1], [reg 1->0], ...) that would not be
   // possible to evaluate as a direct remapping.
-  SmallVector<std::pair<uint8_t, uint8_t>, 8> srcDstRegs;
+  SmallVector<std::pair<uint16_t, uint16_t>, 8> srcDstRegs;
   auto *targetBlock = op->getSuccessor(successorIndex);
   auto operands =
       cast<BranchOpInterface>(op).getSuccessorOperands(successorIndex);
   for (auto it : llvm::enumerate(*operands)) {
-    uint8_t srcReg = mapToRegister(it.value());
+    uint16_t srcReg = mapToRegister(it.value());
     BlockArgument targetArg = targetBlock->getArgument(it.index());
-    uint8_t dstReg = mapToRegister(targetArg);
+    uint16_t dstReg = mapToRegister(targetArg);
     if (!compareRegistersEqual(srcReg, dstReg)) {
       srcDstRegs.push_back({srcReg, dstReg});
     }
@@ -522,11 +522,11 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
   //        "liveness tracking of scratch registers not yet implemented");
 
   // The last register in each bank is reserved for swapping, when required.
-  uint8_t scratchI32Reg = maxI32RegisterOrdinal_;
-  uint8_t scratchRefReg = kRefRegisterTypeBit | maxRefRegisterOrdinal_;
+  uint16_t scratchI32Reg = maxI32RegisterOrdinal_;
+  uint16_t scratchRefReg = kRefRegisterTypeBit | maxRefRegisterOrdinal_;
 
   for (auto feedbackEdge : feedbackArcSet.feedbackEdges) {
-    uint8_t scratchReg =
+    uint16_t scratchReg =
         isRefRegister(feedbackEdge.first) ? scratchRefReg : scratchI32Reg;
     feedbackArcSet.acyclicEdges.insert(feedbackArcSet.acyclicEdges.begin(),
                                        {feedbackEdge.first, scratchReg});
