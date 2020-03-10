@@ -80,7 +80,9 @@ void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel,
   // Obtain the execution engine.
   auto created = mlir::ExecutionEngine::create(
       *module, transformer, static_cast<llvm::CodeGenOpt::Level>(llcOptLevel),
-      libs);
+      libs,
+      /*enableObjectCache=*/true,
+      /*enableGDBNotificationListener=*/false);
   llvm::handleAllErrors(created.takeError(), [](const llvm::ErrorInfoBase& b) {
     b.log(llvm::errs());
     assert(false);

@@ -26,9 +26,13 @@ iree_lit_test_suite(
     srcs = glob(["*.cpp"]),
     data = [
         ":runtime-support.so",
+        # Tests.
         ":test-mnist-jit",
         ":test-simple-jit",
         ":test-simple-mlir",
+        # Benchmarks.
+        ":bench-matmul-vector-jit",
+        # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
     tags = [

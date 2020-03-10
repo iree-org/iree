@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: true
+// RUN: bench-matmul-vector-jit --benchmark_filter=all
 
 #include "benchmark/benchmark.h"
 #include "experimental/ModelBuilder/MemRefUtils.h"
@@ -125,18 +125,6 @@ void testMatMulUsingVectors(benchmark::State &state, StringLiteral funcName) {
 // Benchmark drivers.
 //
 
-// TODO(ntv): share one JIT between all execution engines
-//            so this can run in debug mode too
-#ifndef NDEBUG
-
-static void BM_Dummy(benchmark::State &state) {
-  static int stat = 0;
-  for (auto _ : state) stat++;
-}
-BENCHMARK(BM_Dummy);
-
-#else
-
 static void BM_MatMul_1_1(benchmark::State &state) {
   testMatMulUsingVectors<1, 1, 1>(state, "test_matmul_1_1_1");
 }
@@ -161,5 +149,3 @@ static void BM_MatMul_16_16(benchmark::State &state) {
   testMatMulUsingVectors<16, 16, 16>(state, "test_matmul_16_16_16");
 }
 BENCHMARK(BM_MatMul_16_16);
-
-#endif  // NDEBUG
