@@ -172,6 +172,7 @@ iree_cc_library(
     absl::core_headers
     absl::memory
     absl::span
+    absl::strings
     iree::base::dynamic_library
     iree::base::platform_headers
     iree::base::ref_ptr
