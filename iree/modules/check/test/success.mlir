@@ -13,13 +13,27 @@ func @expect_false() attributes { iree.module.export } {
   return
 }
 
+func @expect_all_true() attributes {iree.module.export} {
+  %dev = hal.ex.shared_device : !hal.device
+  %allocator = hal.device.allocator %dev : !hal.allocator
+  %all_true = hal.buffer_view.const %allocator, "HostLocal|DeviceVisible", "All" : !hal.buffer_view = dense<1> : tensor<2x2xi32>
+  check.expect_all_true(%all_true) : !hal.buffer_view
+  return
+}
+
+func @expect_all_true_tensor() attributes { iree.module.export } {
+  %all_true = iree.unfoldable_constant dense<1> : tensor<2x2xi32>
+  check.expect_all_true(%all_true) : tensor<2x2xi32>
+  return
+}
+
 func @abs() attributes { iree.module.export } {
   %cm5 = iree.unfoldable_constant dense<-5> : tensor<i32>
   %result = "xla_hlo.abs"(%cm5) : (tensor<i32>) -> tensor<i32>
   %c5 = iree.unfoldable_constant dense<5> : tensor<i32>
   %eq = "xla_hlo.compare"(%result, %c5) {comparison_direction = "EQ"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
-  %eq_el = extract_element %eq[] : tensor<i1>
-  check.expect_true(%eq_el) : i1
+  %eqi32 = "xla_hlo.convert"(%eq) : (tensor<i1>) -> tensor<i32>
+  check.expect_all_true(%eqi32) : tensor<i32>
   return
 }
 

@@ -42,6 +42,8 @@ cc_library(
     deps = [
         ":check_imports",
         ":check_ops_gen",
+        "//iree/compiler/Dialect/HAL/Conversion",
+        "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
@@ -64,6 +66,8 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "//iree/compiler/Dialect/HAL/IR:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
     ],
 )
 

@@ -21,3 +21,8 @@ func @expectFalse(%arg : i32) attributes { iree.module.export } {
   check.expect_false(%arg) : i32
   return
 }
+
+func @expectAllTrue(%arg : !hal.buffer_view) attributes { iree.module.export } {
+  check.expect_all_true(%arg) : !hal.buffer_view
+  return
+}

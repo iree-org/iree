@@ -14,11 +14,14 @@
 
 #include "iree/modules/check/dialect/check_dialect.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/modules/check/dialect/check.imports.h"
 #include "iree/modules/check/dialect/check_ops.h"
 #include "iree/modules/check/dialect/conversion_patterns.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Parser.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -45,11 +48,24 @@ class CheckToVmConversionInterface : public VMConversionDialectInterface {
                               patterns, typeConverter);
   }
 };
+
+class CheckToHalConversionInterface : public HALConversionDialectInterface {
+ public:
+  using HALConversionDialectInterface::HALConversionDialectInterface;
+
+  void setupConversionTarget(ConversionTarget &target,
+                             OwningRewritePatternList &patterns,
+                             TypeConverter &typeConverter) const override {
+    populateCheckToHALPatterns(getDialect()->getContext(), patterns,
+                               typeConverter);
+  }
+};
 }  // namespace
 
 CheckDialect::CheckDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
   addInterfaces<CheckToVmConversionInterface>();
+  addInterfaces<CheckToHalConversionInterface>();
 #define GET_OP_LIST
   addOperations<
 #include "iree/modules/check/dialect/check_ops.cc.inc"

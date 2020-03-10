@@ -14,6 +14,7 @@
 
 #include "iree/modules/check/dialect/check_ops.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/IR/OpImplementation.h"
 
 namespace mlir {

@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# bazel_to_cmake: DO NOT EDIT
-add_subdirectory(test)
+iree_add_all_subdirs()
 
+file(GLOB _GLOB_X_TD CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
     dialect
@@ -30,13 +30,15 @@ iree_cc_library(
     "conversion_patterns.cc"
   DEPS
     ::check_imports
-    iree::compiler::Dialect::VM::Conversion
     LLVMSupport
     MLIRIR
     MLIRParser
     MLIRPass
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::VM::Conversion
   ALWAYSLINK
   PUBLIC
 )
@@ -75,7 +77,6 @@ iree_cc_binary(
     ::dialect
     iree::tools::iree_opt_main
 )
-add_executable(check-opt ALIAS iree_modules_check_dialect_check-opt)
 
 iree_cc_binary(
   NAME
@@ -86,4 +87,3 @@ iree_cc_binary(
     ::dialect
     iree::tools::iree_translate_main
 )
-add_executable(check-translate ALIAS iree_modules_check_dialect_check-translate)

@@ -39,13 +39,18 @@ iree_cc_test(
     absl::core_headers
     absl::strings
     iree::base::api
+    iree::base::api_util
     iree::base::logging
+    iree::base::status
+    iree::base::status_matchers
     iree::hal::api
+    iree::hal::vmla::vmla_driver_module
     iree::modules::hal
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode_module
     iree::vm::ref
+    iree::vm::ref_cc
 )
 
 iree_cc_binary(
@@ -88,6 +93,7 @@ iree_cc_library(
     iree::base::api
     iree::base::api_util
     iree::base::buffer_string_util
+    iree::base::status
     iree::hal::api
     iree::modules::hal
     iree::testing::gtest

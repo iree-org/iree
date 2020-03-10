@@ -21,6 +21,7 @@
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
 #include "iree/base/buffer_string_util.h"
+#include "iree/base/status.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -32,6 +33,58 @@
 
 namespace iree {
 namespace {
+
+using ::testing::Each;
+using ::testing::Not;
+
+template <typename T>
+Status ExpectAllTrue(iree_byte_span_t bytes) {
+  EXPECT_THAT(absl::Span<T>(reinterpret_cast<T*>(bytes.data),
+                            bytes.data_length / sizeof(T)),
+              Each(Not(0)));
+  return OkStatus();
+}
+
+Status ExpectAllTrue(iree_byte_span_t bytes,
+                     iree_hal_element_type_t element_type) {
+  switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+      return ExpectAllTrue<int8_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+      return ExpectAllTrue<uint8_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+      return ExpectAllTrue<int16_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+      return ExpectAllTrue<uint16_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+      return ExpectAllTrue<int32_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+      return ExpectAllTrue<uint32_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+      return ExpectAllTrue<int64_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
+      return ExpectAllTrue<uint64_t>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+      return ExpectAllTrue<float>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+      return ExpectAllTrue<double>(bytes);
+    case IREE_HAL_ELEMENT_TYPE_NONE:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_8:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_16:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_32:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_64:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
+      // fall through
+    }
+  }
+  char element_type_str[16];
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_hal_format_element_type(element_type, sizeof(element_type_str),
+                                   element_type_str, nullptr),
+      IREE_LOC));
+  return InvalidArgumentErrorBuilder(IREE_LOC)
+         << "Unsupported element type " << element_type_str;
+}
 
 // Per-context module state.
 // This can contain "globals" and other arbitrary state.
@@ -45,13 +98,33 @@ class CheckModuleState final {
       : allocator_(allocator) {}
   ~CheckModuleState() = default;
 
-  Status ExpectTrue(int32_t val) {
-    EXPECT_TRUE(val) << "Expected " << val << " to be nonzero.";
+  Status ExpectTrue(int32_t operand) {
+    EXPECT_TRUE(operand) << "Expected " << operand << " to be nonzero.";
     return OkStatus();
   }
 
-  Status ExpectFalse(int32_t val) {
-    EXPECT_FALSE(val) << "Expected " << val << " to be zero.";
+  Status ExpectFalse(int32_t operand) {
+    EXPECT_FALSE(operand) << "Expected " << operand << " to be zero.";
+    return OkStatus();
+  }
+
+  Status ExpectAllTrue(vm::ref<iree_hal_buffer_view_t> operand) {
+    auto* view = operand.get();
+    if (view == nullptr) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "View does not point to a buffer";
+    }
+    iree_hal_element_type_t element_type =
+        iree_hal_buffer_view_element_type(view);
+    iree_hal_buffer_t* buf = iree_hal_buffer_view_buffer(view);
+    iree_hal_mapped_memory_t mapped_memory;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_map(buf, IREE_HAL_MEMORY_ACCESS_READ, /*byte_offset=*/0,
+                            IREE_WHOLE_BUFFER, &mapped_memory),
+        IREE_LOC));
+    RETURN_IF_ERROR(
+        ::iree::ExpectAllTrue(mapped_memory.contents, element_type));
+    iree_hal_buffer_unmap(buf, &mapped_memory);
     return OkStatus();
   }
 
@@ -67,6 +140,7 @@ class CheckModuleState final {
 static const vm::NativeFunction<CheckModuleState> kCheckModuleFunctions[] = {
     vm::MakeNativeFunction("expect_true", &CheckModuleState::ExpectTrue),
     vm::MakeNativeFunction("expect_false", &CheckModuleState::ExpectFalse),
+    vm::MakeNativeFunction("expect_all_true", &CheckModuleState::ExpectAllTrue),
 };
 
 // The module instance that will be allocated and reused across contexts.

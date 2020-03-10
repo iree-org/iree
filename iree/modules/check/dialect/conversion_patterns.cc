@@ -14,6 +14,7 @@
 
 #include "iree/modules/check/dialect/conversion_patterns.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/modules/check/dialect/check_ops.h"
 #include "mlir/Pass/Pass.h"
@@ -31,6 +32,17 @@ void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
       context, importSymbols, typeConverter, "check.expect_true");
   patterns.insert<VMImportOpConversion<IREE::Check::ExpectFalseOp>>(
       context, importSymbols, typeConverter, "check.expect_false");
+  patterns.insert<VMImportOpConversion<IREE::Check::ExpectAllTrueOp>>(
+      context, importSymbols, typeConverter, "check.expect_all_true");
+}
+
+void populateCheckToHALPatterns(MLIRContext *context,
+                                OwningRewritePatternList &patterns,
+                                TypeConverter &typeConverter) {
+  // The same op handles both tensors and buffer views.
+  patterns.insert<HALOpConversion<IREE::Check::ExpectAllTrueOp,
+                                  IREE::Check::ExpectAllTrueOp>>(context,
+                                                                 typeConverter);
 }
 
 }  // namespace Check

@@ -15,11 +15,15 @@
 vm.module @check {
 
 vm.import @expect_true(
-  %arg : i32
+  %operand : i32
 )
 
 vm.import @expect_false(
-  %arg : i32
+  %operand : i32
+)
+
+vm.import @expect_all_true(
+  %operand : !vm.ref<!hal.buffer_view>,
 )
 
 

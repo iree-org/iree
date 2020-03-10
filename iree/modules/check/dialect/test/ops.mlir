@@ -17,21 +17,39 @@
 // RUN: check-opt -split-input-file %s | check-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @expect_true
-func @expect_true() {
-  // CHECK: [[C:%.+]] = constant
-  %c = constant 1 : i32
-  // CHECK: check.expect_true([[C]]) : i32
-  check.expect_true(%c) : i32
+// CHECK-SAME: [[ARG:%[a-zA-Z0-9]+]]
+func @expect_true(%arg : i32) {
+  // CHECK: check.expect_true([[ARG]]) : i32
+  check.expect_true(%arg) : i32
   return
 }
 
 // -----
 
 // CHECK-LABEL: @expect_false
-func @expect_false() {
-  // CHECK: [[C:%.+]] = constant
-  %c = constant 1 : i32
-  // CHECK: check.expect_false([[C]]) : i32
-  check.expect_false(%c) : i32
+// CHECK-SAME: [[ARG:%[a-zA-Z0-9]+]]
+func @expect_false(%arg : i32) {
+  // CHECK: check.expect_false([[ARG]]) : i32
+  check.expect_false(%arg) : i32
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @expect_all_true
+// CHECK-SAME: [[ARG:%[a-zA-Z0-9]+]]
+func @expect_all_true(%arg : !hal.buffer_view) {
+  // CHECK: check.expect_all_true([[ARG]]) : !hal.buffer_view
+  check.expect_all_true(%arg) : !hal.buffer_view
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @expect_all_true_tensor
+// CHECK-SAME: [[ARG:%[a-zA-Z0-9]+]]
+func @expect_all_true_tensor(%arg : tensor<2x2xi32>) {
+  // CHECK: check.expect_all_true([[ARG]]) : tensor<2x2xi32>
+  check.expect_all_true(%arg) : tensor<2x2xi32>
   return
 }
