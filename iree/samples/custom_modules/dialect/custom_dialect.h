@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/SideEffects.h"
 
 namespace mlir {
 namespace iree_compiler {

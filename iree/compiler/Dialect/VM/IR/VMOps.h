@@ -21,14 +21,15 @@
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMTraits.h"
 #include "iree/compiler/Dialect/VM/IR/VMTypes.h"
-#include "mlir/Analysis/CallInterfaces.h"
-#include "mlir/Analysis/ControlFlowInterfaces.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/FunctionSupport.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/CallInterfaces.h"
+#include "mlir/Interfaces/ControlFlowInterfaces.h"
+#include "mlir/Interfaces/SideEffects.h"
 
 namespace mlir {
 namespace iree_compiler {

@@ -17,7 +17,7 @@
 
 include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_base.td"
 include "mlir/IR/OpBase.td"
-include "mlir/Analysis/InferTypeOpInterface.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "tensorflow/compiler/mlir/tensorflow/ir/tf_op_base.td"
 
 class TfTensorList_Op<string mnemonic, list<OpTrait> traits = []> :

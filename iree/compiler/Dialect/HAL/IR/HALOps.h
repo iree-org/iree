@@ -27,6 +27,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/Interfaces/SideEffects.h"
 
 namespace mlir {
 namespace iree_compiler {
