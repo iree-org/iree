@@ -1,5 +1,7 @@
 # IREE: An Experimental MLIR Execution Environment
 
+Test DO NOT SUBMIT
+
 **DISCLAIMER**: This is an early phase project that we hope will graduate into a
 supported form someday, but it is far from ready for everyday use and is made
 available without any support. With that said, feel free to browse the issues
