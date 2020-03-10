@@ -51,12 +51,6 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
           moduleOp.lookupSymbol<FuncOp>(dispatchEntryOp.function_ref());
       entryFuncOps.push_back(funcOp);
       entryLocs.push_back(dispatchEntryOp.getLoc());
-    } else if (auto reductionEntryOp =
-                   dyn_cast<IREE::Flow::ReductionEntryOp>(op)) {
-      auto funcOp =
-          moduleOp.lookupSymbol<FuncOp>(reductionEntryOp.function_ref());
-      entryFuncOps.push_back(funcOp);
-      entryLocs.push_back(reductionEntryOp.getLoc());
     }
   }
   auto interfaceLoc = executableBuilder.getFusedLoc(entryLocs);
@@ -206,26 +200,6 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
           dispatchEntryOp.getLoc(),
           builder.getStringAttr(thunkFuncOp->getName()),
           builder.getI32IntegerAttr(nextOrdinal++), workGroupSizeAttr,
-          builder.getSymbolRefAttr(interfaceOp),
-          TypeAttr::get(sourceFuncOp.getType()));
-    } else if (auto reductionEntryOp =
-                   dyn_cast<IREE::Flow::ReductionEntryOp>(op)) {
-      auto sourceFuncOp = sourceOp.getInnerModule().lookupSymbol<FuncOp>(
-          reductionEntryOp.function_ref());
-      auto thunkFuncOp = createDispatchEntryThunk(sourceFuncOp, interfaceOp);
-      if (!thunkFuncOp.hasValue()) {
-        return failure();
-      }
-      reductionEntryOp.setAttr(
-          "function_ref", builder.getSymbolRefAttr(thunkFuncOp.getValue()));
-
-      builder.create<IREE::HAL::ExecutableEntryPointOp>(
-          reductionEntryOp.getLoc(),
-          builder.getStringAttr(thunkFuncOp->getName()),
-          builder.getI32IntegerAttr(nextOrdinal++),
-          DenseIntElementsAttr::get(
-              VectorType::get({3}, builder.getIntegerType(32)),
-              ArrayRef<int32_t>{1, 1, 1}),
           builder.getSymbolRefAttr(interfaceOp),
           TypeAttr::get(sourceFuncOp.getType()));
     }

@@ -160,28 +160,28 @@ func @reduction(%arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
   return %1 : tensor<4xf32>
 }
 
-// CHECK-LABEL: flow.executable @reduction_reduce_0_dim_0 {
-// CHECK-NEXT:   flow.reduction.entry @reduction_reduce_0_dim_0_dispatch apply(@reduction_reduce_0_dim_0_invocation) attributes {
-// CHECK-SAME:     dimension = 1 : i32,
-// CHECK-SAME:     workload = dense<[4, 1, 1]>
-// CHECK-SAME:   }
-// CHECK-NEXT:   module {
-// CHECK-NEXT:     func @reduction_reduce_0_dim_0_dispatch(tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
-// CHECK-NEXT:     func @reduction_reduce_0_dim_0_invocation(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
-// CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg1 : tensor<f32>
-// CHECK-NEXT:       return %0 : tensor<f32>
-// CHECK-NEXT:     }
-// CHECK-NEXT:   }
-// CHECK-NEXT: }
-// CHECK-NEXT: func @reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
-// CHECK-NEXT:   %cst = constant dense<0.000000e+00> : tensor<f32>
-// CHECK-NEXT:   %cst_0 = constant dense<[4, 1, 1]> : vector<3xi32>
-// CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %cst_0 : vector<3xi32>, %arg2 = %arg0 : tensor<4x8xf32>, %arg3 = %cst : tensor<f32>) -> tensor<4xf32> {
-// CHECK-NEXT:     %1 = flow.dispatch @reduction_reduce_0_dim_0::@reduction_reduce_0_dim_0_dispatch[%arg1 : vector<3xi32>](%arg2, %arg3) : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
-// CHECK-NEXT:     flow.return %1 : tensor<4xf32>
-// CHECK-NEXT:   }
-// CHECK-NEXT:   return %0 : tensor<4xf32>
-// CHECK-NEXT: }
+// CHECK-LABEL: flow.executable @reduction_ex_dispatch_0 {
+//  CHECK-NEXT:   flow.dispatch.entry @reduction_ex_dispatch_0 attributes {workload = dense<[4, 1, 1]> : vector<3xi32>}
+//  CHECK-NEXT:   module {
+//  CHECK-NEXT:     func @reduction_ex_dispatch_0(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
+//  CHECK-NEXT:       %cst = constant dense<0.000000e+00> : tensor<f32>
+//  CHECK-NEXT:       %0 = "xla_hlo.reduce"(%arg0, %cst) ( {
+//  CHECK-NEXT:       ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>): // no predecessors
+//  CHECK-NEXT:         %1 = xla_hlo.add %arg1, %arg2 : tensor<f32>
+//  CHECK-NEXT:         "xla_hlo.return"(%1) : (tensor<f32>) -> ()
+//  CHECK-NEXT:       }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
+//  CHECK-NEXT:       return %0 : tensor<4xf32>
+//  CHECK-NEXT:     }
+//  CHECK-NEXT:   }
+//  CHECK-NEXT: }
+//  CHECK-NEXT: func @reduction(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
+//  CHECK-NEXT:   %cst = constant dense<[4, 1, 1]> : vector<3xi32>
+//  CHECK-NEXT:   %0 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<4x8xf32>) -> tensor<4xf32> {
+//  CHECK-NEXT:     %1 = flow.dispatch @reduction_ex_dispatch_0::@reduction_ex_dispatch_0[%arg1 : vector<3xi32>](%arg2) : (tensor<4x8xf32>) -> tensor<4xf32>
+//  CHECK-NEXT:     flow.return %1 : tensor<4xf32>
+//  CHECK-NEXT:   }
+//  CHECK-NEXT:   return %0 : tensor<4xf32>
+//  CHECK-NEXT: }
 
 // -----
 

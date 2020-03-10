@@ -102,8 +102,6 @@ static std::vector<std::string> populateEntryPointNames(
   for (auto &op : executableOp.getBlock().getOperations()) {
     if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
       entryPointNames.push_back(std::string(entryOp.function_ref()));
-    } else if (auto entryOp = dyn_cast<IREE::Flow::ReductionEntryOp>(op)) {
-      entryPointNames.push_back(std::string(entryOp.function_ref()));
     }
   }
   return entryPointNames;
@@ -211,14 +209,6 @@ static void propagateModifiedExecutableABI(
       assert(targetEntryOp && "could not find HAL entry point");
       auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
       assert(funcOp && "could not find target function for HAL entry point");
-      auto workGroupSize = funcOp.getAttrOfType<DenseIntElementsAttr>(
-          "iree.executable.workgroup_size");
-      targetEntryOp.setAttr("workgroup_size", workGroupSize);
-    } else if (auto entryOp = dyn_cast<IREE::Flow::ReductionEntryOp>(&op)) {
-      auto targetEntryOp =
-          executableOp.lookupSymbol<IREE::HAL::ExecutableEntryPointOp>(
-              entryOp.sym_name());
-      auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
       auto workGroupSize = funcOp.getAttrOfType<DenseIntElementsAttr>(
           "iree.executable.workgroup_size");
       targetEntryOp.setAttr("workgroup_size", workGroupSize);

@@ -1,4 +1,4 @@
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -split-input-file -iree-hal-target-backends=vulkan-spirv -iree-flow-experimental-dispatch-reduce %s | IreeFileCheck %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -split-input-file -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // CHECK-LABEL: EXEC @reduce_dim_1
 // CHECK: 2xi32=25 50

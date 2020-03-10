@@ -110,17 +110,6 @@ std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass(
     std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps);
 
 //===----------------------------------------------------------------------===//
-// Reductions (flow.reduction.region)
-//===----------------------------------------------------------------------===//
-
-// Identifies reduction regions and wraps them in flow.reduction_regions.
-std::unique_ptr<OpPassBase<ModuleOp>> createIdentifyReductionRegionsPass();
-
-// Outlines dispatch regions into executables.
-std::unique_ptr<OpPassBase<ModuleOp>> createOutlineReductionRegionsPass(
-    std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps);
-
-//===----------------------------------------------------------------------===//
 // Optimizations
 //===----------------------------------------------------------------------===//
 

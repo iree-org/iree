@@ -92,46 +92,6 @@ static void makeLegacyExecutableDispatchABI(
   for (auto *deadOp : deadOps) deadOp->erase();
 }
 
-// TODO(b/150312935): remove this when the SPIR-V and LLVM targets use
-// hal.interface.
-static void makeLegacyExecutableReductionABI(
-    IREE::Flow::ReductionEntryOp reductionEntryOp, FuncOp thunkOp) {
-  auto *context = thunkOp.getContext();
-
-  auto implOp = thunkOp.getParentOfType<ModuleOp>().lookupSymbol<FuncOp>(
-      (thunkOp.getName() + "_impl").str());
-  implOp.setAttr("iree.executable.export", UnitAttr::get(context));
-  implOp.setAttr("iree.executable.reduction", UnitAttr::get(context));
-  implOp.setAttr("iree.executable.reduction.apply",
-                 FlatSymbolRefAttr::get(reductionEntryOp.apply_ref(), context));
-  implOp.setAttr("iree.executable.reduction.dimension",
-                 IntegerAttr::get(IntegerType::get(32, context),
-                                  reductionEntryOp.dimension()));
-
-  // Remove any blocks that may exist within the implementation function as the
-  // backend will be replacing the body with its own implementation.
-  implOp.getBlocks().clear();
-
-  // Destroy the IO op and replace with the original entry.
-  SymbolTable::setSymbolVisibility(implOp, SymbolTable::Visibility::Public);
-  auto originalName = thunkOp.getName();
-  thunkOp.erase();
-  implOp.setName(originalName);
-
-  // Reset function type to memrefs with output args.
-  SmallVector<Type, 4> inputTypes;
-  for (const auto &oldType : implOp.getType().getInputs()) {
-    inputTypes.push_back(
-        convertLegacyTypeToMemRef(legalizeLegacyType(oldType)));
-  }
-  for (const auto &oldType : implOp.getType().getResults()) {
-    inputTypes.push_back(
-        convertLegacyTypeToMemRef(legalizeLegacyType(oldType)));
-  }
-  auto funcType = FunctionType::get(inputTypes, {}, context);
-  implOp.setType(funcType);
-}
-
 class RewriteLegacyIOPass
     : public OperationPass<RewriteLegacyIOPass, IREE::Flow::ExecutableOp> {
  public:
@@ -144,9 +104,6 @@ class RewriteLegacyIOPass
       if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
         auto thunkOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
         makeLegacyExecutableDispatchABI(entryOp, thunkOp);
-      } else if (auto entryOp = dyn_cast<IREE::Flow::ReductionEntryOp>(&op)) {
-        auto thunkOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
-        makeLegacyExecutableReductionABI(entryOp, thunkOp);
       }
     }
 

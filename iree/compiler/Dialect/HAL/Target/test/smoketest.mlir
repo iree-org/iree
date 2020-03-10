@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=vulkan-spirv -iree-flow-experimental-dispatch-reduce %s | IreeFileCheck %s -check-prefix=VKSPV
+// RUN: iree-opt -split-input-file -iree-hal-transformation-pipeline -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s -check-prefix=VKSPV
 
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {

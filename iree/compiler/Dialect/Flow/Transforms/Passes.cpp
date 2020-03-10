@@ -25,11 +25,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace Flow {
 
-static llvm::cl::opt<bool> experimentalDispatchReduce{
-    "iree-flow-experimental-dispatch-reduce",
-    llvm::cl::desc("Enables reductions within dispatch regions"),
-    llvm::cl::init(false)};
-
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
 
@@ -53,16 +48,8 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
 
-  if (experimentalDispatchReduce) {
-    // Unroll multi-dimensional reductions to one reduction per dimension.
-    passManager.addNestedPass<FuncOp>(IREE::Flow::createUnrollReductionsPass());
-  } else {
-    // Find reduction ops and create flow.reduction.regions. We do this prior to
-    // performing dispatch region identification so that we can build as big of
-    // fused reduction regions as possible. The remaining ops will be put into
-    // dispatch regions.
-    passManager.addPass(IREE::Flow::createIdentifyReductionRegionsPass());
-  }
+  // Unroll multi-dimensional reductions to one reduction per dimension.
+  passManager.addNestedPass<FuncOp>(IREE::Flow::createUnrollReductionsPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // First perform module-level analysis that following passes will use to query
@@ -87,8 +74,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // sequencer functions performing dispatches from the dispatchees.
   passManager.addPass(
       IREE::Flow::createOutlineDispatchRegionsPass(dispatchableFuncOps));
-  passManager.addPass(
-      IREE::Flow::createOutlineReductionRegionsPass(dispatchableFuncOps));
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());

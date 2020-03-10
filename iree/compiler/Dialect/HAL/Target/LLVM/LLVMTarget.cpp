@@ -49,8 +49,6 @@ static std::vector<std::string> populateEntryPointNames(
   for (auto& op : executableOp.getBlock().getOperations()) {
     if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
       entryPointNames.push_back(std::string(entryOp.function_ref()));
-    } else if (auto entryOp = dyn_cast<IREE::Flow::ReductionEntryOp>(op)) {
-      entryPointNames.push_back(std::string(entryOp.function_ref()));
     }
   }
   return entryPointNames;
