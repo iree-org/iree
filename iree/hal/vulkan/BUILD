@@ -168,6 +168,7 @@ cc_library(
         "//iree/base:tracing",
         "@com_google_absl//absl/base:core_headers",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
         "@vulkan_headers//:vulkan_headers_no_prototypes",
     ],

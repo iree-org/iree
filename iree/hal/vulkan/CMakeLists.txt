@@ -167,10 +167,12 @@ iree_cc_library(
     "dynamic_symbols.cc"
   COPTS
     "-DVK_NO_PROTOTYPES"
+    "-DIREE_VK_LAYER_PATH_EXTRAS=${CMAKE_BINARY_DIR}/third_party/vulkan_extensionlayer/layers"
   DEPS
     absl::core_headers
     absl::memory
     absl::span
+    absl::strings
     iree::base::dynamic_library
     iree::base::platform_headers
     iree::base::ref_ptr
@@ -491,5 +493,7 @@ iree_cc_library(
     iree::hal::driver_registry
     iree::hal::vulkan::dynamic_symbols
     iree::hal::vulkan::vulkan_driver
+  DATA
+    vk_layer_khronos_timeline_semaphore
   PUBLIC
 )

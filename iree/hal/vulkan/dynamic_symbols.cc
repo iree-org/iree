@@ -20,6 +20,7 @@
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
 #include "iree/base/file_path.h"
 #include "iree/base/platform_headers.h"
@@ -132,21 +133,42 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
 
-#if defined(IREE_VK_ICD_FILENAMES)
 #define IREE_STRINGIFY_(x) #x
 #define IREE_STRING_(x) IREE_STRINGIFY_(x)
+
+#if defined(IREE_VK_ICD_FILENAMES)
   std::string vk_icd_filenames = IREE_STRING_(IREE_VK_ICD_FILENAMES);
-#undef IREE_STRINGIFY_
-#undef IREE_STRING_
 #if defined(IREE_PLATFORM_WINDOWS)
-  // TODO(b/138220713): Set VK_ICD_FILENAMES on Windows
+// TODO(scotttodd): Set VK_ICD_FILENAMES on Windows
 #else
   ::setenv("VK_ICD_FILENAMES", vk_icd_filenames.c_str(), 0);
 #endif  // IREE_PLATFORM_WINDOWS
 #else
-  // Leave VK_ICD_FILENAMES unchanged and rely on the system Vulkan loader to
-  // discover ICDs.
+// Leave VK_ICD_FILENAMES unchanged and rely on the system Vulkan loader to
+// discover ICDs.
 #endif  // IREE_VK_ICD_FILENAMES
+
+#if defined(IREE_VK_LAYER_PATH_EXTRAS)
+  std::string vk_layer_path_extras = IREE_STRING_(IREE_VK_LAYER_PATH_EXTRAS);
+#if defined(IREE_PLATFORM_WINDOWS)
+// TODO(scotttodd): Layer discovery on Windows
+#else
+  const char* vk_layer_path = ::getenv("VK_LAYER_PATH");
+  std::string combined_path;
+  if (vk_layer_path) {
+    combined_path = absl::StrCat(vk_layer_path, ":", vk_layer_path_extras);
+  } else {
+    combined_path = vk_layer_path_extras;
+  }
+  ::setenv("VK_LAYER_PATH", combined_path.c_str(), 0);
+#endif  // IREE_PLATFORM_WINDOWS
+#else
+// Leave VK_LAYER_PATH unchanged and rely on the system Vulkan loader to
+// discover layers at the default path(s).
+#endif  // IREE_VK_LAYER_PATH_EXTRAS
+
+#undef IREE_STRINGIFY_
+#undef IREE_STRING_
 
   ASSIGN_OR_RETURN(
       auto loader_library,

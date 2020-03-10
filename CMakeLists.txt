@@ -128,7 +128,9 @@ add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/abseil-cpp EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/flatbuffers EXCLUDE_FROM_ALL)
 add_subdirectory(third_party/vulkan_headers EXCLUDE_FROM_ALL)
+add_subdirectory(third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 add_subdirectory(build_tools/third_party/renderdoc_api EXCLUDE_FROM_ALL)
+add_subdirectory(build_tools/third_party/vulkan_extensionlayer EXCLUDE_FROM_ALL)
 
 if(${IREE_ENABLE_LLVM})
   # If CMAKE_BUILD_TYPE is FastBuild, set to Debug for llvm
