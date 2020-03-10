@@ -47,8 +47,10 @@
 
 #include "mlir/Dialect/AffineOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/Linalg/EDSC/Intrinsics.h"
+#include "mlir/Dialect/LoopOps/EDSC/Builders.h"
 #include "mlir/Dialect/StandardOps/EDSC/Intrinsics.h"
 #include "mlir/Dialect/VectorOps/EDSC/Intrinsics.h"
+#include "mlir/EDSC/Builders.h"
 
 namespace mlir {
 using edsc::ScopedContext;
@@ -79,6 +81,16 @@ using edsc::intrinsics::StdIndexedValue;
 // From the Affine Dialect.
 using edsc::intrinsics::AffineIndexedValue;
 // -----------------------------------------------------------------------------
+
+class CapturedValueHandle {
+ public:
+  CapturedValueHandle(Type t) : value_handle_(t) {}
+  ValueHandle capture(std::function<ValueHandle(void)> f);
+  operator ValueHandle() const { return value_handle_; }
+
+ private:
+  ValueHandle value_handle_;
+};
 
 // Entry point class to build a whole model declaratively with C++ EDSCs.
 class ModelBuilder : public OpBuilder {

@@ -15,6 +15,7 @@
 #include "experimental/ModelBuilder/ModelBuilder.h"
 
 #include "mlir/Dialect/AffineOps/EDSC/Builders.h"
+#include "mlir/EDSC/Builders.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 
@@ -126,4 +127,9 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
   StructuredIndexed o2(O2), bias(Bias), o3Type(outputTensorType);
   return linalg_pointwise(fusedBiasTanh, o2({i, j}), bias({j}), o3Type({i, j}))
       ->getResult(0);
+}
+
+ValueHandle CapturedValueHandle::capture(std::function<ValueHandle(void)> f) {
+  if (!value_handle_.hasValue()) value_handle_ = f();
+  return value_handle_;
 }
