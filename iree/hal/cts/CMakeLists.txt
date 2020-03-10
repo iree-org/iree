@@ -25,7 +25,6 @@ iree_cc_library(
     iree::base::status
     iree::base::status_matchers
     iree::hal::driver_registry
-    iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module
     iree::testing::gtest_main
   TESTONLY
