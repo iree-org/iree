@@ -31,7 +31,6 @@ package(
 )
 
 DRIVER_DEPS = PLATFORM_VULKAN_DEPS + [
-    "//iree/hal/interpreter:interpreter_driver_module",
     "//iree/hal/vulkan:vulkan_driver_module",
     "//iree/hal/llvmjit:llvmjit_driver_module",
     "//iree/hal/vmla:vmla_driver_module",

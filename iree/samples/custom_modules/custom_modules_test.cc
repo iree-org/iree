@@ -39,8 +39,7 @@ class CustomModulesTest : public ::testing::Test {
     // TODO(benvanik): make a 'don't care' helper method.
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_CHECK_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("interpreter"), IREE_ALLOCATOR_SYSTEM,
-        &hal_driver));
+        iree_make_cstring_view("vmla"), IREE_ALLOCATOR_SYSTEM, &hal_driver));
     iree_hal_device_t* hal_device = nullptr;
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
         hal_driver, IREE_ALLOCATOR_SYSTEM, &hal_device));

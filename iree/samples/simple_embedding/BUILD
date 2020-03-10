@@ -53,7 +53,7 @@ cc_test(
 
         # These are the drivers we support running with and can produce
         # executables for from the source MLIR.
-        "//iree/hal/interpreter:interpreter_driver_module",  # build-cleaner: keep
+        "//iree/hal/vmla:vmla_driver_module",  # build-cleaner: keep
         "//iree/hal/vulkan:vulkan_driver_module",  # build-cleaner: keep
     ] + PLATFORM_VULKAN_TEST_DEPS,
 )

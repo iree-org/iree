@@ -108,7 +108,6 @@ class BuildFileFunctions(object):
     self.FLATBUFFER_SUPPORTS_REFLECTIONS = False
     self.PLATFORM_VULKAN_LOADER_COPTS = []
     self.IREE_DRIVER_MODULES = [
-        "//iree/hal/interpreter:interpreter_driver_module",
         # TODO(b/142004903): enable when Dawn HAL implementation is functional
         # "//iree/hal/dawn:dawn_driver_module",
         "//iree/hal/vmla:vmla_driver_module",

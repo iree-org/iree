@@ -34,7 +34,7 @@ ABSL_FLAG(std::string, entry_function, "",
           "Name of a function contained in the module specified by input_file "
           "to run.");
 
-ABSL_FLAG(std::string, driver, "interpreter", "Backend driver to use.");
+ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
 
 ABSL_FLAG(std::vector<std::string>, inputs, {},
           "A comma-separated list of of input buffers of the format:"

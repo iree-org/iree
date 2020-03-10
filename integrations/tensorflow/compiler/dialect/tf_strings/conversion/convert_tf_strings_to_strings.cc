@@ -22,7 +22,6 @@
 #include "iree/compiler/Dialect/Modules/Strings/IR/Dialect.h"
 #include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
-#include "iree/compiler/Translation/Interpreter/Transforms/ConversionUtils.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"

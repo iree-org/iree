@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @scalar
 func @scalar() -> (i32, i32) {

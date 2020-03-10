@@ -47,7 +47,7 @@ class SystemApiTest(absltest.TestCase):
       config = rt.Config("nothere1,nothere2")
 
   def test_subsequent_driver(self):
-    config = rt.Config("nothere1,interpreter")
+    config = rt.Config("nothere1,vmla")
 
   def test_empty_dynamic(self):
     ctx = rt.SystemContext()

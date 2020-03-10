@@ -51,6 +51,7 @@ LogicalResult translateToVMLAExecutable(
   // Clone the module containing the things we want to translate. We do this so
   // that multiple targets can pull from the same source without conflicting.
   auto sourceOp = executableOp.getSourceOp().clone();
+  auto sourceOpErase = llvm::make_scope_exit([&]() { sourceOp.erase(); });
   auto flowExecutableOp =
       *sourceOp.getInnerModule().getOps<IREE::Flow::ExecutableOp>().begin();
   auto innerModuleOp = flowExecutableOp.getInnerModule();

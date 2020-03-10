@@ -39,7 +39,7 @@ AnyModule = _binding.VmModule
 PREFERRED_DRIVER_ENV_KEY = "IREE_DEFAULT_DRIVER"
 
 # Default value for IREE_DRIVER
-DEFAULT_IREE_DRIVER_VALUE = "vulkan,interpreter"
+DEFAULT_IREE_DRIVER_VALUE = "vulkan,vmla"
 
 
 def _create_default_iree_driver(

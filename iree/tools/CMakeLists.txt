@@ -21,7 +21,6 @@ iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
     "iree::hal::vmla::vmla_driver_module"
     "iree::hal::vulkan::vulkan_driver_module"
   CLANG_OR_GCC
-    "iree::hal::interpreter::interpreter_driver_module"
     "iree::hal::llvmjit::llvmjit_driver_module"
 )
 
@@ -30,7 +29,6 @@ iree_select_compiler_opts(IREE_COMPILER_TARGET_BACKENDS
     "iree::compiler::Dialect::HAL::Target::VMLA"
     "iree::compiler::Dialect::HAL::Target::VulkanSPIRV"
   CLANG_OR_GCC
-    "iree::compiler::Dialect::HAL::Target::LegacyInterpreter"
     "iree::compiler::Dialect::HAL::Target::LLVM"
 )
 
@@ -178,7 +176,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VMLA::Transforms
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::Translation::IREEVM
-      iree::compiler::Translation::Interpreter::Transforms
       iree::compiler::Translation::SPIRV::LinalgToSPIRV
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::CodegenPasses
@@ -303,7 +300,7 @@ iree_cc_test(
     iree::base::api
     iree::base::status_matchers
     iree::hal::api
-    iree::hal::interpreter::interpreter_driver_module
+    iree::hal::vmla::vmla_driver_module
     iree::modules::hal
     iree::testing::gtest_main
     iree::vm::value

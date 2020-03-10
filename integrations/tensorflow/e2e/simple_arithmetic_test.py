@@ -45,10 +45,10 @@ class SimpleArithmeticTest(tf_test_utils.SavedModelTestCase):
     a = np.array([1., 2., 3., 4.], dtype=np.float32)
     b = np.array([400., 5., 6., 7.], dtype=np.float32)
     # Individual backends can be accessed off of the module by name ('tf,
-    # 'iree_interpreter' below).
+    # 'iree_vmla' below).
     tf_c = self.modules.simple_arithmetic.tf.simple_mul(a, b)
     print("TF Result:", tf_c)
-    iree_c = self.modules.simple_arithmetic.iree_interpreter.simple_mul(a, b)
+    iree_c = self.modules.simple_arithmetic.iree_vmla.simple_mul(a, b)
     print("IREE Result:", iree_c)
     self.assertAllClose(tf_c, iree_c)
 

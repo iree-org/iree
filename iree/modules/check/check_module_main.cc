@@ -32,7 +32,7 @@ ABSL_FLAG(std::string, input_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
 
-ABSL_FLAG(std::string, driver, "interpreter", "Backend driver to use.");
+ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
 
 ABSL_FLAG(
     bool, expect_failure, false,

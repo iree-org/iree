@@ -22,7 +22,7 @@ To use `iree-benchmark-module`, generate an IREE module for the target backend:
 ```shell
 $ bazel run //iree/tools:iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=interpreter-bytecode \
+  --iree-hal-target-backends=vmla \
   $PWD/iree/tools/test/simple.mlir \
   -o /tmp/module.fb
 ```
@@ -32,7 +32,7 @@ and then benchmark an exported function in that module:
 ```shell
 $ bazel run //iree/tools:iree-benchmark-module -- \
   --input_file=/tmp/module.fb \
-  --driver=interpreter \
+  --driver=vmla \
   --entry_function=abs \
   --inputs="i32=-2"
 ```
@@ -79,7 +79,7 @@ Now we'll actually invoke the binary:
 ```shell
 $ ./bazel-bin/iree/tools/iree-benchmark-module \
   --input_file=/tmp/module.fb \
-  --driver=interpreter \
+  --driver=vmla \
   --entry_function=abs \
   --inputs="i32=-2"
 ```

@@ -31,7 +31,7 @@ class VmUtilTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
     IREE_ASSERT_OK(iree_hal_module_register_types());
-    ASSERT_OK(CreateDevice("interpreter", &device_));
+    ASSERT_OK(CreateDevice("vmla", &device_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 

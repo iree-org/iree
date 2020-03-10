@@ -45,8 +45,7 @@ class TensorListModulesTest : public ::testing::Test {
     // TODO(benvanik): make a 'don't care' helper method.
     iree_hal_driver_t* hal_driver = nullptr;
     IREE_CHECK_OK(iree_hal_driver_registry_create_driver(
-        iree_make_cstring_view("interpreter"), IREE_ALLOCATOR_SYSTEM,
-        &hal_driver));
+        iree_make_cstring_view("vmla"), IREE_ALLOCATOR_SYSTEM, &hal_driver));
     IREE_CHECK_OK(iree_hal_driver_create_default_device(
         hal_driver, IREE_ALLOCATOR_SYSTEM, &device_));
     IREE_CHECK_OK(

@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir -iree-hal-target-backends=interpreter-bytecode %s | IreeFileCheck %s
+// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @compare_tensor
 func @compare_tensor() -> tensor<4xi8> {

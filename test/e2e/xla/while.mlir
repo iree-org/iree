@@ -1,6 +1,6 @@
 // A simple while loop example.
 
-// RUN: iree-run-mlir %s -iree-hal-target-backends=interpreter-bytecode --export-all=false | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]"
+// RUN: iree-run-mlir %s -iree-hal-target-backends=vmla --export-all=false | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]"
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=vulkan-spirv --export-all=false | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]")
 
 // CHECK-LABEL: EXEC @main

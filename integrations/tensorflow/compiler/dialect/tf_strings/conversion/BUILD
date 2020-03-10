@@ -33,7 +33,6 @@ cc_library(
         "//iree/compiler/Dialect/Modules/Strings/IR",
         "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
         "//iree/compiler/Dialect/VM/Conversion",
-        "//iree/compiler/Translation/Interpreter/Transforms",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:Analysis",

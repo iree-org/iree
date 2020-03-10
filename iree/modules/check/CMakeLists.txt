@@ -66,7 +66,6 @@ iree_cc_binary(
     iree::base::localfile
     iree::base::source_location
     iree::base::status
-    iree::hal::interpreter::interpreter_driver_module
     iree::hal::llvmjit::llvmjit_driver_module
     iree::hal::vmla::vmla_driver_module
     iree::hal::vulkan::vulkan_driver_module

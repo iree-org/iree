@@ -97,7 +97,7 @@ use this command:
 ```shell
 $ bazel run //iree/tools:iree-translate -- \
   -iree-mlir-to-vm-bytecode-module \
-  --iree-hal-target-backends=interpreter-bytecode \
+  --iree-hal-target-backends=vmla \
   $PWD/iree/tools/test/simple.mlir \
   -o /tmp/module.fb
 ```
@@ -119,7 +119,7 @@ interpreter
 ```shell
 $ bazel run //iree/tools:iree-run-module -- \
   --input_file=/tmp/module.fb \
-  --driver=interpreter \
+  --driver=vmla \
   --entry_function=abs \
   --inputs="i32=-2"
 ```
@@ -139,7 +139,7 @@ For example, to execute the contents of a test .mlir file, use this command:
 $ bazel run //iree/tools:iree-run-mlir -- \
   $PWD/iree/tools/test/simple.mlir \
   --input-value="i32=-2" \
-  --iree-hal-target-backends=interpreter-bytecode
+  --iree-hal-target-backends=vmla
 ```
 
 ### iree-dump-module
