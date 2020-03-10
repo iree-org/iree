@@ -24,8 +24,8 @@
 #include <vulkan/vulkan.h>
 
 #include <array>
+#include <cstring>
 #include <set>
-#include <string>
 #include <vector>
 
 // IREE's C API:
