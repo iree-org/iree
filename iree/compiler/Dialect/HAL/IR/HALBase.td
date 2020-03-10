@@ -146,6 +146,16 @@ def HAL_DescriptorTypeAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_DescriptorSetLayoutUsageType_Immutable : I32EnumAttrCase<"Immutable", 0>;
+def HAL_DescriptorSetLayoutUsageType_PushOnly : I32EnumAttrCase<"PushOnly", 1>;
+def HAL_DescriptorSetLayoutUsageTypeAttr :
+    I32EnumAttr<"DescriptorSetLayoutUsageType", "IREE HAL DescriptorSetLayoutType", [
+      HAL_DescriptorSetLayoutUsageType_Immutable,
+      HAL_DescriptorSetLayoutUsageType_PushOnly,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_ExecutionStage_None : BitEnumAttrCase<"None", 0x0000>;
 def HAL_ExecutionStage_CommandIssue : BitEnumAttrCase<"CommandIssue", 0x0001>;
 def HAL_ExecutionStage_CommandProcess : BitEnumAttrCase<"CommandProcess", 0x0002>;
@@ -528,19 +538,6 @@ def HAL_BufferBarrier : NamedTupleOf<[
   }];
 }
 def HAL_BufferBarrierList : TupleOf<[HAL_BufferBarrier]>;
-
-def HAL_DescriptorSetBinding : NamedTupleOf<[
-    NamedTupleElement<0, "binding", I32>,
-    NamedTupleElement<1, "buffer", HAL_Buffer>,
-    NamedTupleElement<2, "buffer_offset", HAL_DeviceSize>,
-    NamedTupleElement<3, "buffer_length", HAL_DeviceSize>,
-  ], "DescriptorSetBinding"> {
-  let typeDescription = [{
-    DescriptorSetBinding struct that can be passed to the
-    hal.descriptor_set.update operation. Constructed via the
-    hal.descriptor_set.make_binding operation.
-  }];
-}
 
 def HAL_DescriptorSetLayoutBindingAttr :
   IREE_StructAttr<"descriptor_set_layout_binding",

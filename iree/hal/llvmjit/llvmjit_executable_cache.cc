@@ -36,7 +36,8 @@ bool LLVMJITExecutableCache::CanPrepareFormat(ExecutableFormat format) const {
 }
 
 StatusOr<ref_ptr<Executable>> LLVMJITExecutableCache::PrepareExecutable(
-    ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
+    ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+    const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("LLVMJITExecutableCache::PrepareExecutable");
 
   // Wrap the data (or copy it).

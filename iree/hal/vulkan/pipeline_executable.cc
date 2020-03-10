@@ -64,9 +64,9 @@ PopulateSpecializationInfo(const VkSpecializationInfoDef* info_def) {
 
 // static
 StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
-    const ref_ptr<VkDeviceHandle>& logical_device,
-    VkPipelineCache pipeline_cache, VkPipelineLayout pipeline_layout,
-    PipelineDescriptorSets descriptor_sets, ExecutableCachingModeBitfield mode,
+    ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
+    PipelineExecutableLayout* executable_layout,
+    ExecutableCachingModeBitfield mode,
     const SpirVExecutableDef& spirv_executable_def) {
   IREE_TRACE_SCOPE0("PipelineExecutable::Create");
   const auto& syms = logical_device->syms();
@@ -127,7 +127,7 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
     } else {
       pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
     }
-    pipeline_create_info.layout = pipeline_layout;
+    pipeline_create_info.layout = executable_layout->handle();
     pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_create_info.basePipelineIndex = 0;
     auto& stage_create_info = pipeline_create_info.stage;
@@ -152,21 +152,17 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
       pipelines.data()));
   IREE_ENABLE_LEAK_CHECKS();
 
-  auto executable =
-      make_ref<PipelineExecutable>(CtorKey{}, logical_device, pipeline_layout,
-                                   descriptor_sets, std::move(pipelines));
+  auto executable = make_ref<PipelineExecutable>(std::move(logical_device),
+                                                 std::move(pipelines));
   executable->tag_ =
       spirv_executable_def.tag() ? spirv_executable_def.tag()->str() : "";
   return executable;
 }
 
 PipelineExecutable::PipelineExecutable(
-    CtorKey ctor_key, const ref_ptr<VkDeviceHandle>& logical_device,
-    VkPipelineLayout pipeline_layout, PipelineDescriptorSets descriptor_sets,
+    ref_ptr<VkDeviceHandle> logical_device,
     absl::InlinedVector<VkPipeline, 1> pipelines)
-    : logical_device_(add_ref(logical_device)),
-      pipeline_layout_(pipeline_layout),
-      descriptor_sets_(descriptor_sets),
+    : logical_device_(std::move(logical_device)),
       pipelines_(std::move(pipelines)) {}
 
 PipelineExecutable::~PipelineExecutable() {

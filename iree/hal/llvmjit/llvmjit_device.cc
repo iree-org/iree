@@ -23,7 +23,9 @@
 #include "iree/hal/command_queue.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/host/async_command_queue.h"
+#include "iree/hal/host/host_descriptor_set.h"
 #include "iree/hal/host/host_event.h"
+#include "iree/hal/host/host_executable_layout.h"
 #include "iree/hal/host/host_submission_queue.h"
 #include "iree/hal/host/inproc_command_buffer.h"
 #include "iree/hal/llvmjit/llvmjit_command_processor.h"
@@ -128,7 +130,28 @@ StatusOr<ref_ptr<LLVMJITDevice>> LLVMJITDevice::CreateLLVMJITDevice(
 LLVMJITDevice::~LLVMJITDevice() = default;
 
 ref_ptr<ExecutableCache> LLVMJITDevice::CreateExecutableCache() {
+  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateExecutableCache");
   return make_ref<LLVMJITExecutableCache>(&allocator_, execution_engine_.get());
+}
+
+StatusOr<ref_ptr<DescriptorSetLayout>> LLVMJITDevice::CreateDescriptorSetLayout(
+    DescriptorSetLayout::UsageType usage_type,
+    absl::Span<const DescriptorSetLayout::Binding> bindings) {
+  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateDescriptorSetLayout");
+  return make_ref<HostDescriptorSetLayout>(usage_type, bindings);
+}
+
+StatusOr<ref_ptr<ExecutableLayout>> LLVMJITDevice::CreateExecutableLayout(
+    absl::Span<DescriptorSetLayout* const> set_layouts, size_t push_constants) {
+  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateExecutableLayout");
+  return make_ref<HostExecutableLayout>(set_layouts, push_constants);
+}
+
+StatusOr<ref_ptr<DescriptorSet>> LLVMJITDevice::CreateDescriptorSet(
+    DescriptorSetLayout* set_layout,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateDescriptorSet");
+  return make_ref<HostDescriptorSet>(set_layout, bindings);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> LLVMJITDevice::CreateCommandBuffer(

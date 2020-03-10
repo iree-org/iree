@@ -27,7 +27,12 @@ class VMLACommandProcessor final : public HostLocalCommandProcessor {
                        CommandCategoryBitfield command_categories);
   ~VMLACommandProcessor() override;
 
-  Status Dispatch(const DispatchRequest& dispatch_request) override;
+  Status DispatchInline(
+      Executable* executable, int32_t entry_point,
+      std::array<uint32_t, 3> workgroups,
+      const PushConstantBlock& push_constants,
+      absl::Span<const absl::Span<const DescriptorSet::Binding>> set_bindings)
+      override;
 };
 
 }  // namespace vmla

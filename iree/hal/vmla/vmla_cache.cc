@@ -41,7 +41,8 @@ bool VMLACache::CanPrepareFormat(ExecutableFormat format) const {
 }
 
 StatusOr<ref_ptr<Executable>> VMLACache::PrepareExecutable(
-    ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
+    ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+    const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("VMLACache::PrepareExecutable");
   // Wrap the data (or copy it).
   bool allow_aliasing_data =

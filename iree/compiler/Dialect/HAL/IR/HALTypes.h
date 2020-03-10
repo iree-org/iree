@@ -235,6 +235,9 @@ class DescriptorSetBindingType {
   }
 };
 
+// A tuple containing runtime values for a DescriptorSetBindingType.
+using DescriptorSetBindingValue = std::tuple<uint32_t, Value, Value, Value>;
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -127,8 +127,9 @@ class MaterializeResourceCachesPass
     auto *block = initializerOp.addEntryBlock();
     OpBuilder blockBuilder(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
+    auto layoutUsage = IREE::HAL::DescriptorSetLayoutUsageType::PushOnly;
     auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
-        loc, layoutType, deviceValue, bindingsAttr);
+        loc, layoutType, deviceValue, layoutUsage, bindingsAttr);
     blockBuilder.create<ReturnOp>(loc, layoutValue);
 
     return variableOp;

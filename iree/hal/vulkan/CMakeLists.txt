@@ -334,10 +334,31 @@ iree_cc_library(
     iree::base::tracing
     iree::hal::executable
     iree::hal::executable_cache
+    iree::hal::executable_layout
     iree::hal::executable_spec
     iree::hal::vulkan::handle_util
+    iree::hal::vulkan::pipeline_executable_layout
     iree::hal::vulkan::status_util
     iree::schemas::spirv_executable_def_cc_fbs
+    Vulkan::Headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    pipeline_executable_layout
+  HDRS
+    "pipeline_executable_layout.h"
+  SRCS
+    "pipeline_executable_layout.cc"
+  COPTS
+    "-DVK_NO_PROTOTYPES"
+  DEPS
+    absl::inlined_vector
+    absl::span
+    iree::hal::descriptor_set_layout
+    iree::hal::executable_layout
+    iree::hal::vulkan::handle_util
     Vulkan::Headers
   PUBLIC
 )
@@ -445,6 +466,7 @@ iree_cc_library(
     iree::hal::vulkan::native_binary_semaphore
     iree::hal::vulkan::native_event
     iree::hal::vulkan::pipeline_cache
+    iree::hal::vulkan::pipeline_executable_layout
     iree::hal::vulkan::status_util
     iree::hal::vulkan::vma_allocator
     Vulkan::Headers

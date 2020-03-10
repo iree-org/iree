@@ -39,8 +39,9 @@ class DescriptorSetArena final {
   // The command buffer will have the descriptor set containing |bindings| bound
   // to it.
   Status BindDescriptorSet(VkCommandBuffer command_buffer,
-                           PipelineExecutable* executable,
-                           absl::Span<const BufferBinding> bindings);
+                           PipelineExecutableLayout* executable_layout,
+                           int32_t set,
+                           absl::Span<const DescriptorSet::Binding> bindings);
 
   // Flushes all pending writes to descriptor sets allocated from the arena and
   // returns a group that - when dropped - will release the descriptor sets
@@ -52,8 +53,9 @@ class DescriptorSetArena final {
 
   // Pushes the descriptor set to the command buffer, if supported.
   Status PushDescriptorSet(VkCommandBuffer command_buffer,
-                           PipelineExecutable* executable,
-                           absl::Span<const BufferBinding> bindings);
+                           PipelineExecutableLayout* executable_layout,
+                           int32_t set,
+                           absl::Span<const DescriptorSet::Binding> bindings);
 
   ref_ptr<VkDeviceHandle> logical_device_;
   ref_ptr<DescriptorPoolCache> descriptor_pool_cache_;

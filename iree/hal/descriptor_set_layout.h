@@ -35,6 +35,14 @@ enum class DescriptorType : uint32_t {
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayout.html
 class DescriptorSetLayout : public Resource {
  public:
+  // Specifies the usage type of the descriptor set.
+  enum class UsageType : uint32_t {
+    // Descriptor set will be initialized once and never changed.
+    kImmutable = 0,
+    // Descriptor set is never created and instead used with push descriptors.
+    kPushOnly = 1,
+  };
+
   // Specifies a descriptor set layout binding.
   struct Binding {
     // The binding number of this entry and corresponds to a resource of the

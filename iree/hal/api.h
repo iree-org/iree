@@ -242,6 +242,14 @@ typedef struct {
   iree_device_size_t length;
 } iree_hal_descriptor_set_binding_t;
 
+// Specifies the usage type of the descriptor set.
+typedef enum {
+  // Descriptor set will be initialized once and never changed.
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_IMMUTABLE = 0,
+  // Descriptor set is never created and instead used with push descriptors.
+  IREE_HAL_DESCRIPTOR_SET_LAYOUT_USAGE_TYPE_PUSH_ONLY = 1,
+} iree_hal_descriptor_set_layout_usage_type_t;
+
 // Specifies a descriptor set layout binding.
 //
 // Maps to VkDescriptorSetLayoutBinding.
@@ -801,6 +809,20 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length);
 
+// Pushes a descriptor set and associates it with |set|.
+// This uses an internal ringbuffer inside of the command buffer to avoid the
+// need for creating and binding descriptor sets and managing their lifetime.
+//
+// The descriptor set will remain bound and valid so long as the executable
+// layouts used by dispatches are compatible (same descriptor layouts and push
+// constant sizes).
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_push_descriptor_set(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_layout_t* executable_layout, int32_t set,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_binding_t* bindings);
+
 // Binds a descriptor set to the given |set| matching that used in the
 // executable layout interface.
 //
@@ -819,11 +841,29 @@ iree_hal_command_buffer_bind_descriptor_set(
     iree_host_size_t dynamic_offset_count,
     const iree_device_size_t* dynamic_offsets);
 
+// Dispatches an execution request.
+// The request may execute overlapped with any other transfer operation or
+// dispatch made within the same barrier-defined sequence.
+//
+// The executable specified must be registered for use with the device driver
+// owning this queue. It must not be unregistered until all requests that use
+// it have completed.
+//
+// Fails if the queue does not support dispatch operations (as indicated by
+// can_dispatch).
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point, int32_t workgroup_x,
-    int32_t workgroup_y, int32_t workgroup_z);
+    iree_hal_executable_t* executable, int32_t entry_point,
+    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z);
 
+// Dispatches an execution request with deferred workgroup counts.
+// This is the same as iree_hal_command_buffer_dispatch but the workgroup counts
+// are read from the given |workgroups_buffer| at offset |workgroups_offset| as
+// 3 uint32_t XYZ values before performing the dispatch. This allows prior
+// dispatches within the command sequence to populate the workgroup counts.
+//
+// The buffer must have been allocated with IREE_HAL_BUFFER_USAGE_DISPATCH and
+// be of IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
@@ -865,7 +905,9 @@ iree_hal_descriptor_set_release(iree_hal_descriptor_set_t* descriptor_set);
 // Creates a descriptor set layout with the given bindings.
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_descriptor_set_layout_create(
-    iree_hal_device_t* device, iree_host_size_t binding_count,
+    iree_hal_device_t* device,
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_allocator_t allocator,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout);
@@ -1044,8 +1086,7 @@ iree_hal_executable_cache_prepare_executable(
 // same compatible resource binding layouts.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_hal_device_t* device, iree_host_size_t set_layout_count,
-    const iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_allocator_t allocator,
+    iree_hal_descriptor_set_layout_t** set_layouts, iree_allocator_t allocator,
     iree_hal_executable_layout_t** out_executable_layout);
 
 // Retains the given |executable_layout| for the caller.

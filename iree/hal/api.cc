@@ -26,7 +26,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/api_detail.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/buffer_view.h"
 #include "iree/hal/command_buffer.h"
 #include "iree/hal/device.h"
 #include "iree/hal/driver.h"
@@ -793,6 +792,37 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_push_descriptor_set(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_layout_t* executable_layout, int32_t set,
+    iree_host_size_t binding_count,
+    const iree_hal_descriptor_set_binding_t* bindings) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_push_descriptor_set");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (!executable_layout) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (binding_count && !bindings) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  // TODO(benvanik): refactor the C++ types to use the C types for storage so
+  // that we can safely map between the two. For now assume size equality
+  // is layout equality (as compilers aren't allowed to reorder structs).
+  static_assert(sizeof(DescriptorSet::Binding) ==
+                    sizeof(iree_hal_descriptor_set_binding_t),
+                "Expecting identical layout");
+  return ToApiStatus(handle->PushDescriptorSet(
+      reinterpret_cast<ExecutableLayout*>(executable_layout), set,
+      absl::MakeConstSpan(
+          reinterpret_cast<const DescriptorSet::Binding*>(bindings),
+          binding_count)));
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_command_buffer_bind_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, int32_t set,
@@ -804,21 +834,35 @@ iree_hal_command_buffer_bind_descriptor_set(
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  // TODO(benvanik): implement descriptor sets.
-  return IREE_STATUS_UNIMPLEMENTED;
+  if (!executable_layout) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  if (dynamic_offset_count && !dynamic_offsets) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  static_assert(sizeof(iree_device_size_t) == sizeof(device_size_t),
+                "Device sizes must match");
+  return ToApiStatus(handle->BindDescriptorSet(
+      reinterpret_cast<ExecutableLayout*>(executable_layout), set,
+      reinterpret_cast<DescriptorSet*>(descriptor_set),
+      absl::MakeConstSpan(dynamic_offsets, dynamic_offset_count)));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_dispatch(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point, int32_t workgroup_x,
-    int32_t workgroup_y, int32_t workgroup_z) {
+    iree_hal_executable_t* executable, int32_t entry_point,
+    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
   IREE_TRACE_SCOPE0("iree_hal_command_buffer_dispatch");
   auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  // TODO(benvanik): implement descriptor sets.
-  return IREE_STATUS_UNIMPLEMENTED;
+  if (!executable) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return ToApiStatus(handle->Dispatch(reinterpret_cast<Executable*>(executable),
+                                      entry_point,
+                                      {workgroup_x, workgroup_y, workgroup_z}));
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
@@ -832,8 +876,12 @@ iree_hal_command_buffer_dispatch_indirect(
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
-  // TODO(benvanik): implement descriptor sets.
-  return IREE_STATUS_UNIMPLEMENTED;
+  if (!executable || workgroups_buffer) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return ToApiStatus(handle->DispatchIndirect(
+      reinterpret_cast<Executable*>(executable), entry_point,
+      reinterpret_cast<Buffer*>(workgroups_buffer), workgroups_offset));
 }
 
 //===----------------------------------------------------------------------===//
@@ -873,7 +921,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_descriptor_set_create(
   IREE_API_ASSIGN_OR_RETURN(
       auto descriptor_set,
       handle->CreateDescriptorSet(
-          add_ref(reinterpret_cast<DescriptorSetLayout*>(set_layout)),
+          reinterpret_cast<DescriptorSetLayout*>(set_layout),
           absl::MakeConstSpan(
               reinterpret_cast<const DescriptorSet::Binding*>(bindings),
               binding_count)));
@@ -891,7 +939,9 @@ IREE_HAL_API_RETAIN_RELEASE(descriptor_set_layout, DescriptorSetLayout);
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_descriptor_set_layout_create(
-    iree_hal_device_t* device, iree_host_size_t binding_count,
+    iree_hal_device_t* device,
+    iree_hal_descriptor_set_layout_usage_type_t usage_type,
+    iree_host_size_t binding_count,
     const iree_hal_descriptor_set_layout_binding_t* bindings,
     iree_allocator_t allocator,
     iree_hal_descriptor_set_layout_t** out_descriptor_set_layout) {
@@ -916,9 +966,11 @@ iree_hal_descriptor_set_layout_create(
                 "Expecting identical layout");
   IREE_API_ASSIGN_OR_RETURN(
       auto descriptor_set_layout,
-      handle->CreateDescriptorSetLayout(absl::MakeConstSpan(
-          reinterpret_cast<const DescriptorSetLayout::Binding*>(bindings),
-          binding_count)));
+      handle->CreateDescriptorSetLayout(
+          static_cast<DescriptorSetLayout::UsageType>(usage_type),
+          absl::MakeConstSpan(
+              reinterpret_cast<const DescriptorSetLayout::Binding*>(bindings),
+              binding_count)));
 
   *out_descriptor_set_layout =
       reinterpret_cast<iree_hal_descriptor_set_layout_t*>(
@@ -1161,12 +1213,16 @@ iree_hal_executable_cache_prepare_executable(
   if (!handle) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
+  if (!executable_layout) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
 
   ExecutableSpec spec;
   spec.executable_data = {executable_data.data, executable_data.data_length};
   IREE_API_ASSIGN_OR_RETURN(
       auto executable,
       handle->PrepareExecutable(
+          reinterpret_cast<ExecutableLayout*>(executable_layout),
           static_cast<ExecutableCachingMode>(caching_mode), spec));
 
   *out_executable =
@@ -1182,8 +1238,7 @@ IREE_HAL_API_RETAIN_RELEASE(executable_layout, ExecutableLayout);
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_hal_device_t* device, iree_host_size_t set_layout_count,
-    const iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_allocator_t allocator,
+    iree_hal_descriptor_set_layout_t** set_layouts, iree_allocator_t allocator,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_TRACE_SCOPE0("iree_hal_executable_layout_create");
   if (!out_executable_layout) {
@@ -1200,9 +1255,11 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
 
   IREE_API_ASSIGN_OR_RETURN(
       auto executable_layout,
-      handle->CreateExecutableLayout(absl::MakeConstSpan(
-          reinterpret_cast<const ref_ptr<DescriptorSetLayout>*>(set_layouts),
-          set_layout_count)));
+      handle->CreateExecutableLayout(
+          absl::MakeConstSpan(
+              reinterpret_cast<DescriptorSetLayout* const*>(set_layouts),
+              set_layout_count),
+          /*push_constants=*/0));
 
   *out_executable_layout = reinterpret_cast<iree_hal_executable_layout_t*>(
       executable_layout.release());

@@ -11,14 +11,6 @@ vm.module @hal {
 vm.import @ex.shared_device() -> !vm.ref<!hal.device>
 attributes {nosideeffects}
 
-vm.import @ex.push_binding(
-  %command_buffer : !vm.ref<!hal.command_buffer>,
-  %ordinal : i32,
-  %buffer : !vm.ref<!hal.buffer>,
-  %shape : i32 ...,
-  %element_type : i32
-)
-
 vm.import @ex.defer_release(
   %operand : !vm.ref<?>
 )
@@ -243,6 +235,17 @@ vm.import @command_buffer.copy_buffer(
   %length : i32
 )
 
+// Pushes a descriptor set to the given set number.
+vm.import @command_buffer.push_descriptor_set(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %executable_layout : !vm.ref<!hal.executable_layout>,
+  %set : i32,
+  %bindings : i32 ...,
+  %binding_buffers : !vm.ref<!hal.buffer>...,
+  %binding_offsets : i32 ...,
+  %binding_lengths : i32 ...
+)
+
 // Binds a descriptor set to the given set number.
 vm.import @command_buffer.bind_descriptor_set(
   %command_buffer : !vm.ref<!hal.command_buffer>,
@@ -280,8 +283,10 @@ vm.import @command_buffer.dispatch.indirect(
 vm.import @descriptor_set.create(
   %device : !vm.ref<!hal.device>,
   %set_layout : !vm.ref<!hal.descriptor_set_layout>,
-  // <binding, buffer, offset, length>
-  %bindings : tuple<i32, !vm.ref<!hal.buffer>, i32, i32>...
+  %bindings : i32 ...,
+  %binding_buffers : !vm.ref<!hal.buffer>...,
+  %binding_offsets : i32 ...,
+  %binding_lengths : i32 ...
 ) -> !vm.ref<!hal.descriptor_set>
 
 //===----------------------------------------------------------------------===//
@@ -291,6 +296,7 @@ vm.import @descriptor_set.create(
 // Creates a descriptor set layout that defines the bindings used within a set.
 vm.import @descriptor_set_layout.create(
   %device : !vm.ref<!hal.device>,
+  %usage_type : i32,
   // <binding, type, access>
   %bindings : tuple<i32, i32, i32>...
 ) -> !vm.ref<!hal.descriptor_set_layout>

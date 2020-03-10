@@ -39,25 +39,28 @@ LLVMJITCommandProcessor::LLVMJITCommandProcessor(
 
 LLVMJITCommandProcessor::~LLVMJITCommandProcessor() = default;
 
-Status LLVMJITCommandProcessor::Dispatch(
-    const DispatchRequest& dispatch_request) {
-  IREE_TRACE_SCOPE0("LLVMJITCommandProcessor::Dispatch");
-  auto* executable =
-      static_cast<LLVMJITExecutable*>(dispatch_request.executable);
+Status LLVMJITCommandProcessor::DispatchInline(
+    Executable* executable, int32_t entry_point,
+    std::array<uint32_t, 3> workgroups, const PushConstantBlock& push_constants,
+    absl::Span<const absl::Span<const DescriptorSet::Binding>> set_bindings) {
+  IREE_TRACE_SCOPE0("LLVMJITCommandProcessor::DispatchInline");
+  auto* llvmjit_executable = static_cast<LLVMJITExecutable*>(executable);
 
-  llvm::SmallVector<UnrankedMemRefType<uint32_t>*, 4> descriptors(
-      dispatch_request.bindings.size());
-  llvm::SmallVector<void*, 4> args(dispatch_request.bindings.size());
-  for (size_t i = 0; i < dispatch_request.bindings.size(); ++i) {
-    ASSIGN_OR_RETURN(
-        auto memory,
-        dispatch_request.bindings.at(i).buffer->MapMemory<uint32_t>(
-            MemoryAccessBitfield::kWrite));
-    auto data = memory.mutable_data();
-    descriptors[i] = allocUnrankedDescriptor<uint32_t>(data);
-    args[i] = &descriptors[i]->descriptor;
+  llvm::SmallVector<UnrankedMemRefType<uint32_t>*, 4> descriptors;
+  llvm::SmallVector<void*, 4> args;
+  for (size_t set = 0; set < set_bindings.size(); ++set) {
+    for (size_t binding = 0; binding < set_bindings[set].size(); ++binding) {
+      const auto& io_binding = set_bindings[set][binding];
+      ASSIGN_OR_RETURN(auto memory, io_binding.buffer->MapMemory<uint8_t>(
+                                        MemoryAccessBitfield::kWrite,
+                                        io_binding.offset, io_binding.length));
+      auto data = memory.mutable_data();
+      auto descriptor = allocUnrankedDescriptor<uint32_t>(data);
+      descriptors.push_back(descriptor);
+      args.push_back(&descriptor->descriptor);
+    }
   }
-  auto status = executable->Invoke(dispatch_request.entry_point, args);
+  auto status = llvmjit_executable->Invoke(entry_point, args);
 
   for (int i = 0; i < descriptors.size(); ++i) {
     freeUnrankedDescriptor(descriptors[i]);

@@ -69,6 +69,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    host_descriptor_set
+  HDRS
+    "host_descriptor_set.h"
+  SRCS
+    "host_descriptor_set.cc"
+  DEPS
+    absl::inlined_vector
+    iree::hal::descriptor_set
+    iree::hal::descriptor_set_layout
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     host_event
   HDRS
     "host_event.h"
@@ -76,6 +90,21 @@ iree_cc_library(
     "host_event.cc"
   DEPS
     iree::hal::event
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    host_executable_layout
+  HDRS
+    "host_executable_layout.h"
+  SRCS
+    "host_executable_layout.cc"
+  DEPS
+    absl::inlined_vector
+    iree::base::memory
+    iree::hal::descriptor_set_layout
+    iree::hal::executable_layout
   PUBLIC
 )
 
@@ -135,6 +164,9 @@ iree_cc_library(
   SRCS
     "host_local_command_processor.cc"
   DEPS
+    ::host_descriptor_set
+    ::host_executable_layout
+    absl::inlined_vector
     iree::base::source_location
     iree::base::status
     iree::base::tracing

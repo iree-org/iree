@@ -225,19 +225,19 @@ static void recordPushBindings(Value device, Value commandBuffer,
                                IREE::Flow::DispatchOp &dispatchOp,
                                IREE::HAL::ExecutableOp &executableOp,
                                IREE::HAL::ExecutableEntryPointOp &entryPointOp,
-                               BufferSet &bufferSet,
+                               Value executableLayout, BufferSet &bufferSet,
                                ConversionPatternRewriter &rewriter) {
-  int bindingOrdinal = 0;
+  uint32_t setOrdinal = 0;
+  uint32_t bindingOrdinal = 0;
+  SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIntOp>(dispatchOp.getLoc(), 0, 32);
   auto pushBinding = [&](Value tensorValue) {
     auto &bufferRange = bufferSet.rangeMap[tensorValue];
     IREE::HAL::TensorRewriteAdaptor value(dispatchOp.getLoc(), tensorValue,
                                           bufferRange.buffer, rewriter);
-    rewriter.create<IREE::HAL::ExPushBindingOp>(
-        dispatchOp.getLoc(), commandBuffer,
-        rewriter.getI32IntegerAttr(bindingOrdinal++), value.getBuffer(),
-        value.getShapeDims(), value.getElementTypeAttr());
-    rewriter.create<IREE::HAL::ExDeferReleaseOp>(dispatchOp.getLoc(),
-                                                 bufferRange.buffer);
+    bindings.push_back(std::make_tuple(bindingOrdinal++, value.getBuffer(),
+                                       zeroOffset, value.getByteLength()));
   };
   for (auto tensorValue : dispatchOp.operands()) {
     pushBinding(tensorValue);
@@ -245,6 +245,9 @@ static void recordPushBindings(Value device, Value commandBuffer,
   for (auto tensorValue : dispatchOp.results()) {
     pushBinding(tensorValue);
   }
+  rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
+      dispatchOp.getLoc(), commandBuffer, executableLayout, setOrdinal,
+      bindings);
 }
 
 // Records a dispatch operation.
@@ -262,6 +265,15 @@ static void recordDispatch(Value device, Value commandBuffer,
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
 
+  // TODO(benvanik): support multiple interfaces. We'd probably want to
+  // store each executable+interface as a variable.
+  auto interfaceOp = executableOp.getInterfaceOp();
+  auto executableLayout =
+      rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
+          dispatchOp.getLoc(),
+          IREE::HAL::ExecutableLayoutType::get(device.getContext()), device,
+          interfaceOp.getExecutableSetLayoutsAttr());
+
   // Compute the workgroup count based on the executable's tiling.
   auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
       SymbolTable::lookupSymbolIn(executableOp, dispatchOp.entry_point()));
@@ -271,7 +283,7 @@ static void recordDispatch(Value device, Value commandBuffer,
   // Setup bindings, right now pushed immediately but soon to be replaced with
   // descriptor sets (or something better, anyway).
   recordPushBindings(device, commandBuffer, dispatchOp, executableOp,
-                     entryPointOp, bufferSet, rewriter);
+                     entryPointOp, executableLayout, bufferSet, rewriter);
 
   rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
       dispatchOp.getLoc(), commandBuffer, executable, entryPointOp,

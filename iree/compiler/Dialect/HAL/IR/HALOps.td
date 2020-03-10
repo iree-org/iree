@@ -49,22 +49,6 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   ];
 }
 
-// TODO(benvanik): remove and replace with descriptor sets.
-def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
-  let arguments = (ins
-    HAL_CommandBuffer:$command_buffer,
-    I32Attr:$ordinal,
-    HAL_Buffer:$buffer,
-    HAL_Shape:$shape,
-    HAL_ElementTypeAttr:$element_type
-  );
-
-  let assemblyFormat = [{
-    $command_buffer `,` $ordinal `,` $buffer `,` `shape` `=` `[` $shape `]` `,`
-    `element_type` `=` $element_type attr-dict
-  }];
-}
-
 // TODO(benvanik): replace with resource sets.
 def HAL_ExDeferReleaseOp : HAL_Op<"ex.defer_release"> {
   let arguments = (ins
@@ -981,6 +965,43 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   let assemblyFormat = "operands attr-dict";
 }
 
+def HAL_CommandBufferPushDescriptorSetOp :
+    HAL_Op<"command_buffer.push_descriptor_set", [
+      SameVariadicOperandSize,
+    ]> {
+  let summary = [{command buffer descriptor set push binding operation}];
+  let description = [{
+    Pushes an inline-defined descriptor set to the command buffer.
+
+    ```mlir
+    hal.command_buffer.push_descriptor_set %cmd, %executable_layout, set = 0, bindings = [
+      0 = (%buffer_0, %buffer_offset_0, %buffer_length_0),
+      1 = (%buffer_1, %buffer_offset_1, %buffer_length_1),
+      2 = (%buffer_2, %buffer_offset_2, %buffer_length_2)
+    ]
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    HAL_ExecutableLayout:$executable_layout,
+    I32Attr:$set,
+    I32ArrayAttr:$bindings,
+    Variadic<HAL_Buffer>:$binding_buffers,
+    Variadic<HAL_DeviceSize>:$binding_offsets,
+    Variadic<HAL_DeviceSize>:$binding_lengths
+  );
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value commandBuffer,
+      Value executableLayout, uint32_t set,
+      ArrayRef<DescriptorSetBindingValue> bindings
+    }]>,
+  ];
+}
+
 def HAL_CommandBufferBindDescriptorSetOp :
     HAL_Op<"command_buffer.bind_descriptor_set"> {
   let summary = [{command buffer descriptor set binding operation}];
@@ -1017,6 +1038,15 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let summary = [{command buffer dispatch recording operation}];
   let description = [{
     Dispatches an execution request.
+
+    ```mlir
+    %x = constant 128 : index
+    %y = constant 32 : index
+    %z = constant 1 : index
+    hal.command_buffer.dispatch %cmd, %executable,
+                                entry_point = 0,
+                                workgroup_xyz = [%x, %y, %z]
+    ```
   }];
 
   let arguments = (ins
@@ -1049,6 +1079,12 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
   let description = [{
     Dispatches an execution request with the dispatch parameters loaded from the
     given buffer.
+
+    ```mlir
+    hal.command_buffer.dispatch.indirect %cmd, %executable,
+                                         entry_point = 0,
+                                         workgroups = %buffer[%offset]
+    ```
   }];
 
   let arguments = (ins
@@ -1069,41 +1105,9 @@ def HAL_CommandBufferDispatchIndirectOp : HAL_Op<"command_buffer.dispatch.indire
 // iree::hal::DescriptorSet
 //===----------------------------------------------------------------------===//
 
-def HAL_DescriptorSetMakeBindingOp :
-  HAL_MakeTupleOp<"descriptor_set.make_binding", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{temporary buffer binding allocation operation}];
-  let description = [{
-    Allocates a temporary DescriptorSet binding struct that can be passed to the
-    hal.descriptor_set.update operation.
-  }];
-
-  let arguments = (ins
-    I32Attr:$binding,
-    HAL_Buffer:$buffer,
-    HAL_DeviceSize:$offset,
-    HAL_DeviceSize:$length
-  );
-  let results = (outs
-    HAL_DescriptorSetBinding:$result
-  );
-
-  let assemblyFormat = [{
-    `binding` `=` $binding `,` operands attr-dict `:` type($result)
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state,
-      int32_t binding, Value buffer, Value offset, Value length
-    }]>,
-  ];
-}
-
 def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
+    SameVariadicOperandSize,
   ]> {
   let summary = [{allocates a descriptor set from the device pool}];
   let description = [{
@@ -1113,16 +1117,22 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
   let arguments = (ins
     HAL_Device:$device,
     HAL_DescriptorSetLayout:$set_layout,
-    Variadic<HAL_DescriptorSetBinding>:$bindings
+    I32ArrayAttr:$bindings,
+    Variadic<HAL_Buffer>:$binding_buffers,
+    Variadic<HAL_DeviceSize>:$binding_offsets,
+    Variadic<HAL_DeviceSize>:$binding_lengths
   );
   let results = (outs
     HAL_DescriptorSet:$result
   );
 
-  let assemblyFormat = [{
-    $device `,` $set_layout `,` `bindings` `=` `[` $bindings `]` attr-dict `:`
-    type($result)
-  }];
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, Value device, Value setLayout,
+      ArrayRef<DescriptorSetBindingValue> bindings
+    }]>,
+  ];
 }
 
 //===----------------------------------------------------------------------===//
@@ -1150,6 +1160,7 @@ def HAL_DescriptorSetLayoutCreateOp :
 
   let arguments = (ins
     HAL_Device:$device,
+    HAL_DescriptorSetLayoutUsageTypeAttr:$usage_type,
     HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
   );
   let results = (outs
@@ -1157,7 +1168,7 @@ def HAL_DescriptorSetLayoutCreateOp :
   );
 
   let assemblyFormat = [{
-    $device `,` `bindings` `=` $bindings attr-dict `:` type($result)
+    $device `,` $usage_type `,` `bindings` `=` $bindings attr-dict `:` type($result)
   }];
 }
 
@@ -1179,6 +1190,7 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
 
   let arguments = (ins
     HAL_Device:$device,
+    HAL_DescriptorSetLayoutUsageTypeAttr:$usage_type,
     HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
   );
   let results = (outs
@@ -1186,7 +1198,7 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
   );
 
   let assemblyFormat = [{
-    $device `,` `bindings` `=` $bindings attr-dict `:` type($result)
+    $device `,` $usage_type `,` `bindings` `=` $bindings attr-dict `:` type($result)
   }];
 }
 

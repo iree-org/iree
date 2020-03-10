@@ -83,6 +83,18 @@ class VulkanDevice final : public Device {
 
   ref_ptr<ExecutableCache> CreateExecutableCache() override;
 
+  StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
+      DescriptorSetLayout::UsageType usage_type,
+      absl::Span<const DescriptorSetLayout::Binding> bindings) override;
+
+  StatusOr<ref_ptr<ExecutableLayout>> CreateExecutableLayout(
+      absl::Span<DescriptorSetLayout* const> set_layouts,
+      size_t push_constants) override;
+
+  StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
+      DescriptorSetLayout* set_layout,
+      absl::Span<const DescriptorSet::Binding> bindings) override;
+
   StatusOr<ref_ptr<CommandBuffer>> CreateCommandBuffer(
       CommandBufferModeBitfield mode,
       CommandCategoryBitfield command_categories) override;
