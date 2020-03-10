@@ -30,6 +30,7 @@ iree_lit_test_suite(
         ":test-mnist-jit",
         ":test-simple-jit",
         ":test-simple-mlir",
+        ":test-unit-features",
         # Benchmarks.
         ":bench-matmul-vector-jit",
         # FileChecker.
@@ -84,6 +85,20 @@ cc_binary(
     deps = [
         "//experimental/ModelBuilder",
         "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//mlir:AllPassesAndDialects",
+    ],
+)
+
+cc_binary(
+    name = "test-unit-features",
+    srcs = ["TestUnitFeatures.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//llvm:support",
         "@llvm-project//mlir:AllPassesAndDialects",
     ],
 )
