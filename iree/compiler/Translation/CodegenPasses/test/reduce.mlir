@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
 
 // CHECK: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d0, d1)>
-// CHECK: [[MAP1:#.*]] = affine_map<(d0, d1) -> (0)>
+// CHECK: [[MAP1:#.*]] = affine_map<(d0, d1) -> ()>
 // CHECK: [[MAP2:#.*]] = affine_map<(d0, d1) -> (d0)>
 module {
   //      CHECK: func @reduction_entry(
@@ -93,7 +93,7 @@ module {
 // -----
 
 // CHECK: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d1, d0)>
-// CHECK: [[MAP1:#.*]] = affine_map<(d0, d1) -> (0)>
+// CHECK: [[MAP1:#.*]] = affine_map<(d0, d1) -> ()>
 // CHECK: [[MAP2:#.*]] = affine_map<(d0, d1) -> (d0)>
 module {
   //      CHECK: func @reduction_entry(
