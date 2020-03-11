@@ -1,5 +1,5 @@
 // RUN: iree-run-mlir %s -iree-hal-target-backends=vmla -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
-// TODO(b/151092778): Enable with -iree-use-linalg-to-spirv-path
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=vulkan-spirv -iree-use-linalg-to-spirv-path -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=vulkan-spirv -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
 // RUN: iree-run-mlir %s -iree-hal-target-backends=llvm-ir -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
 
