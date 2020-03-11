@@ -1,69 +1,62 @@
 # IREE Roadmap
 
-## Winter 2019
+## Design
 
-Our goal for the end of the year is to have depth in a few complex examples
-(such as streaming speech recognition) and breadth in platforms. This should
-hopefully allow for contributions both from Googlers and externally to enable
-broader platform support and optimizations as well as prove out some of the core
-IREE concepts.
+Though many of the core dialects are now in place enough for correctness testing
+a large majority of the features we are most excited to demonstrate are still
+TODO and will be coming over the next few quarters. You can find a highlighted
+set of coming features in the [design roadmap](roadmap_design.md).
 
-### Frontend: SavedModel/TF2.0
+## Sprint/Summer 2020 Focus Areas
 
-MLIR work to get SavedModels importing and lowering through the new MLIR-based
-tf2xla bridge. This will give us a clean interface for writing stateful sample
-models for both training and inference. The primary work on the IREE-side is
-adding support for global variables to the sequencer IR and sequencer runtime
-state tracking.
+IREE is able to run many foundational models and more are expected to come
+online this spring. Much of the work has been on infrastructure and getting the
+code in a place to allow for rapid parallel development and now work is ramping
+up on op coverage and completeness. There's still some core work to be done on
+the primary IREE dialects (`flow` and `hal`) prior to beginning the low-hanging
+fruit optimization burn-down, but we're getting close!
+
+### Frontend: Enhanced SavedModel/TF2.0 Support
+
+We are now able to import SavedModels written in the TF2.0 style with resource
+variables and some simple usages of TensorList (`tf.TensorArray`, etc).
 
 ### Coverage: XLA HLO Ops
 
-A majority of XLA HLO ops (what IREE works with) are already lowering to both
-the IREE interpreter and the SPIR-V backend. A select few ops - such as
-ReduceWindow and Convolution - are not yet implemented and need to be both
-plumbed through the HLO dialect and the IREE lowering process as well as
-implemented in the backends.
+A select few ops - such as ReduceWindow - are not yet implemented and need to be
+both plumbed through the HLO dialect and the IREE lowering process as well as
+implemented in the backends. Work is ongoing to complete the remaining ops such
+that we can focus on higher-level model usage semantics.
 
-### Sequencer: IR Refactoring
+### Scheduler: Dynamic Shapes
 
-The current sequencer IR is a placeholder designed to test the HAL backends and
-needs to be reworked to its final (initial) form. This means rewriting the IR
-description files, implementing lowerings, and rewriting the runtime dispatching
-code. This will enable future work on codegen, binary size evaluation,
-performance evaluation, and compiler optimizations around memory aliasing and
-batching.
+Progress is underway on dynamic shape support throughout the stack. The tf2xla
+effort is adding shape propagation/inference upstream and we have a decent
+amount of glue mostly ready to accept it.
 
-### Sequencer: Dynamic Shapes
+### HAL: Marl CPU Scheduling
 
-Dynamic shapes requires a decent amount of work on the MLIR-side to flesh out
-the tf2xla bridge such that we can get input IR that has dynamic shapes at all.
-The shape inference dialect also needs to be designed and implemented so that we
-have shape math in a form we can lower. As both of these are in progress we plan
-to mostly design and experiment with how the runtime portions of dynamic shaping
-will function in IREE.
+We want to plug in [marl](https://github.com/google/marl) to provide
+[CPU-side work scheduling](roadmap_design.md#gpu-like-cpu-scheduling) that
+matches GPU semantics. This will enable improved CPU utilization and allow us to
+verify the approach with benchmarks.
+
+### Codegen: Full Linalg-based Conversion
+
+A large part of the codegen story for both CPU (via LLVM IR) and GPU (via
+SPIR-V) relies on the upstream
+[Linalg dialect](https://mlir.llvm.org/docs/Dialects/Linalg/) and associated
+lowerings. We are contributing here and have partial end-to-end demonstrations
+of conversion. By the end of summer we should be fully switched over to this
+path and can remove the index-propagation-based SPIR-V lowering approach in
+favor of the more generalized solution.
+
+## Beyond
 
 ### HAL: Dawn Implementation
 
 To better engage with the WebGPU and WebML efforts we will be implementing a
 [Dawn](https://dawn.googlesource.com/dawn/) backend that uses the same generated
-SPIR-V kernels as the Vulkan backend but enables us to target Metal, Direct3D
+SPIR-V kernels as the Vulkan backend which enables us to target Metal, Direct3D
 12, and WebGPU. The goal is to get something working in place (even if
 suboptimal) such that we can provide feedback to the various efforts.
-
-### HAL: SIMD Dialect and Marl Implementation
-
-Reusing most of the SPIR-V lowering we can implement a simple SIMD dialect for
-both codegen and JITing. We're likely to start with the
-[WebAssembly SIMD spec](https://github.com/WebAssembly/simd/blob/master/proposals/simd/SIMD.md)
-for the dialect (with the goal of being trivially compatible with WASM and to
-avoid bikeshedding). Once we have at least one lowering to executable code
-(either via codegen to JITing) we can use [Marl](https://github.com/google/marl)
-to provide the work scheduling. This should be roughly equivalent to performance
-to Swiftshader however with far less overhead. The ultimate goal is to be able
-to delete the current IREE interpreter.
-
-## Spring 2020
-
-With the foundation laid in winter 2019 we'll be looking to expand support,
-continue optimizations and tuning, and implement the cellular batching
-techniques at the core of the IREE design.
