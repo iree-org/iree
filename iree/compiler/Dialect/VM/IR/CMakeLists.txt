@@ -38,8 +38,10 @@ iree_cc_library(
     "VMTypes.cpp"
   DEPS
     LLVMSupport
+    MLIRControlFlowInterfaces
     MLIRIR
     MLIRParser
+    MLIRSideEffects
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils
