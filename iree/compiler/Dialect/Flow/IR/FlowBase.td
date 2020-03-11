@@ -78,9 +78,6 @@ class FLOW_Op<string mnemonic, list<OpTrait> traits = []> :
   let printer = [{ return print$cppClass(p, *this); }];
 }
 
-class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    FLOW_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
-
 def FLOW_StreamableOp : OpInterface<"StreamableOpInterface"> {
   let description = [{
     Interface for ops that can be used within a stream.

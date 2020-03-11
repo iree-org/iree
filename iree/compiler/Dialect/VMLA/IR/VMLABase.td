@@ -151,9 +151,6 @@ class VMLA_Op<string mnemonic, list<OpTrait> traits = []> :
   // let printer = [{ return print$cppClass(p, *this); }];
 }
 
-class VMLA_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    VMLA_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
-
 class VMLA_ElementTypeOp<string mnemonic, list<OpTrait> traits = []> :
     VMLA_Op<mnemonic, !listconcat(traits, [VMLA_OpInterface])> {
   let extraClassDeclaration = [{

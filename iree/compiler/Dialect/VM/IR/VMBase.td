@@ -343,9 +343,6 @@ class VM_Op<string mnemonic, list<OpTrait> traits = []> :
   list<VM_EncEncodeExpr> encoding = ?;
 }
 
-class VM_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    VM_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
-
 //===----------------------------------------------------------------------===//
 // VM traits
 //===----------------------------------------------------------------------===//

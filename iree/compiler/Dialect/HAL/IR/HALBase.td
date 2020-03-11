@@ -563,10 +563,4 @@ class HAL_Op<string mnemonic, list<OpTrait> traits = []> :
   let printer = [{ return print$cppClass(p, *this); }];
 }
 
-class HAL_PureOp<string mnemonic, list<OpTrait> traits = []> :
-    HAL_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
-
-class HAL_MakeTupleOp<string mnemonic, list<OpTrait> traits = []> :
-    HAL_PureOp<mnemonic, traits>;
-
 #endif  // IREE_DIALECT_HAL_BASE

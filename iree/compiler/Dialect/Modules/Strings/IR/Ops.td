@@ -17,6 +17,7 @@
 
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffects.td"
 
 def IREESTRINGS_Dialect : Dialect {
   let name = "strings";
