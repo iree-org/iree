@@ -53,8 +53,9 @@ VectorType mlir::ModelBuilder::getVectorType(ArrayRef<int64_t> shape,
 }
 
 MemRefType mlir::ModelBuilder::getMemRefType(ArrayRef<int64_t> shape,
-                                             Type elementType) {
-  return MemRefType::get(shape, elementType, {});
+                                             Type elementType,
+                                             unsigned addressSpace) {
+  return MemRefType::get(shape, elementType, {}, addressSpace);
 }
 
 RankedTensorType mlir::ModelBuilder::getRankedTensorType(

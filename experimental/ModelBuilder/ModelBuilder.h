@@ -106,7 +106,8 @@ class ModelBuilder : public OpBuilder {
   // and contiguous layout.
   // In the future, this can be extended support more advanced layouts, on a
   // per-need basis.
-  MemRefType getMemRefType(ArrayRef<int64_t> shape, Type elementType);
+  MemRefType getMemRefType(ArrayRef<int64_t> shape, Type elementType,
+                           unsigned addressSpace = 0);
 
   // Build an MLIR RankedTensorType with a base `elementType` and a `shape` that
   // can be any mix of static and dynamic values. For now this only supports a
