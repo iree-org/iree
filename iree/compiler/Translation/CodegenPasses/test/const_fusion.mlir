@@ -14,7 +14,10 @@ func @scalar_const_fusion(%arg0 : tensor<5x5xi32>) -> tensor<5x5xi32> {
   // CHECK-NEXT: ^{{.*}}([[ARG:%.*]]: i32):
   // CHECK-NEXT: [[RESULT:%.*]] = muli [[ARG]], [[CONST]] : i32
   // CHECK-NEXT: linalg.yield [[RESULT]]
-  %1 = linalg.generic {args_in = 2 : i64, args_out = 1 : i64, indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (0)>], iterator_types = ["parallel", "parallel"]} %arg0, %0 {
+  %1 = linalg.generic {args_in = 2 : i64, args_out = 1 : i64,
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                     affine_map<(d0, d1) -> ()>],
+    iterator_types = ["parallel", "parallel"]} %arg0, %0 {
   ^bb0(%arg1 : i32, %arg2 : i32) :
     %2 = muli %arg1, %arg2 : i32
     linalg.yield %2 : i32
