@@ -55,6 +55,13 @@ If using Colab, you may also want to install TensorFlow:
 sudo pip3 install tf-nightly
 ```
 
+Or generate XLA using JAX:
+
+```shell
+sudo pip3 install jax jaxlib
+sudo pip3 install --upgrade jax jaxlib
+```
+
 ### Install the Vulkan SDK
 
 Some parts of the project link against the Vulkan SDK and require it be
