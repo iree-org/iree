@@ -65,5 +65,6 @@ gentbl(
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
     ],
 )
