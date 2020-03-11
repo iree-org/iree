@@ -16,8 +16,8 @@
 #define IREE_INTEGRATIONS_TENSORFLOW_COMPILER_TF_TENSORLIST_OPS_H_
 
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/ir/tf_tensorlist_types.h"
-#include "mlir/Analysis/InferTypeOpInterface.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "tensorflow/compiler/mlir/tensorflow/ir/tf_types.h"
 
 namespace mlir {

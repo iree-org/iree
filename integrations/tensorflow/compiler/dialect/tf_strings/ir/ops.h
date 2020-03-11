@@ -20,7 +20,6 @@
 #define INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_OPS_H_
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/dialect.h"
-#include "mlir/Analysis/CallInterfaces.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dialect.h"
@@ -29,6 +28,7 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/CallInterfaces.h"
 
 namespace mlir {
 namespace iree_compiler {

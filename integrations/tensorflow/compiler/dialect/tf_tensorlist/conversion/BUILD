@@ -54,7 +54,7 @@ gentbl(
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:td_files",
         "@llvm-project//mlir:StdOpsTdFiles",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@llvm-project//mlir:include/mlir/Analysis/InferTypeOpInterface.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/InferTypeOpInterface.td",
     ],
 )
 

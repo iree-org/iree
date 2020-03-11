@@ -54,6 +54,7 @@ cc_library(
         "//iree/compiler/Dialect/VM/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
@@ -93,7 +94,7 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
@@ -111,7 +112,7 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
@@ -129,6 +130,6 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "//iree/compiler/Dialect/Shape/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
-        "@llvm-project//mlir:include/mlir/Analysis/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
     ],
 )

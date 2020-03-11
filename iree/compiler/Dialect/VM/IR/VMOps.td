@@ -15,8 +15,8 @@
 #ifndef IREE_DIALECT_VM_OPS
 #define IREE_DIALECT_VM_OPS
 
-include "mlir/Analysis/CallInterfaces.td"
-include "mlir/Analysis/ControlFlowInterfaces.td"
+include "mlir/Interfaces/CallInterfaces.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 //===----------------------------------------------------------------------===//
