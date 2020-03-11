@@ -8,7 +8,7 @@ module {
   func @main(%arg0: tensor<1x28x28x1xf32>) -> tuple<tensor<1x10xf32>>
   attributes {iree.module.export} {
     %cst = constant  {name = "constant.9"} dense<0.5> : tensor<f32>
-    %0 = "xla_hlo.broadcast_in_dim"(%cst) {name = "broadcast.10"} : (tensor<f32>) -> tensor<1x128xf32>
+    %0 = "xla_hlo.broadcast_in_dim"(%cst) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.10"} : (tensor<f32>) -> tensor<1x128xf32>
     %1 = "xla_hlo.copy"(%arg0) {name = "copy.1"} : (tensor<1x28x28x1xf32>) -> tensor<1x28x28x1xf32>
     %2 = "xla_hlo.reshape"(%1) {name = "reshape.2"} : (tensor<1x28x28x1xf32>) -> tensor<1x28x28x1xf32>
     %3 = "xla_hlo.reshape"(%2) {name = "reshape.3"} : (tensor<1x28x28x1xf32>) -> tensor<1x784xf32>

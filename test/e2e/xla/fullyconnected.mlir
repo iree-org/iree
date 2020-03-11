@@ -1,6 +1,6 @@
 // RUN: iree-run-mlir %s -iree-hal-target-backends=vmla -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
+// TODO(b/151092778): Enable with -iree-use-linalg-to-spirv-path
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=vulkan-spirv -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir %s -iree-hal-target-backends=vulkan-spirv -iree-use-linalg-to-spirv-path -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s)
 // RUN: iree-run-mlir %s -iree-hal-target-backends=llvm-ir -input-value="1x5xf32=1,-2,-3,4,-5" -input-value="1x5x3x1xf32=15,14,13,12,11,10,9,8,7,6,5,4,3,2,1" | IreeFileCheck %s
 
 // CHECK-LABEL: EXEC @main
@@ -12,39 +12,39 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %3 = "xla_hlo.reshape"(%2) {name = "reshape.55"} : (tensor<5x1x1xf32>) -> tensor<5x1xf32>
   %4 = "xla_hlo.broadcast_in_dim"(%3) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.56"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
   %cst = constant  {name = "constant.22"} dense<1.000000e+00> : tensor<f32>
-  %5 = "xla_hlo.broadcast_in_dim"(%cst) {name = "broadcast.23"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %5 = "xla_hlo.broadcast_in_dim"(%cst) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.23"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %6 = xla_hlo.mul %4, %5 {name = "multiply.57"} : tensor<5x1x5xf32>
   %cst_0 = constant  {name = "constant.58"} dense<0.000000e+00> : tensor<f32>
-  %7 = "xla_hlo.broadcast_in_dim"(%cst_0) {name = "broadcast.59"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %7 = "xla_hlo.broadcast_in_dim"(%cst_0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.59"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %8 = "xla_hlo.compare"(%6, %7) {comparison_direction = "GT", name = "compare.60"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %cst_1 = constant  {name = "constant.24"} dense<0.000000e+00> : tensor<f32>
-  %9 = "xla_hlo.broadcast_in_dim"(%cst_1) {name = "broadcast.25"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %9 = "xla_hlo.broadcast_in_dim"(%cst_1) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.25"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %cst_2 = constant  {name = "constant.90"} dense<0.000000e+00> : tensor<f32>
-  %10 = "xla_hlo.broadcast_in_dim"(%cst_2) {name = "broadcast.91"} : (tensor<f32>) -> tensor<5x5xf32>
+  %10 = "xla_hlo.broadcast_in_dim"(%cst_2) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.91"} : (tensor<f32>) -> tensor<5x5xf32>
   %11 = "xla_hlo.reshape"(%2) {name = "reshape.49"} : (tensor<5x1x1xf32>) -> tensor<5x1xf32>
   %12 = "xla_hlo.broadcast_in_dim"(%11) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.50"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
   %cst_3 = constant  {name = "constant.15"} dense<1.000000e+00> : tensor<f32>
-  %13 = "xla_hlo.broadcast_in_dim"(%cst_3) {name = "broadcast.16"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %13 = "xla_hlo.broadcast_in_dim"(%cst_3) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.16"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %14 = xla_hlo.mul %12, %13 {name = "multiply.51"} : tensor<5x1x5xf32>
   %cst_4 = constant  {name = "constant.52"} dense<0.000000e+00> : tensor<f32>
-  %15 = "xla_hlo.broadcast_in_dim"(%cst_4) {name = "broadcast.53"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %15 = "xla_hlo.broadcast_in_dim"(%cst_4) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.53"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %16 = "xla_hlo.compare"(%14, %15) {comparison_direction = "GT", name = "compare.54"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %cst_5 = constant  {name = "constant.17"} dense<0.000000e+00> : tensor<f32>
-  %17 = "xla_hlo.broadcast_in_dim"(%cst_5) {name = "broadcast.18"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %17 = "xla_hlo.broadcast_in_dim"(%cst_5) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.18"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %cst_6 = constant  {name = "constant.78"} dense<0.000000e+00> : tensor<f32>
-  %18 = "xla_hlo.broadcast_in_dim"(%cst_6) {name = "broadcast.79"} : (tensor<f32>) -> tensor<5x5xf32>
+  %18 = "xla_hlo.broadcast_in_dim"(%cst_6) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.79"} : (tensor<f32>) -> tensor<5x5xf32>
   %19 = "xla_hlo.reshape"(%2) {name = "reshape.43"} : (tensor<5x1x1xf32>) -> tensor<5x1xf32>
   %20 = "xla_hlo.broadcast_in_dim"(%19) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.44"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
   %cst_7 = constant  {name = "constant.8"} dense<1.000000e+00> : tensor<f32>
-  %21 = "xla_hlo.broadcast_in_dim"(%cst_7) {name = "broadcast.9"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %21 = "xla_hlo.broadcast_in_dim"(%cst_7) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.9"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %22 = xla_hlo.mul %20, %21 {name = "multiply.45"} : tensor<5x1x5xf32>
   %cst_8 = constant  {name = "constant.46"} dense<0.000000e+00> : tensor<f32>
-  %23 = "xla_hlo.broadcast_in_dim"(%cst_8) {name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %23 = "xla_hlo.broadcast_in_dim"(%cst_8) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %24 = "xla_hlo.compare"(%22, %23) {comparison_direction = "GT", name = "compare.48"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %cst_9 = constant  {name = "constant.10"} dense<0.000000e+00> : tensor<f32>
-  %25 = "xla_hlo.broadcast_in_dim"(%cst_9) {name = "broadcast.11"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %25 = "xla_hlo.broadcast_in_dim"(%cst_9) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.11"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %cst_10 = constant  {name = "constant.66"} dense<0.000000e+00> : tensor<f32>
-  %26 = "xla_hlo.broadcast_in_dim"(%cst_10) {name = "broadcast.67"} : (tensor<f32>) -> tensor<5x5xf32>
+  %26 = "xla_hlo.broadcast_in_dim"(%cst_10) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.67"} : (tensor<f32>) -> tensor<5x5xf32>
   %27 = "xla_hlo.copy"(%arg1) {name = "copy.3"} : (tensor<1x5x3x1xf32>) -> tensor<1x5x3x1xf32>
   %28 = "xla_hlo.reshape"(%27) {name = "reshape.4"} : (tensor<1x5x3x1xf32>) -> tensor<1x5x3x1xf32>
   %29 = "xla_hlo.reshape"(%28) {name = "reshape.38"} : (tensor<1x5x3x1xf32>) -> tensor<1x5x3xf32>

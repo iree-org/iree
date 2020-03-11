@@ -9,12 +9,12 @@ func @main_entry_dispatch_3(
     %3: tensor<5x5xf32>,
     %4: tensor<5xf32>) -> tensor<5x5xf32> {
   %5 = "xla_hlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.44"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
-  %6 = "xla_hlo.broadcast_in_dim"(%2) {name = "broadcast.9"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %6 = "xla_hlo.broadcast_in_dim"(%2) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.9"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %7 = mulf %5, %6 : tensor<5x1x5xf32>
-  %8 = "xla_hlo.broadcast_in_dim"(%0) {name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %8 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %9 = cmpf "ogt", %7, %8 : tensor<5x1x5xf32>
-  %10 = "xla_hlo.broadcast_in_dim"(%0) {name = "broadcast.11"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %11 = "xla_hlo.broadcast_in_dim"(%0) {name = "broadcast.67"} : (tensor<f32>) -> tensor<5x5xf32>
+  %10 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.11"} : (tensor<f32>) -> tensor<5x1x5xf32>
+  %11 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.67"} : (tensor<f32>) -> tensor<5x5xf32>
   %12 = "xla_hlo.broadcast_in_dim"(%4) {broadcast_dimensions = dense<1> : tensor<1xi64>, name = "broadcast.64"} : (tensor<5xf32>) -> tensor<5x5xf32>
   %13 = addf %3, %12 : tensor<5x5xf32>
   %14 = xla_hlo.max %11, %13 {name = "maximum.68"} : tensor<5x5xf32>

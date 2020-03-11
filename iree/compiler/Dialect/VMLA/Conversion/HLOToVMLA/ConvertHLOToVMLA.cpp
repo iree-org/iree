@@ -102,7 +102,7 @@ struct BroadcastInDimOpConversion
       }
       SmallVector<int64_t, 4> broadcastDims;
       if (srcOp.broadcast_dimensions()) {
-        auto srcBroadcastDims = *srcOp.broadcast_dimensions();
+        auto srcBroadcastDims = srcOp.broadcast_dimensions();
         for (auto broadcastDim : srcBroadcastDims) {
           broadcastDims.push_back(broadcastDim.getSExtValue());
         }

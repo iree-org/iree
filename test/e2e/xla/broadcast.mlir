@@ -63,7 +63,7 @@ func @broadcast_3D_scalar() -> tensor<3x2x4xi32> {
 // CHECK-LABEL: EXEC @broadcast_in_dim_3D_scalar
 func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> {
   %input = iree.unfoldable_constant dense<42> : tensor<i32>
-  %0 = "xla_hlo.broadcast_in_dim"(%input) : (tensor<i32>) -> tensor<3x2x4xi32>
+  %0 = "xla_hlo.broadcast_in_dim"(%input) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<i32>) -> tensor<3x2x4xi32>
   return %0 : tensor<3x2x4xi32>
 }
 // CHECK: 3x2x4xi32=[

@@ -25,7 +25,7 @@ func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> attributes { sym_visibil
   %input = constant dense<42> : tensor<i32>
   // CHECK-NEXT: [[DST:%.+]] = "vmla.buffer.alloc"([[DST_SIZE]])
   // CHECK-NEXT: "vmla.broadcast"([[SRC]], [[SRC_SHAPE]], [[DST]], [[DST_SHAPE]]) {element_type = i32}
-  %0 = "xla_hlo.broadcast_in_dim"(%input) : (tensor<i32>) -> tensor<3x2x4xi32>
+  %0 = "xla_hlo.broadcast_in_dim"(%input) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<i32>) -> tensor<3x2x4xi32>
   // CHECK-NEXT: return [[DST]] : !vmla.buffer
   return %0 : tensor<3x2x4xi32>
 }

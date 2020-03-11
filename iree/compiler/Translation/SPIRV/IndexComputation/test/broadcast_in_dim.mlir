@@ -42,7 +42,7 @@ module {
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (0)>]
     // CHECK-SAME: result_index
     // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, d1, d0)>]
-    %1 = "xla_hlo.broadcast_in_dim"(%0) : (tensor<i32>) -> tensor<3x12x42xi32>
+    %1 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<i32>) -> tensor<3x12x42xi32>
     iree.store_output(%1 : tensor<3x12x42xi32>, %arg1 : memref<3x12x42xi32>)
     return
   }

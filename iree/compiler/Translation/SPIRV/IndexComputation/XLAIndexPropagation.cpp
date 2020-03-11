@@ -36,7 +36,7 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
   auto broadcastDim = broadcastOp.broadcast_dimensions();
 
   Builder builder(operation->getContext());
-  if (!broadcastDim || broadcastDim->getNumElements() == 0) {
+  if (broadcastDim.getNumElements() == 0) {
     // This is a scalar. So all indices map to the same element.
     AffineMap scalarMap = getAffineMap(operation->getParentOfType<FuncOp>(),
                                        builder.getAffineConstantExpr(0));
@@ -45,7 +45,7 @@ LogicalResult XLABroadcastInDimOpIndexPropagation::propagateIndexMap(
   }
 
   // Handle non-scalar cases.
-  auto dimensions = broadcastDim->getValues<int64_t>();
+  auto dimensions = broadcastDim.getValues<int64_t>();
   SmallVector<AffineExpr, 4> exprs;
   for (auto resultExpr : enumerate(resultIndex.getResults())) {
     if (llvm::any_of(dimensions, [&resultExpr](int64_t dim) {
