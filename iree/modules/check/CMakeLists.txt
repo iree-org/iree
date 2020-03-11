@@ -14,27 +14,12 @@
 
 iree_add_all_subdirs()
 
-iree_bytecode_module(
-  NAME
-    check_test_module
-  SRC
-    "check_test.mlir"
-  CC_NAMESPACE
-    "iree::check"
-  TRANSLATE_TOOL
-    iree_modules_check_dialect_check-translate
-  FLAGS
-    "-iree-mlir-to-vm-bytecode-module"
-  PUBLIC
-)
-
 iree_cc_test(
   NAME
     check_test
   SRCS
     "check_test.cc"
   DEPS
-    ::check_test_module_cc
     ::native_module
     absl::core_headers
     absl::strings

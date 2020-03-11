@@ -22,7 +22,6 @@
 #include "iree/base/status.h"
 #include "iree/base/status_matchers.h"
 #include "iree/hal/api.h"
-#include "iree/modules/check/check_test_module.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
@@ -55,27 +54,17 @@ class CheckTest : public ::testing::Test {
     IREE_ASSERT_OK(
         check_native_module_create(IREE_ALLOCATOR_SYSTEM, &check_module_))
         << "Native module failed to init";
-
-    const auto* module_file_toc = iree::check::check_test_module_create();
-    IREE_ASSERT_OK(iree_vm_bytecode_module_create(
-        iree_const_byte_span_t{
-            reinterpret_cast<const uint8_t*>(module_file_toc->data),
-            module_file_toc->size},
-        IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &input_module_))
-        << "Bytecode module failed to load";
   }
 
   static void TearDownTestSuite() {
     iree_hal_device_release(device_);
     iree_vm_module_release(check_module_);
-    iree_vm_module_release(input_module_);
     iree_vm_module_release(hal_module_);
     iree_vm_instance_release(instance_);
   }
 
   void SetUp() override {
-    std::vector<iree_vm_module_t*> modules = {hal_module_, check_module_,
-                                              input_module_};
+    std::vector<iree_vm_module_t*> modules = {hal_module_, check_module_};
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
         instance_, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
         &context_));
@@ -118,8 +107,8 @@ class CheckTest : public ::testing::Test {
   Status Invoke(absl::string_view function_name) {
     iree_vm_function_t function;
     RETURN_IF_ERROR(FromApiStatus(
-        input_module_->lookup_function(
-            input_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+        check_module_->lookup_function(
+            check_module_->self, IREE_VM_FUNCTION_LINKAGE_EXPORT,
             iree_string_view_t{function_name.data(), function_name.size()},
             &function),
         IREE_LOC))
@@ -160,7 +149,6 @@ class CheckTest : public ::testing::Test {
  private:
   static iree_hal_device_t* device_;
   static iree_vm_instance_t* instance_;
-  static iree_vm_module_t* input_module_;
   static iree_vm_module_t* check_module_;
   static iree_vm_module_t* hal_module_;
 
@@ -170,33 +158,32 @@ class CheckTest : public ::testing::Test {
 };
 iree_hal_device_t* CheckTest::device_ = nullptr;
 iree_vm_instance_t* CheckTest::instance_ = nullptr;
-iree_vm_module_t* CheckTest::input_module_ = nullptr;
 iree_vm_module_t* CheckTest::check_module_ = nullptr;
 iree_vm_module_t* CheckTest::hal_module_ = nullptr;
 
 TEST_F(CheckTest, ExpectTrueSuccess) {
-  ASSERT_OK(Invoke("expectTrue", {IREE_VM_VALUE_MAKE_I32(1)}));
+  ASSERT_OK(Invoke("expect_true", {IREE_VM_VALUE_MAKE_I32(1)}));
 }
 
 TEST_F(CheckTest, ExpectTrueFailure) {
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expectTrue", {IREE_VM_VALUE_MAKE_I32(0)})),
+      ASSERT_OK(Invoke("expect_true", {IREE_VM_VALUE_MAKE_I32(0)})),
       "Expected 0 to be nonzero");
 }
 
 TEST_F(CheckTest, ExpectFalseSuccess) {
-  ASSERT_OK(Invoke("expectFalse", {IREE_VM_VALUE_MAKE_I32(0)}));
+  ASSERT_OK(Invoke("expect_false", {IREE_VM_VALUE_MAKE_I32(0)}));
 }
 
 TEST_F(CheckTest, ExpectFalseFailure) {
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expectFalse", {IREE_VM_VALUE_MAKE_I32(1)})),
+      ASSERT_OK(Invoke("expect_false", {IREE_VM_VALUE_MAKE_I32(1)})),
       "Expected 1 to be zero");
 }
 
 TEST_F(CheckTest, ExpectFalseNotOneFailure) {
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expectFalse", {IREE_VM_VALUE_MAKE_I32(42)})),
+      ASSERT_OK(Invoke("expect_false", {IREE_VM_VALUE_MAKE_I32(42)})),
       "Expected 42 to be zero");
 }
 
@@ -208,7 +195,7 @@ TEST_F(CheckTest, ExpectAllTrueSuccess) {
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   iree_vm_ref_t input_buffer_view_ref =
       iree_hal_buffer_view_move_ref(input_buffer_view.get());
-  ASSERT_OK(Invoke("expectAllTrue", {&input_buffer_view_ref}));
+  ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref}));
 }
 
 TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
@@ -219,7 +206,7 @@ TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
       CreateInt32BufferView(contents, shape, &input_buffer_view));
   iree_vm_ref_t input_buffer_view_ref =
       iree_hal_buffer_view_move_ref(input_buffer_view.get());
-  ASSERT_OK(Invoke("expectAllTrue", {&input_buffer_view_ref}));
+  ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref}));
 }
 
 TEST_F(CheckTest, ExpectAllTrueFailure) {
@@ -231,7 +218,7 @@ TEST_F(CheckTest, ExpectAllTrueFailure) {
   iree_vm_ref_t input_buffer_view_ref =
       iree_hal_buffer_view_move_ref(input_buffer_view.get());
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expectAllTrue", {&input_buffer_view_ref})), "0");
+      ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref})), "0");
 }
 
 TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
@@ -243,7 +230,7 @@ TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
   iree_vm_ref_t input_buffer_view_ref =
       iree_hal_buffer_view_move_ref(input_buffer_view.get());
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expectAllTrue", {&input_buffer_view_ref})),
+      ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref})),
       "1, 2, 3, 0, 4");
 }
 
@@ -256,7 +243,7 @@ TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
   iree_vm_ref_t input_buffer_view_ref =
       iree_hal_buffer_view_move_ref(input_buffer_view.get());
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expectAllTrue", {&input_buffer_view_ref})),
+      ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref})),
       "1, 2, 3, 4, 5, 6, 0, 8");
 }
 

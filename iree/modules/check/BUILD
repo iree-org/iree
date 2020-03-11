@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES", "PLATFORM_VULKAN_DEPS")
 
 package(
@@ -20,19 +19,10 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_bytecode_module(
-    name = "check_test_module",
-    src = "check_test.mlir",
-    cc_namespace = "iree::check",
-    flags = ["-iree-mlir-to-vm-bytecode-module"],
-    translate_tool = "//iree/modules/check/dialect:check-translate",
-)
-
 cc_test(
     name = "check_test",
     srcs = ["check_test.cc"],
     deps = [
-        ":check_test_module_cc",
         ":native_module",
         "//iree/base:api",
         "//iree/base:api_util",
