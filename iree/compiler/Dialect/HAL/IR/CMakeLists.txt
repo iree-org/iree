@@ -36,6 +36,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRParser
+    MLIRSideEffects
     MLIRStandardOps
     MLIRSupport
     MLIRTransformUtils
