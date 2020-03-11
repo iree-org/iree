@@ -16,6 +16,7 @@
 #define IREE_DIALECT_SHAPE_OPS
 
 include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
+include "mlir/Interfaces/SideEffects.td"
 
 //===----------------------------------------------------------------------===//
 // Op types

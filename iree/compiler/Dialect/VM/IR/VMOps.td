@@ -17,7 +17,11 @@
 
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffects.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
+
+class VM_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
 // Structural ops

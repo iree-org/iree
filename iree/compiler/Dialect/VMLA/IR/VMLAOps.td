@@ -17,6 +17,10 @@
 
 include "iree/compiler/Dialect/VMLA/IR/VMLABase.td"
 include "mlir/IR/OpAsmInterface.td"
+include "mlir/Interfaces/SideEffects.td"
+
+class VMLA_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    VMLA_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
 // VMLA Ops: pseudo ops

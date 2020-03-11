@@ -104,6 +104,7 @@ gentbl(
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
         "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
     ],
 )
 
