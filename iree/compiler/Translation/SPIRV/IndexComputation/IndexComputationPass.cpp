@@ -87,6 +87,7 @@ void IndexComputationPass::runOnFunction() {
       NoBroadcastPwOpIndexPropagation<xla_hlo::MaxOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::MinOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::OrOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::SubOp>,
       // XLA other ops:
       // TODO(ravishankarm): conv, dot.
