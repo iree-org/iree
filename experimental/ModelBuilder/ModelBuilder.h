@@ -94,6 +94,9 @@ class ModelBuilder : public OpBuilder {
   // Build the MLIR representation for an f32 constant.
   static Value constant_f32(float v);
 
+  // Build the MLIR representation for an f64 constant.
+  static Value constant_f64(double v);
+
   // Build an MLIR FuncOp that will be callable after JIT compilation occured.
   FuncOp makeFunction(StringRef name, ArrayRef<Type> results = {},
                       ArrayRef<Type> args = {}, bool declOnly = false);
@@ -146,6 +149,8 @@ class ModelBuilder : public OpBuilder {
   IntegerType i8;
   // The unique mlir::FloatType of 32 bits.
   FloatType f32;
+  // The unique mlir::FloatType of 64 bits.
+  FloatType f64;
 };
 
 }  // namespace mlir

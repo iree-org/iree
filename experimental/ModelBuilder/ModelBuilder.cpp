@@ -31,11 +31,17 @@ mlir::ModelBuilder::ModelBuilder()
       symbolTable(*module),
       loc(module->getLoc()),
       i8(IntegerType::get(8, &ctx)),
-      f32(FloatType::getF32(&ctx)) {}
+      f32(FloatType::getF32(&ctx)),
+      f64(FloatType::getF64(&ctx)) {}
 
 Value mlir::ModelBuilder::constant_f32(float v) {
   return std_constant_float(llvm::APFloat(v),
                             FloatType::getF32(ScopedContext::getContext()));
+}
+
+Value mlir::ModelBuilder::constant_f64(double v) {
+  return std_constant_float(llvm::APFloat(v),
+                            FloatType::getF64(ScopedContext::getContext()));
 }
 
 FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
