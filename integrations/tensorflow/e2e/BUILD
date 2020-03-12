@@ -37,6 +37,7 @@ package(
     )
     for name in [
         "batch_norm_test",
+        "fill_test",
         "control_flow_test",
         "dynamic_mlp_test",
         "exported_names_test",
