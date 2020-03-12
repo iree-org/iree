@@ -13,7 +13,7 @@
 # limitations under the License.
 
 set(RUY_SRC_ROOT
-  "${IREE_ROOT_DIR}/third_party/tensorflow/tensorflow/lite/experimental/ruy/"
+  "${IREE_ROOT_DIR}/third_party/ruy/"
 )
 set(GEMMLOWP_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/gemmlowp/"
