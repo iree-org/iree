@@ -69,4 +69,21 @@ def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
 }
 
+// TODO(b/146898896): Consider a cmp op instead.
+def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
+  let summary = [{Checks that the tensor or buffer view operands are equal}];
+  let description = [{
+    Verifies that the operands are exactly equal.
+
+    Issues a non-fatal failure if the verification fails.
+  }];
+
+  let arguments = (ins
+      AnyTypeOf<[HAL_BufferView, AnyTensor]>:$lhs,
+      AnyTypeOf<[HAL_BufferView, AnyTensor]>:$rhs
+  );
+
+  let assemblyFormat = "`(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)";
+}
+
 #endif  // IREE_MODULES_CHECK_DIALECT_CHECK_OPS

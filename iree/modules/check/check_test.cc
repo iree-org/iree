@@ -36,7 +36,6 @@ namespace {
 class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
-    // NOTE: we only use the HAL types here, we don't need the full module.
     // TODO(benvanik): move to instance-based registration.
     IREE_ASSERT_OK(iree_hal_module_register_types());
 
@@ -104,6 +103,35 @@ class CheckTest : public ::testing::Test {
         IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
   }
 
+  void CreateFloat32BufferView(absl::Span<const float> contents,
+                               absl::Span<const int32_t> shape,
+                               iree_hal_buffer_view_t** out_buffer_view) {
+    size_t num_elements = 1;
+    for (int32_t dim : shape) {
+      num_elements *= dim;
+    }
+    ASSERT_EQ(contents.size(), num_elements);
+    vm::ref<iree_hal_buffer_t> buffer;
+    IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
+        allocator_,
+        static_cast<iree_hal_memory_type_t>(
+            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
+    iree_hal_mapped_memory_t mapped_memory;
+    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
+                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
+                                       IREE_WHOLE_BUFFER, &mapped_memory));
+    memcpy(mapped_memory.contents.data,
+           static_cast<const void*>(contents.data()),
+           mapped_memory.contents.data_length);
+    IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
+    IREE_ASSERT_OK(
+        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
+                                    IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+                                    IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
+  }
+
   Status Invoke(absl::string_view function_name) {
     iree_vm_function_t function;
     RETURN_IF_ERROR(FromApiStatus(
@@ -134,14 +162,15 @@ class CheckTest : public ::testing::Test {
   }
 
   Status Invoke(absl::string_view function_name,
-                std::vector<iree_vm_ref_t*> args) {
+                std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     RETURN_IF_ERROR(
         FromApiStatus(iree_vm_variant_list_alloc(
                           args.size(), IREE_ALLOCATOR_SYSTEM, &inputs_),
                       IREE_LOC));
-    for (iree_vm_ref_t* arg : args) {
+    for (auto& arg : args) {
+      iree_vm_ref_t arg_ref = iree_hal_buffer_view_move_ref(arg.get());
       RETURN_IF_ERROR(FromApiStatus(
-          iree_vm_variant_list_append_ref_retain(inputs_, arg), IREE_LOC));
+          iree_vm_variant_list_append_ref_retain(inputs_, &arg_ref), IREE_LOC));
     }
     return Invoke(function_name);
   }
@@ -193,9 +222,7 @@ TEST_F(CheckTest, ExpectAllTrueSuccess) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
-  ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref}));
+  ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
 }
 
 TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
@@ -204,9 +231,7 @@ TEST_F(CheckTest, ExpectAllTrue3DTrueSuccess) {
   int32_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
-  ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref}));
+  ASSERT_OK(Invoke("expect_all_true", {input_buffer_view}));
 }
 
 TEST_F(CheckTest, ExpectAllTrueFailure) {
@@ -215,10 +240,8 @@ TEST_F(CheckTest, ExpectAllTrueFailure) {
   int32_t shape[] = {1};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref})), "0");
+      ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})), "0");
 }
 
 TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
@@ -227,10 +250,8 @@ TEST_F(CheckTest, ExpectAllTrueSingleElementFailure) {
   int32_t shape[] = {5};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref})),
+      ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
       "1, 2, 3, 0, 4");
 }
 
@@ -240,12 +261,111 @@ TEST_F(CheckTest, ExpectAllTrue3DSingleElementFailure) {
   int32_t shape[] = {2, 2, 2};
   ASSERT_NO_FATAL_FAILURE(
       CreateInt32BufferView(contents, shape, &input_buffer_view));
-  iree_vm_ref_t input_buffer_view_ref =
-      iree_hal_buffer_view_move_ref(input_buffer_view.get());
   EXPECT_NONFATAL_FAILURE(
-      ASSERT_OK(Invoke("expect_all_true", {&input_buffer_view_ref})),
+      ASSERT_OK(Invoke("expect_all_true", {input_buffer_view})),
       "1, 2, 3, 4, 5, 6, 0, 8");
 }
 
+TEST_F(CheckTest, ExpectEqSameBufferSuccess) {
+  vm::ref<iree_hal_buffer_view_t> input_buffer_view;
+  int32_t contents[] = {1};
+  int32_t shape[] = {1};
+  ASSERT_NO_FATAL_FAILURE(
+      CreateInt32BufferView(contents, shape, &input_buffer_view));
+  ASSERT_OK(Invoke("expect_eq", {input_buffer_view, input_buffer_view}));
+}
+
+TEST_F(CheckTest, ExpectEqIdenticalBufferSuccess) {
+  vm::ref<iree_hal_buffer_view_t> lhs;
+  vm::ref<iree_hal_buffer_view_t> rhs;
+  int32_t contents[] = {1};
+  int32_t shape[] = {1};
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
+  ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
+}
+
+TEST_F(CheckTest, ExpectEqIdentical3DBufferSuccess) {
+  vm::ref<iree_hal_buffer_view_t> lhs;
+  vm::ref<iree_hal_buffer_view_t> rhs;
+  int32_t contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  int32_t shape[] = {2, 2, 2};
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &lhs));
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, shape, &rhs));
+  ASSERT_OK(Invoke("expect_eq", {lhs, rhs}));
+}
+
+TEST_F(CheckTest, ExpectEqDifferentShapeFailure) {
+  vm::ref<iree_hal_buffer_view_t> lhs;
+  vm::ref<iree_hal_buffer_view_t> rhs;
+  int32_t contents[] = {1, 2, 3, 4};
+  int32_t lhs_shape[] = {2, 2};
+  int32_t rhs_shape[] = {4};
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, lhs_shape, &lhs));
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(contents, rhs_shape, &rhs));
+  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+                          "Shapes do not match");
+}
+
+TEST_F(CheckTest, ExpectEqDifferentElementTypeFailure) {
+  vm::ref<iree_hal_buffer_view_t> lhs;
+  vm::ref<iree_hal_buffer_view_t> rhs;
+  int32_t lhs_contents[] = {1, 2, 3, 4};
+  float rhs_contents[] = {1, 2, 3, 4};
+  int32_t shape[] = {2, 2};
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
+  ASSERT_NO_FATAL_FAILURE(CreateFloat32BufferView(rhs_contents, shape, &rhs));
+  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+                          "Element types do not match");
+}
+
+TEST_F(CheckTest, ExpectEqDifferentContentsFailure) {
+  vm::ref<iree_hal_buffer_view_t> lhs;
+  vm::ref<iree_hal_buffer_view_t> rhs;
+  int32_t lhs_contents[] = {1};
+  int32_t rhs_contents[] = {2};
+  int32_t shape[] = {1};
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(rhs_contents, shape, &rhs));
+  EXPECT_NONFATAL_FAILURE(ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+                          "Contents does not match");
+}
+
+TEST_F(CheckTest, ExpectEqDifferentEverythingFullMessageFailure) {
+  vm::ref<iree_hal_buffer_view_t> lhs;
+  vm::ref<iree_hal_buffer_view_t> rhs;
+  int32_t lhs_contents[] = {1, 2, 3, 4, 5, 6};
+  float rhs_contents[] = {1, 2, 3, 42};
+  int32_t lhs_shape[] = {2, 3};
+  int32_t rhs_shape[] = {2, 2};
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, lhs_shape, &lhs));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateFloat32BufferView(rhs_contents, rhs_shape, &rhs));
+  EXPECT_NONFATAL_FAILURE(
+      ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+      "Expected equality of these values. Element types do not match."
+      " Shapes do not match. Contents does not match.\n"
+      "  lhs:\n"
+      "    2x3xi32=[1 2 3][4 5 6]\n"
+      "  rhs:\n"
+      "    2x2xf32=[1 2][3 42]");
+}
+
+TEST_F(CheckTest, ExpectEqDifferentContents3DFullMessageFailure) {
+  vm::ref<iree_hal_buffer_view_t> lhs;
+  vm::ref<iree_hal_buffer_view_t> rhs;
+  int32_t lhs_contents[] = {1, 2, 3, 4, 5, 6, 7, 8};
+  int32_t rhs_contents[] = {1, 2, 3, 42, 5, 6, 7, 8};
+  int32_t shape[] = {2, 2, 2};
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(lhs_contents, shape, &lhs));
+  ASSERT_NO_FATAL_FAILURE(CreateInt32BufferView(rhs_contents, shape, &rhs));
+  EXPECT_NONFATAL_FAILURE(
+      ASSERT_OK(Invoke("expect_eq", {lhs, rhs})),
+      "Expected equality of these values. Contents does not match.\n"
+      "  lhs:\n"
+      "    2x2x2xi32=[[1 2][3 4]][[5 6][7 8]]\n"
+      "  rhs:\n"
+      "    2x2x2xi32=[[1 2][3 42]][[5 6][7 8]]");
+}
 }  // namespace
 }  // namespace iree

@@ -34,6 +34,8 @@ void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
       context, importSymbols, typeConverter, "check.expect_false");
   patterns.insert<VMImportOpConversion<IREE::Check::ExpectAllTrueOp>>(
       context, importSymbols, typeConverter, "check.expect_all_true");
+  patterns.insert<VMImportOpConversion<IREE::Check::ExpectEqOp>>(
+      context, importSymbols, typeConverter, "check.expect_eq");
 }
 
 void populateCheckToHALPatterns(MLIRContext *context,
@@ -43,6 +45,9 @@ void populateCheckToHALPatterns(MLIRContext *context,
   patterns.insert<HALOpConversion<IREE::Check::ExpectAllTrueOp,
                                   IREE::Check::ExpectAllTrueOp>>(context,
                                                                  typeConverter);
+  patterns.insert<
+      HALOpConversion<IREE::Check::ExpectEqOp, IREE::Check::ExpectEqOp>>(
+      context, typeConverter);
 }
 
 }  // namespace Check

@@ -26,5 +26,9 @@ vm.import @expect_all_true(
   %operand : !vm.ref<!hal.buffer_view>,
 )
 
+vm.import @expect_eq(
+  %lhs : !vm.ref<!hal.buffer_view>,
+  %rhs : !vm.ref<!hal.buffer_view>
+)
 
 }  // vm.module

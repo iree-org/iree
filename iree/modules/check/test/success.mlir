@@ -31,9 +31,7 @@ func @abs() attributes { iree.module.export } {
   %cm5 = iree.unfoldable_constant dense<-5> : tensor<i32>
   %result = "xla_hlo.abs"(%cm5) : (tensor<i32>) -> tensor<i32>
   %c5 = iree.unfoldable_constant dense<5> : tensor<i32>
-  %eq = "xla_hlo.compare"(%result, %c5) {comparison_direction = "EQ"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
-  %eqi32 = "xla_hlo.convert"(%eq) : (tensor<i1>) -> tensor<i32>
-  check.expect_all_true(%eqi32) : tensor<i32>
+  check.expect_eq(%result, %c5) : tensor<i32>
   return
 }
 
