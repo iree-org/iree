@@ -22,6 +22,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -191,27 +192,34 @@ static Optional<Attribute> getInitValueAsConst(Value init) {
 }
 
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
-/// are "parallel" except the `reductionDim`-th element.
+/// are "parallel" except the last `nReduction` elements, where are "reduction"
+/// attributes.
 // TODO(hanchung): Use helpers in StructuredOpsUtils.h instead of hardcoded
 // strings once the build system is set up.
-static ArrayAttr getInnermostReductionIterAttrs(Builder b, unsigned nLoops) {
-  SmallVector<Attribute, 3> attrs(nLoops, b.getStringAttr("parallel"));
-  attrs.back() = b.getStringAttr("reduction");
+static ArrayAttr getParallelAndReductionIterAttrs(Builder b, unsigned nLoops,
+                                                  unsigned nReduction) {
+  SmallVector<Attribute, 3> attrs(nLoops - nReduction,
+                                  b.getStringAttr("parallel"));
+  attrs.append(nReduction, b.getStringAttr("reduction"));
   return b.getArrayAttr(attrs);
 }
 
-/// Returns a permutation AffineMap that puts `reductionDim` to the last. The
-/// order of the first (`rank` - 1) is sorted. E.g., if `rank` is 4 and
-/// `reductionDim` is 1, then "(d0, d1, d2, d3) -> (d0, d2, d3, d1)" is used.
-/// The inverse permutation of the AffineMap is returned.
-static AffineMap getTransposeMapForReduction(OpBuilder &builder, int rank,
-                                             int reductionDim) {
+/// Returns a permutation AffineMap that puts all reduction dimensions to the
+/// last. The order of parallel loops and reduction loops are all sorted. E.g.,
+/// if `rank` is 4 and `reductionDims` is {1, 3}, then
+/// "(d0, d1, d2, d3) -> (d0, d2, d1, d3)" is used. The inverse permutation of
+/// the AffineMap is returned.
+static AffineMap getTransposeMapForReduction(MLIRContext *context, int rank,
+                                             ArrayRef<int> reductionDims) {
+  llvm::SmallSetVector<int, 4> s;
+  for (auto dim : reductionDims) s.insert(dim);
+
   SmallVector<unsigned, 4> permutation;
-  for (int i = 0; i < rank; ++i) {
-    if (i != reductionDim) permutation.push_back(i);
-  }
-  permutation.push_back(reductionDim);
-  auto map = AffineMap::getPermutationMap(permutation, builder.getContext());
+  for (int i = 0; i < rank; ++i)
+    if (!s.count(i)) permutation.push_back(i);
+  for (auto dim : reductionDims) permutation.push_back(dim);
+
+  auto map = AffineMap::getPermutationMap(permutation, context);
   return inversePermutation(map);
 }
 
@@ -322,9 +330,9 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
   // dimension.
   auto loc = reduceOp.getLoc();
   DenseIntElementsAttr dimensionsAttr = reduceOp.dimensions();
-  Type attrType = dimensionsAttr.getType();
-  if (attrType.cast<RankedTensorType>().getNumElements() != 1) return nullptr;
-  int reductionDim = dimensionsAttr.getValue<APInt>(0).getSExtValue();
+  SmallVector<int, 4> reductionDims;
+  for (auto dim : dimensionsAttr.getIntValues())
+    reductionDims.push_back(dim.getSExtValue());
 
   // Check if initVal is constant. If so, inline the value into the region.
   Optional<Attribute> initConstVal = getInitValueAsConst(initVal);
@@ -336,20 +344,20 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
 
   // Prepare indexing maps for linalg generic op. The elements are for src,
   // initial value and dst, respectively.
-  // Transpose `src` to make the reduction loop be the innermost, because it's
+  // Transpose `src` to make the reduction loops be the innermost, because it's
   // easier to fully utilize processors.
   SmallVector<Attribute, 3> indexingMaps;
-  indexingMaps.emplace_back(AffineMapAttr::get(
-      getTransposeMapForReduction(rewriter, nInputRank, reductionDim)));
+  indexingMaps.emplace_back(AffineMapAttr::get(getTransposeMapForReduction(
+      rewriter.getContext(), nInputRank, reductionDims)));
   if (!initConstVal.hasValue())
     indexingMaps.emplace_back(AffineMapAttr::get(
         AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())));
-  // Since the reduction loop now is the innermost and the parallel loops are
-  // sorted, the indexing map of `dst` should drop the latest dimension, e.g.,
-  // (d0, d1, d2) -> (d0, d1). We don't need an inverse permutation here because
-  // they are the same.
+  // The indexing map of `dst` should drop the reduction loops. Since the
+  // reduction loops now are all in the innermost, drops `reductionDims.size()`
+  // dimensions. We don't need an inverse permutation here because they are the
+  // same.
   SmallVector<AffineExpr, 4> exprs;
-  for (int i = 0; i < nInputRank - 1; ++i)
+  for (int i = 0, e = nInputRank - reductionDims.size(); i < e; ++i)
     exprs.push_back(rewriter.getAffineDimExpr(i));
   indexingMaps.emplace_back(AffineMapAttr::get(
       exprs.empty()
@@ -365,7 +373,8 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
       rewriter.getI64IntegerAttr(linalgOpArgs.size() - 1),  // args_in
       rewriter.getI64IntegerAttr(1),                        // args_out
       rewriter.getArrayAttr(indexingMaps),
-      getInnermostReductionIterAttrs(rewriter, nInputRank),
+      getParallelAndReductionIterAttrs(rewriter, nInputRank,
+                                       reductionDims.size()),
       /*doc=*/nullptr, /*fun=*/nullptr, /*library_call=*/nullptr);
 
   linalgOp.region().takeBody(reduceOp.body());
@@ -402,12 +411,18 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
       initArg = initVal;
     else
       initArg = entryBlock->getArgument(numArgs - 2);
+    // The reduction dimensions are the innermost loops now, compare all
+    // reduction indices to zero. If they are all zero, it's the first time to
+    // update the output element, i.e., we should take initial value to compute
+    // with the input element.
     Value zero = rewriter.create<ConstantOp>(
         loc, indexType, rewriter.getIntegerAttr(indexType, 0));
-    // The reduction dimension is the innermost loop now, so compare the
-    // innermost index to zero.
-    Value cond = rewriter.create<CmpIOp>(
-        loc, CmpIPredicate::eq, entryBlock->getArgument(nInputRank - 1), zero);
+    Value cond = rewriter.create<ConstantOp>(loc, rewriter.getBoolAttr(true));
+    for (int i = nInputRank - reductionDims.size(); i < nInputRank; ++i) {
+      Value isZero = rewriter.create<CmpIOp>(loc, CmpIPredicate::eq,
+                                             entryBlock->getArgument(i), zero);
+      cond = rewriter.create<AndOp>(loc, cond, isZero);
+    }
     Value lhs = rewriter.create<SelectOp>(loc, cond, initArg, blockDstArg);
     rewriter.replaceUsesOfBlockArgument(blockDstArg, lhs);
   }
