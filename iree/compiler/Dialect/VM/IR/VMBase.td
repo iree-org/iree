@@ -86,8 +86,10 @@ def VM_OPC_ConstRefRodata        : VM_OPC<0x0B, "ConstRefRodata">;
 // (none yet)
 
 // Conditional assignment:
-def VM_OPC_SelectI32             : VM_OPC<0x20, "SelectI32">;
-def VM_OPC_SelectRef             : VM_OPC<0x21, "SelectRef">;
+def VM_OPC_SelectI32             : VM_OPC<0x1E, "SelectI32">;
+def VM_OPC_SelectRef             : VM_OPC<0x1F, "SelectRef">;
+def VM_OPC_SwitchI32             : VM_OPC<0x20, "SwitchI32">;
+def VM_OPC_SwitchRef             : VM_OPC<0x21, "SwitchRef">;
 
 // Integer arithmetic and logic:
 def VM_OPC_AddI32                : VM_OPC<0x22, "AddI32">;
@@ -162,6 +164,8 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_ConstRefRodata,
     VM_OPC_SelectI32,
     VM_OPC_SelectRef,
+    VM_OPC_SwitchI32,
+    VM_OPC_SwitchRef,
     VM_OPC_AddI32,
     VM_OPC_SubI32,
     VM_OPC_MulI32,

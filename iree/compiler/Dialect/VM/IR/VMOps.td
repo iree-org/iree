@@ -786,9 +786,95 @@ def VM_SelectRefOp : VM_PureOp<"select.ref", [
   let encoding = [
     VM_EncOpcode<VM_OPC_SelectRef>,
     VM_EncOperand<"condition", 0>,
-    VM_EncTypeOf<"true_value">,
+    VM_EncTypeOf<"result">,
     VM_EncOperand<"true_value", 1>,
     VM_EncOperand<"false_value", 2>,
+    VM_EncResult<"result">,
+  ];
+
+  let hasFolder = 1;
+}
+
+class VM_SwitchPrimitiveOp<Type type, string mnemonic, VM_OPC opcode,
+                           list<OpTrait> traits = []> :
+    VM_PureOp<mnemonic, !listconcat(traits, [
+      DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+      AllTypesMatch<["default_value", "result"]>,
+    ])> {
+  let description = [{
+    Returns the value with the given `index` in `values` or `default_value` if
+    the index is out of bounds.
+
+    ```mlir
+    // Switch %arg0 to cases of %c100/%c200/%c300 if arg0==0, ==1, ==2.
+    // If %arg0 is out of range (<0 or >2) then default to %c5.
+    %0 = vm.switch.i32 %index[%c100, %c200, %c300] else %c5 : i32
+    ```
+  }];
+
+  let arguments = (ins
+    I32:$index,
+    I32:$default_value,
+    Variadic<type>:$values
+  );
+  let results = (outs
+    type:$result
+  );
+
+  let assemblyFormat = [{
+    $index `[` $values `]` `else` $default_value attr-dict `:` type($result)
+  }];
+
+  let encoding = [
+    VM_EncOpcode<opcode>,
+    VM_EncOperand<"index", 0>,
+    VM_EncIntAttr<"default_value", 32>,
+    VM_EncVariadicOperands<"values">,
+    VM_EncResult<"result">,
+  ];
+}
+
+def VM_SwitchI32Op : VM_SwitchPrimitiveOp<I32, "switch.i32", VM_OPC_SwitchI32> {
+  let summary = [{integer switch operation}];
+  let hasFolder = 1;
+}
+
+def VM_SwitchRefOp : VM_PureOp<"switch.ref", [
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    AllTypesMatch<["default_value", "result"]>,
+  ]> {
+  let summary = [{ref_ptr switch operation}];
+  let description = [{
+    Returns the value with the given `index` in `values` or `default_value` if
+    the index is out of bounds.
+
+    ```mlir
+    // Switch %arg0 to cases of %r0/%r1/%r2 if arg0==0, ==1, ==2.
+    // If %arg0 is out of range (<0 or >2) then default to %null.
+    %0 = vm.switch.ref %index[%r0, %r1, %r2] else %null : vm.ref<!foo>
+    ```
+  }];
+
+  let arguments = (ins
+    I32:$index,
+    VM_AnyRef:$default_value,
+    Variadic<VM_AnyRef>:$values
+  );
+  let results = (outs
+    VM_AnyRef:$result
+  );
+
+  // TODO(benvanik): figure out how to get $values types in the format.
+  // let assemblyFormat = [{
+  //   $index `[` $values `]` `else` $default_value attr-dict `:` type($values)
+  // }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_SwitchRef>,
+    VM_EncOperand<"index", 0>,
+    VM_EncTypeOf<"result">,
+    VM_EncOperand<"default_value", 1>,
+    VM_EncVariadicOperands<"values">,
     VM_EncResult<"result">,
   ];
 
