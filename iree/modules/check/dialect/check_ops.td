@@ -29,7 +29,7 @@ def CHECK_Dialect : Dialect {
 def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
   let summary = [{Checks that the operand is true}];
   let description = [{
-    Verifies that the operand represents a true value, which is represented by
+    Verifies that the operand contains a true value, which is represented by
     any non-zero integer.
 
     Issues a non-fatal failure if the verification fails.
@@ -44,7 +44,7 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
 def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
   let summary = [{Checks that the operand is false}];
   let description = [{
-    Verifies that the operand represents a false value, which is represented by
+    Verifies that the operand contains a false value, which is represented by
     zero.
 
     Issues a non-fatal failure if the verification fails.
@@ -58,13 +58,14 @@ def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
 def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
   let summary = [{Checks that the operand contains only values that are true}];
   let description = [{
-    Verifies that the operand contains only values that represent a true value,
-    which is represented by any non-zero integer.
+    Verifies that the operand contains true values, which are represented by any
+    non-zero integer.
 
     Issues a non-fatal failure if the verification fails.
   }];
 
-  let arguments = (ins AnyTypeOf<[HAL_BufferView, AnyTensor]>:$operand);
+  let arguments =
+    (ins AnyTypeOf<[HAL_BufferView, TensorOf<[AnySignlessInteger]>]>:$operand);
 
   let assemblyFormat = "`(` $operand `)` attr-dict `:` type($operand)";
 }
