@@ -58,6 +58,13 @@ iree_pybind_cc_library(
     bindings::python::pyiree::common
     LLVMSupport
     MLIRIR
+    # TODO(marbre): The following deps are necessary as we still rely on
+    #  mlir::registerAllDialects(). In the Bazel build these are pulled in
+    #  by the dependency on mlir:AllPassesAndDialectsNoRegistration
+    MLIRNVVMIR # mlir:AllPassesAndDialectsNoRegistration
+    MLIRROCDLIR # mlir:AllPassesAndDialectsNoRegistration
+    MLIRQuantizerFxpMathConfig # mlir:AllPassesAndDialectsNoRegistration
+    MLIRQuantizerSupport # mlir:AllPassesAndDialectsNoRegistration
     MLIRLoopOpsTransforms
     MLIRParser
     MLIRPass
