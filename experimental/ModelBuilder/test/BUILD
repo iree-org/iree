@@ -90,7 +90,7 @@ cc_binary(
 
 # Benchmarks.
 
-cc_test(
+cc_binary(
     name = "bench-matmul-vector-jit",
     srcs = ["BenchMatMulVectorJIT.cpp"],
     tags = [
@@ -103,6 +103,7 @@ cc_test(
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOps",
         "@llvm-project//mlir:LoopOpsTransforms",
     ],
 )
