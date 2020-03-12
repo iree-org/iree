@@ -57,10 +57,6 @@ std::unique_ptr<OpPassBase<ModuleOp>> createFlattenTuplesInCFGPass();
 // allowed to pass through successfully.
 std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeInputTypesPass();
 
-// Unrolls multi-dimensional reduction operations into reductions along each
-// dimension, from innermost to outermost.
-std::unique_ptr<OpPassBase<FuncOp>> createUnrollReductionsPass();
-
 // Runs pre-partitioning conversion passes to convert to the flow dialect.
 // This converts some input ops directly to flow ops when doing so has a
 // benefit. Other ops are left unmodified and will be outlined later on.

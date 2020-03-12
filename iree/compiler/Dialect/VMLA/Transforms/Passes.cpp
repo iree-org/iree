@@ -44,6 +44,10 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
   // TODO(benvanik): preserve these hints during conversion.
   passManager.addNestedPass<FuncOp>(createDropCompilerHintsPass());
 
+  // Unroll multi-dimensional reductions to one reduction per dimension.
+  passManager.addNestedPass<FuncOp>(createUnrollReductionsPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+
   // Convert from the various input dialects to the VMLA dialect.
   passManager.addPass(createConversionPass());
 

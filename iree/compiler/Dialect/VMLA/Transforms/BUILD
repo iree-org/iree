@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "Conversion.cpp",
         "Passes.cpp",
+        "UnrollReductions.cpp",
     ],
     hdrs = [
         "Passes.h",

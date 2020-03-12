@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
@@ -22,7 +20,7 @@
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
-namespace Flow {
+namespace VMLA {
 
 namespace {
 
@@ -167,10 +165,10 @@ std::unique_ptr<OpPassBase<FuncOp>> createUnrollReductionsPass() {
 }
 
 static PassRegistration<UnrollReductionsPass> pass(
-    "iree-flow-unroll-reductions",
+    "iree-vmla-unroll-reductions",
     "Unrolls multi-dimensional reductions to one reduction per dimension.");
 
-}  // namespace Flow
+}  // namespace VMLA
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

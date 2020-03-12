@@ -48,10 +48,6 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
 
-  // Unroll multi-dimensional reductions to one reduction per dimension.
-  passManager.addNestedPass<FuncOp>(IREE::Flow::createUnrollReductionsPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-
   // First perform module-level analysis that following passes will use to query
   // per-function dispatchability information. We run this first so that it only
   // needs to run once and will be cached for all of the following passes.

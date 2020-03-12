@@ -48,6 +48,10 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager);
 // Input canonicalization and legalization
 //===----------------------------------------------------------------------===//
 
+// Unrolls multi-dimensional reduction operations into reductions along each
+// dimension, from innermost to outermost.
+std::unique_ptr<OpPassBase<FuncOp>> createUnrollReductionsPass();
+
 //===----------------------------------------------------------------------===//
 // Dialect conversion
 //===----------------------------------------------------------------------===//

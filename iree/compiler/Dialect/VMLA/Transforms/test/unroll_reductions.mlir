@@ -1,4 +1,4 @@
-// RUN: iree-opt -split-input-file -iree-flow-unroll-reductions -cse %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-vmla-unroll-reductions -cse %s | IreeFileCheck %s
 
 // CHECK-LABEL: func @unrolled_reduction
 func @unrolled_reduction(%arg0: tensor<4x2x8xf32>) -> tensor<4xf32> {

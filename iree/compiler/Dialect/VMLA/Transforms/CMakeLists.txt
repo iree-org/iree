@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "Conversion.cpp"
     "Passes.cpp"
+    "UnrollReductions.cpp"
   DEPS
     LLVMSupport
     MLIRIR

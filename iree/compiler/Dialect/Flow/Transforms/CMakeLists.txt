@@ -33,7 +33,6 @@ iree_cc_library(
     "Passes.cpp"
     "PrePostPartitioningConversion.cpp"
     "RematerializeDispatchConstants.cpp"
-    "UnrollReductions.cpp"
   DEPS
     LLVMSupport
     MLIRAnalysis
