@@ -140,7 +140,7 @@ module{
     // CHECK: select %[[INDEX]], %[[CST]], %[[OUTPUT]] : f32
     %cst = constant dense<0xFF800000> : tensor<f32>
     %1 = "xla_hlo.reduce"(%0, %cst) ( {
-    ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>):	// no predecessors
+    ^bb0(%arg2: tensor<f32>, %arg3: tensor<f32>): // no predecessors
       %2 = xla_hlo.add %arg2, %arg3 {name = "maximum.21"} : tensor<f32>
       "xla_hlo.return"(%2) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
