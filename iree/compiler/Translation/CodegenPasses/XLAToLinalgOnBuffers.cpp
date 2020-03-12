@@ -201,15 +201,18 @@ static ArrayAttr getInnermostReductionIterAttrs(Builder b, unsigned nLoops) {
 }
 
 /// Returns a permutation AffineMap that puts `reductionDim` to the last. The
-/// order of the first (`rank` - 1) can be unsorted. E.g., if `rank` is 4 and
-/// `reductionDim` is 1, then "(d0, d1, d2, d3) -> (d0, d3, d2, d1)" can be
-/// returned.
+/// order of the first (`rank` - 1) is sorted. E.g., if `rank` is 4 and
+/// `reductionDim` is 1, then "(d0, d1, d2, d3) -> (d0, d2, d3, d1)" is used.
+/// The inverse permutation of the AffineMap is returned.
 static AffineMap getTransposeMapForReduction(OpBuilder &builder, int rank,
                                              int reductionDim) {
   SmallVector<unsigned, 4> permutation;
-  for (int i = 0; i < rank; ++i) permutation.push_back(i);
-  std::swap(permutation[reductionDim], permutation[rank - 1]);
-  return AffineMap::getPermutationMap(permutation, builder.getContext());
+  for (int i = 0; i < rank; ++i) {
+    if (i != reductionDim) permutation.push_back(i);
+  }
+  permutation.push_back(reductionDim);
+  auto map = AffineMap::getPermutationMap(permutation, builder.getContext());
+  return inversePermutation(map);
 }
 
 /// Checks whether an op is wthin an xla-hlo reduce region. During conversion,
@@ -341,8 +344,10 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
   if (!initConstVal.hasValue())
     indexingMaps.emplace_back(AffineMapAttr::get(
         AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())));
-  // Since the reduction loop now is the innermost, the indexing map of `dst`
-  // should drop the latest dimension, e.g., (d0, d1, d2) -> (d0, d1).
+  // Since the reduction loop now is the innermost and the parallel loops are
+  // sorted, the indexing map of `dst` should drop the latest dimension, e.g.,
+  // (d0, d1, d2) -> (d0, d1). We don't need an inverse permutation here because
+  // they are the same.
   SmallVector<AffineExpr, 4> exprs;
   for (int i = 0; i < nInputRank - 1; ++i)
     exprs.push_back(rewriter.getAffineDimExpr(i));

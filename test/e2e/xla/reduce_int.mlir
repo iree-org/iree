@@ -1,5 +1,5 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv  %s)
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 // Int sum values from [1, 10]
 // CHECK-LABEL: EXEC @reduce_sum_1x10xi32
