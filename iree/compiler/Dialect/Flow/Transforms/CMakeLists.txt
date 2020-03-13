@@ -48,6 +48,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Conversion::StandardToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Utils
+    iree::compiler::Dialect::Shape::IR
     iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK

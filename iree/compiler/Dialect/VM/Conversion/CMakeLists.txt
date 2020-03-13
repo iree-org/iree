@@ -27,6 +27,7 @@ iree_cc_library(
     "ImportUtils.cpp"
     "TypeConverter.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRParser
     MLIRStandardOps
