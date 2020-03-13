@@ -130,3 +130,6 @@ $ bazel build iree/tools:iree-run-mlir && LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$REND
 You can also launch IREE's headless programs through RenderDoc itself, just be
 sure to set the command line arguments appropriately. Saving capture settings in
 RenderDoc can help if you find yourself doing this frequently.
+
+Note: RenderDoc version 1.7 or higher is needed to record captures from IREE's
+headless compute programs.
