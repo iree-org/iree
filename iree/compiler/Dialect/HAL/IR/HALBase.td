@@ -517,17 +517,20 @@ def HAL_DescriptorSetBinding : NamedTupleOf<[
   }];
 }
 
-def HAL_DescriptorSetLayoutBinding : NamedTupleOf<[
-    NamedTupleElement<0, "binding", I32>,
-    NamedTupleElement<1, "type", I32>,
-    NamedTupleElement<2, "access", I32>,
-  ], "DescriptorSetLayoutBinding"> {
-  let typeDescription = [{
-    DescriptorSetLayoutBinding struct that can be passed to the
-    hal.descriptor_set_layout.create operation. Constructed via the
-    hal.descriptor_set_layout.make_binding operation.
-  }];
+def HAL_DescriptorSetLayoutBindingAttr :
+  IREE_StructAttr<"descriptor_set_layout_binding",
+                  "DescriptorSetLayoutBindingAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"binding", I32Attr>,
+    IREE_StructFieldAttr<"type", HAL_DescriptorTypeAttr>,
+    IREE_StructFieldAttr<"access", HAL_MemoryAccessBitfieldAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
+
+def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
+    HAL_DescriptorSetLayoutBindingAttr,
+    "HAL descriptor set layout binding array attribute">;
 
 def HAL_FenceValue : NamedTupleOf<[
     NamedTupleElement<0, "fence", HAL_Fence>,

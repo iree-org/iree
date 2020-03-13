@@ -1155,39 +1155,6 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
 // iree::hal::DescriptorSetLayout
 //===----------------------------------------------------------------------===//
 
-def HAL_DescriptorSetLayoutMakeBindingOp :
-  HAL_MakeTupleOp<"descriptor_set_layout.make_binding", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let summary = [{temporary layout binding allocation operation}];
-  let description = [{
-    Allocates a temporary DescriptorSetLayout binding struct that can be passed
-    to the hal.descriptor_set_layout.create operation.
-  }];
-
-  let arguments = (ins
-    I32Attr:$binding,
-    HAL_DescriptorTypeAttr:$type,
-    HAL_MemoryAccessBitfieldAttr:$access
-  );
-  let results = (outs
-    HAL_DescriptorSetLayoutBinding:$result
-  );
-
-  let assemblyFormat = [{
-    `binding` `=` $binding attr-dict-with-keyword `:` type($result)
-  }];
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state,
-      int32_t binding, IREE::HAL::DescriptorType type,
-      IREE::HAL::MemoryAccessBitfield access
-    }]>,
-  ];
-}
-
 def HAL_DescriptorSetLayoutCreateOp :
   HAL_PureOp<"descriptor_set_layout.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
@@ -1199,7 +1166,7 @@ def HAL_DescriptorSetLayoutCreateOp :
 
   let arguments = (ins
     HAL_Device:$device,
-    Variadic<HAL_DescriptorSetLayoutBinding>:$bindings
+    HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
   );
   let results = (outs
     HAL_DescriptorSetLayout:$result

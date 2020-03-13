@@ -773,26 +773,6 @@ void DescriptorSetCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.descriptor_set_layout.make_binding
-//===----------------------------------------------------------------------===//
-
-void DescriptorSetLayoutMakeBindingOp::build(
-    Builder *builder, OperationState &state, int32_t binding,
-    IREE::HAL::DescriptorType type, IREE::HAL::MemoryAccessBitfield access) {
-  state.addAttribute("binding", builder->getI32IntegerAttr(binding));
-  state.addAttribute("type",
-                     builder->getI32IntegerAttr(static_cast<int32_t>(type)));
-  state.addAttribute("access",
-                     builder->getI32IntegerAttr(static_cast<int32_t>(access)));
-  state.addTypes({DescriptorSetLayoutBindingType::get(builder->getContext())});
-}
-
-void DescriptorSetLayoutMakeBindingOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "binding");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.descriptor_set_layout.create
 //===----------------------------------------------------------------------===//
 

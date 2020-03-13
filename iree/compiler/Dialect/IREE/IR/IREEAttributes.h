@@ -23,9 +23,18 @@ namespace IREE {
 
 namespace AttrKind {
 enum Kind {
+  FIRST_HAL_ATTR = Attribute::FIRST_IREE_ATTR + 10,
   FIRST_VULKAN_ATTR = Attribute::FIRST_IREE_ATTR + 20,
 };
 }  // namespace AttrKind
+
+namespace HAL {
+namespace AttrKind {
+enum Kind {
+  DescriptorSetLayoutBindingAttr = IREE::AttrKind::FIRST_HAL_ATTR,
+};
+}  // namespace AttrKind
+}  // namespace HAL
 
 namespace Vulkan {
 namespace AttrKind {

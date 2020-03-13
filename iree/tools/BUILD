@@ -203,6 +203,7 @@ cc_binary(
         "-lpthread",
     ],
     deps = [
+        "//iree/compiler/Dialect/IREE/Tools",
         "//iree/compiler/Dialect/VM/Tools",
         "@llvm-project//mlir:MlirTableGenMain",
         "@llvm-project//mlir:Support",

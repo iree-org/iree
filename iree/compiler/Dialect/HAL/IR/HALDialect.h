@@ -28,6 +28,9 @@ class HALDialect : public Dialect {
   explicit HALDialect(MLIRContext *context);
   static StringRef getDialectNamespace() { return "hal"; }
 
+  Attribute parseAttribute(DialectAsmParser &parser, Type type) const override;
+  void printAttribute(Attribute attr, DialectAsmPrinter &p) const override;
+
   Type parseType(DialectAsmParser &parser) const override;
   void printType(Type type, DialectAsmPrinter &p) const override;
 };

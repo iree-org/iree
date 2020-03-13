@@ -93,6 +93,33 @@ class NamedTupleOf<list<NamedTupleElement> elements, string descr> :
 }
 
 //===----------------------------------------------------------------------===//
+// IREE_StructAttr
+//===----------------------------------------------------------------------===//
+// This has a custom tablegen generator in StructAttrGen.cpp to create the
+// attribute and storage types. It differs from the core MLIR StructAttr
+// by more closely matching what handwritten C++ would have (better typing
+// and ergonomics and custom parser/printer).
+
+class IREE_StructFieldAttr<string thisName, Attr thisType> {
+  string name = thisName;
+  Attr type = thisType;
+}
+
+class IREE_StructAttr<string thisKind, string name, Dialect dialect,
+                      list<IREE_StructFieldAttr> attributes>
+    : Attr<CPred<"$_self.isa<" # name # ">()">,
+                 "structured attribute of " # name> {
+  string kind = thisKind;
+  string className = name;
+  string cppNamespace = ?;
+  let storageType = name;
+  let returnType = name;
+  let convertFromStorage = "$_self";
+  Dialect structDialect = dialect;
+  list<IREE_StructFieldAttr> fields = attributes;
+}
+
+//===----------------------------------------------------------------------===//
 // ptr types
 //===----------------------------------------------------------------------===//
 
