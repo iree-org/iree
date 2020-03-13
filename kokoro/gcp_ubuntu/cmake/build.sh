@@ -16,31 +16,21 @@
 
 # Build the project with cmake using Kokoro.
 
-set -e
 set -x
 
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
-
-export CMAKE_BIN="$(which cmake)"
-export CC="$(which clang-6.0)"
-export CXX="$(which clang++-6.0)"
-
-# Check these exist and print the versions for later debugging
-"$CMAKE_BIN" --version
-"$CC" --version
-"$CXX" --version
 
 # Kokoro checks out the repository here.
 cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
 echo "Initializing submodules"
 ./scripts/git/submodule_versions.py init
 
-# TODO(gcmn): It would be nice to be able to build and test as much as possible,
-# so a build failure only prevents building/testing things that depend on it and
-# we can still run the other tests.
-echo "Building with cmake"
-./build_tools/cmake/clean_build.sh
+for i in {1..1000}
+do
+  echo "Looking for git root"
+  ROOT_DIR=$(git rev-parse --show-toplevel)
 
-echo "Testing with ctest"
-./build_tools/cmake/test.sh
+  cd ${ROOT_DIR?}
+  sleep 1
+done
