@@ -68,7 +68,9 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
     // we need to bail.
     SmallVector<Operation *, 8> opsWithSideEffects;
     for (auto &op : block) {
-      if (!op.hasNoSideEffect() || op.hasTrait<OpTrait::IREE::YieldPoint>()) {
+      // TODO: Handle region side effects.
+      if (!MemoryEffectOpInterface::hasNoEffect(&op) ||
+          op.hasTrait<OpTrait::IREE::YieldPoint>() || op.getNumRegions() != 0) {
         opsWithSideEffects.push_back(&op);
       }
     }
@@ -111,7 +113,9 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
       }
       processedOps.insert(op);
 
-      if (!op->hasNoSideEffect()) {
+      // TODO: Handle region side effects.
+      if (!MemoryEffectOpInterface::hasNoEffect(op) ||
+          op->getNumRegions() != 0) {
         // Op has side-effects and should split the current stream.
         resetCurrentStream();
         return;
@@ -140,7 +144,10 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
           // cross-block dependencies.
           markOpDAGOutside(depOp);
           continue;
-        } else if (!depOp->hasNoSideEffect() || !isStreamableOp(depOp)) {
+
+          // TODO: Handle region side effects.
+        } else if (!MemoryEffectOpInterface::hasNoEffect(depOp) ||
+                   !isStreamableOp(depOp) || depOp->getNumRegions() != 0) {
           // Source op has side effects or isn't streamable meaning that we
           // can't fold it into the stream region.
           markOpDAGOutside(depOp);

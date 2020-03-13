@@ -338,6 +338,7 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   spirvModulePM.addPass(spirv::createLowerABIAttributesPass());
   spirvModulePM.addPass(createCanonicalizerPass());
   spirvModulePM.addPass(createCSEPass());
+  spirvModulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
 
 void addLowerToSPIRVPasses(OpPassManager &pm, ArrayRef<int64_t> workGroupSize) {

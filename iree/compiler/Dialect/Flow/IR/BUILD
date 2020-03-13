@@ -100,5 +100,6 @@ gentbl(
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
     ],
 )

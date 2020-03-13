@@ -17,6 +17,13 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "mlir/IR/OpAsmInterface.td"
+include "mlir/Interfaces/SideEffects.td"
+
+class HAL_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    HAL_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
+
+class HAL_MakeTupleOp<string mnemonic, list<OpTrait> traits = []> :
+    HAL_PureOp<mnemonic, traits>;
 
 //===----------------------------------------------------------------------===//
 // Magic temporary hacks

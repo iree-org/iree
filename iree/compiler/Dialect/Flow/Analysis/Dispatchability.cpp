@@ -115,16 +115,19 @@ Optional<bool> Dispatchability::computeDispatchability(FuncOp funcOp) {
         // TODO(benvanik): widen to all known terminators? sometimes they may
         // have side-effects.
         continue;
-      } else if (!op.getDialect() || !op.hasNoSideEffect()) {
-        // Ops with side-effects cannot be dispatched as we must be able to
-        // exactly model I/O.
-        return false;
       } else if (isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ConvOp>(op)) {
         // Some unfusable ops must remain on their own.
         return false;
       } else if (isa<xla_hlo::ReduceOp>(op) ||
                  isa<xla_hlo::ReduceWindowOp>(op)) {
         // Reductions always become flow ops.
+        return false;
+
+        // TODO: Properly handle region side effects.
+      } else if (!MemoryEffectOpInterface::hasNoEffect(&op) ||
+                 op.getNumRegions() != 0) {
+        // Ops with side-effects cannot be dispatched as we must be able to
+        // exactly model I/O.
         return false;
       }
     }

@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
 module {
-  // CHECK:spv.module "Logical" "GLSL450"
+  // CHECK:spv.module Logical GLSL450
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   // CHECK: spv.func [[FN:@broadcast_in_dim_2D_3D]]
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<504 x i32 [4]> [0]>, StorageBuffer>
@@ -18,7 +18,7 @@ module {
 // -----
 
 module {
-  // CHECK:spv.module "Logical" "GLSL450"
+  // CHECK:spv.module Logical GLSL450
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   // CHECK: spv.func [[FN:@broadcast_in_dim_scalar_3D]]
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>

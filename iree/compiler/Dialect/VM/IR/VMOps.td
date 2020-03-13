@@ -17,7 +17,11 @@
 
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/SideEffects.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
+
+class VM_PureOp<string mnemonic, list<OpTrait> traits = []> :
+    VM_Op<mnemonic, !listconcat(traits, [NoSideEffect])>;
 
 //===----------------------------------------------------------------------===//
 // Structural ops
@@ -521,6 +525,7 @@ def VM_GlobalStoreIndirectRefOp :
 
 class VM_ConstOp<string mnemonic, string ctype, list<OpTrait> traits = []> :
     VM_PureOp<mnemonic, !listconcat(traits, [
+      ConstantLike,
       DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
     ])> {
   let skipDefaultBuilders = 1;
@@ -571,6 +576,7 @@ def VM_ConstI32Op :
 }
 
 def VM_ConstI32ZeroOp : VM_PureOp<"const.i32.zero", [
+    ConstantLike,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
   ]> {
   let summary = [{32-bit integer constant zero operation}];
@@ -600,6 +606,7 @@ def VM_ConstI32ZeroOp : VM_PureOp<"const.i32.zero", [
 }
 
 def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
+    ConstantLike,
     DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
   ]> {
   let summary = [{null ref_ptr constant operation}];

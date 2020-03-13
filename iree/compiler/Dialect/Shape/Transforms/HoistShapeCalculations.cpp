@@ -29,7 +29,7 @@ namespace {
 
 bool isSimpleShapeCalculationOp(Operation *op) {
   // The op must have no side effects.
-  if (!op->hasNoSideEffect()) {
+  if (!MemoryEffectOpInterface::hasNoEffect(op) || op->getNumRegions() != 0) {
     return false;
   }
   // The op should operate on types that are likely shape calculations.

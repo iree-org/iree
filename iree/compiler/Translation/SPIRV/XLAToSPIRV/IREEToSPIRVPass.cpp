@@ -176,8 +176,7 @@ void IREEToSPIRVPass::runOnModule() {
   // Create a spirv.module Op.
   auto spvModule = builder.create<spirv::ModuleOp>(
       module.getLoc(), spirv::AddressingModel::Logical,
-      spirv::MemoryModel::GLSL450, spirv::Capability::Shader,
-      spirv::Extension::SPV_KHR_storage_buffer_storage_class);
+      spirv::MemoryModel::GLSL450);
 
   // Generate the SPIR-V entry function for the dispatch function
   if (failed(lowerEntryFunctions(spvModule, fns))) {
@@ -209,6 +208,7 @@ void addIREEToSPIRVPasses(PassManager &conversionPassManager) {
   OpPassManager &spirvPasses = conversionPassManager.nest<spirv::ModuleOp>();
   spirvPasses.addPass(spirv::createLowerABIAttributesPass());
   spirvPasses.addPass(createAdjustIntegerWidthPass());
+  spirvPasses.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
 
 }  // namespace iree_compiler
