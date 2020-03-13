@@ -29,6 +29,7 @@ iree_cc_library(
     MLIRStandardOps
     MLIRSupport
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Shape::IR
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC
