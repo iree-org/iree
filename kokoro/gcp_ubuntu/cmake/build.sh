@@ -21,13 +21,9 @@ set -x
 # Print the UTC time when set -x is on
 export PS4='[$(date -u "+%T %Z")] '
 
-# Kokoro checks out the repository here.
-cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
-echo "Initializing submodules"
-./scripts/git/submodule_versions.py init
-
 for i in {1..1000}
 do
+  cd ${KOKORO_ARTIFACTS_DIR?}/github/iree
   echo "Looking for git root"
   ROOT_DIR=$(git rev-parse --show-toplevel)
 
