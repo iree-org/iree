@@ -14,7 +14,6 @@
 # limitations under the License.
 """Test matrix ops."""
 
-import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
@@ -22,26 +21,73 @@ import tensorflow.compat.v2 as tf
 class MatrixOpsModule(tf.Module):
 
   @tf.function(input_signature=[
-      tf.TensorSpec([1, 2, 3], tf.float32),
-      tf.TensorSpec([3, 4], tf.float32)
+      tf.TensorSpec([4, 2], tf.float32),
+      tf.TensorSpec([2, 4], tf.float32),
   ])
-  def batch_matmul(self, x, y):
-    return tf.matmul(x, y)
+  def basic_matmul(self, lhs, rhs):
+    return tf.matmul(lhs, rhs)
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([3, 4, 2], tf.float32),
+      tf.TensorSpec([2, 4], tf.float32),
+  ])
+  def matmul_lhs_batch(self, lhs, rhs):
+    return tf.matmul(lhs, rhs)
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([4, 2], tf.float32),
+      tf.TensorSpec([3, 2, 4], tf.float32),
+  ])
+  def matmul_rhs_batch(self, lhs, rhs):
+    return tf.matmul(lhs, rhs)
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([1, 4, 2], tf.float32),
+      tf.TensorSpec([3, 2, 4], tf.float32),
+  ])
+  def matmul_broadcast_singleton_dimension(self, lhs, rhs):
+    return tf.matmul(lhs, rhs)
+
+  @tf.function(input_signature=[
+      tf.TensorSpec([1, 7, 4, 2], tf.float32),
+      tf.TensorSpec([7, 1, 2, 4], tf.float32),
+  ])
+  def matmul_high_rank_batch(self, lhs, rhs):
+    return tf.matmul(lhs, rhs)
 
 
-# TODO(b/147890602)
 @tf_test_utils.compile_modules(
-    backends=["tf"], mat=(MatrixOpsModule, ["batch_matmul"]))
+    backends=["tf", "iree_vmla"], mat=MatrixOpsModule)
 class MatrixOpsTest(tf_test_utils.SavedModelTestCase):
 
-  def test_batch_matmul(self):
-    a = np.array([[[1, 2, 3], [4, 5, 6]]], dtype=np.float32)
-    b = np.array([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]],
-                 dtype=np.float32)
-    ab = self.modules.mat.all.batch_matmul(a, b)
-    output = np.array([[[38, 44, 50, 56], [83, 98, 113, 128]]],
-                      dtype=np.float32)
-    assert np.allclose(ab, output)
+  def test_basic_matmul(self):
+    m = self.modules.mat.all
+    dst = m.basic_matmul(tf.random.uniform([4, 2]), tf.random.uniform([2, 4]))
+    dst.print().assert_all_close()
+
+  def test_matmul_lhs_batch(self):
+    m = self.modules.mat.all
+    dst = m.matmul_lhs_batch(
+        tf.random.uniform([3, 4, 2]), tf.random.uniform([2, 4]))
+    dst.print().assert_all_close()
+
+  def test_matmul_rhs_batch(self):
+    m = self.modules.mat.all
+    dst = m.matmul_rhs_batch(
+        tf.random.uniform([4, 2]), tf.random.uniform([3, 2, 4]))
+    dst.print().assert_all_close()
+
+  def test_matmul_broadcast_singleton_dimension(self):
+    m = self.modules.mat.all
+    dst = m.matmul_broadcast_singleton_dimension(
+        tf.random.uniform([1, 4, 2]), tf.random.uniform([3, 2, 4]))
+    dst.print().assert_all_close()
+
+  def test_matmul_high_rank_batch(self):
+    m = self.modules.mat.all
+    dst = m.matmul_high_rank_batch(
+        tf.random.uniform([1, 7, 4, 2]), tf.random.uniform([7, 1, 2, 4]))
+    dst.print().assert_all_close()
 
 
 if __name__ == "__main__":

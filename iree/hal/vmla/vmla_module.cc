@@ -14,6 +14,7 @@
 
 #include "iree/hal/vmla/vmla_module.h"
 
+#include "absl/types/span.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vmla/op_kernels.h"
 #include "iree/vm/module_abi_packing.h"
@@ -586,19 +587,53 @@ class VMLAModuleState final {
   // VMLA Ops: GEMM/GEMV
   //===--------------------------------------------------------------------===//
 
-  Status MatMulF32F32F32(vm::ref<Buffer> lhs, iree_vmla_shape_t lhs_shape,
-                         vm::ref<Buffer> rhs, iree_vmla_shape_t rhs_shape,
-                         vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) {
-    IREE_TRACE_SCOPE0("VMLAModuleState::MatMulF32F32F32");
-    kernels::MatMul::Buffers<float, float> buffers;
-    buffers.lhs_buffer = lhs->As<float>();
-    buffers.lhs_shape = Shape(lhs_shape);
-    buffers.rhs_buffer = rhs->As<float>();
-    buffers.rhs_shape = Shape(rhs_shape);
-    buffers.dst_buffer = dst->As<float>();
-    buffers.dst_shape = Shape(dst_shape);
-    return kernels::MatMul::Execute(kernel_state_->mat_mul_state.get(),
-                                    buffers);
+  Status BatchMatMulF32F32F32(vm::ref<Buffer> lhs, iree_vmla_shape_t lhs_shape,
+                              vm::ref<Buffer> rhs, iree_vmla_shape_t rhs_shape,
+                              vm::ref<Buffer> dst,
+                              iree_vmla_shape_t dst_shape) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::BatchMatMulF32F32F32");
+    // Compiler guarantees. Here for documentation purposes.
+    assert(lhs_shape.size() == 3 && rhs_shape.size() == 3 &&
+           dst_shape.size() == 3);
+    assert(lhs_shape[0] == rhs_shape[0] && rhs_shape[0] == dst_shape[0]);
+
+    auto total_elements = [](absl::Span<const int32_t> extents) {
+      int32_t result = 1;
+      for (int32_t extent : extents) {
+        result *= extent;
+      }
+      return result;
+    };
+
+    iree_vmla_shape_t lhs_batch_element_shape = lhs_shape.subspan(1);
+    iree_vmla_shape_t rhs_batch_element_shape = rhs_shape.subspan(1);
+    iree_vmla_shape_t dst_batch_element_shape = dst_shape.subspan(1);
+    Shape lhs_batch_element_shape2(lhs_batch_element_shape.data(), 2);
+    Shape rhs_batch_element_shape2(rhs_batch_element_shape.data(), 2);
+    Shape dst_batch_element_shape2(dst_batch_element_shape.data(), 2);
+    int32_t lhs_batch_stride = total_elements(lhs_batch_element_shape);
+    int32_t rhs_batch_stride = total_elements(rhs_batch_element_shape);
+    int32_t dst_batch_stride = total_elements(dst_batch_element_shape);
+    float* lhs_batch_base = lhs->As<float>().data();
+    float* rhs_batch_base = rhs->As<float>().data();
+    float* dst_batch_base = dst->As<float>().data();
+    int32_t batch_dim = lhs_shape[0];
+    for (int i = 0; i < batch_dim; i++) {
+      kernels::MatMul::Buffers<float, float> buffers;
+      buffers.lhs_buffer = absl::MakeSpan(lhs_batch_base + i * lhs_batch_stride,
+                                          lhs_batch_stride);
+      buffers.lhs_shape = lhs_batch_element_shape2;
+      buffers.rhs_buffer = absl::MakeSpan(rhs_batch_base + i * rhs_batch_stride,
+                                          rhs_batch_stride);
+      buffers.rhs_shape = rhs_batch_element_shape2;
+      buffers.dst_buffer = absl::MakeSpan(dst_batch_base + i * dst_batch_stride,
+                                          dst_batch_stride);
+      buffers.dst_shape = dst_batch_element_shape2;
+
+      RETURN_IF_ERROR(kernels::MatMul::Execute(
+          kernel_state_->mat_mul_state.get(), buffers));
+    }
+    return OkStatus();
   }
 
   //===--------------------------------------------------------------------===//
@@ -790,8 +825,8 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("reduce.max.i32", &VMLAModuleState::ReduceMaxI32),
     vm::MakeNativeFunction("reduce.max.f32", &VMLAModuleState::ReduceMaxF32),
 
-    vm::MakeNativeFunction("matmul.f32f32.f32",
-                           &VMLAModuleState::MatMulF32F32F32),
+    vm::MakeNativeFunction("batch.matmul.f32f32.f32",
+                           &VMLAModuleState::BatchMatMulF32F32F32),
 };
 
 // Per-device VMLA module.

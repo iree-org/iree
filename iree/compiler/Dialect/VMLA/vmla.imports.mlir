@@ -305,7 +305,7 @@ vm.import @convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.bu
 // VMLA Ops: GEMM/GEMV
 //===----------------------------------------------------------------------===//
 
-vm.import @matmul.f32f32.f32(
+vm.import @batch.matmul.f32f32.f32(
   %lhs : !vm.ref<!vmla.buffer>, %lhs_shape : i32 ...,
   %rhs : !vm.ref<!vmla.buffer>, %rhs_shape : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...

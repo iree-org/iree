@@ -41,6 +41,9 @@ VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
   // conversion has already happened).
   addLegalOp<ModuleOp, ModuleTerminatorOp>();
   addLegalDialect<IREE::VMLA::VMLADialect>();
+  // Pseudo-ops are illegal.
+  // If we end up with a lot of these, consider using an "is pseudo" trait.
+  addIllegalOp<IREE::VMLA::BatchMatMulPseudoOp>();
 
   // Allow other ops to pass through so long as their type is valid (not a
   // tensor, basically).

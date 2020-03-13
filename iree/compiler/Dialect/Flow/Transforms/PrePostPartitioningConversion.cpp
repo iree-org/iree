@@ -57,9 +57,6 @@ class PrePartitioningConversionPass
     // xla_hlo::createLegalizeControlFlowPass() prior to conversion.
     conversionTarget.addIllegalOp<xla_hlo::ConditionalOp, xla_hlo::WhileOp>();
 
-    conversionTarget.addIllegalOp<xla_hlo::DotGeneralOp>();
-    xla_hlo::PopulateGeneralDotOpLoweringPatterns(&conversionPatterns, context);
-
     // We don't support broadcast_dimensions as part of ops, so materialize
     // any such attributes to dedicated xla_hlo.broadcast_in_dim ops.
     xla_hlo::SetupMaterializeBroadcastsLegality(context, &conversionTarget);

@@ -288,7 +288,44 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
 // VMLA Ops: GEMM/GEMV
 //===----------------------------------------------------------------------===//
 
-def VMLA_MatMulOp : VMLA_Op<"matmul", [VMLA_OpInterface, VMLA_IncludeShapes]> {
+def VMLA_BatchMatMulPseudoOp : VMLA_Op<"batch.matmul.pseudo"> {
+  let summary = "Tensor-level pseudo-op of VMLA::BatchMatMulOp.";
+  let description = [{
+    This is a tensor-level version of VMLA::BatchMatMulOp, to facilitate
+    the lowering process.
+
+    All operands are rank-3 with the following dimension structure:
+    - lhs = [B, FLHS, C]
+    - rhs = [B, FRHS, C]
+    - dst = [B, FLHS, FRHS]
+    Where:
+    - B = batch dimension
+    - C = contracting dimension
+    - FLHS and FRHS are the free dimensions of each operand
+
+    To put this in terms closer to the mathematics of matrix multiplication,
+    if we ignore the leading B dimension and focus on what is mathematically an
+    MxKxN matmul, then this corresponds to:
+    - lhs = [M, K] = [LHSROWS, K]
+    - rhs = [N, K] = [RHSCOLS, K]
+    - dst = [N, M] = [RHSCOLS, LHSROWS]
+    Note that dst is transposed from what one would expect.
+    This is due to an implementation detail of this op in the runtime.
+    This op is backed by an invocation of the Ruy matrix multiplication library,
+    which prefers its matrices in this layout (in matrix terminology:
+    lhs = row-major, rhs = column-major, dst = column-major).
+    We insert the relevant transposes as needed in the compiler.
+  }];
+  let arguments = (ins
+    AnyTensor:$lhs,
+    AnyTensor:$rhs
+  );
+  let results = (outs
+    AnyTensor:$dst
+  );
+}
+
+def VMLA_BatchMatMulOp : VMLA_Op<"batch.matmul", [VMLA_OpInterface, VMLA_IncludeShapes]> {
   let arguments = (ins
     VMLA_Buffer:$lhs,
     VMLA_Shape:$lhs_shape,

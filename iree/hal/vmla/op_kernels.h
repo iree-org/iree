@@ -350,23 +350,6 @@ struct MatMul {
   template <typename T, typename ACC>
   static Status Execute(RuntimeState* runtime_state,
                         const Buffers<T, ACC>& buffers);
-
-  // Simple 2D transpose, borrowed from TFLite. This is temporary to get RUY
-  // on an optimized path until proper compiler support for layout and
-  // pre-packing is implemented.
-  template <typename T>
-  static void Transpose2D(int d0, int d1, const T* input_data, T* output_data);
-
-  template <typename T>
-  static void preload_l1_keep(const T* ptr) {
-#ifdef __GNUC__
-    // builtin offered by GCC-compatible compilers including clang
-    __builtin_prefetch(ptr, /* 0 means read */ 0,
-                       /* 3 means high locality */ 3);
-#else
-    (void)ptr;
-#endif
-  }
 };
 
 struct RuntimeState {

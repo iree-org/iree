@@ -63,22 +63,22 @@ func @convert(%arg0 : !vmla.buffer, %arg1 : !vmla.buffer) {
 
 // -----
 
-// CHECK-LABEL: vm.func @matmul
-func @matmul(
+// CHECK-LABEL: vm.func @batch_matmul
+func @batch_matmul(
     %lhs : !vmla.buffer,
-    %lhs_shape : !shapex.ranked_shape<[4,?],i32>,
+    %lhs_shape : !shapex.ranked_shape<[3,4,?],i32>,
     %rhs : !vmla.buffer,
-    %rhs_shape : !shapex.ranked_shape<[?,4],i32>,
+    %rhs_shape : !shapex.ranked_shape<[3,?,4],i32>,
     %dst : !vmla.buffer,
-    %dst_shape : !shapex.ranked_shape<[4,4],i32>) {
-  // CHECK: vm.call.variadic @vmla.matmul.f32f32.f32(%arg0, [%c4, %arg1], %arg2, [%arg3, %c4], %arg4, [%c4, %c4])
-  "vmla.matmul"(%lhs, %lhs_shape, %rhs, %rhs_shape, %dst, %dst_shape)
+    %dst_shape : !shapex.ranked_shape<[3,4,4],i32>) {
+  // CHECK: vm.call.variadic @vmla.batch.matmul.f32f32.f32(%arg0, [%c3, %c4, %arg1], %arg2, [%c3, %arg3, %c4], %arg4, [%c3, %c4, %c4])
+  "vmla.batch.matmul"(%lhs, %lhs_shape, %rhs, %rhs_shape, %dst, %dst_shape)
       { lhs_type = f32, rhs_type = f32, dst_type = f32 } :
       (!vmla.buffer,
-       !shapex.ranked_shape<[4,?],i32>,
+       !shapex.ranked_shape<[3,4,?],i32>,
        !vmla.buffer,
-       !shapex.ranked_shape<[?,4],i32>,
+       !shapex.ranked_shape<[3,?,4],i32>,
        !vmla.buffer,
-       !shapex.ranked_shape<[4,4],i32>) -> ()
+       !shapex.ranked_shape<[3,4,4],i32>) -> ()
   return
 }

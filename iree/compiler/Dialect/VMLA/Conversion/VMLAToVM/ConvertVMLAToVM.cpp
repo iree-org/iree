@@ -220,12 +220,13 @@ class VMLAConvertImportOpConversion
   }
 };
 
-class VMLAMatMulImportOpConversion
-    : public VMLAImportOpConversion<IREE::VMLA::MatMulOp> {
+class VMLABatchMatMulImportOpConversion
+    : public VMLAImportOpConversion<IREE::VMLA::BatchMatMulOp> {
  public:
-  using VMLAImportOpConversion<IREE::VMLA::MatMulOp>::VMLAImportOpConversion;
+  using VMLAImportOpConversion<
+      IREE::VMLA::BatchMatMulOp>::VMLAImportOpConversion;
 
-  std::string getImportSuffix(IREE::VMLA::MatMulOp op) const override {
+  std::string getImportSuffix(IREE::VMLA::BatchMatMulOp op) const override {
     return std::string(".") + getTypedTypeStr(op.lhs_type()) +
            getTypedTypeStr(op.rhs_type()) + std::string(".") +
            getTypedTypeStr(op.dst_type());
@@ -290,8 +291,8 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 
   patterns.insert<VMLAConvertImportOpConversion>(context, importSymbols,
                                                  typeConverter, "vmla.convert");
-  patterns.insert<VMLAMatMulImportOpConversion>(context, importSymbols,
-                                                typeConverter, "vmla.matmul");
+  patterns.insert<VMLABatchMatMulImportOpConversion>(
+      context, importSymbols, typeConverter, "vmla.batch.matmul");
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceSumOp, "vmla.reduce.sum");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMinOp, "vmla.reduce.min");

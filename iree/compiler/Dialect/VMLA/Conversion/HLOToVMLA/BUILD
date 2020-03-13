@@ -20,6 +20,7 @@ package(
 cc_library(
     name = "HLOToVMLA",
     srcs = [
+        "ConvertDotOps.cpp",
         "ConvertHLOToVMLA.cpp",
         "ConvertReductionOps.cpp",
     ],
@@ -32,6 +33,7 @@ cc_library(
         "//iree/compiler/Dialect/VMLA/Conversion",
         "//iree/compiler/Dialect/VMLA/IR",
         "//iree/compiler/Dialect/VMLA/IR:VMLADialect",
+        "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",

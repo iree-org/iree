@@ -37,6 +37,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+void populateHLODotToVMLAPatterns(MLIRContext *context,
+                                  OwningRewritePatternList &patterns,
+                                  TypeConverter &typeConverter);
 void populateHLOReductionToVMLAPatterns(MLIRContext *context,
                                         OwningRewritePatternList &patterns,
                                         TypeConverter &typeConverter);
@@ -444,6 +447,9 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // xla_hlo.reduce and xla_hlo.reduce_window.
   populateHLOReductionToVMLAPatterns(context, patterns, typeConverter);
 
+  // xla_hlo.dot and xla_hlo.dot_general.
+  populateHLODotToVMLAPatterns(context, patterns, typeConverter);
+
   // Simple 1:1 conversion patterns using the automated trait-based converter.
   // Used for HLO ops that have equivalent VMLA ops such as most arithmetic ops.
   patterns.insert<VMLAOpConversion<xla_hlo::AddOp, IREE::VMLA::AddOp>>(
@@ -509,8 +515,6 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   patterns.insert<VMLAOpConversion<xla_hlo::MinOp, IREE::VMLA::MinOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::ClampOp, IREE::VMLA::ClampOp>>(
-      context, typeConverter);
-  patterns.insert<VMLAOpConversion<xla_hlo::DotOp, IREE::VMLA::MatMulOp>>(
       context, typeConverter);
 
   // Ops that are only used for type information that we erase. We can elide
