@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -26,6 +27,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Transforms/DialectConversion.h"
+
+#define DEBUG_TYPE "iree-hal"
 
 namespace mlir {
 namespace iree_compiler {
@@ -163,32 +166,39 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
 }
 
 // Returns a the (x, y, z) workgroup counts calculated from the given |workload|
-// and the workgroup size of the dispatch |entryPointOp|.
+// (invocation count) and the workgroup size of the dispatch |entryPointOp|.
 static std::array<Value, 3> getDispatchWorkgroupCounts(
     IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
     ConversionPatternRewriter &rewriter) {
   std::array<Value, 3> result;
   auto loc = entryPointOp.getLoc();
+  auto i32Type = rewriter.getIntegerType(32);
+  auto constantOne = rewriter.createOrFold<mlir::ConstantOp>(
+      loc, rewriter.getI32IntegerAttr(1));
+  workload = rewriter.createOrFold<mlir::IndexCastOp>(loc, i32Type, workload);
   for (int i = 0; i < 3; ++i) {
     // Round up: (workload + workgroup_size - 1) / workgroup_size;
-    auto workloadI = rewriter.createOrFold<ExtractElementOp>(
-        loc, workload,
-        rewriter.createOrFold<mlir::ConstantOp>(
-            loc, IntegerAttr::get(rewriter.getIndexType(), i)));
     auto workgroupSizeI = rewriter.createOrFold<mlir::ConstantOp>(
         loc, rewriter.getI32IntegerAttr(
                  entryPointOp.workgroup_size().getValue<int32_t>(
                      {static_cast<uint64_t>(i)})));
+    auto rounded = rewriter.createOrFold<mlir::SubIOp>(
+        loc, rewriter.createOrFold<mlir::AddIOp>(loc, workload, workgroupSizeI),
+        constantOne);
     auto workgroupCountI = rewriter.createOrFold<mlir::UnsignedDivIOp>(
-        loc,
-        rewriter.createOrFold<mlir::SubIOp>(
-            loc,
-            rewriter.createOrFold<mlir::AddIOp>(loc, workloadI, workgroupSizeI),
-            rewriter.createOrFold<mlir::ConstantOp>(
-                loc, rewriter.getI32IntegerAttr(1))),
-        workgroupSizeI);
-
+        loc, rounded, workgroupSizeI);
     result[i] = workgroupCountI;
+
+    // Multiply back out and subtract from invocations.
+    workload = rewriter.createOrFold<SubIOp>(
+        loc, workload,
+        rewriter.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
+
+    // Ensure > 0.
+    auto workloadGreaterZero =
+        rewriter.create<CmpIOp>(loc, CmpIPredicate::sge, workload, constantOne);
+    workload = rewriter.create<SelectOp>(loc, workloadGreaterZero, workload,
+                                         constantOne);
   }
   return result;
 }

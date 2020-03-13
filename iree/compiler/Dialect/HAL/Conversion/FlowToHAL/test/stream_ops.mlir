@@ -18,14 +18,14 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK-DAG: [[C1:%.+]] = constant 1
   // CHECK-DAG: [[C4:%.+]] = constant 4
   // CHECK-DAG: [[C128:%.+]] = constant 128
-  %cst = constant dense<[128, 1, 1]> : vector<3xi32>
+  %cst = constant 128 : index
   // CHECK: [[RET_BUF:%.+]] = hal.allocator.allocate {{.+}}, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch"
   // CHECK-NEXT: hal.ex.defer_release [[RET_BUF]]
   // CHECK: [[TMP_BUF:%.+]] = hal.allocator.allocate {{.+}}, "DeviceVisible|DeviceLocal", "Transfer|Dispatch"
   // CHECK-NEXT: hal.ex.defer_release [[TMP_BUF]]
   // CHECK: [[CMD:%.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
-  %0 = flow.ex.stream.fragment(%arg1 = %cst : vector<3xi32>, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
+  %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
     // CHECK: [[EXE:%.+]] = hal.ex.cache_executable {{.+}}, @ex0 : !hal.executable
     // CHECK-NEXT: hal.ex.push_binding [[CMD]], 0, %arg0, shape = [
     // CHECK-SAME:   [[C128]]
@@ -39,7 +39,7 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
     // CHECK: hal.command_buffer.execution_barrier
-    %1 = flow.dispatch @ex0::@entry0[%arg1 : vector<3xi32>](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
+    %1 = flow.dispatch @ex0::@entry0[%arg1 : index](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
     // CHECK: hal.ex.push_binding [[CMD]], 0, [[TMP_BUF]], shape = [
     // CHECK-SAME:   [[C128]]
     // CHECK-SAME: ], element_type = 50331680
@@ -52,7 +52,7 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
     // CHECK: hal.command_buffer.execution_barrier
-    %2 = flow.dispatch @ex0::@entry0[%arg1 : vector<3xi32>](%1) : (tensor<128xf32>) -> tensor<128xf32>
+    %2 = flow.dispatch @ex0::@entry0[%arg1 : index](%1) : (tensor<128xf32>) -> tensor<128xf32>
     flow.return %2 : tensor<128xf32>
   }
   // CHECK: hal.command_buffer.end [[CMD]]

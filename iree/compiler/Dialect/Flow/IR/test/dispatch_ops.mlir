@@ -13,8 +13,9 @@ flow.executable @ex0 {
 
 // CHECK-LABEL: @dispatch
 func @dispatch(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %cst = constant dense<1> : vector<3xi32>
-  // CHECK: %0 = flow.dispatch @ex0::@dispatch_fn[%cst : vector<3xi32>](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  %0 = flow.dispatch @ex0::@dispatch_fn[%cst : vector<3xi32>](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  // CHECK: %[[CST:.+]] = constant
+  %cst = constant 4 : index
+  // CHECK: %0 = flow.dispatch @ex0::@dispatch_fn[%[[CST]] : index](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
+  %0 = flow.dispatch @ex0::@dispatch_fn[%cst : index](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   return %0 : tensor<4xf32>
 }

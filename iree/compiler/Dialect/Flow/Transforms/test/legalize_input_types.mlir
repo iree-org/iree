@@ -40,15 +40,6 @@ func @constantDenseTensorI64() -> tensor<4xi64> {
 
 // -----
 
-// CHECK-LABEL: func @typesIndex
-// CHECK-SAME: (%arg0: i32) -> i32
-func @typesIndex(%arg0 : index) -> index {
-  // CHECK-NEXT: return %arg0 : i32
-  return %arg0 : index
-}
-
-// -----
-
 // CHECK-LABEL: func @typesI64
 // CHECK-SAME: (%arg0: i32) -> i32
 func @typesI64(%arg0 : i64) -> i64 {

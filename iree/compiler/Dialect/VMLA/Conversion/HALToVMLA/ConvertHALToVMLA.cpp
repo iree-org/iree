@@ -70,6 +70,7 @@ struct InterfaceLoadTensorOpConversion
         interfaceArg, bindingOp.set(), bindingOp.binding());
     auto byteLengthValue = VMLAConversionTarget::getBufferLength(
         loadOp.getLoc(), loadOp.result(), typeConverter, rewriter);
+    if (!byteLengthValue) return matchFailure();
     rewriter.replaceOpWithNewOp<IREE::VMLA::BufferViewOp>(
         loadOp, IREE::VMLA::BufferType::get(loadOp.getContext()),
         bufferOp.result(), newOperands.offset(), byteLengthValue);

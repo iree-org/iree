@@ -23,10 +23,10 @@ namespace iree_compiler {
 FlowTypeConverter::FlowTypeConverter() {
   // Allow types through by default.
   addConversion([](Type type) { return type; });
-  addConversion([](IndexType type) {
-    // Always treat as 32-bit.
-    return IntegerType::get(32, type.getContext());
-  });
+  // addConversion([](IndexType type) {
+  //   // Always treat as 32-bit.
+  //   return IntegerType::get(32, type.getContext());
+  // });
   addConversion([](IntegerType integerType) -> Optional<Type> {
     if (integerType.isSignlessInteger() && integerType.getWidth() > 32) {
       // Don't support 64-bit types in general. Rewrite to i32 (if desired).

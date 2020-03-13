@@ -125,9 +125,6 @@ std::unique_ptr<OpPassBase<FuncOp>> createFormStreamsPass();
 // Module Analysis and Finalization
 //===----------------------------------------------------------------------===//
 
-// Assigns workload attributes to executable entry points based on dispatches.
-std::unique_ptr<OpPassBase<ModuleOp>> createAssignExecutableWorkloadsPass();
-
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

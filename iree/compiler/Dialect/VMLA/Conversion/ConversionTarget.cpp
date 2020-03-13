@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
@@ -28,6 +29,8 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+using Shape::buildOrFindRankedShapeForValue;
 
 VMLAConversionTarget::VMLAConversionTarget(MLIRContext *context,
                                            TypeConverter &typeConverter)
@@ -188,12 +191,8 @@ LogicalResult VMLAConversionTarget::applyDefaultBufferRewrite(
 Value VMLAConversionTarget::getTensorShape(
     Location loc, Value originalValue, TypeConverter &typeConverter,
     ConversionPatternRewriter &rewriter) {
-  // TODO(benvanik): use tie_shape to find the ranked shape to use for the
-  // originalValue tensor.
-  auto originalType = originalValue.getType().cast<ShapedType>();
-  return rewriter.createOrFold<Shape::ConstRankedShapeOp>(
-      loc, Shape::RankedShapeType::get(originalType.getShape(),
-                                       rewriter.getIntegerType(32)));
+  return buildOrFindRankedShapeForValue(loc, originalValue,
+                                        rewriter.getIntegerType(32), rewriter);
 }
 
 // static
@@ -224,6 +223,9 @@ Value VMLAConversionTarget::getBufferOffset(
           VMLATypeConverter::getRoundedElementByteWidth(elementType)));
 
   auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
+  if (!shape) {
+    return nullptr;
+  }
   Value offset = rewriter.createOrFold<mlir::ConstantOp>(
       loc, rewriter.getIntegerType(32), rewriter.getI32IntegerAttr(0));
   for (int i = 0; i < tensorType.getRank(); ++i) {
@@ -250,6 +252,7 @@ Value VMLAConversionTarget::getBufferLength(
           VMLATypeConverter::getRoundedElementByteWidth(elementType)));
 
   auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
+  if (!shape) return nullptr;
   auto dims = rewriter.create<Shape::RankedDimsOp>(loc, shape);
   Value length = elementSize;
   for (auto dim : dims.getResults()) {

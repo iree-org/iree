@@ -100,9 +100,12 @@ class Conv2dModule(tf.Module):
 
 @tf_test_utils.compile_modules(
     backends=[
-        "iree_vulkan",
+        # TODO(laurenzo): Enable for all backends once vmla reference
+        # and Linalg vulkan impl lands.
+        # "iree_vulkan",
         "tf",
-    ], conv2d=Conv2dModule)
+    ],
+    conv2d=Conv2dModule)
 class ConvTest(tf_test_utils.SavedModelTestCase):
 
   def test_id_batch_size_1(self):

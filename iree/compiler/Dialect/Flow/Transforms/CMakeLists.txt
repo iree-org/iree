@@ -20,7 +20,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "AssignExecutableWorkloads.cpp"
     "DispatchabilityAnalysis.cpp"
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"

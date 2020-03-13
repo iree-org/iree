@@ -349,6 +349,7 @@ void GetRankedShapeOp::getCanonicalizationPatterns(
 
 void ConstRankedShapeOp::build(Builder *builder, OperationState &result,
                                Type type) {
+  assert(type.cast<RankedShapeType>().isFullyStatic());
   result.types.push_back(type);
 }
 

@@ -20,7 +20,6 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
-        "AssignExecutableWorkloads.cpp",
         "DispatchabilityAnalysis.cpp",
         "FlattenTuplesInCFG.cpp",
         "FoldCompatibleDispatchRegions.cpp",
@@ -45,6 +44,7 @@ cc_library(
         "//iree/compiler/Dialect/Flow/Conversion/StandardToFlow",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Utils",
+        "//iree/compiler/Dialect/Shape/IR",
         "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:Analysis",

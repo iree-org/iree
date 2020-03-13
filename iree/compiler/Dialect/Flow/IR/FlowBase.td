@@ -131,7 +131,7 @@ def FLOW_VariableRefAttr : AliasedSymbolRefAttr;
 def FLOW_VariablePtr : AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 
 // TODO(benvanik): use index types instead of i32.
-def FLOW_Workload : VectorOfLengthAndType<[3], [I32]> {
+def FLOW_Workload : AnyTypeOf<[Index]> {
   let typeDescription = [{
     Describes the total untiled invocations along one or more dimensions.
     Tiling may later divide this value for workgroup sizes.

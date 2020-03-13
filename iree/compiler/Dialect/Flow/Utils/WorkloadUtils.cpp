@@ -15,7 +15,11 @@
 #include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
 
 #include <array>
+#include <limits>
 
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -25,59 +29,55 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+using Shape::buildOrFindRankedShapeForValue;
+using Shape::RankedDimOp;
+
 namespace IREE {
 namespace Flow {
 
 Value calculateWorkload(Operation *op, Value baseOperand) {
-  OpBuilder builder(op);
-
-  std::array<int32_t, 3> workload = {1, 1, 1};
-
-  // TODO(b/139353314): lookup/calculate based on type/etc.
+  OpBuilder builder(op->getContext());
   auto baseOperandType = baseOperand.getType().cast<ShapedType>();
-  if (!baseOperandType.hasStaticShape()) {
-    op->emitOpError() << "Dynamic shapes not yet supported";
+  if (baseOperandType.hasRank() && baseOperandType.hasStaticShape()) {
+    // Just a constant (note this also covers rank0).
+    int64_t numElements = baseOperandType.getNumElements();
+    if (numElements > std::numeric_limits<int32_t>::max()) {
+      return (op->emitOpError()
+              << "total element count > 32bit integer capacity"),
+             nullptr;
+    }
+    builder.setInsertionPointToStart(op->getBlock());
+    return builder.create<ConstantOp>(
+        op->getLoc(), builder.getIndexType(),
+        builder.getIntegerAttr(builder.getIndexType(), numElements));
+  } else if (baseOperandType.hasRank()) {
+    // Materialize a ranked shape and compute.
+    auto rankedShape = buildOrFindRankedShapeForValue(
+        op->getLoc(), baseOperand, builder.getIndexType(), builder);
+    if (!rankedShape) return nullptr;
+    // Ensure to emit with proper dominance.
+    // TODO(laurenzo): Need to overhaul insertion points generally in
+    // dispatch region formation.
+    if (rankedShape.getDefiningOp()) {
+      builder.setInsertionPointAfter(rankedShape.getDefiningOp());
+    }
+    Value numElements;
+    for (int64_t i = 0, e = baseOperandType.getRank(); i < e; ++i) {
+      auto dim = builder.create<RankedDimOp>(op->getLoc(), rankedShape, i);
+      if (!numElements) {
+        numElements = dim;
+        continue;
+      }
+      numElements = builder.create<MulIOp>(op->getLoc(), numElements, dim);
+    }
+    op->getParentOp()->dump();
+    return numElements;
+  } else {
+    op->emitOpError()
+        << "unranked shapes not supported for workload calculation";
     return nullptr;
   }
-  auto shape = baseOperandType.getShape();
-  if (auto conv = dyn_cast_or_null<xla_hlo::ConvOp>(op)) {
-    workload[2] =
-        shape[conv.dimension_numbers().output_batch_dimension().getInt()];
-    int i = 0;
-    for (const auto &dim :
-         conv.dimension_numbers().output_spatial_dimensions().getIntValues()) {
-      if (i > 1) {
-        break;
-      }
-      workload[1 - i++] = shape[dim.getSExtValue()];
-    }
-  } else {
-    // Drop the trailing ones from the shape.
-    while (shape.size() > 1 && shape.back() == 1) {
-      shape = shape.drop_back();
-    }
-    if (shape.size() <= 3) {
-      // Maps to XYZ (possibly with 1's for unused dimensions).
-      for (auto dim : enumerate(shape)) {
-        workload[shape.size() - 1 - dim.index()] = dim.value();
-      }
-    } else {
-      // Need to flatten the shape to fit XYZ. For now we just squash from LHS.
-      workload[2] = 1;
-      for (int i = 0; i < shape.size() - 2; ++i) {
-        workload[2] *= shape[i];
-      }
-      workload[1] = shape[shape.size() - 2];
-      workload[0] = shape.back();
-    }
-  }
-
-  // TODO(b/139353314): optimize workload layout.
-
-  auto constantType = VectorType::get({3}, builder.getIntegerType(32));
-  return builder.create<ConstantOp>(
-      op->getLoc(), constantType,
-      DenseIntElementsAttr::get(constantType, workload));
 }
 
 }  // namespace Flow

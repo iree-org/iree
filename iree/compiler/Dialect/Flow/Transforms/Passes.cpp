@@ -78,7 +78,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createPostPartitioningConversionPass());
 
   // Assign attributes and negotiate each executable's ABI signature.
-  passManager.addPass(IREE::Flow::createAssignExecutableWorkloadsPass());
+  // passManager.addPass(IREE::Flow::createAssignExecutableWorkloadsPass());
 
   // Form streams.
   passManager.addPass(IREE::Flow::createFormStreamsPass());

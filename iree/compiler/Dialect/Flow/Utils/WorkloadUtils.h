@@ -24,7 +24,7 @@ namespace IREE {
 namespace Flow {
 
 // Calculates the workload for |op| based on the given operation operand.
-// Returns a vector<3xi32> containing the X, Y, Z workload parameters.
+// Returns an index representing the total number of invocations required.
 //
 // The |baseOperand| is usually one of the results of a dispatch that signifies
 // how many invocations are ideal for writing the result. Later on in the

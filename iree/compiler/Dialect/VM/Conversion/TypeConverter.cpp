@@ -15,9 +15,13 @@
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/IR/StandardTypes.h"
+
+#define DEBUG_TYPE "iree-vm"
 
 namespace mlir {
 namespace iree_compiler {
@@ -56,7 +60,7 @@ VMTypeConverter::VMTypeConverter() {
     }
     return IREE::PtrType::get(targetType);
   });
-  // Convert ranked shape types.
+  // Convert ranked shape types (expanding all dims).
   addConversion(
       [](Shape::RankedShapeType rankedShape, SmallVectorImpl<Type> &results) {
         for (int i = 0; i < rankedShape.getRank(); ++i) {
@@ -72,6 +76,11 @@ Operation *VMTypeConverter::materializeConversion(PatternRewriter &rewriter,
                                                   Type resultType,
                                                   ArrayRef<Value> inputs,
                                                   Location loc) {
+  LLVM_DEBUG(llvm::dbgs() << "MATERIALIZE CONVERSION: " << resultType << "\n");
+  if (auto rsType = resultType.dyn_cast<Shape::RankedShapeType>()) {
+    return rewriter.create<Shape::MakeRankedShapeOp>(loc, rsType, inputs);
+  }
+
   // TODO(b/145876978): materialize conversion when this is called.
   llvm_unreachable("unhandled materialization");
   return nullptr;
