@@ -24,6 +24,7 @@ iree_cc_library(
     "ConvertHLOToVMLA.cpp"
     "ConvertReductionOps.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRPass
     MLIRStandardOps
