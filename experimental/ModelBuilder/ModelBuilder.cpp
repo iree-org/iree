@@ -127,3 +127,8 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
   return linalg_pointwise(fusedBiasTanh, o2({i, j}), bias({j}), o3Type({i, j}))
       ->getResult(0);
 }
+
+ValueHandle CapturedValueHandle::capture(std::function<ValueHandle(void)> f) {
+  if (!value_handle_.hasValue()) value_handle_ = f();
+  return value_handle_;
+}
