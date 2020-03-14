@@ -36,18 +36,21 @@ void populateCheckToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
       context, importSymbols, typeConverter, "check.expect_all_true");
   patterns.insert<VMImportOpConversion<IREE::Check::ExpectEqOp>>(
       context, importSymbols, typeConverter, "check.expect_eq");
+  patterns.insert<VMImportOpConversion<IREE::Check::ExpectAlmostEqOp>>(
+      context, importSymbols, typeConverter, "check.expect_almost_eq");
 }
 
 void populateCheckToHALPatterns(MLIRContext *context,
                                 OwningRewritePatternList &patterns,
                                 TypeConverter &typeConverter) {
   // The same op handles both tensors and buffer views.
-  patterns.insert<HALOpConversion<IREE::Check::ExpectAllTrueOp,
-                                  IREE::Check::ExpectAllTrueOp>>(context,
-                                                                 typeConverter);
-  patterns.insert<
-      HALOpConversion<IREE::Check::ExpectEqOp, IREE::Check::ExpectEqOp>>(
-      context, typeConverter);
+  patterns
+      .insert<HALOpConversion<IREE::Check::ExpectAllTrueOp,
+                              IREE::Check::ExpectAllTrueOp>,
+              HALOpConversion<IREE::Check::ExpectEqOp, IREE::Check::ExpectEqOp>,
+              HALOpConversion<IREE::Check::ExpectAlmostEqOp,
+                              IREE::Check::ExpectAlmostEqOp>>(context,
+                                                              typeConverter);
 }
 
 }  // namespace Check

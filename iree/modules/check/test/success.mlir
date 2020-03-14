@@ -27,6 +27,20 @@ func @expect_all_true_tensor() attributes { iree.module.export } {
   return
 }
 
+func @expect_eq() attributes { iree.module.export } {
+  %const0 = iree.unfoldable_constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  %const1 = iree.unfoldable_constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  check.expect_eq(%const0, %const1) : tensor<5xi32>
+  return
+}
+
+func @expect_almost_eq() attributes { iree.module.export } {
+  %const0 = iree.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
+  %const1 = iree.unfoldable_constant dense<[0.999999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
+  check.expect_almost_eq(%const0, %const1) : tensor<5xf32>
+  return
+}
+
 func @abs() attributes { iree.module.export } {
   %cm5 = iree.unfoldable_constant dense<-5> : tensor<i32>
   %result = "xla_hlo.abs"(%cm5) : (tensor<i32>) -> tensor<i32>
@@ -35,3 +49,19 @@ func @abs() attributes { iree.module.export } {
   return
 }
 
+func @floats() attributes { iree.module.export } {
+  %cp1 = iree.unfoldable_constant dense<0.1> : tensor<f32>
+  %c1 = iree.unfoldable_constant dense<1.0> : tensor<f32>
+  %p2 = "xla_hlo.add"(%cp1, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p3 = "xla_hlo.add"(%p2, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p4 = "xla_hlo.add"(%p3, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p5 = "xla_hlo.add"(%p4, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p6 = "xla_hlo.add"(%p5, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p7 = "xla_hlo.add"(%p6, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p8 = "xla_hlo.add"(%p7, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %p9 = "xla_hlo.add"(%p8, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  %approximately_1 = "xla_hlo.add"(%p9, %cp1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+
+  check.expect_almost_eq(%approximately_1, %c1) : tensor<f32>
+  return
+}

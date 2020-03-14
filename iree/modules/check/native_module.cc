@@ -14,6 +14,8 @@
 
 #include "iree/modules/check/native_module.h"
 
+#include <math.h>
+
 #include <cstdio>
 #include <cstring>
 #include <sstream>
@@ -40,17 +42,75 @@ using ::testing::Each;
 using ::testing::Not;
 
 template <typename T>
+absl::Span<const T> AbslSpan(iree_byte_span_t bytes) {
+  return absl::Span<T>(reinterpret_cast<T*>(bytes.data),
+                       bytes.data_length / sizeof(T));
+}
+
+template <typename T>
 Status ExpectAllTrue(iree_byte_span_t bytes) {
-  EXPECT_THAT(absl::Span<T>(reinterpret_cast<T*>(bytes.data),
-                            bytes.data_length / sizeof(T)),
-              Each(Not(0)));
+  EXPECT_THAT(AbslSpan<T>(bytes), Each(Not(0)));
   return OkStatus();
 }
 
 // TODO(b/146898896): Put this somewhere common. Operator overload?
-bool EqByteSpan(iree_byte_span_t lhsBytes, iree_byte_span_t rhsBytes) {
-  return (absl::Span<uint8_t>(lhsBytes.data, lhsBytes.data_length) ==
-          absl::Span<uint8_t>(rhsBytes.data, rhsBytes.data_length));
+bool EqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
+  return AbslSpan<uint8_t>(lhs_bytes) == AbslSpan<uint8_t>(rhs_bytes);
+}
+
+template <typename T>
+bool AlmostEqByteSpan(iree_byte_span_t lhs_bytes, iree_byte_span_t rhs_bytes) {
+  auto lhs_span = AbslSpan<T>(lhs_bytes);
+  auto rhs_span = AbslSpan<T>(rhs_bytes);
+  assert(lhs_span.size() == rhs_span.size());
+  for (int i = 0; i < lhs_span.size(); ++i) {
+    if (fabs(lhs_span[i] - rhs_span[i]) > 0.0001) {
+      return false;
+    }
+  }
+  return true;
+}
+
+StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
+                                iree_byte_span_t rhs_bytes,
+                                iree_hal_element_type_t element_type) {
+  switch (element_type) {
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+      return AlmostEqByteSpan<int8_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+      return AlmostEqByteSpan<uint8_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+      return AlmostEqByteSpan<int16_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+      return AlmostEqByteSpan<uint16_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+      return AlmostEqByteSpan<int32_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+      return AlmostEqByteSpan<uint32_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+      return AlmostEqByteSpan<int64_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
+      return AlmostEqByteSpan<uint64_t>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+      return AlmostEqByteSpan<float>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+      return AlmostEqByteSpan<double>(lhs_bytes, rhs_bytes);
+    case IREE_HAL_ELEMENT_TYPE_NONE:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_8:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_16:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_32:
+    case IREE_HAL_ELEMENT_TYPE_OPAQUE_64:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
+      break;
+    }
+  }
+  char element_type_str[16];
+  RETURN_IF_ERROR(FromApiStatus(
+      iree_hal_format_element_type(element_type, sizeof(element_type_str),
+                                   element_type_str, nullptr),
+      IREE_LOC));
+  return InvalidArgumentErrorBuilder(IREE_LOC)
+         << "Unsupported element type " << element_type_str;
 }
 
 Status ExpectAllTrue(iree_byte_span_t bytes,
@@ -82,7 +142,7 @@ Status ExpectAllTrue(iree_byte_span_t bytes,
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_32:
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_64:
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
-      // fall through
+      break;
     }
   }
   char element_type_str[16];
@@ -229,6 +289,109 @@ class CheckModuleState final {
     return OkStatus();
   }
 
+  Status ExpectAlmostEq(vm::ref<iree_hal_buffer_view_t> lhs_ref,
+                        vm::ref<iree_hal_buffer_view_t> rhs_ref) {
+    auto* lhs = lhs_ref.get();
+    auto* rhs = rhs_ref.get();
+    size_t lhs_rank = iree_hal_buffer_view_shape_rank(lhs);
+    absl::InlinedVector<int32_t, 6> lhs_shape(lhs_rank);
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_view_shape(lhs, lhs_rank, lhs_shape.data(), nullptr),
+        IREE_LOC));
+
+    size_t rhs_rank = iree_hal_buffer_view_shape_rank(rhs);
+    absl::InlinedVector<int32_t, 6> rhs_shape(rhs_rank);
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_view_shape(rhs, rhs_rank, rhs_shape.data(), nullptr),
+        IREE_LOC));
+
+    iree_hal_element_type_t lhs_element_type =
+        iree_hal_buffer_view_element_type(lhs);
+    iree_hal_element_type_t rhs_element_type =
+        iree_hal_buffer_view_element_type(rhs);
+
+    iree_hal_buffer_t* lhs_buf = iree_hal_buffer_view_buffer(lhs);
+    iree_hal_mapped_memory_t lhs_mapped_memory;
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_buffer_map(lhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
+                                          &lhs_mapped_memory),
+                      IREE_LOC));
+    iree_hal_buffer_t* rhs_buf = iree_hal_buffer_view_buffer(rhs);
+    iree_hal_mapped_memory_t rhs_mapped_memory;
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_buffer_map(rhs_buf, IREE_HAL_MEMORY_ACCESS_READ,
+                                          /*byte_offset=*/0, IREE_WHOLE_BUFFER,
+                                          &rhs_mapped_memory),
+                      IREE_LOC));
+
+    bool element_types_eq = lhs_element_type == rhs_element_type;
+    bool shape_eq = lhs_shape == rhs_shape;
+    // Only check contents if shape and element type match. Otherwise we can't.
+    bool contents_could_be_almost_eq = true;
+    if (element_types_eq && shape_eq) {
+      ASSIGN_OR_RETURN(
+          contents_could_be_almost_eq,
+          AlmostEqByteSpan(lhs_mapped_memory.contents,
+                           rhs_mapped_memory.contents, lhs_element_type));
+    }
+    if (!element_types_eq || !shape_eq || !contents_could_be_almost_eq) {
+      std::ostringstream os;
+      os << "Expected near equality of these values.";
+      if (!element_types_eq) {
+        os << " Element types do not match.";
+      }
+      if (!shape_eq) {
+        os << " Shapes do not match.";
+      }
+      if (!contents_could_be_almost_eq) {
+        os << " Contents does not match.";
+      }
+      // TODO(b/146898896): Propagate original variable names.
+      os << "\n"
+            "  lhs:\n"
+            "    ";
+      char lhs_element_type_str[16];
+      RETURN_IF_ERROR(FromApiStatus(
+          iree_hal_format_element_type(iree_hal_buffer_view_element_type(lhs),
+                                       sizeof(lhs_element_type_str),
+                                       lhs_element_type_str, nullptr),
+          IREE_LOC));
+      // TODO(b/146898896): Remove dependence on Shape.
+      PrintShapedTypeToStream(Shape{lhs_shape}, lhs_element_type_str, &os);
+      os << "=";
+      RETURN_IF_ERROR(
+          PrintNumericalDataToStream(Shape{lhs_shape}, lhs_element_type_str,
+                                     {lhs_mapped_memory.contents.data,
+                                      lhs_mapped_memory.contents.data_length},
+                                     /*max_entries=*/1024, &os));
+
+      os << "\n"
+            "  rhs:\n"
+            "    ";
+      char rhs_element_type_str[16];
+      RETURN_IF_ERROR(FromApiStatus(
+          iree_hal_format_element_type(iree_hal_buffer_view_element_type(rhs),
+                                       sizeof(rhs_element_type_str),
+                                       rhs_element_type_str, nullptr),
+          IREE_LOC));
+      PrintShapedTypeToStream(Shape{rhs_shape}, rhs_element_type_str, &os);
+      os << "=";
+      RETURN_IF_ERROR(
+          PrintNumericalDataToStream(Shape{rhs_shape}, rhs_element_type_str,
+                                     {rhs_mapped_memory.contents.data,
+                                      rhs_mapped_memory.contents.data_length},
+                                     /*max_entries=*/1024, &os));
+
+      // TODO(b/146898896): Use ADD_FAILURE_AT to propagate source location.
+      ADD_FAILURE() << os.str();
+    }
+    iree_hal_buffer_unmap(lhs_buf, &lhs_mapped_memory);
+    iree_hal_buffer_unmap(rhs_buf, &rhs_mapped_memory);
+
+    return OkStatus();
+  }
+
  private:
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
@@ -243,6 +406,8 @@ static const vm::NativeFunction<CheckModuleState> kCheckModuleFunctions[] = {
     vm::MakeNativeFunction("expect_false", &CheckModuleState::ExpectFalse),
     vm::MakeNativeFunction("expect_all_true", &CheckModuleState::ExpectAllTrue),
     vm::MakeNativeFunction("expect_eq", &CheckModuleState::ExpectEq),
+    vm::MakeNativeFunction("expect_almost_eq",
+                           &CheckModuleState::ExpectAlmostEq),
 };
 
 // The module instance that will be allocated and reused across contexts.

@@ -31,4 +31,9 @@ vm.import @expect_eq(
   %rhs : !vm.ref<!hal.buffer_view>
 )
 
+vm.import @expect_almost_eq(
+  %lhs : !vm.ref<!hal.buffer_view>,
+  %rhs : !vm.ref<!hal.buffer_view>
+)
+
 }  // vm.module

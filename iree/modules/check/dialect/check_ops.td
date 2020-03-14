@@ -87,4 +87,21 @@ def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
   let assemblyFormat = "`(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)";
 }
 
+def CHECK_ExpectAlmostEqOp : Op<CHECK_Dialect, "expect_almost_eq", [SameTypeOperands]> {
+  let summary = [{Checks that the operands are almost equal}];
+  let description = [{
+    Verifies that the buffer view or tensor operands with float elements are
+    almost equal to within an implementation-defined "reasonable" tolerance.
+
+    Issues a non-fatal failure if the verification fails.
+  }];
+
+  let arguments = (ins
+      AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$lhs,
+      AnyTypeOf<[HAL_BufferView, TensorOf<[AnyFloat]>]>:$rhs
+  );
+
+  let assemblyFormat = "`(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)";
+}
+
 #endif  // IREE_MODULES_CHECK_DIALECT_CHECK_OPS

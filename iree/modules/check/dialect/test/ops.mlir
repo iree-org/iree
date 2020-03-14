@@ -75,3 +75,25 @@ func @expect_eq_tensor(%lhs : tensor<2x2xi32>, %rhs : tensor<2x2xi32>) {
   check.expect_eq(%lhs, %rhs) : tensor<2x2xi32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: @expect_almost_eq
+// CHECK-SAME: [[LHS:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[RHS:%[a-zA-Z0-9]+]]
+func @expect_almost_eq(%lhs : !hal.buffer_view, %rhs : !hal.buffer_view) {
+  // CHECK: check.expect_almost_eq([[LHS]], [[RHS]]) : !hal.buffer_view
+  check.expect_almost_eq(%lhs, %rhs) : !hal.buffer_view
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @expect_almost_eq_tensor
+// CHECK-SAME: [[LHS:%[a-zA-Z0-9]+]]
+// CHECK-SAME: [[RHS:%[a-zA-Z0-9]+]]
+func @expect_almost_eq_tensor(%lhs : tensor<2x2xf32>, %rhs : tensor<2x2xf32>) {
+  // CHECK: check.expect_almost_eq([[LHS]], [[RHS]]) : tensor<2x2xf32>
+  check.expect_almost_eq(%lhs, %rhs) : tensor<2x2xf32>
+  return
+}
