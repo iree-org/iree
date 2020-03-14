@@ -71,31 +71,6 @@ void VariableOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
 
 namespace {
 
-/// Erases hal.variable.load ops whose values are unused.
-/// We have to do this manually as the load op cannot be marked pure and have it
-/// done automatically.
-struct EraseUnusedVariableLoadOp : public OpRewritePattern<VariableLoadOp> {
-  using OpRewritePattern<VariableLoadOp>::OpRewritePattern;
-
-  PatternMatchResult matchAndRewrite(VariableLoadOp op,
-                                     PatternRewriter &rewriter) const override {
-    if (op.result().use_empty()) {
-      rewriter.eraseOp(op);
-      return matchSuccess();
-    }
-    return matchFailure();
-  }
-};
-
-}  // namespace
-
-void VariableLoadOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<EraseUnusedVariableLoadOp>(context);
-}
-
-namespace {
-
 class PropagateVariableLoadAddress
     : public OpRewritePattern<VariableLoadIndirectOp> {
   using OpRewritePattern::OpRewritePattern;

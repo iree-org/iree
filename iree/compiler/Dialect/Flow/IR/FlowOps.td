@@ -82,7 +82,7 @@ def FLOW_VariableAddressOp : FLOW_PureOp<"variable.address"> {
   let assemblyFormat = "$variable attr-dict `:` type($result)";
 }
 
-def FLOW_VariableLoadOp : FLOW_Op<"variable.load"> {
+def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [MemoryEffects<[MemRead]>]> {
   let summary = [{loads a value from a global variable}];
   let description = [{
     Returns a copy of the variable value.
@@ -98,8 +98,6 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load"> {
   let assemblyFormat = "$variable attr-dict `:` type($result)";
 
   let verifier = [{ return verifyVariableLoadOp(*this); }];
-
-  let hasCanonicalizer = 1;
 }
 
 def FLOW_VariableLoadIndirectOp : FLOW_Op<"variable.load.indirect"> {
