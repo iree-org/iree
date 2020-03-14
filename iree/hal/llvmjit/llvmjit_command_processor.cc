@@ -58,7 +58,7 @@ Status LLVMJITCommandProcessor::Dispatch(
         dispatch_request.bindings.at(i).shape.begin(),
         dispatch_request.bindings.at(i).shape.end());
     descriptors[i] = allocUnrankedDescriptor<uint32_t>(data, shape);
-    args[i] = descriptors[i]->descriptor;
+    args[i] = &descriptors[i]->descriptor;
   }
   auto status = executable->Invoke(dispatch_request.entry_point, args);
 

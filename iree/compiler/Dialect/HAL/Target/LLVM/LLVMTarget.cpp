@@ -20,6 +20,7 @@
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/Module.h"
+#include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -44,11 +45,14 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
 // TODO(ataei) Move this to utils ?
 // Returns a list of entry point names matching the expected export ordinals.
 static std::vector<std::string> populateEntryPointNames(
-    IREE::Flow::ExecutableOp executableOp) {
+    IREE::Flow::ExecutableOp executableOp, bool addCInterface) {
   std::vector<std::string> entryPointNames;
   for (auto& op : executableOp.getBlock().getOperations()) {
     if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
-      entryPointNames.push_back(std::string(entryOp.function_ref()));
+      std::string func_name =
+          addCInterface ? "_mlir_ciface_" + std::string(entryOp.function_ref())
+                        : std::string(entryOp.function_ref());
+      entryPointNames.push_back(func_name);
     }
   }
   return entryPointNames;
@@ -70,9 +74,8 @@ void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 
-  // STD -> LLVM
-  pm.addPass(
-      createLowerToLLVMPass(/*useAlloca*/ false, /*emitCWrappers*/ true));
+  // (Linalg, STD) -> LLVM
+  pm.addPass(createConvertLinalgToLLVMPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
 }
@@ -114,7 +117,8 @@ LogicalResult translateToLLVMExecutable(
   iree::LLVMIRExecutableDefT llvmIrExecutableDef;
   llvmIrExecutableDef.llvmir_module = {bufferString.begin(),
                                        bufferString.end()};
-  llvmIrExecutableDef.entry_points = populateEntryPointNames(flowExecutableOp);
+  llvmIrExecutableDef.entry_points =
+      populateEntryPointNames(flowExecutableOp, true);
   ::flatbuffers::FlatBufferBuilder fbb;
   auto executableOffset =
       iree::LLVMIRExecutableDef::Pack(fbb, &llvmIrExecutableDef);

@@ -26,6 +26,7 @@ iree_cc_library(
     LLVMSupport
     MLIRIR
     MLIRLinalgOps
+    MLIRLinalgToLLVM
     MLIRLinalgTransforms
     MLIRLoopToStandard
     MLIRPass

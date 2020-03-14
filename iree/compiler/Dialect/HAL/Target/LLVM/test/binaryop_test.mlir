@@ -17,5 +17,4 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = 1280071245 : i32} {
 // CHECK-NEXT:     module {
-// CHECK-NEXT:       llvm.func @simpleMath_rgn_dispatch_0(
-// CHECK-SAME: {{%.*}}: !llvm<"float*">, {{%.*}}: !llvm<"float*">)
+// CHECK:            llvm.func @_mlir_ciface_simpleMath_rgn_dispatch_0
