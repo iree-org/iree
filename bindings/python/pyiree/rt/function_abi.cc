@@ -84,7 +84,7 @@ py::object PyRawUnpackResults(FunctionAbi* self, VmVariantList& f_args) {
   for (size_t i = 0, e = py_results.size(); i < e; ++i) {
     py_result_tuple[i] = std::move(py_results[i]);
   }
-  return py_result_tuple;
+  return std::move(py_result_tuple);  // Without move, warns of copy.
 }
 
 // RAII wrapper for a Py_buffer which calls PyBuffer_Release when it goes
