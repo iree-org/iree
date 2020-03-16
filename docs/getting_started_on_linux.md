@@ -132,7 +132,18 @@ replacements as needed):
 
 ```
 build --disk_cache=/REPLACE/WITH/CACHE/DIR
-build:debug --compilation_mode=dbg --copt=-O2 --per_file_copt=iree@-O0 --strip=never
+
+# Use --config=debug to compile iree and llvm without optimizations
+# and with assertions enabled.
+build:debug --config=asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-O0' --strip=never
+
+# Use --config=asserts to enable assertions in iree and llvm.
+build:asserts --compilation_mode=opt '--per_file_copt=iree|llvm@-UNDEBUG'
+
+# Bazel sandboxes the environment... because reasons, so punch through
+# the path to swiftshader if needed (i.e. if your machine does not have
+# a supported GPU/driver).
+test --test_env=VK_ICD_FILENAMES=/path/to/your/vk_swiftshader_icd.json
 ```
 
 ### Build
