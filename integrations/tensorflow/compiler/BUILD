@@ -48,19 +48,12 @@ cc_library(
     alwayslink = 1,
 )
 
-cc_library(
-    name = "dialect_registration",
-    srcs = ["DialectRegistration.cpp"],
-    deps = ["@org_tensorflow//tensorflow/compiler/mlir/tensorflow"],
-    alwayslink = 1,
-)
-
 cc_binary(
     name = "iree-tf-opt",
     deps = [
-        ":dialect_registration",
         ":tensorflow",
         "//iree/tools:iree_opt_main",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_passes",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_tf",
     ],
