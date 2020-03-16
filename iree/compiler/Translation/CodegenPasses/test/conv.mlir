@@ -4,7 +4,11 @@
 func @conv(%arg0: memref<3x5x5x3xf32>, %arg1: memref<2x2x3x4xf32>, %arg2: memref<3x5x5x4xf32>) {
   %0 = iree.load_input(%arg0 : memref<3x5x5x3xf32>) : tensor<3x5x5x3xf32>
   %1 = iree.load_input(%arg1 : memref<2x2x3x4xf32>) : tensor<2x2x3x4xf32>
-  // CHECK: linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 2], strides = [2, 1]}
+  //      CHECK: linalg.conv(%arg0, %arg1, %arg2) {
+  // CHECK-SAME: dilations = [1, 2]
+  // CHECK-SAME: padding = dense<[
+  // CHECK-SAME:                  [0, 1], [0, 1]]> : tensor<2x2xi64>
+  // CHECK-SAME: strides = [2, 1]}
   %2 = "xla_hlo.conv"(%1, %0) {
     batch_group_count = 1 : i64,
     dimension_numbers = {

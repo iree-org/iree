@@ -175,7 +175,8 @@ linalg::ConvOp ConvOpConversion::apply(
   auto dilationArg = ArrayAttr::get(dilation, op.getContext());
 
   return rewriter.create<linalg::ConvOp>(op.getLoc(), args[1], args[0],
-                                         results[0], stridesArg, dilationArg);
+                                         results[0], stridesArg, dilationArg,
+                                         op.paddingAttr());
 }
 
 // ----------------------------------------------------------------------------
