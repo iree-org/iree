@@ -89,19 +89,19 @@ function(iree_cc_test)
     PRIVATE
       ${_RULE_COPTS}
   )
-  target_link_libraries(${_NAME}
-    PUBLIC
-      ${_RULE_DEPS}
-      gmock
-    PRIVATE
-      ${_RULE_LINKOPTS}
-  )
   iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
   # Add all IREE targets to a folder in the IDE for organization.
   set_property(TARGET ${_NAME} PROPERTY FOLDER ${IREE_IDE_FOLDER}/test)
 
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD ${IREE_CXX_STANDARD})
   set_property(TARGET ${_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+
+  # Defer computing transitive dependencies and calling target_link_libraries()
+  # until all libraries have been declared.
+  # Track target and deps, use in iree_complete_binary_link_options() later.
+  list(APPEND _RULE_DEPS "gmock")
+  set_property(GLOBAL APPEND PROPERTY _IREE_CC_BINARY_NAMES "${_NAME}")
+  set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 
   # We run all our tests through a custom test runner to allow temp directory
   # cleanup upon test completion.
