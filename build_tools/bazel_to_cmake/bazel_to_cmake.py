@@ -335,15 +335,10 @@ class BuildFileFunctions(object):
     pass
 
   def glob(self, include, exclude=None, exclude_directories=1):
-    # Rather than converting bazel globs into CMake globs, we evaluate the glob
-    # at conversion time. This avoids issues with different glob semantics and
-    # dire warnings about not knowing when to reevaluate the glob. See
-    # https://cmake.org/cmake/help/v3.12/command/file.html#filesystem
-
     if exclude_directories != 1:
-      self._convert_unimplemented_function("glob", "with exclude")
-    if exclude:
       self._convert_unimplemented_function("glob", "with exclude_directories")
+    if exclude:
+      self._convert_unimplemented_function("glob", "with exclude")
 
     glob_vars = []
     for pattern in include:
