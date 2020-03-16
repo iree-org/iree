@@ -111,8 +111,7 @@ LogicalResult SPIRVCodegenImpl::createEntryFn(
     }
     entryFnArgTypes.emplace_back(convertedArgType);
     entryFnArgAttrs.emplace_back(spirv::getInterfaceVarABIAttr(
-        0, argType.index(), spirv::StorageClass::StorageBuffer,
-        builder.getContext()));
+        0, argType.index(), /*storageClass=*/llvm::None, builder.getContext()));
   }
 
   // TODO(ravishankarm) : Handle return types. The SPIR-V ABI attribute lowering
