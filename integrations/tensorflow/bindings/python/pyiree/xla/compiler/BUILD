@@ -99,7 +99,7 @@ iree_py_test(
     ],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "@absl_py//absl/testing:absltest",
-        "//third_party/py/pyiree/xla/compiler",
+        "//integrations/tensorflow/bindings/python/pyiree/xla/compiler",
         "@org_tensorflow//tensorflow/compiler/xla/python:xla_client",
     ],
 )
