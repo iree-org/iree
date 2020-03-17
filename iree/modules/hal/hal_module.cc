@@ -145,7 +145,6 @@ class HALModuleState final {
     IREE_TRACE_SCOPE0("HALModuleState::ExCacheExecutable");
 
     ExecutableSpec spec;
-    spec.format = executable_format;
     spec.executable_data = {executable_data->data.data,
                             executable_data->data.data_length};
     ASSIGN_OR_RETURN(auto executable,

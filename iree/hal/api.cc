@@ -1109,6 +1109,72 @@ iree_hal_driver_registry_create_driver(iree_string_view_t driver_name,
 IREE_HAL_API_RETAIN_RELEASE(executable, Executable);
 
 //===----------------------------------------------------------------------===//
+// iree::hal::ExecutableCache
+//===----------------------------------------------------------------------===//
+
+IREE_HAL_API_RETAIN_RELEASE(executable_cache, ExecutableCache);
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
+    iree_hal_device_t* device, iree_string_view_t identifier,
+    iree_allocator_t allocator,
+    iree_hal_executable_cache_t** out_executable_cache) {
+  IREE_TRACE_SCOPE0("iree_hal_executable_cache_create");
+  if (!out_executable_cache) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_executable_cache = nullptr;
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  auto executable_cache = handle->CreateExecutableCache();
+
+  *out_executable_cache = reinterpret_cast<iree_hal_executable_cache_t*>(
+      executable_cache.release());
+  return IREE_STATUS_OK;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
+    iree_hal_executable_cache_t* executable_cache,
+    iree_hal_executable_format_t format) {
+  auto* handle = reinterpret_cast<ExecutableCache*>(executable_cache);
+  if (!handle) {
+    return false;
+  }
+  return handle->CanPrepareFormat(format);
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_executable_cache_prepare_executable(
+    iree_hal_executable_cache_t* executable_cache,
+    iree_hal_executable_layout_t* executable_layout,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data, iree_allocator_t allocator,
+    iree_hal_executable_t** out_executable) {
+  IREE_TRACE_SCOPE0("iree_hal_executable_cache_prepare_executable");
+  if (!out_executable) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_executable = nullptr;
+  auto* handle = reinterpret_cast<ExecutableCache*>(executable_cache);
+  if (!handle) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  ExecutableSpec spec;
+  spec.executable_data = {executable_data.data, executable_data.data_length};
+  IREE_API_ASSIGN_OR_RETURN(
+      auto executable,
+      handle->PrepareExecutable(
+          static_cast<ExecutableCachingMode>(caching_mode), spec));
+
+  *out_executable =
+      reinterpret_cast<iree_hal_executable_t*>(executable.release());
+  return IREE_STATUS_OK;
+}
+
+//===----------------------------------------------------------------------===//
 // iree::hal::ExecutableLayout
 //===----------------------------------------------------------------------===//
 
@@ -1117,7 +1183,7 @@ IREE_HAL_API_RETAIN_RELEASE(executable_layout, ExecutableLayout);
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_hal_device_t* device, iree_host_size_t set_layout_count,
     const iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_host_size_t push_constants, iree_allocator_t allocator,
+    iree_allocator_t allocator,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_TRACE_SCOPE0("iree_hal_executable_layout_create");
   if (!out_executable_layout) {
@@ -1134,12 +1200,9 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
 
   IREE_API_ASSIGN_OR_RETURN(
       auto executable_layout,
-      handle->CreateExecutableLayout(
-          absl::MakeConstSpan(
-              reinterpret_cast<const ref_ptr<DescriptorSetLayout>*>(
-                  set_layouts),
-              set_layout_count),
-          push_constants));
+      handle->CreateExecutableLayout(absl::MakeConstSpan(
+          reinterpret_cast<const ref_ptr<DescriptorSetLayout>*>(set_layouts),
+          set_layout_count)));
 
   *out_executable_layout = reinterpret_cast<iree_hal_executable_layout_t*>(
       executable_layout.release());

@@ -70,7 +70,7 @@ class Device : public RefObject<Device> {
   // Creates a descriptor set layout with the given bindings.
   virtual StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
       absl::Span<const DescriptorSetLayout::Binding> bindings) {
-    return UnimplementedErrorBuilder(IREE_LOC);
+    return make_ref<DescriptorSetLayout>();
   }
 
   // Creates a descriptor set of the given layout and bindings.
@@ -96,9 +96,8 @@ class Device : public RefObject<Device> {
   // The returned executable layout can be used by multiple executables with the
   // same compatible resource binding layouts.
   virtual StatusOr<ref_ptr<ExecutableLayout>> CreateExecutableLayout(
-      absl::Span<const ref_ptr<DescriptorSetLayout>> set_layouts,
-      size_t push_constants) {
-    return UnimplementedErrorBuilder(IREE_LOC);
+      absl::Span<const ref_ptr<DescriptorSetLayout>> set_layouts) {
+    return make_ref<ExecutableLayout>();
   }
 
   // Creates a command buffer for recording commands to submit to queues owned

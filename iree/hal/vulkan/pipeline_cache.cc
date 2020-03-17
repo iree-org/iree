@@ -42,10 +42,6 @@ bool PipelineCache::CanPrepareFormat(ExecutableFormat format) const {
 StatusOr<ref_ptr<Executable>> PipelineCache::PrepareExecutable(
     ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("PipelineCache::PrepareExecutable");
-  if (!CanPrepareFormat(spec.format)) {
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Unsupported 4CC format: 0x" << std::hex << spec.format;
-  }
   if (spec.executable_data.size() <= 4 ||
       !SpirVExecutableDefBufferHasIdentifier(spec.executable_data.data())) {
     return InvalidArgumentErrorBuilder(IREE_LOC)

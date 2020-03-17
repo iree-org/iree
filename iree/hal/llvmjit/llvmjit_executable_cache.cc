@@ -38,10 +38,6 @@ bool LLVMJITExecutableCache::CanPrepareFormat(ExecutableFormat format) const {
 StatusOr<ref_ptr<Executable>> LLVMJITExecutableCache::PrepareExecutable(
     ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) {
   IREE_TRACE_SCOPE0("LLVMJITExecutableCache::PrepareExecutable");
-  if (!CanPrepareFormat(spec.format)) {
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Unsupported format: " << spec.format;
-  }
 
   // Wrap the data (or copy it).
   bool allow_aliasing_data =

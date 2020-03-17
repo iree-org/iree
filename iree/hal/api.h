@@ -39,6 +39,7 @@ typedef struct iree_hal_descriptor_set_layout iree_hal_descriptor_set_layout_t;
 typedef struct iree_hal_device iree_hal_device_t;
 typedef struct iree_hal_driver iree_hal_driver_t;
 typedef struct iree_hal_executable iree_hal_executable_t;
+typedef struct iree_hal_executable_cache iree_hal_executable_cache_t;
 typedef struct iree_hal_executable_layout iree_hal_executable_layout_t;
 typedef struct iree_hal_fence iree_hal_fence_t;
 typedef struct iree_hal_semaphore iree_hal_semaphore_t;
@@ -254,7 +255,54 @@ typedef struct {
   iree_hal_memory_access_t access;
 } iree_hal_descriptor_set_layout_binding_t;
 
-// Bitfield specifying which execution stage a brarrier should start/end at.
+// An identifier for executable formats used to query support.
+typedef uint32_t iree_hal_executable_format_t;
+
+// Defines how the executable cache performs preparation.
+typedef enum {
+  // Allows the cache to reference the provided executable_data after it has
+  // prepared the executable. Callers must ensure the data remains valid for the
+  // lifetime of the cache. If memory mapping constant executable data from
+  // disk this can be used to avoid copies.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ALIAS_PROVIDED_DATA = 1 << 0,
+  // Allows the prepared executable to be cached persistently (on disk/etc).
+  // Enable for any executable that is likely to be used in future runs.
+  // Note that not all caches support persistent serialization and this is just
+  // a hint.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING = 1 << 1,
+  // Allows the cache to optimize the executable as much as it can.
+  // This may cause preparation to take significantly longer while (hopefully)
+  // improving runtime performance. Avoid for one-shot executables.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION = 1 << 2,
+  // Enables Executable debugging methods if supported by the device and
+  // executable. This may disable certain optimizations or retain additional
+  // data to allow disassembly, stepping, etc.
+  //
+  // Device must support the DeviceFeature::kDebugging feature and executables
+  // must support the ExecutableFeature::kDebugging feature.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_DEBUGGING = 1 << 3,
+  // Enables Executable coverage if supported by the device and executable.
+  // Depending on the optimization mode this may produce partial coverage
+  // results (for example, when certain source operations were optimized away).
+  //
+  // Device must support the DeviceFeature::kCoverage feature and executables
+  // must support the ExecutableFeature::kCoverage feature.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_COVERAGE = 1 << 4,
+  // Enables Executable profiling if supported by the device and executable.
+  // Depending on the optimization mode this may produce partial profiling
+  // results. Profiling attribution (whether to the entire executable or
+  // specific operations) depends on the implementation.
+  //
+  // Device must support the DeviceFeature::kProfiling feature and executables
+  // must support the ExecutableFeature::kProfiling feature.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_ENABLE_PROFILING = 1 << 5,
+  // Default caching mode.
+  IREE_HAL_EXECUTABLE_CACHING_MODE_DEFAULT =
+      IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_PERSISTENT_CACHING |
+      IREE_HAL_EXECUTABLE_CACHING_MODE_ALLOW_OPTIMIZATION,
+} iree_hal_executable_caching_mode_t;
+
+// Bitfield specifying which execution stage a barrier should start/end at.
 //
 // Maps to VkPipelineStageFlagBits.
 typedef enum {
@@ -939,6 +987,53 @@ iree_hal_executable_release(iree_hal_executable_t* executable);
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//
+// iree::hal::ExecutableCache
+//===----------------------------------------------------------------------===//
+
+#ifndef IREE_API_NO_PROTOTYPES
+
+// Creates an executable cache using the given identifier.
+// The identifier is provided to the backing cache API as way to partition
+// caches between different groups of executables (from different modules, etc).
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_create(
+    iree_hal_device_t* device, iree_string_view_t identifier,
+    iree_allocator_t allocator,
+    iree_hal_executable_cache_t** out_executable_cache);
+
+// Retains the given |executable_cache| for the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_executable_cache_retain(iree_hal_executable_cache_t* executable_cache);
+
+// Releases the given |executable_cache| from the caller.
+IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_cache_release(
+    iree_hal_executable_cache_t* executable_cache);
+
+// Returns true if the executable cache can prepare the given executable input
+// format. Preparation may still fail if the particular version or features
+// required by the executable are not supported.
+IREE_API_EXPORT bool IREE_API_CALL iree_hal_executable_cache_can_prepare_format(
+    iree_hal_executable_cache_t* executable_cache,
+    iree_hal_executable_format_t format);
+
+// Prepares an executable for use.
+// The provided |executable_data| will be used to either lookup a previously
+// prepared executable in the cache or prepare a new one.
+//
+// Depending on the driver preparation may take a non-trivial amount of time
+// (such as when JITing/etc). As the cache is internally synchronized callers
+// can issue preparation requests from multiple threads - even for the same
+// executables - and calls will block until preparation completes.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_executable_cache_prepare_executable(
+    iree_hal_executable_cache_t* executable_cache,
+    iree_hal_executable_layout_t* executable_layout,
+    iree_hal_executable_caching_mode_t caching_mode,
+    iree_const_byte_span_t executable_data, iree_allocator_t allocator,
+    iree_hal_executable_t** out_executable);
+
+#endif  // IREE_API_NO_PROTOTYPES
+
+//===----------------------------------------------------------------------===//
 // iree::hal::ExecutableLayout
 //===----------------------------------------------------------------------===//
 
@@ -950,7 +1045,7 @@ iree_hal_executable_release(iree_hal_executable_t* executable);
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_hal_device_t* device, iree_host_size_t set_layout_count,
     const iree_hal_descriptor_set_layout_t** set_layouts,
-    iree_host_size_t push_constants, iree_allocator_t allocator,
+    iree_allocator_t allocator,
     iree_hal_executable_layout_t** out_executable_layout);
 
 // Retains the given |executable_layout| for the caller.
