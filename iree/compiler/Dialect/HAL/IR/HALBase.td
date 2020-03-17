@@ -219,7 +219,7 @@ def HAL_ExecutableFormatAttr :
   let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
-// LINT.ThenChange(//iree/iree/hal/executable_format.h:fourcc)
+// LINT.ThenChange(https://github.com/google/iree/tree/master/iree/hal/executable_format.h:fourcc)
 
 //===----------------------------------------------------------------------===//
 // HAL types

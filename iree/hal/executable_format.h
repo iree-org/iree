@@ -67,7 +67,7 @@ constexpr ExecutableFormat kExecutableFormatSpirV =
 constexpr ExecutableFormat kExecutableFormatLLVM =
     MakeExecutableFormatID("LLVM");
 
-// LINT.ThenChange(//iree/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
+// LINT.ThenChange(https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/IR/HALBase.td:executable_format)
 
 }  // namespace hal
 }  // namespace iree

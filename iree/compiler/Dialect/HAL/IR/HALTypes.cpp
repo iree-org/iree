@@ -57,7 +57,7 @@ llvm::Optional<int32_t> getElementTypeValue(Type type) {
   }
   return llvm::None;
 }
-// LINT.ThenChange(//iree/iree/hal/api.h:element_type)
+// LINT.ThenChange(https://github.com/google/iree/tree/master/iree/hal/api.h:element_type)
 
 IntegerAttr getElementTypeAttr(Type type) {
   auto elementType = getElementTypeValue(type);

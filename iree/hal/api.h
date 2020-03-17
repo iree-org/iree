@@ -383,7 +383,7 @@ typedef enum {
 } iree_hal_element_type_t;
 // clang-format on
 
-// LINT.ThenChange(//iree/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
+// LINT.ThenChange(https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/IR/HALTypes.h:element_type)
 
 //===----------------------------------------------------------------------===//
 // Utilities
