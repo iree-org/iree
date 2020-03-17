@@ -52,10 +52,10 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT:   %1 = xla_hlo.add %arg1, %arg1 : tensor<4xf32>
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   %2 = xla_hlo.sub %1, %arg1 : tensor<4xf32>
-  %1 = xla_hlo.sub %0, %arg0 : tensor<4xf32>
-  // CHECK-NEXT:   %3 = xla_hlo.mul %2, %arg1 : tensor<4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %2 = xla_hlo.subtract %1, %arg1 : tensor<4xf32>
+  %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %3 = xla_hlo.multiply %2, %arg1 : tensor<4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4xf32>
   // CHECK-NEXT: }
   // CHECK-NEXT: return %0 : tensor<4xf32>
@@ -88,8 +88,8 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   // CHECK: %[[R2:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD2]] : index]
   // CHECK-SAME: (%arg1 = %[[R1]] : tensor<4x4xf32>, %arg2 = %arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
-  // CHECK-NEXT:   %3 = xla_hlo.mul %arg1, %arg2 : tensor<4x4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4x4xf32>
+  // CHECK-NEXT:   %3 = xla_hlo.multiply %arg1, %arg2 : tensor<4x4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4x4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4x4xf32>
   // CHECK-NEXT: }
   // CHECK-NEXT: return %[[R2]] : tensor<4x4xf32>
@@ -108,8 +108,8 @@ func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   %2 = call @callee(%1) : (tensor<4xf32>) -> tensor<4xf32>
   %1 = call @callee(%0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   %3 = xla_hlo.mul %2, %arg1 : tensor<4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %3 = xla_hlo.multiply %2, %arg1 : tensor<4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %3 : tensor<4xf32>
   // CHECK-NEXT: }
   // CHECK-NEXT: return %[[R0]] : tensor<4xf32>
@@ -121,8 +121,8 @@ func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   // CHECK: %[[R0:.+]] = flow.dispatch.region
   // CHECK-SAME: [%[[WORKLOAD0]] : index]
   // CHECK-SAME: (%arg1 = %arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  // CHECK-NEXT:   %1 = xla_hlo.mul %arg1, %arg1 : tensor<4xf32>
-  %0 = xla_hlo.mul %arg0, %arg0 : tensor<4xf32>
+  // CHECK-NEXT:   %1 = xla_hlo.multiply %arg1, %arg1 : tensor<4xf32>
+  %0 = xla_hlo.multiply %arg0, %arg0 : tensor<4xf32>
   // CHECK-NEXT:   flow.return %1 : tensor<4xf32>
   // CHECK-NEXT: }
   // CHECK: return %[[R0]] : tensor<4xf32>

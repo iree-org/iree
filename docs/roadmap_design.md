@@ -347,9 +347,9 @@ additional dispatch, materialization of an intermediate tensor, and a barrier:
 
 ```mlir
 %bcast = "xla_hlo.broadcast_in_dim"(%cst) : (tensor<f32>) -> tensor<1024x10xf32>
-%mul1 = xla_hlo.mul %arg0, %bcast : tensor<1024x10xf32>
+%mul1 = xla_hlo.multiply %arg0, %bcast : tensor<1024x10xf32>
 // (pretend something here that prevents fusion)
-%mul2 = xla_hlo.mul %arg1, %bcast : tensor<1024x10xf32>
+%mul2 = xla_hlo.multiply %arg1, %bcast : tensor<1024x10xf32>
 ```
 
 ```mlir
@@ -359,11 +359,11 @@ additional dispatch, materialization of an intermediate tensor, and a barrier:
 }
 // a barrier will be required here
 %mul1 = flow.dispatch.region(%arg0 : tensor<1024x10xf32>, %bcast : tensor<1024x10xf32>) -> tensor<1024x10xf32> {
-  %1 = xla_hlo.mul %arg0, %bcast : tensor<1024x10xf32>
+  %1 = xla_hlo.multiply %arg0, %bcast : tensor<1024x10xf32>
   return %1 : tensor<1024x10xf32>
 }
 %mul2 = flow.dispatch.region(%arg1 : tensor<1024x10xf32>, %bcast : tensor<1024x10xf32>) -> tensor<1024x10xf32> {
-  %2 = xla_hlo.mul %arg1, %bcast : tensor<1024x10xf32>
+  %2 = xla_hlo.multiply %arg1, %bcast : tensor<1024x10xf32>
   return %2 : tensor<1024x10xf32>
 }
 ```

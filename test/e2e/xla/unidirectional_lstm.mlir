@@ -11,15 +11,15 @@
 // some calls from @main and the call graphs of the removed callees.
 
 func @Min_reduction.47(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> attributes { sym_visibility = "private" } {
-  %0 = xla_hlo.min %arg0, %arg1 : tensor<f32>
+  %0 = xla_hlo.minimum %arg0, %arg1 : tensor<f32>
   return %0 : tensor<f32>
 }
 func @Max_reduction.51(%arg0: tensor<i32>, %arg1: tensor<i32>) -> tensor<i32> attributes { sym_visibility = "private" } {
-  %0 = xla_hlo.max %arg0, %arg1 : tensor<i32>
+  %0 = xla_hlo.maximum %arg0, %arg1 : tensor<i32>
   return %0 : tensor<i32>
 }
 func @Max_1_reduction.55(%arg0: tensor<i32>, %arg1: tensor<i32>) -> tensor<i32> attributes { sym_visibility = "private" } {
-  %0 = xla_hlo.max %arg0, %arg1 : tensor<i32>
+  %0 = xla_hlo.maximum %arg0, %arg1 : tensor<i32>
   return %0 : tensor<i32>
 }
 func @ForwardLoopCond_gFAnjWGSoLs__.167(%arg0: tuple<tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>>) -> tuple<tensor<i1>> attributes { sym_visibility = "private" } {
@@ -36,7 +36,7 @@ func @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<
   %1 = "xla_hlo.convert"(%cst_0) : (tensor<f32>) -> tensor<f32>
   %2 = "xla_hlo.reduce"(%0, %1) ( {
   ^bb0(%arg5: tensor<f32>, %arg6: tensor<f32>):
-    %42 = xla_hlo.min %arg5, %arg6 : tensor<f32>
+    %42 = xla_hlo.minimum %arg5, %arg6 : tensor<f32>
     "xla_hlo.return"(%42) : (tensor<f32>) -> ()
   }) {dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<5x1x1xf32>, tensor<f32>) -> tensor<5xf32>
   %3 = "xla_hlo.convert"(%2) : (tensor<5xf32>) -> tensor<5xf32>
@@ -45,17 +45,17 @@ func @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<
   %5 = "xla_hlo.compare"(%3, %4) {comparison_direction = "EQ"} : (tensor<5xf32>, tensor<5xf32>) -> tensor<5xi1>
   %6 = "xla_hlo.convert"(%5) : (tensor<5xi1>) -> tensor<5xi32>
   %cst_2 = constant  dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-  %7 = xla_hlo.mul %6, %cst_2 : tensor<5xi32>
+  %7 = xla_hlo.multiply %6, %cst_2 : tensor<5xi32>
   %8 = "xla_hlo.convert"(%7) : (tensor<5xi32>) -> tensor<5xi32>
   %cst_3 = constant dense<-2147483648> : tensor<i32>
   %9 = "xla_hlo.convert"(%cst_3) : (tensor<i32>) -> tensor<i32>
   %10 = "xla_hlo.reduce"(%8, %9) ( {
   ^bb0(%arg5: tensor<i32>, %arg6: tensor<i32>):
-    %42 = xla_hlo.max %arg5, %arg6 : tensor<i32>
+    %42 = xla_hlo.maximum %arg5, %arg6 : tensor<i32>
     "xla_hlo.return"(%42) : (tensor<i32>) -> ()
   }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<i32>
   %11 = "xla_hlo.convert"(%10) : (tensor<i32>) -> tensor<i32>
-  %12 = xla_hlo.sub %cst, %11 : tensor<i32>
+  %12 = xla_hlo.subtract %cst, %11 : tensor<i32>
   %cst_4 = constant dense<5> : tensor<i32>
   %13 = "xla_hlo.compare"(%12, %cst_4) {comparison_direction = "EQ"} : (tensor<i32>, tensor<i32>) -> tensor<i1>
   %cst_5 = constant dense<0> : tensor<i32>
@@ -66,21 +66,21 @@ func @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<
   %16 = "xla_hlo.compare"(%14, %15) {comparison_direction = "EQ"} : (tensor<5xf32>, tensor<5xf32>) -> tensor<5xi1>
   %17 = "xla_hlo.convert"(%16) : (tensor<5xi1>) -> tensor<5xi32>
   %cst_8 = constant  dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
-  %18 = xla_hlo.mul %17, %cst_8 : tensor<5xi32>
+  %18 = xla_hlo.multiply %17, %cst_8 : tensor<5xi32>
   %19 = "xla_hlo.convert"(%18) : (tensor<5xi32>) -> tensor<5xi32>
   %cst_9 = constant dense<-2147483648> : tensor<i32>
   %20 = "xla_hlo.convert"(%cst_9) : (tensor<i32>) -> tensor<i32>
   %21 = "xla_hlo.reduce"(%19, %20) ( {
   ^bb0(%arg5: tensor<i32>, %arg6: tensor<i32>):
-    %42 = xla_hlo.max %arg5, %arg6 : tensor<i32>
+    %42 = xla_hlo.maximum %arg5, %arg6 : tensor<i32>
     "xla_hlo.return"(%42) : (tensor<i32>) -> ()
   }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5xi32>, tensor<i32>) -> tensor<i32>
   %22 = "xla_hlo.convert"(%21) : (tensor<i32>) -> tensor<i32>
-  %23 = xla_hlo.sub %cst_6, %22 : tensor<i32>
+  %23 = xla_hlo.subtract %cst_6, %22 : tensor<i32>
   %24 = "xla_hlo.select"(%13, %cst_5, %23) : (tensor<i1>, tensor<i32>, tensor<i32>) -> tensor<i32>
   %25 = "xla_hlo.convert"(%24) : (tensor<i32>) -> tensor<i64>
   %cst_10 = constant dense<5> : tensor<i32>
-  %26 = xla_hlo.sub %cst_10, %12 : tensor<i32>
+  %26 = xla_hlo.subtract %cst_10, %12 : tensor<i32>
   %27 = "xla_hlo.convert"(%26) : (tensor<i32>) -> tensor<i64>
   %cst_11 = constant dense<0.000000e+00> : tensor<f32>
   %28 = "xla_hlo.broadcast_in_dim"(%cst_11) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<40xf32>
@@ -115,7 +115,7 @@ func @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<
     %52 = "xla_hlo.broadcast_in_dim"(%51) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1xf32>) -> tensor<1x10xf32>
     %cst_19 = constant dense<1.000000e+00> : tensor<f32>
     %53 = "xla_hlo.broadcast_in_dim"(%cst_19) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
-    %54 = xla_hlo.mul %52, %53 : tensor<1x10xf32>
+    %54 = xla_hlo.multiply %52, %53 : tensor<1x10xf32>
     %cst_20 = constant dense<0.000000e+00> : tensor<f32>
     %55 = "xla_hlo.broadcast_in_dim"(%cst_20) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
     %56 = "xla_hlo.compare"(%54, %55) {comparison_direction = "GT"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
@@ -133,36 +133,36 @@ func @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<
     %67 = "xla_hlo.reshape"(%45) : (tensor<40xf32>) -> tensor<1x40xf32>
     %68 = xla_hlo.add %66, %67 : tensor<1x40xf32>
     %69 = "xla_hlo.slice"(%68) {limit_indices = dense<[1, 30]> : tensor<2xi64>, start_indices = dense<[0, 20]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
-    %70 = xla_hlo.mul %60, %69 : tensor<1x10xf32>
+    %70 = xla_hlo.multiply %60, %69 : tensor<1x10xf32>
     %71 = "xla_hlo.tanh"(%70) : (tensor<1x10xf32>) -> tensor<1x10xf32>
-    %72 = xla_hlo.mul %59, %71 : tensor<1x10xf32>
+    %72 = xla_hlo.multiply %59, %71 : tensor<1x10xf32>
     %73 = xla_hlo.add %58, %72 : tensor<1x10xf32>
-    %74 = xla_hlo.mul %73, %57 : tensor<1x10xf32>
+    %74 = xla_hlo.multiply %73, %57 : tensor<1x10xf32>
     %cst_22 = constant dense<5.000000e-01> : tensor<f32>
     %75 = "xla_hlo.broadcast_in_dim"(%cst_22) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
     %76 = "xla_hlo.broadcast_in_dim"(%cst_22) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
     %77 = "xla_hlo.broadcast_in_dim"(%cst_22) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
     %78 = "xla_hlo.slice"(%68) {limit_indices = dense<[1, 20]> : tensor<2xi64>, start_indices = dense<[0, 10]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
-    %79 = xla_hlo.mul %77, %78 : tensor<1x10xf32>
+    %79 = xla_hlo.multiply %77, %78 : tensor<1x10xf32>
     %80 = "xla_hlo.tanh"(%79) : (tensor<1x10xf32>) -> tensor<1x10xf32>
-    %81 = xla_hlo.mul %76, %80 : tensor<1x10xf32>
+    %81 = xla_hlo.multiply %76, %80 : tensor<1x10xf32>
     %82 = xla_hlo.add %75, %81 : tensor<1x10xf32>
     %83 = "xla_hlo.slice"(%68) {limit_indices = dense<[1, 10]> : tensor<2xi64>, start_indices = dense<0> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
     %84 = "xla_hlo.tanh"(%83) : (tensor<1x10xf32>) -> tensor<1x10xf32>
-    %85 = xla_hlo.mul %82, %84 : tensor<1x10xf32>
+    %85 = xla_hlo.multiply %82, %84 : tensor<1x10xf32>
     %86 = xla_hlo.add %74, %85 : tensor<1x10xf32>
     %cst_23 = constant dense<1.000000e+01> : tensor<f32>
     %87 = "xla_hlo.broadcast_in_dim"(%cst_23) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
-    %88 = xla_hlo.min %86, %87 : tensor<1x10xf32>
+    %88 = xla_hlo.minimum %86, %87 : tensor<1x10xf32>
     %cst_24 = constant dense<-1.000000e+01> : tensor<f32>
     %89 = "xla_hlo.broadcast_in_dim"(%cst_24) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
-    %90 = xla_hlo.max %88, %89 : tensor<1x10xf32>
+    %90 = xla_hlo.maximum %88, %89 : tensor<1x10xf32>
     %91 = "xla_hlo.select"(%56, %57, %90) : (tensor<1x10xi1>, tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xf32>
     %92 = "xla_hlo.reshape"(%50) : (tensor<1x1xf32>) -> tensor<1xf32>
     %93 = "xla_hlo.broadcast_in_dim"(%92) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1xf32>) -> tensor<1x10xf32>
     %cst_25 = constant dense<1.000000e+00> : tensor<f32>
     %94 = "xla_hlo.broadcast_in_dim"(%cst_25) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
-    %95 = xla_hlo.mul %93, %94 : tensor<1x10xf32>
+    %95 = xla_hlo.multiply %93, %94 : tensor<1x10xf32>
     %cst_26 = constant dense<0.000000e+00> : tensor<f32>
     %96 = "xla_hlo.broadcast_in_dim"(%cst_26) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
     %97 = "xla_hlo.compare"(%95, %96) {comparison_direction = "GT"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xi1>
@@ -171,12 +171,12 @@ func @Forward_o16DF3vQKaI__disable_call_shape_inference_true_.189(%arg0: tensor<
     %99 = "xla_hlo.broadcast_in_dim"(%cst_27) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
     %100 = "xla_hlo.broadcast_in_dim"(%cst_27) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x10xf32>
     %101 = "xla_hlo.slice"(%68) {limit_indices = dense<[1, 40]> : tensor<2xi64>, start_indices = dense<[0, 30]> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>} : (tensor<1x40xf32>) -> tensor<1x10xf32>
-    %102 = xla_hlo.mul %100, %101 : tensor<1x10xf32>
+    %102 = xla_hlo.multiply %100, %101 : tensor<1x10xf32>
     %103 = "xla_hlo.tanh"(%102) : (tensor<1x10xf32>) -> tensor<1x10xf32>
-    %104 = xla_hlo.mul %99, %103 : tensor<1x10xf32>
+    %104 = xla_hlo.multiply %99, %103 : tensor<1x10xf32>
     %105 = xla_hlo.add %98, %104 : tensor<1x10xf32>
     %106 = "xla_hlo.tanh"(%90) : (tensor<1x10xf32>) -> tensor<1x10xf32>
-    %107 = xla_hlo.mul %105, %106 : tensor<1x10xf32>
+    %107 = xla_hlo.multiply %105, %106 : tensor<1x10xf32>
     %108 = "xla_hlo.select"(%97, %63, %107) : (tensor<1x10xi1>, tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xf32>
     %109 = "xla_hlo.get_tuple_element"(%arg5) {index = 10 : i32} : (tuple<tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>>) -> tensor<5x1x1xf32>
     %110 = "xla_hlo.get_tuple_element"(%arg5) {index = 11 : i32} : (tuple<tensor<i64>, tensor<i64>, tensor<40xf32>, tensor<i64>, tensor<74x40xf32>, tensor<i64>, tensor<1x10xf32>, tensor<1x10xf32>, tensor<5x1x64xf32>, tensor<5x1x1xf32>, tensor<5x1x1xf32>, tensor<5xi64>, tensor<5x1x10xf32>, tensor<5x1x10xf32>>) -> tensor<5xi64>

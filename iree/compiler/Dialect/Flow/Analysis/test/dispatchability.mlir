@@ -41,8 +41,8 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-SAME: dispatchable = true
 func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  %1 = xla_hlo.sub %0, %arg0 : tensor<4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
+  %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
   return %2 : tensor<4xf32>
 }
 
@@ -53,7 +53,7 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
   %1 = "xla_hlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4x4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4x4xf32>
   return %2 : tensor<4x4xf32>
 }
 
@@ -64,13 +64,13 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 func @caller(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
   %1 = call @callee(%0) : (tensor<4xf32>) -> tensor<4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
   return %2 : tensor<4xf32>
 }
 // CHECK-LABEL: func @callee
 // CHECK-SAME: dispatchable = true
 func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
-  %0 = xla_hlo.mul %arg0, %arg0 : tensor<4xf32>
+  %0 = xla_hlo.multiply %arg0, %arg0 : tensor<4xf32>
   return %0 : tensor<4xf32>
 }
 
@@ -81,7 +81,7 @@ func @callee(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 func @dotCaller(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
   %1 = call @dotCallee(%0) : (tensor<4x4xf32>) -> tensor<4x4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4x4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4x4xf32>
   return %2 : tensor<4x4xf32>
 }
 // CHECK-LABEL: func @dotCallee
