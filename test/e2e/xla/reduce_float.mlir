@@ -25,7 +25,7 @@ func @reduce_max_1x10xf32() -> tensor<1xf32> {
   %2 = "xla_hlo.reduce"(%0, %1)
   ( {
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
-      %3 = "xla_hlo.max"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+      %3 = "xla_hlo.maximum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
   })
   {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
@@ -42,7 +42,7 @@ func @reduce_min_5x1x1xf32() -> tensor<5xf32> {
   %1 = iree.unfoldable_constant dense<999.0> : tensor<f32>
   %2 = "xla_hlo.reduce"(%0, %1) ( {
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
-      %3 = "xla_hlo.min"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+      %3 = "xla_hlo.minimum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
   }) {dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<5x1x1xf32>, tensor<f32>) -> tensor<5xf32>
   return %2 : tensor<5xf32>

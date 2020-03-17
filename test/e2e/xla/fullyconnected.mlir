@@ -13,7 +13,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %4 = "xla_hlo.broadcast_in_dim"(%3) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.56"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
   %cst = constant  {name = "constant.22"} dense<1.000000e+00> : tensor<f32>
   %5 = "xla_hlo.broadcast_in_dim"(%cst) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.23"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %6 = xla_hlo.mul %4, %5 {name = "multiply.57"} : tensor<5x1x5xf32>
+  %6 = xla_hlo.multiply %4, %5 {name = "multiply.57"} : tensor<5x1x5xf32>
   %cst_0 = constant  {name = "constant.58"} dense<0.000000e+00> : tensor<f32>
   %7 = "xla_hlo.broadcast_in_dim"(%cst_0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.59"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %8 = "xla_hlo.compare"(%6, %7) {comparison_direction = "GT", name = "compare.60"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
@@ -25,7 +25,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %12 = "xla_hlo.broadcast_in_dim"(%11) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.50"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
   %cst_3 = constant  {name = "constant.15"} dense<1.000000e+00> : tensor<f32>
   %13 = "xla_hlo.broadcast_in_dim"(%cst_3) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.16"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %14 = xla_hlo.mul %12, %13 {name = "multiply.51"} : tensor<5x1x5xf32>
+  %14 = xla_hlo.multiply %12, %13 {name = "multiply.51"} : tensor<5x1x5xf32>
   %cst_4 = constant  {name = "constant.52"} dense<0.000000e+00> : tensor<f32>
   %15 = "xla_hlo.broadcast_in_dim"(%cst_4) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.53"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %16 = "xla_hlo.compare"(%14, %15) {comparison_direction = "GT", name = "compare.54"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
@@ -37,7 +37,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %20 = "xla_hlo.broadcast_in_dim"(%19) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.44"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
   %cst_7 = constant  {name = "constant.8"} dense<1.000000e+00> : tensor<f32>
   %21 = "xla_hlo.broadcast_in_dim"(%cst_7) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.9"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %22 = xla_hlo.mul %20, %21 {name = "multiply.45"} : tensor<5x1x5xf32>
+  %22 = xla_hlo.multiply %20, %21 {name = "multiply.45"} : tensor<5x1x5xf32>
   %cst_8 = constant  {name = "constant.46"} dense<0.000000e+00> : tensor<f32>
   %23 = "xla_hlo.broadcast_in_dim"(%cst_8) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %24 = "xla_hlo.compare"(%22, %23) {comparison_direction = "GT", name = "compare.48"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
@@ -55,7 +55,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %cst_12 = constant  {name = "constant.63"} dense<[0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00]> : tensor<5xf32>
   %33 = "xla_hlo.broadcast_in_dim"(%cst_12) {broadcast_dimensions = dense<[1]> : tensor<1xi64>, name = "broadcast.64"} : (tensor<5xf32>) -> tensor<5x5xf32>
   %34 = xla_hlo.add %32, %33 {name = "add.65"} : tensor<5x5xf32>
-  %35 = xla_hlo.max %26, %34 {name = "maximum.68"} : tensor<5x5xf32>
+  %35 = xla_hlo.maximum %26, %34 {name = "maximum.68"} : tensor<5x5xf32>
   %36 = "xla_hlo.reshape"(%35) {name = "reshape.70"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
   %37 = "xla_hlo.select"(%24, %25, %36) {name = "select.71"} : (tensor<5x1x5xi1>, tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
   %38 = "xla_hlo.copy"(%37) {name = "copy.4"} : (tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
@@ -65,7 +65,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %cst_14 = constant  {name = "constant.75"} dense<[0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00]> : tensor<5xf32>
   %41 = "xla_hlo.broadcast_in_dim"(%cst_14) {broadcast_dimensions = dense<[1]> : tensor<1xi64>, name = "broadcast.76"} : (tensor<5xf32>) -> tensor<5x5xf32>
   %42 = xla_hlo.add %40, %41 {name = "add.77"} : tensor<5x5xf32>
-  %43 = xla_hlo.max %18, %42 {name = "maximum.80"} : tensor<5x5xf32>
+  %43 = xla_hlo.maximum %18, %42 {name = "maximum.80"} : tensor<5x5xf32>
   %44 = "xla_hlo.reshape"(%43) {name = "reshape.82"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
   %45 = "xla_hlo.select"(%16, %17, %44) {name = "select.83"} : (tensor<5x1x5xi1>, tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
   %46 = "xla_hlo.copy"(%45) {name = "copy.5"} : (tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
@@ -75,7 +75,7 @@ func @main(%arg0: tensor<1x5xf32>, %arg1: tensor<1x5x3x1xf32>) -> tuple<tensor<5
   %cst_16 = constant  {name = "constant.87"} dense<[0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00, 0.000000e+00]> : tensor<5xf32>
   %49 = "xla_hlo.broadcast_in_dim"(%cst_16) {broadcast_dimensions = dense<[1]> : tensor<1xi64>, name = "broadcast.88"} : (tensor<5xf32>) -> tensor<5x5xf32>
   %50 = xla_hlo.add %48, %49 {name = "add.89"} : tensor<5x5xf32>
-  %51 = xla_hlo.max %10, %50 {name = "maximum.92"} : tensor<5x5xf32>
+  %51 = xla_hlo.maximum %10, %50 {name = "maximum.92"} : tensor<5x5xf32>
   %52 = "xla_hlo.reshape"(%51) {name = "reshape.94"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
   %53 = "xla_hlo.select"(%8, %9, %52) {name = "select.95"} : (tensor<5x1x5xi1>, tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
   %54 = "xla_hlo.reshape"(%53) {name = "reshape.96"} : (tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
