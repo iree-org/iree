@@ -152,7 +152,7 @@ void IREELinalgFusionPass::runOnFunction() {
   applyPatternsGreedily(op->getRegions(), patterns);
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createLinalgFusionPass() {
+std::unique_ptr<OpPassBase<FuncOp>> createLinalgOnTensorsFusionPass() {
   return std::make_unique<IREELinalgFusionPass>();
 }
 

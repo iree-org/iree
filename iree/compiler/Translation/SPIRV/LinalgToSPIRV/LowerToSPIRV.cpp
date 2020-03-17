@@ -341,8 +341,9 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
   spirvModulePM.addPass(spirv::createUpdateVersionCapabilityExtensionPass());
 }
 
-void addLowerToSPIRVPasses(OpPassManager &pm, ArrayRef<int64_t> workGroupSize) {
-  addXLAToLinalgOnBuffersPasses(pm);
+void addHLOToLinalgToSPIRVPasses(OpPassManager &pm,
+                                 ArrayRef<int64_t> workGroupSize) {
+  addHLOToLinalgOnBuffersPasses(pm);
   addLinalgToSPIRVPasses(pm, workGroupSize);
 }
 
@@ -363,7 +364,7 @@ static PassPipelineRegistration<WorkGroupOptions> xlaToLinalgSPIRVPipeline(
       SmallVector<int64_t, 2> workGroupSize;
       workGroupSize.assign(options.workGroupSize.begin(),
                            options.workGroupSize.end());
-      addLowerToSPIRVPasses(passManager, workGroupSize);
+      addHLOToLinalgToSPIRVPasses(passManager, workGroupSize);
     });
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -31,27 +31,27 @@ namespace iree_compiler {
 /// handling some IREE specific conversions (like IREE::LoadInputOp and
 /// IREE::StoreOutputOp). At the end of the pass, the dispatch function will
 /// only contain linalg ops or standard ops if the pipeline succeeds.
-void addXLAToLinalgOnBuffersPasses(OpPassManager &pm);
+void addHLOToLinalgOnBuffersPasses(OpPassManager &pm);
 
 /// Fuses linalg operations on tensors in dispatch function. For now does only
 /// producer consumer fusion.
-std::unique_ptr<OpPassBase<FuncOp>> createLinalgFusionPass();
+std::unique_ptr<OpPassBase<FuncOp>> createLinalgOnTensorsFusionPass();
 
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
-std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgOnBuffersPass();
+std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnBuffersPass();
 
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
-std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgOnTensorsPass();
+std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnTensorsPass();
 
 /// Populates the patterns that convert from XLA to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.
-void populateXLAToLinalgOnTensorsConversionPatterns(
+void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
 /// Populates the patterns that convert from XLA to Linalg on buffers. Currently
 /// only implements conversions when the XLA op is the only op XLA op in the
 /// dispatch region.
-void populateXLAToLinalgOnBuffersConversionPatterns(
+void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
 }  // namespace iree_compiler

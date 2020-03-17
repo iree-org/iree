@@ -6,10 +6,10 @@ package(
 cc_library(
     name = "CodegenPasses",
     srcs = [
+        "HLOToLinalgOnBuffers.cpp",
+        "HLOToLinalgOnTensors.cpp",
         "LinalgFusion.cpp",
         "Passes.cpp",
-        "XLAToLinalgOnBuffers.cpp",
-        "XLAToLinalgOnTensors.cpp",
     ],
     hdrs = [
         "Passes.h",

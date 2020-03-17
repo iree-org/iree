@@ -71,9 +71,10 @@ struct IREEStoreOutputOpConversion final
   }
 };
 
-/// Returns a buffer to use for the result of the operation. For now checks if
-/// the results has a single use as the src operand of an iree.store_output
-/// op. This can be generalized to allocate temp buffers later.
+/// Returns a buffer to use for the `result` value of the operation. For now
+/// checks if the result has a single use as the src operand of an
+/// iree.store_output op. This can be generalized to allocate temp buffers
+/// later.
 static Value getBufferForResult(Value result, OpBuilder &builder) {
   if (!result.hasOneUse()) return nullptr;
   auto resultMemrefOp =
@@ -158,17 +159,15 @@ linalg::ConvOp ConvOpConversion::apply(
   llvm::SmallVector<Attribute, 4> strides;
   llvm::SmallVector<Attribute, 4> dilation;
   if (op.window_strides().hasValue()) {
-    strides.insert(strides.begin(),
-                   op.window_strides().getValue().getAttributeValues().begin(),
-                   op.window_strides().getValue().getAttributeValues().end());
+    auto range = op.window_strides().getValue().getAttributeValues();
+    strides.append(range.begin(), range.end());
   }
 
   // TODO(ataei): Support dilated convolution only for now we need to add lhs
   // for deconvolution support
   if (op.rhs_dilation().hasValue()) {
-    dilation.insert(dilation.begin(),
-                    op.rhs_dilation().getValue().getAttributeValues().begin(),
-                    op.rhs_dilation().getValue().getAttributeValues().end());
+    auto range = op.rhs_dilation().getValue().getAttributeValues();
+    dilation.append(range.begin(), range.end());
   }
 
   auto stridesArg = ArrayAttr::get(strides, op.getContext());
@@ -587,7 +586,7 @@ struct XLAToLinalgOnBuffersPass
 };
 }  // namespace
 
-void populateXLAToLinalgOnConversionPatterns(
+void populateHLOToLinalgOnConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   patterns.insert<ConvOpConversion, DotOpConversion, ReshapeOpConversion,
                   IREELoadInputOpConversion, IREEStoreOutputOpConversion,
@@ -603,7 +602,7 @@ void populateXLAToLinalgOnConversionPatterns(
 void XLAToLinalgOnBuffersPass::runOnFunction() {
   OwningRewritePatternList patterns;
   auto *context = &getContext();
-  populateXLAToLinalgOnConversionPatterns(context, patterns);
+  populateHLOToLinalgOnConversionPatterns(context, patterns);
   ConversionTarget target(*context);
   target.addLegalDialect<linalg::LinalgDialect, StandardOpsDialect>();
   target.addDynamicallyLegalOp<linalg::GenericOp, linalg::IndexedGenericOp>(
@@ -613,12 +612,12 @@ void XLAToLinalgOnBuffersPass::runOnFunction() {
     return signalPassFailure();
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgOnBuffersPass() {
+std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnBuffersPass() {
   return std::make_unique<XLAToLinalgOnBuffersPass>();
 }
 
 static PassRegistration<XLAToLinalgOnBuffersPass> pass(
     "iree-hlo-to-linalg-on-buffers",
-    "Convert XLA-HLO ops to Linalg on Buffer ops");
+    "Convert from XLA-HLO ops to Linalg ops on buffers");
 }  // namespace iree_compiler
 }  // namespace mlir

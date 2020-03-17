@@ -20,9 +20,10 @@
 namespace mlir {
 namespace iree_compiler {
 
-/// Populates passes needed to lower a XLA HLO op to SPIR-V dialect.
-void addLowerToSPIRVPasses(OpPassManager &pm,
-                           ArrayRef<int64_t> workGroupSize = {});
+/// Populates passes needed to lower a XLA HLO op to SPIR-V dialect through
+/// Linalg dialect..
+void addHLOToLinalgToSPIRVPasses(OpPassManager &pm,
+                                 ArrayRef<int64_t> workGroupSize = {});
 
 /// Populates passes needed to lower a linalg op (on buffers) to SPIR-V dialect.
 void addLinalgToSPIRVPasses(OpPassManager &pm,

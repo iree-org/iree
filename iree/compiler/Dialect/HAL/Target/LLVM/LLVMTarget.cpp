@@ -62,7 +62,7 @@ static std::vector<std::string> populateEntryPointNames(
 // from HLO to LLVM throught linalg dialect.
 void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   // HLO -> Linalg on buffers.
-  addXLAToLinalgOnBuffersPasses(pm);
+  addHLOToLinalgOnBuffersPasses(pm);
 
   // Linalg -> Loops
   pm.addPass(createConvertLinalgToLoopsPass());

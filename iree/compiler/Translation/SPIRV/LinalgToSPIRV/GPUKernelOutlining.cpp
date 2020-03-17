@@ -70,7 +70,7 @@ PatternMatchResult ConvertToGPUFuncOp::matchAndRewrite(
 
   // Add the SPIR-V ABI attr here since it is needed for the SPIR-V lowering.
   // TODO(ravishankarm/antiagainst) : When there is a mirror of the
-  // workgroup-size attribute in gpu dialect use that instad.
+  // workgroup-size attribute in GPU dialect use that instead.
   StringRef abiAttrName = spirv::getEntryPointABIAttrName();
   auto abiAttr =
       spirv::getEntryPointABIAttr(workGroupSize, rewriter.getContext());

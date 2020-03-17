@@ -19,10 +19,10 @@
 namespace mlir {
 namespace iree_compiler {
 
-void addXLAToLinalgOnBuffersPasses(OpPassManager &pm) {
-  pm.addPass(createXLAToLinalgOnTensorsPass());
-  pm.addPass(createLinalgFusionPass());
-  pm.addPass(createXLAToLinalgOnBuffersPass());
+void addHLOToLinalgOnBuffersPasses(OpPassManager &pm) {
+  pm.addPass(createHLOToLinalgOnTensorsPass());
+  pm.addPass(createLinalgOnTensorsFusionPass());
+  pm.addPass(createHLOToLinalgOnBuffersPass());
 }
 
 }  // namespace iree_compiler

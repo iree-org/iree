@@ -61,7 +61,8 @@ bool verifyXLAOpTensorSemantics(Operation* op) {
          llvm::all_of(op->getResults(), verifyType);
 }
 
-/// Conversion pattern for splat constants that are not scalars.
+/// Conversion pattern for splat constants that are not zero-dim tensors, i.e
+/// constant dense<...> : tensor<?xelem-type> -> linalg.generic op.
 class SplatConstConverter : public OpConversionPattern<ConstantOp> {
  public:
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
@@ -109,7 +110,7 @@ struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
     });
 
     auto func = getFunction();
-    populateXLAToLinalgOnTensorsConversionPatterns(func.getContext(), patterns);
+    populateHLOToLinalgOnTensorsConversionPatterns(func.getContext(), patterns);
     if (failed(applyPartialConversion(func, target, patterns, nullptr))) {
       signalPassFailure();
     }
@@ -118,19 +119,19 @@ struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
 
 }  // namespace
 
-void populateXLAToLinalgOnTensorsConversionPatterns(
+void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext* context, OwningRewritePatternList& patterns) {
   xla_hlo::populateHLOToLinalgConversionPattern(context, &patterns);
   patterns.insert<SplatConstConverter>(context);
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createXLAToLinalgOnTensorsPass() {
+std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnTensorsPass() {
   return std::make_unique<XlaLegalizeToLinalg>();
 }
 
 static PassRegistration<XlaLegalizeToLinalg> legalize_pass(
     "iree-hlo-to-linalg-on-tensors",
-    "Legalize from HLO dialect to Linalg dialect");
+    "Convert from XLA-HLO ops to Linalg ops on tensors");
 
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -217,14 +217,12 @@ static void propagateModifiedExecutableABI(
 }
 
 /// Returns true if the linalg on tensors path is to be used for
-/// compilation. This pipeline is avoided if the dispatch function has any ops
-/// not supported on this path.
+/// compilation.
 static bool useLinalgPath(ModuleOp moduleOp,
                           VulkanSPIRVTargetOptions const &targetOptions) {
-  /// TODO(ravishankarm): For now just rely on the command line flag, but
-  /// eventually look at the ops in the dispatch function.
   if (targetOptions.useLinalgToSPIRVPath) return true;
 
+  // Use linalg path if dispatch function contains any of the following ops.
   SmallVector<FuncOp, 1> dispatchFn;
   for (auto funcOp : moduleOp.getOps<FuncOp>()) {
     if (isDispatchFunction(funcOp)) dispatchFn.push_back(funcOp);
@@ -278,8 +276,8 @@ LogicalResult translateToVulkanSPIRVExecutable(
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
     if (useLinalgPath(moduleOp, targetOptions)) {
-      addLowerToSPIRVPasses(conversionPassManager,
-                            targetOptions.linalgToSPIRVWorkgroupSize);
+      addHLOToLinalgToSPIRVPasses(conversionPassManager,
+                                  targetOptions.linalgToSPIRVWorkgroupSize);
     } else {
       // Use the Index computation path as fallback.
       addIREEToSPIRVPasses(conversionPassManager);

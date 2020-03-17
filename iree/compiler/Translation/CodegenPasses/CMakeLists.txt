@@ -20,10 +20,10 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "HLOToLinalgOnBuffers.cpp"
+    "HLOToLinalgOnTensors.cpp"
     "LinalgFusion.cpp"
     "Passes.cpp"
-    "XLAToLinalgOnBuffers.cpp"
-    "XLAToLinalgOnTensors.cpp"
   DEPS
     LLVMSupport
     MLIRIR
