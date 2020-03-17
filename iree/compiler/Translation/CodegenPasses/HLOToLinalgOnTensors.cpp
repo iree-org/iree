@@ -35,6 +35,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 #include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
@@ -108,6 +109,14 @@ struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
     target.addDynamicallyLegalOp<ConstantOp>([](ConstantOp op) -> bool {
       return isa<linalg::LinalgOp>(op.getOperation()->getParentOp());
     });
+
+    // Don't convert the body of reduction ops.
+    target.addDynamicallyLegalDialect<xla_hlo::XlaHloDialect>(
+        Optional<ConversionTarget::DynamicLegalityCallbackFn>(
+            [](Operation* op) {
+              return isa<xla_hlo::ReduceOp>(
+                  op->getParentRegion()->getParentOp());
+            }));
 
     auto func = getFunction();
     populateHLOToLinalgOnTensorsConversionPatterns(func.getContext(), patterns);
