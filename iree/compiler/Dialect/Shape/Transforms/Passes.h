@@ -32,7 +32,7 @@ void populateMaterializeDynamicShapesPipeline(OpPassManager &pm);
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OpPassBase<ModuleOp>> createExpandFunctionDynamicDimsPass();
+std::unique_ptr<OpPassBase<FuncOp>> createExpandFunctionDynamicDimsPass();
 
 // For any dynamically shaped edges in a function, introduces an appropriate
 // get_ranked_shape and corresponding tie_shape op to make the association.

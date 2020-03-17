@@ -16,27 +16,15 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Transforms
+    TypeConversion
   HDRS
-    "Passes.h"
+    "TypeConversion.h"
   SRCS
-    "CleanupPlaceholders.cpp"
-    "ConvertHLOToShapeDialect.cpp"
-    "ExpandFunctionDynamicDims.cpp"
-    "HoistShapeCalculations.cpp"
-    "MaterializeShapeCalculations.cpp"
-    "Passes.cpp"
-    "TieDynamicShapes.cpp"
+    "TypeConversion.cpp"
   DEPS
-    MLIRAnalysis
     MLIRIR
-    MLIRPass
     MLIRStandardOps
-    MLIRTransforms
+    MLIRSupport
     iree::compiler::Dialect::Shape::IR
-    iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
-    iree::compiler::Dialect::Shape::Utils::TypeConversion
-    tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )

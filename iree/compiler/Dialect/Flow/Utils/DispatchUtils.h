@@ -53,12 +53,6 @@ ExecutableOp createExecutable(Location loc, StringRef executableName,
                               ArrayRef<FuncOp> funcOps, ModuleOp parentModuleOp,
                               llvm::StringMap<FuncOp> &dispatchableFuncOps);
 
-// Converts a region body to a function.
-// The region entry block args and return terminators are used to derive the
-// function type.
-FuncOp createRegionFunction(Location loc, StringRef functionName,
-                            Region &region);
-
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

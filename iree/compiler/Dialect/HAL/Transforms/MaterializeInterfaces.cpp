@@ -76,8 +76,8 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
           IREE::HAL::MemoryAccessBitfield::Read);
     } else {
       emitError(interfaceLoc)
-          << "unsupported argument " << inputType.index() << " type "
-          << inputType.value()
+          << "unsupported interface function argument " << inputType.index()
+          << " type " << inputType.value()
           << "; requires tensors or simple primitive values (i32, etc)";
       return llvm::None;
     }

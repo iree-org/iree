@@ -16,12 +16,24 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Dialect/Shape/Utils/TypeConversion.h"
+#include "llvm/Support/Debug.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
+#define DEBUG_TYPE "iree-dispatch"
+
 namespace mlir {
 namespace iree_compiler {
+
+using Shape::getShapeToPrimitiveTypeExpander;
+
 namespace IREE {
 namespace Flow {
 
@@ -35,11 +47,19 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
   // Insert at the same place as the original region.
   OpBuilder builder(regionOp);
 
+  // Perform shape to primitive type expansion.
+  auto &typeExpander = getShapeToPrimitiveTypeExpander();
+  SmallVector<Value, 4> origArgs(regionOp.args());
+  SmallVector<Value, 4> newArgs;
+  if (failed(typeExpander.expandSourceValuesToTarget(
+          regionOp.getLoc(), origArgs, newArgs, builder))) {
+    return failure();
+  }
+
   // Create the dispatch op to the executable function.
   auto dispatchOp = builder.create<DispatchOp>(
       regionOp.getLoc(), executableOp.getName(), entryPointOp.getName(),
-      regionOp.workload(), outlinedFuncOp.getType().getResults(),
-      regionOp.args());
+      regionOp.workload(), outlinedFuncOp.getType().getResults(), newArgs);
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < regionOp.getNumResults(); ++i) {
@@ -52,6 +72,54 @@ LogicalResult convertToDispatchOp(DispatchRegionOp regionOp,
   return success();
 }
 
+// Converts a region body to a function.
+// The region entry block args and return terminators are used to derive the
+// function type.
+FuncOp createRegionFunction(Location loc, StringRef functionName,
+                            Region &region) {
+  // Build function type matching 1:1 with the region signature.
+  SmallVector<Type, 4> operandTypes;
+  SmallVector<Type, 4> resultTypes;
+  auto &entryBlock = region.front();
+  for (auto &operand : entryBlock.getArguments()) {
+    operandTypes.push_back(operand.getType());
+  }
+  for (auto &block : region.getBlocks()) {
+    if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
+      resultTypes = llvm::to_vector<4>(returnOp.getOperandTypes());
+      break;
+    }
+  }
+
+  // Clone region into the function body.
+  auto functionType =
+      FunctionType::get(operandTypes, resultTypes, region.getContext());
+  auto funcOp = FuncOp::create(loc, functionName, functionType);
+  BlockAndValueMapping mapping;
+  region.cloneInto(&funcOp.getBody(), mapping);
+
+  // Replace flow.return with std.return.
+  for (auto &block : funcOp.getBlocks()) {
+    if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
+      OpBuilder builder(returnOp);
+      builder.create<mlir::ReturnOp>(
+          returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
+      returnOp.erase();
+    }
+  }
+
+  // Expand shape types to primitives.
+  auto &typeExpander = getShapeToPrimitiveTypeExpander();
+  OpBuilder expandBuilder(funcOp.getContext());
+  if (failed(typeExpander.expandFunctionSignature(funcOp, expandBuilder)) ||
+      failed(typeExpander.expandAllReturnLikeTerminators<mlir::ReturnOp>(
+          funcOp, expandBuilder))) {
+    return nullptr;
+  }
+
+  return funcOp;
+}
+
 // Outlines a dispatch region into a flow.executable.
 LogicalResult outlineDispatchRegion(
     DispatchRegionOp regionOp, int outlinedRegionOrdinal,
@@ -60,8 +128,13 @@ LogicalResult outlineDispatchRegion(
   auto parentFuncOp = regionOp.getParentOfType<FuncOp>();
   std::string namePrefix = parentFuncOp.getName().str() + "_ex_dispatch_" +
                            std::to_string(outlinedRegionOrdinal);
+
+  // Convert the region to a function.
   auto dispatchFuncOp =
       createRegionFunction(regionOp.getLoc(), namePrefix, regionOp.body());
+  if (!dispatchFuncOp) {
+    return failure();
+  }
 
   // Create the executable with the region cloned into it.
   auto executableOp = createExecutable(

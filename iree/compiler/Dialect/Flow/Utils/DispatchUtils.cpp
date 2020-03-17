@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BlockAndValueMapping.h"
@@ -33,7 +34,8 @@ bool isOpOfKnownDialect(Operation *op) {
   auto dialectNamespace = op->getDialect()->getNamespace();
   return dialectNamespace == xla_hlo::XlaHloDialect::getDialectNamespace() ||
          dialectNamespace == mlir::StandardOpsDialect::getDialectNamespace() ||
-         dialectNamespace == FlowDialect::getDialectNamespace();
+         dialectNamespace == FlowDialect::getDialectNamespace() ||
+         dialectNamespace == ShapeDialect::getDialectNamespace();
 }
 
 namespace {
@@ -194,42 +196,6 @@ ExecutableOp createExecutable(Location loc, StringRef executableName,
   }
 
   return executableOp;
-}
-
-FuncOp createRegionFunction(Location loc, StringRef functionName,
-                            Region &region) {
-  // Build function type matching 1:1 with the region signature.
-  SmallVector<Type, 4> operandTypes;
-  SmallVector<Type, 4> resultTypes;
-  auto &entryBlock = region.front();
-  for (auto &operand : entryBlock.getArguments()) {
-    operandTypes.push_back(operand.getType());
-  }
-  for (auto &block : region.getBlocks()) {
-    if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
-      resultTypes = llvm::to_vector<4>(returnOp.getOperandTypes());
-      break;
-    }
-  }
-  auto functionType =
-      FunctionType::get(operandTypes, resultTypes, region.getContext());
-
-  // Clone region into the function body.
-  auto funcOp = FuncOp::create(loc, functionName, functionType);
-  BlockAndValueMapping mapping;
-  region.cloneInto(&funcOp.getBody(), mapping);
-
-  // Replace flow.return with std.return.
-  for (auto &block : funcOp.getBlocks()) {
-    if (auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(block.back())) {
-      OpBuilder builder(returnOp);
-      builder.create<mlir::ReturnOp>(
-          returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
-      returnOp.erase();
-    }
-  }
-
-  return funcOp;
 }
 
 }  // namespace Flow

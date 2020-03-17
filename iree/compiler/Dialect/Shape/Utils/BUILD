@@ -18,29 +18,13 @@ package(
 )
 
 cc_library(
-    name = "Transforms",
-    srcs = [
-        "CleanupPlaceholders.cpp",
-        "ConvertHLOToShapeDialect.cpp",
-        "ExpandFunctionDynamicDims.cpp",
-        "HoistShapeCalculations.cpp",
-        "MaterializeShapeCalculations.cpp",
-        "Passes.cpp",
-        "TieDynamicShapes.cpp",
-    ],
-    hdrs = [
-        "Passes.h",
-    ],
+    name = "TypeConversion",
+    srcs = ["TypeConversion.cpp"],
+    hdrs = ["TypeConversion.h"],
     deps = [
         "//iree/compiler/Dialect/Shape/IR",
-        "//iree/compiler/Dialect/Shape/Plugins/XLA:XlaHloShapeBuilder",
-        "//iree/compiler/Dialect/Shape/Utils:TypeConversion",
-        "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
-        "@llvm-project//mlir:Transforms",
-        "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
+        "@llvm-project//mlir:Support",
     ],
-    alwayslink = 1,
 )
