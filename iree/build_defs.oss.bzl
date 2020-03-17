@@ -41,13 +41,6 @@ def platform_trampoline_deps(basename, path = "base"):
         "//iree/%s/internal:%s_internal" % (path, basename),
     ]
 
-# A platform-sensitive list of copts for the Vulkan loader.
-PLATFORM_VULKAN_LOADER_COPTS = select({
-    "//iree/hal/vulkan:native_vk": [],
-    "//iree/hal/vulkan:swiftshader_vk": [],
-    "//conditions:default": [],
-})
-
 # A platform-sensitive list of dependencies for non-test targets using Vulkan.
 PLATFORM_VULKAN_DEPS = select({
     "//iree/hal/vulkan:native_vk": [],

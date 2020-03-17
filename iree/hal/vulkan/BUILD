@@ -14,7 +14,7 @@
 
 # HAL implementation using Vulkan and (likely) SPIR-V executables.
 
-load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_LOADER_COPTS", "PLATFORM_VULKAN_TEST_DEPS")
+load("//iree:build_defs.oss.bzl", "PLATFORM_VULKAN_TEST_DEPS")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -156,10 +156,8 @@ cc_library(
         "dynamic_symbol_tables.h",
         "dynamic_symbols.h",
     ],
-    copts = PLATFORM_VULKAN_LOADER_COPTS,
     deps = [
         "//iree/base:dynamic_library",
-        "//iree/base:file_path",
         "//iree/base:platform_headers",
         "//iree/base:ref_ptr",
         "//iree/base:source_location",

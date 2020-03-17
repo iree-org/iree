@@ -22,7 +22,6 @@
 #include "absl/memory/memory.h"
 #include "absl/strings/str_cat.h"
 #include "absl/types/span.h"
-#include "iree/base/file_path.h"
 #include "iree/base/platform_headers.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
@@ -135,18 +134,6 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
 
 #define IREE_STRINGIFY_(x) #x
 #define IREE_STRING_(x) IREE_STRINGIFY_(x)
-
-#if defined(IREE_VK_ICD_FILENAMES)
-  std::string vk_icd_filenames = IREE_STRING_(IREE_VK_ICD_FILENAMES);
-#if defined(IREE_PLATFORM_WINDOWS)
-// TODO(scotttodd): Set VK_ICD_FILENAMES on Windows
-#else
-  ::setenv("VK_ICD_FILENAMES", vk_icd_filenames.c_str(), 0);
-#endif  // IREE_PLATFORM_WINDOWS
-#else
-// Leave VK_ICD_FILENAMES unchanged and rely on the system Vulkan loader to
-// discover ICDs.
-#endif  // IREE_VK_ICD_FILENAMES
 
 #if defined(IREE_VK_LAYER_PATH_EXTRAS)
   std::string vk_layer_path_extras = IREE_STRING_(IREE_VK_LAYER_PATH_EXTRAS);
