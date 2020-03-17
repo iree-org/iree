@@ -64,8 +64,8 @@ func @stdElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 
 func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  %1 = xla_hlo.sub %0, %arg0 : tensor<4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
+  %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
   return %2 : tensor<4xf32>
 }
 
@@ -74,8 +74,8 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @hloElementwiseOps_ex_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
 // CHECK-NEXT:       %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       %1 = xla_hlo.sub %0, %arg0 : tensor<4xf32>
-// CHECK-NEXT:       %2 = xla_hlo.mul %1, %arg0 : tensor<4xf32>
+// CHECK-NEXT:       %1 = xla_hlo.subtract %0, %arg0 : tensor<4xf32>
+// CHECK-NEXT:       %2 = xla_hlo.multiply %1, %arg0 : tensor<4xf32>
 // CHECK-NEXT:       return %2 : tensor<4xf32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }
@@ -94,7 +94,7 @@ func @hloElementwiseOps(%arg0 : tensor<4xf32>) -> tensor<4xf32> {
 func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4x4xf32>
   %1 = "xla_hlo.dot"(%0, %arg0) : (tensor<4x4xf32>, tensor<4x4xf32>) -> tensor<4x4xf32>
-  %2 = xla_hlo.mul %1, %arg0 : tensor<4x4xf32>
+  %2 = xla_hlo.multiply %1, %arg0 : tensor<4x4xf32>
   return %2 : tensor<4x4xf32>
 }
 
@@ -120,7 +120,7 @@ func @interleavedDot(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 // CHECK-NEXT:   flow.dispatch.entry @interleavedDot_ex_dispatch_2
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @interleavedDot_ex_dispatch_2(%arg0: tensor<4x4xf32>, %arg1: tensor<4x4xf32>) -> tensor<4x4xf32> {
-// CHECK-NEXT:       %0 = xla_hlo.mul %arg0, %arg1 : tensor<4x4xf32>
+// CHECK-NEXT:       %0 = xla_hlo.multiply %arg0, %arg1 : tensor<4x4xf32>
 // CHECK-NEXT:       return %0 : tensor<4x4xf32>
 // CHECK-NEXT:     }
 // CHECK-NEXT:   }

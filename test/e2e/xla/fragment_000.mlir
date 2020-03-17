@@ -17,7 +17,7 @@ func @main_entry_dispatch_3(
   %11 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.67"} : (tensor<f32>) -> tensor<5x5xf32>
   %12 = "xla_hlo.broadcast_in_dim"(%4) {broadcast_dimensions = dense<1> : tensor<1xi64>, name = "broadcast.64"} : (tensor<5xf32>) -> tensor<5x5xf32>
   %13 = addf %3, %12 : tensor<5x5xf32>
-  %14 = xla_hlo.max %11, %13 {name = "maximum.68"} : tensor<5x5xf32>
+  %14 = xla_hlo.maximum %11, %13 {name = "maximum.68"} : tensor<5x5xf32>
   %15 = "xla_hlo.reshape"(%14) {name = "reshape.70"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
   %16 = "xla_hlo.select"(%9, %10, %15) {name = "select.71"} : (tensor<5x1x5xi1>, tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
   %17 = "xla_hlo.copy"(%16) {name = "copy.4"} : (tensor<5x1x5xf32>) -> tensor<5x1x5xf32>

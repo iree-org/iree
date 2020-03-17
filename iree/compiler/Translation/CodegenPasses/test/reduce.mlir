@@ -43,7 +43,7 @@ module {
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.min %arg3, %arg4 : tensor<f32>
+      %3 = xla_hlo.minimum %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
     iree.store_output(%2 : tensor<5xf32>, %arg2 : memref<5xf32>)
@@ -62,7 +62,7 @@ module {
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.max %arg3, %arg4 : tensor<f32>
+      %3 = xla_hlo.maximum %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<5xf32>
     iree.store_output(%2 : tensor<5xf32>, %arg2 : memref<5xf32>)
@@ -81,7 +81,7 @@ module {
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
     ^bb0(%arg3: tensor<f32>, %arg4 : tensor<f32>):
-      %3 = xla_hlo.max %arg3, %arg4 : tensor<f32>
+      %3 = xla_hlo.maximum %arg3, %arg4 : tensor<f32>
       "xla_hlo.return"(%3) : (tensor<f32>) -> ()
     }) {dimensions = dense<0> : tensor<1xi64>} : (tensor<5x4xf32>, tensor<f32>) -> tensor<4xf32>
     iree.store_output(%2 : tensor<4xf32>, %arg2 : memref<4xf32>)
