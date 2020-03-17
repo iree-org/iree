@@ -194,6 +194,26 @@ def HAL_AccessScopeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_ExecutableCachingMode_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecutableCachingMode_AliasProvidedData : BitEnumAttrCase<"AliasProvidedData", 0x0001>;
+def HAL_ExecutableCachingMode_AllowPersistentCaching : BitEnumAttrCase<"AllowPersistentCaching", 0x0002>;
+def HAL_ExecutableCachingMode_AllowOptimization : BitEnumAttrCase<"AllowOptimization", 0x0004>;
+def HAL_ExecutableCachingMode_EnableDebugging : BitEnumAttrCase<"EnableDebugging", 0x0008>;
+def HAL_ExecutableCachingMode_EnableCoverage : BitEnumAttrCase<"EnableCoverage", 0x0010>;
+def HAL_ExecutableCachingMode_EnableProfiling : BitEnumAttrCase<"EnableProfiling", 0x0020>;
+def HAL_ExecutableCachingModeBitfieldAttr :
+    BitEnumAttr<"ExecutableCachingModeBitfield", "valid ExecutableCachingMode", [
+      HAL_ExecutableCachingMode_None,
+      HAL_ExecutableCachingMode_AliasProvidedData,
+      HAL_ExecutableCachingMode_AllowPersistentCaching,
+      HAL_ExecutableCachingMode_AllowOptimization,
+      HAL_ExecutableCachingMode_EnableDebugging,
+      HAL_ExecutableCachingMode_EnableCoverage,
+      HAL_ExecutableCachingMode_EnableProfiling,
+    ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 // Values are FourCC codes.
 // See https://github.com/google/iree/tree/master/iree/hal/executable_format.h for more info.
 // https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
@@ -215,11 +235,15 @@ def HAL_ExecutableFormatAttr :
       HAL_EF_SpirV,
       HAL_EF_LLVM
     ]> {
-  let returnType = "uint32_t";
-  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
+  let returnType = "IREE::HAL::ExecutableFormat";
+  let convertFromStorage = "static_cast<IREE::HAL::ExecutableFormat>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 // LINT.ThenChange(https://github.com/google/iree/tree/master/iree/hal/executable_format.h:fourcc)
+
+def HAL_ExecutableFormatArrayAttr : TypedArrayAttrBase<
+    HAL_ExecutableFormatAttr,
+    "HAL executable format array attribute">;
 
 //===----------------------------------------------------------------------===//
 // HAL types
@@ -336,6 +360,7 @@ def HAL_ExecutableCache : DialectType<
     that the cache is a no-op and the returned Executables only live for as long
     as the cache does.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::ExecutableCacheType>()";
 }
 
 def HAL_ExecutableLayout : DialectType<

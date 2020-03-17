@@ -226,6 +226,8 @@ class MaterializeInterfacesPass : public ModulePass<MaterializeInterfacesPass> {
       builder.setInsertionPointAfter(sourceOp);
       auto targetOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
+      SymbolTable::setSymbolVisibility(targetOp,
+                                       SymbolTable::Visibility::Private);
 
       // Add IO ops to define the bindings and how parameters are passed.
       auto interfaceOp = declareInterfaceIO(sourceOp, targetOp);

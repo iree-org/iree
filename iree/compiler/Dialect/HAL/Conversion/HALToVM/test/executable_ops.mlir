@@ -70,6 +70,6 @@ hal.executable @exe {
 // CHECK-LABEL: @exeLookup
 func @exeLookup(%arg0 : !hal.device) -> !hal.executable {
   // CHECK: vm.call @exe(%arg0) : (!vm.ref<!hal.device>) -> !vm.ref<!hal.executable>
-  %0 = hal.ex.cache_executable %arg0, @exe : !hal.executable
+  %0 = hal.executable.lookup %arg0, @exe : !hal.executable
   return %0 : !hal.executable
 }

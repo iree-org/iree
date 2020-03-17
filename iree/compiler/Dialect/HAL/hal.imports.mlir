@@ -11,24 +11,6 @@ vm.module @hal {
 vm.import @ex.shared_device() -> !vm.ref<!hal.device>
 attributes {nosideeffects}
 
-// Returns one of the provided executable formats that can be used by the
-// device or 0 if none are supported.
-vm.import @ex.match_supported_executable_format(
-  %device : !vm.ref<!hal.device>,
-  %available_formats : i32 ...
-) -> i32
-attributes {nosideeffects}
-
-// Caches an executable for use with the specified device.
-// The executable may be shared with other contexts but as it is immutable
-// this does not matter.
-vm.import @ex.cache_executable(
-  %device : !vm.ref<!hal.device>,
-  %executable_format : i32,
-  %executable_data : !vm.ref<!iree.byte_buffer>
-) -> !vm.ref<!hal.executable>
-attributes {nosideeffects}
-
 vm.import @ex.push_binding(
   %command_buffer : !vm.ref<!hal.command_buffer>,
   %ordinal : i32,
@@ -326,6 +308,37 @@ vm.import @device.allocator(
 attributes {nosideeffects}
 
 //===----------------------------------------------------------------------===//
+// iree::hal::ExecutableCache
+//===----------------------------------------------------------------------===//
+
+// Creates an executable cache with the given identifier.
+vm.import @executable_cache.create(
+  %device : !vm.ref<!hal.device>,
+  %identifier : !vm.ref<!iree.byte_buffer>
+) -> !vm.ref<!hal.executable_cache>
+attributes {nosideeffects}
+
+// Returns the index of the preferred format of the cache from the given set or
+// -1 if none can be used. Preparation may still fail if the particular version
+// or features required by the executable are not supported.
+vm.import @executable_cache.select_format(
+  %executable_cache : !vm.ref<!hal.executable_cache>,
+  %available_formats : i32 ...
+) -> i32
+attributes {nosideeffects}
+
+// Caches an executable for use with the specified device.
+// The executable may be shared with other contexts but as it is immutable
+// this does not matter.
+vm.import @executable_cache.prepare(
+  %executable_cache : !vm.ref<!hal.executable_cache>,
+  %executable_layout : !vm.ref<!hal.executable_layout>,
+  %caching_mode : i32,
+  %executable_data : !vm.ref<!iree.byte_buffer>
+) -> !vm.ref<!hal.executable>
+attributes {nosideeffects}
+
+//===----------------------------------------------------------------------===//
 // iree::hal::ExecutableLayout
 //===----------------------------------------------------------------------===//
 
@@ -333,8 +346,7 @@ attributes {nosideeffects}
 // required size.
 vm.import @executable_layout.create(
   %device : !vm.ref<!hal.device>,
-  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...,
-  %push_constants : i32
+  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
 ) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
 

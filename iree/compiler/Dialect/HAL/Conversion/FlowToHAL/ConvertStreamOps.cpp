@@ -255,8 +255,8 @@ static void recordDispatch(Value device, Value commandBuffer,
   // Get the handle to the executable that is compatible with our device.
   auto executable =
       rewriter
-          .create<IREE::HAL::ExCacheExecutableOp>(dispatchOp.getLoc(), device,
-                                                  dispatchOp.executable())
+          .create<IREE::HAL::ExecutableLookupOp>(dispatchOp.getLoc(), device,
+                                                 dispatchOp.executable())
           .getResult();
   auto executableOp =
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(

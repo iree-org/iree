@@ -73,6 +73,16 @@ createRewriteLegacyIOPass();
 // typical clients to use.
 std::unique_ptr<OpPassBase<ModuleOp>> createPublicABIGenerationPass();
 
+//===----------------------------------------------------------------------===//
+// Resource initialization, caching, and optimization
+//===----------------------------------------------------------------------===//
+
+// Finds all resource lookups (such as hal.executable.lookup), materializes
+// their cache storage and initialization, and rewrites the lookups to
+// references.
+std::unique_ptr<OpPassBase<ModuleOp>> createMaterializeResourceCachesPass(
+    ExecutableTargetOptions executableOptions);
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

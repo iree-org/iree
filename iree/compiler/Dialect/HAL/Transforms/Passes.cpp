@@ -34,6 +34,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createTranslateExecutablesPass(executableOptions));
   passManager.addPass(createConvertFlowToHALPass());
   passManager.addPass(createPublicABIGenerationPass());
+  passManager.addPass(createMaterializeResourceCachesPass(executableOptions));
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());

@@ -49,32 +49,6 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   ];
 }
 
-def HAL_ExCacheExecutableOp : HAL_PureOp<"ex.cache_executable", [
-    DeclareOpInterfaceMethods<OpAsmOpInterface>,
-  ]> {
-  let arguments = (ins
-    HAL_Device:$device,
-    FlatSymbolRefAttr:$executable
-  );
-  let results = (outs
-    HAL_Executable:$result
-  );
-
-  let assemblyFormat = "$device `,` $executable attr-dict `:` type($result)";
-
-  let skipDefaultBuilders = 1;
-  let builders = [
-    OpBuilder<[{
-      Builder *builder, OperationState &state,
-      Value device, StringRef executable
-    }], [{
-      state.addOperands({device});
-      state.addAttribute("executable", builder->getSymbolRefAttr(executable));
-      state.addTypes({ExecutableType::get(builder->getContext())});
-    }]>,
-  ];
-}
-
 // TODO(benvanik): remove and replace with descriptor sets.
 def HAL_ExPushBindingOp : HAL_Op<"ex.push_binding"> {
   let arguments = (ins
@@ -1162,6 +1136,16 @@ def HAL_DescriptorSetLayoutCreateOp :
   let summary = [{creates a descriptor set layout}];
   let description = [{
     Creates a descriptor set layout that defines the bindings used within a set.
+    The same descriptor set layout may be shared with many different executable
+    layouts and by doing so some runtime binding overhead when switching between
+    executables that use the same set layouts can be reduced.
+
+    ```mlir
+    %layout = hal.descriptor_set_layout.create %device, bindings = [
+      #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
+      #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+    ] : !hal.descriptor_set_layout
+    ```
   }];
 
   let arguments = (ins
@@ -1173,7 +1157,36 @@ def HAL_DescriptorSetLayoutCreateOp :
   );
 
   let assemblyFormat = [{
-    $device `,` `bindings` `=` `[` $bindings `]` attr-dict `:` type($result)
+    $device `,` `bindings` `=` $bindings attr-dict `:` type($result)
+  }];
+}
+
+def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{descriptor set layout cache lookup pseudo-op}];
+  let description = [{
+    Used during conversion to provide a placeholder for a globally cached and
+    possibly lazy-initialized descriptor set layout.
+
+    ```mlir
+    %layout = hal.descriptor_set_layout.lookup %device, bindings = [
+      #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
+      #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+    ] : !hal.descriptor_set_layout
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    HAL_DescriptorSetLayoutBindingArrayAttr:$bindings
+  );
+  let results = (outs
+    HAL_DescriptorSetLayout:$result
+  );
+
+  let assemblyFormat = [{
+    $device `,` `bindings` `=` $bindings attr-dict `:` type($result)
   }];
 }
 
@@ -1216,8 +1229,6 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
 // iree::hal::Executable
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): executable runtime type.
-
 def HAL_ExecutableOp : HAL_Op<"executable", [
     IsolatedFromAbove,
     SingleBlockImplicitTerminator<"IREE::HAL::ExecutableEndOp">,
@@ -1247,6 +1258,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   let extraClassDeclaration = [{
     Block& getBlock() { return body().front(); }
     IREE::HAL::ExecutableSourceOp getSourceOp();
+    IREE::HAL::InterfaceOp getInterfaceOp();
   }];
 
   let verifier = [{ return verifyExecutableOp(*this); }];
@@ -1366,6 +1378,38 @@ def HAL_ExecutableBinaryEndOp : HAL_Op<"executable.binary_end", [
   let assemblyFormat = "attr-dict";
 }
 
+def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{executable cache lookup pseudo-op}];
+  let description = [{
+    Used during conversion to provide a placeholder for a globally cached and
+    possibly lazy-initialized executable.
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    FlatSymbolRefAttr:$executable
+  );
+  let results = (outs
+    HAL_Executable:$result
+  );
+
+  let assemblyFormat = "$device `,` $executable attr-dict `:` type($result)";
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state,
+      Value device, StringRef executable
+    }], [{
+      state.addOperands({device});
+      state.addAttribute("executable", builder->getSymbolRefAttr(executable));
+      state.addTypes({ExecutableType::get(builder->getContext())});
+    }]>,
+  ];
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Executable Interfaces
 //===----------------------------------------------------------------------===//
@@ -1414,6 +1458,10 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return body().front(); }
+
+    // TODO(benvanik): replace with a nested typed attr that works.
+    // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
+    ArrayAttr getExecutableSetLayoutsAttr();
   }];
 }
 
@@ -1521,27 +1569,141 @@ def HAL_InterfaceStoreTensorOp : HAL_Op<"interface.store.tensor"> {
 // iree::hal::ExecutableCache
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): executable cache.
+def HAL_ExecutableCacheCreateOp : HAL_Op<"executable_cache.create", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{creates an executable cache}];
+  let description = [{
+    Caches may be shared across multiple devices from the same driver or
+    specific to individual devices. Caches may persist prepared executables
+    across process launches or re-prepare them each run. Callers should assume
+    that the cache is a no-op and the returned hal.executables only live for as
+    long as the cache does.
+
+    The term 'cache' here is rather optimistic - it's perfectly acceptable for
+    implementations to not cache at all and return new hal.executables for each
+    preparation (even for the same executable). Callers should expect such
+    behavior and try to retain the results of the preparation to reduce overhead
+    from re-preparing executables.
+
+    Currently caches are synchronous but the intent is to support asynchronous
+    compilation of multiple executables with semaphores used to indicate when
+    the executables are ready for use.
+
+    ```mlir
+    %cache = hal.executable_cache.create %device, identifier = "some_guid" : !hal.executable_cache
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    StrAttr:$identifier
+  );
+  let results = (outs
+    HAL_ExecutableCache:$result
+  );
+
+  let assemblyFormat = [{
+    $device `,` `identifier` `=` $identifier
+    attr-dict-with-keyword `:` type($result)
+  }];
+}
+
+def HAL_ExecutableCacheSelectFormatOp :
+  HAL_PureOp<"executable_cache.select_format", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{selects the preferred format from the given list}];
+  let description = [{
+    Returns the index of the preferred format of the cache from the given set or
+    -1 if none can be used. Preparation may still fail if the particular version
+    or features required by the executable are not supported.
+
+    ```mlir
+    // Returns indices 0 or 1 if either of the two inputs are usable or -1 otherwise.
+    %index = hal.executable_cache.select_format %cache, available_formats = [1447906369 : i32, 123482395 : i32] : i32
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_ExecutableCache:$executable_cache,
+    HAL_ExecutableFormatArrayAttr:$available_formats
+  );
+  let results = (outs
+    I32:$result
+  );
+
+  let assemblyFormat = [{
+    $executable_cache `,` `available_formats` `=` $available_formats
+    attr-dict-with-keyword `:` type($result)
+  }];
+}
+
+def HAL_ExecutableCachePrepareOp : HAL_PureOp<"executable_cache.prepare", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{synchronously prepares an executable for use}];
+  let description = [{
+    The provided spec and data will be used to either lookup a previously
+    prepared executable in the cache or prepare a new one.
+
+    Depending on the driver preparation may take a non-trivial amount of time
+    (such as when JITing/etc). As the cache is internally synchronized callers
+    can issue preparation requests from multiple threads - even for the same
+    executables - and calls will block until preparation completes.
+
+    ```mlir
+    %exe = hal.executable_cache.prepare %executable_cache,
+                                        layout = %layout,
+                                        caching_mode = "AllowPersistentCaching|AllowOptimization",
+                                        @executable : !hal.executable
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_ExecutableCache:$executable_cache,
+    HAL_ExecutableLayout:$executable_layout,
+    HAL_ExecutableCachingModeBitfieldAttr:$caching_mode,
+    FlatSymbolRefAttr:$executable
+  );
+  let results = (outs
+    HAL_Executable:$result
+  );
+
+  let assemblyFormat = [{
+    $executable_cache `,` `layout` `=` $executable_layout `,`
+    `caching_mode` `=` $caching_mode `,` $executable
+    attr-dict-with-keyword `:` type($result)
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::ExecutableLayout
 //===----------------------------------------------------------------------===//
 
-def HAL_ExecutableLayoutCreateOp :
-  HAL_PureOp<"executable_layout.create", [
+def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
     DeclareOpInterfaceMethods<OpAsmOpInterface>,
   ]> {
   let summary = [{creates an executable layout}];
   let description = [{
     Creates an executable layout from the given descriptor sets and push
     constant required size. Executable layouts can be shared across any
-    executable that uses the same layout and push constant information.
+    executable that uses the same layout and push constant information. Sharing
+    the layout between executables will reduce runtime binding overhead and it
+    is often worth the cost to allow a small number of unused bindings in one
+    executable such that it can share layouts with others that will be scheduled
+    adjacent to it.
+
+    ```mlir
+    %set0 = hal.descriptor_set_layout.create ...
+    %set1 = hal.descriptor_set_layout.create ...
+    %layout = hal.executable_layout.create %device, set_layouts = [%set0, %set1] : !hal.executable_layout
+    ```
   }];
 
   let arguments = (ins
     HAL_Device:$device,
-    Variadic<HAL_DescriptorSetLayout>:$set_layouts,
-    OptionalAttr<I32Attr>:$push_constants
+    Variadic<HAL_DescriptorSetLayout>:$set_layouts
   );
   let results = (outs
     HAL_ExecutableLayout:$result
@@ -1549,11 +1711,43 @@ def HAL_ExecutableLayoutCreateOp :
 
   let assemblyFormat = [{
     $device `,` `set_layouts` `=` `[` $set_layouts `]`
-    (`,` `push_constants` `=` $push_constants^)? attr-dict-with-keyword `:`
-    type($result)
+    attr-dict-with-keyword `:` type($result)
   }];
 }
 
+def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
+    DeclareOpInterfaceMethods<OpAsmOpInterface>,
+  ]> {
+  let summary = [{executable layout cache lookup pseudo-op}];
+  let description = [{
+    Used during conversion to provide a placeholder for a globally cached and
+    possibly lazy-initialized executable layout.
+
+    ```mlir
+    %layout = hal.executable_layout.lookup %device, set_layouts = [
+      [
+        #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
+        #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+      ]
+    ] : !hal.executable_layout
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    // TODO(benvanik): replace with a nested typed attr that works.
+    // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
+    ArrayAttr:$set_layouts
+  );
+  let results = (outs
+    HAL_ExecutableLayout:$result
+  );
+
+  let assemblyFormat = [{
+    $device `,` `set_layouts` `=` $set_layouts
+    attr-dict-with-keyword `:` type($result)
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Fence

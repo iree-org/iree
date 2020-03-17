@@ -76,15 +76,6 @@ void ExSharedDeviceOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
-// hal.ex.cache_executable
-//===----------------------------------------------------------------------===//
-
-void ExCacheExecutableOp::getAsmResultNames(
-    function_ref<void(Value, StringRef)> setNameFn) {
-  setNameFn(result(), "exe");
-}
-
-//===----------------------------------------------------------------------===//
 // hal.make_memory_barrier
 //===----------------------------------------------------------------------===//
 
@@ -782,6 +773,15 @@ void DescriptorSetLayoutCreateOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.descriptor_set_layout.lookup
+//===----------------------------------------------------------------------===//
+
+void DescriptorSetLayoutLookupOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "descriptor_set_layout");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.device.allocator
 //===----------------------------------------------------------------------===//
 
@@ -798,6 +798,12 @@ ExecutableSourceOp ExecutableOp::getSourceOp() {
   auto ops = getBlock().getOps<ExecutableSourceOp>();
   assert(!ops.empty() && "executables must contain source ops");
   return *ops.begin();
+}
+
+InterfaceOp ExecutableOp::getInterfaceOp() {
+  auto interfaceOps = llvm::to_vector<1>(getBlock().getOps<InterfaceOp>());
+  assert(interfaceOps.size() == 1 && "executable must have one interface");
+  return interfaceOps.front();
 }
 
 void ExecutableOp::build(Builder *builder, OperationState &state,
@@ -951,6 +957,15 @@ static LogicalResult verifyExecutableBinaryOp(ExecutableBinaryOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.executable.lookup
+//===----------------------------------------------------------------------===//
+
+void ExecutableLookupOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "exe");
+}
+
+//===----------------------------------------------------------------------===//
 // hal.interface
 //===----------------------------------------------------------------------===//
 
@@ -990,6 +1005,24 @@ static void printInterfaceOp(OpAsmPrinter &p, InterfaceOp op) {
       /*elidedAttrs=*/{mlir::SymbolTable::getSymbolAttrName()});
   p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                 /*printBlockTerminators=*/false);
+}
+
+ArrayAttr InterfaceOp::getExecutableSetLayoutsAttr() {
+  Builder builder(getContext());
+  SmallVector<SmallVector<Attribute, 4>, 4> setAttrs;
+  for (auto bindingOp : getBlock().getOps<InterfaceBindingOp>()) {
+    int set = bindingOp.set().getZExtValue();
+    int binding = bindingOp.binding().getZExtValue();
+    if (set >= setAttrs.size()) setAttrs.resize(set + 1);
+    auto &bindingAttrs = setAttrs[set];
+    if (binding >= bindingAttrs.size()) bindingAttrs.resize(binding + 1);
+    bindingAttrs[binding] = DescriptorSetLayoutBindingAttr::get(
+        bindingOp.bindingAttr(), bindingOp.typeAttr(), bindingOp.accessAttr());
+  }
+  return builder.getArrayAttr(llvm::to_vector<4>(
+      llvm::map_range(setAttrs, [&](ArrayRef<Attribute> bindingsArray) {
+        return builder.getArrayAttr(bindingsArray).cast<Attribute>();
+      })));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1046,10 +1079,46 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.executable_cache.create
+//===----------------------------------------------------------------------===//
+
+void ExecutableCacheCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), (StringRef("executable_cache_") + identifier()).str());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable_cache.select_format
+//===----------------------------------------------------------------------===//
+
+void ExecutableCacheSelectFormatOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "preferred_format");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable_cache.prepare
+//===----------------------------------------------------------------------===//
+
+void ExecutableCachePrepareOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), (StringRef("executable_") + executable()).str());
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable_layout.create
 //===----------------------------------------------------------------------===//
 
 void ExecutableLayoutCreateOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  setNameFn(result(), "executable_layout");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.executable_layout.lookup
+//===----------------------------------------------------------------------===//
+
+void ExecutableLayoutLookupOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(result(), "executable_layout");
 }
