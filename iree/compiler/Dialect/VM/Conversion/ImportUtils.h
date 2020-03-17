@@ -158,10 +158,8 @@ class VMImportOpConversion : public OpConversionPattern<T> {
   PatternMatchResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    return succeeded(rewriteToCall(op, Adaptor{operands}, importOp,
-                                   typeConverter, rewriter))
-               ? OpConversionPattern<T>::matchSuccess()
-               : llvm::None;
+    return rewriteToCall(op, Adaptor{operands}, importOp, typeConverter,
+                         rewriter);
   }
 
  protected:
