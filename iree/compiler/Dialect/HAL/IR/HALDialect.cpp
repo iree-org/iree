@@ -49,6 +49,14 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
     populateHALToVMPatterns(getDialect()->getContext(), importSymbols, patterns,
                             typeConverter);
   }
+
+  void walkAttributeStorage(
+      Attribute attr,
+      const function_ref<void(Attribute elementAttr)> &fn) const {
+    if (auto structAttr = attr.dyn_cast<DescriptorSetLayoutBindingAttr>()) {
+      structAttr.walkStorage(fn);
+    }
+  }
 };
 
 }  // namespace

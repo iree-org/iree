@@ -157,6 +157,9 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, detail::{1}St
                   field.getName());
   }
 
+  os << "  void walkStorage(const llvm::function_ref<void(mlir::Attribute "
+        "elementAttr)> &fn) const;\n";
+
   os << "};\n\n";
 }
 
@@ -386,6 +389,17 @@ static void emitAccessorDefs(const StructAttr &structAttr,
             &ctx.withSelf(field.getName() + "Attr()")));
 }
 
+static void emitWalkStorageDef(const StructAttr &structAttr, raw_ostream &os) {
+  os << formatv(
+      "void {0}::walkStorage(const llvm::function_ref<void(mlir::Attribute "
+      "elementAttr)> &fn) const {{\n",
+      structAttr.getStructClassName());
+  for (auto field : structAttr.getAllFields()) {
+    os << formatv("  fn({0}Attr());\n", field.getName());
+  }
+  os << "}\n";
+}
+
 static void emitStructDef(const Record &structDef, raw_ostream &os) {
   StructAttr structAttr(&structDef);
   StringRef cppNamespace = structAttr.getCppNamespace();
@@ -406,6 +420,7 @@ static void emitStructDef(const Record &structDef, raw_ostream &os) {
   for (auto field : structAttr.getAllFields()) {
     emitAccessorDefs(structAttr, field, os);
   }
+  emitWalkStorageDef(structAttr, os);
 
   os << "\n";
   for (auto ns : llvm::reverse(namespaces)) {
