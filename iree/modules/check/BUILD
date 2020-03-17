@@ -64,6 +64,8 @@ cc_binary(
     ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
 )
 
+exports_files(["check_module.sh"])
+
 cc_library(
     name = "native_module",
     testonly = True,

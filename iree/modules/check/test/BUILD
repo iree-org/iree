@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -26,5 +27,46 @@ iree_lit_test_suite(
         "//iree/modules/check:iree-check-module",
         "//iree/modules/check/dialect:check-translate",
         "//iree/tools:IreeFileCheck",
+    ],
+)
+
+iree_bytecode_module(
+    name = "success_module",
+    src = "success.mlir",
+    flags = ["-iree-mlir-to-vm-bytecode-module"],
+    translate_tool = "//iree/modules/check/dialect:check-translate",
+)
+
+sh_test(
+    name = "success_test",
+    srcs = ["//iree/modules/check:check_module.sh"],
+    args = [
+        "--driver=vmla",
+        "--input_file=$(location :success_module)",
+    ],
+    data = [
+        ":success_module",
+        "//iree/modules/check:iree-check-module",
+    ],
+)
+
+iree_bytecode_module(
+    name = "failure_module",
+    src = "failure.mlir",
+    flags = ["-iree-mlir-to-vm-bytecode-module"],
+    translate_tool = "//iree/modules/check/dialect:check-translate",
+)
+
+sh_test(
+    name = "failure_test",
+    srcs = ["//iree/modules/check:check_module.sh"],
+    args = [
+        "--driver=vmla",
+        "--input_file=$(location :failure_module)",
+        "--expect_failure",
+    ],
+    data = [
+        ":failure_module",
+        "//iree/modules/check:iree-check-module",
     ],
 )
