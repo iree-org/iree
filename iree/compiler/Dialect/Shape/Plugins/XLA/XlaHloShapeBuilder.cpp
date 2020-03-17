@@ -203,7 +203,7 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   b.insertOpRankedShapeBuilder<OpTy>(rewriteXlaBinaryElementwiseOpShape<OpTy>);
   INSERT_EW_OP(AddOp);
   INSERT_EW_OP(Atan2Op);
-  INSERT_EW_OP(DivOp);
+  INSERT_EW_OP(DivideOp);
   INSERT_EW_OP(MaxOp);
   INSERT_EW_OP(MinOp);
   INSERT_EW_OP(MulOp);

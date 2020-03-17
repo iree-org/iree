@@ -94,7 +94,7 @@ static LogicalResult lowerEntryFunctions(spirv::ModuleOp spvModule,
       // XLA binary elementwise ops:
       SPIRVPwOpLowering<xla_hlo::AddOp, spirv::IAddOp, spirv::FAddOp>,
       SPIRVPwOpLowering<xla_hlo::AndOp, spirv::LogicalAndOp>,
-      SPIRVPwOpLowering<xla_hlo::DivOp, spirv::FDivOp>,
+      SPIRVPwOpLowering<xla_hlo::DivideOp, spirv::FDivOp>,
       SPIRVPwOpLowering<xla_hlo::MaxOp, spirv::GLSLSMaxOp, spirv::GLSLFMaxOp>,
       SPIRVPwOpLowering<xla_hlo::MinOp, spirv::GLSLSMinOp, spirv::GLSLFMinOp>,
       SPIRVPwOpLowering<xla_hlo::MulOp, spirv::IMulOp, spirv::FMulOp>,

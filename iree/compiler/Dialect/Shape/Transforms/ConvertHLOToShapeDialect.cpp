@@ -155,7 +155,7 @@ class ConvertHLOToShapePass : public FunctionPass<ConvertHLOToShapePass> {
 
     CONVERT_BINARY_ELEMENTWISE_OP(xla_hlo::AddOp);
     CONVERT_BINARY_ELEMENTWISE_OP(xla_hlo::Atan2Op);
-    CONVERT_BINARY_ELEMENTWISE_OP(xla_hlo::DivOp);
+    CONVERT_BINARY_ELEMENTWISE_OP(xla_hlo::DivideOp);
     CONVERT_BINARY_ELEMENTWISE_OP(xla_hlo::MaxOp);
     CONVERT_BINARY_ELEMENTWISE_OP(xla_hlo::MinOp);
     CONVERT_BINARY_ELEMENTWISE_OP(xla_hlo::MulOp);

@@ -83,7 +83,7 @@ void IndexComputationPass::runOnFunction() {
       // XLA binary elementwise ops:
       NoBroadcastPwOpIndexPropagation<xla_hlo::AddOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::AndOp>,
-      NoBroadcastPwOpIndexPropagation<xla_hlo::DivOp>,
+      NoBroadcastPwOpIndexPropagation<xla_hlo::DivideOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::MaxOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::MinOp>,
       NoBroadcastPwOpIndexPropagation<xla_hlo::MulOp>,

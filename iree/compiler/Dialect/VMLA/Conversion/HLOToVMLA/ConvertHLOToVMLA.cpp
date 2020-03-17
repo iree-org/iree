@@ -456,7 +456,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::SubOp, IREE::VMLA::SubOp>>(
       context, typeConverter);
-  patterns.insert<VMLAOpConversion<xla_hlo::DivOp, IREE::VMLA::DivOp>>(
+  patterns.insert<VMLAOpConversion<xla_hlo::DivideOp, IREE::VMLA::DivOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::MulOp, IREE::VMLA::MulOp>>(
       context, typeConverter);

@@ -30,7 +30,7 @@ func @collatz() -> tensor<f32> {
   %22 = xla_hlo.add %21, %0 : tensor<f32>
   br ^bb5(%22 : tensor<f32>)
 ^bb4: // pred: ^bb2
-  %23 = xla_hlo.div %9, %2 : tensor<f32>
+  %23 = xla_hlo.divide %9, %2 : tensor<f32>
   br ^bb5(%23 : tensor<f32>)
 ^bb5(%24: tensor<f32>): // 2 preds: ^bb3, ^bb4
   br ^bb1(%10, %24 : tensor<f32>, tensor<f32>)
