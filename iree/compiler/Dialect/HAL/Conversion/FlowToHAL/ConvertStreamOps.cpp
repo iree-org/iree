@@ -221,6 +221,34 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
       ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
 }
 
+static void recordPushConstants(Value device, Value commandBuffer,
+                                IREE::Flow::DispatchOp &dispatchOp,
+                                IREE::HAL::ExecutableOp &executableOp,
+                                IREE::HAL::ExecutableEntryPointOp &entryPointOp,
+                                Value executableLayout,
+                                ConversionPatternRewriter &rewriter) {
+  SmallVector<Value, 4> pushConstantValues;
+  for (auto inputValue : dispatchOp.operands()) {
+    if (inputValue.getType().isa<IndexType>() ||
+        inputValue.getType().isa<IntegerType>()) {
+      pushConstantValues.push_back(inputValue);
+    }
+  }
+  if (pushConstantValues.empty()) {
+    return;
+  }
+
+  auto interfaceOp = executableOp.getInterfaceOp();
+  uint64_t maxPushConstants =
+      interfaceOp.push_constants().getValueOr(APInt(32, 0)).getZExtValue();
+  assert(pushConstantValues.size() <= maxPushConstants &&
+         "uniform buffer spilling not yet implemented");
+
+  rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
+      dispatchOp.getLoc(), commandBuffer, executableLayout,
+      rewriter.getI32IntegerAttr(0), pushConstantValues);
+}
+
 static void recordPushBindings(Value device, Value commandBuffer,
                                IREE::Flow::DispatchOp &dispatchOp,
                                IREE::HAL::ExecutableOp &executableOp,
@@ -239,8 +267,10 @@ static void recordPushBindings(Value device, Value commandBuffer,
     bindings.push_back(std::make_tuple(bindingOrdinal++, value.getBuffer(),
                                        zeroOffset, value.getByteLength()));
   };
-  for (auto tensorValue : dispatchOp.operands()) {
-    pushBinding(tensorValue);
+  for (auto inputValue : dispatchOp.operands()) {
+    if (inputValue.getType().isa<TensorType>()) {
+      pushBinding(inputValue);
+    }
   }
   for (auto tensorValue : dispatchOp.results()) {
     pushBinding(tensorValue);
@@ -272,13 +302,19 @@ static void recordDispatch(Value device, Value commandBuffer,
       rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
           dispatchOp.getLoc(),
           IREE::HAL::ExecutableLayoutType::get(device.getContext()), device,
-          interfaceOp.getExecutableSetLayoutsAttr());
+          interfaceOp.getExecutableSetLayoutsAttr(),
+          interfaceOp.push_constantsAttr());
 
   // Compute the workgroup count based on the executable's tiling.
   auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
       SymbolTable::lookupSymbolIn(executableOp, dispatchOp.entry_point()));
   auto workgroupCounts = getDispatchWorkgroupCounts(
       entryPointOp, rewriter.getRemappedValue(dispatchOp.workload()), rewriter);
+
+  // Setup push constants for any dynamic values we need to pass across at
+  // runtime.
+  recordPushConstants(device, commandBuffer, dispatchOp, executableOp,
+                      entryPointOp, executableLayout, rewriter);
 
   // Setup bindings, right now pushed immediately but soon to be replaced with
   // descriptor sets (or something better, anyway).

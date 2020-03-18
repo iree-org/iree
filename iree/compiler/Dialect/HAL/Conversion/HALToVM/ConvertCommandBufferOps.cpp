@@ -184,6 +184,10 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
+  patterns
+      .insert<VMImportOpConversion<IREE::HAL::CommandBufferPushConstantsOp>>(
+          context, importSymbols, typeConverter,
+          "hal.command_buffer.push_constants");
   patterns.insert<CommandBufferPushDescriptorSetOpConversion>(
       context, importSymbols, typeConverter,
       "hal.command_buffer.push_descriptor_set");

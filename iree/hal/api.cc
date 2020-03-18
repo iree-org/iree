@@ -792,6 +792,27 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_push_constants(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    const void* values, iree_host_size_t values_length) {
+  IREE_TRACE_SCOPE0("iree_hal_command_buffer_push_constants");
+  auto* handle = reinterpret_cast<CommandBuffer*>(command_buffer);
+  if (!handle || !executable_layout || !values) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  } else if (values_length == 0) {
+    return IREE_STATUS_OK;
+  }
+  if ((values_length % 4) != 0) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  return ToApiStatus(handle->PushConstants(
+      reinterpret_cast<ExecutableLayout*>(executable_layout), offset,
+      absl::MakeConstSpan(reinterpret_cast<const uint32_t*>(values),
+                          values_length / sizeof(uint32_t))));
+}
+
+IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_hal_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_layout_t* executable_layout, int32_t set,
@@ -1238,7 +1259,8 @@ IREE_HAL_API_RETAIN_RELEASE(executable_layout, ExecutableLayout);
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_hal_device_t* device, iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts, iree_allocator_t allocator,
+    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_host_size_t push_constants, iree_allocator_t allocator,
     iree_hal_executable_layout_t** out_executable_layout) {
   IREE_TRACE_SCOPE0("iree_hal_executable_layout_create");
   if (!out_executable_layout) {
@@ -1259,7 +1281,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
           absl::MakeConstSpan(
               reinterpret_cast<DescriptorSetLayout* const*>(set_layouts),
               set_layout_count),
-          /*push_constants=*/0));
+          push_constants));
 
   *out_executable_layout = reinterpret_cast<iree_hal_executable_layout_t*>(
       executable_layout.release());

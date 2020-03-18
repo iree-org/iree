@@ -63,6 +63,8 @@ class ValidatingCommandBuffer : public CommandBuffer {
   Status CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
                     Buffer* target_buffer, device_size_t target_offset,
                     device_size_t length) override;
+  Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
+                       absl::Span<const uint32_t> values) override;
   Status PushDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
       absl::Span<const DescriptorSet::Binding> bindings) override;
@@ -382,6 +384,20 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
 
   return impl_->CopyBuffer(source_buffer, source_offset, target_buffer,
                            target_offset, length);
+}
+
+Status ValidatingCommandBuffer::PushConstants(
+    ExecutableLayout* executable_layout, size_t offset,
+    absl::Span<const uint32_t> values) {
+  DVLOG(3) << "CommandBuffer::PushConstants("
+           << executable_layout->DebugString() << ", " << offset << ", "
+           << absl::StrJoin(values, ", ") << ")";
+
+  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+
+  // TODO(benvanik): validate offset and value count with layout.
+
+  return impl_->PushConstants(executable_layout, offset, values);
 }
 
 Status ValidatingCommandBuffer::PushDescriptorSet(

@@ -284,6 +284,15 @@ class CommandBuffer : public Resource {
                             Buffer* target_buffer, device_size_t target_offset,
                             device_size_t length) = 0;
 
+  // Pushes an inline set of constants that can be accessed by subsequent
+  // dispatches using a compatible executable layout.
+  //
+  // Push constants are always 4-byte values and treated as opaque, meaning that
+  // they may be bit-casted floats, bit-packed booleans, etc.
+  virtual Status PushConstants(ExecutableLayout* executable_layout,
+                               size_t offset,
+                               absl::Span<const uint32_t> values) = 0;
+
   // Pushes a descriptor set and associates it with |set|.
   // This uses an internal ringbuffer inside of the command buffer to avoid the
   // need for creating and binding descriptor sets and managing their lifetime.

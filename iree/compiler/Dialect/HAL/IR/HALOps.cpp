@@ -1139,11 +1139,14 @@ void ExecutableLookupOp::getAsmResultNames(
 // hal.interface
 //===----------------------------------------------------------------------===//
 
-void InterfaceOp::build(Builder *builder, OperationState &state,
-                        StringRef name) {
+void InterfaceOp::build(Builder *builder, OperationState &state, StringRef name,
+                        IntegerAttr pushConstants) {
   ensureTerminator(*state.addRegion(), *builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
                      builder->getStringAttr(name));
+  if (pushConstants) {
+    state.addAttribute("push_constants", pushConstants);
+  }
 }
 
 static ParseResult parseInterfaceOp(OpAsmParser &parser,

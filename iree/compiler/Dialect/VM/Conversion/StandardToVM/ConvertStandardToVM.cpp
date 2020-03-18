@@ -234,6 +234,8 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
         return success();
+      default:
+        return failure();
     }
   }
 };

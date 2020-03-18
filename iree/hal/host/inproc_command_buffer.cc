@@ -137,6 +137,17 @@ Status InProcCommandBuffer::CopyBuffer(Buffer* source_buffer,
   return OkStatus();
 }
 
+Status InProcCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
+                                          size_t offset,
+                                          absl::Span<const uint32_t> values) {
+  IREE_TRACE_SCOPE0("InProcCommandBuffer::PushConstants");
+  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushConstantsCmd>());
+  cmd->executable_layout = executable_layout;
+  cmd->offset = offset;
+  cmd->values = AppendStructSpan(values);
+  return OkStatus();
+}
+
 Status InProcCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     absl::Span<const DescriptorSet::Binding> bindings) {
@@ -285,6 +296,11 @@ Status InProcCommandBuffer::ProcessCmd(CmdHeader* cmd_header,
       return command_processor->CopyBuffer(
           cmd->source_buffer, cmd->source_offset, cmd->target_buffer,
           cmd->target_offset, cmd->length);
+    }
+    case CmdType::kPushConstants: {
+      auto* cmd = reinterpret_cast<PushConstantsCmd*>(cmd_header + 1);
+      return command_processor->PushConstants(cmd->executable_layout,
+                                              cmd->offset, cmd->values);
     }
     case CmdType::kPushDescriptorSet: {
       auto* cmd = reinterpret_cast<PushDescriptorSetCmd*>(cmd_header + 1);

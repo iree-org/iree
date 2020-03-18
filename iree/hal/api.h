@@ -809,6 +809,17 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_command_buffer_copy_buffer(
     iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
     iree_device_size_t target_offset, iree_device_size_t length);
 
+// Pushes an inline set of constants that can be accessed by subsequent
+// dispatches using a compatible executable layout.
+//
+// Push constants are always 4-byte values and treated as opaque, meaning that
+// they may be bit-casted floats, bit-packed booleans, etc.
+IREE_API_EXPORT iree_status_t IREE_API_CALL
+iree_hal_command_buffer_push_constants(
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_executable_layout_t* executable_layout, iree_host_size_t offset,
+    const void* values, iree_host_size_t values_length);
+
 // Pushes a descriptor set and associates it with |set|.
 // This uses an internal ringbuffer inside of the command buffer to avoid the
 // need for creating and binding descriptor sets and managing their lifetime.
@@ -1086,7 +1097,8 @@ iree_hal_executable_cache_prepare_executable(
 // same compatible resource binding layouts.
 IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_executable_layout_create(
     iree_hal_device_t* device, iree_host_size_t set_layout_count,
-    iree_hal_descriptor_set_layout_t** set_layouts, iree_allocator_t allocator,
+    iree_hal_descriptor_set_layout_t** set_layouts,
+    iree_host_size_t push_constants, iree_allocator_t allocator,
     iree_hal_executable_layout_t** out_executable_layout);
 
 // Retains the given |executable_layout| for the caller.

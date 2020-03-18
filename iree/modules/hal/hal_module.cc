@@ -482,6 +482,19 @@ class HALModuleState final {
     return OkStatus();
   }
 
+  Status CommandBufferPushConstants(
+      vm::ref<iree_hal_command_buffer_t> command_buffer,
+      vm::ref<iree_hal_executable_layout_t> executable_layout, uint32_t offset,
+      absl::Span<const uint32_t> values) {
+    IREE_TRACE_SCOPE0("HALModuleState::CommandBufferPushConstants");
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_command_buffer_push_constants(command_buffer.get(),
+                                               executable_layout.get(), offset,
+                                               values.data(), values.size()),
+        IREE_LOC));
+    return OkStatus();
+  }
+
   Status CommandBufferPushDescriptorSet(
       vm::ref<iree_hal_command_buffer_t> command_buffer,
       vm::ref<iree_hal_executable_layout_t> executable_layout, int32_t set,
@@ -668,7 +681,8 @@ class HALModuleState final {
 
   StatusOr<vm::ref<iree_hal_executable_layout_t>> ExecutableLayoutCreate(
       vm::ref<iree_hal_device_t> device,
-      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts) {
+      absl::Span<const vm::ref<iree_hal_descriptor_set_layout_t>> set_layouts,
+      int32_t push_constants) {
     IREE_TRACE_SCOPE0("HALModuleState::ExecutableLayoutCreate");
     vm::ref<iree_hal_executable_layout_t> executable_layout;
     RETURN_IF_ERROR(FromApiStatus(
@@ -677,7 +691,7 @@ class HALModuleState final {
             reinterpret_cast<iree_hal_descriptor_set_layout_t**>(
                 const_cast<vm::ref<iree_hal_descriptor_set_layout_t>*>(
                     set_layouts.data())),
-            allocator_, &executable_layout),
+            push_constants, allocator_, &executable_layout),
         IREE_LOC));
     return std::move(executable_layout);
   }
@@ -746,6 +760,8 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::CommandBufferFillBuffer),
     vm::MakeNativeFunction("command_buffer.copy_buffer",
                            &HALModuleState::CommandBufferCopyBuffer),
+    vm::MakeNativeFunction("command_buffer.push_constants",
+                           &HALModuleState::CommandBufferPushConstants),
     vm::MakeNativeFunction("command_buffer.push_descriptor_set",
                            &HALModuleState::CommandBufferPushDescriptorSet),
     vm::MakeNativeFunction("command_buffer.bind_descriptor_set",

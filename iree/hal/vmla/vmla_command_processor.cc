@@ -47,6 +47,8 @@ Status VMLACommandProcessor::DispatchInline(
   }
 
   auto interface = vmla_executable->interface();
+  RETURN_IF_ERROR(interface->SetConstants(push_constants.values));
+
   for (int set_ordinal = 0; set_ordinal < set_bindings.size(); ++set_ordinal) {
     const auto& bindings = set_bindings[set_ordinal];
     for (const auto& binding : set_bindings[set_ordinal]) {

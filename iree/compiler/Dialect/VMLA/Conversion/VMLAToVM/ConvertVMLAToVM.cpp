@@ -294,6 +294,7 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMinOp, "vmla.reduce.min");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMaxOp, "vmla.reduce.max");
 
+  VMLA_IMPORT_OP(IREE::VMLA::InterfaceConstOp, "vmla.interface.const");
   VMLA_IMPORT_OP(IREE::VMLA::InterfaceBindingOp, "vmla.interface.binding");
 }
 

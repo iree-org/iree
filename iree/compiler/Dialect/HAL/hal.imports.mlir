@@ -235,6 +235,14 @@ vm.import @command_buffer.copy_buffer(
   %length : i32
 )
 
+// Pushes constants for consumption by dispatches.
+vm.import @command_buffer.push_constants(
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  %executable_layout : !vm.ref<!hal.executable_layout>,
+  %offset : i32,
+  %values : i32 ...
+)
+
 // Pushes a descriptor set to the given set number.
 vm.import @command_buffer.push_descriptor_set(
   %command_buffer : !vm.ref<!hal.command_buffer>,
@@ -352,7 +360,8 @@ attributes {nosideeffects}
 // required size.
 vm.import @executable_layout.create(
   %device : !vm.ref<!hal.device>,
-  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...
+  %set_layouts : !vm.ref<!hal.descriptor_set_layout>...,
+  %push_constants : i32
 ) -> !vm.ref<!hal.executable_layout>
 attributes {nosideeffects}
 

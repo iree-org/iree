@@ -965,6 +965,39 @@ def HAL_CommandBufferCopyBufferOp : HAL_Op<"command_buffer.copy_buffer"> {
   let assemblyFormat = "operands attr-dict";
 }
 
+def HAL_CommandBufferPushConstantsOp :
+    HAL_Op<"command_buffer.push_constants"> {
+  let summary = [{command buffer push constants operation}];
+  let description = [{
+    Pushes an inline set of constants that can be accessed by subsequent
+    dispatches using a compatible executable layout.
+
+    Push constants are always 4-byte values and treated as opaque, meaning that
+    they may be bit-casted floats, bit-packed booleans, etc.
+
+    ```mlir
+    hal.command_buffer.push_constants %cmd, %exe_layout,
+                                      offset = 0,
+                                      values = [%value0, %value1] : i32
+    hal.command_buffer.push_constants %cmd, %exe_layout,
+                                      offset = 2,
+                                      values = [%value2, %value3] : i32
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_CommandBuffer:$command_buffer,
+    HAL_ExecutableLayout:$executable_layout,
+    I32Attr:$offset,
+    Variadic<I32>:$values
+  );
+
+  let assemblyFormat = [{
+    $command_buffer `,` $executable_layout `,` `offset` `=` $offset `,`
+    `values` `=` `[` $values `]` `:` `i32` attr-dict-with-keyword
+  }];
+}
+
 def HAL_CommandBufferPushDescriptorSetOp :
     HAL_Op<"command_buffer.push_descriptor_set", [
       SameVariadicOperandSize,
@@ -1456,7 +1489,8 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
   }];
 
   let arguments = (ins
-    StrAttr:$sym_name
+    StrAttr:$sym_name,
+    OptionalAttr<I32Attr>:$push_constants
   );
 
   let regions = (region SizedRegion<1>:$body);
@@ -1464,7 +1498,8 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, StringRef name
+      Builder *builder, OperationState &state, StringRef name,
+      IntegerAttr pushConstants = {}
     }]>,
   ];
 
@@ -1513,6 +1548,26 @@ def HAL_InterfaceBindingOp : HAL_Op<"interface.binding", [
     HAL_DescriptorTypeAttr:$type,
     HAL_MemoryAccessBitfieldAttr:$access
   );
+}
+
+def HAL_InterfaceLoadConstantOp : HAL_PureOp<"interface.load.constant"> {
+  let summary = [{loads a constant value from the interface constant block}];
+  let description = [{
+    Loads a scalar constant value from an executable IO push constant block.
+    The value will be loaded from the given constant offset and will be
+    bitcast (possibly with truncation or zero-extension) to the result type.
+  }];
+
+  let arguments = (ins
+    HAL_HostSizeAttr:$offset
+  );
+  let results = (outs
+    HAL_PrimitiveType:$result
+  );
+
+  let assemblyFormat = [{
+    `offset` `=` $offset attr-dict `:` type($result)
+  }];
 }
 
 def HAL_InterfaceLoadTensorOp : HAL_PureOp<"interface.load.tensor"> {
@@ -1709,20 +1764,24 @@ def HAL_ExecutableLayoutCreateOp : HAL_PureOp<"executable_layout.create", [
     ```mlir
     %set0 = hal.descriptor_set_layout.create ...
     %set1 = hal.descriptor_set_layout.create ...
-    %layout = hal.executable_layout.create %device, set_layouts = [%set0, %set1] : !hal.executable_layout
+    %layout = hal.executable_layout.create %device,
+                                           set_layouts = [%set0, %set1],
+                                           push_constants = 3 : !hal.executable_layout
     ```
   }];
 
   let arguments = (ins
     HAL_Device:$device,
-    Variadic<HAL_DescriptorSetLayout>:$set_layouts
+    Variadic<HAL_DescriptorSetLayout>:$set_layouts,
+    I32Attr:$push_constants
   );
   let results = (outs
     HAL_ExecutableLayout:$result
   );
 
   let assemblyFormat = [{
-    $device `,` `set_layouts` `=` `[` $set_layouts `]`
+    $device `,` `set_layouts` `=` `[` $set_layouts `]` `,`
+    `push_constants` `=` $push_constants
     attr-dict-with-keyword `:` type($result)
   }];
 }
@@ -1749,7 +1808,8 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
     HAL_Device:$device,
     // TODO(benvanik): replace with a nested typed attr that works.
     // Array of HAL_DescriptorSetLayoutBindingArrayAttr.
-    ArrayAttr:$set_layouts
+    ArrayAttr:$set_layouts,
+    OptionalAttr<I32Attr>:$push_constants
   );
   let results = (outs
     HAL_ExecutableLayout:$result
@@ -1757,6 +1817,7 @@ def HAL_ExecutableLayoutLookupOp : HAL_PureOp<"executable_layout.lookup", [
 
   let assemblyFormat = [{
     $device `,` `set_layouts` `=` $set_layouts
+    (`,` `push_constants` `=` $push_constants^)?
     attr-dict-with-keyword `:` type($result)
   }];
 }

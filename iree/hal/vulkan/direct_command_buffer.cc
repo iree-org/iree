@@ -376,6 +376,21 @@ Status DirectCommandBuffer::CopyBuffer(Buffer* source_buffer,
   return OkStatus();
 }
 
+Status DirectCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
+                                          size_t offset,
+                                          absl::Span<const uint32_t> values) {
+  IREE_TRACE_SCOPE0("DirectCommandBuffer::PushConstants");
+  ASSIGN_OR_RETURN(auto* device_executable_layout,
+                   CastExecutableLayout(executable_layout));
+
+  syms()->vkCmdPushConstants(
+      command_buffer_, device_executable_layout->handle(),
+      VK_SHADER_STAGE_COMPUTE_BIT, offset * sizeof(uint32_t),
+      values.size() * sizeof(uint32_t), values.data());
+
+  return OkStatus();
+}
+
 Status DirectCommandBuffer::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     absl::Span<const DescriptorSet::Binding> bindings) {

@@ -77,6 +77,9 @@ class DirectCommandBuffer final : public CommandBuffer {
                     Buffer* target_buffer, device_size_t target_offset,
                     device_size_t length) override;
 
+  Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
+                       absl::Span<const uint32_t> values) override;
+
   Status PushDescriptorSet(
       ExecutableLayout* executable_layout, int32_t set,
       absl::Span<const DescriptorSet::Binding> bindings) override;

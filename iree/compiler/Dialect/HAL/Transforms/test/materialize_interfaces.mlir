@@ -35,3 +35,19 @@ flow.executable @simpleMath_ex_dispatch_0 {
     // CHECK: hal.interface @legacy_io attributes {sym_visibility = "private"}
   }
 }
+
+// -----
+
+flow.executable @shaped_dispatch {
+  flow.dispatch.entry @entry
+  module {
+    func @entry(%arg0: tensor<?x7x10xf32>, %arg1: i32, %arg2: i32) -> tensor<7x?x10xf32> {
+      %0 = shapex.make_ranked_shape %arg1 -> !shapex.ranked_shape<[?,7,10], i32>
+      %1 = shapex.make_ranked_shape %arg2 -> !shapex.ranked_shape<[7,?,10], i32>
+      %2 = shapex.tie_shape %arg0, %0 : tensor<?x7x10xf32>, !shapex.ranked_shape<[?,7,10], i32>
+      %3 = "xla_hlo.transpose"(%2) {permutation = dense<[1, 0, 2]> : tensor<3xi64>} : (tensor<?x7x10xf32>) -> tensor<7x?x10xf32>
+      %4 = shapex.tie_shape %3, %1 : tensor<7x?x10xf32>, !shapex.ranked_shape<[7,?,10], i32>
+      return %4 : tensor<7x?x10xf32>
+    }
+  }
+}

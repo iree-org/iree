@@ -112,6 +112,20 @@ Status HostLocalCommandProcessor::CopyBuffer(Buffer* source_buffer,
                                  length);
 }
 
+Status HostLocalCommandProcessor::PushConstants(
+    ExecutableLayout* executable_layout, size_t offset,
+    absl::Span<const uint32_t> values) {
+  IREE_TRACE_SCOPE0("HostLocalCommandProcessor::PushConstants");
+  if (offset + values.size() > push_constants_.values.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Push constants out of range";
+  }
+  for (int i = 0; i < values.size(); ++i) {
+    push_constants_.values[offset + i] = values[i];
+  }
+  return OkStatus();
+}
+
 Status HostLocalCommandProcessor::PushDescriptorSet(
     ExecutableLayout* executable_layout, int32_t set,
     absl::Span<const DescriptorSet::Binding> bindings) {

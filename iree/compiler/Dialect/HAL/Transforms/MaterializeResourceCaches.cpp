@@ -57,7 +57,8 @@ class MaterializeResourceCachesPass
     for (auto executableOp : executableOps) {
       auto interfaceOp = executableOp.getInterfaceOp();
       defineExecutableLayoutOp(interfaceOp.getLoc(),
-                               interfaceOp.getExecutableSetLayoutsAttr());
+                               interfaceOp.getExecutableSetLayoutsAttr(),
+                               interfaceOp.push_constantsAttr());
     }
 
     // Generate cached resource singletons and replace lookup ops with direct
@@ -136,7 +137,8 @@ class MaterializeResourceCachesPass
   }
 
   VariableOp defineExecutableLayoutOp(Location loc,
-                                      ArrayAttr setLayoutsArrayAttr) {
+                                      ArrayAttr setLayoutsArrayAttr,
+                                      IntegerAttr pushConstantsAttr) {
     auto existingIt = executableLayoutCache_.find(setLayoutsArrayAttr);
     if (existingIt != executableLayoutCache_.end()) {
       return existingIt->second;
@@ -178,8 +180,12 @@ class MaterializeResourceCachesPass
       setLayoutValues.push_back(setLayoutValue);
     }
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
+    // Push constants are optional but we always provide the value.
+    if (!pushConstantsAttr) {
+      pushConstantsAttr = blockBuilder.getI32IntegerAttr(0);
+    }
     auto layoutValue = blockBuilder.createOrFold<ExecutableLayoutCreateOp>(
-        loc, layoutType, deviceValue, setLayoutValues);
+        loc, layoutType, deviceValue, setLayoutValues, pushConstantsAttr);
     blockBuilder.create<ReturnOp>(loc, layoutValue);
 
     return variableOp;
@@ -228,7 +234,8 @@ class MaterializeResourceCachesPass
       auto interfaceOp = executableOp.getInterfaceOp();
 
       auto executableLayoutVariableOp = defineExecutableLayoutOp(
-          executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr());
+          executableOp.getLoc(), interfaceOp.getExecutableSetLayoutsAttr(),
+          interfaceOp.push_constantsAttr());
       auto executableLayoutValue = blockBuilder.createOrFold<VariableLoadOp>(
           loc, ExecutableLayoutType::get(loc.getContext()),
           executableLayoutVariableOp.sym_name());
@@ -260,7 +267,8 @@ class MaterializeResourceCachesPass
   void replaceExecutableLayoutLookupOp(ExecutableLayoutLookupOp &lookupOp) {
     OpBuilder builder(lookupOp);
     auto variableOp =
-        defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.set_layouts());
+        defineExecutableLayoutOp(lookupOp.getLoc(), lookupOp.set_layouts(),
+                                 lookupOp.push_constantsAttr());
     auto loadOp = builder.create<VariableLoadOp>(
         lookupOp.getLoc(), ExecutableLayoutType::get(lookupOp.getContext()),
         variableOp.sym_name());

@@ -42,6 +42,21 @@ flow.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
+flow.executable @shaped_dispatch {
+  flow.dispatch.entry @entry
+  module {
+    func @entry(%arg0: tensor<4x?xf32>, %arg1 : index) -> tensor<4x?xf32> {
+      %0 = shapex.make_ranked_shape %arg1 -> !shapex.ranked_shape<[4,?]>
+      %1 = shapex.tie_shape %arg0, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+      %2 = xla_hlo.add %arg0, %arg0 : tensor<4x?xf32>
+      %3 = shapex.tie_shape %2, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+      return %3 : tensor<4x?xf32>
+    }
+  }
+}
+
+// -----
+
 flow.executable @reduction_ex_dispatch_0 {
   flow.dispatch.entry @reduction_ex_dispatch_0 attributes {workload = dense<[4, 1, 1]> : vector<3xi32>}
   module {
