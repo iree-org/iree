@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/modules/check/dialect/conversion_patterns.h"
+#include "iree/compiler/Dialect/Modules/Check/Conversion/ConversionPatterns.h"
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
-#include "iree/modules/check/dialect/check_ops.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 

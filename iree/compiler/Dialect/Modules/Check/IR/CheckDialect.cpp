@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/modules/check/dialect/check_dialect.h"
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckDialect.h"
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
+#include "iree/compiler/Dialect/Modules/Check/Conversion/ConversionPatterns.h"
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.h"
+#include "iree/compiler/Dialect/Modules/Check/check.imports.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
-#include "iree/modules/check/dialect/check.imports.h"
-#include "iree/modules/check/dialect/check_ops.h"
-#include "iree/modules/check/dialect/conversion_patterns.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Parser.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -68,7 +68,7 @@ CheckDialect::CheckDialect(MLIRContext *context)
   addInterfaces<CheckToHalConversionInterface>();
 #define GET_OP_LIST
   addOperations<
-#include "iree/modules/check/dialect/check_ops.cc.inc"
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.cpp.inc"
       >();
 }
 

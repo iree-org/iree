@@ -14,13 +14,18 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
-iree_lit_test_suite(
+iree_cc_library(
   NAME
-    lit
+    Conversion
+  HDRS
+    "ConversionPatterns.h"
   SRCS
-    "${_GLOB_X_MLIR}"
-  DATA
-    iree::modules::check::dialect::check-opt
-    iree::tools::IreeFileCheck
+    "ConversionPatterns.cpp"
+  DEPS
+    MLIRPass
+    MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::Modules::Check::IR
+    iree::compiler::Dialect::VM::Conversion
+  PUBLIC
 )

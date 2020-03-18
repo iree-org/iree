@@ -24,8 +24,8 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
     data = [
+        "//iree/compiler/Dialect/Modules/Check:check-translate",
         "//iree/modules/check:iree-check-module",
-        "//iree/modules/check/dialect:check-translate",
         "//iree/tools:IreeFileCheck",
     ],
 )
@@ -34,7 +34,7 @@ iree_bytecode_module(
     name = "success_module",
     src = "success.mlir",
     flags = ["-iree-mlir-to-vm-bytecode-module"],
-    translate_tool = "//iree/modules/check/dialect:check-translate",
+    translate_tool = "//iree/compiler/Dialect/Modules/Check:check-translate",
 )
 
 sh_test(
@@ -54,7 +54,7 @@ iree_bytecode_module(
     name = "failure_module",
     src = "failure.mlir",
     flags = ["-iree-mlir-to-vm-bytecode-module"],
-    translate_tool = "//iree/modules/check/dialect:check-translate",
+    translate_tool = "//iree/compiler/Dialect/Modules/Check:check-translate",
 )
 
 sh_test(

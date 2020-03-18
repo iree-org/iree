@@ -14,14 +14,37 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
-iree_lit_test_suite(
+iree_cc_embed_data(
   NAME
-    lit
+    check_imports
   SRCS
-    "${_GLOB_X_MLIR}"
-  DATA
-    iree::compiler::Dialect::Modules::Check::check-translate
-    iree::modules::check::iree-check-module
-    iree::tools::IreeFileCheck
+    "check.imports.mlir"
+  CC_FILE_OUTPUT
+    "check.imports.cc"
+  H_FILE_OUTPUT
+    "check.imports.h"
+  CPP_NAMESPACE
+    "mlir::iree_compiler::IREE::Check"
+  FLATTEN
+  PUBLIC
+)
+
+iree_cc_binary(
+  NAME
+    check-opt
+  OUT
+    check-opt
+  DEPS
+    iree::compiler::Dialect::Modules::Check::IR::CheckDialect
+    iree::tools::iree_opt_main
+)
+
+iree_cc_binary(
+  NAME
+    check-translate
+  OUT
+    check-translate
+  DEPS
+    iree::compiler::Dialect::Modules::Check::IR::CheckDialect
+    iree::tools::iree_translate_main
 )

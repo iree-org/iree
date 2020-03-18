@@ -12,16 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-iree_add_all_subdirs()
+package(
+    default_visibility = ["//visibility:public"],
+    licenses = ["notice"],  # Apache 2.0
+)
 
-file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
-iree_lit_test_suite(
-  NAME
-    lit
-  SRCS
-    "${_GLOB_X_MLIR}"
-  DATA
-    iree::compiler::Dialect::Modules::Check::check-translate
-    iree::modules::check::iree-check-module
-    iree::tools::IreeFileCheck
+cc_library(
+    name = "Conversion",
+    srcs = [
+        "ConversionPatterns.cpp",
+    ],
+    hdrs = [
+        "ConversionPatterns.h",
+    ],
+    deps = [
+        "//iree/compiler/Dialect/HAL/Conversion",
+        "//iree/compiler/Dialect/Modules/Check/IR",
+        "//iree/compiler/Dialect/VM/Conversion",
+        "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:Transforms",
+    ],
 )

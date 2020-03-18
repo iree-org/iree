@@ -17,27 +17,34 @@ iree_add_all_subdirs()
 file(GLOB _GLOB_X_TD CONFIGURE_DEPENDS *.td)
 iree_cc_library(
   NAME
-    dialect
+    IR
   HDRS
-    "check_dialect.h"
-    "check_ops.h"
-    "check_ops.h.inc"
-    "conversion_patterns.h"
+    "CheckOps.h"
+    "CheckOps.h.inc"
   SRCS
-    "check_dialect.cc"
-    "check_ops.cc"
-    "check_ops.cc.inc"
-    "conversion_patterns.cc"
+    "CheckOps.cpp"
+    "CheckOps.cpp.inc"
   DEPS
-    ::check_imports
-    LLVMSupport
+    MLIRIR
+    iree::compiler::Dialect::HAL::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    CheckDialect
+  HDRS
+    "CheckDialect.h"
+  SRCS
+    "CheckDialect.cpp"
+  DEPS
+    ::IR
     MLIRIR
     MLIRParser
-    MLIRPass
-    MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
-    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::Modules::Check::Conversion
+    iree::compiler::Dialect::Modules::Check::check_imports
     iree::compiler::Dialect::VM::Conversion
   ALWAYSLINK
   PUBLIC
@@ -47,43 +54,8 @@ iree_tablegen_library(
   NAME
     check_ops_gen
   TD_FILE
-    "check_ops.td"
+    "CheckOps.td"
   OUTS
-    -gen-op-decls check_ops.h.inc
-    -gen-op-defs check_ops.cc.inc
-)
-
-iree_cc_embed_data(
-  NAME
-    check_imports
-  SRCS
-    "check.imports.mlir"
-  CC_FILE_OUTPUT
-    "check.imports.cc"
-  H_FILE_OUTPUT
-    "check.imports.h"
-  CPP_NAMESPACE
-    "mlir::iree_compiler::IREE::Check"
-  FLATTEN
-  PUBLIC
-)
-
-iree_cc_binary(
-  NAME
-    check-opt
-  OUT
-    check-opt
-  DEPS
-    ::dialect
-    iree::tools::iree_opt_main
-)
-
-iree_cc_binary(
-  NAME
-    check-translate
-  OUT
-    check-translate
-  DEPS
-    ::dialect
-    iree::tools::iree_translate_main
+    -gen-op-decls CheckOps.h.inc
+    -gen-op-defs CheckOps.cpp.inc
 )

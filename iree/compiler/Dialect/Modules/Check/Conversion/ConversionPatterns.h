@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_MODULES_CHECK_DIALECT_CONVERSION_PATTERNS_H_
-#define IREE_MODULES_CHECK_DIALECT_CONVERSION_PATTERNS_H_
+#ifndef IREE_COMPILER_DIALECT_MODULES_CHECK_CONVERSION_CONVERSION_PATTERNS_H_
+#define IREE_COMPILER_DIALECT_MODULES_CHECK_CONVERSION_CONVERSION_PATTERNS_H_
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -39,4 +39,4 @@ void populateCheckToHALPatterns(MLIRContext *context,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_MODULES_CHECK_DIALECT_CONVERSION_PATTERNS_H_
+#endif  // IREE_COMPILER_DIALECT_MODULES_CHECK_CONVERSION_CONVERSION_PATTERNS_H_

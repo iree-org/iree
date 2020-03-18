@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/modules/check/dialect/check_ops.h"
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.h"
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "mlir/IR/OpImplementation.h"
@@ -23,7 +23,7 @@ namespace IREE {
 namespace Check {
 
 #define GET_OP_CLASSES
-#include "iree/modules/check/dialect/check_ops.cc.inc"
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.cpp.inc"
 
 }  // namespace Check
 }  // namespace IREE

@@ -12,18 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
-iree_lit_test_suite(
-    name = "lit",
-    srcs = glob(["*.mlir"]),
-    data = [
-        "//iree/modules/check/dialect:check-opt",
-        "//iree/tools:IreeFileCheck",
+cc_embed_data(
+    name = "check_imports",
+    srcs = ["check.imports.mlir"],
+    cc_file_output = "check.imports.cc",
+    cpp_namespace = "mlir::iree_compiler::IREE::Check",
+    flatten = True,
+    h_file_output = "check.imports.h",
+)
+
+cc_binary(
+    name = "check-opt",
+    deps = [
+        "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
+        "//iree/tools:iree_opt_main",
+    ],
+)
+
+cc_binary(
+    name = "check-translate",
+    deps = [
+        "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
+        "//iree/tools:iree_translate_main",
     ],
 )

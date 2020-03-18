@@ -12,25 +12,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_MODULES_CHECK_DIALECT_CHECK_DIALECT_H_
-#define IREE_MODULES_CHECK_DIALECT_CHECK_DIALECT_H_
+#ifndef IREE_COMPILER_DIALECT_MODULES_CHECK_IR_CHECK_OPS_H_
+#define IREE_COMPILER_DIALECT_MODULES_CHECK_IR_CHECK_OPS_H_
 
-#include "mlir/IR/Dialect.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Check {
 
-class CheckDialect : public Dialect {
- public:
-  explicit CheckDialect(MLIRContext *context);
-  static StringRef getDialectNamespace() { return "check"; }
-};
+#define GET_OP_CLASSES
+#include "iree/compiler/Dialect/Modules/Check/IR/CheckOps.h.inc"
 
 }  // namespace Check
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_MODULES_CHECK_DIALECT_CHECK_DIALECT_H_
+#endif  // IREE_COMPILER_DIALECT_MODULES_CHECK_IR_CHECK_OPS_H_

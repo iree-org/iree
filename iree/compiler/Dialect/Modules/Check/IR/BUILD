@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//build_tools/embed_data:build_defs.bzl", "cc_embed_data")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -26,30 +25,39 @@ filegroup(
 )
 
 cc_library(
-    name = "dialect",
+    name = "IR",
     srcs = [
-        "check_dialect.cc",
-        "check_ops.cc",
-        "check_ops.cc.inc",
-        "conversion_patterns.cc",
+        "CheckOps.cpp",
+        "CheckOps.cpp.inc",
     ],
     hdrs = [
-        "check_dialect.h",
-        "check_ops.h",
-        "check_ops.h.inc",
-        "conversion_patterns.h",
+        "CheckOps.h",
+        "CheckOps.h.inc",
     ],
     deps = [
-        ":check_imports",
+        ":check_ops_gen",
+        "//iree/compiler/Dialect/HAL/IR",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+cc_library(
+    name = "CheckDialect",
+    srcs = [
+        "CheckDialect.cpp",
+    ],
+    hdrs = [
+        "CheckDialect.h",
+    ],
+    deps = [
+        ":IR",
         ":check_ops_gen",
         "//iree/compiler/Dialect/HAL/Conversion",
-        "//iree/compiler/Dialect/HAL/IR",
+        "//iree/compiler/Dialect/Modules/Check:check_imports",
+        "//iree/compiler/Dialect/Modules/Check/Conversion",
         "//iree/compiler/Dialect/VM/Conversion",
-        "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
@@ -58,40 +66,15 @@ cc_library(
 gentbl(
     name = "check_ops_gen",
     tbl_outs = [
-        ("-gen-op-decls", "check_ops.h.inc"),
-        ("-gen-op-defs", "check_ops.cc.inc"),
+        ("-gen-op-decls", "CheckOps.h.inc"),
+        ("-gen-op-defs", "CheckOps.cpp.inc"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "check_ops.td",
+    td_file = "CheckOps.td",
     td_srcs = [
         ":td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "//iree/compiler/Dialect/HAL/IR:td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
-    ],
-)
-
-cc_embed_data(
-    name = "check_imports",
-    srcs = ["check.imports.mlir"],
-    cc_file_output = "check.imports.cc",
-    cpp_namespace = "mlir::iree_compiler::IREE::Check",
-    flatten = True,
-    h_file_output = "check.imports.h",
-)
-
-cc_binary(
-    name = "check-opt",
-    deps = [
-        ":dialect",
-        "//iree/tools:iree_opt_main",
-    ],
-)
-
-cc_binary(
-    name = "check-translate",
-    deps = [
-        ":dialect",
-        "//iree/tools:iree_translate_main",
     ],
 )
