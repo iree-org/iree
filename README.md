@@ -17,11 +17,22 @@ and reach out on the
 -   [Dependencies](#dependencies)
 -   [License](#license)
 
-## Contact
+## Communication Channels
 
-For bugs and issues, prefer filing a GitHub issue. For other topics, feel free
-to join/post/read messages on the
-[iree-discuss mailing list](https://groups.google.com/forum/#!forum/iree-discuss).
+*   [GitHub Issues](https://github.com/google/iree/issues): preferred for
+    specific issues and coordination on upcoming features
+*   [Google IREE Discord Server](https://discord.gg/QB6xmkb): This is a guest
+    invite. Feel free to ask for a permanent role/invite. The core team hangs
+    out here. (caveat: the core team is trying this and may re-evaluate at some
+    point)
+*   [Google Groups Email List](https://groups.google.com/forum/#!forum/iree-discuss):
+    General, low-priority discussion.
+
+### Related Project Channels
+
+*   [MLIR topic within LLVM Discourse](https://llvm.discourse.group/c/llvm-project/mlir/31):
+    Often, discussions that span IREE and various infrastructure topics will
+    fork into topics on this forum.
 
 ## Build Status
 
