@@ -51,23 +51,23 @@ namespace iree_compiler {
 struct IREELoadInputOpConversion final
     : public OpConversionPattern<IREE::LoadInputOp> {
   using OpConversionPattern<IREE::LoadInputOp>::OpConversionPattern;
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::LoadInputOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, op.src());
-    return matchSuccess();
+    return success();
   }
 };
 
 struct IREEStoreOutputOpConversion final
     : public OpConversionPattern<IREE::StoreOutputOp> {
   using OpConversionPattern<IREE::StoreOutputOp>::OpConversionPattern;
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::StoreOutputOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (operands[0] != op.dst()) return matchFailure();
+    if (operands[0] != op.dst()) return failure();
     rewriter.eraseOp(op);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -98,14 +98,14 @@ template <typename DerivedTy, typename SrcOpTy, typename LinalgOpTy>
 struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       SrcOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     SmallVector<Value, 2> resultBuffers;
     resultBuffers.reserve(op.getOperation()->getNumResults());
     for (auto result : op.getOperation()->getResults()) {
       Value resultBuffer = getBufferForResult(result, rewriter);
-      if (!resultBuffer) return ConversionPattern::matchFailure();
+      if (!resultBuffer) return failure();
       resultBuffers.push_back(resultBuffer);
     }
 
@@ -113,11 +113,10 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
     LinalgOpTy linalgOp = static_cast<const DerivedTy &>(*this).apply(
         op, operands, resultBuffers, rewriter);
 
-    if (!linalgOp || !linalgOp.hasBufferSemantics())
-      return ConversionPattern::matchFailure();
+    if (!linalgOp || !linalgOp.hasBufferSemantics()) return failure();
 
     rewriter.replaceOp(op, linalgOp.getOutputBuffers());
-    return ConversionPattern::matchSuccess();
+    return success();
   }
 };
 
@@ -368,16 +367,16 @@ struct ReduceOpConversion
 template <typename DerivedTy, typename OpTy>
 struct ReduceRegionOpConversion : public OpConversionPattern<OpTy> {
   using OpConversionPattern<OpTy>::OpConversionPattern;
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       OpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Only convert it if it is within a reduce op region.
-    if (!isWithinReduceOpRegion(op)) return this->matchFailure();
+    if (!isWithinReduceOpRegion(op)) return failure();
     Operation *replacement =
         static_cast<const DerivedTy &>(*this).apply(op, operands, rewriter);
-    if (!replacement) return this->matchFailure();
+    if (!replacement) return failure();
     rewriter.replaceOp(op, replacement->getResults());
-    return this->matchSuccess();
+    return success();
   }
 
  protected:

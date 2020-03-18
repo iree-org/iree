@@ -41,8 +41,8 @@ namespace {
 // Pattern to get the gpu.GPUModuleOp from the gpu.LaunchOp.
 struct ConvertToGPUFuncOp : public OpRewritePattern<gpu::LaunchOp> {
   using OpRewritePattern<gpu::LaunchOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(gpu::LaunchOp launchOp,
-                                     PatternRewriter &rewriter) const final;
+  LogicalResult matchAndRewrite(gpu::LaunchOp launchOp,
+                                PatternRewriter &rewriter) const final;
 };
 
 // Pass to outline the region of the gpu.LaunchOp.
@@ -53,14 +53,14 @@ class IREEGpuKernelOutliningPass
 };
 }  // namespace
 
-PatternMatchResult ConvertToGPUFuncOp::matchAndRewrite(
+LogicalResult ConvertToGPUFuncOp::matchAndRewrite(
     gpu::LaunchOp launchOp, PatternRewriter &rewriter) const {
   OpBuilder::InsertionGuard guard(rewriter);
   auto funcOp = launchOp.getParentOfType<FuncOp>();
   SmallVector<int32_t, 3> workGroupSize;
-  if (failed(getWorkGroupSize(funcOp, workGroupSize))) return matchFailure();
+  if (failed(getWorkGroupSize(funcOp, workGroupSize))) return failure();
 
-  if (failed(sinkOperationsIntoLaunchOp(launchOp))) return matchFailure();
+  if (failed(sinkOperationsIntoLaunchOp(launchOp))) return failure();
 
   // The arguments of the funcOp must be the arguments of the launchOp, in the
   // same order.
@@ -78,7 +78,7 @@ PatternMatchResult ConvertToGPUFuncOp::matchAndRewrite(
 
   // If any additional arguments are needed, then the launch op cannot be
   // converted.
-  if (arguments.size() != gpuFuncOp.getNumArguments()) return matchFailure();
+  if (arguments.size() != gpuFuncOp.getNumArguments()) return failure();
 
   // Wrap this within a gpu.module
   rewriter.setInsertionPoint(funcOp);
@@ -94,7 +94,7 @@ PatternMatchResult ConvertToGPUFuncOp::matchAndRewrite(
                        spirv::lookupTargetEnvOrDefault(funcOp));
 
   rewriter.eraseOp(launchOp);
-  return matchSuccess();
+  return success();
 }
 
 void IREEGpuKernelOutliningPass::runOnModule() {

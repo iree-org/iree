@@ -356,7 +356,7 @@ class ExStreamFragmentOpConversion
  public:
   using OpConversionPattern<
       IREE::Flow::ExStreamFragmentOp>::OpConversionPattern;
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::ExStreamFragmentOp streamOp, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): choose buffer mode/category based on stream commands.
@@ -402,7 +402,7 @@ class ExStreamFragmentOpConversion
     // Record all of the commands into the command buffer.
     if (failed(recordStreamCommands(device, commandBuffer, entryBlock,
                                     bufferSet, rewriter))) {
-      return matchFailure();
+      return failure();
     }
 
     // End and submit the command buffer.
@@ -424,7 +424,7 @@ class ExStreamFragmentOpConversion
     }
 
     rewriter.replaceOp(streamOp, bufferSet.outputBuffers);
-    return matchSuccess();
+    return success();
   }
 };
 

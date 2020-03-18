@@ -46,11 +46,11 @@ class EraseNonVMOp : public ConversionPattern {
   EraseNonVMOp(StringRef rootName, MLIRContext *ctx)
       : ConversionPattern(rootName, 0, ctx) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       Operation *op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -59,8 +59,6 @@ class EraseNonVMOp : public ConversionPattern {
 template <typename T, typename Adaptor = typename T::OperandAdaptor>
 class VMLAImportOpConversion : public OpConversionPattern<T> {
  public:
-  using OpConversionPattern<T>::matchFailure;
-
   VMLAImportOpConversion(MLIRContext *context, SymbolTable &importSymbols,
                          TypeConverter &typeConverter, StringRef importName)
       : OpConversionPattern<T>(context),
@@ -68,7 +66,7 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
         typeConverter(typeConverter),
         importName(importName) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     std::string importFqName = importName + getImportSuffix(op);
@@ -77,13 +75,11 @@ class VMLAImportOpConversion : public OpConversionPattern<T> {
     if (!importOp) {
       op.emitError() << "failed to resolve VM function import for "
                      << importFqName;
-      return matchFailure();
+      return failure();
     }
     assert(importOp);
-    return succeeded(rewriteToCall(op, Adaptor{operands}, importOp,
-                                   typeConverter, rewriter))
-               ? this->matchSuccess()
-               : this->matchFailure();
+    return rewriteToCall(op, Adaptor{operands}, importOp, typeConverter,
+                         rewriter);
   }
 
  protected:
@@ -169,7 +165,7 @@ class VMLAConstantOpConversion
   VMLAConstantOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::VMLA::ConstantOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Encode constant data into a rodata segment. These will eventually get
@@ -190,7 +186,7 @@ class VMLAConstantOpConversion
     rewriter.replaceOpWithNewOp<IREE::VMLA::BufferConstOp>(
         op, IREE::VMLA::BufferType::get(op.getContext()),
         loadRodataOp.getResult());
-    return matchSuccess();
+    return success();
   }
 
  private:

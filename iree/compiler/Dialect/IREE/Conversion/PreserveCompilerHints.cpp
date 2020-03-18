@@ -27,12 +27,12 @@ class PreserveDoNotOptimize
     : public OpConversionPattern<IREE::DoNotOptimizeOp> {
  public:
   using OpConversionPattern<IREE::DoNotOptimizeOp>::OpConversionPattern;
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::DoNotOptimizeOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::DoNotOptimizeOp>(op, operands,
                                                        op.getAttrs());
-    return matchSuccess();
+    return success();
   }
 };
 }  // namespace

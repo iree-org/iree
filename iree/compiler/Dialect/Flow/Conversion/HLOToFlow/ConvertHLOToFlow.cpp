@@ -33,18 +33,18 @@ namespace {
 
 struct ConstOpLowering : public OpRewritePattern<xla_hlo::ConstOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(xla_hlo::ConstOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(xla_hlo::ConstOp op,
+                                PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<ConstantOp>(op, op.value());
-    return matchSuccess();
+    return success();
   }
 };
 
 struct DynamicUpdateSliceOpLowering
     : public OpRewritePattern<xla_hlo::DynamicUpdateSliceOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(xla_hlo::DynamicUpdateSliceOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(xla_hlo::DynamicUpdateSliceOp op,
+                                PatternRewriter &rewriter) const override {
     auto startIndices = llvm::to_vector<4>(
         llvm::map_range(op.start_indices(), [&](Value tensorValue) {
           return rewriter.createOrFold<ExtractElementOp>(op.getLoc(),
@@ -52,7 +52,7 @@ struct DynamicUpdateSliceOpLowering
         }));
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(
         op, op.getResult().getType(), op.update(), op.operand(), startIndices);
-    return matchSuccess();
+    return success();
   }
 };
 

@@ -134,13 +134,13 @@ class ExpandRankedBroadcastShapePattern
     : public OpRewritePattern<RankedBroadcastShapeOp> {
  public:
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(RankedBroadcastShapeOp bcastOp,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(RankedBroadcastShapeOp bcastOp,
+                                PatternRewriter &rewriter) const override {
     auto newValue = rewriteShapexRankedBroadcastShape(bcastOp, rewriter);
-    if (!newValue) return matchFailure();
+    if (!newValue) return failure();
 
     rewriter.replaceOp(bcastOp, newValue);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -150,8 +150,8 @@ class MaterializeRunTimeRankedShapePattern
   MaterializeRunTimeRankedShapePattern(MLIRContext *context)
       : OpRewritePattern(context, 1) {}
 
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp getShapeOp,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(GetRankedShapeOp getShapeOp,
+                                PatternRewriter &rewriter) const override {
     auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
     SmallVector<Value, 4> dynamicDims;
     for (int64_t i = 0, e = shapeType.getRank(); i < e; ++i) {
@@ -173,7 +173,7 @@ class MaterializeRunTimeRankedShapePattern
 
     rewriter.replaceOpWithNewOp<MakeRankedShapeOp>(getShapeOp, shapeType,
                                                    dynamicDims);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -186,15 +186,15 @@ class MaterializeCompileTimeRankedShapePattern
       : OpRewritePattern(context, 10),
         customOpShapeBuilder(customOpShapeBuilder) {}
 
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp getShapeOp,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(GetRankedShapeOp getShapeOp,
+                                PatternRewriter &rewriter) const override {
     // Check for static shape and elide.
     auto operandType =
         getShapeOp.operand().getType().dyn_cast<RankedTensorType>();
     auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
     if (operandType && shapeType && operandType.hasStaticShape()) {
       rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(getShapeOp, shapeType);
-      return matchSuccess();
+      return success();
     }
 
     // Check for input operation (unless if a small set of shape ops).
@@ -203,16 +203,16 @@ class MaterializeCompileTimeRankedShapePattern
       return rewriteInputOp(getShapeOp, inputOperation, rewriter);
     }
 
-    return matchFailure();
+    return failure();
   }
 
  private:
   // Matches the case where the input to a GetRankedShapeOp is another
   // operation. This is the primary supported case as other rewrites should
   // have isolated function/block boundaries with TieShape ops.
-  PatternMatchResult rewriteInputOp(GetRankedShapeOp getShapeOp,
-                                    Operation *inputOperation,
-                                    PatternRewriter &rewriter) const {
+  LogicalResult rewriteInputOp(GetRankedShapeOp getShapeOp,
+                               Operation *inputOperation,
+                               PatternRewriter &rewriter) const {
     // SameOperandsAndResultShape trait.
     if (inputOperation->hasTrait<OpTrait::SameOperandsAndResultShape>() ||
         inputOperation->hasTrait<OpTrait::SameOperandsAndResultType>()) {
@@ -228,24 +228,24 @@ class MaterializeCompileTimeRankedShapePattern
             resultShape, inputOperation, rewriter);
         if (customShape) {
           rewriter.replaceOp(getShapeOp, customShape);
-          return matchSuccess();
+          return success();
         }
       }
     }
 
-    return matchFailure();
+    return failure();
   }
 
-  PatternMatchResult rewriteSameOperandsAndResultShape(
+  LogicalResult rewriteSameOperandsAndResultShape(
       GetRankedShapeOp getShapeOp, Operation *inputOperation,
       PatternRewriter &rewriter) const {
     llvm::SmallVector<Value, 4> inputOperands(inputOperation->getOperands());
     auto combinedShapeOp = buildCastInputsToResultShape(
         inputOperation->getLoc(), getShapeOp.getRankedShape(), inputOperands,
         rewriter);
-    if (!combinedShapeOp) return matchFailure();
+    if (!combinedShapeOp) return failure();
     rewriter.replaceOp(getShapeOp, {combinedShapeOp});
-    return matchSuccess();
+    return success();
   }
 
   const CustomOpShapeBuilderList *customOpShapeBuilder;

@@ -135,11 +135,11 @@ namespace {
 struct ExpandUnfoldableConstantOp
     : public OpRewritePattern<UnfoldableConstantOp> {
   using OpRewritePattern<IREE::UnfoldableConstantOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(UnfoldableConstantOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(UnfoldableConstantOp op,
+                                PatternRewriter &rewriter) const override {
     auto stdConst = rewriter.create<ConstantOp>(op.getLoc(), op.value());
     rewriter.replaceOpWithNewOp<DoNotOptimizeOp>(op, stdConst.getResult());
-    return matchSuccess();
+    return success();
   }
 };
 

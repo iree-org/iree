@@ -36,7 +36,7 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
   FuncOpSignatureConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx), converter(converter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       mlir::FuncOp funcOp, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Convert the input signature types.
@@ -47,13 +47,13 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
     for (auto argType : llvm::enumerate(originalType.getInputs())) {
       if (failed(converter.convertSignatureArg(argType.index(), argType.value(),
                                                newSignature))) {
-        return matchFailure();
+        return failure();
       }
     }
     SmallVector<Type, 4> newResultTypes;
     if (failed(converter.convertTypes(originalType.getResults(),
                                       newResultTypes))) {
-      return matchFailure();
+      return failure();
     }
 
     // Replace function.
@@ -66,7 +66,7 @@ class FuncOpSignatureConversion : public OpConversionPattern<mlir::FuncOp> {
     rewriter.applySignatureConversion(&newFuncOp.getBody(), newSignature);
 
     rewriter.eraseOp(funcOp);
-    return matchSuccess();
+    return success();
   }
 
  private:

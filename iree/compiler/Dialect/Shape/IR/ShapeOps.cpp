@@ -56,8 +56,8 @@ static RepeatRange<Type> getDimTypeDynamicRange(RankedShapeType type) {
 class SafeCastCompatibleShapePattern
     : public OpRewritePattern<CastCompatibleShapeOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CastCompatibleShapeOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CastCompatibleShapeOp op,
+                                PatternRewriter &rewriter) const override {
     // TODO(laurenzo): This is just eliding if everything is the same. Make
     // it generic.
     auto resultRs = op.result().getType().dyn_cast<RankedShapeType>();
@@ -66,73 +66,73 @@ class SafeCastCompatibleShapePattern
       for (auto operandType : op.getOperandTypes()) {
         auto operandRs = operandType.dyn_cast<RankedShapeType>();
         if (!operandRs || operandRs != resultRs) {
-          return matchFailure();
+          return failure();
         }
       }
       rewriter.replaceOp(op, op.operands()[0]);
-      return matchSuccess();
+      return success();
     }
 
-    return matchFailure();
+    return failure();
   }
 };
 
 class ElideTiedGetRankedShapePattern
     : public OpRewritePattern<GetRankedShapeOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(GetRankedShapeOp op,
+                                PatternRewriter &rewriter) const override {
     // If the immediate predecessor is a TieShapeOp, then this op can be
     // erased in favor of the input to the tie op.
     auto tieOp = dyn_cast_or_null<TieShapeOp>(op.operand().getDefiningOp());
-    if (!tieOp) return matchFailure();
+    if (!tieOp) return failure();
 
     rewriter.replaceOp(op, tieOp.shape());
 
-    return matchSuccess();
+    return success();
   }
 };
 
 class ElideDuplicateGetRankedShapePattern
     : public OpRewritePattern<GetRankedShapeOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(GetRankedShapeOp op,
+                                PatternRewriter &rewriter) const override {
     // If the immediate predecessor is a GetRankedShapeOp, then this op can be
     // erased in favor of the input to the tie op.
     auto precedingGetRankedShapeOp =
         dyn_cast_or_null<GetRankedShapeOp>(op.operand().getDefiningOp());
-    if (!precedingGetRankedShapeOp) return matchFailure();
+    if (!precedingGetRankedShapeOp) return failure();
 
     rewriter.replaceOp(op, precedingGetRankedShapeOp.shape());
-    return matchSuccess();
+    return success();
   }
 };
 
 class ElideStaticGetRankedShapePattern
     : public OpRewritePattern<GetRankedShapeOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GetRankedShapeOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(GetRankedShapeOp op,
+                                PatternRewriter &rewriter) const override {
     auto operandType = op.operand().getType().dyn_cast<RankedTensorType>();
     auto shapeType = op.shape().getType().dyn_cast<RankedShapeType>();
     if (!operandType || !shapeType || !operandType.hasStaticShape()) {
-      return matchFailure();
+      return failure();
     }
 
     rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, shapeType);
-    return matchSuccess();
+    return success();
   }
 };
 
 class IdentityMakeRankedShapePattern
     : public OpRewritePattern<MakeRankedShapeOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(MakeRankedShapeOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(MakeRankedShapeOp op,
+                                PatternRewriter &rewriter) const override {
     if (op.dynamic_dimensions().empty()) {
       // Do not match static shapes.
-      return matchFailure();
+      return failure();
     }
 
     // Detects make_ranked_shape ops whose dynamic dimensions are provided by
@@ -143,13 +143,13 @@ class IdentityMakeRankedShapePattern
     for (auto providingDim : op.dynamic_dimensions()) {
       auto rankedDimOp =
           llvm::dyn_cast_or_null<RankedDimOp>(providingDim.getDefiningOp());
-      if (!rankedDimOp) return matchFailure();
+      if (!rankedDimOp) return failure();
 
       // Shapes must match and refer to a dynamic index.
       unsigned providingIndex = rankedDimOp.getIndex();
       if (rankedDimOp.getRankedShapeType() != rankedShape ||
           !rankedShape.isDimDynamic(providingIndex)) {
-        return matchFailure();
+        return failure();
       }
 
       if (commonRankedDimOp) {
@@ -157,7 +157,7 @@ class IdentityMakeRankedShapePattern
         // dynamic dim.
         if (rankedDimOp.shape() != commonRankedDimOp.shape() ||
             providingIndex <= previousProvidingIndex) {
-          return matchFailure();
+          return failure();
         }
       }
 
@@ -171,19 +171,19 @@ class IdentityMakeRankedShapePattern
            "dynamic ranked_shape did not find a common provider");
 
     rewriter.replaceOp(op, commonRankedDimOp.shape());
-    return matchSuccess();
+    return success();
   }
 };
 
 class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(RankedDimOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(RankedDimOp op,
+                                PatternRewriter &rewriter) const override {
     // If the immediate predecessor is a MakeRankedShapeOp, then this op can be
     // erased in favor of the corresponding input to that op.
     auto makeRsOp =
         dyn_cast_or_null<MakeRankedShapeOp>(op.shape().getDefiningOp());
-    if (!makeRsOp) return matchFailure();
+    if (!makeRsOp) return failure();
 
     RankedShapeType rsType = op.getRankedShapeType();
     unsigned index = op.getIndex();
@@ -191,7 +191,7 @@ class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
     assert(index < allDims.size());
     if (allDims[index] >= 0) {
       // Not dynamic.
-      return matchFailure();
+      return failure();
     }
 
     // Map the overall index to the dynamic dim index.
@@ -202,7 +202,7 @@ class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
 
     assert(dynamicDimIndex < makeRsOp.dynamic_dimensions().size());
     rewriter.replaceOp(op, makeRsOp.dynamic_dimensions()[dynamicDimIndex]);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -210,39 +210,39 @@ class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
 // This allows better folding of static dimensions.
 class ExpandRankedShapeDimsPattern : public OpRewritePattern<RankedDimsOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(RankedDimsOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(RankedDimsOp op,
+                                PatternRewriter &rewriter) const override {
     auto rsType = op.getRankedShapeType();
     SmallVector<Value, 4> dims(rsType.getRank());
     for (int i = 0; i < rsType.getRank(); ++i) {
       dims[i] = rewriter.createOrFold<RankedDimOp>(op.getLoc(), op.shape(), i);
     }
     rewriter.replaceOp(op, dims);
-    return matchSuccess();
+    return success();
   }
 };
 
 class ElideDuplicateTieShapePattern : public OpRewritePattern<TieShapeOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(TieShapeOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(TieShapeOp op,
+                                PatternRewriter &rewriter) const override {
     // If the immediate predecessor is a TieShapeOp, then it can be possible
     // to merge these. This can often happen when function/block tie_shape
     // placeholders are inserted prior to materializing later parts of the
     // computation.
     auto precedingTieShapeOp =
         dyn_cast_or_null<TieShapeOp>(op.operand().getDefiningOp());
-    if (!precedingTieShapeOp) return matchFailure();
+    if (!precedingTieShapeOp) return failure();
 
     if (op.shape() != precedingTieShapeOp.shape()) {
       // This can happen in intermediate states before all shape calculations
       // are collapsed (i.e. the shapes may actually be equivalent but
       // constructed through different branches).
-      return matchFailure();
+      return failure();
     }
 
     rewriter.replaceOp(op, precedingTieShapeOp.result());
-    return matchSuccess();
+    return success();
   }
 };
 

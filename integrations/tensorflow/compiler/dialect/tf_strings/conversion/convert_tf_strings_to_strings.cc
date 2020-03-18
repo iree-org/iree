@@ -50,19 +50,19 @@ Value ToStringHelper(Location loc, Value value, OpBuilder &builder) {
 struct ToStringLowering : public OpRewritePattern<ToStringOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(ToStringOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(ToStringOp op,
+                                PatternRewriter &rewriter) const override {
     auto newValue = ToStringHelper(op.getLoc(), op.getOperand(), rewriter);
     rewriter.replaceOp(op, newValue);
-    return matchSuccess();
+    return success();
   }
 };
 
 struct PrintOpLowering : public OpRewritePattern<PrintOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(PrintOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(PrintOp op,
+                                PatternRewriter &rewriter) const override {
     Value stringVal = nullptr;
     Type type = op.getOperand().getType();
     if (auto stringType = type.dyn_cast<TFStrings::StringType>()) {
@@ -77,7 +77,7 @@ struct PrintOpLowering : public OpRewritePattern<PrintOp> {
     rewriter.create<IREE::Strings::PrintOp>(op.getLoc(), stringVal);
 
     rewriter.eraseOp(op);
-    return matchSuccess();
+    return success();
   }
 };
 

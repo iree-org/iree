@@ -34,7 +34,7 @@ class AllocatorAllocateConstOpConversion
     assert(importOp);
   }
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::AllocatorAllocateConstOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Encode constant data into a rodata segment. These will eventually get
@@ -81,7 +81,7 @@ class AllocatorAllocateConstOpConversion
     rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         segmentSizes, importType.getInputs(), callOperands);
-    return matchSuccess();
+    return success();
   }
 
  private:

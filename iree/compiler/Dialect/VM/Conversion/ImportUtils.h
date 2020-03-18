@@ -155,7 +155,7 @@ class VMImportOpConversion : public OpConversionPattern<T> {
     assert(importOp);
   }
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       T op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     return rewriteToCall(op, Adaptor{operands}, importOp, typeConverter,

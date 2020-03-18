@@ -29,17 +29,17 @@ namespace {
 
 struct ExtractElementOpLowering : public OpRewritePattern<ExtractElementOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(ExtractElementOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(ExtractElementOp op,
+                                PatternRewriter &rewriter) const override {
     auto aggregateType = op.getAggregate().getType().dyn_cast<TensorType>();
     if (!aggregateType) {
       // We currently are only looking for tensor types.
-      return matchFailure();
+      return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
         op, aggregateType.getElementType(), op.aggregate(),
         llvm::to_vector<4>(op.indices()));
-    return matchSuccess();
+    return success();
   }
 };
 

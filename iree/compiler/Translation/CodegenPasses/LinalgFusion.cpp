@@ -38,8 +38,8 @@ namespace {
 // TODO(ravishankarm): Generalize this to handle more valid fusion cases.
 struct IREEFuseGenericTensorOps : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(linalg::GenericOp op,
-                                     PatternRewriter &rewriter) const override;
+  LogicalResult matchAndRewrite(linalg::GenericOp op,
+                                PatternRewriter &rewriter) const override;
 };
 
 /// Fuses linalg operations on tensors in dispatch function. For now does only
@@ -121,9 +121,9 @@ static Optional<linalg::LinalgOp> fuseGenericOpWithConstantScalar(
   return cast<linalg::LinalgOp>(fusedLinalgOp.getOperation());
 }
 
-PatternMatchResult IREEFuseGenericTensorOps::matchAndRewrite(
+LogicalResult IREEFuseGenericTensorOps::matchAndRewrite(
     linalg::GenericOp op, PatternRewriter &rewriter) const {
-  if (!op.hasTensorSemantics()) return matchFailure();
+  if (!op.hasTensorSemantics()) return failure();
   for (auto operand : llvm::enumerate(op.getOperation()->getOperands())) {
     auto producer = operand.value().getDefiningOp();
     if (!producer || producer->getNumResults() != 1) continue;
@@ -140,9 +140,9 @@ PatternMatchResult IREEFuseGenericTensorOps::matchAndRewrite(
     if (!fusedOp) continue;
     rewriter.replaceOp(op, fusedOp.getValue().getOperation()->getResults());
     if (hasSingleUse) rewriter.eraseOp(producer);
-    return matchSuccess();
+    return success();
   }
-  return matchFailure();
+  return failure();
 }
 
 void IREELinalgFusionPass::runOnFunction() {

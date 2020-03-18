@@ -38,10 +38,10 @@ class ConstantTensorOpConversion
   ConstantTensorOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       mlir::ConstantOp constantOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
-    if (!constantOp.getType().isa<TensorType>()) return matchFailure();
+    if (!constantOp.getType().isa<TensorType>()) return failure();
 
     auto device =
         rewriter.createOrFold<IREE::HAL::ExSharedDeviceOp>(constantOp.getLoc());
@@ -64,7 +64,7 @@ class ConstantTensorOpConversion
     rewriter.create<IREE::HAL::ExDeferReleaseOp>(constantOp.getLoc(), buffer);
 
     rewriter.replaceOp(constantOp, {buffer});
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -74,7 +74,7 @@ class TensorLoadOpConversion
   TensorLoadOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx), converter(converter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::TensorLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorLoadOpOperandAdaptor operands(newOperands);
@@ -85,7 +85,7 @@ class TensorLoadOpConversion
     rewriter.replaceOpWithNewOp<IREE::HAL::BufferLoadOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
         source.getBuffer(), sourceOffset);
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -98,7 +98,7 @@ class TensorStoreOpConversion
   TensorStoreOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::TensorStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::TensorStoreOpOperandAdaptor operands(newOperands);
@@ -109,7 +109,7 @@ class TensorStoreOpConversion
     rewriter.create<IREE::HAL::BufferStoreOp>(
         storeOp.getLoc(), operands.value(), target.getBuffer(), targetOffset);
     rewriter.replaceOp(storeOp, {operands.value()});
-    return matchSuccess();
+    return success();
   }
 };
 

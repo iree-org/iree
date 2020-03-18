@@ -38,11 +38,11 @@ namespace {
 struct InterfaceOpEraser : public OpConversionPattern<IREE::HAL::InterfaceOp> {
   using OpConversionPattern<IREE::HAL::InterfaceOp>::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceOp interfaceOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(interfaceOp);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -52,7 +52,7 @@ struct InterfaceLoadTensorOpConversion
                                   TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceLoadTensorOp loadOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmla.interface argument to the function.
@@ -70,11 +70,11 @@ struct InterfaceLoadTensorOpConversion
         interfaceArg, bindingOp.set(), bindingOp.binding());
     auto byteLengthValue = VMLAConversionTarget::getBufferLength(
         loadOp.getLoc(), loadOp.result(), typeConverter, rewriter);
-    if (!byteLengthValue) return matchFailure();
+    if (!byteLengthValue) return failure();
     rewriter.replaceOpWithNewOp<IREE::VMLA::BufferViewOp>(
         loadOp, IREE::VMLA::BufferType::get(loadOp.getContext()),
         bufferOp.result(), newOperands.offset(), byteLengthValue);
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;
@@ -86,7 +86,7 @@ struct InterfaceStoreTensorOpConversion
                                    TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::InterfaceStoreTensorOp storeOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Find the vmla.interface argument to the function.
@@ -110,7 +110,7 @@ struct InterfaceStoreTensorOpConversion
         storeOp.getLoc(), newOperands.operand(), zeroValue, bufferOp,
         newOperands.offset(), byteLengthValue);
     rewriter.replaceOp(storeOp, {});
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;

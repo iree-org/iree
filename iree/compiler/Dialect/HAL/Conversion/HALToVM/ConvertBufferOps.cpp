@@ -30,7 +30,7 @@ class BufferLoadOpConversion
     assert(importOp);
   }
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::BufferLoadOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferLoadOpOperandAdaptor adaptor(operands);
@@ -43,7 +43,7 @@ class BufferLoadOpConversion
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.source_buffer(), adaptor.source_offset(),
                         sizeConst});
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -60,7 +60,7 @@ class BufferStoreOpConversion
     assert(importOp);
   }
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::BufferStoreOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::BufferStoreOpOperandAdaptor adaptor(operands);
@@ -73,7 +73,7 @@ class BufferStoreOpConversion
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         ArrayRef<Value>{adaptor.value(), adaptor.target_buffer(),
                         adaptor.target_offset(), sizeConst});
-    return matchSuccess();
+    return success();
   }
 
  private:

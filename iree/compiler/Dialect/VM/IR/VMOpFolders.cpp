@@ -87,15 +87,13 @@ namespace {
 template <typename T>
 struct InlineConstGlobalOpInitializer : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
-  using OpRewritePattern<T>::matchSuccess;
-  using OpRewritePattern<T>::matchFailure;
 
-  PatternMatchResult matchAndRewrite(T op,
-                                     PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return matchFailure();
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.initializer()) return failure();
     auto initializer = dyn_cast_or_null<FuncOp>(
         SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue()));
-    if (!initializer) return matchFailure();
+    if (!initializer) return failure();
     if (initializer.getBlocks().size() == 1 &&
         initializer.getBlocks().front().getOperations().size() == 2 &&
         isa<ReturnOp>(initializer.getBlocks().front().getOperations().back())) {
@@ -104,10 +102,10 @@ struct InlineConstGlobalOpInitializer : public OpRewritePattern<T> {
       if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
         rewriter.replaceOpWithNewOp<T>(op, op.sym_name(), op.is_mutable(),
                                        op.type(), constResult);
-        return matchSuccess();
+        return success();
       }
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -116,15 +114,15 @@ struct InlineConstGlobalOpInitializer : public OpRewritePattern<T> {
 struct DropDefaultConstGlobalOpInitializer
     : public OpRewritePattern<GlobalI32Op> {
   using OpRewritePattern<GlobalI32Op>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GlobalI32Op op,
-                                     PatternRewriter &rewriter) const override {
-    if (!op.initial_value().hasValue()) return matchFailure();
+  LogicalResult matchAndRewrite(GlobalI32Op op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.initial_value().hasValue()) return failure();
     auto value = op.initial_valueAttr().cast<IntegerAttr>();
-    if (value.getValue() != 0) return matchFailure();
+    if (value.getValue() != 0) return failure();
     rewriter.replaceOpWithNewOp<GlobalI32Op>(
         op, op.sym_name(), op.is_mutable(), op.type(),
         llvm::to_vector<4>(op.getDialectAttrs()));
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -146,21 +144,21 @@ namespace {
 /// Inlines immutable global constants into their loads.
 struct InlineConstGlobalLoadI32Op : public OpRewritePattern<GlobalLoadI32Op> {
   using OpRewritePattern<GlobalLoadI32Op>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GlobalLoadI32Op op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(GlobalLoadI32Op op,
+                                PatternRewriter &rewriter) const override {
     auto globalAttr = op.getAttrOfType<FlatSymbolRefAttr>("global");
     auto globalOp =
         op.getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalI32Op>(
             globalAttr.getValue());
-    if (!globalOp) return matchFailure();
-    if (globalOp.is_mutable()) return matchFailure();
+    if (!globalOp) return failure();
+    if (globalOp.is_mutable()) return failure();
     if (globalOp.initial_value()) {
       rewriter.replaceOpWithNewOp<ConstI32Op>(
           op, globalOp.initial_value().getValue());
     } else {
       rewriter.replaceOpWithNewOp<ConstI32ZeroOp>(op);
     }
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -176,16 +174,16 @@ namespace {
 /// Inlines immutable global constants into their loads.
 struct InlineConstGlobalLoadRefOp : public OpRewritePattern<GlobalLoadRefOp> {
   using OpRewritePattern<GlobalLoadRefOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(GlobalLoadRefOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(GlobalLoadRefOp op,
+                                PatternRewriter &rewriter) const override {
     auto globalAttr = op.getAttrOfType<FlatSymbolRefAttr>("global");
     auto globalOp =
         op.getParentOfType<VM::ModuleOp>().lookupSymbol<GlobalRefOp>(
             globalAttr.getValue());
-    if (!globalOp) return matchFailure();
-    if (globalOp.is_mutable()) return matchFailure();
+    if (!globalOp) return failure();
+    if (globalOp.is_mutable()) return failure();
     rewriter.replaceOpWithNewOp<ConstRefZeroOp>(op, op.getType());
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -203,15 +201,15 @@ class PropagateGlobalLoadAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
 
  public:
-  PatternMatchResult matchAndRewrite(INDIRECT op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(INDIRECT op,
+                                PatternRewriter &rewriter) const override {
     if (auto addressOp =
             dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(op, op.value().getType(),
                                           addressOp.global());
-      return this->matchSuccess();
+      return success();
     }
-    return this->matchFailure();
+    return failure();
   }
 };
 
@@ -238,14 +236,14 @@ class PropagateGlobalStoreAddress : public OpRewritePattern<INDIRECT> {
   using OpRewritePattern<INDIRECT>::OpRewritePattern;
 
  public:
-  PatternMatchResult matchAndRewrite(INDIRECT op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(INDIRECT op,
+                                PatternRewriter &rewriter) const override {
     if (auto addressOp =
             dyn_cast_or_null<GlobalAddressOp>(op.global().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<DIRECT>(op, op.value(), addressOp.global());
-      return this->matchSuccess();
+      return success();
     }
-    return this->matchFailure();
+    return failure();
   }
 };
 
@@ -690,21 +688,21 @@ namespace {
 /// Changes a cmp.eq.ref check against null to a cmp.nz.ref and inverted cond.
 struct NullCheckCmpEQRefToCmpNZRef : public OpRewritePattern<CmpEQRefOp> {
   using OpRewritePattern<CmpEQRefOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CmpEQRefOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CmpEQRefOp op,
+                                PatternRewriter &rewriter) const override {
     Attribute lhs, rhs;
     if (matchPattern(op.lhs(), m_Constant(&lhs))) {
       auto cmpNz =
           rewriter.create<CmpNZRefOp>(op.getLoc(), op.getType(), op.rhs());
       rewriter.replaceOpWithNewOp<NotI32Op>(op, op.getType(), cmpNz);
-      return matchSuccess();
+      return success();
     } else if (matchPattern(op.rhs(), m_Constant(&rhs))) {
       auto cmpNz =
           rewriter.create<CmpNZRefOp>(op.getLoc(), op.getType(), op.lhs());
       rewriter.replaceOpWithNewOp<NotI32Op>(op, op.getType(), cmpNz);
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -728,17 +726,17 @@ namespace {
 /// Changes a cmp.ne.ref check against null to a cmp.nz.ref.
 struct NullCheckCmpNERefToCmpNZRef : public OpRewritePattern<CmpNERefOp> {
   using OpRewritePattern<CmpNERefOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CmpNERefOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CmpNERefOp op,
+                                PatternRewriter &rewriter) const override {
     Attribute lhs, rhs;
     if (matchPattern(op.lhs(), m_Constant(&lhs))) {
       rewriter.replaceOpWithNewOp<CmpNZRefOp>(op, op.getType(), op.rhs());
-      return matchSuccess();
+      return success();
     } else if (matchPattern(op.rhs(), m_Constant(&rhs))) {
       rewriter.replaceOpWithNewOp<CmpNZRefOp>(op, op.getType(), op.lhs());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -767,20 +765,20 @@ namespace {
 /// Simplifies a cond_br with a constant condition to an unconditional branch.
 struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
   using OpRewritePattern<CondBranchOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CondBranchOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CondBranchOp op,
+                                PatternRewriter &rewriter) const override {
     if (matchPattern(op.condition(), m_NonZero())) {
       // True branch taken.
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getTrueDest(),
                                             op.getTrueOperands());
-      return matchSuccess();
+      return success();
     } else if (matchPattern(op.condition(), m_Zero())) {
       // False branch taken.
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getFalseDest(),
                                             op.getFalseOperands());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -788,11 +786,11 @@ struct SimplifyConstCondBranchPred : public OpRewritePattern<CondBranchOp> {
 /// an unconditional branch.
 struct SimplifySameTargetCondBranchOp : public OpRewritePattern<CondBranchOp> {
   using OpRewritePattern<CondBranchOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CondBranchOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CondBranchOp op,
+                                PatternRewriter &rewriter) const override {
     if (op.getTrueDest() != op.getFalseDest()) {
       // Targets differ so we need to be a cond branch.
-      return matchFailure();
+      return failure();
     }
 
     // If all operands match between the targets then we can become a normal
@@ -801,28 +799,28 @@ struct SimplifySameTargetCondBranchOp : public OpRewritePattern<CondBranchOp> {
     auto falseOperands = llvm::to_vector<4>(op.getFalseOperands());
     if (trueOperands == falseOperands) {
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getTrueDest(), trueOperands);
-      return matchSuccess();
+      return success();
     }
 
-    return matchFailure();
+    return failure();
   }
 };
 
 /// Swaps the cond_br true and false targets if the condition is inverted.
 struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
   using OpRewritePattern<CondBranchOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CondBranchOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CondBranchOp op,
+                                PatternRewriter &rewriter) const override {
     if (!op.getCondition().getDefiningOp()) {
-      return matchFailure();
+      return failure();
     }
     if (auto notOp = dyn_cast<NotI32Op>(op.getCondition().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<CondBranchOp>(
           op, notOp.getOperand(), op.getFalseDest(), op.getFalseOperands(),
           op.getTrueDest(), op.getTrueOperands());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -841,15 +839,13 @@ namespace {
 template <typename T>
 struct EraseUnusedCallOp : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
-  using OpRewritePattern<T>::matchSuccess;
-  using OpRewritePattern<T>::matchFailure;
-  PatternMatchResult matchAndRewrite(T op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
     // First check if the call is unused - this ensures we only do the symbol
     // lookup if we are actually going to use it.
     for (auto result : op.getResults()) {
       if (!result.use_empty()) {
-        return matchFailure();
+        return failure();
       }
     }
 
@@ -864,12 +860,12 @@ struct EraseUnusedCallOp : public OpRewritePattern<T> {
     }
     if (!hasNoSideEffects) {
       // Op has side-effects (or may have them); can't remove.
-      return matchFailure();
+      return failure();
     }
 
     // Erase op as it is unused.
     rewriter.eraseOp(op);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -885,18 +881,18 @@ namespace {
 /// Converts a vm.call.variadic to a non-variadic function to a normal vm.call.
 struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
   using OpRewritePattern<CallVariadicOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CallVariadicOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CallVariadicOp op,
+                                PatternRewriter &rewriter) const override {
     // If any segment size is != -1 (which indicates variadic) we bail.
     for (auto segmentSize : op.segment_sizes()) {
       if (segmentSize.getSExtValue() != -1) {
-        return matchFailure();
+        return failure();
       }
     }
     rewriter.replaceOpWithNewOp<CallOp>(op, op.callee(),
                                         llvm::to_vector<4>(op.getResultTypes()),
                                         op.getOperands());
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -920,33 +916,31 @@ namespace {
 
 template <typename T>
 struct RemoveDisabledDebugOp : public OpRewritePattern<T> {
-  using self = OpRewritePattern<T>;
   using OpRewritePattern<T>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(T op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
     // TODO(benvanik): if debug disabled then replace inputs -> outputs.
-    return this->matchFailure();
+    return failure();
   }
 };
 
 template <typename T>
 struct RemoveDisabledDebugAsyncOp : public OpRewritePattern<T> {
-  using self = OpRewritePattern<T>;
   using OpRewritePattern<T>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(T op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(T op,
+                                PatternRewriter &rewriter) const override {
     // TODO(benvanik): if debug disabled then replace with a branch to dest.
-    return self::matchFailure();
+    return failure();
   }
 };
 
 struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
   using OpRewritePattern<CondBreakOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(CondBreakOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(CondBreakOp op,
+                                PatternRewriter &rewriter) const override {
     IntegerAttr condValue;
     if (!matchPattern(op.condition(), m_Constant(&condValue))) {
-      return matchFailure();
+      return failure();
     }
 
     if (condValue.getValue() != 0) {
@@ -957,7 +951,7 @@ struct SimplifyConstCondBreakPred : public OpRewritePattern<CondBreakOp> {
       rewriter.replaceOpWithNewOp<BranchOp>(op, op.getDest(),
                                             op.destOperands());
     }
-    return matchSuccess();
+    return success();
   }
 };
 

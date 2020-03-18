@@ -37,13 +37,13 @@ struct ConstantOpConversion
     : public VMLAOpConversion<mlir::ConstantOp, IREE::VMLA::BufferConstOp> {
   using VMLAOpConversion::VMLAOpConversion;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       mlir::ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto value = srcOp.value().dyn_cast<ElementsAttr>();
-    if (!value) return matchFailure();
+    if (!value) return failure();
     rewriter.replaceOpWithNewOp<IREE::VMLA::ConstantOp>(srcOp, value);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -51,11 +51,11 @@ struct CmpIOpConversion
     : public VMLAOpConversion<mlir::CmpIOp, IREE::VMLA::CmpOp> {
   using VMLAOpConversion::VMLAOpConversion;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       mlir::CmpIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto inputType = srcOp.lhs().getType().dyn_cast<ShapedType>();
-    if (!inputType) return matchFailure();
+    if (!inputType) return failure();
 
     IREE::VMLA::CmpPredicate predicate = IREE::VMLA::CmpPredicate::EQ;
     bool forceUnsigned = false;
@@ -96,7 +96,7 @@ struct CmpIOpConversion
         break;
       default:
         llvm_unreachable("unhandled comparison predicate");
-        return matchFailure();
+        return failure();
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
@@ -108,7 +108,7 @@ struct CmpIOpConversion
       newOp.setAttr("force_unsigned", UnitAttr::get(rewriter.getContext()));
     }
     rewriter.replaceOp(srcOp, newOp.dst());
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -117,11 +117,11 @@ class CmpFOpConversion
  public:
   using VMLAOpConversion::VMLAOpConversion;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       mlir::CmpFOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto inputType = srcOp.lhs().getType().dyn_cast<ShapedType>();
-    if (!inputType) return matchFailure();
+    if (!inputType) return failure();
 
     // NOTE: the std.cmpf semantics are practically undefined. We explicitly
     // match the HLO semantics (that get lowered to the expected case values
@@ -152,7 +152,7 @@ class CmpFOpConversion
         break;
       default:
         llvm_unreachable("unhandled comparison predicate");
-        return matchFailure();
+        return failure();
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
@@ -161,7 +161,7 @@ class CmpFOpConversion
         srcOp.getLoc(), static_cast<uint32_t>(predicate), operands[0],
         operands[1], dst, TypeAttr::get(inputType.getElementType()));
     rewriter.replaceOp(srcOp, newOp.dst());
-    return matchSuccess();
+    return success();
   }
 };
 

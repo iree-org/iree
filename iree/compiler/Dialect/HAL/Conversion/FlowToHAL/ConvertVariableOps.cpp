@@ -59,7 +59,7 @@ class VariableOpConversion
   VariableOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx), converter(converter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::VariableOp variableOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple variables.
@@ -82,7 +82,7 @@ class VariableOpConversion
         variableOp, variableOp.sym_name(), variableOp.is_mutable(),
         converter.convertType(variableOp.type()), initializer, initialValue,
         llvm::to_vector<4>(variableOp.getDialectAttrs()));
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -95,7 +95,7 @@ class VariableAddressOpConversion
   VariableAddressOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx), converter(converter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::VariableAddressOp addressOp,
       llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
@@ -103,7 +103,7 @@ class VariableAddressOpConversion
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableAddressOp>(
         addressOp, converter.convertType(addressOp.result().getType()),
         addressOp.variable());
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -116,14 +116,14 @@ class VariableLoadOpConversion
   VariableLoadOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx), converter(converter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::VariableLoadOp loadOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableLoadOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
         rewriter.getSymbolRefAttr(loadOp.variable()));
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -136,7 +136,7 @@ class VariableLoadIndirectOpConversion
   VariableLoadIndirectOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx), converter(converter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::VariableLoadIndirectOp loadOp,
       llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
@@ -144,7 +144,7 @@ class VariableLoadIndirectOpConversion
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableLoadIndirectOp>(
         loadOp, converter.convertType(loadOp.result().getType()),
         loadOp.variable());
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -157,7 +157,7 @@ class VariableStoreOpConversion
   VariableStoreOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::VariableStoreOp storeOp, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::Flow::VariableStoreOpOperandAdaptor operands(newOperands);
@@ -165,7 +165,7 @@ class VariableStoreOpConversion
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableStoreOp>(
         storeOp, operands.value(),
         rewriter.getSymbolRefAttr(storeOp.variable()));
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -175,7 +175,7 @@ class VariableStoreIndirectOpConversion
   VariableStoreIndirectOpConversion(MLIRContext *ctx, TypeConverter &converter)
       : OpConversionPattern(ctx) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::Flow::VariableStoreIndirectOp storeOp,
       llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
@@ -183,7 +183,7 @@ class VariableStoreIndirectOpConversion
     // TODO(benvanik): multiple converted type results to multiple variables.
     rewriter.replaceOpWithNewOp<IREE::HAL::VariableStoreIndirectOp>(
         storeOp, operands.value(), storeOp.variable());
-    return matchSuccess();
+    return success();
   }
 };
 

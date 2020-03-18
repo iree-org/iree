@@ -53,21 +53,21 @@ template <typename SRC>
 struct IdentityOpConversion : public OpConversionPattern<SRC> {
   using OpConversionPattern<SRC>::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       SRC srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.getOperand().hasOneUse()) {
       // Can directly pass through the input buffer as we don't need to clone
       // for other users.
       rewriter.replaceOp(srcOp, operands[0]);
-      return this->matchSuccess();
+      return success();
     } else {
       // More than one user of the operand exist and we need to ensure they
       // keep a valid snapshot of the buffer.
       rewriter.replaceOpWithNewOp<IREE::VMLA::BufferCloneOp>(
           srcOp, IREE::VMLA::BufferType::get(rewriter.getContext()),
           operands[0]);
-      return this->matchSuccess();
+      return success();
     }
   }
 };
@@ -79,7 +79,7 @@ struct BroadcastInDimOpConversion
   BroadcastInDimOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::BroadcastInDimOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto srcShape = VMLAConversionTarget::getTensorShape(
@@ -101,7 +101,7 @@ struct BroadcastInDimOpConversion
       auto dstRsType = dstShape.getType().dyn_cast<Shape::RankedShapeType>();
       if (!dstRsType) {
         srcOp.emitWarning() << "currently only operates on ranked tensors";
-        return matchFailure();
+        return failure();
       }
       SmallVector<int64_t, 4> broadcastDims;
       if (srcOp.broadcast_dimensions()) {
@@ -115,7 +115,7 @@ struct BroadcastInDimOpConversion
           srcShape, dstRsType.getRank(), broadcastDims, rewriter);
       if (!broadcastedShape) {
         srcOp.emitWarning("unsupported shape type for degenerate broadcast");
-        return matchFailure();
+        return failure();
       }
       rewriter.create<IREE::VMLA::TileOp>(
           srcOp.getLoc(), operands[0], broadcastedShape, dst, dstShape,
@@ -123,7 +123,7 @@ struct BroadcastInDimOpConversion
     }
 
     rewriter.replaceOp(srcOp, {dst});
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;
@@ -131,8 +131,8 @@ struct BroadcastInDimOpConversion
 
 struct CanonicalizeBroadcastOp : public OpRewritePattern<xla_hlo::BroadcastOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(xla_hlo::BroadcastOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(xla_hlo::BroadcastOp op,
+                                PatternRewriter &rewriter) const override {
     SmallVector<int64_t, 6> broadcastDimensions;
     RankedTensorType inputType =
         op.getOperand().getType().cast<RankedTensorType>();
@@ -152,7 +152,7 @@ struct CanonicalizeBroadcastOp : public OpRewritePattern<xla_hlo::BroadcastOp> {
     rewriter.replaceOpWithNewOp<xla_hlo::BroadcastInDimOp>(
         op, op.getType(), op.getOperand(),
         make1DElementsAttr(broadcastDimensions));
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -162,7 +162,7 @@ struct ConcatenateOpConversion
   ConcatenateOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::ConcatenateOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto zero = rewriter.createOrFold<mlir::ConstantOp>(
@@ -201,7 +201,7 @@ struct ConcatenateOpConversion
     }
 
     rewriter.replaceOp(srcOp, {dst});
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;
@@ -215,7 +215,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
 
   // TODO(gcmn): This only handles a minimal number of cases. When XLA
   // redefines gather to be simpler, lower it properly.
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::GatherOp gatherOp, ArrayRef<Value> operandValues,
       ConversionPatternRewriter &rewriter) const override {
     xla_hlo::GatherOpOperandAdaptor operands(operandValues);
@@ -223,7 +223,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
     if (dimension_numbers.index_vector_dim().getValue().getSExtValue() != 0) {
       gatherOp.emitRemark()
           << "couldn't lower gather with index_vector_dim != 0";
-      return matchFailure();
+      return failure();
     }
     if (dimension_numbers.start_index_map().getType().getRank() != 1 ||
         dimension_numbers.start_index_map()
@@ -232,7 +232,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
                 .getValue() != 0) {
       gatherOp.emitRemark()
           << "couldn't lower gather with start_index_map != [0]";
-      return matchFailure();
+      return failure();
     }
     if (dimension_numbers.collapsed_slice_dims().getType().getRank() != 1 ||
         dimension_numbers.collapsed_slice_dims()
@@ -241,7 +241,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
                 .getValue() != 0) {
       gatherOp.emitRemark()
           << "couldn't lower gather with collapsed_dims != [0]";
-      return matchFailure();
+      return failure();
     }
 
     auto resultType = gatherOp.getResult().getType().cast<RankedTensorType>();
@@ -249,13 +249,13 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
         resultType.getRank()) {
       gatherOp.emitRemark() << "couldn't lower gather with offset_dims != "
                                "[0,...,rank of output]";
-      return matchFailure();
+      return failure();
     }
     for (auto it : llvm::enumerate(dimension_numbers.offset_dims())) {
       if (it.index() != it.value()) {
         gatherOp.emitRemark() << "couldn't lower gather with offset_dims != "
                                  "[0,...,rank of output]";
-        return matchFailure();
+        return failure();
       }
     }
 
@@ -266,7 +266,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
               .getValue() != it.value()) {
         gatherOp.emitRemark()
             << "couldn't lower gather with slice_sizes not [1] + final shape";
-        return matchFailure();
+        return failure();
       }
     }
 
@@ -278,7 +278,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
     auto srcRsType = srcShape.getType().dyn_cast<Shape::RankedShapeType>();
     if (!srcRsType) {
       gatherOp.emitWarning() << "currently only operates on ranked tensors";
-      return matchFailure();
+      return failure();
     }
 
     // Broadcast the dst shape to the src rank by prepending degenerate
@@ -288,7 +288,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
         dstShape, srcRsType.getRank(), emptyBroadcastDims, rewriter);
     if (!dstShape) {
       gatherOp.emitWarning("unsupported shape type for degenerate broadcast");
-      return matchFailure();
+      return failure();
     }
 
     auto inputType = gatherOp.operand().getType().cast<RankedTensorType>();
@@ -325,7 +325,7 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
         dstShape, dstIndices, lengths,
         TypeAttr::get(inputType.getElementType()));
     rewriter.replaceOp(gatherOp, {dst});
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;
@@ -336,14 +336,14 @@ struct SliceOpConversion : public OpConversionPattern<xla_hlo::SliceOp> {
   SliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::SliceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto isNotOne = [](APInt stride) { return stride != 1; };
     if (llvm::any_of(srcOp.strides(), isNotOne)) {
       srcOp.emitWarning()
           << "Could not lower slice op with non-singular strides";
-      return matchFailure();
+      return failure();
     }
 
     // TODO(benvanik): if the source is only used by this op then replace with
@@ -379,7 +379,7 @@ struct SliceOpConversion : public OpConversionPattern<xla_hlo::SliceOp> {
         dstIndices, lengths,
         TypeAttr::get(srcOp.getType().cast<ShapedType>().getElementType()));
     rewriter.replaceOp(srcOp, {dst});
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;
@@ -391,7 +391,7 @@ struct DynamicSliceOpConversion
   DynamicSliceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::DynamicSliceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // TODO(benvanik): if the source is only used by this op then replace with
@@ -427,7 +427,7 @@ struct DynamicSliceOpConversion
         dstIndices, lengths,
         TypeAttr::get(srcOp.getType().cast<ShapedType>().getElementType()));
     rewriter.replaceOp(srcOp, {dst});
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;

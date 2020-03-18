@@ -33,13 +33,13 @@ namespace {
 class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       ModuleOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module.
     // This mechanism can only support rewriting non top-level modules.
     if (!srcOp.getParentOp() || !isa<ModuleOp>(srcOp.getParentOp())) {
-      return matchFailure();
+      return failure();
     }
 
     StringRef name = srcOp.getName() ? *srcOp.getName() : "module";
@@ -47,7 +47,7 @@ class ModuleOpConversion : public OpConversionPattern<ModuleOp> {
         rewriter.create<IREE::VM::ModuleOp>(srcOp.getLoc(), name);
     newModuleOp.getBodyRegion().takeBody(srcOp.getBodyRegion());
     rewriter.replaceOp(srcOp, {});
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -55,16 +55,16 @@ class ModuleTerminatorOpConversion
     : public OpConversionPattern<ModuleTerminatorOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       ModuleTerminatorOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Do not attempt to convert the top level module's terminator.
     // This mechanism can only support rewriting non top-level modules.
     if (!isa<IREE::VM::ModuleOp>(srcOp.getParentOp())) {
-      return matchFailure();
+      return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::VM::ModuleTerminatorOp>(srcOp);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -77,7 +77,7 @@ constexpr const char *kRetainedAttributes[] = {
 class FuncOpConversion : public OpConversionPattern<FuncOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       FuncOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     FunctionType srcFuncType = srcOp.getType();
@@ -89,7 +89,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     for (unsigned i = 0, e = srcFuncType.getNumInputs(); i < e; ++i) {
       if (failed(typeConverter.convertSignatureArg(i, srcFuncType.getInput(i),
                                                    signatureConversion))) {
-        return matchFailure();
+        return failure();
       }
     }
 
@@ -97,7 +97,7 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     SmallVector<Type, 1> convertedResultTypes;
     if (failed(typeConverter.convertTypes(srcFuncType.getResults(),
                                           convertedResultTypes))) {
-      return matchFailure();
+      return failure();
     }
 
     // Create new function with converted argument and result types.
@@ -133,37 +133,37 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
     }
 
     rewriter.replaceOp(srcOp, llvm::None);
-    return matchSuccess();
+    return success();
   }
 };
 
 class ReturnOpConversion : public OpConversionPattern<ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       ReturnOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(srcOp, operands);
-    return matchSuccess();
+    return success();
   }
 };
 
 class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       ConstantOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto integerAttr = srcOp.getValue().dyn_cast<IntegerAttr>();
     // Only 32bit integer supported for now.
     if (!integerAttr) {
       srcOp.emitRemark() << "unsupported const type for dialect";
-      return matchFailure();
+      return failure();
     }
     int numBits = integerAttr.getType().getIntOrFloatBitWidth();
     if (numBits != 1 && numBits != 32) {
       srcOp.emitRemark() << "unsupported bit width for dialect constant";
-      return matchFailure();
+      return failure();
     }
 
     auto intValue = integerAttr.getInt();
@@ -172,14 +172,14 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
     } else {
       rewriter.replaceOpWithNewOp<IREE::VM::ConstI32Op>(srcOp, intValue);
     }
-    return matchSuccess();
+    return success();
   }
 };
 
 class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       CmpIOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     CmpIOpOperandAdaptor srcAdapter(operands);
@@ -188,43 +188,43 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
       case CmpIPredicate::eq:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpEQI32Op>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::ne:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpNEI32Op>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::slt:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32SOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::sle:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32SOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::sgt:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32SOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::sge:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32SOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::ult:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTI32UOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::ule:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpLTEI32UOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::ugt:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTI32UOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
       case CmpIPredicate::uge:
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
-        return matchSuccess();
+        return success();
     }
   }
 };
@@ -232,44 +232,41 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
 template <typename SrcOpTy, typename DstOpTy>
 class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-  using OpConversionPattern<SrcOpTy>::matchSuccess;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdapter(operands);
 
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
                                          srcAdapter.lhs(), srcAdapter.rhs());
-    return matchSuccess();
+    return success();
   }
 };
 
 template <typename SrcOpTy, typename DstOpTy, unsigned kBits = 32>
 class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   using OpConversionPattern<SrcOpTy>::OpConversionPattern;
-  using OpConversionPattern<SrcOpTy>::matchFailure;
-  using OpConversionPattern<SrcOpTy>::matchSuccess;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       SrcOpTy srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdaptor(operands);
     auto type = srcOp.getType();
     if (!type.isSignlessInteger() || type.getIntOrFloatBitWidth() != kBits) {
-      return matchFailure();
+      return failure();
     }
     APInt amount;
     if (!matchPattern(srcAdaptor.rhs(), m_ConstantInt(&amount))) {
-      return matchFailure();
+      return failure();
     }
     uint64_t amountRaw = amount.getZExtValue();
-    if (amountRaw > kBits) return matchFailure();
+    if (amountRaw > kBits) return failure();
     IntegerAttr amountAttr =
         IntegerAttr::get(IntegerType::get(8, srcOp.getContext()), amountRaw);
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
                                          srcAdaptor.lhs(), amountAttr);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -277,37 +274,36 @@ class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   static constexpr unsigned kBits = 32;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     SelectOpOperandAdaptor srcAdaptor(operands);
     IntegerType requiredType = IntegerType::get(kBits, srcOp.getContext());
-    if (srcAdaptor.true_value().getType() != requiredType)
-      return matchFailure();
+    if (srcAdaptor.true_value().getType() != requiredType) return failure();
 
     rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
         srcOp, requiredType, srcAdaptor.condition(), srcAdaptor.true_value(),
         srcAdaptor.false_value());
-    return matchSuccess();
+    return success();
   }
 };
 
 class BranchOpConversion : public OpConversionPattern<BranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       BranchOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::BranchOp>(srcOp, srcOp.getDest(),
                                                     operands);
-    return matchSuccess();
+    return success();
   }
 };
 
 class CondBranchOpConversion : public OpConversionPattern<CondBranchOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       CondBranchOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     Block *trueDest = srcOp.getTrueDest();
@@ -315,14 +311,14 @@ class CondBranchOpConversion : public OpConversionPattern<CondBranchOp> {
         srcOp, operands[0], trueDest,
         operands.slice(1, trueDest->getNumArguments()), srcOp.getFalseDest(),
         operands.slice(1 + trueDest->getNumArguments()));
-    return matchSuccess();
+    return success();
   }
 };
 
 class CallOpConversion : public OpConversionPattern<CallOp> {
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       CallOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     CallOpOperandAdaptor srcAdaptor(operands);
@@ -333,14 +329,14 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
     for (auto resultType : srcOp.getResultTypes()) {
       resultType = typeConverter.convertType(resultType);
       if (!resultType) {
-        return matchFailure();
+        return failure();
       }
       resultTypes.push_back(resultType);
     }
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
         srcOp, srcOp.getCallee(), resultTypes, srcAdaptor.operands());
 
-    return matchSuccess();
+    return success();
   }
 };
 

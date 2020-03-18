@@ -27,7 +27,7 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
   VariableOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::VariableOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto convertedType = typeConverter.convertType(op.type());
@@ -36,15 +36,15 @@ class VariableOpConversion : public OpConversionPattern<IREE::HAL::VariableOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalRefOp>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
-      return matchSuccess();
+      return success();
     } else if (convertedType.isSignlessIntOrIndex()) {
       // TODO(benvanik): support other types.
       rewriter.replaceOpWithNewOp<IREE::VM::GlobalI32Op>(
           op, op.sym_name(), op.is_mutable(), convertedType, op.initializer(),
           op.initial_value(), llvm::to_vector<4>(op.getDialectAttrs()));
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 
  private:
@@ -58,12 +58,12 @@ class VariableAddressOpConversion
                               TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::VariableAddressOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalAddressOp>(
         op, typeConverter.convertType(op.getType()), op.variable());
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -76,12 +76,12 @@ class VariableLoadOpConversion
   VariableLoadOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::VariableLoadOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadRefOp>(
         op, typeConverter.convertType(op.getType()), op.variable());
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -95,13 +95,13 @@ class VariableLoadIndirectOpConversion
                                    TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::VariableLoadIndirectOp op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::VariableLoadIndirectOpOperandAdaptor operands(newOperands);
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectRefOp>(
         op, typeConverter.convertType(op.getType()), operands.variable());
-    return matchSuccess();
+    return success();
   }
 
  private:
@@ -114,13 +114,13 @@ class VariableStoreOpConversion
   VariableStoreOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::VariableStoreOp op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::VariableStoreOpOperandAdaptor operands(newOperands);
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreRefOp>(
         op, operands.value(), op.variable());
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -131,13 +131,13 @@ class VariableStoreIndirectOpConversion
                                     TypeConverter &typeConverter)
       : OpConversionPattern(context) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::VariableStoreIndirectOp op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::VariableStoreIndirectOpOperandAdaptor operands(newOperands);
     rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectRefOp>(
         op, operands.value(), operands.variable());
-    return matchSuccess();
+    return success();
   }
 };
 

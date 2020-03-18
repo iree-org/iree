@@ -75,7 +75,7 @@ class ExecutableOpConversion
  public:
   using OpConversionPattern<IREE::HAL::ExecutableOp>::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::ExecutableOp executableOp, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     // Get the binary data for each format and create the rodata for each.
@@ -208,7 +208,7 @@ class ExecutableOpConversion
                  .result());
 
     rewriter.eraseOp(executableOp);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -219,7 +219,7 @@ class ExCacheExecutableOpConversion
   using OpConversionPattern<
       IREE::HAL::ExCacheExecutableOp>::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::ExCacheExecutableOp cacheExecutableOp,
       llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -229,7 +229,7 @@ class ExCacheExecutableOpConversion
         ArrayRef<Type>{
             IREE::VM::RefType::get(cacheExecutableOp.getResult().getType())},
         ArrayRef<Value>{operands[0]});
-    return matchSuccess();
+    return success();
   }
 };
 

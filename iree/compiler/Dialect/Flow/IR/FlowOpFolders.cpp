@@ -44,9 +44,9 @@ namespace {
 struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
   using OpRewritePattern<VariableOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(VariableOp op,
-                                     PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return matchFailure();
+  LogicalResult matchAndRewrite(VariableOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.initializer()) return failure();
     auto *symbolOp =
         SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
     auto initializer = cast<FuncOp>(symbolOp);
@@ -59,10 +59,10 @@ struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
       if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
         rewriter.replaceOpWithNewOp<VariableOp>(
             op, op.sym_name(), op.is_mutable(), op.type(), constResult);
-        return matchSuccess();
+        return success();
       }
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -80,15 +80,15 @@ class PropagateVariableLoadAddress
   using OpRewritePattern::OpRewritePattern;
 
  public:
-  PatternMatchResult matchAndRewrite(VariableLoadIndirectOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(VariableLoadIndirectOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
             op.variable().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<VariableLoadOp>(op, op.result().getType(),
                                                   addressOp.variable());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -108,16 +108,16 @@ namespace {
 struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
   using OpRewritePattern<VariableStoreOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(VariableStoreOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(VariableStoreOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto loadOp =
             dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
       if (loadOp.variable() == op.variable()) {
         rewriter.eraseOp(op);
-        return matchSuccess();
+        return success();
       }
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -135,15 +135,15 @@ class PropagateVariableStoreAddress
   using OpRewritePattern::OpRewritePattern;
 
  public:
-  PatternMatchResult matchAndRewrite(VariableStoreIndirectOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(VariableStoreIndirectOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
             op.variable().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<VariableStoreOp>(op, op.value(),
                                                    addressOp.variable());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 

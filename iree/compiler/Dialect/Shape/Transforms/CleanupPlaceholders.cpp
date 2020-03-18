@@ -27,10 +27,10 @@ namespace {
 class CleanupTieShapePattern : public OpRewritePattern<Shape::TieShapeOp> {
   using OpRewritePattern::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(TieShapeOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(TieShapeOp op,
+                                PatternRewriter &rewriter) const override {
     rewriter.replaceOp(op, op.operand());
-    return matchSuccess();
+    return success();
   }
 };
 

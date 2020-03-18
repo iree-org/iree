@@ -92,16 +92,16 @@ Type legalizeIntegerType(Type type) {
 /// types.
 struct AdjustAccessChainOp : public OpRewritePattern<spirv::AccessChainOp> {
   using OpRewritePattern<spirv::AccessChainOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::AccessChainOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(spirv::AccessChainOp op,
+                                PatternRewriter &rewriter) const override {
     if (!hasSupportedIntegerType(op.component_ptr().getType())) {
-      return matchFailure();
+      return failure();
     }
     ValueRange indices(op.indices());
     Type newType = legalizeIntegerType(op.component_ptr().getType());
     rewriter.replaceOpWithNewOp<spirv::AccessChainOp>(op, newType,
                                                       op.base_ptr(), indices);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -109,15 +109,15 @@ struct AdjustAccessChainOp : public OpRewritePattern<spirv::AccessChainOp> {
 /// i1 or i64 types.
 struct AdjustAddressOfOp : public OpRewritePattern<spirv::AddressOfOp> {
   using OpRewritePattern<spirv::AddressOfOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::AddressOfOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(spirv::AddressOfOp op,
+                                PatternRewriter &rewriter) const override {
     if (!hasSupportedIntegerType(op.pointer().getType())) {
-      return matchFailure();
+      return failure();
     }
     rewriter.replaceOpWithNewOp<spirv::AddressOfOp>(
         op, legalizeIntegerType(op.pointer().getType()),
         SymbolRefAttr::get(op.variable(), rewriter.getContext()));
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -126,16 +126,16 @@ struct AdjustAddressOfOp : public OpRewritePattern<spirv::AddressOfOp> {
 struct AdjustGlobalVariableWidth
     : public OpRewritePattern<spirv::GlobalVariableOp> {
   using OpRewritePattern<spirv::GlobalVariableOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::GlobalVariableOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(spirv::GlobalVariableOp op,
+                                PatternRewriter &rewriter) const override {
     if (!hasSupportedIntegerType(op.type())) {
-      return matchFailure();
+      return failure();
     }
     rewriter.replaceOpWithNewOp<spirv::GlobalVariableOp>(
         op, legalizeIntegerType(op.type()), op.sym_name(),
         op.getAttr("descriptor_set").cast<IntegerAttr>().getInt(),
         op.getAttr("binding").cast<IntegerAttr>().getInt());
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -236,11 +236,11 @@ Value rewriteIntForLoadOp(spirv::LoadOp op, PatternRewriter &rewriter) {
 /// by an extraction.
 struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
   using OpRewritePattern<spirv::LoadOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::LoadOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(spirv::LoadOp op,
+                                PatternRewriter &rewriter) const override {
     Type valueType = op.value().getType();
     if (!hasSupportedIntegerType(valueType)) {
-      return matchFailure();
+      return failure();
     }
 
     Type newType = legalizeIntegerType(valueType);
@@ -258,7 +258,7 @@ struct AdjustLoadOp : public OpRewritePattern<spirv::LoadOp> {
     }
 
     rewriter.replaceOp(op, result);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -342,15 +342,15 @@ LogicalResult rewriteIntForStoreOp(spirv::StoreOp op,
 struct AdjustStoreOp : public OpRewritePattern<spirv::StoreOp> {
   using OpRewritePattern<spirv::StoreOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(spirv::StoreOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(spirv::StoreOp op,
+                                PatternRewriter &rewriter) const override {
     Type valueType = op.value().getType();
     if (!hasSupportedIntegerType(valueType)) {
-      return matchFailure();
+      return failure();
     }
 
     if (hasIntTypeOfWidth(valueType, {1, 8, 16})) {
-      if (failed(rewriteIntForStoreOp(op, rewriter))) return matchFailure();
+      if (failed(rewriteIntForStoreOp(op, rewriter))) return failure();
     } else {
       const auto loc = op.getLoc();
       auto i32Type = rewriter.getIntegerType(32);
@@ -362,7 +362,7 @@ struct AdjustStoreOp : public OpRewritePattern<spirv::StoreOp> {
           op.getAttrOfType<IntegerAttr>("alignment"));
     }
 
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -373,40 +373,40 @@ struct AdjustStoreOp : public OpRewritePattern<spirv::StoreOp> {
 /// right operands to other operations.
 struct RemoveNopSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
   using OpRewritePattern<spirv::SConvertOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::SConvertOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(spirv::SConvertOp op,
+                                PatternRewriter &rewriter) const override {
     Type t1 = op.operand().getType();
     Type t2 = op.result().getType();
-    if (t1 != t2) return matchFailure();
+    if (t1 != t2) return failure();
     auto zero = spirv::ConstantOp::getZero(t1, op.getLoc(), &rewriter);
     rewriter.replaceOpWithNewOp<spirv::IAddOp>(op, op.operand(), zero);
-    return matchSuccess();
+    return success();
   }
 };
 
 /// Rewrite SConvert operation that the target type is i8, i16 or i64.
 struct AdjustSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
   using OpRewritePattern<spirv::SConvertOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::SConvertOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(spirv::SConvertOp op,
+                                PatternRewriter &rewriter) const override {
     Type t = op.result().getType();
     if (!hasIntTypeOfWidth(t, {8, 16, 64})) {
-      return matchFailure();
+      return failure();
     }
     Type i32Type = rewriter.getIntegerType(32);
     rewriter.replaceOpWithNewOp<spirv::SConvertOp>(op, i32Type, op.operand());
-    return matchSuccess();
+    return success();
   }
 };
 
 /// Rewrite i64 constants to i32 constants.
 struct AdjustConstantOp : public OpRewritePattern<spirv::ConstantOp> {
   using OpRewritePattern<spirv::ConstantOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::ConstantOp op,
-                                     PatternRewriter &rewriter) const {
+  LogicalResult matchAndRewrite(spirv::ConstantOp op,
+                                PatternRewriter &rewriter) const {
     Type constantType = op.getType();
     if (!hasIntTypeOfWidth(constantType, {8, 16, 64})) {
-      return matchFailure();
+      return failure();
     }
 
     Value i32cst;
@@ -420,7 +420,7 @@ struct AdjustConstantOp : public OpRewritePattern<spirv::ConstantOp> {
     }
 
     rewriter.replaceOpWithNewOp<spirv::SConvertOp>(op, constantType, i32cst);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -429,32 +429,32 @@ struct AdjustConstantOp : public OpRewritePattern<spirv::ConstantOp> {
 template <typename OpTy>
 struct AdjustIntegerArithmeticOperations : public OpRewritePattern<OpTy> {
   using OpRewritePattern<OpTy>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(OpTy op, PatternRewriter &rewriter) const {
+  LogicalResult matchAndRewrite(OpTy op, PatternRewriter &rewriter) const {
     Type resultType = op.result().getType();
     if (!hasIntTypeOfWidth(resultType, {8, 16, 64})) {
-      return Pattern::matchFailure();
+      return failure();
     }
     Type newType = legalizeIntegerType(op.getResult().getType());
     ValueRange operands(op.getOperation()->getOperands());
     rewriter.replaceOpWithNewOp<OpTy>(op, newType, operands, op.getAttrs());
-    return Pattern::matchSuccess();
+    return success();
   }
 };
 
 /// Rewrite SelectOp so that result is a 32-bit integer.
 struct AdjustSelectOp : public OpRewritePattern<spirv::SelectOp> {
   using OpRewritePattern<spirv::SelectOp>::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(spirv::SelectOp op,
-                                     PatternRewriter &rewriter) const {
+  LogicalResult matchAndRewrite(spirv::SelectOp op,
+                                PatternRewriter &rewriter) const {
     Type resultType = op.result().getType();
     if (!hasSupportedIntegerType(resultType)) {
-      return Pattern::matchFailure();
+      return failure();
     }
     Type newType = legalizeIntegerType(op.getResult().getType());
     ValueRange operands(op.getOperation()->getOperands());
     rewriter.replaceOpWithNewOp<spirv::SelectOp>(op, newType, operands,
                                                  op.getAttrs());
-    return Pattern::matchSuccess();
+    return success();
   }
 };
 

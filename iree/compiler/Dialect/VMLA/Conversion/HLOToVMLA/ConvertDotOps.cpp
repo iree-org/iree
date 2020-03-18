@@ -44,17 +44,17 @@ namespace {
 // type of pass in the xla_hlo dialect proper.
 struct CanonicalizeDotOp : public OpRewritePattern<xla_hlo::DotOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(xla_hlo::DotOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(xla_hlo::DotOp op,
+                                PatternRewriter &rewriter) const override {
     Value lhs = op.lhs();
     Value rhs = op.rhs();
     RankedTensorType lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     RankedTensorType rhsType = rhs.getType().dyn_cast<RankedTensorType>();
     if (!lhsType || !rhsType) {
-      return matchFailure();
+      return failure();
     }
     if (lhsType.getRank() != 2 || rhsType.getRank() != 2) {
-      return matchFailure();
+      return failure();
     }
     // TODO(silvasean): Move this helper to MLIR core.
     auto make1DElementsAttr = [&rewriter](ArrayRef<int64_t> integers) {
@@ -72,7 +72,7 @@ struct CanonicalizeDotOp : public OpRewritePattern<xla_hlo::DotOp> {
         op, op.getType(), lhs, rhs, dimensionNumbers,
         op.precision_config().hasValue() ? op.precision_config().getValue()
                                          : nullptr);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -94,21 +94,21 @@ struct CanonicalizeDotOp : public OpRewritePattern<xla_hlo::DotOp> {
 struct CanonicalizeDotGeneralOp
     : public OpRewritePattern<xla_hlo::DotGeneralOp> {
   using OpRewritePattern::OpRewritePattern;
-  PatternMatchResult matchAndRewrite(xla_hlo::DotGeneralOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(xla_hlo::DotGeneralOp op,
+                                PatternRewriter &rewriter) const override {
     Value lhs = op.lhs();
     Value rhs = op.rhs();
     RankedTensorType lhsType = lhs.getType().dyn_cast<RankedTensorType>();
     RankedTensorType rhsType = rhs.getType().dyn_cast<RankedTensorType>();
     Type elementType = lhsType.getElementType();
     if (!lhsType || !rhsType) {
-      return matchFailure();
+      return failure();
     }
     // TODO(silvasean): Extend to support dynamic shapes.
     // This op is a really good case for testing our e2e dynamic shape support.
     // There's interesting questions at the TF2XLA level too.
     if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) {
-      return matchFailure();
+      return failure();
     }
     xla_hlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
     auto extract1DVector = [](DenseIntElementsAttr elements) {
@@ -210,7 +210,7 @@ struct CanonicalizeDotGeneralOp
     reshapeShape.append(rhsFreeDimExtents.begin(), rhsFreeDimExtents.end());
     auto reshapeType = RankedTensorType::get(reshapeShape, elementType);
     rewriter.replaceOpWithNewOp<xla_hlo::ReshapeOp>(op, reshapeType, transpose);
-    return matchSuccess();
+    return success();
   }
 };
 

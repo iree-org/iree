@@ -64,10 +64,8 @@ template <typename HloOpTy>
 class BroadcastedRankedBinaryElementwiseConversion
     : public OpConversionPattern<HloOpTy> {
   using OpConversionPattern<HloOpTy>::OpConversionPattern;
-  using ConversionPattern::matchFailure;
-  using ConversionPattern::matchSuccess;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       HloOpTy op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     auto lhs = operands[0];
@@ -79,7 +77,7 @@ class BroadcastedRankedBinaryElementwiseConversion
                           .template dyn_cast<RankedTensorType>();
     if (!lhsType || !rhsType || !resultType) {
       // This conversion only supports ranked.
-      return matchFailure();
+      return failure();
     }
 
     // Get the shapes of the operands. Note that we assume that a prior shape
@@ -110,12 +108,12 @@ class BroadcastedRankedBinaryElementwiseConversion
       } else {
         op.emitOpError() << "broadcast_dimensions implies rank broadcast "
                          << "but operands are of the same rank";
-        return matchFailure();
+        return failure();
       }
     } else if (lhsType != rhsType) {
       op.emitError() << "degenerate broadcast of same-rank operands "
                      << "not yet implemented";
-      return matchFailure();
+      return failure();
     }
 
     auto resultShape = rewriter.create<RankedBroadcastShapeOp>(
@@ -133,7 +131,7 @@ class BroadcastedRankedBinaryElementwiseConversion
     auto newOp = rewriter.create<HloOpTy>(
         op.getLoc(), resultType, broadcastedLhs, broadcastedRhs, nullptr);
     rewriter.replaceOp(op, {newOp});
-    return matchSuccess();
+    return success();
   }
 };
 

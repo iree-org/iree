@@ -26,11 +26,11 @@ class RemoveMakeMemoryBarrierOpConversion
  public:
   using OpConversionPattern::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::MakeMemoryBarrierOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.eraseOp(op);
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -46,7 +46,7 @@ class CommandBufferExecutionBarrierOpConversion
     assert(importOp);
   }
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       IREE::HAL::CommandBufferExecutionBarrierOp op,
       llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
@@ -75,7 +75,7 @@ class CommandBufferExecutionBarrierOpConversion
     if (!op.buffer_barriers().empty()) {
       op.emitOpError()
           << "tuples not yet fully supported; don't use buffer barriers";
-      return matchFailure();
+      return failure();
     }
     for (auto memoryBarrier : op.memory_barriers()) {
       assert(memoryBarrier.getDefiningOp());
@@ -92,7 +92,7 @@ class CommandBufferExecutionBarrierOpConversion
     rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
         op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
         segmentSizes, importType.getInputs(), callOperands);
-    return matchSuccess();
+    return success();
   }
 
  private:

@@ -49,15 +49,15 @@ struct SplitIndependentReductionOpConversion
                                         TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::ReduceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.dimensions().getNumElements() > 1) {
       srcOp.emitOpError() << "multi-dimensional reductions must be unrolled";
-      return matchFailure();
+      return failure();
     } else if (srcOp.body().getBlocks().size() > 1) {
       // Control flow within the computation is not supported; bail to fallback.
-      return matchFailure();
+      return failure();
     }
     auto &block = srcOp.body().getBlocks().front();
     xla_hlo::ReduceOpOperandAdaptor newOperands(operands);
@@ -67,7 +67,7 @@ struct SplitIndependentReductionOpConversion
         continue;
       } else if (op.getOperands().size() != 2) {
         // Only binary ops are supported for builtins.
-        return matchFailure();
+        return failure();
       }
 
       // Determine which argument set this op is acting on. For the builtins we
@@ -81,7 +81,7 @@ struct SplitIndependentReductionOpConversion
       for (auto operand : op.getOperands()) {
         if (operand.getDefiningOp() != nullptr) {
           // Operand comes from another op within the block; unsupported.
-          return matchFailure();
+          return failure();
         }
         int operandSetIndex =
             std::distance(block.args_begin(),
@@ -90,14 +90,14 @@ struct SplitIndependentReductionOpConversion
         if (operandSetIndex != opSetIndex) {
           // Operand is not coming from the same set as the other operands of
           // this op; unsupported.
-          return matchFailure();
+          return failure();
         }
       }
       for (auto result : op.getResults()) {
         for (auto *user : result.getUsers()) {
           if (!user->isKnownTerminator()) {
             // Result is not directly returned from the block; unsupported.
-            return matchFailure();
+            return failure();
           }
         }
       }
@@ -122,7 +122,7 @@ struct SplitIndependentReductionOpConversion
     }
 
     rewriter.replaceOp(srcOp, setResults);
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;
@@ -142,18 +142,18 @@ struct BuiltinReduceOpConversion
       : OpConversionPattern(context, /*benefit=*/1000),
         typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::ReduceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.dimensions().getNumElements() > 1) {
       srcOp.emitOpError() << "multi-dimensional reductions must be unrolled";
-      return matchFailure();
+      return failure();
     } else if (srcOp.body().getBlocks().size() > 1) {
       // Control flow within the computation is not supported; bail to fallback.
-      return matchFailure();
+      return failure();
     } else if (srcOp.body().front().getOperations().size() > 2) {
       // Require splitting first.
-      return matchFailure();
+      return failure();
     }
 
     auto operand = operands[0];
@@ -189,11 +189,11 @@ struct BuiltinReduceOpConversion
           TypeAttr::get(elementType));
     } else {
       computeOp.emitRemark() << "unsupported builtin reduction operation";
-      return matchFailure();
+      return failure();
     }
 
     rewriter.replaceOp(srcOp, {dst});
-    return matchSuccess();
+    return success();
   }
 
   TypeConverter &typeConverter;
@@ -208,17 +208,17 @@ struct GenericReduceOpConversion
   GenericReduceOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       xla_hlo::ReduceOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     if (srcOp.dimensions().getNumElements() > 1) {
       srcOp.emitOpError() << "multi-dimensional reductions must be unrolled";
-      return matchFailure();
+      return failure();
     }
 
     // TODO(benvanik): emit VM loop around computation.
     srcOp.emitOpError() << "generic reduction lowering not yet implemented";
-    return matchFailure();
+    return failure();
   }
 
   TypeConverter &typeConverter;

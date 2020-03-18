@@ -40,9 +40,9 @@ namespace {
 struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
   using OpRewritePattern<VariableOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(VariableOp op,
-                                     PatternRewriter &rewriter) const override {
-    if (!op.initializer()) return matchFailure();
+  LogicalResult matchAndRewrite(VariableOp op,
+                                PatternRewriter &rewriter) const override {
+    if (!op.initializer()) return failure();
     auto *symbolOp =
         SymbolTable::lookupNearestSymbolFrom(op, op.initializer().getValue());
     auto initializer = cast<FuncOp>(symbolOp);
@@ -55,10 +55,10 @@ struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
       if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
         rewriter.replaceOpWithNewOp<VariableOp>(
             op, op.sym_name(), op.is_mutable(), op.type(), constResult);
-        return matchSuccess();
+        return success();
       }
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -76,15 +76,15 @@ class PropagateVariableLoadAddress
   using OpRewritePattern::OpRewritePattern;
 
  public:
-  PatternMatchResult matchAndRewrite(VariableLoadIndirectOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(VariableLoadIndirectOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
             op.variable().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<VariableLoadOp>(op, op.result().getType(),
                                                   addressOp.variable());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -104,16 +104,16 @@ namespace {
 struct EraseUnusedVariableStoreOp : public OpRewritePattern<VariableStoreOp> {
   using OpRewritePattern<VariableStoreOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(VariableStoreOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(VariableStoreOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto loadOp =
             dyn_cast_or_null<VariableLoadOp>(op.value().getDefiningOp())) {
       if (loadOp.variable() == op.variable()) {
         rewriter.eraseOp(op);
-        return matchSuccess();
+        return success();
       }
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -131,15 +131,15 @@ class PropagateVariableStoreAddress
   using OpRewritePattern::OpRewritePattern;
 
  public:
-  PatternMatchResult matchAndRewrite(VariableStoreIndirectOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(VariableStoreIndirectOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto addressOp = dyn_cast_or_null<VariableAddressOp>(
             op.variable().getDefiningOp())) {
       rewriter.replaceOpWithNewOp<VariableStoreOp>(op, op.value(),
                                                    addressOp.variable());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -161,18 +161,18 @@ namespace {
 struct SkipBufferAllocatorOp : public OpRewritePattern<BufferAllocatorOp> {
   using OpRewritePattern<BufferAllocatorOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(BufferAllocatorOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(BufferAllocatorOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto allocateOp = dyn_cast_or_null<AllocatorAllocateOp>(
             op.buffer().getDefiningOp())) {
       rewriter.replaceOp(op, allocateOp.allocator());
-      return matchSuccess();
+      return success();
     } else if (auto allocateOp = dyn_cast_or_null<AllocatorAllocateConstOp>(
                    op.buffer().getDefiningOp())) {
       rewriter.replaceOp(op, allocateOp.allocator());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 
@@ -193,12 +193,12 @@ namespace {
 struct ExpandBufferViewConstOp : public OpRewritePattern<BufferViewConstOp> {
   using OpRewritePattern<BufferViewConstOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(BufferViewConstOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(BufferViewConstOp op,
+                                PatternRewriter &rewriter) const override {
     auto shapedType = op.value().getType();
     auto elementType = getElementTypeValue(shapedType.getElementType());
     if (!elementType.hasValue()) {
-      return matchFailure();
+      return failure();
     }
 
     auto buffer = rewriter.createOrFold<AllocatorAllocateConstOp>(
@@ -216,7 +216,7 @@ struct ExpandBufferViewConstOp : public OpRewritePattern<BufferViewConstOp> {
 
     rewriter.replaceOpWithNewOp<BufferViewCreateOp>(op, buffer, shape,
                                                     elementType.getValue());
-    return matchSuccess();
+    return success();
   }
 };
 
@@ -234,14 +234,14 @@ namespace {
 struct SkipBufferViewBufferOp : public OpRewritePattern<BufferViewBufferOp> {
   using OpRewritePattern<BufferViewBufferOp>::OpRewritePattern;
 
-  PatternMatchResult matchAndRewrite(BufferViewBufferOp op,
-                                     PatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(BufferViewBufferOp op,
+                                PatternRewriter &rewriter) const override {
     if (auto createOp = dyn_cast_or_null<BufferViewCreateOp>(
             op.buffer_view().getDefiningOp())) {
       rewriter.replaceOp(op, createOp.buffer());
-      return matchSuccess();
+      return success();
     }
-    return matchFailure();
+    return failure();
   }
 };
 

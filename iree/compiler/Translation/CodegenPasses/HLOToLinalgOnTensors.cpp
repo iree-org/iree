@@ -68,16 +68,16 @@ class SplatConstConverter : public OpConversionPattern<ConstantOp> {
  public:
   using OpConversionPattern<ConstantOp>::OpConversionPattern;
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       ConstantOp op, ArrayRef<Value> args,
       ConversionPatternRewriter& rewriter) const final {
     if (!verifyXLAOpTensorSemantics(op)) {
-      return matchFailure();
+      return failure();
     }
     auto resultType = getXLAOpResultType(op);
-    if (resultType.getRank() == 0) return matchFailure();
+    if (resultType.getRank() == 0) return failure();
     auto valueAttr = op.value().template cast<DenseElementsAttr>();
-    if (!valueAttr.isSplat()) return matchFailure();
+    if (!valueAttr.isSplat()) return failure();
 
     OpBuilder::InsertionGuard linalgOpGuard(rewriter);
     auto nloops = std::max<unsigned>(resultType.getRank(), 1);
@@ -97,7 +97,7 @@ class SplatConstConverter : public OpConversionPattern<ConstantOp> {
         rewriter.create<mlir::ConstantOp>(loc, valueAttr.getSplatValue());
     rewriter.create<linalg::YieldOp>(loc, stdConstOp.getResult());
     rewriter.replaceOp(op, linalgOp.getResults());
-    return matchSuccess();
+    return success();
   }
 };
 

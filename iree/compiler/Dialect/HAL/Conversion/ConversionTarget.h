@@ -67,15 +67,11 @@ class HALOpConversion : public OpConversionPattern<SRC> {
   HALOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern<SRC>(context), typeConverter(typeConverter) {}
 
-  PatternMatchResult matchAndRewrite(
+  LogicalResult matchAndRewrite(
       SRC srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    if (succeeded(HALConversionTarget::applyDefaultBufferRewrite(
-            srcOp, operands, DST::getOperationName(), typeConverter,
-            rewriter))) {
-      return OpConversionPattern<SRC>::matchSuccess();
-    }
-    return OpConversionPattern<SRC>::matchFailure();
+    return HALConversionTarget::applyDefaultBufferRewrite(
+        srcOp, operands, DST::getOperationName(), typeConverter, rewriter);
   }
 
  protected:
