@@ -26,11 +26,11 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/LoopOps/LoopOps.h"
-#include "mlir/Dialect/QuantOps/QuantOps.h"
+#include "mlir/Dialect/Quant/QuantOps.h"
 #include "mlir/Dialect/SDBM/SDBMDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/VectorOps/VectorOps.h"
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/IR/Dialect.h"
 
 namespace mlir {
@@ -48,7 +48,7 @@ inline void registerMlirDialects() {
     registerDialect<quant::QuantizationDialect>();
     registerDialect<spirv::SPIRVDialect>();
     registerDialect<StandardOpsDialect>();
-    registerDialect<vector::VectorOpsDialect>();
+    registerDialect<vector::VectorDialect>();
     registerDialect<SDBMDialect>();
     return true;
   }();
