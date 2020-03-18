@@ -217,6 +217,7 @@ function(iree_complete_binary_link_options)
         # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
         # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
         # try to link the library in, so we need the flag *and* the dependency.
+        # For macOS, also add a `-Wl,-force_load` version of the dep.
         if(MSVC)
           get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
           if (_ALIASED_TARGET)
@@ -238,7 +239,6 @@ function(iree_complete_binary_link_options)
     endforeach(_DEP)
 
     # Call into target_link_libraries with the lists of deps.
-    # TODO(scotttodd): `-Wl,-force_load` version
     if(MSVC OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin"))
       target_link_libraries(${_NAME}
         PUBLIC
