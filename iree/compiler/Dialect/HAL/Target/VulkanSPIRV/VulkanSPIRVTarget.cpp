@@ -275,6 +275,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
 
     // Lower module to spirv::ModuleOp.
     PassManager conversionPassManager(moduleOp.getContext());
+    applyPassManagerCLOptions(conversionPassManager);
     if (useLinalgPath(moduleOp, targetOptions)) {
       addHLOToLinalgToSPIRVPasses(conversionPassManager,
                                   targetOptions.linalgToSPIRVWorkgroupSize);

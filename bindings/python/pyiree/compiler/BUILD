@@ -35,6 +35,8 @@ COMPILER_DEPS = [
     "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
     "//iree/compiler/Dialect/HAL/Transforms",
     "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+    "//iree/compiler/Dialect/Shape/IR",
+    "//iree/compiler/Dialect/Shape/Transforms",
     "//iree/compiler/Dialect/VM/Transforms",
 
     # Targets.

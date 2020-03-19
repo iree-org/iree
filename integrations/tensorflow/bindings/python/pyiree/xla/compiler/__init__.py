@@ -37,6 +37,7 @@ from typing import Collection, Optional, Sequence
 from . import binding
 
 # Native aliases (matches those in the generic compiler).
+llvm = binding.llvm
 Context = binding.CompilerContext
 Module = binding.CompilerModule
 CompileOptions = binding.CompileOptions

@@ -24,6 +24,8 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
@@ -56,6 +58,56 @@ namespace python {
     CompilerContextBundle::default_crash_reproducer_path_;
 
 namespace {
+
+bool LLVMOnceInit() {
+  // Enable LLVM's signal handler to get nice stack traces.
+  llvm::sys::SetOneShotPipeSignalFunction(
+      llvm::sys::DefaultOneShotPipeSignalHandler);
+  llvm::sys::PrintStackTraceOnErrorSignal("pyiree");
+
+  // Register built-in MLIR dialects.
+  mlir::registerAllDialects();
+
+  // Register any pass manager command line options.
+  mlir::registerPassManagerCLOptions();
+
+  std::string program_name = "pyiree";
+  std::vector<const char*> default_options = {program_name.c_str(), nullptr};
+  llvm::cl::ParseCommandLineOptions(1, default_options.data());
+  return true;
+}
+
+void SetupLLVMModule(pybind11::module m) {
+  m.def("print_help_message", []() { llvm::cl::PrintHelpMessage(); });
+  m.def(
+      "add_option",
+      [](std::string name, absl::optional<std::string> value) {
+        auto options_map = llvm::cl::getRegisteredOptions();
+        auto found_it = options_map.find(name);
+        if (found_it == options_map.end()) {
+          std::string message = "Unknown LLVM option: ";
+          message.append(name);
+          throw RaiseValueError(message.c_str());
+        }
+
+        std::string value_sr = value ? *value : "";
+        found_it->getValue()->addOccurrence(1, name, value_sr);
+      },
+      py::arg("name"), py::arg("value") = absl::nullopt);
+  m.def(
+      "reset_option",
+      [](std::string name) {
+        auto options_map = llvm::cl::getRegisteredOptions();
+        auto found_it = options_map.find(name);
+        if (found_it == options_map.end()) {
+          std::string message = "Unknown LLVM option: ";
+          message.append(name);
+          throw RaiseValueError(message.c_str());
+        }
+        found_it->getValue()->setDefault();
+      },
+      py::arg("name"));
+}
 
 OwningModuleRef parseMLIRModuleFromString(StringRef contents,
                                           MLIRContext* context) {
@@ -260,6 +312,7 @@ std::string CompilerModuleBundle::ToAsm(bool enableDebugInfo, bool prettyForm,
 std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
     BytecodeTargetOptions options, std::vector<std::string> target_backends) {
   mlir::PassManager pass_manager(context_->mlir_context());
+  mlir::applyPassManagerCLOptions(pass_manager);
   auto crash_reproducer_path = context_->crash_reproducer_path();
   if (crash_reproducer_path) {
     pass_manager.enableCrashReproducerGeneration(*crash_reproducer_path);
@@ -300,6 +353,7 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
 void CompilerModuleBundle::RunPassPipeline(
     const std::vector<std::string>& pipelines) {
   mlir::PassManager pm(context_->mlir_context());
+  mlir::applyPassManagerCLOptions(pm);
   auto crash_reproducer_path = context_->crash_reproducer_path();
   if (crash_reproducer_path) {
     pm.enableCrashReproducerGeneration(*crash_reproducer_path);
@@ -325,7 +379,16 @@ void CompilerModuleBundle::RunPassPipeline(
 }
 
 void SetupCommonCompilerBindings(pybind11::module m) {
-  mlir::registerAllDialects();
+  // Guard the once init to happen once per process (vs module, which in
+  // mondo builds can happen multiple times).
+  static bool llvm_init_baton = ([]() { return LLVMOnceInit(); })();
+  (void)(llvm_init_baton);
+
+  // llvm module
+  auto llvm_m = m.def_submodule("llvm", "Global LLVM configuration");
+  SetupLLVMModule(llvm_m);
+
+  // OpaqueBlob class
   py::class_<OpaqueBlob, std::shared_ptr<OpaqueBlob>>(m, "OpaqueBlob",
                                                       py::buffer_protocol())
       .def_buffer([](OpaqueBlob* self) -> py::buffer_info {
@@ -349,6 +412,7 @@ void SetupCommonCompilerBindings(pybind11::module m) {
         return py::str(static_cast<const char*>(self->data()), self->size());
       });
 
+  // CompilerContext class
   py::class_<CompilerContextBundle, std::shared_ptr<CompilerContextBundle>>(
       m, "CompilerContext")
       .def(py::init<>([]() {
@@ -371,11 +435,15 @@ void SetupCommonCompilerBindings(pybind11::module m) {
       .def_property("crash_reproducer_path",
                     &CompilerContextBundle::crash_reproducer_path,
                     &CompilerContextBundle::set_crash_reproducer_path);
+
+  // OutputFormat enum
   py::enum_<BytecodeOutputFormat>(m, "OutputFormat")
       .value("FLATBUFFER_BINARY", BytecodeOutputFormat::kFlatBufferBinary)
       .value("FLATBUFFER_TEXT", BytecodeOutputFormat::kFlatBufferText)
       .value("MLIR_TEXT", BytecodeOutputFormat::kMlirText)
       .export_values();
+
+  // CompileOptions class
   py::class_<BytecodeTargetOptions>(m, "CompileOptions")
       .def(py::init<>())
       .def_readwrite("output_format", &BytecodeTargetOptions::outputFormat)
@@ -383,6 +451,8 @@ void SetupCommonCompilerBindings(pybind11::module m) {
       .def_readwrite("strip_debug_ops", &BytecodeTargetOptions::stripDebugOps)
       .def_readwrite("strip_source_map", &BytecodeTargetOptions::stripSourceMap)
       .def_readwrite("strip_symbols", &BytecodeTargetOptions::stripSymbols);
+
+  // CompilerModule class
   py::class_<CompilerModuleBundle>(m, "CompilerModule")
       .def("to_asm", &CompilerModuleBundle::ToAsm,
            py::arg("debug_info") = false, py::arg("pretty") = false,

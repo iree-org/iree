@@ -21,6 +21,7 @@
 from . import binding as binding
 
 # Native aliases.
+llvm = binding.llvm
 Context = binding.CompilerContext
 Module = binding.CompilerModule
 CompileOptions = binding.CompileOptions

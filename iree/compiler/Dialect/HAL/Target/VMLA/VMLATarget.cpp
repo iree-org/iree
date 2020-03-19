@@ -68,6 +68,7 @@ LogicalResult translateToVMLAExecutable(
 
   // Convert to VMLA.
   PassManager conversionPassManager(innerModuleOp.getContext());
+  applyPassManagerCLOptions(conversionPassManager);
   IREE::VMLA::buildVMLATransformPassPipeline(conversionPassManager);
   IREE::VM::buildVMTransformPassPipeline(conversionPassManager);
   if (failed(conversionPassManager.run(innerModuleOp))) {
