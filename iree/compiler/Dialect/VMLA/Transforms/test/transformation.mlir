@@ -27,9 +27,3 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 // CHECK-NEXT:   "vmla.buffer.copy"(%2, %c0_i32, %3, %c0_i32, %c16_i32) : (!vmla.buffer, i32, !vmla.buffer, i32, i32) -> ()
 // CHECK-NEXT:   return
 // CHECK-NEXT: }
-// CHECK-NEXT: func @simpleMath_rgn_dispatch_0_impl(%arg0: !vmla.buffer) -> !vmla.buffer attributes {sym_visibility = "private"} {
-// CHECK-NEXT:   %c16_i32 = constant 16 : i32
-// CHECK-NEXT:   %0 = "vmla.buffer.alloc"(%c16_i32) : (i32) -> !vmla.buffer
-// CHECK-NEXT:   "vmla.add"(%arg0, %arg0, %0) {element_type = f32} : (!vmla.buffer, !vmla.buffer, !vmla.buffer) -> ()
-// CHECK-NEXT:   return %0 : !vmla.buffer
-// CHECK-NEXT: }

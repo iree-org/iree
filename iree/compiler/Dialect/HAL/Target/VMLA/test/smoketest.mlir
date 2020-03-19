@@ -86,7 +86,6 @@ flow.executable @reduction_ex_dispatch_0 {
 //  CHECK-NEXT:         vm.return
 //  CHECK-NEXT:       }
 //  CHECK-NEXT:       vm.export @reduction_ex_dispatch_0 attributes {ordinal = 0 : i32}
-//  CHECK-NEXT:       vm.rodata @reduction_ex_dispatch_0_impl_const_0 dense<0.000000e+00> : tensor<f32>
 //  CHECK-NEXT:       vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 0 : i32, sym_visibility = "private"}
 //  CHECK-NEXT:       vm.import @vmla.buffer.const(%value : !vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 1 : i32, sym_visibility = "private"}
 //  CHECK-NEXT:       vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 2 : i32, sym_visibility = "private"}
