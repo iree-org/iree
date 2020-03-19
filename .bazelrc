@@ -156,8 +156,10 @@ build:windows --distinct_host_configuration=false
 build:windows --copt=/DWIN32_LEAN_AND_MEAN --host_copt=/DWIN32_LEAN_AND_MEAN
 # That is one way to have less warnings :(
 build:windows --per_file_copt=tensorflow@-w
+build:windows --per_file_copt=protobuf@-w
 # This is used a lot and shouldn't be an error.
 build:windows --per_file_copt=tensorflow@-Wno-microsoft-unqualified-friend
+build:windows --per_file_copt=protobuf@-Wno-microsoft-unqualified-friend
 # Why are min/max macros? No one knows.
 build:windows --copt=/DNOMINMAX --host_copt=/DNOMINMAX
 # Yay for security warnings. Boo for non-standard.
@@ -170,6 +172,15 @@ build:windows --define framework_shared_object=false
 # See: http://clang-developers.42468.n3.nabble.com/Issue-with-Clang-on-Windows-and-compiler-rt-builtins-td4059230.html
 build:windows --linkopt=/DEFAULTLIB:clang_rt.builtins-x86_64.lib
 build:windows --linkopt=/DEFAULTLIB:ws2_32.lib
+# Necessary for M_* math constants.
+build:windows --copt=/D_USE_MATH_DEFINES
+build:windows --host_copt=/D_USE_MATH_DEFINES
+
+# Workaround WinGDI.h defining `ERROR`, which conflicts with logging macros.
+# Note that IREE and TensorFlow both `#undef ERROR` and define their own
+# separate logging constants with the same name, but IREE needs the Windows
+# "graphics device interface" (GDI) for certain GUI sample projects.
+build:windows --per_file_copt=tensorflow@-DNOGDI
 
 # Used in TensorFlow, so we have to enable it here as well.
 common --experimental_repo_remote_exec
