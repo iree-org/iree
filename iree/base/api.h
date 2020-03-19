@@ -65,6 +65,45 @@
 //   s = iree_file_mapping_some_call(file_mapping, ...);
 //   // Must release ownership when no longer required.
 //   s = iree_file_mapping_release(file_mapping);
+//
+// String Formatting
+// -----------------------------------------------------------------------------
+//
+// Functions that produce variable-length strings follow a standard usage
+// pattern with the arguments:
+//   `iree_host_size_t buffer_capacity`: total bytes including \0 available.
+//   `char* buffer`: optional buffer to write into.
+//   `iree_host_size_t* out_buffer_length`: required/actual length excluding \0.
+//
+// To query the size required for the output and allocate storage:
+//   iree_host_size_t required_length = 0;
+//   iree_format_xyz(/*buffer_capacity=*/0, /*buffer=*/NULL, &required_length);
+//   iree_host_size_t buffer_capacity = required_length + 1;
+//   char* buffer = iree_allocator_malloc(buffer_capacity);
+//   iree_host_size_t actual_length = 0;
+//   iree_format_xyz(buffer_capacity, buffer, &actual_length);
+//   ASSERT(required_length == actual_length);
+//
+// To handle fixed-length maximum strings (common):
+//   // Fails if the string is longer than 127 characters (127 + \0 >= 128).
+//   char buffer[128];
+//   IREE_RETURN_IF_ERROR(iree_format_xyz(sizeof(buffer), buffer, NULL));
+//
+// Try fixed-length and fallback to a dynamic allocation:
+//   char inline_buffer[128];
+//   iree_host_size_t required_length = 0;
+//   iree_status_t inline_status = iree_format_xyz(sizeof(inline_buffer),
+//                                                 inline_buffer,
+//                                                 &required_length);
+//   if (iree_status_is_out_of_range(inline_status)) {
+//     // Spilled inline_buffer, need to allocate required_length bytes and
+//     // try again.
+//     // ... see above for example ...
+//   } else if (iree_status_is_ok(inline_status)) {
+//     // Fit inside inline_buffer, required_length contains actual length.
+//   } else {
+//     return inline_status;
+//   }
 
 #ifndef IREE_BASE_API_H_
 #define IREE_BASE_API_H_
@@ -375,12 +414,15 @@ iree_allocator_system_free(void* self, void* ptr);
 // A string view (ala std::string_view) into a non-NUL-terminated string.
 typedef struct {
   const char* data;
-  size_t size;
+  iree_host_size_t size;
 } iree_string_view_t;
 
 // Empty string view initializer.
 #define IREE_STRING_VIEW_EMPTY \
   { 0, 0 }
+
+// Returns true if the given string view is the empty string.
+#define iree_string_view_is_empty(sv) (((sv).data == NULL) || (sv.size == 0))
 
 #ifndef IREE_API_NO_PROTOTYPES
 
