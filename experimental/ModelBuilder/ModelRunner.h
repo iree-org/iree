@@ -47,6 +47,7 @@
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MODELRUNNER_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MODELRUNNER_H_
 
+#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/IR/Module.h"
 
@@ -57,6 +58,13 @@ class TargetMachine;
 namespace mlir {
 
 class ExecutionEngine;
+
+struct CompilationOptions {
+  unsigned llvmOptLevel = 3;
+  unsigned llcOptLevel = 3;
+  vector::VectorTransformsOptions vectorTransformsOptions =
+      vector::VectorTransformsOptions();
+};
 
 class ModelRunner {
  public:
@@ -69,9 +77,11 @@ class ModelRunner {
 
   // Compile the owned `module` into LLVMIR that can be passed to the buffer.
   // For now, the MLIR passes and transformations are kept to a minimum and only
-  // perform straightforward lowering to LLVMIR. An optional shared runtime
+  // perform straightforward lowering to LLVMIR.
+  // An optional CompilationOptions object is passed to control special passes
+  // An optional shared runtime
   // support library is passed to the execution engine.
-  void compile(int llvmOptLevel, int llcOptLevel,
+  void compile(CompilationOptions compilationOptions,
                const std::string &runtime = {});
 
   // Reference to the compiled module.

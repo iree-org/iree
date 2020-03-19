@@ -24,10 +24,6 @@
 #include "experimental/ModelBuilder/ModelRunner.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
-#include "mlir/EDSC/Builders.h"
-#include "mlir/EDSC/Intrinsics.h"
-#include "mlir/IR/Function.h"
-#include "mlir/IR/StandardTypes.h"
 
 using namespace mlir;  // NOLINT
 
@@ -66,7 +62,7 @@ void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
   // 2. Compile the function, pass in runtime support library
   //    to the execution engine for vector.print.
   ModelRunner runner(modelBuilder.getModuleRef());
-  runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3, runtimeSupport);
+  runner.compile(CompilationOptions(), runtimeSupport);
 
   // 3. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.
@@ -130,7 +126,7 @@ void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
   // 2. Compile the function, pass in runtime support library
   //    to the execution engine for vector.print.
   ModelRunner runner(modelBuilder.getModuleRef());
-  runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3, runtimeSupport);
+  runner.compile(CompilationOptions(), runtimeSupport);
 
   // 3. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.

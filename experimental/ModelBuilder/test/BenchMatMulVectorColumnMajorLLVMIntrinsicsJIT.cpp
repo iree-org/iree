@@ -20,11 +20,14 @@
 using namespace mlir;  // NOLINT
 
 // Helper method to construct an affine map.
-static AffineMap makeMap(ModelBuilder &mb, int i, int j) {
-  SmallVector<AffineExpr, 4> results;
-  results.push_back(getAffineDimExpr(i, mb.getContext()));
-  results.push_back(getAffineDimExpr(j, mb.getContext()));
-  return AffineMap::get(3, 0, results);
+static SmallVector<AffineMap, 3> makeColumnMajorMatmulMaps(ModelBuilder &mb) {
+  AffineExpr m, n, k;
+  bindDims(mb.getContext(), m, n, k);
+  SmallVector<AffineMap, 3> results;
+  results.push_back(AffineMap::get(3, 0, {k, n}));
+  results.push_back(AffineMap::get(3, 0, {m, k}));
+  results.push_back(AffineMap::get(3, 0, {n, m}));
+  return results;
 }
 
 // Helper method to build matrix-matrix-transposed multiplication.
@@ -43,13 +46,10 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   ScopedContext scope(b, f.getLoc());
 
   // Build the following accesses:
-  //   affine_map<(i, j, k) -> (i, k)>,
-  //   affine_map<(i, j, k) -> (j, k)>,
-  //   affine_map<(i, j, k) -> (i, j)>
-  SmallVector<AffineMap, 4> accesses;
-  accesses.push_back(makeMap(mb, 0, 2));
-  accesses.push_back(makeMap(mb, 1, 2));
-  accesses.push_back(makeMap(mb, 0, 1));
+  //   affine_map<(m, n, k) -> (k, m)>,
+  //   affine_map<(m, n, k) -> (n, k)>,
+  //   affine_map<(m, n, k) -> (n, m)>
+  SmallVector<AffineMap, 4> accesses = makeColumnMajorMatmulMaps(mb);
 
   // Build the following iterator types:
   //   iterator_types = ["parallel", "parallel", "reduction"]
@@ -66,7 +66,7 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   OpBuilder bodyBuilder = loop.getBodyBuilder();
   {
     edsc::ScopedContext bodyScope(bodyBuilder, f.getLoc());
-    // Compute C += A x B^T with row-wise dot-products.
+    // Compute C += A x B, in column-major form, with LLVM matrix intrinsics.
     StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
         C(f.getArgument(2));
     C() = (vector_contract(*A(), *B(), *C(), mb.getAffineMapArrayAttr(accesses),
@@ -77,36 +77,44 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
 }
 
 // Benchmark method.
-template <unsigned M, unsigned N, unsigned K>
-void testMatMulUsingVectors(benchmark::State &state, StringLiteral funcName,
-                            bool measureBuild) {
+template <unsigned M, unsigned N, unsigned K, bool MeasureBuild,
+          bool LowerToLLVMMatrixIntrinsics>
+void BM_MxMColMajorVectors(benchmark::State &state) {
+  constexpr unsigned NumMxMPerIteration = 1000;
+  state.counters["NumMxM/Iter"] = NumMxMPerIteration;
+  // Column major vector types.
+  using TypeLHS = Vector2D<K, M, float>;
+  using TypeRHS = Vector2D<N, K, float>;
+  using TypeRES = Vector2D<N, M, float>;
   // Prepare arguments beforehand.
-  auto oneInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
+  auto oneInit = [](unsigned idx, TypeLHS *ptr) {
     float *p = reinterpret_cast<float *>(ptr + idx);
     for (unsigned i = 0; i < M * N; ++i) p[i] = 1.0f;
   };
-  auto incInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
+  auto incInit = [](unsigned idx, TypeRHS *ptr) {
     float *p = reinterpret_cast<float *>(ptr + idx);
     for (unsigned i = 0; i < M * N; ++i) p[i] = 1.0f + i;
   };
-  auto zeroInit = [](unsigned idx, Vector2D<M, N, float> *ptr) {
+  auto zeroInit = [](unsigned idx, TypeRES *ptr) {
     float *p = reinterpret_cast<float *>(ptr + idx);
     for (unsigned i = 0; i < M * N; ++i) p[i] = 0.0f;
   };
-  auto A = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
-      {1}, oneInit);
-  auto B = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
-      {1}, incInit);
-  auto C = makeInitializedStridedMemRefDescriptor<Vector2D<M, N, float>, 1>(
-      {1}, zeroInit);
+  auto A = makeInitializedStridedMemRefDescriptor<TypeLHS, 1>({1}, oneInit);
+  auto B = makeInitializedStridedMemRefDescriptor<TypeRHS, 1>({1}, incInit);
+  auto C = makeInitializedStridedMemRefDescriptor<TypeRES, 1>({1}, zeroInit);
   auto *bufferA = A.get();
   auto *bufferB = B.get();
   auto *bufferC = C.get();
   void *args[3] = {&bufferA, &bufferB, &bufferC};
+  StringLiteral funcName = "matmult_column_major";
   const std::string kFuncAdapterName =
       (llvm::Twine("_mlir_ciface_") + funcName).str();
 
-  if (measureBuild) {
+  vector::VectorTransformsOptions vectorTransformsOptions{
+      LowerToLLVMMatrixIntrinsics};
+  CompilationOptions compilationOptions{/*llvmOptLevel=*/3, /*llcOptLevel=*/3,
+                                        vectorTransformsOptions};
+  if (MeasureBuild) {
     // If this is a build-time benchmark, build, compile, and execute
     // the function inside the timed loop, building a fresh new function
     // in each iteration to get the full JIT time (keep I == 1 here).
@@ -114,7 +122,7 @@ void testMatMulUsingVectors(benchmark::State &state, StringLiteral funcName,
       ModelBuilder builder;
       buildMatMat<M, N, K, 1>(builder, funcName);
       ModelRunner runner(builder.getModuleRef());
-      runner.compile(CompilationOptions());
+      runner.compile(compilationOptions);
       auto err = runner.engine->invoke(kFuncAdapterName,
                                        MutableArrayRef<void *>{args});
       if (err) llvm_unreachable("Error compiling/running function.");
@@ -123,11 +131,11 @@ void testMatMulUsingVectors(benchmark::State &state, StringLiteral funcName,
     // If this is a run-time benchmark, build, compile, and execute
     // the function once outside the timed loop, then continue running
     // the same function inside the loop to focus on actual runtime
-    // (set I == 1000 here to amortize calling overhead).
+    // (set I == NumIterations here to amortize calling overhead).
     ModelBuilder builder;
-    buildMatMat<M, N, K, 1000>(builder, funcName);
+    buildMatMat<M, N, K, NumMxMPerIteration>(builder, funcName);
     ModelRunner runner(builder.getModuleRef());
-    runner.compile(CompilationOptions());
+    runner.compile(compilationOptions);
     auto err =
         runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
     if (err) llvm_unreachable("Error compiling/running function.");
@@ -143,56 +151,14 @@ void testMatMulUsingVectors(benchmark::State &state, StringLiteral funcName,
 // Benchmark drivers (build).
 //
 
-static void BM_Build_MatMul_1_1(benchmark::State &state) {
-  testMatMulUsingVectors<1, 1, 1>(state, "test_matmul_1_1_1", true);
-}
-BENCHMARK(BM_Build_MatMul_1_1);
+#define BENCHMARK_MATMUL_COLUMN_MAJOR(SZ_M, SZ_N, SZ_K)                      \
+  BENCHMARK_TEMPLATE(BM_MxMColMajorVectors, SZ_M, SZ_N, SZ_K, true, false);  \
+  BENCHMARK_TEMPLATE(BM_MxMColMajorVectors, SZ_M, SZ_N, SZ_K, true, true);   \
+  BENCHMARK_TEMPLATE(BM_MxMColMajorVectors, SZ_M, SZ_N, SZ_K, false, false); \
+  BENCHMARK_TEMPLATE(BM_MxMColMajorVectors, SZ_M, SZ_N, SZ_K, false, true);
 
-static void BM_Build_MatMul_2_2(benchmark::State &state) {
-  testMatMulUsingVectors<2, 2, 2>(state, "test_matmul_2_2_2", true);
-}
-BENCHMARK(BM_Build_MatMul_2_2);
-
-static void BM_Build_MatMul_4_4(benchmark::State &state) {
-  testMatMulUsingVectors<4, 4, 4>(state, "test_matmul_4_4_4", true);
-}
-BENCHMARK(BM_Build_MatMul_4_4);
-
-static void BM_Build_MatMul_8_8(benchmark::State &state) {
-  testMatMulUsingVectors<8, 8, 8>(state, "test_matmul_8_8_8", true);
-}
-BENCHMARK(BM_Build_MatMul_8_8);
-
-static void BM_Build_MatMul_16_16(benchmark::State &state) {
-  testMatMulUsingVectors<16, 16, 16>(state, "test_matmul_16_16_16", true);
-}
-BENCHMARK(BM_Build_MatMul_16_16);
-
-//
-// Benchmark drivers (run).
-//
-
-static void BM_Run1000_MatMul_1_1(benchmark::State &state) {
-  testMatMulUsingVectors<1, 1, 1>(state, "test_matmul_1_1_1", false);
-}
-BENCHMARK(BM_Run1000_MatMul_1_1);
-
-static void BM_Run1000_MatMul_2_2(benchmark::State &state) {
-  testMatMulUsingVectors<2, 2, 2>(state, "test_matmul_2_2_2", false);
-}
-BENCHMARK(BM_Run1000_MatMul_2_2);
-
-static void BM_Run1000_MatMul_4_4(benchmark::State &state) {
-  testMatMulUsingVectors<4, 4, 4>(state, "test_matmul_4_4_4", false);
-}
-BENCHMARK(BM_Run1000_MatMul_4_4);
-
-static void BM_Run1000_MatMul_8_8(benchmark::State &state) {
-  testMatMulUsingVectors<8, 8, 8>(state, "test_matmul_8_8_8", false);
-}
-BENCHMARK(BM_Run1000_MatMul_8_8);
-
-static void BM_Run1000_MatMul_16_16(benchmark::State &state) {
-  testMatMulUsingVectors<16, 16, 16>(state, "test_matmul_16_16_16", false);
-}
-BENCHMARK(BM_Run1000_MatMul_16_16);
+BENCHMARK_MATMUL_COLUMN_MAJOR(1, 1, 1);
+BENCHMARK_MATMUL_COLUMN_MAJOR(2, 2, 2);
+BENCHMARK_MATMUL_COLUMN_MAJOR(4, 4, 4);
+BENCHMARK_MATMUL_COLUMN_MAJOR(8, 8, 8);
+BENCHMARK_MATMUL_COLUMN_MAJOR(16, 16, 16);

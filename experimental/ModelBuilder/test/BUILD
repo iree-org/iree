@@ -23,15 +23,16 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.cpp"]),
+    srcs = glob(
+        ["*.cpp"],
+        exclude = ["Bench*"],
+    ),
     data = [
         ":runtime-support.so",
         # Tests.
         ":test-mnist-jit",
         ":test-simple-jit",
         ":test-simple-mlir",
-        # Benchmarks.
-        ":bench-matmul-vector-jit",
         # FileChecker.
         "//iree/tools:IreeFileCheck",
     ],
@@ -89,7 +90,6 @@ cc_binary(
 )
 
 # Benchmarks.
-
 cc_binary(
     name = "bench-matmul-vector-jit",
     srcs = ["BenchMatMulVectorJIT.cpp"],
@@ -103,8 +103,23 @@ cc_binary(
         "@llvm-project//mlir:AllPassesAndDialects",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LoopOps",
-        "@llvm-project//mlir:LoopOpsTransforms",
+    ],
+)
+
+cc_binary(
+    name = "bench-matmul-vector-column-major-llvm-intrinsics-jit",
+    srcs = ["BenchMatMulVectorColumnMajorLLVMIntrinsicsJIT.cpp"],
+    copts = ["-O3"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@com_google_benchmark//:benchmark:benchmark_main",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:IR",
     ],
 )
 

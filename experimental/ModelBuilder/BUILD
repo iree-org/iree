@@ -31,6 +31,7 @@ cc_library(
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LoopOps",
+        "@llvm-project//mlir:LoopOpsTransforms",
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:VectorOps",
     ],
@@ -62,6 +63,7 @@ cc_library(
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorOps",
+        "@llvm-project//mlir:VectorToLLVM",
         "@llvm-project//mlir:mlir_c_runner_utils",
     ],
 )

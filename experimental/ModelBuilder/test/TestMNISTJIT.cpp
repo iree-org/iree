@@ -19,8 +19,6 @@
 #include "experimental/ModelBuilder/ModelRunner.h"
 // RunnerUtils.h with iostream needed for printMemRef atm
 #include "mlir/ExecutionEngine/RunnerUtils.h"
-#include "mlir/IR/Function.h"
-#include "mlir/IR/StandardTypes.h"
 
 using namespace mlir;  // NOLINT
 
@@ -170,7 +168,7 @@ int main() {
 
   // 3. Compile the function.
   ModelRunner runner(modelBuilder.getModuleRef());
-  runner.compile(/*llvmOptLevel=*/3, /*llcOptLevel=*/3);
+  runner.compile(CompilationOptions());
 
   // 4. Allocate data within data structures that interoperate with the MLIR ABI
   // conventions used by codegen.

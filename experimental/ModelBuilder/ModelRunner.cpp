@@ -17,8 +17,8 @@
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/Linalg/Passes.h"
-#include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/PatternMatch.h"
@@ -35,7 +35,11 @@ struct LLVMInitializer {
 };
 static LLVMInitializer initializer;
 
-void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel,
+namespace llvm {
+extern Pass* createLowerMatrixIntrinsicsPass();
+}  // end namespace llvm
+
+void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
                                 const std::string& runtime) {
   // Lower vector operations progressively into more elementary
   // vector operations before running the regular compiler passes.
@@ -43,8 +47,9 @@ void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel,
     OwningRewritePatternList patterns;
     vector::populateVectorSlicesLoweringPatterns(patterns,
                                                  module->getContext());
-    vector::populateVectorContractLoweringPatterns(patterns,
-                                                   module->getContext());
+    vector::populateVectorContractLoweringPatterns(
+        patterns, module->getContext(),
+        compilationOptions.vectorTransformsOptions);
     mlir::applyPatternsGreedily(*module, patterns);
   }
 
@@ -52,6 +57,7 @@ void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel,
   PassManager manager(module->getContext());
   manager.addPass(mlir::createConvertLinalgToLoopsPass());
   manager.addPass(mlir::createConvertLinalgToLLVMPass());
+  manager.addPass(mlir::createConvertVectorToLLVMPass());
   manager.addPass(mlir::createLowerToLLVMPass());
   if (failed(manager.run(*module))) {
     llvm::errs() << "conversion to the LLVM IR dialect failed\n";
@@ -67,10 +73,14 @@ void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel,
   if (!tmOrError) llvm::errs() << tmOrError.takeError() << "\n";
   assert(tmOrError);
   targetMachine = std::move(tmOrError.get());
+  // TODO(ntv): Looking up the pass by name fails quite surprisingly. Just build
+  // the pass to get its ID to look up the PassInfo.
+  const llvm::PassInfo* lowerMatrixIntrinsics = llvm::Pass::lookupPassInfo(
+      llvm::createLowerMatrixIntrinsicsPass()->getPassID());
+  assert(lowerMatrixIntrinsics);
+  SmallVector<const llvm::PassInfo*, 4> llvmPasses{lowerMatrixIntrinsics};
   auto transformer = mlir::makeLLVMPassesTransformer(
-      /*llvmPasses=*/{},
-      llvmOptLevel == -1 ? llvm::Optional<unsigned>() : llvmOptLevel,
-      targetMachine.get(),
+      llvmPasses, compilationOptions.llvmOptLevel, targetMachine.get(),
       /*optPassesInsertPos=*/0);
 
   // Pass in runtime support library when specified.
@@ -79,7 +89,8 @@ void mlir::ModelRunner::compile(int llvmOptLevel, int llcOptLevel,
 
   // Obtain the execution engine.
   auto created = mlir::ExecutionEngine::create(
-      *module, transformer, static_cast<llvm::CodeGenOpt::Level>(llcOptLevel),
+      *module, transformer,
+      static_cast<llvm::CodeGenOpt::Level>(compilationOptions.llcOptLevel),
       libs,
       /*enableObjectCache=*/true,
       /*enableGDBNotificationListener=*/false);
