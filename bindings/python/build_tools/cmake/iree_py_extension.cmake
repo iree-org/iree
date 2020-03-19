@@ -212,12 +212,20 @@ function(iree_complete_py_extension_link_options)
         # For MSVC, also add a `-WHOLEARCHIVE:` version of the dep.
         # CMake treats -WHOLEARCHIVE[:lib] as a link flag and will not actually
         # try to link the library in, so we need the flag *and* the dependency.
+        # For macOS, also add a `-Wl,-force_load` version of the dep.
         if(MSVC)
           get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
           if (_ALIASED_TARGET)
             list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_ALIASED_TARGET}")
           else()
             list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_DEP}")
+          endif()
+        elseif(APPLE)
+          get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
+          if (_ALIASED_TARGET)
+            list(APPEND _ALWAYS_LINK_DEPS "-Wl,-force_load $<TARGET_FILE:${_ALIASED_TARGET}>")
+          else()
+            list(APPEND _ALWAYS_LINK_DEPS "-Wl,-force_load $<TARGET_FILE:${_DEP}>")
           endif()
         endif()
       else()
@@ -226,8 +234,7 @@ function(iree_complete_py_extension_link_options)
     endforeach(_DEP)
 
     # Call into target_link_libraries with the lists of deps.
-    # TODO(scotttodd): `-Wl,-force_load` version
-    if(MSVC)
+    if(MSVC OR APPLE)
       target_link_libraries(${_NAME}
         PUBLIC
           ${_ALWAYS_LINK_DEPS}
