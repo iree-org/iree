@@ -56,12 +56,18 @@ Value calculateWorkload(Operation *op, Value baseOperand) {
     auto rankedShape = buildOrFindRankedShapeForValue(
         op->getLoc(), baseOperand, builder.getIndexType(), builder);
     if (!rankedShape) return nullptr;
-    // Ensure to emit with proper dominance.
+
+    // Set the insertion point to the earliest feasible (either to just after
+    // the input ranked shape op or the start of the block we are emitting
+    // into).
     // TODO(laurenzo): Need to overhaul insertion points generally in
-    // dispatch region formation.
+    // dispatch region formation as there are dominance hazards here.
     if (rankedShape.getDefiningOp()) {
       builder.setInsertionPointAfter(rankedShape.getDefiningOp());
+    } else {
+      builder.setInsertionPointToStart(op->getBlock());
     }
+
     Value numElements;
     for (int64_t i = 0, e = baseOperandType.getRank(); i < e; ++i) {
       auto dim = builder.create<RankedDimOp>(op->getLoc(), rankedShape, i);
