@@ -2,7 +2,7 @@ load("@org_tensorflow//third_party/mlir:tblgen.bzl", "gentbl")
 
 licenses(["notice"])
 
-package(default_visibility = ["//visibility:public"])
+package(default_visibility = [":test_friends"])
 
 # Please only depend on this from MLIR tests.
 package_group(
@@ -162,6 +162,7 @@ cc_library(
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:GPUTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
