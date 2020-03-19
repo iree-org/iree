@@ -27,6 +27,8 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
       - name: Initializing submodules
         run: ./scripts/git/submodule_versions.py init
       - name: Checking submodule state
@@ -43,5 +45,5 @@ jobs:
         if: env.has_diff == 'true'
         uses: ad-m/github-push-action@v0.5.0
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           
