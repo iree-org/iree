@@ -142,8 +142,10 @@ struct IREETileLinalgPass : public FunctionPass<IREETileLinalgPass> {
       return signalPassFailure();
     }
 
+    // TODO(ravishankarm): Tile conv op.
+    bool isConvOp = isa<linalg::ConvOp>(linalgOp.getOperation());
     unsigned numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
-    if (!numOuterParallelLoops) {
+    if (isConvOp || !numOuterParallelLoops) {
       // There are no outer parallel loops to partition. So just create dummy
       // 1-trip loops that will be "split" across workgroups and workitems.
       builder.setInsertionPoint(linalgOp);

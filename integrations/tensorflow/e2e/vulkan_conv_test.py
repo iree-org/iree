@@ -102,7 +102,7 @@ class Conv2dModule(tf.Module):
     backends=[
         # TODO(laurenzo): Enable for all backends once vmla reference
         # and Linalg vulkan impl lands.
-        # "iree_vulkan",
+        "iree_vulkan",
         "tf",
     ],
     conv2d=Conv2dModule)

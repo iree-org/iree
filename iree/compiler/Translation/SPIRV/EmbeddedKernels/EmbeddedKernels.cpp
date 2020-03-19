@@ -302,19 +302,6 @@ LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
 
 bool tryEmbeddedKernelRewrite(ModuleOp moduleOp,
                               iree::SpirVExecutableDefT *outDef) {
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-    for (auto &block : funcOp) {
-      for (auto &op : block) {
-        if (auto convOp = dyn_cast_or_null<xla_hlo::ConvOp>(&op)) {
-          if (failed(buildConvExecutable(moduleOp, funcOp, convOp, outDef))) {
-            moduleOp.emitOpError() << "failed to splat in the conv kernel";
-            return false;
-          }
-          return true;
-        }
-      }
-    }
-  }
   return false;
 }
 
