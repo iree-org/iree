@@ -127,7 +127,8 @@ static LogicalResult convertAffineApplyOps(MLIRContext *context,
                                            spirv::ModuleOp spvModule) {
   OwningRewritePatternList patterns;
   populateAffineToStdConversionPatterns(patterns, context);
-  SPIRVTypeConverter typeConverter;
+  auto targetAttr = spirv::lookupTargetEnvOrDefault(spvModule);
+  SPIRVTypeConverter typeConverter(targetAttr);
   populateStandardToSPIRVPatterns(context, typeConverter, patterns);
   ConversionTarget target(*context);
   target.addLegalDialect<spirv::SPIRVDialect>();

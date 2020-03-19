@@ -232,15 +232,15 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
       return signalPassFailure();
     }
     gpu::GPUModuleOp gpuModule = *kernelModules.begin();
-    SPIRVTypeConverter typeConverter;
+    auto targetAttr = spirv::lookupTargetEnvOrDefault(gpuModule);
+    SPIRVTypeConverter typeConverter(targetAttr);
     OwningRewritePatternList patterns;
 
     populateGPUToSPIRVPatterns(context, typeConverter, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
 
     std::unique_ptr<ConversionTarget> target =
-        spirv::SPIRVConversionTarget::get(
-            spirv::lookupTargetEnvOrDefault(gpuModule), context);
+        spirv::SPIRVConversionTarget::get(targetAttr);
     target->addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
       return typeConverter.isSignatureLegal(op.getType());
     });
