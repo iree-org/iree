@@ -86,6 +86,7 @@ pybind_cc_library(
     tags = ["nokokoro"],
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",
+        "//iree/tools:PassesAndDialects",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:AllPassesAndDialectsNoRegistration",
         "@llvm-project//mlir:IR",

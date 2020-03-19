@@ -24,13 +24,13 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/tools/init_dialects.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Location.h"
-#include "mlir/InitAllDialects.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -66,7 +66,7 @@ bool LLVMOnceInit() {
   llvm::sys::PrintStackTraceOnErrorSignal("pyiree");
 
   // Register built-in MLIR dialects.
-  mlir::registerAllDialects();
+  mlir::registerMlirDialects();
 
   // Register any pass manager command line options.
   mlir::registerPassManagerCLOptions();
