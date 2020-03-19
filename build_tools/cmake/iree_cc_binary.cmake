@@ -225,7 +225,7 @@ function(iree_complete_binary_link_options)
           else()
             list(APPEND _ALWAYS_LINK_DEPS "-WHOLEARCHIVE:${_DEP}")
           endif()
-        elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
+        elseif(APPLE)
           get_target_property(_ALIASED_TARGET ${_DEP} ALIASED_TARGET)
           if (_ALIASED_TARGET)
             list(APPEND _ALWAYS_LINK_DEPS "-Wl,-force_load $<TARGET_FILE:${_ALIASED_TARGET}>")
@@ -239,7 +239,7 @@ function(iree_complete_binary_link_options)
     endforeach(_DEP)
 
     # Call into target_link_libraries with the lists of deps.
-    if(MSVC OR ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin"))
+    if(MSVC OR APPLE)
       target_link_libraries(${_NAME}
         PUBLIC
           ${_ALWAYS_LINK_DEPS}
