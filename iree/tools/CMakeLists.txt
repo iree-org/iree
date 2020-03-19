@@ -101,7 +101,7 @@ iree_cc_library(
     MLIRStandardOps
     MLIRStandardToSPIRVTransforms
     MLIRTransforms
-    MLIRVectorOps
+    MLIRVector
   PUBLIC
 )
 
