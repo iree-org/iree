@@ -34,6 +34,7 @@ jobs:
       - name: Creating Pull Request
         uses: peter-evans/create-pull-request@v2
         with:
+          # Personal token is required to trigger additional automation (e.g. presubmits).
           token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           commit-message: "Automatically update LLVM & TF submodules"
           title: "Update LLVM & TF submodules"
