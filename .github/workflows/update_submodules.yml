@@ -18,8 +18,8 @@ name: Update Submodules
 
 on:
   schedule:
-     # Every 15 minutes
-     - cron: '*/15 * * * *'
+     # Every weekday at 14:00 UTC (06:00 PST/07:00 PDT)
+     - cron: '0 14 * * 1-5'
 
 jobs:
   update:
@@ -39,5 +39,6 @@ jobs:
           title: "Update LLVM & TF submodules"
           body: "Automated submodule bump from .github/workflows/update_submodules.yml"
           committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
+          # TODO(gcmn): Figure out a way to assign this to someone dynamically.
           reviewers: gmngeoffrey
           branch: "auto_submodule_update"
