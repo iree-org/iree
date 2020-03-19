@@ -33,6 +33,8 @@ EXCLUDED_TESTS=(
     bindings_python_pyiree_rt_function_abi_test
     bindings_python_pyiree_rt_system_api_test
     bindings_python_pyiree_rt_vm_test
+    bindings_python_pyiree_rt_hal_test # TODO: Enable after the VM is fixed
+    bindings_python_pyiree_compiler_compiler_test # TODO: Enable after the VM is fixed
 )
 
 # Join with | and add anchors
