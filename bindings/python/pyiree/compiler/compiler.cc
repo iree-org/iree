@@ -94,7 +94,7 @@ void SetupLLVMModule(pybind11::module m) {
         std::string value_sr = value ? *value : "";
         found_it->getValue()->addOccurrence(1, name, value_sr);
       },
-      py::arg("name"), py::arg("value") = absl::nullopt);
+      py::arg("name"), py::arg("value") = absl::optional<std::string>());
   m.def(
       "reset_option",
       [](std::string name) {
