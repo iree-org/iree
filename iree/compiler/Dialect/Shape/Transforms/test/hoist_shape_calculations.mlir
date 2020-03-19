@@ -27,16 +27,16 @@ func @f(%arg0: tensor<?xf32>) {
 // -----
 
 // CHECK-LABEL: func @f
-func @f(%arg0: tensor<?xf32>, %arg1: index) {
+func @f(%arg0: tensor<?xf32>, %arg1: i32) {
   // CHECK: addi
   // CHECK: muli
   // CHECK: shapex.make_ranked_shape
   // CHECK: some_dialect.some_op
   "some_dialect.some_op"() : () -> ()
-  %addi = addi %arg1, %arg1 : index
-  %dim = muli %addi, %addi : index
-  %shape = shapex.make_ranked_shape %dim -> !shapex.ranked_shape<[?]>
-  shapex.tie_shape %arg0, %shape : tensor<?xf32>, !shapex.ranked_shape<[?]>
+  %addi = addi %arg1, %arg1 : i32
+  %dim = muli %addi, %addi : i32
+  %shape = shapex.make_ranked_shape %dim -> !shapex.ranked_shape<[?], i32>
+  shapex.tie_shape %arg0, %shape : tensor<?xf32>, !shapex.ranked_shape<[?], i32>
   return
 }
 

@@ -36,7 +36,7 @@ bool isSimpleShapeCalculationOp(Operation *op) {
   // The exact predicate used here isn't too important. The main important thing
   // is that we don't want to include ops on tensors.
   for (Type type : op->getOperandTypes()) {
-    if (type.isa<IntegerType>() || type.isa<Shape::RankedShapeType>()) {
+    if (type.isa<TensorType>()) {
       return false;
     }
   }
