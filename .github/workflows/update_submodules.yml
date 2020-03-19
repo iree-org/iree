@@ -18,7 +18,8 @@ name: Update Submodules
 
 on:
   schedule:
-     - cron:  '*/15 * * * *'
+     # Every 15 minutes
+     - cron: '*/15 * * * *'
 
 jobs:
   update:
@@ -30,16 +31,13 @@ jobs:
         run: ./scripts/git/submodule_versions.py init
       - name: Updating submodules
         run: ./scripts/git/update_tf_llvm_submodules.py --update_build_files=true
-      - name: Checking whether LLVM submodule has changed
-        run: |
-          echo "::set-env name=has_llvm_diff::false"
-          git diff --cached --exit-code third_party/llvm-project || echo "::set-env name=has_llvm_diff::true"
       - name: Creating Pull Request
-        if: env.has_llvm_diff == 'true'
         uses: peter-evans/create-pull-request@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_WRITE_ACCESS_TOKEN }}
           commit-message: "Automatically update LLVM & TF submodules"
           title: "Update LLVM & TF submodules"
           body: "Automated submodule bump from .github/workflows/update_submodules.yml"
+          committer: "Submodule Update Action <iree-github-actions-bot@google.com>"
+          reviewers: gmngeoffrey
           branch: "auto_submodule_update"
