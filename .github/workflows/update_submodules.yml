@@ -18,13 +18,11 @@ name: Update Submodules
 
 on:
   schedule:
-     # Every five minutes
-     - cron: '*/5 * * * *'
+     # Every weekday at 14:00 UTC (06:00 PST/07:00 PDT)
+     - cron: '0 14 * * 1-5'
 
 jobs:
   update:
-    # Don't run this in everyone's forks.
-    if: github.repository == 'gmngeoffrey/iree'
     runs-on: ubuntu-18.04
     steps:
       - name: Checking out repository
