@@ -85,8 +85,8 @@ package(
 ]
 
 iree_py_test(
-    name = "vulkan_conv_test",
-    srcs = ["vulkan_conv_test.py"],
+    name = "conv_test",
+    srcs = ["conv_test.py"],
     python_version = "PY3",
     # TODO(b/145815906) Get this running in OSS CI.
     tags = [

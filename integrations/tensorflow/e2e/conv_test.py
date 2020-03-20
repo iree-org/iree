@@ -100,9 +100,9 @@ class Conv2dModule(tf.Module):
 
 @tf_test_utils.compile_modules(
     backends=[
-        # TODO(laurenzo): Enable for all backends once vmla reference
-        # and Linalg vulkan impl lands.
+        # TODO(laurenzo): Enable for all backends once vmla reference lands.
         "iree_vulkan",
+        "iree_llvmjit",
         "tf",
     ],
     conv2d=Conv2dModule)

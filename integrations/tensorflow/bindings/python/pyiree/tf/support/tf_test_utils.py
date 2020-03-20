@@ -472,6 +472,11 @@ BackendInfo.add(
     CompiledModule=IreeCompiledModule,
     iree_driver="vulkan",
     iree_compiler_targets=["vulkan-*"])
+BackendInfo.add(
+    name="iree_llvmjit",
+    CompiledModule=IreeCompiledModule,
+    iree_driver="llvm",
+    iree_compiler_targets=["llvm-ir"])
 
 
 def _backend_spec_string_to_backends(backend_spec):

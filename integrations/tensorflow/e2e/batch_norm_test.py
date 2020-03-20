@@ -38,7 +38,7 @@ class BatchNormModule(tf.Module):
         variance_epsilon=1e-4)
 
 
-@tf_test_utils.compile_modules(bn=BatchNormModule)
+@tf_test_utils.compile_modules(backends=["iree_vmla"], bn=BatchNormModule)
 class BatchNormTest(tf_test_utils.SavedModelTestCase):
 
   def test_batch_norm_inference(self):
