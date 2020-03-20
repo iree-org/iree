@@ -24,6 +24,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
@@ -155,6 +156,55 @@ struct ConvOpConversion
 linalg::ConvOp ConvOpConversion::apply(
     xla_hlo::ConvOp op, ArrayRef<Value> args, ArrayRef<Value> results,
     ConversionPatternRewriter &rewriter) const {
+  if (op.dimension_numbers()) {
+    const auto dimensionNumbers = op.dimension_numbers();
+    const int inputSpatialRank =
+        std::distance(dimensionNumbers.input_spatial_dimensions().begin(),
+                      dimensionNumbers.input_spatial_dimensions().end());
+    // Input storage order is N,spatial_dims...,Ci.
+    if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
+        dimensionNumbers.input_feature_dimension().getInt() !=
+            (inputSpatialRank + 1))
+      return nullptr;
+
+    const int kernelSpatialRank =
+        std::distance(dimensionNumbers.kernel_spatial_dimensions().begin(),
+                      dimensionNumbers.kernel_spatial_dimensions().end());
+    // Filter storage order is spatial_dims...,C, Co.
+    if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
+            kernelSpatialRank ||
+        dimensionNumbers.kernel_output_feature_dimension().getInt() !=
+            (kernelSpatialRank + 1))
+      return nullptr;
+
+    const int outputSpatialRank =
+        std::distance(dimensionNumbers.output_spatial_dimensions().begin(),
+                      dimensionNumbers.output_spatial_dimensions().end());
+    // Output storage order is N,spatial_dims..,Co.
+    if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
+        dimensionNumbers.output_feature_dimension().getInt() !=
+            (outputSpatialRank + 1))
+      return nullptr;
+
+    if (inputSpatialRank != outputSpatialRank ||
+        inputSpatialRank != kernelSpatialRank)
+      return nullptr;
+
+    auto inputSpatialDim = dimensionNumbers.input_spatial_dimensions().begin();
+    auto kernelSpatialDim =
+        dimensionNumbers.kernel_spatial_dimensions().begin();
+    auto outputSpatialDim =
+        dimensionNumbers.output_spatial_dimensions().begin();
+    // Check spatial dims are ordred correctly.
+    for (int i = 0; i < inputSpatialRank; ++i) {
+      const int dim = i + 1;
+      if ((*inputSpatialDim++).getZExtValue() != dim ||
+          (*outputSpatialDim++).getZExtValue() != dim ||
+          (*kernelSpatialDim++).getZExtValue() != i)
+        return nullptr;
+    }
+  }
+
   llvm::SmallVector<Attribute, 4> strides;
   llvm::SmallVector<Attribute, 4> dilation;
   if (op.window_strides().hasValue()) {
