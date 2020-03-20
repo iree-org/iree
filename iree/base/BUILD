@@ -307,6 +307,20 @@ cc_library(
 )
 
 cc_library(
+    name = "main",
+    srcs = [
+        "main_posix.cc",
+        "main_win32.cc",
+    ],
+    hdrs = ["main.h"],
+    deps = [
+        ":logging",
+        ":platform_headers",
+        ":target_platform",
+    ],
+)
+
+cc_library(
     name = "math",
     hdrs = ["math.h"],
     deps = [

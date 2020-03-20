@@ -43,6 +43,7 @@ cc_binary(
         ":simple_mul_bytecode_module_cc",
         "//iree/base:api",
         "//iree/base:logging",
+        "//iree/base:main",
         "//iree/hal:api",
         "//iree/hal/vulkan:api",
         "//iree/modules/hal",
@@ -54,5 +55,8 @@ cc_binary(
         "@sdl2//:SDL2",
         "@vulkan_headers//:vulkan_headers_no_prototypes",
         "@vulkan_sdk//:sdk",
+    ],
+    linkopts = [
+        "-SUBSYSTEM:WINDOWS",
     ],
 )
