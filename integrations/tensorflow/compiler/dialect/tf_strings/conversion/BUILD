@@ -23,9 +23,11 @@ cc_library(
     name = "conversion",
     srcs = [
         "convert_tf_strings_to_strings.cc",
+        "convert_tf_to_tf_strings.cc",
     ],
     hdrs = [
         "convert_tf_strings_to_strings.h",
+        "convert_tf_to_tf_strings.h",
     ],
     deps = [
         "//integrations/tensorflow/compiler/dialect/tf_strings/ir",
@@ -39,9 +41,12 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:StandardOps",
+        "@llvm-project//mlir:StandardToStandard",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow",
+        "@org_tensorflow//tensorflow/compiler/mlir/tensorflow:tensorflow_types",
     ],
     alwayslink = 1,
 )
