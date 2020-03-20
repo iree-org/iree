@@ -190,3 +190,11 @@ func @identityMakeRankedShape_nomatch_different_shape(%arg0 : !shapex.ranked_sha
   // CHECK: return %[[RS]]
   return %2 : !shapex.ranked_shape<[?,16,?]>
 }
+
+// CHECK-LABEL: @constantFoldStaticRankedShapes(
+func @constantFoldStaticRankedShapes(%arg0: !shapex.ranked_shape<[2]>, %arg1: !shapex.ranked_shape<[2]>) -> !shapex.ranked_shape<[2]> {
+  // CHECK: %[[RS:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[2]>
+  // CHECK: return %[[RS]]
+  %0 = "shapex.ranked_broadcast_shape"(%arg0, %arg1) {lhs_broadcast_dimensions = dense<[0]> : tensor<1xi64>, rhs_broadcast_dimensions = dense<[0]> : tensor<1xi64>} : (!shapex.ranked_shape<[2]>, !shapex.ranked_shape<[2]>) -> !shapex.ranked_shape<[2]>
+  return %0 : !shapex.ranked_shape<[2]>
+}

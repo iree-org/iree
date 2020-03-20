@@ -38,6 +38,31 @@ ShapeDialect::ShapeDialect(MLIRContext* context)
   addOperations<
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.cpp.inc"
       >();
+
+  constantFoldHook = [](Operation* op, ArrayRef<Attribute> operands,
+                        SmallVectorImpl<Attribute>& results) -> LogicalResult {
+    bool foundConstantRankedShape = false;
+    for (Value result : op->getResults()) {
+      auto rankedShape = result.getType().dyn_cast<Shape::RankedShapeType>();
+      if (rankedShape && rankedShape.isFullyStatic()) {
+        foundConstantRankedShape = true;
+        results.push_back(TypeAttr::get(rankedShape));
+      } else {
+        results.push_back(nullptr);
+      }
+    }
+    return success(foundConstantRankedShape);
+  };
+}
+
+Operation* ShapeDialect::materializeConstant(OpBuilder& builder,
+                                             Attribute value, Type type,
+                                             Location loc) {
+  if (auto typeAttr = value.dyn_cast<TypeAttr>()) {
+    auto rankedShape = typeAttr.getValue().cast<Shape::RankedShapeType>();
+    return builder.create<Shape::ConstRankedShapeOp>(loc, rankedShape);
+  }
+  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

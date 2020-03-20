@@ -19,8 +19,12 @@ func @parse_print_get_ranked_shape(%arg0 : tensor<2x?x4xi32>) {
 // -----
 // CHECK-LABEL: @const_ranked_shape
 func @const_ranked_shape() -> !shapex.ranked_shape<[2,4],i32> {
-  // CHECK: shapex.const_ranked_shape : !shapex.ranked_shape<[2,4],i32>
+  // CHECK: %rs2_4_i32 = shapex.const_ranked_shape : !shapex.ranked_shape<[2,4],i32>
   %0 = shapex.const_ranked_shape : !shapex.ranked_shape<[2,4],i32>
+  // CHECK: %rs_i64 = shapex.const_ranked_shape : !shapex.ranked_shape<[],i64>
+  %1 = shapex.const_ranked_shape : !shapex.ranked_shape<[],i64>
+  // CHECK: %rs5_6_i64 = shapex.const_ranked_shape : !shapex.ranked_shape<[5,6],i64>
+  %2 = shapex.const_ranked_shape : !shapex.ranked_shape<[5,6],i64>
   return %0 : !shapex.ranked_shape<[2,4],i32>
 }
 

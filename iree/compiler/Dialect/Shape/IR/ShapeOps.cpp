@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/SMLoc.h"
@@ -359,6 +360,20 @@ static LogicalResult verifyConstRankedShapeOp(ConstRankedShapeOp op) {
     return op.emitOpError("must be a fully static ranked_shape");
   }
   return success();
+}
+
+void ConstRankedShapeOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  auto rankedShape = result().getType().cast<RankedShapeType>();
+  SmallString<32> buffer;
+  llvm::raw_svector_ostream os(buffer);
+  os << "rs";
+  interleave(
+      rankedShape.getAllDims(), os, [&](int64_t dim) { os << dim; }, "_");
+  if (!rankedShape.getDimType().isa<IndexType>()) {
+    os << "_" << rankedShape.getDimType();
+  }
+  setNameFn(getResult(), os.str());
 }
 
 //===----------------------------------------------------------------------===//

@@ -17,6 +17,7 @@
 
 include "iree/compiler/Dialect/Shape/IR/ShapeBase.td"
 include "mlir/Interfaces/SideEffects.td"
+include "mlir/IR/OpAsmInterface.td"
 
 //===----------------------------------------------------------------------===//
 // Op types
@@ -144,7 +145,8 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
   }];
 }
 
-def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape"> {
+def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
+    [ConstantLike, DeclareOpInterfaceMethods<OpAsmOpInterface>]> {
   let summary = "A constant ranked_shape.";
   let description = [{
     Holds a RankedShape value. Note that it is only legal to store a constant

@@ -70,5 +70,6 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
+        "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
     ],
 )
