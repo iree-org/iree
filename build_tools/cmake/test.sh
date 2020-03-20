@@ -30,6 +30,11 @@ EXCLUDED_TESTS=(
     iree_compiler_Translation_SPIRV_LinalgToSPIRV_test_pw_add.mlir.test
     iree_hal_vulkan_dynamic_symbols_test
     iree_vm_bytecode_module_benchmark # Make this test not take an eternity
+    bindings_python_pyiree_rt_function_abi_test
+    bindings_python_pyiree_rt_system_api_test
+    bindings_python_pyiree_rt_vm_test
+    bindings_python_pyiree_rt_hal_test # TODO: Enable after the VM is fixed
+    bindings_python_pyiree_compiler_compiler_test # TODO: Enable after the VM is fixed
 )
 
 # Join with | and add anchors
