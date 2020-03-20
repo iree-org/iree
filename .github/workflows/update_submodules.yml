@@ -23,6 +23,8 @@ on:
 
 jobs:
   update:
+    # Don't run this in everyone's forks.
+    if: github.repository == 'google/iree'
     runs-on: ubuntu-18.04
     steps:
       - name: Checking out repository
