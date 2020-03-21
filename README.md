@@ -61,6 +61,15 @@ See also:
 *   [MNIST example on IREE](docs/mnist_example.md)
 *   [Details of IREE Repository Management](docs/repository_management.md)
 
+## Talks
+
+We occasionally have either productive, recorded meetings or talks and will post
+them here.
+
+*   [March 18, 2020: Interactive HAL IR Walkthrough (Ben Vanik and core team)](https://drive.google.com/open?id=1FDrW9wvmiCQsVNSNzTD_V0bYmBl0XTyQ)
+*   [Jan 31, 2020: IREE Presentation at MLIR ODM](https://drive.google.com/open?id=1os9FaPodPI59uj7JJI3aXnTzkuttuVkR)
+    ([slides](https://drive.google.com/open?id=1RCQ4ZPQFK9cVgu3IH1e5xbrBcqy7d_cEZ578j84OvYI))
+
 ## Project Goals
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
