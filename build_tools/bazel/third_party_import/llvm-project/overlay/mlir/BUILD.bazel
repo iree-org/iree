@@ -142,8 +142,8 @@ filegroup(
 filegroup(
     name = "AffineOpsTdFiles",
     srcs = [
-        "include/mlir/Dialect/AffineOps/AffineOps.td",
-        "include/mlir/Dialect/AffineOps/AffineOpsBase.td",
+        "include/mlir/Dialect/Affine/AffineOps.td",
+        "include/mlir/Dialect/Affine/AffineOpsBase.td",
         "include/mlir/Interfaces/LoopLikeInterface.td",
         "include/mlir/Interfaces/SideEffects.td",
         ":OpBaseTdFiles",
@@ -156,19 +156,19 @@ gentbl(
     tbl_outs = [
         (
             "-gen-op-decls",
-            "include/mlir/Dialect/AffineOps/AffineOps.h.inc",
+            "include/mlir/Dialect/Affine/AffineOps.h.inc",
         ),
         (
             "-gen-op-defs",
-            "include/mlir/Dialect/AffineOps/AffineOps.cpp.inc",
+            "include/mlir/Dialect/Affine/AffineOps.cpp.inc",
         ),
         (
             "-gen-dialect-decls",
-            "include/mlir/Dialect/AffineOps/AffineOpsDialect.h.inc",
+            "include/mlir/Dialect/Affine/AffineOpsDialect.h.inc",
         ),
     ],
     tblgen = ":mlir-tblgen",
-    td_file = "include/mlir/Dialect/AffineOps/AffineOps.td",
+    td_file = "include/mlir/Dialect/Affine/AffineOps.td",
     td_srcs = [
         ":AffineOpsTdFiles",
     ],
@@ -306,16 +306,16 @@ cc_library(
     name = "AffineOps",
     srcs = glob(
         [
-            "lib/Dialect/AffineOps/*.cpp",
-            "lib/Dialect/AffineOps/*.h",
-            "lib/Dialect/AffineOps/EDSC/*.cpp",
+            "lib/Dialect/Affine/*.cpp",
+            "lib/Dialect/Affine/*.h",
+            "lib/Dialect/Affine/EDSC/*.cpp",
         ],
     ) + [
         "include/mlir/Transforms/InliningUtils.h",
     ],
     hdrs = glob([
-        "include/mlir/Dialect/AffineOps/*.h",
-        "include/mlir/Dialect/AffineOps/EDSC/*.h",
+        "include/mlir/Dialect/Affine/*.h",
+        "include/mlir/Dialect/Affine/EDSC/*.h",
     ]),
     includes = ["include"],
     deps = [

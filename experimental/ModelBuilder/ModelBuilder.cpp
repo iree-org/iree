@@ -14,7 +14,7 @@
 
 #include "experimental/ModelBuilder/ModelBuilder.h"
 
-#include "mlir/Dialect/AffineOps/EDSC/Builders.h"
+#include "mlir/Dialect/Affine/EDSC/Builders.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeUtilities.h"
 

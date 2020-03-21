@@ -25,7 +25,7 @@ cc_library(
         "noga",
     ],
     deps = [
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgOps",
