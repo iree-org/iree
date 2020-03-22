@@ -22,7 +22,6 @@
 
 #include <cstdlib>
 
-#include "mlir/Analysis/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
