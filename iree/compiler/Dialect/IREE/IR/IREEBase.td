@@ -40,6 +40,18 @@ def IREE_Bool :
 def IREE_Element : AnyTypeOf<[AnySignlessInteger, AnyFloat]>;
 def IREE_MemRef : MemRefOf<[IREE_Element]>;
 
+class IREE_IndexAttrBase<string descr> :
+    TypedAttrBase<
+      Index, "IntegerAttr",
+      And<[
+        CPred<"$_self.isa<IntegerAttr>()">,
+        CPred<"$_self.cast<IntegerAttr>().getType().isIndex()">,
+      ]>,
+      descr> {
+  let returnType = [{ APInt }];
+}
+def IREE_IndexAttr : IREE_IndexAttrBase<"size_t">;
+
 //===----------------------------------------------------------------------===//
 // Attribute constraints
 //===----------------------------------------------------------------------===//

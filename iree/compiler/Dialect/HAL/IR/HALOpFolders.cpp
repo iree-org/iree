@@ -208,9 +208,8 @@ struct ExpandBufferViewConstOp : public OpRewritePattern<BufferViewConstOp> {
     SmallVector<Value, 4> shape;
     if (shapedType.getRank() >= 1) {
       for (auto dim : shapedType.getShape()) {
-        shape.push_back(rewriter.createOrFold<mlir::ConstantOp>(
-            op.getLoc(),
-            rewriter.getI32IntegerAttr(static_cast<int32_t>(dim))));
+        shape.push_back(
+            rewriter.createOrFold<mlir::ConstantIndexOp>(op.getLoc(), dim));
       }
     }
 

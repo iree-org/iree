@@ -30,11 +30,11 @@ namespace IREE {
 namespace HAL {
 
 static Type getDimType(OpAsmParser &parser) {
-  return parser.getBuilder().getIntegerType(32);
+  return parser.getBuilder().getIndexType();
 }
 
 static Type getDeviceSizeType(OpAsmParser &parser) {
-  return parser.getBuilder().getIntegerType(32);
+  return parser.getBuilder().getIndexType();
 }
 
 template <typename T>
@@ -343,7 +343,7 @@ void AllocatorComputeSizeOp::build(Builder *builder, OperationState &state,
   state.addOperands({allocator});
   state.addOperands(shape);
   state.addAttribute("element_type", builder->getI32IntegerAttr(elementType));
-  state.addTypes({builder->getIntegerType(32)});
+  state.addTypes({builder->getIndexType()});
 }
 
 void AllocatorComputeSizeOp::getAsmResultNames(
@@ -362,7 +362,7 @@ void AllocatorComputeOffsetOp::build(Builder *builder, OperationState &state,
   state.addOperands(shape);
   state.addAttribute("element_type", builder->getI32IntegerAttr(elementType));
   state.addOperands(indices);
-  state.addTypes({builder->getIntegerType(32)});
+  state.addTypes({builder->getIndexType()});
 }
 
 void AllocatorComputeOffsetOp::getAsmResultNames(
@@ -383,7 +383,7 @@ void AllocatorComputeRangeOp::build(Builder *builder, OperationState &state,
   state.addAttribute("element_type", builder->getI32IntegerAttr(elementType));
   state.addOperands(indices);
   state.addOperands(lengths);
-  state.addTypes({builder->getIntegerType(32), builder->getIntegerType(32)});
+  state.addTypes({builder->getIndexType(), builder->getIndexType()});
 }
 
 void AllocatorComputeRangeOp::getAsmResultNames(
@@ -533,7 +533,7 @@ void BufferViewBufferOp::getAsmResultNames(
 void BufferViewByteLengthOp::build(Builder *builder, OperationState &state,
                                    Value bufferView) {
   state.addOperands({bufferView});
-  state.addTypes({builder->getIntegerType(32)});
+  state.addTypes({builder->getIndexType()});
 }
 
 void BufferViewByteLengthOp::getAsmResultNames(
@@ -549,7 +549,7 @@ void BufferViewComputeOffsetOp::build(Builder *builder, OperationState &state,
                                       Value bufferView, ValueRange indices) {
   state.addOperands({bufferView});
   state.addOperands(indices);
-  state.addTypes({builder->getIntegerType(32)});
+  state.addTypes({builder->getIndexType()});
 }
 
 void BufferViewComputeOffsetOp::getAsmResultNames(
@@ -567,7 +567,7 @@ void BufferViewComputeRangeOp::build(Builder *builder, OperationState &state,
   state.addOperands({bufferView});
   state.addOperands(indices);
   state.addOperands(lengths);
-  state.addTypes({builder->getIntegerType(32), builder->getIntegerType(32)});
+  state.addTypes({builder->getIndexType(), builder->getIndexType()});
 }
 
 void BufferViewComputeRangeOp::getAsmResultNames(
@@ -735,6 +735,7 @@ void CommandBufferPushDescriptorSetOp::build(
 static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
                                               OperationState *result) {
   auto i32Type = parser.getBuilder().getIntegerType(32);
+  auto indexType = parser.getBuilder().getIndexType();
   SmallVector<Attribute, 4> bindingAttrs;
   do {
     IntegerAttr bindingAttr;
@@ -751,11 +752,11 @@ static ParseResult parseDescriptorSetBindings(OpAsmParser &parser,
         failed(parser.parseComma()) ||
         failed(parser.parseOperand(bufferOffset)) ||
         failed(
-            parser.resolveOperand(bufferOffset, i32Type, result->operands)) ||
+            parser.resolveOperand(bufferOffset, indexType, result->operands)) ||
         failed(parser.parseComma()) ||
         failed(parser.parseOperand(bufferLength)) ||
         failed(
-            parser.resolveOperand(bufferLength, i32Type, result->operands)) ||
+            parser.resolveOperand(bufferLength, indexType, result->operands)) ||
         failed(parser.parseRParen())) {
       return failure();
     }

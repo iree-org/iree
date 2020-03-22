@@ -129,7 +129,7 @@ struct InterfaceStoreTensorOpConversion
         interfaceArg, bindingOp.set(), bindingOp.binding());
 
     auto zeroValue =
-        rewriter.createOrFold<mlir::ConstantIntOp>(storeOp.getLoc(), 0, 32);
+        rewriter.createOrFold<mlir::ConstantIndexOp>(storeOp.getLoc(), 0);
     auto byteLengthValue = VMLAConversionTarget::getBufferLength(
         storeOp.getLoc(), storeOp.operand(), typeConverter, rewriter);
     rewriter.create<IREE::VMLA::BufferCopyOp>(

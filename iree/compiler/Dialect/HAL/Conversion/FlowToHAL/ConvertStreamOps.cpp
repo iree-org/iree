@@ -172,16 +172,12 @@ static std::array<Value, 3> getDispatchWorkgroupCounts(
     ConversionPatternRewriter &rewriter) {
   std::array<Value, 3> result;
   auto loc = entryPointOp.getLoc();
-  auto i32Type = rewriter.getIntegerType(32);
-  auto constantOne = rewriter.createOrFold<mlir::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(1));
-  workload = rewriter.createOrFold<mlir::IndexCastOp>(loc, i32Type, workload);
+  auto constantOne = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 1);
+  auto workgroupSizeArray = entryPointOp.workgroup_size().getValue();
   for (int i = 0; i < 3; ++i) {
     // Round up: (workload + workgroup_size - 1) / workgroup_size;
-    auto workgroupSizeI = rewriter.createOrFold<mlir::ConstantOp>(
-        loc, rewriter.getI32IntegerAttr(
-                 entryPointOp.workgroup_size().getValue<int32_t>(
-                     {static_cast<uint64_t>(i)})));
+    auto workgroupSizeI = rewriter.createOrFold<mlir::ConstantIndexOp>(
+        loc, workgroupSizeArray[i].cast<IntegerAttr>().getInt());
     auto rounded = rewriter.createOrFold<mlir::SubIOp>(
         loc, rewriter.createOrFold<mlir::AddIOp>(loc, workload, workgroupSizeI),
         constantOne);
@@ -231,7 +227,7 @@ static void recordPushConstants(Value device, Value commandBuffer,
   for (auto inputValue : dispatchOp.operands()) {
     if (inputValue.getType().isa<IndexType>() ||
         inputValue.getType().isa<IntegerType>()) {
-      pushConstantValues.push_back(inputValue);
+      pushConstantValues.push_back(rewriter.getRemappedValue(inputValue));
     }
   }
   if (pushConstantValues.empty()) {
@@ -259,9 +255,10 @@ static void recordPushBindings(Value device, Value commandBuffer,
   uint32_t bindingOrdinal = 0;
   SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
   auto zeroOffset =
-      rewriter.createOrFold<mlir::ConstantIntOp>(dispatchOp.getLoc(), 0, 32);
+      rewriter.createOrFold<mlir::ConstantIndexOp>(dispatchOp.getLoc(), 0);
   auto pushBinding = [&](Value tensorValue) {
     auto &bufferRange = bufferSet.rangeMap[tensorValue];
+    assert(bufferRange.buffer && "buffer not preallocated");
     IREE::HAL::TensorRewriteAdaptor value(dispatchOp.getLoc(), tensorValue,
                                           bufferRange.buffer, rewriter);
     bindings.push_back(std::make_tuple(bindingOrdinal++, value.getBuffer(),
@@ -348,8 +345,8 @@ static void recordTensorUpdate(Value device, Value commandBuffer,
   IREE::HAL::TensorRewriteAdaptor result(updateOp.getLoc(), updateOp.result(),
                                          resultBuffer.buffer, rewriter);
 
-  auto zeroOffset = rewriter.createOrFold<mlir::ConstantOp>(
-      updateOp.getLoc(), rewriter.getI32IntegerAttr(0));
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIndexOp>(updateOp.getLoc(), 0);
 
   // Compute the size of the update range.
   auto startIndices = llvm::to_vector<4>(llvm::map_range(

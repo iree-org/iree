@@ -377,7 +377,7 @@ def VMLA_InterfaceConstOp :
     VMLA_PureOp<"interface.const", [VMLA_OpInterface]> {
   let arguments = (ins
     VMLA_Interface:$interface,
-    I32Attr:$offset
+    IREE_IndexAttr:$offset
   );
   let results = (outs
     AnyTypeOf<[I32, VMLA_Index]>:$result

@@ -144,8 +144,8 @@ static Optional<FuncOp> createDispatchEntryThunk(
   // Pull all arguments from the bindings.
   auto* thunkEntryBlock = thunkFuncOp.addEntryBlock();
   OpBuilder thunkEntryBuilder(thunkEntryBlock);
-  auto zeroOffset = thunkEntryBuilder.createOrFold<mlir::ConstantOp>(
-      thunkFuncOp.getLoc(), thunkEntryBuilder.getI32IntegerAttr(0));
+  auto zeroOffset = thunkEntryBuilder.createOrFold<mlir::ConstantIndexOp>(
+      thunkFuncOp.getLoc(), 0);
   SmallVector<Value, 4> operands;
   int pushConstantOffset = 0;
   for (auto inputType : sourceFuncType.getInputs()) {
@@ -161,7 +161,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
     } else if (inputType.isa<IndexType>() || inputType.isa<IntegerType>()) {
       auto loadOp =
           thunkEntryBuilder.create<IREE::HAL::InterfaceLoadConstantOp>(
-              thunkFuncOp.getLoc(), inputType, APInt(32, pushConstantOffset));
+              thunkFuncOp.getLoc(), inputType, APInt(64, pushConstantOffset));
       operands.push_back(loadOp.getResult());
       ++pushConstantOffset;
     } else {
@@ -211,8 +211,7 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
       // Hardwire workgroup size to 1,1,1 by default. Backends can override.
       auto sourceFuncOp = sourceOp.getInnerModule().lookupSymbol<FuncOp>(
           dispatchEntryOp.function_ref());
-      auto workGroupSizeAttr = DenseIntElementsAttr::get(
-          VectorType::get(3, builder.getIntegerType(32)), {1, 1, 1});
+      auto workGroupSizeAttr = builder.getIndexArrayAttr({1, 1, 1});
       auto thunkFuncOp = createDispatchEntryThunk(sourceFuncOp, interfaceOp);
       if (!thunkFuncOp.hasValue()) {
         return failure();

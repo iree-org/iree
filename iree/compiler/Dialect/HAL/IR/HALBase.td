@@ -440,15 +440,15 @@ def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
-def HAL_DeviceSize : TypeAlias<I32>;
-def HAL_DeviceSizeAttr : SignlessIntegerAttrBase<I32, "device_size_t">;
+def HAL_DeviceSize : TypeAlias<Index>;
+def HAL_DeviceSizeAttr : IREE_IndexAttrBase<"device_size_t">;
 
-def HAL_HostSize : TypeAlias<I32>;
-def HAL_HostSizeAttr : SignlessIntegerAttrBase<I32, "size_t">;
+def HAL_HostSize : TypeAlias<Index>;
+def HAL_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
 
-def HAL_TimelineValue : TypeAlias<I32>;
+def HAL_TimelineValue : TypeAlias<Index>;
 
-def HAL_Status : TypeAlias<I32>;
+def HAL_Status : TypeAlias<Index>;
 
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
@@ -456,35 +456,16 @@ def HAL_VariableRefAttr : AliasedSymbolRefAttr;
 def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
 def HAL_VariablePtr : PtrOf<HAL_VariableType>;
 
-def HAL_Dim : I<32>;
+def HAL_Dim : TypeAlias<Index>;
 def HAL_Dims : Variadic<HAL_Dim>;
 def HAL_Shape : Variadic<HAL_Dim>;
 
-// TODO(cl/277443143): moving into OpBase.td.
-// A `width`-bit integer elements attribute. The attribute should be
-// ranked and has a shape as specified in `dims`.
-class HAL_RankedIntElementsAttr<int width, list<int> dims> : ElementsAttrBase<
-  CPred<"$_self.isa<DenseIntElementsAttr>() &&"
-      "$_self.cast<DenseIntElementsAttr>().getType()."
-      "getElementType().isSignlessInteger(" # width # ") && "
-      // Check that this is ranked and has the specified shape.
-      "$_self.cast<DenseIntElementsAttr>().getType().hasRank() && "
-      "$_self.cast<DenseIntElementsAttr>().getType().getShape() == "
-      "llvm::ArrayRef<int64_t>({" # StrJoinInt<dims>.result # "})">,
-  width # "-bit integer elements attribute of shape [" #
-  StrJoinInt<dims>.result # "]"> {
-
-  let storageType = [{ DenseIntElementsAttr }];
-  let returnType = [{ DenseIntElementsAttr }];
-
-  let constBuilderCall = "DenseElementsAttr::get("
-    "VectorType::get({" # StrJoinInt<dims>.result #
-    "}, $_builder.getIntegerType(" # width # ")), "
-    "llvm::makeArrayRef($0)).cast<DenseIntElementsAttr>()";
-  let convertFromStorage = "$_self";
+// TODO(benvanik): assert rank 3
+def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
+    IREE_IndexAttrBase<"size_t">,
+    "index array attribute"> {
+  let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
-
-def HAL_WorkgroupSizeAttr : HAL_RankedIntElementsAttr<32, [3]>;
 
 def HAL_HostBuffer : AnyTypeOf<[
   ByteBufferType,

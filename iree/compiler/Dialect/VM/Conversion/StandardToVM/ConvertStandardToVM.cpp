@@ -169,10 +169,12 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       srcOp.emitRemark() << "unsupported const type for dialect";
       return failure();
     }
-    int numBits = integerAttr.getType().getIntOrFloatBitWidth();
-    if (numBits != 1 && numBits != 32) {
-      srcOp.emitRemark() << "unsupported bit width for dialect constant";
-      return failure();
+    if (integerAttr.getType().isIntOrFloat()) {
+      int numBits = integerAttr.getType().getIntOrFloatBitWidth();
+      if (numBits != 1 && numBits != 32) {
+        srcOp.emitRemark() << "unsupported bit width for dialect constant";
+        return failure();
+      }
     }
 
     auto intValue = integerAttr.getInt();
@@ -249,7 +251,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdapter(operands);
 
-    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
+    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
                                          srcAdapter.lhs(), srcAdapter.rhs());
     return success();
   }

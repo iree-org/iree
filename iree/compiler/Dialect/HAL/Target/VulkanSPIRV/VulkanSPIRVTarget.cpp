@@ -109,7 +109,7 @@ static std::vector<std::string> populateEntryPointNames(
 
 // Returns an (x,y,z) workgroup size for the given |targetFuncOp|.
 // This is pure heuristics until we support dynamic/varying workgroup sizes.
-static std::array<int32_t, 3> guessWorkGroupSize(
+static std::array<int64_t, 3> guessWorkGroupSize(
     IREE::Flow::DispatchEntryOp entryOp, FuncOp targetFuncOp) {
   for (auto &block : targetFuncOp.getBlocks()) {
     if (!block.getOps<xla_hlo::DotOp>().empty()) {
@@ -135,9 +135,8 @@ static void guessEntryWorkGroupSizes(IREE::Flow::ExecutableOp sourceOp,
   for (auto &op : sourceOp.getBlock()) {
     if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
       auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
-      auto workGroupSizeAttr = DenseIntElementsAttr::get(
-          VectorType::get(3, builder.getIntegerType(32)),
-          guessWorkGroupSize(entryOp, funcOp));
+      auto workGroupSizeAttr =
+          builder.getIndexArrayAttr(guessWorkGroupSize(entryOp, funcOp));
       funcOp.setAttr("iree.executable.workgroup_size", workGroupSizeAttr);
     }
   }
@@ -157,8 +156,7 @@ static void propagateModifiedExecutableABI(
       assert(targetEntryOp && "could not find HAL entry point");
       auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
       assert(funcOp && "could not find target function for HAL entry point");
-      auto workGroupSize = funcOp.getAttrOfType<DenseIntElementsAttr>(
-          "iree.executable.workgroup_size");
+      auto workGroupSize = funcOp.getAttr("iree.executable.workgroup_size");
       targetEntryOp.setAttr("workgroup_size", workGroupSize);
     }
   }
