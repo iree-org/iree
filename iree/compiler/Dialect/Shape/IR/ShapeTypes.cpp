@@ -66,14 +66,12 @@ using namespace mlir::iree_compiler::Shape;
 //===----------------------------------------------------------------------===//
 
 RankedShapeType RankedShapeType::get(ArrayRef<int64_t> dims, Type dimType) {
-  return Base::get(dimType.getContext(), IREE::Shape::TypeKind::RankedShape,
-                   dims, dimType);
+  return Base::get(dimType.getContext(), TypeKind::RankedShape, dims, dimType);
 }
 
 RankedShapeType RankedShapeType::getChecked(ArrayRef<int64_t> dims,
                                             Type dimType, Location loc) {
-  return Base::getChecked(loc, IREE::Shape::TypeKind::RankedShape, dims,
-                          dimType);
+  return Base::getChecked(loc, TypeKind::RankedShape, dims, dimType);
 }
 
 LogicalResult RankedShapeType::verifyConstructionInvariants(

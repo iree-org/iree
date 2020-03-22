@@ -40,9 +40,7 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
   using Base::Base;
 
   /// Support method to enable LLVM-style type casting.
-  static bool kindof(unsigned kind) {
-    return kind == IREE::Shape::TypeKind::RankedShape;
-  }
+  static bool kindof(unsigned kind) { return kind == TypeKind::RankedShape; }
 
   // Gets an instance of a RankedShapeType given an array of dimensions and
   // the integral dimension type to use at runtime. Any dynamic dim should be

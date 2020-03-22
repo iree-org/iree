@@ -155,7 +155,7 @@ Type ShapeDialect::parseType(DialectAsmParser& parser) const {
 
 void ShapeDialect::printType(Type type, DialectAsmPrinter& os) const {
   switch (type.getKind()) {
-    case IREE::Shape::TypeKind::RankedShape:
+    case Shape::TypeKind::RankedShape:
       printRankedShape(type.cast<Shape::RankedShapeType>(), os);
       break;
     default:

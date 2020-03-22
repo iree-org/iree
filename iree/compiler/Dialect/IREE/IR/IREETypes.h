@@ -79,14 +79,6 @@ enum Kind {
 }  // namespace TypeKind
 }  // namespace SEQ
 
-namespace Shape {
-namespace TypeKind {
-enum Kind {
-  RankedShape = IREE::TypeKind::FIRST_SHAPE_TYPE,
-};
-}  // namespace TypeKind
-}  // namespace Shape
-
 namespace Strings {
 namespace TypeKind {
 enum Kind {
@@ -153,6 +145,15 @@ class MutableByteBufferType
 };
 
 }  // namespace IREE
+
+namespace Shape {
+namespace TypeKind {
+enum Kind {
+  RankedShape = IREE::TypeKind::FIRST_SHAPE_TYPE,
+};
+}  // namespace TypeKind
+}  // namespace Shape
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
