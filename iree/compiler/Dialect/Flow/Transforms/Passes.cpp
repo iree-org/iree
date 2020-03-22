@@ -16,6 +16,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
@@ -26,6 +27,9 @@ namespace IREE {
 namespace Flow {
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager) {
+  //----------------------------------------------------------------------------
+  // Input dialect sanitization and type legalization.
+  //----------------------------------------------------------------------------
   passManager.addPass(createCanonicalizerPass());
 
   // Flatten structured control flow to our CFG.
@@ -44,6 +48,47 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // have to deal with them.
   passManager.addPass(IREE::Flow::createLegalizeInputTypesPass());
 
+  //----------------------------------------------------------------------------
+  // Shape and reflection ABI materialization.
+  // Must happen after:
+  //   - Type conversion and sanitization of public function signatures
+  //   - Conversion to CFG
+  // Must happen before:
+  //   - Dependencies on shape metadata ops
+  //   - Dependencies on reflection attributes
+  //----------------------------------------------------------------------------
+  // Materialize default arg/result reflection metadata.
+  // This pass must come before any 1:N type expansion that will not be retained
+  // in the public ABI (i.e. loose shape dims, etc).
+  passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
+
+  // Materialize dynamic shapes in the IR, also expanding function signatures
+  // such that:
+  //   - Dynamic ranked tensors: (tensor<?x?xf32>) expands to
+  //     (tensor<?x?xf32>, ranked_shape<[?,?]>), and ultimately expands to
+  //     (tensor<?x?xf32>, i32, i32)
+  //   - Unranked tensors: TODO
+  // The generated ABI wrappers assume such an expansion and will generate code
+  // to produce it from the original reflection metadata captured in the
+  // previous pass.
+  populateMaterializeDynamicShapesPipeline(passManager);
+
+  // Merge arg/result reflection metadata.
+  // NOTE(laurenzo): This will eventually not be the right place for this as
+  // it should happen after the HAL has further annotated the exported
+  // functions (such as with synthetic barrier arguments).
+  passManager.addPass(IREE::Flow::createMergeExportedReflection());
+
+  //----------------------------------------------------------------------------
+  // Partitioning and dispatch region formation
+  // Must happen after:
+  //   - Conversion to CFG
+  //   - Materialization of shape metadata ops
+  // Must happen before:
+  //   - Dependencies on fully formed flow.dispatch and flow.dispatch_region ops
+  //   - Dependencies on extra-dispatch-region ops being converted to flow
+  //     ops
+  //----------------------------------------------------------------------------
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
       IREE::Flow::createPrePartitioningConversionPass());
@@ -80,20 +125,15 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // Assign attributes and negotiate each executable's ABI signature.
   // passManager.addPass(IREE::Flow::createAssignExecutableWorkloadsPass());
 
+  //----------------------------------------------------------------------------
+  // Stream formation.
+  // Must happen after:
+  //   - Full formation of dispatch regions
+  //----------------------------------------------------------------------------
   // Form streams.
   passManager.addPass(IREE::Flow::createFormStreamsPass());
 
   // TODO(benvanik): run symbol DCE pass.
-
-  // Materialize default arg/result reflection metadata.
-  passManager.addPass(IREE::Flow::createMaterializeExportedReflection());
-
-  // Merge arg/result reflection metadata.
-  // NOTE(laurenzo): This will eventually not be the right place for this as
-  // it should happen after the HAL has further annotated the exported
-  // functions (which will be needed for dynamic shapes and synthetic barrier
-  // arguments).
-  passManager.addPass(IREE::Flow::createMergeExportedReflection());
 }
 
 static PassPipelineRegistration<> transformPassPipeline(

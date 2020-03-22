@@ -43,10 +43,9 @@ class MergeExportedReflectionPass
                        int operandIndex) {
       auto partialString = partialAttr.dyn_cast_or_null<StringAttr>();
       if (!partialString) {
-        func.emitError() << "Reflection signature missing for " << operandType
-                         << " " << operandIndex;
-        signalPassFailure();
-        return failure();
+        // Ignore it - it is normal for synthetic args/results to not be
+        // annotated so long as the ABI wrappers expect the convention.
+        return success();
       }
 
       SignatureParser p(absl::string_view(partialString.getValue().begin(),
