@@ -40,6 +40,7 @@
 #include "absl/base/macros.h"
 #include "absl/types/span.h"
 #include "iree/base/logging.h"
+#include "iree/base/main.h"
 
 // NOTE: order matters here, imgui must come first:
 #include "third_party/dear_imgui/imgui.h"
@@ -429,7 +430,7 @@ static void FramePresent(ImGui_ImplVulkanH_Window* wd) {
       wd->ImageCount;  // Now we can use the next set of semaphores
 }
 
-extern "C" int main(int argc, char** argv) {
+int iree::IreeMain(int argc, char** argv) {
   // --------------------------------------------------------------------------
   // Create a window.
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {

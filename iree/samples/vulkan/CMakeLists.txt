@@ -45,6 +45,7 @@ iree_cc_binary(
       dear_imgui::impl_vulkan
       iree::base::api
       iree::base::logging
+      iree::base::main
       iree::hal::api
       iree::hal::vulkan::api
       iree::modules::hal
@@ -53,4 +54,6 @@ iree_cc_binary(
       iree::vm::bytecode_module
       SDL2-static
       Vulkan::Vulkan
+    LINKOPTS
+      "-SUBSYSTEM:WINDOWS"
 )

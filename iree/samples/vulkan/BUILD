@@ -34,6 +34,12 @@ iree_bytecode_module(
 cc_binary(
     name = "vulkan_inference_gui",
     srcs = ["vulkan_inference_gui.cc"],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [
+            "-SUBSYSTEM:WINDOWS",
+        ],
+        "//conditions:default": [],
+    }),
     tags = [
         "manual",
         "noga",
@@ -43,6 +49,7 @@ cc_binary(
         ":simple_mul_bytecode_module_cc",
         "//iree/base:api",
         "//iree/base:logging",
+        "//iree/base:main",
         "//iree/hal:api",
         "//iree/hal/vulkan:api",
         "//iree/modules/hal",

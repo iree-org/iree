@@ -360,6 +360,20 @@ iree_cc_library(
 
 iree_cc_library(
   NAME
+    main
+  SRCS
+    "main_posix.cc"
+    "main_win32.cc"
+  HDRS
+    "main.h"
+  DEPS
+    iree::base::logging
+    iree::base::platform_headers
+    iree::base::target_platform
+)
+
+iree_cc_library(
+  NAME
     math
   HDRS
     "math.h"
