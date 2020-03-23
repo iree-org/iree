@@ -58,8 +58,8 @@ cc_binary(
         "@com_google_absl//absl/base:core_headers",
         "@dear_imgui",
         "@dear_imgui//:imgui_sdl_vulkan",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
         "@sdl2//:SDL2",
-        "@vulkan_headers//:vulkan_headers_no_prototypes",
         "@vulkan_sdk//:sdk",
     ],
 )

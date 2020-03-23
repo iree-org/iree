@@ -68,7 +68,7 @@ cc_library(
     ],
     deps = [
         ":dear_imgui_srcs",
-        "@vulkan_headers//:vulkan_headers",
+        "@iree_vulkan_headers//:vulkan_headers",
         "@vulkan_sdk//:sdk",
         "@sdl2//:SDL2",
     ],

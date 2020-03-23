@@ -162,8 +162,10 @@ maybe(new_local_repository,
     build_file = "build_tools/third_party/google_tracing_framework_cpp/BUILD.overlay",
 )
 
+# TODO(scotttodd): TensorFlow is squatting on the vulkan_headers repo name, so
+# we use a temporary one until resolved. Theirs is set to an outdated version.
 maybe(new_local_repository,
-    name = "vulkan_headers",
+    name = "iree_vulkan_headers",
     path = "third_party/vulkan_headers",
     build_file = "build_tools/third_party/vulkan_headers/BUILD.overlay",
 )

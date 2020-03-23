@@ -63,8 +63,8 @@ EXPLICIT_TARGET_MAPPING = {
     # Vulkan
     # TODO(scotttodd): Set -DVK_NO_PROTOTYPES to COPTS for _no_prototypes.
     #   Maybe add a wrapper CMake lib within build_tools/third_party/?
-    "@vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
-    "@vulkan_headers//:vulkan_headers_no_prototypes": ["Vulkan::Headers"],
+    "@iree_vulkan_headers//:vulkan_headers": ["Vulkan::Headers"],
+    "@iree_vulkan_headers//:vulkan_headers_no_prototypes": ["Vulkan::Headers"],
     # The Bazel target maps to the IMPORTED target defined by FindVulkan().
     "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets
