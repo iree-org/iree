@@ -362,7 +362,7 @@ namespace vulkan {
   DEV_PFN(REQUIRED, vkQueueSubmit)                                      \
   DEV_PFN(REQUIRED, vkQueueWaitIdle)                                    \
                                                                         \
-  // Device extension: VK_KHR_timeline_semaphore                        \
+  /* Device extension: VK_KHR_timeline_semaphore */                     \
   DEV_PFN(OPTIONAL, vkGetSemaphoreCounterValueKHR)                      \
   DEV_PFN(OPTIONAL, vkWaitSemaphoresKHR)                                \
   DEV_PFN(OPTIONAL, vkSignalSemaphoreKHR)
