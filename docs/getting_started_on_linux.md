@@ -30,6 +30,10 @@ versions:
 
 *   6.0.1
 
+There have been issues with the following versions:
+
+*   [9.0.0-2](https://github.com/google/iree/issues/1216)
+
 ### Install python, pip and dependencies
 
 Install python (note that if, on your distribution, python3 is the only option,
