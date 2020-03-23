@@ -14,6 +14,7 @@
 
 load("//iree/tools:compilation.bzl", "iree_bytecode_module")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
+load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -37,17 +38,14 @@ iree_bytecode_module(
     translate_tool = "//iree/compiler/Dialect/Modules/Check:check-translate",
 )
 
-sh_test(
+run_binary_test(
     name = "success_test",
-    srcs = ["//iree/modules/check:check_module.sh"],
     args = [
         "--driver=vmla",
         "--input_file=$(location :success_module)",
     ],
-    data = [
-        ":success_module",
-        "//iree/modules/check:iree-check-module",
-    ],
+    data = [":success_module"],
+    test_binary = "//iree/modules/check:iree-check-module",
 )
 
 iree_bytecode_module(
@@ -57,16 +55,13 @@ iree_bytecode_module(
     translate_tool = "//iree/compiler/Dialect/Modules/Check:check-translate",
 )
 
-sh_test(
+run_binary_test(
     name = "failure_test",
-    srcs = ["//iree/modules/check:check_module.sh"],
     args = [
         "--driver=vmla",
         "--input_file=$(location :failure_module)",
         "--expect_failure",
     ],
-    data = [
-        ":failure_module",
-        "//iree/modules/check:iree-check-module",
-    ],
+    data = [":failure_module"],
+    test_binary = "//iree/modules/check:iree-check-module",
 )
