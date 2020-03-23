@@ -38,7 +38,7 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/IndexComputation",
         "//iree/compiler/Translation/SPIRV/Passes",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

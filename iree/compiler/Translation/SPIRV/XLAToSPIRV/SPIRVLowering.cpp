@@ -19,7 +19,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/SPIRVLowering.h"
 
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVLowering.h"
 
 namespace mlir {

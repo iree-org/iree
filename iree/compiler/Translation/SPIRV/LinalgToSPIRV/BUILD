@@ -32,7 +32,7 @@ cc_library(
         "//iree/compiler/Translation/CodegenPasses",
         "//iree/compiler/Translation/CodegenUtils",
         "@llvm-project//llvm:support",
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
         "@llvm-project//mlir:AffineToStandardTransforms",
         "@llvm-project//mlir:EDSC",
         "@llvm-project//mlir:GPUDialect",

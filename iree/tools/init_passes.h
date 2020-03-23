@@ -22,12 +22,12 @@
 
 #include <cstdlib>
 
-#include "mlir/Analysis/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/FxpMathOps/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -59,7 +59,7 @@ inline void registerMlirPasses() {
   // Init general passes
   createCanonicalizerPass();
   createCSEPass();
-  createVectorizePass({});
+  createSuperVectorizePass({});
   createLoopUnrollPass();
   createLoopUnrollAndJamPass();
   createSimplifyAffineStructuresPass();

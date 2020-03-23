@@ -21,7 +21,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_TENSORINDEXTOSCALAR_H
 #define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_TENSORINDEXTOSCALAR_H
 
-#include "mlir/Dialect/AffineOps/AffineOps.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineExprVisitor.h"

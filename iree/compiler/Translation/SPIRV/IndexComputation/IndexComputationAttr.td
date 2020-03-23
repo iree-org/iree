@@ -15,7 +15,7 @@
 #ifndef IREE_INDEX_COMPUTATION_ATTR
 #define IREE_INDEX_COMPUTATION_ATTR
 
-include "mlir/Dialect/AffineOps/AffineOpsBase.td"
+include "mlir/Dialect/Affine/IR/AffineOpsBase.td"
 include "iree/compiler/Dialect/IREE/IR/IREEBase.td"
 
 // TODO(ravishankarm) : Using this in tablegen returns a compiler

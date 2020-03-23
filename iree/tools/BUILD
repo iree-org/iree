@@ -73,7 +73,8 @@ cc_library(
         "init_passes.h",
     ],
     deps = [
-        "@llvm-project//mlir:AffineOps",
+        "@llvm-project//mlir:Affine",
+        "@llvm-project//mlir:AffineTransforms",
         "@llvm-project//mlir:Analysis",
         "@llvm-project//mlir:FxpMathOps",
         "@llvm-project//mlir:GPUDialect",
