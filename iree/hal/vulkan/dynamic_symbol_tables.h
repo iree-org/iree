@@ -360,7 +360,12 @@ namespace vulkan {
   DEV_PFN(OPTIONAL, vkQueueInsertDebugUtilsLabelEXT)                    \
   DEV_PFN(EXCLUDED, vkQueuePresentKHR)                                  \
   DEV_PFN(REQUIRED, vkQueueSubmit)                                      \
-  DEV_PFN(REQUIRED, vkQueueWaitIdle)
+  DEV_PFN(REQUIRED, vkQueueWaitIdle)                                    \
+                                                                        \
+  /* Device extension: VK_KHR_timeline_semaphore */                     \
+  DEV_PFN(OPTIONAL, vkGetSemaphoreCounterValueKHR)                      \
+  DEV_PFN(OPTIONAL, vkWaitSemaphoresKHR)                                \
+  DEV_PFN(OPTIONAL, vkSignalSemaphoreKHR)
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
 #define IREE_VULKAN_DYNAMIC_SYMBOL_TABLE_ANDROID_KHR(INS_PFN, DEV_PFN) \
