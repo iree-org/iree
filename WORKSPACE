@@ -145,6 +145,11 @@ maybe(local_repository,
 )
 
 maybe(local_repository,
+     name = "com_google_ruy",
+     path = "third_party/ruy",
+)
+
+maybe(local_repository,
      name = "com_google_googletest",
      path = "third_party/googletest",
 )
