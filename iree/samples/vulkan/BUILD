@@ -56,7 +56,10 @@ cc_binary(
         "@vulkan_headers//:vulkan_headers_no_prototypes",
         "@vulkan_sdk//:sdk",
     ],
-    linkopts = [
-        "-SUBSYSTEM:WINDOWS",
-    ],
+    linkopts = select({
+        "@bazel_tools//src/conditions:windows": [
+            "-SUBSYSTEM:WINDOWS",
+        ],
+        "//conditions:default": [],
+    }),
 )
