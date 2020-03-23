@@ -25,7 +25,7 @@ iree_cc_library(
     "LowerToSPIRV.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
+    MLIRAffine
     MLIRAffineToStandard
     MLIREDSC
     MLIRGPU
