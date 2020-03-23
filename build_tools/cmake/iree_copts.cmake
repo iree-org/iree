@@ -147,6 +147,7 @@ set(IREE_TABLEGEN_EXE iree-tblgen)
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/ruy
 )
 
 #-------------------------------------------------------------------------------
