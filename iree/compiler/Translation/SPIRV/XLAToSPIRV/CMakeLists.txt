@@ -30,7 +30,7 @@ iree_cc_library(
     "XLAToSPIRV.cpp"
   DEPS
     LLVMSupport
-    MLIRAffineOps
+    MLIRAffine
     MLIRAffineToStandard
     MLIRIR
     MLIRPass

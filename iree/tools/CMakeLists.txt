@@ -79,7 +79,8 @@ iree_cc_library(
     "init_dialects.h"
     "init_passes.h"
   DEPS
-    MLIRAffineOps
+    MLIRAffine
+    MLIRAffineTransforms
     MLIRAnalysis
     MLIRFxpMathOps
     MLIRGPU
