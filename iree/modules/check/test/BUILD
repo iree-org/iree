@@ -29,6 +29,7 @@ iree_lit_test_suite(
         "//iree/modules/check:iree-check-module",
         "//iree/tools:IreeFileCheck",
     ],
+    tags = ["hostonly"],
 )
 
 iree_bytecode_module(

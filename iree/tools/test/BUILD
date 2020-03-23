@@ -31,4 +31,5 @@ iree_lit_test_suite(
         "//iree/tools:iree-run-module",
         "//iree/tools:iree-translate",
     ],
+    tags = ["hostonly"],
 )

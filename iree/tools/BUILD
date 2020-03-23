@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Misc tools used to optimize, translate, and evaluate IREE.
-# Most of these are not designed to run on-device.
+# Compiler tooling, like the compiler, is not designed to run on device and is tagged as "hostonly".
 
 load("//iree:build_defs.oss.bzl", "IREE_DRIVER_MODULES", "PLATFORM_VULKAN_DEPS")
 
@@ -141,6 +141,7 @@ cc_library(
 
 cc_binary(
     name = "iree-opt",
+    tags = ["hostonly"],
     deps = [
         ":iree_opt_main",
     ],
@@ -149,6 +150,7 @@ cc_binary(
 cc_binary(
     name = "iree-run-mlir",
     srcs = ["run_mlir_main.cc"],
+    tags = ["hostonly"],
     deps = [
         ":PassesAndDialects",
         ":vm_util",
@@ -203,6 +205,7 @@ cc_binary(
     linkopts = [
         "-lpthread",
     ],
+    tags = ["hostonly"],
     deps = [
         "//iree/compiler/Dialect/VM/Tools",
         "@llvm-project//mlir:MlirTableGenMain",
@@ -233,6 +236,7 @@ cc_library(
 
 cc_binary(
     name = "iree-translate",
+    tags = ["hostonly"],
     deps = [
         ":iree_translate_main",
     ],
@@ -243,6 +247,7 @@ sh_binary(
     testonly = True,
     srcs = ["IreeFileCheck.sh"],
     data = ["@llvm-project//llvm:FileCheck"],
+    tags = ["hostonly"],
 )
 
 # TODO(b/146898896): Refactor these into more coherent packages.
