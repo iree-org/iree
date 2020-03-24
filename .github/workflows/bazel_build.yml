@@ -44,8 +44,7 @@ jobs:
           sudo apt-get install clang libsdl2-dev python3 python3-pip python3-setuptools
           # Update pip before using it so it picks up the latest versions of our dependencies.
           sudo python3 -m pip install --upgrade pip
-          sudo python3 -m pip install jax jaxlib numpy tf-nightly
-          sudo python3 -m pip install --upgrade  jax jaxlib
+          sudo python3 -m pip install numpy tf-nightly
       - name: Checking out repository
         uses: actions/checkout@v2
       - name: Initializing submodules
