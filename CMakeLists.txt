@@ -179,6 +179,7 @@ add_subdirectory(iree/hal)
 add_subdirectory(iree/modules)
 add_subdirectory(iree/schemas)
 add_subdirectory(iree/testing)
+add_subdirectory(iree/test)
 
 if(${IREE_ENABLE_LLVM})
   # The VM requires LLVM to build its op definitions.
