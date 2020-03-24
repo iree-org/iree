@@ -29,8 +29,25 @@ and Installable Client Drivers (ICDs).
 See also:
 
 *   https://www.lunarg.com/tutorial-overview-of-vulkan-loader-layers/
-*   https://vulkan.lunarg.com/doc/view/1.1.70.1/windows/loader_and_layer_interface.html
+*   https://vulkan.lunarg.com/doc/view/latest/windows/loader_and_layer_interface.html
 *   https://github.com/KhronosGroup/Vulkan-Loader
+
+#### Installing or Updating the Loader
+
+The Vulkan loader should already be installed on Vulkan-capable systems, but you
+might need to update it if the version that is installed is too old to use some
+of the more recently added Vulkan features.
+
+To get a more recent version of the loader, these are some options:
+
+*   Update your system's GPU drivers
+*   Install the Vulkan SDK: https://www.lunarg.com/vulkan-sdk/
+*   Build the Vulkan loader from source:
+    https://github.com/KhronosGroup/Vulkan-Loader
+
+If you build the loader from source, you may also need to set
+`LD_PRELOAD=/path/to/libvulkan.so.1` (or equivalent) to bypass the installed
+loader.
 
 #### Choosing ICDs and SwiftShader
 
