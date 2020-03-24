@@ -30,9 +30,9 @@ func @multi_reduction(%arg0 : tensor<4x8xf32>, %arg1 : tensor<4x8xf32>) -> (tens
   //  CHECK-DAG: [[SCALAR_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[]>
   //  CHECK-DAG: [[RESULT_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[4]>
   //  CHECK-DAG: [[RET_SIZE:%.+]] = muli
-  // CHECK-NEXT: [[RET0:%.+]] = "vmla.buffer.alloc"([[RET_SIZE]]) : (i32) -> !vmla.buffer
+  // CHECK-NEXT: [[RET0:%.+]] = "vmla.buffer.alloc"([[RET_SIZE]])
   // CHECK-NEXT: "vmla.reduce.sum"(%arg0, [[INPUT_SHAPE]], [[CST0]], [[SCALAR_SHAPE]], [[RET0]], [[RESULT_SHAPE]]) {dimension = 1 : i32, element_type = f32} : (!vmla.buffer, !shapex.ranked_shape<[4,8]>, !vmla.buffer, !shapex.ranked_shape<[]>, !vmla.buffer, !shapex.ranked_shape<[4]>) -> ()
-  // CHECK-NEXT: [[RET1:%.+]] = "vmla.buffer.alloc"([[RET_SIZE]]) : (i32) -> !vmla.buffer
+  // CHECK-NEXT: [[RET1:%.+]] = "vmla.buffer.alloc"([[RET_SIZE]])
   // CHECK-NEXT: "vmla.reduce.sum"(%arg1, [[INPUT_SHAPE]], [[CST1]], [[SCALAR_SHAPE]], [[RET1]], [[RESULT_SHAPE]]) {dimension = 1 : i32, element_type = f32} : (!vmla.buffer, !shapex.ranked_shape<[4,8]>, !vmla.buffer, !shapex.ranked_shape<[]>, !vmla.buffer, !shapex.ranked_shape<[4]>) -> ()
   %2, %3 = "xla_hlo.reduce"(%arg0, %arg1, %0, %1) ( {
   ^bb0(%arg0_lhs : tensor<f32>, %arg1_lhs : tensor<f32>, %arg0_rhs : tensor<f32>, %arg1_rhs : tensor<f32>):

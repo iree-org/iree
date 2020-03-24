@@ -105,9 +105,12 @@ function(iree_cc_test)
 
   # We run all our tests through a custom test runner to allow temp directory
   # cleanup upon test completion.
+
+  string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})
+  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
   add_test(
     NAME
-      ${_NAME}
+      ${_NAME_PATH}
     COMMAND
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "$<TARGET_FILE:${_NAME}>"
@@ -116,8 +119,11 @@ function(iree_cc_test)
     )
   set_property(
     TEST
-      ${_NAME}
+      ${_NAME_PATH}
     PROPERTY
-      ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir"
+      ENVIRONMENT
+        "TEST_TMPDIR=${_NAME}_test_tmpdir"
+      LABELS
+        ${_PACKAGE_PATH}
   )
 endfunction()

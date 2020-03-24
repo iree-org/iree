@@ -251,8 +251,8 @@ Value VMLAConversionTarget::getBufferLength(
 
   auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
   if (!shape) return nullptr;
-  auto dims = rewriter.create<Shape::RankedDimsOp>(
-      loc, rewriter.getIntegerType(32), shape);
+  auto dims =
+      rewriter.create<Shape::RankedDimsOp>(loc, rewriter.getIndexType(), shape);
   Value length = elementSize;
   for (auto dim : dims.getResults()) {
     length = rewriter.createOrFold<mlir::MulIOp>(loc, length, dim);

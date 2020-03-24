@@ -6,12 +6,13 @@
 func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<i64>) -> tensor<1x5xi32> attributes { sym_visibility = "private" } {
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,1,5]>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,1,5]>
-  // CHECK-DAG: [[INDEX0:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0_i32)
-  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c20_i32)
+  // CHECK-DAG: [[INDEX0_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0)
+  // CHECK-DAG: [[INDEX0:%.+]] = index_cast [[INDEX0_I32]]
+  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c20)
   // CHECK-NEXT: "vmla.copy"(
-  // CHECK-SAME: [[SRC]], [[SRC_SHAPE]], [[INDEX0]], %c0_i32, %c0_i32,
-  // CHECK-SAME: [[DST]], [[DST_SHAPE]], %c0_i32, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c1_i32, %c1_i32, %c5_i32
+  // CHECK-SAME: [[SRC]], [[SRC_SHAPE]], [[INDEX0]], %c0, %c0,
+  // CHECK-SAME: [[DST]], [[DST_SHAPE]], %c0, %c0, %c0,
+  // CHECK-SAME: %c1, %c1, %c5
   // CHECK-SAME: ) {element_type = i32}
   %0 = "xla_hlo.gather"(%input, %start_indices) {
     dimension_numbers = {
@@ -34,14 +35,17 @@ func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<
 func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices : tensor<3xi64>) -> tensor<2x3xf32> attributes { sym_visibility = "private" } {
   // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,2,3]>
   // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,3]>
-  // CHECK-DAG: [[INDEX0:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0_i32)
-  // CHECK-DAG: [[INDEX1:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c4_i32)
-  // CHECK-DAG: [[INDEX2:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c8_i32)
-  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c24_i32)
+  // CHECK-DAG: [[INDEX0_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0)
+  // CHECK-DAG: [[INDEX0:%.+]] = index_cast [[INDEX0_I32]]
+  // CHECK-DAG: [[INDEX1_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c4)
+  // CHECK-DAG: [[INDEX1:%.+]] = index_cast [[INDEX1_I32]]
+  // CHECK-DAG: [[INDEX2_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c8)
+  // CHECK-DAG: [[INDEX2:%.+]] = index_cast [[INDEX2_I32]]
+  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c24)
   // CHECK-NEXT: "vmla.copy"(
   // CHECK-SAME: [[SRC]], [[SRC_SHAPE]], [[INDEX0]], [[INDEX1]], [[INDEX2]],
-  // CHECK-SAME: [[DST]], [[DST_SHAPE]], %c0_i32, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c1_i32, %c2_i32, %c3_i32
+  // CHECK-SAME: [[DST]], [[DST_SHAPE]], %c0, %c0, %c0,
+  // CHECK-SAME: %c1, %c2, %c3
   // CHECK-SAME: ) {element_type = f32}
   %0 = "xla_hlo.gather"(%input, %start_indices) {
     dimension_numbers = {

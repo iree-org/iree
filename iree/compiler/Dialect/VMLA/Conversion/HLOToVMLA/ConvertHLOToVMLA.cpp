@@ -186,7 +186,7 @@ struct ConcatenateOpConversion
       SmallVector<Value, 4> lengths(rank);
       for (int i = 0; i < rank; ++i) {
         lengths[i] = rewriter.createOrFold<Shape::RankedDimOp>(
-            srcOp.getLoc(), rewriter.getIntegerType(32), srcShape, i);
+            srcOp.getLoc(), rewriter.getIndexType(), srcShape, i);
       }
 
       rewriter.create<IREE::VMLA::CopyOp>(
@@ -303,9 +303,11 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
       if (i < startIndicesType.getNumElements()) {
         auto srcIndexByteOffset = rewriter.createOrFold<mlir::ConstantIndexOp>(
             gatherOp.getLoc(), i * sizeof(int32_t));
-        srcIndices[i] = rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
-            gatherOp.getLoc(), rewriter.getIntegerType(32),
-            operands.start_indices(), srcIndexByteOffset);
+        srcIndices[i] = rewriter.createOrFold<IndexCastOp>(
+            gatherOp.getLoc(), rewriter.getIndexType(),
+            rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
+                gatherOp.getLoc(), rewriter.getIntegerType(32),
+                operands.start_indices(), srcIndexByteOffset));
       } else {
         // Pad missing dimensions to zero offsets.
         srcIndices[i] = zero;
@@ -405,10 +407,12 @@ struct DynamicSliceOpConversion
     Value zero =
         rewriter.createOrFold<mlir::ConstantIndexOp>(srcOp.getLoc(), 0);
     for (int i = 0; i < rank; ++i) {
-      srcIndices[i] = rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
-          srcOp.getLoc(), rewriter.getIntegerType(32), operands[1],
-          rewriter.createOrFold<mlir::ConstantIndexOp>(srcOp.getLoc(),
-                                                       i * sizeof(int32_t)));
+      srcIndices[i] = rewriter.createOrFold<IndexCastOp>(
+          srcOp.getLoc(), rewriter.getIndexType(),
+          rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
+              srcOp.getLoc(), rewriter.getIntegerType(32), operands[1],
+              rewriter.createOrFold<mlir::ConstantIndexOp>(
+                  srcOp.getLoc(), i * sizeof(int32_t))));
       dstIndices[i] = zero;
       lengths[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
           srcOp.getLoc(),

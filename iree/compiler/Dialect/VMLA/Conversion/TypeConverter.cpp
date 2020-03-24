@@ -29,6 +29,7 @@ VMLATypeConverter::VMLATypeConverter() {
     }
     return type;
   });
+
   addConversion([](TensorType type) {
     // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
     return IREE::VMLA::BufferType::get(type.getContext());

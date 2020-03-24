@@ -53,7 +53,7 @@ ExecutableTargetOptions getExecutableTargetOptionsFromFlags();
 //       interface = @main_io,
 //       ordinal = 0 : i32,
 //       signature = (tensor<4xf32>) -> tensor<4xf32>,
-//       workgroup_size = dense<1> : vector<3xi32>
+//       workgroup_size = [1 : index, 1 : index, 1 : index]
 //     }
 //     hal.executable.source {
 //       flow.executable ...

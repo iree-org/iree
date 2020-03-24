@@ -3,38 +3,38 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @allocator_compute_size
-func @allocator_compute_size() -> i32 {
+func @allocator_compute_size() -> index {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
-  %1:2 = "test_hal.shape"() : () -> (i32, i32)
+  %1:2 = "test_hal.shape"() : () -> (index, index)
   // CHECK: [[SZ:%.+]] = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = 32
   %sz = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = 32
   // CHECK-NEXT: return [[SZ]]
-  return %sz : i32
+  return %sz : index
 }
 
 // -----
 
 // CHECK-LABEL: @allocator_compute_offset
-func @allocator_compute_offset() -> i32 {
+func @allocator_compute_offset() -> index {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
-  %1:2 = "test_hal.shape"() : () -> (i32, i32)
-  %2:2 = "test_hal.indices"() : () -> (i32, i32)
+  %1:2 = "test_hal.shape"() : () -> (index, index)
+  %2:2 = "test_hal.indices"() : () -> (index, index)
   // CHECK: %off = hal.allocator.compute_offset %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1]
   %off = hal.allocator.compute_offset %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1]
-  return %off : i32
+  return %off : index
 }
 
 // -----
 
 // CHECK-LABEL: @allocator_compute_range
-func @allocator_compute_range() -> (i32, i32) {
+func @allocator_compute_range() -> (index, index) {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
-  %1:2 = "test_hal.shape"() : () -> (i32, i32)
-  %2:2 = "test_hal.indices"() : () -> (i32, i32)
-  %3:2 = "test_hal.lengths"() : () -> (i32, i32)
+  %1:2 = "test_hal.shape"() : () -> (index, index)
+  %2:2 = "test_hal.indices"() : () -> (index, index)
+  %3:2 = "test_hal.lengths"() : () -> (index, index)
   // CHECK: %off, %len = hal.allocator.compute_range %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1], lengths = [%3#0, %3#1]
   %off, %len = hal.allocator.compute_range %0, shape = [%1#0, %1#1], element_type = 32, indices = [%2#0, %2#1], lengths=[%3#0, %3#1]
-  return %off, %len : i32, i32
+  return %off, %len : index, index
 }
 
 // -----
@@ -42,7 +42,7 @@ func @allocator_compute_range() -> (i32, i32) {
 // CHECK-LABEL: @allocator_allocate
 func @allocator_allocate() -> !hal.buffer {
   // CHECK-DAG: [[C123:%.+]] = constant 123
-  %0 = constant 123 : i32
+  %0 = constant 123 : index
   // CHECK-DAG: [[AL:%.+]] = "test_hal.allocator"
   %1 = "test_hal.allocator"() : () -> !hal.allocator
   // CHECK: [[CB:%.+]] = hal.allocator.allocate [[AL]], "HostVisible|HostCoherent", "Transfer", [[C123]] : !hal.buffer

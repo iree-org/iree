@@ -9,14 +9,14 @@
 // CHECK-SAME:  interface = @legacy_io,
 // CHECK-SAME:  ordinal = 0 : i32,
 // CHECK-SAME:  signature = (tensor<4xf32>) -> tensor<4xf32>,
-// CHECK-SAME:  workgroup_size = dense<1> : vector<3xi32>
+// CHECK-SAME:  workgroup_size = [1 : index, 1 : index, 1 : index]
 // CHECK-SAME:}
 // CHECK-DAG: hal.executable.source {
 // CHECK-NEXT: module {
 // CHECK-NEXT: flow.executable @simpleMath_ex_dispatch_0
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-      workload = dense<[4, 1, 1]> : vector<3xi32>
+      workload = 4 : index
   }
   // CHECK: module {
   module {

@@ -202,8 +202,8 @@ class BufferBarrierType {
             IntegerType::get(32, context),
             IntegerType::get(32, context),
             BufferType::get(context),
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
+            IndexType::get(context),
+            IndexType::get(context),
         },
         context);
   }
@@ -221,21 +221,8 @@ class MemoryBarrierType {
   }
 };
 
-class DescriptorSetBindingType {
- public:
-  static TupleType get(MLIRContext *context) {
-    return TupleType::get(
-        {
-            IntegerType::get(32, context),
-            BufferType::get(context),
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-        },
-        context);
-  }
-};
-
-// A tuple containing runtime values for a DescriptorSetBindingType.
+// A tuple containing runtime values for a descriptor set binding:
+// <binding ordinal, hal.buffer, buffer byte offset, buffer byte length>
 using DescriptorSetBindingValue = std::tuple<uint32_t, Value, Value, Value>;
 
 }  // namespace HAL

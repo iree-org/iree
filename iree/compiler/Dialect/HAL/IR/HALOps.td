@@ -1184,7 +1184,7 @@ def HAL_DescriptorSetLayoutCreateOp :
     executables that use the same set layouts can be reduced.
 
     ```mlir
-    %layout = hal.descriptor_set_layout.create %device, bindings = [
+    %layout = hal.descriptor_set_layout.create %device, "PushOnly", bindings = [
       #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
       #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
     ] : !hal.descriptor_set_layout
@@ -1214,7 +1214,7 @@ def HAL_DescriptorSetLayoutLookupOp : HAL_PureOp<"descriptor_set_layout.lookup",
     possibly lazy-initialized descriptor set layout.
 
     ```mlir
-    %layout = hal.descriptor_set_layout.lookup %device, bindings = [
+    %layout = hal.descriptor_set_layout.lookup %device, "PushOnly", bindings = [
       #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
       #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
     ] : !hal.descriptor_set_layout

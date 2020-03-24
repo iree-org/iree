@@ -47,8 +47,10 @@ struct DynamicUpdateSliceOpLowering
                                 PatternRewriter &rewriter) const override {
     auto startIndices = llvm::to_vector<4>(
         llvm::map_range(op.start_indices(), [&](Value tensorValue) {
-          return rewriter.createOrFold<ExtractElementOp>(op.getLoc(),
-                                                         tensorValue);
+          return rewriter.createOrFold<IndexCastOp>(
+              op.getLoc(),
+              rewriter.createOrFold<ExtractElementOp>(op.getLoc(), tensorValue),
+              rewriter.getIndexType());
         }));
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorUpdateOp>(
         op, op.getResult().getType(), op.update(), op.operand(), startIndices);
