@@ -36,11 +36,6 @@ fi
 BUILD_TAG_FILTERS="${BUILD_TAG_FILTERS:-${default_build_tag_filters[@]?}}"
 TEST_TAG_FILTERS="${TEST_TAG_FILTERS:-${default_test_tag_filters[@]?}}"
 
-echo "Running with "
-echo "  test env args: ${test_env_args[@]?}"
-echo "  build_tag_filters: ${BUILD_TAG_FILTERS[@]?}"
-echo "  test_tag_filters: ${TEST_TAG_FILTERS[@]?}"
-
 # Build and test everything in supported directories not explicitly marked as
 # excluded from CI (using the tag "nokokoro").
 # Note that somewhat contrary to its name `bazel test` will also build
