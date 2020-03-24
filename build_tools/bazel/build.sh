@@ -20,8 +20,10 @@ set -e
 
 set -x
 
-# CI-friendly defaults that control availability of certain platform tests.
-IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
+# Use user-environment variables if set, otherwise use CI-friendly defaults.
+if ! [[ -v IREE_VULKAN_DISABLE ]]; then
+  IREE_VULKAN_DISABLE=1
+fi
 declare -a test_env_args=(
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
 )
@@ -33,11 +35,15 @@ declare -a default_test_tag_filters=("-nokokoro")
 if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
   default_test_tag_filters+=("-driver=vulkan")
 fi
-BUILD_TAG_FILTERS=("${BUILD_TAG_FILTERS:-${default_build_tag_filters[@]?}}")
-TEST_TAG_FILTERS=("${TEST_TAG_FILTERS:-${default_test_tag_filters[@]?}}")
-
-BUILD_TAG_FILTER_STRING="$(IFS="," ; echo "${BUILD_TAG_FILTERS[*]?}")"
-TEST_TAG_FILTER_STRING="$(IFS="," ; echo "${TEST_TAG_FILTERS[*]?}")"
+# Use user-environment variables if set, otherwise use CI-friendly defaults.
+if ! [[ -v BUILD_TAG_FILTERS ]]; then
+  # String join on comma
+  BUILD_TAG_FILTERS="$(IFS="," ; echo "${default_build_tag_filters[*]?}")"
+fi
+if ! [[ -v TEST_TAG_FILTERS ]]; then
+  # String join on comma
+  TEST_TAG_FILTERS="$(IFS="," ; echo "${default_test_tag_filters[*]?}")"
+fi
 
 # Build and test everything in supported directories not explicitly marked as
 # excluded from CI (using the tag "nokokoro").
@@ -49,8 +55,8 @@ TEST_TAG_FILTER_STRING="$(IFS="," ; echo "${TEST_TAG_FILTERS[*]?}")"
 # want them built by CI unless they are excluded with "nokokoro".
 bazel query "//iree/... + //bindings/..." | \
   xargs bazel test ${test_env_args[@]} \
-    --build_tag_filters="${BUILD_TAG_FILTER_STRING?}" \
-    --test_tag_filters="${TEST_TAG_FILTER_STRING?}" \
+    --build_tag_filters="${BUILD_TAG_FILTERS?}" \
+    --test_tag_filters="${TEST_TAG_FILTERS?}" \
     --keep_going \
     --test_output=errors \
     --config=rs
