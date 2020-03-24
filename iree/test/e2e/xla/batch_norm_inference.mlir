@@ -1,5 +1,6 @@
 // RUN: iree-run-mlir %s -iree-hal-target-backends=llvm-ir | IreeFileCheck %s
-// TODO(hanchung): Enable the test for vulkan-spirv backend.
+// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv -iree-use-linalg-to-spirv-path %s | IreeFileCheck %s)
+
 func @batchnorm_inference_4x2() -> tensor<2x4xf32> {
   %x = iree.unfoldable_constant dense<[[1.0, 2.0, 3.0, 4.0],[5.0, 6.0, 7.0, 8.0]]> : tensor<2x4xf32>
   %mean = iree.unfoldable_constant dense<[1.0, 1.0, 1.0, 1.0]> : tensor<4xf32>
