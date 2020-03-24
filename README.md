@@ -19,12 +19,10 @@ and reach out on the
 
 ## Communication Channels
 
-*   [GitHub Issues](https://github.com/google/iree/issues): preferred for
-    specific issues and coordination on upcoming features
-*   [Google IREE Discord Server](https://discord.gg/QB6xmkb): This is a guest
-    invite. Feel free to ask for a permanent role/invite. The core team hangs
-    out here. (caveat: the core team is trying this and may re-evaluate at some
-    point)
+*   [GitHub Issues](https://github.com/google/iree/issues): Preferred for
+    specific issues and coordination on upcoming features.
+*   [Google IREE Discord Server](https://discord.gg/26P4xW4): The core team and
+    collaborators hang out here.
 *   [Google Groups Email List](https://groups.google.com/forum/#!forum/iree-discuss):
     General, low-priority discussion.
 
