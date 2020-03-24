@@ -26,7 +26,7 @@
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 namespace mlir {
 namespace iree_compiler {
 
@@ -145,10 +145,26 @@ LogicalResult IREEFuseGenericTensorOps::matchAndRewrite(
   return failure();
 }
 
+// TODO(ataei): We should instead use xla_hlo -> std legalization pass before
+// fusion. But this requires chaining reduction lowering and many other steps.
+class HLOConstantConverter : public OpRewritePattern<xla_hlo::ConstOp> {
+ public:
+  using OpRewritePattern<xla_hlo::ConstOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(xla_hlo::ConstOp op,
+                                PatternRewriter &rewriter) const {
+    auto loc = op.getLoc();
+    auto stdConstOp = rewriter.create<ConstantOp>(loc, op.value());
+    rewriter.replaceOp(op, stdConstOp.getResult());
+    return success();
+  }
+};
+
 void IREELinalgFusionPass::runOnFunction() {
   OwningRewritePatternList patterns;
   Operation *op = getOperation();
-  patterns.insert<IREEFuseGenericTensorOps>(op->getContext());
+  patterns.insert<IREEFuseGenericTensorOps, HLOConstantConverter>(
+      op->getContext());
   applyPatternsGreedily(op->getRegions(), patterns);
 }
 

@@ -43,6 +43,9 @@ std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnBuffersPass();
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
 std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnTensorsPass();
 
+/// Creates XLA-HLO preprocessing transformation pass.
+std::unique_ptr<OpPassBase<FuncOp>> createHLOPreprocessingPass();
+
 /// Populates the patterns that convert from XLA to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.
 void populateHLOToLinalgOnTensorsConversionPatterns(
