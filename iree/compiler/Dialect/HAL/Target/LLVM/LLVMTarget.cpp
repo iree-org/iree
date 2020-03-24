@@ -19,6 +19,7 @@
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
@@ -42,20 +43,39 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   return targetOptions;
 }
 
-// TODO(ataei) Move this to utils ?
-// Returns a list of entry point names matching the expected export ordinals.
-static std::vector<std::string> populateEntryPointNames(
-    IREE::Flow::ExecutableOp executableOp, bool addCInterface) {
-  std::vector<std::string> entryPointNames;
-  for (auto& op : executableOp.getBlock().getOperations()) {
-    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
-      std::string func_name =
-          addCInterface ? "_mlir_ciface_" + std::string(entryOp.function_ref())
-                        : std::string(entryOp.function_ref());
-      entryPointNames.push_back(func_name);
-    }
+static void CreateInvocationFunc(const std::string& name,
+                                 llvm::Module* module) {
+  auto& ctx = module->getContext();
+  llvm::IRBuilder<> builder(ctx);
+  auto var_func = module->getFunction(name);
+
+  auto new_type = llvm::FunctionType::get(
+      builder.getVoidTy(), builder.getInt8PtrTy()->getPointerTo(),
+      /*isVarArg=*/false);
+
+  auto new_name = "invoke_" + name;
+  auto func_cst = module->getOrInsertFunction(new_name, new_type);
+  llvm::Function* interface_func =
+      llvm::cast<llvm::Function>(func_cst.getCallee());
+
+  auto bb = llvm::BasicBlock::Create(ctx);
+  bb->insertInto(interface_func);
+  builder.SetInsertPoint(bb);
+  llvm::Value* argList = interface_func->arg_begin();
+  llvm::SmallVector<llvm::Value*, 8> args;
+  args.reserve(llvm::size(var_func->args()));
+  for (auto& indexedArg : llvm::enumerate(var_func->args())) {
+    llvm::Value* arg_index = llvm::Constant::getIntegerValue(
+        builder.getInt64Ty(), llvm::APInt(64, indexedArg.index()));
+    llvm::Value* arg_ptr_ptr = builder.CreateGEP(argList, arg_index);
+    llvm::Value* arg_ptr = builder.CreateLoad(arg_ptr_ptr);
+    arg_ptr = builder.CreateBitCast(
+        arg_ptr, indexedArg.value().getType()->getPointerTo());
+    llvm::Value* arg = builder.CreateLoad(arg_ptr);
+    args.push_back(arg);
   }
-  return entryPointNames;
+  builder.CreateCall(var_func, args);
+  builder.CreateRetVoid();
 }
 
 // Adds a sequence of passess to a given pass manager that progressively lower
@@ -107,6 +127,19 @@ LogicalResult translateToLLVMExecutable(
   // At this moment we are leaving MLIR LLVM dialect land translating module
   // into target independent LLVMIR.
   auto llvmModule = mlir::translateModuleToLLVMIR(moduleOp);
+  iree::LLVMIRExecutableDefT llvmIrExecutableDef;
+
+  // Create invocation function an populate entry_points.
+  const bool addCInterface = true;
+  for (auto& op : flowExecutableOp.getBlock().getOperations()) {
+    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
+      std::string func_name =
+          addCInterface ? "_mlir_ciface_" + std::string(entryOp.function_ref())
+                        : std::string(entryOp.function_ref());
+      llvmIrExecutableDef.entry_points.push_back(func_name);
+      CreateInvocationFunc(func_name, llvmModule.get());
+    }
+  }
 
   // Serialize LLVM module.
   std::string bufferString;
@@ -115,11 +148,9 @@ LogicalResult translateToLLVMExecutable(
   ostream.flush();
 
   // Creates executable bytes.
-  iree::LLVMIRExecutableDefT llvmIrExecutableDef;
   llvmIrExecutableDef.llvmir_module = {bufferString.begin(),
                                        bufferString.end()};
-  llvmIrExecutableDef.entry_points =
-      populateEntryPointNames(flowExecutableOp, true);
+
   ::flatbuffers::FlatBufferBuilder fbb;
   auto executableOffset =
       iree::LLVMIRExecutableDef::Pack(fbb, &llvmIrExecutableDef);

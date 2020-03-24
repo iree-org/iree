@@ -33,42 +33,6 @@
 namespace iree {
 namespace hal {
 namespace llvmjit {
-// TODO(ataei): Move this to compile time HAL/Target/LLVM.
-static void CreateInvocationFunc(const std::string& name,
-                                 llvm::Module* module) {
-  auto& ctx = module->getContext();
-  llvm::IRBuilder<> builder(ctx);
-  auto var_func = module->getFunction(name);
-
-  auto new_type = llvm::FunctionType::get(
-      builder.getVoidTy(), builder.getInt8PtrTy()->getPointerTo(),
-      /*isVarArg=*/false);
-
-  auto new_name = "invoke_" + name;
-  auto func_cst = module->getOrInsertFunction(new_name, new_type);
-  llvm::Function* interface_func =
-      llvm::cast<llvm::Function>(func_cst.getCallee());
-
-  auto bb = llvm::BasicBlock::Create(ctx);
-  bb->insertInto(interface_func);
-  builder.SetInsertPoint(bb);
-  llvm::Value* argList = interface_func->arg_begin();
-  llvm::SmallVector<llvm::Value*, 8> args;
-  args.reserve(llvm::size(var_func->args()));
-  for (auto& indexedArg : llvm::enumerate(var_func->args())) {
-    llvm::Value* arg_index = llvm::Constant::getIntegerValue(
-        builder.getInt64Ty(), llvm::APInt(64, indexedArg.index()));
-    llvm::Value* arg_ptr_ptr = builder.CreateGEP(argList, arg_index);
-    llvm::Value* arg_ptr = builder.CreateLoad(arg_ptr_ptr);
-    arg_ptr = builder.CreateBitCast(
-        arg_ptr, indexedArg.value().getType()->getPointerTo());
-    llvm::Value* arg = builder.CreateLoad(arg_ptr);
-    args.push_back(arg);
-  }
-  builder.CreateCall(var_func, args);
-  builder.CreateRetVoid();
-}
-
 // static
 StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
     hal::Allocator* allocator, ExecutableSpec spec,
@@ -87,10 +51,6 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
     return InvalidArgumentErrorBuilder(IREE_LOC) << "Can't parse LLVMIR Module";
   auto dataLayout = module->getDataLayout();
   const auto entry_points = module_def->entry_points();
-  // Create an invocation function for each entry point.
-  for (const auto func_name : *entry_points) {
-    CreateInvocationFunc(func_name->str(), module.get());
-  }
   llvm::orc::ThreadSafeModule thread_safe_module(std::move(module),
                                                  std::move(llvm_context));
   llvm::Error err =
