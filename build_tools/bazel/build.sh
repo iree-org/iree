@@ -45,8 +45,8 @@ if ! [[ -v TEST_TAG_FILTERS ]]; then
   TEST_TAG_FILTERS="$(IFS="," ; echo "${default_test_tag_filters[*]?}")"
 fi
 
-# Build and test everything in supported directories not explicitly marked as
-# excluded from CI (using the tag "nokokoro").
+# Build and test everything in supported directories not excluded by the tag
+# filters.
 # Note that somewhat contrary to its name `bazel test` will also build
 # any non-test targets specified.
 # We use `bazel query //...` piped to `bazel test` rather than the simpler
