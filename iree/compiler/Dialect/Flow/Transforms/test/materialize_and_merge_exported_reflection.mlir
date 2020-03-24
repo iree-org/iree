@@ -25,6 +25,24 @@ func @exportedTensor(%arg0 : tensor<4x4xi64>, %arg1 : tensor<5x5xi64>) -> tensor
 }
 
 // -----
+// CHECK-LABEL: func @noReflectionOnAbiNone
+// CHECK-NOT: iree.reflection
+func @noReflectionOnAbiNone(%arg0 : tensor<4x4xi64>, %arg1 : tensor<5x5xi64>) -> tensor<5x5xi64>
+    attributes {iree.module.export, iree.abi.none}
+{
+  return %arg1 : tensor<5x5xi64>
+}
+
+// -----
+// CHECK-LABEL: @unsupportedTypeOnAbiNone
+// Should not generate warning
+func @unsupportedTypeOnAbiNone(%arg0 : i1) -> ()
+    attributes {iree.module.export, iree.abi.none}
+{
+  return
+}
+
+// -----
 // expected-warning @+1 {{Argument #0 of function unsupportedType is not a recognized public ABI type and the function may not be invokable by standard tools}}
 func @unsupportedType(%arg0 : i1) -> ()
     attributes {iree.module.export}

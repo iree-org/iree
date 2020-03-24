@@ -15,10 +15,12 @@
 #include "bindings/python/pyiree/rt/vm.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
 #include "bindings/python/pyiree/common/status_utils.h"
 #include "bindings/python/pyiree/rt/function_abi.h"
 #include "iree/base/api.h"
+#include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/tensorlist/native_module.h"
 #include "iree/vm/invocation.h"
@@ -201,6 +203,16 @@ std::string VmVariantList::DebugString() const {
         assert(hal_buffer);
         absl::StrAppend(&s, "HalBuffer(",
                         iree_hal_buffer_byte_length(hal_buffer), ")");
+      } else if (iree_hal_buffer_view_isa(&variant->ref)) {
+        auto hal_bv = iree_hal_buffer_view_deref(&variant->ref);
+        absl::StrAppend(&s, "HalBufferView(");
+        absl::InlinedVector<int32_t, 5> shape(
+            iree_hal_buffer_view_shape_rank(hal_bv));
+        iree_hal_buffer_view_shape(hal_bv, shape.size(), shape.data(), nullptr);
+        absl::StrAppend(&s, absl::StrJoin(shape, "x"), ":0x",
+                        absl::Hex(static_cast<uint32_t>(
+                            iree_hal_buffer_view_element_type(hal_bv))),
+                        ")");
       } else {
         absl::StrAppend(&s, "Unknown(", variant->ref_type, ")");
       }

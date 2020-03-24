@@ -34,6 +34,7 @@ class MergeExportedReflectionPass
 
     // Only process exported functions.
     if (!func.getAttr("iree.module.export")) return;
+    if (func.getAttr("iree.abi.none")) return;
 
     // Accumulate input and results into these.
     std::string inputsAccum;

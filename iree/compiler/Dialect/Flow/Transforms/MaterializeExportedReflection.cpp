@@ -124,8 +124,9 @@ class MaterializeExportedReflectionPass
     auto funcType = func.getType();
     auto builder = Builder(&getContext());
 
-    // Only process exported functions.
+    // Only process exported functions that are not marked to omit an abi.
     if (!func.getAttr("iree.module.export")) return;
+    if (func.getAttr("iree.abi.none")) return;
 
     // Arguments.
     for (int i = 0, e = funcType.getNumInputs(); i < e; ++i) {

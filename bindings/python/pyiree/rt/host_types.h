@@ -29,6 +29,10 @@ extern const std::array<
     const char*,
     static_cast<unsigned>(AbiConstants::ScalarType::kMaxScalarType) + 1>
     kScalarTypePyFormat;
+extern const std::array<
+    uint32_t,
+    static_cast<unsigned>(AbiConstants::ScalarType::kMaxScalarType) + 1>
+    kScalarTypeToHalElementType;
 
 class HostTypeFactory {
  public:

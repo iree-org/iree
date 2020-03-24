@@ -50,6 +50,10 @@ VMTypeConverter::VMTypeConverter() {
     }
     return llvm::None;
   });
+  // Convert index types.
+  addConversion([](IndexType indexType) -> Optional<Type> {
+    return IntegerType::get(32, indexType.getContext());
+  });
   // All ref_ptr types are passed through unmodified.
   addConversion([this](IREE::PtrType type) -> Type {
     // Recursively handle pointer target types (we want to convert ptr<index> to
@@ -63,9 +67,10 @@ VMTypeConverter::VMTypeConverter() {
   // Convert ranked shape types (expanding all dims).
   addConversion(
       [](Shape::RankedShapeType rankedShape, SmallVectorImpl<Type> &results) {
+        auto vmIntegerType = IntegerType::get(32, rankedShape.getContext());
         for (int i = 0; i < rankedShape.getRank(); ++i) {
           if (rankedShape.isDimDynamic(i)) {
-            results.push_back(rankedShape.getDimType());
+            results.push_back(vmIntegerType);
           }
         }
         return success();

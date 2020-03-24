@@ -40,6 +40,7 @@
 #include <utility>
 
 #include "absl/flags/flag.h"
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "absl/types/span.h"
 #include "iree/base/api.h"
@@ -248,11 +249,9 @@ StatusOr<std::string> PrepareModule(
 // Evaluates a single function in its own fiber, printing the results to stdout.
 Status EvaluateFunction(iree_vm_context_t* context,
                         iree_hal_allocator_t* allocator,
-                        iree_vm_function_t function) {
-  auto function_name = iree_vm_function_name(&function);
-  std::cout << "EXEC @"
-            << absl::string_view(function_name.data, function_name.size)
-            << std::endl;
+                        iree_vm_function_t function,
+                        absl::string_view export_name) {
+  std::cout << "EXEC @" << export_name << std::endl;
   ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
   auto input_values_list = absl::MakeConstSpan(
       input_values_flag.empty() ? nullptr : &input_values_flag.front(),
@@ -310,15 +309,17 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
   // Evaluate all exported functions.
   auto run_function = [&](int ordinal) -> Status {
     iree_vm_function_t function;
+    iree_string_view_t export_name_isv;
     RETURN_IF_ERROR(
         FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
                           bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
-                          ordinal, &function),
+                          ordinal, &function, &export_name_isv),
                       IREE_LOC))
         << "Looking up function export " << ordinal;
-    if (iree_string_view_starts_with(iree_vm_function_name(&function),
-                                     iree_make_cstring_view("__"))) {
-      // Skip internal functions.
+    absl::string_view export_name(export_name_isv.data, export_name_isv.size);
+    if (absl::StartsWith(export_name, "__") ||
+        export_name.find('$') != absl::string_view::npos) {
+      // Skip internal or special functions.
       return OkStatus();
     }
     RETURN_IF_ERROR(ValidateFunctionAbi(function));
@@ -335,8 +336,8 @@ Status EvaluateFunctions(iree_vm_instance_t* instance,
         << "Creating context";
 
     // Invoke the function and print results.
-    RETURN_IF_ERROR(
-        EvaluateFunction(context, iree_hal_device_allocator(device), function))
+    RETURN_IF_ERROR(EvaluateFunction(context, iree_hal_device_allocator(device),
+                                     function, export_name))
         << "Evaluating export function " << ordinal;
 
     iree_vm_context_release(context);

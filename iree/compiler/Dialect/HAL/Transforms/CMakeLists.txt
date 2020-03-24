@@ -22,6 +22,7 @@ iree_cc_library(
   SRCS
     "MaterializeInterfaces.cpp"
     "Passes.cpp"
+    "PublicAbiGeneration.cpp"
     "RewriteLegacyIO.cpp"
     "TranslateExecutables.cpp"
   DEPS
@@ -31,11 +32,14 @@ iree_cc_library(
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
+    absl::strings
+    iree::base::signature_mangle
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Conversion::FlowToHAL
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::Target::ExecutableTarget
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK

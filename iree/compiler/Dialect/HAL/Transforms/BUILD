@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "MaterializeInterfaces.cpp",
         "Passes.cpp",
+        "PublicAbiGeneration.cpp",
         "RewriteLegacyIO.cpp",
         "TranslateExecutables.cpp",
     ],
@@ -29,12 +30,15 @@ cc_library(
         "Passes.h",
     ],
     deps = [
+        "//iree/base:signature_mangle",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Utils",
+        "@com_google_absl//absl/strings",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",

@@ -255,17 +255,39 @@ void FunctionAbi::RawUnpack(absl::Span<const Description> descs,
         iree_vm_variant_list_get(f_results.raw_ptr(), i);
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer: {
-        iree_hal_buffer* raw_buffer = iree_hal_buffer_deref(&f_result->ref);
+        iree_hal_buffer_view_t* buffer_view =
+            iree_hal_buffer_view_deref(&f_result->ref);
+        if (!buffer_view) {
+          throw RaiseValueError(
+              "Could not deref result buffer view (wrong type?)");
+        }
+        iree_hal_buffer* raw_buffer = iree_hal_buffer_view_buffer(buffer_view);
         if (!raw_buffer) {
           throw RaiseValueError("Could not deref result buffer (wrong type?)");
         }
         HalBuffer buffer = HalBuffer::RetainAndCreate(raw_buffer);
-        // TODO(laurenzo): In the case of dynamic dims, the full dims will
-        // need to be splied together based on known static dims and dynamic
-        // dims from a subsequent result.
-        absl::Span<const int> dims = absl::MakeSpan(desc.dims);
+
+        // Extract dims from the buffer view.
+        size_t rank = 0;
+        absl::InlinedVector<int32_t, 6> dims(6);
+        if (ABSL_PREDICT_FALSE(!iree_status_is_ok(iree_hal_buffer_view_shape(
+                buffer_view, dims.capacity(), dims.data(), &rank)))) {
+          dims.resize(rank);
+          CheckApiStatus(iree_hal_buffer_view_shape(
+                             buffer_view, dims.capacity(), dims.data(), &rank),
+                         "Error extracting shape");
+        }
+        dims.resize(rank);
+
+        // Deal with int32_t != int (but require 32bits). Happens on some
+        // embedded platforms.
+        static_assert(sizeof(dims[0]) == sizeof(int),
+                      "expected int to be 32 bits");
         py_results[i] = host_type_factory_->CreateImmediateNdarray(
-            desc.buffer.scalar_type, dims, std::move(buffer));
+            desc.buffer.scalar_type,
+            absl::MakeConstSpan(reinterpret_cast<int*>(dims.data()),
+                                dims.size()),
+            std::move(buffer));
         break;
       }
       case RawSignatureParser::Type::kRefObject:
@@ -293,6 +315,7 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
             desc.buffer.scalar_type)];
     switch (desc.type) {
       case RawSignatureParser::Type::kBuffer: {
+        absl::InlinedVector<int32_t, 5> dims;
         for (auto dim : desc.dims) {
           if (dim < 0) {
             // If there is a dynamic dim, fallback to completely func allocated
@@ -303,6 +326,7 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
             f_results.AppendNullRef();
           }
           alloc_size *= dim;
+          dims.push_back(dim);
         }
 
         // Static cases are easy.
@@ -314,9 +338,19 @@ void FunctionAbi::AllocateResults(absl::Span<const Description> descs,
                                IREE_HAL_MEMORY_TYPE_HOST_VISIBLE),
                            IREE_HAL_BUFFER_USAGE_ALL, alloc_size, &raw_buffer),
                        "Error allocating host visible buffer");
-        iree_vm_ref_t buffer_ref = iree_hal_buffer_move_ref(raw_buffer);
+        auto element_type = static_cast<iree_hal_element_type_t>(
+            kScalarTypeToHalElementType[static_cast<unsigned>(
+                desc.scalar.type)]);
+        iree_hal_buffer_view_t* buffer_view;
+        CheckApiStatus(iree_hal_buffer_view_create(
+                           raw_buffer, dims.data(), dims.size(), element_type,
+                           IREE_ALLOCATOR_SYSTEM, &buffer_view),
+                       "Error allocating buffer_view");
+        iree_hal_buffer_release(raw_buffer);
+        iree_vm_ref_t buffer_view_ref =
+            iree_hal_buffer_view_move_ref(buffer_view);
         CheckApiStatus(iree_vm_variant_list_append_ref_move(f_results.raw_ptr(),
-                                                            &buffer_ref),
+                                                            &buffer_view_ref),
                        "Error moving buffer");
         break;
       }
@@ -360,10 +394,6 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   // Verify compatibility.
   absl::InlinedVector<int, 2> dynamic_dims;
   MapBufferAttrs(py_view, desc, dynamic_dims);
-  if (!dynamic_dims.empty()) {
-    throw RaisePyError(PyExc_NotImplementedError,
-                       "Dynamic argument dimensions not implemented");
-  }
 
   // Allocate a HalBuffer.
   // This is hard-coded to C-contiguous right now.
@@ -380,10 +410,6 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
   CheckApiStatus(
       iree_hal_buffer_write_data(raw_buffer, 0, py_view.buf, py_view.len),
       "Error writing to input buffer");
-  iree_vm_ref_t buffer_ref = iree_hal_buffer_move_ref(raw_buffer);
-  CheckApiStatus(
-      iree_vm_variant_list_append_ref_move(f_args.raw_ptr(), &buffer_ref),
-      "Error moving buffer");
 
   // Only capture the reference to the exporting object (incrementing it)
   // once guaranteed successful.
@@ -395,6 +421,22 @@ void FunctionAbi::PackBuffer(const RawSignatureParser::Description& desc,
     throw RaisePyError(PyExc_NotImplementedError,
                        "Dependent buffer arguments not implemented");
   }
+
+  // Create the buffer_view. (note that numpy shape is ssize_t)
+  auto element_type = static_cast<iree_hal_element_type_t>(
+      kScalarTypeToHalElementType[static_cast<unsigned>(desc.scalar.type)]);
+  absl::InlinedVector<int, 5> dims(py_view.ndim);
+  std::copy(py_view.shape, py_view.shape + py_view.ndim, dims.begin());
+  iree_hal_buffer_view_t* buffer_view;
+  CheckApiStatus(iree_hal_buffer_view_create(
+                     raw_buffer, dims.data(), dims.size(), element_type,
+                     IREE_ALLOCATOR_SYSTEM, &buffer_view),
+                 "Error allocating buffer_view");
+  iree_hal_buffer_release(raw_buffer);
+  iree_vm_ref_t buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+  CheckApiStatus(
+      iree_vm_variant_list_append_ref_move(f_args.raw_ptr(), &buffer_view_ref),
+      "Error moving buffer view");
 }
 
 void SetupFunctionAbiBindings(pybind11::module m) {

@@ -45,6 +45,39 @@ static_assert(kScalarTypePyFormat.size() ==
                   AbiConstants::kScalarTypeSize.size(),
               "Mismatch kScalarTypePyFormat");
 
+const std::array<uint32_t, static_cast<unsigned>(
+                               AbiConstants::ScalarType::kMaxScalarType) +
+                               1>
+    kScalarTypeToHalElementType = {
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,
+                                    32),  // kIeeeFloat32 = 0,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,
+                                    16),  // kIeeeFloat16 = 1,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,
+                                    64),  // kIeeeFloat64 = 2,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_UNKNOWN,
+                                    16),  // kGoogleBfloat16 = 3,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,
+                                    8),  // kSint8 = 4,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,
+                                    16),  // kSint16 = 5,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,
+                                    32),  // kSint32 = 6,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,
+                                    64),  // kSint64 = 7,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,
+                                    8),  // kUint8 = 8,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,
+                                    16),  // kUint16 = 9,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,
+                                    32),  // kUint32 = 10,
+        IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,
+                                    64),  // kUint64 = 11,
+};
+static_assert(kScalarTypeToHalElementType.size() ==
+                  AbiConstants::kScalarTypeSize.size(),
+              "Mismatch kScalarTypeToHalElementType");
+
 namespace {
 
 class PyMappedMemory {

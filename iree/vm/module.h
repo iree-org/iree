@@ -191,11 +191,18 @@ iree_vm_module_lookup_function_by_name(const iree_vm_module_t* module,
                                        iree_vm_function_t* out_function);
 
 // Looks up a function with the given ordinal and linkage in the |module|.
+// If |linkage_name| is not null, then it will be populated with the name
+// of the linkage record (i.e. the actual exported name vs the internal
+// name which would be returned in a subsequent call to iree_vm_function_name).
+// TODO(laurenzo): Remove out_linkage_name in favore of a LINKAGE_PUBLIC (with
+// the name that you'd get from a function_name call on that being the public
+// name).
 IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_module_lookup_function_by_ordinal(const iree_vm_module_t* module,
                                           iree_vm_function_linkage_t linkage,
                                           int32_t ordinal,
-                                          iree_vm_function_t* out_function);
+                                          iree_vm_function_t* out_function,
+                                          iree_string_view_t* out_linkage_name);
 
 // Returns the name of the given function or empty string if not available.
 IREE_API_EXPORT iree_string_view_t IREE_API_CALL

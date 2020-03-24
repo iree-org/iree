@@ -70,7 +70,8 @@ class FunctionAbiTest(absltest.TestCase):
     arg = np.zeros((10, 128, 64), dtype=np.float32)
     packed = fabi.raw_pack_inputs([arg])
     print(packed)
-    self.assertEqual("<VmVariantList(1): [HalBuffer(327680)]>", repr(packed))
+    self.assertEqual("<VmVariantList(1): [HalBufferView(10x128x64:0x3000020)]>",
+                     repr(packed))
 
   def test_static_result_success(self):
     fabi = rt.FunctionAbi(self.device, self.htf,
@@ -79,7 +80,8 @@ class FunctionAbiTest(absltest.TestCase):
     f_args = fabi.raw_pack_inputs([arg])
     f_results = fabi.allocate_results(f_args)
     print(f_results)
-    self.assertEqual("<VmVariantList(1): [HalBuffer(65536)]>", repr(f_results))
+    self.assertEqual("<VmVariantList(1): [HalBufferView(32x8x64:0x1000020)]>",
+                     repr(f_results))
     py_result, = fabi.raw_unpack_results(f_results)
     self.assertEqual(np.int32, py_result.dtype)
     self.assertEqual((32, 8, 64), py_result.shape)
@@ -104,14 +106,10 @@ class FunctionAbiTest(absltest.TestCase):
     self.assertEqual(1, fabi.raw_result_arity)
 
     arg = np.zeros((10, 128, 64), dtype=np.float32)
-    with self.assertRaisesRegex(NotImplementedError,
-                                "Dynamic argument dimensions not implemented"):
-      unused_packed = fabi.raw_pack_inputs([arg])
-      # TODO(laurenzo): Re-enable the following once implemented.
-      # print(packed)
-      # self.assertEqual(
-      #     "<VmVariantList(1): [HalBuffer(327680, dynamic_dims=[10])]>",
-      #     repr(packed))
+    packed = fabi.raw_pack_inputs([arg])
+    print(packed)
+    self.assertEqual("<VmVariantList(1): [HalBufferView(10x128x64:0x3000020)]>",
+                     repr(packed))
 
   def test_static_arg_rank_mismatch(self):
     fabi = rt.FunctionAbi(self.device, self.htf,

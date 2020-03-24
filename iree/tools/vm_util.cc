@@ -27,6 +27,7 @@
 #include "iree/base/shaped_buffer_string_util.h"
 #include "iree/base/signature_mangle.h"
 #include "iree/base/status.h"
+#include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/module.h"
@@ -38,8 +39,11 @@ Status ValidateFunctionAbi(const iree_vm_function_t& function) {
   iree_string_view_t sig_fv =
       iree_vm_function_reflection_attr(&function, iree_make_cstring_view("fv"));
   if (absl::string_view{sig_fv.data, sig_fv.size} != "1") {
+    auto function_name = iree_vm_function_name(&function);
     return iree::UnimplementedErrorBuilder(IREE_LOC)
-           << "Unsupported function ABI";
+           << "Unsupported function ABI for: '"
+           << absl::string_view(function_name.data, function_name.size) << "'("
+           << absl::string_view{sig_fv.data, sig_fv.size} << ")";
   }
   return OkStatus();
 }
@@ -98,6 +102,8 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
     auto input_string = input_strings[i];
     auto desc = descs[i];
     std::string desc_str;
+    // TODO(laurenzo): Parse real element type once bindings code enforces it.
+    iree_hal_element_type_t hal_element_type = IREE_HAL_ELEMENT_TYPE_NONE;
     desc.ToString(desc_str);
     switch (desc.type) {
       case RawSignatureParser::Type::kScalar: {
@@ -127,6 +133,7 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
         ASSIGN_OR_RETURN(auto shaped_buffer,
                          ParseShapedBufferFromString(input_string),
                          _ << "Parsing value '" << input_string << "'");
+        // Allocate the buffer.
         iree_hal_buffer_t* buf = nullptr;
         // TODO(benvanik): combined function for linear to optimal upload.
         iree_device_size_t allocation_size =
@@ -148,10 +155,29 @@ StatusOr<iree_vm_variant_list_t*> ParseToVariantList(
                                        shaped_buffer.contents().size()),
             IREE_LOC))
             << "Populating buffer contents ";
-        auto buf_ref = iree_hal_buffer_move_ref(buf);
+
+        absl::InlinedVector<int32_t, 5> dims(shaped_buffer.shape().size());
+        // TODO(laurenzo): The following should work but Shape iterators
+        // cause access violations.
+        // std::copy(shaped_buffer.shape().begin(), shaped_buffer.shape().end(),
+        //           dims.begin());
+        for (size_t i = 0; i < dims.size(); ++i) {
+          dims[i] = shaped_buffer.shape()[i];
+        }
+
+        // Wrap in buffer view.
+        iree_hal_buffer_view_t* buffer_view = nullptr;
         RETURN_IF_ERROR(FromApiStatus(
-            iree_vm_variant_list_append_ref_move(variant_list, &buf_ref),
-            IREE_LOC));
+            iree_hal_buffer_view_create(buf, dims.data(), dims.size(),
+                                        hal_element_type, IREE_ALLOCATOR_SYSTEM,
+                                        &buffer_view),
+            IREE_LOC))
+            << "Creating buffer view";
+        iree_hal_buffer_release(buf);
+        auto buffer_view_ref = iree_hal_buffer_view_move_ref(buffer_view);
+        RETURN_IF_ERROR(FromApiStatus(iree_vm_variant_list_append_ref_move(
+                                          variant_list, &buffer_view_ref),
+                                      IREE_LOC));
         break;
       }
       default:
@@ -199,15 +225,28 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
                  << static_cast<int>(variant->value_type)
                  << " but descriptor information " << desc_str;
         }
-        auto* buffer = iree_hal_buffer_deref(&variant->ref);
-        if (!buffer) {
+        auto* buffer_view = iree_hal_buffer_view_deref(&variant->ref);
+        if (!buffer_view) {
           return InvalidArgumentErrorBuilder(IREE_LOC)
                  << "failed dereferencing variant " << i;
+        }
+        auto* buffer = iree_hal_buffer_view_buffer(buffer_view);
+        if (!buffer) {
+          return InvalidArgumentErrorBuilder(IREE_LOC)
+                 << "failed to get buffer for variant " << i;
         }
 
         auto print_mode = BufferDataPrintMode::kFloatingPoint;
         int8_t element_size = 4;
-        Shape shape;
+
+        // Copy the dims out of the buffer view.
+        absl::InlinedVector<int32_t, 5> dims32(
+            iree_hal_buffer_view_shape_rank(buffer_view));
+        iree_hal_buffer_view_shape(buffer_view, dims32.size(), dims32.data(),
+                                   nullptr);
+        absl::InlinedVector<int, 5> dims(dims32.size());
+        std::copy(dims32.begin(), dims32.end(), dims.begin());
+        Shape shape{dims};
 
         switch (desc.buffer.scalar_type) {
           case AbiConstants::ScalarType::kIeeeFloat16:
@@ -233,7 +272,6 @@ Status PrintVariantList(absl::Span<const RawSignatureParser::Description> descs,
         }
         element_size = AbiConstants::kScalarTypeSize[static_cast<unsigned>(
             desc.buffer.scalar_type)];
-        shape = Shape{desc.dims};
 
         iree_hal_mapped_memory_t mapped_memory;
         RETURN_IF_ERROR(FromApiStatus(

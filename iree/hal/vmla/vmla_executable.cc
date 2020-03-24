@@ -93,7 +93,7 @@ Status VMLAExecutable::Initialize(iree_vm_instance_t* instance,
     RETURN_IF_ERROR(
         FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
                           bytecode_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i,
-                          &entry_functions_[i]),
+                          &entry_functions_[i], nullptr),
                       IREE_LOC));
   }
 

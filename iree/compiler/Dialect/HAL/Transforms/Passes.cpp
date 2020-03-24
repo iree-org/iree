@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -32,6 +33,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMaterializeInterfacesPass(executableOptions));
   passManager.addPass(createTranslateExecutablesPass(executableOptions));
   passManager.addPass(createConvertFlowToHALPass());
+  passManager.addPass(createPublicABIGenerationPass());
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());

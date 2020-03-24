@@ -1,4 +1,4 @@
-func @identity_through_set_item_get_item(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.module.export} {
+func @identity_through_set_item_get_item(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.module.export, iree.abi.none} {
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %0 = hal.buffer_view.const %allocator, "HostLocal|DeviceVisible", "All" : !hal.buffer_view = dense<1> : tensor<i32>
@@ -10,7 +10,7 @@ func @identity_through_set_item_get_item(%arg0: !hal.buffer_view) -> !hal.buffer
   return %5 : !hal.buffer_view
 }
 
-func @identity_through_stack(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.module.export} {
+func @identity_through_stack(%arg0: !hal.buffer_view) -> !hal.buffer_view attributes {iree.module.export, iree.abi.none} {
   %dev = hal.ex.shared_device : !hal.device
   %allocator = hal.device.allocator %dev : !hal.allocator
   %element_shape = hal.buffer_view.const %allocator, "HostLocal|DeviceVisible", "All" : !hal.buffer_view = dense<[]> : tensor<0xi32>

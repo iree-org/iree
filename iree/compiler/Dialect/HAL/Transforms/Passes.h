@@ -68,6 +68,11 @@ std::unique_ptr<OpPassBase<ModuleOp>> createTranslateExecutablesPass(
 std::unique_ptr<OpPassBase<IREE::Flow::ExecutableOp>>
 createRewriteLegacyIOPass();
 
+// For functions that contain reflection metadata in an
+// iree.generateabi.reflection attribute, generate public ABI functions for
+// typical clients to use.
+std::unique_ptr<OpPassBase<ModuleOp>> createPublicABIGenerationPass();
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

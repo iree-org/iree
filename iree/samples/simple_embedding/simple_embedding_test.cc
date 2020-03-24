@@ -107,7 +107,9 @@ TEST_P(SimpleEmbeddingTest, RunOnce) {
   iree_vm_module_release(bytecode_module);
 
   // Lookup the entry point function.
-  const char kMainFunctionName[] = "module.simple_mul";
+  // Note that we use the "raw" variant which operates on pure type/shape
+  // erased buffers.
+  const char kMainFunctionName[] = "module.simple_mul$raw";
   iree_vm_function_t main_function;
   CHECK_EQ(
       IREE_STATUS_OK,

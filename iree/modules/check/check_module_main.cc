@@ -15,6 +15,7 @@
 #include <iostream>
 
 #include "absl/flags/flag.h"
+#include "absl/strings/match.h"
 #include "absl/strings/string_view.h"
 #include "iree/base/api.h"
 #include "iree/base/api_util.h"
@@ -110,20 +111,26 @@ StatusOr<int> Run() {
   for (int ordinal = 0; ordinal < module_signature.export_function_count;
        ++ordinal) {
     iree_vm_function_t function;
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_vm_module_lookup_function_by_ordinal(
-            input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, ordinal, &function),
-        IREE_LOC))
+    iree_string_view_t export_name_sv;
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_vm_module_lookup_function_by_ordinal(
+                          input_module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+                          ordinal, &function, &export_name_sv),
+                      IREE_LOC))
         << "Looking up function export " << ordinal;
 
-    iree_string_view_t function_name_iree_sv = iree_vm_function_name(&function);
     // TODO(gcmn): Implicit conversion from iree to absl string view.
-    auto function_name = absl::string_view(function_name_iree_sv.data,
-                                           function_name_iree_sv.size);
+    auto export_name =
+        absl::string_view(export_name_sv.data, export_name_sv.size);
 
     iree_string_view_t module_name_iree_sv = iree_vm_module_name(input_module);
     auto module_name =
         absl::string_view(module_name_iree_sv.data, module_name_iree_sv.size);
+    if (absl::StartsWith(export_name, "__") ||
+        export_name.find('$') != absl::string_view::npos) {
+      // Skip internal or special functions.
+      continue;
+    }
 
     RETURN_IF_ERROR(ValidateFunctionAbi(function));
     ASSIGN_OR_RETURN(auto input_descs, ParseInputSignature(function));
@@ -141,11 +148,11 @@ StatusOr<int> Run() {
       }
       return InvalidArgumentErrorBuilder(IREE_LOC)
              << "Expected function with no inputs or outputs, but "
-             << function_name << "' has signature '" << sig_str.value() << "'";
+             << export_name << "' has signature '" << sig_str.value() << "'";
     }
 
     ::testing::RegisterTest(
-        module_name.data(), function_name.data(), nullptr,
+        module_name.data(), export_name.data(), nullptr,
         std::to_string(ordinal).c_str(), __FILE__, __LINE__,
         [&instance, modules, function]() -> CheckModuleTest* {
           return new CheckModuleTest(instance, modules, function);
