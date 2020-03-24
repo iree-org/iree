@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/Dialect.h"

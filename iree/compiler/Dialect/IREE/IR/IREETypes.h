@@ -83,6 +83,7 @@ namespace Strings {
 namespace TypeKind {
 enum Kind {
   String = IREE::TypeKind::FIRST_STRING_TYPE,
+  StringTensor
 };
 }  // namespace TypeKind
 }  // namespace Strings

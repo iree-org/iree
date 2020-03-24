@@ -27,9 +27,18 @@ vm.module @strings {
 vm.import @i32_to_string(%value : i32) -> !vm.ref<!strings.string>
 attributes {nosideeffects}
 
+// Returns a tensor of strings of elementwise to string of
+// buffer_view elements.
+// Maps to the IREE::Strings::ToString.
+vm.import @to_string(%value : !vm.ref<!hal.buffer_view>) -> !vm.ref<!strings.string_tensor>
+attributes {nosideeffects}
 
 // Prints the contents of a string.
 // Maps to the IREE::Strings::Print.
 vm.import @print(%value : !vm.ref<!strings.string>)
+
+// Prints the contents of a string tensor.
+// Maps to the IREE::Strings::PrintTensor.
+vm.import @print_tensor(%value : !vm.ref<!strings.string_tensor>)
 
 }  // vm.module
