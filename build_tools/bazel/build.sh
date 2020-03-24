@@ -21,13 +21,25 @@ set -e
 set -x
 
 # CI-friendly defaults that control availability of certain platform tests.
-if ! [[ -v IREE_VULKAN_DISABLE ]]; then
-  IREE_VULKAN_DISABLE=1
-fi
-test_env_args=(
+IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE:-1}"
+declare -a test_env_args=(
   --test_env=IREE_VULKAN_DISABLE=$IREE_VULKAN_DISABLE
 )
-echo "Running with test env args: ${test_env_args[@]}"
+
+declare -a default_build_tag_filters=("-nokokoro")
+declare -a default_test_tag_filters=("-nokokoro")
+
+# We can still build things that use vulkan. Only add to test tag filters.
+if [[ "${IREE_VULKAN_DISABLE?}" == 1 ]]; then
+  default_test_tag_filters+=("-driver=vulkan")
+fi
+BUILD_TAG_FILTERS="${BUILD_TAG_FILTERS:-${default_build_tag_filters[@]?}}"
+TEST_TAG_FILTERS="${TEST_TAG_FILTERS:-${default_test_tag_filters[@]?}}"
+
+echo "Running with "
+echo "  test env args: ${test_env_args[@]?}"
+echo "  build_tag_filters: ${BUILD_TAG_FILTERS[@]?}"
+echo "  test_tag_filters: ${TEST_TAG_FILTERS[@]?}"
 
 # Build and test everything in supported directories not explicitly marked as
 # excluded from CI (using the tag "nokokoro").
@@ -37,8 +49,13 @@ echo "Running with test env args: ${test_env_args[@]}"
 # `bazel test //...` because the latter excludes targets tagged "manual". The
 # "manual" tag allows targets to be excluded from human wildcard builds, but we
 # want them built by CI unless they are excluded with "nokokoro".
-bazel query '//iree/... + //bindings/... except attr("tags", "nokokoro", //...)' | \
-  xargs bazel test ${test_env_args[@]} --keep_going --test_output=errors --config=rs
+bazel query "//iree/... + //bindings/..." | \
+  xargs bazel test ${test_env_args[@]} \
+    --build_tag_filters="$BUILD_TAG_FILTERS" \
+    --test_tag_filters="$TEST_TAG_FILTERS" \
+    --keep_going \
+    --test_output=errors \
+    --config=rs
 
 # Disable RBE until compatibility issues with the experimental_repo_remote_exec
 # flag are fixed.
