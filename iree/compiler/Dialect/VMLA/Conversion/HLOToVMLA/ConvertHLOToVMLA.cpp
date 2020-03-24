@@ -186,8 +186,8 @@ struct ConcatenateOpConversion
           srcOp.getLoc(), tensorOperand, typeConverter, rewriter);
       SmallVector<Value, 4> lengths(rank);
       for (int i = 0; i < rank; ++i) {
-        lengths[i] = rewriter.createOrFold<Shape::RankedDimOp>(srcOp.getLoc(),
-                                                               srcShape, i);
+        lengths[i] = rewriter.createOrFold<Shape::RankedDimOp>(
+            srcOp.getLoc(), rewriter.getIntegerType(32), srcShape, i);
       }
 
       rewriter.create<IREE::VMLA::CopyOp>(

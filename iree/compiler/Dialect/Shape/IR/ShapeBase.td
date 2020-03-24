@@ -39,6 +39,17 @@ def Shape_RankedShape :
     Type<CPred<"$_self.isa<::mlir::iree_compiler::Shape::RankedShapeType>()">,
          "Ranked shape type">;
 
+// TODO(silvasean): Investigate the layering aspects of allowing non-index types
+// here. There seem to be two primary motivators right now, both of which are
+// not obviously ideal long-term:
+//
+// 1. xla_hlo dialect uses i64 in many places that index should be used.
+//    This is understood to be a bug.
+// 2. VMLA gets these values as i32 directly.
+//
+// Both cases can be resolved by inserting casts if we decide to take a firmer
+// stance on only allowing index type. But retaining the flexibility might
+// be a useful feature.
 def Shape_DimType : AnyTypeOf<[Index, AnySignlessInteger]>;
 
 #endif  // IREE_DIALECT_SHAPE_BASE

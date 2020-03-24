@@ -14,27 +14,21 @@ func @parseStaticShapeIndex(%arg0 : !shapex.ranked_shape<[1, 2]>) {
 }
 
 // CHECK-LABEL: @parseScalarShape
-// CHECK: !shapex.ranked_shape<[],i32>
-func @parseScalarShape(%arg0 : !shapex.ranked_shape<[], i32>) {
+// CHECK: !shapex.ranked_shape<[]>
+func @parseScalarShape(%arg0 : !shapex.ranked_shape<[]>) {
   return
 }
 
 // -----
 // CHECK-LABEL: @parseStaticShape
-// CHECK: !shapex.ranked_shape<[1,2],i32>
-func @parseStaticShape(%arg0 : !shapex.ranked_shape<[1, 2], i32>) {
+// CHECK: !shapex.ranked_shape<[1,2]>
+func @parseStaticShape(%arg0 : !shapex.ranked_shape<[1, 2]>) {
   return
 }
 
 // -----
 // CHECK-LABEL: @parseDynamicShape
-// CHECK: !shapex.ranked_shape<[1,?,2,?],i32>
-func @parseDynamicShape(%arg0 : !shapex.ranked_shape<[1,?,2,?],i32>) {
-  return
-}
-
-// -----
-// expected-error @+1 {{RankedShapeType must have an integral or index dim type}}
-func @error(%arg0 : !shapex.ranked_shape<[1,?],f32>) {
+// CHECK: !shapex.ranked_shape<[1,?,2,?]>
+func @parseDynamicShape(%arg0 : !shapex.ranked_shape<[1,?,2,?]>) {
   return
 }

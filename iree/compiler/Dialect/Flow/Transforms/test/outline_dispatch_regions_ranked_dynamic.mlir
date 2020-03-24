@@ -22,7 +22,7 @@ func @dynamicRankedShape(%arg0 : tensor<7x?x24x?xf32>) -> tensor<1024xf32> {
   %dim1 = dim %arg0, 1 : tensor<7x?x24x?xf32>
   %dim3 = dim %arg0, 3 : tensor<7x?x24x?xf32>
   %workload0 = constant 1024 : index
-  %shape0 = shapex.make_ranked_shape %dim1, %dim3 -> !shapex.ranked_shape<[7,?,24,?]>
+  %shape0 = shapex.make_ranked_shape %dim1, %dim3 : (index, index) -> !shapex.ranked_shape<[7,?,24,?]>
   %1 = flow.dispatch.region[%workload0 : index](%arg1 = %arg0 : tensor<7x?x24x?xf32>, %arg2 = %shape0 : !shapex.ranked_shape<[7,?,24,?]>) -> tensor<1024xf32> {
     %2 = shapex.tie_shape %arg1, %arg2 : tensor<7x?x24x?xf32>, !shapex.ranked_shape<[7,?,24,?]>
     %3 = "some_kind_of_sum"(%2) : (tensor<7x?x24x?xf32>) -> tensor<1024xf32>

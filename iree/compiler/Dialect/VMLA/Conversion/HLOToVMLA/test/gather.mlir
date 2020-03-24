@@ -4,8 +4,8 @@
 // CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
 // CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
 func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<i64>) -> tensor<1x5xi32> attributes { sym_visibility = "private" } {
-  // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,1,5],i32>
-  // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,1,5],i32>
+  // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,1,5]>
+  // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,1,5]>
   // CHECK-DAG: [[INDEX0:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0_i32)
   // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c20_i32)
   // CHECK-NEXT: "vmla.copy"(
@@ -32,8 +32,8 @@ func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<
 // CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
 // CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
 func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices : tensor<3xi64>) -> tensor<2x3xf32> attributes { sym_visibility = "private" } {
-  // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,2,3],i32>
-  // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,3],i32>
+  // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,2,3]>
+  // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,3]>
   // CHECK-DAG: [[INDEX0:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0_i32)
   // CHECK-DAG: [[INDEX1:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c4_i32)
   // CHECK-DAG: [[INDEX2:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c8_i32)

@@ -51,8 +51,7 @@ Value buildCastInputsToResultShape(Location loc,
   for (auto inputOperand : inputs) {
     auto inputOperandType = inputOperand.getType().dyn_cast<RankedTensorType>();
     RankedShapeType inputOperandShape = RankedShapeType::getChecked(
-        inputOperandType.getShape(), resultShapeType.getDimType(),
-        inputOperand.getLoc());
+        inputOperandType.getShape(), inputOperand.getLoc());
     if (!inputOperandShape) return nullptr;
 
     inputShapes.push_back(
@@ -103,8 +102,8 @@ Value buildDegenerateBroadcastRankedShape(
     } else if (srcRsType.isDimDynamic(inputDimIndex)) {
       // Append dynamic source dim.
       outputAllDims.push_back(-1);
-      auto dim = builder.create<RankedDimOp>(srcShape.getLoc(), srcShape,
-                                             inputDimIndex);
+      auto dim = builder.create<RankedDimOp>(
+          srcShape.getLoc(), builder.getIndexType(), srcShape, inputDimIndex);
       outputDynamicDims.push_back(dim);
     } else {
       // Append static source dim.
@@ -112,7 +111,7 @@ Value buildDegenerateBroadcastRankedShape(
     }
   }
 
-  auto dstRsType = RankedShapeType::get(outputAllDims, srcRsType.getDimType());
+  auto dstRsType = RankedShapeType::get(outputAllDims, srcRsType.getContext());
   if (outputDynamicDims.empty()) {
     return builder.create<ConstRankedShapeOp>(srcShape.getLoc(), dstRsType);
   } else {
@@ -123,7 +122,6 @@ Value buildDegenerateBroadcastRankedShape(
 
 Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
                                      OpBuilder &builder) {
-  if (!dimType) dimType = builder.getIndexType();
   auto valueSt = value.getType().dyn_cast<ShapedType>();
   if (!valueSt) {
     builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
@@ -131,7 +129,8 @@ Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
     return nullptr;
   }
   if (valueSt.hasStaticShape()) {
-    auto rsType = RankedShapeType::get(valueSt.getShape(), dimType);
+    auto rsType =
+        RankedShapeType::get(valueSt.getShape(), builder.getContext());
     return builder.createOrFold<ConstRankedShapeOp>(loc, rsType);
   }
 
@@ -152,15 +151,6 @@ Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
         << "supported)";
     return nullptr;
   }
-
-  if (rsType.getDimType() != dimType) {
-    // TODO(laurenzo): Emit a cast.
-    builder.getContext()->getDiagEngine().emit(loc, DiagnosticSeverity::Error)
-        << "dynamically shaped shape has the wrong dimension type: "
-        << rsType.getDimType();
-    return nullptr;
-  }
-
   return rs;
 }
 

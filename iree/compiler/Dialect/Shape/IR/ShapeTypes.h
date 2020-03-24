@@ -42,20 +42,14 @@ class RankedShapeType : public Type::TypeBase<RankedShapeType, Type,
   /// Support method to enable LLVM-style type casting.
   static bool kindof(unsigned kind) { return kind == TypeKind::RankedShape; }
 
-  // Gets an instance of a RankedShapeType given an array of dimensions and
-  // the integral dimension type to use at runtime. Any dynamic dim should be
-  // -1.
-  static RankedShapeType get(ArrayRef<int64_t> dims, Type dimType);
-  static RankedShapeType getChecked(ArrayRef<int64_t> dims, Type dimType,
-                                    Location loc);
+  // Gets an instance of a RankedShapeType given an array of dimensions.
+  // Any dynamic dim should be -1.
+  static RankedShapeType get(ArrayRef<int64_t> dims, MLIRContext *context);
+  static RankedShapeType getChecked(ArrayRef<int64_t> dims, Location loc);
 
   // Verifies construction invariants and issues errors/warnings.
   static LogicalResult verifyConstructionInvariants(Location loc,
-                                                    ArrayRef<int64_t> dims,
-                                                    Type dimType);
-
-  // Gets an integral type suitable for holding dimensions of this shape.
-  Type getDimType() const;
+                                                    ArrayRef<int64_t> dims);
 
   // Gets the rank (counting all dims, static and dynamic).
   int64_t getRank() const;

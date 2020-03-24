@@ -207,8 +207,8 @@ class DynamicShapeTypeExpander : public TypeExpander {
   LogicalResult convertType(Type sourceType,
                             SmallVectorImpl<Type> &targetTypes) const override {
     if (auto rankedTensorType = getDynamicRankedTensorType(sourceType)) {
-      auto rankedShapeType = RankedShapeType::get(
-          rankedTensorType.getShape(), IndexType::get(sourceType.getContext()));
+      auto rankedShapeType = RankedShapeType::get(rankedTensorType.getShape(),
+                                                  sourceType.getContext());
       targetTypes.push_back(sourceType);
       targetTypes.push_back(rankedShapeType);
       return success();
@@ -274,7 +274,7 @@ class ShapeToPrimitiveTypeExpander : public TypeExpander {
   LogicalResult convertType(Type sourceType,
                             SmallVectorImpl<Type> &targetTypes) const override {
     if (auto rsType = sourceType.dyn_cast<RankedShapeType>()) {
-      auto dimType = rsType.getDimType();
+      auto dimType = IndexType::get(sourceType.getContext());
       for (int i = 0; i < rsType.getNumDynamicDims(); ++i) {
         targetTypes.push_back(dimType);
       }

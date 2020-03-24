@@ -86,7 +86,7 @@ class BroadcastedRankedBinaryElementwiseConversion
     auto lhsShape = rewriter.create<GetRankedShapeOp>(op.getLoc(), lhs);
     auto rhsShape = rewriter.create<GetRankedShapeOp>(op.getLoc(), rhs);
     auto resultShapeType =
-        RankedShapeType::get(resultType.getShape(), rewriter.getIndexType());
+        RankedShapeType::get(resultType.getShape(), rewriter.getContext());
     auto resultShapeDims = resultShapeType.getAllDims();
 
     // Rank broadcast as appropriate.

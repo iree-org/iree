@@ -234,7 +234,8 @@ Value VMLAConversionTarget::getBufferOffset(
   for (int i = 0; i < tensorType.getRank(); ++i) {
     auto axisOffset = indices[i];
     for (int j = i + 1; j < tensorType.getRank(); ++j) {
-      auto dim = rewriter.createOrFold<Shape::RankedDimOp>(loc, shape, j);
+      auto dim = rewriter.createOrFold<Shape::RankedDimOp>(
+          loc, rewriter.getIntegerType(32), shape, j);
       axisOffset = rewriter.createOrFold<mlir::MulIOp>(loc, axisOffset, dim);
     }
     offset = rewriter.createOrFold<mlir::AddIOp>(loc, offset, axisOffset);
@@ -256,7 +257,8 @@ Value VMLAConversionTarget::getBufferLength(
 
   auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
   if (!shape) return nullptr;
-  auto dims = rewriter.create<Shape::RankedDimsOp>(loc, shape);
+  auto dims = rewriter.create<Shape::RankedDimsOp>(
+      loc, rewriter.getIntegerType(32), shape);
   Value length = elementSize;
   for (auto dim : dims.getResults()) {
     length = rewriter.createOrFold<mlir::MulIOp>(loc, length, dim);

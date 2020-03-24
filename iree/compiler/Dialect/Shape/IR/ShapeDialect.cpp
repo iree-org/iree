@@ -117,7 +117,7 @@ static Type parseRankedShape(DialectAsmParser& parser) {
   }
 
   return Shape::RankedShapeType::getChecked(
-      dims, dimType, parser.getEncodedSourceLoc(parser.getNameLoc()));
+      dims, parser.getEncodedSourceLoc(parser.getNameLoc()));
 }
 
 static void printRankedShape(Shape::RankedShapeType type,
@@ -133,14 +133,7 @@ static void printRankedShape(Shape::RankedShapeType type,
           printer << dim;
       },
       ",");
-  printer << "]";
-  auto dimType = type.getDimType();
-  if (!dimType.isa<IndexType>()) {
-    // Only print for non index type.
-    printer << ",";
-    printer.printType(dimType);
-  }
-  printer << ">";
+  printer << "]>";
 }
 
 Type ShapeDialect::parseType(DialectAsmParser& parser) const {

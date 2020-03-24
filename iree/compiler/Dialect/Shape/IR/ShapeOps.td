@@ -154,7 +154,7 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
     in the type, not have dims represented as const SSA values.
 
     Usage:
-      %0 = shape.const_ranked_shape : !shape.ranked_shape<[1,2],i32>
+      %0 = shape.const_ranked_shape : !shape.ranked_shape<[1,2]>
   }];
 
   let arguments = (ins);
@@ -171,17 +171,14 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
   let verifier = [{ return verify$cppClass(*this); }];
 }
 
-def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape", [
-    TypesMatchWith<"dimensions type and rank to match Dim type of result",
-                   "shape", "dynamic_dimensions",
-                   "getDimTypeDynamicRange($_self.cast<RankedShapeType>())">]> {
+def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape"> {
   let summary = "Makes a ranked_shape from individual dims.";
   let description = [{
     Given a list of SSA values holding compatible dims, makes a corresponding
     ranked_shape.
 
     Usage:
-      %0 = shape.make_ranked_shape %dim0, %dim1 ->
+      %0 = shape.make_ranked_shape %dim0, %dim1 : (i32, i32) ->
           !shape.ranked_shape<[?,?,128]>
 
     Note that the type of the dims is is implied by the dim type of the result.
@@ -190,13 +187,14 @@ def Shape_MakeRankedShapeOp : Shape_PureOp<"make_ranked_shape", [
   let arguments = (ins Variadic<Shape_DimType>:$dynamic_dimensions);
   let results = (outs Shape_RankedShape:$shape);
 
-  let assemblyFormat = "$dynamic_dimensions `->` type($shape) attr-dict";
+  let assemblyFormat = "$dynamic_dimensions `:` functional-type($dynamic_dimensions, $shape) attr-dict";
 
   let extraClassDeclaration = [{
     RankedShapeType getRankedShapeType() {
       return shape().getType().cast<RankedShapeType>();
     }
   }];
+  let verifier = [{ return verify$cppClass(*this); }];
   let hasCanonicalizer = 1;
 }
 
@@ -206,8 +204,8 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
     Static dimensions will fold to constants.
 
     Usage:
-      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2],i32>
-      %1 = shape.ranked_dim %0[0] : !shape.ranked_shape<[1,2],i32>
+      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2]>
+      %1 = shape.ranked_dim %0[0] : !shape.ranked_shape<[1,2]> -> i32
   }];
 
   let arguments = (ins Shape_RankedShape:$shape,
@@ -217,7 +215,13 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
 
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, Value shape, int index
+      Builder *builder, OperationState &result,
+      Type dimType, Value shape, int index
+    }]>,
+    // dimType is defaulted to IndexType.
+    OpBuilder<[{
+      Builder *builder, OperationState &result,
+      Value shape, int index
     }]>,
   ];
 
@@ -233,25 +237,25 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
   let hasCanonicalizer = 1;
 }
 
-def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims", [
-    TypesMatchWith<"result type and rank to match Dim type of shape operand",
-                   "shape", "result",
-                   "getDimTypeRange($_self.cast<RankedShapeType>())">]> {
+def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
   let summary = "Gets all dimension values from a ranked_shape.";
   let description = [{
     Static dimensions will fold to constants.
 
     Usage:
-      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2],i32>
-      %1, %2 = shape.ranked_dims %0 : !shape.ranked_shape<[1,2],i32>
+      %0 = shape.const ranked_shape : !shape.ranked_shape<[1,2]>
+      %1, %2 = shape.ranked_dims %0 : !shape.ranked_shape<[1,2]> -> (i32, i32)
   }];
 
   let arguments = (ins Shape_RankedShape:$shape);
   let results = (outs Variadic<Shape_DimType>:$result);
 
-  let assemblyFormat = "$shape `:` type($shape) attr-dict";
+  let assemblyFormat = "$shape `:` type($shape) `->` type($result) attr-dict";
 
   let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result, Type dimType, Value shape
+    }]>,
     OpBuilder<[{
       Builder *builder, OperationState &result, Value shape
     }]>,

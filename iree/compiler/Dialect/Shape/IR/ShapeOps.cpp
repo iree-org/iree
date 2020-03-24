@@ -41,13 +41,16 @@ namespace Shape {
 /// Make a range of the DimType for a RankedShapeType with the number of
 /// elements equal to the rank of the shaped type.
 static RepeatRange<Type> getDimTypeRange(RankedShapeType type) {
-  return make_repeated_range(type.getDimType(), type.getRank());
+  return make_repeated_range(
+      static_cast<Type>(IndexType::get(type.getContext())), type.getRank());
 }
 
 /// Make a range of the DimType for a RankedShapeType with the number of
 /// elements equal to the dynamic dimensions of the shaped type.
 static RepeatRange<Type> getDimTypeDynamicRange(RankedShapeType type) {
-  return make_repeated_range(type.getDimType(), type.getNumDynamicDims());
+  return make_repeated_range(
+      static_cast<Type>(IndexType::get(type.getContext())),
+      type.getNumDynamicDims());
 }
 
 //===----------------------------------------------------------------------===//
@@ -216,7 +219,8 @@ class ExpandRankedShapeDimsPattern : public OpRewritePattern<RankedDimsOp> {
     auto rsType = op.getRankedShapeType();
     SmallVector<Value, 4> dims(rsType.getRank());
     for (int i = 0; i < rsType.getRank(); ++i) {
-      dims[i] = rewriter.createOrFold<RankedDimOp>(op.getLoc(), op.shape(), i);
+      dims[i] = rewriter.createOrFold<RankedDimOp>(
+          op.getLoc(), op.getResult(i).getType(), op.shape(), i);
     }
     rewriter.replaceOp(op, dims);
     return success();
@@ -318,7 +322,7 @@ void GetRankedShapeOp::build(Builder *builder, OperationState &result,
   auto rankedOperandType = operand.getType().dyn_cast<RankedTensorType>();
   if (rankedOperandType) {
     result.types.push_back(RankedShapeType::get(rankedOperandType.getShape(),
-                                                builder->getIndexType()));
+                                                builder->getContext()));
   }
   result.addOperands(operand);
 }
@@ -370,15 +374,20 @@ void ConstRankedShapeOp::getAsmResultNames(
   os << "rs";
   interleave(
       rankedShape.getAllDims(), os, [&](int64_t dim) { os << dim; }, "_");
-  if (!rankedShape.getDimType().isa<IndexType>()) {
-    os << "_" << rankedShape.getDimType();
-  }
   setNameFn(getResult(), os.str());
 }
 
 //===----------------------------------------------------------------------===//
 // shape.make_ranked_shape
 //===----------------------------------------------------------------------===//
+
+static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
+  if (op.getRankedShapeType().getNumDynamicDims() != op.getNumOperands()) {
+    return op.emitError()
+           << "number of dynamic dims doesn't match number of operands";
+  }
+  return success();
+}
 
 void MakeRankedShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
@@ -389,13 +398,17 @@ void MakeRankedShapeOp::getCanonicalizationPatterns(
 // shape.ranked_dim
 //===----------------------------------------------------------------------===//
 
-void RankedDimOp::build(Builder *builder, OperationState &result, Value shape,
-                        int index) {
+void RankedDimOp::build(Builder *builder, OperationState &result, Type dimType,
+                        Value shape, int index) {
   result.addOperands(shape);
   result.addAttribute("index",
                       builder->getIntegerAttr(builder->getIndexType(), index));
-  auto rankedShapeType = shape.getType().cast<RankedShapeType>();
-  result.addTypes({rankedShapeType.getDimType()});
+  result.addTypes(dimType);
+}
+
+void RankedDimOp::build(Builder *builder, OperationState &result, Value shape,
+                        int index) {
+  RankedDimOp::build(builder, result, builder->getIndexType(), shape, index);
 }
 
 ParseResult parseRankedDimOp(OpAsmParser &parser, OperationState &state) {
@@ -403,9 +416,11 @@ ParseResult parseRankedDimOp(OpAsmParser &parser, OperationState &state) {
   Type operandType;
   IntegerAttr indexAttr;
   Type indexType = parser.getBuilder().getIndexType();
+  SmallVector<Type, 1> resultTypes;
   if (parser.parseOperand(operand) || parser.parseLSquare() ||
       parser.parseAttribute(indexAttr, indexType, "index", state.attributes) ||
       parser.parseRSquare() || parser.parseColonType(operandType) ||
+      parser.parseArrowTypeList(resultTypes) || resultTypes.empty() ||
       parser.resolveOperand(operand, operandType, state.operands)) {
     return failure();
   }
@@ -414,7 +429,7 @@ ParseResult parseRankedDimOp(OpAsmParser &parser, OperationState &state) {
   if (!rsType) {
     return parser.emitError(parser.getNameLoc());
   }
-  state.types.push_back(rsType.getDimType());
+  state.types.push_back(resultTypes[0]);
   return success();
 }
 
@@ -424,15 +439,12 @@ static void printRankedDimOp(OpAsmPrinter &p, RankedDimOp op) {
   p << "[" << op.getIndex() << "]";
   p << " : ";
   p.printType(op.shape().getType());
+  p << " -> ";
+  p.printType(op.getType());
 }
 
 static LogicalResult verifyRankedDimOp(RankedDimOp op) {
-  auto resultType = op.result().getType();
   auto rsType = op.shape().getType().dyn_cast<RankedShapeType>();
-  if (resultType != rsType.getDimType()) {
-    return op.emitOpError()
-           << "expected result of type " << rsType.getDimType();
-  }
   auto index = static_cast<int64_t>(op.getIndex());
   if (index < 0 || index >= rsType.getRank()) {
     return op.emitOpError() << "index out of bounds of shape";
@@ -445,7 +457,7 @@ OpFoldResult RankedDimOp::fold(ArrayRef<Attribute> operand) {
   int index = getIndex();
   if (!rsType.isDimDynamic(index)) {
     auto dimSize = rsType.getStaticDim(index);
-    return IntegerAttr::get(rsType.getDimType(), dimSize);
+    return IntegerAttr::get(getType(), dimSize);
   }
 
   return {};
@@ -460,13 +472,18 @@ void RankedDimOp::getCanonicalizationPatterns(
 // shape.ranked_dims
 //===----------------------------------------------------------------------===//
 
-void RankedDimsOp::build(Builder *builder, OperationState &result,
+void RankedDimsOp::build(Builder *builder, OperationState &result, Type dimType,
                          Value shape) {
   result.addOperands(shape);
   auto rankedShapeType = shape.getType().cast<RankedShapeType>();
   for (int i = 0; i < rankedShapeType.getRank(); ++i) {
-    result.types.push_back(rankedShapeType.getDimType());
+    result.types.push_back(dimType);
   }
+}
+
+void RankedDimsOp::build(Builder *builder, OperationState &result,
+                         Value shape) {
+  RankedDimsOp::build(builder, result, builder->getIndexType(), shape);
 }
 
 void RankedDimsOp::getCanonicalizationPatterns(

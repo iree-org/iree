@@ -38,7 +38,7 @@ Value rewriteShapexRankedBroadcastShape(RankedBroadcastShapeOp bcastOp,
 
   auto loc = bcastOp.getLoc();
   auto resultRs = bcastOp.getResult().getType().cast<RankedShapeType>();
-  auto dimType = resultRs.getDimType();
+  auto dimType = IndexType::get(builder.getContext());
 
   // Pairs of the shape dim and corresponding value if dynamic.
   SmallVector<std::pair<Optional<int>, Value>, 4> lhsDims;

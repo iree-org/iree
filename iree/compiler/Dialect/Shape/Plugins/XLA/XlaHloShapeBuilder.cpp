@@ -61,18 +61,19 @@ Value rewriteXlaDotOpShape(RankedShapeType resultRs, DotOp dotOp,
   auto lhsRank = lhsType.getRank();
   auto rhsRank = rhsType.getRank();
   auto resultRank = resultType.getRank();
-  auto dimType = resultRs.getDimType();
   auto loc = dotOp.getLoc();
   if (lhsRank == 1 && rhsRank == 1 && resultRank == 0) {
-    auto scalarShape = RankedShapeType::getChecked({}, dimType, loc);
+    auto scalarShape = RankedShapeType::getChecked({}, loc);
     return builder.create<ConstRankedShapeOp>(dotOp.getLoc(), scalarShape);
   } else if (lhsRank == 2 && rhsRank == 1 && resultRank == 1) {
     SmallVector<Value, 1> dynamicDims;
     if (resultRs.isDimDynamic(0)) {
       auto lhsGetShape = builder.create<GetRankedShapeOp>(
-          loc, RankedShapeType::get(lhsType.getShape(), dimType), dotOp.lhs());
-      auto getMDim = builder.create<RankedDimOp>(loc, dimType, lhsGetShape,
-                                                 builder.getI64IntegerAttr(0));
+          loc, RankedShapeType::get(lhsType.getShape(), builder.getContext()),
+          dotOp.lhs());
+      auto getMDim =
+          builder.create<RankedDimOp>(loc, builder.getIndexType(), lhsGetShape,
+                                      builder.getI64IntegerAttr(0));
       dynamicDims.push_back(getMDim);
     }
     return builder.create<MakeRankedShapeOp>(loc, resultRs, dynamicDims);
@@ -80,16 +81,20 @@ Value rewriteXlaDotOpShape(RankedShapeType resultRs, DotOp dotOp,
     SmallVector<Value, 2> dynamicDims;
     if (resultRs.isDimDynamic(0)) {
       auto lhsGetShape = builder.create<GetRankedShapeOp>(
-          loc, RankedShapeType::get(lhsType.getShape(), dimType), dotOp.lhs());
-      auto getMDim = builder.create<RankedDimOp>(loc, dimType, lhsGetShape,
-                                                 builder.getI64IntegerAttr(0));
+          loc, RankedShapeType::get(lhsType.getShape(), builder.getContext()),
+          dotOp.lhs());
+      auto getMDim =
+          builder.create<RankedDimOp>(loc, builder.getIndexType(), lhsGetShape,
+                                      builder.getI64IntegerAttr(0));
       dynamicDims.push_back(getMDim);
     }
     if (resultRs.isDimDynamic(1)) {
       auto rhsGetShape = builder.create<GetRankedShapeOp>(
-          loc, RankedShapeType::get(rhsType.getShape(), dimType), dotOp.rhs());
-      auto getNDim = builder.create<RankedDimOp>(loc, dimType, rhsGetShape,
-                                                 builder.getI64IntegerAttr(1));
+          loc, RankedShapeType::get(rhsType.getShape(), builder.getContext()),
+          dotOp.rhs());
+      auto getNDim =
+          builder.create<RankedDimOp>(loc, builder.getIndexType(), rhsGetShape,
+                                      builder.getI64IntegerAttr(1));
       dynamicDims.push_back(getNDim);
     }
     return builder.create<MakeRankedShapeOp>(loc, resultRs, dynamicDims);
@@ -167,9 +172,8 @@ Value rewriteTranspose(RankedShapeType resultShape, TransposeOp transposeOp,
       transposeOp.operand().getType().dyn_cast<RankedTensorType>();
   if (!operandType) return nullptr;
 
-  auto dimType = resultShape.getDimType();
   auto operandShapeValue = builder.create<GetRankedShapeOp>(
-      loc, RankedShapeType::get(operandType.getShape(), dimType),
+      loc, RankedShapeType::get(operandType.getShape(), builder.getContext()),
       transposeOp.operand());
 
   SmallVector<int64_t, 4> perm;
@@ -184,7 +188,8 @@ Value rewriteTranspose(RankedShapeType resultShape, TransposeOp transposeOp,
     if (!resultShape.isDimDynamic(i)) continue;
     int64_t operandDim = perm[i];
     auto dimValue = builder.create<RankedDimOp>(
-        loc, dimType, operandShapeValue, builder.getI64IntegerAttr(operandDim));
+        loc, builder.getIndexType(), operandShapeValue,
+        builder.getI64IntegerAttr(operandDim));
     dynamicDims.push_back(dimValue);
   }
 

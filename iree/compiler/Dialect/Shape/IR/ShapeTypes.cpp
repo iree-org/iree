@@ -16,6 +16,7 @@
 
 #include "llvm/ADT/Twine.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
 
@@ -26,17 +27,14 @@ namespace detail {
 
 struct RankedShapeTypeStorage : public TypeStorage {
   struct KeyTy {
-    KeyTy(ArrayRef<int64_t> dims, Type dimType)
-        : dims(dims), dimType(dimType) {}
+    KeyTy(ArrayRef<int64_t> dims) : dims(dims) {}
     bool operator==(const KeyTy &other) const {
-      return dimType == dimType && dims.equals(other.dims);
+      return dims.equals(other.dims);
     }
     unsigned getHashValue() const {
-      return llvm::hash_combine(
-          dimType, llvm::hash_combine_range(dims.begin(), dims.end()));
+      return llvm::hash_combine_range(dims.begin(), dims.end());
     }
     ArrayRef<int64_t> dims;
-    Type dimType;
   };
 
   RankedShapeTypeStorage(const KeyTy &key) : key(key) {}
@@ -65,34 +63,25 @@ using namespace mlir::iree_compiler::Shape;
 // RankedShapeType
 //===----------------------------------------------------------------------===//
 
-RankedShapeType RankedShapeType::get(ArrayRef<int64_t> dims, Type dimType) {
-  return Base::get(dimType.getContext(), TypeKind::RankedShape, dims, dimType);
+RankedShapeType RankedShapeType::get(ArrayRef<int64_t> dims,
+                                     MLIRContext *context) {
+  return Base::get(context, TypeKind::RankedShape, dims);
 }
 
 RankedShapeType RankedShapeType::getChecked(ArrayRef<int64_t> dims,
-                                            Type dimType, Location loc) {
-  return Base::getChecked(loc, TypeKind::RankedShape, dims, dimType);
+                                            Location loc) {
+  return Base::getChecked(loc, TypeKind::RankedShape, dims);
 }
 
 LogicalResult RankedShapeType::verifyConstructionInvariants(
-    Location loc, ArrayRef<int64_t> dims, Type dimType) {
+    Location loc, ArrayRef<int64_t> dims) {
   for (auto dim : dims) {
     if (dim < 0 && dim != -1) {
       return emitError(loc, "dims must be -1 for dynamic");
     }
   }
-  if (!dimType) {
-    return emitError(loc, "RankedShapeType must have a dim type");
-  }
-  if (!dimType.isSignlessInteger() && !dimType.isa<IndexType>()) {
-    return emitError(loc,
-                     "RankedShapeType must have an integral or index "
-                     "dim type");
-  }
   return success();
 }
-
-Type RankedShapeType::getDimType() const { return getImpl()->key.dimType; }
 
 int64_t RankedShapeType::getRank() const { return getImpl()->key.dims.size(); }
 

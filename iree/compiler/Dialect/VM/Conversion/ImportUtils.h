@@ -108,8 +108,8 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
             state.addOperands({newOperands[dynamicDimIndex++]});
           } else {
             auto dimOp = rewriter.createOrFold<mlir::ConstantOp>(
-                op.getLoc(), rankedShapeType.getDimType(),
-                rewriter.getIntegerAttr(rankedShapeType.getDimType(),
+                op.getLoc(), rewriter.getIntegerType(32),
+                rewriter.getIntegerAttr(rewriter.getIntegerType(32),
                                         rankedShapeType.getStaticDim(i)));
             state.addOperands({dimOp});
           }
