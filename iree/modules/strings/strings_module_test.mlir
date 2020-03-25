@@ -17,3 +17,8 @@ func @print_example_func(%arg0 : i32) attributes { iree.module.export } {
   "strings.print"(%0) : (!strings.string) -> ()
   return
 }
+
+func @print_string_tensor(%arg0 : !strings.string_tensor) attributes { iree.module.export, iree.abi.none } {
+  "strings.print_tensor"(%arg0) : (!strings.string_tensor) -> ()
+  return
+}

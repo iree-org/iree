@@ -28,6 +28,8 @@ iree_cc_library(
     benchmark
     iree::base::api
     iree::base::logging
+    iree::hal::api
+    iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
     iree::vm::module
@@ -51,6 +53,9 @@ iree_cc_test(
     benchmark
     iree::base::api
     iree::base::logging
+    iree::hal::api
+    iree::hal::vmla::vmla_driver_module
+    iree::modules::hal
     iree::testing::gtest_main
     iree::vm::bytecode_module
     iree::vm::context

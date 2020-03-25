@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRSideEffects
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
   ALWAYSLINK
@@ -53,6 +54,8 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::HAL::Conversion
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Modules::Strings::Conversion
     iree::compiler::Dialect::Modules::Strings::strings_imports

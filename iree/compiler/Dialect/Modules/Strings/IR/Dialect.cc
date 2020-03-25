@@ -91,7 +91,7 @@ void StringsDialect::printType(Type type, DialectAsmPrinter &p) const {
   if (type.isa<StringType>()) {
     p << "string";
   } else if (type.isa<StringTensorType>()) {
-    p << "string_type";
+    p << "string_tensor";
   } else {
     llvm_unreachable("unknown type");
   }
