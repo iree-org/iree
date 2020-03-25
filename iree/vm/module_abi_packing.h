@@ -259,7 +259,6 @@ struct ParamUnpack<std::array<U, S>> {
   using element_type = typename impl::remove_cvref<U>::type;
   using storage_type = std::array<element_type, S>;
   static void Load(ParamUnpackState* param_state, storage_type& out_param) {
-    ++param_state->varargs_ordinal;
     for (int i = 0; i < S; ++i) {
       ParamUnpack::Load(param_state, out_param[i]);
     }
@@ -270,7 +269,6 @@ template <typename... Ts>
 struct ParamUnpack<std::tuple<Ts...>> {
   using storage_type = std::tuple<typename impl::remove_cvref<Ts>::type...>;
   static void Load(ParamUnpackState* param_state, storage_type& out_param) {
-    ++param_state->varargs_ordinal;
     UnpackTuple(param_state, out_param,
                 std::make_index_sequence<sizeof...(Ts)>());
   }
@@ -292,9 +290,9 @@ struct ParamUnpack<absl::Span<U>> {
     const uint16_t count = param_state->frame->return_registers
                                ->registers[param_state->varargs_ordinal++];
     int32_t original_varargs_ordinal = param_state->varargs_ordinal;
-    out_param.resize(count);
-    for (int i = 0; i < count; ++i) {
-      ParamUnpack<element_type>::Load(param_state, out_param[i]);
+    while (param_state->varargs_ordinal - original_varargs_ordinal < count) {
+      out_param.push_back({});
+      ParamUnpack<element_type>::Load(param_state, out_param.back());
     }
     param_state->varargs_ordinal = original_varargs_ordinal;
   }

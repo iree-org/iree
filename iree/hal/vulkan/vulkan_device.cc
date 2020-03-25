@@ -500,7 +500,7 @@ StatusOr<ref_ptr<DescriptorSetLayout>> VulkanDevice::CreateDescriptorSetLayout(
     native_binding.descriptorType =
         static_cast<VkDescriptorType>(bindings[i].type);
     native_binding.descriptorCount = 1;
-    native_binding.stageFlags = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+    native_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     native_binding.pImmutableSamplers = nullptr;
   }
 
