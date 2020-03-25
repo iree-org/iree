@@ -46,7 +46,6 @@ package(
         "keras_lstm_static_test",
         "linspace_test",
         "mandelbrot_test",
-        "math_test",
         "matrix_ops_test",
         "ring_buffer_test",
         "sliding_window_test",
@@ -84,16 +83,22 @@ package(
     ]
 ]
 
-iree_py_test(
-    name = "conv_test",
-    srcs = ["conv_test.py"],
-    python_version = "PY3",
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = [
-        "noga",
-        "nokokoro",
-    ],
-    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-    ],
-)
+[
+    iree_py_test(
+        name = name,
+        srcs = [name + ".py"],
+        python_version = "PY3",
+        # TODO(b/145815906) Get this running in OSS CI.
+        tags = [
+            "noga",
+            "nokokoro",
+        ],
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        ],
+    )
+    for name in [
+        "conv_test",
+        "math_test",
+    ]
+]
