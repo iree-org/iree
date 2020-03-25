@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//iree/tools:compilation.bzl", "iree_bytecode_module")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test_suite")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
-load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 
 package(
     default_visibility = ["//visibility:public"],
@@ -32,37 +31,16 @@ iree_lit_test_suite(
     tags = ["hostonly"],
 )
 
-iree_bytecode_module(
-    name = "success_module",
-    src = "success.mlir",
-    flags = ["-iree-mlir-to-vm-bytecode-module"],
-    translate_tool = "//iree/compiler/Dialect/Modules/Check:check-translate",
+iree_check_test_suite(
+    name = "check",
+    srcs = glob(
+        ["*.mlir"],
+        exclude = ["failure.mlir"],
+    ),
 )
 
-run_binary_test(
-    name = "success_test",
-    args = [
-        "--driver=vmla",
-        "--input_file=$(location :success_module)",
-    ],
-    data = [":success_module"],
-    test_binary = "//iree/modules/check:iree-check-module",
-)
-
-iree_bytecode_module(
-    name = "failure_module",
-    src = "failure.mlir",
-    flags = ["-iree-mlir-to-vm-bytecode-module"],
-    translate_tool = "//iree/compiler/Dialect/Modules/Check:check-translate",
-)
-
-run_binary_test(
-    name = "failure_test",
-    args = [
-        "--driver=vmla",
-        "--input_file=$(location :failure_module)",
-        "--expect_failure",
-    ],
-    data = [":failure_module"],
-    test_binary = "//iree/modules/check:iree-check-module",
+iree_check_test_suite(
+    name = "check_failure",
+    srcs = ["failure.mlir"],
+    args = ["--expect_failure"],
 )

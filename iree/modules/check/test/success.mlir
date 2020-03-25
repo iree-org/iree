@@ -41,11 +41,11 @@ func @expect_almost_eq() attributes { iree.module.export } {
   return
 }
 
-func @abs() attributes { iree.module.export } {
-  %cm5 = iree.unfoldable_constant dense<-5> : tensor<i32>
-  %result = "xla_hlo.abs"(%cm5) : (tensor<i32>) -> tensor<i32>
+func @add() attributes { iree.module.export } {
   %c5 = iree.unfoldable_constant dense<5> : tensor<i32>
-  check.expect_eq(%result, %c5) : tensor<i32>
+  %result = "xla_hlo.add"(%c5, %c5) : (tensor<i32>, tensor<i32>) -> tensor<i32>
+  %c10 = iree.unfoldable_constant dense<10> : tensor<i32>
+  check.expect_eq(%result, %c10) : tensor<i32>
   return
 }
 
