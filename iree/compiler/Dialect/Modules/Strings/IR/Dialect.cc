@@ -75,9 +75,8 @@ Type StringsDialect::parseType(DialectAsmParser &parser) const {
 
   if (!type) {
     type = llvm::StringSwitch<Type>(typeName)
-                   .Case("string_tensor", StringTensorType::get(getContext()))
-                   .Default(nullptr);
-
+               .Case("string_tensor", StringTensorType::get(getContext()))
+               .Default(nullptr);
   }
 
   if (!type) {

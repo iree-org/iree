@@ -67,13 +67,10 @@ extern "C" iree_status_t string_create(iree_string_view_t value,
   *out_message = message;
   return IREE_STATUS_OK;
 }
-  
-extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
-                                   iree_string_view_t* value,
-                                   int64_t value_count,
-                                   const int32_t* shape,
-                                   size_t shape_rank,
-                                   string_tensor_t** out_message) {
+
+extern "C" iree_status_t string_tensor_create(
+    iree_allocator_t allocator, iree_string_view_t* value, int64_t value_count,
+    const int32_t* shape, size_t shape_rank, string_tensor_t** out_message) {
   // TODO(suderman): Use separate allocation for each string. More ref counters
   // but prevents constantly copying.
 
@@ -95,15 +92,15 @@ extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
 
   const size_t shape_bytes = shape_rank * sizeof(int32_t);
   const size_t string_view_bytes = value_count * sizeof(iree_string_view_t);
-  const size_t byte_count = sizeof(string_tensor_t) + shape_bytes 
-        + string_view_bytes + string_bytes;
+  const size_t byte_count =
+      sizeof(string_tensor_t) + shape_bytes + string_view_bytes + string_bytes;
 
   // Allocate and compute byte offsets.
   string_tensor_t* message = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, byte_count, (void**)&message));
+  IREE_RETURN_IF_ERROR(
+      iree_allocator_malloc(allocator, byte_count, (void**)&message));
 
-  char* shape_ptr = ((char*) message) + sizeof(string_tensor_t);
+  char* shape_ptr = ((char*)message) + sizeof(string_tensor_t);
   char* string_view_ptr = shape_ptr + shape_bytes;
   char* contents_ptr = string_view_ptr + string_view_bytes;
 
@@ -125,7 +122,7 @@ extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
     const auto& src = value[i];
     auto& dest = message->values[i];
 
-    dest.data = (char*) contents_ptr;
+    dest.data = (char*)contents_ptr;
     dest.size = src.size;
     memcpy((void*)dest.data, src.data, src.size);
     contents_ptr += src.size;
@@ -160,14 +157,14 @@ class StringsModuleState final {
     std::string str = std::to_string(value);
     RETURN_IF_ERROR(
         FromApiStatus(string_create(iree_make_cstring_view(str.c_str()),
-                            allocator_, &new_string),
+                                    allocator_, &new_string),
                       IREE_LOC));
     return new_string;
   }
 
   const iree_string_view_t* PrintTensorHelper(const iree_string_view_t* strs,
-                         const int32_t* shape,
-                         int32_t shape_rank) {
+                                              const int32_t* shape,
+                                              int32_t shape_rank) {
     // Handle a scalar tensor value.
     if (shape_rank == 0) {
       const auto& str = strs[0];
@@ -181,7 +178,7 @@ class StringsModuleState final {
       for (int32_t i = 0, s = shape[0]; i < s; i++) {
         const auto& str = strs[i];
         fwrite(str.data, 1, str.size, stdout);
-        if (i != s -1) {
+        if (i != s - 1) {
           fwrite(", ", 1, /*size=*/2, stdout);
         }
       }
@@ -200,7 +197,7 @@ class StringsModuleState final {
     }
     fputc(']', stdout);
     return strs;
-  } 
+  }
 
   // strings.print_tensor(%str_tensor)
   Status PrintTensor(vm::ref<string_tensor_t> str_tensor) {
@@ -208,14 +205,16 @@ class StringsModuleState final {
       return OkStatus();
     }
 
-    PrintTensorHelper(str_tensor->values, str_tensor->shape, str_tensor->shape_rank);
+    PrintTensorHelper(str_tensor->values, str_tensor->shape,
+                      str_tensor->shape_rank);
     fputc('\n', stdout);
     fflush(stdout);
     return OkStatus();
   }
 
   // strings.to_string(%hal_buffer) -> %str_tensor
-  StatusOr<vm::ref<string_tensor_t>> ToString(vm::ref<iree_hal_buffer_view_t> hal_buffer) {
+  StatusOr<vm::ref<string_tensor_t>> ToString(
+      vm::ref<iree_hal_buffer_view_t> hal_buffer) {
     return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
   }
 
@@ -227,10 +226,12 @@ class StringsModuleState final {
 
 static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
     {
-        vm::MakeNativeFunction("print",         &StringsModuleState::Print),
-        vm::MakeNativeFunction("i32_to_string", &StringsModuleState::I32ToString),
-        vm::MakeNativeFunction("print_tensor",  &StringsModuleState::PrintTensor),
-        vm::MakeNativeFunction("to_string",     &StringsModuleState::ToString),
+        vm::MakeNativeFunction("print", &StringsModuleState::Print),
+        vm::MakeNativeFunction("i32_to_string",
+                               &StringsModuleState::I32ToString),
+        vm::MakeNativeFunction("print_tensor",
+                               &StringsModuleState::PrintTensor),
+        vm::MakeNativeFunction("to_string", &StringsModuleState::ToString),
 
 };
 
@@ -277,8 +278,10 @@ extern "C" iree_status_t strings_module_register_types() {
   IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&string_descriptor));
 
   // Register strings.string_tensor
-  string_tensor_descriptor.type_name = iree_make_cstring_view("strings.string_tensor");
-  string_tensor_descriptor.offsetof_counter = offsetof(string_tensor_t, ref_object.counter);
+  string_tensor_descriptor.type_name =
+      iree_make_cstring_view("strings.string_tensor");
+  string_tensor_descriptor.offsetof_counter =
+      offsetof(string_tensor_t, ref_object.counter);
   string_tensor_descriptor.destroy = string_tensor_destroy;
   IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&string_tensor_descriptor));
 

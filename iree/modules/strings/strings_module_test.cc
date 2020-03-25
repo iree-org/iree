@@ -70,8 +70,8 @@ class StringsModuleTest : public ::testing::Test {
         IREE_ALLOCATOR_NULL, IREE_ALLOCATOR_SYSTEM, &bytecode_module_))
         << "Bytecode module failed to load";
 
-    std::vector<iree_vm_module_t*> modules = {
-      strings_module_, hal_module_, bytecode_module_};
+    std::vector<iree_vm_module_t*> modules = {strings_module_, hal_module_,
+                                              bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
         instance_, modules.data(), modules.size(), IREE_ALLOCATOR_SYSTEM,
         &context_));
@@ -108,20 +108,23 @@ class StringsModuleTest : public ::testing::Test {
     iree_hal_allocator_t* allocator = iree_hal_device_allocator(device_);
     IREE_ASSERT_OK(iree_hal_allocator_allocate_buffer(
         allocator,
-        static_cast<iree_hal_memory_type_t>(IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
-                                            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
+        static_cast<iree_hal_memory_type_t>(
+            IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
+            IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
         IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
     iree_hal_mapped_memory_t mapped_memory;
-    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(), IREE_HAL_MEMORY_ACCESS_WRITE,
-                                       0, IREE_WHOLE_BUFFER, &mapped_memory));
+    IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
+                                       IREE_HAL_MEMORY_ACCESS_WRITE, 0,
+                                       IREE_WHOLE_BUFFER, &mapped_memory));
     memcpy(mapped_memory.contents.data, static_cast<void*>(contents.data()),
            mapped_memory.contents.data_length);
     IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
-    IREE_ASSERT_OK(iree_hal_buffer_view_create(
-        buffer.get(), shape.data(), shape.size(), IREE_HAL_ELEMENT_TYPE_FLOAT_32,
-        IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
+    IREE_ASSERT_OK(
+        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
+                                    IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+                                    IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
   }
-  
+
   iree_hal_device_t* device_ = nullptr;
   iree_vm_instance_t* instance_ = nullptr;
   iree_vm_context_t* context_ = nullptr;
@@ -165,35 +168,37 @@ TEST_F(StringsModuleTest, StringTensor_PrintTensor) {
   vm::ref<string_tensor_t> input_string_tensor;
   const size_t count = 4;
   iree_string_view_t string_views[4] = {
-      iree_make_cstring_view("str1"),
-      iree_make_cstring_view("str2"),
-      iree_make_cstring_view("str3"),
-      iree_make_cstring_view("str4")
-  };
+      iree_make_cstring_view("str1"), iree_make_cstring_view("str2"),
+      iree_make_cstring_view("str3"), iree_make_cstring_view("str4")};
 
   const size_t shape_rank = 3;
   const int32_t shape[shape_rank] = {2, 1, 2};
 
-  IREE_ASSERT_OK(string_tensor_create(IREE_ALLOCATOR_SYSTEM, string_views, count,
-                                      shape, shape_rank, &input_string_tensor));
+  IREE_ASSERT_OK(string_tensor_create(IREE_ALLOCATOR_SYSTEM, string_views,
+                                      count, shape, shape_rank,
+                                      &input_string_tensor));
 
   // Construct the input list for execution.
   iree_vm_variant_list_t* inputs = nullptr;
   IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
 
   // Add the string tensor to the input list.
-  iree_vm_ref_t input_string_tensor_ref = string_tensor_move_ref(input_string_tensor.get());
-  IREE_ASSERT_OK(iree_vm_variant_list_append_ref_retain(inputs, &input_string_tensor_ref));
+  iree_vm_ref_t input_string_tensor_ref =
+      string_tensor_move_ref(input_string_tensor.get());
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_append_ref_retain(inputs, &input_string_tensor_ref));
 
   // Construct the output list for accepting results from the invocation.
   iree_vm_variant_list_t* outputs = nullptr;
-  IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
 
   CaptureStdout();
 
   // Invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("print_string_tensor"),
-    /*policy=*/nullptr, inputs, outputs, IREE_ALLOCATOR_SYSTEM));
+                                /*policy=*/nullptr, inputs, outputs,
+                                IREE_ALLOCATOR_SYSTEM));
 
   // Validate output.
   EXPECT_EQ(GetCapturedStdout(), expected_output);
@@ -217,26 +222,31 @@ TEST_F(StringsModuleTest, StringTensor_PrintScalar) {
   const size_t shape_rank = 0;
   const int32_t shape[shape_rank] = {};
 
-  IREE_ASSERT_OK(string_tensor_create(IREE_ALLOCATOR_SYSTEM, string_views, count,
-                                      shape, shape_rank, &input_string_tensor));
+  IREE_ASSERT_OK(string_tensor_create(IREE_ALLOCATOR_SYSTEM, string_views,
+                                      count, shape, shape_rank,
+                                      &input_string_tensor));
 
   // Construct the input list for execution.
   iree_vm_variant_list_t* inputs = nullptr;
   IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &inputs));
 
   // Add the string tensor to the input list.
-  iree_vm_ref_t input_string_tensor_ref = string_tensor_move_ref(input_string_tensor.get());
-  IREE_ASSERT_OK(iree_vm_variant_list_append_ref_retain(inputs, &input_string_tensor_ref));
+  iree_vm_ref_t input_string_tensor_ref =
+      string_tensor_move_ref(input_string_tensor.get());
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_append_ref_retain(inputs, &input_string_tensor_ref));
 
   // Construct the output list for accepting results from the invocation.
   iree_vm_variant_list_t* outputs = nullptr;
-  IREE_ASSERT_OK(iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
+  IREE_ASSERT_OK(
+      iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
 
   CaptureStdout();
 
   // Invoke the function.
   IREE_ASSERT_OK(iree_vm_invoke(context_, LookupFunction("print_string_tensor"),
-    /*policy=*/nullptr, inputs, outputs, IREE_ALLOCATOR_SYSTEM));
+                                /*policy=*/nullptr, inputs, outputs,
+                                IREE_ALLOCATOR_SYSTEM));
 
   // Validate output.
   EXPECT_EQ(GetCapturedStdout(), expected_output);

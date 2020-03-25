@@ -37,14 +37,12 @@ iree_status_t strings_module_create(iree_allocator_t allocator,
 
 // Creates a string type.
 iree_status_t string_create(iree_string_view_t value,
-iree_allocator_t allocator,
-                            string_t** out_message);
+                            iree_allocator_t allocator, string_t** out_message);
 
 // Creates a string tensor type.
 iree_status_t string_tensor_create(iree_allocator_t allocator,
                                    iree_string_view_t* value,
-                                   int64_t value_count,
-                                   const int32_t* shape,
+                                   int64_t value_count, const int32_t* shape,
                                    size_t shape_rank,
                                    string_tensor_t** out_message);
 
