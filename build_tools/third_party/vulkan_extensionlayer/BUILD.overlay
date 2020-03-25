@@ -89,3 +89,8 @@ template_rule(
         "@VK_VERSION@": "1.1.133",
     }
 )
+
+filegroup(
+    name = "VkLayer_khronos_timeline_semaphore_files",
+    srcs = [":VkLayer_khronos_timeline_semaphore_json"],
+)

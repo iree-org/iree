@@ -433,6 +433,12 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:driver_registry",
         "@com_google_absl//absl/flags:flag",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "//conditions:default": [
+            # TODO(scotttodd): platform_trampoline_deps
+            "@vulkan_extensionlayer_config//:vulkan_loader_setup",
+        ],
+    }),
     alwayslink = 1,
 )

@@ -177,6 +177,12 @@ maybe(new_local_repository,
 )
 
 maybe(new_local_repository,
+    name = "vulkan_extensionlayer_config",
+    path = "build_tools/third_party/vulkan_extensionlayer",
+    build_file = "build_tools/third_party/vulkan_extensionlayer/BUILD",
+)
+
+maybe(new_local_repository,
     name = "vulkan_memory_allocator",
     path = "third_party/vulkan_memory_allocator",
     build_file = "build_tools/third_party/vulkan_memory_allocator/BUILD.overlay",
