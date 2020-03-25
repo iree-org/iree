@@ -23,8 +23,8 @@ set(GEMMLOWP_SRC_ROOT
 # TODO(benvanik): if andoird_arm64 then add -O3
 iree_select_compiler_opts(RUY_COPTS_BASE
   ALL
-    "-I${IREE_ROOT_DIR}/third_party/ruy"
-    "-I${IREE_ROOT_DIR}/third_party/gemmlowp"
+#    "-I${IREE_ROOT_DIR}/third_party/ruy"
+#     "-I${IREE_ROOT_DIR}/third_party/gemmlowp"
   CLANG_OR_GCC
     "-O3"
     "-Wno-shadow"
@@ -962,7 +962,7 @@ external_cc_library(
     ruy::trmul
     ruy::trmul_params
     ruy::tune
-  INCLUDES
-    "${IREE_ROOT_DIR}/third_party/ruy"
+  #  INCLUDES
+  #   "${IREE_ROOT_DIR}/third_party/ruy"
   PUBLIC
 )
