@@ -88,3 +88,18 @@ gentbl(
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
+
+gentbl(
+    name = "TensorListDialectDocGen",
+    tbl_outs = [
+        ("-gen-op-doc", "TensorListOps.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "TensorListOps.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/HAL/IR:td_files",
+        "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)

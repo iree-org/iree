@@ -59,3 +59,12 @@ iree_tablegen_library(
     -gen-op-decls CheckOps.h.inc
     -gen-op-defs CheckOps.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    CheckDialectDocGen
+  TD_FILE
+    "CheckOps.td"
+  OUTS
+    -gen-op-doc CheckOps.md
+)

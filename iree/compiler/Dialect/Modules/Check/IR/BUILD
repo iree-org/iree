@@ -78,3 +78,18 @@ gentbl(
         "//iree/compiler/Dialect/IREE/IR:td_files",
     ],
 )
+
+gentbl(
+    name = "CheckDialectDocGen",
+    tbl_outs = [
+        ("-gen-op-doc", "CheckOps.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "CheckOps.td",
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "//iree/compiler/Dialect/HAL/IR:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+    ],
+)

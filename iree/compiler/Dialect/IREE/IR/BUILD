@@ -68,3 +68,17 @@ gentbl(
         "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
     ],
 )
+
+gentbl(
+    name = "IREEDialectDocGen",
+    tbl_outs = [
+        ("-gen-op-doc", "IREEOps.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEOps.td",
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
+    ],
+)

@@ -124,3 +124,17 @@ gentbl(
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
+
+gentbl(
+    name = "HALDialectDocGen",
+    tbl_outs = [
+        ("-gen-op-doc", "HALOps.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALOps.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)

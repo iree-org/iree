@@ -88,3 +88,17 @@ gentbl(
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )
+
+gentbl(
+    name = "DialectDocGen",
+    tbl_outs = [
+        ("-gen-op-doc", "Ops.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Ops.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)

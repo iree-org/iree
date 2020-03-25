@@ -96,3 +96,12 @@ iree_tablegen_library(
     -gen-op-decls HALOps.h.inc
     -gen-op-defs HALOps.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    HALDialectDocGen
+  TD_FILE
+    "HALOps.td"
+  OUTS
+    -gen-op-doc HALOps.md
+)

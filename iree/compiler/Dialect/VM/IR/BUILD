@@ -130,3 +130,17 @@ gentbl(
         "@llvm-project//mlir:OpBaseTdFiles",
     ],
 )
+
+gentbl(
+    name = "VMDialectDocGen",
+    tbl_outs = [
+        ("-gen-op-doc", "VMOps.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VMOps.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)

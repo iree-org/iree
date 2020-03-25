@@ -73,3 +73,19 @@ gentbl(
         "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
     ],
 )
+
+gentbl(
+    name = "ShapeDialectDocGen",
+    tbl_outs = [
+        ("-gen-op-doc", "ShapeOps.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ShapeOps.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
+        "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
+    ],
+)

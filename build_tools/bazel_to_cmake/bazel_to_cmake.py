@@ -535,8 +535,12 @@ class BuildFileFunctions(object):
     td_file_block = self._convert_td_file_block(td_file)
     outs_block = self._convert_tbl_outs_block(tbl_outs)
 
-    self.converter.body += """iree_tablegen_library(
+    # Which kind of file to generate. We use the name as a convention here.
+    genfile_kind = "doc" if name.endswith("DocGen") else "library"
+
+    self.converter.body += """iree_tablegen_%(genfile_kind)s(
 %(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
+    "genfile_kind": genfile_kind,
     "name_block": name_block,
     "td_file_block": td_file_block,
     "outs_block": outs_block,
