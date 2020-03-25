@@ -33,7 +33,6 @@ iree_cc_library(
     MLIRParser
     MLIRPass
     MLIRSideEffects
-    MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR

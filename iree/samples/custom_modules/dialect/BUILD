@@ -49,7 +49,6 @@ cc_library(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SideEffects",
-        "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
