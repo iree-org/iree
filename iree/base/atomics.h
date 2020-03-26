@@ -71,13 +71,13 @@ typedef struct {
 
 typedef _Atomic __INTPTR_TYPE__ iree_atomic_intptr_t;
 #define IREE_ATOMIC_VAR_INIT(value) (value)
-#define iree_atomic_load(object) __atomic_load_ptr(object, __ATOMIC_SEQ_CST)
-__extension__({
-  __auto_type __atomic_load_ptr = (object);
-  __typeof__(*__atomic_load_ptr) __atomic_load_tmp;
-  __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (__ATOMIC_SEQ_CST));
-  __atomic_load_tmp;
-})
+#define iree_atomic_load(object)                                              \
+  __atomic_load_ptr(object, __ATOMIC_SEQ_CST) __extension__({                 \
+    __auto_type __atomic_load_ptr = (object);                                 \
+    __typeof__(*__atomic_load_ptr) __atomic_load_tmp;                         \
+    __atomic_load(__atomic_load_ptr, &__atomic_load_tmp, (__ATOMIC_SEQ_CST)); \
+    __atomic_load_tmp;                                                        \
+  })
 #define iree_atomic_store(object, desired)                          \
   __extension__({                                                   \
     __auto_type __atomic_store_ptr = (object);                      \
