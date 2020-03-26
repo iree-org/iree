@@ -39,6 +39,7 @@ class LLVMJITExecutableCache final : public ExecutableCache {
   hal::Allocator* allocator_;
   llvm::orc::LLJIT* execution_engine_;
 };
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

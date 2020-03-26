@@ -28,6 +28,7 @@ class LLVMJITCommandProcessor final : public HostLocalCommandProcessor {
 
   Status Dispatch(const DispatchRequest& dispatch_request) override;
 };
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

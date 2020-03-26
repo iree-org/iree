@@ -116,10 +116,13 @@ LLVMJITDevice::LLVMJITDevice(DeviceInfo device_info,
 
 StatusOr<ref_ptr<LLVMJITDevice>> LLVMJITDevice::CreateLLVMJITDevice(
     DeviceInfo device_info) {
-  auto execution_engine = std::move(llvm::orc::LLJITBuilder().create().get());
-  if (!execution_engine)
-    InternalErrorBuilder(IREE_LOC) << "Can't create LLJIT for llvmjit device";
-  return make_ref<LLVMJITDevice>(device_info, std::move(execution_engine));
+  auto execution_engine = llvm::orc::LLJITBuilder().create();
+  if (!execution_engine) {
+    return InternalErrorBuilder(IREE_LOC)
+           << "Can't create LLJIT for llvmjit device";
+  }
+  return make_ref<LLVMJITDevice>(device_info,
+                                 std::move(execution_engine.get()));
 }
 
 LLVMJITDevice::~LLVMJITDevice() = default;
@@ -179,6 +182,7 @@ Status LLVMJITDevice::WaitIdle(absl::Time deadline) {
   }
   return OkStatus();
 }
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

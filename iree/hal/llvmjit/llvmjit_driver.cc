@@ -56,6 +56,7 @@ StatusOr<ref_ptr<Device>> LLVMJITDriver::CreateDevice(
     DriverDeviceID device_id) {
   return LLVMJITDevice::CreateLLVMJITDevice(GetDefaultDeviceInfo());
 }
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

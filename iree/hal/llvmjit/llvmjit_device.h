@@ -70,6 +70,7 @@ class LLVMJITDevice final : public Device {
   mutable HostLocalAllocator allocator_;
   mutable absl::InlinedVector<std::unique_ptr<CommandQueue>, 1> command_queues_;
 };
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

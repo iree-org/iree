@@ -57,6 +57,7 @@ class LLVMJITExecutable final : public Executable {
   ExecutableSpec spec_;
   std::vector<uint8_t> cloned_executable_data_;
 };
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

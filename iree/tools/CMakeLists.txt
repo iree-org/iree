@@ -18,18 +18,16 @@ add_subdirectory(test)
 # TODO: skip targets disabled by options.
 iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
   ALL
+    "iree::hal::llvmjit::llvmjit_driver_module"
     "iree::hal::vmla::vmla_driver_module"
     "iree::hal::vulkan::vulkan_driver_module"
-  CLANG_OR_GCC
-    "iree::hal::llvmjit::llvmjit_driver_module"
 )
 
 iree_select_compiler_opts(IREE_COMPILER_TARGET_BACKENDS
   ALL
+    "iree::compiler::Dialect::HAL::Target::LLVM"
     "iree::compiler::Dialect::HAL::Target::VMLA"
     "iree::compiler::Dialect::HAL::Target::VulkanSPIRV"
-  CLANG_OR_GCC
-    "iree::compiler::Dialect::HAL::Target::LLVM"
 )
 
 iree_cc_binary(
