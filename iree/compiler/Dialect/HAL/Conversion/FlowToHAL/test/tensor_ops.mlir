@@ -24,12 +24,12 @@ func @constantTensor1() {
 
 // CHECK-LABEL: @tensorLoad
 func @tensorLoad(%arg0 : tensor<2x3xi32>) {
-  // CHECK-DAG: [[C0:%.+]] = constant 0 : i32
-  // CHECK-DAG: [[C1:%.+]] = constant 1 : i32
-  // CHECK-DAG: [[C2:%.+]] = constant 2 : i32
-  // CHECK-DAG: [[C3:%.+]] = constant 3 : i32
-  %i0 = constant 0 : i32
-  %i1 = constant 1 : i32
+  // CHECK-DAG: [[C0:%.+]] = constant 0 : index
+  // CHECK-DAG: [[C1:%.+]] = constant 1 : index
+  // CHECK-DAG: [[C2:%.+]] = constant 2 : index
+  // CHECK-DAG: [[C3:%.+]] = constant 3 : index
+  %i0 = constant 0 : index
+  %i1 = constant 1 : index
   // CHECK: [[OFF:%.+]] = hal.allocator.compute_offset %allocator, shape = [
   // CHECK-SAME:   [[C2]], [[C3]]
   // CHECK-SAME: ], element_type = 16777248, indices = [
@@ -58,13 +58,13 @@ func @tensorLoad1(%arg0 : tensor<i1>) {
 
 // CHECK-LABEL: @tensorStore
 func @tensorStore(%arg0 : tensor<2x3xi32>) {
-  // CHECK-DAG: [[C0:%.+]] = constant 0 : i32
-  // CHECK-DAG: [[C1:%.+]] = constant 1 : i32
+  // CHECK-DAG: [[C0:%.+]] = constant 0 : index
+  // CHECK-DAG: [[C1:%.+]] = constant 1 : index
   // CHECK-DAG: [[C9:%.+]] = constant 9 : i32
-  // CHECK-DAG: [[C2:%.+]] = constant 2 : i32
-  // CHECK-DAG: [[C3:%.+]] = constant 3 : i32
-  %i0 = constant 0 : i32
-  %i1 = constant 1 : i32
+  // CHECK-DAG: [[C2:%.+]] = constant 2 : index
+  // CHECK-DAG: [[C3:%.+]] = constant 3 : index
+  %i0 = constant 0 : index
+  %i1 = constant 1 : index
   %c9 = constant 9 : i32
   // CHECK: [[OFF:%.+]] = hal.allocator.compute_offset %allocator, shape = [
   // CHECK-SAME:   [[C2]], [[C3]]

@@ -117,15 +117,16 @@ LogicalResult getWorkGroupSize(FuncOp funcOp,
         "expected operation to be in dispatch function to get launch size");
   }
   auto workGroupSizeAttr =
-      funcOp.getAttrOfType<DenseElementsAttr>("iree.executable.workgroup_size");
+      funcOp.getAttrOfType<ArrayAttr>("iree.executable.workgroup_size");
   if (!workGroupSizeAttr) {
     return funcOp.emitError(
         "unable to find workgroup size, missing attribute "
         "iree.executable.workgroup_size in dispatch function");
   }
   workGroupSize.clear();
-  for (auto value : workGroupSizeAttr.getValues<APInt>()) {
-    workGroupSize.push_back(value.getSExtValue());
+  for (auto value : workGroupSizeAttr) {
+    workGroupSize.push_back(
+        value.cast<IntegerAttr>().getValue().getSExtValue());
   }
   return success();
 }

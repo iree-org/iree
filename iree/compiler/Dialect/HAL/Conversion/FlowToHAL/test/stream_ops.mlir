@@ -9,7 +9,7 @@ hal.executable @ex0 {
     interface = @interface,
     ordinal = 0 : i32,
     signature = (tensor<128xf32>) -> tensor<128xf32>,
-    workgroup_size = dense<[32, 1, 1]> : vector<3xi32>
+    workgroup_size = [32 : index, 1 : index, 1 : index]
   }
 }
 
@@ -26,32 +26,19 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
   // CHECK: [[CMD:%.+]] = hal.command_buffer.create {{.+}}, "OneShot", "Transfer|Dispatch"
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
   %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<128xf32>) -> tensor<128xf32> {
-    // CHECK: [[EXE:%.+]] = hal.ex.cache_executable {{.+}}, @ex0 : !hal.executable
-    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 0, %arg0, shape = [
-    // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type = 50331680
-    // CHECK-NEXT: hal.ex.defer_release
-    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[TMP_BUF]], shape = [
-    // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type = 50331680
-    // CHECK-NEXT: hal.ex.defer_release
+    //  CHECK-DAG: [[EXE:%.+]] = hal.executable.lookup {{.+}}, @ex0 : !hal.executable
+    //  CHECK-DAG: [[EXE_LAYOUT:%.+]] = hal.executable_layout.lookup
+    //      CHECK: hal.command_buffer.push_descriptor_set [[CMD]], [[EXE_LAYOUT]], set=0, bindings=[0 = (%arg0, %c0, %sz_3), 1 = (%buffer_1, %c0, %sz_4)]
     // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], [[EXE]], entry_point = 0, workgroup_xyz = [
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
-    // CHECK: hal.command_buffer.execution_barrier
+    //      CHECK: hal.command_buffer.execution_barrier
     %1 = flow.dispatch @ex0::@entry0[%arg1 : index](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
-    // CHECK: hal.ex.push_binding [[CMD]], 0, [[TMP_BUF]], shape = [
-    // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type = 50331680
-    // CHECK-NEXT: hal.ex.defer_release
-    // CHECK-NEXT: hal.ex.push_binding [[CMD]], 1, [[RET_BUF]], shape = [
-    // CHECK-SAME:   [[C128]]
-    // CHECK-SAME: ], element_type = 50331680
-    // CHECK-NEXT: hal.ex.defer_release
+    //      CHECK: hal.command_buffer.push_descriptor_set
     // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], {{.+}}, entry_point = 0, workgroup_xyz = [
     // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
     // CHECK-SAME: ]
-    // CHECK: hal.command_buffer.execution_barrier
+    //      CHECK: hal.command_buffer.execution_barrier
     %2 = flow.dispatch @ex0::@entry0[%arg1 : index](%1) : (tensor<128xf32>) -> tensor<128xf32>
     flow.return %2 : tensor<128xf32>
   }
@@ -67,12 +54,12 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
 // CHECK-SAME: ([[UBUF:%.+]]:{{.+}}, [[TBUF:%.+]]:{{.+}})
 func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> tensor<5x1x10xf32> {
   // CHECK: [[C0:%.+]] = constant 0
-  %c4 = constant 4 : i32
-  %c1 = constant 1 : i32
+  %c4 = constant 4 : index
+  %c1 = constant 1 : index
   // CHECK: [[RET_BUF:%.+]] = hal.allocator.allocate
   // CHECK: [[CMD:%.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
-  %0 = flow.ex.stream.fragment(%arg2 = %arg0 : tensor<1x1x10xf32>, %arg3 = %arg1 : tensor<5x1x10xf32>, %arg4 = %c4 : i32, %arg5 = %c1 : i32) -> tensor<5x1x10xf32> {
+  %0 = flow.ex.stream.fragment(%arg2 = %arg0 : tensor<1x1x10xf32>, %arg3 = %arg1 : tensor<5x1x10xf32>, %arg4 = %c4 : index, %arg5 = %c1 : index) -> tensor<5x1x10xf32> {
     // CHECK: [[UOFF:%.+]], [[ULEN:%.+]] = hal.allocator.compute_range {{%.+}}
     // CHECK: [[TLEN:%.+]] = hal.allocator.compute_size {{%.+}}
     // CHECK-NEXT: hal.command_buffer.copy_buffer [[CMD]], [[TBUF]], [[C0]], [[RET_BUF]], [[C0]], [[TLEN]]

@@ -78,10 +78,13 @@ class VariableOpConversion
     }
 
     rewriter.setInsertionPoint(variableOp);
-    rewriter.replaceOpWithNewOp<IREE::HAL::VariableOp>(
-        variableOp, variableOp.sym_name(), variableOp.is_mutable(),
+    auto newOp = rewriter.create<IREE::HAL::VariableOp>(
+        variableOp.getLoc(), variableOp.sym_name(), variableOp.is_mutable(),
         converter.convertType(variableOp.type()), initializer, initialValue,
         llvm::to_vector<4>(variableOp.getDialectAttrs()));
+    SymbolTable::setSymbolVisibility(
+        newOp, SymbolTable::getSymbolVisibility(variableOp));
+    rewriter.replaceOp(variableOp, {});
     return success();
   }
 

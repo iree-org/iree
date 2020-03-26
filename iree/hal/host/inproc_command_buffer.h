@@ -73,7 +73,24 @@ class InProcCommandBuffer final : public CommandBuffer {
                     Buffer* target_buffer, device_size_t target_offset,
                     device_size_t length) override;
 
-  Status Dispatch(const DispatchRequest& dispatch_request) override;
+  Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
+                       absl::Span<const uint32_t> values) override;
+
+  Status PushDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      absl::Span<const DescriptorSet::Binding> bindings) override;
+
+  Status BindDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      DescriptorSet* descriptor_set,
+      absl::Span<const device_size_t> dynamic_offsets) override;
+
+  Status Dispatch(Executable* executable, int32_t entry_point,
+                  std::array<uint32_t, 3> workgroups) override;
+
+  Status DispatchIndirect(Executable* executable, int32_t entry_point,
+                          Buffer* workgroups_buffer,
+                          device_size_t workgroups_offset) override;
 
   // Processes all commands in the buffer using the given |command_processor|.
   // The commands are issued in the order they were recorded.
@@ -90,7 +107,11 @@ class InProcCommandBuffer final : public CommandBuffer {
     kDiscardBuffer,
     kUpdateBuffer,
     kCopyBuffer,
+    kPushConstants,
+    kPushDescriptorSet,
+    kBindDescriptorSet,
     kDispatch,
+    kDispatchIndirect,
   };
 
   // Prefix for commands encoded into the CmdList.
@@ -189,10 +210,46 @@ class InProcCommandBuffer final : public CommandBuffer {
     device_size_t length;
   };
 
+  // Pushes inline constant values.
+  struct PushConstantsCmd {
+    static constexpr CmdType kType = CmdType::kPushConstants;
+    ExecutableLayout* executable_layout;
+    size_t offset;
+    absl::Span<const uint32_t> values;
+  };
+
+  // Pushes an inline descriptor set update.
+  struct PushDescriptorSetCmd {
+    static constexpr CmdType kType = CmdType::kPushDescriptorSet;
+    ExecutableLayout* executable_layout;
+    int32_t set;
+    absl::Span<const DescriptorSet::Binding> bindings;
+  };
+
+  // Binds a descriptor set.
+  struct BindDescriptorSetCmd {
+    static constexpr CmdType kType = CmdType::kBindDescriptorSet;
+    ExecutableLayout* executable_layout;
+    int32_t set;
+    DescriptorSet* descriptor_set;
+    absl::Span<const device_size_t> dynamic_offsets;
+  };
+
   // Dispatches an execution request.
   struct DispatchCmd {
     static constexpr CmdType kType = CmdType::kDispatch;
-    DispatchRequest request;
+    Executable* executable;
+    int32_t entry_point;
+    std::array<uint32_t, 3> workgroups;
+  };
+
+  // Dispatches an execution request with indirect workgroup counts.
+  struct DispatchIndirectCmd {
+    static constexpr CmdType kType = CmdType::kDispatchIndirect;
+    Executable* executable;
+    int32_t entry_point;
+    Buffer* workgroups_buffer;
+    device_size_t workgroups_offset;
   };
 
   // Resets the command list.

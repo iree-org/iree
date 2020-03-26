@@ -2,26 +2,12 @@
 
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
-// CHECK-LABEL: @descriptor_set_make_binding
-func @descriptor_set_make_binding() {
-  %0 = "test_hal.buffer"() : () -> !hal.buffer
-  %1 = "test_hal.offset"() : () -> i32
-  %2 = "test_hal.length"() : () -> i32
-  // CHECK: %binding = hal.descriptor_set.make_binding binding = 0, %0, %1, %2 : tuple<i32, !hal.buffer, i32, i32>
-  %3 = hal.descriptor_set.make_binding binding = 0, %0, %1, %2 : tuple<i32, !hal.buffer, i32, i32>
-  return
-}
-
-// -----
-
-// CHECK-LABEL: @descriptor_set_create
-func @descriptor_set_create(%arg0 : !hal.device, %arg1 : !hal.descriptor_set_layout) {
-  %0 = "test_hal.buffer"() : () -> !hal.buffer
-  %1 = "test_hal.offset"() : () -> i32
-  %2 = "test_hal.length"() : () -> i32
-  // CHECK: %binding = hal.descriptor_set.make_binding binding = 0, %0, %1, %2 : tuple<i32, !hal.buffer, i32, i32>
-  %binding = hal.descriptor_set.make_binding binding = 0, %0, %1, %2 : tuple<i32, !hal.buffer, i32, i32>
-  // CHECK: %descriptor_set = hal.descriptor_set.create %arg0, %arg1, bindings = [%binding, %binding] : !hal.descriptor_set
-  %descriptor_set = hal.descriptor_set.create %arg0, %arg1, bindings = [%binding, %binding] : !hal.descriptor_set
+// CHECK-LABEL: @descriptor_set_layout_create
+func @descriptor_set_layout_create(%arg0 : !hal.device) {
+  // CHECK: hal.descriptor_set_layout.create %arg0, "PushOnly", bindings = [#hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">, #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">] : !hal.descriptor_set_layout
+  %descriptor_set_layout = hal.descriptor_set_layout.create %arg0, "PushOnly", bindings = [
+    #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
+    #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
+  ] : !hal.descriptor_set_layout
   return
 }

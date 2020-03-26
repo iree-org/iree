@@ -69,7 +69,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_stack_function_enter(
   ++stack->depth;
 
   callee_frame->function = function;
-  callee_frame->offset = 0;
+  callee_frame->pc = 0;
   callee_frame->registers.ref_register_count = 0;
   callee_frame->return_registers = NULL;
 

@@ -97,6 +97,7 @@ class Buffer final : public RefObject<Buffer> {
 
 class Interface final : public RefObject<Interface> {
  public:
+  static constexpr int kMaxConstants = 32;
   static constexpr int kMaxSets = 4;
   static constexpr int kMaxBindings = 32;
 
@@ -108,6 +109,12 @@ class Interface final : public RefObject<Interface> {
   // Resets all bindings on the interface.
   void Reset();
 
+  // Gets the value from the push constants block at the given element offset.
+  StatusOr<uint32_t> GetConstant(uint32_t offset) const;
+
+  // Sets the push constant block contents to the given values.
+  Status SetConstants(absl::Span<const uint32_t> values);
+
   // Gets the binding within a set. Note that the buffer may be null.
   StatusOr<const Binding> GetBinding(int32_t set, int32_t binding) const;
 
@@ -115,6 +122,7 @@ class Interface final : public RefObject<Interface> {
   Status SetBinding(int32_t set, int32_t binding, Binding value);
 
  private:
+  std::array<uint32_t, kMaxConstants> constants_;
   std::array<std::array<Binding, kMaxBindings>, kMaxSets> bindings_;
 };
 

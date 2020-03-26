@@ -67,20 +67,6 @@ class Device : public RefObject<Device> {
   // list may be the same as (or a subset of) dispatch_queues.
   virtual absl::Span<CommandQueue*> transfer_queues() const = 0;
 
-  // Creates a descriptor set layout with the given bindings.
-  virtual StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
-      absl::Span<const DescriptorSetLayout::Binding> bindings) {
-    return UnimplementedErrorBuilder(IREE_LOC);
-  }
-
-  // Creates a descriptor set of the given layout and bindings.
-  // Descriptor sets are immutable and retain their bindings.
-  virtual StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
-      ref_ptr<DescriptorSetLayout> set_layout,
-      absl::Span<const DescriptorSet::Binding> bindings) {
-    return UnimplementedErrorBuilder(IREE_LOC);
-  }
-
   // TODO(b/137153339): accept initial cache data.
   // Creates a device-specific cache for executables prepared for dispatch.
   // The cache manages executable compilation, caching (on disk or in memory),
@@ -92,14 +78,23 @@ class Device : public RefObject<Device> {
   // using the cache are no longer in-flight.
   virtual ref_ptr<ExecutableCache> CreateExecutableCache() = 0;
 
+  // Creates a descriptor set layout with the given bindings.
+  virtual StatusOr<ref_ptr<DescriptorSetLayout>> CreateDescriptorSetLayout(
+      DescriptorSetLayout::UsageType usage_type,
+      absl::Span<const DescriptorSetLayout::Binding> bindings) = 0;
+
   // Creates an executable layout composed of the given descriptor set layouts.
   // The returned executable layout can be used by multiple executables with the
   // same compatible resource binding layouts.
   virtual StatusOr<ref_ptr<ExecutableLayout>> CreateExecutableLayout(
-      absl::Span<const ref_ptr<DescriptorSetLayout>> set_layouts,
-      size_t push_constants) {
-    return UnimplementedErrorBuilder(IREE_LOC);
-  }
+      absl::Span<DescriptorSetLayout* const> set_layouts,
+      size_t push_constants) = 0;
+
+  // Creates a descriptor set of the given layout and bindings.
+  // Descriptor sets are immutable and retain their bindings.
+  virtual StatusOr<ref_ptr<DescriptorSet>> CreateDescriptorSet(
+      DescriptorSetLayout* set_layout,
+      absl::Span<const DescriptorSet::Binding> bindings) = 0;
 
   // Creates a command buffer for recording commands to submit to queues owned
   // by this device. The command buffer may come from a pool but will be reset

@@ -16,7 +16,7 @@ func @buffer_view_const() -> !hal.buffer_view {
 
 // CHECK-LABEL: @buffer_view_create
 func @buffer_view_create(%arg0 : !hal.buffer) -> !hal.buffer_view {
-  %0:2 = "test_hal.shape"() : () -> (i32, i32)
+  %0:2 = "test_hal.shape"() : () -> (index, index)
   // CHECK: %view = hal.buffer_view.create %arg0, shape = [%0#0, %0#1], element_type = 32 : !hal.buffer_view
   %view = hal.buffer_view.create %arg0, shape=[%0#0, %0#1], element_type=32 : !hal.buffer_view
   return %view : !hal.buffer_view
@@ -26,8 +26,8 @@ func @buffer_view_create(%arg0 : !hal.buffer) -> !hal.buffer_view {
 
 // CHECK-LABEL: @buffer_view_subview
 func @buffer_view_subview(%arg0 : !hal.buffer_view) -> !hal.buffer_view {
-  %0:2 = "test_hal.indices"() : () -> (i32, i32)
-  %1:2 = "test_hal.lengths"() : () -> (i32, i32)
+  %0:2 = "test_hal.indices"() : () -> (index, index)
+  %1:2 = "test_hal.lengths"() : () -> (index, index)
   // CHECK: %view = hal.buffer_view.subview %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : !hal.buffer_view
   %view = hal.buffer_view.subview %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1] : !hal.buffer_view
   return %view : !hal.buffer_view
@@ -45,29 +45,29 @@ func @buffer_view_buffer(%arg0 : !hal.buffer_view) -> !hal.buffer {
 // -----
 
 // CHECK-LABEL: @buffer_view_byte_length
-func @buffer_view_byte_length(%arg0 : !hal.buffer_view) -> i32 {
-  // CHECK: %len = hal.buffer_view.byte_length %arg0 : i32
-  %len = hal.buffer_view.byte_length %arg0 : i32
-  return %len : i32
+func @buffer_view_byte_length(%arg0 : !hal.buffer_view) -> index {
+  // CHECK: %len = hal.buffer_view.byte_length %arg0 : index
+  %len = hal.buffer_view.byte_length %arg0 : index
+  return %len : index
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_view_compute_offset
-func @buffer_view_compute_offset(%arg0 : !hal.buffer_view) -> i32 {
-  %0:2 = "test_hal.indices"() : () -> (i32, i32)
+func @buffer_view_compute_offset(%arg0 : !hal.buffer_view) -> index {
+  %0:2 = "test_hal.indices"() : () -> (index, index)
   // CHECK: %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1]
   %off = hal.buffer_view.compute_offset %arg0, indices = [%0#0, %0#1]
-  return %off : i32
+  return %off : index
 }
 
 // -----
 
 // CHECK-LABEL: @buffer_view_compute_range
-func @buffer_view_compute_range(%arg0 : !hal.buffer_view) -> (i32, i32) {
-  %0:2 = "test_hal.indices"() : () -> (i32, i32)
-  %1:2 = "test_hal.lengths"() : () -> (i32, i32)
+func @buffer_view_compute_range(%arg0 : !hal.buffer_view) -> (index, index) {
+  %0:2 = "test_hal.indices"() : () -> (index, index)
+  %1:2 = "test_hal.lengths"() : () -> (index, index)
   // CHECK: %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1]
   %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1]
-  return %off, %len : i32, i32
+  return %off, %len : index, index
 }

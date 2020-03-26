@@ -23,7 +23,9 @@
 #include "iree/hal/command_queue.h"
 #include "iree/hal/fence.h"
 #include "iree/hal/host/async_command_queue.h"
+#include "iree/hal/host/host_descriptor_set.h"
 #include "iree/hal/host/host_event.h"
+#include "iree/hal/host/host_executable_layout.h"
 #include "iree/hal/host/host_submission_queue.h"
 #include "iree/hal/host/inproc_command_buffer.h"
 #include "iree/hal/vmla/vmla_cache.h"
@@ -123,7 +125,28 @@ VMLADevice::~VMLADevice() {
 }
 
 ref_ptr<ExecutableCache> VMLADevice::CreateExecutableCache() {
+  IREE_TRACE_SCOPE0("VMLADevice::CreateExecutableCache");
   return make_ref<VMLACache>(instance_, vmla_module_);
+}
+
+StatusOr<ref_ptr<DescriptorSetLayout>> VMLADevice::CreateDescriptorSetLayout(
+    DescriptorSetLayout::UsageType usage_type,
+    absl::Span<const DescriptorSetLayout::Binding> bindings) {
+  IREE_TRACE_SCOPE0("VMLADevice::CreateDescriptorSetLayout");
+  return make_ref<HostDescriptorSetLayout>(usage_type, bindings);
+}
+
+StatusOr<ref_ptr<ExecutableLayout>> VMLADevice::CreateExecutableLayout(
+    absl::Span<DescriptorSetLayout* const> set_layouts, size_t push_constants) {
+  IREE_TRACE_SCOPE0("VMLADevice::CreateExecutableLayout");
+  return make_ref<HostExecutableLayout>(set_layouts, push_constants);
+}
+
+StatusOr<ref_ptr<DescriptorSet>> VMLADevice::CreateDescriptorSet(
+    DescriptorSetLayout* set_layout,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  IREE_TRACE_SCOPE0("VMLADevice::CreateDescriptorSet");
+  return make_ref<HostDescriptorSet>(set_layout, bindings);
 }
 
 StatusOr<ref_ptr<CommandBuffer>> VMLADevice::CreateCommandBuffer(

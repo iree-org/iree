@@ -24,6 +24,12 @@ vm.module @vmla {
 vm.import @interface.current() -> !vm.ref<!vmla.interface>
 attributes {nosideeffects}
 
+vm.import @interface.const(
+  %interface : !vm.ref<!vmla.interface>,
+  %offset : i32
+) -> i32
+attributes {nosideeffects}
+
 vm.import @interface.binding(
   %interface : !vm.ref<!vmla.interface>,
   %set : i32,

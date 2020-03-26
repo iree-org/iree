@@ -373,6 +373,17 @@ def VMLA_ReduceMaxOp : VMLA_ReduceOp<"reduce.max">;
 // VMLA Ops: ABI
 //===----------------------------------------------------------------------===//
 
+def VMLA_InterfaceConstOp :
+    VMLA_PureOp<"interface.const", [VMLA_OpInterface]> {
+  let arguments = (ins
+    VMLA_Interface:$interface,
+    IREE_IndexAttr:$offset
+  );
+  let results = (outs
+    AnyTypeOf<[I32, VMLA_Index]>:$result
+  );
+}
+
 def VMLA_InterfaceBindingOp :
     VMLA_PureOp<"interface.binding", [VMLA_OpInterface]> {
   let arguments = (ins

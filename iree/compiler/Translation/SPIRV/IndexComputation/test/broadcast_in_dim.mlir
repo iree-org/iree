@@ -9,7 +9,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1, d0)>]
   func @broadcast_in_dim_2D_3D(%arg0: memref<12x42xi32>, %arg1: memref<3x12x42xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
     // CHECK: xla_hlo.broadcast_in_dim
     // CHECK-SAME: iree.index_computation_info
@@ -34,7 +34,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1, d2) -> (0)>]
   func @broadcast_in_dim_scalar_3D(%arg0: memref<i32>, %arg1: memref<3x12x42xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<i32>) : tensor<i32>
     // CHECK: xla_hlo.broadcast_in_dim
     // CHECK-SAME: iree.index_computation_info
@@ -52,7 +52,7 @@ module {
 
 module {
   func @const_float_splat(%arg0: memref<12x42xf32>)
-    attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     // CHECK: constant
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices
@@ -76,7 +76,7 @@ module {
 
 module {
   func @const_int_splat(%arg0: memref<12x42xi32>)
-    attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     // CHECK: constant
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices
@@ -100,7 +100,7 @@ module {
 
 module {
   func @const_int_nonsplat(%arg0: memref<2x12x42xi32>)
-    attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     // CHECK: constant
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices
@@ -124,7 +124,7 @@ module {
 
 module {
   func @zero_element_1dtensor(%arg0 : memref<f32>, %arg1 : memref<4xf32>)
-    attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+    attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<f32>) : tensor<f32>
     // CHECK: xla_hlo.broadcast_in_dim
     // CHECK-SAME: iree.index_computation_info

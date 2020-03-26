@@ -4,14 +4,14 @@
 
 // CHECK-LABEL: @interface_io
 func @interface_io() {
-  %c16_i32 = constant 16 : i32
-  // CHECK: [[ARG0:%.+]] = hal.interface.load.tensor @interface::@s0b0, offset = %c16_i32 : tensor<4xf32>
-  %arg0 = hal.interface.load.tensor @interface::@s0b0, offset=%c16_i32 : tensor<4xf32>
+  %c16 = constant 16 : index
+  // CHECK: [[ARG0:%.+]] = hal.interface.load.tensor @interface::@s0b0, offset = %c16 : tensor<4xf32>
+  %arg0 = hal.interface.load.tensor @interface::@s0b0, offset=%c16 : tensor<4xf32>
   // CHECK-NEXT: [[TEMP:%.+]] = xla_hlo.add [[ARG0]], [[ARG0]]
   %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-  %c32_i32 = constant 32 : i32
-  // CHECK: hal.interface.store.tensor [[TEMP]], @interface::@s0b1, offset = %c32_i32 : tensor<4xf32>
-  hal.interface.store.tensor %0, @interface::@s0b1, offset=%c32_i32 : tensor<4xf32>
+  %c32 = constant 32 : index
+  // CHECK: hal.interface.store.tensor [[TEMP]], @interface::@s0b1, offset = %c32 : tensor<4xf32>
+  hal.interface.store.tensor %0, @interface::@s0b1, offset=%c32 : tensor<4xf32>
   return
 }
 
@@ -23,12 +23,12 @@ hal.executable @ex {
   // CHECK-SAME:     interface = @interface
   // CHECK-SAME:     ordinal = 0 : i32
   // CHECK-SAME:     signature = (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-SAME:     workgroup_size = dense<[4, 1, 1]> : vector<3xi32>
+  // CHECK-SAME:     workgroup_size = [4 : index, 1 : index, 1 : index]
   hal.executable.entry_point @entry0 attributes {
     interface = @interface,
     ordinal = 0 : i32,
     signature = (tensor<4xf32>) -> tensor<4xf32>,
-    workgroup_size = dense<[4, 1, 1]> : vector<3xi32>
+    workgroup_size = [4 : index, 1 : index, 1 : index]
   }
   // CHECK-DAG: hal.interface @interface
   hal.interface @interface {
@@ -72,4 +72,22 @@ hal.executable @ex_with_source {
       }
     }
   }
+}
+
+// -----
+
+// CHECK-LABEL: @executable_cache
+func @executable_cache(%arg0 : !hal.executable_cache, %arg1 : !hal.executable_layout) {
+  // CHECK: hal.executable_cache.prepare %arg0, layout = %arg1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
+  %executable_exe = hal.executable_cache.prepare %arg0, layout = %arg1, caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @executable_layout_create
+func @executable_layout_create(%arg0 : !hal.device, %arg1 : !hal.descriptor_set_layout) {
+  // CHECK: hal.executable_layout.create %arg0, set_layouts = [%arg1], push_constants = 1 : !hal.executable_layout
+  %executable_layout = hal.executable_layout.create %arg0, set_layouts = [%arg1], push_constants = 1 : !hal.executable_layout
+  return
 }

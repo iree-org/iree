@@ -99,6 +99,70 @@ class CommandBufferExecutionBarrierOpConversion
   mutable IREE::VM::ImportOp importOp;
 };
 
+class CommandBufferPushDescriptorSetOpConversion
+    : public OpConversionPattern<IREE::HAL::CommandBufferPushDescriptorSetOp> {
+ public:
+  CommandBufferPushDescriptorSetOpConversion(MLIRContext *context,
+                                             SymbolTable &importSymbols,
+                                             TypeConverter &typeConverter,
+                                             StringRef importName)
+      : OpConversionPattern(context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::CommandBufferPushDescriptorSetOp op,
+      llvm::ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getType();
+    IREE::HAL::CommandBufferPushDescriptorSetOpOperandAdaptor newOperands(
+        operands);
+
+    SmallVector<Value, 8> callOperands = {
+        newOperands.command_buffer(),
+        newOperands.executable_layout(),
+        rewriter.create<mlir::ConstantOp>(
+            op.getLoc(), rewriter.getI32IntegerAttr(
+                             static_cast<int32_t>(op.setAttr().getInt()))),
+    };
+    SmallVector<int16_t, 5> segmentSizes = {
+        /*command_buffer=*/-1,
+        /*executable_layout=*/-1,
+        /*set=*/-1,
+        /*bindings_ordinals=*/
+        static_cast<int16_t>(op.bindings().size()),
+        /*bindings_buffers=*/
+        static_cast<int16_t>(op.bindings().size()),
+        /*bindings_offsets=*/
+        static_cast<int16_t>(op.bindings().size()),
+        /*bindings_lengths=*/
+        static_cast<int16_t>(op.bindings().size()),
+    };
+    for (auto bindingAttr : op.bindings()) {
+      callOperands.push_back(
+          rewriter.create<mlir::ConstantOp>(op.getLoc(), bindingAttr));
+    }
+    for (auto bindingBuffer : newOperands.binding_buffers()) {
+      callOperands.push_back(bindingBuffer);
+    }
+    for (auto bindingOffset : newOperands.binding_offsets()) {
+      callOperands.push_back(bindingOffset);
+    }
+    for (auto bindingLength : newOperands.binding_lengths()) {
+      callOperands.push_back(bindingLength);
+    }
+
+    rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
+        op, rewriter.getSymbolRefAttr(importOp), importType.getResults(),
+        segmentSizes, importType.getInputs(), callOperands);
+    return success();
+  }
+
+ private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 }  // namespace
 
 void populateHALCommandBufferToVMPatterns(MLIRContext *context,
@@ -120,6 +184,13 @@ void populateHALCommandBufferToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.command_buffer.fill_buffer");
   patterns.insert<VMImportOpConversion<IREE::HAL::CommandBufferCopyBufferOp>>(
       context, importSymbols, typeConverter, "hal.command_buffer.copy_buffer");
+  patterns
+      .insert<VMImportOpConversion<IREE::HAL::CommandBufferPushConstantsOp>>(
+          context, importSymbols, typeConverter,
+          "hal.command_buffer.push_constants");
+  patterns.insert<CommandBufferPushDescriptorSetOpConversion>(
+      context, importSymbols, typeConverter,
+      "hal.command_buffer.push_descriptor_set");
   patterns.insert<
       VMImportOpConversion<IREE::HAL::CommandBufferBindDescriptorSetOp>>(
       context, importSymbols, typeConverter,

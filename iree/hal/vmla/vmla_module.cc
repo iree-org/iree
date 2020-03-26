@@ -124,6 +124,7 @@ StatusOr<absl::Span<uint8_t>> Buffer::MakeRange(
   return absl::MakeSpan(data, data_length);
 }
 
+constexpr int Interface::kMaxConstants;
 constexpr int Interface::kMaxSets;
 constexpr int Interface::kMaxBindings;
 
@@ -133,6 +134,26 @@ void Interface::Reset() {
       bindings_[i][j] = {};
     }
   }
+}
+
+StatusOr<uint32_t> Interface::GetConstant(uint32_t offset) const {
+  if (offset >= kMaxConstants) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Invalid constant offset=" << offset;
+  }
+  return constants_[offset];
+}
+
+Status Interface::SetConstants(absl::Span<const uint32_t> values) {
+  if (values.size() > kMaxConstants) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Constant value overflow; have " << values.size()
+           << " but max is " << kMaxConstants;
+  }
+  for (int i = 0; i < values.size(); ++i) {
+    constants_[i] = values[i];
+  }
+  return OkStatus();
 }
 
 StatusOr<const Interface::Binding> Interface::GetBinding(
@@ -181,6 +202,12 @@ class VMLAModuleState final {
 
   StatusOr<vm::ref<Interface>> InterfaceCurrent() {
     return vm::retain_ref(interface_);
+  }
+
+  StatusOr<uint32_t> InterfaceConst(vm::ref<Interface> interface,
+                                    uint32_t offset) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::InterfaceConst");
+    return interface->GetConstant(offset);
   }
 
   StatusOr<vm::ref<Buffer>> InterfaceBinding(vm::ref<Interface> interface,
@@ -684,6 +711,7 @@ class VMLAModuleState final {
 static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("interface.current",
                            &VMLAModuleState::InterfaceCurrent),
+    vm::MakeNativeFunction("interface.const", &VMLAModuleState::InterfaceConst),
     vm::MakeNativeFunction("interface.binding",
                            &VMLAModuleState::InterfaceBinding),
 

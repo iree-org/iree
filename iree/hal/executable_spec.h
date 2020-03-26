@@ -25,9 +25,6 @@ namespace hal {
 struct ExecutableSpec {
   // TODO(benvanik): pre-populated hash_code/key to avoid calculation.
 
-  // Format of the executable input data.
-  ExecutableFormat format = kExecutableFormatUnspecified;
-
   // A reference to the executable data as input to the cache.
   // If ExecutableCachingMode::kAliasProvidedData is set then this reference
   // may be retained by the cache and the backing buffer must be kept valid for

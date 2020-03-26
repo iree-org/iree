@@ -33,8 +33,10 @@
 #include "iree/hal/vulkan/extensibility_util.h"
 #include "iree/hal/vulkan/legacy_fence.h"
 #include "iree/hal/vulkan/native_binary_semaphore.h"
+#include "iree/hal/vulkan/native_descriptor_set.h"
 #include "iree/hal/vulkan/native_event.h"
 #include "iree/hal/vulkan/pipeline_cache.h"
+#include "iree/hal/vulkan/pipeline_executable_layout.h"
 #include "iree/hal/vulkan/status_util.h"
 #include "iree/hal/vulkan/vma_allocator.h"
 
@@ -486,7 +488,97 @@ VulkanDevice::~VulkanDevice() {
 
 ref_ptr<ExecutableCache> VulkanDevice::CreateExecutableCache() {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateExecutableCache");
-  return make_ref<PipelineCache>(logical_device_);
+  return make_ref<PipelineCache>(add_ref(logical_device_));
+}
+
+StatusOr<ref_ptr<DescriptorSetLayout>> VulkanDevice::CreateDescriptorSetLayout(
+    DescriptorSetLayout::UsageType usage_type,
+    absl::Span<const DescriptorSetLayout::Binding> bindings) {
+  IREE_TRACE_SCOPE0("VulkanDevice::CreateDescriptorSetLayout");
+
+  absl::InlinedVector<VkDescriptorSetLayoutBinding, 4> native_bindings(
+      bindings.size());
+  for (int i = 0; i < bindings.size(); ++i) {
+    auto& native_binding = native_bindings[i];
+    native_binding.binding = bindings[i].binding;
+    native_binding.descriptorType =
+        static_cast<VkDescriptorType>(bindings[i].type);
+    native_binding.descriptorCount = 1;
+    native_binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    native_binding.pImmutableSamplers = nullptr;
+  }
+
+  VkDescriptorSetLayoutCreateInfo create_info;
+  create_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  create_info.pNext = nullptr;
+  create_info.flags = 0;
+  if (usage_type == DescriptorSetLayout::UsageType::kPushOnly &&
+      logical_device_->enabled_extensions().push_descriptors) {
+    // Note that we can *only* use push descriptor sets if we set this create
+    // flag. If push descriptors aren't supported we emulate them with normal
+    // descriptors so it's fine to have kPushOnly without support.
+    create_info.flags |=
+        VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR;
+  }
+  create_info.bindingCount = native_bindings.size();
+  create_info.pBindings = native_bindings.data();
+
+  // Create and insert into the cache.
+  VkDescriptorSetLayout descriptor_set_layout = VK_NULL_HANDLE;
+  VK_RETURN_IF_ERROR(syms()->vkCreateDescriptorSetLayout(
+      *logical_device_, &create_info, logical_device_->allocator(),
+      &descriptor_set_layout));
+
+  return make_ref<NativeDescriptorSetLayout>(add_ref(logical_device_),
+                                             descriptor_set_layout);
+}
+
+StatusOr<ref_ptr<ExecutableLayout>> VulkanDevice::CreateExecutableLayout(
+    absl::Span<DescriptorSetLayout* const> set_layouts, size_t push_constants) {
+  IREE_TRACE_SCOPE0("VulkanDevice::CreateExecutableLayout");
+
+  absl::InlinedVector<ref_ptr<NativeDescriptorSetLayout>, 2> typed_set_layouts(
+      set_layouts.size());
+  absl::InlinedVector<VkDescriptorSetLayout, 2> set_layout_handles(
+      set_layouts.size());
+  for (int i = 0; i < set_layouts.size(); ++i) {
+    typed_set_layouts[i] =
+        add_ref(static_cast<NativeDescriptorSetLayout*>(set_layouts[i]));
+    set_layout_handles[i] = typed_set_layouts[i]->handle();
+  }
+
+  absl::InlinedVector<VkPushConstantRange, 1> push_constant_ranges;
+  if (push_constants > 0) {
+    push_constant_ranges.push_back(VkPushConstantRange{
+        VK_SHADER_STAGE_COMPUTE_BIT, 0,
+        static_cast<uint32_t>(sizeof(uint32_t) * push_constants)});
+  }
+
+  VkPipelineLayoutCreateInfo create_info;
+  create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  create_info.pNext = nullptr;
+  create_info.flags = 0;
+  create_info.setLayoutCount = set_layout_handles.size();
+  create_info.pSetLayouts = set_layout_handles.data();
+  create_info.pushConstantRangeCount = push_constant_ranges.size();
+  create_info.pPushConstantRanges = push_constant_ranges.data();
+
+  // Create and insert into the cache.
+  VkPipelineLayout pipeline_layout = VK_NULL_HANDLE;
+  VK_RETURN_IF_ERROR(syms()->vkCreatePipelineLayout(
+      *logical_device_, &create_info, logical_device_->allocator(),
+      &pipeline_layout));
+
+  return make_ref<PipelineExecutableLayout>(
+      add_ref(logical_device_), pipeline_layout, std::move(typed_set_layouts));
+}
+
+StatusOr<ref_ptr<DescriptorSet>> VulkanDevice::CreateDescriptorSet(
+    DescriptorSetLayout* set_layout,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  IREE_TRACE_SCOPE0("VulkanDevice::CreateDescriptorSet");
+  return UnimplementedErrorBuilder(IREE_LOC)
+         << "CreateDescriptorSet not yet implemented (needs timeline)";
 }
 
 StatusOr<ref_ptr<CommandBuffer>> VulkanDevice::CreateCommandBuffer(

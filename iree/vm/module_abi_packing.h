@@ -218,6 +218,35 @@ struct ParamUnpack<absl::optional<ref<T>>> {
   }
 };
 
+template <>
+struct ParamUnpack<absl::string_view> {
+  using storage_type = absl::string_view;
+  static void Load(ParamUnpackState* param_state, storage_type& out_param) {
+    ++param_state->varargs_ordinal;
+    auto& ref_storage =
+        param_state->frame->registers.ref[param_state->ref_ordinal++];
+    if (ref_storage.type ==
+        ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()->type) {
+      auto byte_span =
+          reinterpret_cast<iree_vm_ro_byte_buffer_t*>(ref_storage.ptr)->data;
+      out_param = absl::string_view{
+          reinterpret_cast<const char*>(byte_span.data), byte_span.data_length};
+    } else if (ref_storage.type != IREE_VM_REF_TYPE_NULL) {
+      param_state->status =
+          InvalidArgumentErrorBuilder(IREE_LOC)
+          << "Parameter " << (param_state->varargs_ordinal - 1)
+          << " contains a reference to the wrong type; have "
+          << iree_vm_ref_type_name(ref_storage.type).data << " but expected "
+          << ref_type_descriptor<iree_vm_ro_byte_buffer_t>::get()
+                 ->type_name.data
+          << " (" << typeid(storage_type).name() << ")";
+    } else {
+      // NOTE: empty string is allowed here!
+      out_param = {};
+    }
+  }
+};
+
 template <typename U, size_t S>
 struct ParamUnpack<std::array<U, S>>;
 template <typename... Ts>
@@ -230,7 +259,6 @@ struct ParamUnpack<std::array<U, S>> {
   using element_type = typename impl::remove_cvref<U>::type;
   using storage_type = std::array<element_type, S>;
   static void Load(ParamUnpackState* param_state, storage_type& out_param) {
-    ++param_state->varargs_ordinal;
     for (int i = 0; i < S; ++i) {
       ParamUnpack::Load(param_state, out_param[i]);
     }
@@ -241,7 +269,6 @@ template <typename... Ts>
 struct ParamUnpack<std::tuple<Ts...>> {
   using storage_type = std::tuple<typename impl::remove_cvref<Ts>::type...>;
   static void Load(ParamUnpackState* param_state, storage_type& out_param) {
-    ++param_state->varargs_ordinal;
     UnpackTuple(param_state, out_param,
                 std::make_index_sequence<sizeof...(Ts)>());
   }
@@ -263,9 +290,9 @@ struct ParamUnpack<absl::Span<U>> {
     const uint16_t count = param_state->frame->return_registers
                                ->registers[param_state->varargs_ordinal++];
     int32_t original_varargs_ordinal = param_state->varargs_ordinal;
-    out_param.resize(count);
-    for (int i = 0; i < count; ++i) {
-      ParamUnpack<element_type>::Load(param_state, out_param[i]);
+    while (param_state->varargs_ordinal - original_varargs_ordinal < count) {
+      out_param.push_back({});
+      ParamUnpack<element_type>::Load(param_state, out_param.back());
     }
     param_state->varargs_ordinal = original_varargs_ordinal;
   }

@@ -118,8 +118,7 @@ class Optional<Type type> : Variadic<type>;
 
 def FLOW_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
-// TODO(benvanik): use index here instead? need to wait for si dialect.
-def FLOW_Dim : I<32>;
+def FLOW_Dim : TypeAlias<Index>;
 
 def FLOW_Tensor : TypeAlias<AnyRankedTensor>;
 
@@ -135,31 +134,7 @@ def FLOW_Workload : AnyTypeOf<[Index]> {
   }];
 }
 
-// TODO(cl/277443143): moving into OpBase.td.
-// A `width`-bit integer elements attribute. The attribute should be
-// ranked and has a shape as specified in `dims`.
-class FLOW_RankedIntVectorAttr<int width, list<int> dims> : ElementsAttrBase<
-  CPred<"$_self.isa<DenseIntElementsAttr>() &&"
-      "$_self.cast<DenseIntElementsAttr>().getType()."
-      "getElementType().isSignlessInteger(" # width # ") && "
-      // Check that this is ranked and has the specified shape.
-      "$_self.cast<DenseIntElementsAttr>().getType().hasRank() && "
-      "$_self.cast<DenseIntElementsAttr>().getType().getShape() == "
-      "llvm::ArrayRef<int64_t>({" # StrJoinInt<dims>.result # "})">,
-  width # "-bit integer elements attribute of shape [" #
-  StrJoinInt<dims>.result # "]"> {
-
-  let storageType = [{ DenseIntElementsAttr }];
-  let returnType = [{ DenseIntElementsAttr }];
-
-  let constBuilderCall = "DenseElementsAttr::get("
-    "VectorType::get({" # StrJoinInt<dims>.result #
-    "}, $_builder.getIntegerType(" # width # ")), "
-    "llvm::makeArrayRef($0)).cast<DenseIntElementsAttr>()";
-  let convertFromStorage = "$_self";
-}
-
-def FLOW_WorkloadAttr : FLOW_RankedIntVectorAttr<32, [3]>;
+def FLOW_WorkloadAttr : IREE_IndexAttrBase<"size_t">;
 
 // Use no padding and clamp the window to the valid area, possibly stopping
 // early prior to having covered all data.

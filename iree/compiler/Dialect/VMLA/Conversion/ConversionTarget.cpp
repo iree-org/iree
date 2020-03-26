@@ -195,7 +195,7 @@ Value VMLAConversionTarget::getTensorShape(
     Location loc, Value originalValue, TypeConverter &typeConverter,
     ConversionPatternRewriter &rewriter) {
   return buildOrFindRankedShapeForValue(loc, originalValue,
-                                        rewriter.getIntegerType(32), rewriter);
+                                        rewriter.getIndexType(), rewriter);
 }
 
 // static
@@ -205,8 +205,7 @@ Value VMLAConversionTarget::getBufferOffset(
   auto indicesType = indicesValue.getType().cast<ShapedType>();
   SmallVector<Value, 4> indices(indicesType.getNumElements());
   for (int i = 0; i < indicesType.getNumElements(); ++i) {
-    auto extractIndex = rewriter.createOrFold<mlir::ConstantOp>(
-        loc, rewriter.getIntegerType(32), rewriter.getI32IntegerAttr(i));
+    auto extractIndex = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, i);
     indices[i] = rewriter.createOrFold<mlir::ExtractElementOp>(
         loc, indicesValue, ValueRange{extractIndex});
   }
@@ -220,17 +219,14 @@ Value VMLAConversionTarget::getBufferOffset(
   // Element type byte length as the base.
   auto tensorType = tensorValue.getType().cast<ShapedType>();
   auto elementType = tensorType.getElementType();
-  auto elementSize = rewriter.createOrFold<mlir::ConstantOp>(
-      loc, rewriter.getIntegerType(32),
-      rewriter.getI32IntegerAttr(
-          VMLATypeConverter::getRoundedElementByteWidth(elementType)));
+  auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
+      loc, VMLATypeConverter::getRoundedElementByteWidth(elementType));
 
   auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
   if (!shape) {
     return nullptr;
   }
-  Value offset = rewriter.createOrFold<mlir::ConstantOp>(
-      loc, rewriter.getIntegerType(32), rewriter.getI32IntegerAttr(0));
+  Value offset = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 0);
   for (int i = 0; i < tensorType.getRank(); ++i) {
     auto axisOffset = indices[i];
     for (int j = i + 1; j < tensorType.getRank(); ++j) {
@@ -250,15 +246,13 @@ Value VMLAConversionTarget::getBufferLength(
   // Element type byte length as the base.
   auto tensorType = tensorValue.getType().cast<ShapedType>();
   auto elementType = tensorType.getElementType();
-  auto elementSize = rewriter.createOrFold<mlir::ConstantOp>(
-      loc, rewriter.getIntegerType(32),
-      rewriter.getI32IntegerAttr(
-          VMLATypeConverter::getRoundedElementByteWidth(elementType)));
+  auto elementSize = rewriter.createOrFold<mlir::ConstantIndexOp>(
+      loc, VMLATypeConverter::getRoundedElementByteWidth(elementType));
 
   auto shape = getTensorShape(loc, tensorValue, typeConverter, rewriter);
   if (!shape) return nullptr;
-  auto dims = rewriter.create<Shape::RankedDimsOp>(
-      loc, rewriter.getIntegerType(32), shape);
+  auto dims =
+      rewriter.create<Shape::RankedDimsOp>(loc, rewriter.getIndexType(), shape);
   Value length = elementSize;
   for (auto dim : dims.getResults()) {
     length = rewriter.createOrFold<mlir::MulIOp>(loc, length, dim);

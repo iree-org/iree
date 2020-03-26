@@ -109,8 +109,6 @@ LogicalResult generateSynchronousBody(
 
   // Build call operands.
   SmallVector<Value, 4> callOperands;
-  auto dimType = IndexType::get(ctx);
-  auto halDimType = IntegerType::get(32, ctx);
   for (const auto &input : llvm::enumerate(inputDescs)) {
     auto blockArg = entryBlock->getArgument(input.index());
     switch (input.value().type) {
@@ -127,8 +125,7 @@ LogicalResult generateSynchronousBody(
           }
           // Dynamic.
           // TODO(laurenzo): How to get the shape dim???
-          auto dimValue = builder.create<ConstantOp>(
-              loc, dimType, IntegerAttr::get(dimType, 1));
+          auto dimValue = builder.create<ConstantIndexOp>(loc, 1);
           callOperands.push_back(dimValue);
         }
         break;
@@ -165,14 +162,13 @@ LogicalResult generateSynchronousBody(
         for (auto dim : llvm::enumerate(output.value().dims)) {
           if (dim.value() >= 0) {
             // Static.
-            dimValues.push_back(builder.create<ConstantOp>(
-                loc, halDimType,
-                builder.getIntegerAttr(halDimType, dim.value())));
+            dimValues.push_back(
+                builder.create<ConstantIndexOp>(loc, dim.value()));
           } else {
             // Dynamic.
             assert(callResultsIt != callResults.end());
-            dimValues.push_back(
-                builder.create<IndexCastOp>(loc, halDimType, *callResultsIt));
+            dimValues.push_back(builder.create<IndexCastOp>(
+                loc, builder.getIndexType(), *callResultsIt));
             ++callResultsIt;
           }
         }

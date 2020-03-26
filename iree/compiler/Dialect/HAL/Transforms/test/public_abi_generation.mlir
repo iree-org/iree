@@ -27,8 +27,8 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
   // CHECK-DAG: %[[BUFFER0:.+]] = hal.buffer_view.buffer %[[ARG0]] : !hal.buffer
   // CHECK-DAG: %[[BUFFER1:.+]] = hal.buffer_view.buffer %[[ARG1]] : !hal.buffer
   // CHECK-DAG: %[[R0:.+]] = call @staticTwoArg(%[[BUFFER0]], %[[BUFFER1]])
-  // CHECK-DAG: %[[C5:.+]] = constant 5 : i32
-  // CHECK-DAG: %[[C6:.+]] = constant 6 : i32
+  // CHECK-DAG: %[[C5:.+]] = constant 5 : index
+  // CHECK-DAG: %[[C6:.+]] = constant 6 : index
   // CHECK-DAG: %[[VIEW:.+]] = hal.buffer_view.create %[[R0]], shape = [%[[C5]], %[[C6]]], element_type = 16777280 : !hal.buffer_view
   // CHECK: return %[[VIEW]]
   return %arg1 : !hal.buffer

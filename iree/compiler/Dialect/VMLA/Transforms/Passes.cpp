@@ -34,6 +34,7 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
 
   // Perform inlining and cleanup after CFG manipulation.
   passManager.addPass(createInlinerPass());
+  passManager.addPass(createSymbolDCEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 

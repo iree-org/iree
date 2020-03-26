@@ -17,12 +17,14 @@
 
 #include <cstdint>
 
+#include "iree/compiler/Dialect/IREE/IR/IREEAttributes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/IR/Attributes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/TypeSupport.h"
@@ -31,6 +33,7 @@
 
 // Order matters.
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.h.inc"
+#include "iree/compiler/Dialect/HAL/IR/HALStructs.h.inc"
 
 namespace mlir {
 namespace iree_compiler {
@@ -199,8 +202,8 @@ class BufferBarrierType {
             IntegerType::get(32, context),
             IntegerType::get(32, context),
             BufferType::get(context),
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
+            IndexType::get(context),
+            IndexType::get(context),
         },
         context);
   }
@@ -218,32 +221,9 @@ class MemoryBarrierType {
   }
 };
 
-class DescriptorSetBindingType {
- public:
-  static TupleType get(MLIRContext *context) {
-    return TupleType::get(
-        {
-            IntegerType::get(32, context),
-            BufferType::get(context),
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-        },
-        context);
-  }
-};
-
-class DescriptorSetLayoutBindingType {
- public:
-  static TupleType get(MLIRContext *context) {
-    return TupleType::get(
-        {
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-            IntegerType::get(32, context),
-        },
-        context);
-  }
-};
+// A tuple containing runtime values for a descriptor set binding:
+// <binding ordinal, hal.buffer, buffer byte offset, buffer byte length>
+using DescriptorSetBindingValue = std::tuple<uint32_t, Value, Value, Value>;
 
 }  // namespace HAL
 }  // namespace IREE

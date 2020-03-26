@@ -1,4 +1,4 @@
-// RUN: iree-run-mlir -iree-hal-target-backends=llvm-ir %s | IreeFileCheck %s
+// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=llvm-ir %s | IreeFileCheck %s)
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
 
 func @conv2d_nopadding() -> tensor<1x2x3x1xf32> attributes {iree.module.export} {

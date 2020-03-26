@@ -172,16 +172,12 @@ static std::array<Value, 3> getDispatchWorkgroupCounts(
     ConversionPatternRewriter &rewriter) {
   std::array<Value, 3> result;
   auto loc = entryPointOp.getLoc();
-  auto i32Type = rewriter.getIntegerType(32);
-  auto constantOne = rewriter.createOrFold<mlir::ConstantOp>(
-      loc, rewriter.getI32IntegerAttr(1));
-  workload = rewriter.createOrFold<mlir::IndexCastOp>(loc, i32Type, workload);
+  auto constantOne = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 1);
+  auto workgroupSizeArray = entryPointOp.workgroup_size().getValue();
   for (int i = 0; i < 3; ++i) {
     // Round up: (workload + workgroup_size - 1) / workgroup_size;
-    auto workgroupSizeI = rewriter.createOrFold<mlir::ConstantOp>(
-        loc, rewriter.getI32IntegerAttr(
-                 entryPointOp.workgroup_size().getValue<int32_t>(
-                     {static_cast<uint64_t>(i)})));
+    auto workgroupSizeI = rewriter.createOrFold<mlir::ConstantIndexOp>(
+        loc, workgroupSizeArray[i].cast<IntegerAttr>().getInt());
     auto rounded = rewriter.createOrFold<mlir::SubIOp>(
         loc, rewriter.createOrFold<mlir::AddIOp>(loc, workload, workgroupSizeI),
         constantOne);
@@ -221,30 +217,65 @@ static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
       ArrayRef<Value>{memoryBarrier}, ArrayRef<Value>{});
 }
 
+static void recordPushConstants(Value device, Value commandBuffer,
+                                IREE::Flow::DispatchOp &dispatchOp,
+                                IREE::HAL::ExecutableOp &executableOp,
+                                IREE::HAL::ExecutableEntryPointOp &entryPointOp,
+                                Value executableLayout,
+                                ConversionPatternRewriter &rewriter) {
+  SmallVector<Value, 4> pushConstantValues;
+  for (auto inputValue : dispatchOp.operands()) {
+    if (inputValue.getType().isa<IndexType>() ||
+        inputValue.getType().isa<IntegerType>()) {
+      pushConstantValues.push_back(rewriter.getRemappedValue(inputValue));
+    }
+  }
+  if (pushConstantValues.empty()) {
+    return;
+  }
+
+  auto interfaceOp = executableOp.getInterfaceOp();
+  uint64_t maxPushConstants =
+      interfaceOp.push_constants().getValueOr(APInt(32, 0)).getZExtValue();
+  (void)maxPushConstants;
+  assert(pushConstantValues.size() <= maxPushConstants &&
+         "uniform buffer spilling not yet implemented");
+
+  rewriter.create<IREE::HAL::CommandBufferPushConstantsOp>(
+      dispatchOp.getLoc(), commandBuffer, executableLayout,
+      rewriter.getI32IntegerAttr(0), pushConstantValues);
+}
+
 static void recordPushBindings(Value device, Value commandBuffer,
                                IREE::Flow::DispatchOp &dispatchOp,
                                IREE::HAL::ExecutableOp &executableOp,
                                IREE::HAL::ExecutableEntryPointOp &entryPointOp,
-                               BufferSet &bufferSet,
+                               Value executableLayout, BufferSet &bufferSet,
                                ConversionPatternRewriter &rewriter) {
-  int bindingOrdinal = 0;
+  uint32_t setOrdinal = 0;
+  uint32_t bindingOrdinal = 0;
+  SmallVector<IREE::HAL::DescriptorSetBindingValue, 4> bindings;
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIndexOp>(dispatchOp.getLoc(), 0);
   auto pushBinding = [&](Value tensorValue) {
     auto &bufferRange = bufferSet.rangeMap[tensorValue];
+    assert(bufferRange.buffer && "buffer not preallocated");
     IREE::HAL::TensorRewriteAdaptor value(dispatchOp.getLoc(), tensorValue,
                                           bufferRange.buffer, rewriter);
-    rewriter.create<IREE::HAL::ExPushBindingOp>(
-        dispatchOp.getLoc(), commandBuffer,
-        rewriter.getI32IntegerAttr(bindingOrdinal++), value.getBuffer(),
-        value.getShapeDims(), value.getElementTypeAttr());
-    rewriter.create<IREE::HAL::ExDeferReleaseOp>(dispatchOp.getLoc(),
-                                                 bufferRange.buffer);
+    bindings.push_back(std::make_tuple(bindingOrdinal++, value.getBuffer(),
+                                       zeroOffset, value.getByteLength()));
   };
-  for (auto tensorValue : dispatchOp.operands()) {
-    pushBinding(tensorValue);
+  for (auto inputValue : dispatchOp.operands()) {
+    if (inputValue.getType().isa<TensorType>()) {
+      pushBinding(inputValue);
+    }
   }
   for (auto tensorValue : dispatchOp.results()) {
     pushBinding(tensorValue);
   }
+  rewriter.create<IREE::HAL::CommandBufferPushDescriptorSetOp>(
+      dispatchOp.getLoc(), commandBuffer, executableLayout, setOrdinal,
+      bindings);
 }
 
 // Records a dispatch operation.
@@ -255,12 +286,22 @@ static void recordDispatch(Value device, Value commandBuffer,
   // Get the handle to the executable that is compatible with our device.
   auto executable =
       rewriter
-          .create<IREE::HAL::ExCacheExecutableOp>(dispatchOp.getLoc(), device,
-                                                  dispatchOp.executable())
+          .create<IREE::HAL::ExecutableLookupOp>(dispatchOp.getLoc(), device,
+                                                 dispatchOp.executable())
           .getResult();
   auto executableOp =
       cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
           dispatchOp, dispatchOp.executable()));
+
+  // TODO(benvanik): support multiple interfaces. We'd probably want to
+  // store each executable+interface as a variable.
+  auto interfaceOp = executableOp.getInterfaceOp();
+  auto executableLayout =
+      rewriter.createOrFold<IREE::HAL::ExecutableLayoutLookupOp>(
+          dispatchOp.getLoc(),
+          IREE::HAL::ExecutableLayoutType::get(device.getContext()), device,
+          interfaceOp.getExecutableSetLayoutsAttr(),
+          interfaceOp.push_constantsAttr());
 
   // Compute the workgroup count based on the executable's tiling.
   auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
@@ -268,10 +309,15 @@ static void recordDispatch(Value device, Value commandBuffer,
   auto workgroupCounts = getDispatchWorkgroupCounts(
       entryPointOp, rewriter.getRemappedValue(dispatchOp.workload()), rewriter);
 
+  // Setup push constants for any dynamic values we need to pass across at
+  // runtime.
+  recordPushConstants(device, commandBuffer, dispatchOp, executableOp,
+                      entryPointOp, executableLayout, rewriter);
+
   // Setup bindings, right now pushed immediately but soon to be replaced with
   // descriptor sets (or something better, anyway).
   recordPushBindings(device, commandBuffer, dispatchOp, executableOp,
-                     entryPointOp, bufferSet, rewriter);
+                     entryPointOp, executableLayout, bufferSet, rewriter);
 
   rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
       dispatchOp.getLoc(), commandBuffer, executable, entryPointOp,
@@ -300,8 +346,8 @@ static void recordTensorUpdate(Value device, Value commandBuffer,
   IREE::HAL::TensorRewriteAdaptor result(updateOp.getLoc(), updateOp.result(),
                                          resultBuffer.buffer, rewriter);
 
-  auto zeroOffset = rewriter.createOrFold<mlir::ConstantOp>(
-      updateOp.getLoc(), rewriter.getI32IntegerAttr(0));
+  auto zeroOffset =
+      rewriter.createOrFold<mlir::ConstantIndexOp>(updateOp.getLoc(), 0);
 
   // Compute the size of the update range.
   auto startIndices = llvm::to_vector<4>(llvm::map_range(

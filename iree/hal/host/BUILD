@@ -67,11 +67,34 @@ cc_library(
 )
 
 cc_library(
+    name = "host_descriptor_set",
+    srcs = ["host_descriptor_set.cc"],
+    hdrs = ["host_descriptor_set.h"],
+    deps = [
+        "//iree/hal:descriptor_set",
+        "//iree/hal:descriptor_set_layout",
+        "@com_google_absl//absl/container:inlined_vector",
+    ],
+)
+
+cc_library(
     name = "host_event",
     srcs = ["host_event.cc"],
     hdrs = ["host_event.h"],
     deps = [
         "//iree/hal:event",
+    ],
+)
+
+cc_library(
+    name = "host_executable_layout",
+    srcs = ["host_executable_layout.cc"],
+    hdrs = ["host_executable_layout.h"],
+    deps = [
+        "//iree/base:memory",
+        "//iree/hal:descriptor_set_layout",
+        "//iree/hal:executable_layout",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 
@@ -121,10 +144,13 @@ cc_library(
     srcs = ["host_local_command_processor.cc"],
     hdrs = ["host_local_command_processor.h"],
     deps = [
+        ":host_descriptor_set",
+        ":host_executable_layout",
         "//iree/base:source_location",
         "//iree/base:status",
         "//iree/base:tracing",
         "//iree/hal:command_buffer",
+        "@com_google_absl//absl/container:inlined_vector",
     ],
 )
 

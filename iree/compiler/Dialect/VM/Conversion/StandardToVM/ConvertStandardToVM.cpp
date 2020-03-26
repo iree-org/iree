@@ -169,10 +169,12 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       srcOp.emitRemark() << "unsupported const type for dialect";
       return failure();
     }
-    int numBits = integerAttr.getType().getIntOrFloatBitWidth();
-    if (numBits != 1 && numBits != 32) {
-      srcOp.emitRemark() << "unsupported bit width for dialect constant";
-      return failure();
+    if (integerAttr.getType().isIntOrFloat()) {
+      int numBits = integerAttr.getType().getIntOrFloatBitWidth();
+      if (numBits != 1 && numBits != 32) {
+        srcOp.emitRemark() << "unsupported bit width for dialect constant";
+        return failure();
+      }
     }
 
     auto intValue = integerAttr.getInt();
@@ -234,6 +236,8 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
         return success();
+      default:
+        return failure();
     }
   }
 };
@@ -247,7 +251,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdapter(operands);
 
-    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
+    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
                                          srcAdapter.lhs(), srcAdapter.rhs());
     return success();
   }
@@ -275,6 +279,17 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
         IntegerAttr::get(IntegerType::get(8, srcOp.getContext()), amountRaw);
     rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
                                          srcAdaptor.lhs(), amountAttr);
+    return success();
+  }
+};
+
+class IndexCastOpConversion : public OpConversionPattern<IndexCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IndexCastOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(srcOp, operands);
     return success();
   }
 };
@@ -353,11 +368,12 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 
 void populateStandardToVMPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns) {
-  patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-                  CondBranchOpConversion, ConstantOpConversion,
-                  ModuleOpConversion, ModuleTerminatorOpConversion,
-                  FuncOpConversion, ReturnOpConversion, SelectI32OpConversion>(
-      context);
+  patterns
+      .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
+              CondBranchOpConversion, ConstantOpConversion, ModuleOpConversion,
+              ModuleTerminatorOpConversion, FuncOpConversion,
+              ReturnOpConversion, IndexCastOpConversion, SelectI32OpConversion>(
+          context);
 
   // Binary arithmetic ops
   patterns

@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "llvm/ADT/DenseMap.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -32,203 +33,93 @@ namespace mlir {
 namespace iree_compiler {
 namespace {
 
-static FunctionType getExecutableCachingFunctionType(MLIRContext *context) {
-  return FunctionType::get(
-      {IREE::VM::RefType::get(IREE::HAL::DeviceType::get(context))},
-      {IREE::VM::RefType::get(IREE::HAL::ExecutableType::get(context))},
-      context);
-}
-
-// Converts a hal.executable to rodata and a lazy-initialization/caching getter.
-// References to the executable must be converted to call the caching function.
-//
-// The hope is that the runtime HAL portions will cache executables globally and
-// then this accessor caches internally to avoid lookups/locks and make
-// debugging clearer.
-//
-// The resulting function is effectively:
-//   func @exe(%device : !hal.device) -> !hal.executable {
-//     if (%cached = @exe_cached) return %cached
-//     %format = pick_supported_format(%device, exe_format_1, exe_format_2, ...)
-//     switch (%format) {
-//      case exe_format_1:
-//        %exe = prepare_executable(%device, exe_format_1, @rodata_format_1)
-//        break;
-//      case exe_format_2:
-//        %exe = prepare_executable(%device, exe_format_2, @rodata_format_2)
-//        break;
-//      default:
-//       return nullptr;
-//     }
-//     @exe_cached = %exe
-//     return %exe
-//   }
-//
-// There are plenty of optimizations we could do here. For example:
-// - group multiple executables together to prepare them as a batch
-// - move the cache miss IR to its own function to let the inliner have a better
-//   cache of inlining the load and compare
-// - executable data compression
-// - vm.switch instead of the chained cond branches (*much* simpler IR)
-class ExecutableOpConversion
+class RemoveExecutableOpConversion
     : public OpConversionPattern<IREE::HAL::ExecutableOp> {
  public:
-  using OpConversionPattern<IREE::HAL::ExecutableOp>::OpConversionPattern;
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::ExecutableOp executableOp, llvm::ArrayRef<Value> operands,
+      IREE::HAL::ExecutableOp op, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    // Get the binary data for each format and create the rodata for each.
-    llvm::SmallDenseMap<uint32_t, IREE::VM::RodataOp> rodataOps;
-    for (auto binaryOp :
-         executableOp.getBlock().getOps<IREE::HAL::ExecutableBinaryOp>()) {
-      rodataOps[binaryOp.format()] = rewriter.create<IREE::VM::RodataOp>(
-          binaryOp.getLoc(),
-          (executableOp.getName() + "_data_" +
-           std::to_string(binaryOp.format()))
-              .str(),
-          binaryOp.data());
-    }
-
-    // One global for now that represents the cached executable. We could add a
-    // table for devices or something if we wanted, though that may be best done
-    // as a custom type in the HAL runtime.
-    auto loc = executableOp.getLoc();
-    auto globalOp = rewriter.create<IREE::VM::GlobalRefOp>(
-        loc, (executableOp.getName() + "_cached").str(),
-        /*isMutable=*/true,
-        IREE::VM::RefType::get(
-            IREE::HAL::ExecutableType::get(rewriter.getContext())));
-
-    // Caching function that creates the executable if needed.
-    auto funcOp = rewriter.create<IREE::VM::FuncOp>(
-        loc, executableOp.getName(),
-        getExecutableCachingFunctionType(rewriter.getContext()),
-        ArrayRef<NamedAttribute>{});
-    auto *entryBlock = funcOp.addEntryBlock();
-    auto *fastReturnBlock = funcOp.addBlock();
-    auto *switchEntryBlock = funcOp.addBlock();
-    auto *switchExitBlock = new Block();
-    auto *failBlock = new Block();
-
-    // if (auto cached_exe = @exe_cached) return cached_exe;
-    OpBuilder funcBuilder(entryBlock);
-    Value deviceArg = entryBlock->getArgument(0);
-    auto loadOp = funcBuilder.create<IREE::VM::GlobalLoadRefOp>(
-        loc, globalOp.type(), funcBuilder.getSymbolRefAttr(globalOp));
-    auto cmpOp = funcBuilder.create<IREE::VM::CmpNZRefOp>(
-        loc, funcBuilder.getIntegerType(32), loadOp.getResult());
-    funcBuilder.create<IREE::VM::CondBranchOp>(
-        loc, cmpOp.result(), fastReturnBlock,
-        ArrayRef<Value>{loadOp.getResult()}, switchEntryBlock,
-        ArrayRef<Value>{});
-
-    funcBuilder.setInsertionPointToStart(fastReturnBlock);
-    funcBuilder.create<IREE::VM::ReturnOp>(
-        loc, fastReturnBlock->addArgument(globalOp.type()));
-
-    // Uncached; pick rodata and create.
-    // We query which format is supported and then request that.
-    funcBuilder.setInsertionPointToStart(switchEntryBlock);
-    SmallVector<Value, 4> queryCallArgs;
-    queryCallArgs.push_back(deviceArg);
-    for (auto formatRodataOp : rodataOps) {
-      queryCallArgs.push_back(funcBuilder.createOrFold<IREE::VM::ConstI32Op>(
-          loc, formatRodataOp.getFirst()));
-    }
-    auto queryCallOp = funcBuilder.create<IREE::VM::CallVariadicOp>(
-        loc,
-        funcBuilder.getSymbolRefAttr(
-            "hal.ex.match_supported_executable_format"),
-        ArrayRef<Type>({funcBuilder.getIntegerType(32)}),
-        ArrayRef<int16_t>({-1, static_cast<int16_t>(rodataOps.size())}),
-        ArrayRef<Type>({IREE::VM::RefType::get(
-                            IREE::HAL::DeviceType::get(funcOp.getContext())),
-                        funcBuilder.getIntegerType(32)}),
-        queryCallArgs);
-    Value selectedFormat = queryCallOp.getResult(0);
-
-    // Switch on the result to pick the rodata.
-    // We generate a big switch of if (format == xxx) goto cacheFormat(xxx);
-    llvm::SmallDenseMap<uint32_t, Block *> formatMatchBlocks;
-    llvm::SmallDenseMap<uint32_t, Block *> formatCacheBlocks;
-    for (auto formatRodataOp : rodataOps) {
-      formatMatchBlocks[formatRodataOp.getFirst()] = funcOp.addBlock();
-      formatCacheBlocks[formatRodataOp.getFirst()] = funcOp.addBlock();
-    }
-    auto formatMatchBlockIt = formatMatchBlocks.begin();
-    funcBuilder.create<IREE::VM::BranchOp>(loc, formatMatchBlockIt->getSecond(),
-                                           ArrayRef<Value>{selectedFormat});
-    for (auto formatRodataOp : rodataOps) {
-      uint32_t format = formatRodataOp.getFirst();
-      auto &rodataOp = formatRodataOp.getSecond();
-
-      OpBuilder caseBuilder(formatMatchBlocks[format]);
-      Value matchArg =
-          caseBuilder.getBlock()->addArgument(caseBuilder.getIntegerType(32));
-      auto cmpFormatOp = caseBuilder.create<IREE::VM::CmpEQI32Op>(
-          loc, rewriter.getIntegerType(32), matchArg,
-          caseBuilder.createOrFold<IREE::VM::ConstI32Op>(
-              loc, formatRodataOp.getFirst()));
-      ++formatMatchBlockIt;
-      if (formatMatchBlockIt != formatMatchBlocks.end()) {
-        caseBuilder.create<IREE::VM::CondBranchOp>(
-            loc, cmpFormatOp.result(), formatCacheBlocks[format],
-            ArrayRef<Value>{matchArg}, formatMatchBlockIt->getSecond(),
-            ArrayRef<Value>{matchArg});
-      } else {
-        caseBuilder.create<IREE::VM::CondBranchOp>(
-            loc, cmpFormatOp.result(), formatCacheBlocks[format],
-            ArrayRef<Value>{matchArg}, failBlock, ArrayRef<Value>{});
-      }
-
-      OpBuilder cacheBuilder(formatCacheBlocks[format]);
-      Value formatArg =
-          cacheBuilder.getBlock()->addArgument(caseBuilder.getIntegerType(32));
-      auto loadRodataOp =
-          cacheBuilder.create<IREE::VM::ConstRefRodataOp>(loc, rodataOp);
-      auto cacheOp = cacheBuilder.create<IREE::VM::CallOp>(
-          loc, "hal.ex.cache_executable", ArrayRef<Type>{globalOp.type()},
-          ArrayRef<Value>{deviceArg, formatArg, loadRodataOp.value()});
-      cacheBuilder.create<IREE::VM::BranchOp>(
-          loc, switchExitBlock, ArrayRef<Value>{cacheOp.getResult(0)});
-    }
-
-    funcOp.getBlocks().push_back(switchExitBlock);
-    funcBuilder.setInsertionPointToStart(switchExitBlock);
-    Value valueArg = switchExitBlock->addArgument(globalOp.type());
-    funcBuilder.create<IREE::VM::GlobalStoreRefOp>(
-        loc, valueArg, funcBuilder.getSymbolRefAttr(globalOp));
-    funcBuilder.create<IREE::VM::ReturnOp>(loc, valueArg);
-
-    funcOp.getBlocks().push_back(failBlock);
-    funcBuilder.setInsertionPointToStart(failBlock);
-    funcBuilder.create<IREE::VM::ReturnOp>(
-        loc, funcBuilder.create<IREE::VM::ConstRefZeroOp>(loc, globalOp.type())
-                 .result());
-
-    rewriter.eraseOp(executableOp);
+    rewriter.eraseOp(op);
     return success();
   }
 };
 
-// Converts hal.ex.cache_executable to a call to the executable caching routine.
-class ExCacheExecutableOpConversion
-    : public OpConversionPattern<IREE::HAL::ExCacheExecutableOp> {
+class ExecutableCachePrepareOpConversion
+    : public OpConversionPattern<IREE::HAL::ExecutableCachePrepareOp> {
  public:
-  using OpConversionPattern<
-      IREE::HAL::ExCacheExecutableOp>::OpConversionPattern;
+  using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      IREE::HAL::ExCacheExecutableOp cacheExecutableOp,
+      IREE::HAL::ExecutableCachePrepareOp prepareOp,
       llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
+    auto loc = prepareOp.getLoc();
+    IREE::HAL::ExecutableCachePrepareOpOperandAdaptor newOperands(operands);
+
+    auto funcOp = dyn_cast_or_null<IREE::VM::FuncOp>(
+        rewriter.getInsertionBlock()->getParentOp());
+    assert(funcOp && "prepare op not in a function");
+
+    // Materialize vm.rodata for each binary format available.
+    SmallVector<Attribute, 4> availableFormatAttrs;
+    SmallVector<IREE::VM::RodataOp, 4> rodataOps;
+    auto executableOp =
+        cast<IREE::HAL::ExecutableOp>(SymbolTable::lookupNearestSymbolFrom(
+            prepareOp, prepareOp.executable()));
+    auto insertPoint = rewriter.saveInsertionPoint();
+    rewriter.setInsertionPoint(funcOp);
+    for (auto binaryOp :
+         executableOp.getBlock().getOps<IREE::HAL::ExecutableBinaryOp>()) {
+      availableFormatAttrs.push_back(binaryOp.formatAttr());
+      auto rodataOp = rewriter.create<IREE::VM::RodataOp>(
+          binaryOp.getLoc(),
+          (StringRef("_") + executableOp.getName() + "_binary_" +
+           IREE::HAL::stringifyExecutableFormat(binaryOp.format()).lower())
+              .str(),
+          binaryOp.data());
+      SymbolTable::setSymbolVisibility(rodataOp,
+                                       SymbolTable::Visibility::Private);
+      rodataOps.push_back(rodataOp);
+    }
+    rewriter.restoreInsertionPoint(insertPoint);
+
+    // Get the index of the format the cache prefers. Returns -1 if none
+    // available which will cause the fallthrough on the select.
+    auto indexValue =
+        rewriter.createOrFold<IREE::HAL::ExecutableCacheSelectFormatOp>(
+            loc, rewriter.getIntegerType(32), newOperands.executable_cache(),
+            rewriter.getArrayAttr(availableFormatAttrs));
+
+    // Select the byte buffer based on the preferred format.
+    SmallVector<Value, 4> rodataValues;
+    for (auto rodataOp : rodataOps) {
+      rodataValues.push_back(
+          rewriter.createOrFold<IREE::VM::ConstRefRodataOp>(loc, rodataOp));
+    }
+    auto byteBufferRefType = IREE::VM::RefType::get(
+        IREE::ByteBufferType::get(rewriter.getContext()));
+    auto defaultValue =
+        rewriter.createOrFold<IREE::VM::ConstRefZeroOp>(loc, byteBufferRefType);
+    auto chosenByteBufferValue = rewriter.createOrFold<IREE::VM::SwitchRefOp>(
+        loc, byteBufferRefType, indexValue, defaultValue, rodataValues);
+
+    // Call the import method with the byte buffer. Note that if no format
+    // was available then we will default to null and preparation will fail.
+    // We could instead check here in the IR and change our behavior, but the
+    // error message from the failed prepare is good enough.
+    auto executableRefType = IREE::VM::RefType::get(
+        IREE::HAL::ExecutableType::get(rewriter.getContext()));
     rewriter.replaceOpWithNewOp<IREE::VM::CallOp>(
-        cacheExecutableOp,
-        rewriter.getSymbolRefAttr(cacheExecutableOp.executable()),
-        ArrayRef<Type>{
-            IREE::VM::RefType::get(cacheExecutableOp.getResult().getType())},
-        ArrayRef<Value>{operands[0]});
+        prepareOp, "hal.executable_cache.prepare",
+        ArrayRef<Type>{executableRefType},
+        ArrayRef<Value>{newOperands.executable_cache(),
+                        newOperands.executable_layout(),
+                        rewriter.createOrFold<IREE::VM::ConstI32Op>(
+                            loc, prepareOp.caching_modeAttr()),
+                        chosenByteBufferValue});
+
     return success();
   }
 };
@@ -239,8 +130,23 @@ void populateHALExecutableToVMPatterns(MLIRContext *context,
                                        SymbolTable &importSymbols,
                                        TypeConverter &typeConverter,
                                        OwningRewritePatternList &patterns) {
-  patterns.insert<ExecutableOpConversion, ExCacheExecutableOpConversion>(
-      context);
+  // hal.executables are not needed after conversion as we extract their
+  // contents during conversion of the ops that use them.
+  patterns.insert<RemoveExecutableOpConversion>(context);
+
+  patterns.insert<VMImportOpConversion<IREE::HAL::ExecutableCacheCreateOp>>(
+      context, importSymbols, typeConverter, "hal.executable_cache.create");
+  patterns
+      .insert<VMImportOpConversion<IREE::HAL::ExecutableCacheSelectFormatOp>>(
+          context, importSymbols, typeConverter,
+          "hal.executable_cache.select_format");
+  patterns.insert<ExecutableCachePrepareOpConversion>(context);
+
+  patterns.insert<VMImportOpConversion<IREE::HAL::DescriptorSetLayoutCreateOp>>(
+      context, importSymbols, typeConverter,
+      "hal.descriptor_set_layout.create");
+  patterns.insert<VMImportOpConversion<IREE::HAL::ExecutableLayoutCreateOp>>(
+      context, importSymbols, typeConverter, "hal.executable_layout.create");
 }
 
 }  // namespace iree_compiler

@@ -46,14 +46,10 @@ cc_library(
     deps = [
         ":api_hdrs",
         ":buffer",
-        ":buffer_view",
         ":command_buffer",
-        ":descriptor_set",
-        ":descriptor_set_layout",
         ":device",
         ":driver",
         ":driver_registry",
-        ":executable_layout",
         ":fence",
         ":heap_buffer",
         ":semaphore",
@@ -109,71 +105,16 @@ cc_test(
 )
 
 cc_library(
-    name = "buffer_view",
-    srcs = ["buffer_view.cc"],
-    hdrs = ["buffer_view.h"],
-    deps = [
-        ":buffer",
-        "//iree/base:shape",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/strings",
-    ],
-)
-
-cc_test(
-    name = "buffer_view_test",
-    srcs = [
-        "buffer_view_test.cc",
-    ],
-    deps = [
-        ":buffer",
-        ":buffer_view",
-        ":heap_buffer",
-        "//iree/base:status",
-        "//iree/base:status_matchers",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
-    name = "buffer_view_string_util",
-    srcs = ["buffer_view_string_util.cc"],
-    hdrs = ["buffer_view_string_util.h"],
-    deps = [
-        ":allocator",
-        ":buffer_view",
-        ":heap_buffer",
-        "//iree/base:buffer_string_util",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/types:optional",
-    ],
-)
-
-cc_test(
-    name = "buffer_view_string_util_test",
-    srcs = ["buffer_view_string_util_test.cc"],
-    deps = [
-        ":buffer_view_string_util",
-        "//iree/base:status",
-        "//iree/base:status_matchers",
-        "//iree/testing:gtest_main",
-    ],
-)
-
-cc_library(
     name = "command_buffer",
     srcs = ["command_buffer.cc"],
     hdrs = ["command_buffer.h"],
     deps = [
         ":allocator",
         ":buffer",
-        ":buffer_view",
+        ":descriptor_set",
         ":event",
         ":executable",
+        ":executable_layout",
         ":resource",
         "//iree/base:bitfield",
         "//iree/base:shape",
@@ -190,6 +131,7 @@ cc_library(
         ":command_buffer",
         "//iree/base:logging",
         "//iree/base:status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -246,7 +188,7 @@ cc_library(
     deps = [
         ":buffer",
         ":resource",
-        "//iree/base:status",
+        "@com_google_absl//absl/strings",
     ],
 )
 
@@ -365,6 +307,7 @@ cc_library(
     deps = [
         ":executable",
         ":executable_format",
+        ":executable_layout",
         ":executable_spec",
         "//iree/base:bitfield",
         "//iree/base:ref_ptr",

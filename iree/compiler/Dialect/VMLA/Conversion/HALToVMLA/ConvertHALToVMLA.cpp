@@ -46,6 +46,32 @@ struct InterfaceOpEraser : public OpConversionPattern<IREE::HAL::InterfaceOp> {
   }
 };
 
+struct InterfaceLoadConstantOpConversion
+    : public OpConversionPattern<IREE::HAL::InterfaceLoadConstantOp> {
+  InterfaceLoadConstantOpConversion(MLIRContext *context,
+                                    TypeConverter &typeConverter)
+      : OpConversionPattern(context), typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      IREE::HAL::InterfaceLoadConstantOp loadOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    // Find the vmla.interface argument to the function.
+    auto interfaceArg = loadOp.getParentOfType<FuncOp>().getArgument(0);
+    assert(interfaceArg &&
+           interfaceArg.getType().isa<IREE::VMLA::InterfaceType>() &&
+           "exported VMLA functions require vmla.interface ops as their only "
+           "argument");
+
+    IREE::HAL::InterfaceLoadConstantOpOperandAdaptor newOperands(operands);
+    rewriter.replaceOpWithNewOp<IREE::VMLA::InterfaceConstOp>(
+        loadOp, typeConverter.convertType(loadOp.getResult().getType()),
+        interfaceArg, loadOp.offsetAttr());
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 struct InterfaceLoadTensorOpConversion
     : public OpConversionPattern<IREE::HAL::InterfaceLoadTensorOp> {
   InterfaceLoadTensorOpConversion(MLIRContext *context,
@@ -103,7 +129,7 @@ struct InterfaceStoreTensorOpConversion
         interfaceArg, bindingOp.set(), bindingOp.binding());
 
     auto zeroValue =
-        rewriter.createOrFold<mlir::ConstantIntOp>(storeOp.getLoc(), 0, 32);
+        rewriter.createOrFold<mlir::ConstantIndexOp>(storeOp.getLoc(), 0);
     auto byteLengthValue = VMLAConversionTarget::getBufferLength(
         storeOp.getLoc(), storeOp.operand(), typeConverter, rewriter);
     rewriter.create<IREE::VMLA::BufferCopyOp>(
@@ -122,6 +148,7 @@ void populateHALToVMLAPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                TypeConverter &typeConverter) {
   patterns.insert<InterfaceOpEraser>(context);
+  patterns.insert<InterfaceLoadConstantOpConversion>(context, typeConverter);
   patterns.insert<InterfaceLoadTensorOpConversion>(context, typeConverter);
   patterns.insert<InterfaceStoreTensorOpConversion>(context, typeConverter);
 }

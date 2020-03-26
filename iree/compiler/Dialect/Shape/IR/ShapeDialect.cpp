@@ -25,15 +25,27 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
 #include "mlir/Support/STLExtras.h"
+#include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
 
 static DialectRegistration<ShapeDialect> base_dialect;
 
+// Used to control inlining behavior.
+struct ShapeInlinerInterface : public DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  bool isLegalToInline(Operation* op, Region* dest,
+                       BlockAndValueMapping& valueMapping) const final {
+    return true;
+  }
+};
+
 ShapeDialect::ShapeDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
   addTypes<Shape::RankedShapeType>();
+  addInterfaces<ShapeInlinerInterface>();
 #define GET_OP_LIST
   addOperations<
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.cpp.inc"

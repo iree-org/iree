@@ -70,7 +70,25 @@ class MockCommandBuffer : public ::testing::StrictMock<CommandBuffer> {
                       Buffer* target_buffer, device_size_t target_offset,
                       device_size_t length));
 
-  MOCK_METHOD1(Dispatch, Status(const DispatchRequest& dispatch_request));
+  MOCK_METHOD3(PushConstants,
+               Status(ExecutableLayout* executable_layout, size_t offset,
+                      absl::Span<const uint32_t> values));
+
+  MOCK_METHOD3(PushDescriptorSet,
+               Status(ExecutableLayout* executable_layout, int32_t set,
+                      absl::Span<const DescriptorSet::Binding> bindings));
+  MOCK_METHOD4(BindDescriptorSet,
+               Status(ExecutableLayout* executable_layout, int32_t set,
+                      DescriptorSet* descriptor_set,
+                      absl::Span<const device_size_t> dynamic_offsets));
+
+  MOCK_METHOD3(Dispatch, Status(Executable* executable, int32_t entry_point,
+                                std::array<uint32_t, 3> workgroups));
+
+  MOCK_METHOD4(DispatchIndirect,
+               Status(Executable* executable, int32_t entry_point,
+                      Buffer* workgroups_buffer,
+                      device_size_t workgroups_offset));
 };
 
 }  // namespace testing

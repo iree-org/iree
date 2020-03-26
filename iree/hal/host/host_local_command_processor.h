@@ -15,10 +15,18 @@
 #ifndef IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
 #define IREE_HAL_HOST_HOST_LOCAL_COMMAND_PROCESSOR_H_
 
+#include "absl/container/inlined_vector.h"
 #include "iree/hal/command_buffer.h"
 
 namespace iree {
 namespace hal {
+
+struct PushConstantBlock {
+  // We limit ourselves to 32 constants (32*sizeof(uint32) = 128b).
+  // This is the lower bound for Vulkan implementations and ensures that we have
+  // consistent support everywhere.
+  std::array<uint32_t, 32> values;
+};
 
 // Host-local command processor for dispatching transfer operations against
 // buffers allocated from the HostLocalAllocator.
@@ -73,10 +81,41 @@ class HostLocalCommandProcessor : public CommandBuffer {
                     Buffer* target_buffer, device_size_t target_offset,
                     device_size_t length) override;
 
-  Status Dispatch(const DispatchRequest& dispatch_request) override;
+  Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
+                       absl::Span<const uint32_t> values) override;
+
+  Status PushDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      absl::Span<const DescriptorSet::Binding> bindings) override;
+
+  Status BindDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      DescriptorSet* descriptor_set,
+      absl::Span<const device_size_t> dynamic_offsets) override;
+
+  Status Dispatch(Executable* executable, int32_t entry_point,
+                  std::array<uint32_t, 3> workgroups) override;
+
+  Status DispatchIndirect(Executable* executable, int32_t entry_point,
+                          Buffer* workgroups_buffer,
+                          device_size_t workgroups_offset) override;
+
+ protected:
+  virtual Status DispatchInline(
+      Executable* executable, int32_t entry_point,
+      std::array<uint32_t, 3> workgroups,
+      const PushConstantBlock& push_constants,
+      absl::Span<const absl::Span<const DescriptorSet::Binding>> set_bindings) {
+    return FailedPreconditionErrorBuilder(IREE_LOC)
+           << "Command processor does not support dispatch operations";
+  }
 
  private:
   bool is_recording_ = false;
+
+  PushConstantBlock push_constants_;
+  absl::InlinedVector<absl::InlinedVector<DescriptorSet::Binding, 8>, 2>
+      descriptor_sets_;
 };
 
 }  // namespace hal

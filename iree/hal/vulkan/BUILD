@@ -109,8 +109,10 @@ cc_library(
         ":descriptor_set_arena",
         ":dynamic_symbols",
         ":handle_util",
+        ":native_descriptor_set",
         ":native_event",
         ":pipeline_executable",
+        ":pipeline_executable_layout",
         ":status_util",
         ":vma_allocator",
         "//iree/base:math",
@@ -259,6 +261,17 @@ cc_library(
 )
 
 cc_library(
+    name = "native_descriptor_set",
+    srcs = ["native_descriptor_set.cc"],
+    hdrs = ["native_descriptor_set.h"],
+    deps = [
+        ":handle_util",
+        "//iree/hal:descriptor_set",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
+    ],
+)
+
+cc_library(
     name = "pipeline_cache",
     srcs = ["pipeline_cache.cc"],
     hdrs = ["pipeline_cache.h"],
@@ -272,6 +285,7 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
+        "//iree/hal:executable_layout",
         "//iree/schemas:spirv_executable_def_cc_fbs",
         "@com_github_google_flatbuffers//:flatbuffers",
         "@com_google_absl//absl/base:core_headers",
@@ -287,6 +301,8 @@ cc_library(
     hdrs = ["pipeline_executable.h"],
     deps = [
         ":handle_util",
+        ":native_descriptor_set",
+        ":pipeline_executable_layout",
         ":status_util",
         "//iree/base:memory",
         "//iree/base:source_location",
@@ -294,9 +310,24 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
+        "//iree/hal:executable_layout",
         "//iree/hal:executable_spec",
         "//iree/schemas:spirv_executable_def_cc_fbs",
         "@com_google_absl//absl/container:inlined_vector",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
+    ],
+)
+
+cc_library(
+    name = "pipeline_executable_layout",
+    srcs = ["pipeline_executable_layout.cc"],
+    hdrs = ["pipeline_executable_layout.h"],
+    deps = [
+        ":handle_util",
+        "//iree/hal:descriptor_set_layout",
+        "//iree/hal:executable_layout",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
@@ -376,8 +407,10 @@ cc_library(
         ":handle_util",
         ":legacy_fence",
         ":native_binary_semaphore",
+        ":native_descriptor_set",
         ":native_event",
         ":pipeline_cache",
+        ":pipeline_executable_layout",
         ":status_util",
         ":vma_allocator",
         "//iree/base:math",

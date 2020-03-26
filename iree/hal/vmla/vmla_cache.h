@@ -34,7 +34,8 @@ class VMLACache final : public ExecutableCache {
   bool CanPrepareFormat(ExecutableFormat format) const override;
 
   StatusOr<ref_ptr<Executable>> PrepareExecutable(
-      ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) override;
+      ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+      const ExecutableSpec& spec) override;
 
  private:
   iree_vm_instance_t* instance_ = nullptr;

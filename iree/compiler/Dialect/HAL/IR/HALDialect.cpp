@@ -49,6 +49,14 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
     populateHALToVMPatterns(getDialect()->getContext(), importSymbols, patterns,
                             typeConverter);
   }
+
+  void walkAttributeStorage(
+      Attribute attr,
+      const function_ref<void(Attribute elementAttr)> &fn) const override {
+    if (auto structAttr = attr.dyn_cast<DescriptorSetLayoutBindingAttr>()) {
+      structAttr.walkStorage(fn);
+    }
+  }
 };
 
 }  // namespace
@@ -56,6 +64,8 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
   addInterfaces<HALToVMConversionInterface>();
+
+  addAttributes<DescriptorSetLayoutBindingAttr>();
 
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
@@ -69,14 +79,38 @@ HALDialect::HALDialect(MLIRContext *context)
 }
 
 //===----------------------------------------------------------------------===//
+// Attribute printing and parsing
+//===----------------------------------------------------------------------===//
+
+Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
+                                     Type type) const {
+  StringRef attrKind;
+  if (failed(parser.parseKeyword(&attrKind))) return {};
+  if (attrKind == DescriptorSetLayoutBindingAttr::getKindName()) {
+    return DescriptorSetLayoutBindingAttr::parse(parser);
+  }
+  parser.emitError(parser.getNameLoc())
+      << "unknown HAL attribute: " << attrKind;
+  return {};
+}
+
+void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
+  if (auto typedAttr = attr.dyn_cast<DescriptorSetLayoutBindingAttr>()) {
+    typedAttr.print(p);
+  } else {
+    llvm_unreachable("unhandled HAL attribute kind");
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Type printing and parsing
 //===----------------------------------------------------------------------===//
 
 Type HALDialect::parseType(DialectAsmParser &parser) const {
-  StringRef typeName;
-  if (parser.parseKeyword(&typeName)) return Type();
+  StringRef typeKind;
+  if (parser.parseKeyword(&typeKind)) return {};
   auto type =
-      llvm::StringSwitch<Type>(typeName)
+      llvm::StringSwitch<Type>(typeKind)
           .Case("allocator", AllocatorType::get(getContext()))
           .Case("buffer", BufferType::get(getContext()))
           .Case("buffer_view", BufferViewType::get(getContext()))
@@ -95,7 +129,7 @@ Type HALDialect::parseType(DialectAsmParser &parser) const {
           .Default(nullptr);
   if (!type) {
     parser.emitError(parser.getCurrentLocation())
-        << "unknown HAL type: " << typeName;
+        << "unknown HAL type: " << typeKind;
   }
   return type;
 }

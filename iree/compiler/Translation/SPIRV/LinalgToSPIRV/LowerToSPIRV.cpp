@@ -65,17 +65,6 @@ struct WorkGroupOptions : public PassPipelineOptions<WorkGroupOptions> {
 };
 }  // namespace
 
-static DenseIntElementsAttr getDenseIntElementsAttrVal(
-    Builder *builder, ArrayRef<int64_t> value) {
-  SmallVector<int32_t, 3> vector;
-  vector.reserve(3);
-  for (auto val : value) {
-    vector.emplace_back(val);
-  }
-  vector.resize(3, 1);
-  return builder->getI32VectorAttr(vector);
-}
-
 /// Helper function to create a std.constant of index type to initialize the
 /// workgroup size as a SSA value.
 static void createConstantsInFunc(FuncOp funcOp, ArrayRef<int64_t> intVal,
@@ -304,8 +293,9 @@ struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
       // workitems.
     }
     OpBuilder builder(&getContext());
+    assert(workGroupSize.size() == 3);
     funcOp.setAttr("iree.executable.workgroup_size",
-                   getDenseIntElementsAttrVal(&builder, workGroupSize));
+                   builder.getIndexArrayAttr(workGroupSize));
   }
 
  private:

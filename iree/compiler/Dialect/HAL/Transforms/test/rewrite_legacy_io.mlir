@@ -1,13 +1,13 @@
 // RUN: iree-opt -split-input-file -iree-hal-rewrite-legacy-io %s | IreeFileCheck %s
 
 flow.executable @simpleMath_ex_dispatch_0 {
-  flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {workload = dense<[4, 1, 1]> : vector<3xi32>}
+  flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {workload = 4 : index}
   module {
     func @simpleMath_rgn_dispatch_0() {
-      %c0_i32 = constant 0 : i32
-      %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0_i32 : tensor<4xf32>
+      %c0 = constant 0 : index
+      %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<4xf32>
       %1 = call @simpleMath_rgn_dispatch_0_impl(%0) : (tensor<4xf32>) -> tensor<4xf32>
-      hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0_i32 : tensor<4xf32>
+      hal.interface.store.tensor %1, @legacy_io::@ret0, offset = %c0 : tensor<4xf32>
       return
     }
     func @simpleMath_rgn_dispatch_0_impl(%arg0: tensor<4xf32>) -> tensor<4xf32> attributes {sym_visibility = "private"} {
@@ -22,7 +22,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
 }
 
 // CHECK-LABEL: flow.executable @simpleMath_ex_dispatch_0 {
-// CHECK-NEXT:   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {workload = dense<[4, 1, 1]> : vector<3xi32>}
+// CHECK-NEXT:   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {workload = 4 : index}
 // CHECK-NEXT:   module {
 // CHECK-NEXT:     func @simpleMath_rgn_dispatch_0(%arg0: memref<4xf32>, %arg1: memref<4xf32>) attributes {iree.executable.export} {
 // CHECK-NEXT:       %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>

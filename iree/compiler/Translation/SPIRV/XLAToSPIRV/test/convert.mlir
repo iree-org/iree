@@ -2,7 +2,7 @@
 
 module {
   func @convert_f2f_nop(%arg0: memref<12xf32>, %arg1 : memref<12xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12xf32>) : tensor<12xf32>
     // CHECK-NOT: spv.FConvert
     %1 = "xla_hlo.convert"(%0) : (tensor<12xf32>) -> tensor<12xf32>
@@ -15,7 +15,7 @@ module {
 
 module {
   func @convert_f2f(%arg0: memref<12xf32>, %arg1 : memref<12xf16>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12xf32>) : tensor<12xf32>
     // CHECK: spv.FConvert {{%.*}} f32 to f16
     %1 = "xla_hlo.convert"(%0) : (tensor<12xf32>) -> tensor<12xf16>
@@ -28,7 +28,7 @@ module {
 
 module {
   func @convert_i2i_nop(%arg0: memref<12xi32>, %arg1 : memref<12xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12xi32>) : tensor<12xi32>
     // CHECK-NOT: spv.SConvert
     %1 = "xla_hlo.convert"(%0) : (tensor<12xi32>) -> tensor<12xi32>
@@ -41,7 +41,7 @@ module {
 
 module {
   func @convert_i2i(%arg0: memref<12xi32>, %arg1 : memref<12xi16>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12xi32>) : tensor<12xi32>
     // CHECK: spv.SConvert {{%.*}} i32 to i16
     %1 = "xla_hlo.convert"(%0) : (tensor<12xi32>) -> tensor<12xi16>
@@ -54,7 +54,7 @@ module {
 
 module {
   func @convert_i2f(%arg0: memref<12xi32>, %arg1 : memref<12xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12xi32>) : tensor<12xi32>
     // CHECK: spv.ConvertSToF
     %1 = "xla_hlo.convert"(%0) : (tensor<12xi32>) -> tensor<12xf32>
@@ -67,7 +67,7 @@ module {
 
 module {
   func @convert_f2i_nop(%arg0: memref<12xf32>, %arg1 : memref<12xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12xf32>) : tensor<12xf32>
     // CHECK: spv.ConvertFToS
     %1 = "xla_hlo.convert"(%0) : (tensor<12xf32>) -> tensor<12xi32>
@@ -80,7 +80,7 @@ module {
 
 module {
   func @convert_b2i(%arg0: memref<12xi1>, %arg1 : memref<12xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     // CHECK: [[VAL0:%.*]] = spv.Load "StorageBuffer" %{{.*}} : i1
     // CHECK: [[ZERO:%.*]] = spv.constant 0 : i32
     // CHECK: [[ONE:%.*]] = spv.constant 1 : i32

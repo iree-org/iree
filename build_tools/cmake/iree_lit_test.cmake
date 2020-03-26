@@ -50,16 +50,18 @@ function(iree_lit_test)
     string(REPLACE "::" "_" _DATA_DEP_NAME ${_DATA_DEP})
     # TODO(*): iree_sh_binary so we can avoid this.
     if("${_DATA_DEP_NAME}" STREQUAL "iree_tools_IreeFileCheck")
-      list(APPEND _DATA_DEP_PATHS "${CMAKE_SOURCE_DIR}/iree/tools/IreeFileCheck.bat")
+      list(APPEND _DATA_DEP_PATHS "${CMAKE_SOURCE_DIR}/iree/tools/IreeFileCheck.sh")
     else()
       list(APPEND _DATA_DEP_PATHS $<TARGET_FILE:${_DATA_DEP_NAME}>)
     endif()
   endforeach(_DATA_DEP)
 
   # We run all our tests through a custom test runner to allow setup and teardown.
+  string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})
+  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
   add_test(
     NAME
-      ${_NAME}
+      ${_NAME_PATH}
     COMMAND
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${CMAKE_SOURCE_DIR}/iree/tools/run_lit.${IREE_HOST_SCRIPT_EXT}"
@@ -70,10 +72,12 @@ function(iree_lit_test)
   )
   set_property(
     TEST
-      ${_NAME}
+      ${_NAME_PATH}
     PROPERTY
       ENVIRONMENT
         "TEST_TMPDIR=${_NAME}_test_tmpdir"
+      LABELS
+        ${_PACKAGE_PATH}
       REQUIRED_FILES
         "${_TEST_FILE_PATH}"
   )

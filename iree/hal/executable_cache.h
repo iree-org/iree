@@ -20,6 +20,7 @@
 #include "iree/base/status.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_format.h"
+#include "iree/hal/executable_layout.h"
 #include "iree/hal/executable_spec.h"
 
 namespace iree {
@@ -114,7 +115,8 @@ class ExecutableCache : public RefObject<ExecutableCache> {
   // When preparing a large number of executables it's recommended to use the
   // PrepareExecutables method to batch and wait on the results.
   virtual StatusOr<ref_ptr<Executable>> PrepareExecutable(
-      ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) = 0;
+      ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+      const ExecutableSpec& spec) = 0;
 
  protected:
   ExecutableCache();

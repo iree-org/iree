@@ -66,6 +66,7 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
   // TODO(benvanik): replace when we have descriptor sets in the HAL IR.
   auto anyFuncOp = entryFuncOps.front();
   int binding = 0;
+  int pushConstantCount = 0;
   for (auto inputType : llvm::enumerate(anyFuncOp.getType().getInputs())) {
     auto bindingName = "arg" + std::to_string(inputType.index());
     if (inputType.value().isa<TensorType>()) {
@@ -74,6 +75,17 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
           /*set=*/APInt(32, 0), /*binding=*/APInt(32, binding++),
           IREE::HAL::DescriptorType::StorageBuffer,
           IREE::HAL::MemoryAccessBitfield::Read);
+    } else if (auto indexType = inputType.value().dyn_cast<IndexType>()) {
+      ++pushConstantCount;
+    } else if (auto integerType = inputType.value().dyn_cast<IntegerType>()) {
+      if (integerType.getIntOrFloatBitWidth() != 32) {
+        emitError(interfaceLoc)
+            << "unsupported argument " << inputType.index() << " bit depth "
+            << integerType.getIntOrFloatBitWidth() << " (" << integerType
+            << "); only 32-bit values are supported right now";
+        return llvm::None;
+      }
+      ++pushConstantCount;
     } else {
       emitError(interfaceLoc)
           << "unsupported interface function argument " << inputType.index()
@@ -96,6 +108,11 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
           << outputType.value() << "; requires tensor types";
       return llvm::None;
     }
+  }
+
+  if (pushConstantCount > 0) {
+    interfaceOp.setAttr("push_constants",
+                        interfaceBuilder.getI32IntegerAttr(pushConstantCount));
   }
 
   return interfaceOp;
@@ -127,9 +144,10 @@ static Optional<FuncOp> createDispatchEntryThunk(
   // Pull all arguments from the bindings.
   auto* thunkEntryBlock = thunkFuncOp.addEntryBlock();
   OpBuilder thunkEntryBuilder(thunkEntryBlock);
-  auto zeroOffset = thunkEntryBuilder.createOrFold<mlir::ConstantOp>(
-      thunkFuncOp.getLoc(), thunkEntryBuilder.getI32IntegerAttr(0));
+  auto zeroOffset = thunkEntryBuilder.createOrFold<mlir::ConstantIndexOp>(
+      thunkFuncOp.getLoc(), 0);
   SmallVector<Value, 4> operands;
+  int pushConstantOffset = 0;
   for (auto inputType : sourceFuncType.getInputs()) {
     if (inputType.isa<TensorType>()) {
       auto bindingOp = bindingOps[binding++];
@@ -140,6 +158,12 @@ static Optional<FuncOp> createDispatchEntryThunk(
               {thunkEntryBuilder.getSymbolRefAttr(bindingOp)}),
           zeroOffset);
       operands.push_back(loadOp.getResult());
+    } else if (inputType.isa<IndexType>() || inputType.isa<IntegerType>()) {
+      auto loadOp =
+          thunkEntryBuilder.create<IREE::HAL::InterfaceLoadConstantOp>(
+              thunkFuncOp.getLoc(), inputType, APInt(64, pushConstantOffset));
+      operands.push_back(loadOp.getResult());
+      ++pushConstantOffset;
     } else {
       sourceFuncOp.emitError() << "function argument type " << inputType
                                << " is not valid for interface I/O";
@@ -187,8 +211,7 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
       // Hardwire workgroup size to 1,1,1 by default. Backends can override.
       auto sourceFuncOp = sourceOp.getInnerModule().lookupSymbol<FuncOp>(
           dispatchEntryOp.function_ref());
-      auto workGroupSizeAttr = DenseIntElementsAttr::get(
-          VectorType::get(3, builder.getIntegerType(32)), {1, 1, 1});
+      auto workGroupSizeAttr = builder.getIndexArrayAttr({1, 1, 1});
       auto thunkFuncOp = createDispatchEntryThunk(sourceFuncOp, interfaceOp);
       if (!thunkFuncOp.hasValue()) {
         return failure();
@@ -226,6 +249,8 @@ class MaterializeInterfacesPass : public ModulePass<MaterializeInterfacesPass> {
       builder.setInsertionPointAfter(sourceOp);
       auto targetOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
+      SymbolTable::setSymbolVisibility(targetOp,
+                                       SymbolTable::Visibility::Private);
 
       // Add IO ops to define the bindings and how parameters are passed.
       auto interfaceOp = declareInterfaceIO(sourceOp, targetOp);

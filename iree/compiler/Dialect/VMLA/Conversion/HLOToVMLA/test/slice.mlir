@@ -8,11 +8,11 @@ func @slice_whole_buffer() -> tensor<3x4xi32> attributes { sym_visibility = "pri
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c48_i32)
+  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c48)
   // CHECK: "vmla.copy"(
-  // CHECK-SAME: [[SRC]], %rs3_4, %c0_i32, %c0_i32,
-  // CHECK-SAME: [[DST]], %rs3_4, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c3_i32, %c4_i32
+  // CHECK-SAME: [[SRC]], %rs3_4, %c0, %c0,
+  // CHECK-SAME: [[DST]], %rs3_4, %c0, %c0,
+  // CHECK-SAME: %c3, %c4
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.slice"(%input) {
     start_indices = dense<[0, 0]> : tensor<2xi64>,
@@ -33,11 +33,11 @@ func @slice_whole_stride() -> tensor<1x4xi32> attributes { sym_visibility = "pri
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c16_i32)
+  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c16)
   // CHECK: "vmla.copy"(
-  // CHECK-SAME: [[SRC]], %rs3_4, %c1_i32, %c0_i32,
-  // CHECK-SAME: [[DST]], %rs1_4, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c1_i32, %c4_i32
+  // CHECK-SAME: [[SRC]], %rs3_4, %c1, %c0,
+  // CHECK-SAME: [[DST]], %rs1_4, %c0, %c0,
+  // CHECK-SAME: %c1, %c4
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.slice"(%input) {
     start_indices = dense<[1, 0]> : tensor<2xi64>,
@@ -58,11 +58,11 @@ func @slice_stride_part() -> tensor<1x2xi32> attributes { sym_visibility = "priv
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c8_i32)
+  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c8)
   // CHECK: "vmla.copy"(
-  // CHECK-SAME: [[SRC]], %rs3_4, %c1_i32, %c1_i32,
-  // CHECK-SAME: [[DST]], %rs1_2, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c1_i32, %c2_i32
+  // CHECK-SAME: [[SRC]], %rs3_4, %c1, %c1,
+  // CHECK-SAME: [[DST]], %rs1_2, %c0, %c0,
+  // CHECK-SAME: %c1, %c2
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.slice"(%input) {
     start_indices = dense<[1, 1]> : tensor<2xi64>,
@@ -83,11 +83,11 @@ func @slice_multi_stride() -> tensor<2x4xi32> attributes { sym_visibility = "pri
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c32_i32)
+  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c32)
   // CHECK: "vmla.copy"(
-  // CHECK-SAME: [[SRC]], %rs3_4, %c1_i32, %c0_i32,
-  // CHECK-SAME: [[DST]], %rs2_4, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c2_i32, %c4_i32
+  // CHECK-SAME: [[SRC]], %rs3_4, %c1, %c0,
+  // CHECK-SAME: [[DST]], %rs2_4, %c0, %c0,
+  // CHECK-SAME: %c2, %c4
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.slice"(%input) {
     start_indices = dense<[1, 0]> : tensor<2xi64>,

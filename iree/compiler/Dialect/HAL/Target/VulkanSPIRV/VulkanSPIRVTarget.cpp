@@ -107,61 +107,9 @@ static std::vector<std::string> populateEntryPointNames(
   return entryPointNames;
 }
 
-// Returns a pipeline layout definition based on the bindings required.
-static std::unique_ptr<iree::VkPipelineLayoutDefT> populatePipelineLayout(
-    spirv::ModuleOp spirvModuleOp) {
-  // NOTE: we currently make some assumptions about this based on the expected
-  // ABI of the runtime. If we wanted to support more general shaders with more
-  // complex I/O we'd need to find a better way to communicate this through the
-  // VkPipelineLayoutDef.
-  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
-  pipelineLayoutDef->buffer_binding_set = 0;
-
-  // Build a set of descriptor_set -> binding -> variable.
-  // This makes it easier to write out the descriptor in a logical order, even
-  // though this is not strictly required.
-  int64_t maxDescriptorSetOrdinal = -1;
-  std::map<int32_t, std::map<int32_t, spirv::GlobalVariableOp>> descriptorSets;
-  for (auto globalVar :
-       spirvModuleOp.getBlock().getOps<spirv::GlobalVariableOp>()) {
-    auto descriptorSetAttr =
-        globalVar.getAttrOfType<IntegerAttr>("descriptor_set");
-    auto bindingAttr = globalVar.getAttrOfType<IntegerAttr>("binding");
-    if (!descriptorSetAttr || !bindingAttr) {
-      // Not something the runtime cares about.
-      continue;
-    }
-    maxDescriptorSetOrdinal =
-        std::max(descriptorSetAttr.getInt(), maxDescriptorSetOrdinal);
-    auto &descriptorSet = descriptorSets[descriptorSetAttr.getInt()];
-    descriptorSet[bindingAttr.getInt()] = globalVar;
-  }
-
-  // Create the individual layout and binding defs.
-  pipelineLayoutDef->descriptor_set_layouts.resize(maxDescriptorSetOrdinal + 1);
-  for (auto &descriptorSetBindings : descriptorSets) {
-    int32_t descriptorSet = descriptorSetBindings.first;
-    auto dsl = std::make_unique<iree::VkDescriptorSetLayoutDefT>();
-
-    for (auto &globalVarBinding : descriptorSetBindings.second) {
-      auto binding = std::make_unique<iree::VkDescriptorSetLayoutBindingDefT>();
-      binding->binding = globalVarBinding.first;
-      binding->descriptor_count = 1;
-      // TODO(benvanik): pull from type info.
-      binding->descriptor_type = 7;       // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-      binding->stage_flags = 0x00000020;  // VK_SHADER_STAGE_COMPUTE_BIT
-      dsl->bindings.push_back(std::move(binding));
-    }
-
-    pipelineLayoutDef->descriptor_set_layouts[descriptorSet] = std::move(dsl);
-  }
-
-  return pipelineLayoutDef;
-}
-
 // Returns an (x,y,z) workgroup size for the given |targetFuncOp|.
 // This is pure heuristics until we support dynamic/varying workgroup sizes.
-static std::array<int32_t, 3> guessWorkGroupSize(
+static std::array<int64_t, 3> guessWorkGroupSize(
     IREE::Flow::DispatchEntryOp entryOp, FuncOp targetFuncOp) {
   for (auto &block : targetFuncOp.getBlocks()) {
     if (!block.getOps<xla_hlo::DotOp>().empty()) {
@@ -187,9 +135,8 @@ static void guessEntryWorkGroupSizes(IREE::Flow::ExecutableOp sourceOp,
   for (auto &op : sourceOp.getBlock()) {
     if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
       auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
-      auto workGroupSizeAttr = DenseIntElementsAttr::get(
-          VectorType::get(3, builder.getIntegerType(32)),
-          guessWorkGroupSize(entryOp, funcOp));
+      auto workGroupSizeAttr =
+          builder.getIndexArrayAttr(guessWorkGroupSize(entryOp, funcOp));
       funcOp.setAttr("iree.executable.workgroup_size", workGroupSizeAttr);
     }
   }
@@ -209,8 +156,7 @@ static void propagateModifiedExecutableABI(
       assert(targetEntryOp && "could not find HAL entry point");
       auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
       assert(funcOp && "could not find target function for HAL entry point");
-      auto workGroupSize = funcOp.getAttrOfType<DenseIntElementsAttr>(
-          "iree.executable.workgroup_size");
+      auto workGroupSize = funcOp.getAttr("iree.executable.workgroup_size");
       targetEntryOp.setAttr("workgroup_size", workGroupSize);
     }
   }
@@ -307,15 +253,6 @@ LogicalResult translateToVulkanSPIRVExecutable(
     if (spirvExecutableDef.code.empty()) {
       return spvModuleOp.emitError()
              << "failed to translate and serialize SPIR-V executable";
-    }
-
-    // Reflect against the entry thunk to identify the required pipeline
-    // layout based on binding information. This is used by the runtime to
-    // create the VkPipelineLayout.
-    spirvExecutableDef.pipeline_layout = populatePipelineLayout(spvModuleOp);
-    if (!spirvExecutableDef.pipeline_layout) {
-      return spvModuleOp.emitError()
-             << "failed to generate pipeline for SPIR-V module";
     }
 
     // Remove the original functions as we just want to keep the spv.module for
