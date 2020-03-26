@@ -1,4 +1,4 @@
-// RUN: iree-opt -print-ir-after-all -split-input-file -iree-hal-materialize-resource-caches %s | IreeFileCheck %s
+// RUN: iree-opt -split-input-file -iree-hal-materialize-resource-caches %s | IreeFileCheck %s
 
 //      CHECK: hal.variable @_descriptor_set_layout_0 init(@_descriptor_set_layout_0_initializer) : !hal.descriptor_set_layout
 // CHECK-NEXT: func @_descriptor_set_layout_0_initializer() -> !hal.descriptor_set_layout attributes {sym_visibility = "private"} {
@@ -76,7 +76,7 @@ func @sharedLayoutLookup(%arg0 : !hal.device) -> !hal.executable_layout {
 
 // CHECK: @otherDescriptorSetLayoutLookup
 func @otherDescriptorSetLayoutLookup(%arg0 : !hal.device) -> !hal.descriptor_set_layout {
-  // CHECK: %[[LAYOUT:%.+]] = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
+  // CHECK: %[[LAYOUT:.+]] = hal.variable.load @_descriptor_set_layout_0 : !hal.descriptor_set_layout
   %0 = hal.descriptor_set_layout.lookup %arg0, "PushOnly", bindings = [
     #hal.descriptor_set_layout_binding<0, "StorageBuffer", "Read">,
     #hal.descriptor_set_layout_binding<1, "StorageBuffer", "Write">
@@ -118,7 +118,7 @@ hal.executable @exe {
 // CHECK-NEXT: func @_executable_cache_initializer
 //      CHECK: %[[CACHE:.+]] = hal.executable_cache.create %dev, identifier = "default" : !hal.executable_cache
 // CHECK-NEXT: %[[LAYOUT:.+]] = hal.variable.load @_executable_layout_0 : !hal.executable_layout
-// CHECK-NEXT: %[[EXE:%.+]] = hal.executable_cache.prepare %[[CACHE]], layout = %[[LAYOUT]], caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
+// CHECK-NEXT: %[[EXE:.+]] = hal.executable_cache.prepare %[[CACHE]], layout = %[[LAYOUT]], caching_mode = "AliasProvidedData|AllowPersistentCaching|AllowOptimization", @exe : !hal.executable
 
 // CHECK-LABEL: @exeLookup
 func @exeLookup(%arg0 : !hal.device) -> !hal.executable {
