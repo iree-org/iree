@@ -75,32 +75,25 @@ StatusOr<bool> AlmostEqByteSpan(iree_byte_span_t lhs_bytes,
                                 iree_byte_span_t rhs_bytes,
                                 iree_hal_element_type_t element_type) {
   switch (element_type) {
-    case IREE_HAL_ELEMENT_TYPE_SINT_8:
-      return AlmostEqByteSpan<int8_t>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_UINT_8:
-      return AlmostEqByteSpan<uint8_t>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_SINT_16:
-      return AlmostEqByteSpan<int16_t>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_UINT_16:
-      return AlmostEqByteSpan<uint16_t>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_SINT_32:
-      return AlmostEqByteSpan<int32_t>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_UINT_32:
-      return AlmostEqByteSpan<uint32_t>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_SINT_64:
-      return AlmostEqByteSpan<int64_t>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_UINT_64:
-      return AlmostEqByteSpan<uint64_t>(lhs_bytes, rhs_bytes);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
       return AlmostEqByteSpan<float>(lhs_bytes, rhs_bytes);
     case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
       return AlmostEqByteSpan<double>(lhs_bytes, rhs_bytes);
-    case IREE_HAL_ELEMENT_TYPE_NONE:
+    case IREE_HAL_ELEMENT_TYPE_SINT_8:
+    case IREE_HAL_ELEMENT_TYPE_UINT_8:
+    case IREE_HAL_ELEMENT_TYPE_SINT_16:
+    case IREE_HAL_ELEMENT_TYPE_UINT_16:
+    case IREE_HAL_ELEMENT_TYPE_SINT_32:
+    case IREE_HAL_ELEMENT_TYPE_UINT_32:
+    case IREE_HAL_ELEMENT_TYPE_SINT_64:
+    case IREE_HAL_ELEMENT_TYPE_UINT_64:
+      // TODO(gcmn): Consider supporting fuzzy matching for quantized integers.
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_8:
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_16:
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_32:
     case IREE_HAL_ELEMENT_TYPE_OPAQUE_64:
-    case IREE_HAL_ELEMENT_TYPE_FLOAT_16: {
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
+    case IREE_HAL_ELEMENT_TYPE_NONE: {
       break;
     }
   }
