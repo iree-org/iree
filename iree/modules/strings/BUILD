@@ -7,11 +7,13 @@ package(
 
 cc_library(
     name = "strings_module",
-    srcs = ["strings_module.cc"],
+    srcs = ["api.cc", "strings_module.cc"],
     hdrs = ["api.h", "strings_module.h"],
     deps = [
         "//iree/base:api",
         "//iree/base:logging",
+        "//iree/hal:api",
+        "//iree/modules/hal",
         "//iree/vm",
         "//iree/vm:bytecode_module",
         "//iree/vm:module",
@@ -35,6 +37,9 @@ cc_test(
         "//iree/base:api",
         "//iree/base:logging",
         "//iree/testing:gtest_main",
+        "//iree/hal:api",
+        "//iree/hal/vmla:vmla_driver_module",
+        "//iree/modules/hal",
         "//iree/vm:bytecode_module",
         "//iree/vm:context",
         "//iree/vm:instance",
