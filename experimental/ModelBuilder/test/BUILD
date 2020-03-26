@@ -30,6 +30,7 @@ iree_lit_test_suite(
     data = [
         ":runtime-support.so",
         # Tests.
+        ":test-dot-prod",
         ":test-mnist-jit",
         ":test-simple-jit",
         ":test-simple-mlir",
@@ -38,6 +39,24 @@ iree_lit_test_suite(
     ],
     tags = [
         "noga",
+    ],
+)
+
+cc_binary(
+    name = "test-dot-prod",
+    srcs = ["TestDotProdJIT.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        ":runtime-support.so",
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LoopOpsTransforms",
     ],
 )
 
