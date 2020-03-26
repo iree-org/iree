@@ -24,6 +24,7 @@ ROOT_DIR=$(git rev-parse --show-toplevel)
 # Respect the user setting, but default to as many jobs as we have cores.
 export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 
+export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
 EXCLUDED_TESTS=(
