@@ -29,37 +29,7 @@ export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 EXCLUDED_TESTS=(
     iree_compiler_Translation_SPIRV_LinalgToSPIRV_test_pw_add.mlir.test
     iree_hal_vulkan_dynamic_symbols_test
-    iree_test_e2e_xla_abs.mlir.test
-    iree_test_e2e_xla_add.mlir.test
-    iree_test_e2e_xla_batch_norm_inference.mlir.test
-    iree_test_e2e_xla_compare.mlir.test
-    iree_test_e2e_xla_constants.mlir.test
-    iree_test_e2e_xla_conv.mlir.test
-    iree_test_e2e_xla_cos.mlir.test
-    iree_test_e2e_xla_dot.mlir.test
-    iree_test_e2e_xla_exp.mlir.test
-    iree_test_e2e_xla_fullyconnected.mlir.test
-    iree_test_e2e_xla_gemm.mlir.test
-    iree_test_e2e_xla_gemm_large.mlir.test
-    iree_test_e2e_xla_log.mlir.test
-    iree_test_e2e_xla_max_float.mlir.test
-    iree_test_e2e_xla_max_int.mlir.test
-    iree_test_e2e_xla_min_float.mlir.test
-    iree_test_e2e_xla_min_int.mlir.test
-    iree_test_e2e_xla_mnist.mlir.test
-    iree_test_e2e_xla_multiple_return.mlir.test
-    iree_test_e2e_xla_reduce_float.mlir.test
-    iree_test_e2e_xla_reduce_int.mlir.test
     iree_test_e2e_xla_rem.mlir.test
-    iree_test_e2e_xla_reshape.mlir.test
-    iree_test_e2e_xla_reshape_adddims.mlir.test
-    iree_test_e2e_xla_reshape_dropdims.mlir.test
-    iree_test_e2e_xla_rsqrt.mlir.test
-    iree_test_e2e_xla_scalar.mlir.test
-    iree_test_e2e_xla_select.mlir.test
-    iree_test_e2e_xla_sqrt.mlir.test
-    iree_test_e2e_xla_through_std.mlir.test
-    iree_test_e2e_xla_while.mlir.test
     iree_vm_bytecode_module_benchmark # Make this test not take an eternity
     bindings_python_pyiree_rt_function_abi_test
     bindings_python_pyiree_rt_system_api_test
