@@ -283,6 +283,17 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   }
 };
 
+class IndexCastOpConversion : public OpConversionPattern<IndexCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IndexCastOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(srcOp, operands);
+    return success();
+  }
+};
+
 class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   using OpConversionPattern::OpConversionPattern;
   static constexpr unsigned kBits = 32;
@@ -357,11 +368,12 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 
 void populateStandardToVMPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns) {
-  patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-                  CondBranchOpConversion, ConstantOpConversion,
-                  ModuleOpConversion, ModuleTerminatorOpConversion,
-                  FuncOpConversion, ReturnOpConversion, SelectI32OpConversion>(
-      context);
+  patterns
+      .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
+              CondBranchOpConversion, ConstantOpConversion, ModuleOpConversion,
+              ModuleTerminatorOpConversion, FuncOpConversion,
+              ReturnOpConversion, IndexCastOpConversion, SelectI32OpConversion>(
+          context);
 
   // Binary arithmetic ops
   patterns
