@@ -21,6 +21,6 @@ iree_lit_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    iree::compiler::Dialect::Modules::TensorList::tensorlist-opt
     iree::tools::IreeFileCheck
+    iree::tools::iree-opt
 )

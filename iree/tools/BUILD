@@ -27,10 +27,16 @@ exports_files([
     "sanitizer_suppressions.txt",
 ])
 
-TARGET_COMPILER_BACKENDS = [
+IREE_COMPILER_TARGET_BACKENDS = [
     "//iree/compiler/Dialect/HAL/Target/VMLA",
     "//iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     "//iree/compiler/Dialect/HAL/Target/LLVM",
+]
+
+IREE_COMPILER_DIALECT_MODULES = [
+    "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
+    "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
+    "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
 ]
 
 cc_binary(
@@ -136,7 +142,7 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
-    ] + TARGET_COMPILER_BACKENDS,
+    ] + IREE_COMPILER_DIALECT_MODULES + IREE_COMPILER_TARGET_BACKENDS,
 )
 
 cc_binary(
@@ -179,7 +185,7 @@ cc_binary(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/compiler/Translation:IREEVM",
-    ] + TARGET_COMPILER_BACKENDS + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + IREE_COMPILER_DIALECT_MODULES + IREE_COMPILER_TARGET_BACKENDS + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
 )
 
 cc_binary(
@@ -230,7 +236,7 @@ cc_library(
         "@llvm-project//mlir:TranslateClParser",
         "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
-    ] + TARGET_COMPILER_BACKENDS,
+    ] + IREE_COMPILER_DIALECT_MODULES + IREE_COMPILER_TARGET_BACKENDS,
     alwayslink = 1,
 )
 

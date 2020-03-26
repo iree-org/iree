@@ -28,23 +28,3 @@ iree_cc_embed_data(
   FLATTEN
   PUBLIC
 )
-
-iree_cc_binary(
-  NAME
-    strings-opt
-  OUT
-    strings-opt
-  DEPS
-    iree::compiler::Dialect::Modules::Strings::IR::Dialect
-    iree::tools::iree_opt_main
-)
-
-iree_cc_binary(
-  NAME
-    strings-translate
-  OUT
-    strings-translate
-  DEPS
-    iree::compiler::Dialect::Modules::Strings::IR::Dialect
-    iree::tools::iree_translate_main
-)

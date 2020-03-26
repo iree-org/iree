@@ -21,7 +21,7 @@ iree_lit_test_suite(
   SRCS
     "${_GLOB_X_MLIR}"
   DATA
-    iree::compiler::Dialect::Modules::Check::check-translate
     iree::modules::check::iree-check-module
     iree::tools::IreeFileCheck
+    iree::tools::iree-translate
 )

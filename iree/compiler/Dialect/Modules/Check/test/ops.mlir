@@ -14,7 +14,7 @@
 
 // Tests the printing/parsing of the Check dialect ops.
 
-// RUN: check-opt -split-input-file %s | check-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @expect_true
 // CHECK-SAME: [[ARG:%[a-zA-Z0-9]+]]
