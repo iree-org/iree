@@ -52,6 +52,7 @@ StatusOr<ref_ptr<Executable>> LLVMJITExecutableCache::PrepareExecutable(
 
   return executable;
 }
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

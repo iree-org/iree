@@ -29,6 +29,7 @@ static StatusOr<ref_ptr<Driver>> CreateLLVMJITDriver() {
   llvm::InitializeNativeTargetAsmPrinter();
   return make_ref<LLVMJITDriver>();
 }
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

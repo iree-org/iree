@@ -173,4 +173,5 @@ void freeUnrankedDescriptor(UnrankedMemRefType<T> *desc) {
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree
+
 #endif  // IREE_HAL_LLVMJIT_LLVMJIT_MEMREF_RUNTIME_H_

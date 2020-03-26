@@ -45,7 +45,7 @@ Status LLVMJITCommandProcessor::Dispatch(
   auto* executable =
       static_cast<LLVMJITExecutable*>(dispatch_request.executable);
 
-  std::vector<UnrankedMemRefType<uint32_t>*> descriptors(
+  llvm::SmallVector<UnrankedMemRefType<uint32_t>*, 4> descriptors(
       dispatch_request.bindings.size());
   llvm::SmallVector<void*, 4> args(dispatch_request.bindings.size());
   for (size_t i = 0; i < dispatch_request.bindings.size(); ++i) {
@@ -65,6 +65,7 @@ Status LLVMJITCommandProcessor::Dispatch(
 
   return status;
 }
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

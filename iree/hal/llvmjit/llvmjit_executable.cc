@@ -33,6 +33,7 @@
 namespace iree {
 namespace hal {
 namespace llvmjit {
+
 // static
 StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
     hal::Allocator* allocator, ExecutableSpec spec,
@@ -62,8 +63,7 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   auto dylib_serarch_generator =
       llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
           dataLayout.getGlobalPrefix());
-
-  if (!dylib_serarch_generator.get())
+  if (!dylib_serarch_generator)
     return UnavailableErrorBuilder(IREE_LOC)
            << "Can't resolve symbols in current process";
 
@@ -75,7 +75,7 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
 
   for (const auto func_name : *entry_points) {
     auto func_symbol = execution_engine->lookup("invoke_" + func_name->str());
-    if (!func_symbol.get()) {
+    if (!func_symbol) {
       return NotFoundErrorBuilder(IREE_LOC)
              << "Can't JIT compile function : " << func_name;
     }
@@ -111,6 +111,7 @@ LLVMJITExecutable::LLVMJITExecutable(hal::Allocator* allocator,
 }
 
 LLVMJITExecutable::~LLVMJITExecutable() = default;
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree

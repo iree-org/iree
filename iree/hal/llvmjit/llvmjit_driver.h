@@ -32,6 +32,7 @@ class LLVMJITDriver final : public Driver {
 
   StatusOr<ref_ptr<Device>> CreateDevice(DriverDeviceID device_id) override;
 };
+
 }  // namespace llvmjit
 }  // namespace hal
 }  // namespace iree
