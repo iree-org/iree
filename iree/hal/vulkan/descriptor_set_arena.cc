@@ -65,21 +65,6 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
   return write_infos;
 }
 
-VkDescriptorSetAllocateInfo PopulateDescriptorSetsAllocateInfo(
-    const DescriptorPool& descriptor_pool,
-    NativeDescriptorSetLayout* set_layout) {
-  VkDescriptorSetAllocateInfo allocate_info;
-  allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-  allocate_info.pNext = nullptr;
-  allocate_info.descriptorPool = descriptor_pool.handle;
-
-  VkDescriptorSetLayout set_layout_handle = set_layout->handle();
-  allocate_info.descriptorSetCount = 1;
-  allocate_info.pSetLayouts = &set_layout_handle;
-
-  return allocate_info;
-}
-
 }  // namespace
 
 DescriptorSetArena::DescriptorSetArena(
@@ -130,8 +115,14 @@ Status DescriptorSetArena::BindDescriptorSet(
   }
   auto& descriptor_pool = descriptor_pool_buckets_[bucket];
 
-  auto allocate_info =
-      PopulateDescriptorSetsAllocateInfo(descriptor_pool, set_layout);
+  VkDescriptorSetAllocateInfo allocate_info;
+  allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocate_info.pNext = nullptr;
+  allocate_info.descriptorPool = descriptor_pool.handle;
+  VkDescriptorSetLayout set_layout_handle = set_layout->handle();
+  allocate_info.descriptorSetCount = 1;
+  allocate_info.pSetLayouts = &set_layout_handle;
+
   VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
   VkResult result = syms().vkAllocateDescriptorSets(
       *logical_device_, &allocate_info, &descriptor_set);
@@ -146,8 +137,13 @@ Status DescriptorSetArena::BindDescriptorSet(
     used_descriptor_pools_.push_back(descriptor_pool_buckets_[bucket]);
 
     // Allocate descriptor sets.
-    auto allocate_info = PopulateDescriptorSetsAllocateInfo(
-        descriptor_pool_buckets_[bucket], set_layout);
+    VkDescriptorSetAllocateInfo allocate_info;
+    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocate_info.pNext = nullptr;
+    allocate_info.descriptorPool = descriptor_pool_buckets_[bucket].handle;
+    VkDescriptorSetLayout set_layout_handle = set_layout->handle();
+    allocate_info.descriptorSetCount = 1;
+    allocate_info.pSetLayouts = &set_layout_handle;
     descriptor_set = VK_NULL_HANDLE;
     VK_RETURN_IF_ERROR(syms().vkAllocateDescriptorSets(
         *logical_device_, &allocate_info, &descriptor_set));

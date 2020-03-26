@@ -310,6 +310,7 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
+        "//iree/hal:executable_layout",
         "//iree/hal:executable_spec",
         "//iree/schemas:spirv_executable_def_cc_fbs",
         "@com_google_absl//absl/container:inlined_vector",

@@ -50,7 +50,6 @@ Status VMLACommandProcessor::DispatchInline(
   RETURN_IF_ERROR(interface->SetConstants(push_constants.values));
 
   for (int set_ordinal = 0; set_ordinal < set_bindings.size(); ++set_ordinal) {
-    const auto& bindings = set_bindings[set_ordinal];
     for (const auto& binding : set_bindings[set_ordinal]) {
       // TODO(benvanik): plumb binding directly into VMLA to avoid this.
       void* data = static_cast<HostBuffer*>(binding.buffer->allocated_buffer())

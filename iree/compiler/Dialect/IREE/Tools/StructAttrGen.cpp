@@ -403,7 +403,6 @@ static void emitWalkStorageDef(const StructAttr &structAttr, raw_ostream &os) {
 static void emitStructDef(const Record &structDef, raw_ostream &os) {
   StructAttr structAttr(&structDef);
   StringRef cppNamespace = structAttr.getCppNamespace();
-  StringRef structName = structAttr.getStructClassName();
 
   llvm::SmallVector<StringRef, 2> namespaces;
   llvm::SplitString(cppNamespace, namespaces, "::");
