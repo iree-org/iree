@@ -24,6 +24,7 @@
 #include "iree/base/logging.h"
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
+#include "iree/modules/strings/api.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/module.h"
 #include "iree/vm/module_abi_cc.h"
@@ -34,177 +35,11 @@
 static iree_vm_ref_type_descriptor_t string_descriptor = {0};
 static iree_vm_ref_type_descriptor_t string_tensor_descriptor = {0};
 
-typedef struct string {
-  iree_vm_ref_object_t ref_object;
-  iree_allocator_t allocator;
-  iree_string_view_t value;
-} string_t;
-
-typedef struct string_tensor {
-  iree_vm_ref_object_t ref_object;
-  iree_allocator_t allocator;
-  iree_string_view_t* values;
-  size_t count;
-  const int32_t* shape;
-  size_t rank;
-} string_tensor_t;
-
 IREE_VM_DEFINE_TYPE_ADAPTERS(string, string_t);
 IREE_VM_DEFINE_TYPE_ADAPTERS(string_tensor, string_tensor_t);
 
-extern "C" iree_status_t string_create(iree_string_view_t value,
-                                       iree_allocator_t allocator,
-                                       string_t** out_message) {
-  // Note that we allocate the message and the string value together.
-  string_t* message = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(string_t) + value.size, (void**)&message));
-  message->ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
-  message->allocator = allocator;
-  message->value.data = ((const char*)message) + sizeof(string_t);
-  message->value.size = value.size;
-  memcpy((void*)message->value.data, value.data, message->value.size);
-  *out_message = message;
-  return IREE_STATUS_OK;
-}
-
-extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
-                                              const iree_string_view_t* value,
-                                              int64_t value_count,
-                                              const int32_t* shape, size_t rank,
-                                              string_tensor_t** out_message) {
-  // TODO(suderman): Use separate allocation for each string. More ref counters
-  // but prevents constantly copying.
-
-  // Validate the count is correct.
-  size_t count = 1;
-  for (int i = 0; i < rank; i++) {
-    count *= shape[i];
-  }
-
-  if (count != value_count) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  // Compute our total memory requirements
-  size_t string_bytes = 0;
-  for (int i = 0; i < value_count; i++) {
-    string_bytes += value[i].size;
-  }
-
-  const size_t shape_bytes = rank * sizeof(int32_t);
-  const size_t string_view_bytes = value_count * sizeof(iree_string_view_t);
-  const size_t byte_count =
-      sizeof(string_tensor_t) + shape_bytes + string_view_bytes + string_bytes;
-
-  // Allocate and compute byte offsets.
-  string_tensor_t* message = NULL;
-  IREE_RETURN_IF_ERROR(
-      iree_allocator_malloc(allocator, byte_count, (void**)&message));
-
-  char* shape_ptr = ((char*)message) + sizeof(string_tensor_t);
-  char* string_view_ptr = shape_ptr + shape_bytes;
-  char* contents_ptr = string_view_ptr + string_view_bytes;
-
-  // Setup the string tensor structure.
-  message->shape = (int32_t*)shape_ptr;
-  message->values = (iree_string_view_t*)string_view_ptr;
-  message->ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
-  message->allocator = allocator;
-
-  // Set string tensor values.
-  message->rank = rank;
-  message->count = count;
-
-  // Copy the shape.
-  memcpy((void*)message->shape, shape, rank * sizeof(int32_t));
-
-  // Copy and allocate each string.
-  for (int i = 0; i < count; i++) {
-    const auto& src = value[i];
-    auto& dest = message->values[i];
-
-    dest.data = (char*)contents_ptr;
-    dest.size = src.size;
-    memcpy((void*)dest.data, src.data, src.size);
-    contents_ptr += src.size;
-  }
-
-  *out_message = message;
-  return IREE_STATUS_OK;
-}
-
-// Returns the count of elements in the tensor.
-iree_status_t string_tensor_get_count(const string_tensor_t* tensor,
-                                      size_t* count) {
-  if (!tensor) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  *count = tensor->count;
-  return IREE_STATUS_OK;
-}
-
-// returns the list of stored string views.
-iree_status_t string_tensor_get_elements(const string_tensor_t* tensor,
-                                         iree_string_view_t* strs, size_t count,
-                                         size_t offset) {
-  if (!tensor || offset < 0 || offset + count > tensor->count) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  for (size_t i = 0; i < count; i++) {
-    strs[i] = tensor->values[i + offset];
-  }
-  return IREE_STATUS_OK;
-}
-
-// Returns the rank of the tensor.
-iree_status_t string_tensor_get_rank(const string_tensor_t* tensor,
-                                     int32_t* rank) {
-  if (!tensor || !rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-  *rank = tensor->rank;
-  return IREE_STATUS_OK;
-}
-
-// Returns the shape of the tensor.
-iree_status_t string_tensor_get_shape(const string_tensor_t* tensor,
-                                      int32_t* shape, size_t rank) {
-  if (!tensor || (!shape && rank != 0) || rank != tensor->rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  for (int i = 0; i < rank; i++) {
-    shape[i] = tensor->shape[i];
-  }
-  return IREE_STATUS_OK;
-}
-
-// Returns the store string view using the provided indices.
-iree_status_t string_tensor_get_element(const string_tensor_t* tensor,
-                                        int32_t* indices, size_t rank,
-                                        iree_string_view_t* str) {
-  if (!tensor || !indices || rank != tensor->rank) {
-    return IREE_STATUS_INVALID_ARGUMENT;
-  }
-
-  size_t index = 0;
-  for (int i = 0; i < rank; i++) {
-    if (indices[i] >= tensor->shape[i]) {
-      return IREE_STATUS_INVALID_ARGUMENT;
-    }
-
-    index = index * tensor->shape[i] + indices[i];
-  }
-
-  *str = tensor->values[index];
-  return IREE_STATUS_OK;
-}
-
 namespace iree {
 namespace {
-
 class StringsModuleState final {
  public:
   explicit StringsModuleState(iree_allocator_t allocator)
@@ -384,16 +219,6 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
 
 }  // namespace
 }  // namespace iree
-
-void string_destroy(void* ptr) {
-  string_t* message = (string_t*)ptr;
-  iree_allocator_free(message->allocator, ptr);
-}
-
-void string_tensor_destroy(void* ptr) {
-  string_t* message = (string_t*)ptr;
-  iree_allocator_free(message->allocator, ptr);
-}
 
 extern "C" iree_status_t strings_module_register_types() {
   if (string_descriptor.type) {

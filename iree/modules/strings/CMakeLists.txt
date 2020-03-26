@@ -18,8 +18,10 @@ iree_cc_library(
   NAME
     strings_module
   HDRS
+    "api.h"
     "strings_module.h"
   SRCS
+    "api.cc"
     "strings_module.cc"
   DEPS
     absl::inlined_vector
