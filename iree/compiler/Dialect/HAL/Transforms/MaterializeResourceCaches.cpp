@@ -83,7 +83,9 @@ class MaterializeResourceCachesPass
     // In the future we can instead cluster executables based on usage into
     // multiple caches to speed up load time in models that may have different
     // usage characteristics; for now this prepares all executables at startup.
-    defineExecutableCacheOp(executableOps);
+    if (!executableOps.empty()) {
+      defineExecutableCacheOp(executableOps);
+    }
   }
 
  private:

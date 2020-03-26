@@ -53,8 +53,12 @@ struct InlineConstVariableOpInitializer : public OpRewritePattern<VariableOp> {
       auto &primaryOp = initializer.getBlocks().front().getOperations().front();
       Attribute constResult;
       if (matchPattern(primaryOp.getResult(0), m_Constant(&constResult))) {
-        rewriter.replaceOpWithNewOp<VariableOp>(
-            op, op.sym_name(), op.is_mutable(), op.type(), constResult);
+        auto newOp = rewriter.create<VariableOp>(op.getLoc(), op.sym_name(),
+                                                 op.is_mutable(), op.type(),
+                                                 constResult);
+        SymbolTable::setSymbolVisibility(newOp,
+                                         SymbolTable::getSymbolVisibility(op));
+        rewriter.replaceOp(op, {});
         return success();
       }
     }

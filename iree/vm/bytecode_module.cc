@@ -126,7 +126,8 @@ static iree_status_t iree_vm_bytecode_module_flatbuffer_verify(
     }
     if (!iree_vm_type_def_is_valid(
             iree_vm_bytecode_module_resolve_type(type_def))) {
-      LOG(ERROR) << "No type registered.";
+      LOG(ERROR) << "No type registered with name '"
+                 << type_def->full_name()->c_str() << "'.";
       return IREE_STATUS_INVALID_ARGUMENT;
     }
   }

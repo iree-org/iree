@@ -267,7 +267,7 @@ cc_library(
     deps = [
         ":handle_util",
         "//iree/hal:descriptor_set",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 
@@ -323,11 +323,11 @@ cc_library(
     hdrs = ["pipeline_executable_layout.h"],
     deps = [
         ":handle_util",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/types:span",
         "//iree/hal:descriptor_set_layout",
         "//iree/hal:executable_layout",
-        "//third_party/vulkan_headers:vulkan_headers_no_prototypes",
+        "@com_google_absl//absl/container:inlined_vector",
+        "@com_google_absl//absl/types:span",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
 

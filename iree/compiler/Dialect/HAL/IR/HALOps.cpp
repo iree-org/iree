@@ -805,7 +805,7 @@ static ParseResult parseCommandBufferPushDescriptorSetOp(
 template <typename T>
 static void printDescriptorSetBindings(OpAsmPrinter &p, T op) {
   for (int i = 0; i < op.bindings().size(); ++i) {
-    p << op.bindings()[i].cast<IntegerAttr>().getValue();
+    p << op.bindings()[i].template cast<IntegerAttr>().getValue();
     p << " = (";
     p.printOperand(op.binding_buffers()[i]);
     p << ", ";

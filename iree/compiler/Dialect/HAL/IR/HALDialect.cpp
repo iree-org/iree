@@ -52,7 +52,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 
   void walkAttributeStorage(
       Attribute attr,
-      const function_ref<void(Attribute elementAttr)> &fn) const {
+      const function_ref<void(Attribute elementAttr)> &fn) const override {
     if (auto structAttr = attr.dyn_cast<DescriptorSetLayoutBindingAttr>()) {
       structAttr.walkStorage(fn);
     }

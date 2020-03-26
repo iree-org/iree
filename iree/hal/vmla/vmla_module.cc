@@ -124,6 +124,7 @@ StatusOr<absl::Span<uint8_t>> Buffer::MakeRange(
   return absl::MakeSpan(data, data_length);
 }
 
+constexpr int Interface::kMaxConstants;
 constexpr int Interface::kMaxSets;
 constexpr int Interface::kMaxBindings;
 
