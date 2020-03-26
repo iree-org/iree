@@ -154,5 +154,10 @@ bool Dispatchability::isDispatchable(FuncOp funcOp) {
   return isDispatchable(funcOp.getName());
 }
 
+bool Dispatchability::isInvalidated(
+    const AnalysisManager::PreservedAnalyses &pa) {
+  return !pa.isPreserved<Dispatchability>();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -28,9 +28,6 @@ class DispatchabilityAnalysisPass
     : public OperationPass<DispatchabilityAnalysisPass, ModuleOp> {
  public:
   DispatchabilityAnalysisPass() = default;
-  explicit DispatchabilityAnalysisPass(
-      std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps)
-      : dispatchableFuncOps_(std::move(dispatchableFuncOps)) {}
 
   void runOnOperation() override {
     // Force creation (or caching) of dispatchability information.
@@ -48,10 +45,8 @@ class DispatchabilityAnalysisPass
   std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps_;
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createDispatchabilityAnalysisPass(
-    std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps) {
-  return std::make_unique<DispatchabilityAnalysisPass>(
-      std::move(dispatchableFuncOps));
+std::unique_ptr<OpPassBase<ModuleOp>> createDispatchabilityAnalysisPass() {
+  return std::make_unique<DispatchabilityAnalysisPass>();
 }
 
 static PassRegistration<DispatchabilityAnalysisPass> pass(

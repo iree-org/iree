@@ -93,8 +93,7 @@ std::unique_ptr<OpPassBase<FuncOp>> createMergeExportedReflection();
 // Analyzes a module to identify which functions are dispatchable.
 // This information is cached on the module and is used by other FuncOp-scoped
 // passes to quickly access the module-level dispatchability information.
-std::unique_ptr<OpPassBase<ModuleOp>> createDispatchabilityAnalysisPass(
-    std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps);
+std::unique_ptr<OpPassBase<ModuleOp>> createDispatchabilityAnalysisPass();
 
 // Identifies dispatchable regions of functions and wraps them in
 // flow.dispatch_regions.
@@ -107,8 +106,7 @@ std::unique_ptr<OpPassBase<FuncOp>> createFoldCompatibleDispatchRegionsPass();
 std::unique_ptr<OpPassBase<FuncOp>> createRematerializeDispatchConstantsPass();
 
 // Outlines dispatch regions into executables.
-std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass(
-    std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps);
+std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass();
 
 //===----------------------------------------------------------------------===//
 // Optimizations
