@@ -48,8 +48,8 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape",
       %0 = shape.tie_shape %1, %2 : tensor<...>, shape.ranked_shape<...>
   }];
 
-  let arguments = (ins AnyTensor:$operand, Shape_RankedShape:$shape);
-  let results = (outs AnyTensor:$result);
+  let arguments = (ins AnyType:$operand, Shape_RankedShape:$shape);
+  let results = (outs AnyType:$result);
 
   let assemblyFormat = "operands attr-dict `:` type($operand) `,` type($shape)";
 
