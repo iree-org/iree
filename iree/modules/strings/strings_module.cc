@@ -46,7 +46,7 @@ typedef struct string_tensor {
   iree_string_view_t* values;
   size_t count;
   const int32_t* shape;
-  size_t shape_rank;
+  size_t rank;
 } string_tensor_t;
 
 IREE_VM_DEFINE_TYPE_ADAPTERS(string, string_t);
@@ -68,15 +68,17 @@ extern "C" iree_status_t string_create(iree_string_view_t value,
   return IREE_STATUS_OK;
 }
 
-extern "C" iree_status_t string_tensor_create(
-    iree_allocator_t allocator, iree_string_view_t* value, int64_t value_count,
-    const int32_t* shape, size_t shape_rank, string_tensor_t** out_message) {
+extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
+                                              iree_string_view_t* value,
+                                              int64_t value_count,
+                                              const int32_t* shape, size_t rank,
+                                              string_tensor_t** out_message) {
   // TODO(suderman): Use separate allocation for each string. More ref counters
   // but prevents constantly copying.
 
   // Validate the count is correct.
   size_t count = 1;
-  for (int i = 0; i < shape_rank; i++) {
+  for (int i = 0; i < rank; i++) {
     count *= shape[i];
   }
 
@@ -90,7 +92,7 @@ extern "C" iree_status_t string_tensor_create(
     string_bytes += value[i].size;
   }
 
-  const size_t shape_bytes = shape_rank * sizeof(int32_t);
+  const size_t shape_bytes = rank * sizeof(int32_t);
   const size_t string_view_bytes = value_count * sizeof(iree_string_view_t);
   const size_t byte_count =
       sizeof(string_tensor_t) + shape_bytes + string_view_bytes + string_bytes;
@@ -111,11 +113,11 @@ extern "C" iree_status_t string_tensor_create(
   message->allocator = allocator;
 
   // Set string tensor values.
-  message->shape_rank = shape_rank;
+  message->rank = rank;
   message->count = count;
 
   // Copy the shape.
-  memcpy((void*)message->shape, shape, shape_rank * sizeof(int32_t));
+  memcpy((void*)message->shape, shape, rank * sizeof(int32_t));
 
   // Copy and allocate each string.
   for (int i = 0; i < count; i++) {
@@ -129,6 +131,74 @@ extern "C" iree_status_t string_tensor_create(
   }
 
   *out_message = message;
+  return IREE_STATUS_OK;
+}
+
+// Returns the count of elements in the tensor.
+iree_status_t string_tensor_get_count(const string_tensor_t* tensor,
+                                      size_t* count) {
+  if (!tensor) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *count = tensor->count;
+  return IREE_STATUS_OK;
+}
+
+// returns the list of stored string views.
+iree_status_t string_tensor_get_elements(const string_tensor_t* tensor,
+                                         iree_string_view_t* strs, size_t count,
+                                         size_t offset) {
+  if (!tensor || offset < 0 || offset + count > tensor->count) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  for (size_t i = 0; i < count; i++) {
+    strs[i] = tensor->values[i + offset];
+  }
+  return IREE_STATUS_OK;
+}
+
+// Returns the rank of the tensor.
+iree_status_t string_tensor_get_rank(const string_tensor_t* tensor,
+                                     int32_t* rank) {
+  if (!tensor || !rank) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+  *rank = tensor->rank;
+  return IREE_STATUS_OK;
+}
+
+// Returns the shape of the tensor.
+iree_status_t string_tensor_get_shape(const string_tensor_t* tensor,
+                                      int32_t* shape, size_t rank) {
+  if (!tensor || !shape || rank != tensor->rank) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  for (int i = 0; i < rank; i++) {
+    *shape = tensor->shape[i];
+  }
+  return IREE_STATUS_OK;
+}
+
+// Returns the store string view using the provided indices.
+iree_status_t string_tensor_get_element(const string_tensor_t* tensor,
+                                        int32_t* indices, size_t rank,
+                                        iree_string_view_t* str) {
+  if (!tensor || !indices || rank != tensor->rank) {
+    return IREE_STATUS_INVALID_ARGUMENT;
+  }
+
+  size_t index = 0;
+  for (int i = 0; i < rank; i++) {
+    if (indices[i] >= tensor->shape[i]) {
+      return IREE_STATUS_INVALID_ARGUMENT;
+    }
+
+    index = index * tensor->shape[i] + indices[i];
+  }
+
+  *str = tensor->values[index];
   return IREE_STATUS_OK;
 }
 
@@ -164,16 +234,16 @@ class StringsModuleState final {
 
   const iree_string_view_t* PrintTensorHelper(const iree_string_view_t* strs,
                                               const int32_t* shape,
-                                              int32_t shape_rank) {
+                                              int32_t rank) {
     // Handle a scalar tensor value.
-    if (shape_rank == 0) {
+    if (rank == 0) {
       const auto& str = strs[0];
       fwrite(str.data, 1, str.size, stdout);
       return strs + 1;
     }
 
     // The row for the final tensor dimension.
-    if (shape_rank == 1) {
+    if (rank == 1) {
       fputc('[', stdout);
       for (int32_t i = 0, s = shape[0]; i < s; i++) {
         const auto& str = strs[i];
@@ -190,7 +260,7 @@ class StringsModuleState final {
     // Recurse to the lower dimension with the approrpiate brackets.
     fputc('[', stdout);
     for (int32_t i = 0, s = shape[0]; i < s; i++) {
-      strs = PrintTensorHelper(strs, shape + 1, shape_rank - 1);
+      strs = PrintTensorHelper(strs, shape + 1, rank - 1);
       if (i != s - 1) {
         fwrite(",\n", 1, /*size=*/2, stdout);
       }
@@ -205,8 +275,7 @@ class StringsModuleState final {
       return OkStatus();
     }
 
-    PrintTensorHelper(str_tensor->values, str_tensor->shape,
-                      str_tensor->shape_rank);
+    PrintTensorHelper(str_tensor->values, str_tensor->shape, str_tensor->rank);
     fputc('\n', stdout);
     fflush(stdout);
     return OkStatus();
@@ -214,8 +283,67 @@ class StringsModuleState final {
 
   // strings.to_string(%hal_buffer) -> %str_tensor
   StatusOr<vm::ref<string_tensor_t>> ToString(
-      vm::ref<iree_hal_buffer_view_t> hal_buffer) {
-    return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
+      vm::ref<iree_hal_buffer_view_t> hal_buffer_view) {
+    const size_t rank = iree_hal_buffer_view_shape_rank(hal_buffer_view.get());
+    absl::InlinedVector<int32_t, 6> shape(rank);
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_buffer_view_shape(hal_buffer_view.get(), rank,
+                                                 shape.data(), nullptr),
+                      IREE_LOC));
+
+    size_t num_elements = 1;
+    for (auto val : shape) {
+      num_elements *= val;
+    }
+
+    // Pull the values down.
+    size_t element_size =
+        iree_hal_buffer_view_element_size(hal_buffer_view.get());
+    size_t tensor_size = element_size * num_elements;
+    iree_hal_buffer_t* hal_buffer =
+        iree_hal_buffer_view_buffer(hal_buffer_view.get());
+    iree_hal_mapped_memory_t tensor_mapping;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                            /*element_offset=*/0, tensor_size, &tensor_mapping),
+        IREE_LOC));
+
+    iree_hal_element_type_t type =
+        iree_hal_buffer_view_element_type(hal_buffer_view.get());
+
+    std::vector<std::string> strings;
+    strings.reserve(num_elements);
+    const auto& contents = tensor_mapping.contents;
+    // TODO(suderman): Expand support for types.
+    if (type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+      for (const float *
+               p = (const float*)contents.data,
+              *s = (const float*)(contents.data + contents.data_length);
+           p < s; p++) {
+        std::string str = std::to_string(*p);
+        strings.push_back(std::move(str));
+      }
+    } else {
+      LOG(ERROR) << "to_string encountered unsupposed type: " << type;
+      return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
+    }
+
+    // Place into iree_string_views.
+    std::vector<iree_string_view_t> string_views;
+    string_views.reserve(num_elements);
+
+    for (auto str : strings) {
+      string_views.push_back(iree_make_cstring_view(str.data()));
+    }
+
+    string_tensor_t* string_tensor;
+    RETURN_IF_ERROR(
+        FromApiStatus(string_tensor_create(allocator_, string_views.data(),
+                                           string_views.size(), shape.data(),
+                                           rank, &string_tensor),
+                      IREE_LOC));
+
+    return string_tensor;
   }
 
  private:

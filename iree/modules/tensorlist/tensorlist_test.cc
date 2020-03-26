@@ -218,5 +218,4 @@ TEST_F(TensorListModulesTest, IdentityThroughStack) {
 }
 
 }  // namespace
-
 }  // namespace iree
