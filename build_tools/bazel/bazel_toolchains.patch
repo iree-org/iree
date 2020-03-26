@@ -1,0 +1,49 @@
+diff --git rules/rbe_repo.bzl rules/rbe_repo.bzl
+index afdf06e..68d7b3e 100644
+--- rules/rbe_repo.bzl
++++ rules/rbe_repo.bzl
+@@ -564,7 +564,7 @@ def _rbe_autoconfig_impl(ctx):
+             ctx.report_progress("creating export platform")
+             create_export_platform(
+                 ctx,
+-                exec_properties = ctx.attr.exec_properties,
++                exec_properties = ctx.attr.exec_properties1,
+                 image_name = resolve_rbe_original_image_name(ctx, image_name),
+                 name = name,
+                 toolchain_config_spec_name = toolchain_config_spec_name,
+@@ -592,7 +592,7 @@ def _rbe_autoconfig_impl(ctx):
+             ctx.report_progress("creating external repo platform")
+             create_external_repo_platform(
+                 ctx,
+-                exec_properties = ctx.attr.exec_properties,
++                exec_properties = ctx.attr.exec_properties1,
+                 image_name = resolve_rbe_original_image_name(ctx, image_name),
+                 name = name,
+                 use_legacy_platform_definition = ctx.attr.use_legacy_platform_definition,
+@@ -605,7 +605,7 @@ def _rbe_autoconfig_impl(ctx):
+         create_config_aliases(ctx, toolchain_config_spec_name)
+         create_alias_platform(
+             ctx,
+-            exec_properties = ctx.attr.exec_properties,
++            exec_properties = ctx.attr.exec_properties1,
+             image_name = resolve_rbe_original_image_name(ctx, image_name),
+             name = name,
+             toolchain_config_spec_name = toolchain_config_spec_name,
+@@ -755,7 +755,7 @@ _rbe_autoconfig = repository_rule(
+                    "example, [\"@bazel_tools//platforms:linux\"]. Default " +
+                    " is set to values for rbe-ubuntu16-04 container."),
+         ),
+-        "exec_properties": attr.string_dict(
++        "exec_properties1": attr.string_dict(
+             doc = (
+                 "Optional. The execution properties to be used when creating the " +
+                 "underlying platform. When providing this attribute, " +
+@@ -1167,7 +1167,7 @@ def rbe_autoconfig(
+         digest = digest,
+         env = env,
+         exec_compatible_with = exec_compatible_with,
+-        exec_properties = exec_properties,
++        exec_properties1 = exec_properties,
+         export_configs = export_configs,
+         java_home = java_home,
+         toolchain_config_suite_spec = toolchain_config_suite_spec_stripped,
