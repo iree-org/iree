@@ -90,6 +90,25 @@ cc_binary(
 )
 
 # Benchmarks.
+
+# Matrix x Vector expressed in Vector dialect.
+cc_binary(
+    name = "bench-matvec-vector-jit",
+    srcs = ["BenchMatVecVectorJIT.cpp"],
+    tags = [
+        "noga",
+    ],
+    deps = [
+        "//experimental/ModelBuilder",
+        "//experimental/ModelBuilder:ModelRunner",
+        "@com_google_benchmark//:benchmark:benchmark_main",
+        "@llvm-project//mlir:AllPassesAndDialects",
+        "@llvm-project//mlir:EDSC",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+# Matrix x Matrix expressed in Vector dialect.
 cc_binary(
     name = "bench-matmul-vector-jit",
     srcs = ["BenchMatMulVectorJIT.cpp"],
@@ -106,6 +125,7 @@ cc_binary(
     ],
 )
 
+# Matrix x Matrix expressed in Vector dialect (using intrinsics).
 cc_binary(
     name = "bench-matmul-vector-column-major-llvm-intrinsics-jit",
     srcs = ["BenchMatMulVectorColumnMajorLLVMIntrinsicsJIT.cpp"],
