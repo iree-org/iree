@@ -68,8 +68,6 @@ iree_bytecode_module(
     "strings_module_test.mlir"
   CC_NAMESPACE
     "iree::strings_module_test"
-  TRANSLATE_TOOL
-    iree_compiler_Dialect_Modules_Strings_strings-translate
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC

@@ -1,4 +1,4 @@
-// RUN: tensorlist-opt -split-input-file %s | tensorlist-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @Reserve
 func @Reserve(%element_shape: !hal.buffer_view, %num_elements: !hal.buffer_view) -> !tensorlist.list {

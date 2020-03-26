@@ -1,4 +1,4 @@
-// RUN: strings-opt -split-input-file %s | strings-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @i32ToStringOp
 func @i32ToStringOp(%arg0 : i32) -> !strings.string {

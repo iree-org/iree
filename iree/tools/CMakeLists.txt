@@ -32,6 +32,12 @@ iree_select_compiler_opts(IREE_COMPILER_TARGET_BACKENDS
     "iree::compiler::Dialect::HAL::Target::LLVM"
 )
 
+set(IREE_COMPILER_DIALECT_MODULES
+  "iree::compiler::Dialect::Modules::Check::IR::CheckDialect"
+  "iree::compiler::Dialect::Modules::Strings::IR::Dialect"
+  "iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect"
+)
+
 iree_cc_binary(
   NAME
     iree-benchmark-module
@@ -181,6 +187,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::CodegenPasses
       tensorflow::mlir_xla
+      ${IREE_COMPILER_DIALECT_MODULES}
       ${IREE_COMPILER_TARGET_BACKENDS}
     PUBLIC
   )
@@ -229,6 +236,7 @@ if(${IREE_BUILD_COMPILER})
       iree::vm
       iree::vm::bytecode_module
       iree::vm::value
+      ${IREE_COMPILER_DIALECT_MODULES}
       ${IREE_COMPILER_TARGET_BACKENDS}
       ${IREE_HAL_DRIVER_MODULES}
   )
@@ -251,6 +259,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       tensorflow::mlir_xla
+      ${IREE_COMPILER_DIALECT_MODULES}
       ${IREE_COMPILER_TARGET_BACKENDS}
     ALWAYSLINK
     PUBLIC

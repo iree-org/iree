@@ -24,9 +24,9 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
     data = [
-        "//iree/compiler/Dialect/Modules/Check:check-translate",
         "//iree/modules/check:iree-check-module",
         "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-translate",
     ],
     tags = ["hostonly"],
 )

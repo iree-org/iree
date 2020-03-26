@@ -45,7 +45,6 @@ def iree_check_test(name, src, target_backend, driver, args = [], tags = [], **k
             "-iree-mlir-to-vm-bytecode-module",
             "--iree-hal-target-backends=%s" % target_backend,
         ],
-        translate_tool = "//iree/compiler/Dialect/Modules/Check:check-translate",
         visibility = ["//visibility:private"],
     )
 

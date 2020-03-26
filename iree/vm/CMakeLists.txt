@@ -38,8 +38,6 @@ iree_bytecode_module(
     "bytecode_dispatch_test.mlir"
   CC_NAMESPACE
     "iree::vm"
-  TRANSLATE_TOOL
-    iree_tools_iree-translate
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC
@@ -95,8 +93,6 @@ iree_bytecode_module(
     "bytecode_module_benchmark.mlir"
   CC_NAMESPACE
     "iree::vm"
-  TRANSLATE_TOOL
-    iree_tools_iree-translate
   FLAGS
     "-iree-vm-ir-to-bytecode-module"
   PUBLIC

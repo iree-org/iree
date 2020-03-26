@@ -149,7 +149,7 @@ class BuildFileFunctions(object):
     return "  FLAGS\n%s\n" % (flags_list)
 
   def _convert_translate_tool_block(self, translate_tool):
-    if translate_tool:
+    if translate_tool and translate_tool != "//iree/tools:iree-translate":
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
       translate_tool = translate_tool.replace("//iree", "iree")  # iree/base:api

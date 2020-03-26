@@ -27,19 +27,3 @@ cc_embed_data(
     flatten = True,
     h_file_output = "strings.imports.h",
 )
-
-cc_binary(
-    name = "strings-opt",
-    deps = [
-        "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "//iree/tools:iree_opt_main",
-    ],
-)
-
-cc_binary(
-    name = "strings-translate",
-    deps = [
-        "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-        "//iree/tools:iree_translate_main",
-    ],
-)

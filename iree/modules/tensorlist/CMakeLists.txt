@@ -21,8 +21,6 @@ iree_bytecode_module(
     "tensorlist_test.mlir"
   CC_NAMESPACE
     "iree::modules::tensorlist"
-  TRANSLATE_TOOL
-    iree_compiler_Dialect_Modules_TensorList_tensorlist-translate
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC

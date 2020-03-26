@@ -21,8 +21,6 @@ iree_bytecode_module(
     "simple_embedding_test.mlir"
   CC_NAMESPACE
     "iree::samples"
-  TRANSLATE_TOOL
-    iree_tools_iree-translate
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
   PUBLIC

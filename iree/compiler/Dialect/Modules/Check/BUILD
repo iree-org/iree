@@ -27,19 +27,3 @@ cc_embed_data(
     flatten = True,
     h_file_output = "check.imports.h",
 )
-
-cc_binary(
-    name = "check-opt",
-    deps = [
-        "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
-        "//iree/tools:iree_opt_main",
-    ],
-)
-
-cc_binary(
-    name = "check-translate",
-    deps = [
-        "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
-        "//iree/tools:iree_translate_main",
-    ],
-)

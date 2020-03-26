@@ -29,23 +29,3 @@ iree_cc_embed_data(
   FLATTEN
   PUBLIC
 )
-
-iree_cc_binary(
-  NAME
-    tensorlist-opt
-  OUT
-    tensorlist-opt
-  DEPS
-    iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
-    iree::tools::iree_opt_main
-)
-
-iree_cc_binary(
-  NAME
-    tensorlist-translate
-  OUT
-    tensorlist-translate
-  DEPS
-    iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
-    iree::tools::iree_translate_main
-)

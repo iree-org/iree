@@ -23,7 +23,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = glob(["*.mlir"]),
     data = [
-        "//iree/compiler/Dialect/Modules/Check:check-opt",
         "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-opt",
     ],
 )

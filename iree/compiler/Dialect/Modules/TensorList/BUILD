@@ -32,19 +32,3 @@ cc_embed_data(
     flatten = True,
     h_file_output = "tensorlist.imports.h",
 )
-
-cc_binary(
-    name = "tensorlist-opt",
-    deps = [
-        "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
-        "//iree/tools:iree_opt_main",
-    ],
-)
-
-cc_binary(
-    name = "tensorlist-translate",
-    deps = [
-        "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
-        "//iree/tools:iree_translate_main",
-    ],
-)
