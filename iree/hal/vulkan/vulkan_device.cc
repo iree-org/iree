@@ -292,9 +292,13 @@ StatusOr<ref_ptr<VulkanDevice>> VulkanDevice::Create(
   auto logical_device =
       make_ref<VkDeviceHandle>(syms, enabled_device_extensions,
                                /*owns_device=*/true, /*allocator=*/nullptr);
+  // The Vulkan loader can leak here, depending on which layers are enabled.
+  // This is out of our control, so disable leak checks.
+  IREE_DISABLE_LEAK_CHECKS();
   VK_RETURN_IF_ERROR(syms->vkCreateDevice(physical_device, &device_create_info,
                                           logical_device->allocator(),
                                           logical_device->mutable_value()));
+  IREE_ENABLE_LEAK_CHECKS();
 
   // Create the device memory allocator.
   // TODO(benvanik): allow other types to be plugged in.
