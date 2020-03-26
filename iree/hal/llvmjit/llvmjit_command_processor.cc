@@ -54,10 +54,7 @@ Status LLVMJITCommandProcessor::Dispatch(
         dispatch_request.bindings.at(i).buffer->MapMemory<uint32_t>(
             MemoryAccessBitfield::kWrite));
     auto data = memory.mutable_data();
-    const std::vector<int64_t> shape(
-        dispatch_request.bindings.at(i).shape.begin(),
-        dispatch_request.bindings.at(i).shape.end());
-    descriptors[i] = allocUnrankedDescriptor<uint32_t>(data, shape);
+    descriptors[i] = allocUnrankedDescriptor<uint32_t>(data);
     args[i] = &descriptors[i]->descriptor;
   }
   auto status = executable->Invoke(dispatch_request.entry_point, args);

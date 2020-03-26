@@ -153,6 +153,16 @@ UnrankedMemRefType<T> *allocUnrankedDescriptor(
   return res;
 }
 
+// Shape and strides aren't used in the generated code (yet).
+// TODO(ataei): Delete this version once we can pass shapes.
+template <typename T>
+UnrankedMemRefType<T> *allocUnrankedDescriptor(void *data) {
+  UnrankedMemRefType<T> *res = static_cast<UnrankedMemRefType<T> *>(
+      malloc(sizeof(UnrankedMemRefType<T>)));
+  res->descriptor = makeStridedMemRefDescriptor<T>(data, {});
+  return res;
+}
+
 // Frees an UnrankedMemRefType<T>*
 template <typename T>
 void freeUnrankedDescriptor(UnrankedMemRefType<T> *desc) {
