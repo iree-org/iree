@@ -31,8 +31,8 @@ static AffineMap makeMap(ModelBuilder &mb, int i) {
   return AffineMap::get(2, 0, results);
 }
 
-// Helper method to build a NxN matrix-vector multiplication
-// that runs I times to amortize any calling overhead.
+// Helper method to build a NxN matrix-vector multiplication function
+// using vector dialect that runs I times to amortize any calling overhead.
 template <unsigned N, unsigned I>
 void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   auto f32 = mb.f32;
@@ -80,9 +80,8 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
 }
 
 // Benchmark method.
-template <unsigned N>
-void testMatVecUsingVectors(benchmark::State &state, StringLiteral funcName,
-                            bool measureBuild) {
+template <unsigned N, bool MeasureBuild>
+void BM_MxV_UsingVector(benchmark::State &state) {
   // Prepare arguments beforehand.
   auto incInit = [](unsigned idx, Vector2D<N, N, float> *ptr) {
     float *p = reinterpret_cast<float *>(ptr + idx);
@@ -106,10 +105,11 @@ void testMatVecUsingVectors(benchmark::State &state, StringLiteral funcName,
   auto *bufferB = B.get();
   auto *bufferC = C.get();
   void *args[3] = {&bufferA, &bufferB, &bufferC};
+  StringLiteral funcName = "matvec_mult";
   const std::string kFuncAdapterName =
       (llvm::Twine("_mlir_ciface_") + funcName).str();
 
-  if (measureBuild) {
+  if (MeasureBuild) {
     // If this is a build-time benchmark, build, compile, and execute
     // the function inside the timed loop, building a fresh new function
     // in each iteration to get the full JIT time (keep I == 1 here).
@@ -143,69 +143,18 @@ void testMatVecUsingVectors(benchmark::State &state, StringLiteral funcName,
 }
 
 //
-// Benchmark drivers (build).
+// Benchmark drivers (build and run).
 //
 
-static void BM_Build_MatVec_1(benchmark::State &state) {
-  testMatVecUsingVectors<1>(state, "test_matvec_1", true);
-}
-BENCHMARK(BM_Build_MatVec_1);
+#define JIT true
+#define RUN false
+#define BENCHMARK_MAT_VEC(SZ_N)                      \
+  BENCHMARK_TEMPLATE(BM_MxV_UsingVector, SZ_N, JIT); \
+  BENCHMARK_TEMPLATE(BM_MxV_UsingVector, SZ_N, RUN);
 
-static void BM_Build_MatVec_2(benchmark::State &state) {
-  testMatVecUsingVectors<2>(state, "test_matvec_2", true);
-}
-BENCHMARK(BM_Build_MatVec_2);
-
-static void BM_Build_MatVec_4(benchmark::State &state) {
-  testMatVecUsingVectors<4>(state, "test_matvec_4", true);
-}
-BENCHMARK(BM_Build_MatVec_4);
-
-static void BM_Build_MatVec_8(benchmark::State &state) {
-  testMatVecUsingVectors<8>(state, "test_matvec_8", true);
-}
-BENCHMARK(BM_Build_MatVec_8);
-
-static void BM_Build_MatVec_16(benchmark::State &state) {
-  testMatVecUsingVectors<16>(state, "test_matvec_16", true);
-}
-BENCHMARK(BM_Build_MatVec_16);
-
-static void BM_Build_MatVec_32(benchmark::State &state) {
-  testMatVecUsingVectors<32>(state, "test_matvec_32", true);
-}
-BENCHMARK(BM_Build_MatVec_32);
-
-//
-// Benchmark drivers (run).
-//
-
-static void BM_Run1000_MatVec_1(benchmark::State &state) {
-  testMatVecUsingVectors<1>(state, "test_matvec_1", false);
-}
-BENCHMARK(BM_Run1000_MatVec_1);
-
-static void BM_Run1000_MatVec_2(benchmark::State &state) {
-  testMatVecUsingVectors<2>(state, "test_matvec_2", false);
-}
-BENCHMARK(BM_Run1000_MatVec_2);
-
-static void BM_Run1000_MatVec_4(benchmark::State &state) {
-  testMatVecUsingVectors<4>(state, "test_matvec_4", false);
-}
-BENCHMARK(BM_Run1000_MatVec_4);
-
-static void BM_Run1000_MatVec_8(benchmark::State &state) {
-  testMatVecUsingVectors<8>(state, "test_matvec_8", false);
-}
-BENCHMARK(BM_Run1000_MatVec_8);
-
-static void BM_Run1000_MatVec_16(benchmark::State &state) {
-  testMatVecUsingVectors<16>(state, "test_matvec_16", false);
-}
-BENCHMARK(BM_Run1000_MatVec_16);
-
-static void BM_Run1000_MatVec_32(benchmark::State &state) {
-  testMatVecUsingVectors<32>(state, "test_matvec_32", false);
-}
-BENCHMARK(BM_Run1000_MatVec_32);
+BENCHMARK_MAT_VEC(1);
+BENCHMARK_MAT_VEC(2);
+BENCHMARK_MAT_VEC(4);
+BENCHMARK_MAT_VEC(8);
+BENCHMARK_MAT_VEC(16);
+BENCHMARK_MAT_VEC(32);
