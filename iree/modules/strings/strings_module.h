@@ -41,7 +41,7 @@ iree_status_t string_create(iree_string_view_t value,
 
 // Creates a string tensor type.
 iree_status_t string_tensor_create(iree_allocator_t allocator,
-                                   iree_string_view_t* value,
+                                   const iree_string_view_t* value,
                                    int64_t value_count, const int32_t* shape,
                                    size_t rank, string_tensor_t** out_message);
 

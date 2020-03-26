@@ -69,7 +69,7 @@ extern "C" iree_status_t string_create(iree_string_view_t value,
 }
 
 extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
-                                              iree_string_view_t* value,
+                                              const iree_string_view_t* value,
                                               int64_t value_count,
                                               const int32_t* shape, size_t rank,
                                               string_tensor_t** out_message) {
@@ -171,12 +171,12 @@ iree_status_t string_tensor_get_rank(const string_tensor_t* tensor,
 // Returns the shape of the tensor.
 iree_status_t string_tensor_get_shape(const string_tensor_t* tensor,
                                       int32_t* shape, size_t rank) {
-  if (!tensor || !shape || rank != tensor->rank) {
+  if (!tensor || (!shape && rank != 0) || rank != tensor->rank) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
 
   for (int i = 0; i < rank; i++) {
-    *shape = tensor->shape[i];
+    shape[i] = tensor->shape[i];
   }
   return IREE_STATUS_OK;
 }
@@ -314,7 +314,6 @@ class StringsModuleState final {
     std::vector<std::string> strings;
     strings.reserve(num_elements);
     const auto& contents = tensor_mapping.contents;
-    // TODO(suderman): Expand support for types.
     if (type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
       for (const float *
                p = (const float*)contents.data,
@@ -324,7 +323,6 @@ class StringsModuleState final {
         strings.push_back(std::move(str));
       }
     } else {
-      LOG(ERROR) << "to_string encountered unsupposed type: " << type;
       return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
     }
 
@@ -332,8 +330,11 @@ class StringsModuleState final {
     std::vector<iree_string_view_t> string_views;
     string_views.reserve(num_elements);
 
-    for (auto str : strings) {
+    for (const auto& str : strings) {
       string_views.push_back(iree_make_cstring_view(str.data()));
+    }
+
+    for (const auto& view : string_views) {
     }
 
     string_tensor_t* string_tensor;
