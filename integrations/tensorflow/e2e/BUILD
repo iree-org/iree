@@ -74,7 +74,7 @@ package(
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
     )
-    # TODO(b/150244105) update backends with "tf,iree_interpreter,iree_vulkan"
+    # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
     # and add other supported vision models
     for model_name, backends in [
         ("ResNet50", "tf"),

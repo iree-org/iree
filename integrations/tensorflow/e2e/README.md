@@ -17,8 +17,8 @@ instructions.
 
 If you do not have your environment setup to use IREE with Vulkan (see
 [the doc](../../../docs/vulkan_and_spirv.md)), then you can run the tests with
-`IREE_DEFAULT_BACKENDS=tf,iree_interpreter` (that is, by omitting `iree_vulkan`
-from the list of backends to use).
+`IREE_DEFAULT_BACKENDS=tf,iree_vmla` (that is, by omitting `iree_vulkan` from
+the list of backends to use).
 
 ## Running tests
 
@@ -31,10 +31,10 @@ bazel test simple_arithmetic_test --test_output=streamed
 
 # Run tests with an altered list of backends.
 bazel test ... --test_output=errors -- \
-    --override_backends=tf,iree_interpreter,iree_vulkan
+    --override_backends=tf,iree_vmla,iree_vulkan
 
 # (alternative) Run tests with an altered list of backends.
-bazel test ... --test_env=IREE_OVERRIDE_BACKENDS=tf,iree_interpreter,iree_vulkan \
+bazel test ... --test_env=IREE_OVERRIDE_BACKENDS=tf,iree_vmla,iree_vulkan \
     --test_output=errors
 ```
 
