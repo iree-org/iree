@@ -16,6 +16,10 @@ integrated fashion on accelerators like GPUs.
 TODO(benvanik): specify required extensions and caps. Cross reference with
 gpuinfo.
 
+The `VK_KHR_timeline_semaphore` extension is required. For systems where it is
+not natively available, the `VK_LAYER_KHRONOS_timeline_semaphore` compatibility
+layer may be used (see below).
+
 ### Supported Configurations
 
 TODO(benvanik): fill out hardware and OS matrix.
@@ -110,6 +114,26 @@ DISPLAY=:0
 ### IREE's Vulkan API Usage
 
 #### Optional Extensions
+
+TODO(benvanik): document optional extensions (e.g. VK_EXT_debug_utils)
+
+### Timeline Semaphore Support
+
+IREE uses Vulkan's timeline semaphores from the `VK_KHR_timeline_semaphore`
+extension, which is core in Vulkan 1.2. For older Vulkan installs without native
+support for this extension, the
+[Vulkan-ExtensionLayer](https://github.com/KhronosGroup/Vulkan-ExtensionLayer)
+project provides support through the `VK_LAYER_KHRONOS_timeline_semaphore`
+layer.
+
+Developers may build/install this layer on their own, or using the Bazel or
+CMake build targets at
+[build_tools/third_party/vulkan_extensionlayer](../build_tools/third_party/vulkan_extensionlayer).
+
+After building the layer, set the `VK_LAYER_PATH` environment variable to
+include the path to the associated manifest file (see the
+[docs](https://vulkan.lunarg.com/doc/view/latest/windows/loader_and_layer_interface.html)
+for details).
 
 ## SPIR-V
 
