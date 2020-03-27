@@ -22,6 +22,8 @@ set(GEMMLOWP_SRC_ROOT
 # TODO(benvanik): if android_arm then add -O3/-mfpu=neon.
 # TODO(benvanik): if andoird_arm64 then add -O3
 iree_select_compiler_opts(RUY_COPTS_BASE
+  ALL
+    "-I${IREE_ROOT_DIR}/third_party/ruy"
   CLANG_OR_GCC
     "-O3"
     "-Wno-shadow"
