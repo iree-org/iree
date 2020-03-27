@@ -268,6 +268,9 @@ Value VMLAConversionTarget::allocateOutputBuffer(
   // this is just normal x*y*z*...
   Value byteLength =
       getBufferLength(loc, originalValue, typeConverter, rewriter);
+  if (!byteLength) {
+    return nullptr;
+  }
 
   // Allocate the buffer of the required size.
   // The caller can then use the buffer instead of the original SSA value.
