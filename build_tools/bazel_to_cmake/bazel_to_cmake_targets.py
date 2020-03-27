@@ -122,7 +122,7 @@ def convert_external_target(target):
   if target.startswith("@org_tensorflow//tensorflow/compiler/mlir"):
     # All Bazel targets map to a single CMake target.
     return ["tensorflow::mlir_xla"]
-  if target.startswith("@org_tensorflow//tensorflow/lite/experimental/ruy"):
+  if target.startswith("@com_google_ruy//ruy"):
     # All Bazel targets map to a single CMake target.
     return ["ruy"]
 

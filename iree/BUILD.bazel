@@ -22,6 +22,7 @@
 #   "@com_github_google_flatbuffers//:flatbuffers"
 #   "@org_tensorflow//tensorflow"
 #   "@renderdoc_api//"
+#   "@com_google_ruy//ruy"
 #
 # Various scripts and helpers operate on these prefixes textually, so
 # avoid doing any systematic construction that would break the matching.

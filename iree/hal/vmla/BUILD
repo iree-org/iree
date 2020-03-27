@@ -37,8 +37,8 @@ cc_library(
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
-        "@org_tensorflow//tensorflow/lite/experimental/ruy",
-        "@org_tensorflow//tensorflow/lite/experimental/ruy:context",
+        "@com_google_ruy//ruy",
+        "@com_google_ruy//ruy:context",
     ],
 )
 
