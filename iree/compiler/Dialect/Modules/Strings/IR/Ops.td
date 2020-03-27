@@ -78,6 +78,19 @@ def STRINGS_ToStringTensorOp : Op<STRINGS_Dialect, "to_string_tensor", [NoSideEf
   );
 }
 
+def STRINGS_StringTensorToStringOp : Op<STRINGS_Dialect, "string_tensor_to_string", [NoSideEffect]> {
+  let summary = [{converts a string tensor to a string}];
+  let description = [{
+    Converts a string tensor to a string.
+  }];
+
+  let arguments = (ins STRINGS_StringTensor:$value);
+
+  let results = (outs
+    STRINGS_String:$result
+  );
+}
+
 def STRINGS_PrintOp : Op<STRINGS_Dialect, "print"> {
   let summary = [{prints the contents of a string}];
   let description = [{
@@ -85,15 +98,6 @@ def STRINGS_PrintOp : Op<STRINGS_Dialect, "print"> {
   }];
 
   let arguments = (ins STRINGS_String:$value);
-}
-
-def STRINGS_PrintTensorOp : Op<STRINGS_Dialect, "print_tensor"> {
-  let summary = [{prints the contents of a string tensor}];
-  let description = [{
-    Prints the contents of a string tensor.
-  }];
-
-  let arguments = (ins STRINGS_StringTensor:$value);
 }
 
 #endif  // IREE_SAMPLES_STRINGS_MODULES_DIALECT_STRINGS_OPS

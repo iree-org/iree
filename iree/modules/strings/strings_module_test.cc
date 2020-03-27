@@ -127,9 +127,9 @@ class StringsModuleTest : public ::testing::Test {
                                     IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
   }
 
-  void TestPrintTensor(absl::Span<const iree_string_view_t> string_views,
-                       absl::Span<const int32_t> shape,
-                       absl::string_view expected_output) {
+  void TestStringTensorToString(
+      absl::Span<const iree_string_view_t> string_views,
+      absl::Span<const int32_t> shape, absl::string_view expected_output) {
     vm::ref<string_tensor_t> input_string_tensor;
     IREE_ASSERT_OK(string_tensor_create(
         IREE_ALLOCATOR_SYSTEM, string_views.data(), string_views.size(),
@@ -151,24 +151,25 @@ class StringsModuleTest : public ::testing::Test {
     IREE_ASSERT_OK(
         iree_vm_variant_list_alloc(1, IREE_ALLOCATOR_SYSTEM, &outputs));
 
-    CaptureStdout();
-
     // Invoke the function.
     IREE_ASSERT_OK(iree_vm_invoke(
-        context_, LookupFunction("print_string_tensor"),
+        context_, LookupFunction("string_tensor_to_string"),
         /*policy=*/nullptr, inputs, outputs, IREE_ALLOCATOR_SYSTEM));
 
-    // Validate output.
-    EXPECT_EQ(GetCapturedStdout(), expected_output);
+    // Retrieve and validate the string tensor;
+    string_t* output_string =
+        string_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+    ASSERT_EQ(output_string->value.size, expected_output.length());
+    EXPECT_EQ(absl::string_view(output_string->value.data), expected_output);
 
     // Free the lists.
     iree_vm_variant_list_free(inputs);
     iree_vm_variant_list_free(outputs);
   }
 
-  void TestToString(absl::Span<const float> contents,
-                    absl::Span<const int32_t> shape,
-                    absl::Span<const iree_string_view_t> expected) {
+  void TestToStringTensor(absl::Span<const float> contents,
+                          absl::Span<const int32_t> shape,
+                          absl::Span<const iree_string_view_t> expected) {
     vm::ref<iree_hal_buffer_view_t> input_buffer_view;
     CreateBufferView(contents, shape, &input_buffer_view);
 
@@ -267,22 +268,32 @@ TEST_F(StringsModuleTest, Prototype) {
   iree_vm_variant_list_free(outputs);
 }
 
-TEST_F(StringsModuleTest, PrintTensor_Tensor) {
+TEST_F(StringsModuleTest, StringTensorToString_Scalar) {
   // Expected output.
-  std::string expected_output = "[[[str1, str2]],\n[[str3, str4]]]\n";
+  std::string expected_output = "str";
+  absl::InlinedVector<iree_string_view_t, 1> string_views = {
+      iree_make_cstring_view("str")};
+  TestStringTensorToString(string_views, {}, expected_output);
+}
+
+TEST_F(StringsModuleTest, StringTensorToString_Vector) {
+  // Expected output.
+  std::string expected_output = "[str1, str2]";
+  absl::InlinedVector<iree_string_view_t, 1> string_views = {
+      iree_make_cstring_view("str1"),
+      iree_make_cstring_view("str2"),
+  };
+  TestStringTensorToString(string_views, {2}, expected_output);
+}
+
+TEST_F(StringsModuleTest, StringTensorToString_Tensor) {
+  // Expected output.
+  std::string expected_output = "[[[str1, str2]],\n[[str3, str4]]]";
   absl::InlinedVector<iree_string_view_t, 4> string_views = {
       iree_make_cstring_view("str1"), iree_make_cstring_view("str2"),
       iree_make_cstring_view("str3"), iree_make_cstring_view("str4")};
   absl::InlinedVector<int32_t, 4> shape = {2, 1, 2};
-  TestPrintTensor(string_views, shape, expected_output);
-}
-
-TEST_F(StringsModuleTest, PrintTensor_Scalar) {
-  // Expected output.
-  std::string expected_output = "str\n";
-  absl::InlinedVector<iree_string_view_t, 1> string_views = {
-      iree_make_cstring_view("str")};
-  TestPrintTensor(string_views, {}, expected_output);
+  TestStringTensorToString(string_views, shape, expected_output);
 }
 
 TEST_F(StringsModuleTest, ToString_Scalar) {
@@ -291,7 +302,7 @@ TEST_F(StringsModuleTest, ToString_Scalar) {
 
   absl::InlinedVector<float, 1> contents{14.0f};
   static float kBufferContents[] = {42.0f, 43.0f};
-  TestToString(contents, {}, expected);
+  TestToStringTensor(contents, {}, expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Vector) {
@@ -301,7 +312,7 @@ TEST_F(StringsModuleTest, ToString_Vector) {
   absl::InlinedVector<float, 2> contents{42.0f, 43.0f};
   static float kBufferContents[] = {42.0f, 43.0f};
   absl::InlinedVector<int32_t, 4> shape{2};
-  TestToString(contents, shape, expected);
+  TestToStringTensor(contents, shape, expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor) {
@@ -311,7 +322,7 @@ TEST_F(StringsModuleTest, ToString_Tensor) {
 
   absl::InlinedVector<float, 4> contents{1.0f, 2.0f, 3.0f, 4.0f};
   absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
-  TestToString(contents, shape, expected);
+  TestToStringTensor(contents, shape, expected);
 }
 
 }  // namespace

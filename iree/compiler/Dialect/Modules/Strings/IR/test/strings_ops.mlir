@@ -27,10 +27,10 @@ func @toStringOp(%arg0 : !hal.buffer_view) -> !strings.string_tensor {
 
 // -----
 
-// CHECK-LABEL: @printTensorOp
-func @printTensorOp(%arg0 : !strings.string_tensor) {
-  // CHECK: "strings.print_tensor"(%arg0) : (!strings.string_tensor)
-  "strings.print_tensor"(%arg0) : (!strings.string_tensor) -> ()
-  return
+// CHECK-LABEL: @stringTensorToStringOp
+func @stringTensorToStringOp(%arg0 : !strings.string_tensor) -> !strings.string {
+  // CHECK: "strings.string_tensor_to_string"(%arg0) : (!strings.string_tensor) -> !strings.string
+  %0 = "strings.string_tensor_to_string"(%arg0) : (!strings.string_tensor) -> (!strings.string)
+  return %0 : !strings.string
 }
 

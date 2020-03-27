@@ -32,8 +32,8 @@ void populateStringsToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "strings.print");
   patterns.insert<VMImportOpConversion<IREE::Strings::ToStringTensorOp>>(
       context, importSymbols, typeConverter, "strings.to_string_tensor");
-  patterns.insert<VMImportOpConversion<IREE::Strings::PrintTensorOp>>(
-      context, importSymbols, typeConverter, "strings.print_tensor");
+  patterns.insert<VMImportOpConversion<IREE::Strings::StringTensorToStringOp>>(
+      context, importSymbols, typeConverter, "strings.string_tensor_to_string");
 }
 
 }  // namespace Strings

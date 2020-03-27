@@ -37,8 +37,8 @@ attributes {nosideeffects}
 // Maps to the IREE::Strings::Print.
 vm.import @print(%value : !vm.ref<!strings.string>)
 
-// Prints the contents of a string tensor.
-// Maps to the IREE::Strings::PrintTensor.
-vm.import @print_tensor(%value : !vm.ref<!strings.string_tensor>)
+// Converts the contents of a StringTensor to a String
+// Maps to the IREE::Strings::StringTensortoString.
+vm.import @string_tensor_to_string(%value : !vm.ref<!strings.string_tensor>) -> !vm.ref<!strings.string>
 
 }  // vm.module

@@ -67,53 +67,74 @@ class StringsModuleState final {
     return new_string;
   }
 
-  const iree_string_view_t* PrintTensorHelper(const iree_string_view_t* strs,
-                                              const int32_t* shape,
-                                              int32_t rank) {
+  const iree_string_view_t* StringTensorToStringHelper(
+      const iree_string_view_t* strs, const int32_t* shape, int32_t rank,
+      std::string* output) {
     // Handle a scalar tensor value.
     if (rank == 0) {
       const auto& str = strs[0];
-      fwrite(str.data, 1, str.size, stdout);
+      output->append(str.data, str.size);
       return strs + 1;
     }
 
     // The row for the final tensor dimension.
     if (rank == 1) {
-      fputc('[', stdout);
+      output->append("[", 1);
       for (int32_t i = 0, s = shape[0]; i < s; i++) {
         const auto& str = strs[i];
-        fwrite(str.data, 1, str.size, stdout);
+        output->append(str.data, str.size);
         if (i != s - 1) {
-          fwrite(", ", 1, /*size=*/2, stdout);
+          output->append(", ", 2);
         }
       }
 
-      fputc(']', stdout);
+      output->append("]", 1);
       return strs + shape[0];
     }
 
     // Recurse to the lower dimension with the approrpiate brackets.
-    fputc('[', stdout);
+    output->append("[", 1);
     for (int32_t i = 0, s = shape[0]; i < s; i++) {
-      strs = PrintTensorHelper(strs, shape + 1, rank - 1);
+      strs = StringTensorToStringHelper(strs, shape + 1, rank - 1, output);
       if (i != s - 1) {
-        fwrite(",\n", 1, /*size=*/2, stdout);
+        output->append(",\n", 2);
       }
     }
-    fputc(']', stdout);
+    output->append("]", 1);
     return strs;
   }
 
   // strings.print_tensor(%str_tensor)
-  Status PrintTensor(vm::ref<string_tensor_t> str_tensor) {
-    if (!str_tensor) {
-      return OkStatus();
+  StatusOr<vm::ref<string_t>> StringTensorToString(
+      vm::ref<string_tensor_t> str_tensor) {
+    size_t string_length = 0;
+    for (int i = str_tensor->rank - 1; i >= 0; i--) {
+      // Handle the increased dimensions.
+      string_length *= str_tensor->shape[i];
+
+      // Allocate for brackets.
+      string_length += 2;
+
+      // Allocate for command and space/newline.
+      string_length += 2 * (str_tensor->shape[i] - 1);
     }
 
-    PrintTensorHelper(str_tensor->values, str_tensor->shape, str_tensor->rank);
-    fputc('\n', stdout);
-    fflush(stdout);
-    return OkStatus();
+    // Allocate the room for strings.
+    for (int i = 0; i < str_tensor->count; i++) {
+      string_length += str_tensor->values[i].size;
+    }
+
+    vm::ref<string_t> new_string;
+    std::string str;
+    str.reserve(string_length);
+    StringTensorToStringHelper(str_tensor->values, str_tensor->shape,
+                               str_tensor->rank, &str);
+
+    RETURN_IF_ERROR(
+        FromApiStatus(string_create(iree_make_cstring_view(str.c_str()),
+                                    allocator_, &new_string),
+                      IREE_LOC));
+    return new_string;
   }
 
   // strings.to_string_tensor(%hal_buffer) -> %str_tensor
@@ -193,8 +214,8 @@ static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
         vm::MakeNativeFunction("print", &StringsModuleState::Print),
         vm::MakeNativeFunction("i32_to_string",
                                &StringsModuleState::I32ToString),
-        vm::MakeNativeFunction("print_tensor",
-                               &StringsModuleState::PrintTensor),
+        vm::MakeNativeFunction("string_tensor_to_string",
+                               &StringsModuleState::StringTensorToString),
         vm::MakeNativeFunction("to_string_tensor",
                                &StringsModuleState::ToStringTensor),
 
