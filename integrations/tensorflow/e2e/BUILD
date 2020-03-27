@@ -51,6 +51,7 @@ package(
         "sliding_window_test",
         "simple_arithmetic_test",
         "simple_stateful_test",
+        "strings_test",
     ]
 ]
 
