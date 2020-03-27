@@ -165,10 +165,10 @@ class OutlineDispatchRegionsPass
   void runOnOperation() override {
 =======
   void runOnModule() override {
-    auto dispatchability = getCachedParentAnalysis<Dispatchability>();
+    auto dispatchability = getCachedAnalysis<Dispatchability>();
     if (!dispatchability.hasValue()) {
       getModule().emitError()
-          << "dispatchability analysis not performed "
+          << " dispatchability analysis not performed "
              "on module; run -iree-flow-dispatchability-analysis first";
       return signalPassFailure();
     }

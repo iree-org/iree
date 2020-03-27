@@ -156,7 +156,7 @@ bool Dispatchability::isDispatchable(FuncOp funcOp) {
 
 bool Dispatchability::isInvalidated(
     const AnalysisManager::PreservedAnalyses &pa) {
-  return !pa.isPreserved<Dispatchability>();
+  return false;
 }
 
 }  // namespace iree_compiler
