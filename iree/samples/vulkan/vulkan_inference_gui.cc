@@ -726,12 +726,14 @@ int iree::IreeMain(int argc, char** argv) {
         iree_vm_variant_list_t* input_list = nullptr;
         CHECK_IREE_OK(
             iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &input_list));
-        auto input0_buffer_view_ref = iree_hal_buffer_view_move_ref(input0_buffer_view);
-        auto input1_buffer_view_ref = iree_hal_buffer_view_move_ref(input1_buffer_view);
-        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(input_list,
-                                                           &input0_buffer_view_ref));
-        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(input_list,
-                                                           &input1_buffer_view_ref));
+        auto input0_buffer_view_ref =
+            iree_hal_buffer_view_move_ref(input0_buffer_view);
+        auto input1_buffer_view_ref =
+            iree_hal_buffer_view_move_ref(input1_buffer_view);
+        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(
+            input_list, &input0_buffer_view_ref));
+        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(
+            input_list, &input1_buffer_view_ref));
 
         // Prepare outputs list to accept results from the invocation.
         iree_vm_variant_list_t* output_list = nullptr;
@@ -749,7 +751,8 @@ int iree::IreeMain(int argc, char** argv) {
         DLOG(INFO) << "Reading back results...";
         iree_vm_variant_t* output_variant =
             iree_vm_variant_list_get(output_list, 0);
-        auto* output_buffer_view = iree_hal_buffer_view_deref(&output_variant->ref);
+        auto* output_buffer_view =
+            iree_hal_buffer_view_deref(&output_variant->ref);
         auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
         iree_hal_mapped_memory_t mapped_memory;
         CHECK_IREE_OK(iree_hal_buffer_map(output_buffer,
