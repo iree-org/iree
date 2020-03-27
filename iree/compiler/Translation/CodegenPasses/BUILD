@@ -6,7 +6,6 @@ package(
 cc_library(
     name = "CodegenPasses",
     srcs = [
-        "HLOPreprocessing.cpp",
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
         "LinalgFusion.cpp",

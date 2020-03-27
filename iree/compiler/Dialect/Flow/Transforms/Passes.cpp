@@ -79,6 +79,10 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // functions (such as with synthetic barrier arguments).
   passManager.addPass(IREE::Flow::createMergeExportedReflection());
 
+  // Rewrite some hlo ops to a form that is compatible for all
+  // backends.
+  passManager.addPass(createHLOPreprocessingPass());
+
   //----------------------------------------------------------------------------
   // Partitioning and dispatch region formation
   // Must happen after:

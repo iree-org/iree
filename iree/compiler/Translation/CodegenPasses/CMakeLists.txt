@@ -20,7 +20,6 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
-    "HLOPreprocessing.cpp"
     "HLOToLinalgOnBuffers.cpp"
     "HLOToLinalgOnTensors.cpp"
     "LinalgFusion.cpp"

@@ -440,11 +440,10 @@ struct DynamicSliceOpConversion
 void populateHLOToVMLAPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                TypeConverter &typeConverter) {
-  // We rely on some additional HLO->HLO/HLO->std patterns and assume they
+  // We rely on some additional HLO->std patterns and assume they
   // have been run already. In case they haven't we provide them here (useful
   // for standalone conversion testing).
   xla_hlo::PopulateXlaToStdPatterns(&patterns, context);
-  xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
 
   // xla_hlo.conv.
   populateHLOConvToVMLAPatterns(context, patterns, typeConverter);
