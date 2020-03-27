@@ -401,6 +401,34 @@ TEST(ReduceMin, TwoDimensionsToOne) {
   }
 }
 
+TEST(Conv2d, NoDilation) {
+  Shape input_shape = {4, 5, 2};
+  Shape filter_shape = {3, 2, 2, 1};
+  Shape dst_shape = {2, 3, 1};
+  Shape strides = {1, 1};
+  Shape pad_h = {0, 0};
+  Shape pad_w = {0, 0};
+  Shape dilation = {1, 1};
+  std::vector<float> input_buffer(input_shape.element_count());
+  std::vector<float> filter_buffer(filter_shape.element_count());
+  std::vector<float> expected_dst = {1310, 1466, 1622, 2090, 2246, 2402};
+  for (int i = 0; i < input_shape.element_count(); ++i) {
+    input_buffer[i] = i + 1;
+    if (i < filter_shape.element_count()) {
+      filter_buffer[i] = i + 1;
+    }
+  }
+  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+
+  EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape, filter_buffer,
+                                   filter_shape, absl::MakeSpan(dst_buffer),
+                                   dst_shape, strides, pad_h, pad_w, dilation));
+
+  for (int i = 0; i < dst_buffer.size(); ++i) {
+    EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
+  }
+}
+
 }  // namespace
 }  // namespace kernels
 }  // namespace vmla

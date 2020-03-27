@@ -308,6 +308,22 @@ vm.import @convert.f32.i16(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.bu
 vm.import @convert.f32.i32(%src : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 
 //===----------------------------------------------------------------------===//
+// VMLA Ops: Convolution
+//===----------------------------------------------------------------------===//
+
+vm.import @conv.f32f32.f32(
+  %input: !vm.ref<!vmla.buffer>, %input_shape: i32 ...,
+  %filter: !vm.ref<!vmla.buffer>, %filter_shape: i32 ...,
+  %dst: !vm.ref<!vmla.buffer>, %dst_shape: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...,
+  %lhs_dilation: i32 ...,
+  %rhs_dilation: i32 ...,
+  %feature_group_count: i32,
+  %batch_group_count: i32
+)
+
+//===----------------------------------------------------------------------===//
 // VMLA Ops: GEMM/GEMV
 //===----------------------------------------------------------------------===//
 

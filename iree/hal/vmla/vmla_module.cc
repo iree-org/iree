@@ -14,6 +14,8 @@
 
 #include "iree/hal/vmla/vmla_module.h"
 
+#include <cstdint>
+
 #include "absl/types/span.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/vmla/op_kernels.h"
@@ -611,6 +613,58 @@ class VMLAModuleState final {
   IREE_VMLA_CONVERSION_OP(ConvertF32I32, float, int32_t);
 
   //===--------------------------------------------------------------------===//
+  // VMLA Ops: Convolution
+  //===--------------------------------------------------------------------===//
+
+  Status ConvF32F32F32(vm::ref<Buffer> input, iree_vmla_shape_t input_shape,
+                       vm::ref<Buffer> filter, iree_vmla_shape_t filter_shape,
+                       vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,
+                       absl::Span<const int32_t> window_strides,
+                       absl::Span<const int32_t> padding,
+                       absl::Span<const int32_t> lhs_dilation,
+                       absl::Span<const int32_t> rhs_dilation,
+                       const int32_t feature_group_count,
+                       const int32_t batch_group_count) {
+    IREE_TRACE_SCOPE0("VMLAModuleState::ConvF32F32F32");
+    if (input_shape.size() != 4 || filter_shape.size() != 4 ||
+        dst_shape.size() != 4) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Expecting 4-d tensors for Conv2D kernel";
+    }
+    // 2D conv
+    const int32_t batch_size = input_shape[0];
+    const Shape input_example_shape{input_shape[1], input_shape[2],
+                                    input_shape[3]};
+    const Shape output_example_shape{dst_shape[1], dst_shape[2], dst_shape[3]};
+    const Shape filter_shape_4d(filter_shape.data(), 4);
+    const Shape dilation(lhs_dilation.data(), 2);
+    const Shape pad_h(padding.data(), 2);
+    const Shape pad_w(padding.subspan(2).data(), 2);
+    const Shape window_strides_2d(window_strides.data(), 2);
+
+    const float* raw_inputs_data = input->As<float>().data();
+    const float* raw_filter_data = filter->As<float>().data();
+    float* raw_dst_data = dst->As<float>().data();
+    auto filter_buffer =
+        absl::MakeConstSpan(raw_filter_data, filter_shape_4d.element_count());
+
+    const int input_stride = input_example_shape.element_count();
+    const int output_stride = output_example_shape.element_count();
+
+    for (int i = 0; i < batch_size; ++i) {
+      auto input_example =
+          absl::MakeConstSpan(raw_inputs_data + i * input_stride, input_stride);
+      auto output_example =
+          absl::MakeSpan(raw_dst_data + i * output_stride, output_stride);
+      RETURN_IF_ERROR(kernels::Conv2D::Execute(
+          input_example, input_example_shape, filter_buffer, filter_shape_4d,
+          output_example, output_example_shape, window_strides_2d, pad_h, pad_w,
+          dilation));
+    }
+    return OkStatus();
+  }
+
+  //===--------------------------------------------------------------------===//
   // VMLA Ops: GEMM/GEMV
   //===--------------------------------------------------------------------===//
 
@@ -855,7 +909,8 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
 
     vm::MakeNativeFunction("batch.matmul.f32f32.f32",
                            &VMLAModuleState::BatchMatMulF32F32F32),
-};
+
+    vm::MakeNativeFunction("conv.f32f32.f32", &VMLAModuleState::ConvF32F32F32)};
 
 // Per-device VMLA module.
 // One of these will be created per device and be shared across all executables

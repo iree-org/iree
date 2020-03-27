@@ -37,6 +37,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+void populateHLOConvToVMLAPatterns(MLIRContext *context,
+                                   OwningRewritePatternList &patterns,
+                                   TypeConverter &typeConverter);
 void populateHLODotToVMLAPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns,
                                   TypeConverter &typeConverter);
@@ -442,6 +445,9 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // for standalone conversion testing).
   xla_hlo::PopulateXlaToStdPatterns(&patterns, context);
   xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
+
+  // xla_hlo.conv.
+  populateHLOConvToVMLAPatterns(context, patterns, typeConverter);
 
   // xla_hlo.reduce and xla_hlo.reduce_window.
   populateHLOReductionToVMLAPatterns(context, patterns, typeConverter);

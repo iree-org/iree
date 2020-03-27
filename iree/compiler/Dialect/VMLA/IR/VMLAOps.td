@@ -285,6 +285,38 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
 }
 
 //===----------------------------------------------------------------------===//
+// VMLA Ops: Convultion
+//===----------------------------------------------------------------------===//
+
+def VLMA_ConvOp : VMLA_Op<"conv", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$input,
+    VMLA_Shape:$input_shape,
+    VMLA_Buffer:$filter,
+    VMLA_Shape:$filter_shape,
+    VMLA_Buffer:$dst,
+    VMLA_Shape:$dst_shape,
+    I32ElementsAttr:$window_strides,
+    I32ElementsAttr:$padding,
+    I32ElementsAttr:$lhs_dilation,
+    I32ElementsAttr:$rhs_dilation,
+    I32Attr:$feature_group_count,
+    I32Attr:$batch_group_count,
+    VMLA_FloatTypeAttr:$input_type,
+    VMLA_FloatTypeAttr:$filter_type,
+    VMLA_FloatTypeAttr:$dst_type
+  );
+
+  let extraClassDeclaration = [{
+    static void extractTypeAttributes(OperationState &state, ArrayRef<Type> operandTypes, ArrayRef<Type> resultTypes) {
+      state.addAttribute("input_type", TypeAttr::get(operandTypes[0]));
+      state.addAttribute("filter_type", TypeAttr::get(operandTypes[1]));
+      state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // VMLA Ops: GEMM/GEMV
 //===----------------------------------------------------------------------===//
 

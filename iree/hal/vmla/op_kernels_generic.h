@@ -157,6 +157,53 @@ Status Copy::Execute(absl::Span<const uint8_t> src_buffer,
 }
 
 template <typename T>
+Status Conv2D::Execute(absl::Span<const T> input_buffer,
+                       const Shape& input_shape,
+                       absl::Span<const T> filter_buffer,
+                       const Shape& filter_shape, absl::Span<T> dst_buffer,
+                       const Shape& dst_shape, const Shape& window_strides,
+                       const Shape& pad_h, const Shape& pad_w,
+                       const Shape& dilation) {
+  const Shape input_strides = {input_shape[1] * input_shape[2], input_shape[2],
+                               1};
+  const Shape filter_strides = {
+      filter_shape[1] * filter_shape[2] * filter_shape[3],
+      filter_shape[2] * filter_shape[3], filter_shape[3], 1};
+  const Shape dst_strides = {dst_shape[1] * dst_shape[2], dst_shape[2], 1};
+  // Direct 2d convolution slow implementation. ref:
+  // https://www.tensorflow.org/versions/r2.0/api_docs/python/tf/nn/convolution)
+  // TODO(ataei): Implement tiled GEMM based implementation.
+  for (int ho = 0; ho < dst_shape[0]; ho++) {
+    for (int wo = 0; wo < dst_shape[1]; wo++) {
+      for (int co = 0; co < dst_shape[2]; co++) {
+        const int y_i = ho * dst_strides[0] + wo * dst_strides[1] + co;
+        T dst_value = T(0);
+        for (int ci = 0; ci < input_shape[2]; ci++) {
+          for (int kh = 0; kh < filter_shape[0]; kh++) {
+            const int ih = ho * window_strides[0] + kh - pad_h[0];
+            // left-right padding condition.
+            if (ih < 0 || ih >= input_shape[0]) continue;
+            for (int kw = 0; kw < filter_shape[1]; kw++) {
+              // top-bottom padding condition.
+              const int iw = wo * window_strides[1] + kw - pad_w[0];
+              if (iw < 0 || iw >= input_shape[1]) continue;
+              const int w_i = kh * dilation[0] * filter_strides[0] +
+                              kw * dilation[1] * filter_strides[1] +
+                              ci * filter_strides[2] + co;
+              const int x_i =
+                  ih * input_strides[0] + iw * input_strides[1] + ci;
+              dst_value += input_buffer[x_i] * filter_buffer[w_i];
+            }
+          }
+        }
+        dst_buffer[y_i] = dst_value;
+      }
+    }
+  }
+  return OkStatus();
+}
+
+template <typename T>
 Status Select::Execute(absl::Span<const uint8_t> cond_buffer,
                        absl::Span<const T> lhs_buffer,
                        absl::Span<const T> rhs_buffer,

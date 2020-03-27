@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "ConvertHLOToVMLA.h"
   SRCS
+    "ConvertConvOps.cpp"
     "ConvertDotOps.cpp"
     "ConvertHLOToVMLA.cpp"
     "ConvertReductionOps.cpp"

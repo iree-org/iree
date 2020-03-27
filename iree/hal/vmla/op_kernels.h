@@ -83,6 +83,17 @@ struct CompareGE {
                         absl::Span<uint8_t> dst_buffer);
 };
 
+struct Conv2D {
+  template <typename T>
+  static Status Execute(absl::Span<const T> input_buffer,
+                        const Shape& input_shape,
+                        absl::Span<const T> filter_buffer,
+                        const Shape& filter_shape, absl::Span<T> dst_buffer,
+                        const Shape& dst_shape, const Shape& strides,
+                        const Shape& pad_h, const Shape& pad_w,
+                        const Shape& dilation);
+};
+
 struct Copy {
   template <int element_size>
   static Status Execute(absl::Span<const uint8_t> src_buffer,
