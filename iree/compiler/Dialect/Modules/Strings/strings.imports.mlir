@@ -29,8 +29,8 @@ attributes {nosideeffects}
 
 // Returns a tensor of strings of elementwise to string of
 // buffer_view elements.
-// Maps to the IREE::Strings::ToString.
-vm.import @to_string(%value : !vm.ref<!hal.buffer_view>) -> !vm.ref<!strings.string_tensor>
+// Maps to the IREE::Strings::ToStringTensor.
+vm.import @to_string_tensor(%value : !vm.ref<!hal.buffer_view>) -> !vm.ref<!strings.string_tensor>
 attributes {nosideeffects}
 
 // Prints the contents of a string.

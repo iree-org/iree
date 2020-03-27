@@ -116,8 +116,8 @@ class StringsModuleState final {
     return OkStatus();
   }
 
-  // strings.to_string(%hal_buffer) -> %str_tensor
-  StatusOr<vm::ref<string_tensor_t>> ToString(
+  // strings.to_string_tensor(%hal_buffer) -> %str_tensor
+  StatusOr<vm::ref<string_tensor_t>> ToStringTensor(
       vm::ref<iree_hal_buffer_view_t> hal_buffer_view) {
     const size_t rank = iree_hal_buffer_view_shape_rank(hal_buffer_view.get());
     absl::InlinedVector<int32_t, 6> shape(rank);
@@ -195,7 +195,8 @@ static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
                                &StringsModuleState::I32ToString),
         vm::MakeNativeFunction("print_tensor",
                                &StringsModuleState::PrintTensor),
-        vm::MakeNativeFunction("to_string", &StringsModuleState::ToString),
+        vm::MakeNativeFunction("to_string_tensor",
+                               &StringsModuleState::ToStringTensor),
 
 };
 

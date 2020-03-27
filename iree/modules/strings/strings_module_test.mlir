@@ -24,6 +24,6 @@ func @print_string_tensor(%arg0 : !strings.string_tensor) attributes { iree.modu
 }
 
 func @to_string_tensor(%arg0 : !hal.buffer_view) -> !strings.string_tensor attributes { iree.module.export, iree.abi.none } {
-  %0 = "strings.to_string"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
+  %0 = "strings.to_string_tensor"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
   return %0 : !strings.string_tensor
 }

@@ -20,8 +20,8 @@ func @printOp(%arg0 : !strings.string) {
 
 // CHECK-LABEL: @toStringOp
 func @toStringOp(%arg0 : !hal.buffer_view) -> !strings.string_tensor {
-  // CHECK: "strings.to_string"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
-  %0 = "strings.to_string"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
+  // CHECK: "strings.to_string_tensor"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
+  %0 = "strings.to_string_tensor"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
   return %0 : !strings.string_tensor
 }
 

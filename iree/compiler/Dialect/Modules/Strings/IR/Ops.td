@@ -65,7 +65,7 @@ def STRINGS_I32ToStringOp : Op<STRINGS_Dialect, "i32_to_string", [NoSideEffect]>
   );
 }
 
-def STRINGS_ToStringOp : Op<STRINGS_Dialect, "to_string", [NoSideEffect]> {
+def STRINGS_ToStringTensorOp : Op<STRINGS_Dialect, "to_string_tensor", [NoSideEffect]> {
   let summary = [{converts a hal buffer to a string tensor}];
   let description = [{
     Converts a hal buffer to a tensor of strings representation.
