@@ -18,8 +18,8 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
-#include "context.h"
-#include "ruy.h"
+#include "ruy/context.h"
+#include "ruy/ruy.h"
 
 namespace iree {
 namespace hal {
