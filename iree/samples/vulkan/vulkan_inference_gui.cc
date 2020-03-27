@@ -687,7 +687,7 @@ int iree::IreeMain(int argc, char** argv) {
 
         // Write inputs into mappable buffers.
         DLOG(INFO) << "Creating I/O buffers...";
-        constexpr int kElementCount = 4;
+        constexpr int32_t kElementCount = 4;
         iree_hal_allocator_t* allocator =
             iree_hal_device_allocator(iree_vk_device);
         iree_hal_buffer_t* input0_buffer = nullptr;
@@ -709,16 +709,31 @@ int iree::IreeMain(int argc, char** argv) {
                                                  sizeof(input_x)));
         CHECK_IREE_OK(iree_hal_buffer_write_data(input1_buffer, 0, &input_y,
                                                  sizeof(input_y)));
-        // Marshal input buffers through a VM variant list.
+        // Wrap input buffers in buffer views.
+        iree_hal_buffer_view_t* input0_buffer_view = nullptr;
+        iree_hal_buffer_view_t* input1_buffer_view = nullptr;
+        CHECK_IREE_OK(iree_hal_buffer_view_create(
+            input0_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ALLOCATOR_SYSTEM,
+            &input0_buffer_view));
+        CHECK_IREE_OK(iree_hal_buffer_view_create(
+            input1_buffer, /*shape=*/&kElementCount, /*shape_rank=*/1,
+            IREE_HAL_ELEMENT_TYPE_FLOAT_32, IREE_ALLOCATOR_SYSTEM,
+            &input1_buffer_view));
+        iree_hal_buffer_release(input0_buffer);
+        iree_hal_buffer_release(input1_buffer);
+        // Marshal input buffer views through a VM variant list.
         iree_vm_variant_list_t* input_list = nullptr;
         CHECK_IREE_OK(
             iree_vm_variant_list_alloc(2, IREE_ALLOCATOR_SYSTEM, &input_list));
-        auto input0_buffer_ref = iree_hal_buffer_move_ref(input0_buffer);
-        auto input1_buffer_ref = iree_hal_buffer_move_ref(input1_buffer);
-        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(input_list,
-                                                           &input0_buffer_ref));
-        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(input_list,
-                                                           &input1_buffer_ref));
+        auto input0_buffer_view_ref =
+            iree_hal_buffer_view_move_ref(input0_buffer_view);
+        auto input1_buffer_view_ref =
+            iree_hal_buffer_view_move_ref(input1_buffer_view);
+        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(
+            input_list, &input0_buffer_view_ref));
+        CHECK_IREE_OK(iree_vm_variant_list_append_ref_move(
+            input_list, &input1_buffer_view_ref));
 
         // Prepare outputs list to accept results from the invocation.
         iree_vm_variant_list_t* output_list = nullptr;
@@ -736,7 +751,9 @@ int iree::IreeMain(int argc, char** argv) {
         DLOG(INFO) << "Reading back results...";
         iree_vm_variant_t* output_variant =
             iree_vm_variant_list_get(output_list, 0);
-        auto* output_buffer = iree_hal_buffer_deref(&output_variant->ref);
+        auto* output_buffer_view =
+            iree_hal_buffer_view_deref(&output_variant->ref);
+        auto* output_buffer = iree_hal_buffer_view_buffer(output_buffer_view);
         iree_hal_mapped_memory_t mapped_memory;
         CHECK_IREE_OK(iree_hal_buffer_map(output_buffer,
                                           IREE_HAL_MEMORY_ACCESS_READ, 0,
