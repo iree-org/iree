@@ -64,7 +64,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL
 iree_vm_context_release(iree_vm_context_t* context);
 
 // Returns a process-unique ID for the |context|.
-IREE_API_EXPORT int32_t IREE_API_CALL
+IREE_API_EXPORT intptr_t IREE_API_CALL
 iree_vm_context_id(const iree_vm_context_t* context);
 
 // Returns a state resolver setup to use the |context| for resolving module
