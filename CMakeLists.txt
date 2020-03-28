@@ -80,6 +80,7 @@ include(iree_py_test)
 include(iree_lit_test)
 include(iree_alwayslink)
 include(iree_add_all_subdirs)
+include(iree_check_test)
 
 string(JOIN " " CMAKE_CXX_FLAGS ${IREE_DEFAULT_COPTS})
 
