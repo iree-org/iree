@@ -117,10 +117,9 @@ function(iree_cc_test)
     WORKING_DIRECTORY
       "${CMAKE_BINARY_DIR}"
     )
-  set_property(
-    TEST
-      ${_NAME_PATH}
-    PROPERTY
+  set_tests_properties(
+    ${_NAME_PATH}
+    PROPERTIES
       ENVIRONMENT
         "TEST_TMPDIR=${_NAME}_test_tmpdir"
       LABELS
