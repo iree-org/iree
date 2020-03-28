@@ -131,7 +131,8 @@ function(iree_check_test_suite)
   list(LENGTH _RULE_DRIVERS _DRIVER_COUNT)
 
   if(NOT _TARGET_BACKEND_COUNT EQUAL _DRIVER_COUNT)
-    message(SEND_ERROR "TARGET_BACKENDS count ${_TARGET_BACKEND_COUNT} does not match DRIVERS count ${_DRIVER_COUNT}")
+    message(SEND_ERROR
+        "TARGET_BACKENDS count ${_TARGET_BACKEND_COUNT} does not match DRIVERS count ${_DRIVER_COUNT}")
   endif()
 
   math(EXPR _MAX_INDEX "${_TARGET_BACKEND_COUNT} - 1")
