@@ -36,6 +36,9 @@ EXCLUDED_TESTS=(
     bindings_python_pyiree_rt_vm_test
     bindings_python_pyiree_rt_hal_test # TODO: Enable after the VM is fixed
     bindings_python_pyiree_compiler_compiler_test # TODO: Enable after the VM is fixed
+    # TODO(b/146898896) get label-based exclusions working
+    iree/modules/check/test:check_success.mlir_vulkan-spirv_vulkan
+    iree/modules/check/test:check_failure_failure.mlir_vulkan-spirv_vulkan
 )
 
 # Join with | and add anchors
