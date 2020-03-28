@@ -19,7 +19,7 @@ def iree_lit_test(
         test_file,
         data,
         size = "small",
-        driver = "//iree/tools:run_lit.sh",
+        driver = "//iree/tools:run_lit.py",
         **kwargs):
     """Creates a lit test from the specified source file.
 
@@ -31,12 +31,13 @@ def iree_lit_test(
       driver: the shell runner for the lit tests.
       **kwargs: Any additional arguments that will be passed to the underlying sh_test.
     """
-    native.sh_test(
+    native.py_test(
         name = name,
         srcs = [driver],
+        main = driver,
         size = size,
         data = data + [test_file],
-        args = ["$(location %s)" % (test_file,)],
+        args = ["--test_file=$(location %s)" % (test_file,)],
         **kwargs
     )
 
@@ -45,7 +46,7 @@ def iree_lit_test_suite(
         data,
         srcs,
         size = "small",
-        driver = "//iree/tools:run_lit.sh",
+        driver = "//iree/tools:run_lit.py",
         tags = [],
         **kwargs):
     """Creates one lit test per source file and a test suite that bundles them.

@@ -24,6 +24,7 @@ package(
 
 exports_files([
     "run_lit.sh",
+    "run_lit.py",
     "sanitizer_suppressions.txt",
 ])
 
