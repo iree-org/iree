@@ -21,6 +21,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/modules/strings/api.h"
+#include "iree/modules/strings/api_detail.h"
 #include "iree/modules/strings/strings_module_test_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/vm/bytecode_module.h"
