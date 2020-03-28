@@ -71,3 +71,16 @@ func @buffer_view_compute_range(%arg0 : !hal.buffer_view) -> (index, index) {
   %off, %len = hal.buffer_view.compute_range %arg0, indices = [%0#0, %0#1], lengths = [%1#0, %1#1]
   return %off, %len : index, index
 }
+
+// -----
+
+// CHECK-LABEL: @buffer_view_shape_queries
+func @buffer_view_shape_queries(%arg0 : !hal.buffer_view) -> (index, index, index, index) {
+  // CHECK: %{{.+}} = hal.buffer_view.rank %arg0 : index
+  %0 = hal.buffer_view.rank %arg0 : index
+  // CHECK: %{{.+}} = hal.buffer_view.dim %arg0, 0 : index
+  %1 = hal.buffer_view.dim %arg0, 0 : index
+  // CHECK: %{{.+}}:2 = hal.buffer_view.dims %arg0 : index, index
+  %2, %3 = hal.buffer_view.dims %arg0 : index, index
+  return %0, %1, %2, %3 : index, index, index, index
+}

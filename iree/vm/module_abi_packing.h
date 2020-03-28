@@ -349,6 +349,11 @@ struct ResultPack<ref<T>> {
   }
 };
 
+template <typename U, size_t S>
+struct ResultPack<std::array<U, S>>;
+template <typename... Ts>
+struct ResultPack<std::tuple<Ts...>>;
+
 template <typename T>
 struct ResultPack<absl::optional<ref<T>>> {
   static void Store(ResultPackState* result_state,
@@ -358,6 +363,15 @@ struct ResultPack<absl::optional<ref<T>>> {
     std::memset(reg_ptr, 0, sizeof(*reg_ptr));
     if (value.has_value()) {
       iree_vm_ref_wrap_assign(value.release(), value.type(), reg_ptr);
+    }
+  }
+};
+
+template <typename U, size_t S>
+struct ResultPack<std::array<U, S>> {
+  static void Store(ResultPackState* result_state, std::array<U, S> value) {
+    for (int i = 0; i < S; ++i) {
+      ResultPack<U>::Store(result_state, std::move(value[i]));
     }
   }
 };
