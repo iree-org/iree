@@ -55,6 +55,8 @@ function(iree_check_test)
     TESTONLY
   )
 
+  # TODO(bf/146898896): Do this in iree_bytecode_module and avoid having to
+  # reach into the internals.
   set(_GENERATED_MODULE_NAME "${_MODULE_TARGET_NAME}.module")
   add_custom_target(
     "${_NAME}" ALL
