@@ -22,7 +22,7 @@ iree_cc_library(
   SRCS
     "CleanupPlaceholders.cpp"
     "ConvertHLOToShapeDialect.cpp"
-    "ExpandFunctionDynamicDims.cpp"
+    "FunctionSignatureExpansion.cpp"
     "HoistShapeCalculations.cpp"
     "MaterializeShapeCalculations.cpp"
     "Passes.cpp"

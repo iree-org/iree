@@ -82,6 +82,20 @@ class ExpandFunctionDynamicDimsPass
   }
 };
 
+class ExpandFunctionRankedShapeDimsPass
+    : public FunctionPass<ExpandFunctionRankedShapeDimsPass> {
+  void runOnFunction() override {
+    auto funcOp = getFunction();
+    auto &typeExpander = getShapeToPrimitiveTypeExpander();
+    OpBuilder builder(funcOp);
+    if (failed(typeExpander.expandFunctionSignature(funcOp, builder)) ||
+        failed(typeExpander.expandAllReturnLikeTerminators<mlir::ReturnOp>(
+            funcOp, builder))) {
+      return signalPassFailure();
+    }
+  }
+};
+
 }  // namespace
 }  // namespace Shape
 
@@ -91,9 +105,20 @@ std::unique_ptr<OpPassBase<FuncOp>> createExpandFunctionDynamicDimsPass() {
   return std::make_unique<Shape::ExpandFunctionDynamicDimsPass>();
 }
 
-static PassRegistration<Shape::ExpandFunctionDynamicDimsPass> pass(
+// For any function which contains ranked_shape argument/result types,
+// expands them to individual dynamic dimensions, inserting appropriate casts
+// within the function.
+std::unique_ptr<OpPassBase<FuncOp>> createExpandFunctionRankedShapeDimsPass() {
+  return std::make_unique<Shape::ExpandFunctionRankedShapeDimsPass>();
+}
+
+static PassRegistration<Shape::ExpandFunctionDynamicDimsPass> pass_dynamic(
     "iree-shape-expand-function-dynamic-dims",
     "Expands dynamic dimensions in function signatures.");
+
+static PassRegistration<Shape::ExpandFunctionRankedShapeDimsPass> pass_rs(
+    "iree-shape-expand-function-ranked-shape-dims",
+    "Expands ranked_shape types at function boundaries to loose dims.");
 
 }  // namespace iree_compiler
 }  // namespace mlir
