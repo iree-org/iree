@@ -14,18 +14,17 @@
 
 iree_add_all_subdirs()
 
-# file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
-# iree_lit_test_suite(
-#   NAME
-#     lit
-#   SRCS
-#     "${_GLOB_X_MLIR}"
-#   DATA
-#     iree::modules::check::iree-check-module
-#     iree::tools::IreeFileCheck
-#     iree::tools::iree-translate
-# )
-
+file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
+iree_lit_test_suite(
+  NAME
+    lit
+  SRCS
+    "${_GLOB_X_MLIR}"
+  DATA
+    iree::modules::check::iree-check-module
+    iree::tools::IreeFileCheck
+    iree::tools::iree-translate
+)
 
 iree_check_test_suite(
   NAME
