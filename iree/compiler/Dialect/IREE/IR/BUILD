@@ -72,7 +72,7 @@ gentbl(
 gentbl(
     name = "IREEDialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "IREEOps.md"),
+        ("-gen-dialect-doc", "IREEDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEOps.td",

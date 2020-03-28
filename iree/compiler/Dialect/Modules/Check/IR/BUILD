@@ -82,7 +82,7 @@ gentbl(
 gentbl(
     name = "CheckDialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "CheckOps.md"),
+        ("-gen-dialect-doc", "CheckDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CheckOps.td",

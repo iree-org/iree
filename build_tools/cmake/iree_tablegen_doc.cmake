@@ -45,6 +45,7 @@ function(iree_tablegen_doc)
     set(_INPUTS ${_RULE_TD_FILE})
     set(LLVM_TARGET_DEFINITIONS ${_INPUTS})
 
+    set(_OUTPUTS)
     while(_RULE_OUTS)
       list(GET _RULE_OUTS 0 _COMMAND)
       list(REMOVE_AT _RULE_OUTS 0)
@@ -53,23 +54,19 @@ function(iree_tablegen_doc)
 
       # TableGen this output with the given command.
       tablegen(${_TBLGEN} ${_OUTPUT} ${_COMMAND} ${_INCLUDE_DIRS})
-
-      # Put all dialect docs at one place.
-      set(_DOC_FILE ${PROJECT_BINARY_DIR}/doc/Dialects/${_OUTPUT})
-      add_custom_command(
-        OUTPUT ${_DOC_FILE}
-        COMMAND ${CMAKE_COMMAND} -E copy
-                ${CMAKE_CURRENT_BINARY_DIR}/${_OUTPUT}
-                ${_DOC_FILE}
-        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/${_OUTPUT})
-
-      # Set a target to drive copy.
-      add_custom_target(${_NAME}_target DEPENDS ${_DOC_FILE})
-      set_target_properties(${_NAME}_target PROPERTIES FOLDER "Tablegenning")
-
-      # Register this dialect doc to iree-doc.
-      add_dependencies(iree-doc ${_NAME}_target)
+      list(APPEND _OUTPUTS ${CMAKE_CURRENT_BINARY_DIR}/${_OUTPUT})
     endwhile()
 
+    # Put all dialect docs at one place.
+    set(_DOC_DIR ${PROJECT_BINARY_DIR}/doc/Dialects/)
+    # Set a target to drive copy.
+    add_custom_target(${_NAME}_target
+              ${CMAKE_COMMAND} -E make_directory ${_DOC_DIR}
+      COMMAND ${CMAKE_COMMAND} -E copy ${_OUTPUTS} ${_DOC_DIR}
+      DEPENDS ${_OUTPUTS})
+    set_target_properties(${_NAME}_target PROPERTIES FOLDER "Tablegenning")
+
+    # Register this dialect doc to iree-doc.
+    add_dependencies(iree-doc ${_NAME}_target)
   endif()
 endfunction()

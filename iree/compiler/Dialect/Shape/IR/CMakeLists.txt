@@ -60,5 +60,5 @@ iree_tablegen_doc(
   TD_FILE
     "ShapeOps.td"
   OUTS
-    -gen-op-doc ShapeOps.md
+    -gen-dialect-doc ShapeDialect.md
 )

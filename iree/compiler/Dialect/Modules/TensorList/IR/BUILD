@@ -92,7 +92,7 @@ gentbl(
 gentbl(
     name = "TensorListDialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "TensorListOps.md"),
+        ("-gen-dialect-doc", "TensorListDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "TensorListOps.td",

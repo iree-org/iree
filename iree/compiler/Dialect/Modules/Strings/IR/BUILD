@@ -92,7 +92,7 @@ gentbl(
 gentbl(
     name = "DialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "Ops.md"),
+        ("-gen-dialect-doc", "StringsDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "Ops.td",

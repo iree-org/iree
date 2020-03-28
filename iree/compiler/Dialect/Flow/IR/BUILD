@@ -107,7 +107,7 @@ gentbl(
 gentbl(
     name = "FlowDialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "FlowOps.md"),
+        ("-gen-dialect-doc", "FlowDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "FlowOps.td",

@@ -103,5 +103,5 @@ iree_tablegen_doc(
   TD_FILE
     "HALOps.td"
   OUTS
-    -gen-op-doc HALOps.md
+    -gen-dialect-doc HALDialect.md
 )

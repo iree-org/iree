@@ -97,5 +97,5 @@ iree_tablegen_doc(
   TD_FILE
     "VMOps.td"
   OUTS
-    -gen-op-doc VMOps.md
+    -gen-dialect-doc VMDialect.md
 )

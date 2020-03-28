@@ -77,7 +77,7 @@ gentbl(
 gentbl(
     name = "ShapeDialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "ShapeOps.md"),
+        ("-gen-dialect-doc", "ShapeDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeOps.td",

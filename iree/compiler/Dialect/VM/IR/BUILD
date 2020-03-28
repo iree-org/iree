@@ -134,7 +134,7 @@ gentbl(
 gentbl(
     name = "VMDialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "VMOps.md"),
+        ("-gen-dialect-doc", "VMDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "VMOps.td",

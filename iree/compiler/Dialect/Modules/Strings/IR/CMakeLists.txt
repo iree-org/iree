@@ -77,5 +77,5 @@ iree_tablegen_doc(
   TD_FILE
     "Ops.td"
   OUTS
-    -gen-op-doc Ops.md
+    -gen-dialect-doc StringsDialect.md
 )

@@ -66,5 +66,5 @@ iree_tablegen_doc(
   TD_FILE
     "CheckOps.td"
   OUTS
-    -gen-op-doc CheckOps.md
+    -gen-dialect-doc CheckDialect.md
 )

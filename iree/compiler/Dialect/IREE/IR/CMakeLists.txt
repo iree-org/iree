@@ -57,5 +57,5 @@ iree_tablegen_doc(
   TD_FILE
     "IREEOps.td"
   OUTS
-    -gen-op-doc IREEOps.md
+    -gen-dialect-doc IREEDialect.md
 )

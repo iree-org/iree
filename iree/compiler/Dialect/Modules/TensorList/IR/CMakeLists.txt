@@ -78,5 +78,5 @@ iree_tablegen_doc(
   TD_FILE
     "TensorListOps.td"
   OUTS
-    -gen-op-doc TensorListOps.md
+    -gen-dialect-doc TensorListDialect.md
 )

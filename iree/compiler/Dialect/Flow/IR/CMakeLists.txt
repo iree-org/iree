@@ -81,5 +81,5 @@ iree_tablegen_doc(
   TD_FILE
     "FlowOps.td"
   OUTS
-    -gen-op-doc FlowOps.md
+    -gen-dialect-doc FlowDialect.md
 )

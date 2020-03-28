@@ -128,7 +128,7 @@ gentbl(
 gentbl(
     name = "HALDialectDocGen",
     tbl_outs = [
-        ("-gen-op-doc", "HALOps.md"),
+        ("-gen-dialect-doc", "HALDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "HALOps.td",

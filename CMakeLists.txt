@@ -176,7 +176,9 @@ endif()
 
 if(${IREE_BUILD_DOCS})
   # Add a top-level custom target to drive generating all documentation.
-  add_custom_target(iree-doc)
+  # Register it to the default target given that IREE_BUILD_DOCS is explicitly
+  # requested.
+  add_custom_target(iree-doc ALL)
 endif()
 
 #-------------------------------------------------------------------------------
