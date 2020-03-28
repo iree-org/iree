@@ -33,3 +33,31 @@ func @staticTwoArg(%arg0 : !hal.buffer, %arg1 : !hal.buffer) -> !hal.buffer
   // CHECK: return %[[VIEW]]
   return %arg1 : !hal.buffer
 }
+
+// -----
+// CHECK-LABEL: @dynamicTwoDims
+// Note: reflection matches signature:
+//   (%arg0 : tensor<?x?xf32>) -> tensor<?x?xf32>
+// Original func should be rewritten to export with $raw suffix with no
+// reflection metadata.
+// CHECK-SAME: {iree.module.export = "dynamicTwoDims$raw"}
+// A new function with $sync suffix based on buffer_view should be generated.
+// CHECK: func @dynamicTwoDims$sync(%[[ARG0:.+]]: !hal.buffer_view)
+// CHECK-SAME: attributes
+// CHECK-SAME:   iree.abi.stub
+// CHECK-SAME:   iree.module.export = "dynamicTwoDims"
+// CHECK-SAME:   iree.reflection = {f = "I10!B7!d-1d-1R10!B7!d-1d-1", fv = "1"}
+// CHECK-DAG: %[[BUFFER:.+]] = hal.buffer_view.buffer %[[ARG0]] : !hal.buffer
+// CHECK-DAG: %[[DIM0:.+]] = hal.buffer_view.dim %[[ARG0]], 0 : index
+// CHECK-DAG: %[[DIM1:.+]] = hal.buffer_view.dim %[[ARG0]], 1 : index
+// CHECK-DAG: %[[RESULT:.+]]:3 = call @dynamicTwoDims(%[[BUFFER]], %[[DIM0]], %[[DIM1]])
+// CHECK-DAG: %[[RESULT_VIEW:.+]] = hal.buffer_view.create %[[RESULT]]#0, shape = [%[[RESULT]]#1, %[[RESULT]]#2], element_type = 50331680 : !hal.buffer_view
+// CHECK: return %[[RESULT_VIEW]]
+func @dynamicTwoDims(%arg0 : !hal.buffer, %arg1 : index, %arg2 : index) -> (!hal.buffer, index, index)
+    attributes {iree.module.export,
+      iree.reflection = {f = "I10!B7!d-1d-1R10!B7!d-1d-1", fv = "1"}}
+{
+  %0 = constant 5 : index
+  %1 = constant 6 : index
+  return %arg0, %0, %1 : !hal.buffer, index, index
+}
