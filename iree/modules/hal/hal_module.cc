@@ -401,6 +401,49 @@ class HALModuleState final {
         static_cast<int32_t>(subspan_length));
   }
 
+  StatusOr<int32_t> BufferViewRank(
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+    return static_cast<int32_t>(
+        iree_hal_buffer_view_shape_rank(buffer_view.get()));
+  }
+
+  StatusOr<int32_t> BufferViewDim(vm::ref<iree_hal_buffer_view_t> buffer_view,
+                                  int32_t index) {
+    return static_cast<int32_t>(
+        iree_hal_buffer_view_shape_dim(buffer_view.get(), index));
+  }
+
+  template <size_t N>
+  StatusOr<std::array<int32_t, N>> BufferViewDimsN(
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+    std::array<int32_t, N> value;
+    iree_host_size_t rank = 0;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_view_shape(buffer_view.get(), N, value.data(), &rank),
+        IREE_LOC));
+    return value;
+  }
+
+  StatusOr<std::array<int32_t, 1>> BufferViewDims1(
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+    return BufferViewDimsN<1>(std::move(buffer_view));
+  }
+
+  StatusOr<std::array<int32_t, 2>> BufferViewDims2(
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+    return BufferViewDimsN<2>(std::move(buffer_view));
+  }
+
+  StatusOr<std::array<int32_t, 3>> BufferViewDims3(
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+    return BufferViewDimsN<3>(std::move(buffer_view));
+  }
+
+  StatusOr<std::array<int32_t, 4>> BufferViewDims4(
+      vm::ref<iree_hal_buffer_view_t> buffer_view) {
+    return BufferViewDimsN<4>(std::move(buffer_view));
+  }
+
   //===--------------------------------------------------------------------===//
   // iree::hal::CommandBuffer
   //===--------------------------------------------------------------------===//
@@ -747,6 +790,16 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
                            &HALModuleState::BufferViewComputeOffset),
     vm::MakeNativeFunction("buffer_view.compute_range",
                            &HALModuleState::BufferViewComputeRange),
+    vm::MakeNativeFunction("buffer_view.rank", &HALModuleState::BufferViewRank),
+    vm::MakeNativeFunction("buffer_view.dim", &HALModuleState::BufferViewDim),
+    vm::MakeNativeFunction("buffer_view.dims.1",
+                           &HALModuleState::BufferViewDims1),
+    vm::MakeNativeFunction("buffer_view.dims.2",
+                           &HALModuleState::BufferViewDims2),
+    vm::MakeNativeFunction("buffer_view.dims.3",
+                           &HALModuleState::BufferViewDims3),
+    vm::MakeNativeFunction("buffer_view.dims.4",
+                           &HALModuleState::BufferViewDims4),
 
     vm::MakeNativeFunction("command_buffer.create",
                            &HALModuleState::CommandBufferCreate),
