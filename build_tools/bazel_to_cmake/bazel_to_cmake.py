@@ -382,8 +382,14 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_cc_library(\n"
-      f"{name_block}{hdrs_block}{textual_hdrs_block}{srcs_block}{data_block}"
-      f"{deps_block}{alwayslink_block}{testonly_block}"
+      f"{name_block}"
+      f"{hdrs_block}"
+      f"{textual_hdrs_block}"
+      f"{srcs_block}"
+      f"{data_block}"
+      f"{deps_block}"
+      f"{alwayslink_block}"
+      f"{testonly_block}"
       f"  PUBLIC\n)\n\n")
 
   def cc_test(self, name, hdrs=None, srcs=None, data=None, deps=None, **kwargs):
@@ -395,7 +401,11 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_cc_test(\n"
-      f"{name_block}{hdrs_block}{srcs_block}{data_block}{deps_block}"
+      f"{name_block}"
+      f"{hdrs_block}"
+      f"{srcs_block}"
+      f"{data_block}"
+      f"{deps_block}"
       f")\n\n")
 
   def cc_binary(self,
@@ -417,7 +427,11 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_cc_binary(\n"
-      f"{name_block}{out_block}{srcs_block}{data_block}{deps_block}"
+      f"{name_block}"
+      f"{out_block}"
+      f"{srcs_block}"
+      f"{data_block}"
+      f"{deps_block}"
       f"{testonly_block}"
       f")\n\n")
 
@@ -443,8 +457,12 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_cc_embed_data(\n"
-      f"{name_block}{srcs_block}{cc_file_output_block}{h_file_output_block}"
-      f"{namespace_block}{flatten_block}"
+      f"{name_block}"
+      f"{srcs_block}"
+      f"{cc_file_output_block}"
+      f"{h_file_output_block}"
+      f"{namespace_block}"
+      f"{flatten_block}"
       f"  PUBLIC\n)\n\n")
 
   def spirv_kernel_cc_library(self, name, srcs):
@@ -453,7 +471,8 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_spirv_kernel_cc_library(\n"
-      f"{name_block}{srcs_block}"
+      f"{name_block}"
+      f"{srcs_block}"
       f")\n\n")
 
   def iree_bytecode_module(self,
@@ -470,7 +489,10 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_bytecode_module(\n"
-      f"{name_block}{src_block}{namespace_block}{translate_tool_block}"
+      f"{name_block}"
+      f"{src_block}"
+      f"{namespace_block}"
+      f"{translate_tool_block}"
       f"{flags_block}"
       f"  PUBLIC\n)\n\n")
 
@@ -481,7 +503,9 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"flatbuffer_cc_library(\n"
-      f"{name_block}{srcs_block}{flatc_args_block}"
+      f"{name_block}"
+      f"{srcs_block}"
+      f"{flatc_args_block}"
       f"  PUBLIC\n)\n\n")
 
   def gentbl(self,
@@ -500,7 +524,10 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_tablegen_library(\n"
-      f"{name_block}{td_file_block}{outs_block}{tblgen_block}"
+      f"{name_block}"
+      f"{td_file_block}"
+      f"{outs_block}"
+      f"{tblgen_block}"
       f")\n\n")
 
   def iree_lit_test_suite(self, name, srcs, data, **kwargs):
@@ -510,7 +537,9 @@ class BuildFileFunctions(object):
 
     self.converter.body += (
       f"iree_lit_test_suite(\n"
-      f"{name_block}{srcs_block}{data_block}"
+      f"{name_block}"
+      f"{srcs_block}"
+      f"{data_block}"
       f")\n\n")
 
 
