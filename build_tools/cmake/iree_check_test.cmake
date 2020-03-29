@@ -78,16 +78,9 @@ function(iree_check_test)
       "${_RULE_ARGS}"
   )
 
-  set_tests_properties(
-      "${_NAME_PATH}"
-    PROPERTIES
-      REQUIRED_FILES
-	"${_GENERATED_MODULE_NAME}"
-      ENVIRONMENT
-        "TEST_TMPDIR=${_NAME}_test_tmpdir"
-      LABELS
-         "${_PACKAGE_PATH}"
-  )
+  set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_GENERATED_MODULE_NAME}")
+  set_property(TEST "${_NAME_PATH}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
+  set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_PACKAGE_PATH}")
 endfunction()
 
 
