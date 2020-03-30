@@ -450,8 +450,7 @@ int iree::IreeMain(int argc, char** argv) {
       static_cast<iree_hal_vulkan_features_t>(
           IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS |
           IREE_HAL_VULKAN_ENABLE_DEBUG_UTILS |
-          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS |
-          IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES);
+          IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS);
   std::vector<const char*> layers = GetInstanceLayers(iree_vulkan_features);
   std::vector<const char*> extensions =
       GetInstanceExtensions(window, iree_vulkan_features);

@@ -90,6 +90,10 @@ ExtensibilitySpec GetInstanceExtensibilitySpec(
     const iree_hal_vulkan_features_t& features) {
   ExtensibilitySpec spec;
 
+  // Multiple extensions depend on VK_KHR_get_physical_device_properties2.
+  spec.required_extensions.push_back(
+      VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+
   if (features & IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS) {
     spec.optional_layers.push_back("VK_LAYER_LUNARG_standard_validation");
   }
@@ -98,16 +102,8 @@ ExtensibilitySpec GetInstanceExtensibilitySpec(
     spec.optional_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
   }
 
-  if (features & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS ||
-      features & IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES) {
-    spec.optional_extensions.push_back(
-        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
-  }
-
-  if (features & IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES) {
-    // Polyfill layer - enable if present.
-    spec.optional_layers.push_back("VK_LAYER_KHRONOS_timeline_semaphore");
-  }
+  // Polyfill layer - enable if present.
+  spec.optional_layers.push_back("VK_LAYER_KHRONOS_timeline_semaphore");
 
   return spec;
 }
@@ -120,14 +116,11 @@ ExtensibilitySpec GetDeviceExtensibilitySpec(
   // work (such as those relied upon by SPIR-V kernels, etc).
   spec.required_extensions.push_back(
       VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
+  // Timeline semaphore support is required.
+  spec.required_extensions.push_back(VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
 
   if (features & IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS) {
     spec.optional_extensions.push_back(VK_KHR_PUSH_DESCRIPTOR_EXTENSION_NAME);
-  }
-
-  if (features & IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES) {
-    spec.optional_extensions.push_back(
-        VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME);
   }
 
   return spec;
