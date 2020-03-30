@@ -8,7 +8,7 @@ package(
 cc_library(
     name = "strings_module",
     srcs = ["api.cc", "strings_module.cc"],
-    hdrs = ["api.h", "strings_module.h"],
+    hdrs = ["api.h", "api_detail.h", "strings_module.h"],
     deps = [
         "//iree/base:api",
         "//iree/base:logging",
