@@ -32,27 +32,26 @@
 #include "iree/vm/stack.h"
 #include "iree/vm/types.h"
 
-extern "C" iree_status_t string_create(iree_string_view_t value,
-                                       iree_allocator_t allocator,
-                                       string_t** out_message) {
+extern "C" iree_status_t strings_string_create(iree_string_view_t value,
+                                               iree_allocator_t allocator,
+                                               strings_string_t** out_message) {
   // Note that we allocate the message and the string value together.
-  string_t* message = NULL;
+  strings_string_t* message = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(string_t) + value.size, (void**)&message));
+      allocator, sizeof(strings_string_t) + value.size, (void**)&message));
   message->ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
   message->allocator = allocator;
-  message->value.data = ((const char*)message) + sizeof(string_t);
+  message->value.data = ((const char*)message) + sizeof(strings_string_t);
   message->value.size = value.size;
   memcpy((void*)message->value.data, value.data, message->value.size);
   *out_message = message;
   return IREE_STATUS_OK;
 }
 
-extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
-                                              const iree_string_view_t* value,
-                                              int64_t value_count,
-                                              const int32_t* shape, size_t rank,
-                                              string_tensor_t** out_message) {
+extern "C" iree_status_t strings_string_tensor_create(
+    iree_allocator_t allocator, const iree_string_view_t* value,
+    int64_t value_count, const int32_t* shape, size_t rank,
+    strings_string_tensor_t** out_message) {
   // TODO(suderman): Use separate allocation for each string. More ref counters
   // but prevents constantly copying.
 
@@ -74,15 +73,15 @@ extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
 
   const size_t shape_bytes = rank * sizeof(int32_t);
   const size_t string_view_bytes = value_count * sizeof(iree_string_view_t);
-  const size_t byte_count =
-      sizeof(string_tensor_t) + shape_bytes + string_view_bytes + string_bytes;
+  const size_t byte_count = sizeof(strings_string_tensor_t) + shape_bytes +
+                            string_view_bytes + string_bytes;
 
   // Allocate and compute byte offsets.
-  string_tensor_t* message = NULL;
+  strings_string_tensor_t* message = NULL;
   IREE_RETURN_IF_ERROR(
       iree_allocator_malloc(allocator, byte_count, (void**)&message));
 
-  char* shape_ptr = ((char*)message) + sizeof(string_tensor_t);
+  char* shape_ptr = ((char*)message) + sizeof(strings_string_tensor_t);
   char* string_view_ptr = shape_ptr + shape_bytes;
   char* contents_ptr = string_view_ptr + string_view_bytes;
 
@@ -115,8 +114,8 @@ extern "C" iree_status_t string_tensor_create(iree_allocator_t allocator,
 }
 
 // Returns the count of elements in the tensor.
-iree_status_t string_tensor_get_count(const string_tensor_t* tensor,
-                                      size_t* count) {
+iree_status_t strings_string_tensor_get_count(
+    const strings_string_tensor_t* tensor, size_t* count) {
   if (!tensor) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -125,9 +124,9 @@ iree_status_t string_tensor_get_count(const string_tensor_t* tensor,
 }
 
 // returns the list of stored string views.
-iree_status_t string_tensor_get_elements(const string_tensor_t* tensor,
-                                         iree_string_view_t* strs, size_t count,
-                                         size_t offset) {
+iree_status_t strings_string_tensor_get_elements(
+    const strings_string_tensor_t* tensor, iree_string_view_t* strs,
+    size_t count, size_t offset) {
   if (!tensor || offset < 0 || offset + count > tensor->count) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -139,8 +138,8 @@ iree_status_t string_tensor_get_elements(const string_tensor_t* tensor,
 }
 
 // Returns the rank of the tensor.
-iree_status_t string_tensor_get_rank(const string_tensor_t* tensor,
-                                     int32_t* rank) {
+iree_status_t strings_string_tensor_get_rank(
+    const strings_string_tensor_t* tensor, int32_t* rank) {
   if (!tensor || !rank) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -149,8 +148,8 @@ iree_status_t string_tensor_get_rank(const string_tensor_t* tensor,
 }
 
 // Returns the shape of the tensor.
-iree_status_t string_tensor_get_shape(const string_tensor_t* tensor,
-                                      int32_t* shape, size_t rank) {
+iree_status_t strings_string_tensor_get_shape(
+    const strings_string_tensor_t* tensor, int32_t* shape, size_t rank) {
   if (!tensor || (!shape && rank != 0) || rank != tensor->rank) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -162,9 +161,9 @@ iree_status_t string_tensor_get_shape(const string_tensor_t* tensor,
 }
 
 // Returns the store string view using the provided indices.
-iree_status_t string_tensor_get_element(const string_tensor_t* tensor,
-                                        int32_t* indices, size_t rank,
-                                        iree_string_view_t* str) {
+iree_status_t strings_string_tensor_get_element(
+    const strings_string_tensor_t* tensor, int32_t* indices, size_t rank,
+    iree_string_view_t* str) {
   if (!tensor || !indices || rank != tensor->rank) {
     return IREE_STATUS_INVALID_ARGUMENT;
   }
@@ -182,12 +181,12 @@ iree_status_t string_tensor_get_element(const string_tensor_t* tensor,
   return IREE_STATUS_OK;
 }
 
-void string_destroy(void* ptr) {
-  string_t* message = (string_t*)ptr;
+void strings_string_destroy(void* ptr) {
+  strings_string_t* message = (strings_string_t*)ptr;
   iree_allocator_free(message->allocator, ptr);
 }
 
-void string_tensor_destroy(void* ptr) {
-  string_t* message = (string_t*)ptr;
+void strings_string_tensor_destroy(void* ptr) {
+  strings_string_t* message = (strings_string_t*)ptr;
   iree_allocator_free(message->allocator, ptr);
 }

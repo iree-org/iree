@@ -131,8 +131,8 @@ class StringsModuleTest : public ::testing::Test {
   void TestStringTensorToString(
       absl::Span<const iree_string_view_t> string_views,
       absl::Span<const int32_t> shape, absl::string_view expected_output) {
-    vm::ref<string_tensor_t> input_string_tensor;
-    IREE_ASSERT_OK(string_tensor_create(
+    vm::ref<strings_string_tensor_t> input_string_tensor;
+    IREE_ASSERT_OK(strings_string_tensor_create(
         IREE_ALLOCATOR_SYSTEM, string_views.data(), string_views.size(),
         shape.data(), shape.size(), &input_string_tensor));
 
@@ -143,7 +143,7 @@ class StringsModuleTest : public ::testing::Test {
 
     // Add the string tensor to the input list.
     iree_vm_ref_t input_string_tensor_ref =
-        string_tensor_move_ref(input_string_tensor.get());
+        strings_string_tensor_move_ref(input_string_tensor.get());
     IREE_ASSERT_OK(iree_vm_variant_list_append_ref_retain(
         inputs, &input_string_tensor_ref));
 
@@ -158,8 +158,8 @@ class StringsModuleTest : public ::testing::Test {
         /*policy=*/nullptr, inputs, outputs, IREE_ALLOCATOR_SYSTEM));
 
     // Retrieve and validate the string tensor;
-    string_t* output_string =
-        string_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+    strings_string_t* output_string =
+        strings_string_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
     ASSERT_EQ(output_string->value.size, expected_output.length());
     EXPECT_EQ(absl::string_view(output_string->value.data), expected_output);
 
@@ -197,23 +197,23 @@ class StringsModuleTest : public ::testing::Test {
                                   IREE_ALLOCATOR_SYSTEM));
 
     // Retrieve and validate the string tensor;
-    string_tensor_t* output_tensor =
-        string_tensor_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
+    strings_string_tensor_t* output_tensor =
+        strings_string_tensor_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
 
     // Validate the count.
     size_t count;
-    IREE_ASSERT_OK(string_tensor_get_count(output_tensor, &count));
+    IREE_ASSERT_OK(strings_string_tensor_get_count(output_tensor, &count));
     EXPECT_EQ(count, contents.size());
 
     // Validate the rank.
     int32_t rank;
-    IREE_ASSERT_OK(string_tensor_get_rank(output_tensor, &rank));
+    IREE_ASSERT_OK(strings_string_tensor_get_rank(output_tensor, &rank));
     ASSERT_EQ(rank, shape.size());
 
     // Validate the shape.
     std::vector<int32_t> out_shape(rank);
     IREE_ASSERT_OK(
-        string_tensor_get_shape(output_tensor, out_shape.data(), rank));
+        strings_string_tensor_get_shape(output_tensor, out_shape.data(), rank));
     for (int i = 0; i < rank; i++) {
       EXPECT_EQ(out_shape[i], shape[i])
           << "Dimension : " << i << " does not match";
@@ -221,8 +221,8 @@ class StringsModuleTest : public ::testing::Test {
 
     // Fetch and validate string contents.
     std::vector<iree_string_view_t> out_strings(expected.size());
-    IREE_ASSERT_OK(string_tensor_get_elements(output_tensor, out_strings.data(),
-                                              out_strings.size(), 0));
+    IREE_ASSERT_OK(strings_string_tensor_get_elements(
+        output_tensor, out_strings.data(), out_strings.size(), 0));
     for (int i = 0; i < expected.size(); i++) {
       EXPECT_EQ(iree_string_view_compare(out_strings[i], expected[i]), 0)
           << "Expected: " << expected[i].data << " found "

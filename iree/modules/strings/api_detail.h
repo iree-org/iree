@@ -22,23 +22,23 @@
 extern "C" {
 #endif  // __cplusplus
 
-typedef struct string {
+typedef struct strings_string {
   iree_vm_ref_object_t ref_object;
   iree_allocator_t allocator;
   iree_string_view_t value;
-} string_t;
+} strings_string_t;
 
-typedef struct string_tensor {
+typedef struct strings_string_tensor {
   iree_vm_ref_object_t ref_object;
   iree_allocator_t allocator;
   iree_string_view_t* values;
   size_t count;
   const int32_t* shape;
   size_t rank;
-} string_tensor_t;
+} strings_string_tensor_t;
 
-IREE_VM_DECLARE_TYPE_ADAPTERS(string, string_t);
-IREE_VM_DECLARE_TYPE_ADAPTERS(string_tensor, string_tensor_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string, strings_string_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string_tensor, strings_string_tensor_t);
 
 #ifdef __cplusplus
 }  // extern "C"

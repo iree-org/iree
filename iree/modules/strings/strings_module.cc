@@ -33,11 +33,11 @@
 #include "iree/vm/stack.h"
 #include "iree/vm/types.h"
 
-static iree_vm_ref_type_descriptor_t string_descriptor = {0};
-static iree_vm_ref_type_descriptor_t string_tensor_descriptor = {0};
+static iree_vm_ref_type_descriptor_t strings_string_descriptor = {0};
+static iree_vm_ref_type_descriptor_t strings_string_tensor_descriptor = {0};
 
-IREE_VM_DEFINE_TYPE_ADAPTERS(string, string_t);
-IREE_VM_DEFINE_TYPE_ADAPTERS(string_tensor, string_tensor_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(strings_string, strings_string_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(strings_string_tensor, strings_string_tensor_t);
 
 namespace iree {
 namespace {
@@ -50,7 +50,7 @@ class StringsModuleState final {
   Status Initialize() { return OkStatus(); }
 
   // strings.print(%str)
-  Status Print(vm::ref<string_t> str) {
+  Status Print(vm::ref<strings_string_t> str) {
     fwrite(str->value.data, 1, str->value.size, stdout);
     fputc('\n', stdout);
     fflush(stdout);
@@ -58,12 +58,12 @@ class StringsModuleState final {
   }
 
   // strings.i32_to_string(%value) -> %str
-  StatusOr<vm::ref<string_t>> I32ToString(int32_t value) {
-    vm::ref<string_t> new_string;
+  StatusOr<vm::ref<strings_string_t>> I32ToString(int32_t value) {
+    vm::ref<strings_string_t> new_string;
     std::string str = std::to_string(value);
     RETURN_IF_ERROR(
-        FromApiStatus(string_create(iree_make_cstring_view(str.c_str()),
-                                    allocator_, &new_string),
+        FromApiStatus(strings_string_create(iree_make_cstring_view(str.c_str()),
+                                            allocator_, &new_string),
                       IREE_LOC));
     return new_string;
   }
@@ -106,29 +106,29 @@ class StringsModuleState final {
   }
 
   // strings.print_tensor(%str_tensor)
-  StatusOr<vm::ref<string_t>> StringTensorToString(
-      vm::ref<string_tensor_t> str_tensor) {
+  StatusOr<vm::ref<strings_string_t>> StringTensorToString(
+      vm::ref<strings_string_tensor_t> str_tensor) {
     // Perform a rough estimation of the amount of space we need.
     size_t string_length = 0;
     for (int i = 0; i < str_tensor->count; i++) {
       string_length += str_tensor->values[i].size + 2;
     }
 
-    vm::ref<string_t> new_string;
+    vm::ref<strings_string_t> new_string;
     std::string str;
     str.reserve(string_length);
     StringTensorToStringHelper(str_tensor->values, str_tensor->shape,
                                str_tensor->rank, &str);
 
     RETURN_IF_ERROR(
-        FromApiStatus(string_create(iree_make_cstring_view(str.c_str()),
-                                    allocator_, &new_string),
+        FromApiStatus(strings_string_create(iree_make_cstring_view(str.c_str()),
+                                            allocator_, &new_string),
                       IREE_LOC));
     return new_string;
   }
 
   // strings.to_string_tensor(%hal_buffer) -> %str_tensor
-  StatusOr<vm::ref<string_tensor_t>> ToStringTensor(
+  StatusOr<vm::ref<strings_string_tensor_t>> ToStringTensor(
       vm::ref<iree_hal_buffer_view_t> hal_buffer_view) {
     const size_t rank = iree_hal_buffer_view_shape_rank(hal_buffer_view.get());
     absl::InlinedVector<int32_t, 6> shape(rank);
@@ -180,15 +180,12 @@ class StringsModuleState final {
       string_views.push_back(iree_make_cstring_view(str.data()));
     }
 
-    for (const auto& view : string_views) {
-    }
-
-    string_tensor_t* string_tensor;
-    RETURN_IF_ERROR(
-        FromApiStatus(string_tensor_create(allocator_, string_views.data(),
-                                           string_views.size(), shape.data(),
-                                           rank, &string_tensor),
-                      IREE_LOC));
+    strings_string_tensor_t* string_tensor;
+    RETURN_IF_ERROR(FromApiStatus(
+        strings_string_tensor_create(allocator_, string_views.data(),
+                                     string_views.size(), shape.data(), rank,
+                                     &string_tensor),
+        IREE_LOC));
 
     return string_tensor;
   }
@@ -232,23 +229,26 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
 }  // namespace iree
 
 extern "C" iree_status_t strings_module_register_types() {
-  if (string_descriptor.type) {
+  if (strings_string_descriptor.type) {
     return IREE_STATUS_OK;  // Already registered.
   }
 
   // Register strings.string
-  string_descriptor.type_name = iree_make_cstring_view("strings.string");
-  string_descriptor.offsetof_counter = offsetof(string_t, ref_object.counter);
-  string_descriptor.destroy = string_destroy;
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&string_descriptor));
+  strings_string_descriptor.type_name =
+      iree_make_cstring_view("strings.string");
+  strings_string_descriptor.offsetof_counter =
+      offsetof(strings_string_t, ref_object.counter);
+  strings_string_descriptor.destroy = strings_string_destroy;
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&strings_string_descriptor));
 
   // Register strings.string_tensor
-  string_tensor_descriptor.type_name =
+  strings_string_tensor_descriptor.type_name =
       iree_make_cstring_view("strings.string_tensor");
-  string_tensor_descriptor.offsetof_counter =
-      offsetof(string_tensor_t, ref_object.counter);
-  string_tensor_descriptor.destroy = string_tensor_destroy;
-  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&string_tensor_descriptor));
+  strings_string_tensor_descriptor.offsetof_counter =
+      offsetof(strings_string_tensor_t, ref_object.counter);
+  strings_string_tensor_descriptor.destroy = strings_string_tensor_destroy;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ref_register_type(&strings_string_tensor_descriptor));
 
   return IREE_STATUS_OK;
 }
