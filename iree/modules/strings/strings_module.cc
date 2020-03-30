@@ -172,6 +172,10 @@ class StringsModuleState final {
       return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
     }
 
+    // Unmap used buffer.
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_unmap(hal_buffer, &tensor_mapping), IREE_LOC));
+
     // Place into iree_string_views.
     std::vector<iree_string_view_t> string_views;
     string_views.reserve(num_elements);
