@@ -535,12 +535,29 @@ class BuildFileFunctions(object):
     td_file_block = self._convert_td_file_block(td_file)
     outs_block = self._convert_tbl_outs_block(tbl_outs)
 
-    # Which kind of file to generate. We use the name as a convention here.
-    genfile_kind = "doc" if name.endswith("DocGen") else "library"
-
-    self.converter.body += """iree_tablegen_%(genfile_kind)s(
+    self.converter.body += """iree_tablegen_library(
 %(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
-    "genfile_kind": genfile_kind,
+    "name_block": name_block,
+    "td_file_block": td_file_block,
+    "outs_block": outs_block,
+    "tblgen_block": tblgen_block,
+    }
+
+  def iree_tablegen_doc(self,
+                        name,
+                        tblgen,
+                        td_file,
+                        tbl_outs,
+                        td_srcs=None,
+                        td_includes=None,
+                        strip_include_prefix=None):
+    name_block = self._convert_name_block(name)
+    tblgen_block = self._convert_tblgen_block(tblgen)
+    td_file_block = self._convert_td_file_block(td_file)
+    outs_block = self._convert_tbl_outs_block(tbl_outs)
+
+    self.converter.body += """iree_tablegen_doc(
+%(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
     "name_block": name_block,
     "td_file_block": td_file_block,
     "outs_block": outs_block,

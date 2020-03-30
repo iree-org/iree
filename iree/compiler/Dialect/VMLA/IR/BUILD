@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -131,7 +132,7 @@ gentbl(
     ],
 )
 
-gentbl(
+iree_tablegen_doc(
     name = "VMLADialecDocGen",
     tbl_outs = [
         ("-gen-dialect-doc", "VMLADialect.md"),
