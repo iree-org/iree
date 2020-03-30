@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -68,6 +69,21 @@ gentbl(
     tbl_outs = [
         ("-gen-op-decls", "CheckOps.h.inc"),
         ("-gen-op-defs", "CheckOps.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "CheckOps.td",
+    td_srcs = [
+        ":td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "//iree/compiler/Dialect/HAL/IR:td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "CheckDialectDocGen",
+    tbl_outs = [
+        ("-gen-dialect-doc", "CheckDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "CheckOps.td",

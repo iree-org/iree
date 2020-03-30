@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -128,5 +129,22 @@ gentbl(
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "VMDialectDocGen",
+    tbl_outs = [
+        ("-gen-dialect-doc", "VMDialect.md"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "VMOps.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Interfaces/CallInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/ControlFlowInterfaces.td",
+        "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
     ],
 )

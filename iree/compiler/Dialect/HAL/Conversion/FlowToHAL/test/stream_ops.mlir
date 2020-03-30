@@ -72,3 +72,33 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
   // CHECK: return [[RET_BUF]]
   return %0 : tensor<5x1x10xf32>
 }
+
+// -----
+
+hal.executable @ex0 {
+  hal.interface @interface attributes {push_constants = 2 : i32} {
+    hal.interface.binding @s0b0, set=0, binding=0, type="StorageBuffer", access="Read"
+    hal.interface.binding @s0b1, set=0, binding=1, type="StorageBuffer", access="Read|Write"
+  }
+  hal.executable.entry_point @entry0 attributes {
+    interface = @interface,
+    ordinal = 0 : i32,
+    signature = (tensor<?x128xf32>, index) -> tensor<?x128xf32>,
+    workgroup_size = [32 : index, 1 : index, 1 : index]
+  }
+}
+
+// CHECK-LABEL: func @dispatchWithDynamicPushIndex
+// Verifies that an unfoldable index push constant is cast to an i32
+// CHECK-SAME: (%[[T:.+]]:{{.+}}, %[[BS:.+]]:{{.+}})
+func @dispatchWithDynamicPushIndex(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x128xf32> {
+  %cst = constant 128 : index
+  // CHECK: %[[BSI32:.+]] = index_cast %[[BS]] : index to i32
+  // CHECK: hal.command_buffer.push_constants
+  // CHECK-SAME: values = [%[[BSI32]]] : i32
+  %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<?x128xf32>, %arg3 = %bs : index) -> tensor<?x128xf32> {
+    %1 = flow.dispatch @ex0::@entry0[%arg1 : index](%arg2, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
+    flow.return %1 : tensor<?x128xf32>
+  }
+  return %0 : tensor<?x128xf32>
+}

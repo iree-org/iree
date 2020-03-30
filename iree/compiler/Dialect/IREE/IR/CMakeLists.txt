@@ -50,3 +50,12 @@ iree_tablegen_library(
     -gen-op-decls IREEOps.h.inc
     -gen-op-defs IREEOps.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    IREEDialectDocGen
+  TD_FILE
+    "IREEOps.td"
+  OUTS
+    -gen-dialect-doc IREEDialect.md
+)

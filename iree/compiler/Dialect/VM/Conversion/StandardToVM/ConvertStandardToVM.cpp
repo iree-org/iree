@@ -296,14 +296,20 @@ class IndexCastOpConversion : public OpConversionPattern<IndexCastOp> {
 
 class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   using OpConversionPattern::OpConversionPattern;
-  static constexpr unsigned kBits = 32;
-
   LogicalResult matchAndRewrite(
       SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     SelectOpOperandAdaptor srcAdaptor(operands);
-    IntegerType requiredType = IntegerType::get(kBits, srcOp.getContext());
-    if (srcAdaptor.true_value().getType() != requiredType) return failure();
+    IntegerType requiredType = IntegerType::get(32, srcOp.getContext());
+    // Note: This check can correctly just be a verification that
+    // actualType == requiredType, but since the VM type conversion also
+    // maps Indextype to this type, widening the check here reduces red-herrings
+    // when other conversions fail to properly match/rewrite index related ops.
+    // (Otherwise, the dialect converter may report the error as a failure to
+    // legalize the select op depending on order of resolution).
+    auto actualType = srcAdaptor.true_value().getType();
+    if (actualType != requiredType && actualType.isa<IndexType>())
+      return failure();
 
     rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
         srcOp, requiredType, srcAdaptor.condition(), srcAdaptor.true_value(),

@@ -70,17 +70,10 @@ function(iree_lit_test)
     WORKING_DIRECTORY
       "${CMAKE_BINARY_DIR}"
   )
-  set_property(
-    TEST
-      ${_NAME_PATH}
-    PROPERTY
-      ENVIRONMENT
-        "TEST_TMPDIR=${_NAME}_test_tmpdir"
-      LABELS
-        ${_PACKAGE_PATH}
-      REQUIRED_FILES
-        "${_TEST_FILE_PATH}"
-  )
+  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
+  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_PACKAGE_PATH}")
+  set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
+
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
 endfunction()
 

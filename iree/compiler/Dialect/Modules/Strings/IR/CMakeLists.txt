@@ -70,3 +70,12 @@ iree_tablegen_library(
     -gen-op-decls Ops.h.inc
     -gen-op-defs Ops.cc.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    DialectDocGen
+  TD_FILE
+    "Ops.td"
+  OUTS
+    -gen-dialect-doc StringsDialect.md
+)

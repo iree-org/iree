@@ -835,6 +835,55 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
   ];
 }
 
+def HAL_BufferViewRankOp : HAL_PureOp<"buffer_view.rank"> {
+  let summary = [{buffer view rank query}];
+  let description = [{
+    Returns the rank of the buffer view.
+  }];
+
+  let arguments = (ins
+    HAL_BufferView:$buffer_view
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{$buffer_view attr-dict `:` type($result)}];
+}
+
+def HAL_BufferViewDimOp : HAL_PureOp<"buffer_view.dim"> {
+  let summary = [{buffer view dimension value query}];
+  let description = [{
+    Returns the value of the given dimension.
+  }];
+
+  let arguments = (ins
+    HAL_BufferView:$buffer_view,
+    I32Attr:$index
+  );
+  let results = (outs
+    Index:$result
+  );
+
+  let assemblyFormat = [{$buffer_view `,` $index attr-dict `:` type($result)}];
+}
+
+def HAL_BufferViewDimsOp : HAL_PureOp<"buffer_view.dims"> {
+  let summary = [{buffer view multi-value dimension query}];
+  let description = [{
+    Returns each dimension value of the buffer view.
+  }];
+
+  let arguments = (ins
+    HAL_BufferView:$buffer_view
+  );
+  let results = (outs
+    Variadic<Index>:$result
+  );
+
+  let assemblyFormat = [{$buffer_view attr-dict `:` type($result)}];
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::CommandBuffer
 //===----------------------------------------------------------------------===//

@@ -227,7 +227,15 @@ static void recordPushConstants(Value device, Value commandBuffer,
   for (auto inputValue : dispatchOp.operands()) {
     if (inputValue.getType().isa<IndexType>() ||
         inputValue.getType().isa<IntegerType>()) {
-      pushConstantValues.push_back(rewriter.getRemappedValue(inputValue));
+      auto pushConstantValue = rewriter.getRemappedValue(inputValue);
+      // Need an explicit index cast to i32 since the
+      // CommandBufferPushConstantsOp is intrinsically i32 based.
+      if (inputValue.getType().isa<IndexType>()) {
+        pushConstantValue = rewriter.create<IndexCastOp>(
+            dispatchOp.getLoc(), rewriter.getIntegerType(32),
+            pushConstantValue);
+      }
+      pushConstantValues.push_back(pushConstantValue);
     }
   }
   if (pushConstantValues.empty()) {

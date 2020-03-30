@@ -117,15 +117,20 @@ LogicalResult generateSynchronousBody(
         // TODO(laurenzo): Validate shape.
         callOperands.push_back(
             builder.create<HAL::BufferViewBufferOp>(loc, blockArg));
+
         // Now, each dynamic dim is passed individually.
         for (auto dim : llvm::enumerate(input.value().dims)) {
           if (dim.value() >= 0) {
             // Static.
             continue;
           }
-          // Dynamic.
-          // TODO(laurenzo): How to get the shape dim???
-          auto dimValue = builder.create<ConstantIndexOp>(loc, 1);
+          // Dynamic: Get each dim individually.
+          // There is an optimization potential here if more than a couple of
+          // dynamic dims to use the bulk dim query op, but here just get one
+          // at a time as needed.
+          auto dimValue = builder.create<HAL::BufferViewDimOp>(
+              loc, builder.getIndexType(), blockArg,
+              builder.getI32IntegerAttr(dim.index()));
           callOperands.push_back(dimValue);
         }
         break;
@@ -152,7 +157,11 @@ LogicalResult generateSynchronousBody(
   auto callResultsIt = callResults.begin();
   SmallVector<Value, 4> funcResults;
   for (const auto &output : llvm::enumerate(resultDescs)) {
-    assert(callResultsIt != callResults.end());
+    if (callResultsIt == callResults.end()) {
+      return emitError(loc)
+             << "mismatched reflection metadata and function signature "
+             << "(overall arity)";
+    }
     Value nextCallResult = *(callResultsIt++);
     switch (output.value().type) {
       case RawSignatureParser::Type::kBuffer: {
@@ -166,9 +175,12 @@ LogicalResult generateSynchronousBody(
                 builder.create<ConstantIndexOp>(loc, dim.value()));
           } else {
             // Dynamic.
-            assert(callResultsIt != callResults.end());
-            dimValues.push_back(builder.create<IndexCastOp>(
-                loc, builder.getIndexType(), *callResultsIt));
+            if (callResultsIt == callResults.end()) {
+              return emitError(loc)
+                     << "mismatched reflection metadata and function signature "
+                     << "(dynamic dim)";
+            }
+            dimValues.push_back(*callResultsIt);
             ++callResultsIt;
           }
         }

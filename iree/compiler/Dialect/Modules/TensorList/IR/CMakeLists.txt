@@ -71,3 +71,12 @@ iree_tablegen_library(
     -gen-op-decls TensorListOps.h.inc
     -gen-op-defs TensorListOps.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    TensorListDialectDocGen
+  TD_FILE
+    "TensorListOps.td"
+  OUTS
+    -gen-dialect-doc TensorListDialect.md
+)
