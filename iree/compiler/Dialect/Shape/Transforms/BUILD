@@ -22,7 +22,7 @@ cc_library(
     srcs = [
         "CleanupPlaceholders.cpp",
         "ConvertHLOToShapeDialect.cpp",
-        "ExpandFunctionDynamicDims.cpp",
+        "FunctionSignatureExpansion.cpp",
         "HoistShapeCalculations.cpp",
         "MaterializeShapeCalculations.cpp",
         "Passes.cpp",

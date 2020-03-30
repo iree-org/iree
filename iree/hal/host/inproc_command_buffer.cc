@@ -137,14 +137,62 @@ Status InProcCommandBuffer::CopyBuffer(Buffer* source_buffer,
   return OkStatus();
 }
 
-Status InProcCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
+Status InProcCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
+                                          size_t offset,
+                                          absl::Span<const uint32_t> values) {
+  IREE_TRACE_SCOPE0("InProcCommandBuffer::PushConstants");
+  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushConstantsCmd>());
+  cmd->executable_layout = executable_layout;
+  cmd->offset = offset;
+  cmd->values = AppendStructSpan(values);
+  return OkStatus();
+}
+
+Status InProcCommandBuffer::PushDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  IREE_TRACE_SCOPE0("InProcCommandBuffer::PushDescriptorSet");
+  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<PushDescriptorSetCmd>());
+  cmd->executable_layout = executable_layout;
+  cmd->set = set;
+  cmd->bindings = AppendStructSpan(bindings);
+  return OkStatus();
+}
+
+Status InProcCommandBuffer::BindDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    DescriptorSet* descriptor_set,
+    absl::Span<const device_size_t> dynamic_offsets) {
+  IREE_TRACE_SCOPE0("InProcCommandBuffer::BindDescriptorSet");
+  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<BindDescriptorSetCmd>());
+  cmd->executable_layout = executable_layout;
+  cmd->set = set;
+  cmd->descriptor_set = descriptor_set;
+  cmd->dynamic_offsets = AppendStructSpan(dynamic_offsets);
+  return OkStatus();
+}
+
+Status InProcCommandBuffer::Dispatch(Executable* executable,
+                                     int32_t entry_point,
+                                     std::array<uint32_t, 3> workgroups) {
   IREE_TRACE_SCOPE0("InProcCommandBuffer::Dispatch");
   ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DispatchCmd>());
-  cmd->request.executable = dispatch_request.executable;
-  cmd->request.entry_point = dispatch_request.entry_point;
-  cmd->request.workload = dispatch_request.workload;
-  cmd->request.workload_buffer = dispatch_request.workload_buffer;
-  cmd->request.bindings = AppendStructSpan(dispatch_request.bindings);
+  cmd->executable = executable;
+  cmd->entry_point = entry_point;
+  cmd->workgroups = workgroups;
+  return OkStatus();
+}
+
+Status InProcCommandBuffer::DispatchIndirect(Executable* executable,
+                                             int32_t entry_point,
+                                             Buffer* workgroups_buffer,
+                                             device_size_t workgroups_offset) {
+  IREE_TRACE_SCOPE0("InProcCommandBuffer::DispatchIndirect");
+  ASSIGN_OR_RETURN(auto* cmd, AppendCmd<DispatchIndirectCmd>());
+  cmd->executable = executable;
+  cmd->entry_point = entry_point;
+  cmd->workgroups_buffer = workgroups_buffer;
+  cmd->workgroups_offset = workgroups_offset;
   return OkStatus();
 }
 
@@ -249,9 +297,32 @@ Status InProcCommandBuffer::ProcessCmd(CmdHeader* cmd_header,
           cmd->source_buffer, cmd->source_offset, cmd->target_buffer,
           cmd->target_offset, cmd->length);
     }
+    case CmdType::kPushConstants: {
+      auto* cmd = reinterpret_cast<PushConstantsCmd*>(cmd_header + 1);
+      return command_processor->PushConstants(cmd->executable_layout,
+                                              cmd->offset, cmd->values);
+    }
+    case CmdType::kPushDescriptorSet: {
+      auto* cmd = reinterpret_cast<PushDescriptorSetCmd*>(cmd_header + 1);
+      return command_processor->PushDescriptorSet(cmd->executable_layout,
+                                                  cmd->set, cmd->bindings);
+    }
+    case CmdType::kBindDescriptorSet: {
+      auto* cmd = reinterpret_cast<BindDescriptorSetCmd*>(cmd_header + 1);
+      return command_processor->BindDescriptorSet(cmd->executable_layout,
+                                                  cmd->set, cmd->descriptor_set,
+                                                  cmd->dynamic_offsets);
+    }
     case CmdType::kDispatch: {
       auto* cmd = reinterpret_cast<DispatchCmd*>(cmd_header + 1);
-      return command_processor->Dispatch(cmd->request);
+      return command_processor->Dispatch(cmd->executable, cmd->entry_point,
+                                         cmd->workgroups);
+    }
+    case CmdType::kDispatchIndirect: {
+      auto* cmd = reinterpret_cast<DispatchIndirectCmd*>(cmd_header + 1);
+      return command_processor->DispatchIndirect(
+          cmd->executable, cmd->entry_point, cmd->workgroups_buffer,
+          cmd->workgroups_offset);
     }
     default:
       return DataLossErrorBuilder(IREE_LOC)

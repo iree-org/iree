@@ -146,6 +146,16 @@ def HAL_DescriptorTypeAttr :
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_DescriptorSetLayoutUsageType_Immutable : I32EnumAttrCase<"Immutable", 0>;
+def HAL_DescriptorSetLayoutUsageType_PushOnly : I32EnumAttrCase<"PushOnly", 1>;
+def HAL_DescriptorSetLayoutUsageTypeAttr :
+    I32EnumAttr<"DescriptorSetLayoutUsageType", "IREE HAL DescriptorSetLayoutType", [
+      HAL_DescriptorSetLayoutUsageType_Immutable,
+      HAL_DescriptorSetLayoutUsageType_PushOnly,
+    ]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
+}
+
 def HAL_ExecutionStage_None : BitEnumAttrCase<"None", 0x0000>;
 def HAL_ExecutionStage_CommandIssue : BitEnumAttrCase<"CommandIssue", 0x0001>;
 def HAL_ExecutionStage_CommandProcess : BitEnumAttrCase<"CommandProcess", 0x0002>;
@@ -194,6 +204,26 @@ def HAL_AccessScopeBitfieldAttr :
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
+def HAL_ExecutableCachingMode_None : BitEnumAttrCase<"None", 0x0000>;
+def HAL_ExecutableCachingMode_AliasProvidedData : BitEnumAttrCase<"AliasProvidedData", 0x0001>;
+def HAL_ExecutableCachingMode_AllowPersistentCaching : BitEnumAttrCase<"AllowPersistentCaching", 0x0002>;
+def HAL_ExecutableCachingMode_AllowOptimization : BitEnumAttrCase<"AllowOptimization", 0x0004>;
+def HAL_ExecutableCachingMode_EnableDebugging : BitEnumAttrCase<"EnableDebugging", 0x0008>;
+def HAL_ExecutableCachingMode_EnableCoverage : BitEnumAttrCase<"EnableCoverage", 0x0010>;
+def HAL_ExecutableCachingMode_EnableProfiling : BitEnumAttrCase<"EnableProfiling", 0x0020>;
+def HAL_ExecutableCachingModeBitfieldAttr :
+    BitEnumAttr<"ExecutableCachingModeBitfield", "valid ExecutableCachingMode", [
+      HAL_ExecutableCachingMode_None,
+      HAL_ExecutableCachingMode_AliasProvidedData,
+      HAL_ExecutableCachingMode_AllowPersistentCaching,
+      HAL_ExecutableCachingMode_AllowOptimization,
+      HAL_ExecutableCachingMode_EnableDebugging,
+      HAL_ExecutableCachingMode_EnableCoverage,
+      HAL_ExecutableCachingMode_EnableProfiling,
+    ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
 // Values are FourCC codes.
 // See https://github.com/google/iree/tree/master/iree/hal/executable_format.h for more info.
 // https://ubershmekel.github.io/fourcc-to-text/ can be used to generate the
@@ -215,11 +245,15 @@ def HAL_ExecutableFormatAttr :
       HAL_EF_SpirV,
       HAL_EF_LLVM
     ]> {
-  let returnType = "uint32_t";
-  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
+  let returnType = "IREE::HAL::ExecutableFormat";
+  let convertFromStorage = "static_cast<IREE::HAL::ExecutableFormat>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE::HAL";
 }
 // LINT.ThenChange(https://github.com/google/iree/tree/master/iree/hal/executable_format.h:fourcc)
+
+def HAL_ExecutableFormatArrayAttr : TypedArrayAttrBase<
+    HAL_ExecutableFormatAttr,
+    "HAL executable format array attribute">;
 
 //===----------------------------------------------------------------------===//
 // HAL types
@@ -336,6 +370,7 @@ def HAL_ExecutableCache : DialectType<
     that the cache is a no-op and the returned Executables only live for as long
     as the cache does.
   }];
+  let builderCall = "$_builder.getType<IREE::HAL::ExecutableCacheType>()";
 }
 
 def HAL_ExecutableLayout : DialectType<
@@ -405,15 +440,15 @@ def HAL_ExecutableDataAttr : SignlessIntElementsAttr<8>;
 def HAL_ElementTypeAttr : SignlessIntegerAttrBase<
   I32, "element type attribute">;
 
-def HAL_DeviceSize : TypeAlias<I32>;
-def HAL_DeviceSizeAttr : SignlessIntegerAttrBase<I32, "device_size_t">;
+def HAL_DeviceSize : TypeAlias<Index>;
+def HAL_DeviceSizeAttr : IREE_IndexAttrBase<"device_size_t">;
 
-def HAL_HostSize : TypeAlias<I32>;
-def HAL_HostSizeAttr : SignlessIntegerAttrBase<I32, "size_t">;
+def HAL_HostSize : TypeAlias<Index>;
+def HAL_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
 
-def HAL_TimelineValue : TypeAlias<I32>;
+def HAL_TimelineValue : TypeAlias<Index>;
 
-def HAL_Status : TypeAlias<I32>;
+def HAL_Status : TypeAlias<Index>;
 
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
@@ -421,35 +456,16 @@ def HAL_VariableRefAttr : AliasedSymbolRefAttr;
 def HAL_VariableType : AnyTypeOf<[HAL_PrimitiveType, AnyVector, HAL_ObjectType]>;
 def HAL_VariablePtr : PtrOf<HAL_VariableType>;
 
-def HAL_Dim : I<32>;
+def HAL_Dim : TypeAlias<Index>;
 def HAL_Dims : Variadic<HAL_Dim>;
 def HAL_Shape : Variadic<HAL_Dim>;
 
-// TODO(cl/277443143): moving into OpBase.td.
-// A `width`-bit integer elements attribute. The attribute should be
-// ranked and has a shape as specified in `dims`.
-class HAL_RankedIntElementsAttr<int width, list<int> dims> : ElementsAttrBase<
-  CPred<"$_self.isa<DenseIntElementsAttr>() &&"
-      "$_self.cast<DenseIntElementsAttr>().getType()."
-      "getElementType().isSignlessInteger(" # width # ") && "
-      // Check that this is ranked and has the specified shape.
-      "$_self.cast<DenseIntElementsAttr>().getType().hasRank() && "
-      "$_self.cast<DenseIntElementsAttr>().getType().getShape() == "
-      "llvm::ArrayRef<int64_t>({" # StrJoinInt<dims>.result # "})">,
-  width # "-bit integer elements attribute of shape [" #
-  StrJoinInt<dims>.result # "]"> {
-
-  let storageType = [{ DenseIntElementsAttr }];
-  let returnType = [{ DenseIntElementsAttr }];
-
-  let constBuilderCall = "DenseElementsAttr::get("
-    "VectorType::get({" # StrJoinInt<dims>.result #
-    "}, $_builder.getIntegerType(" # width # ")), "
-    "llvm::makeArrayRef($0)).cast<DenseIntElementsAttr>()";
-  let convertFromStorage = "$_self";
+// TODO(benvanik): assert rank 3
+def HAL_WorkgroupSizeAttr : TypedArrayAttrBase<
+    IREE_IndexAttrBase<"size_t">,
+    "index array attribute"> {
+  let constBuilderCall = "$_builder.getIndexArrayAttr($0)";
 }
-
-def HAL_WorkgroupSizeAttr : HAL_RankedIntElementsAttr<32, [3]>;
 
 def HAL_HostBuffer : AnyTypeOf<[
   ByteBufferType,
@@ -504,30 +520,20 @@ def HAL_BufferBarrier : NamedTupleOf<[
 }
 def HAL_BufferBarrierList : TupleOf<[HAL_BufferBarrier]>;
 
-def HAL_DescriptorSetBinding : NamedTupleOf<[
-    NamedTupleElement<0, "binding", I32>,
-    NamedTupleElement<1, "buffer", HAL_Buffer>,
-    NamedTupleElement<2, "buffer_offset", HAL_DeviceSize>,
-    NamedTupleElement<3, "buffer_length", HAL_DeviceSize>,
-  ], "DescriptorSetBinding"> {
-  let typeDescription = [{
-    DescriptorSetBinding struct that can be passed to the
-    hal.descriptor_set.update operation. Constructed via the
-    hal.descriptor_set.make_binding operation.
-  }];
+def HAL_DescriptorSetLayoutBindingAttr :
+  IREE_StructAttr<"descriptor_set_layout_binding",
+                  "DescriptorSetLayoutBindingAttr",
+                  HAL_Dialect, [
+    IREE_StructFieldAttr<"binding", I32Attr>,
+    IREE_StructFieldAttr<"type", HAL_DescriptorTypeAttr>,
+    IREE_StructFieldAttr<"access", HAL_MemoryAccessBitfieldAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
 }
 
-def HAL_DescriptorSetLayoutBinding : NamedTupleOf<[
-    NamedTupleElement<0, "binding", I32>,
-    NamedTupleElement<1, "type", I32>,
-    NamedTupleElement<2, "access", I32>,
-  ], "DescriptorSetLayoutBinding"> {
-  let typeDescription = [{
-    DescriptorSetLayoutBinding struct that can be passed to the
-    hal.descriptor_set_layout.create operation. Constructed via the
-    hal.descriptor_set_layout.make_binding operation.
-  }];
-}
+def HAL_DescriptorSetLayoutBindingArrayAttr : TypedArrayAttrBase<
+    HAL_DescriptorSetLayoutBindingAttr,
+    "HAL descriptor set layout binding array attribute">;
 
 def HAL_FenceValue : NamedTupleOf<[
     NamedTupleElement<0, "fence", HAL_Fence>,

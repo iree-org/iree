@@ -1,18 +1,18 @@
 // RUN: iree-opt -split-input-file -iree-convert-hal-to-vm %s | IreeFileCheck %s
 
 // CHECK-LABEL: @allocatorComputeSize
-func @allocatorComputeSize(%arg0 : !hal.allocator) -> i32 {
-  %c1024 = constant 1024 : i32
+func @allocatorComputeSize(%arg0 : !hal.allocator) -> index {
+  %c1024 = constant 1024 : index
   // CHECK: %0 = vm.call.variadic @hal.allocator.compute_size(%arg0, [%c1024, %c1024], %c32) : (!vm.ref<!hal.allocator>, i32..., i32) -> i32
   %0 = hal.allocator.compute_size %arg0, shape=[%c1024, %c1024], element_type=32
-  return %0 : i32
+  return %0 : index
 }
 
 // -----
 
 // CHECK-LABEL: @allocatorAllocate
 func @allocatorAllocate(%arg0 : !hal.allocator) -> !hal.buffer {
-  %c1024 = constant 1024 : i32
+  %c1024 = constant 1024 : index
   // CHECK: %ref = vm.call @hal.allocator.allocate(%arg0, %c6, %c15, %c1024) : (!vm.ref<!hal.allocator>, i32, i32, i32) -> !vm.ref<!hal.buffer>
   %0 = hal.allocator.allocate %arg0, "HostLocal", "All", %c1024 : !hal.buffer
   return %0 : !hal.buffer

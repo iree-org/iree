@@ -11,17 +11,6 @@ func @shared_device() -> !hal.device {
 
 // -----
 
-// CHECK-LABEL: @cache_executable
-hal.executable @foo {}
-func @cache_executable() -> !hal.executable {
-  %0 = "test_hal.device"() : () -> !hal.device
-  // CHECK: %exe = hal.ex.cache_executable %0, @foo : !hal.executable
-  %exe = hal.ex.cache_executable %0, @foo : !hal.executable
-  return %exe : !hal.executable
-}
-
-// -----
-
 // CHECK-LABEL: @submit_and_wait
 func @submit_and_wait() {
   %0 = "test_hal.device"() : () -> !hal.device

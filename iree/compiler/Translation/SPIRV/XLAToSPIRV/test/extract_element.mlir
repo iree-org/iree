@@ -5,7 +5,7 @@ module {
   // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
   func @extract_element(%arg0: memref<i1>, %arg1: memref<i1>)
-    attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.num_dims = 3 : i32, iree.ordinal = 0 : i32} {
+    attributes  {iree.executable.export, iree.executable.workgroup_size = [32 : index, 1 : index, 1 : index], iree.num_dims = 3 : i32, iree.ordinal = 0 : i32} {
     %0 = "iree.load_input"(%arg0) : (memref<i1>) -> tensor<i1>
     // CHECK: [[ZERO1:%.*]] = spv.constant 0 : i32
     // CHECK: {{%.*}} = spv.AccessChain [[ARG0]]{{\[}}[[ZERO1]]{{\]}}

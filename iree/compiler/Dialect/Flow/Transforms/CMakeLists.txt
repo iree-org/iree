@@ -24,6 +24,7 @@ iree_cc_library(
     "FlattenTuplesInCFG.cpp"
     "FoldCompatibleDispatchRegions.cpp"
     "FormStreams.cpp"
+    "HLOToHLOPreprocessing.cpp"
     "IdentifyDispatchRegions.cpp"
     "LegalizeInputTypes.cpp"
     "MaterializeExportedReflection.cpp"

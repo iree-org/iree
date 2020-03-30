@@ -9,13 +9,15 @@ func @slice_whole_buffer(%src_indices : tensor<2xi64>) -> tensor<3x4xi32> attrib
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[SRC_INDEX_0:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0_i32)
-  // CHECK: [[SRC_INDEX_1:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4_i32)
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c48_i32)
+  // CHECK-DAG: [[SRC_INDEX_0_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0)
+  // CHECK-DAG: [[SRC_INDEX_0:%.+]] = index_cast [[SRC_INDEX_0_I32]]
+  // CHECK-DAG: [[SRC_INDEX_1_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4)
+  // CHECK-DAG: [[SRC_INDEX_1:%.+]] = index_cast [[SRC_INDEX_1_I32]]
+  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c48)
   // CHECK: "vmla.copy"(
   // CHECK-SAME: [[SRC]], %rs3_4, [[SRC_INDEX_0]], [[SRC_INDEX_1]],
-  // CHECK-SAME: [[DST]], %rs3_4, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c3_i32, %c4_i32
+  // CHECK-SAME: [[DST]], %rs3_4, %c0, %c0,
+  // CHECK-SAME: %c3, %c4
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.dynamic-slice"(%input, %src_indices) {
     slice_sizes = dense<[3, 4]> : tensor<2xi64>
@@ -35,13 +37,15 @@ func @slice_whole_stride(%src_indices : tensor<2xi64>) -> tensor<1x4xi32> attrib
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[SRC_INDEX_0:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0_i32)
-  // CHECK: [[SRC_INDEX_1:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4_i32)
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c16_i32)
+  // CHECK-DAG: [[SRC_INDEX_0_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0)
+  // CHECK-DAG: [[SRC_INDEX_0:%.+]] = index_cast [[SRC_INDEX_0_I32]]
+  // CHECK-DAG: [[SRC_INDEX_1_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4)
+  // CHECK-DAG: [[SRC_INDEX_1:%.+]] = index_cast [[SRC_INDEX_1_I32]]
+  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c16)
   // CHECK: "vmla.copy"(
   // CHECK-SAME: [[SRC]], %rs3_4, [[SRC_INDEX_0]], [[SRC_INDEX_1]],
-  // CHECK-SAME: [[DST]], %rs1_4, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c1_i32, %c4_i32
+  // CHECK-SAME: [[DST]], %rs1_4, %c0, %c0,
+  // CHECK-SAME: %c1, %c4
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.dynamic-slice"(%input, %src_indices) {
     slice_sizes = dense<[1, 4]> : tensor<2xi64>
@@ -61,13 +65,15 @@ func @slice_stride_part(%src_indices : tensor<2xi64>) -> tensor<1x2xi32> attribu
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[SRC_INDEX_0:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0_i32)
-  // CHECK: [[SRC_INDEX_1:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4_i32)
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c8_i32)
+  // CHECK-DAG: [[SRC_INDEX_0_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0)
+  // CHECK-DAG: [[SRC_INDEX_0:%.+]] = index_cast [[SRC_INDEX_0_I32]]
+  // CHECK-DAG: [[SRC_INDEX_1_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4)
+  // CHECK-DAG: [[SRC_INDEX_1:%.+]] = index_cast [[SRC_INDEX_1_I32]]
+  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c8)
   // CHECK: "vmla.copy"(
   // CHECK-SAME: [[SRC]], %rs3_4, [[SRC_INDEX_0]], [[SRC_INDEX_1]],
-  // CHECK-SAME: [[DST]], %rs1_2, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c1_i32, %c2_i32
+  // CHECK-SAME: [[DST]], %rs1_2, %c0, %c0,
+  // CHECK-SAME: %c1, %c2
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.dynamic-slice"(%input, %src_indices) {
     slice_sizes = dense<[1, 2]> : tensor<2xi64>
@@ -87,13 +93,15 @@ func @slice_multi_stride(%src_indices : tensor<2xi64>) -> tensor<2x4xi32> attrib
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: [[SRC_INDEX_0:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0_i32)
-  // CHECK: [[SRC_INDEX_1:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4_i32)
-  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c32_i32)
+  // CHECK-DAG: [[SRC_INDEX_0_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c0)
+  // CHECK-DAG: [[SRC_INDEX_0:%.+]] = index_cast [[SRC_INDEX_0_I32]]
+  // CHECK-DAG: [[SRC_INDEX_1_I32:%.+]] = "vmla.buffer.load.i32"([[SRC_INDICES]], %c4)
+  // CHECK-DAG: [[SRC_INDEX_1:%.+]] = index_cast [[SRC_INDEX_1_I32]]
+  // CHECK: [[DST:%.+]] = "vmla.buffer.alloc"(%c32)
   // CHECK: "vmla.copy"(
   // CHECK-SAME: [[SRC]], %rs3_4, [[SRC_INDEX_0]], [[SRC_INDEX_1]],
-  // CHECK-SAME: [[DST]], %rs2_4, %c0_i32, %c0_i32,
-  // CHECK-SAME: %c2_i32, %c4_i32
+  // CHECK-SAME: [[DST]], %rs2_4, %c0, %c0,
+  // CHECK-SAME: %c2, %c4
   // CHECK-SAME: ) {element_type = i32}
   %result = "xla_hlo.dynamic-slice"(%input, %src_indices) {
     slice_sizes = dense<[2, 4]> : tensor<2xi64>

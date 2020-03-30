@@ -14,9 +14,9 @@ func @constValues() -> !vmla.buffer {
 
 // CHECK-LABEL: vm.func @bufferImport
 func @bufferImport() -> !vmla.buffer {
-  %c0 = std.constant 1 : i32
+  %c0 = std.constant 1 : index
   // CHECK: = vm.call @vmla.buffer.alloc(%c1) : (i32) -> !vm.ref<!vmla.buffer>
-  %0 = "vmla.buffer.alloc"(%c0) : (i32) -> !vmla.buffer
+  %0 = "vmla.buffer.alloc"(%c0) : (index) -> !vmla.buffer
   return %0 : !vmla.buffer
 }
 

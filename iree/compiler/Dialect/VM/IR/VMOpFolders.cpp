@@ -309,6 +309,42 @@ OpFoldResult SelectRefOp::fold(ArrayRef<Attribute> operands) {
   return foldSelectOp(*this);
 }
 
+template <typename T>
+static OpFoldResult foldSwitchOp(T op) {
+  APInt indexValue;
+  if (matchPattern(op.index(), m_ConstantInt(&indexValue))) {
+    // Index is constant and we can resolve immediately.
+    int64_t index = indexValue.getSExtValue();
+    if (index < 0 || index >= op.values().size()) {
+      return op.default_value();
+    }
+    return op.values()[index];
+  }
+
+  bool allValuesMatch = true;
+  for (auto value : op.values()) {
+    if (value != op.default_value()) {
+      allValuesMatch = false;
+      break;
+    }
+  }
+  if (allValuesMatch) {
+    // All values (and the default) are the same so just return it regardless of
+    // the provided index.
+    return op.default_value();
+  }
+
+  return {};
+}
+
+OpFoldResult SwitchI32Op::fold(ArrayRef<Attribute> operands) {
+  return foldSwitchOp(*this);
+}
+
+OpFoldResult SwitchRefOp::fold(ArrayRef<Attribute> operands) {
+  return foldSwitchOp(*this);
+}
+
 //===----------------------------------------------------------------------===//
 // Native integer arithmetic
 //===----------------------------------------------------------------------===//

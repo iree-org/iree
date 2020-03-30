@@ -15,14 +15,49 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 
 #include "llvm/ADT/StringExtras.h"
+#include "mlir/IR/Builders.h"
+#include "mlir/IR/DialectImplementation.h"
 
 // Order matters:
 #include "iree/compiler/Dialect/HAL/IR/HALEnums.cpp.inc"
+#include "iree/compiler/Dialect/HAL/IR/HALStructs.cpp.inc"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace HAL {
+
+//===----------------------------------------------------------------------===//
+// Enum utilities
+//===----------------------------------------------------------------------===//
+
+template <typename T>
+using EnumSymbolizerFn = llvm::Optional<T> (*)(llvm::StringRef);
+template <typename T, EnumSymbolizerFn<T> F>
+static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
+                                   Attribute &attr) {
+  Attribute genericAttr;
+  auto loc = parser.getCurrentLocation();
+  if (failed(parser.parseAttribute(genericAttr,
+                                   parser.getBuilder().getNoneType()))) {
+    return parser.emitError(loc)
+           << "failed to parse '" << attrName << "' enum string value";
+  }
+  auto stringAttr = genericAttr.dyn_cast<StringAttr>();
+  if (!stringAttr) {
+    return parser.emitError(loc)
+           << "expected " << attrName << " attribute specified as string";
+  }
+  // TODO(b/145167884): remove F and use symbolizeEnum<T> instead.
+  auto symbolized = F(stringAttr.getValue());
+  if (!symbolized.hasValue()) {
+    return parser.emitError(loc)
+           << "failed to parse '" << attrName << "' enum value";
+  }
+  attr = parser.getBuilder().getI32IntegerAttr(
+      static_cast<int32_t>(symbolized.getValue()));
+  return success();
+}
 
 // LINT.IfChange(element_type)
 namespace {
@@ -64,6 +99,39 @@ IntegerAttr getElementTypeAttr(Type type) {
   if (!elementType) return {};
   return IntegerAttr::get(IntegerType::get(32, type.getContext()),
                           elementType.getValue());
+}
+
+//===----------------------------------------------------------------------===//
+// Attribute printing and parsing
+//===----------------------------------------------------------------------===//
+
+// static
+Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
+  auto b = p.getBuilder();
+  IntegerAttr bindingAttr;
+  IntegerAttr typeAttr;
+  IntegerAttr accessAttr;
+  if (failed(p.parseLess()) ||
+      failed(p.parseAttribute(bindingAttr, b.getIntegerType(32))) ||
+      failed(p.parseComma()) ||
+      failed(parseEnumAttr<DescriptorType, symbolizeDescriptorType>(
+          p, "type", typeAttr)) ||
+      failed(p.parseComma()) ||
+      failed(parseEnumAttr<MemoryAccessBitfield, symbolizeMemoryAccessBitfield>(
+          p, "access", accessAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(bindingAttr, typeAttr, accessAttr);
+}
+
+void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<";
+  os << binding() << ", ";
+  os << "\"" << stringifyDescriptorType(type()) << "\", ";
+  os << "\"" << stringifyMemoryAccessBitfield(access()) << "\"";
+  os << ">";
 }
 
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"

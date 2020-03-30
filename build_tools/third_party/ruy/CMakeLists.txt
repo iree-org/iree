@@ -13,7 +13,7 @@
 # limitations under the License.
 
 set(RUY_SRC_ROOT
-  "${IREE_ROOT_DIR}/third_party/tensorflow/tensorflow/lite/experimental/ruy/"
+  "${IREE_ROOT_DIR}/third_party/ruy/ruy/"
 )
 set(GEMMLOWP_SRC_ROOT
   "${IREE_ROOT_DIR}/third_party/gemmlowp/"
@@ -23,8 +23,7 @@ set(GEMMLOWP_SRC_ROOT
 # TODO(benvanik): if andoird_arm64 then add -O3
 iree_select_compiler_opts(RUY_COPTS_BASE
   ALL
-    "-I${IREE_ROOT_DIR}/third_party/tensorflow"
-    "-I${IREE_ROOT_DIR}/third_party/gemmlowp"
+    "-I${IREE_ROOT_DIR}/third_party/ruy"
   CLANG_OR_GCC
     "-O3"
     "-Wno-shadow"
@@ -962,7 +961,5 @@ external_cc_library(
     ruy::trmul
     ruy::trmul_params
     ruy::tune
-  INCLUDES
-    "${IREE_ROOT_DIR}/third_party/tensorflow"
   PUBLIC
 )

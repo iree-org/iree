@@ -140,6 +140,24 @@ StatusOr<VmaBuffer*> DirectCommandBuffer::CastBuffer(Buffer* buffer) const {
   return static_cast<VmaBuffer*>(buffer->allocated_buffer());
 }
 
+StatusOr<NativeDescriptorSet*> DirectCommandBuffer::CastDescriptorSet(
+    DescriptorSet* descriptor_set) const {
+  // TODO(benvanik): assert the descriptor_set is valid.
+  return static_cast<NativeDescriptorSet*>(descriptor_set);
+}
+
+StatusOr<PipelineExecutableLayout*> DirectCommandBuffer::CastExecutableLayout(
+    ExecutableLayout* executable_layout) const {
+  // TODO(benvanik): assert the executable_layout is valid.
+  return static_cast<PipelineExecutableLayout*>(executable_layout);
+}
+
+StatusOr<PipelineExecutable*> DirectCommandBuffer::CastExecutable(
+    Executable* executable) const {
+  // TODO(benvanik): assert the executable is valid.
+  return static_cast<PipelineExecutable*>(executable);
+}
+
 Status DirectCommandBuffer::Begin() {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::Begin");
 
@@ -358,36 +376,97 @@ Status DirectCommandBuffer::CopyBuffer(Buffer* source_buffer,
   return OkStatus();
 }
 
-Status DirectCommandBuffer::Dispatch(const DispatchRequest& dispatch_request) {
+Status DirectCommandBuffer::PushConstants(ExecutableLayout* executable_layout,
+                                          size_t offset,
+                                          absl::Span<const uint32_t> values) {
+  IREE_TRACE_SCOPE0("DirectCommandBuffer::PushConstants");
+  ASSIGN_OR_RETURN(auto* device_executable_layout,
+                   CastExecutableLayout(executable_layout));
+
+  syms()->vkCmdPushConstants(
+      command_buffer_, device_executable_layout->handle(),
+      VK_SHADER_STAGE_COMPUTE_BIT, offset * sizeof(uint32_t),
+      values.size() * sizeof(uint32_t), values.data());
+
+  return OkStatus();
+}
+
+Status DirectCommandBuffer::PushDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  IREE_TRACE_SCOPE0("DirectCommandBuffer::PushDescriptorSet");
+  ASSIGN_OR_RETURN(auto* device_executable_layout,
+                   CastExecutableLayout(executable_layout));
+
+  // Either allocate, update, and bind a descriptor set or use push descriptor
+  // sets to use the command buffer pool when supported.
+  return descriptor_set_arena_.BindDescriptorSet(
+      command_buffer_, device_executable_layout, set, bindings);
+}
+
+Status DirectCommandBuffer::BindDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    DescriptorSet* descriptor_set,
+    absl::Span<const device_size_t> dynamic_offsets) {
+  IREE_TRACE_SCOPE0("DirectCommandBuffer::BindDescriptorSet");
+  ASSIGN_OR_RETURN(auto* device_executable_layout,
+                   CastExecutableLayout(executable_layout));
+  ASSIGN_OR_RETURN(auto* device_descriptor_set,
+                   CastDescriptorSet(descriptor_set));
+
+  // Vulkan takes uint32_t as the size here, unlike everywhere else.
+  absl::InlinedVector<uint32_t, 4> dynamic_offsets_i32(dynamic_offsets.size());
+  for (int i = 0; i < dynamic_offsets.size(); ++i) {
+    dynamic_offsets_i32[i] = static_cast<uint32_t>(dynamic_offsets[i]);
+  }
+
+  std::array<VkDescriptorSet, 1> descriptor_sets = {
+      device_descriptor_set->handle()};
+  syms()->vkCmdBindDescriptorSets(
+      command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
+      device_executable_layout->handle(), set, descriptor_sets.size(),
+      descriptor_sets.data(), dynamic_offsets_i32.size(),
+      dynamic_offsets_i32.data());
+
+  return OkStatus();
+}
+
+Status DirectCommandBuffer::Dispatch(Executable* executable,
+                                     int32_t entry_point,
+                                     std::array<uint32_t, 3> workgroups) {
   IREE_TRACE_SCOPE0("DirectCommandBuffer::Dispatch");
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.
-  auto* executable =
-      static_cast<PipelineExecutable*>(dispatch_request.executable);
-  ASSIGN_OR_RETURN(VkPipeline pipeline, executable->GetPipelineForEntryPoint(
-                                            dispatch_request.entry_point));
+  ASSIGN_OR_RETURN(auto* device_executable, CastExecutable(executable));
+  ASSIGN_OR_RETURN(VkPipeline pipeline,
+                   device_executable->GetPipelineForEntryPoint(entry_point));
   syms()->vkCmdBindPipeline(command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
                             pipeline);
 
-  // Either allocate, update, and bind a descriptor set or use push descriptor
-  // sets to use the command buffer pool when supported.
-  RETURN_IF_ERROR(descriptor_set_arena_.BindDescriptorSet(
-      command_buffer_, executable, dispatch_request.bindings));
+  syms()->vkCmdDispatch(command_buffer_, workgroups[0], workgroups[1],
+                        workgroups[2]);
+  return OkStatus();
+}
 
-  // TODO(benvanik): divide workload by caps and issue multiple dispatches.
-  // TODO(benvanik): track local workgroup/subgroup size and divide into groups.
-  if (dispatch_request.workload_buffer) {
-    return UnimplementedErrorBuilder(IREE_LOC)
-           << "Dynamic dispatches not yet implemented";
-  }
-  uint32_t group_count_x = dispatch_request.workload[0];
-  uint32_t group_count_y = dispatch_request.workload[1];
-  uint32_t group_count_z = dispatch_request.workload[2];
+Status DirectCommandBuffer::DispatchIndirect(Executable* executable,
+                                             int32_t entry_point,
+                                             Buffer* workgroups_buffer,
+                                             device_size_t workgroups_offset) {
+  IREE_TRACE_SCOPE0("DirectCommandBuffer::DispatchIndirect");
 
-  syms()->vkCmdDispatch(command_buffer_, group_count_x, group_count_y,
-                        group_count_z);
+  // Get the compiled and linked pipeline for the specified entry point and
+  // bind it to the command buffer.
+  ASSIGN_OR_RETURN(auto* device_executable, CastExecutable(executable));
+  ASSIGN_OR_RETURN(VkPipeline pipeline,
+                   device_executable->GetPipelineForEntryPoint(entry_point));
+  syms()->vkCmdBindPipeline(command_buffer_, VK_PIPELINE_BIND_POINT_COMPUTE,
+                            pipeline);
 
+  ASSIGN_OR_RETURN(auto* workgroups_device_buffer,
+                   CastBuffer(workgroups_buffer));
+  syms()->vkCmdDispatchIndirect(
+      command_buffer_, workgroups_device_buffer->handle(), workgroups_offset);
   return OkStatus();
 }
 

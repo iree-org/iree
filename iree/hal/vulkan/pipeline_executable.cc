@@ -60,13 +60,47 @@ PopulateSpecializationInfo(const VkSpecializationInfoDef* info_def) {
   return {std::move(entries), std::move(data)};
 }
 
+class VkShaderModuleHandle : public RefObject<VkShaderModuleHandle> {
+ public:
+  explicit VkShaderModuleHandle(const ref_ptr<VkDeviceHandle>& logical_device)
+      : logical_device_(add_ref(logical_device)) {}
+  ~VkShaderModuleHandle() { reset(); }
+
+  VkShaderModuleHandle(const VkShaderModuleHandle&) = delete;
+  VkShaderModuleHandle& operator=(const VkShaderModuleHandle&) = delete;
+  VkShaderModuleHandle(VkShaderModuleHandle&& other) noexcept
+      : logical_device_(std::move(other.logical_device_)),
+        value_(absl::exchange(other.value_,
+                              static_cast<VkShaderModule>(VK_NULL_HANDLE))) {}
+  VkShaderModuleHandle& operator=(VkShaderModuleHandle&& other) {
+    std::swap(logical_device_, other.logical_device_);
+    std::swap(value_, other.value_);
+    return *this;
+  }
+
+  void reset() {
+    if (value_ == VK_NULL_HANDLE) return;
+    logical_device_->syms()->vkDestroyShaderModule(
+        *logical_device_, value_, logical_device_->allocator());
+    value_ = VK_NULL_HANDLE;
+  }
+
+  VkShaderModule value() const noexcept { return value_; }
+  VkShaderModule* mutable_value() noexcept { return &value_; }
+  operator VkShaderModule() const noexcept { return value_; }
+
+ private:
+  ref_ptr<VkDeviceHandle> logical_device_;
+  VkShaderModule value_ = VK_NULL_HANDLE;
+};
+
 }  // namespace
 
 // static
 StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
-    const ref_ptr<VkDeviceHandle>& logical_device,
-    VkPipelineCache pipeline_cache, VkPipelineLayout pipeline_layout,
-    PipelineDescriptorSets descriptor_sets, ExecutableCachingModeBitfield mode,
+    ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
+    PipelineExecutableLayout* executable_layout,
+    ExecutableCachingModeBitfield mode,
     const SpirVExecutableDef& spirv_executable_def) {
   IREE_TRACE_SCOPE0("PipelineExecutable::Create");
   const auto& syms = logical_device->syms();
@@ -86,17 +120,10 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
   shader_module_create_info.flags = 0;
   shader_module_create_info.codeSize = code.size() * sizeof(uint32_t);
   shader_module_create_info.pCode = code.data();
-  VkShaderModule shader_module = VK_NULL_HANDLE;
-  VK_RETURN_IF_ERROR(
-      syms->vkCreateShaderModule(*logical_device, &shader_module_create_info,
-                                 logical_device->allocator(), &shader_module));
-
-  // We only need to keep this around during pipeline creation so ensure we
-  // always clean it up when we exit this function.
-  auto shader_module_cleanup = MakeCleanup([&logical_device, shader_module]() {
-    logical_device->syms()->vkDestroyShaderModule(
-        *logical_device, shader_module, logical_device->allocator());
-  });
+  VkShaderModuleHandle shader_module(add_ref(logical_device));
+  VK_RETURN_IF_ERROR(syms->vkCreateShaderModule(
+      *logical_device, &shader_module_create_info, logical_device->allocator(),
+      shader_module.mutable_value()));
 
   // Specialization info is currently constant against all entry points.
   std::vector<VkSpecializationMapEntry> spec_entries;
@@ -127,7 +154,7 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
     } else {
       pipeline_create_info.flags |= VK_PIPELINE_CREATE_DERIVATIVE_BIT;
     }
-    pipeline_create_info.layout = pipeline_layout;
+    pipeline_create_info.layout = executable_layout->handle();
     pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
     pipeline_create_info.basePipelineIndex = 0;
     auto& stage_create_info = pipeline_create_info.stage;
@@ -152,21 +179,17 @@ StatusOr<ref_ptr<PipelineExecutable>> PipelineExecutable::Create(
       pipelines.data()));
   IREE_ENABLE_LEAK_CHECKS();
 
-  auto executable =
-      make_ref<PipelineExecutable>(CtorKey{}, logical_device, pipeline_layout,
-                                   descriptor_sets, std::move(pipelines));
+  auto executable = make_ref<PipelineExecutable>(std::move(logical_device),
+                                                 std::move(pipelines));
   executable->tag_ =
       spirv_executable_def.tag() ? spirv_executable_def.tag()->str() : "";
   return executable;
 }
 
 PipelineExecutable::PipelineExecutable(
-    CtorKey ctor_key, const ref_ptr<VkDeviceHandle>& logical_device,
-    VkPipelineLayout pipeline_layout, PipelineDescriptorSets descriptor_sets,
+    ref_ptr<VkDeviceHandle> logical_device,
     absl::InlinedVector<VkPipeline, 1> pipelines)
-    : logical_device_(add_ref(logical_device)),
-      pipeline_layout_(pipeline_layout),
-      descriptor_sets_(descriptor_sets),
+    : logical_device_(std::move(logical_device)),
       pipelines_(std::move(pipelines)) {}
 
 PipelineExecutable::~PipelineExecutable() {

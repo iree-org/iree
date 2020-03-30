@@ -21,6 +21,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "MaterializeInterfaces.cpp"
+    "MaterializeResourceCaches.cpp"
     "Passes.cpp"
     "PublicAbiGeneration.cpp"
     "RewriteLegacyIO.cpp"

@@ -77,8 +77,8 @@ typedef struct iree_vm_stack_frame {
   iree_vm_function_t function;
   // Cached module state pointer for the module containing |function|.
   iree_vm_module_state_t* module_state;
-  // Offset within the function.
-  iree_vm_source_offset_t offset;
+  // Current program counter (byte offset) within the function.
+  iree_vm_source_offset_t pc;
   // Registers used within the frame.
   // TODO(benvanik): pointer to an arena? avoids fixed overheads.
   iree_vm_registers_t registers;

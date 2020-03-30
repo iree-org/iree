@@ -14,6 +14,7 @@
 
 #include "iree/hal/command_buffer_validation.h"
 
+#include "absl/strings/str_join.h"
 #include "iree/base/logging.h"
 #include "iree/base/status.h"
 
@@ -62,7 +63,20 @@ class ValidatingCommandBuffer : public CommandBuffer {
   Status CopyBuffer(Buffer* source_buffer, device_size_t source_offset,
                     Buffer* target_buffer, device_size_t target_offset,
                     device_size_t length) override;
-  Status Dispatch(const DispatchRequest& dispatch_request) override;
+  Status PushConstants(ExecutableLayout* executable_layout, size_t offset,
+                       absl::Span<const uint32_t> values) override;
+  Status PushDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      absl::Span<const DescriptorSet::Binding> bindings) override;
+  Status BindDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      DescriptorSet* descriptor_set,
+      absl::Span<const device_size_t> dynamic_offsets) override;
+  Status Dispatch(Executable* executable, int32_t entry_point,
+                  std::array<uint32_t, 3> workgroups) override;
+  Status DispatchIndirect(Executable* executable, int32_t entry_point,
+                          Buffer* workgroups_buffer,
+                          device_size_t workgroups_offset) override;
 
  private:
   // Returns a failure if the queue does not support the given caps.
@@ -80,6 +94,10 @@ class ValidatingCommandBuffer : public CommandBuffer {
   // Validates that the range provided is within the given buffer.
   Status ValidateRange(Buffer* buffer, device_size_t byte_offset,
                        device_size_t byte_length) const;
+
+  // Validates that the currently bound descriptor sets are valid for the given
+  // executable entry point.
+  Status ValidateDispatchBindings(Executable* executable, int32_t entry_point);
 
   ref_ptr<CommandBuffer> impl_;
 };
@@ -368,28 +386,108 @@ Status ValidatingCommandBuffer::CopyBuffer(Buffer* source_buffer,
                            target_offset, length);
 }
 
-Status ValidatingCommandBuffer::Dispatch(
-    const DispatchRequest& dispatch_request) {
-  DVLOG(3) << "CommandBuffer::Dispatch(?)";
+Status ValidatingCommandBuffer::PushConstants(
+    ExecutableLayout* executable_layout, size_t offset,
+    absl::Span<const uint32_t> values) {
+  DVLOG(3) << "CommandBuffer::PushConstants("
+           << executable_layout->DebugString() << ", " << offset << ", "
+           << absl::StrJoin(values, ", ") << ")";
 
   RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
 
+  // TODO(benvanik): validate offset and value count with layout.
+
+  return impl_->PushConstants(executable_layout, offset, values);
+}
+
+Status ValidatingCommandBuffer::PushDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  DVLOG(3) << "CommandBuffer::PushDescriptorSet("
+           << executable_layout->DebugString() << ", " << set << ", ["
+           << absl::StrJoin(bindings, ", ", DescriptorSetBindingFormatter())
+           << "])";
+
+  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+
+  // TODO(benvanik): validate set index.
+  // TODO(benvanik): validate bindings.
+
+  return impl_->PushDescriptorSet(executable_layout, set, bindings);
+}
+
+Status ValidatingCommandBuffer::BindDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    DescriptorSet* descriptor_set,
+    absl::Span<const device_size_t> dynamic_offsets) {
+  DVLOG(3) << "CommandBuffer::BindDescriptorSet("
+           << executable_layout->DebugString() << ", " << set << ", "
+           << descriptor_set->DebugString() << ", ["
+           << absl::StrJoin(dynamic_offsets, ", ") << "])";
+
+  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+
+  // TODO(benvanik): validate set index.
+  // TODO(benvanik): validate dynamic offsets (both count and offsets).
+
+  return impl_->BindDescriptorSet(executable_layout, set, descriptor_set,
+                                  dynamic_offsets);
+}
+
+Status ValidatingCommandBuffer::ValidateDispatchBindings(Executable* executable,
+                                                         int32_t entry_point) {
   // Validate all buffers referenced have compatible memory types, access
   // rights, and usage.
-  for (const auto& binding : dispatch_request.bindings) {
-    RETURN_IF_ERROR(ValidateCompatibleMemoryType(binding.buffer,
-                                                 MemoryType::kDeviceVisible))
-        << "input buffer: " << MemoryAccessString(binding.access) << " "
-        << binding.buffer->DebugStringShort();
-    RETURN_IF_ERROR(ValidateAccess(binding.buffer, binding.access));
-    RETURN_IF_ERROR(ValidateUsage(binding.buffer, BufferUsage::kDispatch));
-    // TODO(benvanik): validate it matches the executable expectations.
-    // TODO(benvanik): validate buffer contains enough data for shape+size.
-  }
+  // TODO(benvanik): add validation by walking executable layout.
+  // for (const auto& binding : bindings) {
+  //   RETURN_IF_ERROR(ValidateCompatibleMemoryType(binding.buffer,
+  //                                                MemoryType::kDeviceVisible))
+  //       << "input buffer: " << MemoryAccessString(binding.access) << " "
+  //       << binding.buffer->DebugStringShort();
+  //   RETURN_IF_ERROR(ValidateAccess(binding.buffer, binding.access));
+  //   RETURN_IF_ERROR(ValidateUsage(binding.buffer, BufferUsage::kDispatch));
+  // TODO(benvanik): validate it matches the executable expectations.
+  // TODO(benvanik): validate buffer contains enough data for shape+size.
+  // }
 
-  // TODO(benvanik): validate no aliasing?
+  // TODO(benvanik): validate no aliasing between inputs/outputs.
 
-  return impl_->Dispatch(dispatch_request);
+  return OkStatus();
+}
+
+Status ValidatingCommandBuffer::Dispatch(Executable* executable,
+                                         int32_t entry_point,
+                                         std::array<uint32_t, 3> workgroups) {
+  DVLOG(3) << "CommandBuffer::Dispatch(" << executable->DebugString() << ", "
+           << entry_point << ", [" << absl::StrJoin(workgroups, ", ") << "])";
+
+  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+  RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
+
+  return impl_->Dispatch(executable, entry_point, workgroups);
+}
+
+Status ValidatingCommandBuffer::DispatchIndirect(
+    Executable* executable, int32_t entry_point, Buffer* workgroups_buffer,
+    device_size_t workgroups_offset) {
+  DVLOG(3) << "CommandBuffer::DispatchIndirect(" << executable->DebugString()
+           << ", " << entry_point << ", " << workgroups_buffer->DebugString()
+           << ", " << workgroups_offset << ")";
+
+  RETURN_IF_ERROR(ValidateCategories(CommandCategory::kDispatch));
+
+  RETURN_IF_ERROR(ValidateCompatibleMemoryType(workgroups_buffer,
+                                               MemoryType::kDeviceVisible))
+      << "input buffer: " << workgroups_buffer->DebugStringShort();
+  RETURN_IF_ERROR(ValidateAccess(workgroups_buffer, MemoryAccess::kRead));
+  RETURN_IF_ERROR(ValidateUsage(workgroups_buffer, BufferUsage::kDispatch));
+  RETURN_IF_ERROR(ValidateRange(workgroups_buffer, workgroups_offset,
+                                sizeof(uint32_t) * 3));
+
+  RETURN_IF_ERROR(ValidateDispatchBindings(executable, entry_point));
+
+  return impl_->DispatchIndirect(executable, entry_point, workgroups_buffer,
+                                 workgroups_offset);
 }
 
 }  // namespace

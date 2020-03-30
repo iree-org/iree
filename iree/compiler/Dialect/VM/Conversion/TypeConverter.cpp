@@ -50,10 +50,12 @@ VMTypeConverter::VMTypeConverter() {
     }
     return llvm::None;
   });
-  // Convert index types.
+
+  // Convert index types to i32.
   addConversion([](IndexType indexType) -> Optional<Type> {
     return IntegerType::get(32, indexType.getContext());
   });
+
   // All ref_ptr types are passed through unmodified.
   addConversion([this](IREE::PtrType type) -> Type {
     // Recursively handle pointer target types (we want to convert ptr<index> to
@@ -64,6 +66,7 @@ VMTypeConverter::VMTypeConverter() {
     }
     return IREE::PtrType::get(targetType);
   });
+
   // Convert ranked shape types (expanding all dims).
   addConversion(
       [](Shape::RankedShapeType rankedShape, SmallVectorImpl<Type> &results) {

@@ -228,6 +228,18 @@ class VMLABatchMatMulImportOpConversion
            getTypedTypeStr(op.dst_type());
   }
 };
+
+class VMLAConvImportOpConversion
+    : public VMLAImportOpConversion<IREE::VMLA::ConvOp> {
+ public:
+  using VMLAImportOpConversion<IREE::VMLA::ConvOp>::VMLAImportOpConversion;
+
+  std::string getImportSuffix(IREE::VMLA::ConvOp op) const override {
+    return std::string(".") + getTypedTypeStr(op.input_type()) +
+           getTypedTypeStr(op.filter_type()) + std::string(".") +
+           getTypedTypeStr(op.dst_type());
+  }
+};
 }  // namespace
 
 void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
@@ -289,11 +301,14 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
                                                  typeConverter, "vmla.convert");
   patterns.insert<VMLABatchMatMulImportOpConversion>(
       context, importSymbols, typeConverter, "vmla.batch.matmul");
+  patterns.insert<VMLAConvImportOpConversion>(context, importSymbols,
+                                              typeConverter, "vmla.conv");
 
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceSumOp, "vmla.reduce.sum");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMinOp, "vmla.reduce.min");
   VMLA_TYPED_IMPORT_OP(IREE::VMLA::ReduceMaxOp, "vmla.reduce.max");
 
+  VMLA_IMPORT_OP(IREE::VMLA::InterfaceConstOp, "vmla.interface.const");
   VMLA_IMPORT_OP(IREE::VMLA::InterfaceBindingOp, "vmla.interface.binding");
 }
 

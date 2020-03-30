@@ -16,7 +16,7 @@ func @func(%arg0 : i32) -> i32 attributes { iree.module.export } {
 // CHECK-NEXT: bytecode_length: 5
 // CHECK-NEXT: i32_register_count: 1
 // CHECK-NEXT: ref_register_count: 0
-// CHECK: bytecode_data: [ 84, 1, 0, 0, 0, 84, 1, 0, 0, 0 ]
+// CHECK: bytecode_data: [ 84, 1, 0, 0,
 }
 
 // -----

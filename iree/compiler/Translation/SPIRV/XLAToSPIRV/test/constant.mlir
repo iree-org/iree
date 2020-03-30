@@ -2,7 +2,7 @@
 
 module {
   func @const_f32(%arg0: memref<2x3xf32>, %arg1: memref<2x3xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     // CHECK: [[CONST:%.*]] = spv.constant dense<[1.000000e+00, 2.000000e+00, 3.000000e+00, 4.000000e+00, 5.000000e+00, 6.000000e+00]> : tensor<6xf32> : !spv.array<6 x f32 [4]>
     // CHECK: [[VAR:%.*]] = spv.Variable init([[CONST]])
     // CHECK: [[NUMPTR:%.*]] = spv.AccessChain [[VAR]]
@@ -19,7 +19,7 @@ module {
 
 module {
   func @splat_const_f32(%arg0: memref<2x3xf32>, %arg1: memref<2x3xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     // CHECK: spv.constant 1.000000e+00 : f32
     %0 = iree.load_input(%arg0 : memref<2x3xf32>) : tensor<2x3xf32>
     %1 = "xla_hlo.constant"() {value = dense<1.0> : tensor<2x3xf32>} : () -> (tensor<2x3xf32>)
@@ -33,7 +33,7 @@ module {
 
 module {
   func @const_i32(%arg0: memref<2x3xi32>, %arg1: memref<2x3xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     // CHECK: [[CONST:%.*]] = spv.constant dense<[1, 2, 3, 4, 5, 6]> : tensor<6xi32> : !spv.array<6 x i32 [4]>
     // CHECK: [[VAR:%.*]] = spv.Variable init([[CONST]])
     // CHECK: [[NUMPTR:%.*]] = spv.AccessChain [[VAR]]

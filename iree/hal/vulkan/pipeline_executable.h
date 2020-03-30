@@ -23,39 +23,26 @@
 #include "iree/base/status.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/executable_cache.h"
+#include "iree/hal/executable_layout.h"
 #include "iree/hal/executable_spec.h"
 #include "iree/hal/vulkan/handle_util.h"
+#include "iree/hal/vulkan/native_descriptor_set.h"
+#include "iree/hal/vulkan/pipeline_executable_layout.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 
 namespace iree {
 namespace hal {
 namespace vulkan {
 
-struct PipelineDescriptorSets {
-  uint32_t buffer_binding_set;
-  VkDescriptorSetLayout buffer_binding_set_layout;
-  absl::InlinedVector<uint32_t, 8> buffer_binding_set_map;
-};
-
 class PipelineExecutable final : public Executable {
  public:
   static StatusOr<ref_ptr<PipelineExecutable>> Create(
-      const ref_ptr<VkDeviceHandle>& logical_device,
-      VkPipelineCache pipeline_cache, VkPipelineLayout pipeline_layout,
-      PipelineDescriptorSets descriptor_sets,
+      ref_ptr<VkDeviceHandle> logical_device, VkPipelineCache pipeline_cache,
+      PipelineExecutableLayout* executable_layout,
       ExecutableCachingModeBitfield mode,
       const SpirVExecutableDef& spirv_executable_def);
 
-  // Private constructor.
-  struct CtorKey {
-   private:
-    friend class PipelineExecutable;
-    CtorKey() = default;
-  };
-  PipelineExecutable(CtorKey ctor_key,
-                     const ref_ptr<VkDeviceHandle>& logical_device,
-                     VkPipelineLayout pipeline_layout,
-                     PipelineDescriptorSets descriptor_sets,
+  PipelineExecutable(ref_ptr<VkDeviceHandle> logical_device,
                      absl::InlinedVector<VkPipeline, 1> pipelines);
   ~PipelineExecutable() override;
 
@@ -65,17 +52,10 @@ class PipelineExecutable final : public Executable {
 
   bool supports_debugging() const override { return false; }
 
-  VkPipelineLayout pipeline_layout() const { return pipeline_layout_; }
-  const PipelineDescriptorSets& descriptor_sets() const {
-    return descriptor_sets_;
-  }
-
   StatusOr<VkPipeline> GetPipelineForEntryPoint(int entry_ordinal) const;
 
  private:
   ref_ptr<VkDeviceHandle> logical_device_;
-  VkPipelineLayout pipeline_layout_;
-  PipelineDescriptorSets descriptor_sets_;
   std::string tag_;
 
   // One pipeline per entry point.

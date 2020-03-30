@@ -41,17 +41,6 @@ std::vector<uint32_t> readEmbeddedKernelCode(std::string kernelName) {
   return {};
 }
 
-// Adds a storage buffer binding to the descriptor set layout.
-void addDescriptorSetLayoutBinding(uint32_t binding,
-                                   iree::VkDescriptorSetLayoutDefT *dsl) {
-  auto bindingDef = std::make_unique<iree::VkDescriptorSetLayoutBindingDefT>();
-  bindingDef->binding = binding;
-  bindingDef->descriptor_count = 1;
-  bindingDef->descriptor_type = 7;       // VK_DESCRIPTOR_TYPE_STORAGE_BUFFER
-  bindingDef->stage_flags = 0x00000020;  // VK_SHADER_STAGE_COMPUTE_BIT
-  dsl->bindings.push_back(std::move(bindingDef));
-}
-
 // Adds a specialization map entry for |constant_id| set to a 4-byte int value.
 void addSpecializationMapEntry(
     uint32_t constant_id, uint32_t value,
@@ -107,16 +96,6 @@ LogicalResult buildReductionExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
   outDef->entry_points = {"main"};
 
   outDef->code = readEmbeddedKernelCode(kernelName);
-
-  // arg0, arg1, ret0
-  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
-  pipelineLayoutDef->buffer_binding_set = 0;
-  auto dsl = std::make_unique<iree::VkDescriptorSetLayoutDefT>();
-  addDescriptorSetLayoutBinding(0, dsl.get());
-  addDescriptorSetLayoutBinding(1, dsl.get());
-  addDescriptorSetLayoutBinding(2, dsl.get());
-  pipelineLayoutDef->descriptor_set_layouts.push_back(std::move(dsl));
-  outDef->pipeline_layout = std::move(pipelineLayoutDef);
 
   // See the shader source for documentation on the values of A/B/C/R.
   int64_t reductionDimension =
@@ -242,15 +221,6 @@ LogicalResult buildConvExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
   outDef->tag = "__conv2d_nhwc__";
   outDef->entry_points = {"main"};
   outDef->code = readEmbeddedKernelCode("conv2d_nhwc.spv");
-
-  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
-  pipelineLayoutDef->buffer_binding_set = 0;
-  auto dsl = std::make_unique<iree::VkDescriptorSetLayoutDefT>();
-  addDescriptorSetLayoutBinding(0, dsl.get());
-  addDescriptorSetLayoutBinding(1, dsl.get());
-  addDescriptorSetLayoutBinding(2, dsl.get());
-  pipelineLayoutDef->descriptor_set_layouts.push_back(std::move(dsl));
-  outDef->pipeline_layout = std::move(pipelineLayoutDef);
   outDef->specialization_info = std::move(specializationInfoDef);
 
   return success();
@@ -269,16 +239,6 @@ LogicalResult buildMatMulExecutable(ModuleOp moduleOp, FuncOp entryFuncOp,
 
   // TODO(benvanik): specialize (template on shapes/types/etc).
   outDef->code = readEmbeddedKernelCode("matmul.spv");
-
-  // arg0, arg1, ret0
-  auto pipelineLayoutDef = std::make_unique<iree::VkPipelineLayoutDefT>();
-  pipelineLayoutDef->buffer_binding_set = 0;
-  auto dsl = std::make_unique<iree::VkDescriptorSetLayoutDefT>();
-  addDescriptorSetLayoutBinding(0, dsl.get());
-  addDescriptorSetLayoutBinding(1, dsl.get());
-  addDescriptorSetLayoutBinding(2, dsl.get());
-  pipelineLayoutDef->descriptor_set_layouts.push_back(std::move(dsl));
-  outDef->pipeline_layout = std::move(pipelineLayoutDef);
 
   // Shapes of [arg0, arg1, ret0].
   //   arg0 = [b0, m, k]

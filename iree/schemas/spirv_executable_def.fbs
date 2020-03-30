@@ -18,88 +18,6 @@ namespace iree;
 file_identifier "SPVE";
 file_extension "spve";
 
-// Structure specifying a descriptor set layout binding.
-//
-// VkDescriptorSetLayoutBinding:
-//   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorSetLayoutBinding.html
-table VkDescriptorSetLayoutBindingDef {
-  // The binding number of this entry. Corresponds to a resource of the same
-  // binding number in the shader stages.
-  binding:uint32;
-
-  // VkDescriptorType specifying which type of resource descriptors are used for
-  // this binding.
-  //
-  // VkDescriptorType:
-  //   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorType.html
-  descriptor_type:uint32;
-
-  // The number of descriptors contained in the binding. Accessed in a shader as
-  // an array.
-  descriptor_count:uint32;
-
-  // A bitmask of VkShaderStageFlagBits specifying which pipeline shader stages
-  // can access a resource for this binding.
-  //
-  // VkShaderStageFlagBits:
-  //   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkShaderStageFlagBits.html
-  //
-  // Assume 'VK_SHADER_STAGE_ALL' as a good default.
-  stage_flags:uint32;
-}
-
-// A descriptor set layout defined by an array of zero or more descriptor
-// bindings.
-//
-// VkDescriptorSetLayout:
-//   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkDescriptorSetLayout.html
-table VkDescriptorSetLayoutDef {
-  // A set of serialized VkDescriptorSetLayoutBindings.
-  bindings:[VkDescriptorSetLayoutBindingDef];
-}
-
-// Structure specifying a push constant range.
-//
-// VkPushConstantRange:
-//   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPushConstantRange.html
-table VkPushConstantRangeDef {
-  // A set of stage flags describing the shader stages that will access a range
-  // of push constants.
-  //
-  // VkShaderStageFlagBits:
-  //   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkShaderStageFlagBits.html
-  //
-  // Assume 'VK_SHADER_STAGE_ALL' as a good default.
-  stage_flags:uint32;
-
-  // The start offset and size, respectively, consumed by the range. Both offset
-  // and size are in units of bytes and must be a multiple of 4.
-  offset:uint32;
-  size:uint32;
-}
-
-// Zero or more descriptor set layouts and zero or more push constant ranges are
-// combined to form a pipeline layout object which describes the complete set of
-// resources that can be accessed by a pipeline.
-//
-// VkPipelineLayout:
-//   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkPipelineLayout.html
-table VkPipelineLayoutDef {
-  // An array of serialized VkDescriptorSetLayout objects.
-  descriptor_set_layouts:[VkDescriptorSetLayoutDef];
-
-  // An array of serialized VkPushConstantRange structures defining a set of
-  // push constant ranges for use in a single pipeline layout.
-  //
-  // Note that some implementations support as few as 128 bytes of push
-  // constants:
-  //   https://vulkan.gpuinfo.org/displaydevicelimit.php?name=maxPushConstantsSize
-  push_constant_ranges:[VkPushConstantRangeDef];
-
-  // Index into the pipeline layout descriptor sets used for I/O buffer binding.
-  buffer_binding_set:uint32;
-}
-
 // VkSpecializationMapEntry:
 //   https://www.khronos.org/registry/vulkan/specs/1.1-extensions/man/html/VkSpecializationMapEntry.html
 //
@@ -137,10 +55,6 @@ table SpirVExecutableDef {
 
   // SPIR-V code words.
   code:[uint32];
-
-  // A serialized VkPipelineLayout object describing the bindings and push
-  // constants used by the shader.
-  pipeline_layout:VkPipelineLayoutDef;
 
   // Optional specialization constants.
   specialization_info:VkSpecializationInfoDef;

@@ -15,16 +15,14 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Pass/Pass.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
-#include "tensorflow/compiler/mlir/xla/transforms/map_xla_to_scalar_op.h"
 #include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace IREE {
+namespace Flow {
 
-namespace {
-
-struct HLOToLinalgPreprocessing
-    : public FunctionPass<HLOToLinalgPreprocessing> {
+struct HLOToHLOPreprocessing : public FunctionPass<HLOToHLOPreprocessing> {
   void runOnFunction() override {
     ConversionTarget conversionTarget(getContext());
     OwningRewritePatternList conversionPatterns;
@@ -41,15 +39,16 @@ struct HLOToLinalgPreprocessing
     }
   }
 };
-}  // namespace
 
 std::unique_ptr<OpPassBase<FuncOp>> createHLOPreprocessingPass() {
-  return std::make_unique<HLOToLinalgPreprocessing>();
+  return std::make_unique<HLOToHLOPreprocessing>();
 }
 
-static PassRegistration<HLOToLinalgPreprocessing> legalize_pass(
-    "iree-hlo-to-linalg-preprocessing",
+static PassRegistration<HLOToHLOPreprocessing> legalize_pass(
+    "iree-flow-hlo-to-hlo-preprocessing",
     "Apply hlo to hlo transformations for some hlo ops");
 
+}  // namespace Flow
+}  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir

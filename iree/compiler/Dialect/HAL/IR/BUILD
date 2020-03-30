@@ -29,26 +29,28 @@ filegroup(
 cc_library(
     name = "IR",
     srcs = [
-        "HALEnums.cpp.inc",
         "HALOpFolders.cpp",
-        "HALOpInterface.cpp.inc",
         "HALOps.cpp",
         "HALTypes.cpp",
     ],
     hdrs = [
-        "HALEnums.h.inc",
-        "HALOpInterface.h.inc",
         "HALOps.h",
-        "HALOps.h.inc",
         "HALTypes.h",
     ],
     textual_hdrs = [
+        "HALEnums.cpp.inc",
+        "HALEnums.h.inc",
         "HALOps.cpp.inc",
+        "HALOps.h.inc",
+        "HALOpInterface.cpp.inc",
+        "HALOpInterface.h.inc",
+        "HALStructs.cpp.inc",
+        "HALStructs.h.inc",
     ],
     deps = [
-        ":HALEnumsGen",
-        ":HALOpInterfaceGen",
         ":HALOpsGen",
+        ":HALStructsGen",
+        ":HALTypesGen",
         "//iree/compiler/Dialect/IREE/IR",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
@@ -81,36 +83,6 @@ cc_library(
 )
 
 gentbl(
-    name = "HALEnumsGen",
-    tbl_outs = [
-        ("-gen-enum-decls", "HALEnums.h.inc"),
-        ("-gen-enum-defs", "HALEnums.cpp.inc"),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "HALBase.td",
-    td_srcs = [
-        ":td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@llvm-project//mlir:StdOpsTdFiles",
-    ],
-)
-
-gentbl(
-    name = "HALOpInterfaceGen",
-    tbl_outs = [
-        ("-gen-op-interface-decls", "HALOpInterface.h.inc"),
-        ("-gen-op-interface-defs", "HALOpInterface.cpp.inc"),
-    ],
-    tblgen = "@llvm-project//mlir:mlir-tblgen",
-    td_file = "HALBase.td",
-    td_srcs = [
-        ":td_files",
-        "//iree/compiler/Dialect/IREE/IR:td_files",
-        "@llvm-project//mlir:StdOpsTdFiles",
-    ],
-)
-
-gentbl(
     name = "HALOpsGen",
     tbl_outs = [
         ("-gen-op-decls", "HALOps.h.inc"),
@@ -121,6 +93,40 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)
+
+gentbl(
+    name = "HALStructsGen",
+    tbl_outs = [
+        ("-gen-iree-struct-attr-decls", "HALStructs.h.inc"),
+        ("-gen-iree-struct-attr-defs", "HALStructs.cpp.inc"),
+    ],
+    tblgen = "//iree/tools:iree-tblgen",
+    td_file = "HALBase.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+    ],
+)
+
+gentbl(
+    name = "HALTypesGen",
+    tbl_outs = [
+        ("-gen-enum-decls", "HALEnums.h.inc"),
+        ("-gen-enum-defs", "HALEnums.cpp.inc"),
+        ("-gen-op-interface-decls", "HALOpInterface.h.inc"),
+        ("-gen-op-interface-defs", "HALOpInterface.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "HALBase.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )

@@ -18,8 +18,8 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/memory/memory.h"
 #include "iree/base/status.h"
-#include "tensorflow/lite/experimental/ruy/context.h"
-#include "tensorflow/lite/experimental/ruy/ruy.h"
+#include "ruy/context.h"
+#include "ruy/ruy.h"
 
 namespace iree {
 namespace hal {

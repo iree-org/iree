@@ -45,6 +45,11 @@ class VMConversionDialectInterface
   virtual void populateVMConversionPatterns(
       SymbolTable &importSymbols, OwningRewritePatternList &patterns,
       TypeConverter &typeConverter) const = 0;
+
+  // Walks all child attributes defined within a custom dialect attribute.
+  virtual void walkAttributeStorage(
+      Attribute attr,
+      const function_ref<void(Attribute elementAttr)> &fn) const {}
 };
 
 }  // namespace iree_compiler

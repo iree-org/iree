@@ -697,6 +697,55 @@ void ConstRefRodataOp::build(Builder *builder, OperationState &result,
 }
 
 //===----------------------------------------------------------------------===//
+// Assignment
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseSwitchOp(OpAsmParser &parser, OperationState *result) {
+  SmallVector<OpAsmParser::OperandType, 4> values;
+  OpAsmParser::OperandType index;
+  OpAsmParser::OperandType defaultValue;
+  Type type;
+  if (failed(parser.parseOperand(index)) ||
+      failed(parser.parseOperandList(values, OpAsmParser::Delimiter::Square)) ||
+      failed(parser.parseKeyword("else")) ||
+      failed(parser.parseOperand(defaultValue)) ||
+      failed(parser.parseOptionalAttrDict(result->attributes)) ||
+      failed(parser.parseColonType(type)) ||
+      failed(parser.resolveOperand(index,
+                                   IntegerType::get(32, result->getContext()),
+                                   result->operands)) ||
+      failed(parser.resolveOperand(defaultValue, type, result->operands)) ||
+      failed(parser.resolveOperands(values, type, result->operands)) ||
+      failed(parser.addTypeToList(type, result->types))) {
+    return failure();
+  }
+  return success();
+}
+
+template <typename T>
+static void printSwitchOp(OpAsmPrinter &p, T &op) {
+  p << op.getOperationName() << " ";
+  p.printOperand(op.index());
+  p << "[";
+  p.printOperands(op.values());
+  p << "]";
+  p << " else ";
+  p.printOperand(op.default_value());
+  p.printOptionalAttrDict(op.getAttrs());
+  p << " : ";
+  p.printType(op.default_value().getType());
+}
+
+static ParseResult parseSwitchRefOp(OpAsmParser &parser,
+                                    OperationState *result) {
+  return parseSwitchOp(parser, result);
+}
+
+static void printSwitchRefOp(OpAsmPrinter &p, SwitchRefOp &op) {
+  printSwitchOp(p, op);
+}
+
+//===----------------------------------------------------------------------===//
 // Control flow
 //===----------------------------------------------------------------------===//
 

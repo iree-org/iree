@@ -2,7 +2,7 @@
 
 flow.executable @simpleMath_ex_dispatch_0 {
   flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-    workload = dense<[4, 1, 1]> : vector<3xi32>
+    workload = 4 : index
   }
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
@@ -12,12 +12,12 @@ flow.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0 {
+// CHECK-LABEL: hal.executable @simpleMath_ex_dispatch_0 attributes {sym_visibility = "private"} {
 //  CHECK-NEXT:   hal.interface @legacy_io {
 //  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4xf32>) -> tensor<4xf32>, workgroup_size = dense<1> : vector<3xi32>}
+//  CHECK-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4xf32>) -> tensor<4xf32>, workgroup_size = [1 : index, 1 : index, 1 : index]}
 //  CHECK-NEXT:   hal.executable.binary attributes {
 //  CHECK-SAME:       data = dense<
 //  CHECK-SAME:       format = 1447906369 : i32} {
@@ -42,8 +42,24 @@ flow.executable @simpleMath_ex_dispatch_0 {
 
 // -----
 
+// TODO(GH-1245): support dynamic shapes here.
+// flow.executable @shaped_dispatch {
+//   flow.dispatch.entry @entry
+//   module {
+//     func @entry(%arg0: tensor<4x?xf32>, %arg1 : index) -> tensor<4x?xf32> {
+//       %0 = shapex.make_ranked_shape %arg1 : (index) -> !shapex.ranked_shape<[4,?]>
+//       %1 = shapex.tie_shape %arg0, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+//       %2 = xla_hlo.add %1, %1 : tensor<4x?xf32>
+//       %3 = shapex.tie_shape %2, %0 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+//       return %3 : tensor<4x?xf32>
+//     }
+//   }
+// }
+
+// -----
+
 flow.executable @reduction_ex_dispatch_0 {
-  flow.dispatch.entry @reduction_ex_dispatch_0 attributes {workload = dense<[4, 1, 1]> : vector<3xi32>}
+  flow.dispatch.entry @reduction_ex_dispatch_0 attributes {workload = 4 : index}
   module {
     func @reduction_ex_dispatch_0(%arg0: tensor<4x8xf32>) -> tensor<4xf32> {
       %cst = constant dense<0.000000e+00> : tensor<f32>
@@ -57,12 +73,12 @@ flow.executable @reduction_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable @reduction_ex_dispatch_0 {
+// CHECK-LABEL: hal.executable @reduction_ex_dispatch_0 attributes {sym_visibility = "private"} {
 //  CHECK-NEXT:   hal.interface @legacy_io {
 //  CHECK-NEXT:     hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 //  CHECK-NEXT:     hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 //  CHECK-NEXT:   }
-//  CHECK-NEXT:   hal.executable.entry_point @reduction_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4x8xf32>) -> tensor<4xf32>, workgroup_size = dense<1> : vector<3xi32>}
+//  CHECK-NEXT:   hal.executable.entry_point @reduction_ex_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4x8xf32>) -> tensor<4xf32>, workgroup_size = [1 : index, 1 : index, 1 : index]}
 //  CHECK-NEXT:   hal.executable.binary attributes {
 //  CHECK-SAME:       data = dense<
 //  CHECK-SAME:       format = 1447906369 : i32} {

@@ -98,14 +98,7 @@ class Conv2dModule(tf.Module):
     return tf.nn.conv2d(img, kernel, [1, 1, 1, 1], "VALID", name="result")
 
 
-@tf_test_utils.compile_modules(
-    backends=[
-        # TODO(laurenzo): Enable for all backends once vmla reference lands.
-        "iree_vulkan",
-        "iree_llvmjit",
-        "tf",
-    ],
-    conv2d=Conv2dModule)
+@tf_test_utils.compile_modules(conv2d=Conv2dModule)
 class ConvTest(tf_test_utils.SavedModelTestCase):
 
   def test_id_batch_size_1(self):

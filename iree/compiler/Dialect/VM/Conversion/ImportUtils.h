@@ -39,6 +39,12 @@ LogicalResult appendImportModule(IREE::VM::ModuleOp importModuleOp,
 LogicalResult appendImportModule(StringRef importModuleSrc,
                                  ModuleOp targetModuleOp);
 
+namespace detail {
+Optional<SmallVector<Value, 4>> rewriteAttrToOperands(
+    Location loc, Attribute attrValue, Type inputType,
+    ConversionPatternRewriter &rewriter);
+}  // namespace detail
+
 // Rewrites the op T to a VM call to |importOp|.
 // Automatically handles type conversion and special logic for variadic operands
 // and special types (such as ranked shape).
@@ -67,27 +73,16 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
     auto inputType = input.value();
     auto inputName = importOp.getFuncArgumentName(input.index());
     if (auto attrValue = op.getAttr(inputName)) {
-      if (auto intAttr = attrValue.template dyn_cast<IntegerAttr>()) {
-        // NOTE: we intentionally go to std.constant ops so that the standard
-        // conversions can do their job. If we want to remove the dependency
-        // from standard ops in the future we could instead go directly to
-        // one of the vm constant ops.
-        auto constOp = rewriter.createOrFold<mlir::ConstantOp>(
-            op.getLoc(), inputType, intAttr);
-        state.operands.push_back(constOp);
-        segmentSizes.push_back(kFixedSingleValue);
-      } else if (auto elementsAttr =
-                     attrValue.template dyn_cast<DenseIntElementsAttr>()) {
-        for (auto intAttr : elementsAttr.getAttributeValues()) {
-          auto constOp = rewriter.createOrFold<mlir::ConstantOp>(
-              op.getLoc(), elementsAttr.getType().getElementType(), intAttr);
-          state.operands.push_back(constOp);
-        }
-        segmentSizes.push_back(elementsAttr.getNumElements());
+      auto flattenedAttrs = detail::rewriteAttrToOperands(
+          op.getLoc(), attrValue, inputType, rewriter);
+      if (!flattenedAttrs) return failure();
+      state.addOperands(*flattenedAttrs);
+      if (importOp.isFuncArgumentVariadic(input.index())) {
+        segmentSizes.push_back(flattenedAttrs->size());
       } else {
-        op.emitOpError() << "unsupported attribute encoding: "
-                         << attrValue.getType();
-        return failure();
+        assert(flattenedAttrs->size() == 1 &&
+               "expected non-variadic attribute to have a single value");
+        segmentSizes.push_back(kFixedSingleValue);
       }
     } else {
       auto oldOperands = llvm::to_vector<4>(op.getODSOperands(inputSetIndex));

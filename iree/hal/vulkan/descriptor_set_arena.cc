@@ -32,15 +32,11 @@ StatusOr<VmaBuffer*> CastBuffer(Buffer* buffer) {
 }
 
 StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
-    const PipelineDescriptorSets& pipeline_descriptor_sets,
-    absl::Span<const BufferBinding> bindings, VkDescriptorSet dst_set,
+    absl::Span<const DescriptorSet::Binding> bindings, VkDescriptorSet dst_set,
     Arena* arena) {
-  int required_descriptor_count =
-      pipeline_descriptor_sets.buffer_binding_set_map.size();
-
   arena->Reset();
   auto buffer_infos =
-      arena->AllocateSpan<VkDescriptorBufferInfo>(required_descriptor_count);
+      arena->AllocateSpan<VkDescriptorBufferInfo>(bindings.size());
   auto write_infos = arena->AllocateSpan<VkWriteDescriptorSet>(bindings.size());
 
   for (int i = 0; i < bindings.size(); ++i) {
@@ -57,7 +53,7 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
     write_info.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     write_info.pNext = nullptr;
     write_info.dstSet = dst_set;
-    write_info.dstBinding = pipeline_descriptor_sets.buffer_binding_set_map[i];
+    write_info.dstBinding = binding.binding;
     write_info.dstArrayElement = 0;
     write_info.descriptorCount = 1;
     write_info.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -71,14 +67,16 @@ StatusOr<absl::Span<VkWriteDescriptorSet>> PopulateDescriptorSetWriteInfos(
 
 VkDescriptorSetAllocateInfo PopulateDescriptorSetsAllocateInfo(
     const DescriptorPool& descriptor_pool,
-    const PipelineDescriptorSets& pipeline_descriptor_sets) {
+    NativeDescriptorSetLayout* set_layout) {
   VkDescriptorSetAllocateInfo allocate_info;
   allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   allocate_info.pNext = nullptr;
   allocate_info.descriptorPool = descriptor_pool.handle;
+
+  VkDescriptorSetLayout set_layout_handle = set_layout->handle();
   allocate_info.descriptorSetCount = 1;
-  allocate_info.pSetLayouts =
-      &pipeline_descriptor_sets.buffer_binding_set_layout;
+  allocate_info.pSetLayouts = &set_layout_handle;
+
   return allocate_info;
 }
 
@@ -99,15 +97,17 @@ DescriptorSetArena::~DescriptorSetArena() {
 }
 
 Status DescriptorSetArena::BindDescriptorSet(
-    VkCommandBuffer command_buffer, PipelineExecutable* executable,
-    absl::Span<const BufferBinding> bindings) {
+    VkCommandBuffer command_buffer, PipelineExecutableLayout* executable_layout,
+    int32_t set, absl::Span<const DescriptorSet::Binding> bindings) {
   // Always prefer using push descriptors when available as we can avoid the
   // additional API overhead of updating/resetting pools.
   if (logical_device_->enabled_extensions().push_descriptors) {
-    return PushDescriptorSet(command_buffer, executable, bindings);
+    return PushDescriptorSet(command_buffer, executable_layout, set, bindings);
   }
 
   IREE_TRACE_SCOPE0("DescriptorSetArena::BindDescriptorSet");
+
+  auto* set_layout = executable_layout->set_layouts()[set].get();
 
   // Pick a bucket based on the number of descriptors required.
   // NOTE: right now we are 1:1 with bindings.
@@ -130,9 +130,14 @@ Status DescriptorSetArena::BindDescriptorSet(
   }
   auto& descriptor_pool = descriptor_pool_buckets_[bucket];
 
-  const auto& pipeline_descriptor_sets = executable->descriptor_sets();
-  auto allocate_info = PopulateDescriptorSetsAllocateInfo(
-      descriptor_pool, pipeline_descriptor_sets);
+  VkDescriptorSetAllocateInfo allocate_info;
+  allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  allocate_info.pNext = nullptr;
+  allocate_info.descriptorPool = descriptor_pool.handle;
+  VkDescriptorSetLayout set_layout_handle = set_layout->handle();
+  allocate_info.descriptorSetCount = 1;
+  allocate_info.pSetLayouts = &set_layout_handle;
+
   VkDescriptorSet descriptor_set = VK_NULL_HANDLE;
   VkResult result = syms().vkAllocateDescriptorSets(
       *logical_device_, &allocate_info, &descriptor_set);
@@ -147,17 +152,22 @@ Status DescriptorSetArena::BindDescriptorSet(
     used_descriptor_pools_.push_back(descriptor_pool_buckets_[bucket]);
 
     // Allocate descriptor sets.
-    auto allocate_info = PopulateDescriptorSetsAllocateInfo(
-        descriptor_pool_buckets_[bucket], pipeline_descriptor_sets);
+    VkDescriptorSetAllocateInfo allocate_info;
+    allocate_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocate_info.pNext = nullptr;
+    allocate_info.descriptorPool = descriptor_pool_buckets_[bucket].handle;
+    VkDescriptorSetLayout set_layout_handle = set_layout->handle();
+    allocate_info.descriptorSetCount = 1;
+    allocate_info.pSetLayouts = &set_layout_handle;
     descriptor_set = VK_NULL_HANDLE;
     VK_RETURN_IF_ERROR(syms().vkAllocateDescriptorSets(
         *logical_device_, &allocate_info, &descriptor_set));
   }
 
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
-  ASSIGN_OR_RETURN(auto write_infos, PopulateDescriptorSetWriteInfos(
-                                         pipeline_descriptor_sets, bindings,
-                                         descriptor_set, &scratch_arena_));
+  ASSIGN_OR_RETURN(auto write_infos,
+                   PopulateDescriptorSetWriteInfos(bindings, descriptor_set,
+                                                   &scratch_arena_));
 
   // This is the reason why push descriptor sets are good.
   // We can't batch these effectively as we don't know prior to recording what
@@ -169,32 +179,27 @@ Status DescriptorSetArena::BindDescriptorSet(
 
   // Bind the descriptor set.
   syms().vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-                                 executable->pipeline_layout(),
-                                 pipeline_descriptor_sets.buffer_binding_set, 1,
+                                 executable_layout->handle(), set, 1,
                                  &descriptor_set, 0, nullptr);
 
   return OkStatus();
 }
 
 Status DescriptorSetArena::PushDescriptorSet(
-    VkCommandBuffer command_buffer, PipelineExecutable* executable,
-    absl::Span<const BufferBinding> bindings) {
+    VkCommandBuffer command_buffer, PipelineExecutableLayout* executable_layout,
+    int32_t set, absl::Span<const DescriptorSet::Binding> bindings) {
   IREE_TRACE_SCOPE0("DescriptorSetArena::PushDescriptorSet");
 
-  const auto& pipeline_descriptor_sets = executable->descriptor_sets();
-
   // Get a list of VkWriteDescriptorSet structs with all bound buffers.
-  ASSIGN_OR_RETURN(auto write_infos, PopulateDescriptorSetWriteInfos(
-                                         pipeline_descriptor_sets, bindings,
-                                         VK_NULL_HANDLE, &scratch_arena_));
+  ASSIGN_OR_RETURN(auto write_infos,
+                   PopulateDescriptorSetWriteInfos(bindings, VK_NULL_HANDLE,
+                                                   &scratch_arena_));
 
   // Fast path using push descriptors. These are pooled internally by the
   // command buffer and prevent the need for our own pooling mechanisms.
-  syms().vkCmdPushDescriptorSetKHR(command_buffer,
-                                   VK_PIPELINE_BIND_POINT_COMPUTE,
-                                   executable->pipeline_layout(),
-                                   pipeline_descriptor_sets.buffer_binding_set,
-                                   write_infos.size(), write_infos.data());
+  syms().vkCmdPushDescriptorSetKHR(
+      command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+      executable_layout->handle(), set, write_infos.size(), write_infos.data());
 
   return OkStatus();
 }

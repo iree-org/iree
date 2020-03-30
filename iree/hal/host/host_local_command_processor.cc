@@ -17,6 +17,8 @@
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/host/host_descriptor_set.h"
+#include "iree/hal/host/host_executable_layout.h"
 
 namespace iree {
 namespace hal {
@@ -110,10 +112,113 @@ Status HostLocalCommandProcessor::CopyBuffer(Buffer* source_buffer,
                                  length);
 }
 
-Status HostLocalCommandProcessor::Dispatch(
-    const DispatchRequest& dispatch_request) {
-  return FailedPreconditionErrorBuilder(IREE_LOC)
-         << "Command processor does not support dispatch operations";
+Status HostLocalCommandProcessor::PushConstants(
+    ExecutableLayout* executable_layout, size_t offset,
+    absl::Span<const uint32_t> values) {
+  IREE_TRACE_SCOPE0("HostLocalCommandProcessor::PushConstants");
+  if (offset + values.size() > push_constants_.values.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Push constants out of range";
+  }
+  for (int i = 0; i < values.size(); ++i) {
+    push_constants_.values[offset + i] = values[i];
+  }
+  return OkStatus();
+}
+
+Status HostLocalCommandProcessor::PushDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  IREE_TRACE_SCOPE0("HostLocalCommandProcessor::PushDescriptorSet");
+  if (!AnyBitSet(command_categories() & CommandCategory::kDispatch)) {
+    return FailedPreconditionErrorBuilder(IREE_LOC)
+           << "Command processor does not support dispatch operations";
+  }
+
+  auto* host_executable_layout =
+      static_cast<HostExecutableLayout*>(executable_layout);
+  descriptor_sets_.resize(host_executable_layout->set_count());
+  if (set < 0 || set >= descriptor_sets_.size()) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Set " << set << " out of range (" << descriptor_sets_.size()
+           << ")";
+  }
+
+  auto& set_bindings = descriptor_sets_[set];
+  set_bindings = {bindings.begin(), bindings.end()};
+
+  return OkStatus();
+}
+
+Status HostLocalCommandProcessor::BindDescriptorSet(
+    ExecutableLayout* executable_layout, int32_t set,
+    DescriptorSet* descriptor_set,
+    absl::Span<const device_size_t> dynamic_offsets) {
+  IREE_TRACE_SCOPE0("HostLocalCommandProcessor::BindDescriptorSet");
+  if (!AnyBitSet(command_categories() & CommandCategory::kDispatch)) {
+    return FailedPreconditionErrorBuilder(IREE_LOC)
+           << "Command processor does not support dispatch operations";
+  }
+
+  auto* host_executable_layout =
+      static_cast<HostExecutableLayout*>(executable_layout);
+  descriptor_sets_.resize(host_executable_layout->set_count());
+  if (set < 0 || descriptor_sets_.size() >= set) {
+    return InvalidArgumentErrorBuilder(IREE_LOC)
+           << "Set " << set << " out of range (" << descriptor_sets_.size()
+           << ")";
+  }
+
+  auto* host_descriptor_set = static_cast<HostDescriptorSet*>(descriptor_set);
+  auto* set_bindings = &descriptor_sets_[set];
+  *set_bindings = {host_descriptor_set->bindings().begin(),
+                   host_descriptor_set->bindings().end()};
+  if (!dynamic_offsets.empty()) {
+    auto dynamic_binding_map =
+        host_executable_layout->GetDynamicBindingMap(set);
+    if (dynamic_offsets.size() != dynamic_binding_map.size()) {
+      return InvalidArgumentErrorBuilder(IREE_LOC)
+             << "Dynamic offset count mismatch (provided "
+             << dynamic_offsets.size() << " but expected "
+             << dynamic_binding_map.size() << ")";
+    }
+    for (int i = 0; i < dynamic_binding_map.size(); ++i) {
+      (*set_bindings)[dynamic_binding_map[i]].offset += dynamic_offsets[i];
+    }
+  }
+
+  return OkStatus();
+}
+
+Status HostLocalCommandProcessor::Dispatch(Executable* executable,
+                                           int32_t entry_point,
+                                           std::array<uint32_t, 3> workgroups) {
+  IREE_TRACE_SCOPE0("HostLocalCommandProcessor::Dispatch");
+  absl::InlinedVector<absl::Span<const DescriptorSet::Binding>, 2>
+      descriptor_sets(descriptor_sets_.size());
+  for (int i = 0; i < descriptor_sets_.size(); ++i) {
+    descriptor_sets[i] = absl::MakeConstSpan(descriptor_sets_[i]);
+  }
+  return DispatchInline(executable, entry_point, workgroups, push_constants_,
+                        descriptor_sets);
+}
+
+Status HostLocalCommandProcessor::DispatchIndirect(
+    Executable* executable, int32_t entry_point, Buffer* workgroups_buffer,
+    device_size_t workgroups_offset) {
+  IREE_TRACE_SCOPE0("HostLocalCommandProcessor::DispatchIndirect");
+
+  std::array<uint32_t, 3> workgroups;
+  RETURN_IF_ERROR(workgroups_buffer->ReadData(
+      workgroups_offset, workgroups.data(), sizeof(uint32_t) * 3));
+
+  absl::InlinedVector<absl::Span<const DescriptorSet::Binding>, 2>
+      descriptor_sets(descriptor_sets_.size());
+  for (int i = 0; i < descriptor_sets_.size(); ++i) {
+    descriptor_sets[i] = absl::MakeConstSpan(descriptor_sets_[i]);
+  }
+  return DispatchInline(executable, entry_point, workgroups, push_constants_,
+                        descriptor_sets);
 }
 
 }  // namespace hal

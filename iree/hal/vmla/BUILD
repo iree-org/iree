@@ -37,8 +37,8 @@ cc_library(
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
-        "@org_tensorflow//tensorflow/lite/experimental/ruy",
-        "@org_tensorflow//tensorflow/lite/experimental/ruy:context",
+        "@com_google_ruy//ruy",
+        "@com_google_ruy//ruy:context",
     ],
 )
 
@@ -103,7 +103,9 @@ cc_library(
         "//iree/hal:device",
         "//iree/hal:fence",
         "//iree/hal/host:async_command_queue",
+        "//iree/hal/host:host_descriptor_set",
         "//iree/hal/host:host_event",
+        "//iree/hal/host:host_executable_layout",
         "//iree/hal/host:host_local_allocator",
         "//iree/hal/host:host_submission_queue",
         "//iree/hal/host:inproc_command_buffer",

@@ -138,12 +138,11 @@ if(${IREE_ENABLE_LLVM})
       iree-tblgen
     SRCS
       "${IREE_ROOT_DIR}/third_party/llvm-project/mlir/tools/mlir-tblgen/mlir-tblgen.cpp"
-    OUT
-      iree-tblgen
     DEPS
       LLVMMLIRTableGen
       MLIRSupport
       MLIRTableGen
+      iree::compiler::Dialect::IREE::Tools
       iree::compiler::Dialect::VM::Tools
     LINKOPTS
       "-lpthread"

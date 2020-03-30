@@ -39,7 +39,8 @@ class NoopExecutableCache final : public ExecutableCache {
   }
 
   StatusOr<ref_ptr<Executable>> PrepareExecutable(
-      ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) override {
+      ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+      const ExecutableSpec& spec) override {
     return UnimplementedErrorBuilder(IREE_LOC) << "PrepareExecutable NYI";
   }
 };
@@ -80,8 +81,29 @@ DawnDevice::DawnDevice(const DeviceInfo& device_info,
 
 DawnDevice::~DawnDevice() = default;
 
+StatusOr<ref_ptr<DescriptorSetLayout>> DawnDevice::CreateDescriptorSetLayout(
+    DescriptorSetLayout::UsageType usage_type,
+    absl::Span<const DescriptorSetLayout::Binding> bindings) {
+  IREE_TRACE_SCOPE0("DawnDevice::CreateDescriptorSetLayout");
+  return UnimplementedErrorBuilder(IREE_LOC) << "CreateDescriptorSetLayout NYI";
+}
+
+StatusOr<ref_ptr<DescriptorSet>> DawnDevice::CreateDescriptorSet(
+    DescriptorSetLayout* set_layout,
+    absl::Span<const DescriptorSet::Binding> bindings) {
+  IREE_TRACE_SCOPE0("DawnDevice::CreateDescriptorSet");
+  return UnimplementedErrorBuilder(IREE_LOC) << "CreateDescriptorSet NYI";
+}
+
 ref_ptr<ExecutableCache> DawnDevice::CreateExecutableCache() {
+  IREE_TRACE_SCOPE0("DawnDevice::CreateExecutableCache");
   return make_ref<NoopExecutableCache>();
+}
+
+StatusOr<ref_ptr<ExecutableLayout>> DawnDevice::CreateExecutableLayout(
+    absl::Span<DescriptorSetLayout* const> set_layouts, size_t push_constants) {
+  IREE_TRACE_SCOPE0("DawnDevice::CreateExecutableLayout");
+  return UnimplementedErrorBuilder(IREE_LOC) << "CreateExecutableLayout NYI";
 }
 
 StatusOr<ref_ptr<CommandBuffer>> DawnDevice::CreateCommandBuffer(

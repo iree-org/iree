@@ -57,6 +57,11 @@ std::unique_ptr<OpPassBase<ModuleOp>> createFlattenTuplesInCFGPass();
 // allowed to pass through successfully.
 std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeInputTypesPass();
 
+/// Creates XLA-HLO preprocessing transformation pass. In this pass we should
+/// have all xla_hlo -> xla_hlo transformations that are shared between all
+/// backends.
+std::unique_ptr<OpPassBase<FuncOp>> createHLOPreprocessingPass();
+
 // Runs pre-partitioning conversion passes to convert to the flow dialect.
 // This converts some input ops directly to flow ops when doing so has a
 // benefit. Other ops are left unmodified and will be outlined later on.

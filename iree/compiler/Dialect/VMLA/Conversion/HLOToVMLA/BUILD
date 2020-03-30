@@ -20,6 +20,7 @@ package(
 cc_library(
     name = "HLOToVMLA",
     srcs = [
+        "ConvertConvOps.cpp",
         "ConvertDotOps.cpp",
         "ConvertHLOToVMLA.cpp",
         "ConvertReductionOps.cpp",

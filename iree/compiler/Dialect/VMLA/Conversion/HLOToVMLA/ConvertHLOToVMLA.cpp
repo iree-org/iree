@@ -37,6 +37,9 @@
 namespace mlir {
 namespace iree_compiler {
 
+void populateHLOConvToVMLAPatterns(MLIRContext *context,
+                                   OwningRewritePatternList &patterns,
+                                   TypeConverter &typeConverter);
 void populateHLODotToVMLAPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns,
                                   TypeConverter &typeConverter);
@@ -165,8 +168,7 @@ struct ConcatenateOpConversion
   LogicalResult matchAndRewrite(
       xla_hlo::ConcatenateOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    auto zero = rewriter.createOrFold<mlir::ConstantOp>(
-        srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
+    auto zero = rewriter.createOrFold<mlir::ConstantIndexOp>(srcOp.getLoc(), 0);
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
@@ -187,7 +189,7 @@ struct ConcatenateOpConversion
       SmallVector<Value, 4> lengths(rank);
       for (int i = 0; i < rank; ++i) {
         lengths[i] = rewriter.createOrFold<Shape::RankedDimOp>(
-            srcOp.getLoc(), rewriter.getIntegerType(32), srcShape, i);
+            srcOp.getLoc(), rewriter.getIndexType(), srcShape, i);
       }
 
       rewriter.create<IREE::VMLA::CopyOp>(
@@ -298,24 +300,25 @@ struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
     SmallVector<Value, 4> srcIndices(rank);
     SmallVector<Value, 4> dstIndices(rank);
     SmallVector<Value, 4> lengths(rank);
-    Value zero = rewriter.createOrFold<mlir::ConstantOp>(
-        gatherOp.getLoc(), rewriter.getI32IntegerAttr(0));
+    Value zero =
+        rewriter.createOrFold<mlir::ConstantIndexOp>(gatherOp.getLoc(), 0);
     for (int i = 0; i < rank; ++i) {
       if (i < startIndicesType.getNumElements()) {
-        auto srcIndexByteOffset = rewriter.createOrFold<mlir::ConstantOp>(
-            gatherOp.getLoc(), rewriter.getI32IntegerAttr(i * sizeof(int32_t)));
-        srcIndices[i] = rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
-            gatherOp.getLoc(), rewriter.getIntegerType(32),
-            operands.start_indices(), srcIndexByteOffset);
+        auto srcIndexByteOffset = rewriter.createOrFold<mlir::ConstantIndexOp>(
+            gatherOp.getLoc(), i * sizeof(int32_t));
+        srcIndices[i] = rewriter.createOrFold<IndexCastOp>(
+            gatherOp.getLoc(), rewriter.getIndexType(),
+            rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
+                gatherOp.getLoc(), rewriter.getIntegerType(32),
+                operands.start_indices(), srcIndexByteOffset));
       } else {
         // Pad missing dimensions to zero offsets.
         srcIndices[i] = zero;
       }
       dstIndices[i] = zero;
-      lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
+      lengths[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
           gatherOp.getLoc(),
-          rewriter.getI32IntegerAttr(gatherOp.slice_sizes().getValue<int64_t>(
-              {static_cast<uint64_t>(i)})));
+          gatherOp.slice_sizes().getValue<int64_t>({static_cast<uint64_t>(i)}));
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
@@ -358,18 +361,16 @@ struct SliceOpConversion : public OpConversionPattern<xla_hlo::SliceOp> {
     SmallVector<Value, 4> srcIndices(rank);
     SmallVector<Value, 4> dstIndices(rank);
     SmallVector<Value, 4> lengths(rank);
-    Value zero = rewriter.createOrFold<mlir::ConstantOp>(
-        srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
+    Value zero =
+        rewriter.createOrFold<mlir::ConstantIndexOp>(srcOp.getLoc(), 0);
     for (int i = 0; i < rank; ++i) {
       uint64_t ui = static_cast<uint64_t>(i);
-      srcIndices[i] = rewriter.createOrFold<mlir::ConstantOp>(
-          srcOp.getLoc(), rewriter.getI32IntegerAttr(
-                              srcOp.start_indices().getValue<int64_t>({ui})));
+      srcIndices[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
+          srcOp.getLoc(), srcOp.start_indices().getValue<int64_t>({ui}));
       dstIndices[i] = zero;
-      lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
-          srcOp.getLoc(), rewriter.getI32IntegerAttr(
-                              srcOp.limit_indices().getValue<int64_t>({ui}) -
-                              srcOp.start_indices().getValue<int64_t>({ui})));
+      lengths[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
+          srcOp.getLoc(), srcOp.limit_indices().getValue<int64_t>({ui}) -
+                              srcOp.start_indices().getValue<int64_t>({ui}));
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
@@ -406,18 +407,19 @@ struct DynamicSliceOpConversion
     SmallVector<Value, 4> srcIndices(rank);
     SmallVector<Value, 4> dstIndices(rank);
     SmallVector<Value, 4> lengths(rank);
-    Value zero = rewriter.createOrFold<mlir::ConstantOp>(
-        srcOp.getLoc(), rewriter.getI32IntegerAttr(0));
+    Value zero =
+        rewriter.createOrFold<mlir::ConstantIndexOp>(srcOp.getLoc(), 0);
     for (int i = 0; i < rank; ++i) {
-      srcIndices[i] = rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
-          srcOp.getLoc(), rewriter.getIntegerType(32), operands[1],
-          rewriter.createOrFold<mlir::ConstantOp>(
-              srcOp.getLoc(), rewriter.getI32IntegerAttr(i * sizeof(int32_t))));
+      srcIndices[i] = rewriter.createOrFold<IndexCastOp>(
+          srcOp.getLoc(), rewriter.getIndexType(),
+          rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
+              srcOp.getLoc(), rewriter.getIntegerType(32), operands[1],
+              rewriter.createOrFold<mlir::ConstantIndexOp>(
+                  srcOp.getLoc(), i * sizeof(int32_t))));
       dstIndices[i] = zero;
-      lengths[i] = rewriter.createOrFold<mlir::ConstantOp>(
+      lengths[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
           srcOp.getLoc(),
-          rewriter.getI32IntegerAttr(srcOp.slice_sizes().getValue<int64_t>(
-              {static_cast<uint64_t>(i)})));
+          srcOp.slice_sizes().getValue<int64_t>({static_cast<uint64_t>(i)}));
     }
 
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
@@ -438,11 +440,13 @@ struct DynamicSliceOpConversion
 void populateHLOToVMLAPatterns(MLIRContext *context,
                                OwningRewritePatternList &patterns,
                                TypeConverter &typeConverter) {
-  // We rely on some additional HLO->HLO/HLO->std patterns and assume they
+  // We rely on some additional HLO->std patterns and assume they
   // have been run already. In case they haven't we provide them here (useful
   // for standalone conversion testing).
   xla_hlo::PopulateXlaToStdPatterns(&patterns, context);
-  xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
+
+  // xla_hlo.conv.
+  populateHLOConvToVMLAPatterns(context, patterns, typeConverter);
 
   // xla_hlo.reduce and xla_hlo.reduce_window.
   populateHLOReductionToVMLAPatterns(context, patterns, typeConverter);

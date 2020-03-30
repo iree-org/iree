@@ -42,14 +42,10 @@ iree_cc_library(
   DEPS
     ::api_hdrs
     ::buffer
-    ::buffer_view
     ::command_buffer
-    ::descriptor_set
-    ::descriptor_set_layout
     ::device
     ::driver
     ::driver_registry
-    ::executable_layout
     ::fence
     ::heap_buffer
     ::semaphore
@@ -110,68 +106,6 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
-    buffer_view
-  HDRS
-    "buffer_view.h"
-  SRCS
-    "buffer_view.cc"
-  DEPS
-    ::buffer
-    absl::inlined_vector
-    absl::strings
-    iree::base::shape
-    iree::base::source_location
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    buffer_view_test
-  SRCS
-    "buffer_view_test.cc"
-  DEPS
-    ::buffer
-    ::buffer_view
-    ::heap_buffer
-    iree::base::status
-    iree::base::status_matchers
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
-    buffer_view_string_util
-  HDRS
-    "buffer_view_string_util.h"
-  SRCS
-    "buffer_view_string_util.cc"
-  DEPS
-    ::allocator
-    ::buffer_view
-    ::heap_buffer
-    absl::optional
-    absl::strings
-    iree::base::buffer_string_util
-    iree::base::source_location
-    iree::base::status
-  PUBLIC
-)
-
-iree_cc_test(
-  NAME
-    buffer_view_string_util_test
-  SRCS
-    "buffer_view_string_util_test.cc"
-  DEPS
-    ::buffer_view_string_util
-    iree::base::status
-    iree::base::status_matchers
-    iree::testing::gtest_main
-)
-
-iree_cc_library(
-  NAME
     command_buffer
   HDRS
     "command_buffer.h"
@@ -180,9 +114,10 @@ iree_cc_library(
   DEPS
     ::allocator
     ::buffer
-    ::buffer_view
+    ::descriptor_set
     ::event
     ::executable
+    ::executable_layout
     ::resource
     absl::core_headers
     iree::base::bitfield
@@ -200,6 +135,7 @@ iree_cc_library(
     "command_buffer_validation.cc"
   DEPS
     ::command_buffer
+    absl::strings
     iree::base::logging
     iree::base::status
   PUBLIC
@@ -268,7 +204,7 @@ iree_cc_library(
   DEPS
     ::buffer
     ::resource
-    iree::base::status
+    absl::strings
   PUBLIC
 )
 
@@ -413,6 +349,7 @@ iree_cc_library(
   DEPS
     ::executable
     ::executable_format
+    ::executable_layout
     ::executable_spec
     iree::base::bitfield
     iree::base::ref_ptr

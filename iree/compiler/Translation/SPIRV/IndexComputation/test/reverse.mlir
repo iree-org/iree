@@ -9,7 +9,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1) -> (-d1 + 11, -d0 + 11)>]
   func @reverse_2d(%arg0: memref<12x12xf32>, %arg1 : memref<12x12xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<12x12xf32>) : tensor<12x12xf32>
     // CHECK: xla_hlo.reverse
     // CHECK-SAME: iree.index_computation_info
@@ -34,7 +34,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d2, -d1 + 2, d0)>]
   func @reverse_3d(%arg0: memref<3x3x3xf32>, %arg1 : memref<3x3x3xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi32>, iree.ordinal = 0 : i32} {
+  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
     %0 = iree.load_input(%arg0 : memref<3x3x3xf32>) : tensor<3x3x3xf32>
     // CHECK: xla_hlo.reverse
     // CHECK-SAME: iree.index_computation_info

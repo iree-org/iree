@@ -66,13 +66,13 @@ def VMLA_CmpPredicateAttr :
 // VMLA types
 //===----------------------------------------------------------------------===//
 
-def VMLA_DeviceSize : TypeAlias<I32>;
-def VMLA_DeviceSizeAttr : SignlessIntegerAttrBase<I32, "device_size_t">;
+def VMLA_DeviceSize : TypeAlias<Index>;
+def VMLA_DeviceSizeAttr : IREE_IndexAttrBase<"size_t">;
 
-def VMLA_HostSize : TypeAlias<I32>;
-def VMLA_HostSizeAttr : SignlessIntegerAttrBase<I32, "size_t">;
+def VMLA_HostSize : TypeAlias<Index>;
+def VMLA_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
 
-def VMLA_Index : TypeAlias<I32>;
+def VMLA_Index : TypeAlias<Index>;
 
 def VMLA_Shape : TypeAlias<Shape_RankedShape>;
 

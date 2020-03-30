@@ -21,6 +21,7 @@ cc_library(
     name = "Transforms",
     srcs = [
         "MaterializeInterfaces.cpp",
+        "MaterializeResourceCaches.cpp",
         "Passes.cpp",
         "PublicAbiGeneration.cpp",
         "RewriteLegacyIO.cpp",

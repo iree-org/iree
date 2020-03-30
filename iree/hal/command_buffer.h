@@ -22,9 +22,10 @@
 #include "iree/base/status.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
-#include "iree/hal/buffer_view.h"
+#include "iree/hal/descriptor_set.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
+#include "iree/hal/executable_layout.h"
 #include "iree/hal/resource.h"
 
 namespace iree {
@@ -132,75 +133,6 @@ struct BufferBarrier {
   // device allocation at an offset).
   device_size_t offset = 0;
   device_size_t length = kWholeBuffer;
-};
-
-// Represents a binding to a buffer with a set of attributes.
-// This may be used by drivers to validate alignment.
-struct BufferBinding {
-  // Access rights of the buffer contents by the executable.
-  MemoryAccessBitfield access = MemoryAccess::kAll;
-
-  // The buffer this binding references.
-  // The buffer is not retained by the binding and must be kept alive externally
-  // for the duration it is in use by the queue.
-  Buffer* buffer = nullptr;
-
-  // Shape of the buffer contents.
-  Shape shape;
-
-  // Size of each element within the buffer, in bytes.
-  int8_t element_size = 0;
-
-  BufferBinding() = default;
-  BufferBinding(MemoryAccessBitfield access, Buffer* buffer)
-      : access(access), buffer(buffer) {}
-  BufferBinding(MemoryAccessBitfield access, Buffer* buffer, Shape shape,
-                int8_t element_size)
-      : access(access),
-        buffer(buffer),
-        shape(shape),
-        element_size(element_size) {}
-  BufferBinding(MemoryAccessBitfield access, const BufferView& buffer_view)
-      : access(access),
-        buffer(buffer_view.buffer.get()),
-        shape(buffer_view.shape),
-        element_size(buffer_view.element_size) {}
-};
-
-// Wraps parameters for a Dispatch request.
-struct DispatchRequest {
-  // Executable prepared for use on the device.
-  // The executable must remain alive until all in-flight dispatch requests
-  // that use it have completed.
-  Executable* executable = nullptr;
-
-  // Executable entry point ordinal.
-  int entry_point = 0;
-
-  // TODO(benvanik): predication.
-
-  // Static workload parameters defining the X, Y, and Z workgroup counts.
-  std::array<int32_t, 3> workload;
-
-  // An optional buffer containing the dynamic workload to dispatch.
-  // The contents need not be available at the time of recording but must be
-  // made visible prior to execution of the dispatch command.
-  //
-  // Buffer contents are expected to be 3 int32 values defining the X, Y, and Z
-  // workgroup counts.
-  //
-  // The buffer must have been allocated with BufferUsage::kDispatch and be
-  // of MemoryType::kDeviceVisible.
-  Buffer* workload_buffer = nullptr;
-
-  // A list of buffers that contain the execution inputs/outputs.
-  // Order is dependent on executable arg layout.
-  //
-  // Buffers must have been allocated with BufferUsage::kDispatch and be
-  // of MemoryType::kDeviceVisible.
-  absl::Span<const BufferBinding> bindings;
-
-  // TODO(benvanik): push-constant equivalent (uniforms, etc).
 };
 
 // Asynchronous command buffer recording interface.
@@ -352,6 +284,41 @@ class CommandBuffer : public Resource {
                             Buffer* target_buffer, device_size_t target_offset,
                             device_size_t length) = 0;
 
+  // Pushes an inline set of constants that can be accessed by subsequent
+  // dispatches using a compatible executable layout.
+  //
+  // Push constants are always 4-byte values and treated as opaque, meaning that
+  // they may be bit-casted floats, bit-packed booleans, etc.
+  virtual Status PushConstants(ExecutableLayout* executable_layout,
+                               size_t offset,
+                               absl::Span<const uint32_t> values) = 0;
+
+  // Pushes a descriptor set and associates it with |set|.
+  // This uses an internal ringbuffer inside of the command buffer to avoid the
+  // need for creating and binding descriptor sets and managing their lifetime.
+  //
+  // The descriptor set will remain bound and valid so long as the executable
+  // layouts used by dispatches are compatible (same descriptor layouts and push
+  // constant sizes).
+  virtual Status PushDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      absl::Span<const DescriptorSet::Binding> bindings) = 0;
+
+  // Binds a descriptor set to the given |set| matching that used in the
+  // executable layout interface.
+  //
+  // The descriptor set will remain bound and valid so long as the executable
+  // layouts used by dispatches are compatible (same descriptor layouts and push
+  // constant sizes).
+  //
+  // If any dynamic descriptor types are defined in the descriptor set layout
+  // then the dynamic offsets must be provided. These offsets will be added to
+  // the base offset of the descriptor layout binding.
+  virtual Status BindDescriptorSet(
+      ExecutableLayout* executable_layout, int32_t set,
+      DescriptorSet* descriptor_set,
+      absl::Span<const device_size_t> dynamic_offsets) = 0;
+
   // Dispatches an execution request.
   // The request may execute overlapped with any other transfer operation or
   // dispatch made within the same barrier-defined sequence.
@@ -362,7 +329,20 @@ class CommandBuffer : public Resource {
   //
   // Fails if the queue does not support dispatch operations (as indicated by
   // can_dispatch).
-  virtual Status Dispatch(const DispatchRequest& dispatch_request) = 0;
+  virtual Status Dispatch(Executable* executable, int32_t entry_point,
+                          std::array<uint32_t, 3> workgroups) = 0;
+
+  // Dispatches an execution request with deferred workgroup counts.
+  // This is the same as Dispatch but the workgroup counts are read from the
+  // given |workgroups_buffer| at offset |workgroups_offset| as 3 uint32_t XYZ
+  // values before performing the dispatch. This allows prior dispatches within
+  // the command sequence to populate the workgroup counts.
+  //
+  // The buffer must have been allocated with BufferUsage::kDispatch and be
+  // of MemoryType::kDeviceVisible.
+  virtual Status DispatchIndirect(Executable* executable, int32_t entry_point,
+                                  Buffer* workgroups_buffer,
+                                  device_size_t workgroups_offset) = 0;
 
  protected:
   CommandBuffer(Allocator* allocator, CommandBufferModeBitfield mode,

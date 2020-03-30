@@ -169,10 +169,12 @@ class ConstantOpConversion : public OpConversionPattern<ConstantOp> {
       srcOp.emitRemark() << "unsupported const type for dialect";
       return failure();
     }
-    int numBits = integerAttr.getType().getIntOrFloatBitWidth();
-    if (numBits != 1 && numBits != 32) {
-      srcOp.emitRemark() << "unsupported bit width for dialect constant";
-      return failure();
+    if (integerAttr.getType().isIntOrFloat()) {
+      int numBits = integerAttr.getType().getIntOrFloatBitWidth();
+      if (numBits != 1 && numBits != 32) {
+        srcOp.emitRemark() << "unsupported bit width for dialect constant";
+        return failure();
+      }
     }
 
     auto intValue = integerAttr.getInt();
@@ -234,6 +236,8 @@ class CmpIOpConversion : public OpConversionPattern<CmpIOp> {
         rewriter.replaceOpWithNewOp<IREE::VM::CmpGTEI32UOp>(
             srcOp, returnType, srcAdapter.lhs(), srcAdapter.rhs());
         return success();
+      default:
+        return failure();
     }
   }
 };
@@ -247,7 +251,7 @@ class BinaryArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
       ConversionPatternRewriter &rewriter) const override {
     typename SrcOpTy::OperandAdaptor srcAdapter(operands);
 
-    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcOp.getType(),
+    rewriter.replaceOpWithNewOp<DstOpTy>(srcOp, srcAdapter.lhs().getType(),
                                          srcAdapter.lhs(), srcAdapter.rhs());
     return success();
   }
@@ -279,16 +283,33 @@ class ShiftArithmeticOpConversion : public OpConversionPattern<SrcOpTy> {
   }
 };
 
+class IndexCastOpConversion : public OpConversionPattern<IndexCastOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      IndexCastOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(srcOp, operands);
+    return success();
+  }
+};
+
 class SelectI32OpConversion : public OpConversionPattern<SelectOp> {
   using OpConversionPattern::OpConversionPattern;
-  static constexpr unsigned kBits = 32;
-
   LogicalResult matchAndRewrite(
       SelectOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     SelectOpOperandAdaptor srcAdaptor(operands);
-    IntegerType requiredType = IntegerType::get(kBits, srcOp.getContext());
-    if (srcAdaptor.true_value().getType() != requiredType) return failure();
+    IntegerType requiredType = IntegerType::get(32, srcOp.getContext());
+    // Note: This check can correctly just be a verification that
+    // actualType == requiredType, but since the VM type conversion also
+    // maps Indextype to this type, widening the check here reduces red-herrings
+    // when other conversions fail to properly match/rewrite index related ops.
+    // (Otherwise, the dialect converter may report the error as a failure to
+    // legalize the select op depending on order of resolution).
+    auto actualType = srcAdaptor.true_value().getType();
+    if (actualType != requiredType && actualType.isa<IndexType>())
+      return failure();
 
     rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
         srcOp, requiredType, srcAdaptor.condition(), srcAdaptor.true_value(),
@@ -353,11 +374,12 @@ class CallOpConversion : public OpConversionPattern<CallOp> {
 
 void populateStandardToVMPatterns(MLIRContext *context,
                                   OwningRewritePatternList &patterns) {
-  patterns.insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
-                  CondBranchOpConversion, ConstantOpConversion,
-                  ModuleOpConversion, ModuleTerminatorOpConversion,
-                  FuncOpConversion, ReturnOpConversion, SelectI32OpConversion>(
-      context);
+  patterns
+      .insert<BranchOpConversion, CallOpConversion, CmpIOpConversion,
+              CondBranchOpConversion, ConstantOpConversion, ModuleOpConversion,
+              ModuleTerminatorOpConversion, FuncOpConversion,
+              ReturnOpConversion, IndexCastOpConversion, SelectI32OpConversion>(
+          context);
 
   // Binary arithmetic ops
   patterns

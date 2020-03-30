@@ -33,7 +33,8 @@ class LLVMJITExecutableCache final : public ExecutableCache {
   bool CanPrepareFormat(ExecutableFormat format) const override;
 
   StatusOr<ref_ptr<Executable>> PrepareExecutable(
-      ExecutableCachingModeBitfield mode, const ExecutableSpec& spec) override;
+      ExecutableLayout* executable_layout, ExecutableCachingModeBitfield mode,
+      const ExecutableSpec& spec) override;
 
  private:
   hal::Allocator* allocator_;

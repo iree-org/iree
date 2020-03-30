@@ -27,35 +27,6 @@ namespace iree {
 namespace hal {
 namespace vmla {
 
-namespace {
-
-Status MarshalIO(Interface* interface,
-                 const DispatchRequest& dispatch_request) {
-  IREE_TRACE_SCOPE0("VMLACommandProcessor::MarshalIO");
-  if (dispatch_request.bindings.size() >= Interface::kMaxBindings) {
-    return OutOfRangeErrorBuilder(IREE_LOC)
-           << "Too many bindings requested; wanted "
-           << dispatch_request.bindings.size() << " but have a maximum of "
-           << Interface::kMaxBindings;
-  }
-
-  for (int i = 0; i < dispatch_request.bindings.size(); ++i) {
-    const auto& binding = dispatch_request.bindings[i];
-    void* data = static_cast<HostBuffer*>(binding.buffer->allocated_buffer())
-                     ->mutable_data();
-    data = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(data) +
-                                   binding.buffer->byte_offset());
-    ASSIGN_OR_RETURN(auto buffer,
-                     Buffer::WrapMutable(data, binding.buffer->byte_length(),
-                                         IREE_ALLOCATOR_NULL));
-    RETURN_IF_ERROR(interface->SetBinding(0, i, {std::move(buffer)}));
-  }
-
-  return OkStatus();
-}
-
-}  // namespace
-
 VMLACommandProcessor::VMLACommandProcessor(
     Allocator* allocator, CommandBufferModeBitfield mode,
     CommandCategoryBitfield command_categories)
@@ -63,22 +34,41 @@ VMLACommandProcessor::VMLACommandProcessor(
 
 VMLACommandProcessor::~VMLACommandProcessor() = default;
 
-Status VMLACommandProcessor::Dispatch(const DispatchRequest& dispatch_request) {
-  IREE_TRACE_SCOPE0("VMLACommandProcessor::Dispatch");
+Status VMLACommandProcessor::DispatchInline(
+    Executable* executable, int32_t entry_point,
+    std::array<uint32_t, 3> workgroups, const PushConstantBlock& push_constants,
+    absl::Span<const absl::Span<const DescriptorSet::Binding>> set_bindings) {
+  IREE_TRACE_SCOPE0("VMLACommandProcessor::DispatchInline");
 
-  auto* executable = static_cast<VMLAExecutable*>(dispatch_request.executable);
-  if (dispatch_request.entry_point >= executable->entry_functions().size()) {
+  auto* vmla_executable = static_cast<VMLAExecutable*>(executable);
+  if (entry_point >= vmla_executable->entry_functions().size()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Invalid entry point ordinal " << dispatch_request.entry_point;
+           << "Invalid entry point ordinal " << entry_point;
   }
 
-  RETURN_IF_ERROR(MarshalIO(executable->interface(), dispatch_request));
+  auto interface = vmla_executable->interface();
+  RETURN_IF_ERROR(interface->SetConstants(push_constants.values));
+
+  for (int set_ordinal = 0; set_ordinal < set_bindings.size(); ++set_ordinal) {
+    for (const auto& binding : set_bindings[set_ordinal]) {
+      // TODO(benvanik): plumb binding directly into VMLA to avoid this.
+      void* data = static_cast<HostBuffer*>(binding.buffer->allocated_buffer())
+                       ->mutable_data();
+      data = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(data) +
+                                     binding.buffer->byte_offset());
+      ASSIGN_OR_RETURN(auto buffer,
+                       Buffer::WrapMutable(data, binding.buffer->byte_length(),
+                                           IREE_ALLOCATOR_NULL));
+      RETURN_IF_ERROR(interface->SetBinding(set_ordinal, binding.binding,
+                                            {std::move(buffer)}));
+    }
+  }
+
   return FromApiStatus(
-      iree_vm_invoke(
-          executable->context(),
-          executable->entry_functions()[dispatch_request.entry_point],
-          /*policy=*/nullptr, executable->interface_inputs(),
-          /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
+      iree_vm_invoke(vmla_executable->context(),
+                     vmla_executable->entry_functions()[entry_point],
+                     /*policy=*/nullptr, vmla_executable->interface_inputs(),
+                     /*outputs=*/nullptr, IREE_ALLOCATOR_SYSTEM),
       IREE_LOC);
 }
 

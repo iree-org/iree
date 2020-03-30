@@ -77,7 +77,6 @@ Value calculateWorkload(Operation *op, Value baseOperand) {
       }
       numElements = builder.create<MulIOp>(op->getLoc(), numElements, dim);
     }
-    op->getParentOp()->dump();
     return numElements;
   } else {
     op->emitOpError()

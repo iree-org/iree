@@ -58,3 +58,42 @@ vm.module @select_ref_folds {
     vm.return %0 : !vm.ref<?>
   }
 }
+
+// -----
+
+// CHECK-LABEL: @switch_i32_folds
+vm.module @switch_i32_folds {
+  // CHECK-LABEL: @switch_i32_nop
+  vm.func @switch_i32_nop(%arg0 : i32) -> i32 {
+    %c5 = vm.const.i32 5 : i32
+    // CHECK: vm.return %c5 : i32
+    %0 = vm.switch.i32 %arg0[] else %c5 : i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @switch_i32_identical
+  vm.func @switch_i32_identical(%arg0 : i32) -> i32 {
+    %c100 = vm.const.i32 100 : i32
+    // CHECK: vm.return %c100 : i32
+    %0 = vm.switch.i32 %arg0[%c100, %c100, %c100] else %c100 : i32
+    vm.return %0 : i32
+  }
+
+  // CHECK-LABEL: @switch_i32_constant_index
+  vm.func @switch_i32_constant_index() -> (i32, i32, i32, i32) {
+    %c0 = vm.const.i32 0 : i32
+    %c1 = vm.const.i32 1 : i32
+    %c2 = vm.const.i32 2 : i32
+    %c3 = vm.const.i32 3 : i32
+    %c100 = vm.const.i32 100 : i32
+    %c200 = vm.const.i32 200 : i32
+    %c300 = vm.const.i32 300 : i32
+    %c400 = vm.const.i32 400 : i32
+    // CHECK: vm.return %c100, %c200, %c300, %c400 : i32, i32, i32, i32
+    %0 = vm.switch.i32 %c0[%c100, %c200, %c300] else %c400 : i32
+    %1 = vm.switch.i32 %c1[%c100, %c200, %c300] else %c400 : i32
+    %2 = vm.switch.i32 %c2[%c100, %c200, %c300] else %c400 : i32
+    %3 = vm.switch.i32 %c3[%c100, %c200, %c300] else %c400 : i32
+    vm.return %0, %1, %2, %3 : i32, i32, i32, i32
+  }
+}
