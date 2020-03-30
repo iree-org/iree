@@ -26,6 +26,8 @@ include(CMakeParseArguments)
 # COPTS: List of private compile options
 # DEFINES: List of public defines
 # LINKOPTS: List of link options
+# LABELS: Additional labels to apply to the test. The package path is added
+#     automatically.
 #
 # Note:
 # By default, iree_cc_test will always create a binary named iree_${NAME}.
@@ -60,7 +62,7 @@ function(iree_cc_test)
     _RULE
     ""
     "NAME"
-    "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS"
+    "SRCS;COPTS;DEFINES;LINKOPTS;DATA;DEPS;LABELS"
     ${ARGN}
   )
 
@@ -117,6 +119,7 @@ function(iree_cc_test)
     WORKING_DIRECTORY
       "${CMAKE_BINARY_DIR}"
     )
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_PACKAGE_PATH}")
+  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()
