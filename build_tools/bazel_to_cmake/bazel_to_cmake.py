@@ -123,30 +123,30 @@ class BuildFileFunctions(object):
   def _convert_name_block(self, name):
     #  NAME
     #    rule_name
-    return "  NAME\n    %s\n" % (name)
+    return f"  NAME\n    {name}\n"
 
   def _convert_out_block(self, out):
     #  OUT
     #    out_name
-    return "  OUT\n    %s\n" % (out)
+    return f"  OUT\n    {out}\n"
 
   def _convert_cc_namespace_block(self, cc_namespace):
     #  CC_NAMESPACE
     #    "cc_namespace"
     if not cc_namespace:
       return ""
-    return "  CC_NAMESPACE\n    \"%s\"\n" % (cc_namespace)
+    return f'  CC_NAMESPACE\n    "{cc_namespace}"\n'
 
   def _convert_cpp_namespace_block(self, cpp_namespace):
-    if not cpp_namespace:
-      return ""
     #  CPP_NAMESPACE
     #    "cpp_namespace"
-    return "  CPP_NAMESPACE\n    \"%s\"\n" % (cpp_namespace)
+    if not cpp_namespace:
+      return ""
+    return f'  CPP_NAMESPACE\n    "{cpp_namespace}"\n'
 
   def _convert_flags_block(self, flags):
-    flags_list = "\n".join(["    \"%s\"" % (flag) for flag in flags])
-    return "  FLAGS\n%s\n" % (flags_list)
+    flags_list = "\n".join([f'    "{flag}"' for flag in flags])
+    return f"  FLAGS\n{flags_list}\n"
 
   def _convert_translate_tool_block(self, translate_tool):
     if translate_tool and translate_tool != "//iree/tools:iree-translate":
@@ -155,7 +155,7 @@ class BuildFileFunctions(object):
       translate_tool = translate_tool.replace("//iree", "iree")  # iree/base:api
       translate_tool = translate_tool.replace(":", "_")  # iree/base::api
       translate_tool = translate_tool.replace("/", "_")  # iree::base::api
-      return "  TRANSLATE_TOOL\n    %s\n" % (translate_tool)
+      return f"  TRANSLATE_TOOL\n    {translate_tool}\n"
     else:
       return ""
 
@@ -163,7 +163,7 @@ class BuildFileFunctions(object):
     if option_value:
       # Note: this is a truthiness check as well as an existence check, i.e.
       # Bazel `testonly = False` will be handled correctly by this condition.
-      return "  %s\n" % option
+      return f"  {option}\n"
     else:
       return ""
 
@@ -177,15 +177,14 @@ class BuildFileFunctions(object):
     return self._convert_option_block("FLATTEN", flatten)
 
   def _convert_file_list_block(self, list_name, files):
-    if not files:
-      return ""
-
     #  list_name
     #    "file_1.h"
     #    "file_2.h"
     #    "file_3.h"
-    files_list = "\n".join(["    \"%s\"" % (file) for file in files])
-    return "  %s\n%s\n" % (list_name, files_list)
+    if not files:
+      return ""
+    files_list = "\n".join([f'    "{file}"' for file in files])
+    return f"  {list_name}\n{files_list}\n"
 
   def _convert_hdrs_block(self, hdrs):
     return self._convert_file_list_block("HDRS", hdrs)
@@ -197,13 +196,13 @@ class BuildFileFunctions(object):
     return self._convert_file_list_block("SRCS", srcs)
 
   def _convert_src_block(self, src):
-    return "  SRC\n    \"%s\"\n" % src
+    return f'  SRC\n    "{src}"\n'
 
   def _convert_cc_file_output_block(self, cc_file_output):
-    return "  CC_FILE_OUTPUT\n    \"%s\"\n" % (cc_file_output)
+    return f'  CC_FILE_OUTPUT\n    "{cc_file_output}"\n'
 
   def _convert_h_file_output_block(self, h_file_output):
-    return "  H_FILE_OUTPUT\n    \"%s\"\n" % (h_file_output)
+    return f'  H_FILE_OUTPUT\n    "{h_file_output}"\n'
 
   def _convert_td_file_block(self, td_file):
     if td_file.startswith("//iree"):
@@ -213,11 +212,11 @@ class BuildFileFunctions(object):
       # -> CMake `${IREE_ROOT_DIR}/iree/dir/IR/td_file.td
       td_file = td_file.replace("//iree", "${IREE_ROOT_DIR}/iree")
       td_file = td_file.replace(":", "/")
-    return "  TD_FILE\n    \"%s\"\n" % (td_file)
+    return f'  TD_FILE\n    "{td_file}"\n'
 
   def _convert_tbl_outs_block(self, tbl_outs):
-    outs_list = "\n".join(["    %s %s" % tbl_out for tbl_out in tbl_outs])
-    return "  OUTS\n%s\n" % (outs_list)
+    outs_list = "\n".join([f"    {flag} {value}" for flag, value in tbl_outs])
+    return f"  OUTS\n{outs_list}\n"
 
   def _convert_tblgen_block(self, tblgen):
     if tblgen.endswith("iree-tblgen"):
@@ -263,11 +262,8 @@ class BuildFileFunctions(object):
     targets = filter(None, targets)
     # Sort the targets and convert to a list
     targets = sorted(targets)
-    target_list_string = "\n".join(["    %s" % (t,) for t in targets])
-    return "  %s\n%s\n" % (
-        list_name,
-        target_list_string,
-    )
+    target_list_string = "\n".join([f"    {target}" for target in targets])
+    return f"  {list_name}\n{target_list_string}\n"
 
   def _convert_data_block(self, data):
     return self._convert_target_list_block("DATA", data)
@@ -278,15 +274,11 @@ class BuildFileFunctions(object):
   def _convert_flatc_args_block(self, flatc_args):
     if not flatc_args:
       return ""
-    flatc_args = "\n".join(
-        ["    \"%s\"" % (flatc_arg,) for flatc_arg in flatc_args])
-    return "  FLATC_ARGS\n%s\n" % (flatc_args,)
+    flatc_args = "\n".join([f'    "{flatc_arg}"' for flatc_arg in flatc_args])
+    return f"  FLATC_ARGS\n{flatc_args}\n"
 
   def _convert_unimplemented_function(self, function, details=""):
-    message = "Unimplemented %(function)s: %(details)s" % {
-        "function": function,
-        "details": details,
-    }
+    message = f"Unimplemented {function}: {details}"
     if not self.converter.first_error:
       self.converter.first_error = NotImplementedError(message)
     # Avoid submitting the raw results from non-strict runs. These are still
@@ -294,7 +286,7 @@ class BuildFileFunctions(object):
     # prevents changes with this phrase from being submitted.
     # Written as separate literals to avoid the check triggering here.
     submit_blocker = "DO" + " NOT" + " SUBMIT."
-    self.converter.body += "# %s %s\n" % (submit_blocker, message)
+    self.converter.body += f"# {submit_blocker} {message}\n"
 
   # ------------------------------------------------------------------------- #
   # Function handlers that convert BUILD definitions to CMake definitions.    #
@@ -349,18 +341,14 @@ class BuildFileFunctions(object):
         # See https://docs.bazel.build/versions/master/be/functions.html#glob
         raise NotImplementedError("Recursive globs not supported")
       # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
-      glob_var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
-      glob_vars.append("${%s}" % (glob_var,))
-      self.converter.body += ("file(GLOB %(var)s CONFIGURE_DEPENDS "
-                              "%(pattern)s)\n") % {
-                                  "var": glob_var,
-                                  "pattern": pattern
-                              }
+      var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
+      glob_vars.append(f"${{{var}}}")  # {{ / }} are the escapes for { / }
+      self.converter.body += f"file(GLOB {var} CONFIGURE_DEPENDS {pattern})\n"
     return glob_vars
 
   # TODO(gcmn) implement these types of functions in a less hard-coded way
   def platform_trampoline_deps(self, basename, path="base"):
-    return ["//iree/%s/internal:%s_internal" % (path, basename)]
+    return [f"//iree/{path}/internal:{basename}_internal"]
 
   def select(self, d):
     self._convert_unimplemented_function("select", str(d))
@@ -392,18 +380,16 @@ class BuildFileFunctions(object):
     alwayslink_block = self._convert_alwayslink_block(alwayslink)
     testonly_block = self._convert_testonly_block(testonly)
 
-    self.converter.body += """iree_cc_library(
-%(name_block)s%(hdrs_block)s%(textual_hdrs_block)s%(srcs_block)s%(data_block)s%(deps_block)s%(alwayslink_block)s%(testonly_block)s  PUBLIC
-)\n\n""" % {
-    "name_block": name_block,
-    "hdrs_block": hdrs_block,
-    "textual_hdrs_block": textual_hdrs_block,
-    "srcs_block": srcs_block,
-    "data_block": data_block,
-    "deps_block": deps_block,
-    "alwayslink_block": alwayslink_block,
-    "testonly_block": testonly_block,
-    }
+    self.converter.body += (f"iree_cc_library(\n"
+                            f"{name_block}"
+                            f"{hdrs_block}"
+                            f"{textual_hdrs_block}"
+                            f"{srcs_block}"
+                            f"{data_block}"
+                            f"{deps_block}"
+                            f"{alwayslink_block}"
+                            f"{testonly_block}"
+                            f"  PUBLIC\n)\n\n")
 
   def cc_test(self, name, hdrs=None, srcs=None, data=None, deps=None, **kwargs):
     name_block = self._convert_name_block(name)
@@ -412,14 +398,13 @@ class BuildFileFunctions(object):
     data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
 
-    self.converter.body += """iree_cc_test(
-%(name_block)s%(hdrs_block)s%(srcs_block)s%(data_block)s%(deps_block)s)\n\n""" % {
-    "name_block": name_block,
-    "hdrs_block": hdrs_block,
-    "srcs_block": srcs_block,
-    "data_block": data_block,
-    "deps_block": deps_block,
-    }
+    self.converter.body += (f"iree_cc_test(\n"
+                            f"{name_block}"
+                            f"{hdrs_block}"
+                            f"{srcs_block}"
+                            f"{data_block}"
+                            f"{deps_block}"
+                            f")\n\n")
 
   def cc_binary(self,
                 name,
@@ -438,15 +423,14 @@ class BuildFileFunctions(object):
     deps_block = self._convert_deps_block(deps)
     testonly_block = self._convert_testonly_block(testonly)
 
-    self.converter.body += """iree_cc_binary(
-%(name_block)s%(out_block)s%(srcs_block)s%(data_block)s%(deps_block)s%(testonly_block)s)\n\n""" % {
-    "name_block": name_block,
-    "out_block": out_block,
-    "srcs_block": srcs_block,
-    "data_block": data_block,
-    "deps_block": deps_block,
-    "testonly_block": testonly_block,
-    }
+    self.converter.body += (f"iree_cc_binary(\n"
+                            f"{name_block}"
+                            f"{out_block}"
+                            f"{srcs_block}"
+                            f"{data_block}"
+                            f"{deps_block}"
+                            f"{testonly_block}"
+                            f")\n\n")
 
   def cc_embed_data(self,
                     name,
@@ -468,25 +452,23 @@ class BuildFileFunctions(object):
     namespace_block = self._convert_cpp_namespace_block(cpp_namespace)
     flatten_block = self._convert_flatten_block(flatten)
 
-    self.converter.body += """iree_cc_embed_data(
-%(name_block)s%(srcs_block)s%(cc_file_output_block)s%(h_file_output_block)s%(namespace_block)s%(flatten_block)s  PUBLIC\n)\n\n""" % {
-    "name_block": name_block,
-    "srcs_block": srcs_block,
-    "cc_file_output_block": cc_file_output_block,
-    "h_file_output_block": h_file_output_block,
-    "namespace_block": namespace_block,
-    "flatten_block": flatten_block,
-    }
+    self.converter.body += (f"iree_cc_embed_data(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{cc_file_output_block}"
+                            f"{h_file_output_block}"
+                            f"{namespace_block}"
+                            f"{flatten_block}"
+                            f"  PUBLIC\n)\n\n")
 
   def spirv_kernel_cc_library(self, name, srcs):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
 
-    self.converter.body += """iree_spirv_kernel_cc_library(
-%(name_block)s%(srcs_block)s)\n\n""" % {
-    "name_block": name_block,
-    "srcs_block": srcs_block,
-    }
+    self.converter.body += (f"iree_spirv_kernel_cc_library(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f")\n\n")
 
   def iree_bytecode_module(self,
                            name,
@@ -500,26 +482,24 @@ class BuildFileFunctions(object):
     translate_tool_block = self._convert_translate_tool_block(translate_tool)
     flags_block = self._convert_flags_block(flags)
 
-    self.converter.body += """iree_bytecode_module(
-%(name_block)s%(src_block)s%(namespace_block)s%(translate_tool_block)s%(flags_block)s  PUBLIC\n)\n\n""" % {
-    "name_block": name_block,
-    "src_block": src_block,
-    "namespace_block": namespace_block,
-    "translate_tool_block": translate_tool_block,
-    "flags_block": flags_block,
-    }
+    self.converter.body += (f"iree_bytecode_module(\n"
+                            f"{name_block}"
+                            f"{src_block}"
+                            f"{namespace_block}"
+                            f"{translate_tool_block}"
+                            f"{flags_block}"
+                            f"  PUBLIC\n)\n\n")
 
   def iree_flatbuffer_cc_library(self, name, srcs, flatc_args=None):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     flatc_args_block = self._convert_flatc_args_block(flatc_args)
 
-    self.converter.body += """flatbuffer_cc_library(
-%(name_block)s%(srcs_block)s%(flatc_args_block)s  PUBLIC\n)\n\n""" % {
-    "name_block": name_block,
-    "srcs_block": srcs_block,
-    "flatc_args_block": flatc_args_block,
-    }
+    self.converter.body += (f"flatbuffer_cc_library(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{flatc_args_block}"
+                            f"  PUBLIC\n)\n\n")
 
   def gentbl(self,
              name,
@@ -535,13 +515,12 @@ class BuildFileFunctions(object):
     td_file_block = self._convert_td_file_block(td_file)
     outs_block = self._convert_tbl_outs_block(tbl_outs)
 
-    self.converter.body += """iree_tablegen_library(
-%(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
-    "name_block": name_block,
-    "td_file_block": td_file_block,
-    "outs_block": outs_block,
-    "tblgen_block": tblgen_block,
-    }
+    self.converter.body += (f"iree_tablegen_library(\n"
+                            f"{name_block}"
+                            f"{td_file_block}"
+                            f"{outs_block}"
+                            f"{tblgen_block}"
+                            f")\n\n")
 
   def iree_tablegen_doc(self,
                         name,
@@ -556,27 +535,23 @@ class BuildFileFunctions(object):
     td_file_block = self._convert_td_file_block(td_file)
     outs_block = self._convert_tbl_outs_block(tbl_outs)
 
-    self.converter.body += """iree_tablegen_doc(
-%(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
-    "name_block": name_block,
-    "td_file_block": td_file_block,
-    "outs_block": outs_block,
-    "tblgen_block": tblgen_block,
-    }
+    self.converter.body += (f"iree_tablegen_doc(\n"
+                            f"{name_block}"
+                            f"{td_file_block}"
+                            f"{outs_block}"
+                            f"{tblgen_block}"
+                            f")\n\n")
 
   def iree_lit_test_suite(self, name, srcs, data, **kwargs):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     data_block = self._convert_data_block(data)
 
-    self.converter.body += ("iree_lit_test_suite(\n"
-                            "%(name_block)s"
-                            "%(srcs_block)s"
-                            "%(data_block)s)\n\n" % {
-                                "name_block": name_block,
-                                "srcs_block": srcs_block,
-                                "data_block": data_block,
-                            })
+    self.converter.body += (f"iree_lit_test_suite(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{data_block}"
+                            f")\n\n")
 
 
 class Converter(object):
@@ -589,11 +564,10 @@ class Converter(object):
     self.first_error = None
 
   def convert(self, copyright_line):
-    converted_file = self.template % {
-        "copyright_line": copyright_line,
-        "add_subdirectories": "iree_add_all_subdirs()",
-        "body": self.body,
-    }
+    converted_file = (f"{copyright_line}\n"
+                      f"{self.apache_license}\n\n"
+                      f"iree_add_all_subdirs()\n\n"
+                      f"{self.body}")
 
     # Cleanup newline characters. This is more convenient than ensuring all
     # conversions are careful with where they insert newlines.
@@ -602,8 +576,7 @@ class Converter(object):
 
     return converted_file
 
-  template = textwrap.dedent("""\
-    %(copyright_line)s
+  apache_license = textwrap.dedent("""\
     #
     # Licensed under the Apache License, Version 2.0 (the "License");
     # you may not use this file except in compliance with the License.
@@ -615,11 +588,7 @@ class Converter(object):
     # distributed under the License is distributed on an "AS IS" BASIS,
     # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     # See the License for the specific language governing permissions and
-    # limitations under the License.
-
-    %(add_subdirectories)s
-
-    %(body)s""")
+    # limitations under the License.""")
 
 
 def GetDict(obj):
@@ -631,14 +600,14 @@ def GetDict(obj):
 
 
 def convert_directory_tree(root_directory_path, write_files, strict):
-  print("convert_directory_tree: %s" % (root_directory_path,))
+  print(f"convert_directory_tree: {root_directory_path}")
   for root, _, _ in os.walk(root_directory_path):
     convert_directory(root, write_files, strict)
 
 
 def convert_directory(directory_path, write_files, strict):
   if not os.path.isdir(directory_path):
-    raise FileNotFoundError("Cannot find directory '%s'" % (directory_path,))
+    raise FileNotFoundError(f"Cannot find directory '{directory_path}'")
 
   build_file_path = os.path.join(directory_path, "BUILD")
   cmakelists_file_path = os.path.join(directory_path, "CMakeLists.txt")
@@ -650,10 +619,10 @@ def convert_directory(directory_path, write_files, strict):
   global repo_root
   rel_build_file_path = os.path.relpath(build_file_path, repo_root)
   rel_cmakelists_file_path = os.path.relpath(cmakelists_file_path, repo_root)
-  print("Converting %s to %s" % (rel_build_file_path, rel_cmakelists_file_path))
+  print(f"Converting {rel_build_file_path} to {rel_cmakelists_file_path}")
 
   cmake_file_exists = os.path.isfile(cmakelists_file_path)
-  copyright_line = "# Copyright %s Google LLC" % (datetime.date.today().year,)
+  copyright_line = f"# Copyright {datetime.date.today().year} Google LLC"
   write_allowed = write_files
   if cmake_file_exists:
     with open(cmakelists_file_path) as f:
@@ -661,22 +630,18 @@ def convert_directory(directory_path, write_files, strict):
         if line.startswith("# Copyright"):
           copyright_line = line.rstrip()
         if EDIT_BLOCKING_PATTERN.search(line):
-          print(
-              "  %(path)s already exists, and line %(index)d: '%(line)s' prevents edits. Falling back to preview"
-              % {
-                  "path": rel_cmakelists_file_path,
-                  "index": i + 1,
-                  "line": line.strip()
-              })
+          print(f"  {rel_cmakelists_file_path} already exists, and "
+                f"line {i + 1}: '{line.strip()}' prevents edits. "
+                "Falling back to preview")
           write_allowed = False
 
   if write_allowed:
     # TODO(scotttodd): Attempt to merge instead of overwrite?
     #   Existing CMakeLists.txt may have special logic that should be preserved
     if cmake_file_exists:
-      print("  %s already exists, overwriting" % (rel_cmakelists_file_path,))
+      print(f"  {rel_cmakelists_file_path} already exists; overwriting")
     else:
-      print("  %s does not exist yet, creating" % (rel_cmakelists_file_path,))
+      print(f"  {rel_cmakelists_file_path} does not exist yet; creating")
   print("")
 
   with open(build_file_path, "rt") as build_file:
@@ -693,15 +658,13 @@ def convert_directory(directory_path, write_files, strict):
       else:
         print(converted_text)
     except (NameError, NotImplementedError) as e:
-      print(
-          "Failed to convert %s. Missing a rule handler in bazel_to_cmake.py?" %
-          (rel_build_file_path))
-      print("  Reason: `%s: %s`" % (type(e).__name__, e))
+      print(f"Failed to convert {rel_build_file_path}.", end=" ")
+      print("Missing a rule handler in bazel_to_cmake.py?")
+      print(f"  Reason: `{type(e).__name__}: {e}`")
     except KeyError as e:
-      print(
-          "Failed to convert %s. Missing a conversion in bazel_to_cmake_targets.py?"
-          % (rel_build_file_path))
-      print("  Reason: `%s: %s`" % (type(e).__name__, e))
+      print(f"Failed to convert {rel_build_file_path}.", end=" ")
+      print("Missing a conversion in bazel_to_cmake_targets.py?")
+      print(f"  Reason: `{type(e).__name__}: {e}`")
 
 
 def main(args):
