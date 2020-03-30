@@ -38,6 +38,7 @@ iree_cc_library(
     iree::vm::module
     iree::vm::module_abi_cc
     iree::vm::ref
+    iree::vm::ref_cc
     iree::vm::stack
     iree::vm::types
   PUBLIC
@@ -65,6 +66,7 @@ iree_cc_test(
     iree::vm::instance
     iree::vm::module
     iree::vm::ref
+    iree::vm::ref_cc
     iree::vm::stack
     iree::vm::types
 )
