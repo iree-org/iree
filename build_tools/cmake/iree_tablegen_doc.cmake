@@ -16,7 +16,19 @@ include(CMakeParseArguments)
 
 # iree_tablegen_doc()
 #
-# Runs iree-tablegen to produce documentation.
+# Runs iree-tablegen to produce documentation. For TableGen'ing others,
+# please use iree_tablegen_library().
+#
+# One-value parameters:
+# * NAME: base name of the target. The real target name is mangled from this
+#         given name with the package name
+# * TBLGEN: the base project to pass to TableGen
+#
+# Multi-value parameters:
+# * TD_FILE: Input .td files
+# * OUTS: TableGen generator commands and their outputs in the format of
+#         `-gen-<something> <output-file-name>`. Note that the generator
+#         commands should only be for documentation.
 function(iree_tablegen_doc)
   cmake_parse_arguments(
     _RULE
