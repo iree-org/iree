@@ -18,6 +18,10 @@
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif  // __cplusplus
+
 typedef struct string {
   iree_vm_ref_object_t ref_object;
   iree_allocator_t allocator;
@@ -35,5 +39,9 @@ typedef struct string_tensor {
 
 IREE_VM_DECLARE_TYPE_ADAPTERS(string, string_t);
 IREE_VM_DECLARE_TYPE_ADAPTERS(string_tensor, string_tensor_t);
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif  // __cplusplus
 
 #endif  // IREE_MODULES_STRINGS_STRINGS_API_DETAIL_H_

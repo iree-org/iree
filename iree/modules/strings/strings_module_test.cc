@@ -302,7 +302,6 @@ TEST_F(StringsModuleTest, ToString_Scalar) {
       iree_make_cstring_view("14.000000")};
 
   absl::InlinedVector<float, 1> contents{14.0f};
-  static float kBufferContents[] = {42.0f, 43.0f};
   TestToStringTensor(contents, {}, expected);
 }
 
@@ -311,7 +310,6 @@ TEST_F(StringsModuleTest, ToString_Vector) {
       iree_make_cstring_view("42.000000"), iree_make_cstring_view("43.000000")};
 
   absl::InlinedVector<float, 2> contents{42.0f, 43.0f};
-  static float kBufferContents[] = {42.0f, 43.0f};
   absl::InlinedVector<int32_t, 4> shape{2};
   TestToStringTensor(contents, shape, expected);
 }
