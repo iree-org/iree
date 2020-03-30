@@ -19,6 +19,7 @@ iree_cc_library(
     strings_module
   HDRS
     "api.h"
+    "api_detail.h"
     "strings_module.h"
   SRCS
     "api.cc"
