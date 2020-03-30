@@ -543,13 +543,13 @@ class BuildFileFunctions(object):
     td_file_block = self._convert_td_file_block(td_file)
     outs_block = self._convert_tbl_outs_block(tbl_outs)
 
-    self.converter.body += """iree_tablegen_doc(
-%(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
-    "name_block": name_block,
-    "td_file_block": td_file_block,
-    "outs_block": outs_block,
-    "tblgen_block": tblgen_block,
-    }
+    self.converter.body += (
+      f"iree_tablegen_doc(\n"
+      f"{name_block}"
+      f"{td_file_block}"
+      f"{outs_block}"
+      f"{tblgen_block}"
+      f")\n\n")
 
   def iree_lit_test_suite(self, name, srcs, data, **kwargs):
     name_block = self._convert_name_block(name)
