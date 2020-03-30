@@ -27,8 +27,7 @@ vm.module @strings {
 vm.import @i32_to_string(%value : i32) -> !vm.ref<!strings.string>
 attributes {nosideeffects}
 
-// Returns a tensor of strings of elementwise to string of
-// buffer_view elements.
+// Elementwise conversion of a tensor of values to a tensor of strings.
 // Maps to the IREE::Strings::ToStringTensor.
 vm.import @to_string_tensor(%value : !vm.ref<!hal.buffer_view>) -> !vm.ref<!strings.string_tensor>
 attributes {nosideeffects}

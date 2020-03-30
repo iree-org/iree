@@ -108,21 +108,10 @@ class StringsModuleState final {
   // strings.print_tensor(%str_tensor)
   StatusOr<vm::ref<string_t>> StringTensorToString(
       vm::ref<string_tensor_t> str_tensor) {
+    // Perform a rough estimation of the amount of space we need.
     size_t string_length = 0;
-    for (int i = str_tensor->rank - 1; i >= 0; i--) {
-      // Handle the increased dimensions.
-      string_length *= str_tensor->shape[i];
-
-      // Allocate for brackets.
-      string_length += 2;
-
-      // Allocate for command and space/newline.
-      string_length += 2 * (str_tensor->shape[i] - 1);
-    }
-
-    // Allocate the room for strings.
     for (int i = 0; i < str_tensor->count; i++) {
-      string_length += str_tensor->values[i].size;
+      string_length += str_tensor->values[i].size + 2;
     }
 
     vm::ref<string_t> new_string;
