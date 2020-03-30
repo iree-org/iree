@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 #!/bin/bash
+=======
+#!/usr/bin/env python3
+>>>>>>> d4286e6b1e5939d9de64c676b09f416c36f834bd
 
 # Copyright 2020 Google LLC
 #
@@ -18,6 +22,7 @@ import argparse
 import os
 import re
 import subprocess
+<<<<<<< HEAD
 from typing import List, Tuple, Union
 
 
@@ -28,6 +33,9 @@ def execute_in_shell(command: str,
                        stderr=subprocess.PIPE)
   stdout, stderr = p.communicate()
   return stdout, stderr, p.returncode
+=======
+from typing import List
+>>>>>>> d4286e6b1e5939d9de64c676b09f416c36f834bd
 
 
 def parse_arguments():
@@ -55,7 +63,11 @@ def get_runline_commands(test_file: str) -> List[str]:
   """Returns all of the commands listed in the given test file."""
   with open(test_file, 'r') as f:
     lines = f.readlines()
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> d4286e6b1e5939d9de64c676b09f416c36f834bd
   commands = []
   for i, line in enumerate(lines):
     match = re.match('^// RUN: *', line)
@@ -71,6 +83,7 @@ def get_runline_commands(test_file: str) -> List[str]:
 def windows_convert_subpath(subpath: List[str]) -> List[str]:
   """Converts each directory in subpath using cygpath if on Windows."""
   # TODO: Remove this function if it is not needed.
+<<<<<<< HEAD
   # TODO: Determine if calling '/bin/bash' explicitly through subprocess works
   #       as expected on Windows.
   # Attempt to find the path of cygpath on windows. If empty, not on windows.
@@ -78,6 +91,15 @@ def windows_convert_subpath(subpath: List[str]) -> List[str]:
   if cygpath:
     for i, path in enumerate(subpath):
       subpath[i], _, _ = execute_in_shell(f'{cygpath} -u {path}')
+=======
+  # Attempt to find the path of cygpath on windows. If empty, not on windows
+  cygpath, _ = subprocess.Popen('which cygpath', shell=True,
+                                stdout=subprocess.PIPE).communicate()
+  if cygpath:
+    for i, path in enumerate(subpath):
+      subpath[i], _ = subprocess.Popen(f'{cygpath} -u {path}', shell=True,
+                                       stdout=subprocess.PIPE).communicate()
+>>>>>>> d4286e6b1e5939d9de64c676b09f416c36f834bd
   return subpath
 
 
@@ -95,7 +117,11 @@ def main(args):
   # it generically. run_lit expects that anything passed in the runfiles
   # can be found on the path for execution.
   # Currently we iterate through all of the files in RUNFILES_DIR and its
+<<<<<<< HEAD
   # subdirectories to add all the parent directories of files the user can
+=======
+  # subdirectories to add all the parent directories of files the user can 
+>>>>>>> d4286e6b1e5939d9de64c676b09f416c36f834bd
   # execute to the path.
   subpath = [os.path.dirname(file) for file in find_runfiles(runfiles_dir)]
   # TODO: Figure out if windows path conversion is necessary in python, or if
@@ -114,7 +140,11 @@ def main(args):
   if len(commands) == 0:
     print(f'!!! No RUN lines found in {args.test_file}')
     exit(1)
+<<<<<<< HEAD
 
+=======
+  
+>>>>>>> d4286e6b1e5939d9de64c676b09f416c36f834bd
   # Run all of the commands on the shell.
   for command in commands:
     # Substitute any embedded '%s' with the file name.
@@ -122,11 +152,20 @@ def main(args):
 
     print(f'RUNNING TEST: {command}', end='')
     print('-' * 80)
+<<<<<<< HEAD
 
     stdout, stderr, returncode = execute_in_shell(command)
     print(stdout.decode('utf-8'), end='')
     print(stderr.decode('utf-8'), end='')
     if returncode:
+=======
+    p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, 
+                         stderr=subprocess.PIPE)
+    out, err = p.communicate()
+    print(out.decode('utf-8'), end='')
+    print(err.decode('utf-8'), end='')
+    if p.returncode:
+>>>>>>> d4286e6b1e5939d9de64c676b09f416c36f834bd
       print(f'!!! ERROR EVALUATING: {command}', end='')
       exit(1)
     print('--- COMPLETE ---' + '-' * 64 + '\n')
