@@ -23,6 +23,10 @@ if(POLICY CMP0079)
 endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Backup the CMAKE_MESSAGE_LOG_LEVEL value, so we can override it temporarily
+# for spammy dependencies. Note that this only affects CMake > 3.17.0.
+set(_ORIGINAL_CMAKE_MESSAGE_LOG_LEVEL ${CMAKE_MESSAGE_LOG_LEVEL})
+
 #-------------------------------------------------------------------------------
 # Project configuration
 #-------------------------------------------------------------------------------
@@ -155,7 +159,11 @@ if(${IREE_BUILD_COMPILER})
 endif()
 
 if(${IREE_BUILD_DEBUGGER} OR ${IREE_BUILD_SAMPLES})
+  # sdl2 logs are spammy - change log level while adding
+  set(CMAKE_MESSAGE_LOG_LEVEL "WARNING")
   add_subdirectory(third_party/sdl2 EXCLUDE_FROM_ALL)
+  set(CMAKE_MESSAGE_LOG_LEVEL ${_ORIGINAL_CMAKE_MESSAGE_LOG_LEVEL})
+
   add_subdirectory(build_tools/third_party/dear_imgui EXCLUDE_FROM_ALL)
 endif()
 
