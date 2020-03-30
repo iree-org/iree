@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_MODULES_STRINGS_STRINGS_MODULE_H_
-#define IREE_MODULES_STRINGS_STRINGS_MODULE_H_
+#ifndef IREE_MODULES_STRINGS_STRINGS_API_DETAIL_H_
+#define IREE_MODULES_STRINGS_STRINGS_API_DETAIL_H_
 
 #include "iree/base/api.h"
 #include "iree/vm/api.h"
@@ -22,18 +22,26 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Registers the custom types used by the strings module.
-// WARNING: Not threadsafe; call at startup before using..
-iree_status_t strings_module_register_types();
+typedef struct strings_string {
+  iree_vm_ref_object_t ref_object;
+  iree_allocator_t allocator;
+  iree_string_view_t value;
+} strings_string_t;
 
-// Creates a strings module.
-// Modules may exist in multiple contexts should be thread-safe and immutable.
-// Use the per-context allocated state for retaining data.
-iree_status_t strings_module_create(iree_allocator_t allocator,
-                                    iree_vm_module_t** out_module);
+typedef struct strings_string_tensor {
+  iree_vm_ref_object_t ref_object;
+  iree_allocator_t allocator;
+  iree_string_view_t* values;
+  size_t count;
+  const int32_t* shape;
+  size_t rank;
+} strings_string_tensor_t;
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string, strings_string_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string_tensor, strings_string_tensor_t);
 
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_MODULES_STRINGS_STRINGS_MODULE_H_
+#endif  // IREE_MODULES_STRINGS_STRINGS_API_DETAIL_H_

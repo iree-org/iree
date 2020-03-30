@@ -58,7 +58,7 @@ StringsDialect::StringsDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
   addInterfaces<StringsToVMConversionInterface>();
 
-  addTypes<StringType>();
+  addTypes<StringType, StringTensorType>();
 
 #define GET_OP_LIST
   addOperations<
@@ -71,7 +71,9 @@ Type StringsDialect::parseType(DialectAsmParser &parser) const {
   if (failed(parser.parseKeyword(&typeName))) return {};
   auto type = llvm::StringSwitch<Type>(typeName)
                   .Case("string", StringType::get(getContext()))
+                  .Case("string_tensor", StringTensorType::get(getContext()))
                   .Default(nullptr);
+
   if (!type) {
     parser.emitError(parser.getCurrentLocation())
         << "unknown type: " << typeName;
@@ -82,6 +84,8 @@ Type StringsDialect::parseType(DialectAsmParser &parser) const {
 void StringsDialect::printType(Type type, DialectAsmPrinter &p) const {
   if (type.isa<StringType>()) {
     p << "string";
+  } else if (type.isa<StringTensorType>()) {
+    p << "string_tensor";
   } else {
     llvm_unreachable("unknown type");
   }

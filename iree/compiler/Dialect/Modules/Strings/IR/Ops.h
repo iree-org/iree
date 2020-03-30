@@ -34,6 +34,15 @@ class StringType : public Type::TypeBase<StringType, Type> {
   static bool kindof(unsigned kind) { return kind == TypeKind::String; }
 };
 
+class StringTensorType : public Type::TypeBase<StringTensorType, Type> {
+ public:
+  using Base::Base;
+  static StringTensorType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::StringTensor);
+  }
+  static bool kindof(unsigned kind) { return kind == TypeKind::StringTensor; }
+};
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h.inc"
 

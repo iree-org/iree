@@ -22,6 +22,10 @@
 #include "absl/types/span.h"
 #include "iree/base/api.h"
 #include "iree/base/logging.h"
+#include "iree/hal/api.h"
+#include "iree/modules/hal/hal_module.h"
+#include "iree/modules/strings/api.h"
+#include "iree/modules/strings/api_detail.h"
 #include "iree/vm/bytecode_module.h"
 #include "iree/vm/module.h"
 #include "iree/vm/module_abi_cc.h"
@@ -29,35 +33,14 @@
 #include "iree/vm/stack.h"
 #include "iree/vm/types.h"
 
-static iree_vm_ref_type_descriptor_t vmstring_descriptor = {0};
+static iree_vm_ref_type_descriptor_t strings_string_descriptor = {0};
+static iree_vm_ref_type_descriptor_t strings_string_tensor_descriptor = {0};
 
-typedef struct vmstring {
-  iree_vm_ref_object_t ref_object;
-  iree_allocator_t allocator;
-  iree_string_view_t value;
-} vmstring_t;
-
-IREE_VM_DEFINE_TYPE_ADAPTERS(vmstring, vmstring_t);
-
-iree_status_t vmstring_create(iree_string_view_t value,
-                              iree_allocator_t allocator,
-                              vmstring_t** out_message) {
-  // Note that we allocate the message and the string value together.
-  vmstring_t* message = NULL;
-  IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      allocator, sizeof(vmstring_t) + value.size, (void**)&message));
-  message->ref_object.counter = IREE_ATOMIC_VAR_INIT(1);
-  message->allocator = allocator;
-  message->value.data = ((const char*)message) + sizeof(vmstring_t);
-  message->value.size = value.size;
-  memcpy((void*)message->value.data, value.data, message->value.size);
-  *out_message = message;
-  return IREE_STATUS_OK;
-}
+IREE_VM_DEFINE_TYPE_ADAPTERS(strings_string, strings_string_t);
+IREE_VM_DEFINE_TYPE_ADAPTERS(strings_string_tensor, strings_string_tensor_t);
 
 namespace iree {
 namespace {
-
 class StringsModuleState final {
  public:
   explicit StringsModuleState(iree_allocator_t allocator)
@@ -67,7 +50,7 @@ class StringsModuleState final {
   Status Initialize() { return OkStatus(); }
 
   // strings.print(%str)
-  Status Print(vm::ref<vmstring_t> str) {
+  Status Print(vm::ref<strings_string_t> str) {
     fwrite(str->value.data, 1, str->value.size, stdout);
     fputc('\n', stdout);
     fflush(stdout);
@@ -75,15 +58,140 @@ class StringsModuleState final {
   }
 
   // strings.i32_to_string(%value) -> %str
-  StatusOr<vm::ref<vmstring_t>> I32ToString(int32_t value) {
-    vm::ref<vmstring_t> new_string;
+  StatusOr<vm::ref<strings_string_t>> I32ToString(int32_t value) {
+    vm::ref<strings_string_t> new_string;
     std::string str = std::to_string(value);
     RETURN_IF_ERROR(
-        FromApiStatus(vmstring_create(iree_make_cstring_view(str.c_str()),
-                                      allocator_, &new_string),
+        FromApiStatus(strings_string_create(iree_make_cstring_view(str.c_str()),
+                                            allocator_, &new_string),
+                      IREE_LOC));
+    return new_string;
+  }
+
+  const iree_string_view_t* StringTensorToStringHelper(
+      const iree_string_view_t* strs, const int32_t* shape, int32_t rank,
+      std::string* output) {
+    // Handle a scalar tensor value.
+    if (rank == 0) {
+      const auto& str = strs[0];
+      output->append(str.data, str.size);
+      return strs + 1;
+    }
+
+    // The row for the final tensor dimension.
+    if (rank == 1) {
+      output->append("[", 1);
+      for (int32_t i = 0, s = shape[0]; i < s; i++) {
+        const auto& str = strs[i];
+        output->append(str.data, str.size);
+        if (i != s - 1) {
+          output->append(", ", 2);
+        }
+      }
+
+      output->append("]", 1);
+      return strs + shape[0];
+    }
+
+    // Recurse to the lower dimension with the approrpiate brackets.
+    output->append("[", 1);
+    for (int32_t i = 0, s = shape[0]; i < s; i++) {
+      strs = StringTensorToStringHelper(strs, shape + 1, rank - 1, output);
+      if (i != s - 1) {
+        output->append(",\n", 2);
+      }
+    }
+    output->append("]", 1);
+    return strs;
+  }
+
+  // strings.print_tensor(%str_tensor)
+  StatusOr<vm::ref<strings_string_t>> StringTensorToString(
+      vm::ref<strings_string_tensor_t> str_tensor) {
+    // Perform a rough estimation of the amount of space we need.
+    size_t string_length = 0;
+    for (int i = 0; i < str_tensor->count; i++) {
+      string_length += str_tensor->values[i].size + 2;
+    }
+
+    vm::ref<strings_string_t> new_string;
+    std::string str;
+    str.reserve(string_length);
+    StringTensorToStringHelper(str_tensor->values, str_tensor->shape,
+                               str_tensor->rank, &str);
+
+    RETURN_IF_ERROR(
+        FromApiStatus(strings_string_create(iree_make_cstring_view(str.c_str()),
+                                            allocator_, &new_string),
+                      IREE_LOC));
+    return new_string;
+  }
+
+  // strings.to_string_tensor(%hal_buffer) -> %str_tensor
+  StatusOr<vm::ref<strings_string_tensor_t>> ToStringTensor(
+      vm::ref<iree_hal_buffer_view_t> hal_buffer_view) {
+    const size_t rank = iree_hal_buffer_view_shape_rank(hal_buffer_view.get());
+    absl::InlinedVector<int32_t, 6> shape(rank);
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_buffer_view_shape(hal_buffer_view.get(), rank,
+                                                 shape.data(), nullptr),
                       IREE_LOC));
 
-    return std::move(new_string);
+    size_t num_elements = 1;
+    for (auto val : shape) {
+      num_elements *= val;
+    }
+
+    // Pull the values down.
+    size_t element_size =
+        iree_hal_buffer_view_element_size(hal_buffer_view.get());
+    size_t tensor_size = element_size * num_elements;
+    iree_hal_buffer_t* hal_buffer =
+        iree_hal_buffer_view_buffer(hal_buffer_view.get());
+    iree_hal_mapped_memory_t tensor_mapping;
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_map(hal_buffer, IREE_HAL_MEMORY_ACCESS_READ,
+                            /*element_offset=*/0, tensor_size, &tensor_mapping),
+        IREE_LOC));
+
+    iree_hal_element_type_t type =
+        iree_hal_buffer_view_element_type(hal_buffer_view.get());
+
+    std::vector<std::string> strings;
+    strings.reserve(num_elements);
+    const auto& contents = tensor_mapping.contents;
+    if (type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
+      for (const float *
+               p = (const float*)contents.data,
+              *s = (const float*)(contents.data + contents.data_length);
+           p < s; p++) {
+        std::string str = std::to_string(*p);
+        strings.push_back(std::move(str));
+      }
+    } else {
+      return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
+    }
+
+    // Unmap used buffer.
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_buffer_unmap(hal_buffer, &tensor_mapping), IREE_LOC));
+
+    // Place into iree_string_views.
+    std::vector<iree_string_view_t> string_views;
+    string_views.reserve(num_elements);
+
+    for (const auto& str : strings) {
+      string_views.push_back(iree_make_cstring_view(str.data()));
+    }
+
+    strings_string_tensor_t* string_tensor;
+    RETURN_IF_ERROR(FromApiStatus(
+        strings_string_tensor_create(allocator_, string_views.data(),
+                                     string_views.size(), shape.data(), rank,
+                                     &string_tensor),
+        IREE_LOC));
+
+    return string_tensor;
   }
 
  private:
@@ -97,6 +205,10 @@ static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
         vm::MakeNativeFunction("print", &StringsModuleState::Print),
         vm::MakeNativeFunction("i32_to_string",
                                &StringsModuleState::I32ToString),
+        vm::MakeNativeFunction("string_tensor_to_string",
+                               &StringsModuleState::StringTensorToString),
+        vm::MakeNativeFunction("to_string_tensor",
+                               &StringsModuleState::ToStringTensor),
 };
 
 class StringsModule final : public vm::NativeModule<StringsModuleState> {
@@ -120,20 +232,29 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
 }  // namespace
 }  // namespace iree
 
-void vmstring_destroy(void* ptr) {
-  vmstring_t* message = (vmstring_t*)ptr;
-  iree_allocator_free(message->allocator, ptr);
-}
-
 extern "C" iree_status_t strings_module_register_types() {
-  if (vmstring_descriptor.type) {
+  if (strings_string_descriptor.type) {
     return IREE_STATUS_OK;  // Already registered.
   }
-  vmstring_descriptor.type_name = iree_make_cstring_view("strings.string");
-  vmstring_descriptor.offsetof_counter =
-      offsetof(vmstring_t, ref_object.counter);
-  vmstring_descriptor.destroy = vmstring_destroy;
-  return iree_vm_ref_register_type(&vmstring_descriptor);
+
+  // Register strings.string
+  strings_string_descriptor.type_name =
+      iree_make_cstring_view("strings.string");
+  strings_string_descriptor.offsetof_counter =
+      offsetof(strings_string_t, ref_object.counter);
+  strings_string_descriptor.destroy = strings_string_destroy;
+  IREE_RETURN_IF_ERROR(iree_vm_ref_register_type(&strings_string_descriptor));
+
+  // Register strings.string_tensor
+  strings_string_tensor_descriptor.type_name =
+      iree_make_cstring_view("strings.string_tensor");
+  strings_string_tensor_descriptor.offsetof_counter =
+      offsetof(strings_string_tensor_t, ref_object.counter);
+  strings_string_tensor_descriptor.destroy = strings_string_tensor_destroy;
+  IREE_RETURN_IF_ERROR(
+      iree_vm_ref_register_type(&strings_string_tensor_descriptor));
+
+  return IREE_STATUS_OK;
 }
 
 extern "C" iree_status_t strings_module_create(iree_allocator_t allocator,

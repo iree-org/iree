@@ -18,8 +18,11 @@ iree_cc_library(
   NAME
     strings_module
   HDRS
+    "api.h"
+    "api_detail.h"
     "strings_module.h"
   SRCS
+    "api.cc"
     "strings_module.cc"
   DEPS
     absl::inlined_vector
@@ -28,11 +31,14 @@ iree_cc_library(
     benchmark
     iree::base::api
     iree::base::logging
+    iree::hal::api
+    iree::modules::hal
     iree::vm
     iree::vm::bytecode_module
     iree::vm::module
     iree::vm::module_abi_cc
     iree::vm::ref
+    iree::vm::ref_cc
     iree::vm::stack
     iree::vm::types
   PUBLIC
@@ -51,12 +57,16 @@ iree_cc_test(
     benchmark
     iree::base::api
     iree::base::logging
+    iree::hal::api
+    iree::hal::vmla::vmla_driver_module
+    iree::modules::hal
     iree::testing::gtest_main
     iree::vm::bytecode_module
     iree::vm::context
     iree::vm::instance
     iree::vm::module
     iree::vm::ref
+    iree::vm::ref_cc
     iree::vm::stack
     iree::vm::types
 )

@@ -17,3 +17,13 @@ func @print_example_func(%arg0 : i32) attributes { iree.module.export } {
   "strings.print"(%0) : (!strings.string) -> ()
   return
 }
+
+func @string_tensor_to_string(%arg0 : !strings.string_tensor) -> !strings.string attributes { iree.module.export, iree.abi.none } {
+  %0 = "strings.string_tensor_to_string"(%arg0) : (!strings.string_tensor) -> (!strings.string)
+  return %0 : !strings.string
+}
+
+func @to_string_tensor(%arg0 : !hal.buffer_view) -> !strings.string_tensor attributes { iree.module.export, iree.abi.none } {
+  %0 = "strings.to_string_tensor"(%arg0) : (!hal.buffer_view) -> !strings.string_tensor
+  return %0 : !strings.string_tensor
+}
