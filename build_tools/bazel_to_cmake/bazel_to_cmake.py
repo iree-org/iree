@@ -562,8 +562,8 @@ class BuildFileFunctions(object):
 
   def iree_check_test_suite(self,
                             name,
-                            srcs = None,
-                            target_backends_and_drivers = None,
+                            srcs=None,
+                            target_backends_and_drivers=None,
                             args=None,
                             **kwargs):
     name_block = self._convert_name_block(name)
