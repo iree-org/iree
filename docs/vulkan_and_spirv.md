@@ -137,8 +137,9 @@ for details).
 
 ### Development tips
 
-If you are running tests with Bazel, consider putting environment setup in a
-`user.bazelrc` file, such as:
+Bazel runs tests in a sandbox and environment variables must be passed through
+to the test runner. Consider putting environment setup in a `user.bazelrc`.
+For example:
 
 ```
 test --test_env="LD_LIBRARY_PATH={ABSOLUTE_PATH_TO_VULKAN_SDK}/x86_64/lib/"
