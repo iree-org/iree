@@ -578,13 +578,13 @@ class BuildFileFunctions(object):
     drivers_block = self._convert_string_list_block("DRIVERS", drivers)
     args_block = self._convert_string_list_block("ARGS", args)
 
-    self.converter.body += ("iree_check_test_suite(\n"
+    self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"
                             f"{srcs_block}"
                             f"{target_backends_block}"
                             f"{drivers_block}"
                             f"{args_block}"
-                            ")\n\n")
+                            f")\n\n")
 
 
 class Converter(object):
