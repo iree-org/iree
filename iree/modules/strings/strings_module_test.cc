@@ -161,7 +161,9 @@ class StringsModuleTest : public ::testing::Test {
     strings_string_t* output_string =
         strings_string_deref(&iree_vm_variant_list_get(outputs, 0)->ref);
     ASSERT_EQ(output_string->value.size, expected_output.length());
-    EXPECT_EQ(absl::string_view(output_string->value.data), expected_output);
+    EXPECT_EQ(
+        absl::string_view(output_string->value.data, output_string->value.size),
+        expected_output);
 
     // Free the lists.
     iree_vm_variant_list_free(inputs);
