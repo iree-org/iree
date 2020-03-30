@@ -52,12 +52,12 @@ http_archive(
         "https://github.com/bazelbuild/bazel-toolchains/releases/download/2.1.0/bazel-toolchains-2.1.0.tar.gz",
         "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/2.1.0.tar.gz",
     ],
+    # Workaround for b/150158570. This patch needs to be updated if the bazel_toolchains version is updated.
+    patches = ["//build_tools/bazel:bazel_toolchains.patch"],
 )
 
-# Disable RBE until compatibility issues with the experimental_repo_remote_exec
-# flag are fixed.
-# load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
-# rbe_autoconfig(name = "rbe_default")
+load("@bazel_toolchains//rules:rbe_repo.bzl", "rbe_autoconfig")
+rbe_autoconfig(name = "rbe_default")
 
 ###############################################################################
 
