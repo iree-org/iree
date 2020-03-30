@@ -55,13 +55,28 @@ function(iree_check_test)
     TESTONLY
   )
 
-  # TODO(bf/146898896): Do this in iree_bytecode_module and avoid having to
+  # TODO(b/146898896): It would be nice if this were something we could query
+  # rather than having to know the conventions used by iree_bytecode_module.
+  set(_MODULE_FILE_NAME "${_MODULE_TARGET_NAME}.module")
+
+  # iree_bytecode_module does not define a target, only a custom command.
+  # We need to create a target that depends on the command to ensure the
+  # module gets built.
+  # TODO(b/146898896): Do this in iree_bytecode_module and avoid having to
   # reach into the internals.
-  set(_GENERATED_MODULE_NAME "${_MODULE_TARGET_NAME}.module")
   add_custom_target(
-    "${_NAME}" ALL
+    "${_MODULE_TARGET_NAME}"
      DEPENDS
-       "${_GENERATED_MODULE_NAME}"
+       "${_MODULE_FILE_NAME}"
+  )
+
+  # A target specifically for the test. We could combine this with the above,
+  # but we want that one to get pulled into iree_bytecode_module.
+  add_custom_target("${_NAME}" ALL)
+  add_dependencies(
+    "${_NAME}"
+    "${_MODULE_TARGET_NAME}"
+    iree_modules_check_iree-check-module
   )
 
   string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})                                                                                                    
@@ -73,12 +88,12 @@ function(iree_check_test)
     COMMAND
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "$<TARGET_FILE:iree_modules_check_iree-check-module>"
-      "--input_file=${CMAKE_CURRENT_BINARY_DIR}/${_GENERATED_MODULE_NAME}"
+      "--input_file=${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
       "--driver=${_RULE_DRIVER}"
       "${_RULE_ARGS}"
   )
 
-  set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_GENERATED_MODULE_NAME}")
+  set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")
   set_property(TEST "${_NAME_PATH}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
   set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_PACKAGE_PATH}")
 endfunction()
