@@ -14,10 +14,10 @@
 
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
-def iree_tablegen_doc(name, tblgen, td_file, tbl_outs, td_srcs = [], td_includes = [], strip_include_prefix = None):
+def iree_tablegen_doc(*args, **kwargs):
     """iree_tablegen_doc() generates documentation from a table definition file.
 
     This is a simple wrapper over gentbl() so we can differentiate between
     documentation and others. See gentbl() for details regarding arguments.
     """
-    gentbl(name, tblgen, td_file, tbl_outs, td_srcs, td_includes, strip_include_prefix)
+    gentbl(*args, **kwargs)
