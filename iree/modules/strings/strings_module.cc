@@ -208,7 +208,6 @@ static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
                                &StringsModuleState::StringTensorToString),
         vm::MakeNativeFunction("to_string_tensor",
                                &StringsModuleState::ToStringTensor),
-
 };
 
 class StringsModule final : public vm::NativeModule<StringsModuleState> {
