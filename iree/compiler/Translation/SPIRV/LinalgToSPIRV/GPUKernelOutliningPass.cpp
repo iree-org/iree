@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//===- GPUKernelOutlining.cpp - Generate GPU device-side code -------------===//
+//===- GPUKernelOutliningPass.cpp - Generate GPU device-side code ---------===//
 //
 // Implements a pass to convert a launch operation into a device-side code. Uses
 // a separate pass since the pass from core puts the gpu.module at the module

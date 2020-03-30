@@ -21,7 +21,8 @@ iree_cc_library(
     "LowerToSPIRV.h"
     "Passes.h"
   SRCS
-    "GPUKernelOutlining.cpp"
+    "GPUKernelOutliningPass.cpp"
+    "LinalgTileAndFusePass.cpp"
     "LowerToSPIRV.cpp"
   DEPS
     LLVMSupport

@@ -20,7 +20,8 @@ package(
 cc_library(
     name = "LinalgToSPIRV",
     srcs = [
-        "GPUKernelOutlining.cpp",
+        "GPUKernelOutliningPass.cpp",
+        "LinalgTileAndFusePass.cpp",
         "LowerToSPIRV.cpp",
     ],
     hdrs = [

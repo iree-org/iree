@@ -77,98 +77,7 @@ static void createConstantsInFunc(FuncOp funcOp, ArrayRef<int64_t> intVal,
   }
 }
 
-/// Gets the number of outer parallel loops in a linalg operation.
-unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
-  // Find the number of leading parallel loops in the generic op
-  unsigned numOuterParallelLoops = 0;
-  for (auto iteratorType : linalgOp.iterator_types()) {
-    if (iteratorType.cast<StringAttr>().getValue() !=
-        getParallelIteratorTypeName()) {
-      break;
-    }
-    numOuterParallelLoops++;
-  }
-  return numOuterParallelLoops;
-}
-
 namespace {
-
-/// To be able to use the workgroup size from the dispatch function attribute
-/// within the linalg tiling pass, need to actually implement a pass to retrieve
-/// the attribute value from the function and pass it along.
-// TODO(ravishankarm): Move this into Linalg dialect.
-struct IREETileLinalgPass : public FunctionPass<IREETileLinalgPass> {
-  void runOnFunction() override {
-    FuncOp funcOp = getFunction();
-    SmallVector<int64_t, 3> workGroupSizeVec;
-    workGroupSizeVec.reserve(3);
-    if (failed(getWorkGroupSize(funcOp, workGroupSizeVec))) return;
-    ArrayRef<int64_t> workGroupSize = dropTrailingOnes(workGroupSizeVec);
-
-    OpBuilder builder(funcOp);
-    OperationFolder folder(funcOp.getContext());
-    Region &body = funcOp.getBody();
-    if (!mlir::has_single_element(body)) {
-      funcOp.emitError(
-          "unhandled dispatch function that doesn't have a single block");
-      return signalPassFailure();
-    }
-    auto linalgOps = body.front().getOps<linalg::LinalgOp>();
-    if (linalgOps.empty()) {
-      // Nothing to do. Return.
-      return;
-    }
-    if (!mlir::has_single_element(linalgOps)) {
-      funcOp.emitError(
-          "unhandled tiling multiple linalg ops in one dispatch function");
-      return signalPassFailure();
-    }
-    linalg::LinalgOp linalgOp = *linalgOps.begin();
-    if (!linalgOp.hasBufferSemantics()) {
-      linalgOp.emitError(
-          "expected linalg op with buffer semantics during SPIR-V "
-          "code generation");
-      return signalPassFailure();
-    }
-
-    // TODO(ravishankarm): Tile conv op.
-    bool isConvOp = isa<linalg::ConvOp>(linalgOp.getOperation());
-    unsigned numOuterParallelLoops = getNumOuterParallelLoops(linalgOp);
-    if (isConvOp || !numOuterParallelLoops) {
-      // There are no outer parallel loops to partition. So just create dummy
-      // 1-trip loops that will be "split" across workgroups and workitems.
-      builder.setInsertionPoint(linalgOp);
-      auto indexType = builder.getIndexType();
-      auto loc = linalgOp.getLoc();
-      auto zero =
-          builder.create<ConstantOp>(loc, builder.getIntegerAttr(indexType, 0));
-      auto one =
-          builder.create<ConstantOp>(loc, builder.getIntegerAttr(indexType, 1));
-      auto outerLoop = builder.create<loop::ForOp>(loc, zero, one, one);
-      OpBuilder outerLoopBuilder = outerLoop.getBodyBuilder();
-      auto innerLoop =
-          outerLoopBuilder.create<loop::ForOp>(loc, zero, one, one);
-      OpBuilder innerLoopBuilder = innerLoop.getBodyBuilder();
-      innerLoopBuilder.clone(*linalgOp.getOperation());
-      linalgOp.erase();
-      return;
-    }
-
-    // Tile sizes to use are reverse of the workGroupSize.
-    SmallVector<int64_t, 3> tileSizes(reverse(workGroupSize));
-    // Linalg convention is to use 0 for no tiling. If the workgroup size is
-    // 1, then dont tile along that dimension. So overriding 1 to 0.
-    for (auto &tileSize : tileSizes)
-      if (tileSize == 1) tileSize = 0;
-    tileSizes.resize(numOuterParallelLoops, 0);
-    if (linalg::tileLinalgOp(builder, linalgOp, tileSizes, {}, &folder)) {
-      linalgOp.erase();
-      return;
-    }
-    linalgOp.emitError("unable to tile linalg op for SPIR-V code generation");
-    return signalPassFailure();
-  }
-};
 
 /// To be able to use the workgroup size from the dispatch function attribute to
 /// convert loops to GPU kernel, need to actually implement a pass to retrieve
@@ -242,72 +151,12 @@ struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
     }
   }
 };
-
-/// Pass to override the workgroup_size attribute value of a dispatch function.
-struct UpdateWorkGroupSizePass : FunctionPass<UpdateWorkGroupSizePass> {
-  UpdateWorkGroupSizePass(ArrayRef<int64_t> workGroupSize)
-      : workGroupSize(workGroupSize.begin(), workGroupSize.end()) {}
-  void runOnFunction() {
-    FuncOp funcOp = getFunction();
-    if (!isDispatchFunction(funcOp)) return;
-
-    if (workGroupSize.empty()) {
-      // By default look at the number of "parallel" loops in the generic op.
-      Region &body = funcOp.getBody();
-      // Only handle single block functions.
-      if (body.getBlocks().size() != 1) {
-        funcOp.emitError("unhandled dispatch function with multiple blocks");
-        return signalPassFailure();
-      }
-      Block &block = body.front();
-      auto linalgOps = block.getOps<linalg::LinalgOp>();
-      if (linalgOps.empty()) {
-        // Nothing to update. Return.
-        return;
-      }
-      if (!mlir::has_single_element(linalgOps)) {
-        funcOp.emitError(
-            "unhandled updating workgroup size of dispatch function with "
-            "multiple linalg ops");
-        return signalPassFailure();
-      }
-      // Find the number of leading parallel loops in the generic op
-      unsigned numOuterParallelLoops =
-          getNumOuterParallelLoops(*linalgOps.begin());
-      workGroupSize.resize(3, 1);
-      if (numOuterParallelLoops > 0) {
-        workGroupSize[0] = 32;
-      }
-      if (numOuterParallelLoops > 1) {
-        workGroupSize[1] = 4;
-      }
-      if (numOuterParallelLoops > 2) {
-        // Change workGroupsSize[1] such that the total size is equal to 128,
-        // which is the minimum gauranteed by Vulkan spec.
-        workGroupSize[1] = 2;
-        workGroupSize[2] = 2;
-      }
-      // TODO(ravishankarm): The current code-generation will "serialize" all
-      // the inner loops that are more than 3 deep. We can potentially "fold"
-      // all the parallel loops so that they all executed on different
-      // workitems.
-    }
-    OpBuilder builder(&getContext());
-    assert(workGroupSize.size() == 3);
-    funcOp.setAttr("iree.executable.workgroup_size",
-                   builder.getIndexArrayAttr(workGroupSize));
-  }
-
- private:
-  SmallVector<int64_t, 3> workGroupSize;
-};
 }  // namespace
 
 void addLinalgToSPIRVPasses(OpPassManager &pm,
                             ArrayRef<int64_t> workGroupSize) {
   // Linalg to loops.
-  pm.addPass(std::make_unique<UpdateWorkGroupSizePass>(workGroupSize));
-  pm.addPass(std::make_unique<IREETileLinalgPass>());
+  pm.addPass(createLinalgTileAndFusePass(workGroupSize));
   pm.addPass(createConvertLinalgToLoopsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());

@@ -1,0 +1,123 @@
+// RUN: iree-opt -split-input-file -iree-linalg-tile-and-fuse %s | IreeFileCheck %s
+
+module {
+  // CHECK-LABEL: func @tile_only
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<4x8xi32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<4x8xi32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<4x8xi32>
+  //       CHECK: loop.for
+  //       CHECK:   loop.for
+  //       CHECK:     %[[VIEW0:.*]] = subview %[[ARG0]]
+  //       CHECK:     %[[VIEW1:.*]] = subview %[[ARG1]]
+  //       CHECK:     %[[VIEW2:.*]] = subview %[[ARG2]]
+  //       CHECK:     linalg.generic
+  //  CHECK-SAME:       %[[VIEW0]]
+  //  CHECK-SAME:       %[[VIEW1]]
+  //  CHECK-SAME:       %[[VIEW2]]
+  //       CHECK: return
+  func @tile_only(%arg0: memref<4x8xi32>, %arg1: memref<4x8xi32>,
+                  %arg2: memref<4x8xi32>)
+  attributes
+    {iree.executable.export,
+     iree.executable.workgroup_size = dense<[32, 4, 1]> : vector<3xi32>} {
+    linalg.generic
+      {args_in = 2 : i64, args_out = 1 : i64,
+       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]} %arg0, %arg1, %arg2 {
+    ^bb0(%arg3: i32, %arg4: i32, %arg5: i32):
+      %0 = addi %arg3, %arg4 : i32
+      linalg.yield %0 : i32
+    }: memref<4x8xi32>, memref<4x8xi32>, memref<4x8xi32>
+    return
+  }
+}
+
+// -----
+
+module {
+  // CHECK-LABEL: func @sequential
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<10xi32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<i32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<i32>
+  func @sequential(%arg0: memref<10xi32>, %arg1: memref<i32>,
+                   %arg2: memref<i32>)
+  attributes
+    {iree.executable.export,
+     iree.executable.workgroup_size = dense<1> : vector<3xi32>} {
+    //      CHECK: %[[C0:.*]] = constant 0 : index
+    //      CHECK: %[[C1:.*]] = constant 1 : index
+    //      CHECK: loop.for %{{.*}} = %[[C0]] to %[[C1]]
+    //      CHECK:   loop.for %{{.*}} = %[[C0]] to %[[C1]]
+    //      CHECK:     linalg.indexed_generic
+    // CHECK-SAME:       %[[ARG0]]
+    // CHECK-SAME:       %[[ARG1]]
+    // CHECK-SAME:       %[[ARG2]]
+    linalg.indexed_generic
+      {args_in = 2 : i64, args_out = 1 : i64,
+       indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>,
+                        affine_map<(d0) -> ()>],
+       iterator_types = ["reduction"]} %arg0, %arg1, %arg2 {
+    ^bb0(%arg3: index, %arg4: i32, %arg5: i32, %arg6: i32):
+      %c0 = constant 0 : index
+      %cst = constant true
+      %0 = cmpi "eq", %arg3, %c0 : index
+      %1 = and %cst, %0 : i1
+      %2 = select %1, %arg5, %arg6 : i32
+      %3 = addi %arg4, %2 : i32
+      linalg.yield %3 : i32
+    }: memref<10xi32>, memref<i32>, memref<i32>
+    return
+  }
+}
+
+// -----
+
+module {
+  // CHECK-LABEL: func @tile_and_fuse
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<?x?xf32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<?x?xf32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<?x?xf32>
+  //  CHECK-SAME: %[[ARG3:[a-zA-Z0-9_]*]]: memref<?x?xf32>
+  //       CHECK: loop.for
+  //       CHECK:   loop.for
+  //   CHECK-DAG:     %[[VIEW0:.*]] = subview %[[ARG0]]
+  //   CHECK-DAG:     %[[VIEW1:.*]] = subview %[[ARG1]]
+  //   CHECK-DAG:     %[[VIEW2READ:.*]] = subview %[[ARG2]]
+  //   CHECK-DAG:     %[[VIEW2WRITE:.*]] = subview %[[ARG2]]
+  //   CHECK-DAG:     %[[VIEW3:.*]] = subview %[[ARG3]]
+  //       CHECK:     linalg.generic
+  //  CHECK-SAME:       %[[VIEW0]]
+  //  CHECK-SAME:       %[[VIEW1]]
+  //  CHECK-SAME:       %[[VIEW2WRITE]]
+  //       CHECK:     linalg.generic
+  //  CHECK-SAME:       %[[VIEW2READ]]
+  //  CHECK-SAME:       %[[VIEW3]]
+  func @tile_and_fuse(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>,
+                      %arg2: memref<?x?xf32>, %arg3: memref<?x?xf32>)
+  attributes
+    {iree.executable.export,
+     iree.executable.workgroup_size = dense<[32, 4, 1]> : vector<3xi32>} {
+    linalg.generic
+      {args_in = 2 : i64, args_out = 1 : i64,
+       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]} %arg0, %arg1, %arg2 {
+    ^bb0(%arg4: f32, %arg5: f32, %arg6: f32):
+      %0 = addf %arg4, %arg5 : f32
+      linalg.yield %0 : f32
+    }: memref<?x?xf32>, memref<?x?xf32>, memref<?x?xf32>
+    linalg.generic
+      {args_in = 1 : i64, args_out = 1 : i64,
+       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                        affine_map<(d0, d1) -> (d0, d1)>],
+       iterator_types = ["parallel", "parallel"]} %arg2, %arg3 {
+    ^bb0(%arg7: f32, %arg8: f32):
+      %1 = mulf %arg7, %arg7 : f32
+      linalg.yield %1 : f32
+    }: memref<?x?xf32>, memref<?x?xf32>
+    return
+  }
+}
