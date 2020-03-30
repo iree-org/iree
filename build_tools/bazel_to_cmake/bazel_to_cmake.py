@@ -149,8 +149,8 @@ class BuildFileFunctions(object):
     # explicitly specified) and None (argument left as default).
     if values is None:
       return ""
-    values_list = "\n".join(["    \"%s\"" % (v) for v in values])
-    return "  %s\n%s\n" % (name, values_list)
+    values_list = "\n".join([f'    "{v}"' for v in values])
+    return f"  {name}\n{values_list}\n"
 
   def _convert_flags_block(self, flags):
     return self._convert_string_list_block("FLAGS", flags)
@@ -579,18 +579,12 @@ class BuildFileFunctions(object):
     args_block = self._convert_string_list_block("ARGS", args)
 
     self.converter.body += ("iree_check_test_suite(\n"
-                            "%(name_block)s"
-                            "%(srcs_block)s"
-                            "%(target_backends_block)s"
-                            "%(drivers_block)s"
-                            "%(args_block)s"
-                            ")\n\n" % {
-                                "name_block": name_block,
-                                "srcs_block": srcs_block,
-                                "target_backends_block": target_backends_block,
-                                "drivers_block": drivers_block,
-                                "args_block": args_block,
-                            })
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{target_backends_block}"
+                            f"{drivers_block}"
+                            f"{args_block}"
+                            ")\n\n")
 
 
 class Converter(object):
