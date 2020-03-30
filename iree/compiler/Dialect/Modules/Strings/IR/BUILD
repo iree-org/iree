@@ -101,6 +101,7 @@ iree_tablegen_doc(
     td_file = "Ops.td",
     td_srcs = [
         ":td_files",
+        "//iree/compiler/Dialect/HAL/IR:td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
