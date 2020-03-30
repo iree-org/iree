@@ -53,3 +53,12 @@ iree_tablegen_library(
     -gen-op-decls ShapeOps.h.inc
     -gen-op-defs ShapeOps.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    ShapeDialectDocGen
+  TD_FILE
+    "ShapeOps.td"
+  OUTS
+    -gen-dialect-doc ShapeDialect.md
+)

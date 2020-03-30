@@ -543,6 +543,27 @@ class BuildFileFunctions(object):
     "tblgen_block": tblgen_block,
     }
 
+  def iree_tablegen_doc(self,
+                        name,
+                        tblgen,
+                        td_file,
+                        tbl_outs,
+                        td_srcs=None,
+                        td_includes=None,
+                        strip_include_prefix=None):
+    name_block = self._convert_name_block(name)
+    tblgen_block = self._convert_tblgen_block(tblgen)
+    td_file_block = self._convert_td_file_block(td_file)
+    outs_block = self._convert_tbl_outs_block(tbl_outs)
+
+    self.converter.body += """iree_tablegen_doc(
+%(name_block)s%(td_file_block)s%(outs_block)s%(tblgen_block)s)\n\n""" % {
+    "name_block": name_block,
+    "td_file_block": td_file_block,
+    "outs_block": outs_block,
+    "tblgen_block": tblgen_block,
+    }
+
   def iree_lit_test_suite(self, name, srcs, data, **kwargs):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)

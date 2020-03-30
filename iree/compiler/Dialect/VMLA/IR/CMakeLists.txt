@@ -97,3 +97,12 @@ iree_tablegen_library(
     -gen-op-interface-decls VMLAOpInterface.h.inc
     -gen-op-interface-defs VMLAOpInterface.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    VMLADialecDocGen
+  TD_FILE
+    "VMLAOps.td"
+  OUTS
+    -gen-dialect-doc VMLADialect.md
+)

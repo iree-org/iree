@@ -102,3 +102,12 @@ iree_tablegen_library(
     -gen-op-interface-decls HALOpInterface.h.inc
     -gen-op-interface-defs HALOpInterface.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    HALDialectDocGen
+  TD_FILE
+    "HALOps.td"
+  OUTS
+    -gen-dialect-doc HALDialect.md
+)

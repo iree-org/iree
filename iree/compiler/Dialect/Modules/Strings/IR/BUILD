@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -79,6 +80,20 @@ gentbl(
     tbl_outs = [
         ("-gen-op-decls", "Ops.h.inc"),
         ("-gen-op-defs", "Ops.cc.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "Ops.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "DialectDocGen",
+    tbl_outs = [
+        ("-gen-dialect-doc", "StringsDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "Ops.td",

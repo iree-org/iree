@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -78,6 +79,21 @@ gentbl(
     tbl_outs = [
         ("-gen-op-decls", "TensorListOps.h.inc"),
         ("-gen-op-defs", "TensorListOps.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "TensorListOps.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "//iree/compiler/Dialect/HAL/IR:td_files",
+        "@llvm-project//mlir:StdOpsTdFiles",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "TensorListDialectDocGen",
+    tbl_outs = [
+        ("-gen-dialect-doc", "TensorListDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "TensorListOps.td",

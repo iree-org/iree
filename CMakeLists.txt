@@ -37,6 +37,7 @@ option(IREE_ENABLE_TRACING "Enables WTF tracing." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
+option(IREE_BUILD_DOCS "Builds IREE docs." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_DEBUGGER "Builds the IREE debugger app." OFF)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
@@ -66,6 +67,7 @@ include(iree_cc_binary)
 include(iree_cc_library)
 include(iree_cc_test)
 include(iree_tablegen_library)
+include(iree_tablegen_doc)
 include(iree_cc_embed_data)
 include(iree_bytecode_module)
 include(iree_glslang)
@@ -166,6 +168,17 @@ endif()
 
 if(${IREE_BUILD_PYTHON_BINDINGS})
   add_subdirectory(third_party/pybind11 EXCLUDE_FROM_ALL)
+endif()
+
+#-------------------------------------------------------------------------------
+# IREE top-level targets
+#-------------------------------------------------------------------------------
+
+if(${IREE_BUILD_DOCS})
+  # Add a top-level custom target to drive generating all documentation.
+  # Register it to the default target given that IREE_BUILD_DOCS is explicitly
+  # requested.
+  add_custom_target(iree-doc ALL)
 endif()
 
 #-------------------------------------------------------------------------------

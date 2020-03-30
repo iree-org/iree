@@ -90,3 +90,12 @@ iree_tablegen_library(
     -gen-op-interface-decls VMOpInterface.h.inc
     -gen-op-interface-defs VMOpInterface.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    VMDialectDocGen
+  TD_FILE
+    "VMOps.td"
+  OUTS
+    -gen-dialect-doc VMDialect.md
+)

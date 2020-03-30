@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+load("//build_tools/bazel:iree_tablegen_doc.bzl", "iree_tablegen_doc")
 load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
@@ -62,6 +63,22 @@ gentbl(
     tbl_outs = [
         ("-gen-op-decls", "ShapeOps.h.inc"),
         ("-gen-op-defs", "ShapeOps.cpp.inc"),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "ShapeOps.td",
+    td_srcs = [
+        ":td_files",
+        "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
+        "@llvm-project//mlir:include/mlir/IR/OpAsmInterface.td",
+    ],
+)
+
+iree_tablegen_doc(
+    name = "ShapeDialectDocGen",
+    tbl_outs = [
+        ("-gen-dialect-doc", "ShapeDialect.md"),
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "ShapeOps.td",

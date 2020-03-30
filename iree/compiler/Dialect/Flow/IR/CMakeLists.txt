@@ -74,3 +74,12 @@ iree_tablegen_library(
     -gen-op-decls FlowOps.h.inc
     -gen-op-defs FlowOps.cpp.inc
 )
+
+iree_tablegen_doc(
+  NAME
+    FlowDialectDocGen
+  TD_FILE
+    "FlowOps.td"
+  OUTS
+    -gen-dialect-doc FlowDialect.md
+)
