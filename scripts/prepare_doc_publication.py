@@ -79,7 +79,7 @@ def process_file(basedir, relpath, filename):
     # Organize each doc to a section matching its directory structure.
     if relpath and relpath != '.':
         front_matter['parent'] = relpath
-        front_matter['permalink'] = '{}/{}'.format(relpath, front_matter['permalink'])
+        front_matter['permalink'] = f'{relpath}/{front_matter["permalink"]}'
 
     # Find the title and TOC.
     lines = content.splitlines()
@@ -99,7 +99,7 @@ def process_file(basedir, relpath, filename):
 
     # Set the title in front matter and disable it to show up in TOC.
     if title_line_index is not None:
-        front_matter['title'] = '"{}"'.format(lines[title_line_index][2:])
+        front_matter['title'] = f'"{lines[title_line_index][2:]}"'
         lines.insert(title_line_index + 1, '{: .no_toc }')
     else:
         front_matter['title'] = base_name
@@ -111,15 +111,15 @@ def process_file(basedir, relpath, filename):
         front_matter['nav_order'] = NAVI_ORDER_DICT[filename]
 
     # Compose the content prefix for front matter.
-    prefix = '\n'.join(['{}: {}'.format(k, v) for (k, v) in front_matter.items()])
-    prefix = '\n'.join(['---', prefix, '---\n'])
+    prefix = '\n'.join([f'{k}: {v}' for (k, v) in front_matter.items()])
+    prefix = '\n'.join(['---', prefix, '---\n\n'])
 
     # Compose the new content.
     content = '\n'.join(lines)
 
     # Update in place.
     with open(full_path, 'w') as f:
-        f.write('{}{}'.format(prefix, content))
+        f.write(f'{prefix}{content}')
 
 
 def process_directory(basedir):
