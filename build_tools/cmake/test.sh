@@ -40,7 +40,7 @@ declare -a label_exclude_args=(
   # Put the whole directory with anchors for exact matches.
   # For example:
   #   ^bindings/python/pyiree/rt$
-
+  ^bindings$
   # Exclude all tests in some subdirectories.
   # Put the whole parent directory with only a starting anchor.
   # Use a trailing slash to avoid prefix collisions.
