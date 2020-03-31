@@ -24,6 +24,8 @@ iree_lit_test_suite(
     iree::modules::check::iree-check-module
     iree::tools::IreeFileCheck
     iree::tools::iree-translate
+  LABELS
+    "hostonly"
 )
 
 iree_check_test_suite(

@@ -47,4 +47,7 @@ iree_cc_test(
     iree::testing::gtest_main
     iree::vm
     iree::vm::bytecode_module
+  LABELS
+    "noga"
+    "nokokoro"
 )
