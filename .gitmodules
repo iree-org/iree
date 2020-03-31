@@ -56,4 +56,4 @@
 	url = https://github.com/KhronosGroup/Vulkan-ExtensionLayer
 [submodule "third_party/ruy"]
 	path = third_party/ruy
-	url = https://github.com/gmngeoffrey/ruy
+	url = https://github.com/google/ruy
