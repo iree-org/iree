@@ -22,6 +22,8 @@ include(CMakeParseArguments)
 # NAME: name of test
 # SRCS: List of source file
 # DEPS: List of deps the test requires
+# LABELS: Additional labels to apply to the test. The package path is added
+#     automatically.
 
 function(iree_py_test)
   if(NOT IREE_BUILD_TESTS)
@@ -32,19 +34,25 @@ function(iree_py_test)
     _RULE
     ""
     "NAME"
-    "SRCS;DEPS"
+    "SRCS;DEPS;LABELS"
     ${ARGN}
   )
 
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
+  string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})
+  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
+
   add_test(
-    NAME ${_NAME}
+    NAME ${_NAME_PATH}
     COMMAND ${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.sh ${PYTHON_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/${_RULE_SRCS}"
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
   )
-  set_property(TEST ${_NAME} PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH};TEST_TMPDIR=${_NAME}_test_tmpdir")
+
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
+  set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "PYTHONPATH=${CMAKE_BINARY_DIR}/bindings/python:$ENV{PYTHONPATH};TEST_TMPDIR=${_NAME}_test_tmpdir")
   # TODO(marbre): Find out how to add deps to tests.
   #               Similar to _RULE_DATA in iree_lit_test().
 
