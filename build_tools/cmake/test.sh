@@ -29,27 +29,28 @@ export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with the directory it is in.
-# Note that due to the way cmake parses arguments, these args can't be stuck
-# together in one string or with an equals.
 declare -a label_exclude_args=(
   # Exclude specific labels.
   # Put the whole label with anchors for exact matches.
   # For example:
-  #   --label-exclude ^driver=vulkan$
-  --label-exclude ^driver=vulkan$
-
+  #   ^driver=vulkan$
+  ^driver=vulkan$
+  ^nokokoro$
   # Exclude all tests in a directory.
   # Put the whole directory with anchors for exact matches.
   # For example:
-  #   --label-exclude ^bindings/python/pyiree/rt$
+  #   ^bindings/python/pyiree/rt$
 
   # Exclude all tests in some subdirectories.
   # Put the whole parent directory with only a starting anchor.
   # Use a trailing slash to avoid prefix collisions.
   # For example:
-  #   --label-exclude ^bindings/
-  --label-exclude ^bindings/
+  #   ^bindings/
+  ^bindings/
 )
 
+# Join on "|"
+label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
+
 cd ${ROOT_DIR?}/build
-ctest "${label_exclude_args[@]?}"
+ctest --label-exclude "${label_exclude_regex?}"

@@ -27,8 +27,8 @@ include(CMakeParseArguments)
 #   DRIVER: driver to run the module with.
 #   ARGS: additional args to pass to iree-check-module. The driver and input
 #       file are passed automatically.
-#   LABELS: Additional labels to apply to the test. The package path is added
-#       automatically.
+#   LABELS: Additional labels to apply to the test. The package path and
+#       "driver=${DRIVER}" are added automatically.
 function(iree_check_test)
   cmake_parse_arguments(
     _RULE
@@ -95,10 +95,10 @@ function(iree_check_test)
       "${_RULE_ARGS}"
   )
 
-  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}" "driver=${_RULE_DRIVER}")
   set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")
   set_property(TEST "${_NAME_PATH}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-  set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_PACKAGE_PATH}")
+  set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()
 
 
