@@ -98,7 +98,7 @@ iree_cc_library(
     MLIRLoopOps
     MLIRLoopOpsTransforms
     MLIRLoopsToGPU
-    MLIRQuantOps
+    MLIRQuant
     MLIRQuantizerTransforms
     MLIRSDBM
     MLIRSPIRV
