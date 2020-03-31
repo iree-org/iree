@@ -24,24 +24,24 @@ class LinSpaceModule(tf.Module):
 
   @tf.function(input_signature=[
       tf.TensorSpec([], tf.float32),
-      tf.TensorSpec([], tf.float32),
-      tf.TensorSpec([], tf.int32)
+      tf.TensorSpec([], tf.float32)
   ])
-  def linspace(self, start, stop, num):
+  def linspace(self, start, stop):
+    # 'num' is const because XLA's iota operation does not support dynamic
+    # shapes.
+    num = np.array(3, dtype=np.int32)
     return tf.linspace(start, stop, num)
 
 
-# TODO(jennik): Get this test working on IREE by implementing the linspace op in
-# MLIR.
-@tf_test_utils.compile_modules(backends=["tf"], linspace=LinSpaceModule)
+@tf_test_utils.compile_modules(
+    backends=["tf", "iree_vmla", "iree_vulkan"], linspace=LinSpaceModule)
 class LinspaceTest(tf_test_utils.SavedModelTestCase):
 
   def test_linspace(self):
     start = np.array(10., dtype=np.float32)
     stop = np.array(12., dtype=np.float32)
-    num = np.array(3, dtype=np.int32)
 
-    result = self.modules.linspace.all.linspace(start, stop, num)
+    result = self.modules.linspace.all.linspace(start, stop)
     result.assert_all_close()
 
 
