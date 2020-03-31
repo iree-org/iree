@@ -530,11 +530,11 @@ class HALModuleState final {
       vm::ref<iree_hal_executable_layout_t> executable_layout, uint32_t offset,
       absl::Span<const uint32_t> values) {
     IREE_TRACE_SCOPE0("HALModuleState::CommandBufferPushConstants");
-    RETURN_IF_ERROR(FromApiStatus(
-        iree_hal_command_buffer_push_constants(command_buffer.get(),
-                                               executable_layout.get(), offset,
-                                               values.data(), values.size()),
-        IREE_LOC));
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_command_buffer_push_constants(
+                          command_buffer.get(), executable_layout.get(), offset,
+                          values.data(), values.size() * sizeof(uint32_t)),
+                      IREE_LOC));
     return OkStatus();
   }
 
