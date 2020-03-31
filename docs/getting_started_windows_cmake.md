@@ -1,5 +1,15 @@
 # Getting Started on Windows with CMake
 
+<!--
+Notes to those updating this guide:
+
+    * This document should be __simple__ and cover essential items only.
+      Notes for optional components should go in separate files.
+
+    * This document parallels getting_started_linux_cmake.md.
+      Please keep them in sync.
+-->
+
 ## Prerequisites
 
 ### Install CMake
