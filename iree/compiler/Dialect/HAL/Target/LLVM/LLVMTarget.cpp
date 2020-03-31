@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/IRBuilder.h"
@@ -43,6 +44,9 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
   return targetOptions;
 }
 
+// TODO(ataei): This is written as a stub in LLVM IR. It would be easier to have
+// this using MLIR and lower it to LLVM like the dispatch function
+// implementation is.
 static void CreateInvocationFunc(const std::string& name,
                                  llvm::Module* module) {
   auto& ctx = module->getContext();
@@ -78,6 +82,45 @@ static void CreateInvocationFunc(const std::string& name,
   builder.CreateRetVoid();
 }
 
+namespace {
+
+/// Clones the dispatch function implementation into a module to be later passed
+/// onto LLVM lowering.
+struct DispatchFnImplRewritePattern : public OpRewritePattern<FuncOp> {
+  using OpRewritePattern<FuncOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(FuncOp funcOp,
+                                PatternRewriter& rewriter) const override {
+    if (!isDispatchFuncImpl(funcOp)) return failure();
+    // Create a module to put the impl function in.
+    auto moduleOp = rewriter.create<ModuleOp>(funcOp.getLoc());
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointToStart(moduleOp.getBody());
+    auto dispatchFnName = getDispatchFuncName(funcOp);
+    FuncOp newFuncOp =
+        rewriter.create<FuncOp>(funcOp.getLoc(), dispatchFnName.getValue(),
+                                funcOp.getType(), ArrayRef<NamedAttribute>{});
+    rewriter.cloneRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
+                               newFuncOp.end());
+    // To record that this function has been processed, remove the dispatch fn
+    // attribute.
+    rewriter.updateRootInPlace(
+        funcOp, [&funcOp]() { funcOp.removeAttr(getDispatchFuncAttrName()); });
+    return success();
+  }
+};
+
+/// Converting from Linalg to LLVM needs to run on a module and since it
+/// applies a full conversion, make a module with jst the impl function.
+struct PrepareForLLVMLoweringPass : ModulePass<PrepareForLLVMLoweringPass> {
+  void runOnModule() override {
+    OwningRewritePatternList patterns;
+    MLIRContext* context = &getContext();
+    patterns.insert<DispatchFnImplRewritePattern>(context);
+    applyPatternsGreedily(getModule(), patterns);
+  }
+};
+}  // namespace
+
 // Adds a sequence of passess to a given pass manager that progressively lower
 // from HLO to LLVM throught linalg dialect.
 void buildLLVMTransformPassPipeline(OpPassManager& pm) {
@@ -95,9 +138,11 @@ void buildLLVMTransformPassPipeline(OpPassManager& pm) {
   pm.addPass(createCSEPass());
 
   // (Linalg, STD) -> LLVM
-  pm.addPass(createConvertLinalgToLLVMPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  pm.addPass(std::make_unique<PrepareForLLVMLoweringPass>());
+  OpPassManager& llvmPassManager = pm.nest<ModuleOp>();
+  llvmPassManager.addPass(createConvertLinalgToLLVMPass());
+  llvmPassManager.addPass(createCanonicalizerPass());
+  llvmPassManager.addPass(createCSEPass());
 }
 
 LogicalResult translateToLLVMExecutable(
@@ -109,24 +154,30 @@ LogicalResult translateToLLVMExecutable(
   auto sourceOp = executableOp.getSourceOp().clone();
   auto sourceOpErase =
       llvm::make_scope_exit([&sourceOp]() { sourceOp.erase(); });
+  auto sourceModuleOp = sourceOp.getInnerModule();
   auto flowExecutableOp =
-      *sourceOp.getInnerModule().getOps<IREE::Flow::ExecutableOp>().begin();
+      *sourceModuleOp.getOps<IREE::Flow::ExecutableOp>().begin();
   auto moduleOp = flowExecutableOp.getInnerModule();
-  if (failed(makeLegacyExecutableABI(sourceOp))) {
-    return failure();
-  }
 
   // Lower module to LLVM Dialect.
   PassManager conversionPassManager(moduleOp.getContext());
   applyPassManagerCLOptions(conversionPassManager);
-  buildLLVMTransformPassPipeline(conversionPassManager);
-  if (failed(conversionPassManager.run(moduleOp)))
+  conversionPassManager.addPass(createHALInterfaceToMemrefPass());
+  buildLLVMTransformPassPipeline(
+      conversionPassManager.nest<IREE::Flow::ExecutableOp>().nest<ModuleOp>());
+  if (failed(conversionPassManager.run(sourceModuleOp)))
     return moduleOp.emitError()
            << "failed to run IREE -> LLVM conversion passes";
 
+  // Get the module to be passed to llvm lowering.
+  auto llvmModuleOps = moduleOp.getOps<ModuleOp>();
+  if (!mlir::has_single_element(llvmModuleOps)) {
+    return moduleOp.emitError(
+        "expected single sub-module that is to be lowered to LLVM IR");
+  }
   // At this moment we are leaving MLIR LLVM dialect land translating module
   // into target independent LLVMIR.
-  auto llvmModule = mlir::translateModuleToLLVMIR(moduleOp);
+  auto llvmModule = mlir::translateModuleToLLVMIR(*llvmModuleOps.begin());
   iree::LLVMIRExecutableDefT llvmIrExecutableDef;
 
   // Create invocation function an populate entry_points.

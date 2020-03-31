@@ -2,7 +2,8 @@
 
 // CHECK: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @dynamic_shape
-func @dynamic_shape(%operand: tensor<?x?xf32>) {
+func @dynamic_shape(%operand: tensor<?x?xf32>)
+attributes {iree.dispatch_fn_name = ""} {
   %result = "xla_hlo.exp"(%operand) : (tensor<?x?xf32>) -> tensor<?x?xf32>
   return
 }

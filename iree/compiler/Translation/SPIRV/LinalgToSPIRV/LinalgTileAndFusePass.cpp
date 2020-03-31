@@ -57,7 +57,14 @@ static void getDefaultTileSizes(unsigned numDims,
 
 /// Returns the number of "outer" parallel loops specified in the `linalgOp`.
 static unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
-  if (isa<linalg::ConvOp>(linalgOp.getOperation())) return 0;
+  if (auto convOp = dyn_cast<linalg::ConvOp>(linalgOp.getOperation())) {
+    Optional<DenseIntElementsAttr> padding = convOp.padding();
+    if (padding && llvm::any_of(padding.getValue().getValues<APInt>(),
+                                [](APInt intVal) -> bool {
+                                  return intVal.getSExtValue();
+                                }))
+      return convOp.getNumBatchDimensions();
+  }
   return linalgOp.iterator_types()
       .getValue()
       .take_while([](Attribute attr) {
@@ -217,7 +224,7 @@ struct TileAndFuseLinalgOpPattern
 void LinalgTileAndFusePass::runOnFunction() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getFunction();
-  if (!isDispatchFunction(funcOp)) return;
+  if (!isDispatchFuncImpl(funcOp)) return;
 
   Region &body = funcOp.getBody();
   // Only handle single block functions.
@@ -243,9 +250,12 @@ void LinalgTileAndFusePass::runOnFunction() {
   patterns.insert<SequentialExecutionPattern<linalg::ConvOp>,
                   SequentialExecutionPattern<linalg::GenericOp>,
                   SequentialExecutionPattern<linalg::IndexedGenericOp>,
+                  TileLinalgOpPattern<linalg::ConvOp>,
+                  TileLinalgOpPattern<linalg::CopyOp>,
                   TileLinalgOpPattern<linalg::GenericOp>,
                   TileLinalgOpPattern<linalg::IndexedGenericOp>,
                   TileLinalgOpPattern<linalg::MatmulOp>,
+                  TileAndFuseLinalgOpPattern<linalg::CopyOp>,
                   TileAndFuseLinalgOpPattern<linalg::GenericOp>>(context,
                                                                  tileSizes);
   applyPatternsGreedily(getOperation(), patterns);
@@ -276,9 +286,9 @@ void LinalgTileAndFusePass::runOnFunction() {
         return IntegerAttr::get(IndexType::get(context), v);
       },
       updatedWorkGroupSize);
-  // TODO(b/150312935): Switch to update the HAL interface directly.
-  funcOp.setAttr("iree.executable.workgroup_size",
-                 ArrayAttr::get(attrs, context));
+
+  if (failed(updateWorkGroupSize(funcOp, updatedWorkGroupSize)))
+    return signalPassFailure();
 }
 
 std::unique_ptr<OpPassBase<FuncOp>> createLinalgTileAndFusePass(

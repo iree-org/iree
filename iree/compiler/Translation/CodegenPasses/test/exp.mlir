@@ -2,7 +2,7 @@
 
 // CHECK: [[MAP0:#.*]] = affine_map<(d0, d1) -> (d0, d1)>
 // CHECK: func @exp
-func @exp(%operand: tensor<2x2xf32>) {
+func @exp(%operand: tensor<2x2xf32>) attributes {iree.dispatch_fn_name = ""} {
   %result = "xla_hlo.exp"(%operand) : (tensor<2x2xf32>) -> tensor<2x2xf32>
   return
 }

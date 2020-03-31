@@ -141,7 +141,7 @@ void IREEToSPIRVPass::runOnModule() {
   // Check if there are any dispatch functions.
   SmallVector<FuncOp, 1> fns;
   module.walk([&fns](FuncOp funcOp) {
-    if (isDispatchFunction(funcOp)) {
+    if (isDispatchFuncImpl(funcOp)) {
       // If there are not iree.store_output operations, just return as nothing
       // to do.
       auto walkResult = funcOp.walk([](IREE::StoreOutputOp op) -> WalkResult {
@@ -178,7 +178,7 @@ static PassRegistration<IREEToSPIRVPass> ireeToSPIRVPassReg(
     "convert-iree-to-spirv",
     "Convert IREE dispatch functions to SPIR-V dialect");
 
-void addIREEToSPIRVPasses(PassManager &conversionPassManager) {
+void addIREEToSPIRVPasses(OpPassManager &conversionPassManager) {
   // TODO(laurenzo): createLegalizeToStdPass should probably be refactored
   // in terms of conversion patterns and added to above.
   conversionPassManager.addPass(xla_hlo::createLegalizeToStdPass());

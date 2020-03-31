@@ -249,6 +249,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRIR
       MLIRLoopOpsTransforms
       MLIRPass
+      MLIRSPIRVSerialization
       MLIRSupport
       MLIRTranslateClParser
       MLIRTranslation

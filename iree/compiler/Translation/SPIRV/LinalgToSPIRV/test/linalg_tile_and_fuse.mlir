@@ -14,7 +14,6 @@ module {
   //  CHECK-SAME:       %[[VIEW0]]
   //  CHECK-SAME:       %[[VIEW1]]
   //  CHECK-SAME:       %[[VIEW2]]
-  //       CHECK: return
   func @tile_only(%arg0: memref<4x8xi32>, %arg1: memref<4x8xi32>,
                   %arg2: memref<4x8xi32>)
   attributes
@@ -118,6 +117,58 @@ module {
       %1 = mulf %arg7, %arg7 : f32
       linalg.yield %1 : f32
     }: memref<?x?xf32>, memref<?x?xf32>
+    return
+  }
+}
+
+// -----
+
+module {
+  // CHECK-LABEL: func @conv_padding
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
+  //       CHECK: loop.for
+  //       CHECK:   %[[VIEW1:.*]] = subview %[[ARG1]]
+  //       CHECK:   %[[VIEW2:.*]] = subview %[[ARG2]]
+  //       CHECK:   linalg.conv
+  //  CHECK-SAME:     %[[VIEW1]]
+  //  CHECK-SAME:     %[[VIEW2]]
+  func @conv_padding(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32>,
+                     %arg2 : memref<?x?x?x?xf32>)
+    attributes
+      {iree.executable.export,
+       iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>} {
+    linalg.conv(%arg0, %arg1, %arg2)
+      {dilations = [1, 1],
+       padding = dense<[[1, 1], [0, 1]]> : tensor<2x2xi64>, strides = [1, 1]} :
+      memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
+    return
+  }
+}
+
+// -----
+
+module {
+  // CHECK-LABEL: func @conv_no_padding
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
+  //       CHECK: loop.for
+  //       CHECK:   loop.for
+  //       CHECK:     loop.for
+  //       CHECK:       %[[VIEW1:.*]] = subview %[[ARG1]]
+  //       CHECK:       %[[VIEW2:.*]] = subview %[[ARG2]]
+  //       CHECK:       linalg.conv
+  //  CHECK-SAME:         %[[VIEW1]]
+  //  CHECK-SAME:         %[[VIEW2]]
+  func @conv_no_padding(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32>,
+                        %arg2 : memref<?x?x?x?xf32>)
+    attributes
+      {iree.executable.export,
+       iree.executable.workgroup_size = dense<[32, 2, 2]> : vector<3xi32>} {
+    linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 1], strides = [1, 1]} :
+      memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
     return
   }
 }

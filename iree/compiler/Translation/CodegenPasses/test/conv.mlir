@@ -1,7 +1,9 @@
 // RUN: iree-opt -iree-hlo-to-linalg-on-buffers %s | IreeFileCheck %s
 
 // CHECK: func @conv
-func @conv(%arg0: memref<3x5x5x3xf32>, %arg1: memref<2x2x3x4xf32>, %arg2: memref<3x5x5x4xf32>) {
+func @conv(%arg0: memref<3x5x5x3xf32>, %arg1: memref<2x2x3x4xf32>,
+           %arg2: memref<3x5x5x4xf32>)
+attributes {iree.dispatch_fn_name = ""} {
   %0 = iree.load_input(%arg0 : memref<3x5x5x3xf32>) : tensor<3x5x5x3xf32>
   %1 = iree.load_input(%arg1 : memref<2x2x3x4xf32>) : tensor<2x2x3x4xf32>
   //      CHECK: linalg.conv(%arg0, %arg1, %arg2) {

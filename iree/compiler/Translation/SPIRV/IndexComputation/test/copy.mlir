@@ -9,7 +9,7 @@ module {
    // CHECK-SAME: result_index
    // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
   func @simple_load_store(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = ""} {
     // CHECK: iree.load_input
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices

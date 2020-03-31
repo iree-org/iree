@@ -92,6 +92,13 @@ static spirv::PointerType convertArgTypeToVariableType(Location loc,
 namespace detail {
 LogicalResult SPIRVCodegenImpl::createEntryFn(
     OpBuilder &builder, FuncOp &fn, TensorIndexToScalarValueMap &valueCache) {
+  auto entryFnAttr = fn.getAttrOfType<spirv::EntryPointABIAttr>(
+      spirv::getEntryPointABIAttrName());
+  if (!entryFnAttr)
+    return fn.emitError(
+        "expected spv.entry_point_abi attribute on dispatch function "
+        "implementation");
+
   auto loc = fn.getLoc();
 
   // Add ABI attributes to function arguments and return values.
@@ -110,8 +117,17 @@ LogicalResult SPIRVCodegenImpl::createEntryFn(
       return failure();
     }
     entryFnArgTypes.emplace_back(convertedArgType);
-    entryFnArgAttrs.emplace_back(spirv::getInterfaceVarABIAttr(
-        0, argType.index(), /*storageClass=*/llvm::None, builder.getContext()));
+    spirv::InterfaceVarABIAttr abiAttr =
+        fn.getArgAttrOfType<spirv::InterfaceVarABIAttr>(
+            argType.index(), spirv::getInterfaceVarABIAttrName());
+    if (!abiAttr) {
+      // TODO(ravishankarm): Default ABI if no ABI is specified. This is just to
+      // make writing tests easily. Within IREE translation the attributes will
+      // be set already.
+      abiAttr = spirv::getInterfaceVarABIAttr(0, argType.index(), {},
+                                              builder.getContext());
+    }
+    entryFnArgAttrs.emplace_back(abiAttr);
   }
 
   // TODO(ravishankarm) : Handle return types. The SPIR-V ABI attribute lowering
@@ -121,15 +137,12 @@ LogicalResult SPIRVCodegenImpl::createEntryFn(
   }
 
   auto entryFnType = builder.getFunctionType(entryFnArgTypes, ArrayRef<Type>());
-  auto entryFn = builder.create<spirv::FuncOp>(loc, fn.getName(), entryFnType);
+  Optional<StringRef> entryFnName = getDispatchFuncName(fn);
+  if (!entryFnName) return fn.emitError("unable to get dispatch function name");
+  auto entryFn =
+      builder.create<spirv::FuncOp>(loc, entryFnName.getValue(), entryFnType);
   entryFn.addEntryBlock();
 
-  SmallVector<int32_t, 3> workGroupSize;
-  if (failed(getWorkGroupSize(fn, workGroupSize))) {
-    return failure();
-  }
-  auto entryFnAttr =
-      spirv::getEntryPointABIAttr(workGroupSize, builder.getContext());
   if (failed(setABIAttrs(entryFn, entryFnAttr, entryFnArgAttrs))) {
     return failure();
   }

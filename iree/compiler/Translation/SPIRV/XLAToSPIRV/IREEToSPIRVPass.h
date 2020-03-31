@@ -31,7 +31,7 @@ namespace iree_compiler {
 std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass();
 
 /// Adds all the passes needed to lower dispatch function to SPIR-V
-void addIREEToSPIRVPasses(PassManager &conversionPassManager);
+void addIREEToSPIRVPasses(OpPassManager &conversionPassManager);
 
 }  // namespace iree_compiler
 }  // namespace mlir

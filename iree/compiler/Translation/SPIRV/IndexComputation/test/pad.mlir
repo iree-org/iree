@@ -9,7 +9,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1) -> (d1 - 4, d0 - 5)>]
   func @pad_zero_interior(%arg0 : memref<12x4xf32>, %arg1 : memref<18x12xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<12x4xf32>) : tensor<12x4xf32>
     %1 = constant dense<0.0> : tensor<f32>
     // CHECK: xla_hlo.pad
@@ -35,7 +35,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1) -> (d1, d0)>]
   func @pad_no_op(%arg0 : memref<12x4xf32>, %arg1 : memref<12x4xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<12x4xf32>) : tensor<12x4xf32>
     %1 = constant dense<0.0> : tensor<f32>
     // CHECK: xla_hlo.pad
@@ -62,7 +62,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1) -> (d1 floordiv 2 - 2, (d0 - 5) floordiv 3)>]
   func @pad_with_stride(%arg0 : memref<12x4xf32>, %arg1 : memref<29x18xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<12x4xf32>) : tensor<12x4xf32>
     %1 = constant dense<0.0> : tensor<f32>
     // CHECK: xla_hlo.pad

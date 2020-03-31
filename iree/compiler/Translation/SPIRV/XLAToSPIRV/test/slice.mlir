@@ -5,7 +5,7 @@ module {
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<36 x f32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<6 x f32 [4]> [0]>, StorageBuffer>
   func @slice_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)
-  attributes {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = "slice_unit_stride"} {
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]
     // CHECK: [[VAL0:%.*]]  = spv.Load "StorageBuffer" [[ARG0LOADPTR]] : f32
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
@@ -24,7 +24,7 @@ module {
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<36 x f32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<6 x f32 [4]> [0]>, StorageBuffer>
   func @slice_non_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)
-  attributes {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = "slice_non_unit_stride"} {
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]
     // CHECK: [[VAL0:%.*]]  = spv.Load "StorageBuffer" [[ARG0LOADPTR]] : f32
     // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]

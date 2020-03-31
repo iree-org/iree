@@ -30,6 +30,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
         "//iree/compiler/Dialect/HAL/Target:LegacyUtil",
         "//iree/compiler/Translation/CodegenPasses",
+        "//iree/compiler/Translation/CodegenUtils",
         "//iree/schemas:llvmir_executable_def_cc_fbs",
         "@llvm-project//llvm:core",
         "@llvm-project//llvm:support",

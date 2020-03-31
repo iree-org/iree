@@ -23,8 +23,10 @@ iree_cc_library(
     "CodegenUtils.cpp"
   DEPS
     MLIRIR
+    MLIRSPIRV
     MLIRStandardOps
     MLIRSupport
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
   ALWAYSLINK
   PUBLIC

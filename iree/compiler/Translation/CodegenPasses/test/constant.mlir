@@ -2,7 +2,7 @@
 
 // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0) -> (d0)>
 // CHECK: func @const
-func @const() -> tensor<5xi32> {
+func @const() -> tensor<5xi32> attributes {iree.dispatch_fn_name = ""} {
   // CHECK: linalg.generic
   // CHECK-SAME: args_in = 0
   // CHECK-SAME: args_out = 1

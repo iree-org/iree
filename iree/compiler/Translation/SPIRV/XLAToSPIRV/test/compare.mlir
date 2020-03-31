@@ -1,7 +1,7 @@
 // RUN: iree-opt -split-input-file -iree-index-computation -simplify-spirv-affine-exprs=false -convert-iree-to-spirv -verify-diagnostics -o - %s | IreeFileCheck %s
 
 func @ieq(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ieq"} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.IEqual
@@ -13,7 +13,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @ineq(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ineq"} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.INotEqual
@@ -25,7 +25,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @islt(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "islt"} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.SLessThan
@@ -37,7 +37,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @isle(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "isle"} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.SLessThanEqual
@@ -49,7 +49,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @isgt(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "isgt"} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.SGreaterThan
@@ -61,7 +61,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @isge(%arg0: memref<4xi32>, %arg1: memref<4xi32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "isge"} {
   %0 = iree.load_input(%arg0 : memref<4xi32>) : tensor<4xi32>
   %1 = iree.load_input(%arg1 : memref<4xi32>) : tensor<4xi32>
   // CHECK: spv.SGreaterThanEqual
@@ -73,7 +73,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @oeq(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "oeq"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FOrdEqual
@@ -85,7 +85,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @oge(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "oge"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FOrdGreaterThanEqual
@@ -97,7 +97,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @ogt(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ogt"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FOrdGreaterThan
@@ -109,7 +109,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @ole(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ole"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FOrdLessThanEqual
@@ -121,7 +121,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @olt(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "olt"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FOrdLessThan
@@ -133,7 +133,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @ueq(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ueq"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FUnordEqual
@@ -145,7 +145,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @uge(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "uge"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FUnordGreaterThanEqual
@@ -157,7 +157,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @ugt(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ugt"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FUnordGreaterThan
@@ -169,7 +169,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @ule(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ule"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FUnordLessThanEqual
@@ -181,7 +181,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @ult(%arg0: memref<4xf32>, %arg1: memref<4xf32>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "ult"} {
   %0 = iree.load_input(%arg0 : memref<4xf32>) : tensor<4xf32>
   %1 = iree.load_input(%arg1 : memref<4xf32>) : tensor<4xf32>
   // CHECK: spv.FUnordLessThan
@@ -193,7 +193,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @beq(%arg0: memref<4xi1>, %arg1: memref<4xi1>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "beq"} {
   %0 = iree.load_input(%arg0 : memref<4xi1>) : tensor<4xi1>
   %1 = iree.load_input(%arg1 : memref<4xi1>) : tensor<4xi1>
   // CHECK: spv.LogicalEqual
@@ -205,7 +205,7 @@ attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index
 // -----
 
 func @bneq(%arg0: memref<4xi1>, %arg1: memref<4xi1>, %arg2: memref<4xi1>)
-attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+attributes {iree.dispatch_fn_name = "bneq"} {
   %0 = iree.load_input(%arg0 : memref<4xi1>) : tensor<4xi1>
   %1 = iree.load_input(%arg1 : memref<4xi1>) : tensor<4xi1>
   // CHECK: spv.LogicalNotEqual

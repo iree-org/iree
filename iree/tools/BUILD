@@ -233,6 +233,7 @@ cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LoopOpsTransforms",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:SPIRVTranslateRegistration",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TranslateClParser",
         "@llvm-project//mlir:Translation",
