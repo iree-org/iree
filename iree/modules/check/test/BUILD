@@ -33,10 +33,7 @@ iree_lit_test_suite(
 
 iree_check_test_suite(
     name = "check",
-    srcs = glob(
-        ["*.mlir"],
-        exclude = ["failure.mlir"],
-    ),
+    srcs = ["success.mlir"],
 )
 
 iree_check_test_suite(

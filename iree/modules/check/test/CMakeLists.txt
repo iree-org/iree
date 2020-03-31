@@ -25,3 +25,19 @@ iree_lit_test_suite(
     iree::tools::IreeFileCheck
     iree::tools::iree-translate
 )
+
+iree_check_test_suite(
+  NAME
+    check
+  SRCS
+    "success.mlir"
+)
+
+iree_check_test_suite(
+  NAME
+    check_failure
+  SRCS
+    "failure.mlir"
+  ARGS
+    "--expect_failure"
+)

@@ -144,9 +144,16 @@ class BuildFileFunctions(object):
       return ""
     return f'  CPP_NAMESPACE\n    "{cpp_namespace}"\n'
 
+  def _convert_string_list_block(self, name, values):
+    # Note this deliberately distinguishes between an empty list (argument
+    # explicitly specified) and None (argument left as default).
+    if values is None:
+      return ""
+    values_list = "\n".join([f'    "{v}"' for v in values])
+    return f"  {name}\n{values_list}\n"
+
   def _convert_flags_block(self, flags):
-    flags_list = "\n".join([f'    "{flag}"' for flag in flags])
-    return f"  FLAGS\n{flags_list}\n"
+    return self._convert_string_list_block("FLAGS", flags)
 
   def _convert_translate_tool_block(self, translate_tool):
     if translate_tool and translate_tool != "//iree/tools:iree-translate":
@@ -551,6 +558,32 @@ class BuildFileFunctions(object):
                             f"{name_block}"
                             f"{srcs_block}"
                             f"{data_block}"
+                            f")\n\n")
+
+  def iree_check_test_suite(self,
+                            name,
+                            srcs=None,
+                            target_backends_and_drivers=None,
+                            args=None,
+                            **kwargs):
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
+    target_backends = None
+    drivers = None
+    if target_backends_and_drivers is not None:
+      target_backends = [it[0] for it in target_backends_and_drivers]
+      drivers = [it[1] for it in target_backends_and_drivers]
+    target_backends_block = self._convert_string_list_block(
+        "TARGET_BACKENDS", target_backends)
+    drivers_block = self._convert_string_list_block("DRIVERS", drivers)
+    args_block = self._convert_string_list_block("ARGS", args)
+
+    self.converter.body += (f"iree_check_test_suite(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{target_backends_block}"
+                            f"{drivers_block}"
+                            f"{args_block}"
                             f")\n\n")
 
 
