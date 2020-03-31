@@ -112,7 +112,7 @@ def main(args):
     if returncode != 0:
       print('!!! ERROR EVALUATING: {}'.format(command), end='')
       exit(1)
-    print('--- COMPLETE ---' + '-' * 64 + '\n')
+    print('--- COMPLETE ---{}\n'.format('-' * 64))
 
 if __name__ == "__main__":
   main(parse_arguments())
