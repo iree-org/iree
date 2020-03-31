@@ -37,11 +37,11 @@ typedef struct strings_string_tensor {
   size_t rank;
 } strings_string_tensor_t;
 
-IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string, strings_string_t);
-IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string_tensor, strings_string_tensor_t);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
+
+IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string, strings_string_t);
+IREE_VM_DECLARE_TYPE_ADAPTERS(strings_string_tensor, strings_string_tensor_t);
 
 #endif  // IREE_MODULES_STRINGS_STRINGS_API_DETAIL_H_
