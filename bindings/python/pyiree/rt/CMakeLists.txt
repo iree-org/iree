@@ -105,8 +105,6 @@ iree_py_test(
     system_api_test
   SRCS
     "system_api_test.py"
-  LABELS
-    "nokokoro_cmake"
 )
 
 iree_py_test(
