@@ -64,6 +64,11 @@ Configure:
 $ cmake -B build/ .
 ```
 
+> Tip:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;The root
+[CMakeLists.txt](https://github.com/google/iree/blob/master/CMakeLists.txt) file
+has options for configuring which parts of the project to enable.
+
 Build all targets:
 
 ```shell
