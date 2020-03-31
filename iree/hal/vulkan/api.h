@@ -56,9 +56,6 @@ typedef enum {
 
   // Use vkCmdPushDescriptorSetKHR.
   IREE_HAL_VULKAN_ENABLE_PUSH_DESCRIPTORS = 1 << 2,
-
-  // Use VK_KHR_timeline_semaphore.
-  IREE_HAL_VULKAN_ENABLE_TIMELINE_SEMAPHORES = 1 << 3,
 } iree_hal_vulkan_features_t;
 
 // Vulkan driver creation options.

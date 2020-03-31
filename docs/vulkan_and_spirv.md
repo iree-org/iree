@@ -135,6 +135,18 @@ include the path to the associated manifest file (see the
 [docs](https://vulkan.lunarg.com/doc/view/latest/windows/loader_and_layer_interface.html)
 for details).
 
+### Development tips
+
+Bazel runs tests in a sandbox and environment variables must be passed through
+to the test runner. Consider putting environment setup in a `user.bazelrc`. For
+example:
+
+```
+test --test_env="LD_LIBRARY_PATH={ABSOLUTE_PATH_TO_VULKAN_SDK}/x86_64/lib/"
+test --test_env="LD_PRELOAD=libvulkan.so.1"
+test --test_env="VK_LAYER_PATH=$VK_LAYER_PATH:{ABSOLUTE_PATH_TO_BUILD_DIR}/vulkan_extensionlayer/layers"
+```
+
 ## SPIR-V
 
 ### Minimum Requirements
