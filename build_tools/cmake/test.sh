@@ -27,23 +27,13 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
-EXCLUDED_TESTS=(
-    iree/compiler/Translation/SPIRV/LinalgToSPIRV/test:pw_add.mlir.test
-    iree/hal/vulkan:dynamic_symbols_test
-    iree/test/e2e/xla:rem.mlir.test
-    bindings_python_pyiree_rt_function_abi_test
-    bindings_python_pyiree_rt_system_api_test
-    bindings_python_pyiree_rt_vm_test
-    bindings_python_pyiree_rt_hal_test # TODO: Enable after the VM is fixed
-    bindings_python_pyiree_compiler_compiler_test # TODO: Enable after the VM is fixed
-    # TODO(b/146898896) get label-based exclusions working
-    iree/modules/check/test:check_success.mlir_vulkan-spirv_vulkan
-    iree/modules/check/test:check_failure_failure.mlir_vulkan-spirv_vulkan
+EXCLUDED_LABELS=(
+  "nokokoro_cmake"
 )
 
 # Join with | and add anchors
-EXCLUDED_REGEX="^($(IFS="|" ; echo "${EXCLUDED_TESTS[*]?}"))$"
+EXCLUDED_REGEX="^($(IFS="|" ; echo "${EXCLUDED_LABELS[*]?}"))$"
 
 cd ${ROOT_DIR?}/build
-ctest -E "${EXCLUDED_REGEX?}"
+ctest -LE "${EXCLUDED_REGEX?}"
 

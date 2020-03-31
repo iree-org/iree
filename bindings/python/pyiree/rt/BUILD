@@ -159,6 +159,7 @@ iree_py_test(
         # TODO(b/145815906) Get this running in OSS CI.
         "noga",
         "nokokoro",
+        "nokokoro_cmake",
     ],
     deps = NUMPY_DEPS + [
         ":system_api",
