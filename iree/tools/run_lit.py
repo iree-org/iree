@@ -20,6 +20,8 @@ import re
 import subprocess
 from typing import List, Tuple, Union
 
+RUNLINE_PREFIX = '// RUN:'
+
 
 def parse_arguments():
   parser = argparse.ArgumentParser(description="run_lit.py helper.")
@@ -32,8 +34,9 @@ def parse_arguments():
 def execute_in_shell(command: str,
                      shell: str = '/bin/bash') -> Tuple[Union[str, int]]:
   """Executes command and returns its stdout, stderr and returncode."""
-  p = subprocess.Popen([shell, command], shell=True, stdout=subprocess.PIPE,
-                       stderr=subprocess.PIPE)
+  command = 'set -o pipefail; ' + command
+  p = subprocess.Popen(command, shell=True, executable=shell,
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   stdout, stderr = p.communicate()
   return stdout, stderr, p.returncode
 
@@ -53,17 +56,16 @@ def find_runfiles(runfiles_dir: str) -> List[str]:
 
 def get_runline_commands(test_file: str) -> List[str]:
   """Returns all of the commands listed in the given test file."""
-  with open(test_file, 'r') as f:
-    lines = f.readlines()
   commands = []
-  for i, line in enumerate(lines):
-    match = re.match('^// RUN: *', line)
-    if match:
-      commands.append(line[match.span()[-1]:])
-      if not commands[-1]:
-        print(f'ERROR: Encountered an empty runline on line {i + 1} of '
-              f'{test_file}')
-        exit(1)
+  with open(test_file, 'r') as f:
+    for i, line in enumerate(f):
+      if line.startswith(RUNLINE_PREFIX):
+        command = line[len(RUNLINE_PREFIX):].strip()
+        if not command:
+          print('ERROR: Encountered an empty runline on line '
+                '{} of {}'.fornat(i + 1, test_file))
+          exit(1)
+        commands.append(command)
   return commands
 
 
@@ -85,30 +87,30 @@ def main(args):
   # execute to the path.
   subpath = [os.path.dirname(file) for file in find_runfiles(runfiles_dir)]
   subpath = list(set(subpath))  # Remove duplicate paths.
-  os.environ['PATH'] = f'{":".join(subpath)}:{os.environ["PATH"]}'
+  os.environ['PATH'] = '{}:{}'.format(":".join(subpath), os.environ["PATH"])
 
-  print(f'Running run_lit.py on {args.test_file}')
-  print(f'RUNFILES_DIR: {runfiles_dir}')
-  print(f'Current dir:  {os.getcwd()}\n')
+  print('Running run_lit.py on {}'.format(args.test_file))
+  print('RUNFILES_DIR: {}'.format(runfiles_dir))
+  print('Current dir:  {}\n'.format(os.getcwd()))
 
   # Extract all of the RUN lines in the given test file and ensure there are
   # tests to run.
   commands = get_runline_commands(args.test_file)
   if len(commands) == 0:
-    print(f'!!! No RUN lines found in {args.test_file}')
+    print('!!! No RUN lines found in {}'.format(args.test_file))
     exit(1)
   # Run all of the commands on the shell.
   for command in commands:
     # Substitute any embedded '%s' with the file name.
     command = command.replace('%s', args.test_file)
-    print(f'RUNNING TEST: {command}', end='')
+    print('RUNNING TEST: {}'.format(command), end='')
     print('-' * 80)
 
     stdout, stderr, returncode = execute_in_shell(command)
     print(stdout.decode('utf-8'), end='')
     print(stderr.decode('utf-8'), end='')
-    if returncode:
-      print(f'!!! ERROR EVALUATING: {command}', end='')
+    if returncode != 0:
+      print('!!! ERROR EVALUATING: {}'.format(command), end='')
       exit(1)
     print('--- COMPLETE ---' + '-' * 64 + '\n')
 
