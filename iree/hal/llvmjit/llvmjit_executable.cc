@@ -27,6 +27,7 @@
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/LLVMContext.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 
@@ -58,7 +59,8 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
       execution_engine->addIRModule(std::move(thread_safe_module));
   if (err)
     return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Can't add executable module to execution engine";
+           << "Can't add executable module to execution engine:"
+           << llvm::toString(std::move(err));
 
   auto dylib_serarch_generator =
       llvm::orc::DynamicLibrarySearchGenerator::GetForCurrentProcess(
