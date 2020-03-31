@@ -110,6 +110,8 @@ function(iree_cc_library)
         PUBLIC
           "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
           "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
+          "$<INSTALL_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+          "$<INSTALL_INTERFACE:${_RULE_INCLUDES}>"
       )
       target_compile_options(${_NAME}
         PRIVATE
@@ -152,6 +154,7 @@ function(iree_cc_library)
       target_include_directories(${_NAME}
         INTERFACE
           "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
+          "$<INSTALL_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
       )
       target_compile_options(${_NAME}
         INTERFACE

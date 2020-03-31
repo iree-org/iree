@@ -22,7 +22,7 @@ function(external_tablegen_library)
     _RULE
     "TESTONLY"
     "PACKAGE;NAME;ROOT;TBLGEN"
-    "SRCS;OUTS"
+    "SRCS;OUTS;INCLUDES"
     ${ARGN}
   )
 
@@ -35,8 +35,10 @@ function(external_tablegen_library)
     list(TRANSFORM _RULE_SRCS PREPEND ${_RULE_ROOT})
 
     set(LLVM_TARGET_DEFINITIONS ${_RULE_SRCS})
-    set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
-    list(APPEND _INCLUDE_DIRS ${_RULE_ROOT})
+    list(APPEND _INCLUDE_DIRS
+      "${_RULE_INCLUDES}"
+      "${_RULE_ROOT}"
+    )
     list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
     set(_OUTPUTS)
     while(_RULE_OUTS)

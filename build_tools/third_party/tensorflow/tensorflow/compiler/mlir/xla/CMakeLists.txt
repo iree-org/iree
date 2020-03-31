@@ -57,8 +57,8 @@ external_cc_library(
   COPTS
     ${TF_MLIR_XLA_COPTS_BASE}
   INCLUDES
-    ${IREE_ROOT_DIR}/third_party/tensorflow/
-    ${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/
+    ${LLVM_INCLUDE_DIRS}
+    ${TENSORFLOW_INCLUDE_DIRS}
   DEPS
     absl::core_headers
     absl::flat_hash_set
@@ -88,6 +88,9 @@ external_tablegen_library(
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
     "transforms/canonicalize.td"
+  INCLUDES
+    ${LLVM_INCLUDE_DIRS}
+    ${TENSORFLOW_INCLUDE_DIRS}
   OUTS
     -gen-rewriters transforms/generated_canonicalize.inc
 )
@@ -103,6 +106,9 @@ external_tablegen_library(
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
     "ir/hlo_ops.td"
+  INCLUDES
+    ${LLVM_INCLUDE_DIRS}
+    ${TENSORFLOW_INCLUDE_DIRS}
   OUTS
     -gen-op-decls ir/hlo_ops.h.inc
     -gen-op-defs ir/hlo_ops.cc.inc
@@ -121,6 +127,9 @@ external_tablegen_library(
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
     "ir/hlo_client_ops.td"
+  INCLUDES
+    ${LLVM_INCLUDE_DIRS}
+    ${TENSORFLOW_INCLUDE_DIRS}
   OUTS
     -gen-op-decls ir/hlo_client_ops.h.inc
     -gen-op-defs ir/hlo_client_ops.cc.inc
@@ -137,6 +146,9 @@ external_tablegen_library(
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
     "ir/hlo_ops_base.td"
+  INCLUDES
+    ${LLVM_INCLUDE_DIRS}
+    ${TENSORFLOW_INCLUDE_DIRS}
   OUTS
     -gen-op-decls ir/hlo_ops_base.h.inc
     -gen-op-defs ir/hlo_ops_base.cc.inc
@@ -153,6 +165,9 @@ external_tablegen_library(
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
     "transforms/legalize_to_standard_patterns.td"
+  INCLUDES
+    ${LLVM_INCLUDE_DIRS}
+    ${TENSORFLOW_INCLUDE_DIRS}
   OUTS
     -gen-rewriters transforms/generated_legalize_to_standard.inc
 )
@@ -168,6 +183,9 @@ external_tablegen_library(
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
     "ir/lhlo_ops.td"
+  INCLUDES
+    ${LLVM_INCLUDE_DIRS}
+    ${TENSORFLOW_INCLUDE_DIRS}
   OUTS
     -gen-op-decls ir/lhlo_ops.h.inc
     -gen-op-defs ir/lhlo_ops.cc.inc

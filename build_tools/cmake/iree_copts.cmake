@@ -22,8 +22,9 @@ set(IREE_CXX_STANDARD 14)
 
 set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
+  "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}>"
+  "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}>"
+  "$<INSTALL_INTERFACE:include/>"
 )
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
@@ -131,11 +132,11 @@ set(LLVM_TARGETS_TO_BUILD "WebAssembly;X86" CACHE STRING "" FORCE)
 set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+list(APPEND LLVM_INCLUDE_DIRS
+  "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include>"
+  "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include>"
+  "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include>"
+  "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include>"
 )
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
@@ -145,14 +146,15 @@ set(IREE_TABLEGEN_EXE iree-tblgen)
 # Third party: tensorflow
 #-------------------------------------------------------------------------------
 
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
-)
+list(APPEND TENSORFLOW_INCLUDE_DIRS
+  ${PROJECT_SOURCE_DIR}/third_party/tensorflow
+  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
+  )
 
 #-------------------------------------------------------------------------------
 # Third party: tracing
 #-------------------------------------------------------------------------------
 
-list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/google_tracing_framework/bindings/cpp/include
+list(APPEND TRACING_FRAMEWORK_INCLUDE_DIRS
+  ${PROJECT_SOURCE_DIR}/third_party/google_tracing_framework/bindings/cpp/include
 )

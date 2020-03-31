@@ -118,9 +118,9 @@ function(external_cc_library)
           ${_RULE_HDRS}
       )
       target_include_directories(${_NAME}
-        PUBLIC
-          "$<BUILD_INTERFACE:${IREE_COMMON_INCLUDE_DIRS}>"
-          "$<BUILD_INTERFACE:${_RULE_INCLUDES}>"
+        PRIVATE
+          ${IREE_COMMON_INCLUDE_DIRS}
+          ${_RULE_INCLUDES}
       )
       target_compile_options(${_NAME}
         PRIVATE

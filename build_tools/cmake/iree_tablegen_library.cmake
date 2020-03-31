@@ -22,7 +22,7 @@ function(iree_tablegen_library)
     _RULE
     "TESTONLY"
     "NAME;TBLGEN"
-    "TD_FILE;OUTS"
+    "TD_FILE;OUTS;INCLUDES"
     ${ARGN}
   )
 
@@ -38,8 +38,12 @@ function(iree_tablegen_library)
     endif()
 
     set(LLVM_TARGET_DEFINITIONS ${_RULE_TD_FILE})
-    set(_INCLUDE_DIRS ${IREE_COMMON_INCLUDE_DIRS})
-    list(APPEND _INCLUDE_DIRS ${CMAKE_CURRENT_SOURCE_DIR})
+    list(APPEND _INCLUDE_DIRS
+      "${IREE_COMMON_INCLUDE_DIRS}"
+      "${LLVM_INCLUDE_DIRS}"
+      "${_RULE_INCLUDES}"
+    )
+    list(FILTER _INCLUDE_DIRS EXCLUDE REGEX "^$")
     list(TRANSFORM _INCLUDE_DIRS PREPEND "-I")
     set(_OUTPUTS)
     while(_RULE_OUTS)
