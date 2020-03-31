@@ -53,6 +53,11 @@ static llvm::cl::opt<bool> verifyPasses(
     llvm::cl::desc("Run the verifier after each transformation pass"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> allowUnregisteredDialects(
+    "allow-unregistered-dialect",
+    llvm::cl::desc("Allow operation with no registered dialects"),
+    llvm::cl::init(true));
+
 int main(int argc, char **argv) {
   mlir::registerMlirDialects();
   mlir::registerMlirPasses();
@@ -82,5 +87,5 @@ int main(int argc, char **argv) {
 
   return failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
                                   splitInputFile, verifyDiagnostics,
-                                  verifyPasses));
+                                  verifyPasses, allowUnregisteredDialects));
 }
