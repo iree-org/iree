@@ -196,7 +196,7 @@ iree_cc_test(
     iree::hal::vulkan::dynamic_symbols
     iree::testing::gtest_main
   LABELS
-    nokokoro
+    "nokokoro"
 )
 
 iree_cc_library(
