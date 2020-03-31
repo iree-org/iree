@@ -28,7 +28,7 @@ export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
 # Tests to exclude by label. In addition to any custom labels (which are carried
-# over from Bazel tags, every test should be labeled with the directory it is in.
+# over from Bazel tags), every test should be labeled with the directory it is in.
 # Note that due to the way cmake parses arguments, these args can't be stuck
 # together in one string or with an equals.
 declare -a label_exclude_args=(
