@@ -222,9 +222,16 @@ linalg::ConvOp ConvOpConversion::apply(
   auto stridesArg = ArrayAttr::get(strides, op.getContext());
   auto dilationArg = ArrayAttr::get(dilation, op.getContext());
 
-  return rewriter.create<linalg::ConvOp>(op.getLoc(), args[1], args[0],
-                                         results[0], stridesArg, dilationArg,
-                                         op.paddingAttr());
+  // Set padding only if it is non-zero.
+  DenseIntElementsAttr padding = op.paddingAttr();
+  return rewriter.create<linalg::ConvOp>(
+      op.getLoc(), args[1], args[0], results[0], stridesArg, dilationArg,
+      (padding && llvm::any_of(padding.getValues<APInt>(),
+                               [](APInt intVal) -> bool {
+                                 return intVal.getSExtValue();
+                               })
+           ? padding
+           : nullptr));
 }
 
 // ----------------------------------------------------------------------------

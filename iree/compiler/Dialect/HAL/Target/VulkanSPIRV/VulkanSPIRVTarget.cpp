@@ -234,7 +234,6 @@ LogicalResult translateToVulkanSPIRVExecutable(
     }
 
     // Drop the gpu.container_module attribute.
-    moduleOp.removeAttr("gpu.container_module");
     propagateModifiedExecutableABI(flowExecutableOp, moduleOp, executableOp);
     auto spvModuleOps = moduleOp.getOps<spirv::ModuleOp>();
     if (std::distance(spvModuleOps.begin(), spvModuleOps.end()) != 1) {

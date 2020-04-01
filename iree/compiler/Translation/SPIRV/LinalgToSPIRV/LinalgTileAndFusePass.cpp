@@ -57,7 +57,10 @@ static void getDefaultTileSizes(unsigned numDims,
 
 /// Returns the number of "outer" parallel loops specified in the `linalgOp`.
 static unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
-  if (isa<linalg::ConvOp>(linalgOp.getOperation())) return 0;
+  if (auto convOp = dyn_cast<linalg::ConvOp>(linalgOp.getOperation())) {
+    Optional<DenseIntElementsAttr> padding = convOp.padding();
+    if (padding) return convOp.getNumBatchDimensions();
+  }
   return linalgOp.iterator_types()
       .getValue()
       .take_while([](Attribute attr) {
@@ -246,6 +249,7 @@ void LinalgTileAndFusePass::runOnFunction() {
                   TileLinalgOpPattern<linalg::GenericOp>,
                   TileLinalgOpPattern<linalg::IndexedGenericOp>,
                   TileLinalgOpPattern<linalg::MatmulOp>,
+                  TileLinalgOpPattern<linalg::ConvOp>,
                   TileAndFuseLinalgOpPattern<linalg::GenericOp>>(context,
                                                                  tileSizes);
   applyPatternsGreedily(getOperation(), patterns);

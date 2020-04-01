@@ -93,18 +93,26 @@ struct LoopsToGPUPass : public FunctionPass<LoopsToGPUPass> {
     if (failed(getWorkGroupSize(funcOp, workGroupSizeVec))) return;
     ArrayRef<int64_t> workGroupSize = dropTrailingOnes(workGroupSizeVec);
 
-    // For now just use number of workgroups to be [1, 1, 1]. The loop to GPU
-    // lowering doesnt use the value of number of workgroups in the codegen
-    // itself, but rather only uses this in the gpu.launch op which is
-    // irrelevant for IREE.
-    // TODO(ravishankarm): Fix the GPU lowering to allow not using gpu.launch at
-    // all.
-    SmallVector<int64_t, 3> numWorkGroups(workGroupSize.size(), 1);
-
     SmallVector<Value, 3> numWorkGroupsVal, workGroupSizeVal;
+
+    // The number of workgroups passed in the conversion should not be
+    // considered while generating the device-side code. To avoid some
+    // optimization/folding to kick in, allocate variables for the number of
+    // workgroups. This allocated value should not be used within the region of
+    // the gpu.launch, but if it is the compilation will fail due to ABI
+    // mismatch.
     numWorkGroupsVal.reserve(3);
+    OpBuilder builder(funcOp.getBody());
+    auto indexType = IndexType::get(funcOp.getContext());
+    auto int32Type = IntegerType::get(32, funcOp.getContext());
+    auto resultType = MemRefType::get(ArrayRef<int64_t>(), int32Type);
+    for (unsigned i = 0, e = workGroupSize.size(); i != e; ++i) {
+      auto allocOp = builder.create<AllocOp>(funcOp.getLoc(), resultType);
+      auto loadVal = builder.create<LoadOp>(funcOp.getLoc(), allocOp);
+      numWorkGroupsVal.push_back(
+          builder.create<IndexCastOp>(funcOp.getLoc(), loadVal, indexType));
+    }
     workGroupSizeVal.reserve(3);
-    createConstantsInFunc(funcOp, numWorkGroups, numWorkGroupsVal);
     createConstantsInFunc(funcOp, workGroupSize, workGroupSizeVal);
     for (Block &block : getFunction())
       for (Operation &op : llvm::make_early_inc_range(block))
