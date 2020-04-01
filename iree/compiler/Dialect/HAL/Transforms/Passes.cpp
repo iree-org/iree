@@ -33,7 +33,19 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createMaterializeInterfacesPass(executableOptions));
   passManager.addPass(createTranslateExecutablesPass(executableOptions));
   passManager.addPass(createConvertFlowToHALPass());
+
+  // Phase ordering note: Before this pass, functions signatures will be based
+  // on explicit shape types (such as ranked_shape). After this pass, these
+  // composite types will be expanded to primitives (i.e. one 'index' for each
+  // dynamic dim in the case of ranked_shape).
+  passManager.addPass(createExpandFunctionRankedShapeDimsPass());
+
+  // For each exported function, processes the reflection metadata and
+  // generates public ABI wrappers for various calling conventions.
+  // Phase ordering note: This operates on functions whose signatures have
+  // been expanded to primitives.
   passManager.addPass(createPublicABIGenerationPass());
+
   passManager.addPass(createMaterializeResourceCachesPass(executableOptions));
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
