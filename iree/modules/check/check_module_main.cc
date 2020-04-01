@@ -29,6 +29,15 @@
 #include "iree/tools/vm_util.h"
 #include "iree/vm/bytecode_module.h"
 
+// On Windows stdin defaults to text mode and will get weird line ending
+// expansion that will corrupt the input binary.
+#if defined(IREE_PLATFORM_WINDOWS)
+#include <fcntl.h>
+#include <io.h>
+#define IREE_FORCE_BINARY_STDIN() setmode(_fileno(stdin), O_BINARY)
+#else
+#define IREE_FORCE_BINARY_STDIN()
+#endif  // IREE_PLATFORM_WINDOWS
 ABSL_FLAG(std::string, input_file, "-",
           "File containing the module to load that contains the entry "
           "function. Defaults to stdin.");
@@ -181,6 +190,7 @@ StatusOr<int> Run() {
 
 extern "C" int main(int argc, char** argv) {
   InitializeEnvironment(&argc, &argv);
+  IREE_FORCE_BINARY_STDIN();
 
   int ret = Run().ValueOrDie();
 
