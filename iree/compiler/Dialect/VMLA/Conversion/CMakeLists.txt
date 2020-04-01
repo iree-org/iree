@@ -24,6 +24,7 @@ iree_cc_library(
     "ConversionTarget.cpp"
     "TypeConverter.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRStandardOps
     MLIRTransforms

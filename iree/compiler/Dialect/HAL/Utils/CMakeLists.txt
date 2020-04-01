@@ -22,11 +22,13 @@ iree_cc_library(
   SRCS
     "TypeUtils.cpp"
   DEPS
+    LLVMSupport
     MLIRIR
     MLIRStandardOps
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
   ALWAYSLINK
   PUBLIC
 )
