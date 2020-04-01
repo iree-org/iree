@@ -14,6 +14,7 @@
 
 # Python
 *.pyc
+**/.ipynb_checkpoints/
 
 # Visual Studio files
 .vs/
