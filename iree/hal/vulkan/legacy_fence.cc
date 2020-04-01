@@ -187,8 +187,10 @@ Status LegacyFence::WaitForFences(VkDeviceHandle* logical_device,
     } else if (deadline == absl::InfinitePast()) {
       timeout_nanos = 0;
     } else {
-      auto relative_nanos = absl::ToInt64Nanoseconds(deadline - absl::Now());
-      timeout_nanos = relative_nanos < 0 ? 0 : relative_nanos;
+      absl::Duration relative = deadline - absl::Now();
+      timeout_nanos = absl::ToInt64Nanoseconds(relative) < 0
+                          ? 0
+                          : absl::ToInt64Nanoseconds(relative);
     }
 
     // Wait on the fences we still need.
