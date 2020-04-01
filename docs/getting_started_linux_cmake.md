@@ -33,16 +33,6 @@ We recommend Clang. GCC is not fully supported.
 $ sudo apt install clang
 ```
 
-Verify the version with `clang++ --version`. We have tested with the following
-versions:
-
-*   6.0.1
-*   8.0.1
-
-There have been issues with the following versions:
-
-*   [9.0.0-2](https://github.com/google/iree/issues/1216)
-
 Set environment variables:
 
 ```shell
