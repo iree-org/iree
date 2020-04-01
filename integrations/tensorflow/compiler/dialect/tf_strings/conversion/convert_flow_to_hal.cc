@@ -52,4 +52,3 @@ void populateTFStringsToHALPatterns(MLIRContext *context,
 }  // namespace TFStrings
 }  // namespace iree_compiler
 }  // namespace mlir
-
