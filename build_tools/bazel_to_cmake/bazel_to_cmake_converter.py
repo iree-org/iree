@@ -264,8 +264,8 @@ class BuildFileFunctions(object):
   def glob(self, include, exclude=None, exclude_directories=1):
     if exclude_directories != 1:
       self._convert_unimplemented_function("glob", "with exclude_directories")
-    if exclude:
-      self._convert_unimplemented_function("glob", "with exclude")
+    if exclude is None:
+      exclude = []
 
     glob_vars = []
     for pattern in include:
@@ -277,9 +277,19 @@ class BuildFileFunctions(object):
         raise NotImplementedError("Recursive globs not supported")
       # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
       var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
-      glob_vars.append(f"${{{var}}}")  # {{ / }} are the escapes for { / }
+      glob_vars.append(var)
       self.converter.body += f"file(GLOB {var} CONFIGURE_DEPENDS {pattern})\n"
-    return glob_vars
+    for pattern in exclude:
+      if "**" in pattern:
+        raise NotImplementedError("Recursive globs not supported")
+      exclude_var = ("_GLOB_" +
+                     pattern.replace("*", "X").replace(".", "_").upper())
+      self.converter.body += (f"file(GLOB {exclude_var} CONFIGURE_DEPENDS "
+                              f"{pattern})\n")
+      for glob_var in glob_vars:
+        self.converter.body += ("list(REMOVE_ITEM " + glob_var + " ${" +
+                                exclude_var + "})\n")
+    return ["${" + var + "}" for var in glob_vars]
 
   # TODO(gcmn) implement these types of functions in a less hard-coded way
   def platform_trampoline_deps(self, basename, path="base"):
