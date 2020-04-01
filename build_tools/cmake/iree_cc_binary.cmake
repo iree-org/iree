@@ -101,6 +101,10 @@ function(iree_cc_binary)
       PRIVATE
         ${_RULE_COPTS}
     )
+    target_link_options(${_NAME}
+      PRIVATE
+        ${_RULE_LINKOPTS}
+    )
     iree_add_data_dependencies(NAME ${_NAME} DATA ${_RULE_DATA})
 
     iree_package_ns(_PACKAGE_NS)
@@ -244,8 +248,6 @@ function(iree_complete_binary_link_options)
         PUBLIC
           ${_ALWAYS_LINK_DEPS}
           ${_STANDARD_DEPS}
-        PRIVATE
-          ${_RULE_LINKOPTS}
       )
     else()
       target_link_libraries(${_NAME}
@@ -254,8 +256,6 @@ function(iree_complete_binary_link_options)
           ${_ALWAYS_LINK_DEPS}
           "-Wl,--no-whole-archive"
           ${_STANDARD_DEPS}
-        PRIVATE
-          ${_RULE_LINKOPTS}
       )
     endif()
   endforeach(_NAME)
