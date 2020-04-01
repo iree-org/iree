@@ -21,6 +21,7 @@ iree_cc_library(
   HDRS
     "Ops.h"
     "Ops.h.inc"
+    "Types.h"
   SRCS
     "Ops.cc"
     "Ops.cc.inc"
