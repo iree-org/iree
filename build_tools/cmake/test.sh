@@ -27,23 +27,33 @@ export CTEST_PARALLEL_LEVEL=${CTEST_PARALLEL_LEVEL:-$(nproc)}
 export IREE_LLVMJIT_DISABLE=${IREE_LLVMJIT_DISABLE:-1}
 export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 
-EXCLUDED_TESTS=(
-    iree/compiler/Translation/SPIRV/LinalgToSPIRV/test:pw_add.mlir.test
-    iree/hal/vulkan:dynamic_symbols_test
-    iree/test/e2e/xla:rem.mlir.test
-    bindings_python_pyiree_rt_function_abi_test
-    bindings_python_pyiree_rt_system_api_test
-    bindings_python_pyiree_rt_vm_test
-    bindings_python_pyiree_rt_hal_test # TODO: Enable after the VM is fixed
-    bindings_python_pyiree_compiler_compiler_test # TODO: Enable after the VM is fixed
-    # TODO(b/146898896) get label-based exclusions working
-    iree/modules/check/test:check_success.mlir_vulkan-spirv_vulkan
-    iree/modules/check/test:check_failure_failure.mlir_vulkan-spirv_vulkan
+# Tests to exclude by label. In addition to any custom labels (which are carried
+# over from Bazel tags), every test should be labeled with the directory it is in.
+declare -a label_exclude_args=(
+  # Exclude specific labels.
+  # Put the whole label with anchors for exact matches.
+  # For example:
+  #   ^driver=vulkan$
+  ^driver=vulkan$
+  ^nokokoro$
+
+  # TODO(b/151445957) Enable the python tests when the Kokoro VMs support them.
+  # See also, https://github.com/google/iree/issues/1346.
+  # Exclude all tests in a directory.
+  # Put the whole directory with anchors for exact matches.
+  # For example:
+  #   ^bindings/python/pyiree/rt$
+  ^bindings$
+  # Exclude all tests in some subdirectories.
+  # Put the whole parent directory with only a starting anchor.
+  # Use a trailing slash to avoid prefix collisions.
+  # For example:
+  #   ^bindings/
+  ^bindings/
 )
 
-# Join with | and add anchors
-EXCLUDED_REGEX="^($(IFS="|" ; echo "${EXCLUDED_TESTS[*]?}"))$"
+# Join on "|"
+label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]?}"))"
 
 cd ${ROOT_DIR?}/build
-ctest -E "${EXCLUDED_REGEX?}"
-
+ctest --label-exclude "${label_exclude_regex?}"

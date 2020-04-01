@@ -195,6 +195,8 @@ iree_cc_test(
     iree::hal::vulkan::status_util
     iree::hal::vulkan::dynamic_symbols
     iree::testing::gtest_main
+  LABELS
+    "nokokoro"
 )
 
 iree_cc_library(

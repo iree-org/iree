@@ -83,9 +83,6 @@ class BuildFileFunctions(object):
     values_list = "\n".join([f'    "{v}"' for v in values])
     return f"  {name}\n{values_list}\n"
 
-  def _convert_flags_block(self, flags):
-    return self._convert_string_list_block("FLAGS", flags)
-
   def _convert_translate_tool_block(self, translate_tool):
     if translate_tool and translate_tool != "//iree/tools:iree-translate":
       # Bazel `//iree/base`     -> CMake `iree::base`
@@ -329,12 +326,20 @@ class BuildFileFunctions(object):
                             f"{testonly_block}"
                             f"  PUBLIC\n)\n\n")
 
-  def cc_test(self, name, hdrs=None, srcs=None, data=None, deps=None, **kwargs):
+  def cc_test(self,
+              name,
+              hdrs=None,
+              srcs=None,
+              data=None,
+              deps=None,
+              tags=None,
+              **kwargs):
     name_block = self._convert_name_block(name)
     hdrs_block = self._convert_hdrs_block(hdrs)
     srcs_block = self._convert_srcs_block(srcs)
     data_block = self._convert_data_block(data)
     deps_block = self._convert_deps_block(deps)
+    labels_block = self._convert_string_list_block("LABELS", tags)
 
     self.converter.body += (f"iree_cc_test(\n"
                             f"{name_block}"
@@ -342,6 +347,7 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{data_block}"
                             f"{deps_block}"
+                            f"{labels_block}"
                             f")\n\n")
 
   def cc_binary(self,
@@ -418,7 +424,7 @@ class BuildFileFunctions(object):
     src_block = self._convert_src_block(src)
     namespace_block = self._convert_cc_namespace_block(cc_namespace)
     translate_tool_block = self._convert_translate_tool_block(translate_tool)
-    flags_block = self._convert_flags_block(flags)
+    flags_block = self._convert_string_list_block("FLAGS", flags)
 
     self.converter.body += (f"iree_bytecode_module(\n"
                             f"{name_block}"
@@ -480,15 +486,17 @@ class BuildFileFunctions(object):
                             f"{tblgen_block}"
                             f")\n\n")
 
-  def iree_lit_test_suite(self, name, srcs, data, **kwargs):
+  def iree_lit_test_suite(self, name, srcs, data, tags=None, **kwargs):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
     data_block = self._convert_data_block(data)
+    labels_block = self._convert_string_list_block("LABELS", tags)
 
     self.converter.body += (f"iree_lit_test_suite(\n"
                             f"{name_block}"
                             f"{srcs_block}"
                             f"{data_block}"
+                            f"{labels_block}"
                             f")\n\n")
 
   def iree_check_test_suite(self,
@@ -496,6 +504,7 @@ class BuildFileFunctions(object):
                             srcs=None,
                             target_backends_and_drivers=None,
                             args=None,
+                            tags=None,
                             **kwargs):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
@@ -508,6 +517,7 @@ class BuildFileFunctions(object):
         "TARGET_BACKENDS", target_backends)
     drivers_block = self._convert_string_list_block("DRIVERS", drivers)
     args_block = self._convert_string_list_block("ARGS", args)
+    labels_block = self._convert_string_list_block("LABELS", tags)
 
     self.converter.body += (f"iree_check_test_suite(\n"
                             f"{name_block}"
@@ -515,6 +525,7 @@ class BuildFileFunctions(object):
                             f"{target_backends_block}"
                             f"{drivers_block}"
                             f"{args_block}"
+                            f"{labels_block}"
                             f")\n\n")
 
 

@@ -25,6 +25,8 @@ include(CMakeParseArguments)
 # TEST_FILE: Test file to run with the lit runner.
 # DATA: Additional data dependencies invoked by the test (e.g. binaries
 #   called in the RUN line)
+# LABELS: Additional labels to apply to the test. The package path is added
+#     automatically.
 #
 # TODO(gcmn): allow using alternative driver
 # A driver other than the default iree/tools/run_lit.sh is not currently supported.
@@ -33,7 +35,7 @@ function(iree_lit_test)
     _RULE
     ""
     "NAME;TEST_FILE"
-    "DATA"
+    "DATA;LABELS"
     ${ARGN}
   )
   if(NOT IREE_BUILD_TESTS)
@@ -70,8 +72,10 @@ function(iree_lit_test)
     WORKING_DIRECTORY
       "${CMAKE_BINARY_DIR}"
   )
+
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}")
   set_property(TEST ${_NAME_PATH} PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_PACKAGE_PATH}")
+  set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY REQUIRED_FILES "${_TEST_FILE_PATH}")
 
   # TODO(gcmn): Figure out how to indicate a dependency on _RULE_DATA being built
@@ -89,6 +93,8 @@ endfunction()
 # SRCS: List of test files to run with the lit runner. Creates one test per source.
 # DATA: Additional data dependencies invoked by the test (e.g. binaries
 #   called in the RUN line)
+# LABELS: Additional labels to apply to the generated tests. The package path is
+#     added automatically.
 #
 # TODO(gcmn): allow using alternative driver
 # A driver other than the default iree/tools/run_lit.sh is not currently supported.
@@ -97,7 +103,7 @@ function(iree_lit_test_suite)
     _RULE
     ""
     "NAME"
-    "SRCS;DATA"
+    "SRCS;DATA;LABELS"
     ${ARGN}
   )
   IF(NOT IREE_BUILD_TESTS)
@@ -113,6 +119,8 @@ function(iree_lit_test_suite)
         "${_TEST_FILE}"
       DATA
         "${_RULE_DATA}"
+      LABELS
+        "${_RULE_LABELS}"
     )
   endforeach()
 endfunction()

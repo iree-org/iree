@@ -21,17 +21,19 @@ include(CMakeParseArguments)
 # Mirrors the bzl rule of the same name.
 #
 # Parameters:
-# NAME: Name of the target
-# SRC: mlir source file to be compiled to an IREE module.
-# TARGET_BACKEND: target backend to compile for.
-# DRIVER: driver to run the module with.
-# ARGS: additional args to pass to iree-check-module. The driver and input
+#   NAME: Name of the target
+#   SRC: mlir source file to be compiled to an IREE module.
+#   TARGET_BACKEND: target backend to compile for.
+#   DRIVER: driver to run the module with.
+#   ARGS: additional args to pass to iree-check-module. The driver and input
 #       file are passed automatically.
+#   LABELS: Additional labels to apply to the test. The package path and
+#       "driver=${DRIVER}" are added automatically.
 function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER"
+    "NAME;SRC;TARGET_BACKEND;DRIVER;LABELS"
     "ARGS"
     ${ARGN}
   )
@@ -93,9 +95,10 @@ function(iree_check_test)
       ${_RULE_ARGS}
   )
 
+  list(APPEND _RULE_LABELS "${_PACKAGE_PATH}" "driver=${_RULE_DRIVER}")
   set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")
   set_property(TEST "${_NAME_PATH}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
-  set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_PACKAGE_PATH}")
+  set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_RULE_LABELS}")
 endfunction()
 
 
@@ -120,12 +123,14 @@ endfunction()
 #   ARGS: additional args to pass to the underlying iree-check-module tests. The
 #       driver and input file are passed automatically. To use different args per
 #       test, create a separate suite or iree_check_test.
+#   LABELS: Additional labels to apply to the generated tests. The package path is
+#       added automatically.
 function(iree_check_test_suite)
   cmake_parse_arguments(
     _RULE
     ""
     "NAME"
-    "SRCS;TARGET_BACKENDS;DRIVERS;ARGS"
+    "SRCS;TARGET_BACKENDS;DRIVERS;ARGS;LABELS"
     ${ARGN}
   )
   if(NOT IREE_BUILD_TESTS)
@@ -162,6 +167,8 @@ function(iree_check_test_suite)
 	  ${_DRIVER}
 	ARGS
 	  ${_RULE_ARGS}
+	LABELS
+	  ${_RULE_LABELS}
       )
     endforeach()
   endforeach()

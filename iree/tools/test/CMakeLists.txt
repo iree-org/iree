@@ -26,4 +26,6 @@ iree_lit_test_suite(
     iree::tools::iree-run-mlir
     iree::tools::iree-run-module
     iree::tools::iree-translate
+  LABELS
+    "hostonly"
 )
