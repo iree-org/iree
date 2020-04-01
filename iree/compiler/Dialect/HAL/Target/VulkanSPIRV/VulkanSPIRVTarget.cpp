@@ -175,8 +175,8 @@ static bool useLinalgPath(ModuleOp moduleOp,
   }
   if (dispatchFn.size() != 1) return false;
   auto walkResult = dispatchFn[0].walk([](Operation *op) -> WalkResult {
-    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ConvOp>(op) ||
-        isa<xla_hlo::DotOp>(op))
+    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ReduceWindowOp>(op) ||
+        isa<xla_hlo::ConvOp>(op) || isa<xla_hlo::DotOp>(op))
       return WalkResult::interrupt();
     return WalkResult::advance();
   });

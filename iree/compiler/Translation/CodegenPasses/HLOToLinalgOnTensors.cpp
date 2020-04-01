@@ -114,8 +114,9 @@ struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
     target.addDynamicallyLegalDialect<xla_hlo::XlaHloDialect>(
         Optional<ConversionTarget::DynamicLegalityCallbackFn>(
             [](Operation* op) {
-              return isa<xla_hlo::ReduceOp>(
-                  op->getParentRegion()->getParentOp());
+              auto parentOp = op->getParentRegion()->getParentOp();
+              return isa<xla_hlo::ReduceOp>(parentOp) ||
+                     isa<xla_hlo::ReduceWindowOp>(parentOp);
             }));
 
     auto func = getFunction();

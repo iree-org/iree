@@ -320,6 +320,105 @@ linalg::CopyOp ReshapeOpConversion::apply(
 }
 
 // -----------------------------------------------------------------------------
+// xla_hlo.reduce_window conversion patterns and utility functions.
+// -----------------------------------------------------------------------------
+
+namespace {
+struct ReduceWindowOpConversion
+    : public ConvertToLinalgBufferOp<
+          ReduceWindowOpConversion, xla_hlo::ReduceWindowOp, linalg::LinalgOp> {
+  using ConvertToLinalgBufferOp<ReduceWindowOpConversion,
+                                xla_hlo::ReduceWindowOp,
+                                linalg::LinalgOp>::ConvertToLinalgBufferOp;
+
+  enum class PoolingType {
+    kMin,
+    kMax,
+    kAdd,
+  };
+
+  PoolingType getPoolingType(Region &region) const;
+
+  linalg::LinalgOp apply(xla_hlo::ReduceWindowOp op, ArrayRef<Value> operands,
+                         ArrayRef<Value> results,
+                         ConversionPatternRewriter &rewriter) const;
+};
+}  // namespace
+
+ReduceWindowOpConversion::PoolingType ReduceWindowOpConversion::getPoolingType(
+    Region &region) const {
+  assert(region.getBlocks().size() == 1 &&
+         "expected the region has exactlly one block");
+  Block &block = region.front();
+  assert(block.getOperations().size() == 2 &&
+         "expected the block has exactlly two operations");
+  auto op = block.begin();
+  if (isa<xla_hlo::MinOp>(op)) return PoolingType::kMin;
+  if (isa<xla_hlo::MaxOp>(op)) return PoolingType::kMax;
+  if (isa<xla_hlo::AddOp>(op)) return PoolingType::kAdd;
+
+  llvm_unreachable("unknown pooling type");
+}
+
+linalg::LinalgOp ReduceWindowOpConversion::apply(
+    xla_hlo::ReduceWindowOp op, ArrayRef<Value> operands,
+    ArrayRef<Value> results, ConversionPatternRewriter &rewriter) const {
+  auto loc = op.getLoc();
+
+  // Initialize the output buffer to `initVal`.
+  auto initVal = rewriter.create<LoadOp>(loc, operands[1]);
+  rewriter.create<linalg::FillOp>(loc, results[0], initVal);
+
+  // Create a fake window dimension.
+  SmallVector<int64_t, 4> shapes;
+  for (auto dim : op.window_dimensions().getValues<int64_t>())
+    shapes.push_back(dim);
+  Type type = rewriter.getIntegerType(32);
+  auto memrefType = MemRefType::get(shapes, type);
+  auto fakeWindowDims = rewriter.create<AllocOp>(loc, memrefType);
+
+  llvm::SmallVector<Attribute, 4> strides;
+  if (op.window_strides().hasValue()) {
+    strides.insert(strides.begin(),
+                   op.window_strides().getValue().getAttributeValues().begin(),
+                   op.window_strides().getValue().getAttributeValues().end());
+  }
+  auto stridesArg = ArrayAttr::get(strides, op.getContext());
+
+  // TODO(hanchung): Use template lambda after migrating to C++20.
+  auto createOp = [&](auto *type_ptr) -> linalg::LinalgOp {
+    return cast<linalg::LinalgOp>(
+        rewriter
+            .create<std::remove_pointer_t<decltype(type_ptr)>>(
+                loc, ArrayRef<Type>{}, operands[0], fakeWindowDims.getResult(),
+                results[0], stridesArg,
+                /*dilations=*/nullptr,
+                /*padding=*/nullptr)
+            .getOperation());
+  };
+  linalg::LinalgOp poolingOp;
+  PoolingType poolingType = getPoolingType(op.body());
+  switch (poolingType) {
+    case PoolingType::kMin: {
+      poolingOp = createOp(static_cast<linalg::PoolingMinOp *>(nullptr));
+      break;
+    }
+    case PoolingType::kMax: {
+      poolingOp = createOp(static_cast<linalg::PoolingMaxOp *>(nullptr));
+      break;
+    }
+    case PoolingType::kAdd: {
+      poolingOp = createOp(static_cast<linalg::PoolingSumOp *>(nullptr));
+      break;
+    }
+  }
+
+  rewriter.create<DeallocOp>(loc, fakeWindowDims);
+
+  return poolingOp;
+}
+
+// -----------------------------------------------------------------------------
 // xla_hlo.reduce conversion patterns and utility functions.
 // -----------------------------------------------------------------------------
 
@@ -641,11 +740,11 @@ void populateHLOToLinalgOnConversionPatterns(
                   IREELoadInputOpConversion, IREEStoreOutputOpConversion,
                   LinalgOpOnTensorConversion<linalg::GenericOp>>(context);
   // Reduce Operation conversions.
-  patterns
-      .insert<ReduceOpConversion, ReduceRegionXLAOpConversion<xla_hlo::AddOp>,
-              ReduceRegionXLAOpConversion<xla_hlo::MinOp>,
-              ReduceRegionXLAOpConversion<xla_hlo::MaxOp>,
-              ReduceRegionReturnOpConversion>(context);
+  patterns.insert<ReduceOpConversion, ReduceWindowOpConversion,
+                  ReduceRegionXLAOpConversion<xla_hlo::AddOp>,
+                  ReduceRegionXLAOpConversion<xla_hlo::MinOp>,
+                  ReduceRegionXLAOpConversion<xla_hlo::MaxOp>,
+                  ReduceRegionReturnOpConversion>(context);
 }
 
 void XLAToLinalgOnBuffersPass::runOnFunction() {
