@@ -1,5 +1,8 @@
 # Getting Started on Linux
 
+**This guide is due for an update. For Linux CMake instructions, see
+[Getting Started on Linux with CMake](getting_started_linux_cmake.md).**
+
 There are many Linux variants. This document provides project-specific
 requirements for setting up your environment and should be relatively
 translatable. It was written for a relatively recent, Debian-derived
