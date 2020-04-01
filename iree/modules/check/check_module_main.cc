@@ -23,15 +23,23 @@
 #include "iree/base/init.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
+#include "iree/base/target_platform.h"
+#include "iree/base/tracing.h"
 #include "iree/modules/check/native_module.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/testing/gtest.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/bytecode_module.h"
 
-ABSL_FLAG(std::string, input_file, "-",
-          "File containing the module to load that contains the entry "
-          "function. Defaults to stdin.");
+// On Windows stdin defaults to text mode and will get weird line ending
+// expansion that will corrupt the input binary.
+#if defined(IREE_PLATFORM_WINDOWS)
+#include <fcntl.h>
+#include <io.h>
+#define IREE_FORCE_BINARY_STDIN() setmode(_fileno(stdin), O_BINARY)
+#else
+#define IREE_FORCE_BINARY_STDIN()
+#endif  // IREE_PLATFORM_WINDOWS
 
 ABSL_FLAG(std::string, driver, "vmla", "Backend driver to use.");
 
@@ -44,18 +52,6 @@ ABSL_FLAG(
 
 namespace iree {
 namespace {
-
-StatusOr<std::string> GetModuleContentsFromFlags() {
-  auto input_file = absl::GetFlag(FLAGS_input_file);
-  std::string contents;
-  if (input_file == "-") {
-    contents = std::string{std::istreambuf_iterator<char>(std::cin),
-                           std::istreambuf_iterator<char>()};
-  } else {
-    ASSIGN_OR_RETURN(contents, file_io::GetFileContents(input_file));
-  }
-  return contents;
-}
 
 class CheckModuleTest : public ::testing::Test {
  public:
@@ -86,7 +82,9 @@ class CheckModuleTest : public ::testing::Test {
   iree_vm_context_t* context_ = nullptr;
 };
 
-StatusOr<int> Run() {
+StatusOr<int> Run(std::string input_file_path) {
+  IREE_TRACE_SCOPE0("iree-check-module");
+
   RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
       << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;
@@ -94,7 +92,14 @@ StatusOr<int> Run() {
       iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance), IREE_LOC))
       << "creating instance";
 
-  ASSIGN_OR_RETURN(auto module_data, GetModuleContentsFromFlags());
+  std::string module_data;
+  if (input_file_path == "-") {
+    module_data = std::string{std::istreambuf_iterator<char>(std::cin),
+                              std::istreambuf_iterator<char>()};
+  } else {
+    ASSIGN_OR_RETURN(module_data, file_io::GetFileContents(input_file_path));
+  }
+
   iree_vm_module_t* input_module = nullptr;
   RETURN_IF_ERROR(LoadBytecodeModule(module_data, &input_module));
 
@@ -181,8 +186,16 @@ StatusOr<int> Run() {
 
 extern "C" int main(int argc, char** argv) {
   InitializeEnvironment(&argc, &argv);
+  IREE_FORCE_BINARY_STDIN();
 
-  int ret = Run().ValueOrDie();
+  if (argc < 2) {
+    LOG(ERROR)
+        << "A binary module file path to run (or - for stdin) must be passed";
+    return -1;
+  }
+  auto input_file_path = std::string(argv[1]);
+
+  int ret = Run(std::move(input_file_path)).ValueOrDie();
 
   if (absl::GetFlag(FLAGS_expect_failure)) {
     if (ret == 0) {

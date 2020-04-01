@@ -79,8 +79,8 @@ function(iree_check_test)
     iree_modules_check_iree-check-module
   )
 
-  string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})                                                                                                    
-  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}") 
+  string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})
+  set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
 
   add_test(
     NAME
@@ -88,9 +88,9 @@ function(iree_check_test)
     COMMAND
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "$<TARGET_FILE:iree_modules_check_iree-check-module>"
-      "--input_file=${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
       "--driver=${_RULE_DRIVER}"
-      "${_RULE_ARGS}"
+      "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
+      ${_RULE_ARGS}
   )
 
   set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")

@@ -51,7 +51,7 @@ def iree_check_test(name, src, target_backend, driver, args = [], tags = [], **k
         name = name,
         args = [
             "--driver=%s" % driver,
-            "--input_file=$(location :%s)" % bytecode_module_name,
+            "$(location :%s)" % bytecode_module_name,
         ] + args,
         data = [":%s" % bytecode_module_name],
         test_binary = "//iree/modules/check:iree-check-module",
