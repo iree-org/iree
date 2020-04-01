@@ -70,14 +70,17 @@ function(iree_bytecode_module)
       DEPENDS ${_TRANSLATE_TOOL}
     )
 
+    if(_RULE_TESTONLY)
+      set(_TESTONLY_ARG "TESTONLY")
+    endif()
+    if(_RULE_PUBLIC)
+      set(_PUBLIC_ARG "PUBLIC")
+    endif()
+
     if(DEFINED _RULE_CC_NAMESPACE)
       iree_cc_embed_data(
         NAME
           "${_RULE_NAME}_cc"
-        PUBLIC
-          "${_RULE_PUBLIC}"
-        TESTONLY
-          "${_RULE_TESTONLY}"
         IDENTIFIER
           "${_RULE_NAME}"
         GENERATED_SRCS
@@ -89,6 +92,8 @@ function(iree_bytecode_module)
         CPP_NAMESPACE
           "${_RULE_CC_NAMESPACE}"
         FLATTEN
+        "${_PUBLIC_ARG}"
+        "${_TESTONLY_ARG}"
       )
     endif()
   endif()

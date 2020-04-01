@@ -53,13 +53,16 @@ function(iree_spirv_kernel_cc_library)
       )
     endforeach(_SRC)
 
+    if(_RULE_TESTONLY)
+      set(_TESTONLY_ARG "TESTONLY")
+    endif()
+    if(_RULE_PUBLIC)
+      set(_PUBLIC_ARG "PUBLIC")
+    endif()
+
     iree_cc_embed_data(
       NAME
         "${_RULE_NAME}"
-      PUBLIC
-        "${_RULE_PUBLIC}"
-      TESTONLY
-        "${_RULE_TESTONLY}"
       GENERATED_SRCS
         "${_SPV_FILES}"
       CC_FILE_OUTPUT
@@ -69,6 +72,8 @@ function(iree_spirv_kernel_cc_library)
       CPP_NAMESPACE
         "mlir::iree_compiler::spirv_kernels"
       FLATTEN
+      "${_PUBLIC_ARG}"
+      "${_TESTONLY_ARG}"
     )
   endif()
 endfunction()

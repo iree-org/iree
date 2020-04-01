@@ -82,12 +82,19 @@ function(iree_cc_embed_data)
       DEPENDS generate_cc_embed_data ${_RULE_SRCS} ${_RULE_GENERATED_SRCS}
     )
 
+    if(_RULE_TESTONLY)
+      set(_TESTONLY_ARG "TESTONLY")
+    endif()
+    if(_RULE_PUBLIC)
+      set(_PUBLIC_ARG "PUBLIC")
+    endif()
+
     iree_cc_library(
       NAME ${_RULE_NAME}
-      PUBLIC ${_RULE_PUBLIC}
-      TESTONLY ${_RULE_TESTONLY}
       HDRS "${_RULE_H_FILE_OUTPUT}"
       SRCS "${_RULE_CC_FILE_OUTPUT}"
+      "${_PUBLIC_ARG}"
+      "${_TESTONLY_ARG}"
     )
   endif()
 endfunction()
