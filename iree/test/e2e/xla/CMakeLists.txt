@@ -15,6 +15,8 @@
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
+file(GLOB _GLOB_REVERSE_MLIR CONFIGURE_DEPENDS reverse.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REVERSE_MLIR})
 iree_lit_test_suite(
   NAME
     lit
@@ -23,4 +25,11 @@ iree_lit_test_suite(
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
+)
+
+iree_check_test_suite(
+  NAME
+    check
+  SRCS
+    "reverse.mlir"
 )

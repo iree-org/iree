@@ -1,14 +1,16 @@
-// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
+func @xla_reverse() attributes { iree.module.export } {
+  %t1 = iree.unfoldable_constant dense<[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]> : tensor<2x3xf32>
 
-// CHECK-LABEL: EXEC @xla_reverse
-func @xla_reverse () -> (tensor<2x3xf32>, tensor <2x3xf32>, tensor <2x3xf32>) {
-  %t1 = iree.unfoldable_constant dense<[[1.0e0, 2.0e0, 3.0e0], [4.0e0, 5.0e0, 6.0e0]]> : tensor<2x3xf32>
-  %0 = "xla_hlo.reverse"(%t1) {dimensions = dense<[0]> : tensor<1xi64>} : (tensor<2x3xf32>) -> tensor<2x3xf32>
-  %1 = "xla_hlo.reverse"(%t1) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<2x3xf32>) -> tensor<2x3xf32>
-  %2 = "xla_hlo.reverse"(%t1) {dimensions = dense<[0, 1]> : tensor<2xi64>} : (tensor<2x3xf32>) -> tensor<2x3xf32>
-  return %0, %1, %2: tensor<2x3xf32>, tensor<2x3xf32>, tensor<2x3xf32>
+  %dim0 = "xla_hlo.reverse"(%t1) {dimensions = dense<[0]> : tensor<1xi64>} : (tensor<2x3xf32>) -> tensor<2x3xf32>
+  %expected_dim0 = iree.unfoldable_constant dense<[[4.0, 5.0, 6.0], [1.0, 2.0, 3.0]]> : tensor<2x3xf32>
+  check.expect_almost_eq(%dim0, %expected_dim0) : tensor<2x3xf32>
+
+  %dim1 = "xla_hlo.reverse"(%t1) {dimensions = dense<[1]> : tensor<1xi64>} : (tensor<2x3xf32>) -> tensor<2x3xf32>
+  %expected_dim1 = iree.unfoldable_constant dense<[[3.0, 2.0, 1.0], [6.0, 5.0, 4.0]]> : tensor<2x3xf32>
+  check.expect_almost_eq(%dim1, %expected_dim1) : tensor<2x3xf32>
+
+  %both_dims = "xla_hlo.reverse"(%t1) {dimensions = dense<[0, 1]> : tensor<2xi64>} : (tensor<2x3xf32>) -> tensor<2x3xf32>
+  %expected_both_dims = iree.unfoldable_constant dense<[[6.0, 5.0, 4.0], [3.0, 2.0, 1.0]]> : tensor<2x3xf32>
+  check.expect_almost_eq(%both_dims, %expected_both_dims) : tensor<2x3xf32>
+  return
 }
-// CHECK: 2x3xf32=[4 5 6][1 2 3]
-// CHECK-NEXT: 2x3xf32=[3 2 1][6 5 4]
-// CHECK-NEXT: 2x3xf32=[6 5 4][3 2 1]

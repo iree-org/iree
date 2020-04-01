@@ -14,6 +14,7 @@
 
 # Tests for end-to-end IREE support starting from the XLA HLO dialect.
 
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test_suite")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -21,11 +22,23 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+CHECK_TESTS = ["reverse.mlir"]
+
+LEGACY_LIT_TESTS = glob(
+    ["*.mlir"],
+    exclude = CHECK_TESTS,
+)
+
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(["*.mlir"]),
+    srcs = LEGACY_LIT_TESTS,
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
     ],
+)
+
+iree_check_test_suite(
+    name = "check",
+    srcs = CHECK_TESTS,
 )
