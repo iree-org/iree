@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Diagnostics.h"
 
 namespace mlir {
@@ -117,6 +118,37 @@ Value buildDegenerateBroadcastRankedShape(
   } else {
     return builder.create<MakeRankedShapeOp>(srcShape.getLoc(), dstRsType,
                                              outputDynamicDims);
+  }
+}
+
+LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
+                                           bool createIntermediateOps,
+                                           SmallVectorImpl<Value> &outDims,
+                                           OpBuilder &builder) {
+  Operation *op = rsValue.getDefiningOp();
+  if (llvm::isa<MakeRankedShapeOp>(op) || llvm::isa<ConstRankedShapeOp>(op)) {
+    unsigned dynamicDimIndex = 0;
+    auto rsType = rsValue.getType().cast<RankedShapeType>();
+    for (int i = 0, e = rsType.getRank(); i < e; ++i) {
+      if (rsType.isDimDynamic(i)) {
+        if (dynamicDimIndex >= op->getNumOperands()) {
+          return emitError(loc, "mismatched dynamic dimensions");
+        }
+        outDims.push_back(op->getOperand(dynamicDimIndex++));
+      } else {
+        outDims.push_back(
+            builder.create<ConstantIndexOp>(loc, rsType.getStaticDim(i)));
+      }
+    }
+    return success();
+  } else if (createIntermediateOps) {
+    auto dimsOp = builder.create<Shape::RankedDimsOp>(loc, rsValue);
+    outDims.resize(dimsOp.result().size());
+    std::copy(dimsOp.result().begin(), dimsOp.result().end(), outDims.begin());
+    return success();
+  } else {
+    return emitError(loc,
+                     "could not resolve ranked dimensions from metadata ops");
   }
 }
 

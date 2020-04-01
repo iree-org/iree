@@ -17,6 +17,9 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -43,11 +46,30 @@ SmallVector<Value, 4> getStaticShapeDims(Location loc, ShapedType shapedType,
   return shape;
 }
 
-SmallVector<Value, 4> getShapeDims(Value shapedValue,
-                                   PatternRewriter &rewriter) {
-  // TODO(benvanik): dynamic shape support.
-  return getStaticShapeDims(shapedValue.getLoc(),
-                            shapedValue.getType().cast<ShapedType>(), rewriter);
+llvm::Optional<SmallVector<Value, 4>> getShapeDims(
+    Location loc, Value shapedValue, ConversionPatternRewriter &rewriter) {
+  ShapedType shapedType = shapedValue.getType().cast<ShapedType>();
+  if (shapedType.hasStaticShape()) {
+    return getStaticShapeDims(loc, shapedType, rewriter);
+  } else {
+    // Dynamic shape lookup.
+    Value rsValue = Shape::buildOrFindRankedShapeForValue(
+        loc, shapedValue, rewriter.getIndexType(), rewriter);
+    if (!rsValue) {
+      return llvm::None;
+    }
+    SmallVector<Value, 4> dims;
+    // Note that in the following, we require that the dims resolve
+    // to discrete SSA values, which in a stream, will be block args.
+    if (failed(Shape::getRankedDimsFromRankedShape(loc, rsValue, false, dims,
+                                                   rewriter))) {
+      return llvm::None;
+    }
+    for (auto &dim : dims) {
+      dim = rewriter.getRemappedValue(dim);
+    }
+    return dims;
+  }
 }
 
 Value TensorRewriteAdaptor::getAllocator() {
@@ -67,11 +89,14 @@ Value TensorRewriteAdaptor::getBuffer() {
 }
 
 Value TensorRewriteAdaptor::getBufferView() {
+  auto shapeDims = getShapeDims();
+  if (!shapeDims) return {};
+
   if (isBufferView()) {
     return newValue;
   } else {
     return rewriter.createOrFold<IREE::HAL::BufferViewCreateOp>(
-        loc, newValue, getShapeDims(), getElementType());
+        loc, newValue, *shapeDims, getElementType());
   }
 }
 
@@ -88,9 +113,8 @@ IntegerAttr TensorRewriteAdaptor::getElementTypeAttr() {
   return IREE::HAL::getElementTypeAttr(getTensorType().getElementType());
 }
 
-SmallVector<Value, 4> TensorRewriteAdaptor::getShapeDims() {
-  // TODO(benvanik): replace with actual ranked shape tracking to newValue.
-  return IREE::HAL::getShapeDims(oldValue, rewriter);
+llvm::Optional<SmallVector<Value, 4>> TensorRewriteAdaptor::getShapeDims() {
+  return IREE::HAL::getShapeDims(loc, oldValue, rewriter);
 }
 
 Value TensorRewriteAdaptor::getByteLength() {
@@ -98,8 +122,10 @@ Value TensorRewriteAdaptor::getByteLength() {
     return rewriter.createOrFold<IREE::HAL::BufferViewByteLengthOp>(
         loc, getBufferView());
   } else {
+    auto shapeDims = getShapeDims();
+    if (!shapeDims) return {};
     return rewriter.createOrFold<IREE::HAL::AllocatorComputeSizeOp>(
-        loc, getAllocator(), getShapeDims(), getElementType());
+        loc, getAllocator(), *shapeDims, getElementType());
   }
 }
 
@@ -108,21 +134,24 @@ Value TensorRewriteAdaptor::computeOffset(ValueRange indices) {
     return rewriter.createOrFold<IREE::HAL::BufferViewComputeOffsetOp>(
         loc, getBufferView(), indices);
   } else {
+    auto shapeDims = getShapeDims();
+    if (!shapeDims) return {};
     return rewriter.createOrFold<IREE::HAL::AllocatorComputeOffsetOp>(
-        loc, getAllocator(), getShapeDims(), getElementType(), indices);
+        loc, getAllocator(), *shapeDims, getElementType(), indices);
   }
 }
 
-TensorRewriteAdaptor::Range TensorRewriteAdaptor::computeRange(
+llvm::Optional<TensorRewriteAdaptor::Range> TensorRewriteAdaptor::computeRange(
     ValueRange indices, ValueRange lengths) {
   if (isBufferView()) {
     auto range = rewriter.create<IREE::HAL::BufferViewComputeRangeOp>(
         loc, getBufferView(), indices, lengths);
     return Range{range.offset(), range.length()};
   } else {
+    auto shapeDims = getShapeDims();
+    if (!shapeDims) return llvm::None;
     auto range = rewriter.create<IREE::HAL::AllocatorComputeRangeOp>(
-        loc, getAllocator(), getShapeDims(), getElementType(), indices,
-        lengths);
+        loc, getAllocator(), *shapeDims, getElementType(), indices, lengths);
     return Range{range.offset(), range.length()};
   }
 }

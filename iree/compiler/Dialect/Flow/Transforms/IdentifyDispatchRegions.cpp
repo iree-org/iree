@@ -18,10 +18,12 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/Flow/Utils/WorkloadUtils.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -57,25 +59,25 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
   if (FlowDialect::isDialectOp(op)) {
     // Ignore things we've already produced as they should only relate to
     // sequencer operations.
-    LLVM_DEBUG(llvm::dbgs()
-               << "NOT DISPATCHABLE (Flow Dialect): " << op->getName() << "\n");
+    LLVM_DEBUG(llvm::dbgs() << "  NOT DISPATCHABLE (Flow Dialect): "
+                            << op->getName() << "\n");
     return false;
   } else if (op->isKnownTerminator()) {
     // Currently we skip all terminators as we want to leave them in the block
     // to keep it valid. Future folding passes may take care of them if they are
     // worth bringing into the dispatch region.
-    LLVM_DEBUG(llvm::dbgs() << "NOT DISPATCHABLE (Known Terminator): "
+    LLVM_DEBUG(llvm::dbgs() << "  NOT DISPATCHABLE (Known Terminator): "
                             << op->getName() << "\n");
     return false;
   } else if (auto callOp = dyn_cast<CallOp>(op)) {
     bool dispatchable = dispatchability.isDispatchable(callOp.getCallee());
     LLVM_DEBUG(llvm::dbgs()
-               << (dispatchable ? "" : "NOT ")
+               << "  " << (dispatchable ? "" : "NOT ")
                << "DISPATCHABLE (Call): " << op->getName() << "\n");
     return dispatchable;
   } else if (isa<CallIndirectOp>(op)) {
     // Indirect calls are not supported in dispatch code.
-    LLVM_DEBUG(llvm::dbgs() << "NOT DISPATCHABLE (Call Indirect): "
+    LLVM_DEBUG(llvm::dbgs() << "  NOT DISPATCHABLE (Call Indirect): "
                             << op->getName() << "\n");
     return false;
   } else if (isa<ConstantOp>(op)) {
@@ -84,21 +86,21 @@ bool isDispatchableOp(Operation *op, Dispatchability &dispatchability) {
     // constants across all dispatches instead of just on an individual basis
     // as we do here.
     LLVM_DEBUG(llvm::dbgs()
-               << "NOT DISPATCHABLE (Constant): " << op->getName() << "\n");
+               << "  NOT DISPATCHABLE (Constant): " << op->getName() << "\n");
     return false;
   } else if (op->getNumResults() &&
              !op->getResult(0).getType().isa<ShapedType>()) {
     // We don't put scalar manipulation into dispatch regions.
     LLVM_DEBUG(llvm::dbgs()
-               << "NOT DISPATCHABLE (Non Shaped): " << op->getName() << "\n");
+               << "  NOT DISPATCHABLE (Non Shaped): " << op->getName() << "\n");
     return false;
   } else if (!isOpOfKnownDialect(op)) {
     // Probably a custom op.
-    LLVM_DEBUG(llvm::dbgs() << "NOT DISPATCHABLE (Unknown Dialect): "
+    LLVM_DEBUG(llvm::dbgs() << "  NOT DISPATCHABLE (Unknown Dialect): "
                             << op->getName() << "\n");
     return false;
   }
-  LLVM_DEBUG(llvm::dbgs() << "DISPATCHABLE: " << op->getName() << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "  DISPATCHABLE: " << op->getName() << "\n");
   return true;
 }
 
@@ -120,7 +122,17 @@ bool isFusionRootOp(Operation *op) {
     // When we do a bit more magic we should allow these ops to fold.
     return false;
   }
+
   return true;
+}
+
+bool isNonFusionRootOp(Operation *op) {
+  // Avoid forming dispatch regions around metadata ops that do no work.
+  if (isa<Shape::TieShapeOp>(op) || isa<Shape::MakeRankedShapeOp>(op)) {
+    return true;
+  }
+
+  return false;
 }
 
 // Returns true if the given |op| can be fused into other ops.
@@ -146,6 +158,7 @@ bool isFusableOp(Operation *op) {
 // Recursively traverses the IR DAG along the operand edges to find ops we are
 // able to fuse and appends them to |subgraph|.
 void gatherFusionOps(Operation *op, Dispatchability &dispatchability,
+                     llvm::ArrayRef<Operation *> metadataOps,
                      llvm::SetVector<Operation *> *subgraph) {
   // Skip ops that are used outside of the subgraph we are building.
   for (auto result : op->getResults()) {
@@ -163,16 +176,107 @@ void gatherFusionOps(Operation *op, Dispatchability &dispatchability,
   // Walk backward up to ops providing our input operands.
   for (auto operand : op->getOperands()) {
     auto *sourceOp = operand.getDefiningOp();
+
+    // Scan any intermediate "metadata" ops which should be included iff they
+    // are between the starting op and a viable target op.
+    llvm::SmallVector<Operation *, 1> nextMetadataOps;
+    while (sourceOp) {
+      if (auto tieShapeOp = llvm::dyn_cast<Shape::TieShapeOp>(sourceOp)) {
+        nextMetadataOps.push_back(tieShapeOp);
+        sourceOp = tieShapeOp.operand().getDefiningOp();
+        continue;
+      }
+      break;
+    }
     if (!sourceOp) continue;
+
     if (subgraph->count(sourceOp) == 0) {
       if (isDispatchableOp(sourceOp, dispatchability) &&
           isFusableOp(sourceOp)) {
-        gatherFusionOps(sourceOp, dispatchability, subgraph);
+        gatherFusionOps(sourceOp, dispatchability, nextMetadataOps, subgraph);
       }
     }
   }
 
+  for (auto *metadataOp : metadataOps) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  : Add metadata op: " << metadataOp->getName() << "\n");
+    subgraph->insert(metadataOp);
+  }
+  LLVM_DEBUG(llvm::dbgs() << "  : Add dispatchable op: " << op->getName()
+                          << "\n");
   subgraph->insert(op);
+}
+
+void extendInboundMetadataOps(llvm::SetVector<Operation *> *subgraph) {
+  llvm::SmallMapVector<Operation *, Operation *, 4> metadataCloneMap;
+  // Discover and create clones.
+  for (Operation *subgraphOp : *subgraph) {
+    if (llvm::isa<Shape::TieShapeOp>(subgraphOp)) continue;
+
+    LLVM_DEBUG(llvm::dbgs() << "  : Extend inbound metadata for: "
+                            << subgraphOp->getName() << "\n");
+    OpBuilder b(subgraphOp->getContext());
+    for (auto operand : subgraphOp->getOperands()) {
+      // Only consider edges outside of the subgraph.
+      Operation *metadataOp = operand.getDefiningOp();
+      if (!metadataOp || subgraph->count(metadataOp) > 0 ||
+          metadataCloneMap.count(metadataOp) > 0)
+        continue;
+
+      if (auto tieShapeOp = llvm::dyn_cast<Shape::TieShapeOp>(metadataOp)) {
+        LLVM_DEBUG(llvm::dbgs() << "    : Duplicating tie_shape op\n");
+        b.setInsertionPointAfter(tieShapeOp);
+        auto duped = b.create<Shape::TieShapeOp>(
+            tieShapeOp.getLoc(), tieShapeOp, tieShapeOp.shape());
+        metadataCloneMap.insert({metadataOp, duped.getOperation()});
+      }
+    }
+  }
+
+  // Replace uses of clones and add to subgraph.
+  for (auto &kv : metadataCloneMap) {
+    Operation *originalOp = kv.first;
+    Operation *dupedOp = kv.second;
+    originalOp->replaceAllUsesWith(dupedOp);
+    dupedOp->replaceUsesOfWith(dupedOp->getResult(0), originalOp->getResult(0));
+    subgraph->insert(dupedOp);
+  }
+}
+
+void extendOutboundMetadataOps(llvm::SetVector<Operation *> *subgraph) {
+  llvm::SmallSetVector<Operation *, 4> metadataOps;
+  // Discover and create clones.
+  for (Operation *subgraphOp : *subgraph) {
+    if (llvm::isa<Shape::TieShapeOp>(subgraphOp)) continue;
+
+    LLVM_DEBUG(llvm::dbgs() << "  : Extend outbound metadata for: "
+                            << subgraphOp->getName() << "\n");
+    OpBuilder b(subgraphOp->getContext());
+    for (auto result : subgraphOp->getResults()) {
+      for (auto &use : result.getUses()) {
+        // Only consider edges outside of the subgraph.
+        Operation *metadataOp = use.getOwner();
+        if (subgraph->count(metadataOp) > 0 || metadataOps.count(metadataOp))
+          continue;
+
+        if (auto tieShapeOp = llvm::dyn_cast<Shape::TieShapeOp>(metadataOp)) {
+          LLVM_DEBUG(llvm::dbgs() << "    : Duplicating tie_shape op\n");
+          b.setInsertionPointAfter(tieShapeOp);
+          auto duped = b.create<Shape::TieShapeOp>(
+              tieShapeOp.getLoc(), tieShapeOp, tieShapeOp.shape());
+          metadataOp->replaceAllUsesWith(duped);
+          duped.getOperation()->replaceUsesOfWith(duped.result(),
+                                                  tieShapeOp.result());
+          metadataOps.insert(metadataOp);
+        }
+      }
+    }
+  }
+
+  for (auto *metadataOp : metadataOps) {
+    subgraph->insert(metadataOp);
+  }
 }
 
 // Finds all ops that can be fused together with the given |rootOp| by searching
@@ -181,12 +285,19 @@ void gatherFusionOps(Operation *op, Dispatchability &dispatchability,
 // end.
 std::vector<Operation *> findFusionSubgraphFromRoot(
     Operation *rootOp, Dispatchability &dispatchability) {
+  LLVM_DEBUG(llvm::dbgs() << "+++ FINDING FUSION SUBGRAPH FROM ROOT: "
+                          << rootOp->getName() << "\n");
   if (!isFusionRootOp(rootOp)) {
+    LLVM_DEBUG(llvm::dbgs() << "--- FUSED TO SINGLE NON-ROOT\n\n");
     return {rootOp};
   }
   llvm::SetVector<Operation *> subgraph;
   subgraph.insert(rootOp);
-  gatherFusionOps(rootOp, dispatchability, &subgraph);
+  gatherFusionOps(rootOp, dispatchability, {}, &subgraph);
+  extendInboundMetadataOps(&subgraph);
+  extendOutboundMetadataOps(&subgraph);
+  LLVM_DEBUG(llvm::dbgs() << "--- FUSED SUBGRAPH OF " << subgraph.size()
+                          << " OPS\n\n");
   return sortOpsTopologically(subgraph);
 }
 
@@ -199,8 +310,18 @@ LogicalResult identifyBlockDispatchRegions(Block *block,
     // Iterate in reverse so we root further along in the op list.
     didFindAnyNewRegions = false;
     for (auto &rootOp : llvm::reverse(*block)) {
+      LLVM_DEBUG(llvm::dbgs() << "-> EVALUATING OP FOR ROOT FUSION: "
+                              << rootOp.getName() << "\n");
+
       if (!isDispatchableOp(&rootOp, dispatchability)) {
         // Op should remain at the sequencer level.
+        LLVM_DEBUG(llvm::dbgs() << "  -SKIP NON DISPATCHABLE OP-\n");
+        continue;
+      }
+      if (isNonFusionRootOp(&rootOp)) {
+        // Don't form a root around ops that cannot be a fusion root (but
+        // may be otherwise dispatchable).
+        LLVM_DEBUG(llvm::dbgs() << "  -SKIP NON FUSION ROOT OP-\n");
         continue;
       }
 

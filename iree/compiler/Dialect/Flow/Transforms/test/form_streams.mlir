@@ -234,3 +234,31 @@ func @callee(%arg0: tensor<4xf32>) -> tensor<4xf32> {
   // CHECK-NEXT: return %0 : tensor<4xf32>
   return %0 : tensor<4xf32>
 }
+
+// CHECK-LABEL: @simple_unary
+// CHECK-SAME: %[[A0:[^:[:space:]]+]]: tensor<?x?xf32>
+// CHECK-SAME: %[[A1:[^:[:space:]]+]]: !shapex.ranked_shape<[?,?]>
+func @simple_unary(%arg0: tensor<?x?xf32>, %arg1: !shapex.ranked_shape<[?,?]>) -> (tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>) {
+  %0 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
+  %1 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
+  %2 = muli %0, %1 : index
+  %3 = shapex.tie_shape %arg0, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  %4 = shapex.ranked_dim %arg1[0] : !shapex.ranked_shape<[?,?]> -> index
+  %5 = shapex.ranked_dim %arg1[1] : !shapex.ranked_shape<[?,?]> -> index
+  // Verify that the fragment captures the tie_shapes and marshals the indices
+  // in as loose index values (not as ranked_shape types).
+  // CHECK: %7 = flow.ex.stream.fragment
+  // CHECK-SAME: %[[STREAM_A0:[^:[:space:]]+]] = %[[A0]] : tensor<?x?xf32>,
+  // CHECK-SAME: %[[STREAM_A1:[^:[:space:]]+]] = %[[UNUSED0:[^:[:space:]]+]] : index,
+  // CHECK-SAME: %[[STREAM_A2:[^:[:space:]]+]] = %[[UNUSED1:[^:[:space:]]+]] : index,
+  // CHECK-SAME: {
+    // CHECK: %[[STREAM_RS0:.+]] = shapex.make_ranked_shape %[[STREAM_A1]], %[[STREAM_A2]]
+    // CHECK: %[[STREAM_R0:.+]] = shapex.tie_shape %[[STREAM_A0]], %[[STREAM_RS0]]
+    // CHECK: %[[STREAM_R1:.+]] = flow.dispatch @simple_unary_ex_dispatch_0
+    // CHECK: %[[STREAM_R2:.+]] = shapex.tie_shape %[[STREAM_R1]], %[[STREAM_RS0]]
+    // CHECK: return %[[STREAM_R2]]
+  // CHECK: }
+  %6 = flow.dispatch @simple_unary_ex_dispatch_0::@simple_unary_ex_dispatch_0[%2 : index](%3, %4, %5) : (tensor<?x?xf32>, index, index) -> tensor<?x?xf32>
+  %7 = shapex.tie_shape %6, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  return %7, %arg1 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+}

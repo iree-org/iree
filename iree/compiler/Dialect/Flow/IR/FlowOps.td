@@ -603,6 +603,8 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
       ValueRange args, ArrayRef<NamedAttribute> attributes = {}
     }]>,
   ];
+
+  let hasCanonicalizer = 1;
 }
 
 #endif  // IREE_DIALECT_FLOW_OPS

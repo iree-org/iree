@@ -17,6 +17,9 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -26,12 +29,96 @@
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/SymbolTable.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Support/LogicalResult.h"
 
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 namespace Flow {
+
+//===----------------------------------------------------------------------===//
+// Streams
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Optimizes stream fragment arguments by:
+//   - Removing any that are not used in the body
+//   - Deduping arguments that refer to the same Value
+struct OptimizeStreamFragmentArgs
+    : public OpRewritePattern<ExStreamFragmentOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(ExStreamFragmentOp op,
+                                PatternRewriter &rewriter) const override {
+    if (op.body().empty()) return failure();
+
+    bool needsMod = false;
+    Block *entryBlock = &op.body().front();
+    llvm::SmallVector<llvm::Optional<BlockArgument>, 8> blockArgReplacements(
+        entryBlock->getNumArguments());
+    assert(op.args().size() == blockArgReplacements.size());
+    llvm::SmallMapVector<Value, BlockArgument, 8> argToBlockMap;
+    for (auto it :
+         llvm::enumerate(llvm::zip(op.args(), entryBlock->getArguments()))) {
+      Value opArg = std::get<0>(it.value());
+      BlockArgument blockArg = std::get<1>(it.value());
+      if (blockArg.getUses().empty()) {
+        // Not used - Drop.
+        needsMod = true;
+        blockArgReplacements[it.index()] = BlockArgument();
+        continue;
+      }
+      auto existingIt = argToBlockMap.find(opArg);
+      if (existingIt == argToBlockMap.end()) {
+        // Not found - Record for deduping.
+        argToBlockMap.insert(std::make_pair(opArg, blockArg));
+      } else {
+        // Found - Replace.
+        needsMod = true;
+        blockArgReplacements[it.index()] = existingIt->second;
+      }
+    }
+
+    if (!needsMod) return failure();
+
+    rewriter.startRootUpdate(op);
+    llvm::SmallVector<Value, 8> newArgs;
+    unsigned blockArgIndex = 0;
+    for (auto it : llvm::zip(op.args(), blockArgReplacements)) {
+      Value currentOpArg = std::get<0>(it);
+      llvm::Optional<BlockArgument> replacement = std::get<1>(it);
+      if (!replacement) {
+        // No change.
+        newArgs.push_back(currentOpArg);
+        blockArgIndex++;
+        continue;
+      } else if (!replacement.getValue()) {
+        // Drop.
+        entryBlock->eraseArgument(blockArgIndex);
+        continue;
+      } else {
+        // Replace.
+        BlockArgument currentBlockArg = entryBlock->getArgument(blockArgIndex);
+        currentBlockArg.replaceAllUsesWith(*replacement);
+        entryBlock->eraseArgument(blockArgIndex);
+      }
+    }
+
+    op.getOperation()->setOperands(newArgs);
+    rewriter.finalizeRootUpdate(op);
+
+    return success();
+  }
+};
+
+}  // namespace
+
+void ExStreamFragmentOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<OptimizeStreamFragmentArgs>(context);
+}
 
 //===----------------------------------------------------------------------===//
 // Variables

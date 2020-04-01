@@ -59,6 +59,16 @@ Value buildDegenerateBroadcastRankedShape(
 Value buildOrFindRankedShapeForValue(Location loc, Value value, Type dimType,
                                      OpBuilder &builder);
 
+// Given a RankedShapeType'd value |rsValue|, populate values for all
+// dimensions. If |createIntermediateOps|, then if the dims cannot be resolved
+// by walking the IR, then a RankedDimsOp is created. If false, then the dims
+// will either be resolved to discrete dimension SSA values (that already
+// exist) or index consts for static dims.
+LogicalResult getRankedDimsFromRankedShape(Location loc, Value rsValue,
+                                           bool createIntermediateOps,
+                                           SmallVectorImpl<Value> &outDims,
+                                           OpBuilder &builder);
+
 }  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

@@ -60,6 +60,8 @@ func @tensorUpdate(%arg0 : tensor<1x1x10xf32>, %arg1 : tensor<5x1x10xf32>) -> te
   // CHECK: [[CMD:%.+]] = hal.command_buffer.create
   // CHECK-NEXT: hal.command_buffer.begin [[CMD]]
   %0 = flow.ex.stream.fragment(%arg2 = %arg0 : tensor<1x1x10xf32>, %arg3 = %arg1 : tensor<5x1x10xf32>, %arg4 = %c4 : index, %arg5 = %c1 : index) -> tensor<5x1x10xf32> {
+    // TODO(laurenzo): Update these checks to be more precise. The regexes can
+    // match too much, masking issues.
     // CHECK: [[UOFF:%.+]], [[ULEN:%.+]] = hal.allocator.compute_range {{%.+}}
     // CHECK: [[TLEN:%.+]] = hal.allocator.compute_size {{%.+}}
     // CHECK-NEXT: hal.command_buffer.copy_buffer [[CMD]], [[TBUF]], [[C0]], [[RET_BUF]], [[C0]], [[TLEN]]
@@ -88,17 +90,23 @@ hal.executable @ex0 {
   }
 }
 
-// CHECK-LABEL: func @dispatchWithDynamicPushIndex
-// Verifies that an unfoldable index push constant is cast to an i32
+// CHECK-LABEL: func @dispatchWithShapeTies
 // CHECK-SAME: (%[[T:.+]]:{{.+}}, %[[BS:.+]]:{{.+}})
-func @dispatchWithDynamicPushIndex(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x128xf32> {
+func @dispatchWithShapeTies(%arg0: tensor<?x128xf32>, %bs : index) -> tensor<?x128xf32> {
+  // CHECK: %[[C128:.+]] = constant 128
   %cst = constant 128 : index
-  // CHECK: %[[BSI32:.+]] = index_cast %[[BS]] : index to i32
-  // CHECK: hal.command_buffer.push_constants
-  // CHECK-SAME: values = [%[[BSI32]]] : i32
+  // Verify that size computation derives from the passed dynamic index.
+  // CHECK: hal.allocator.compute_size %allocator, shape = [%[[BS]], %[[C128]]], element_type = 50331680
+  // Verify that an i32 is pushed.
+  // CHECK: %[[CAST_BS:.+]] = index_cast %[[BS]] : index to i32
+  // CHECK: hal.command_buffer.push_constants %[[UNUSED0:.+]], %[[UNUSED1:.+]], offset = 0, values = [%[[CAST_BS]]] : i32
+  // CHECK: %[[ALLOCATOR0:.+]] = hal.buffer.allocator %[[T]] : !hal.allocator
   %0 = flow.ex.stream.fragment(%arg1 = %cst : index, %arg2 = %arg0 : tensor<?x128xf32>, %arg3 = %bs : index) -> tensor<?x128xf32> {
-    %1 = flow.dispatch @ex0::@entry0[%arg1 : index](%arg2, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
-    flow.return %1 : tensor<?x128xf32>
+    %1 = shapex.make_ranked_shape %arg3 : (index) -> !shapex.ranked_shape<[?,128]>
+    %2 = shapex.tie_shape %arg2, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
+    %3 = flow.dispatch @ex0::@entry0[%arg1 : index](%2, %arg3) : (tensor<?x128xf32>, index) -> tensor<?x128xf32>
+    %4 = shapex.tie_shape %3, %1 : tensor<?x128xf32>, !shapex.ranked_shape<[?,128]>
+    flow.return %4 : tensor<?x128xf32>
   }
   return %0 : tensor<?x128xf32>
 }

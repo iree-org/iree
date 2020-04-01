@@ -16,6 +16,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/Utils/TypeConversion.h"
 #include "iree/compiler/Utils/GraphUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -42,7 +44,25 @@ static bool isStreamableOp(Operation *op) {
   if (auto streamableOp = dyn_cast<StreamableOpInterface>(op)) {
     return streamableOp.isUsableInStream();
   }
+  if (llvm::isa<Shape::TieShapeOp>(op)) {
+    return true;
+  }
   return false;
+}
+
+// Expand any compound types to primitive types in the stream fragment.
+static void expandFragmentToPrimitiveTypes(ExStreamFragmentOp fragmentOp) {
+  auto loc = fragmentOp.getLoc();
+  Block *entryBlock = &fragmentOp.body().front();
+  auto &typeExpander = Shape::getShapeToPrimitiveTypeExpander();
+  OpBuilder expandBuilder(fragmentOp.getContext());
+  typeExpander.expandBlockSignature(loc, entryBlock, expandBuilder);
+  SmallVector<Value, 4> origFragmentArgs(fragmentOp.args());
+  SmallVector<Value, 4> newFragmentArgs;
+  expandBuilder.setInsertionPoint(fragmentOp);
+  typeExpander.expandSourceValuesToTarget(loc, origFragmentArgs,
+                                          newFragmentArgs, expandBuilder);
+  fragmentOp.getOperation()->setOperands(newFragmentArgs);
 }
 
 // Temporary hack to get the experimental stream ops constructed. In the future
@@ -271,6 +291,9 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
     for (auto *op : llvm::reverse(streamOps)) {
       op->erase();
     }
+
+    // Expand any shape types to corresponding primitives.
+    expandFragmentToPrimitiveTypes(fragmentOp);
   }
 };
 
