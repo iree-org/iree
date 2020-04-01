@@ -90,7 +90,7 @@ LogicalResult buildDispatchRegion(Block *parentBlock, Value workload,
   for (auto value : escapingValues) escapingTypes.push_back(value.getType());
 
   // Build the region op and add it to the parent block.
-  OpBuilder parentBuilder(parentBlock);
+  OpBuilder parentBuilder = OpBuilder::atBlockEnd(parentBlock);
   parentBuilder.setInsertionPoint(ops.back());
   auto dispatchRegionOp = parentBuilder.create<IREE::Flow::DispatchRegionOp>(
       regionLoc, escapingTypes, workload, capturedValues.getArrayRef());
@@ -98,7 +98,7 @@ LogicalResult buildDispatchRegion(Block *parentBlock, Value workload,
   // Create the block and setup the arg mapping for captured values.
   auto *regionBlock = new Block();
   dispatchRegionOp.body().push_back(regionBlock);
-  OpBuilder regionBuilder(regionBlock);
+  OpBuilder regionBuilder = OpBuilder::atBlockEnd(regionBlock);
   BlockAndValueMapping mapping;
   for (auto capturedValue : capturedValues) {
     auto blockArg = regionBlock->addArgument(capturedValue.getType());
@@ -188,7 +188,7 @@ ExecutableOp createExecutable(Location loc, StringRef executableName,
 
   // Copy all reachable functions into the executable.
   // Linker passes may dedupe these later on.
-  OpBuilder innerModuleBuilder(innerModule.getBody());
+  OpBuilder innerModuleBuilder = OpBuilder::atBlockEnd(innerModule.getBody());
   innerModuleBuilder.setInsertionPoint(innerModule.getBody(),
                                        ++innerModule.getBody()->begin());
   for (auto reachableFunc : reachableFuncs) {

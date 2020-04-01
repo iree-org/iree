@@ -47,16 +47,17 @@ class GlobalInitializationPass
   void runOnOperation() override {
     // Create the __init and __deinit functions. They may be empty if there are
     // no globals but that's fine.
-    OpBuilder moduleBuilder(&getOperation().getBlock());
+    OpBuilder moduleBuilder = OpBuilder::atBlockEnd(&getOperation().getBlock());
     moduleBuilder.setInsertionPoint(getOperation().getBlock().getTerminator());
     auto initFuncOp =
         moduleBuilder.create<FuncOp>(moduleBuilder.getUnknownLoc(), "__init",
                                      moduleBuilder.getFunctionType({}, {}));
-    OpBuilder initBuilder(initFuncOp.addEntryBlock());
+    OpBuilder initBuilder = OpBuilder::atBlockEnd(initFuncOp.addEntryBlock());
     auto deinitFuncOp =
         moduleBuilder.create<FuncOp>(moduleBuilder.getUnknownLoc(), "__deinit",
                                      moduleBuilder.getFunctionType({}, {}));
-    OpBuilder deinitBuilder(deinitFuncOp.addEntryBlock());
+    OpBuilder deinitBuilder =
+        OpBuilder::atBlockEnd(deinitFuncOp.addEntryBlock());
 
     // Build out the functions with logic from all globals.
     // Note that the initialization order here is undefined (in that it's just

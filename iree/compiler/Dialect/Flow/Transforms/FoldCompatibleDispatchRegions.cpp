@@ -264,7 +264,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
     }
   }
 
-  OpBuilder regionBuilder(&lhsBlock);
+  OpBuilder regionBuilder = OpBuilder::atBlockEnd(&lhsBlock);
 
   // Copy ops (replacing any args as needed).
   // Note that we need to insert prior to the terminator.
