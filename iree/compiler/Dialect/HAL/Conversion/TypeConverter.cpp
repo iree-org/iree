@@ -16,7 +16,6 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "llvm/Support/raw_ostream.h"
 
 namespace mlir {
 namespace iree_compiler {
