@@ -14,6 +14,7 @@
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/dialect.h"
 
+#include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_flow_to_hal.h"
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.h"
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/types.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -33,6 +34,7 @@ static DialectRegistration<TFStringsDialect> tf_strings_dialect;
 
 TFStringsDialect::TFStringsDialect(MLIRContext* context)
     : Dialect(getDialectNamespace(), context) {
+  addInterfaces<TfStringsToHALConversionInterface>();
   addTypes<StringType>();
 
 #define GET_OP_LIST

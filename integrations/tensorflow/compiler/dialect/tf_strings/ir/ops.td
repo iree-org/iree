@@ -24,23 +24,43 @@ include "integrations/tensorflow/compiler/dialect/tf_strings/ir/base.td"
 // TFStrings dialect used for intermediate manipulations.
 //===----------------------------------------------------------------------===//
 
-def TFStrings_ToStringOp : TFStrings_Op<"to_string"> {
-  let summary = "Converts the passed type to a string type.";
-  let description = [{
-    Prints the contents of a passed tensor.
-  }];
-  let arguments = (ins TFStrings_Any: $arguments);
-  let results = (outs TFStrings_AnyString: $result);
-  let builders = [OpBuilder<"Builder *, OperationState &state, Value value">];
-}
-
 def TFStrings_PrintOp : TFStrings_Op<"print"> {
   let summary = "Prints the string to standard output.";
   let description = [{
     Prints the contents of a passed tensor.
   }];
-  let arguments = (ins TFStrings_AnyString:$arguments);
-  let results = (outs );
+  let arguments = (ins TFStrings_String:$arguments);
+  let results = (outs);
+}
+
+def TFStrings_ToStringOp : TFStrings_Op<"to_string"> {
+  let summary = "Converts the value to a string.";
+  let description = [{
+    Converts the value to a string.
+  }];
+  let arguments = (ins TFStrings_Value: $arguments);
+  let results = (outs TFStrings_String: $result);
+  let builders = [OpBuilder<"Builder *, OperationState &state, Value value">];
+}
+
+def TFStrings_ToStringTensorOp : TFStrings_Op<"to_string_tensor"> {
+  let summary = "Converts a tensor of values to a tensor of strings.";
+  let description = [{
+    Converts a tensor of values to a tensor of strings.
+  }];
+  let arguments = (ins TFStrings_ValueTensor: $arguments);
+  let results = (outs TFStrings_StringTensor: $result);
+  let builders = [OpBuilder<"Builder *, OperationState &state, Value value">];
+}
+
+def TFStrings_StringTensorToStringOp : TFStrings_Op<"string_tensor_to_string"> {
+  let summary = "Converts a string tensor to a string.";
+  let description = [{
+    Converts a tensor of strings to a string.
+  }];
+  let arguments = (ins TFStrings_StringTensor: $arguments);
+  let results = (outs TFStrings_String: $result);
+  let builders = [OpBuilder<"Builder *, OperationState &state, Value value">];
 }
 
 #endif  // TFSTRINGS

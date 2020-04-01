@@ -19,7 +19,6 @@
 #ifndef INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_OPS_H_
 #define INTEGRATIONS_TENSORFLOW_COMPILER_DIALECT_TFSTRINGS_IR_OPS_H_
 
-#include "integrations/tensorflow/compiler/dialect/tf_strings/ir/dialect.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Dialect.h"
