@@ -88,8 +88,8 @@ function(iree_check_test)
     COMMAND
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "$<TARGET_FILE:iree_modules_check_iree-check-module>"
-      "--input_file=${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
       "--driver=${_RULE_DRIVER}"
+      "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
       ${_RULE_ARGS}
   )
 

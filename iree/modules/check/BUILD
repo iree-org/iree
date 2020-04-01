@@ -57,6 +57,8 @@ cc_binary(
         "//iree/base:localfile",
         "//iree/base:source_location",
         "//iree/base:status",
+        "//iree/base:target_platform",
+        "//iree/base:tracing",
         "//iree/modules/hal",
         "//iree/testing:gtest",
         "//iree/tools:vm_util",
