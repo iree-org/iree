@@ -41,7 +41,7 @@ namespace {
 class StringTypeConverter : public TypeConverter {
  public:
   StringTypeConverter() {
-    addConversion([](TensorType type) -> Type {
+    addConversion([](RankedTensorType type) -> Type {
       if (type.getElementType().isa<TF::StringType>()) {
         auto elementType = TFStrings::StringType::get(type.getContext());
         return RankedTensorType::get(type.getShape(), elementType);

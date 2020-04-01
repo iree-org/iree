@@ -35,7 +35,7 @@ HALTypeConverter::HALTypeConverter(
   });
   addConversion([](TensorType type) -> Optional<Type> {
     // HAL only should be concerned with numeric values.
-    if (HALTypeConverter::ConvertToHalBuffer(type)) {
+    if (HALTypeConverter::ShouldConvertToHalBuffer(type)) {
       // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
       return IREE::HAL::BufferType::get(type.getContext());
     }
