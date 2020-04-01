@@ -45,6 +45,7 @@ cc_library(
         "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
         "//iree/compiler/Dialect/VM/Conversion",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Transforms",
     ],
     alwayslink = 1,
 )
