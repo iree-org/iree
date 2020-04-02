@@ -220,7 +220,7 @@ struct TileAndFuseLinalgOpPattern
 void LinalgTileAndFusePass::runOnFunction() {
   MLIRContext *context = &getContext();
   FuncOp funcOp = getFunction();
-  if (!isDispatchFunction(funcOp)) return;
+  if (!isDispatchFuncImpl(funcOp)) return;
 
   Region &body = funcOp.getBody();
   // Only handle single block functions.
@@ -280,9 +280,9 @@ void LinalgTileAndFusePass::runOnFunction() {
         return IntegerAttr::get(IndexType::get(context), v);
       },
       updatedWorkGroupSize);
-  // TODO(b/150312935): Switch to update the HAL interface directly.
-  funcOp.setAttr("iree.executable.workgroup_size",
-                 ArrayAttr::get(attrs, context));
+
+  if (failed(updateWorkGroupSize(funcOp, updatedWorkGroupSize)))
+    return signalPassFailure();
 }
 
 std::unique_ptr<OpPassBase<FuncOp>> createLinalgTileAndFusePass(

@@ -5,7 +5,7 @@ module {
   // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<50 x f32 [4]> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
   func @foo(%arg0: memref<5x1x10xf32>, %arg1: memref<i64>, %arg2: memref<1x10xf32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = [32 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = "foo"} {
     // CHECK: [[ZERO1:%.*]] = spv.constant 0
     // CHECK: [[LOAD_ADDRESS_ARG1:%.*]] = spv.AccessChain [[ARG1]]{{\[}}[[ZERO1]]{{\]}}
     // CHECK: [[INDEXI64:%.*]] = spv.Load {{".*"}} [[LOAD_ADDRESS_ARG1]]

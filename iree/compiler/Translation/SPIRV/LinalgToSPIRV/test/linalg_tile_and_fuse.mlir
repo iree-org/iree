@@ -17,8 +17,7 @@ module {
   func @tile_only(%arg0: memref<4x8xi32>, %arg1: memref<4x8xi32>,
                   %arg2: memref<4x8xi32>)
   attributes
-    {iree.executable.export,
-     iree.executable.workgroup_size = dense<[32, 4, 1]> : vector<3xi32>} {
+    {iree.dispatch_fn_name = "tile_only"} {
     linalg.generic
       {args_in = 2 : i64, args_out = 1 : i64,
        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -43,8 +42,7 @@ module {
   func @sequential(%arg0: memref<10xi32>, %arg1: memref<i32>,
                    %arg2: memref<i32>)
   attributes
-    {iree.executable.export,
-     iree.executable.workgroup_size = dense<1> : vector<3xi32>} {
+    {iree.dispatch_fn_name = "sequential"} {
     //      CHECK: %[[C0:.*]] = constant 0 : index
     //      CHECK: %[[C1:.*]] = constant 1 : index
     //      CHECK: loop.for %{{.*}} = %[[C0]] to %[[C1]]
@@ -96,8 +94,7 @@ module {
   func @tile_and_fuse(%arg0: memref<?x?xf32>, %arg1: memref<?x?xf32>,
                       %arg2: memref<?x?xf32>, %arg3: memref<?x?xf32>)
   attributes
-    {iree.executable.export,
-     iree.executable.workgroup_size = dense<[32, 4, 1]> : vector<3xi32>} {
+    {iree.dispatch_fn_name = "tile_and_fuse"} {
     linalg.generic
       {args_in = 2 : i64, args_out = 1 : i64,
        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
@@ -137,8 +134,7 @@ module {
   func @conv_padding(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32>,
                      %arg2 : memref<?x?x?x?xf32>)
     attributes
-      {iree.executable.export,
-       iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>} {
+      {iree.dispatch_fn_name = "conv_padding"} {
     linalg.conv(%arg0, %arg1, %arg2)
       {dilations = [1, 1],
        padding = dense<[[1, 1], [0, 1]]> : tensor<2x2xi64>, strides = [1, 1]} :
@@ -165,8 +161,7 @@ module {
   func @conv_no_padding(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32>,
                         %arg2 : memref<?x?x?x?xf32>)
     attributes
-      {iree.executable.export,
-       iree.executable.workgroup_size = dense<[32, 2, 2]> : vector<3xi32>} {
+      {iree.dispatch_fn_name = "conv_no_padding"} {
     linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 1], strides = [1, 1]} :
       memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
     return

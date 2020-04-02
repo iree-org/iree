@@ -38,6 +38,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/Functional.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
@@ -107,61 +108,6 @@ static std::vector<std::string> populateEntryPointNames(
   return entryPointNames;
 }
 
-// Returns an (x,y,z) workgroup size for the given |targetFuncOp|.
-// This is pure heuristics until we support dynamic/varying workgroup sizes.
-static std::array<int64_t, 3> guessWorkGroupSize(
-    IREE::Flow::DispatchEntryOp entryOp, FuncOp targetFuncOp) {
-  for (auto &block : targetFuncOp.getBlocks()) {
-    if (!block.getOps<xla_hlo::DotOp>().empty()) {
-      // A special dot kernel. This has a fixed workgroup size based on the
-      // hand-written shader.
-      return {16, 16, 1};
-    } else if (!block.getOps<xla_hlo::ConvOp>().empty()) {
-      // Matches hard-coded assumptions in the conv2d_nhwc hand-written
-      // shader.
-      return {1, 1, 1};
-    }
-  }
-  return {32, 1, 1};
-}
-
-// Applies the guessWorkGroupSize logic to each entry point to ensure we have
-// a compatible size set on entry.
-// TODO(b/150312935): remove this and just call guessWorkGroupSize (or whatever)
-// when you need the workgroup size.
-static void guessEntryWorkGroupSizes(IREE::Flow::ExecutableOp sourceOp,
-                                     ModuleOp moduleOp) {
-  Builder builder(sourceOp.getContext());
-  for (auto &op : sourceOp.getBlock()) {
-    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
-      auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
-      auto workGroupSizeAttr =
-          builder.getIndexArrayAttr(guessWorkGroupSize(entryOp, funcOp));
-      funcOp.setAttr("iree.executable.workgroup_size", workGroupSizeAttr);
-    }
-  }
-}
-
-// Update the workgroup size in the executableOp.
-// TODO(b/150312935): remove this and just write the
-// IREE::HAL::ExecutableEntryPointOp attributes when you need them.
-static void propagateModifiedExecutableABI(
-    IREE::Flow::ExecutableOp sourceOp, ModuleOp moduleOp,
-    IREE::HAL::ExecutableOp executableOp) {
-  for (auto &op : sourceOp.getBlock()) {
-    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(&op)) {
-      auto targetEntryOp =
-          executableOp.lookupSymbol<IREE::HAL::ExecutableEntryPointOp>(
-              entryOp.function_ref());
-      assert(targetEntryOp && "could not find HAL entry point");
-      auto funcOp = moduleOp.lookupSymbol<FuncOp>(entryOp.function_ref());
-      assert(funcOp && "could not find target function for HAL entry point");
-      auto workGroupSize = funcOp.getAttr("iree.executable.workgroup_size");
-      targetEntryOp.setAttr("workgroup_size", workGroupSize);
-    }
-  }
-}
-
 /// Returns true if the linalg on tensors path is to be used for
 /// compilation.
 static bool useLinalgPath(ModuleOp moduleOp,
@@ -169,14 +115,9 @@ static bool useLinalgPath(ModuleOp moduleOp,
   if (targetOptions.useLinalgToSPIRVPath) return true;
 
   // Use linalg path if dispatch function contains any of the following ops.
-  SmallVector<FuncOp, 1> dispatchFn;
-  for (auto funcOp : moduleOp.getOps<FuncOp>()) {
-    if (isDispatchFunction(funcOp)) dispatchFn.push_back(funcOp);
-  }
-  if (dispatchFn.size() != 1) return false;
-  auto walkResult = dispatchFn[0].walk([](Operation *op) -> WalkResult {
-    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ReduceWindowOp>(op) ||
-        isa<xla_hlo::ConvOp>(op) || isa<xla_hlo::DotOp>(op))
+  auto walkResult = moduleOp.walk([](Operation *op) -> WalkResult {
+    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ConvOp>(op) ||
+        isa<xla_hlo::DotOp>(op))
       return WalkResult::interrupt();
     return WalkResult::advance();
   });
@@ -192,75 +133,90 @@ LogicalResult translateToVulkanSPIRVExecutable(
   auto sourceOp = executableOp.getSourceOp().clone();
   auto sourceOpErase =
       llvm::make_scope_exit([&sourceOp]() { sourceOp.erase(); });
+  auto sourceModuleOp = sourceOp.getInnerModule();
   auto flowExecutableOp =
-      *sourceOp.getInnerModule().getOps<IREE::Flow::ExecutableOp>().begin();
-  auto moduleOp = flowExecutableOp.getInnerModule();
-  if (failed(makeLegacyExecutableABI(sourceOp))) {
-    return failure();
-  }
-  guessEntryWorkGroupSizes(flowExecutableOp, moduleOp);
+      *sourceModuleOp.getOps<IREE::Flow::ExecutableOp>().begin();
+  auto flowModuleOp = flowExecutableOp.getInnerModule();
 
   // Attach SPIR-V target environment.
-  spirv::TargetEnvAttr spvTargetEnv =
-      getSPIRVTargetEnv(targetOptions.vulkanTargetEnv, moduleOp.getContext());
-  moduleOp.setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
+  spirv::TargetEnvAttr spvTargetEnv = getSPIRVTargetEnv(
+      targetOptions.vulkanTargetEnv, flowModuleOp.getContext());
+  flowModuleOp.setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
 
-  // Try first to match against an embedded kernel (such as matmul) and
-  // otherwise fall back to generating the kernel.
   iree::SpirVExecutableDefT spirvExecutableDef;
-  if (tryEmbeddedKernelRewrite(moduleOp, &spirvExecutableDef)) {
-    // Strip out the contents as we don't care (they were manually replaced).
-    moduleOp.getBody()->getOperations().erase(
-        moduleOp.getBody()->getOperations().begin(),
-        --moduleOp.getBody()->getOperations().end());
+  // The sequencer and runtime use ordinals instead of names. We provide the
+  // list of entry point names here that are then passed in
+  // VkShaderModuleCreateInfo.
+  spirvExecutableDef.entry_points = populateEntryPointNames(flowExecutableOp);
+
+  // Lower module to spirv::ModuleOp.
+  PassManager conversionPassManager(flowModuleOp.getContext());
+  applyPassManagerCLOptions(conversionPassManager);
+  conversionPassManager.addPass(createHALInterfaceToMemrefPass());
+  OpPassManager &innerModulePassManager =
+      conversionPassManager.nest<IREE::Flow::ExecutableOp>().nest<ModuleOp>();
+  if (useLinalgPath(flowModuleOp, targetOptions)) {
+    addHLOToLinalgToSPIRVPasses(innerModulePassManager,
+                                targetOptions.linalgToSPIRVWorkgroupSize);
   } else {
-    // The sequencer and runtime use ordinals instead of names. We provide the
-    // list of entry point names here that are then passed in
-    // VkShaderModuleCreateInfo.
-    spirvExecutableDef.entry_points = populateEntryPointNames(flowExecutableOp);
+    // Use the Index computation path as fallback.
+    addIREEToSPIRVPasses(innerModulePassManager);
+  }
+  if (failed(conversionPassManager.run(sourceModuleOp))) {
+    return sourceModuleOp.emitError() << "failed to run conversion passes";
+  }
 
-    // Lower module to spirv::ModuleOp.
-    PassManager conversionPassManager(moduleOp.getContext());
-    applyPassManagerCLOptions(conversionPassManager);
-    if (useLinalgPath(moduleOp, targetOptions)) {
-      addHLOToLinalgToSPIRVPasses(conversionPassManager,
-                                  targetOptions.linalgToSPIRVWorkgroupSize);
-    } else {
-      // Use the Index computation path as fallback.
-      addIREEToSPIRVPasses(conversionPassManager);
-    }
-    if (failed(conversionPassManager.run(moduleOp))) {
-      return moduleOp.emitError() << "failed to run conversion passes";
-    }
+  auto spvModuleOps = flowModuleOp.getOps<spirv::ModuleOp>();
+  if (std::distance(spvModuleOps.begin(), spvModuleOps.end()) != 1) {
+    return flowModuleOp.emitError()
+           << "Expected a single spv.module for an IREE executable op";
+  }
+  spirv::ModuleOp spvModuleOp = *spvModuleOps.begin();
 
-    // Drop the gpu.container_module attribute.
-    propagateModifiedExecutableABI(flowExecutableOp, moduleOp, executableOp);
-    auto spvModuleOps = moduleOp.getOps<spirv::ModuleOp>();
-    if (std::distance(spvModuleOps.begin(), spvModuleOps.end()) != 1) {
-      return moduleOp.emitError()
-             << "Expected a single spv.module for an IREE executable op";
-    }
-    spirv::ModuleOp spvModuleOp = *spvModuleOps.begin();
-
-    // Serialize the spirv::ModuleOp into the binary that we will embed in the
-    // final flatbuffer.
-    SmallVector<uint32_t, 256> spvBinary;
-    if (failed(spirv::serialize(spvModuleOp, spvBinary))) {
-      return spvModuleOp.emitError() << "failed to serialize spv.module";
-    }
-    spirvExecutableDef.code = {spvBinary.begin(), spvBinary.end()};
-    if (spirvExecutableDef.code.empty()) {
-      return spvModuleOp.emitError()
-             << "failed to translate and serialize SPIR-V executable";
-    }
-
-    // Remove the original functions as we just want to keep the spv.module for
-    // debugging.
-    for (auto &op :
-         llvm::make_early_inc_range(moduleOp.getBody()->getOperations())) {
-      if (!isa<spirv::ModuleOp>(op) && !isa<ModuleTerminatorOp>(op)) {
-        op.erase();
+  // Find the spv.ExecutionMode operation to get the workgroup size from.
+  // TODO(ravishankarm): This might not be the only way this is specified. You
+  // could also have a spec constant, but that is not generated in the
+  // spv.module right now.
+  auto halEntryPointOps =
+      executableOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
+  for (auto executionModeOp :
+       spvModuleOp.getBlock().getOps<spirv::ExecutionModeOp>()) {
+    if (executionModeOp.execution_mode() == spirv::ExecutionMode::LocalSize) {
+      auto workGroupSize = functional::map(
+          [](Attribute attr) -> int64_t {
+            return attr.cast<IntegerAttr>().getInt();
+          },
+          executionModeOp.values());
+      workGroupSize.resize(3, 1);
+      // Find the corresponding hal.executable.entry_point.
+      for (auto halEntryPointOp : halEntryPointOps) {
+        if (executionModeOp.fn() == halEntryPointOp.sym_name()) {
+          OpBuilder builder(halEntryPointOp);
+          halEntryPointOp.setAttr("workgroup_size",
+                                  builder.getIndexArrayAttr(workGroupSize));
+        }
       }
+    }
+  }
+
+  // Serialize the spirv::ModuleOp into the binary that we will embed in the
+  // final flatbuffer.
+  SmallVector<uint32_t, 256> spvBinary;
+  if (failed(spirv::serialize(spvModuleOp, spvBinary))) {
+    return spvModuleOp.emitError() << "failed to serialize spv.module";
+  }
+  spirvExecutableDef.code = {spvBinary.begin(), spvBinary.end()};
+  if (spirvExecutableDef.code.empty()) {
+    return spvModuleOp.emitError()
+           << "failed to translate and serialize SPIR-V executable";
+  }
+
+  // Remove the original functions as we just want to keep the spv.module for
+  // debugging.
+  for (auto &op :
+       llvm::make_early_inc_range(flowModuleOp.getBody()->getOperations())) {
+    if (!isa<spirv::ModuleOp>(op) && !isa<ModuleTerminatorOp>(op)) {
+      op.erase();
     }
   }
 
@@ -282,7 +238,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
       static_cast<uint32_t>(IREE::HAL::ExecutableFormat::SpirV),
       std::move(bytes));
   OpBuilder binaryBuilder(&binaryOp.getBlock().back());
-  binaryBuilder.clone(*moduleOp.getOperation());
+  binaryBuilder.clone(*flowModuleOp.getOperation());
   return success();
 }
 

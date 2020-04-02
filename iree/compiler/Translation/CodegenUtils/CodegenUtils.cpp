@@ -14,7 +14,9 @@
 
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
+#include "mlir/Dialect/SPIRV/TargetAndABI.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/StandardTypes.h"
 
@@ -33,8 +35,20 @@ ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector) {
   return vector.drop_back(numTrailingOnes);
 }
 
-bool isDispatchFunction(FuncOp funcOp) {
-  return funcOp.getAttr("iree.executable.export") != nullptr;
+StringRef getDispatchFuncAttrName() { return "iree.dispatch_fn_name"; }
+
+Optional<StringRef> getDispatchFuncName(Operation *op) {
+  FuncOp funcOp =
+      (isa<FuncOp>(op) ? cast<FuncOp>(op) : op->getParentOfType<FuncOp>());
+  if (!funcOp) return {};
+  auto dispatchFnAttr =
+      funcOp.getAttrOfType<StringAttr>(getDispatchFuncAttrName());
+  if (!dispatchFnAttr) return {};
+  return dispatchFnAttr.getValue();
+}
+
+bool isDispatchFuncImpl(FuncOp funcOp) {
+  return !!(funcOp.getAttrOfType<StringAttr>(getDispatchFuncAttrName()));
 }
 
 /// Helper function to check shapes are equal. Only care that the number of
@@ -108,26 +122,36 @@ LogicalResult getLaunchSize(FuncOp funcOp,
   return success();
 }
 
-/// Gets the workgroup size.
 template <typename intType>
 LogicalResult getWorkGroupSize(FuncOp funcOp,
                                SmallVectorImpl<intType> &workGroupSize) {
-  if (!isDispatchFunction(funcOp)) {
+  auto entryPointABIAttr = spirv::lookupEntryPointABI(funcOp);
+  if (!entryPointABIAttr) {
     return funcOp.emitError(
-        "expected operation to be in dispatch function to get launch size");
+        "expected operation to be in dispatch function to get workgroup size");
   }
-  auto workGroupSizeAttr =
-      funcOp.getAttrOfType<ArrayAttr>("iree.executable.workgroup_size");
-  if (!workGroupSizeAttr) {
-    return funcOp.emitError(
-        "unable to find workgroup size, missing attribute "
-        "iree.executable.workgroup_size in dispatch function");
-  }
+  DenseIntElementsAttr workGroupSizeAttr = entryPointABIAttr.local_size();
   workGroupSize.clear();
-  for (auto value : workGroupSizeAttr) {
-    workGroupSize.push_back(
-        value.cast<IntegerAttr>().getValue().getSExtValue());
+  for (const APInt &value : workGroupSizeAttr.getValues<APInt>()) {
+    workGroupSize.push_back(value.getSExtValue());
   }
+  return success();
+}
+
+LogicalResult updateWorkGroupSize(Operation *op,
+                                  ArrayRef<int64_t> workGroupSize) {
+  // Need to update both the surrounding FuncOp that has the spv.entry_point_abi
+  // attribute, and the hal.executable.
+  FuncOp funcOp =
+      (isa<FuncOp>(op) ? cast<FuncOp>(op) : op->getParentOfType<FuncOp>());
+  if (!isDispatchFuncImpl(funcOp))
+    return op->emitError("expected operation to be within a dispatch function");
+  MLIRContext *context = op->getContext();
+  SmallVector<int32_t, 3> workGroupSizeVec(workGroupSize.begin(),
+                                           workGroupSize.end());
+  workGroupSizeVec.resize(3, 1);
+  funcOp.setAttr(spirv::getEntryPointABIAttrName(),
+                 spirv::getEntryPointABIAttr(workGroupSizeVec, context));
   return success();
 }
 

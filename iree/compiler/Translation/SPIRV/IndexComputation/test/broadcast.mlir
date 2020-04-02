@@ -9,7 +9,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1, d2) -> (d1, d0)>]
   func @broadcast_2D_3D(%arg0: memref<12x42xi32>, %arg1: memref<3x12x42xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<12x42xi32>) : tensor<12x42xi32>
     // CHECK: xla_hlo.broadcast
     // CHECK-SAME: iree.index_computation_info
@@ -34,7 +34,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1, d2) -> (0)>]
   func @broadcast_scalar_3D(%arg0: memref<i32>, %arg1: memref<3x12x42xi32>)
-  attributes  {iree.executable.export, iree.executable.workgroup_size = [1 : index, 1 : index, 1 : index], iree.ordinal = 0 : i32} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<i32>) : tensor<i32>
     // CHECK: xla_hlo.broadcast
     // CHECK-SAME: iree.index_computation_info

@@ -310,6 +310,10 @@ class SPIRVCodegen : public detail::SPIRVCodegenImpl {
           fn.getLoc(),
           "unimplemeneted handling multiple blocks within a function");
     }
+    // Update the workgroup size to be {32, 1, 1}
+    if (failed(updateWorkGroupSize(fn, {32, 1, 1}))) {
+      return failure();
+    }
 
     OpBuilder builder(spirvModule.body());
     // Create the entry function and generate global invocation ID. Creates a

@@ -24,6 +24,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -755,6 +756,8 @@ void populateHLOToLinalgOnConversionPatterns(
 }
 
 void XLAToLinalgOnBuffersPass::runOnFunction() {
+  FuncOp funcOp = getFunction();
+  if (!isDispatchFuncImpl(funcOp)) return;
   OwningRewritePatternList patterns;
   auto *context = &getContext();
   populateHLOToLinalgOnConversionPatterns(context, patterns);

@@ -22,6 +22,7 @@
 #include <memory>
 
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -103,6 +104,9 @@ class SplatConstConverter : public OpConversionPattern<ConstantOp> {
 
 struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
   void runOnFunction() override {
+    auto func = getFunction();
+    if (!isDispatchFuncImpl(func)) return;
+
     OwningRewritePatternList patterns;
     ConversionTarget target(getContext());
     target.addLegalDialect<linalg::LinalgDialect, StandardOpsDialect>();
@@ -119,7 +123,6 @@ struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
                      isa<xla_hlo::ReduceWindowOp>(parentOp);
             }));
 
-    auto func = getFunction();
     populateHLOToLinalgOnTensorsConversionPatterns(func.getContext(), patterns);
     if (failed(applyPartialConversion(func, target, patterns, nullptr))) {
       signalPassFailure();

@@ -19,7 +19,7 @@ module {
   // CHECK-NEXT:   linalg.yield [[RES]] : f32
   // CHECK-NEXT: }: memref<5x4xf32>, memref<f32>, memref<5xf32>
   func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<5xf32>)
-  attributes {iree.executable.export} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
@@ -38,7 +38,7 @@ module {
   //      CHECK:   [[COND:%.*]] = cmpf "olt", {{%.*}}, {{%.*}} : f32
   // CHECK-NEXT:   {{%.*}} = select [[COND]], {{%.*}}, {{%.*}} : f32
   func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<5xf32>)
-  attributes {iree.executable.export} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
@@ -57,7 +57,7 @@ module {
   //      CHECK:   [[COND:%.*]] = cmpf "ogt", {{%.*}}, {{%.*}} : f32
   // CHECK-NEXT:   {{%.*}} = select [[COND]], {{%.*}}, {{%.*}} : f32
   func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<5xf32>)
-  attributes {iree.executable.export} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
@@ -76,7 +76,7 @@ module {
   //      CHECK:   [[COND:%.*]] = cmpf "ogt", {{%.*}}, {{%.*}} : f32
   // CHECK-NEXT:   {{%.*}} = select [[COND]], {{%.*}}, {{%.*}} : f32
   func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<4xf32>)
-  attributes {iree.executable.export} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
@@ -110,7 +110,7 @@ module {
   // CHECK-NEXT:   linalg.yield [[RES]] : f32
   // CHECK-NEXT: }: memref<5x4xf32>, memref<f32>, memref<4xf32>
   func @reduction_entry(%arg0: memref<5x4xf32>, %arg1: memref<f32>, %arg2: memref<4xf32>)
-  attributes {iree.executable.export} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<5x4xf32>) : tensor<5x4xf32>
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {
@@ -126,7 +126,7 @@ module {
 // -----
 
 module{
-  func @reduce_init_const(%arg0: memref<1x10xf32>, %arg1: memref<1xf32>) attributes {iree.executable.export} {
+  func @reduce_init_const(%arg0: memref<1x10xf32>, %arg1: memref<1xf32>) attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<1x10xf32>) : tensor<1x10xf32>
     // CHECK: %[[CST:.*]] = constant 0xFF800000 : f32
     // CHECK: linalg.indexed_generic
@@ -172,7 +172,7 @@ module {
   // CHECK-NEXT:   linalg.yield [[RES]] : f32
   // CHECK-NEXT: }: memref<5x4x3xf32>, memref<f32>, memref<4xf32>
   func @reduction_multi_dimensions(%arg0: memref<5x4x3xf32>, %arg1: memref<f32>, %arg2: memref<4xf32>)
-  attributes {iree.executable.export} {
+  attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<5x4x3xf32>) : tensor<5x4x3xf32>
     %1 = iree.load_input(%arg1 : memref<f32>) : tensor<f32>
     %2 = "xla_hlo.reduce"(%0, %1) ( {

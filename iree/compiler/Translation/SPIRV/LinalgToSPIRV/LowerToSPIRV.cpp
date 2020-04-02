@@ -88,6 +88,7 @@ struct LoopsToGPUPass : public FunctionPass<LoopsToGPUPass> {
   void runOnFunction() override {
     // Get the workgroup size from the attributes.
     FuncOp funcOp = getFunction();
+    if (!isDispatchFuncImpl(funcOp)) return;
     SmallVector<int64_t, 3> workGroupSizeVec;
     workGroupSizeVec.reserve(3);
     if (failed(getWorkGroupSize(funcOp, workGroupSizeVec))) return;

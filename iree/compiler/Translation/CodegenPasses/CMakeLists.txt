@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "HALInterfaceToMemrefPass.cpp"
     "HLOToLinalgOnBuffers.cpp"
     "HLOToLinalgOnTensors.cpp"
     "LinalgFusion.cpp"
@@ -30,10 +31,14 @@ iree_cc_library(
     MLIRLinalgOps
     MLIRLinalgTransforms
     MLIRPass
+    MLIRSPIRV
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Translation::CodegenUtils
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

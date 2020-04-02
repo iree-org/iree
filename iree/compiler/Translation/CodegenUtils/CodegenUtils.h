@@ -24,8 +24,15 @@ namespace iree_compiler {
 /// Drop trailing ones.
 ArrayRef<int64_t> dropTrailingOnes(ArrayRef<int64_t> vector);
 
-/// Checks that a given function is a dispatch function.
-bool isDispatchFunction(FuncOp funcOp);
+/// Get the name of the attr used to propogate the dispatch function name.
+StringRef getDispatchFuncAttrName();
+
+/// Get the name to use for the dispatch function by looking at the attribute on
+/// the surrounding FuncOp.
+Optional<StringRef> getDispatchFuncName(Operation *op);
+
+/// Checks that a given function is a dispatch function implementaiton.
+bool isDispatchFuncImpl(FuncOp funcOp);
 
 /// The launch size is the size of the outputs of the kernel. For now all
 /// outputs have to be the same shape and static shaped.
@@ -38,6 +45,10 @@ LogicalResult getLaunchSize(FuncOp funcOp,
 template <typename intType>
 LogicalResult getWorkGroupSize(FuncOp funcOp,
                                SmallVectorImpl<intType> &workGroupSize);
+
+/// Updates the workgroup size used for the dispatch region.
+LogicalResult updateWorkGroupSize(Operation *op,
+                                  ArrayRef<int64_t> workGroupSize);
 
 }  // namespace iree_compiler
 }  // namespace mlir

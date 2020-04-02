@@ -104,7 +104,7 @@ void IndexComputationPass::runOnFunction() {
       indexPropagation;
 
   auto funcOp = getFunction();
-  if (!isDispatchFunction(funcOp)) return;
+  if (!isDispatchFuncImpl(funcOp)) return;
   // If there are not iree.store_output operations, just return as nothing to
   // do.
   auto walkResult = funcOp.walk([](IREE::StoreOutputOp op) -> WalkResult {

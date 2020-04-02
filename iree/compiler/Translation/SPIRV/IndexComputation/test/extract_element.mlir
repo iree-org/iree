@@ -9,7 +9,7 @@ module {
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0) -> (0)>]
   func @extract_element(%arg0: memref<i1>, %arg1: memref<i1>)
-    attributes  {iree.executable.export, iree.executable.workgroup_size = dense<[32, 1, 1]> : tensor<3xi64>, iree.num_dims = 3 : i32, iree.ordinal = 0 : i32} {
+    attributes {iree.dispatch_fn_name = ""} {
     // CHECK: iree.load_input
     // CHECK-SAME: iree.index_computation_info
     // CHECK-SAME: operand_indices
