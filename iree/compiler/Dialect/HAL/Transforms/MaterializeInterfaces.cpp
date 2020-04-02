@@ -143,7 +143,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
 
   // Pull all arguments from the bindings.
   auto* thunkEntryBlock = thunkFuncOp.addEntryBlock();
-  OpBuilder thunkEntryBuilder(thunkEntryBlock);
+  OpBuilder thunkEntryBuilder = OpBuilder::atBlockEnd(thunkEntryBlock);
   auto zeroOffset = thunkEntryBuilder.createOrFold<mlir::ConstantIndexOp>(
       thunkFuncOp.getLoc(), 0);
   SmallVector<Value, 4> operands;
@@ -245,7 +245,7 @@ class MaterializeInterfacesPass : public ModulePass<MaterializeInterfacesPass> {
         llvm::to_vector<32>(getModule().getOps<IREE::Flow::ExecutableOp>());
     for (auto sourceOp : executableOps) {
       // Create the op that will contain the translated executables.
-      OpBuilder builder(getModule().getBody());
+      OpBuilder builder = OpBuilder::atBlockEnd(getModule().getBody());
       builder.setInsertionPointAfter(sourceOp);
       auto targetOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());

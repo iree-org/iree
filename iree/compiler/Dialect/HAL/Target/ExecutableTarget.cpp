@@ -26,16 +26,18 @@ namespace HAL {
 static llvm::cl::OptionCategory halTargetOptionsCategory(
     "IREE HAL executable target options");
 
-static llvm::cl::list<std::string> targetBackendsFlag{
-    "iree-hal-target-backends",
-    llvm::cl::desc("Target backends for executable compilation"),
-    llvm::cl::ZeroOrMore,
-    llvm::cl::cat(halTargetOptionsCategory),
-};
-
 ExecutableTargetOptions getExecutableTargetOptionsFromFlags() {
+  // This function is called as part of registering the pass
+  // TranslateExecutablesPass.  Pass registery is also staticly initialized,
+  // so targetBackendsFlags needs to be here to be initialized first.
+  static llvm::cl::list<std::string> *targetBackendsFlag =
+      new llvm::cl::list<std::string>{
+          "iree-hal-target-backends",
+          llvm::cl::desc("Target backends for executable compilation"),
+          llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory)};
+
   ExecutableTargetOptions targetOptions;
-  targetOptions.targets = targetBackendsFlag;
+  targetOptions.targets = *targetBackendsFlag;
   return targetOptions;
 }
 

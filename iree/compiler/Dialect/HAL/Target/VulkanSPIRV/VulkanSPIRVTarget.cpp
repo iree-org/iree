@@ -231,7 +231,7 @@ LogicalResult translateToVulkanSPIRVExecutable(
   std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
 
   // Add the binary data to the target executable.
-  OpBuilder targetBuilder(&executableOp.getBlock());
+  OpBuilder targetBuilder = OpBuilder::atBlockEnd(&executableOp.getBlock());
   targetBuilder.setInsertionPoint(&executableOp.getBlock().back());
   auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
       executableOp.getLoc(),

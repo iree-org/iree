@@ -105,7 +105,7 @@ LogicalResult generateSynchronousBody(
   auto *ctx = funcOp.getContext();
   auto loc = funcOp.getLoc();
   Block *entryBlock = funcOp.addEntryBlock();
-  OpBuilder builder(entryBlock);
+  OpBuilder builder = OpBuilder::atBlockEnd(entryBlock);
 
   // Build call operands.
   SmallVector<Value, 4> callOperands;

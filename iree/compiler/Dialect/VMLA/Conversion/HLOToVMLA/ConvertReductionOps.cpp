@@ -110,7 +110,7 @@ struct SplitIndependentReductionOpConversion
           srcOp.dimensionsAttr());
       auto *splitBlock = new Block();
       splitOp.body().getBlocks().push_back(splitBlock);
-      OpBuilder splitBuilder(splitBlock);
+      OpBuilder splitBuilder = OpBuilder::atBlockEnd(splitBlock);
       BlockAndValueMapping mapping;
       for (auto operand : op.getOperands()) {
         mapping.map(operand, splitBlock->addArgument(operand.getType()));

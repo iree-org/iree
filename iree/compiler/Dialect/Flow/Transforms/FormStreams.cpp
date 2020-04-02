@@ -223,7 +223,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
   void formStreamFragmentInBlock(Block &block,
                                  SmallVector<Operation *, 8> streamOps) {
     auto *context = block.getParent()->getContext();
-    OpBuilder blockBuilder(&block);
+    OpBuilder blockBuilder = OpBuilder::atBlockEnd(&block);
     blockBuilder.setInsertionPointAfter(streamOps.back());
     auto fragmentLoc = FusedLoc::get(
         llvm::to_vector<8>(llvm::map_range(
@@ -271,7 +271,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
     for (auto arg : entryBlock->getArguments()) {
       mapping.map(fragmentOperands[arg.getArgNumber()], arg);
     }
-    OpBuilder fragmentBuilder(entryBlock);
+    OpBuilder fragmentBuilder = OpBuilder::atBlockEnd(entryBlock);
     for (auto *op : streamOps) {
       fragmentBuilder.clone(*op, mapping);
     }
