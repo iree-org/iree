@@ -89,9 +89,11 @@ $ .\build\iree\tools\Debug\iree-run-mlir.exe .\iree\tools\test\simple.mlir -inpu
 
 ### Further Reading
 
+*   To target GPUs using Vulkan, see
+[Getting Started on Windows with Vulkan](./getting_started_windows_vulkan.md)
+
 More documentation coming soon...
 
-<!-- TODO(scotttodd): Vulkan / other driver configuration -->
 <!-- TODO(scotttodd): Running tests -->
 <!-- TODO(scotttodd): Running samples -->
 <!-- TODO(scotttodd): "getting_started.md" equivalent for iree-translate etc. -->
