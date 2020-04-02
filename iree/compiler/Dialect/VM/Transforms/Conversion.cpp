@@ -15,6 +15,7 @@
 #include <tuple>
 
 #include "iree/compiler/Dialect/IREE/Conversion/PreserveCompilerHints.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
@@ -94,11 +95,12 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
       dialectInterface->populateVMConversionPatterns(
           importSymbols, conversionPatterns, typeConverter);
     }
+    Shape::populateFoldConversionPatterns(context, conversionPatterns);
     populatePreserveCompilerHintsPatterns(context, conversionPatterns);
     setupCompilerHintsLegality(context, conversionTarget, typeConverter);
 
-    if (failed(applyFullConversion(outerModuleOp, conversionTarget,
-                                   conversionPatterns, &typeConverter))) {
+    if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
+                                      conversionPatterns, &typeConverter))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
       return signalPassFailure();
     }

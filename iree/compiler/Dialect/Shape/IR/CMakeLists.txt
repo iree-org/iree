@@ -27,6 +27,7 @@ iree_cc_library(
     "ShapeTypes.h"
   SRCS
     "Builders.cpp"
+    "Folders.cpp"
     "ShapeDialect.cpp"
     "ShapeInterface.cpp"
     "ShapeOps.cpp"

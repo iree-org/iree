@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
+    iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR

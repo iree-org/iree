@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
@@ -73,6 +74,10 @@ Operation* ShapeDialect::materializeConstant(OpBuilder& builder,
   if (auto typeAttr = value.dyn_cast<TypeAttr>()) {
     auto rankedShape = typeAttr.getValue().cast<Shape::RankedShapeType>();
     return builder.create<Shape::ConstRankedShapeOp>(loc, rankedShape);
+  } else if (type.isa<IndexType>()) {
+    // Some folders materialize raw index types, which just become std
+    // constants.
+    return builder.create<ConstantOp>(loc, type, value);
   }
   return nullptr;
 }

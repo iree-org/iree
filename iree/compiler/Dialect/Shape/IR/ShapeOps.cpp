@@ -38,219 +38,6 @@ namespace mlir {
 namespace iree_compiler {
 namespace Shape {
 
-/// Make a range of the DimType for a RankedShapeType with the number of
-/// elements equal to the rank of the shaped type.
-static RepeatRange<Type> getDimTypeRange(RankedShapeType type) {
-  return make_repeated_range(
-      static_cast<Type>(IndexType::get(type.getContext())), type.getRank());
-}
-
-/// Make a range of the DimType for a RankedShapeType with the number of
-/// elements equal to the dynamic dimensions of the shaped type.
-static RepeatRange<Type> getDimTypeDynamicRange(RankedShapeType type) {
-  return make_repeated_range(
-      static_cast<Type>(IndexType::get(type.getContext())),
-      type.getNumDynamicDims());
-}
-
-//===----------------------------------------------------------------------===//
-// Canonicalization
-//===----------------------------------------------------------------------===//
-
-class SafeCastCompatibleShapePattern
-    : public OpRewritePattern<CastCompatibleShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(CastCompatibleShapeOp op,
-                                PatternRewriter &rewriter) const override {
-    // TODO(laurenzo): This is just eliding if everything is the same. Make
-    // it generic.
-    auto resultRs = op.result().getType().dyn_cast<RankedShapeType>();
-    if (resultRs) {
-      // Casting to a ranked shape.
-      for (auto operandType : op.getOperandTypes()) {
-        auto operandRs = operandType.dyn_cast<RankedShapeType>();
-        if (!operandRs || operandRs != resultRs) {
-          return failure();
-        }
-      }
-      rewriter.replaceOp(op, op.operands()[0]);
-      return success();
-    }
-
-    return failure();
-  }
-};
-
-class ElideTiedGetRankedShapePattern
-    : public OpRewritePattern<GetRankedShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(GetRankedShapeOp op,
-                                PatternRewriter &rewriter) const override {
-    // If the immediate predecessor is a TieShapeOp, then this op can be
-    // erased in favor of the input to the tie op.
-    auto tieOp = dyn_cast_or_null<TieShapeOp>(op.operand().getDefiningOp());
-    if (!tieOp) return failure();
-
-    rewriter.replaceOp(op, tieOp.shape());
-
-    return success();
-  }
-};
-
-class ElideDuplicateGetRankedShapePattern
-    : public OpRewritePattern<GetRankedShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(GetRankedShapeOp op,
-                                PatternRewriter &rewriter) const override {
-    // If the immediate predecessor is a GetRankedShapeOp, then this op can be
-    // erased in favor of the input to the tie op.
-    auto precedingGetRankedShapeOp =
-        dyn_cast_or_null<GetRankedShapeOp>(op.operand().getDefiningOp());
-    if (!precedingGetRankedShapeOp) return failure();
-
-    rewriter.replaceOp(op, precedingGetRankedShapeOp.shape());
-    return success();
-  }
-};
-
-class ElideStaticGetRankedShapePattern
-    : public OpRewritePattern<GetRankedShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(GetRankedShapeOp op,
-                                PatternRewriter &rewriter) const override {
-    auto operandType = op.operand().getType().dyn_cast<RankedTensorType>();
-    auto shapeType = op.shape().getType().dyn_cast<RankedShapeType>();
-    if (!operandType || !shapeType || !operandType.hasStaticShape()) {
-      return failure();
-    }
-
-    rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(op, shapeType);
-    return success();
-  }
-};
-
-class IdentityMakeRankedShapePattern
-    : public OpRewritePattern<MakeRankedShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(MakeRankedShapeOp op,
-                                PatternRewriter &rewriter) const override {
-    if (op.dynamic_dimensions().empty()) {
-      // Do not match static shapes.
-      return failure();
-    }
-
-    // Detects make_ranked_shape ops whose dynamic dimensions are provided by
-    // ranked_dim ops that extract dimensions from an identical ranked_shape.
-    auto rankedShape = op.getRankedShapeType();
-    RankedDimOp commonRankedDimOp;
-    unsigned previousProvidingIndex = 0;
-    for (auto providingDim : op.dynamic_dimensions()) {
-      auto rankedDimOp =
-          llvm::dyn_cast_or_null<RankedDimOp>(providingDim.getDefiningOp());
-      if (!rankedDimOp) return failure();
-
-      // Shapes must match and refer to a dynamic index.
-      unsigned providingIndex = rankedDimOp.getIndex();
-      if (rankedDimOp.getRankedShapeType() != rankedShape ||
-          !rankedShape.isDimDynamic(providingIndex)) {
-        return failure();
-      }
-
-      if (commonRankedDimOp) {
-        // Not first dim: verify same providing shape and indexes into next
-        // dynamic dim.
-        if (rankedDimOp.shape() != commonRankedDimOp.shape() ||
-            providingIndex <= previousProvidingIndex) {
-          return failure();
-        }
-      }
-
-      commonRankedDimOp = rankedDimOp;
-      previousProvidingIndex = rankedDimOp.getIndex();
-    }
-
-    // Fall-through: this op produces an identical shape as
-    // commonRankedDimOp.
-    assert(commonRankedDimOp &&
-           "dynamic ranked_shape did not find a common provider");
-
-    rewriter.replaceOp(op, commonRankedDimOp.shape());
-    return success();
-  }
-};
-
-class DynamicMakeRankedShapeDimPattern : public OpRewritePattern<RankedDimOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(RankedDimOp op,
-                                PatternRewriter &rewriter) const override {
-    // If the immediate predecessor is a MakeRankedShapeOp, then this op can be
-    // erased in favor of the corresponding input to that op.
-    auto makeRsOp =
-        dyn_cast_or_null<MakeRankedShapeOp>(op.shape().getDefiningOp());
-    if (!makeRsOp) return failure();
-
-    RankedShapeType rsType = op.getRankedShapeType();
-    unsigned index = op.getIndex();
-    auto allDims = rsType.getAllDims();
-    assert(index < allDims.size());
-    if (allDims[index] >= 0) {
-      // Not dynamic.
-      return failure();
-    }
-
-    // Map the overall index to the dynamic dim index.
-    int dynamicDimIndex = 0;
-    for (unsigned i = 0; i < index; ++i) {
-      if (allDims[i] < 0) dynamicDimIndex++;
-    }
-
-    assert(dynamicDimIndex < makeRsOp.dynamic_dimensions().size());
-    rewriter.replaceOp(op, makeRsOp.dynamic_dimensions()[dynamicDimIndex]);
-    return success();
-  }
-};
-
-// Expands a shape.ranked_dims op into multiple shape.ranked_dim ops.
-// This allows better folding of static dimensions.
-class ExpandRankedShapeDimsPattern : public OpRewritePattern<RankedDimsOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(RankedDimsOp op,
-                                PatternRewriter &rewriter) const override {
-    auto rsType = op.getRankedShapeType();
-    SmallVector<Value, 4> dims(rsType.getRank());
-    for (int i = 0; i < rsType.getRank(); ++i) {
-      dims[i] = rewriter.createOrFold<RankedDimOp>(
-          op.getLoc(), op.getResult(i).getType(), op.shape(), i);
-    }
-    rewriter.replaceOp(op, dims);
-    return success();
-  }
-};
-
-class ElideDuplicateTieShapePattern : public OpRewritePattern<TieShapeOp> {
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(TieShapeOp op,
-                                PatternRewriter &rewriter) const override {
-    // If the immediate predecessor is a TieShapeOp, then it can be possible
-    // to merge these. This can often happen when function/block tie_shape
-    // placeholders are inserted prior to materializing later parts of the
-    // computation.
-    auto precedingTieShapeOp =
-        dyn_cast_or_null<TieShapeOp>(op.operand().getDefiningOp());
-    if (!precedingTieShapeOp) return failure();
-
-    if (op.shape() != precedingTieShapeOp.shape()) {
-      // This can happen in intermediate states before all shape calculations
-      // are collapsed (i.e. the shapes may actually be equivalent but
-      // constructed through different branches).
-      return failure();
-    }
-
-    rewriter.replaceOp(op, precedingTieShapeOp.result());
-    return success();
-  }
-};
-
 //===----------------------------------------------------------------------===//
 // shape.tie_shape
 //===----------------------------------------------------------------------===//
@@ -278,11 +65,6 @@ static LogicalResult verifyTieShapeOp(TieShapeOp op) {
   }
 
   return success();
-}
-
-void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
-                                             MLIRContext *context) {
-  patterns.insert<ElideDuplicateTieShapePattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -313,11 +95,6 @@ static LogicalResult verifyCastCompatibleShapeOp(CastCompatibleShapeOp op) {
   return failure();
 }
 
-void CastCompatibleShapeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  patterns.insert<SafeCastCompatibleShapePattern>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // shape.get_ranked_shape
 //===----------------------------------------------------------------------===//
@@ -344,13 +121,6 @@ static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
     return op.emitOpError("operand tensor and result shape must be equal");
   }
   return success();
-}
-
-void GetRankedShapeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  patterns
-      .insert<ElideTiedGetRankedShapePattern, ElideStaticGetRankedShapePattern,
-              ElideDuplicateGetRankedShapePattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -392,11 +162,6 @@ static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
            << "number of dynamic dims doesn't match number of operands";
   }
   return success();
-}
-
-void MakeRankedShapeOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  patterns.insert<IdentityMakeRankedShapePattern>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -457,22 +222,6 @@ static LogicalResult verifyRankedDimOp(RankedDimOp op) {
   return success();
 }
 
-OpFoldResult RankedDimOp::fold(ArrayRef<Attribute> operand) {
-  auto rsType = shape().getType().cast<RankedShapeType>();
-  int index = getIndex();
-  if (!rsType.isDimDynamic(index)) {
-    auto dimSize = rsType.getStaticDim(index);
-    return IntegerAttr::get(getType(), dimSize);
-  }
-
-  return {};
-}
-
-void RankedDimOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  patterns.insert<DynamicMakeRankedShapeDimPattern>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // shape.ranked_dims
 //===----------------------------------------------------------------------===//
@@ -489,11 +238,6 @@ void RankedDimsOp::build(Builder *builder, OperationState &result, Type dimType,
 void RankedDimsOp::build(Builder *builder, OperationState &result,
                          Value shape) {
   RankedDimsOp::build(builder, result, builder->getIndexType(), shape);
-}
-
-void RankedDimsOp::getCanonicalizationPatterns(
-    OwningRewritePatternList &patterns, MLIRContext *context) {
-  patterns.insert<ExpandRankedShapeDimsPattern>(context);
 }
 
 #define GET_OP_CLASSES

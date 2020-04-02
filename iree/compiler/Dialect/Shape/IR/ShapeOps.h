@@ -27,6 +27,12 @@ namespace mlir {
 namespace iree_compiler {
 namespace Shape {
 
+// Populates conversion patterns that perform folding and canonicalization of
+// shape ops. These patterns are intended to be used with the dialect conversion
+// framework.
+void populateFoldConversionPatterns(MLIRContext *context,
+                                    OwningRewritePatternList &patterns);
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h.inc"
 

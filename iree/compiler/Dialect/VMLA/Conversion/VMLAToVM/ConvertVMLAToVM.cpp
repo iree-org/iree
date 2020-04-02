@@ -54,6 +54,19 @@ class EraseNonVMOp : public ConversionPattern {
   }
 };
 
+// When converting to the VM, it is safe to remove any identity tie_shape
+// ops that remain.
+class ElideTieShapeOp : public OpConversionPattern<Shape::TieShapeOp> {
+  using OpConversionPattern::OpConversionPattern;
+
+  LogicalResult matchAndRewrite(
+      Shape::TieShapeOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(op, op.operand());
+    return success();
+  }
+};
+
 // VMLA -> VM import conversion base for generic ops.
 // Handles signatures with integers, VM types, or simple buffers.
 template <typename T, typename Adaptor = typename T::OperandAdaptor>
@@ -248,6 +261,9 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
   patterns.insert<VMLAConstantOpConversion>(context, typeConverter);
   patterns.insert<EraseNonVMOp>(Shape::ConstRankedShapeOp::getOperationName(),
                                 context);
+  patterns.insert<EraseNonVMOp>(Shape::MakeRankedShapeOp::getOperationName(),
+                                context);
+  patterns.insert<ElideTieShapeOp>(context);
 
   VMLA_IMPORT_OP(IREE::VMLA::BufferConstOp, "vmla.buffer.const");
   VMLA_IMPORT_OP(IREE::VMLA::BufferAllocOp, "vmla.buffer.alloc");
