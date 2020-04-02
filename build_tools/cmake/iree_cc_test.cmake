@@ -108,7 +108,8 @@ function(iree_cc_test)
   # We run all our tests through a custom test runner to allow temp directory
   # cleanup upon test completion.
 
-  string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})
+  iree_package_ns(_PACKAGE_NS)
+  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
   add_test(
     NAME
