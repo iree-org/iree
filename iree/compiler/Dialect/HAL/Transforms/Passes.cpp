@@ -26,12 +26,37 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
+namespace {
+
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {
+  Option<bool> serializeExecutables{
+      *this, "serialize-executables",
+      llvm::cl::desc("Whether to serialize hal.executable.target ops to "
+                     "hal.executable.binary ops."),
+      llvm::cl::init(true)};
+};
+
+}  // namespace
+
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   ExecutableTargetOptions executableOptions) {
+                                   TargetOptions targetOptions,
+                                   const TransformOptions &transformOptions) {
   passManager.addPass(createCanonicalizerPass());
 
-  passManager.addPass(createMaterializeInterfacesPass(executableOptions));
-  passManager.addPass(createTranslateExecutablesPass(executableOptions));
+  passManager.addPass(createMaterializeInterfacesPass(targetOptions));
+
+  // TODO(GH-1036): when dynamic pass registration is supported we can just
+  // directly call TargetBackend::buildTranslationPassPipeline function. For now
+  // we need to run each backend translation in isolation and we do that within
+  // this pass.
+  passManager.addPass(createTranslateExecutablesPass(targetOptions));
+
+  // After all executables are translated we allow the backends to link them
+  // together. For example, the LLVM AOT backend may combine all executable
+  // targets for the same architecture into a single executable and link it as
+  // a shared library.
+  passManager.addPass(createLinkExecutablesPass(targetOptions));
+
   passManager.addPass(createConvertFlowToHALPass());
 
   // Phase ordering note: Before this pass, functions signatures will be based
@@ -40,13 +65,16 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // dynamic dim in the case of ranked_shape).
   passManager.addPass(Shape::createExpandFunctionRankedShapeDimsPass());
 
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
+
   // For each exported function, processes the reflection metadata and
   // generates public ABI wrappers for various calling conventions.
   // Phase ordering note: This operates on functions whose signatures have
   // been expanded to primitives.
   passManager.addPass(createPublicABIGenerationPass());
 
-  passManager.addPass(createMaterializeResourceCachesPass(executableOptions));
+  passManager.addPass(createMaterializeResourceCachesPass(targetOptions));
 
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
@@ -59,14 +87,26 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // Right now the global value initializers don't have proper tracking and if
   // we do this we lose initializers that have side effects we care about.
   // passManager.addPass(createSymbolDCEPass());
+
+  // TODO(GH-1036): run this once per hal.executable.target in a nested pass
+  // manager so that we have as many passes as hal.executable.target ops.
+  if (transformOptions.serializeExecutables) {
+    passManager.addPass(createSerializeExecutablesPass(targetOptions));
+  }
 }
 
-static PassPipelineRegistration<> transformPassPipeline(
+void buildHALTransformPassPipeline(OpPassManager &passManager,
+                                   TargetOptions targetOptions) {
+  TransformOptions transformOptions;
+  buildHALTransformPassPipeline(passManager, targetOptions, transformOptions);
+}
+
+static PassPipelineRegistration<TransformOptions> transformPassPipeline(
     "iree-hal-transformation-pipeline",
     "Runs the full IREE HAL dialect transformation pipeline",
-    [](OpPassManager &passManager) {
-      buildHALTransformPassPipeline(passManager,
-                                    getExecutableTargetOptionsFromFlags());
+    [](OpPassManager &passManager, const TransformOptions &transformOptions) {
+      buildHALTransformPassPipeline(passManager, getTargetOptionsFromFlags(),
+                                    transformOptions);
     });
 
 }  // namespace HAL

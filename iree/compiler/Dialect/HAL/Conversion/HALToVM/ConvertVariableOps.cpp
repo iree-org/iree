@@ -79,8 +79,13 @@ class VariableLoadOpConversion
   LogicalResult matchAndRewrite(
       IREE::HAL::VariableLoadOp op, llvm::ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadRefOp>(
-        op, typeConverter.convertType(op.getType()), op.variable());
+    if (IREE::VM::RefType::isCompatible(op.getType())) {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadRefOp>(
+          op, typeConverter.convertType(op.getType()), op.variable());
+    } else {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadI32Op>(
+          op, typeConverter.convertType(op.getType()), op.variable());
+    }
     return success();
   }
 
@@ -99,8 +104,13 @@ class VariableLoadIndirectOpConversion
       IREE::HAL::VariableLoadIndirectOp op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::VariableLoadIndirectOpOperandAdaptor operands(newOperands);
-    rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectRefOp>(
-        op, typeConverter.convertType(op.getType()), operands.variable());
+    if (IREE::VM::RefType::isCompatible(op.getType())) {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectRefOp>(
+          op, typeConverter.convertType(op.getType()), operands.variable());
+    } else {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalLoadIndirectI32Op>(
+          op, typeConverter.convertType(op.getType()), operands.variable());
+    }
     return success();
   }
 
@@ -118,8 +128,13 @@ class VariableStoreOpConversion
       IREE::HAL::VariableStoreOp op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::VariableStoreOpOperandAdaptor operands(newOperands);
-    rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreRefOp>(
-        op, operands.value(), op.variable());
+    if (operands.value().getType().isa<IREE::VM::RefType>()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreRefOp>(
+          op, operands.value(), op.variable());
+    } else {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreI32Op>(
+          op, operands.value(), op.variable());
+    }
     return success();
   }
 };
@@ -135,8 +150,13 @@ class VariableStoreIndirectOpConversion
       IREE::HAL::VariableStoreIndirectOp op, llvm::ArrayRef<Value> newOperands,
       ConversionPatternRewriter &rewriter) const override {
     IREE::HAL::VariableStoreIndirectOpOperandAdaptor operands(newOperands);
-    rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectRefOp>(
-        op, operands.value(), operands.variable());
+    if (operands.value().getType().isa<IREE::VM::RefType>()) {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectRefOp>(
+          op, operands.value(), operands.variable());
+    } else {
+      rewriter.replaceOpWithNewOp<IREE::VM::GlobalStoreIndirectI32Op>(
+          op, operands.value(), operands.variable());
+    }
     return success();
   }
 };

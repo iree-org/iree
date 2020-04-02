@@ -26,14 +26,14 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-LogicalResult makeLegacyExecutableABI(IREE::HAL::ExecutableSourceOp sourceOp) {
-  PassManager passManager(sourceOp.getContext());
+LogicalResult makeLegacyExecutableABI(IREE::HAL::ExecutableTargetOp targetOp) {
+  PassManager passManager(targetOp.getContext());
 
   // Rewrite the hal.interface IO shim to use the legacy memref-based functions.
   passManager.addPass(createRewriteLegacyIOPass());
 
-  if (failed(passManager.run(sourceOp.getInnerModule()))) {
-    return sourceOp.emitError()
+  if (failed(passManager.run(targetOp.getInnerModule()))) {
+    return targetOp.emitError()
            << "required legacy rewriting/inlining failed (possibly "
               "due to symbol resolution issues)";
   }

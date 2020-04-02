@@ -217,5 +217,6 @@ static PassPipelineRegistration<WorkGroupOptions> xlaToLinalgSPIRVPipeline(
                            options.workGroupSize.end());
       addHLOToLinalgToSPIRVPasses(passManager, workGroupSize);
     });
+
 }  // namespace iree_compiler
 }  // namespace mlir

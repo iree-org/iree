@@ -8,15 +8,16 @@ hal.executable @ex0 {
   hal.executable.entry_point @entry0 attributes {
     interface = @interface,
     ordinal = 0 : i32,
-    signature = (tensor<128xf32>) -> tensor<128xf32>,
-    workgroup_size = [32 : index, 1 : index, 1 : index]
+    signature = (tensor<128xf32>) -> tensor<128xf32>
+  }
+  hal.executable.target "vmla" {
+    module {}
   }
 }
 
 // CHECK-LABEL: func @multipleDispatches
 func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
-  // CHECK-DAG: [[C1:%.+]] = constant 1
-  // CHECK-DAG: [[C4:%.+]] = constant 4
+  // CHECK-DAG: [[C0:%.+]] = constant 0
   // CHECK-DAG: [[C128:%.+]] = constant 128
   %cst = constant 128 : index
   // CHECK: [[RET_BUF:%.+]] = hal.allocator.allocate {{.+}}, "HostVisible|DeviceVisible|DeviceLocal", "Constant|Transfer|Mapping|Dispatch"
@@ -29,15 +30,11 @@ func @multipleDispatches(%arg0: tensor<128xf32>) -> tensor<128xf32> {
     //  CHECK-DAG: [[EXE:%.+]] = hal.executable.lookup {{.+}}, @ex0 : !hal.executable
     //  CHECK-DAG: [[EXE_LAYOUT:%.+]] = hal.executable_layout.lookup
     //      CHECK: hal.command_buffer.push_descriptor_set [[CMD]], [[EXE_LAYOUT]], set=0, bindings=[0 = (%arg0, %c0, %sz_3), 1 = (%buffer_1, %c0, %sz_4)]
-    // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], [[EXE]], entry_point = 0, workgroup_xyz = [
-    // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
-    // CHECK-SAME: ]
+    //      CHECK: hal.command_buffer.dispatch {{.+}}, entry_point = 0, workgroup_xyz
     //      CHECK: hal.command_buffer.execution_barrier
     %1 = flow.dispatch @ex0::@entry0[%arg1 : index](%arg2) : (tensor<128xf32>) -> tensor<128xf32>
     //      CHECK: hal.command_buffer.push_descriptor_set
-    // CHECK-NEXT: hal.command_buffer.dispatch [[CMD]], {{.+}}, entry_point = 0, workgroup_xyz = [
-    // CHECK-SAME:   [[C4]], [[C1]], [[C1]]
-    // CHECK-SAME: ]
+    //      CHECK: hal.command_buffer.dispatch {{.+}}, entry_point = 0, workgroup_xyz
     //      CHECK: hal.command_buffer.execution_barrier
     %2 = flow.dispatch @ex0::@entry0[%arg1 : index](%1) : (tensor<128xf32>) -> tensor<128xf32>
     flow.return %2 : tensor<128xf32>
@@ -85,8 +82,10 @@ hal.executable @ex0 {
   hal.executable.entry_point @entry0 attributes {
     interface = @interface,
     ordinal = 0 : i32,
-    signature = (tensor<?x128xf32>, index) -> tensor<?x128xf32>,
-    workgroup_size = [32 : index, 1 : index, 1 : index]
+    signature = (tensor<?x128xf32>, index) -> tensor<?x128xf32>
+  }
+  hal.executable.target "vmla" {
+    module {}
   }
 }
 

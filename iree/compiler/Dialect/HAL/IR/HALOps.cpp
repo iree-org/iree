@@ -29,14 +29,6 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-static Type getDimType(OpAsmParser &parser) {
-  return parser.getBuilder().getIndexType();
-}
-
-static Type getDeviceSizeType(OpAsmParser &parser) {
-  return parser.getBuilder().getIndexType();
-}
-
 template <typename T>
 static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
                                    SmallVectorImpl<NamedAttribute> &attrs) {
@@ -969,11 +961,7 @@ void DeviceSwitchOp::build(Builder *builder, OperationState &state,
   state.addAttribute("conditions", builder->getArrayAttr(conditions));
   for (auto args : conditionArgs) {
     state.addOperands(args);
-    auto *region = state.addRegion();
-    auto *entryBlock = OpBuilder(region).createBlock(region);
-    for (auto arg : args) {
-      entryBlock->addArgument(arg.getType());
-    }
+    state.addRegion();
   }
   state.addTypes(resultTypes);
   state.addAttributes(attributes);
@@ -1130,12 +1118,6 @@ static LogicalResult verifyDeviceSwitchOp(DeviceSwitchOp op) {
 // hal.executable
 //===----------------------------------------------------------------------===//
 
-ExecutableSourceOp ExecutableOp::getSourceOp() {
-  auto ops = getBlock().getOps<ExecutableSourceOp>();
-  assert(!ops.empty() && "executables must contain source ops");
-  return *ops.begin();
-}
-
 InterfaceOp ExecutableOp::getInterfaceOp() {
   auto interfaceOps = llvm::to_vector<1>(getBlock().getOps<InterfaceOp>());
   assert(interfaceOps.size() == 1 && "executable must have one interface");
@@ -1210,30 +1192,37 @@ static void printExecutableEntryPointOp(OpAsmPrinter &p,
 }
 
 //===----------------------------------------------------------------------===//
-// hal.executable.source
+// hal.executable.target
 //===----------------------------------------------------------------------===//
 
-void ExecutableSourceOp::build(Builder *builder, OperationState &state) {
+void ExecutableTargetOp::build(Builder *builder, OperationState &state,
+                               StringRef targetBackend) {
   ensureTerminator(*state.addRegion(), *builder, state.location);
+  state.addAttribute("target_backend", builder->getStringAttr(targetBackend));
 }
 
-static ParseResult parseExecutableSourceOp(OpAsmParser &parser,
+static ParseResult parseExecutableTargetOp(OpAsmParser &parser,
                                            OperationState *result) {
   auto *body = result->addRegion();
-  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
+  StringAttr targetBackendAttr;
+  if (failed(parser.parseAttribute(targetBackendAttr, "target_backend",
+                                   result->attributes)) ||
+      failed(parser.parseOptionalAttrDictWithKeyword(result->attributes)) ||
       failed(parser.parseOptionalRegion(*body, llvm::None, llvm::None))) {
     return failure();
   }
 
   // Ensure that this module has a valid terminator.
-  ExecutableSourceOp::ensureTerminator(*body, parser.getBuilder(),
+  ExecutableTargetOp::ensureTerminator(*body, parser.getBuilder(),
                                        result->location);
   return success();
 }
 
-static void printExecutableSourceOp(OpAsmPrinter &p, ExecutableSourceOp op) {
+static void printExecutableTargetOp(OpAsmPrinter &p, ExecutableTargetOp op) {
   p << op.getOperationName();
-  p.printOptionalAttrDictWithKeyword(op.getAttrs());
+  p << " \"" << op.target_backend() << "\"";
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"target_backend"});
   if (!op.body().empty()) {
     p.printRegion(op.body(), /*printEntryBlockArgs=*/false,
                   /*printBlockTerminators=*/false);

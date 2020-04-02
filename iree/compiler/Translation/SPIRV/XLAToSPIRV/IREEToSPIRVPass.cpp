@@ -169,6 +169,14 @@ void IREEToSPIRVPass::runOnOperation() {
   if (failed(convertAffineApplyOps(context, spvModule))) {
     return signalPassFailure();
   }
+
+  // Remove unneeded ops.
+  for (auto &op :
+       llvm::make_early_inc_range(module.getBody()->getOperations())) {
+    if (!isa<spirv::ModuleOp>(op) && !isa<mlir::ModuleTerminatorOp>(op)) {
+      op.erase();
+    }
+  }
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEToSPIRVPass() {

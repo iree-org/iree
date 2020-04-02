@@ -16,22 +16,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    ExecutableTarget
-  HDRS
-    "ExecutableTarget.h"
-  SRCS
-    "ExecutableTarget.cpp"
-  DEPS
-    LLVMSupport
-    iree::compiler::Dialect::Flow::IR
-    iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::IREE::IR
-  ALWAYSLINK
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     LegacyUtil
   HDRS
     "LegacyUtil.h"
@@ -48,5 +32,27 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Utils
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    Target
+  HDRS
+    "TargetBackend.h"
+    "TargetRegistry.h"
+  SRCS
+    "TargetBackend.cpp"
+    "TargetRegistry.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRPass
+    MLIRSupport
+    MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::HAL::Utils
+    iree::compiler::Dialect::IREE::IR
   PUBLIC
 )

@@ -16,12 +16,14 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/Target/LegacyUtil.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/Mutex.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
@@ -47,7 +49,7 @@ LLVMTargetOptions getLLVMTargetOptionsFromFlags() {
 // TODO(ataei): This is written as a stub in LLVM IR. It would be easier to have
 // this using MLIR and lower it to LLVM like the dispatch function
 // implementation is.
-static void CreateInvocationFunc(const std::string& name,
+static void createInvocationFunc(const std::string& name,
                                  llvm::Module* module) {
   auto& ctx = module->getContext();
   llvm::IRBuilder<> builder(ctx);
@@ -90,24 +92,25 @@ struct DispatchFnImplRewritePattern : public OpRewritePattern<FuncOp> {
   using OpRewritePattern<FuncOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(FuncOp funcOp,
                                 PatternRewriter& rewriter) const override {
-    if (!isDispatchFuncImpl(funcOp)) return failure();
-    // Create a module to put the impl function in.
-    auto moduleOp = rewriter.create<ModuleOp>(funcOp.getLoc());
-    OpBuilder::InsertionGuard guard(rewriter);
-    rewriter.setInsertionPointToStart(moduleOp.getBody());
-    auto dispatchFnName = getDispatchFuncName(funcOp);
-    FuncOp newFuncOp =
-        rewriter.create<FuncOp>(funcOp.getLoc(), dispatchFnName.getValue(),
-                                funcOp.getType(), ArrayRef<NamedAttribute>{});
-    // Emit c_interface for executable invocation function.
-    newFuncOp.setAttr("llvm.emit_c_interface",
-                      mlir::UnitAttr::get(rewriter.getContext()));
-    rewriter.cloneRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
-                               newFuncOp.end());
-    // To record that this function has been processed, remove the dispatch fn
-    // attribute.
-    rewriter.updateRootInPlace(
-        funcOp, [&funcOp]() { funcOp.removeAttr(getDispatchFuncAttrName()); });
+    if (isDispatchFuncImpl(funcOp)) {
+      rewriter.updateRootInPlace(funcOp, [&funcOp]() {
+        funcOp.setAttr("llvm.emit_c_interface",
+                       mlir::UnitAttr::get(funcOp.getContext()));
+        funcOp.setName(getDispatchFuncName(funcOp).getValue());
+      });
+    } else {
+      rewriter.eraseOp(funcOp);
+    }
+    return success();
+  }
+};
+
+struct RemoveInterfaceOpPattern
+    : public OpRewritePattern<IREE::HAL::InterfaceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::HAL::InterfaceOp interfaceOp,
+                                PatternRewriter& rewriter) const override {
+    rewriter.eraseOp(interfaceOp);
     return success();
   }
 };
@@ -120,118 +123,113 @@ struct PrepareForLLVMLoweringPass
     OwningRewritePatternList patterns;
     MLIRContext* context = &getContext();
     patterns.insert<DispatchFnImplRewritePattern>(context);
+    patterns.insert<RemoveInterfaceOpPattern>(context);
     applyPatternsAndFoldGreedily(getOperation(), patterns);
   }
 };
+
 }  // namespace
 
-// Adds a sequence of passess to a given pass manager that progressively lower
-// from HLO to LLVM throught linalg dialect.
-void buildLLVMTransformPassPipeline(OpPassManager& pm) {
-  // HLO -> Linalg on buffers.
-  addHLOToLinalgOnBuffersPasses(pm);
+class LLVMIRTargetBackend final : public TargetBackend {
+ public:
+  LLVMIRTargetBackend(LLVMTargetOptions options)
+      : options_(std::move(options)) {}
 
-  // Linalg -> Loops
-  pm.addPass(createConvertLinalgToLoopsPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  // NOTE: we could vary this based on the options, such as by arch/etc.
+  std::string name() const override { return "llvm*"; }
 
-  // Loops -> STD
-  pm.addPass(createLowerToCFGPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  // Adds a sequence of passess to a given pass manager that progressively lower
+  // from HLO to LLVM throught linalg dialect.
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
+                                    OpPassManager& passManager) override {
+    // Convert IREE's hal.interface accesses to memrefs.
+    passManager.addPass(createHALInterfaceToMemrefPass());
 
-  // (Linalg, STD) -> LLVM
-  pm.addPass(std::make_unique<PrepareForLLVMLoweringPass>());
-  OpPassManager& llvmPassManager = pm.nest<ModuleOp>();
-  llvmPassManager.addPass(createConvertLinalgToLLVMPass());
-  llvmPassManager.addPass(createCanonicalizerPass());
-  llvmPassManager.addPass(createCSEPass());
-}
+    // HLO -> Linalg on buffers.
+    addHLOToLinalgOnBuffersPasses(passManager);
 
-LogicalResult translateToLLVMExecutable(
-    IREE::HAL::ExecutableOp executableOp,
-    ExecutableTargetOptions executableOptions,
-    LLVMTargetOptions targetOptions) {
-  // Clone the module containing the things we want to translate. We do this so
-  // that multiple targets can pull from the same source without conflicting.
-  auto sourceOp = executableOp.getSourceOp().clone();
-  auto sourceOpErase =
-      llvm::make_scope_exit([&sourceOp]() { sourceOp.erase(); });
-  auto sourceModuleOp = sourceOp.getInnerModule();
-  auto flowExecutableOp =
-      *sourceModuleOp.getOps<IREE::Flow::ExecutableOp>().begin();
-  auto moduleOp = flowExecutableOp.getInnerModule();
+    // Linalg -> Loops
+    passManager.addPass(createConvertLinalgToLoopsPass());
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
 
-  // Lower module to LLVM Dialect.
-  PassManager conversionPassManager(moduleOp.getContext());
-  applyPassManagerCLOptions(conversionPassManager);
-  conversionPassManager.addPass(createHALInterfaceToMemrefPass());
-  buildLLVMTransformPassPipeline(
-      conversionPassManager.nest<IREE::Flow::ExecutableOp>().nest<ModuleOp>());
-  if (failed(conversionPassManager.run(sourceModuleOp)))
-    return moduleOp.emitError()
-           << "failed to run IREE -> LLVM conversion passes";
+    // Loops -> STD
+    passManager.addPass(createLowerToCFGPass());
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
 
-  // Get the module to be passed to llvm lowering.
-  auto llvmModuleOps = moduleOp.getOps<ModuleOp>();
-  if (!llvm::hasSingleElement(llvmModuleOps)) {
-    return moduleOp.emitError(
-        "expected single sub-module that is to be lowered to LLVM IR");
+    // (Linalg, STD) -> LLVM
+    passManager.addPass(std::make_unique<PrepareForLLVMLoweringPass>());
+    // OpPassManager& llvmPassManager = passManager.nest<ModuleOp>();
+    passManager.addPass(createConvertLinalgToLLVMPass());
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
   }
-  // At this moment we are leaving MLIR LLVM dialect land translating module
-  // into target independent LLVMIR.
-  auto llvmModule = mlir::translateModuleToLLVMIR(*llvmModuleOps.begin());
-  iree::LLVMIRExecutableDefT llvmIrExecutableDef;
 
-  // Create invocation function an populate entry_points.
-  const bool addCInterface = true;
-  for (auto& op : flowExecutableOp.getBlock().getOperations()) {
-    if (auto entryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
-      std::string func_name =
-          addCInterface ? "_mlir_ciface_" + std::string(entryOp.function_ref())
-                        : std::string(entryOp.function_ref());
-      llvmIrExecutableDef.entry_points.push_back(func_name);
-      CreateInvocationFunc(func_name, llvmModule.get());
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+                                    OpBuilder& executableBuilder) override {
+    // LLVM is not thread safe and currently translation shares an LLVMContext.
+    // Since we serialize executables from multiple threads we have to take a
+    // global lock here.
+    static llvm::sys::SmartMutex<true> mutex;
+    llvm::sys::SmartScopedLock<true> lock(mutex);
+
+    // At this moment we are leaving MLIR LLVM dialect land translating module
+    // into target independent LLVMIR.
+    auto llvmModule = mlir::translateModuleToLLVMIR(targetOp.getInnerModule());
+
+    // Create invocation function an populate entry_points.
+    iree::LLVMIRExecutableDefT llvmIrExecutableDef;
+    auto executableOp = cast<IREE::HAL::ExecutableOp>(targetOp.getParentOp());
+    auto entryPointOps =
+        executableOp.getBlock().getOps<IREE::HAL::ExecutableEntryPointOp>();
+    const bool addCInterface = true;
+    for (auto entryPointOp : entryPointOps) {
+      std::string funcName =
+          addCInterface ? "_mlir_ciface_" + std::string(entryPointOp.sym_name())
+                        : std::string(entryPointOp.sym_name());
+      llvmIrExecutableDef.entry_points.push_back(funcName);
+      createInvocationFunc(funcName, llvmModule.get());
     }
+
+    // Serialize LLVM module.
+    std::string bufferString;
+    llvm::raw_string_ostream ostream(bufferString);
+    llvmModule->print(ostream, nullptr);
+    ostream.flush();
+
+    // Creates executable bytes.
+    llvmIrExecutableDef.llvmir_module = {bufferString.begin(),
+                                         bufferString.end()};
+
+    ::flatbuffers::FlatBufferBuilder fbb;
+    auto executableOffset =
+        iree::LLVMIRExecutableDef::Pack(fbb, &llvmIrExecutableDef);
+    iree::FinishLLVMIRExecutableDefBuffer(fbb, executableOffset);
+    std::vector<uint8_t> bytes;
+    bytes.resize(fbb.GetSize());
+    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+
+    // Add the binary data to the target executable.
+    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+        targetOp.getLoc(),
+        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::LLVM),
+        std::move(bytes));
+
+    return success();
   }
 
-  // Serialize LLVM module.
-  std::string bufferString;
-  llvm::raw_string_ostream ostream(bufferString);
-  llvmModule->print(ostream, nullptr);
-  ostream.flush();
+ private:
+  LLVMTargetOptions options_;
+};
 
-  // Creates executable bytes.
-  llvmIrExecutableDef.llvmir_module = {bufferString.begin(),
-                                       bufferString.end()};
-
-  ::flatbuffers::FlatBufferBuilder fbb;
-  auto executableOffset =
-      iree::LLVMIRExecutableDef::Pack(fbb, &llvmIrExecutableDef);
-  iree::FinishLLVMIRExecutableDefBuffer(fbb, executableOffset);
-  std::vector<uint8_t> bytes;
-  bytes.resize(fbb.GetSize());
-  std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
-
-  // Add the binary data to the target executable.
-  OpBuilder targetBuilder = OpBuilder::atBlockEnd(&executableOp.getBlock());
-  targetBuilder.setInsertionPoint(&executableOp.getBlock().back());
-  auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-      executableOp.getLoc(),
-      static_cast<uint32_t>(IREE::HAL::ExecutableFormat::LLVM),
-      std::move(bytes));
-  OpBuilder binaryBuilder(&binaryOp.getBlock().back());
-  binaryBuilder.clone(*moduleOp.getOperation());
-  return success();
+void registerLLVMTargetBackends(
+    std::function<LLVMTargetOptions()> queryOptions) {
+  getLLVMTargetOptionsFromFlags();
+  static TargetBackendRegistration registration("llvm-ir", [=]() {
+    return std::make_unique<LLVMIRTargetBackend>(queryOptions());
+  });
 }
-
-static ExecutableTargetRegistration targetRegistration(
-    "llvm-ir", +[](IREE::HAL::ExecutableOp executableOp,
-                   ExecutableTargetOptions executableOptions) {
-      return translateToLLVMExecutable(executableOp, executableOptions,
-                                       getLLVMTargetOptionsFromFlags());
-    });
 
 }  // namespace HAL
 }  // namespace IREE

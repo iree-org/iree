@@ -30,6 +30,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createConversionPass());
   passManager.addPass(createGlobalInitializationPass());
+  passManager.addPass(createInlinerPass());
   passManager.addPass(createCSEPass());
   passManager.addPass(createSymbolDCEPass());
 }

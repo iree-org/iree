@@ -20,12 +20,13 @@
 #include "bindings/python/pyiree/common/binding.h"
 #include "bindings/python/pyiree/common/status_utils.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_passes.h"
+#include "iree/tools/init_targets.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
@@ -42,7 +43,7 @@ namespace py = pybind11;
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
-using mlir::iree_compiler::IREE::HAL::ExecutableTargetOptions;
+using mlir::iree_compiler::IREE::HAL::TargetOptions;
 using mlir::iree_compiler::IREE::VM::BytecodeOutputFormat;
 using mlir::iree_compiler::IREE::VM::BytecodeTargetOptions;
 
@@ -69,7 +70,10 @@ bool LLVMOnceInit() {
 
   // Register built-in MLIR dialects.
   mlir::registerMlirDialects();
+
+  // Register IREE dialects and HAL target backends.
   mlir::iree_compiler::registerIreeDialects();
+  mlir::iree_compiler::registerHALTargetBackends();
 
   // Depending on the build environment the MLIR Passes may already be
   // registered. Conditionally register passes until re-registration is
@@ -327,8 +331,14 @@ std::shared_ptr<OpaqueBlob> CompilerModuleBundle::Compile(
   if (crash_reproducer_path) {
     pass_manager.enableCrashReproducerGeneration(*crash_reproducer_path);
   }
-  mlir::iree_compiler::IREE::HAL::ExecutableTargetOptions executable_options;
-  executable_options.targets = std::move(target_backends);
+
+  mlir::iree_compiler::IREE::HAL::TargetOptions executable_options;
+  if (target_backends.empty()) {
+    executable_options.targets =
+        mlir::iree_compiler::IREE::HAL::getRegisteredTargetBackends();
+  } else {
+    executable_options.targets = std::move(target_backends);
+  }
 
   mlir::iree_compiler::IREE::Flow::buildFlowTransformPassPipeline(pass_manager);
   mlir::iree_compiler::IREE::HAL::buildHALTransformPassPipeline(

@@ -16,6 +16,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
@@ -34,90 +35,74 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-// TODO(benvanik): add flags.
-// static llvm::cl::OptionCategory halVMLAOptionsCategory(
-//     "IREE VMLA backend options");
-
 VMLATargetOptions getVMLATargetOptionsFromFlags() {
   VMLATargetOptions targetOptions;
   // TODO(benvanik): flags.
   return targetOptions;
 }
 
-LogicalResult translateToVMLAExecutable(
-    IREE::HAL::ExecutableOp executableOp,
-    ExecutableTargetOptions executableOptions,
-    VMLATargetOptions targetOptions) {
-  // Clone the module containing the things we want to translate. We do this so
-  // that multiple targets can pull from the same source without conflicting.
-  auto sourceOp = executableOp.getSourceOp().clone();
-  auto sourceOpErase = llvm::make_scope_exit([&]() { sourceOp.erase(); });
-  auto flowExecutableOp =
-      *sourceOp.getInnerModule().getOps<IREE::Flow::ExecutableOp>().begin();
-  auto innerModuleOp = flowExecutableOp.getInnerModule();
+class VMLATargetBackend final : public TargetBackend {
+ public:
+  VMLATargetBackend(VMLATargetOptions options) : options_(std::move(options)) {}
 
-  // Markup all entry points as module exports.
-  // TODO(benvanik): this won't be required when replaced with sym_visibility.
-  for (auto funcOp : innerModuleOp.getOps<FuncOp>()) {
-    if (SymbolTable::getSymbolVisibility(funcOp) ==
-        SymbolTable::Visibility::Public) {
-      funcOp.setAttr("iree.module.export",
-                     UnitAttr::get(innerModuleOp.getContext()));
+  std::string name() const override { return "vmla"; }
+
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
+                                    OpPassManager &passManager) override {
+    IREE::VMLA::buildVMLATransformPassPipeline(passManager);
+
+    // TODO(GH-614): remove this when the std->vm conversion isn't looking for
+    // iree.module.export.
+    passManager.addPass(IREE::VM::createMarkPublicSymbolsExportedPass());
+
+    IREE::VM::buildVMTransformPassPipeline(passManager);
+  }
+
+  LogicalResult serializeExecutable(IREE::HAL::ExecutableTargetOp targetOp,
+                                    OpBuilder &executableBuilder) override {
+    // Serialize the VM module to bytes.
+    std::string byteStreamValue;
+    llvm::raw_string_ostream byte_stream(byteStreamValue);
+    IREE::VM::BytecodeTargetOptions bytecodeOptions;
+    if (failed(translateModuleToBytecode(targetOp.getInnerModule(),
+                                         bytecodeOptions, byte_stream))) {
+      return targetOp.emitError() << "failed to serialize converted VM module";
     }
+
+    // Pack the executable definition and get the bytes with the proper header.
+    // The header is used to verify the contents at runtime.
+    ::flatbuffers::FlatBufferBuilder fbb;
+    iree::VMLAExecutableDefT vmlaExecutableDef;
+    vmlaExecutableDef.bytecode_module.resize(byteStreamValue.size());
+    std::memcpy(vmlaExecutableDef.bytecode_module.data(),
+                byteStreamValue.data(), byteStreamValue.size());
+    auto executableOffset =
+        iree::VMLAExecutableDef::Pack(fbb, &vmlaExecutableDef);
+    iree::FinishVMLAExecutableDefBuffer(fbb, executableOffset);
+    std::vector<uint8_t> bytes;
+    bytes.resize(fbb.GetSize());
+    std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
+
+    // Add the binary data to the target executable.
+    executableBuilder.create<IREE::HAL::ExecutableBinaryOp>(
+        targetOp.getLoc(),
+        static_cast<uint32_t>(IREE::HAL::ExecutableFormat::VMLA),
+        std::move(bytes));
+
+    return success();
   }
 
-  // Convert to VMLA.
-  PassManager conversionPassManager(innerModuleOp.getContext());
-  applyPassManagerCLOptions(conversionPassManager);
-  IREE::VMLA::buildVMLATransformPassPipeline(conversionPassManager);
-  IREE::VM::buildVMTransformPassPipeline(conversionPassManager);
-  if (failed(conversionPassManager.run(innerModuleOp))) {
-    return innerModuleOp.emitError() << "failed to run conversion passes";
-  }
+ private:
+  VMLATargetOptions options_;
+};
 
-  // Serialize the VM module to bytes.
-  std::string byteStreamValue;
-  llvm::raw_string_ostream byte_stream(byteStreamValue);
-  IREE::VM::BytecodeTargetOptions bytecodeOptions;
-  if (failed(translateModuleToBytecode(innerModuleOp, bytecodeOptions,
-                                       byte_stream))) {
-    return innerModuleOp.emitError()
-           << "failed to serialize converted VM module";
-  }
-
-  // Pack the executable definition and get the bytes with the proper header.
-  // The header is used to verify the contents at runtime.
-  ::flatbuffers::FlatBufferBuilder fbb;
-  iree::VMLAExecutableDefT vmlaExecutableDef;
-  vmlaExecutableDef.bytecode_module.resize(byteStreamValue.size());
-  std::memcpy(vmlaExecutableDef.bytecode_module.data(), byteStreamValue.data(),
-              byteStreamValue.size());
-  auto executableOffset =
-      iree::VMLAExecutableDef::Pack(fbb, &vmlaExecutableDef);
-  iree::FinishVMLAExecutableDefBuffer(fbb, executableOffset);
-  std::vector<uint8_t> bytes;
-  bytes.resize(fbb.GetSize());
-  std::memcpy(bytes.data(), fbb.GetBufferPointer(), bytes.size());
-
-  // Add the binary data to the target executable.
-  OpBuilder targetBuilder = OpBuilder::atBlockEnd(&executableOp.getBlock());
-  targetBuilder.setInsertionPoint(&executableOp.getBlock().back());
-  auto binaryOp = targetBuilder.create<IREE::HAL::ExecutableBinaryOp>(
-      executableOp.getLoc(),
-      static_cast<uint32_t>(IREE::HAL::ExecutableFormat::VMLA),
-      std::move(bytes));
-  OpBuilder binaryBuilder(&binaryOp.getBlock().back());
-  auto vmModuleOp = *innerModuleOp.getOps<IREE::VM::ModuleOp>().begin();
-  binaryBuilder.clone(*vmModuleOp);
-  return success();
+void registerVMLATargetBackends(
+    std::function<VMLATargetOptions()> queryOptions) {
+  getVMLATargetOptionsFromFlags();
+  static TargetBackendRegistration registration("vmla", [=]() {
+    return std::make_unique<VMLATargetBackend>(queryOptions());
+  });
 }
-
-static ExecutableTargetRegistration targetRegistration(
-    "vmla", +[](IREE::HAL::ExecutableOp executableOp,
-                ExecutableTargetOptions executableOptions) {
-      return translateToVMLAExecutable(executableOp, executableOptions,
-                                       getVMLATargetOptionsFromFlags());
-    });
 
 }  // namespace HAL
 }  // namespace IREE

@@ -27,7 +27,7 @@ cc_library(
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",
-        "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+        "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/VM/Conversion",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Dialect/VM/Transforms",

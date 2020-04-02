@@ -27,24 +27,17 @@
 namespace mlir {
 namespace iree_compiler {
 
-namespace IREE {
-namespace Flow {
-class ExecutableOp;
-}
-}  // namespace IREE
-
 /// Populates passes to convert from XLA-HLO to Linalg on buffers as well as
 /// handling some IREE specific conversions (like IREE::LoadInputOp and
 /// IREE::StoreOutputOp). At the end of the pass, the dispatch function will
 /// only contain linalg ops or standard ops if the pipeline succeeds. The pass
 /// manager `pm` passed in here is expected to operate on the module within the
-/// IREE::HAL::ExecutableSourceOp.
+/// IREE::HAL::ExecutableTargetOp.
 void addHLOToLinalgOnBuffersPasses(OpPassManager &pm);
 
 /// Creates a pass to convert HAL interface on tensors to HAL interface on
 /// memrefs.
-std::unique_ptr<OperationPass<IREE::Flow::ExecutableOp>>
-createHALInterfaceToMemrefPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createHALInterfaceToMemrefPass();
 
 /// Creates XLA-HLO preprocessing transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
@@ -77,4 +70,5 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
 
 }  // namespace iree_compiler
 }  // namespace mlir
+
 #endif  // IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H

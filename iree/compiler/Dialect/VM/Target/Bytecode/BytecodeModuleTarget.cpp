@@ -84,7 +84,7 @@ static ModuleCounts computeModuleSymbolCounts(IREE::VM::ModuleOp moduleOp) {
     } else if (isa<IREE::VM::ImportOp>(op)) {
       ++counts.importFuncs;
     } else if (isa<IREE::VM::GlobalI32Op>(op)) {
-      ++counts.globalBytes;
+      counts.globalBytes += 4;
     } else if (isa<IREE::VM::GlobalRefOp>(op)) {
       ++counts.globalRefs;
     } else if (isa<IREE::VM::RodataOp>(op)) {

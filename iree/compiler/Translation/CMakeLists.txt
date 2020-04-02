@@ -30,7 +30,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::Conversion::HALToVM
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::VM::Conversion::StandardToVM

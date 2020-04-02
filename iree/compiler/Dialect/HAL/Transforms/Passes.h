@@ -17,7 +17,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/ADT/StringMap.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
@@ -45,7 +45,7 @@ namespace HAL {
 //   buildHALTransformPassPipeline & run
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(OpPassManager &passManager,
-                                   ExecutableTargetOptions executableOptions);
+                                   TargetOptions executableOptions);
 
 //===----------------------------------------------------------------------===//
 // Device management
@@ -62,14 +62,10 @@ std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
 //===----------------------------------------------------------------------===//
 
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
-// usage within the module.
+// usage within the module. Target backends are queried to check for support and
+// device placements are made.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    ExecutableTargetOptions executableOptions);
-
-// Translates flow.executable ops to hal.executable ops using the provided
-// options.
-std::unique_ptr<OperationPass<ModuleOp>> createTranslateExecutablesPass(
-    ExecutableTargetOptions executableOptions);
+    TargetOptions executableOptions);
 
 // Rewrites hal.interface IO shims to look like the legacy IREE
 // load_input/store_output form. This is incompatible with dynamic shapes and
@@ -77,6 +73,21 @@ std::unique_ptr<OperationPass<ModuleOp>> createTranslateExecutablesPass(
 // backends using it are ported to hal.interface.
 std::unique_ptr<OperationPass<IREE::Flow::ExecutableOp>>
 createRewriteLegacyIOPass();
+
+// Translates hal.executable.target ops via a nested translation pipeline.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createTranslateExecutablesPass(TargetOptions executableOptions);
+
+// Calls into each target backend to have it link multiple hal.executables
+// together (if that makes sense). For example, the LLVM AOT backend may combine
+// all executable targets for the same architecture into a single executable and
+// link it as a shared library.
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createLinkExecutablesPass(
+    TargetOptions executableOptions);
+
+// Converts hal.executable.target ops to hal.executable.binary ops.
+std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
+createSerializeExecutablesPass(TargetOptions executableOptions);
 
 // For functions that contain reflection metadata in an
 // iree.generateabi.reflection attribute, generate public ABI functions for
@@ -91,7 +102,24 @@ std::unique_ptr<OperationPass<ModuleOp>> createPublicABIGenerationPass();
 // their cache storage and initialization, and rewrites the lookups to
 // references.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
-    ExecutableTargetOptions executableOptions);
+    TargetOptions executableOptions);
+
+//===----------------------------------------------------------------------===//
+// Register all Passes
+//===----------------------------------------------------------------------===//
+
+inline void registerHALPasses() {
+  auto executableOptions = getTargetOptionsFromFlags();
+  createOutlineDeviceSwitchesPass();
+  createMemoizeDeviceQueriesPass();
+  createMaterializeInterfacesPass(executableOptions);
+  createRewriteLegacyIOPass();
+  createTranslateExecutablesPass(executableOptions);
+  createLinkExecutablesPass(executableOptions);
+  createSerializeExecutablesPass(executableOptions);
+  createPublicABIGenerationPass();
+  createMaterializeResourceCachesPass(executableOptions);
+}
 
 }  // namespace HAL
 }  // namespace IREE

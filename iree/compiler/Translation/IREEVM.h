@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_TRANSLATION_IREEVM_H_
 #define IREE_COMPILER_TRANSLATION_IREEVM_H_
 
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/IR/Module.h"
@@ -34,8 +34,8 @@ LogicalResult convertToFlowModule(ModuleOp moduleOp);
 
 // Runs the flow->HAL transform pipeline to lower a flow module and compile
 // executables for the specified target backends.
-LogicalResult convertToHALModule(
-    ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions);
+LogicalResult convertToHALModule(ModuleOp moduleOp,
+                                 IREE::HAL::TargetOptions executableOptions);
 
 // Converts the lowered module to a canonical vm.module containing only vm ops.
 // This uses patterns to convert from standard ops and other dialects to their
@@ -50,7 +50,7 @@ LogicalResult convertToVMModule(ModuleOp moduleOp);
 //
 // Exposed via the --iree-mlir-to-vm-bytecode-module translation.
 LogicalResult translateFromMLIRToVMBytecodeModule(
-    ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions,
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
     IREE::VM::BytecodeTargetOptions bytecodeOptions, llvm::raw_ostream &output);
 
 // TODO(benvanik): versions with multiple targets, etc.

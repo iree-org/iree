@@ -100,7 +100,7 @@ static iree_status_t iree_vm_invoke_empty_function(
                                     &result);
 
   iree_vm_stack_function_leave(stack);
-  return IREE_STATUS_OK;
+  return status;
 }
 
 static void iree_vm_context_release_modules(iree_vm_context_t* context,

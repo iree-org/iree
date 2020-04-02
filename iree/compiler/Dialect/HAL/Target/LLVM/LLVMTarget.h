@@ -16,7 +16,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_LLVM_TARGET_H_
 
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,10 +31,9 @@ struct LLVMTargetOptions {
 // iree-hal-llvm-ir-* flags.
 LLVMTargetOptions getLLVMTargetOptionsFromFlags();
 
-// Translates an executable to the LLVM backends with the given options.
-LogicalResult translateToLLVMExecutable(
-    IREE::HAL::ExecutableOp executableOp,
-    ExecutableTargetOptions executableOptions, LLVMTargetOptions targetOptions);
+// Registers the LLVM backends.
+void registerLLVMTargetBackends(
+    std::function<LLVMTargetOptions()> queryOptions);
 
 }  // namespace HAL
 }  // namespace IREE

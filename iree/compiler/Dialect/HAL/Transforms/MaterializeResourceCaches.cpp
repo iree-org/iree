@@ -15,7 +15,7 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -34,10 +34,9 @@ class MaterializeResourceCachesPass
                          OperationPass<ModuleOp>> {
  public:
   MaterializeResourceCachesPass()
-      : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
-  explicit MaterializeResourceCachesPass(
-      ExecutableTargetOptions executableOptions)
-      : executableOptions_(executableOptions) {}
+      : targetOptions_(getTargetOptionsFromFlags()) {}
+  explicit MaterializeResourceCachesPass(TargetOptions targetOptions)
+      : targetOptions_(targetOptions) {}
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
@@ -222,7 +221,7 @@ class MaterializeResourceCachesPass
             loc, executableCacheType, deviceValue,
             blockBuilder.getStringAttr("default"));
 
-    // TODO(benvanik): use executableOptions_ to determine these flags.
+    // TODO(benvanik): use targetOptions_ to determine these flags.
     auto cachingMode = ExecutableCachingModeBitfield::AliasProvidedData |
                        ExecutableCachingModeBitfield::AllowPersistentCaching |
                        ExecutableCachingModeBitfield::AllowOptimization;
@@ -292,7 +291,7 @@ class MaterializeResourceCachesPass
     lookupOp.erase();
   }
 
-  ExecutableTargetOptions executableOptions_;
+  TargetOptions targetOptions_;
 
   OpBuilder moduleBuilder{static_cast<MLIRContext *>(nullptr)};
   DenseMap<Attribute, VariableOp> descriptorSetLayoutCache_;
@@ -304,9 +303,9 @@ class MaterializeResourceCachesPass
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
-    ExecutableTargetOptions executableOptions) {
+    TargetOptions targetOptions) {
   return std::make_unique<MaterializeResourceCachesPass>(
-      executableOptions);  // NOLINT
+      targetOptions);  // NOLINT
 }
 
 static PassRegistration<MaterializeResourceCachesPass> pass(

@@ -24,7 +24,7 @@ namespace IREE {
 namespace HAL {
 
 // Inserts the iree.load_input/iree.store_output ops to match the legacy ABI.
-LogicalResult makeLegacyExecutableABI(IREE::HAL::ExecutableSourceOp sourceOp);
+LogicalResult makeLegacyExecutableABI(IREE::HAL::ExecutableTargetOp targetOp);
 
 }  // namespace HAL
 }  // namespace IREE
