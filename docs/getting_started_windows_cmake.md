@@ -40,10 +40,8 @@ Visual Studio":
 *   Choose either option from the
     [downloads page](https://visualstudio.microsoft.com/downloads/) and during
     installation make sure you include "C++ Build Tools"
-*   Check that MSBuild is on your PATH. The path typically looks like:<br>
-    `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin`
 *   Initialize MSVC by running `vcvarsall.bat`:<br>
-    `$ "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64`
+    `$ "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"`
 
 ## Clone and Build
 

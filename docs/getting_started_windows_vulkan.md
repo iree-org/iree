@@ -25,8 +25,8 @@ performance CPU-based implementation of Vulkan) on platforms where the
 project builds, but it does not currently
 [build on Windows](https://github.com/KhronosGroup/Vulkan-ExtensionLayer/issues/16).
 
-Vulkan API version > 1.2 is recommended, though older versions with support for
-the `VK_KHR_timeline_semaphore` extension may also work.
+Vulkan API version > 1.2 is recommended where available, though older versions
+with support for the `VK_KHR_timeline_semaphore` extension may also work.
 
 ## Vulkan Setup
 
