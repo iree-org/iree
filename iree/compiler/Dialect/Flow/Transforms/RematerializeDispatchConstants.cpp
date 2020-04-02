@@ -97,7 +97,7 @@ Value cloneOpTreeIntoBlock(Value sourceValue, Block *targetBlock,
     return existingValue;
   }
 
-  OpBuilder builder(targetBlock);
+  OpBuilder builder = OpBuilder::atBlockEnd(targetBlock);
   builder.setInsertionPointToStart(targetBlock);
   auto *sourceOp = sourceValue.getDefiningOp();
   auto *clonedOp = recursivelyCloneOp(sourceOp, builder, mapping);

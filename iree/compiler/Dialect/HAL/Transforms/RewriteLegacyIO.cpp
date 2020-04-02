@@ -66,7 +66,7 @@ static void makeLegacyExecutableDispatchABI(
   // Rewrite the entry block to match the new args for inputs.
   auto &entryBlock = implOp.getBlocks().front();
   auto oldArgs = entryBlock.getArguments().vec();
-  OpBuilder entryBuilder(&entryBlock);
+  OpBuilder entryBuilder = OpBuilder::atBlockEnd(&entryBlock);
   entryBuilder.setInsertionPointToStart(&entryBlock);
   for (auto arg : entryBlock.getArguments()) {
     Type oldType = arg.getType();

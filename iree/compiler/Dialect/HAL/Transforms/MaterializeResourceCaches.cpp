@@ -128,7 +128,7 @@ class MaterializeResourceCachesPass
     SymbolTable::setSymbolVisibility(initializerOp,
                                      SymbolTable::Visibility::Private);
     auto *block = initializerOp.addEntryBlock();
-    OpBuilder blockBuilder(block);
+    OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
     auto layoutUsage = IREE::HAL::DescriptorSetLayoutUsageType::PushOnly;
     auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
@@ -173,7 +173,7 @@ class MaterializeResourceCachesPass
     SymbolTable::setSymbolVisibility(initializerOp,
                                      SymbolTable::Visibility::Private);
     auto *block = initializerOp.addEntryBlock();
-    OpBuilder blockBuilder(block);
+    OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     SmallVector<Value, 4> setLayoutValues;
     for (auto setLayoutVariableOp : setLayoutVariableOps) {
       auto setLayoutValue = blockBuilder.createOrFold<VariableLoadOp>(
@@ -214,7 +214,7 @@ class MaterializeResourceCachesPass
     SymbolTable::setSymbolVisibility(initializerOp,
                                      SymbolTable::Visibility::Private);
     auto *block = initializerOp.addEntryBlock();
-    OpBuilder blockBuilder(block);
+    OpBuilder blockBuilder = OpBuilder::atBlockEnd(block);
     auto deviceValue = blockBuilder.createOrFold<ExSharedDeviceOp>(loc);
     auto executableCacheValue =
         blockBuilder.createOrFold<ExecutableCacheCreateOp>(
