@@ -88,8 +88,8 @@ $ cmake --build build\
 Check out the contents of the 'tools' build directory:
 
 ```shell
-$ dir build\iree\tools\Debug
-$ .\build\iree\tools\Debug\iree-translate.exe --help
+$ dir build\iree\tools
+$ .\build\iree\tools\iree-translate.exe --help
 ```
 
 Translate a
@@ -97,7 +97,7 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ .\build\iree\tools\Debug\iree-run-mlir.exe .\iree\tools\test\simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ .\build\iree\tools\iree-run-mlir.exe .\iree\tools\test\simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
