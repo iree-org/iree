@@ -5,9 +5,9 @@ compute API that provides high-efficiency, cross-platform access to modern GPUs
 used in a wide variety of devices from PCs and consoles to mobile phones and
 embedded platforms.
 
-IREE includes a Vulkan/[SPIR-V](https://www.khronos.org/spir/) HAL backend
-designed for executing advanced ML models in a deeply pipelined and tightly
-integrated fashion on accelerators like GPUs.
+IREE includes a Vulkan/[SPIR-V](https://www.khronos.org/registry/spir-v/) HAL
+backend designed for executing advanced ML models in a deeply pipelined and
+tightly integrated fashion on accelerators like GPUs.
 
 This guide will walk you through using IREE's compiler and runtime Vulkan
 components.
@@ -42,10 +42,9 @@ The
 [dynamic_symbols_test](https://github.com/google/iree/blob/master/iree/hal/vulkan/dynamic_symbols_test.cc)
 checks if the Vulkan loader and a valid ICD are accessible.
 
-To configure CMake then build and run the test:
+Run the test:
 
 ```shell
-$ cmake -G Ninja -B build\ .
 $ cmake --build build\ --target iree_hal_vulkan_dynamic_symbols_test
 $ .\build\iree\hal\vulkan\Debug\iree_hal_vulkan_dynamic_symbols_test.exe
 ```
@@ -92,8 +91,12 @@ Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate.exe`:
 
 ```shell
 $ cmake --build build\ --target iree_tools_iree-translate
-$ .\build\iree\tools\Debug\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb -print-ir-after-all
+$ .\build\iree\tools\Debug\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb
 ```
+
+> Tip:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;If successful, this may have no output. You can pass
+> other flags like `-print-ir-after-all` to control the program.
 
 ### Executing modules with the Vulkan driver
 

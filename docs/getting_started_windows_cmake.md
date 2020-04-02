@@ -10,6 +10,10 @@ Notes to those updating this guide:
       Please keep them in sync.
 -->
 
+This guide walks through building the core compiler and runtime parts of IREE
+from source. Auxilary components like the Python bindings and Vulkan driver are
+documented separately, as they require further setup.
+
 ## Prerequisites
 
 ### Install CMake
