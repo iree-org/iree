@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionDialectInterface.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir {
@@ -29,6 +30,13 @@ class HALTypeConverter : public TypeConverter {
       ArrayRef<const HALConversionDialectInterface *> conversionInterfaces);
 
   // TODO(benvanik): signature conversion for output buffers.
+
+  static bool ShouldConvertToHalBuffer(Type type) {
+    if (TensorType tensor_type = type.template dyn_cast<TensorType>()) {
+      return tensor_type.getElementType().isIntOrFloat();
+    }
+    return false;
+  }
 
  private:
   // The set of dialect conversion interfaces we should query to convert types.

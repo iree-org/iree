@@ -16,7 +16,6 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "mlir/IR/StandardTypes.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -33,9 +32,14 @@ HALTypeConverter::HALTypeConverter(
     results.push_back(type);
     return success();
   });
-  addConversion([](TensorType type) {
-    // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
-    return IREE::HAL::BufferType::get(type.getContext());
+  addConversion([](TensorType type) -> Optional<Type> {
+    // HAL only should be concerned with numeric values.
+    if (HALTypeConverter::ShouldConvertToHalBuffer(type)) {
+      // TODO(benvanik): composite-type conversion (buffer + dynamic dims).
+      return IREE::HAL::BufferType::get(type.getContext());
+    }
+
+    return llvm::None;
   });
   addConversion([this](IREE::PtrType type) -> Type {
     // Recursively handle pointer target types (we want to convert ptr<index> to

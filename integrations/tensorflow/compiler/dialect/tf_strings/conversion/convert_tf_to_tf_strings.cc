@@ -36,46 +36,21 @@ namespace iree_compiler {
 
 namespace {
 
-struct AsStringOpLowering : public OpRewritePattern<TF::AsStringOp> {
-  using OpRewritePattern<TF::AsStringOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TF::AsStringOp op,
-                                PatternRewriter &rewriter) const override {
-    Value replacement = op.input();
-    replacement =
-        rewriter.create<TFStrings::ToStringOp>(op.getLoc(), replacement);
-    rewriter.replaceOp(op, replacement);
-    return success();
-  }
-};
-
-struct PrintOpLowering : public OpRewritePattern<TF::PrintV2Op> {
-  using OpRewritePattern<TF::PrintV2Op>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(TF::PrintV2Op op,
-                                PatternRewriter &rewriter) const override {
-    auto input = op.input();
-    rewriter.create<TFStrings::PrintOp>(op.getLoc(), input);
-    rewriter.eraseOp(op);
-    return success();
-  }
-};
+#include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_tf_to_tf_strings.inc"
 
 class StringTypeConverter : public TypeConverter {
  public:
   StringTypeConverter() {
-    addConversion([](ShapedType type) {
-      auto elementType = TFStrings::StringType::get(type.getContext());
-      return RankedTensorType::get(type.getShape(), elementType);
+    addConversion([](RankedTensorType type) -> Type {
+      if (type.getElementType().isa<TF::StringType>()) {
+        auto elementType = TFStrings::StringType::get(type.getContext());
+        return RankedTensorType::get(type.getShape(), elementType);
+      }
+
+      return type;
     });
     addConversion([](TF::StringType type) {
       return TFStrings::StringType::get(type.getContext());
-    });
-    addConversion([](Type type) -> Optional<Type> {
-      if (!getElementTypeOrSelf(type).isa<TF::StringType>()) {
-        return type;
-      }
-      return llvm::None;
     });
   }
 
@@ -103,11 +78,18 @@ class LowerTensorflowToStringsPass
 
     // Lower to the standard string operations.
     ConversionTarget target(getContext());
-
+    target.addIllegalOp<TF::AsStringOp>();
+    target.addIllegalOp<TF::PrintV2Op>();
     target.addLegalDialect<TFStrings::TFStringsDialect>();
     target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       StringTypeConverter typeConverter;
       return typeConverter.isSignatureLegal(op.getType());
+    });
+
+    target.addDynamicallyLegalOp<ReturnOp>([](ReturnOp op) {
+      StringTypeConverter typeConverter;
+      auto func = [&](Type type) { return typeConverter.isLegal(type); };
+      return llvm::all_of(op.getOperandTypes(), func);
     });
 
     target.addDynamicallyLegalOp<CallOp>([](CallOp op) {
@@ -123,6 +105,19 @@ class LowerTensorflowToStringsPass
 
     auto result = applyPartialConversion(module.getOperation(), target,
                                          patterns, &typeConverter);
+
+    // Partial conversion doesn't include return types. Update in a separate
+    // walk.
+    module.walk([&](Operation *op) {
+      for (auto result : op->getResults()) {
+        auto result_type = result.getType();
+        auto new_type = typeConverter.convertType(result_type);
+        if (new_type) {
+          result.setType(typeConverter.convertType(result_type));
+        }
+      }
+    });
+
     return result;
   }
 };
@@ -131,7 +126,7 @@ class LowerTensorflowToStringsPass
 
 void populateTFToTFStringsPatterns(MLIRContext *ctx,
                                    OwningRewritePatternList &patterns) {
-  patterns.insert<AsStringOpLowering, PrintOpLowering>(ctx);
+  populateWithGenerated(ctx, &patterns);
 }
 
 std::unique_ptr<OpPassBase<ModuleOp>> createLowerTensorflowToStringsPass() {

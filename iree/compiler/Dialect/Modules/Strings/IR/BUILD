@@ -34,6 +34,7 @@ cc_library(
     hdrs = [
         "Ops.h",
         "Ops.h.inc",
+        "Types.h",
     ],
     deps = [
         ":Ops_gen",

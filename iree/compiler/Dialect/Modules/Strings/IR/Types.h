@@ -12,13 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_DIALECT_MODULES_STRINGS_IR_OPS_H_
-#define IREE_COMPILER_DIALECT_MODULES_STRINGS_IR_OPS_H_
+#ifndef IREE_COMPILER_DIALECT_MODULES_STRINGS_IR_TYPES_H_
+#define IREE_COMPILER_DIALECT_MODULES_STRINGS_IR_TYPES_H_
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
-#include "iree/compiler/Dialect/Modules/Strings/IR/Types.h"
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/SideEffects.h"
 
 namespace mlir {
@@ -26,12 +24,27 @@ namespace iree_compiler {
 namespace IREE {
 namespace Strings {
 
-#define GET_OP_CLASSES
-#include "iree/compiler/Dialect/Modules/Strings/IR/Ops.h.inc"
+class StringType : public Type::TypeBase<StringType, Type> {
+ public:
+  using Base::Base;
+  static StringType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::String);
+  }
+  static bool kindof(unsigned kind) { return kind == TypeKind::String; }
+};
+
+class StringTensorType : public Type::TypeBase<StringTensorType, Type> {
+ public:
+  using Base::Base;
+  static StringTensorType get(MLIRContext *context) {
+    return Base::get(context, TypeKind::StringTensor);
+  }
+  static bool kindof(unsigned kind) { return kind == TypeKind::StringTensor; }
+};
 
 }  // namespace Strings
 }  // namespace IREE
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_DIALECT_MODULES_STRINGS_IR_OPS_H_
+#endif  // IREE_COMPILER_DIALECT_MODULES_STRINGS_IR_TYPES_H_

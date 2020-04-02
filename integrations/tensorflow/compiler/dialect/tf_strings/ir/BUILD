@@ -54,13 +54,38 @@ gentbl(
 
 cc_library(
     name = "ir",
+    deps = [
+        ":dialect",
+        ":ops",
+    ],
+)
+
+cc_library(
+    name = "dialect",
     srcs = [
         "dialect.cpp",
+    ],
+    hdrs = [
+        "dialect.h",
+    ],
+    deps = [
+        ":op_interface_gen",
+        ":ops_gen",
+        "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_flow_to_hal",
+        "//integrations/tensorflow/compiler/dialect/tf_strings/ir:ops",
+        "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
+    name = "ops",
+    srcs = [
         "ops.cpp",
         "ops.cpp.inc",
     ],
     hdrs = [
-        "dialect.h",
         "ops.h",
         "ops.h.inc",
         "types.h",

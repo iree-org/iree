@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/Conversion/ConversionTarget.h"
 
+#include "iree/compiler/Dialect/HAL/Conversion/TypeConverter.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
@@ -70,11 +71,10 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
   for (auto srcDstOperand : llvm::zip(srcOp->getOperands(), operands)) {
     auto srcOperand = std::get<0>(srcDstOperand);
     auto dstOperand = std::get<1>(srcDstOperand);
-    if (auto tensorType =
-            srcOperand.getType().template dyn_cast<TensorType>()) {
+    if (HALTypeConverter::ShouldConvertToHalBuffer(srcOperand.getType())) {
       // Create the buffer view that we'll pass to the function.
-      // Note that we expect this to be CSE'd if there are multiple calls using
-      // the same buffer.
+      // Note that we expect this to be CSE'd if there are multiple calls
+      // using the same buffer.
       IREE::HAL::TensorRewriteAdaptor operand(srcOp->getLoc(), srcOperand,
                                               dstOperand, rewriter);
       state.addOperands({operand.getBufferView()});
@@ -84,7 +84,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
     }
   }
   for (auto resultType : srcOp->getResultTypes()) {
-    if (auto tensorType = resultType.template dyn_cast<TensorType>()) {
+    if (HALTypeConverter::ShouldConvertToHalBuffer(resultType)) {
       state.addTypes(IREE::HAL::BufferViewType::get(rewriter.getContext()));
     } else {
       // Normal pass-through result.
@@ -103,7 +103,7 @@ LogicalResult HALConversionTarget::applyDefaultBufferRewrite(
     Type resultType;
     Value resultValue;
     std::tie(resultType, resultValue) = resultTypeValue;
-    if (auto tensorType = resultType.template dyn_cast<TensorType>()) {
+    if (HALTypeConverter::ShouldConvertToHalBuffer(resultType)) {
       results.push_back(rewriter.createOrFold<IREE::HAL::BufferViewBufferOp>(
           srcOp->getLoc(), resultValue));
     } else {

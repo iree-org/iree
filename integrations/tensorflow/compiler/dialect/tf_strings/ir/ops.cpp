@@ -34,13 +34,23 @@ namespace TFStrings {
 
 void ToStringOp::build(Builder* builder, OperationState& tblgen_state,
                        Value value) {
+  build(builder, tblgen_state, StringType::get(builder->getContext()), value);
+}
+
+void ToStringTensorOp::build(Builder* builder, OperationState& tblgen_state,
+                             Value value) {
   if (auto type = value.getType().dyn_cast<ShapedType>()) {
     auto new_type = RankedTensorType::get(
         type.getShape(), StringType::get(builder->getContext()));
     build(builder, tblgen_state, new_type, value);
     return;
   }
-  llvm_unreachable("Incomplete type support for ToString Op");
+  llvm_unreachable("Invalid input to ToStringTensorOp");
+}
+
+void StringTensorToStringOp::build(Builder* builder,
+                                   OperationState& tblgen_state, Value value) {
+  build(builder, tblgen_state, StringType::get(builder->getContext()), value);
 }
 
 }  // namespace TFStrings

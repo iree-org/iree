@@ -12,20 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_INTEGRATIONS_TFSTRINGS_CONVERSION_TF_STRINGSTOSTRINGS_H_
-#define IREE_INTEGRATIONS_TFSTRINGS_CONVERSION_TF_STRINGSTOSTRINGS_H_
+include "mlir/IR/OpBase.td"
+include "mlir/Dialect/StandardOps/IR/Ops.td"
+include "tensorflow/compiler/mlir/tensorflow/ir/tf_ops.td"
+include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.td"
 
-#include "mlir/IR/MLIRContext.h"
-#include "mlir/IR/PatternMatch.h"
+def : Pat<(TF_PrintV2Op TF_Str:$value, $unused1, $unused2),
+          (TFStrings_PrintOp $value)>;
 
-namespace mlir {
-namespace iree_compiler {
+def : Pat<(TF_PrintV2Op TF_StrTensor:$value, $unused1, $unused2),
+          (TFStrings_PrintOp (TFStrings_StringTensorToStringOp $value))>;
 
-// Adds rewrite patterns for lowering tf strings operations to strings.
-void populateTFStringsToStringsPatterns(MLIRContext *ctx,
-                                        OwningRewritePatternList &patterns);
-
-}  // namespace iree_compiler
-}  // namespace mlir
-
-#endif  // IREE_INTEGRATIONS_TFSTRINGS_TRANSFORMS_TFSTRINGSTOSTRINGS_H_
+def : Pat<(TF_AsStringOp $value, $u1, $u2, $u3, $u4, $u5),
+          (TFStrings_ToStringTensorOp $value)>;
