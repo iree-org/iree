@@ -31,6 +31,7 @@ cc_library(
     name = "IR",
     srcs = [
         "Builders.cpp",
+        "Folders.cpp",
         "ShapeDialect.cpp",
         "ShapeInterface.cpp",
         "ShapeOps.cpp",

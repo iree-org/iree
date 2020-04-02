@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/HALToVMLA/ConvertHALToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
@@ -71,7 +72,6 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
     // Ensure all input dialects go away.
     conversionTarget.addIllegalDialect<xla_hlo::XlaHloDialect>();
     conversionTarget.addIllegalDialect<IREE::HAL::HALDialect>();
-    conversionTarget.addLegalDialect<ShapeDialect>();
 
     OwningRewritePatternList conversionPatterns;
     populateStandardToVMLAPatterns(context, conversionPatterns, typeConverter);
@@ -81,6 +81,13 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
     // Ensure FuncOp signatures are updated.
     populateFuncOpTypeConversionPattern(conversionPatterns, context,
                                         typeConverter);
+
+    // We allow the shape dialect to persist, making specific dim queries
+    // illegal (which allows them to fold away).
+    Shape::populateFoldConversionPatterns(&getContext(), conversionPatterns);
+    conversionTarget.addLegalDialect<ShapeDialect>();
+    conversionTarget.addIllegalOp<Shape::RankedDimOp>();
+    conversionTarget.addIllegalOp<Shape::RankedDimsOp>();
 
     if (failed(applyPartialConversion(getOperation(), conversionTarget,
                                       conversionPatterns, &typeConverter))) {
