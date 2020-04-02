@@ -250,8 +250,9 @@ void LinalgTileAndFusePass::runOnFunction() {
                   TileLinalgOpPattern<linalg::IndexedGenericOp>,
                   TileLinalgOpPattern<linalg::MatmulOp>,
                   TileLinalgOpPattern<linalg::ConvOp>,
-                  TileAndFuseLinalgOpPattern<linalg::GenericOp>>(context,
-                                                                 tileSizes);
+                  TileAndFuseLinalgOpPattern<linalg::GenericOp>,
+                  TileAndFuseLinalgOpPattern<linalg::ConvOp>>(context,
+                                                              tileSizes);
   applyPatternsGreedily(getOperation(), patterns);
 
   // Check that there are single perfectly nested loop.for operations at the top

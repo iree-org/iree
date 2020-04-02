@@ -172,3 +172,48 @@ module {
     return
   }
 }
+
+// -----
+
+module {
+  // CHECK-LABEL: func @fill_and_non_padding_conv
+  //       CHECK: loop.for
+  //       CHECK:   loop.for
+  //       CHECK:     loop.for
+  //       CHECK:       linalg.fill
+  //       CHECK:       linalg.conv
+  func @fill_and_non_padding_conv(%arg0 : memref<?x?x?x?xf32>,
+                                  %arg1 : memref<?x?x?x?xf32>,
+                                  %arg2 : memref<?x?x?x?xf32>)
+    attributes
+      {iree.executable.export,
+       iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>} {
+    %zero = constant 0.0 : f32
+    linalg.fill(%arg2, %zero) : memref<?x?x?x?xf32>, f32
+    linalg.conv(%arg0, %arg1, %arg2) {dilations = [1, 1], strides = [1, 1]} :
+      memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
+    return
+  }
+}
+
+// -----
+
+module {
+  // CHECK-LABEL: func @fill_and_padding_conv
+  //       CHECK: loop.for
+  //       CHECK:   linalg.fill
+  //       CHECK:   linalg.conv
+  func @fill_and_padding_conv(%arg0 : memref<?x?x?x?xf32>, %arg1 : memref<?x?x?x?xf32>,
+                     %arg2 : memref<?x?x?x?xf32>)
+    attributes
+      {iree.executable.export,
+       iree.executable.workgroup_size = dense<[32, 1, 1]> : vector<3xi32>} {
+    %zero = constant 0.0 : f32
+    linalg.fill(%arg2, %zero) : memref<?x?x?x?xf32>, f32
+    linalg.conv(%arg0, %arg1, %arg2)
+      {dilations = [1, 1],
+       padding = dense<[[1, 1], [0, 1]]> : tensor<2x2xi64>, strides = [1, 1]} :
+      memref<?x?x?x?xf32>, memref<?x?x?x?xf32>, memref<?x?x?x?xf32>
+    return
+  }
+}
