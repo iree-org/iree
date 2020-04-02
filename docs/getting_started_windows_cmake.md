@@ -84,7 +84,7 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ .\build\iree\tools\Debug\iree-run-mlir.exe %cd%/iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+$ .\build\iree\tools\Debug\iree-run-mlir.exe .\iree\tools\test\simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
