@@ -45,8 +45,8 @@ checks if the Vulkan loader and a valid ICD are accessible.
 To configure CMake then build and run the test:
 
 ```shell
-$ cmake -B build\ .
-$ cmake --build build\ -j 8 --target iree_hal_vulkan_dynamic_symbols_test
+$ cmake -G Ninja -B build\ .
+$ cmake --build build\ --target iree_hal_vulkan_dynamic_symbols_test
 $ .\build\iree\hal\vulkan\Debug\iree_hal_vulkan_dynamic_symbols_test.exe
 ```
 
@@ -57,7 +57,7 @@ Run the
 [allocator test](https://github.com/google/iree/blob/master/iree/hal/cts/allocator_test.cc):
 
 ```shell
-$ cmake --build build\ -j 8 --target iree_hal_cts_allocator_test
+$ cmake --build build\ --target iree_hal_cts_allocator_test
 $ .\build\iree\hal\cts\Debug\iree_hal_cts_allocator_test.exe
 ```
 
@@ -91,7 +91,7 @@ TODO(scotttodd): Document when Vulkan-ExtensionLayer builds for Windows
 Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate.exe`:
 
 ```shell
-$ cmake --build build\ -j 8 --target iree_tools_iree-translate
+$ cmake --build build\ --target iree_tools_iree-translate
 $ .\build\iree\tools\Debug\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb -print-ir-after-all
 ```
 
@@ -100,7 +100,7 @@ $ .\build\iree\tools\Debug\iree-translate.exe -iree-mlir-to-vm-bytecode-module -
 Pass the flag `-driver=vulkan` to `iree-run-module.exe`:
 
 ```shell
-$ cmake --build build\ -j 8 --target iree_tools_iree-run-module
+$ cmake --build build\ --target iree_tools_iree-run-module
 $ .\build\iree\tools\Debug\iree-run-module.exe -input_file=.\build\module.fb -driver=vulkan -entry_function=abs -inputs="i32=-2"
 ```
 
@@ -109,7 +109,7 @@ $ .\build\iree\tools\Debug\iree-run-module.exe -input_file=.\build\module.fb -dr
 Install the [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/), then run:
 
 ```shell
-$ cmake --build build\ -j 8 --target iree_samples_vulkan_vulkan_inference_gui
+$ cmake --build build\ --target iree_samples_vulkan_vulkan_inference_gui
 $ .\build\iree\samples\vulkan\Debug\vulkan_inference_gui.exe
 ```
 

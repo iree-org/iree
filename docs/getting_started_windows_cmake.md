@@ -21,6 +21,13 @@ Install CMake version >= 3.13 from https://cmake.org/download/.
 > such as the Visual Studio Code
 > [CMake Tools](https://github.com/microsoft/vscode-cmake-tools) extension.
 
+### Install Ninja
+
+[Ninja](https://ninja-build.org/) is a fast build system that you can use as
+a CMake generator. Download it from the
+[releases page](https://github.com/ninja-build/ninja/releases), extract
+somewhere, and it to your PATH.
+
 ### Install a Compiler
 
 We recommend MSVC from either the full Visual Studio or from "Build Tools For
@@ -31,6 +38,8 @@ Visual Studio":
     installation make sure you include "C++ Build Tools"
 *   Check that MSBuild is on your PATH. The path typically looks like:<br>
     `C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin`
+*   Initialize MSVC by running `vcvarsall.bat`:<br>
+    `$ "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64`
 
 ## Clone and Build
 
@@ -54,7 +63,7 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -B build\ .
+$ cmake -G Ninja -B build\ .
 ```
 
 > Tip:<br>
@@ -65,7 +74,7 @@ $ cmake -B build\ .
 Build all targets:
 
 ```shell
-$ cmake --build build\ -j 8
+$ cmake --build build\
 ```
 
 ## What's next?

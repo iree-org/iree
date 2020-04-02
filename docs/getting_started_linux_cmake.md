@@ -25,6 +25,12 @@ $ sudo apt install cmake
 > such as the Visual Studio Code
 > [CMake Tools](https://github.com/microsoft/vscode-cmake-tools) extension.
 
+### Install Ninja
+
+[Ninja](https://ninja-build.org/) is a fast build system that you can use as
+a CMake generator. Follow Ninja's
+[installing documentation](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages).
+
 ### Install a Compiler
 
 We recommend Clang. GCC is not fully supported.
@@ -61,7 +67,7 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -B build/ .
+$ cmake -G Ninja -B build/ .
 ```
 
 > Tip:<br>
@@ -72,7 +78,7 @@ $ cmake -B build/ .
 Build all targets:
 
 ```shell
-$ cmake --build build/ -j 8
+$ cmake --build build/
 ```
 
 ## What's next?
