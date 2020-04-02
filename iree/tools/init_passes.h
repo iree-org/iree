@@ -126,7 +126,7 @@ inline void registerMlirPasses() {
   createSymbolDCEPass();
   createLocationSnapshotPass({});
 
-  // FxpOpsDialect passes
+  // Fxp
   fxpmath::createLowerUniformRealMathPass();
   fxpmath::createLowerUniformCastsPass();
 
@@ -145,11 +145,11 @@ inline void registerMlirPasses() {
   createConvertLinalgToAffineLoopsPass();
   createConvertLinalgToLLVMPass();
 
-  // LoopOps
+  // Loop
   createParallelLoopFusionPass();
   createParallelLoopTilingPass();
 
-  // QuantOps
+  // Quant
   quant::createConvertSimulatedQuantPass();
   quant::createConvertConstPass();
   quantizer::createAddDefaultStatsPass();
