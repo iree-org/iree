@@ -105,16 +105,14 @@ function(iree_cc_test)
   set_property(GLOBAL APPEND PROPERTY _IREE_CC_BINARY_NAMES "${_NAME}")
   set_property(TARGET ${_NAME} PROPERTY DIRECT_DEPS ${_RULE_DEPS})
 
-  # We run all our tests through a custom test runner to allow temp directory
-  # cleanup upon test completion.
-
-  iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
   add_test(
     NAME
       ${_NAME_PATH}
     COMMAND
+      # We run all our tests through a custom test runner to allow temp
+      # directory cleanup upon test completion.
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "$<TARGET_FILE:${_NAME}>"
     WORKING_DIRECTORY

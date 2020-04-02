@@ -58,7 +58,6 @@ function(iree_lit_test)
     endif()
   endforeach(_DATA_DEP)
 
-  # We run all our tests through a custom test runner to allow setup and teardown.
   iree_package_ns(_PACKAGE_NS)
   string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
@@ -66,6 +65,8 @@ function(iree_lit_test)
     NAME
       ${_NAME_PATH}
     COMMAND
+      # We run all our tests through a custom test runner to allow setup
+      # and teardown.
       "${CMAKE_SOURCE_DIR}/build_tools/cmake/run_test.${IREE_HOST_SCRIPT_EXT}"
       "${CMAKE_SOURCE_DIR}/iree/tools/run_lit.${IREE_HOST_SCRIPT_EXT}"
       ${_TEST_FILE_PATH}
