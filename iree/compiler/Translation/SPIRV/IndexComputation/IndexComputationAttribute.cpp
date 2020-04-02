@@ -49,7 +49,7 @@ IREE::IndexAttr getIndexAttr(
   };
   SmallVector<Attribute, 2> operandIndexAttrs;
   operandIndexAttrs.reserve(operandIndices.size());
-  for (auto operandIndex : operandIndices) {
+  for (const auto &operandIndex : operandIndices) {
     operandIndexAttrs.push_back(getArrayAttrFn(operandIndex));
   }
   return IREE::IndexAttr::get(getArrayAttrFn(resultIndexMap),

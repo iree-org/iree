@@ -583,7 +583,7 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
   auto loc = reduceOp.getLoc();
   DenseIntElementsAttr dimensionsAttr = reduceOp.dimensions();
   SmallVector<int, 4> reductionDims;
-  for (auto dim : dimensionsAttr.getIntValues())
+  for (const auto &dim : dimensionsAttr.getIntValues())
     reductionDims.push_back(dim.getSExtValue());
 
   // Check if initVal is constant. If so, inline the value into the region.

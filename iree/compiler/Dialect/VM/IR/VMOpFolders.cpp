@@ -920,7 +920,7 @@ struct ConvertNonVariadicToCallOp : public OpRewritePattern<CallVariadicOp> {
   LogicalResult matchAndRewrite(CallVariadicOp op,
                                 PatternRewriter &rewriter) const override {
     // If any segment size is != -1 (which indicates variadic) we bail.
-    for (auto segmentSize : op.segment_sizes()) {
+    for (const auto &segmentSize : op.segment_sizes()) {
       if (segmentSize.getSExtValue() != -1) {
         return failure();
       }

@@ -131,7 +131,7 @@ Value rewriteReduce(RankedShapeType resultShape, ReduceOp reduceOp,
   // Map reduction dims onto operand dimensions.
   SmallVector<bool, 4> isDimReduced;
   isDimReduced.resize(operandRs.getRank());
-  for (auto apIntValue : reduceOp.dimensions().getIntValues()) {
+  for (const auto &apIntValue : reduceOp.dimensions().getIntValues()) {
     auto intValue = apIntValue.getZExtValue();
     assert(intValue < isDimReduced.size());
     isDimReduced[intValue] = true;
@@ -179,7 +179,7 @@ Value rewriteTranspose(RankedShapeType resultShape, TransposeOp transposeOp,
       transposeOp.operand());
 
   SmallVector<int64_t, 4> perm;
-  for (auto permValue : transposeOp.permutation().getIntValues()) {
+  for (const auto &permValue : transposeOp.permutation().getIntValues()) {
     perm.push_back(permValue.getSExtValue());
   }
   assert(perm.size() == resultShape.getRank());

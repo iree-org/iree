@@ -117,7 +117,7 @@ static std::vector<TypeDef> buildTypeTable(IREE::VM::ModuleOp moduleOp) {
 
   std::vector<TypeDef> table;
   table.reserve(typeMap.size());
-  for (auto typeString : typeMap) {
+  for (const auto &typeString : typeMap) {
     table.push_back(TypeDef{typeString.first, typeString.second});
   }
   llvm::sort(
@@ -336,7 +336,7 @@ static Offset<iree::vm::BytecodeModuleDef> buildFlatBufferModule(
   auto bytecodeDataOffset = fbb.CreateUninitializedVector<uint8_t>(
       totalBytecodeLength, &bytecodeDataPtr);
   size_t currentBytecodeOffset = 0;
-  for (auto it : llvm::enumerate(internalFuncOps)) {
+  for (const auto &it : llvm::enumerate(internalFuncOps)) {
     int ordinal = it.index();
     auto data = std::move(bytecodeDataParts[ordinal]);
     std::memcpy(bytecodeDataPtr + currentBytecodeOffset, data.data(),

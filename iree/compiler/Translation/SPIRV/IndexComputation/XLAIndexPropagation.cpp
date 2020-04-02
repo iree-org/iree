@@ -292,7 +292,7 @@ LogicalResult XLAReverseOpIndexPropagation::propagateIndexMap(
     SmallVectorImpl<AffineMap> &indexMap) const {
   auto reverseOp = cast<xla_hlo::ReverseOp>(op);
   DenseSet<unsigned> dimensions;
-  for (auto index : reverseOp.dimensions()) {
+  for (const auto &index : reverseOp.dimensions()) {
     dimensions.insert(index.getZExtValue());
   }
   return propagateIndexMapImpl(op, dimensions, resultIndex, indexMap);
@@ -307,10 +307,10 @@ LogicalResult XLASliceOpIndexPropagation::propagateIndexMap(
     SmallVectorImpl<AffineMap> &indexMap) const {
   auto sliceOp = cast<xla_hlo::SliceOp>(op);
   SmallVector<unsigned, 4> start_indices, strides;
-  for (auto index : sliceOp.start_indices()) {
+  for (const auto &index : sliceOp.start_indices()) {
     start_indices.push_back(index.getZExtValue());
   }
-  for (auto stride : sliceOp.strides()) {
+  for (const auto &stride : sliceOp.strides()) {
     strides.push_back(stride.getZExtValue());
   }
   return propagateIndexMapImpl(op, start_indices, strides, resultIndex,
@@ -327,7 +327,7 @@ LogicalResult XLATransposeOpIndexPropagation::propagateIndexMap(
   auto transposeOp = cast<xla_hlo::TransposeOp>(op);
   // Compute the affine map that represents the permutation.
   SmallVector<unsigned, 4> permutation;
-  for (auto index : transposeOp.permutation()) {
+  for (const auto &index : transposeOp.permutation()) {
     permutation.push_back(index.getZExtValue());
   }
   return propagateIndexMapImpl(op, permutation, resultIndex, indexMap);

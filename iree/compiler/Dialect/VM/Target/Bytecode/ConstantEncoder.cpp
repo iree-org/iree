@@ -39,7 +39,7 @@ static Offset<Vector<uint8_t>> serializeConstantI8Array(
   uint8_t *bytePtr = nullptr;
   auto byteVector =
       fbb.CreateUninitializedVector(attr.getNumElements() * 1, &bytePtr);
-  for (APInt value : attr.getIntValues()) {
+  for (const APInt &value : attr.getIntValues()) {
     *(bytePtr++) = value.extractBitsAsZExtValue(8, 0) & UINT8_MAX;
   }
   return byteVector;
@@ -51,7 +51,7 @@ static Offset<Vector<uint8_t>> serializeConstantI16Array(
   auto byteVector =
       fbb.CreateUninitializedVector(attr.getNumElements() * 2, &bytePtr);
   uint16_t *nativePtr = reinterpret_cast<uint16_t *>(bytePtr);
-  for (APInt value : attr.getIntValues()) {
+  for (const APInt &value : attr.getIntValues()) {
     *(nativePtr++) = value.extractBitsAsZExtValue(16, 0) & UINT16_MAX;
   }
   return byteVector;
@@ -63,7 +63,7 @@ static Offset<Vector<uint8_t>> serializeConstantI32Array(
   auto byteVector =
       fbb.CreateUninitializedVector(attr.getNumElements() * 4, &bytePtr);
   uint32_t *nativePtr = reinterpret_cast<uint32_t *>(bytePtr);
-  for (APInt value : attr.getIntValues()) {
+  for (const APInt &value : attr.getIntValues()) {
     *(nativePtr++) = value.extractBitsAsZExtValue(32, 0) & UINT32_MAX;
   }
   return byteVector;
@@ -75,7 +75,7 @@ static Offset<Vector<uint8_t>> serializeConstantI64Array(
   auto byteVector =
       fbb.CreateUninitializedVector(attr.getNumElements() * 8, &bytePtr);
   uint64_t *nativePtr = reinterpret_cast<uint64_t *>(bytePtr);
-  for (APInt value : attr.getIntValues()) {
+  for (const APInt &value : attr.getIntValues()) {
     *(nativePtr++) = value.extractBitsAsZExtValue(64, 0) & UINT64_MAX;
   }
   return byteVector;
@@ -87,7 +87,7 @@ static Offset<Vector<uint8_t>> serializeConstantF32Array(
   auto byteVector =
       fbb.CreateUninitializedVector(attr.getNumElements() * 4, &bytePtr);
   float *nativePtr = reinterpret_cast<float *>(bytePtr);
-  for (APFloat value : attr.getFloatValues()) {
+  for (const APFloat &value : attr.getFloatValues()) {
     *(nativePtr++) = value.convertToFloat();
   }
   return byteVector;
@@ -99,7 +99,7 @@ static Offset<Vector<uint8_t>> serializeConstantF64Array(
   auto byteVector =
       fbb.CreateUninitializedVector(attr.getNumElements() * 8, &bytePtr);
   double *nativePtr = reinterpret_cast<double *>(bytePtr);
-  for (APFloat value : attr.getFloatValues()) {
+  for (const APFloat &value : attr.getFloatValues()) {
     *(nativePtr++) = value.convertToDouble();
   }
   return byteVector;

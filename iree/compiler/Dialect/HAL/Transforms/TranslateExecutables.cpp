@@ -48,7 +48,7 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
         }
       }
     } else {
-      for (auto targetName : executableOptions_.targets) {
+      for (const auto& targetName : executableOptions_.targets) {
         auto backendNames = matchExecutableTargetNames(targetName);
         targetBackends.append(backendNames.begin(), backendNames.end());
       }
@@ -77,7 +77,7 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
         llvm::to_vector<32>(getModule().getOps<IREE::HAL::ExecutableOp>());
     for (auto executableOp : executableOps) {
       // Translate for each backend. Variants will be added to the executableOp.
-      for (auto targetBackend : targetBackends) {
+      for (const auto& targetBackend : targetBackends) {
         auto targetFn = getExecutableTargetRegistry().find(targetBackend);
         if (targetFn == getExecutableTargetRegistry().end()) {
           executableOp.emitError()
