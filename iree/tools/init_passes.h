@@ -22,23 +22,14 @@
 
 #include <cstdlib>
 
-#include "mlir/Conversion/AVX512ToLLVM/ConvertAVX512ToLLVM.h"
-#include "mlir/Conversion/GPUToCUDA/GPUToCUDAPass.h"
-#include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
-#include "mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
-#include "mlir/Conversion/GPUToVulkan/ConvertGPUToVulkanPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
-#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
-#include "mlir/Conversion/VectorToLLVM/ConvertVectorToLLVM.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/FxpMathOps/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
-#include "mlir/Dialect/LLVMIR/Transforms/LegalizeForExport.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/LoopOps/Passes.h"
 #include "mlir/Dialect/Quant/Passes.h"
@@ -46,8 +37,6 @@
 #include "mlir/Quantizer/Transforms/Passes.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Transforms/ViewOpGraph.h"
-#include "mlir/Transforms/ViewRegionGraph.h"
 
 namespace mlir {
 
@@ -59,39 +48,120 @@ namespace mlir {
 // individual passes.
 // The global registry is interesting to interact with the command-line tools.
 inline void registerMlirPasses() {
-  // Init general passes
-#define GEN_PASS_REGISTRATION
-#include "mlir/Transforms/Passes.h.inc"
+  // A local workaround until we can use individual pass registration from
+  // https://reviews.llvm.org/D77322
+  ::mlir::registerPass(
+      "affine-loop-fusion", "Fuse affine loop nests",
+      []() -> std::unique_ptr<Pass> { return mlir::createLoopFusionPass(); });
+  ::mlir::registerPass("affine-pipeline-data-transfer",
+                       "Pipeline non-blocking data transfers between "
+                       "explicitly managed levels of the memory hierarchy",
+                       []() -> std::unique_ptr<Pass> {
+                         return mlir::createPipelineDataTransferPass();
+                       });
+  ::mlir::registerPass(
+      "cse", "Eliminate common sub-expressions",
+      []() -> std::unique_ptr<Pass> { return mlir::createCSEPass(); });
+  ::mlir::registerPass("canonicalize", "Canonicalize operations",
+                       []() -> std::unique_ptr<Pass> {
+                         return mlir::createCanonicalizerPass();
+                       });
+  ::mlir::registerPass(
+      "inline", "Inline function calls",
+      []() -> std::unique_ptr<Pass> { return mlir::createInlinerPass(); });
+  ::mlir::registerPass("snapshot-op-locations",
+                       "Generate new locations from the current IR",
+                       []() -> std::unique_ptr<Pass> {
+                         return mlir::createLocationSnapshotPass();
+                       });
+  ::mlir::registerPass(
+      "loop-coalescing",
+      "Coalesce nested loops with independent bounds into a single loop",
+      []() -> std::unique_ptr<Pass> {
+        return mlir::createLoopCoalescingPass();
+      });
+  ::mlir::registerPass("loop-invariant-code-motion",
+                       "Hoist loop invariant instructions outside of the loop",
+                       []() -> std::unique_ptr<Pass> {
+                         return mlir::createLoopInvariantCodeMotionPass();
+                       });
+  ::mlir::registerPass("memref-dataflow-opt",
+                       "Perform store/load forwarding for memrefs",
+                       []() -> std::unique_ptr<Pass> {
+                         return mlir::createMemRefDataFlowOptPass();
+                       });
+  ::mlir::registerPass(
+      "parallel-loop-collapsing",
+      "Collapse parallel loops to use less induction variables",
+      []() -> std::unique_ptr<Pass> {
+        return mlir::createParallelLoopCollapsingPass();
+      });
+  ::mlir::registerPass(
+      "print-op-stats", "Print statistics of operations",
+      []() -> std::unique_ptr<Pass> { return mlir::createPrintOpStatsPass(); });
+  ::mlir::registerPass("strip-debuginfo",
+                       "Strip debug info from all operations",
+                       []() -> std::unique_ptr<Pass> {
+                         return mlir::createStripDebugInfoPass();
+                       });
+  ::mlir::registerPass(
+      "symbol-dce", "Eliminate dead symbols",
+      []() -> std::unique_ptr<Pass> { return mlir::createSymbolDCEPass(); });
+  createCanonicalizerPass();
+  createCSEPass();
+  createSuperVectorizePass({});
+  createLoopUnrollPass();
+  createLoopUnrollAndJamPass();
+  createSimplifyAffineStructuresPass();
+  createLoopFusionPass();
+  createLoopInvariantCodeMotionPass();
+  createAffineLoopInvariantCodeMotionPass();
+  createPipelineDataTransferPass();
+  createLowerAffinePass();
+  createLoopTilingPass(0);
+  createLoopCoalescingPass();
+  createAffineDataCopyGenerationPass(0, 0);
+  createMemRefDataFlowOptPass();
+  createInlinerPass();
+  createSymbolDCEPass();
+  createLocationSnapshotPass({});
 
-  // Conversion passes
-#define GEN_PASS_REGISTRATION
-#include "mlir/Conversion/Passes.h.inc"
-
-  // FxpMath
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/FxpMathOps/Passes.h.inc"
+  // Fxp
+  fxpmath::createLowerUniformRealMathPass();
+  fxpmath::createLowerUniformCastsPass();
 
   // GPU
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/GPU/Passes.h.inc"
+  createGpuKernelOutliningPass();
+  createSimpleLoopsToGPUPass(0, 0);
+  createLoopToGPUPass({}, {});
 
   // Linalg
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/Linalg/Passes.h.inc"
+  createLinalgFusionPass();
+  createLinalgTilingPass();
+  createLinalgTilingToParallelLoopsPass();
+  createLinalgPromotionPass(0);
+  createConvertLinalgToLoopsPass();
+  createConvertLinalgToParallelLoopsPass();
+  createConvertLinalgToAffineLoopsPass();
+  createConvertLinalgToLLVMPass();
 
   // Loop
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/LoopOps/Passes.h.inc"
+  createParallelLoopFusionPass();
+  createParallelLoopTilingPass();
 
   // Quant
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/Quant/Passes.h.inc"
-#define GEN_PASS_REGISTRATION
-#include "mlir/Quantizer/Transforms/Passes.h.inc"
+  quant::createConvertSimulatedQuantPass();
+  quant::createConvertConstPass();
+  quantizer::createAddDefaultStatsPass();
+  quantizer::createRemoveInstrumentationPass();
+  quantizer::createInferQuantizedTypesPass();
 
   // SPIR-V
-#define GEN_PASS_REGISTRATION
-#include "mlir/Dialect/SPIRV/Passes.h.inc"
+  spirv::createLowerABIAttributesPass();
+  createConvertGPUToSPIRVPass();
+  createConvertStandardToSPIRVPass();
+  createLegalizeStdOpsForSPIRVLoweringPass();
+  createLinalgToSPIRVPass();
 }
 
 }  // namespace mlir
