@@ -33,6 +33,12 @@ if(NOT Vulkan_FOUND)
   message(FATAL_ERROR "Vulkan library was not found")
 endif()
 
+if(${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows")
+  set(_GUI_LINKOPTS "-SUBSYSTEM:WINDOWS")
+else()
+  set(_GUI_LINKOPTS "")
+endif()
+
 iree_cc_binary(
     NAME
       vulkan_inference_gui
@@ -55,5 +61,5 @@ iree_cc_binary(
       SDL2-static
       Vulkan::Vulkan
     LINKOPTS
-      "-SUBSYSTEM:WINDOWS"
+      "${_GUI_LINKOPTS}"
 )
