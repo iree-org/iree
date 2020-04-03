@@ -147,8 +147,9 @@ LogicalResult updateWorkGroupSize(Operation *op,
   if (!isDispatchFuncImpl(funcOp))
     return op->emitError("expected operation to be within a dispatch function");
   MLIRContext *context = op->getContext();
-  SmallVector<int32_t, 3> workGroupSizeVec(workGroupSize.begin(),
-                                           workGroupSize.end());
+  SmallVector<int32_t, 3> workGroupSizeVec(llvm::map_range(
+      workGroupSize,
+      [](int64_t value) { return static_cast<int32_t>(value); }));
   workGroupSizeVec.resize(3, 1);
   funcOp.setAttr(spirv::getEntryPointABIAttrName(),
                  spirv::getEntryPointABIAttr(workGroupSizeVec, context));
