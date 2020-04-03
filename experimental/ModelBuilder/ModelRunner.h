@@ -73,7 +73,7 @@ class ModelRunner {
   ModelRunner(mlir::OwningModuleRef &m) : module(m) {}
 
   // Get the underlying ModuleOp.
-  ModuleOp getModule() { return *module; }
+  ModuleOp getOperation() { return *module; }
 
   // Compile the owned `module` into LLVMIR that can be passed to the buffer.
   // For now, the MLIR passes and transformations are kept to a minimum and only

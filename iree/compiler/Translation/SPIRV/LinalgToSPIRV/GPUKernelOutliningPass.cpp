@@ -47,9 +47,9 @@ struct ConvertToGPUFuncOp : public OpRewritePattern<gpu::LaunchOp> {
 
 // Pass to outline the region of the gpu.LaunchOp.
 class IREEGpuKernelOutliningPass
-    : public ModulePass<IREEGpuKernelOutliningPass> {
+    : public OperationPass<IREEGpuKernelOutliningPass, ModuleOp> {
  public:
-  void runOnModule() override;
+  void runOnOperation() override;
 };
 }  // namespace
 
@@ -99,9 +99,9 @@ LogicalResult ConvertToGPUFuncOp::matchAndRewrite(
   return success();
 }
 
-void IREEGpuKernelOutliningPass::runOnModule() {
+void IREEGpuKernelOutliningPass::runOnOperation() {
   OwningRewritePatternList patterns;
-  ModuleOp moduleOp = getModule();
+  ModuleOp moduleOp = getOperation();
   SmallVector<gpu::LaunchOp, 1> gpuLaunchOp;
   moduleOp.walk(
       [&gpuLaunchOp](gpu::LaunchOp op) { gpuLaunchOp.push_back(op); });

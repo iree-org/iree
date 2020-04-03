@@ -179,10 +179,11 @@ LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
 
 }  // namespace
 
-class LegalizeInputTypesPass : public ModulePass<LegalizeInputTypesPass> {
+class LegalizeInputTypesPass
+    : public OperationPass<LegalizeInputTypesPass, ModuleOp> {
  public:
-  void runOnModule() override {
-    auto moduleOp = getModule();
+  void runOnOperation() override {
+    auto moduleOp = getOperation();
     FlowTypeConverter typeConverter;
 
     auto oldFuncOps = llvm::to_vector<16>(moduleOp.getOps<FuncOp>());

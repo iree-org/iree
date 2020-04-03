@@ -63,15 +63,15 @@ class StringTypeConverter : public TypeConverter {
 };
 
 class LowerTensorflowToStringsPass
-    : public ModulePass<LowerTensorflowToStringsPass> {
+    : public OperationPass<LowerTensorflowToStringsPass, ModuleOp> {
  public:
-  void runOnModule() override {
+  void runOnOperation() override {
     if (failed(run())) {
       signalPassFailure();
     }
   }
   LogicalResult run() {
-    auto module = getModule();
+    auto module = getOperation();
     OpBuilder builder(module.getContext());
     OwningRewritePatternList patterns;
     StringTypeConverter typeConverter;

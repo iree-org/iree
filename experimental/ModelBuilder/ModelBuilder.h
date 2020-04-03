@@ -39,7 +39,7 @@
 //
 //    // ... build the body of func ...
 //
-//    builder.getModule().print(llvm::outs()); // print MLIR
+//    builder.getOperation().print(llvm::outs()); // print MLIR
 // ```
 
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MODELBUILDER_H_

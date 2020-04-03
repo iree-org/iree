@@ -59,9 +59,10 @@ void populateFlowVariableToHALPatterns(MLIRContext *context,
 namespace {
 
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
-class ConvertFlowToHALPass : public ModulePass<ConvertFlowToHALPass> {
+class ConvertFlowToHALPass
+    : public OperationPass<ConvertFlowToHALPass, ModuleOp> {
  public:
-  void runOnModule() override {
+  void runOnOperation() override {
     auto *context = &getContext();
 
     SmallVector<const HALConversionDialectInterface *, 4> conversionInterfaces;
@@ -96,7 +97,7 @@ class ConvertFlowToHALPass : public ModulePass<ConvertFlowToHALPass> {
     // NOTE: we allow ops that we don't know about to allow custom dialects
     // that don't need anything HAL-specific to pass through. This is handled by
     // the fallback type legality support of the
-    if (failed(applyPartialConversion(getModule(), target, patterns,
+    if (failed(applyPartialConversion(getOperation(), target, patterns,
                                       &typeConverter))) {
       return signalPassFailure();
     }

@@ -331,9 +331,10 @@ void populateVMLAToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 namespace {
 
 // A pass converting the IREE flow dialect into the IREE VMLA dialect.
-class ConvertVMLAToVMPass : public ModulePass<ConvertVMLAToVMPass> {
+class ConvertVMLAToVMPass
+    : public OperationPass<ConvertVMLAToVMPass, ModuleOp> {
  public:
-  void runOnModule() override {
+  void runOnOperation() override {
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);
@@ -341,7 +342,7 @@ class ConvertVMLAToVMPass : public ModulePass<ConvertVMLAToVMPass> {
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
-        VMConversionTarget::nestModuleForConversion(getModule());
+        VMConversionTarget::nestModuleForConversion(getOperation());
 
     appendImportModule(
         StringRef(vmla_imports_create()->data, vmla_imports_create()->size),

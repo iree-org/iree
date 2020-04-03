@@ -283,10 +283,11 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
   return false;
 }
 
-class FlattenTuplesInCFGPass : public ModulePass<FlattenTuplesInCFGPass> {
+class FlattenTuplesInCFGPass
+    : public OperationPass<FlattenTuplesInCFGPass, ModuleOp> {
  public:
-  void runOnModule() override {
-    auto module = getModule();
+  void runOnOperation() override {
+    auto module = getOperation();
     Builder builder(module.getContext());
 
     // Build a list of (oldFunction, newFunction) for all functions we need to

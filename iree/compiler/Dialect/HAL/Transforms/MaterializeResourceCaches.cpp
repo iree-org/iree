@@ -30,7 +30,7 @@ namespace IREE {
 namespace HAL {
 
 class MaterializeResourceCachesPass
-    : public ModulePass<MaterializeResourceCachesPass> {
+    : public OperationPass<MaterializeResourceCachesPass, ModuleOp> {
  public:
   MaterializeResourceCachesPass()
       : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
@@ -38,8 +38,8 @@ class MaterializeResourceCachesPass
       ExecutableTargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
-  void runOnModule() override {
-    auto moduleOp = getModule();
+  void runOnOperation() override {
+    auto moduleOp = getOperation();
     moduleBuilder = OpBuilder(&moduleOp.getBody()->front());
 
     // Declare executable variables so that we can reference them during lookup

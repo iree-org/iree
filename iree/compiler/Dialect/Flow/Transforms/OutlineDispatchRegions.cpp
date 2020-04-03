@@ -156,16 +156,16 @@ LogicalResult outlineDispatchRegion(
 }  // namespace
 
 class OutlineDispatchRegionsPass
-    : public ModulePass<OutlineDispatchRegionsPass> {
+    : public OperationPass<OutlineDispatchRegionsPass, ModuleOp> {
  public:
   OutlineDispatchRegionsPass() = default;
   OutlineDispatchRegionsPass(
       std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps)
       : dispatchableFuncOps_(std::move(dispatchableFuncOps)) {}
 
-  void runOnModule() override {
+  void runOnOperation() override {
     // TODO(benvanik): replace with a pattern rewriter?
-    auto funcOps = llvm::to_vector<32>(getModule().getOps<FuncOp>());
+    auto funcOps = llvm::to_vector<32>(getOperation().getOps<FuncOp>());
     for (auto funcOp : funcOps) {
       // Outline all of the dispatch regions ops in this function.
       SmallVector<DispatchRegionOp, 8> dispatchRegionOps;

@@ -41,8 +41,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-class IREEToSPIRVPass : public ModulePass<IREEToSPIRVPass> {
-  void runOnModule() override;
+class IREEToSPIRVPass : public OperationPass<IREEToSPIRVPass, ModuleOp> {
+  void runOnOperation() override;
 };
 }  // namespace
 
@@ -133,8 +133,8 @@ static LogicalResult convertAffineApplyOps(MLIRContext *context,
   return applyFullConversion(spvModule, target, patterns);
 }
 
-void IREEToSPIRVPass::runOnModule() {
-  auto module = getModule();
+void IREEToSPIRVPass::runOnOperation() {
+  auto module = getOperation();
   OpBuilder builder(module.getBodyRegion());
   auto *context = &getContext();
 

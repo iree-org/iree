@@ -62,16 +62,16 @@ LogicalResult setRawSignatureIndex(FuncOp funcOp, SipSignatureMangler &mangler,
 }  // namespace
 
 class TFSavedModelLowerExportedFunctions
-    : public ModulePass<TFSavedModelLowerExportedFunctions> {
+    : public OperationPass<TFSavedModelLowerExportedFunctions, ModuleOp> {
  public:
-  void runOnModule() override {
+  void runOnOperation() override {
     if (failed(run())) {
       signalPassFailure();
     }
   }
 
   LogicalResult run() {
-    mlir::Builder builder(getModule());
+    mlir::Builder builder(getOperation());
     Identifier savedModelIndexPathIdent =
         builder.getIdentifier("tf_saved_model.index_path");
     Identifier ireeReflectionIdent = builder.getIdentifier("iree.reflection");
@@ -82,7 +82,7 @@ class TFSavedModelLowerExportedFunctions
     Identifier abiVersionIdent = builder.getIdentifier("abiv");
 
     // Handle saved model exported functions.
-    for (auto func : getModule().getOps<FuncOp>()) {
+    for (auto func : getOperation().getOps<FuncOp>()) {
       // Transfer exported names to IREE.
       auto exported_names = mlir::tf_saved_model::GetExportedNames(func);
       if (exported_names.empty()) continue;
@@ -158,7 +158,7 @@ class TFSavedModelLowerExportedFunctions
     }
 
     // We should have now removed anything requiring saved model semantics.
-    getModule().removeAttr("tf_saved_model.semantics");
+    getOperation().removeAttr("tf_saved_model.semantics");
     return success();
   }
 };

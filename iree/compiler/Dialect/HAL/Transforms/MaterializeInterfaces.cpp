@@ -259,22 +259,23 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
   return success();
 }
 
-class MaterializeInterfacesPass : public ModulePass<MaterializeInterfacesPass> {
+class MaterializeInterfacesPass
+    : public OperationPass<MaterializeInterfacesPass, ModuleOp> {
  public:
   MaterializeInterfacesPass()
       : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
   explicit MaterializeInterfacesPass(ExecutableTargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
-  void runOnModule() override {
+  void runOnOperation() override {
     // Processes all executables within the input module and produce the output
     // HAL ops. We should ensure all deduping is performed prior to this when
     // it's easier to diff IR and where we still have the flow context.
     auto executableOps =
-        llvm::to_vector<32>(getModule().getOps<IREE::Flow::ExecutableOp>());
+        llvm::to_vector<32>(getOperation().getOps<IREE::Flow::ExecutableOp>());
     for (auto sourceOp : executableOps) {
       // Create the op that will contain the translated executables.
-      OpBuilder builder = OpBuilder::atBlockEnd(getModule().getBody());
+      OpBuilder builder = OpBuilder::atBlockEnd(getOperation().getBody());
       builder.setInsertionPointAfter(sourceOp);
       auto targetOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());

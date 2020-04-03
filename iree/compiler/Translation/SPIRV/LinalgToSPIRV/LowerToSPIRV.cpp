@@ -128,10 +128,10 @@ struct LoopsToGPUPass : public FunctionPass<LoopsToGPUPass> {
 /// convert GPU kernel into SPIR-V kernel, need to actually implement a pass to
 /// retrieve the attribute value from the function and pass it along.
 // TODO(ravishankarm): Move this into MLIR core.
-struct IREEGPUToSPIRVPass : public ModulePass<IREEGPUToSPIRVPass> {
-  void runOnModule() {
+struct IREEGPUToSPIRVPass : public OperationPass<IREEGPUToSPIRVPass, ModuleOp> {
+  void runOnOperation() {
     MLIRContext *context = &getContext();
-    ModuleOp moduleOp = getModule();
+    ModuleOp moduleOp = getOperation();
 
     auto kernelModules = moduleOp.getOps<gpu::GPUModuleOp>();
     if (kernelModules.empty()) return;

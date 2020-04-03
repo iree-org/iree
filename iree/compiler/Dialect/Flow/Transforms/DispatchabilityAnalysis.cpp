@@ -25,14 +25,14 @@ namespace IREE {
 namespace Flow {
 
 class DispatchabilityAnalysisPass
-    : public ModulePass<DispatchabilityAnalysisPass> {
+    : public OperationPass<DispatchabilityAnalysisPass, ModuleOp> {
  public:
   DispatchabilityAnalysisPass() = default;
   explicit DispatchabilityAnalysisPass(
       std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps)
       : dispatchableFuncOps_(std::move(dispatchableFuncOps)) {}
 
-  void runOnModule() override {
+  void runOnOperation() override {
     // Force creation (or caching) of dispatchability information.
     auto &dispatchability = getAnalysis<Dispatchability>();
     markAllAnalysesPreserved();

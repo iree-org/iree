@@ -87,9 +87,9 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 namespace {
 
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
-class ConvertHALToVMPass : public ModulePass<ConvertHALToVMPass> {
+class ConvertHALToVMPass : public OperationPass<ConvertHALToVMPass, ModuleOp> {
  public:
-  void runOnModule() override {
+  void runOnOperation() override {
     auto *context = &getContext();
 
     VMConversionTarget conversionTarget(context);
@@ -97,7 +97,7 @@ class ConvertHALToVMPass : public ModulePass<ConvertHALToVMPass> {
 
     mlir::ModuleOp outerModuleOp, innerModuleOp;
     std::tie(outerModuleOp, innerModuleOp) =
-        VMConversionTarget::nestModuleForConversion(getModule());
+        VMConversionTarget::nestModuleForConversion(getOperation());
 
     appendImportModule(
         StringRef(hal_imports_create()->data, hal_imports_create()->size),

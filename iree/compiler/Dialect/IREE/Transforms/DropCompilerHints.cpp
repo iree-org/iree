@@ -22,12 +22,13 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 
-class DropCompilerHintsPass : public ModulePass<DropCompilerHintsPass> {
+class DropCompilerHintsPass
+    : public OperationPass<DropCompilerHintsPass, ModuleOp> {
  public:
-  void runOnModule() override {
+  void runOnOperation() override {
     // We can't use patterns and applyPatternsGreedily because that
     // automatically does canonicalization.
-    getModule().walk([&](DoNotOptimizeOp op) {
+    getOperation().walk([&](DoNotOptimizeOp op) {
       op.replaceAllUsesWith(op.getOperands());
       op.erase();
     });

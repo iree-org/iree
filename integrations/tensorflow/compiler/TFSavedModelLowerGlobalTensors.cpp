@@ -155,10 +155,10 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
 }
 
 class TFSavedModelLowerGlobalTensors
-    : public ModulePass<TFSavedModelLowerGlobalTensors> {
+    : public OperationPass<TFSavedModelLowerGlobalTensors, ModuleOp> {
  public:
-  void runOnModule() override {
-    if (failed(importTfSavedModelGlobalTensorsToIREEFlow(getModule()))) {
+  void runOnOperation() override {
+    if (failed(importTfSavedModelGlobalTensorsToIREEFlow(getOperation()))) {
       signalPassFailure();
     }
   }

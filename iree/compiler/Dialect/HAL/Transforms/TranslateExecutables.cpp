@@ -31,14 +31,15 @@ namespace HAL {
 // TODO(ataei): Better way of listing default backends translation.
 static llvm::StringSet<> excludedBackends = {"llvm-ir"};
 
-class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
+class TranslateExecutablesPass
+    : public OperationPass<TranslateExecutablesPass, ModuleOp> {
  public:
   TranslateExecutablesPass()
       : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
   explicit TranslateExecutablesPass(ExecutableTargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
-  void runOnModule() override {
+  void runOnOperation() override {
     // Get the target backends we want to translate executables into.
     SmallVector<std::string, 4> targetBackends;
     if (executableOptions_.targets.empty()) {
@@ -54,7 +55,7 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
       }
     }
     if (targetBackends.empty()) {
-      auto diagnostic = getModule().emitError();
+      auto diagnostic = getOperation().emitError();
       diagnostic
           << "no target backends available for executable translation; ensure "
           << "they are linked in and the target options are properly "
@@ -74,7 +75,7 @@ class TranslateExecutablesPass : public ModulePass<TranslateExecutablesPass> {
     // When we want heterogenous support we'll do this differently - possibly
     // even earlier on in the flow dialect (at least, deciding).
     auto executableOps =
-        llvm::to_vector<32>(getModule().getOps<IREE::HAL::ExecutableOp>());
+        llvm::to_vector<32>(getOperation().getOps<IREE::HAL::ExecutableOp>());
     for (auto executableOp : executableOps) {
       // Translate for each backend. Variants will be added to the executableOp.
       for (const auto& targetBackend : targetBackends) {
