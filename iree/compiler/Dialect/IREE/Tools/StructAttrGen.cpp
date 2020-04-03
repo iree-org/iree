@@ -91,12 +91,17 @@ class StructAttr : public Attribute {
 };
 
 static void emitStructClass(const StructAttr &structAttr, raw_ostream &os) {
+  if (!structAttr.getAllFields().empty()) {
+    os << formatv(R"(
+namespace detail {
+struct {0}Storage;
+}  // namespace detail
+)",
+                  structAttr.getStructClassName());
+  }
   os << formatv(R"(
 // {0}
-namespace detail {
-struct {1}Storage;
-}  // namespace detail
-class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, detail::{1}Storage> {
+class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, {3}Storage> {
  public:
   using Base::Base;
 
@@ -105,7 +110,10 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, detail::{1}St
 
 )",
                 structAttr.getDescription(), structAttr.getStructClassName(),
-                structAttr.getStructKind());
+                structAttr.getStructKind(),
+                structAttr.getAllFields().empty()
+                    ? "Attribute"
+                    : "detail::" + structAttr.getStructClassName());
 
   if (!structAttr.getAllFields().empty()) {
     os << "  static LogicalResult verifyConstructionInvariants(\n";
@@ -134,12 +142,14 @@ class {1} : public mlir::Attribute::AttrBase<{1}, mlir::Attribute, detail::{1}St
   os << ");\n\n";
 
   // Attribute return type constructor (APInt, etc).
-  os << formatv("  static {0} get(\n", structAttr.getStructClassName());
-  for (auto field : structAttr.getAllFields()) {
-    auto type = field.getType();
-    os << formatv("      {0} {1},\n", type.getReturnType(), field.getName());
+  if (!structAttr.getAllFields().empty()) {
+    os << formatv("  static {0} get(\n", structAttr.getStructClassName());
+    for (auto field : structAttr.getAllFields()) {
+      auto type = field.getType();
+      os << formatv("      {0} {1},\n", type.getReturnType(), field.getName());
+    }
+    os << "      mlir::MLIRContext* context);\n";
   }
-  os << "      mlir::MLIRContext* context);\n";
 
   os << R"(
   static Attribute parse(DialectAsmParser &p);
@@ -322,11 +332,13 @@ static void emitAttrFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
                   structAttr.getAllFields().front().getName());
   }
 
-  os << formatv("  return Base::get(context, AttrKind::{0},\n",
+  os << formatv("  return Base::get(context, AttrKind::{0}",
                 structAttr.getStructClassName());
-  os << "                   ";
-  interleaveComma(structAttr.getAllFields(), os,
-                  [&](StructFieldAttr field) { os << field.getName(); });
+  if (!structAttr.getAllFields().empty()) {
+    os << "\n,                   ";
+    interleaveComma(structAttr.getAllFields(), os,
+                    [&](StructFieldAttr field) { os << field.getName(); });
+  }
   os << ");\n";
 
   os << "}\n\n";
@@ -412,12 +424,16 @@ static void emitStructDef(const Record &structDef, raw_ostream &os) {
   }
   os << "\n";
 
-  emitStorageDef(structAttr, os);
-  emitVerifierDef(structAttr, os);
+  if (!structAttr.getAllFields().empty()) {
+    emitStorageDef(structAttr, os);
+    emitVerifierDef(structAttr, os);
+  }
   emitAttrFactoryDef(structAttr, os);
-  emitTypedFactoryDef(structAttr, os);
-  for (auto field : structAttr.getAllFields()) {
-    emitAccessorDefs(structAttr, field, os);
+  if (!structAttr.getAllFields().empty()) {
+    emitTypedFactoryDef(structAttr, os);
+    for (auto field : structAttr.getAllFields()) {
+      emitAccessorDefs(structAttr, field, os);
+    }
   }
   emitWalkStorageDef(structAttr, os);
 
