@@ -10,6 +10,10 @@ Notes to those updating this guide:
       Please keep them in sync.
 -->
 
+This guide walks through building the core compiler and runtime parts of IREE
+from source. Auxilary components like the Python bindings and Vulkan driver are
+documented separately, as they require further setup.
+
 ## Prerequisites
 
 ### Install CMake
@@ -24,6 +28,12 @@ $ sudo apt install cmake
 > &nbsp;&nbsp;&nbsp;&nbsp;Your editor of choice likely has plugins for CMake,
 > such as the Visual Studio Code
 > [CMake Tools](https://github.com/microsoft/vscode-cmake-tools) extension.
+
+### Install Ninja
+
+[Ninja](https://ninja-build.org/) is a fast build system that you can use as a
+CMake generator. Follow Ninja's
+[installing documentation](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages).
 
 ### Install a Compiler
 
@@ -61,7 +71,7 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -B build/ .
+$ cmake -G Ninja -B build/ .
 ```
 
 > Tip:<br>
@@ -72,7 +82,7 @@ $ cmake -B build/ .
 Build all targets:
 
 ```shell
-$ cmake --build build/ -j 8
+$ cmake --build build/
 ```
 
 ## What's next?
