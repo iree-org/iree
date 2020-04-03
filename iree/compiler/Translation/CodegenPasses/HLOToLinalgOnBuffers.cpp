@@ -328,6 +328,24 @@ linalg::CopyOp ReshapeOpConversion::apply(
 }
 
 // -----------------------------------------------------------------------------
+// Reduce operation utility functions.
+// -----------------------------------------------------------------------------
+
+/// Returns the constant value associated with the init value if the defining
+/// operation is a constant.
+static Attribute getInitValueAsConst(Value init) {
+  DenseElementsAttr attr;
+  if (!matchPattern(init, m_Constant(&attr))) return {};
+  auto type = attr.getType().dyn_cast<ShapedType>();
+  if (!type || type.getRank() != 0) return {};
+  if (auto intType = type.getElementType().dyn_cast<IntegerType>())
+    return IntegerAttr::get(intType, attr.getValue<APInt>({}));
+  else if (auto floatType = type.getElementType().dyn_cast<FloatType>())
+    return FloatAttr::get(floatType, attr.getValue<APFloat>({}));
+  return {};
+}
+
+// -----------------------------------------------------------------------------
 // xla_hlo.reduce_window conversion patterns and utility functions.
 // -----------------------------------------------------------------------------
 
@@ -374,7 +392,10 @@ linalg::LinalgOp ReduceWindowOpConversion::apply(
   auto loc = op.getLoc();
 
   // Initialize the output buffer to `initVal`.
-  auto initVal = rewriter.create<LoadOp>(loc, operands[1]);
+  Attribute initConstVal = getInitValueAsConst(operands[1]);
+  Value initVal =
+      initConstVal ? rewriter.create<ConstantOp>(loc, initConstVal).getResult()
+                   : rewriter.create<LoadOp>(loc, operands[1]).getResult();
   rewriter.create<linalg::FillOp>(loc, results[0], initVal);
 
   // Create a fake window dimension.
@@ -429,20 +450,6 @@ linalg::LinalgOp ReduceWindowOpConversion::apply(
 // -----------------------------------------------------------------------------
 // xla_hlo.reduce conversion patterns and utility functions.
 // -----------------------------------------------------------------------------
-
-/// Returns the constant value associated with the init value if the defining
-/// operation is a constant.
-static Optional<Attribute> getInitValueAsConst(Value init) {
-  DenseElementsAttr attr;
-  if (!matchPattern(init, m_Constant(&attr))) return {};
-  auto type = attr.getType().dyn_cast<ShapedType>();
-  if (!type || type.getRank() != 0) return {};
-  if (auto intType = type.getElementType().dyn_cast<IntegerType>())
-    return IntegerAttr::get(intType, attr.getValue<APInt>({}));
-  else if (auto floatType = type.getElementType().dyn_cast<FloatType>())
-    return FloatAttr::get(floatType, attr.getValue<APFloat>({}));
-  return {};
-}
 
 /// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
 /// are "parallel" except the last `nReduction` elements, where are "reduction"
@@ -588,11 +595,11 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
     reductionDims.push_back(dim.getSExtValue());
 
   // Check if initVal is constant. If so, inline the value into the region.
-  Optional<Attribute> initConstVal = getInitValueAsConst(initVal);
-  if (initConstVal.hasValue()) {
+  Attribute initConstVal = getInitValueAsConst(initVal);
+  if (initConstVal) {
     if (initVal.hasOneUse()) rewriter.eraseOp(initVal.getDefiningOp());
     initVal = rewriter.create<ConstantOp>(initVal.getDefiningOp()->getLoc(),
-                                          initConstVal.getValue());
+                                          initConstVal);
   }
 
   // Prepare indexing maps for linalg generic op. The elements are for src,
@@ -602,7 +609,7 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
   SmallVector<Attribute, 3> indexingMaps;
   indexingMaps.emplace_back(AffineMapAttr::get(getTransposeMapForReduction(
       rewriter.getContext(), nInputRank, reductionDims)));
-  if (!initConstVal.hasValue())
+  if (!initConstVal)
     indexingMaps.emplace_back(AffineMapAttr::get(
         AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())));
   // The indexing map of `dst` should drop the reduction loops. Since the
@@ -619,7 +626,7 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
 
   SmallVector<Type, 2> resultTypes = {};
   SmallVector<Value, 2> linalgOpArgs = {operands[0]};
-  if (!initConstVal.hasValue()) linalgOpArgs.push_back(operands[1]);
+  if (!initConstVal) linalgOpArgs.push_back(operands[1]);
   linalgOpArgs.push_back(results[0]);
   auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
       loc, resultTypes, linalgOpArgs,
@@ -647,7 +654,7 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
       signatureConverter.addInputs(indexType);
     }
     signatureConverter.addInputs(0, convertedType);
-    if (!initConstVal.hasValue()) signatureConverter.addInputs(convertedType);
+    if (!initConstVal) signatureConverter.addInputs(convertedType);
     signatureConverter.addInputs(1, convertedType);
     Block *entryBlock = rewriter.applySignatureConversion(&linalgOp.region(),
                                                           signatureConverter);
@@ -659,11 +666,8 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
     unsigned numArgs = entryBlock->getNumArguments();
     BlockArgument blockDstArg = entryBlock->getArgument(numArgs - 1);
     rewriter.setInsertionPointToStart(entryBlock);
-    Value initArg = nullptr;
-    if (initConstVal.hasValue())
-      initArg = initVal;
-    else
-      initArg = entryBlock->getArgument(numArgs - 2);
+    Value initArg =
+        initConstVal ? initVal : entryBlock->getArgument(numArgs - 2);
     // The reduction dimensions are the innermost loops now, compare all
     // reduction indices to zero. If they are all zero, it's the first time to
     // update the output element, i.e., we should take initial value to compute
