@@ -63,12 +63,20 @@ using DeviceFeatureBitfield = DeviceFeature;
 // TODO(benvanik): device info (caps, physical mappings, etc).
 class DeviceInfo {
  public:
-  DeviceInfo(std::string name, DeviceFeatureBitfield supported_features,
+  DeviceInfo(std::string id, std::string name,
+             DeviceFeatureBitfield supported_features,
              DriverDeviceID device_id = 0)
-      : name_(std::move(name)),
+      : id_(std::move(id)),
+        name_(std::move(name)),
         supported_features_(supported_features),
         device_id_(device_id) {}
 
+  // Machine-friendly device identifier used to match the device against
+  // compiler-generated patterns. This should be consistent with the device IDs
+  // emitted by the compiler. For example: `vulkan-v1.1-spec`.
+  const std::string& id() const { return id_; }
+
+  // Human-friendly device name.
   const std::string& name() const { return name_; }
 
   // Features supported by the device.
@@ -82,6 +90,7 @@ class DeviceInfo {
   DriverDeviceID device_id() const { return device_id_; }
 
  private:
+  const std::string id_;
   const std::string name_;
   const DeviceFeatureBitfield supported_features_;
   DriverDeviceID device_id_;

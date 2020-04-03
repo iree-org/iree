@@ -960,6 +960,12 @@ iree_hal_device_release(iree_hal_device_t* device);
 IREE_API_EXPORT iree_hal_allocator_t* IREE_API_CALL
 iree_hal_device_allocator(iree_hal_device_t* device);
 
+// Returns the device identifier.
+// This identifier may vary based on the runtime device type; for example, a
+// Vulkan device may return `vulkan-v1.1` or `vulkan-v1.2-spec1`.
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_hal_device_id(iree_hal_device_t* device);
+
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//

@@ -402,6 +402,17 @@ IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
     iree_string_view_t value, char split_char, iree_string_view_t* out_lhs,
     iree_string_view_t* out_rhs);
 
+// Returns true if the given |value| matches |pattern| (normal * and ? rules).
+// This accepts wildcards in the form of '*' and '?' for any delimited value.
+// '*' will match zero or more of any character and '?' will match exactly one
+// of any character.
+//
+// For example,
+// 'foo-*-bar' matches: 'foo-123-bar', 'foo-456-789-bar'
+// 'foo-10?' matches: 'foo-101', 'foo-102'
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
+    iree_string_view_t value, iree_string_view_t pattern);
+
 #endif  // IREE_API_NO_PROTOTYPES
 
 //===----------------------------------------------------------------------===//

@@ -73,7 +73,7 @@ StatusOr<DeviceInfo> PopulateDeviceInfo(VkPhysicalDevice physical_device,
   // supported_features |= DeviceFeature::kDebugging;
   // supported_features |= DeviceFeature::kCoverage;
   // supported_features |= DeviceFeature::kProfiling;
-  return DeviceInfo(std::move(name), supported_features,
+  return DeviceInfo("vulkan", std::move(name), supported_features,
                     reinterpret_cast<DriverDeviceID>(physical_device));
 }
 

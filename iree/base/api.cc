@@ -199,6 +199,40 @@ IREE_API_EXPORT int IREE_API_CALL iree_string_view_split(
   return offset;
 }
 
+static bool MatchPattern(absl::string_view value, absl::string_view pattern) {
+  size_t next_char_index = pattern.find_first_of("*?");
+  if (next_char_index == std::string::npos) {
+    return value == pattern;
+  } else if (next_char_index > 0) {
+    if (value.substr(0, next_char_index) !=
+        pattern.substr(0, next_char_index)) {
+      return false;
+    }
+    value = value.substr(next_char_index);
+    pattern = pattern.substr(next_char_index);
+  }
+  char pattern_char = pattern[0];
+  if (value.empty() && pattern.empty()) {
+    return true;
+  } else if (pattern_char == '*' && pattern.size() > 1 && value.empty()) {
+    return false;
+  } else if (pattern_char == '*' && pattern.size() == 1) {
+    return true;
+  } else if (pattern_char == '?' || value[0] == pattern_char) {
+    return MatchPattern(value.substr(1), pattern.substr(1));
+  } else if (pattern_char == '*') {
+    return MatchPattern(value, pattern.substr(1)) ||
+           MatchPattern(value.substr(1), pattern);
+  }
+  return false;
+}
+
+IREE_API_EXPORT bool IREE_API_CALL iree_string_view_match_pattern(
+    iree_string_view_t value, iree_string_view_t pattern) {
+  return MatchPattern(absl::string_view(value.data, value.size),
+                      absl::string_view(pattern.data, pattern.size));
+}
+
 //===----------------------------------------------------------------------===//
 // iree::FileMapping
 //===----------------------------------------------------------------------===//
