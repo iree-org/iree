@@ -123,8 +123,8 @@ struct VMLAConvOpConverter : public OpConversionPattern<xla_hlo::ConvOp> {
     SmallVector<int32_t, 4> padding{0, 0, 0, 0};
     SmallVector<int32_t, 4> lhsDilation{1, 1};
     SmallVector<int32_t, 4> rhsDilation{1, 1};
-    int32_t featureGroupCount = 1;
-    int32_t batchGroupCount = 1;
+    int32_t featureGroupCount = op.feature_group_count().getZExtValue();
+    int32_t batchGroupCount = op.batch_group_count().getZExtValue();
 
     auto fill_optional = [](auto filed, SmallVector<int32_t, 4> *vec) {
       if (filed.hasValue()) {
@@ -146,8 +146,8 @@ struct VMLAConvOpConverter : public OpConversionPattern<xla_hlo::ConvOp> {
       return failure();
     }
 
-    if (featureGroupCount != 1 || batchGroupCount != 1) {
-      op.emitWarning() << "Group convoution isn't supported";
+    if (batchGroupCount != 1) {
+      op.emitWarning() << "Batch group convoution isn't supported";
       return failure();
     }
 

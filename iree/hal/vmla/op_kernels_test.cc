@@ -404,14 +404,15 @@ TEST(ReduceMin, TwoDimensionsToOne) {
 TEST(Conv2d, NoDilation) {
   Shape input_shape = {4, 5, 2};
   Shape filter_shape = {3, 2, 2, 1};
-  Shape dst_shape = {2, 3, 1};
+  Shape dst_shape = {2, 4, 1};
   Shape strides = {1, 1};
   Shape pad_h = {0, 0};
   Shape pad_w = {0, 0};
   Shape dilation = {1, 1};
   std::vector<float> input_buffer(input_shape.element_count());
   std::vector<float> filter_buffer(filter_shape.element_count());
-  std::vector<float> expected_dst = {1310, 1466, 1622, 2090, 2246, 2402};
+  std::vector<float> expected_dst = {1310, 1466, 1622, 1778,
+                                     2090, 2246, 2402, 2558};
   for (int i = 0; i < input_shape.element_count(); ++i) {
     input_buffer[i] = i + 1;
     if (i < filter_shape.element_count()) {
@@ -422,7 +423,40 @@ TEST(Conv2d, NoDilation) {
 
   EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape, filter_buffer,
                                    filter_shape, absl::MakeSpan(dst_buffer),
-                                   dst_shape, strides, pad_h, pad_w, dilation));
+                                   dst_shape, strides, pad_h, pad_w, dilation,
+                                   1));
+
+  for (int i = 0; i < dst_buffer.size(); ++i) {
+    EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
+  }
+}
+
+TEST(Conv2d, DepthwiseConv) {
+  Shape input_shape = {4, 5, 2};
+  Shape filter_shape = {3, 2, 2, 2};
+  Shape dst_shape = {2, 4, 4};
+  Shape strides = {1, 1};
+  Shape pad_h = {0, 0};
+  Shape pad_w = {0, 0};
+  Shape dilation = {1, 1};
+  std::vector<float> input_buffer(input_shape.element_count());
+  std::vector<float> filter_buffer(filter_shape.element_count());
+  std::vector<float> expected_dst = {
+      1124, 1196, 1346, 1424, 1256, 1340, 1502, 1592, 1388, 1484, 1658,
+      1760, 1520, 1628, 1814, 1928, 1784, 1916, 2126, 2264, 1916, 2060,
+      2282, 2432, 2048, 2204, 2438, 2600, 2180, 2348, 2594, 2768};
+  for (int i = 0; i < input_shape.element_count(); ++i) {
+    input_buffer[i] = i + 1;
+    if (i < filter_shape.element_count()) {
+      filter_buffer[i] = i + 1;
+    }
+  }
+  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+
+  EXPECT_OK(Conv2D::Execute<float>(input_buffer, input_shape, filter_buffer,
+                                   filter_shape, absl::MakeSpan(dst_buffer),
+                                   dst_shape, strides, pad_h, pad_w, dilation,
+                                   2));
 
   for (int i = 0; i < dst_buffer.size(); ++i) {
     EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);

@@ -659,7 +659,7 @@ class VMLAModuleState final {
       RETURN_IF_ERROR(kernels::Conv2D::Execute(
           input_example, input_example_shape, filter_buffer, filter_shape_4d,
           output_example, output_example_shape, window_strides_2d, pad_h, pad_w,
-          dilation));
+          dilation, feature_group_count));
     }
     return OkStatus();
   }

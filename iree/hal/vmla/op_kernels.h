@@ -91,7 +91,7 @@ struct Conv2D {
                         const Shape& filter_shape, absl::Span<T> dst_buffer,
                         const Shape& dst_shape, const Shape& strides,
                         const Shape& pad_h, const Shape& pad_w,
-                        const Shape& dilation);
+                        const Shape& dilation, const int32_t groups);
 };
 
 struct Copy {
