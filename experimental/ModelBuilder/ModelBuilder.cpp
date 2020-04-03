@@ -45,10 +45,14 @@ Value mlir::ModelBuilder::constant_f64(double v) {
 }
 
 FuncOp mlir::ModelBuilder::makeFunction(StringRef name, ArrayRef<Type> results,
-                                        ArrayRef<Type> args, bool declOnly) {
+                                        ArrayRef<Type> args,
+                                        bool emitCInterface, bool declOnly) {
   auto function =
       FuncOp::create(loc, name, FunctionType::get(args, results, &ctx));
   if (!declOnly) function.addEntryBlock();
+  if (emitCInterface)
+    function.setAttr("llvm.emit_c_interface",
+                     mlir::UnitAttr::get(getContext()));
   module->push_back(function);
   return function;
 }

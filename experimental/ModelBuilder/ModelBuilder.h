@@ -100,7 +100,8 @@ class ModelBuilder : public OpBuilder {
 
   // Build an MLIR FuncOp that will be callable after JIT compilation occured.
   FuncOp makeFunction(StringRef name, ArrayRef<Type> results = {},
-                      ArrayRef<Type> args = {}, bool declOnly = false);
+                      ArrayRef<Type> args = {}, bool emitCInterface = true,
+                      bool declOnly = false);
 
   // Build an MLIR VectorType with a base `elementalType` and a `shape`.
   VectorType getVectorType(ArrayRef<int64_t> shape, Type elementalType);
