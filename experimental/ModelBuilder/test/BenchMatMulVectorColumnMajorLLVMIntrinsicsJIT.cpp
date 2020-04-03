@@ -42,6 +42,12 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   auto typeC = mb.getMemRefType({}, mnVectorType);
 
   auto f = mb.makeFunction(fn, {}, {typeA, typeB, typeC});
+  MLIRContext *context = f32.getContext();
+  auto preferAttr = StringAttr::get("prefer-vector-width", context);
+  auto _512Attr = StringAttr::get("512", context);
+  f.setAttr("passthrough",
+            ArrayAttr::get({ArrayAttr::get({preferAttr, _512Attr}, context)},
+                           context));
   OpBuilder b(&f.getBody());
   ScopedContext scope(b, f.getLoc());
 
