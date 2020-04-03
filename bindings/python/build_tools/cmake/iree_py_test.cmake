@@ -41,7 +41,8 @@ function(iree_py_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  string(REPLACE "_" "/" _PACKAGE_PATH ${_PACKAGE_NAME})
+  iree_package_ns(_PACKAGE_NS)
+  string(REPLACE "::" "/" _PACKAGE_PATH ${_PACKAGE_NS})
   set(_NAME_PATH "${_PACKAGE_PATH}:${_RULE_NAME}")
 
   add_test(
