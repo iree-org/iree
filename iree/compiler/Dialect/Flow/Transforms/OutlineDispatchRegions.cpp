@@ -166,15 +166,14 @@ class OutlineDispatchRegionsPass
 =======
   void runOnModule() override {
     auto dispatchability = getCachedAnalysis<Dispatchability>();
-    if (!dispatchability.hasValue()) {
-      getModule().emitError()
-          << " dispatchability analysis not performed "
-             "on module; run -iree-flow-dispatchability-analysis first";
-      return signalPassFailure();
-    }
     llvm::StringMap<FuncOp> dispatchableFuncOps;
-    dispatchability.getValue().get().walkDispatchableOps(
-        [&](FuncOp funcOp) { dispatchableFuncOps[funcOp.getName()] = funcOp; });
+    if (dispatchability.hasValue()) {
+      // if we do not get dispatchability from cache,
+      // we should keep dispatchableFuncOps empty to be comptaible as before
+      dispatchability.getValue().get().walkDispatchableOps([&](FuncOp funcOp) {
+        dispatchableFuncOps[funcOp.getName()] = funcOp;
+      });
+    }
 
 >>>>>>> Remove sidechannel dispatchability state and use the MLIR analysis cache
     // TODO(benvanik): replace with a pattern rewriter?
