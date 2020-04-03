@@ -115,7 +115,6 @@ and execute a function in the compiled module:
 *   To target GPUs using Vulkan, see
     [Getting Started on Windows with Vulkan](./getting_started_windows_vulkan.md)
 
-<!-- TODO(scotttodd): Vulkan / other driver configuration -->
 <!-- TODO(scotttodd): Running tests -->
 <!-- TODO(scotttodd): Running samples -->
 <!-- TODO(scotttodd): "getting_started.md" equivalent for iree-translate etc. -->
