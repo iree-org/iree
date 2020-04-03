@@ -112,7 +112,8 @@ and execute a function in the compiled module:
 
 ### Further Reading
 
-More documentation coming soon...
+*   To target GPUs using Vulkan, see
+    [Getting Started on Windows with Vulkan](./getting_started_windows_vulkan.md)
 
 <!-- TODO(scotttodd): Vulkan / other driver configuration -->
 <!-- TODO(scotttodd): Running tests -->
