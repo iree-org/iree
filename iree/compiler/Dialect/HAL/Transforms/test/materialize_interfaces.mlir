@@ -55,9 +55,10 @@ flow.executable @shaped_dispatch {
   module {
     //      CHECK: func @entry() {
     // CHECK-NEXT:   %[[ZERO:.+]] = constant 0 : index
-    //  CHECK-DAG:   %[[ARG0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %[[ZERO]] : tensor<?x7x10xf32>
-    //  CHECK-DAG:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
-    //  CHECK-DAG:   %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
+    // Invariant: Constant loads emitted before binding (tensor) loads.
+    //  CHECK-NEXT:   %[[DIM0:.+]] = hal.interface.load.constant offset = 0 : index
+    //  CHECK-NEXT:   %[[DIM1:.+]] = hal.interface.load.constant offset = 1 : index
+    //  CHECK-NEXT:   %[[ARG0:.+]] = hal.interface.load.tensor @legacy_io::@arg0, offset = %[[ZERO]] : tensor<?x7x10xf32>
     // CHECK-NEXT:   %[[RET0:.+]] = call @entry_impl(%[[ARG0]], %[[DIM0]], %[[DIM1]]) : (tensor<?x7x10xf32>, index, index) -> tensor<7x?x10xf32>
     // CHECK-NEXT:   hal.interface.store.tensor %[[RET0]], @legacy_io::@ret0, offset = %[[ZERO]] : tensor<7x?x10xf32>
     // CHECK-NEXT:   return

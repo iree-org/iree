@@ -120,6 +120,18 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
 
 // Creates a new entry function that uses the hal.interface bindings to marshal
 // IO to the original entry function.
+// Invariants:
+//   - The thunk function generates loads for entries in the InterfaceOp
+//     based on category:
+//       1. Push constants
+//       2. Bindings
+//     Within a category, the order follows the order within the interface.
+//     Such an ordering can be useful for downstream code generation because
+//     it can often be necessary to reference primitives in the materialization
+//     of binding-based loads (i.e. for size calculations, etc). For any
+//     stronger guarnatees or inter-load ordering constraints, downstream
+//     code generation must explicitly take non-determinism of argument
+//     ordering into account.
 static Optional<FuncOp> createDispatchEntryThunk(
     FuncOp sourceFuncOp, IREE::HAL::InterfaceOp interfaceOp) {
   // Functions take all I/O through the interface API.
@@ -144,12 +156,26 @@ static Optional<FuncOp> createDispatchEntryThunk(
   // Pull all arguments from the bindings.
   auto* thunkEntryBlock = thunkFuncOp.addEntryBlock();
   OpBuilder thunkEntryBuilder = OpBuilder::atBlockEnd(thunkEntryBlock);
+  Operation* firstNonConstOp = nullptr;
+  auto positionForNonConst = [&]() {
+    thunkEntryBuilder.setInsertionPointToEnd(thunkEntryBlock);
+  };
+  auto positionForConst = [&]() {
+    if (firstNonConstOp) {
+      thunkEntryBuilder.setInsertionPoint(firstNonConstOp);
+    } else {
+      thunkEntryBuilder.setInsertionPointToEnd(thunkEntryBlock);
+    }
+  };
+
+  // Create load ops, first for push constants with binding based loads after.
   auto zeroOffset = thunkEntryBuilder.createOrFold<mlir::ConstantIndexOp>(
       thunkFuncOp.getLoc(), 0);
   SmallVector<Value, 4> operands;
   int pushConstantOffset = 0;
   for (auto inputType : sourceFuncType.getInputs()) {
     if (inputType.isa<TensorType>()) {
+      positionForNonConst();
       auto bindingOp = bindingOps[binding++];
       auto loadOp = thunkEntryBuilder.create<IREE::HAL::InterfaceLoadTensorOp>(
           thunkFuncOp.getLoc(), inputType,
@@ -158,7 +184,9 @@ static Optional<FuncOp> createDispatchEntryThunk(
               {thunkEntryBuilder.getSymbolRefAttr(bindingOp)}),
           zeroOffset);
       operands.push_back(loadOp.getResult());
+      firstNonConstOp = loadOp;
     } else if (inputType.isa<IndexType>() || inputType.isa<IntegerType>()) {
+      positionForConst();
       auto loadOp =
           thunkEntryBuilder.create<IREE::HAL::InterfaceLoadConstantOp>(
               thunkFuncOp.getLoc(), inputType, APInt(64, pushConstantOffset));
@@ -170,6 +198,7 @@ static Optional<FuncOp> createDispatchEntryThunk(
       return llvm::None;
     }
   }
+  thunkEntryBuilder.setInsertionPointToEnd(thunkEntryBlock);
 
   // Call the original entry function.
   auto callOp = thunkEntryBuilder.create<mlir::CallOp>(thunkFuncOp.getLoc(),

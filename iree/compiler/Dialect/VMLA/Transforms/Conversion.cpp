@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/StandardToVMLA/ConvertStandardToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/TypeConverter.h"
+#include "iree/compiler/Dialect/VMLA/IR/VMLATypes.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -86,6 +87,12 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
     // illegal (which allows them to fold away).
     Shape::populateFoldConversionPatterns(&getContext(), conversionPatterns);
     conversionTarget.addLegalDialect<ShapeDialect>();
+    // Since all inputs are converted to buffers, must trigger the TieShape
+    // type conversion if the result type is illegal.
+    conversionTarget.addDynamicallyLegalOp<Shape::TieShapeOp>(
+        [](Shape::TieShapeOp op) {
+          return op.result().getType().isa<BufferType>();
+        });
     conversionTarget.addIllegalOp<Shape::RankedDimOp>();
     conversionTarget.addIllegalOp<Shape::RankedDimsOp>();
 

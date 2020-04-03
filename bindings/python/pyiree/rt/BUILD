@@ -126,7 +126,6 @@ iree_py_test(
     tags = [
         "noga",
         "nokokoro",
-        "notap",
     ],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -154,8 +153,6 @@ iree_py_test(
     srcs = ["system_api_test.py"],
     python_version = "PY3",
     tags = [
-        # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
-        "notap",
         # TODO(b/145815906) Get this running in OSS CI.
         "noga",
         "nokokoro",
@@ -173,12 +170,6 @@ iree_py_test(
     name = "vm_test",
     srcs = ["vm_test.py"],
     python_version = "PY3",
-    # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
-    tags = [
-        "noga",
-        "nokokoro",
-        "notap",
-    ],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",

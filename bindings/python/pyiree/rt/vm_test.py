@@ -21,7 +21,7 @@ from pyiree import compiler
 from pyiree import rt
 
 
-def create_simple_mul_module():
+def create_simple_static_mul_module():
   ctx = compiler.Context()
   input_module = ctx.parse_asm("""
     func @simple_mul(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>) -> tensor<4xf32>
@@ -35,6 +35,22 @@ def create_simple_mul_module():
   return m
 
 
+def create_simple_dynamic_abs_module():
+  ctx = compiler.Context()
+  # TODO(laurenzo): Compile for more backends as dynamic shapes come online.
+  target_backends = ["vmla"]
+  input_module = ctx.parse_asm("""
+    func @simple_mul(%arg0: tensor<?x?xf32>) -> tensor<?x?xf32>
+          attributes { iree.module.export } {
+        %0 = "xla_hlo.abs"(%arg0) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+        return %0 : tensor<?x?xf32>
+    }
+    """)
+  binary = input_module.compile(target_backends=target_backends)
+  m = rt.VmModule.from_flatbuffer(binary)
+  return m
+
+
 class VmTest(absltest.TestCase):
 
   @classmethod
@@ -42,7 +58,7 @@ class VmTest(absltest.TestCase):
     super().setUpClass()
     driver_names = rt.HalDriver.query()
     print("DRIVER_NAMES =", driver_names)
-    cls.driver = rt.HalDriver.create("vulkan")
+    cls.driver = rt.HalDriver.create("vmla")
     cls.device = cls.driver.create_default_device()
     cls.hal_module = rt.create_hal_module(cls.device)
     cls.htf = rt.HostTypeFactory.get_numpy()
@@ -59,7 +75,7 @@ class VmTest(absltest.TestCase):
     self.assertGreater(context2.context_id, context1.context_id)
 
   def test_module_basics(self):
-    m = create_simple_mul_module()
+    m = create_simple_static_mul_module()
     f = m.lookup_function("simple_mul")
     self.assertGreater(f.ordinal, 0)
     notfound = m.lookup_function("notfound")
@@ -68,19 +84,46 @@ class VmTest(absltest.TestCase):
   def test_dynamic_module_context(self):
     instance = rt.VmInstance()
     context = rt.VmContext(instance)
-    m = create_simple_mul_module()
+    m = create_simple_static_mul_module()
     context.register_modules([self.hal_module, m])
 
   def test_static_module_context(self):
-    m = create_simple_mul_module()
+    m = create_simple_static_mul_module()
     print(m)
     instance = rt.VmInstance()
     print(instance)
     context = rt.VmContext(instance, modules=[self.hal_module, m])
     print(context)
 
+  def test_dynamic_shape_compile(self):
+    m = create_simple_dynamic_abs_module()
+    print(m)
+    instance = rt.VmInstance()
+    print(instance)
+    context = rt.VmContext(instance, modules=[self.hal_module, m])
+    print(context)
+
+  def test_synchronous_dynamic_shape_invoke_function(self):
+    m = create_simple_dynamic_abs_module()
+    instance = rt.VmInstance()
+    context = rt.VmContext(instance, modules=[self.hal_module, m])
+    f = m.lookup_function("simple_mul")
+    abi = context.create_function_abi(self.device, self.htf, f)
+    print("INVOKING:", abi)
+    arg0 = np.array([[-1., 2.], [3., -4.]], dtype=np.float32)
+    inputs = abi.raw_pack_inputs((arg0,))
+    print("INPUTS:", inputs)
+    allocated_results = abi.allocate_results(inputs, static_alloc=False)
+    print("ALLOCATED RESULTS:", allocated_results)
+    print("--- INVOKE:")
+    context.invoke(f, inputs, allocated_results)
+    print("--- DONE.")
+    results = abi.raw_unpack_results(allocated_results)
+    print("RESULTS:", results)
+    np.testing.assert_allclose(results[0], [[1., 2.], [3., 4.]])
+
   def test_synchronous_invoke_function(self):
-    m = create_simple_mul_module()
+    m = create_simple_static_mul_module()
     instance = rt.VmInstance()
     context = rt.VmContext(instance, modules=[self.hal_module, m])
     f = m.lookup_function("simple_mul")
