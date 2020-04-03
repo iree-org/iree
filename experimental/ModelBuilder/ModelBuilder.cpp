@@ -89,7 +89,7 @@ ValueHandle mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
   //==========================================================================//
   ValueHandle I(fcArgs[0]), W(fcArgs[1]), O(fcArgs[2]);
   // Emit a linalg.generic op that implements matmul:
-  linalg_matmul(I, W, O);
+  linalg_generic_matmul(I, W, O);
 
   //==========================================================================//
   // Layer 2: BiasAddTanh Block
@@ -106,7 +106,7 @@ ValueHandle mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
   //
   // in which bias is broadcast along `i`.
   StructuredIndexed o(O), bias(biasValueArg);
-  linalg_pointwise(fusedBiasTanh, o({i, j}), bias({j}), o({i, j}));
+  linalg_generic_pointwise(fusedBiasTanh, o({i, j}), bias({j}), o({i, j}));
 
   return O;
 }
@@ -118,7 +118,7 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
   // Layer 1: FC
   //==========================================================================//
   ValueHandle I(fcArgs[0]), W(fcArgs[1]);
-  Value O2 = linalg_matmul(I, W, outputTensorType)->getResult(0);
+  Value O2 = linalg_generic_matmul(I, W, outputTensorType)->getResult(0);
 
   //==========================================================================//
   // Layer 2: BiasAddTanh Block
@@ -128,6 +128,7 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
   bindDims(&ctx, i, j);
   // in-place with explicit bias broacast
   StructuredIndexed o2(O2), bias(Bias), o3Type(outputTensorType);
-  return linalg_pointwise(fusedBiasTanh, o2({i, j}), bias({j}), o3Type({i, j}))
+  return linalg_generic_pointwise(fusedBiasTanh, o2({i, j}), bias({j}),
+                                  o3Type({i, j}))
       ->getResult(0);
 }

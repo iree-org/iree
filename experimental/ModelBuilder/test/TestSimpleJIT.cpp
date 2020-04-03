@@ -183,10 +183,10 @@ void testMatmulOnVectors(StringLiteral funcName) {
       C(func.getArgument(2));
   auto contractionBuilder = [](ArrayRef<BlockArgument> args) {
     assert(args.size() == 3 && "expected 3 block arguments");
-    (linalg_yield(vector_matmul(args[0], args[1], args[2])));
+    (linalg_yield(vector_contraction_matmul(args[0], args[1], args[2])));
   };
 
-  linalg_matmul(A, B, C, contractionBuilder);
+  linalg_generic_matmul(A, B, C, contractionBuilder);
   std_ret();
 }
 
@@ -222,5 +222,5 @@ int main(int argc, char **argv) {
   testVectorAdd2d<3, 5>("test_vector_add_2d_3x3_5f32", /*kNumElements=*/3);
 
   // TBD.
-  testMatmulOnVectors<4, 8, 16>("test_vector_matmul");
+  testMatmulOnVectors<4, 8, 16>("test_vector_contraction_matmul");
 }
