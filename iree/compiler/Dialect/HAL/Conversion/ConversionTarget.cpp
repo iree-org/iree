@@ -41,6 +41,11 @@ HALConversionTarget::HALConversionTarget(MLIRContext *context,
   addLegalOp<ModuleOp, ModuleTerminatorOp>();
   addLegalDialect<IREE::HAL::HALDialect>();
 
+  // There are a variety of patterns which convert std.dim and std.rank ops
+  // to corresponding HAL ops. All should be eliminated.
+  addIllegalOp<DimOp>();
+  addIllegalOp<RankOp>();
+
   // We don't care about the contents of a HAL executable: it may have any kind
   // of dialect and type usage.
   addLegalOp<IREE::HAL::ExecutableOp>();

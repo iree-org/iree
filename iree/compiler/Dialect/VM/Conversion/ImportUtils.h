@@ -16,6 +16,7 @@
 #define IREE_COMPILER_DIALECT_VM_CONVERSION_IMPORTUTILS_H_
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -97,17 +98,10 @@ LogicalResult rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
         auto rankedShapeType = oldOperands[0]
                                    .getType()
                                    .template dyn_cast<Shape::RankedShapeType>();
-        int dynamicDimIndex = 0;
         for (int i = 0; i < rankedShapeType.getRank(); ++i) {
-          if (rankedShapeType.isDimDynamic(i)) {
-            state.addOperands({newOperands[dynamicDimIndex++]});
-          } else {
-            auto dimOp = rewriter.createOrFold<mlir::ConstantOp>(
-                op.getLoc(), rewriter.getIntegerType(32),
-                rewriter.getIntegerAttr(rewriter.getIntegerType(32),
-                                        rankedShapeType.getStaticDim(i)));
-            state.addOperands({dimOp});
-          }
+          auto dimOp = rewriter.createOrFold<Shape::RankedDimOp>(
+              op.getLoc(), oldOperands[0], i);
+          state.addOperands(dimOp);
         }
         segmentSizes.push_back(rankedShapeType.getRank());
       } else {

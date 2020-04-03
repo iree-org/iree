@@ -56,7 +56,7 @@ def CUSTOM_TensorToMessageOp : Op<CUSTOM_Dialect, "tensor_to_message"> {
   }];
 
   let arguments = (ins
-    AnyRankedTensor:$operand
+    AnyTensor:$operand
   );
   let results = (outs
     CUSTOM_Message:$result
@@ -88,7 +88,7 @@ def CUSTOM_MessageToTensorOp : Op<CUSTOM_Dialect, "message_to_tensor"> {
     CUSTOM_Message:$message
   );
   let results = (outs
-    AnyRankedTensor:$result
+    AnyTensor:$result
   );
 }
 

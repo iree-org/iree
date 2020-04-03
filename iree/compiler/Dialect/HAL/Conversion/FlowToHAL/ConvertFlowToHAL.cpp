@@ -30,6 +30,7 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -55,6 +56,11 @@ void populateFlowTensorToHALPatterns(MLIRContext *context,
 void populateFlowVariableToHALPatterns(MLIRContext *context,
                                        OwningRewritePatternList &patterns,
                                        TypeConverter &converter);
+
+// Populates only the std.dim and std.rank conversion patterns.
+void populateHalBufferViewShapePatterns(MLIRContext *context,
+                                        OwningRewritePatternList &patterns,
+                                        TypeConverter &converter);
 
 namespace {
 
@@ -84,6 +90,7 @@ class ConvertFlowToHALPass
     populateFlowStructuralToHALPatterns(context, patterns, typeConverter);
     populateFlowTensorToHALPatterns(context, patterns, typeConverter);
     populateFlowVariableToHALPatterns(context, patterns, typeConverter);
+    populateHalBufferViewShapePatterns(context, patterns, typeConverter);
     populatePreserveCompilerHintsPatterns(context, patterns);
     setupCompilerHintsLegality(context, target, typeConverter);
 

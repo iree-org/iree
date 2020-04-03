@@ -355,6 +355,10 @@ class ConvertVMLAToVMPass
     populateVMLAToVMPatterns(context, importSymbols, conversionPatterns,
                              typeConverter);
 
+    // Usually shape conversion patterns come in at a higher level, but for
+    // this standalone pass, they must be provided directly.
+    Shape::populateFoldConversionPatterns(&getContext(), conversionPatterns);
+
     if (failed(applyPartialConversion(outerModuleOp, conversionTarget,
                                       conversionPatterns, &typeConverter))) {
       outerModuleOp.emitError() << "conversion to vm.module failed";
