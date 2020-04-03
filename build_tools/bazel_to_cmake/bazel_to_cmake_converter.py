@@ -167,13 +167,15 @@ class BuildFileFunctions(object):
       # marked as ALWAYSLINK.
       # This drops deps in the local namespace ending with '_gen' and 'Gen'
       target = [""]
-    elif not target.startswith(("//iree", ":")):
+    elif not target.startswith(("//bindings", "//experimental", "//iree", ":")):
       # External target, call helper method for special case handling.
       target = bazel_to_cmake_targets.convert_external_target(target)
     else:
       # Bazel `:api`            -> CMake `::api`
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
+      target = target.replace("//bindings", "bindings")  # bindings:api
+      target = target.replace("//experimental", "experimental")  # experimental:api
       target = target.replace("//iree", "iree")  # iree/base:api
       target = target.replace(":", "::")  # iree/base::api or ::api
       target = target.replace("/", "::")  # iree::base::api
