@@ -170,6 +170,7 @@ iree_py_test(
     name = "vm_test",
     srcs = ["vm_test.py"],
     python_version = "PY3",
+    tags = ["nokokoro"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
