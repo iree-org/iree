@@ -161,10 +161,7 @@ class OutlineDispatchRegionsPass
  public:
   OutlineDispatchRegionsPass() = default;
 
-<<<<<<< HEAD
   void runOnOperation() override {
-=======
-  void runOnModule() override {
     auto dispatchability = getCachedAnalysis<Dispatchability>();
     llvm::StringMap<FuncOp> dispatchableFuncOps;
     if (dispatchability.hasValue()) {
@@ -175,7 +172,6 @@ class OutlineDispatchRegionsPass
       });
     }
 
->>>>>>> Remove sidechannel dispatchability state and use the MLIR analysis cache
     // TODO(benvanik): replace with a pattern rewriter?
     auto funcOps = llvm::to_vector<32>(getOperation().getOps<FuncOp>());
     for (auto funcOp : funcOps) {
