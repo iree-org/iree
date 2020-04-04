@@ -52,7 +52,7 @@ $ cmake --build build\ --target iree_hal_vulkan_dynamic_symbols_test
 $ .\build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
 
 # -- Bazel --
-$ bazel run iree/hal/vulkan:dynamic_symbols_test
+$ bazel test iree/hal/vulkan:dynamic_symbols_test
 ```
 
 Tests in IREE's HAL "Conformence Test Suite" (CTS) actually exercise the Vulkan
@@ -67,7 +67,7 @@ $ cmake --build build\ --target iree_hal_cts_allocator_test
 $ .\build\iree\hal\cts\iree_hal_cts_allocator_test.exe
 
 # -- Bazel --
-$ bazel run iree/hal/cts:allocator_test
+$ bazel test iree/hal/cts:allocator_test
 ```
 
 If these tests pass, you can skip down to the next section.
