@@ -46,9 +46,9 @@ class StringsModuleTest : public ::testing::Test {
     IREE_CHECK_OK(iree_vm_instance_create(IREE_ALLOCATOR_SYSTEM, &instance_));
 
     // Setup strings module:
-    IREE_CHECK_OK(strings_module_register_types());
+    IREE_CHECK_OK(iree_strings_module_register_types());
     IREE_CHECK_OK(
-        strings_module_create(IREE_ALLOCATOR_SYSTEM, &strings_module_))
+        iree_strings_module_create(IREE_ALLOCATOR_SYSTEM, &strings_module_))
         << "Strings module failed to init";
 
     // Setup hal module:

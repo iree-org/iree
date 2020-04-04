@@ -23,7 +23,7 @@ include "mlir/IR/OpBase.td"
 
 def TFStrings_Dialect : Dialect {
   let name = "tf_strings";
-  let cppNamespace = "TFStrings";
+  let cppNamespace = "tf_strings";
   let summary = [{
     A strings dialect for simplifying tensorflow string operations.
   }];
@@ -35,7 +35,7 @@ def TFStrings_Dialect : Dialect {
 
 def TFStrings_String : DialectType<
     TFStrings_Dialect,
-    CPred<"$_self.isa<TFStrings::StringType>()">,
+    CPred<"$_self.isa<tf_strings::StringType>()">,
     "string"> {
   let typeDescription = [{
     String type representation.

@@ -24,13 +24,13 @@ extern "C" {
 
 // Registers the custom types used by the strings module.
 // WARNING: Not threadsafe; call at startup before using..
-iree_status_t strings_module_register_types();
+iree_status_t iree_strings_module_register_types();
 
 // Creates a strings module.
 // Modules may exist in multiple contexts should be thread-safe and immutable.
 // Use the per-context allocated state for retaining data.
-iree_status_t strings_module_create(iree_allocator_t allocator,
-                                    iree_vm_module_t** out_module);
+iree_status_t iree_strings_module_create(iree_allocator_t allocator,
+                                         iree_vm_module_t** out_module);
 
 #ifdef __cplusplus
 }  // extern "C"

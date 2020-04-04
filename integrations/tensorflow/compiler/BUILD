@@ -31,7 +31,7 @@ cc_library(
         "IREE_COMPILER_TENSORFLOW_ENABLED",
     ],
     deps = [
-        "//integrations/tensorflow/compiler/dialect/tf_strings",
+        "//integrations/tensorflow/compiler/dialect/tf_strings/conversion:convert_tf_to_tf_strings",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion:convert_tf_to_tf_tensorlist",
         "//integrations/tensorflow/compiler/dialect/tf_tensorlist/ir:tf_tensorlist_dialect",
         "//iree/base:signature_mangle",

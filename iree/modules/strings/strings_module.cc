@@ -232,7 +232,7 @@ class StringsModule final : public vm::NativeModule<StringsModuleState> {
 }  // namespace
 }  // namespace iree
 
-extern "C" iree_status_t strings_module_register_types() {
+extern "C" iree_status_t iree_strings_module_register_types() {
   if (strings_string_descriptor.type) {
     return IREE_STATUS_OK;  // Already registered.
   }
@@ -257,8 +257,8 @@ extern "C" iree_status_t strings_module_register_types() {
   return IREE_STATUS_OK;
 }
 
-extern "C" iree_status_t strings_module_create(iree_allocator_t allocator,
-                                               iree_vm_module_t** out_module) {
+extern "C" iree_status_t iree_strings_module_create(
+    iree_allocator_t allocator, iree_vm_module_t** out_module) {
   if (!out_module) return IREE_STATUS_INVALID_ARGUMENT;
   *out_module = NULL;
   auto module = std::make_unique<iree::StringsModule>(

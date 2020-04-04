@@ -26,7 +26,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace TFStrings {
+namespace tf_strings {
 
 #define GET_OP_CLASSES
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.cpp.inc"
@@ -53,6 +53,6 @@ void StringTensorToStringOp::build(Builder* builder,
   build(builder, tblgen_state, StringType::get(builder->getContext()), value);
 }
 
-}  // namespace TFStrings
+}  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir

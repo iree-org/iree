@@ -26,7 +26,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace TFStrings {
+namespace tf_strings {
 
 void populateTFStringsToHALPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns,
@@ -35,20 +35,20 @@ void populateTFStringsToHALPatterns(MLIRContext *context,
   // as we just want the simple form. If we wanted to perform additional
   // verification or have a specific use case (such as a place where only the
   // buffer is required and the shape is not) we could add our own.
-  patterns.insert<HALOpConversion<TFStrings::PrintOp, IREE::Strings::PrintOp>>(
+  patterns.insert<HALOpConversion<tf_strings::PrintOp, IREE::Strings::PrintOp>>(
       context, typeConverter);
-  patterns.insert<HALOpConversion<TFStrings::ToStringTensorOp,
+  patterns.insert<HALOpConversion<tf_strings::ToStringTensorOp,
                                   IREE::Strings::ToStringTensorOp>>(
       context, typeConverter);
-  patterns.insert<HALOpConversion<TFStrings::StringTensorToStringOp,
+  patterns.insert<HALOpConversion<tf_strings::StringTensorToStringOp,
                                   IREE::Strings::StringTensorToStringOp>>(
       context, typeConverter);
   // TODO(suderman): This should be able to handle generic IREE values.
   patterns.insert<
-      HALOpConversion<TFStrings::ToStringOp, IREE::Strings::I32ToStringOp>>(
+      HALOpConversion<tf_strings::ToStringOp, IREE::Strings::I32ToStringOp>>(
       context, typeConverter);
 }
 
-}  // namespace TFStrings
+}  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir

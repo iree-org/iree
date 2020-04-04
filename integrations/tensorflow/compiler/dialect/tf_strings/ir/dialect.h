@@ -21,7 +21,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace TFStrings {
+namespace tf_strings {
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/op_interface.h.inc"
 
@@ -35,7 +35,7 @@ class TFStringsDialect : public Dialect {
   void printType(Type type, DialectAsmPrinter& os) const override;
 };
 
-}  // namespace TFStrings
+}  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir
 

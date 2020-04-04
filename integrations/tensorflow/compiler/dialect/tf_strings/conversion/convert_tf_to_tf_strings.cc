@@ -33,6 +33,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace tf_strings {
 
 namespace {
 
@@ -41,16 +42,27 @@ namespace {
 class StringTypeConverter : public TypeConverter {
  public:
   StringTypeConverter() {
+    // Required to covert any unknown or already converted types.
+    addConversion([](Type type) { return type; });
     addConversion([](RankedTensorType type) -> Type {
       if (type.getElementType().isa<TF::StringType>()) {
-        auto elementType = TFStrings::StringType::get(type.getContext());
+        auto elementType = tf_strings::StringType::get(type.getContext());
+        // TODO(suderman): Find a better way to identify tensor<!tf.string> and
+        // !tf.string.
+        // Tensorflow only operates on tensors, so "scalar" strings are actually
+        // rank-0 tensors of strings. For now separate operating on tensors of
+        // strings and scalar strings by forcing all rank-0 tensors of strings
+        // to strings.
+        if (type.getRank() == 0) {
+          return tf_strings::StringType::get(type.getContext());
+        }
         return RankedTensorType::get(type.getShape(), elementType);
       }
 
       return type;
     });
     addConversion([](TF::StringType type) {
-      return TFStrings::StringType::get(type.getContext());
+      return tf_strings::StringType::get(type.getContext());
     });
   }
 
@@ -59,6 +71,24 @@ class StringTypeConverter : public TypeConverter {
                                    Location loc) override {
     llvm_unreachable("unhandled materialization");
     return nullptr;
+  }
+};
+
+struct StringFormatOpLowering : public OpRewritePattern<TF::StringFormatOp> {
+  using OpRewritePattern<TF::StringFormatOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(TF::StringFormatOp op,
+                                PatternRewriter &rewriter) const override {
+    auto inputs = op.inputs();
+    // TODO(suderman): Implement a variadic version. For now assume one input.
+    if (inputs.size() != 1)
+      return rewriter.notifyMatchFailure(op,
+                                         "Variadic StringFormat unsupported.");
+
+    auto input = inputs[0];
+
+    rewriter.replaceOpWithNewOp<tf_strings::StringTensorToStringOp>(op, input);
+    return success();
   }
 };
 
@@ -80,7 +110,7 @@ class LowerTensorflowToStringsPass
     ConversionTarget target(getContext());
     target.addIllegalOp<TF::AsStringOp>();
     target.addIllegalOp<TF::PrintV2Op>();
-    target.addLegalDialect<TFStrings::TFStringsDialect>();
+    target.addLegalDialect<tf_strings::TFStringsDialect>();
     target.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
       StringTypeConverter typeConverter;
       return typeConverter.isSignatureLegal(op.getType());
@@ -127,14 +157,16 @@ class LowerTensorflowToStringsPass
 void populateTFToTFStringsPatterns(MLIRContext *ctx,
                                    OwningRewritePatternList &patterns) {
   populateWithGenerated(ctx, &patterns);
+  patterns.insert<StringFormatOpLowering>(ctx);
 }
 
-std::unique_ptr<OpPassBase<ModuleOp>> createLowerTensorflowToStringsPass() {
+std::unique_ptr<OpPassBase<ModuleOp>> createConvertTfToTfStrings() {
   return std::make_unique<LowerTensorflowToStringsPass>();
 }
 
 static PassRegistration<LowerTensorflowToStringsPass> pass(
     "convert-tensorflow-to-tf-strings", "Lower tensorflow to tf-strings.");
 
+}  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir

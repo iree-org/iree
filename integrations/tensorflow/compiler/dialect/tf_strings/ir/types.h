@@ -27,7 +27,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace TFStrings {
+namespace tf_strings {
 
 namespace TFStringsTypes {
 enum Kind {
@@ -42,7 +42,7 @@ class TFStringsType : public Type {
   using Type::Type;
 
   static bool classof(Type type) {
-    return type.getKind() >= Type::FIRST_PRIVATE_EXPERIMENTAL_1_TYPE &&
+    return type.getKind() >= TFStringsTypes::FIRST_USED_STRINGS_TYPE &&
            type.getKind() <= TFStringsTypes::LAST_USED_STRINGS_TYPE;
   }
 };
@@ -57,7 +57,7 @@ class StringType : public Type::TypeBase<StringType, TFStringsType> {
   static bool kindof(unsigned kind) { return kind == TFStringsTypes::String; }
 };
 
-}  // namespace TFStrings
+}  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir
 

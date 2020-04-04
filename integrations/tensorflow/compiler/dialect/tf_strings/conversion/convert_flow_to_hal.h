@@ -24,7 +24,7 @@
 
 namespace mlir {
 namespace iree_compiler {
-namespace TFStrings {
+namespace tf_strings {
 
 // Populates conversion patterns from the tensor-based custom dialect ops to the
 // HAL buffer-based ones.
@@ -48,13 +48,13 @@ class TfStringsToHALConversionInterface : public HALConversionDialectInterface {
 
   LogicalResult convertType(Type type,
                             SmallVectorImpl<Type> &results) const override {
-    if (type.isa<TFStrings::StringType>()) {
+    if (type.isa<tf_strings::StringType>()) {
       results.push_back(IREE::Strings::StringType::get(type.getContext()));
       return success();
     }
 
     if (auto tensor = type.dyn_cast<TensorType>()) {
-      if (tensor.getElementType().isa<TFStrings::StringType>()) {
+      if (tensor.getElementType().isa<tf_strings::StringType>()) {
         results.push_back(
             IREE::Strings::StringTensorType::get(type.getContext()));
         return success();
@@ -65,7 +65,7 @@ class TfStringsToHALConversionInterface : public HALConversionDialectInterface {
   }
 };
 
-}  // namespace TFStrings
+}  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir
 

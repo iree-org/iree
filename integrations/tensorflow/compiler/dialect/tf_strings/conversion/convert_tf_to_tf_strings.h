@@ -17,14 +17,18 @@
 
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Pass/Pass.h"
 
 namespace mlir {
 namespace iree_compiler {
+namespace tf_strings {
+
+std::unique_ptr<OpPassBase<ModuleOp>> createConvertTfToTfStrings();
 
 // Adds rewrite patterns for lowering tensorflow operations to tf_strings.
 void populateTFToTFStringsPatterns(MLIRContext *ctx,
                                    OwningRewritePatternList &patterns);
-
+}  // namespace tf_strings
 }  // namespace iree_compiler
 }  // namespace mlir
 

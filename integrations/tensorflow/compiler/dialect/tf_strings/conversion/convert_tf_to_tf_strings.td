@@ -21,7 +21,7 @@ def : Pat<(TF_PrintV2Op TF_Str:$value, $unused1, $unused2),
           (TFStrings_PrintOp $value)>;
 
 def : Pat<(TF_PrintV2Op TF_StrTensor:$value, $unused1, $unused2),
-          (TFStrings_PrintOp (TFStrings_StringTensorToStringOp $value))>;
+          (TFStrings_PrintOp $value)>;
 
 def : Pat<(TF_AsStringOp $value, $u1, $u2, $u3, $u4, $u5),
           (TFStrings_ToStringTensorOp $value)>;

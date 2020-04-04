@@ -14,6 +14,7 @@
 
 #include "integrations/tensorflow/compiler/Passes.h"
 
+#include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_tf_to_tf_strings.h"
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
@@ -29,6 +30,11 @@ void createIreeTfImportPipeline(OpPassManager &pm) {
   // Lowering TensorList-related parts of tf dialect to tf_tensorlist dialect.
   ////////////////////////////////////////////////////////////////////////////
   pm.addPass(tf_tensorlist::createConvertTfToTfTensorList());
+
+  ////////////////////////////////////////////////////////////////////////////
+  // Lowering strings-related parts of tf dialect to tf_strings dialect.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(tf_strings::createConvertTfToTfStrings());
 
   ////////////////////////////////////////////////////
   // Lowering tf_saved_model dialect to IREE dialects.
