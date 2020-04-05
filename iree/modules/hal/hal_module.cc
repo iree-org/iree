@@ -590,9 +590,12 @@ class HALModuleState final {
       vm::ref<iree_hal_executable_t> executable, int32_t entry_point,
       uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
     IREE_TRACE_SCOPE0("HALModuleState::CommandBufferDispatch");
-    return reinterpret_cast<CommandBuffer*>(command_buffer.get())
-        ->Dispatch(reinterpret_cast<Executable*>(executable.get()), entry_point,
-                   {workgroup_x, workgroup_y, workgroup_z});
+    RETURN_IF_ERROR(FromApiStatus(
+        iree_hal_command_buffer_dispatch(command_buffer.get(), executable.get(),
+                                         entry_point, workgroup_x, workgroup_y,
+                                         workgroup_z),
+        IREE_LOC));
+    return OkStatus();
   }
 
   Status CommandBufferDispatchIndirect(
@@ -600,11 +603,12 @@ class HALModuleState final {
       vm::ref<iree_hal_executable_t> executable, int32_t entry_point,
       vm::ref<iree_hal_buffer_t> workgroups_buffer, int32_t workgroups_offset) {
     IREE_TRACE_SCOPE0("HALModuleState::CommandBufferDispatchIndirect");
-    return reinterpret_cast<CommandBuffer*>(command_buffer.get())
-        ->DispatchIndirect(reinterpret_cast<Executable*>(executable.get()),
-                           entry_point,
-                           reinterpret_cast<Buffer*>(workgroups_buffer.get()),
-                           workgroups_offset);
+    RETURN_IF_ERROR(
+        FromApiStatus(iree_hal_command_buffer_dispatch_indirect(
+                          command_buffer.get(), executable.get(), entry_point,
+                          workgroups_buffer.get(), workgroups_offset),
+                      IREE_LOC));
+    return OkStatus();
   }
 
   //===--------------------------------------------------------------------===//
@@ -671,6 +675,15 @@ class HALModuleState final {
   StatusOr<vm::ref<iree_hal_allocator_t>> DeviceAllocator(
       vm::ref<iree_hal_device_t> device) {
     return vm::retain_ref(iree_hal_device_allocator(device.get()));
+  }
+
+  StatusOr<int32_t> DeviceMatchID(vm::ref<iree_hal_device_t> device,
+                                  absl::string_view pattern) {
+    iree_string_view_t device_id = iree_hal_device_id(device.get());
+    return iree_string_view_match_pattern(
+               device_id, iree_string_view_t{pattern.data(), pattern.size()})
+               ? 1
+               : 0;
   }
 
   //===--------------------------------------------------------------------===//
@@ -831,6 +844,7 @@ static const vm::NativeFunction<HALModuleState> kHALModuleFunctions[] = {
 
     vm::MakeNativeFunction("device.allocator",
                            &HALModuleState::DeviceAllocator),
+    vm::MakeNativeFunction("device.match.id", &HALModuleState::DeviceMatchID),
 
     vm::MakeNativeFunction("executable_cache.create",
                            &HALModuleState::ExecutableCacheCreate),

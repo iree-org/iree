@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/HAL/hal.imports.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/ADT/TypeSwitch.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
@@ -65,7 +66,8 @@ HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
   addInterfaces<HALToVMConversionInterface>();
 
-  addAttributes<DescriptorSetLayoutBindingAttr>();
+  addAttributes<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
+                MatchAllAttr, DeviceMatchIDAttr>();
 
   addTypes<AllocatorType, BufferType, BufferViewType, CommandBufferType,
            DescriptorSetType, DescriptorSetLayoutType, DeviceType, EventType,
@@ -88,6 +90,14 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
   if (failed(parser.parseKeyword(&attrKind))) return {};
   if (attrKind == DescriptorSetLayoutBindingAttr::getKindName()) {
     return DescriptorSetLayoutBindingAttr::parse(parser);
+  } else if (attrKind == MatchAlwaysAttr::getKindName()) {
+    return MatchAlwaysAttr::parse(parser);
+  } else if (attrKind == MatchAnyAttr::getKindName()) {
+    return MatchAnyAttr::parse(parser);
+  } else if (attrKind == MatchAllAttr::getKindName()) {
+    return MatchAllAttr::parse(parser);
+  } else if (attrKind == DeviceMatchIDAttr::getKindName()) {
+    return DeviceMatchIDAttr::parse(parser);
   }
   parser.emitError(parser.getNameLoc())
       << "unknown HAL attribute: " << attrKind;
@@ -95,11 +105,12 @@ Attribute HALDialect::parseAttribute(DialectAsmParser &parser,
 }
 
 void HALDialect::printAttribute(Attribute attr, DialectAsmPrinter &p) const {
-  if (auto typedAttr = attr.dyn_cast<DescriptorSetLayoutBindingAttr>()) {
-    typedAttr.print(p);
-  } else {
-    llvm_unreachable("unhandled HAL attribute kind");
-  }
+  TypeSwitch<Attribute>(attr)
+      .Case<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
+            MatchAllAttr, DeviceMatchIDAttr>(
+          [&](auto typedAttr) { typedAttr.print(p); })
+      .Default(
+          [](Attribute) { llvm_unreachable("unhandled HAL attribute kind"); });
 }
 
 //===----------------------------------------------------------------------===//

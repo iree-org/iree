@@ -48,6 +48,16 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                    ExecutableTargetOptions executableOptions);
 
 //===----------------------------------------------------------------------===//
+// Device management
+//===----------------------------------------------------------------------===//
+
+// Outlines hal.device.switch conditions into functions and inlines conditions.
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineDeviceSwitchesPass();
+
+// Finds hal.device.query ops and creates variables initialized on startup.
+std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
+
+//===----------------------------------------------------------------------===//
 // Executable translation and optimization
 //===----------------------------------------------------------------------===//
 

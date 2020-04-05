@@ -554,6 +554,36 @@ def HAL_SemaphoreValue : NamedTupleOf<[
 }
 
 //===----------------------------------------------------------------------===//
+// Expression matching attributes
+//===----------------------------------------------------------------------===//
+
+def HAL_MatchAlwaysAttr :
+  IREE_StructAttr<"match.always", "MatchAlwaysAttr", HAL_Dialect, []> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_MatchAnyAttr :
+  IREE_StructAttr<"match.any", "MatchAnyAttr", HAL_Dialect, [
+    IREE_StructFieldAttr<"conditions", AnyAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_MatchAllAttr :
+  IREE_StructAttr<"match.all", "MatchAllAttr", HAL_Dialect, [
+    IREE_StructFieldAttr<"conditions", AnyAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+def HAL_DeviceMatchIDAttr :
+  IREE_StructAttr<"device.match.id", "DeviceMatchIDAttr", HAL_Dialect, [
+    IREE_StructFieldAttr<"pattern", StrAttr>,
+  ]> {
+  let cppNamespace = "mlir::iree_compiler::IREE::HAL";
+}
+
+//===----------------------------------------------------------------------===//
 // Base HAL op classes
 //===----------------------------------------------------------------------===//
 

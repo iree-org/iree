@@ -1317,7 +1317,137 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   ];
 }
 
+def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
+  let summary = [{runtime device switch pseudo op}];
+  let description = [{
+    Switches between multiple regions based on the runtime device type.
+    The provided regions are matched against the runtime backend of the given
+    device and executed only when the device matches the conditions.
+
+    Conditions can match on wildcards and be folded to enable conditions that
+    have similar bodies to be folded. The patterns themselves are only matched
+    once at startup and then the results are cached; the runtime overhead is
+    equivalent to a normal switch statement. In cases where the compiler can
+    statically identify the device type entire cases can be folded away.
+
+    Supported conditions:
+    * `#hal.match...`: execute the region if the expression matches.
+
+    Supported match expressions:
+    * `#hal.match.always`: always matches; useful for defaults.
+    * `#hal.match.any<[...]>`: matches if any of the nested expressions match.
+    * `#hal.match.all<[...]>`: matches only if all of the nested expressions
+      match.
+    * `#hal.device.match.id<"pattern*-?-*">`: matches against the device
+      identifier. The pattern is evaluated with standard file path wildcards
+      (`*` for zero or more characters and `?` for one character).
+
+    If more than one condition is satisfied the first listed will be chosen.
+    More specific conditions should be earlier in the set. If no condition is
+    matched but there are return values the switch will abort at runtime. It's
+    strongly recommend that all switches that return values end with a trailing
+    `#hal.match.always` condition to handle the fallthrough case.
+
+    Upon creation each condition region will have an empty entry block with the
+    specified operands available as arguments. Each region must be setup to
+    return the same types.
+
+    ```mlir
+    %c0 = constant 0 : i32
+    %c1 = constant 1 : i32
+    %c2 = constant 2 : i32
+    %device = ... : !hal.device
+    %0 = hal.device.switch(%device : !hal.device) -> i32
+      #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
+        hal.return %c1a : i32
+      },
+      #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
+        hal.return %c2a : i32
+      },
+      #hal.match.always(%c0a = %c0 : i32) {
+        hal.return %c0a : i32
+      }
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    ArrayAttr:$conditions,
+    Variadic<AnyType>:$args
+  );
+  let results = (outs
+    Variadic<AnyType>:$results
+  );
+
+  let regions = (region VariadicRegion<AnyRegion>:$condition_regions);
+
+  let extraClassDeclaration = [{
+    /// Returns the index of the args() operand in the Operation operands list.
+    unsigned mapArgOperandToOpOperand(unsigned i) { return i + 1; }
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &state, TypeRange resultTypes,
+      Value device, ArrayRef<Attribute> conditions,
+      ArrayRef<ValueRange> conditionArgs,
+      ArrayRef<NamedAttribute> attributes = {}
+    }]>,
+  ];
+
+  let verifier = [{ return verifyDeviceSwitchOp(*this); }];
+}
+
+def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
+  let summary = [{return from a hal.device.switch region}];
+  let description = [{
+    Returns the given values from the region and back to the host code.
+  }];
+
+  let arguments = (ins
+    Variadic<AnyType>:$operands
+  );
+
+  let assemblyFormat = "attr-dict ($operands^ `:` type($operands))?";
+
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result
+    }], [{
+      build(builder, result, llvm::None);
+    }]>,
+  ];
+}
+
 // TODO(benvanik): additional factory functions and submission ops.
+// TODO(benvanik): %0 = hal.device.query %device, group, property : i32/etc
+
+def HAL_DeviceMatchIDOp : HAL_PureOp<"device.match.id"> {
+  let summary = [{returns true if the device ID matches the pattern}];
+  let description = [{
+    Pattern matches the device ID with the given wildcard pattern.
+    This can be used to conditionally evaluate device-specific code when the
+    device is not known at compile-time.
+
+    ```mlir
+    %is_match = hal.device.match.id %device, pattern = ["vulkan-*"] : (!hal.device) -> i1
+    ```
+  }];
+
+  let arguments = (ins
+    HAL_Device:$device,
+    StrAttr:$pattern
+  );
+  let results = (outs
+    I1:$result
+  );
+
+  let assemblyFormat = [{
+    $device `,` `pattern` `=` `[` $pattern `]` attr-dict
+    `:` `(` type($device) `)` `->` type($result)
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // iree::hal::Executable
