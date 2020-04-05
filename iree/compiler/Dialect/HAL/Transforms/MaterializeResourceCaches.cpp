@@ -134,7 +134,7 @@ class MaterializeResourceCachesPass
     auto layoutUsage = IREE::HAL::DescriptorSetLayoutUsageType::PushOnly;
     auto layoutValue = blockBuilder.createOrFold<DescriptorSetLayoutCreateOp>(
         loc, layoutType, deviceValue, layoutUsage, bindingsAttr);
-    blockBuilder.create<ReturnOp>(loc, layoutValue);
+    blockBuilder.create<mlir::ReturnOp>(loc, layoutValue);
 
     return variableOp;
   }
@@ -189,7 +189,7 @@ class MaterializeResourceCachesPass
     }
     auto layoutValue = blockBuilder.createOrFold<ExecutableLayoutCreateOp>(
         loc, layoutType, deviceValue, setLayoutValues, pushConstantsAttr);
-    blockBuilder.create<ReturnOp>(loc, layoutValue);
+    blockBuilder.create<mlir::ReturnOp>(loc, layoutValue);
 
     return variableOp;
   }
@@ -250,7 +250,7 @@ class MaterializeResourceCachesPass
                                            executableVariableOp.sym_name());
     }
 
-    blockBuilder.create<ReturnOp>(loc, executableCacheValue);
+    blockBuilder.create<mlir::ReturnOp>(loc, executableCacheValue);
 
     return variableOp;
   }

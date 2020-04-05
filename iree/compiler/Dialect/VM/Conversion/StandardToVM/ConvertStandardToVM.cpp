@@ -146,11 +146,11 @@ class FuncOpConversion : public OpConversionPattern<FuncOp> {
   }
 };
 
-class ReturnOpConversion : public OpConversionPattern<ReturnOp> {
+class ReturnOpConversion : public OpConversionPattern<mlir::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
 
   LogicalResult matchAndRewrite(
-      ReturnOp srcOp, ArrayRef<Value> operands,
+      mlir::ReturnOp srcOp, ArrayRef<Value> operands,
       ConversionPatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<IREE::VM::ReturnOp>(srcOp, operands);
     return success();

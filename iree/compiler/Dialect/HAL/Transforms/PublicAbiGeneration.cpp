@@ -212,7 +212,7 @@ LogicalResult generateSynchronousBody(
   }
 
   // Add the return.
-  builder.create<ReturnOp>(loc, funcResults);
+  builder.create<mlir::ReturnOp>(loc, funcResults);
   return success();
 }
 

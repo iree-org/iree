@@ -126,7 +126,7 @@ bool untupleAndLookupValues(T values, llvm::SmallVectorImpl<Value> *newValues,
   return false;
 }
 
-bool convertReturnOp(ReturnOp *op, OpBuilder &builder,
+bool convertReturnOp(mlir::ReturnOp *op, OpBuilder &builder,
                      BlockAndValueMapping *mapping) {
   llvm::SmallVector<Value, 10> newOperands;
   if (untupleAndLookupValues(op->getOperands(), &newOperands, builder,
@@ -134,7 +134,7 @@ bool convertReturnOp(ReturnOp *op, OpBuilder &builder,
     return true;
   }
 
-  builder.create<ReturnOp>(op->getLoc(), newOperands);
+  builder.create<mlir::ReturnOp>(op->getLoc(), newOperands);
   return false;
 }
 
@@ -226,7 +226,7 @@ bool convertCondBranchOp(CondBranchOp *oldOp, OpBuilder &builder,
 
 bool convertOperation(Operation *op, OpBuilder &builder,
                       BlockAndValueMapping *mapping) {
-  if (auto returnOp = dyn_cast<ReturnOp>(op)) {
+  if (auto returnOp = dyn_cast<mlir::ReturnOp>(op)) {
     return convertReturnOp(&returnOp, builder, mapping);
   } else if (auto callOp = dyn_cast<CallOp>(op)) {
     return convertCallOp(&callOp, builder, mapping);

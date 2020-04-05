@@ -111,7 +111,7 @@ Optional<bool> Dispatchability::computeDispatchability(FuncOp funcOp) {
       } else if (isa<CallIndirectOp>(op)) {
         // Indirect calls are not supported and must first be devirtualized.
         return false;
-      } else if (isa<ReturnOp>(op)) {
+      } else if (isa<mlir::ReturnOp>(op)) {
         // TODO(benvanik): widen to all known terminators? sometimes they may
         // have side-effects.
         continue;

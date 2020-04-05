@@ -275,7 +275,7 @@ class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
     for (auto *op : streamOps) {
       fragmentBuilder.clone(*op, mapping);
     }
-    fragmentBuilder.create<ReturnOp>(
+    fragmentBuilder.create<IREE::Flow::ReturnOp>(
         UnknownLoc::get(context),
         llvm::to_vector<8>(llvm::map_range(fragmentResults, [&](Value value) {
           return mapping.lookup(value);

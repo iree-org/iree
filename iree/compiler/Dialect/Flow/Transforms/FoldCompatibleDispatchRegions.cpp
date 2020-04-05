@@ -39,7 +39,7 @@ namespace Flow {
 namespace {
 
 // Replaces |returnOp| with a clone including |newOperands| appended.
-LogicalResult appendReturnOperands(ReturnOp returnOp,
+LogicalResult appendReturnOperands(IREE::Flow::ReturnOp returnOp,
                                    ArrayRef<Value> newOperands) {
   // Insert prior to the original return.
   OpBuilder builder(returnOp);
@@ -49,7 +49,7 @@ LogicalResult appendReturnOperands(ReturnOp returnOp,
   operands.reserve(returnOp.getNumOperands() + newOperands.size());
   operands.append(returnOp.operand_begin(), returnOp.operand_end());
   operands.append(newOperands.begin(), newOperands.end());
-  builder.create<ReturnOp>(returnOp.getLoc(), operands);
+  builder.create<IREE::Flow::ReturnOp>(returnOp.getLoc(), operands);
 
   // Remove original.
   returnOp.erase();
@@ -100,7 +100,7 @@ DispatchRegionOp appendRegionArgsAndResults(DispatchRegionOp &regionOp,
 DispatchRegionOp removeUnusedResults(DispatchRegionOp regionOp) {
   // Find return value within the region.
   auto &regionBlock = regionOp.body().getBlocks().front();
-  auto returnOp = dyn_cast<ReturnOp>(regionBlock.getTerminator());
+  auto returnOp = dyn_cast<IREE::Flow::ReturnOp>(regionBlock.getTerminator());
   if (!returnOp) {
     regionBlock.getParent()->getParentOfType<FuncOp>().emitError()
         << "block does not contain an flow.return op";
@@ -213,7 +213,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
 
   // Find the values used as return values in the lhs.
   // We'll need to replace the uses in rhs with these.
-  auto lhsReturnOp = cast<ReturnOp>(lhsBlock.getTerminator());
+  auto lhsReturnOp = cast<IREE::Flow::ReturnOp>(lhsBlock.getTerminator());
   SmallVector<Value, 8> lhsReturnValues;
   lhsReturnValues.reserve(lhsReturnOp.getNumOperands());
   lhsReturnValues.append(lhsReturnOp.operand_begin(),
@@ -221,7 +221,7 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
 
   // Find the values used as return values in the rhs.
   // We'll add these to the results of the lhs region.
-  auto rhsReturnOp = cast<ReturnOp>(rhsBlock.getTerminator());
+  auto rhsReturnOp = cast<IREE::Flow::ReturnOp>(rhsBlock.getTerminator());
   SmallVector<Value, 8> rhsReturnValues;
   rhsReturnValues.reserve(rhsReturnOp.getNumOperands());
   rhsReturnValues.append(rhsReturnOp.operand_begin(),
