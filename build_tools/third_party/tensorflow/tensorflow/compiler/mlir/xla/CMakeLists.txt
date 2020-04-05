@@ -18,12 +18,12 @@ set(TF_MLIR_XLA_SRC_ROOT
 
 set(TF_MLIR_XLA_COPTS_BASE
   "-I${IREE_ROOT_DIR}/third_party/tensorflow/"
-  "-I${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/"
+  "-I${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/"
 )
 
 # Create directories in the build tree for external_tablegen_library targets to use.
-file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/ir")
-file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/transforms")
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/ir")
+file(MAKE_DIRECTORY "${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow/tensorflow/compiler/mlir/xla/transforms")
 
 external_cc_library(
   PACKAGE

@@ -23,7 +23,7 @@ set(IREE_CXX_STANDARD 14)
 set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
+  ${PROJECT_BINARY_DIR}
 )
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
@@ -133,9 +133,9 @@ set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
+  ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+  ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
 )
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
@@ -147,6 +147,7 @@ set(IREE_TABLEGEN_EXE iree-tblgen)
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
+  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
 )
 
 #-------------------------------------------------------------------------------
