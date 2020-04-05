@@ -20,10 +20,10 @@ include(AbseilConfigureCopts)
 
 set(IREE_CXX_STANDARD 14)
 
-set(IREE_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(IREE_ROOT_DIR ${PROJECT_SOURCE_DIR})
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}
-  ${CMAKE_CURRENT_BINARY_DIR}
+  ${PROJECT_SOURCE_DIR}
+  ${PROJECT_BINARY_DIR}
 )
 
 iree_select_compiler_opts(IREE_DEFAULT_COPTS
@@ -92,7 +92,7 @@ set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "" FORCE)
 set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_BUILD_GRPCTEST OFF CACHE BOOL "" FORCE)
 set(FLATBUFFERS_INCLUDE_DIRS
-  "${CMAKE_CURRENT_SOURCE_DIR}/third_party/flatbuffers/include/"
+  "${PROJECT_SOURCE_DIR}/third_party/flatbuffers/include/"
 )
 iree_select_compiler_opts(FLATBUFFERS_COPTS
   CLANG
@@ -132,10 +132,10 @@ set(LLVM_ENABLE_PROJECTS "mlir" CACHE STRING "" FORCE)
 set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "" FORCE)
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/llvm/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/include
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-  ${CMAKE_CURRENT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
+  ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
+  ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
+  ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
+  ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
 )
 
 set(MLIR_TABLEGEN_EXE mlir-tblgen)
@@ -146,7 +146,8 @@ set(IREE_TABLEGEN_EXE iree-tblgen)
 #-------------------------------------------------------------------------------
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tensorflow
+  ${PROJECT_SOURCE_DIR}/third_party/tensorflow
+  ${PROJECT_BINARY_DIR}/build_tools/third_party/tensorflow
 )
 
 #-------------------------------------------------------------------------------
@@ -154,5 +155,5 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
 #-------------------------------------------------------------------------------
 
 list(APPEND IREE_COMMON_INCLUDE_DIRS
-  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/google_tracing_framework/bindings/cpp/include
+  ${PROJECT_SOURCE_DIR}/third_party/google_tracing_framework/bindings/cpp/include
 )
