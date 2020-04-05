@@ -378,6 +378,7 @@ static void printGlobalOp(OpAsmPrinter &p, Operation *op) {
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), /*elidedAttrs=*/{
                                          "sym_name",
                                          "is_mutable",
+                                         "initializer",
                                          "initial_value",
                                          "type",
                                      });
