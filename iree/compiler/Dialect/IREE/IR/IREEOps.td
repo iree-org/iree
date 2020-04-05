@@ -90,4 +90,27 @@ def IREE_UnfoldableConstantOp : IREE_Op<"unfoldable_constant"> {
   let hasCanonicalizer = 1;
 }
 
+def IREE_UnreachableOp : IREE_Op<"unreachable", [NoSideEffect, Terminator]> {
+  let summary = [{unreachable assertion op}];
+  let description = [{
+    Signals to the compiler that the parent block should not be reachable.
+    This may be converted into a runtime assertion, though ideally they are
+    stripped during translation.
+
+    ```mlir
+    ^bb0:
+      %true = constant 1 : i1
+      cond_br %true, ^bb2, ^bb1
+    ^bb1:
+      // Indicates that this branch should never be taken.
+      iree.unreachable
+    ^bb2:
+      ...
+
+    ```
+  }];
+
+  let assemblyFormat = "attr-dict";
+}
+
 #endif  // IREE_DIALECT_IREE_OPS
