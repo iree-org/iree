@@ -42,6 +42,19 @@ def parse_arguments():
   return parsed_args
 
 
+# A dictionary containing source file to doc title mappings.
+#
+# By default the generated doc will have a title matching the MarkDown H1
+# header. This dictionary will overrule that default behavior.
+DOC_TITLE_DICT = {
+    'getting_started_linux_bazel.md': 'Linux with Bazel',
+    'getting_started_linux_cmake.md': 'Linux with CMake',
+    'getting_started_linux_vulkan.md': 'Linux with Vulkan',
+    'getting_started_windows_bazel.md': 'Windows with Bazel',
+    'getting_started_windows_cmake.md': 'Windows with CMake',
+    'getting_started_windows_vulkan.md': 'Windows with Vulkan',
+}
+
 # A dictionary containing source file to permanent link mappings.
 #
 # By default a source file will have a permanent URL link following its
@@ -50,6 +63,12 @@ def parse_arguments():
 # allows one to override the permanent link if necessary.
 PERMALINK_DICT = {
     'roadmap_design.md': 'DesignRoadmap',
+    'getting_started_linux_bazel.md': 'GetStarted/LinuxBazel',
+    'getting_started_linux_cmake.md': 'GetStarted/LinuxCMake',
+    'getting_started_linux_vulkan.md': 'GetStarted/LinuxVulkan',
+    'getting_started_windows_bazel.md': 'GetStarted/WindowsBazel',
+    'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
+    'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
 }
 
 # A dictionary containing source file to navigation order mappings.
@@ -59,7 +78,19 @@ PERMALINK_DICT = {
 # to specify an order for a specific doc.
 NAVI_ORDER_DICT = {
     # 'Home' is 1.
-    'roadmap_design.md': 2,
+    'roadmap_design.md': 3,
+}
+
+# A dictionary containing source directory to section tile mappings.
+#
+# To put a MarkDown file under a certain section, the front matter should
+# contain a `parent` field pointing to the section's title. By default we
+# use the subdirectory name as the section title. This allows customization.
+# Note that the title here must match with index.md file's title under the
+# subdirectory.
+DIRECTORY_TITLE_DICT = {
+    'Dialects': 'Dialect Definitions',
+    'GetStarted': 'Getting Started',
 }
 
 
@@ -110,10 +141,14 @@ def process_file(basedir, relpath, filename):
     front_matter['title'] = base_name
 
   # Override with manually specified metadata if exists.
+  if filename in DOC_TITLE_DICT:
+    front_matter['title'] = DOC_TITLE_DICT[filename]
   if filename in PERMALINK_DICT:
     front_matter['permalink'] = PERMALINK_DICT[filename]
   if filename in NAVI_ORDER_DICT:
     front_matter['nav_order'] = NAVI_ORDER_DICT[filename]
+  if relpath in DIRECTORY_TITLE_DICT:
+    front_matter['parent'] = DIRECTORY_TITLE_DICT[relpath]
 
   # Compose the content prefix for front matter.
   prefix = '\n'.join([f'{k}: {v}' for (k, v) in front_matter.items()])
@@ -121,6 +156,11 @@ def process_file(basedir, relpath, filename):
 
   # Compose the new content.
   content = '\n'.join(lines)
+
+  # Substitute a specific pattern for "Tips" used in "Getting Started" docs to
+  # make it prettier.
+  content = content.replace('> Tip:<br>\n> &nbsp;&nbsp;&nbsp;&nbsp;',
+                            '> Tip\n> {: .label .label-green }\n> ')
 
   # Update in place.
   with open(full_path, 'w') as f:

@@ -51,4 +51,12 @@ cd ${ROOT_DIR?}
 
 # Copy a curated list of docs to publish. This is expected to cover all docs
 # under docs/ after they are refreshed.
-"$CMAKE_BIN" -E copy ${ROOT_DIR}/docs/roadmap_design.md ${BUILD_DIR}/doc/
+cp docs/roadmap_design.md ${BUILD_DIR}/doc/
+
+mkdir ${BUILD_DIR}/doc/GetStarted/
+cp docs/getting_started_windows_bazel.md ${BUILD_DIR}/doc/GetStarted/
+cp docs/getting_started_windows_cmake.md ${BUILD_DIR}/doc/GetStarted/
+cp docs/getting_started_windows_vulkan.md ${BUILD_DIR}/doc/GetStarted/
+cp docs/getting_started_linux_bazel.md ${BUILD_DIR}/doc/GetStarted/
+cp docs/getting_started_linux_cmake.md ${BUILD_DIR}/doc/GetStarted/
+cp docs/getting_started_linux_vulkan.md ${BUILD_DIR}/doc/GetStarted/
