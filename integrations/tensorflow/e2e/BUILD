@@ -40,6 +40,7 @@ package(
         "fill_test",
         "control_flow_test",
         "dynamic_mlp_test",
+        "dynamic_mlp_relu_test",
         "exported_names_test",
         "tensorlist_test",
         "keras_lstm_test",
