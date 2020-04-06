@@ -62,6 +62,7 @@ iree_pybind_cc_library(
     iree::base::signature_mangle
     iree::hal::api
     iree::modules::hal
+    iree::modules::strings::strings_module
     iree::modules::tensorlist::native_module
     iree::vm
     iree::vm::bytecode_module
