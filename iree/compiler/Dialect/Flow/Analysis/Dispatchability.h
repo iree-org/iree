@@ -17,6 +17,7 @@
 
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Module.h"
+#include "mlir/Pass/AnalysisManager.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
@@ -49,6 +50,7 @@ class Dispatchability {
   // Returns true if |funcOp| is dispatchable.
   bool isDispatchable(StringRef funcName);
   bool isDispatchable(FuncOp funcOp);
+  bool isInvalidated(const AnalysisManager::PreservedAnalyses &pa);
 
  private:
   // Returns true if the given function is dispatch compatible.

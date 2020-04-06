@@ -14,6 +14,7 @@
 
 #include <utility>
 
+#include "iree/compiler/Dialect/Flow/Analysis/Dispatchability.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Utils/DispatchUtils.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -159,11 +160,18 @@ class OutlineDispatchRegionsPass
     : public OperationPass<OutlineDispatchRegionsPass, ModuleOp> {
  public:
   OutlineDispatchRegionsPass() = default;
-  OutlineDispatchRegionsPass(
-      std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps)
-      : dispatchableFuncOps_(std::move(dispatchableFuncOps)) {}
 
   void runOnOperation() override {
+    auto dispatchability = getCachedAnalysis<Dispatchability>();
+    llvm::StringMap<FuncOp> dispatchableFuncOps;
+    if (dispatchability.hasValue()) {
+      // if we do not get dispatchability from cache,
+      // we should keep dispatchableFuncOps empty to be comptaible as before
+      dispatchability.getValue().get().walkDispatchableOps([&](FuncOp funcOp) {
+        dispatchableFuncOps[funcOp.getName()] = funcOp;
+      });
+    }
+
     // TODO(benvanik): replace with a pattern rewriter?
     auto funcOps = llvm::to_vector<32>(getOperation().getOps<FuncOp>());
     for (auto funcOp : funcOps) {
@@ -173,21 +181,16 @@ class OutlineDispatchRegionsPass
           [&](DispatchRegionOp op) { dispatchRegionOps.push_back(op); });
       for (int i = 0; i < dispatchRegionOps.size(); ++i) {
         if (failed(outlineDispatchRegion(dispatchRegionOps[i], i,
-                                         *dispatchableFuncOps_))) {
+                                         dispatchableFuncOps))) {
           return signalPassFailure();
         }
       }
     }
   }
-
- private:
-  std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps_;
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass(
-    std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps) {
-  return std::make_unique<OutlineDispatchRegionsPass>(
-      std::move(dispatchableFuncOps));
+std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass() {
+  return std::make_unique<OutlineDispatchRegionsPass>();
 }
 
 static PassRegistration<OutlineDispatchRegionsPass> pass(

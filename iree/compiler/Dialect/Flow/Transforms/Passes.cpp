@@ -100,10 +100,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // First perform module-level analysis that following passes will use to query
   // per-function dispatchability information. We run this first so that it only
   // needs to run once and will be cached for all of the following passes.
-  // TODO(b/144784188): avoid this and instead rely on AnalysisManager cache.
-  auto dispatchableFuncOps = std::make_shared<llvm::StringMap<FuncOp>>();
-  passManager.addPass(
-      IREE::Flow::createDispatchabilityAnalysisPass(dispatchableFuncOps));
+  passManager.addPass(IREE::Flow::createDispatchabilityAnalysisPass());
 
   // Create all of the dispatch regions, CSE their workloads, and fold.
   passManager.addPass(IREE::Flow::createIdentifyDispatchRegionsPass());
@@ -117,8 +114,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   // Outline the dispatch regions into their own functions. This separates the
   // sequencer functions performing dispatches from the dispatchees.
-  passManager.addPass(
-      IREE::Flow::createOutlineDispatchRegionsPass(dispatchableFuncOps));
+  passManager.addPass(IREE::Flow::createOutlineDispatchRegionsPass());
 
   // Cleanup identity ops that clutter up the IR and canonicalize.
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
