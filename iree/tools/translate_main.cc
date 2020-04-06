@@ -18,6 +18,7 @@
 // options, which is missing in MLIR's translation main entry function.
 
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"

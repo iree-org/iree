@@ -58,6 +58,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
