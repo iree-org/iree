@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/FlowDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'flow' Dialect"
 ---
 

@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/CheckDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'check' Dialect"
 ---
 

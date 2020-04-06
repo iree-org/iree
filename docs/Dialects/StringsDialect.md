@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/StringsDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'strings' Dialect"
 ---
 

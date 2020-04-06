@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/VMDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'vm' Dialect"
 ---
 

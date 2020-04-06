@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/IREEDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'iree' Dialect"
 ---
 

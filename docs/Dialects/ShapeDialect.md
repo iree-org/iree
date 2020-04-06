@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/ShapeDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'shapex' Dialect"
 ---
 

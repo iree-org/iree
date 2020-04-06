@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/TensorListDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'tensorlist' Dialect"
 ---
 

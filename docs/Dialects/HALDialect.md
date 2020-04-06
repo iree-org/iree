@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/HALDialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'hal' Dialect"
 ---
 

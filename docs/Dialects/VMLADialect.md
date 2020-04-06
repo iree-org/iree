@@ -1,7 +1,7 @@
 ---
 layout: default
 permalink: Dialects/VMLADialect
-parent: Dialects
+parent: Dialect Definitions
 title: "'vmla' Dialect"
 ---
 
