@@ -106,9 +106,11 @@ $ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir -input-value
 
 ### Further Reading
 
+*   To target GPUs using Vulkan, see
+    [Getting Started on Linux with Vulkan](./getting_started_linux_vulkan.md)
+
 More documentation coming soon...
 
-<!-- TODO(scotttodd): Vulkan / other driver configuration -->
 <!-- TODO(scotttodd): Running tests -->
 <!-- TODO(scotttodd): Running samples -->
 <!-- TODO(scotttodd): "getting_started.md" equivalent for iree-translate etc. -->
