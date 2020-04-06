@@ -48,6 +48,7 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
   mlir::registerMlirDialects();
+  mlir::registerMlirPasses();
   mlir::registerPassManagerCLOptions();
 
   // Add flags for all the registered translations.
