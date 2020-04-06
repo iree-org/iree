@@ -55,7 +55,7 @@ $ .\build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
 $ bazel test iree/hal/vulkan:dynamic_symbols_test
 ```
 
-Tests in IREE's HAL "Conformence Test Suite" (CTS) actually exercise the Vulkan
+Tests in IREE's HAL "Conformance Test Suite" (CTS) actually exercise the Vulkan
 HAL, which includes checking for supported layers and extensions.
 
 Run the
