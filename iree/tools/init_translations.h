@@ -39,6 +39,6 @@ inline void registerMlirTranslations() {
   }();
   (void)init_once;
 }
-} // namespace mlir
+}  // namespace mlir
 
-#endif // IREE_TOOLS_INIT_TRANSLATIONS_H_
+#endif  // IREE_TOOLS_INIT_TRANSLATIONS_H_
