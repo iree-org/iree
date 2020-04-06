@@ -37,22 +37,18 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
         "MLIRAllDialects"
     ],
-    "@llvm-project//mlir:AffineDialectRegistration": ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRLoopToStandard"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
     "@llvm-project//mlir:GPUToSPIRVTransforms": ["MLIRGPUtoSPIRVTransforms"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
-    "@llvm-project//mlir:LinalgDialectRegistration": ["MLIRLinalgOps"],
     "@llvm-project//mlir:LLVMTransforms": ["MLIRStandardToLLVM"],
     "@llvm-project//mlir:LoopsToGPUPass": ["MLIRLoopsToGPU"],
     "@llvm-project//mlir:SPIRVDialect": ["MLIRSPIRV"],
-    "@llvm-project//mlir:SPIRVDialectRegistration": ["MLIRSPIRV"],
     "@llvm-project//mlir:SPIRVLowering": ["MLIRSPIRV", "MLIRSPIRVTransforms"],
     "@llvm-project//mlir:SPIRVTranslateRegistration": [
         "MLIRSPIRVSerialization"
     ],
-    "@llvm-project//mlir:StandardDialectRegistration": ["MLIRStandardOps"],
     "@llvm-project//mlir:StandardToSPIRVConversions": [
         "MLIRStandardToSPIRVTransforms"
     ],
