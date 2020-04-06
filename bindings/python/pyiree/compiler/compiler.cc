@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
@@ -68,6 +69,7 @@ bool LLVMOnceInit() {
 
   // Register built-in MLIR dialects.
   mlir::registerMlirDialects();
+  mlir::registerMlirPasses();
 
   // Register any pass manager command line options.
   mlir::registerPassManagerCLOptions();
