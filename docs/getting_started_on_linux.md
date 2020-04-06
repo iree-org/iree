@@ -1,7 +1,9 @@
 # Getting Started on Linux
 
 **This guide is due for an update. For Linux CMake instructions, see
-[Getting Started on Linux with CMake](getting_started_linux_cmake.md).**
+[Getting Started on Linux with CMake](getting_started_linux_cmake.md). For Linux
+Bazel instructions, see
+[Getting Started on Linux with Bazel](getting_started_linux_bazel.md).**
 
 There are many Linux variants. This document provides project-specific
 requirements for setting up your environment and should be relatively
