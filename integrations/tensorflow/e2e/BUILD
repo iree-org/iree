@@ -44,7 +44,6 @@ package(
         "tensorlist_test",
         "keras_lstm_test",
         "keras_lstm_static_test",
-        "linspace_test",
         "mandelbrot_test",
         "matrix_ops_test",
         "ring_buffer_test",
@@ -100,6 +99,7 @@ package(
     )
     for name in [
         "conv_test",
+        "linspace_test",
         "math_test",
     ]
 ]
