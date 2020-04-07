@@ -108,6 +108,8 @@ struct CanonicalizeDotGeneralOp
     // This op is a really good case for testing our e2e dynamic shape support.
     // There's interesting questions at the TF2XLA level too.
     if (!lhsType.hasStaticShape() || !rhsType.hasStaticShape()) {
+      emitWarning(op.getLoc())
+          << "unimplemented: vmla dynamic shapes for xla_hlo.dot_general";
       return failure();
     }
     xla_hlo::DotDimensionNumbers dimNumbers = op.dot_dimension_numbers();
