@@ -18,7 +18,8 @@ documented separately, as they require further setup.
 
 ### Install CMake
 
-Install CMake version >= 3.13 from https://cmake.org/download/.
+Install CMake version >= 3.13 from the
+[downloads page](https://cmake.org/download/).
 
 > Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;Your editor of choice likely has plugins for CMake,
