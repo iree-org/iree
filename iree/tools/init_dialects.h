@@ -22,6 +22,7 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
+#include "iree/compiler/Dialect/IREE/IR/IREEDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
@@ -72,6 +73,7 @@ inline void registerIreeDialects() {
     registerDialect<IREE::Flow::FlowDialect>();
     registerDialect<IREE::HAL::HALDialect>();
     registerDialect<ShapeDialect>();
+    registerDialect<IREEDialect>();
     registerDialect<IREE::VM::VMDialect>();
     registerDialect<IREE::VMLA::VMLADialect>();
     registerDialect<IREE::Vulkan::VulkanDialect>();
