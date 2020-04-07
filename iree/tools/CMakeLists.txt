@@ -85,7 +85,6 @@ iree_cc_library(
   DEPS
     MLIRAffine
     MLIRAffineTransforms
-    MLIRAnalysis
     MLIRFxpMathOps
     MLIRGPU
     MLIRGPUtoSPIRVTransforms
@@ -107,6 +106,13 @@ iree_cc_library(
     MLIRStandardToSPIRVTransforms
     MLIRTransforms
     MLIRVector
+    iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VMLA::IR::VMLADialect
+    iree::compiler::Dialect::Vulkan::IR
   PUBLIC
 )
 
