@@ -234,7 +234,6 @@ cc_library(
         "@llvm-project//mlir:LoopOpsTransforms",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:TranslateClParser",
         "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ] + IREE_COMPILER_DIALECT_MODULES + IREE_COMPILER_TARGET_BACKENDS,

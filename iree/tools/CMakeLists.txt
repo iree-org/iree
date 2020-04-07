@@ -250,7 +250,6 @@ if(${IREE_BUILD_COMPILER})
       MLIRLoopOpsTransforms
       MLIRPass
       MLIRSupport
-      MLIRTranslateClParser
       MLIRTranslation
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Translation::IREEVM
