@@ -48,11 +48,12 @@ Run the test:
 
 ```shell
 # -- CMake --
+$ set VK_LOADER_DEBUG=all
 $ cmake --build build/ --target iree_hal_vulkan_dynamic_symbols_test
 $ ./build/iree/hal/vulkan/iree_hal_vulkan_dynamic_symbols_test
 
 # -- Bazel --
-$ bazel test iree/hal/vulkan:dynamic_symbols_test
+$ bazel test iree/hal/vulkan:dynamic_symbols_test --test_env=VK_LOADER_DEBUG=all
 ```
 
 Tests in IREE's HAL "Conformance Test Suite" (CTS) actually exercise the Vulkan
@@ -63,11 +64,12 @@ Run the
 
 ```shell
 # -- CMake --
+$ set VK_LOADER_DEBUG=all
 $ cmake --build build/ --target iree_hal_cts_allocator_test
 $ ./build/iree/hal/cts/iree_hal_cts_allocator_test
 
 # -- Bazel --
-$ bazel test iree/hal/cts:allocator_test
+$ bazel test iree/hal/cts:allocator_test --test_env=VK_LOADER_DEBUG=all
 ```
 
 If these tests pass, you can skip down to the next section.
@@ -122,7 +124,6 @@ extension layer.
 Build:
 
 ```shell
-# -- Bazel --
 $ bazel build @vulkan_extensionlayer//:libVkLayer_khronos_timeline_semaphore.so @vulkan_extensionlayer//:VkLayer_khronos_timeline_semaphore_json
 ```
 
@@ -130,7 +131,6 @@ You should then also set the `VK_LAYER_PATH` environment variable to include the
 path to the built layer:
 
 ```shell
-# -- Bazel --
 $ VK_LAYER_PATH=$VK_LAYER_PATH:$PWD/bazel-bin/external/vulkan_extensionlayer/
 ```
 
@@ -138,7 +138,7 @@ $ VK_LAYER_PATH=$VK_LAYER_PATH:$PWD/bazel-bin/external/vulkan_extensionlayer/
 
 Bazel tests run in a sandbox, which environment variables may be forwarded to
 using the `--test_env` flag. A user.bazelrc file supporting each of the steps
-above looks like this (remember to substitute for the {} paths):
+above looks like this (substitute for the `{}` paths):
 
 ```
 test --test_env="LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/"
@@ -190,20 +190,6 @@ $ ./build/iree/samples/vulkan/vulkan_inference_gui
 
 # -- Bazel --
 $ bazel run iree/samples/vulkan:vulkan_inference_gui
-```
-
-## Troubleshooting
-
-If loading Vulkan fails, try running one the test or programs again with
-`VK_LOADER_DEBUG=all` set:
-
-```shell
-# -- CMake --
-$ set VK_LOADER_DEBUG=all
-$ ./build/iree/hal/vulkan/iree_hal_vulkan_dynamic_symbols_test
-
-# -- Bazel --
-$ bazel test iree/hal/vulkan:dynamic_symbols_test --test_env=VK_LOADER_DEBUG=all
 ```
 
 ## What's next?
