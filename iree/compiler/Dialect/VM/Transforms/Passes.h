@@ -62,6 +62,16 @@ createGlobalInitializationPass();
 // module.
 std::unique_ptr<OpPassBase<IREE::VM::ModuleOp>> createOrdinalAllocationPass();
 
+//===----------------------------------------------------------------------===//
+// Register all Passes
+//===----------------------------------------------------------------------===//
+
+inline void registerVMPasses() {
+  createConversionPass();
+  createGlobalInitializationPass();
+  createOrdinalAllocationPass();
+}
+
 }  // namespace VM
 }  // namespace IREE
 }  // namespace iree_compiler
