@@ -58,8 +58,6 @@ function(set_alwayslink_mlir_libs)
   set(_ALWAYSLINK_LIBS_MLIR
     # Dep tagged ALWAYSLINK for mlir-translate
     MLIRSPIRVSerialization
-    # Required IR targets
-    MLIRIR
     # Required passes
     MLIRPass
     # TODO(marbre): Check the previously added libs

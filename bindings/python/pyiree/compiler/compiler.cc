@@ -68,6 +68,7 @@ bool LLVMOnceInit() {
 
   // Register built-in MLIR dialects.
   mlir::registerMlirDialects();
+  mlir::iree_compiler::registerIreeDialects();
 
   // Register any pass manager command line options.
   mlir::registerPassManagerCLOptions();

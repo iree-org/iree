@@ -37,7 +37,6 @@ iree_cc_library(
     MLIRSideEffects
     MLIRStandardOps
     MLIRSupport
-  ALWAYSLINK
   PUBLIC
 )
 

@@ -46,7 +46,6 @@ iree_cc_library(
     MLIRSupport
     MLIRTransformUtils
     iree::compiler::Dialect::IREE::IR
-  ALWAYSLINK
   PUBLIC
 )
 
