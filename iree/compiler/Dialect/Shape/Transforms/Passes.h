@@ -58,6 +58,17 @@ std::unique_ptr<OpPassBase<FuncOp>> createConvertHLOToShapePass();
 // invariant that shape.tie_shape second operand dominates the first operand.
 std::unique_ptr<OpPassBase<FuncOp>> createHoistShapeCalculationsPass();
 
+// Register all Passes
+inline void registerShapePasses() {
+  createExpandFunctionDynamicDimsPass();
+  createExpandFunctionRankedShapeDimsPass();
+  createTieDynamicShapesPass();
+  createMaterializeShapeCalculationsPass();
+  createCleanupShapePlaceholdersPass();
+  createConvertHLOToShapePass();
+  createHoistShapeCalculationsPass();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
