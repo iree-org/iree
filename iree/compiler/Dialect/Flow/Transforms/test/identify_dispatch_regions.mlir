@@ -233,4 +233,38 @@ func @fusedDispatchWithShapes(%arg0 : tensor<?x4xf32>,
   return %4 : tensor<?x4xf32>
 }
 
+// -----
+// CHECK-LABEL: @fusedDispatchRootWithShapes
+// CHECK-SAME: %[[A0:[^:[:space:]]+]]:
+// CHECK-SAME: %[[A1:[^:[:space:]]+]]:
+// CHECK-SAME: %[[RS0:[^:[:space:]]+]]:
+// CHECK-SAME: %[[RS1:[^:[:space:]]+]]:
+// CHECK-SAME: %[[RS2:[^:[:space:]]+]]:
+func @fusedDispatchRootWithShapes(%arg0 : tensor<?x4xf32>,
+    %arg1 : tensor<4x?xf32>,
+    %rs0 : !shapex.ranked_shape<[?,4]>,
+    %rs1 : !shapex.ranked_shape<[4,?]>,
+    %rs2 : !shapex.ranked_shape<[?,?]>) -> tensor<?x?xf32> {
+  // Lead-in tie_shape should be preserved outside of the dispatch region.
+  // CHECK: %[[TS0:.+]] = shapex.tie_shape %[[A0]], %[[RS0]]
+  // CHECK: %[[TS1:.+]] = shapex.tie_shape %[[A1]], %[[RS1]]
+  // CHECK: %[[R0:.+]] = flow.dispatch.region[%[[UNUSED_WORKLOAD:.+]] : index](
+  // CHECK-SAME: {
+  // Verify that the ties are preserved (relying on outlining tested previously)
+    // CHECK-DAG: %[[DTS0:.+]] = shapex.tie_shape {{.+}}: tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
+    // CHECK-DAG: %[[DTS1:.+]] = shapex.tie_shape {{.+}}: tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+    // CHECK-DAG: %[[DR0:.+]] = "xla_hlo.dot"(%[[DTS0]], %[[DTS1]])
+    // CHECK-DAG: %[[DTS1:.+]] = shapex.tie_shape %[[DR0]], {{.+}}: tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+    // CHECK: flow.return %[[DTS1]]
+  // CHECK: }
+  // Lead-out tie_shape should be preserved.
+  // CHECK: %[[R1:.+]] = shapex.tie_shape %[[R0]], %[[RS2]]
+  // CHECK: return %[[R1]]
+  %0 = shapex.tie_shape %arg0, %rs0 : tensor<?x4xf32>, !shapex.ranked_shape<[?,4]>
+  %1 = shapex.tie_shape %arg1, %rs1 : tensor<4x?xf32>, !shapex.ranked_shape<[4,?]>
+  %2 = "xla_hlo.dot"(%0, %1) : (tensor<?x4xf32>, tensor<4x?xf32>) -> tensor<?x?xf32>
+  %3 = shapex.tie_shape %2, %rs2 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  return %3 : tensor<?x?xf32>
+}
+
 // TODO(benvanik): windowed reduction.

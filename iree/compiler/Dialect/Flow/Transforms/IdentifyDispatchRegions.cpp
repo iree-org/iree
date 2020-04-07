@@ -287,13 +287,16 @@ std::vector<Operation *> findFusionSubgraphFromRoot(
     Operation *rootOp, Dispatchability &dispatchability) {
   LLVM_DEBUG(llvm::dbgs() << "+++ FINDING FUSION SUBGRAPH FROM ROOT: "
                           << rootOp->getName() << "\n");
-  if (!isFusionRootOp(rootOp)) {
-    LLVM_DEBUG(llvm::dbgs() << "--- FUSED TO SINGLE NON-ROOT\n\n");
-    return {rootOp};
-  }
   llvm::SetVector<Operation *> subgraph;
   subgraph.insert(rootOp);
-  gatherFusionOps(rootOp, dispatchability, {}, &subgraph);
+
+  if (isFusionRootOp(rootOp)) {
+    LLVM_DEBUG(llvm::dbgs() << "--- FUSING INTO ROOT\n\n");
+    gatherFusionOps(rootOp, dispatchability, {}, &subgraph);
+  } else {
+    LLVM_DEBUG(llvm::dbgs() << "--- FUSED TO SINGLE NON-ROOT\n\n");
+  }
+
   extendInboundMetadataOps(&subgraph);
   extendOutboundMetadataOps(&subgraph);
   LLVM_DEBUG(llvm::dbgs() << "--- FUSED SUBGRAPH OF " << subgraph.size()
