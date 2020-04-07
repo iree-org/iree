@@ -99,6 +99,9 @@ struct DispatchFnImplRewritePattern : public OpRewritePattern<FuncOp> {
     FuncOp newFuncOp =
         rewriter.create<FuncOp>(funcOp.getLoc(), dispatchFnName.getValue(),
                                 funcOp.getType(), ArrayRef<NamedAttribute>{});
+    // Emit c_interface for executable invocation function.
+    newFuncOp.setAttr("llvm.emit_c_interface",
+                      mlir::UnitAttr::get(rewriter.getContext()));
     rewriter.cloneRegionBefore(funcOp.getBody(), newFuncOp.getBody(),
                                newFuncOp.end());
     // To record that this function has been processed, remove the dispatch fn
