@@ -41,7 +41,7 @@ variables through your "System Properties" or you could use a shell such as
 PowerShell or [cmder](https://cmder.net/)). Setting them through PowerShell
 would look like this:
 
-```shell
+```powershell
 > $env:BAZEL_VS = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
 > $env:USE_CLANG_CL = 1
 ```
@@ -53,7 +53,7 @@ would look like this:
 Using your shell of choice (such as PowerShell or [cmder](https://cmder.net/)),
 clone the repository and initialize its submodules:
 
-```shell
+```powershell
 > git clone https://github.com/google/iree.git
 > cd iree
 > git submodule update --init
@@ -67,7 +67,7 @@ clone the repository and initialize its submodules:
 
 Run all core tests:
 
-```shell
+```powershell
 > bazel test -k --config=windows iree/...
 ```
 
@@ -91,13 +91,13 @@ build:debug --compilation_mode=dbg --copt=/O2 --per_file_copt=iree@/Od --strip=n
 
 Build all of IREE's 'tools' directory:
 
-```shell
+```powershell
 > bazel build iree/tools/...
 ```
 
 Check out what was built:
 
-```shell
+```powershell
 > dir bazel-bin\iree\tools\
 > .\bazel-bin\iree\tools\iree-translate.exe --help
 ```
@@ -106,7 +106,7 @@ Translate a
 [MLIR file](https://github.com/google/iree/blob/master/iree/tools/test/simple.mlir)
 and execute a function in the compiled module:
 
-```shell
+```powershell
 > .\bazel-bin\iree\tools\iree-run-mlir.exe .\iree\tools\test\simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 

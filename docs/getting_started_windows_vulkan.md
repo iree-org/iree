@@ -46,13 +46,13 @@ checks if the Vulkan loader and a valid ICD are accessible.
 
 Run the test:
 
-```shell
+```powershell
 # -- CMake --
-$ cmake --build build\ --target iree_hal_vulkan_dynamic_symbols_test
-$ .\build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
+> cmake --build build\ --target iree_hal_vulkan_dynamic_symbols_test
+> .\build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
 
 # -- Bazel --
-$ bazel test iree/hal/vulkan:dynamic_symbols_test
+> bazel test iree/hal/vulkan:dynamic_symbols_test
 ```
 
 Tests in IREE's HAL "Conformance Test Suite" (CTS) actually exercise the Vulkan
@@ -61,13 +61,13 @@ HAL, which includes checking for supported layers and extensions.
 Run the
 [allocator test](https://github.com/google/iree/blob/master/iree/hal/cts/allocator_test.cc):
 
-```shell
+```powershell
 # -- CMake --
-$ cmake --build build\ --target iree_hal_cts_allocator_test
-$ .\build\iree\hal\cts\iree_hal_cts_allocator_test.exe
+> cmake --build build\ --target iree_hal_cts_allocator_test
+> .\build\iree\hal\cts\iree_hal_cts_allocator_test.exe
 
 # -- Bazel --
-$ bazel test iree/hal/cts:allocator_test
+> bazel test iree/hal/cts:allocator_test
 ```
 
 If these tests pass, you can skip down to the next section.
@@ -99,13 +99,13 @@ TODO(scotttodd): Document when Vulkan-ExtensionLayer builds for Windows
 
 Pass the flag `-iree-hal-target-backends=vulkan-spirv` to `iree-translate.exe`:
 
-```shell
+```powershell
 # -- CMake --
-$ cmake --build build\ --target iree_tools_iree-translate
-$ .\build\iree\tools\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb
+> cmake --build build\ --target iree_tools_iree-translate
+> .\build\iree\tools\iree-translate.exe -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb
 
 # -- Bazel --
-$ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb
+> bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-hal-target-backends=vulkan-spirv .\iree\tools\test\simple.mlir -o .\build\module.fb
 ```
 
 > Tip:<br>
@@ -116,26 +116,26 @@ $ bazel run iree/tools:iree-translate -- -iree-mlir-to-vm-bytecode-module -iree-
 
 Pass the flag `-driver=vulkan` to `iree-run-module.exe`:
 
-```shell
+```powershell
 # -- CMake --
-$ cmake --build build\ --target iree_tools_iree-run-module
-$ .\build\iree\tools\iree-run-module.exe -input_file=.\build\module.fb -driver=vulkan -entry_function=abs -inputs="i32=-2"
+> cmake --build build\ --target iree_tools_iree-run-module
+> .\build\iree\tools\iree-run-module.exe -input_file=.\build\module.fb -driver=vulkan -entry_function=abs -inputs="i32=-2"
 
 # -- Bazel --
-$ bazel run iree/tools:iree-run-module -- -input_file=.\build\module.fb -driver=vulkan -entry_function=abs -inputs="i32=-2"
+> bazel run iree/tools:iree-run-module -- -input_file=.\build\module.fb -driver=vulkan -entry_function=abs -inputs="i32=-2"
 ```
 
 ## Running IREE's Vulkan Samples
 
 Install the [Vulkan SDK](https://www.lunarg.com/vulkan-sdk/), then run:
 
-```shell
+```powershell
 # -- CMake --
-$ cmake --build build\ --target iree_samples_vulkan_vulkan_inference_gui
-$ .\build\iree\samples\vulkan\vulkan_inference_gui.exe
+> cmake --build build\ --target iree_samples_vulkan_vulkan_inference_gui
+> .\build\iree\samples\vulkan\vulkan_inference_gui.exe
 
 # -- Bazel --
-$ bazel run iree/samples/vulkan:vulkan_inference_gui
+> bazel run iree/samples/vulkan:vulkan_inference_gui
 ```
 
 ## Troubleshooting
@@ -143,13 +143,13 @@ $ bazel run iree/samples/vulkan:vulkan_inference_gui
 If loading Vulkan fails, try running one the test or programs again with
 `VK_LOADER_DEBUG=all` set:
 
-```shell
+```powershell
 # -- CMake --
-$ set VK_LOADER_DEBUG=all
-$ .\build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
+> set VK_LOADER_DEBUG=all
+> .\build\iree\hal\vulkan\iree_hal_vulkan_dynamic_symbols_test.exe
 
 # -- Bazel --
-$ bazel test iree/hal/vulkan:dynamic_symbols_test --test_env=VK_LOADER_DEBUG=all
+> bazel test iree/hal/vulkan:dynamic_symbols_test --test_env=VK_LOADER_DEBUG=all
 ```
 
 ## What's next?
