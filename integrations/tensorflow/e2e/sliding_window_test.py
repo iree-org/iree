@@ -77,7 +77,8 @@ class SlidingWindowM(tf.Module):
 
 # TODO(b/148495516)
 @tf_test_utils.compile_modules(
-    backends=["tf"], sw=(SlidingWindowM, ["predict"]))
+    backends=["tf", "iree_vmla", "iree_vulkan"],
+    sw=(SlidingWindowM, ["predict"]))
 class SlidingWindowTest(tf_test_utils.SavedModelTestCase):
 
   def test_slidingwindow(self):
