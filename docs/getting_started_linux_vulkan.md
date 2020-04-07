@@ -138,7 +138,7 @@ $ VK_LAYER_PATH=$VK_LAYER_PATH:$PWD/bazel-bin/external/vulkan_extensionlayer/
 
 Bazel tests run in a sandbox, which environment variables may be forwarded to
 using the `--test_env` flag. A user.bazelrc file supporting each of the steps
-above looks like this (remember to substitute for the {} paths):
+above looks like this (substitute for the `{}` paths):
 
 ```
 test --test_env="LD_LIBRARY_PATH={PATH_TO_VULKAN_SDK}/x86_64/lib/"
