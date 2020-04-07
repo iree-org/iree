@@ -457,6 +457,7 @@ extern "C" int main(int argc, char** argv) {
   }
 
   mlir::registerMlirDialects();
+  mlir::iree_compiler::registerIreeDialects();
   mlir::registerPassManagerCLOptions();
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);

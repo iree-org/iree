@@ -60,6 +60,7 @@ static llvm::cl::opt<bool> allowUnregisteredDialects(
 
 int main(int argc, char **argv) {
   mlir::registerMlirDialects();
+  mlir::iree_compiler::registerIreeDialects();
   mlir::registerMlirPasses();
   llvm::InitLLVM y(argc, argv);
 
