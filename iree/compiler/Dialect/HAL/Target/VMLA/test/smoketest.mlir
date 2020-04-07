@@ -7,7 +7,7 @@ flow.executable @simpleMath_ex_dispatch_0 {
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
       %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
-      return %arg0 : tensor<4xf32>
+      return %0 : tensor<4xf32>
     }
   }
 }
@@ -23,22 +23,23 @@ flow.executable @simpleMath_ex_dispatch_0 {
 //  CHECK-SAME:       format = 1447906369 : i32} {
 //  CHECK-NEXT:     vm.module @module {
 //  CHECK-NEXT:       vm.func @simpleMath_rgn_dispatch_0(%arg0: !vm.ref<!vmla.interface>) attributes {ordinal = 0 : i32} {
-//  CHECK-NEXT:         %zero = vm.const.i32.zero : i32
-//  CHECK-NEXT:         %c16 = vm.const.i32 16 : i32
-//  CHECK-NEXT:         %c1 = vm.const.i32 1 : i32
+//   CHECK-DAG:         %zero = vm.const.i32.zero : i32
+//   CHECK-DAG:         %c16 = vm.const.i32 16 : i32
+//   CHECK-DAG:         %c1 = vm.const.i32 1 : i32
 //  CHECK-NEXT:         %ref = vm.call @vmla.interface.binding(%arg0, %zero, %zero) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
 //  CHECK-NEXT:         %ref_0 = vm.call @vmla.buffer.view(%ref, %zero, %c16) : (!vm.ref<!vmla.buffer>, i32, i32) -> !vm.ref<!vmla.buffer>
-//  CHECK-NEXT:         %ref_1 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
-//  CHECK-NEXT:         vm.call @vmla.buffer.copy(%ref_0, %zero, %ref_1, %zero, %c16) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
+//  CHECK-NEXT:         %ref_1 = vm.call @vmla.buffer.alloc(%c16) : (i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:         vm.call @vmla.add.f32(%ref_0, %ref_0, %ref_1) : (!vm.ref<!vmla.buffer>, !vm.ref<!vmla.buffer>, !vm.ref<!vmla.buffer>) -> ()
+//  CHECK-NEXT:         %ref_2 = vm.call @vmla.interface.binding(%arg0, %zero, %c1) : (!vm.ref<!vmla.interface>, i32, i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:         vm.call @vmla.buffer.copy(%ref_1, %zero, %ref_2, %zero, %c16) : (!vm.ref<!vmla.buffer>, i32, !vm.ref<!vmla.buffer>, i32, i32) -> ()
 //  CHECK-NEXT:         vm.return
 //  CHECK-NEXT:       }
 //  CHECK-NEXT:       vm.export @simpleMath_rgn_dispatch_0 attributes {ordinal = 0 : i32}
-//  CHECK-NEXT:       vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 0 : i32, sym_visibility = "private"}
-//  CHECK-NEXT:       vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer> attributes {nosideeffects, ordinal = 1 : i32, sym_visibility = "private"}
-//  CHECK-NEXT:       vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32) attributes {ordinal = 2 : i32, sym_visibility = "private"}
-//  CHECK-NEXT:     }
-//  CHECK-NEXT:   }
-//  CHECK-NEXT: }
+//  CHECK-NEXT:       vm.import @vmla.interface.binding(%interface : !vm.ref<!vmla.interface>, %set : i32, %binding : i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:       vm.import @vmla.buffer.alloc(%byte_length : i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:       vm.import @vmla.buffer.view(%src : !vm.ref<!vmla.buffer>, %byte_offset : i32, %byte_length : i32) -> !vm.ref<!vmla.buffer>
+//  CHECK-NEXT:       vm.import @vmla.buffer.copy(%src : !vm.ref<!vmla.buffer>, %src_byte_offset : i32, %dst : !vm.ref<!vmla.buffer>, %dst_byte_offset : i32, %byte_length : i32)
+//  CHECK-NEXT:       vm.import @vmla.add.f32(%lhs : !vm.ref<!vmla.buffer>, %rhs : !vm.ref<!vmla.buffer>, %dst : !vm.ref<!vmla.buffer>)
 
 // -----
 
