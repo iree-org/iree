@@ -29,3 +29,31 @@ func @batch_norm_inference(
   // CHECK-DAG: return %[[RESULT]]
   return %0 : tensor<4x256xf32>
 }
+
+// -----
+
+// CHECK-LABEL: @maxpool
+func @maxpool(%input: tensor<1x16x16x64xf32>) -> tensor<1x8x8x64xf32> {
+  %initval = xla_hlo.constant dense<0xFF800000> : tensor<f32>
+  %zero = xla_hlo.constant dense<0.000000e+00> : tensor<f32>
+  %0 = "xla_hlo.maximum"(%input, %zero) {
+    broadcast_dimensions = dense<[]> : tensor<0xi64>
+  } : (tensor<1x16x16x64xf32>, tensor<f32>) -> tensor<1x16x16x64xf32>
+  %1 = "xla_hlo.pad"(%0, %zero)
+    {edge_padding_high = dense<[0, 1, 1, 0]> : tensor<4xi64>,
+     edge_padding_low = dense<[0, 1, 1, 0]> : tensor<4xi64>,
+     interior_padding = dense<0> : tensor<4xi64>
+  } : (tensor<1x16x16x64xf32>, tensor<f32>) -> tensor<1x18x18x64xf32>
+  //  CHECK-NOT: xla_hlo.pad
+  //      CHECK: xla_hlo.reduce_window
+  //      CHECK: padding = dense<[
+  // CHECK-SAME:                  [0, 0], [1, 1], [1, 1], [0, 0]]>
+  %2 = "xla_hlo.reduce_window"(%1, %initval) ( {
+  ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):   // no predecessors
+    %3 = xla_hlo.maximum %arg1, %arg2 : tensor<f32>
+    "xla_hlo.return"(%3) : (tensor<f32>) -> ()
+  }) {window_dimensions = dense<[1, 3, 3, 1]> : tensor<4xi64>,
+      window_strides = dense<[1, 2, 2, 1]> : tensor<4xi64>
+  } : (tensor<1x18x18x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
+  return %2 : tensor<1x8x8x64xf32>
+}
