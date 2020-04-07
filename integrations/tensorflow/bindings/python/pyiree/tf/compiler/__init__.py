@@ -73,6 +73,10 @@ TF_IMPORT_PASS_PIPELINE = (
     # IREE-specific passes to prepare TF code for IREE compilation.
     # In particular, this eliminates tf_saved_model.
     "iree-tf-import-pipeline",
+
+    # Temporary: Does some special case fixups of HLO ops with dynamic
+    # shapes until these can be done properly upstream.
+    "iree-shape-convert-hlo",
 )
 
 

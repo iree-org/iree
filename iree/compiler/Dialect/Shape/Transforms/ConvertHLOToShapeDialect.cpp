@@ -59,7 +59,8 @@ bool IsSameRankedTypeBinaryElementwiseOp(HloOpTy op) {
   return lhsType == rhsType;
 }
 
-// Converts a broadcasted binary elementwise HLO to have explicit broadcasting.
+// Converts a broadcasted binary elementwise HLO with dynamic shapes
+// to have explicit broadcasting.
 template <typename HloOpTy>
 class BroadcastedRankedBinaryElementwiseConversion
     : public OpConversionPattern<HloOpTy> {
@@ -77,6 +78,13 @@ class BroadcastedRankedBinaryElementwiseConversion
                           .template dyn_cast<RankedTensorType>();
     if (!lhsType || !rhsType || !resultType) {
       // This conversion only supports ranked.
+      return failure();
+    }
+
+    if (lhsType.hasStaticShape() && rhsType.hasStaticShape() &&
+        resultType.hasStaticShape()) {
+      // This temporary pass is only used for dynamically shaped elementwise
+      // ops.
       return failure();
     }
 

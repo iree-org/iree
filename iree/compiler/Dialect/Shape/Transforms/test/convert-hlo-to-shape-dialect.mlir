@@ -14,11 +14,3 @@ func @rankBroadcastAdd(%arg0 : tensor<?x16xf32>, %arg1 : tensor<16xf32>) -> (ten
   // CHECK-DAG: return %[[SUM]]
   return %0 : tensor<?x16xf32>
 }
-
-// -----
-// CHECK-LABEL: @implicitBroadcastAdd
-func @implicitBroadcastAdd(%arg0 : tensor<16xf32>, %arg1 : tensor<1xf32>) -> (tensor<16xf32>) {
-  // expected-error @+1 {{degenerate broadcast of same-rank operands not yet implemented}}
-  %0 = "xla_hlo.add"(%arg0, %arg1) : (tensor<16xf32>, tensor<1xf32>) -> tensor<16xf32>
-  return %0 : tensor<16xf32>
-}

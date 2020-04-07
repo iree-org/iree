@@ -27,6 +27,8 @@ void populateMaterializeDynamicShapesPipeline(OpPassManager &pm) {
   pm.addPass(createTieDynamicShapesPass());
   // Materializes shape calculations for any get_ranked_shape ops.
   pm.addPass(createMaterializeShapeCalculationsPass());
+  // Hoists various shape calculations as high as possible.
+  pm.addPass(createHoistShapeCalculationsPass());
 }
 
 static mlir::PassPipelineRegistration<> pipeline(
