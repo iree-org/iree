@@ -26,7 +26,8 @@ documented separately, as they require further setup.
 
 ### Install CMake
 
-Install CMake version >= 3.13 from https://cmake.org/download/.
+Install CMake version >= 3.13 from the
+[downloads page](https://cmake.org/download/).
 
 > Tip
 > {: .label .label-green }
@@ -51,8 +52,8 @@ Visual Studio":
     installation make sure you include "C++ Build Tools"
 *   Initialize MSVC by running `vcvarsall.bat`:
 
-    ```shell
-    $ "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+    ```powershell
+    > "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
     ```
 
 ## Clone and Build
@@ -62,10 +63,10 @@ Visual Studio":
 Using your shell of choice (such as PowerShell or [cmder](https://cmder.net/)),
 clone the repository and initialize its submodules:
 
-```shell
-$ git clone https://github.com/google/iree.git
-$ cd iree
-$ git submodule update --init
+```powershell
+> git clone https://github.com/google/iree.git
+> cd iree
+> git submodule update --init
 ```
 
 > Tip
@@ -77,8 +78,8 @@ $ git submodule update --init
 
 Configure:
 
-```shell
-$ cmake -G Ninja -B build\ .
+```powershell
+> cmake -G Ninja -B build\ .
 ```
 
 > Tip
@@ -89,8 +90,8 @@ $ cmake -G Ninja -B build\ .
 
 Build all targets:
 
-```shell
-$ cmake --build build\
+```powershell
+> cmake --build build\
 ```
 
 ## What's next?
@@ -99,17 +100,17 @@ $ cmake --build build\
 
 Check out the contents of the 'tools' build directory:
 
-```shell
-$ dir build\iree\tools
-$ .\build\iree\tools\iree-translate.exe --help
+```powershell
+> dir build\iree\tools
+> .\build\iree\tools\iree-translate.exe --help
 ```
 
 Translate a
 [MLIR file](https://github.com/google/iree/blob/master/iree/tools/test/simple.mlir)
 and execute a function in the compiled module:
 
-```shell
-$ .\build\iree\tools\iree-run-mlir.exe .\iree\tools\test\simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+```powershell
+> .\build\iree\tools\iree-run-mlir.exe .\iree\tools\test\simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
