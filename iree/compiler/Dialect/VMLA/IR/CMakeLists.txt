@@ -64,7 +64,6 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VMLA::Conversion::VMLAToVM
     iree::compiler::Dialect::VMLA::vmla_imports
-  ALWAYSLINK
   PUBLIC
 )
 
