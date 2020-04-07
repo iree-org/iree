@@ -49,6 +49,14 @@ class TensorListModule(tf.Module):
     ta = ta.unstack(t)
     return ta.read(0)
 
+  @tf.function(
+      input_signature=[tf.TensorSpec([STATIC_SIZE, STATIC_SIZE], tf.float32)])
+  def slice_first_element_with_from_tensor_high_rank(self, t):
+    ta = tf.TensorArray(
+        dtype=tf.float32, size=STATIC_SIZE, element_shape=[STATIC_SIZE])
+    ta = ta.unstack(t)
+    return ta.read(0)
+
   @tf.function(input_signature=[
       tf.TensorSpec([], tf.float32),
       tf.TensorSpec([], tf.float32)
@@ -79,6 +87,14 @@ class TensorListTest(tf_test_utils.SavedModelTestCase):
     m = self.modules.tensorlist.all
     result = m.slice_first_element_with_from_tensor(
         tf.range(STATIC_SIZE, dtype=tf.float32))
+    result.print().assert_all_close()
+
+  def test_slice_first_element_with_from_tensor_high_rank(self):
+    m = self.modules.tensorlist.all
+    result = m.slice_first_element_with_from_tensor_high_rank(
+        tf.broadcast_to(
+            tf.range(STATIC_SIZE, dtype=tf.float32),
+            [STATIC_SIZE, STATIC_SIZE]))
     result.print().assert_all_close()
 
   def test_concat_with_tensorlist_stack(self):

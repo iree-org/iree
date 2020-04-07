@@ -174,7 +174,7 @@ TEST_F(TensorListModulesTest, IdentityThroughSetItemGetItem) {
 TEST_F(TensorListModulesTest, IdentityThroughStack) {
   // Allocate the buffer we'll be passing through.
   static float kBufferContents[2] = {42.0f, 43.0f};
-  absl::InlinedVector<int32_t, 4> shape = {2};
+  absl::InlinedVector<int32_t, 4> shape = {2, 1};
   vm::ref<iree_hal_buffer_view_t> input_buffer_view;
   CreateBufferView(kBufferContents, shape, device_, &input_buffer_view);
 

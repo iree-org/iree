@@ -86,29 +86,19 @@ class TensorList final : public RefObject<TensorList> {
     absl::InlinedVector<int32_t, 6> lengths = shape;
     lengths[0] = 1;
     for (int i = 0, e = shape[0]; i < e; i++) {
-      vm::ref<iree_hal_buffer_view_t> slice_extra_rank;
-      int32_t one = 1;
-      RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_view_subview(tensor.get(), /*start_indices=*/&i,
-                                       /*indices_count=*/1,
-                                       /*lengths=*/&one, /*lengths_count=*/1,
-                                       IREE_ALLOCATOR_SYSTEM,
-                                       &slice_extra_rank),
-          IREE_LOC));
+      start_indices[0] = i;
       iree_device_size_t start_offset = 0;
       iree_device_size_t subview_length = 0;
-      RETURN_IF_ERROR(
-          FromApiStatus(iree_hal_buffer_view_compute_range(
-                            slice_extra_rank.get(), start_indices.data(),
-                            start_indices.size(), lengths.data(),
-                            lengths.size(), &start_offset, &subview_length),
-                        IREE_LOC));
-
+      RETURN_IF_ERROR(FromApiStatus(
+          iree_hal_buffer_view_compute_range(
+              tensor.get(), start_indices.data(), start_indices.size(),
+              lengths.data(), lengths.size(), &start_offset, &subview_length),
+          IREE_LOC));
       vm::ref<iree_hal_buffer_t> subview_buffer;
       RETURN_IF_ERROR(FromApiStatus(
-          iree_hal_buffer_subspan(
-              iree_hal_buffer_view_buffer(slice_extra_rank.get()), start_offset,
-              subview_length, IREE_ALLOCATOR_SYSTEM, &subview_buffer),
+          iree_hal_buffer_subspan(iree_hal_buffer_view_buffer(tensor.get()),
+                                  start_offset, subview_length,
+                                  IREE_ALLOCATOR_SYSTEM, &subview_buffer),
           IREE_LOC));
 
       iree_hal_buffer_view_t* slice = nullptr;
