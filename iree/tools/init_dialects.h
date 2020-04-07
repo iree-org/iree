@@ -28,7 +28,6 @@
 #include "iree/compiler/Dialect/VMLA/IR/VMLADialect.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/FxpMathOps/FxpMathOps.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -47,7 +46,6 @@ namespace mlir {
 inline void registerMlirDialects() {
   static bool init_once = []() {
     registerDialect<AffineDialect>();
-    registerDialect<fxpmath::FxpMathOpsDialect>();
     registerDialect<gpu::GPUDialect>();
     registerDialect<LLVM::LLVMDialect>();
     registerDialect<linalg::LinalgDialect>();

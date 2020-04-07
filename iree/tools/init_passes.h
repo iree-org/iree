@@ -28,13 +28,11 @@
 #include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/Affine/Passes.h"
-#include "mlir/Dialect/FxpMathOps/Passes.h"
 #include "mlir/Dialect/GPU/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/LoopOps/Passes.h"
 #include "mlir/Dialect/Quant/Passes.h"
 #include "mlir/Dialect/SPIRV/Passes.h"
-#include "mlir/Quantizer/Transforms/Passes.h"
 #include "mlir/Transforms/LocationSnapshot.h"
 #include "mlir/Transforms/Passes.h"
 
@@ -126,10 +124,6 @@ inline void registerMlirPasses() {
   createSymbolDCEPass();
   createLocationSnapshotPass({});
 
-  // Fxp
-  fxpmath::createLowerUniformRealMathPass();
-  fxpmath::createLowerUniformCastsPass();
-
   // GPU
   createGpuKernelOutliningPass();
   createSimpleLoopsToGPUPass(0, 0);
@@ -152,9 +146,6 @@ inline void registerMlirPasses() {
   // Quant
   quant::createConvertSimulatedQuantPass();
   quant::createConvertConstPass();
-  quantizer::createAddDefaultStatsPass();
-  quantizer::createRemoveInstrumentationPass();
-  quantizer::createInferQuantizedTypesPass();
 
   // SPIR-V
   spirv::createLowerABIAttributesPass();
