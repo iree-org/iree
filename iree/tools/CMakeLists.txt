@@ -85,7 +85,6 @@ iree_cc_library(
   DEPS
     MLIRAffine
     MLIRAffineTransforms
-    MLIRFxpMathOps
     MLIRGPU
     MLIRGPUtoSPIRVTransforms
     MLIRIR
@@ -98,7 +97,6 @@ iree_cc_library(
     MLIRLoopOpsTransforms
     MLIRLoopsToGPU
     MLIRQuant
-    MLIRQuantizerTransforms
     MLIRSDBM
     MLIRSPIRV
     MLIRSPIRVTransforms
