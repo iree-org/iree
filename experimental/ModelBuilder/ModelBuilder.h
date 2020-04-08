@@ -141,7 +141,17 @@ class ModelBuilder : public OpBuilder {
   // This is used as a region builder when constructing e.g. a pointwise op.
   static Value fusedBiasTanh(ValueHandle x, ValueHandle bias);
 
+  // ---------------------------------------------------------------------------
+  // Support for emitting special function calls.
+  // ---------------------------------------------------------------------------
+  static ValueHandle call_tanhf(Value v);
+
  protected:
+  // Helper function to support calling into known functions (e.g. libmath).
+  static Operation *emitCallToRegisteredSymbol(StringRef functionName,
+                                               ArrayRef<Type> returnTypes,
+                                               ValueRange values);
+
   static thread_local MLIRContext ctx;
   mlir::OwningModuleRef module;
   mlir::SymbolTable symbolTable;

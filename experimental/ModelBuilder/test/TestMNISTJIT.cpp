@@ -195,9 +195,13 @@ int main() {
                                      llvm::MutableArrayRef<void *>{args});
 
   // 6. Dump content of output buffer for testing with FileCheck.
-  if (!error)
-    ::impl::printMemRef(
-        *static_cast<StridedMemRefType<float, 2> *>(outputBuffer->descriptor));
+  if (error) {
+    runner.module->dump();
+    llvm::errs() << "ERROR: " << error << "\n";
+    return 1;
+  }
+  ::impl::printMemRef(
+      *static_cast<StridedMemRefType<float, 2> *>(outputBuffer->descriptor));
 }
 
 // For now, we can only dump the IR for `test_mnist_jit_tensors`.

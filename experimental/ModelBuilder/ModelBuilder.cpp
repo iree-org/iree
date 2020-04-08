@@ -76,10 +76,10 @@ RankedTensorType mlir::ModelBuilder::getRankedTensorType(
 Value mlir::ModelBuilder::fusedBiasTanh(ValueHandle x, ValueHandle bias) {
   using edsc::op::operator+;
   using edsc::op::operator*;
-  using edsc::intrinsics::std_tanh;
+  using edsc::intrinsics::std_call;
   assert(x.getType().isF32() && bias.getType().isF32() && "f32 expected");
   ValueHandle half(constant_f32(0.5f));
-  return x + half * std_tanh((x + bias) * half) + half;
+  return x + half * call_tanhf((x + bias) * half) + half;
 }
 
 ValueHandle mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
@@ -131,4 +131,31 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
   return linalg_generic_pointwise(fusedBiasTanh, o2({i, j}), bias({j}),
                                   o3Type({i, j}))
       ->getResult(0);
+}
+
+ValueHandle ModelBuilder::call_tanhf(Value v) {
+  assert(v.getType().isF32() && "f32 expected");
+  return ValueHandle(
+      emitCallToRegisteredSymbol("tanhf", v.getType(), v)->getResult(0));
+}
+
+Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
+                                                    ArrayRef<Type> returnTypes,
+                                                    ValueRange values) {
+  auto &builder = ScopedContext::getBuilder();
+  auto funcOp =
+      builder.getInsertionBlock()->getParent()->getParentOfType<FuncOp>();
+  Operation *func = SymbolTable::lookupNearestSymbolFrom(funcOp, functionName);
+  if (!func) {
+    OpBuilder::InsertionGuard insertGuard(builder);
+    auto module = funcOp.getParentOfType<ModuleOp>();
+    builder.setInsertionPointToStart(module.getBody());
+    func = builder.create<FuncOp>(
+        module.getLoc(), functionName,
+        FunctionType::get(SmallVector<Type, 4>(values.getTypes()), returnTypes,
+                          builder.getContext()),
+        ArrayRef<NamedAttribute>{});
+  }
+  return std_call(builder.getSymbolRefAttr(func), returnTypes, values)
+      .getOperation();
 }
