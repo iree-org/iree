@@ -33,6 +33,10 @@ def CHECK_ExpectTrueOp : Op<CHECK_Dialect, "expect_true"> {
     any non-zero integer.
 
     Issues a non-fatal failure if the verification fails.
+
+    ```mlir
+    check.expect_true(%arg0) : i32
+    ```
   }];
 
   let arguments = (ins AnySignlessInteger:$operand);
@@ -48,6 +52,10 @@ def CHECK_ExpectFalseOp : Op<CHECK_Dialect, "expect_false"> {
     zero.
 
     Issues a non-fatal failure if the verification fails.
+
+    ```mlir
+    check.expect_false(%arg0) : i32
+    ```
   }];
 
   let arguments = (ins AnySignlessInteger:$operand);
@@ -62,6 +70,11 @@ def CHECK_ExpectAllTrueOp : Op<CHECK_Dialect, "expect_all_true"> {
     non-zero integer.
 
     Issues a non-fatal failure if the verification fails.
+
+    ```mlir
+    check.expect_all_true(%arg0) : !hal.buffer_view
+    check.expect_all_true(%arg1) : tensor<2x2xi32>
+    ```
   }];
 
   let arguments =
@@ -77,6 +90,10 @@ def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
     Verifies that the operands are exactly equal.
 
     Issues a non-fatal failure if the verification fails.
+
+    ```mlir
+    check.expect_eq(%arg0, %arg1) : tensor<5xi32>
+    ```
   }];
 
   let arguments = (ins
@@ -96,6 +113,10 @@ def CHECK_ExpectEqConstOp :
     Issues a non-fatal failure if the verification fails.
 
     This op is just a convenience wrapper around the expect_eq op.
+
+    ```mlir
+    check.expect_eq_const(%arg0, dense<[1, 2]> : tensor<2xi32>) : tensor<2xi32>
+    ```
   }];
 
   let arguments = (ins
@@ -116,6 +137,10 @@ def CHECK_ExpectAlmostEqOp :
     almost equal to within an implementation-defined "reasonable" tolerance.
 
     Issues a non-fatal failure if the verification fails.
+
+    ```mlir
+    check.expect_almost_eq(%arg0, %arg1) : tensor<5xf32>
+    ```
   }];
 
   let arguments = (ins
@@ -137,6 +162,10 @@ def CHECK_ExpectAlmostEqConstOp :
     Issues a non-fatal failure if the verification fails.
 
     This op is just a convenience wrapper around the expect_almost_eq op.
+
+    ```mlir
+    check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>) : tensor<5xf32>
+    ```
   }];
 
   let arguments = (ins
