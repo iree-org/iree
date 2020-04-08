@@ -39,6 +39,7 @@ cc_library(
         ":check_ops_gen",
         "//iree/compiler/Dialect/HAL/IR",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:StandardOps",
     ],
 )
 

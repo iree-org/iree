@@ -34,10 +34,22 @@ func @expect_eq() attributes { iree.module.export } {
   return
 }
 
+func @expect_eq_const() attributes { iree.module.export } {
+  %const0 = iree.unfoldable_constant dense<[1, 2, 3, 4, 5]> : tensor<5xi32>
+  check.expect_eq_const(%const0, dense<[1, 2, 3, 4, 5]> : tensor<5xi32>) : tensor<5xi32>
+  return
+}
+
 func @expect_almost_eq() attributes { iree.module.export } {
   %const0 = iree.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
   %const1 = iree.unfoldable_constant dense<[0.999999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
   check.expect_almost_eq(%const0, %const1) : tensor<5xf32>
+  return
+}
+
+func @expect_almost_eq_const() attributes { iree.module.export } {
+  %const0 = iree.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
+  check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>) : tensor<5xf32>
   return
 }
 

@@ -87,7 +87,29 @@ def CHECK_ExpectEqOp : Op<CHECK_Dialect, "expect_eq", [SameTypeOperands]> {
   let assemblyFormat = "`(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)";
 }
 
-def CHECK_ExpectAlmostEqOp : Op<CHECK_Dialect, "expect_almost_eq", [SameTypeOperands]> {
+def CHECK_ExpectEqConstOp :
+    Op<CHECK_Dialect, "expect_eq_const", [AllTypesMatch<["lhs", "value"]>]> {
+  let summary = [{Checks that the tensor operand is equal to some constant}];
+  let description =  [{
+    Verifies that the tensor operand is exactly equal to a constant attribute.
+
+    Issues a non-fatal failure if the verification fails.
+
+    This op is just a convenience wrapper around the expect_eq op.
+  }];
+
+  let arguments = (ins
+    AnyTensor:$lhs,
+    ElementsAttr:$value
+  );
+
+  let hasCanonicalizer = 1;
+
+  let assemblyFormat = "`(` $lhs `,` $value `)` attr-dict `:` type($lhs)";
+}
+
+def CHECK_ExpectAlmostEqOp :
+    Op<CHECK_Dialect, "expect_almost_eq", [SameTypeOperands]> {
   let summary = [{Checks that the operands are almost equal}];
   let description = [{
     Verifies that the buffer view or tensor operands with float elements are
@@ -102,6 +124,29 @@ def CHECK_ExpectAlmostEqOp : Op<CHECK_Dialect, "expect_almost_eq", [SameTypeOper
   );
 
   let assemblyFormat = "`(` $lhs `,` $rhs `)` attr-dict `:` type($lhs)";
+}
+
+def CHECK_ExpectAlmostEqConstOp :
+    Op<CHECK_Dialect,
+       "expect_almost_eq_const", [AllTypesMatch<["lhs", "value"]>]> {
+  let summary = [{Checks that the tensor operand is almost equal to some constant}];
+  let description =  [{
+    Verifies that the tensor operand with float elements is almost equal to the
+    constant attribute within an implementation-defined "reasonable" tolerance.
+
+    Issues a non-fatal failure if the verification fails.
+
+    This op is just a convenience wrapper around the expect_almost_eq op.
+  }];
+
+  let arguments = (ins
+    TensorOf<[AnyFloat]>:$lhs,
+    ElementsAttr:$value
+  );
+
+  let hasCanonicalizer = 1;
+
+  let assemblyFormat = "`(` $lhs `,` $value `)` attr-dict `:` type($lhs)";
 }
 
 #endif  // IREE_MODULES_CHECK_DIALECT_CHECK_OPS

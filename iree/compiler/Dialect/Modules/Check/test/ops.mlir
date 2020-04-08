@@ -1,17 +1,3 @@
-// Copyright 2020 Google LLC
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      https://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
 // Tests the printing/parsing of the Check dialect ops.
 
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
@@ -78,6 +64,18 @@ func @expect_eq_tensor(%lhs : tensor<2x2xi32>, %rhs : tensor<2x2xi32>) {
 
 // -----
 
+// CHECK-LABEL: @expect_eq_const
+// CHECK-SAME: [[LHS:%[a-zA-Z0-9]+]]
+func @expect_eq_const(%lhs : tensor<2x2xi32>) {
+  // TODO(b/146898896) The attribute type should get elided, but the declarative
+  // parser type inference doesn't support this yet.
+  // CHECK: check.expect_eq_const([[LHS]], dense<1> : tensor<2x2xi32>) : tensor<2x2xi32>
+  check.expect_eq_const(%lhs, dense<1> : tensor<2x2xi32>) : tensor<2x2xi32>
+  return
+}
+
+// -----
+
 // CHECK-LABEL: @expect_almost_eq
 // CHECK-SAME: [[LHS:%[a-zA-Z0-9]+]]
 // CHECK-SAME: [[RHS:%[a-zA-Z0-9]+]]
@@ -97,3 +95,16 @@ func @expect_almost_eq_tensor(%lhs : tensor<2x2xf32>, %rhs : tensor<2x2xf32>) {
   check.expect_almost_eq(%lhs, %rhs) : tensor<2x2xf32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: @expect_almost_eq_const
+// CHECK-SAME: [[LHS:%[a-zA-Z0-9]+]]
+func @expect_almost_eq_const(%lhs : tensor<2x2xf32>) {
+  // TODO(b/146898896) The attribute type should get elided, but the declarative
+  // parser type inference doesn't support this yet.
+  // CHECK: check.expect_almost_eq_const([[LHS]], dense<1.000000e+00> : tensor<2x2xf32>) : tensor<2x2xf32>
+  check.expect_almost_eq_const(%lhs, dense<1.0> : tensor<2x2xf32>) : tensor<2x2xf32>
+  return
+}
+
