@@ -39,6 +39,36 @@ Issues a non-fatal failure if the verification fails.
 | :-----: | ----------- |
 `operand` | buffer_view or tensor of signless integer values
 
+### `check.expect_almost_eq_const` (IREE::Check::ExpectAlmostEqConstOp)
+
+Checks that the tensor operand is almost equal to some constant
+
+Syntax:
+
+```
+operation ::= `check.expect_almost_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+```
+
+
+Verifies that the tensor operand with float elements is almost equal to the
+constant attribute within an implementation-defined "reasonable" tolerance.
+
+Issues a non-fatal failure if the verification fails.
+
+This op is just a convenience wrapper around the expect_almost_eq op.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`value` | ElementsAttr | constant vector/tensor attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | tensor of floating-point values
+
 ### `check.expect_almost_eq` (IREE::Check::ExpectAlmostEqOp)
 
 Checks that the operands are almost equal
@@ -61,6 +91,35 @@ Issues a non-fatal failure if the verification fails.
 | :-----: | ----------- |
 `lhs` | buffer_view or tensor of floating-point values
 `rhs` | buffer_view or tensor of floating-point values
+
+### `check.expect_eq_const` (IREE::Check::ExpectEqConstOp)
+
+Checks that the tensor operand is equal to some constant
+
+Syntax:
+
+```
+operation ::= `check.expect_eq_const` `(` $lhs `,` $value `)` attr-dict `:` type($lhs)
+```
+
+
+Verifies that the tensor operand is exactly equal to a constant attribute.
+
+Issues a non-fatal failure if the verification fails.
+
+This op is just a convenience wrapper around the expect_eq op.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`value` | ElementsAttr | constant vector/tensor attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`lhs` | tensor of any type values
 
 ### `check.expect_eq` (IREE::Check::ExpectEqOp)
 
