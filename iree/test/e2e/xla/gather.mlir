@@ -23,5 +23,5 @@ module {
     } : (tensor<5x1x5xi32>, tensor<i64>) -> tensor<1x5xi32>
     return %res : tensor<1x5xi32>
   }
-  // CHECK 1x5xi32=[11 12 13 14 15]
+  // CHECK: 1x5xi32=[11 12 13 14 15]
 }

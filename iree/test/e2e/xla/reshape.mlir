@@ -16,4 +16,4 @@ func @reshape_1D_3D(%arg : tensor<12xf32>) -> tensor<2x2x3xf32> {
   %result = "xla_hlo.reshape"(%arg) : (tensor<12xf32>) -> tensor<2x2x3xf32>
   return %result : tensor<2x2x3xf32>
 }
-// CHECK 2x2x3xf32=\[[1 2 3][4 5 6]]\[[7 8 9][10 11 12]]
+// CHECK: 2x2x3xf32={{\[\[}}1 2 3][4 5 6]]{{\[\[}}7 8 9][10 11 12]]

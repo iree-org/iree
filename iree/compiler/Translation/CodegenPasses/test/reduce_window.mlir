@@ -61,7 +61,7 @@ module {
   func @reduce_window_cst(%arg0: memref<1x18x18x64xf32>, %arg1: memref<1x8x8x64xf32>)
   attributes {iree.dispatch_fn_name = ""} {
     %0 = iree.load_input(%arg0 : memref<1x18x18x64xf32>) : tensor<1x18x18x64xf32>
-    // CHECK constant {{.*}} : f32
+    // CHECK: constant {{.*}} : f32
     %cst = constant dense<0.0> : tensor<f32>
     // CHECK: linalg.pooling_sum
     %1 = "xla_hlo.reduce_window"(%0, %cst) ( {
