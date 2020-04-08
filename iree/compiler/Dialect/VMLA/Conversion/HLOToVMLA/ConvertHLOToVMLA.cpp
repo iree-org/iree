@@ -514,6 +514,8 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::AbsOp, IREE::VMLA::AbsOp>>(
       context, typeConverter);
+  patterns.insert<VMLAOpConversion<xla_hlo::NegOp, IREE::VMLA::NegOp>>(
+      context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::MaxOp, IREE::VMLA::MaxOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::MinOp, IREE::VMLA::MinOp>>(
