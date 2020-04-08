@@ -72,7 +72,6 @@ EXPLICIT_TARGET_MAPPING = {
     "@vulkan_sdk//:sdk": ["Vulkan::Vulkan"],
     # Misc single targets
     "@com_google_benchmark//:benchmark": ["benchmark"],
-    "@com_google_benchmark//:benchmark:benchmark_main": ["benchmark_main"],
     "@com_github_google_flatbuffers//:flatbuffers": ["flatbuffers"],
     "@com_google_googletest//:gtest": ["gmock", "gtest"],
     "@renderdoc_api//:renderdoc_app": ["renderdoc_api::renderdoc_app"],
