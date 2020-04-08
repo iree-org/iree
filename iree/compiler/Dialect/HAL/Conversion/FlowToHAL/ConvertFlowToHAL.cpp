@@ -66,7 +66,7 @@ namespace {
 
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
 class ConvertFlowToHALPass
-    : public OperationPass<ConvertFlowToHALPass, ModuleOp> {
+    : public PassWrapper<ConvertFlowToHALPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     auto *context = &getContext();
@@ -113,7 +113,7 @@ class ConvertFlowToHALPass
 
 }  // namespace
 
-std::unique_ptr<OpPassBase<ModuleOp>> createConvertFlowToHALPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createConvertFlowToHALPass() {
   return std::make_unique<ConvertFlowToHALPass>();  // NOLINT
 }
 

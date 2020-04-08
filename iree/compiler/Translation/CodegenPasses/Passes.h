@@ -43,21 +43,21 @@ void addHLOToLinalgOnBuffersPasses(OpPassManager &pm);
 
 /// Creates a pass to convert HAL interface on tensors to HAL interface on
 /// memrefs.
-std::unique_ptr<OpPassBase<IREE::Flow::ExecutableOp>>
+std::unique_ptr<OperationPass<IREE::Flow::ExecutableOp>>
 createHALInterfaceToMemrefPass();
 
 /// Creates XLA-HLO preprocessing transformation pass.
-std::unique_ptr<OpPassBase<FuncOp>> createHLOPreprocessingPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
 
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
-std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnBuffersPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
 
 /// Creates XLA-HLO to Linalg on tensors transformation pass.
-std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnTensorsPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass();
 
 /// Fuses linalg operations on tensors in dispatch function. For now does only
 /// producer consumer fusion.
-std::unique_ptr<OpPassBase<FuncOp>> createLinalgOnTensorsFusionPass();
+std::unique_ptr<OperationPass<FuncOp>> createLinalgOnTensorsFusionPass();
 
 /// Populates the patterns that convert from XLA to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.

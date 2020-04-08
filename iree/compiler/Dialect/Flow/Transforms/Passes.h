@@ -49,28 +49,28 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager);
 //===----------------------------------------------------------------------===//
 
 // Flattens tuple values in function signatures and blocks.
-std::unique_ptr<OpPassBase<ModuleOp>> createFlattenTuplesInCFGPass();
+std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass();
 
 // Legalizes the input types to those supported by the flow dialect.
 // This will fail if types that cannot be supported at all are present, however
 // conditionally supported types (based on availability, etc) may still be
 // allowed to pass through successfully.
-std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeInputTypesPass();
+std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass();
 
 /// Creates XLA-HLO preprocessing transformation pass. In this pass we should
 /// have all xla_hlo -> xla_hlo transformations that are shared between all
 /// backends.
-std::unique_ptr<OpPassBase<FuncOp>> createHLOPreprocessingPass();
+std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
 
 // Runs pre-partitioning conversion passes to convert to the flow dialect.
 // This converts some input ops directly to flow ops when doing so has a
 // benefit. Other ops are left unmodified and will be outlined later on.
-std::unique_ptr<OpPassBase<FuncOp>> createPrePartitioningConversionPass();
+std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass();
 
 // Runs post-partitioning conversion passes to legalize the flow dialect.
 // This converts any leftover ops that did not already get converted or outlined
 // to dispatch regions.
-std::unique_ptr<OpPassBase<FuncOp>> createPostPartitioningConversionPass();
+std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass();
 
 // Materializes reflection metadata on exported function arguments and results.
 // This runs as close to the input processing as possible as it needs to
@@ -78,13 +78,13 @@ std::unique_ptr<OpPassBase<FuncOp>> createPostPartitioningConversionPass();
 // Note that this does not combine the argument and result metadata into top
 // level function metadata. That happens late in transformation, as additional
 // synthetic arguments and results may still need to be added.
-std::unique_ptr<OpPassBase<FuncOp>> createMaterializeExportedReflection();
+std::unique_ptr<OperationPass<FuncOp>> createMaterializeExportedReflection();
 
 // Merges f_partial argument and result reflection metadata into a function
 // level signature. This should be run late once all synthetic arguments have
 // been added and no further exported function signature changes are
 // expected.
-std::unique_ptr<OpPassBase<FuncOp>> createMergeExportedReflection();
+std::unique_ptr<OperationPass<FuncOp>> createMergeExportedReflection();
 
 //===----------------------------------------------------------------------===//
 // Dispatches (flow.dispatch.region)
@@ -93,20 +93,22 @@ std::unique_ptr<OpPassBase<FuncOp>> createMergeExportedReflection();
 // Analyzes a module to identify which functions are dispatchable.
 // This information is cached on the module and is used by other FuncOp-scoped
 // passes to quickly access the module-level dispatchability information.
-std::unique_ptr<OpPassBase<ModuleOp>> createDispatchabilityAnalysisPass();
+std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass();
 
 // Identifies dispatchable regions of functions and wraps them in
 // flow.dispatch_regions.
-std::unique_ptr<OpPassBase<FuncOp>> createIdentifyDispatchRegionsPass();
+std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegionsPass();
 
 // Folds multiple dispatch regions together that have compatible workloads.
-std::unique_ptr<OpPassBase<FuncOp>> createFoldCompatibleDispatchRegionsPass();
+std::unique_ptr<OperationPass<FuncOp>>
+createFoldCompatibleDispatchRegionsPass();
 
 // Rematerializes small previously-CSE'd constants into dispatch regions.
-std::unique_ptr<OpPassBase<FuncOp>> createRematerializeDispatchConstantsPass();
+std::unique_ptr<OperationPass<FuncOp>>
+createRematerializeDispatchConstantsPass();
 
 // Outlines dispatch regions into executables.
-std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass();
 
 //===----------------------------------------------------------------------===//
 // Optimizations
@@ -120,7 +122,7 @@ std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass();
 //===----------------------------------------------------------------------===//
 
 // Identifies dispatches that can be grouped into streams within functions.
-std::unique_ptr<OpPassBase<FuncOp>> createFormStreamsPass();
+std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass();
 
 // TODO(benvanik): cross-function stream flows.
 

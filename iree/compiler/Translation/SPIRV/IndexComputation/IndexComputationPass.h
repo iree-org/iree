@@ -26,7 +26,7 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Pass to perform index computation on a dispatch function
-std::unique_ptr<OpPassBase<FuncOp>> createIndexComputationPass();
+std::unique_ptr<OperationPass<FuncOp>> createIndexComputationPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

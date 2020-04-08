@@ -195,7 +195,7 @@ LogicalResult rematerializeConstantInDispatchRegions(ConstantOp constantOp) {
 // already, but if that isn't the case then this pass can be extended to do
 // that.
 class RematerializeDispatchConstantsPass
-    : public FunctionPass<RematerializeDispatchConstantsPass> {
+    : public PassWrapper<RematerializeDispatchConstantsPass, FunctionPass> {
  public:
   void runOnFunction() override {
     for (auto &block : getFunction()) {
@@ -216,7 +216,8 @@ class RematerializeDispatchConstantsPass
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createRematerializeDispatchConstantsPass() {
+std::unique_ptr<OperationPass<FuncOp>>
+createRematerializeDispatchConstantsPass() {
   return std::make_unique<RematerializeDispatchConstantsPass>();
 }
 

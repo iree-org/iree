@@ -29,12 +29,12 @@ namespace iree_compiler {
 //
 // This pass should be run before adopting the exports, which transitions to
 // a module that does not have `tf_saved_model.semantics`.
-std::unique_ptr<OpPassBase<ModuleOp>> createTFSavedModelLowerGlobalTensors();
+std::unique_ptr<OperationPass<ModuleOp>> createTFSavedModelLowerGlobalTensors();
 
 // In a module tagged with `tf_saved_model.semantics`, lowers any tf_saved_model
 // exported functions to IREE exported functions with appropriate reflection
 // metadata.
-std::unique_ptr<OpPassBase<ModuleOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createTFSavedModelLowerExportedFunctions();
 
 // Create a single pipeline that will run all the needed IREE-specific TF import

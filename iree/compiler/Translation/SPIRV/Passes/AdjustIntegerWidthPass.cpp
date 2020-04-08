@@ -35,7 +35,8 @@ namespace {
 /// 2) Legalize !spv.array containing i1 type to !spv.array of i32 types.
 /// 1) Legalize 8-bit integer values to 32-bit integers values.
 /// TODO(b/144743561): Use Int8 capability after it is well-supported.
-struct AdjustIntegerWidthPass : public OperationPass<AdjustIntegerWidthPass> {
+struct AdjustIntegerWidthPass
+    : public PassWrapper<AdjustIntegerWidthPass, OperationPass<>> {
   void runOnOperation() override;
 };
 

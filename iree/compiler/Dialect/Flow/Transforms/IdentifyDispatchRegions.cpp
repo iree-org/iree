@@ -359,7 +359,7 @@ LogicalResult identifyBlockDispatchRegions(Block *block,
 // Identifies dispatchable ops and moves them into dispatch regions.
 // Some ops, such as call, will be deferred until following passes.
 class IdentifyDispatchRegionsPass
-    : public FunctionPass<IdentifyDispatchRegionsPass> {
+    : public PassWrapper<IdentifyDispatchRegionsPass, FunctionPass> {
  public:
   void runOnFunction() override {
     // NOTE: we require the DispatchabilityAnalysisPass to have run first.
@@ -380,7 +380,7 @@ class IdentifyDispatchRegionsPass
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createIdentifyDispatchRegionsPass() {
+std::unique_ptr<OperationPass<FuncOp>> createIdentifyDispatchRegionsPass() {
   return std::make_unique<IdentifyDispatchRegionsPass>();
 }
 

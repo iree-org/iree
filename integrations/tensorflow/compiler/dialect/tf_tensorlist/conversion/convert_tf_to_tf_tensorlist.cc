@@ -25,7 +25,7 @@ namespace tf_tensorlist {
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.inc"
 
 class ConvertTfToTfTensorList
-    : public OperationPass<ConvertTfToTfTensorList, FuncOp> {
+    : public PassWrapper<ConvertTfToTfTensorList, OperationPass<FuncOp>> {
  public:
   void runOnOperation() override;
 };
@@ -130,7 +130,7 @@ void ConvertTfToTfTensorList::runOnOperation() {
 static PassRegistration<ConvertTfToTfTensorList> pass(
     "convert-tf-to-tf_tensorlist", "Convert to more precise types");
 
-std::unique_ptr<OpPassBase<FuncOp>> createConvertTfToTfTensorList() {
+std::unique_ptr<OperationPass<FuncOp>> createConvertTfToTfTensorList() {
   return std::make_unique<ConvertTfToTfTensorList>();
 }
 

@@ -32,7 +32,7 @@ namespace HAL {
 static llvm::StringSet<> excludedBackends = {"llvm-ir"};
 
 class TranslateExecutablesPass
-    : public OperationPass<TranslateExecutablesPass, ModuleOp> {
+    : public PassWrapper<TranslateExecutablesPass, OperationPass<ModuleOp>> {
  public:
   TranslateExecutablesPass()
       : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
@@ -104,7 +104,7 @@ class TranslateExecutablesPass
   ExecutableTargetOptions executableOptions_;
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createTranslateExecutablesPass(
+std::unique_ptr<OperationPass<ModuleOp>> createTranslateExecutablesPass(
     ExecutableTargetOptions executableOptions) {
   return std::make_unique<TranslateExecutablesPass>(
       executableOptions);  // NOLINT

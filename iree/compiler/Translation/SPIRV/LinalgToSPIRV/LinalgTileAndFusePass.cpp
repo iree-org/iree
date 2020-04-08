@@ -101,7 +101,8 @@ static bool hasMarker(Operation *op, StringRef marker) {
 
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
-struct LinalgTileAndFusePass : public FunctionPass<LinalgTileAndFusePass> {
+struct LinalgTileAndFusePass
+    : public PassWrapper<LinalgTileAndFusePass, FunctionPass> {
   LinalgTileAndFusePass(ArrayRef<int64_t> workGroupSize = {})
       : workGroupSize(workGroupSize.begin(), workGroupSize.end()) {}
   void runOnFunction() override;
@@ -285,7 +286,7 @@ void LinalgTileAndFusePass::runOnFunction() {
     return signalPassFailure();
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createLinalgTileAndFusePass(
+std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
     ArrayRef<int64_t> workGroupSize) {
   return std::make_unique<LinalgTileAndFusePass>(workGroupSize);
 }

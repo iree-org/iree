@@ -26,7 +26,7 @@ namespace IREE {
 namespace Flow {
 
 class MergeExportedReflectionPass
-    : public FunctionPass<MergeExportedReflectionPass> {
+    : public PassWrapper<MergeExportedReflectionPass, FunctionPass> {
   void runOnFunction() override {
     auto func = getFunction();
     Builder builder(&getContext());
@@ -115,7 +115,7 @@ class MergeExportedReflectionPass
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createMergeExportedReflection() {
+std::unique_ptr<OperationPass<FuncOp>> createMergeExportedReflection() {
   return std::make_unique<MergeExportedReflectionPass>();
 }
 

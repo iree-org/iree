@@ -80,7 +80,8 @@ struct CallOpConversion : OpConversionPattern<CallOp> {
 
 /// Pass to convert from HAL tensor interface to HAL memref interface.
 struct HALInterfaceToMemrefPass
-    : public OperationPass<HALInterfaceToMemrefPass, IREE::Flow::ExecutableOp> {
+    : public PassWrapper<HALInterfaceToMemrefPass,
+                         OperationPass<IREE::Flow::ExecutableOp>> {
   void runOnOperation() override;
 };
 }  // namespace
@@ -402,7 +403,7 @@ void HALInterfaceToMemrefPass::runOnOperation() {
     return signalPassFailure();
 }
 
-std::unique_ptr<OpPassBase<IREE::Flow::ExecutableOp>>
+std::unique_ptr<OperationPass<IREE::Flow::ExecutableOp>>
 createHALInterfaceToMemrefPass() {
   return std::make_unique<HALInterfaceToMemrefPass>();
 }

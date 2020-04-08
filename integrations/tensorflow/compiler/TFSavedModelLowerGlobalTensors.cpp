@@ -155,7 +155,8 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
 }
 
 class TFSavedModelLowerGlobalTensors
-    : public OperationPass<TFSavedModelLowerGlobalTensors, ModuleOp> {
+    : public PassWrapper<TFSavedModelLowerGlobalTensors,
+                         OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     if (failed(importTfSavedModelGlobalTensorsToIREEFlow(getOperation()))) {
@@ -164,7 +165,8 @@ class TFSavedModelLowerGlobalTensors
   }
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createTFSavedModelLowerGlobalTensors() {
+std::unique_ptr<OperationPass<ModuleOp>>
+createTFSavedModelLowerGlobalTensors() {
   return std::make_unique<TFSavedModelLowerGlobalTensors>();
 }
 

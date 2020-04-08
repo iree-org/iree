@@ -21,7 +21,8 @@ namespace mlir {
 namespace iree_compiler {
 
 class ValueLivenessTestPass
-    : public OperationPass<ValueLivenessTestPass, IREE::VM::FuncOp> {
+    : public PassWrapper<ValueLivenessTestPass,
+                         OperationPass<IREE::VM::FuncOp>> {
  public:
   void runOnOperation() override {
     if (failed(ValueLiveness::annotateIR(getOperation()))) {

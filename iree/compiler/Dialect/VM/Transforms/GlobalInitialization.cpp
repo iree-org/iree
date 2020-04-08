@@ -42,7 +42,7 @@ namespace VM {
 // TODO(benvanik): add initializer functions to make dialect init possible.
 // TODO(benvanik): combine i32 initializers to store more efficiently.
 class GlobalInitializationPass
-    : public OperationPass<GlobalInitializationPass, ModuleOp> {
+    : public PassWrapper<GlobalInitializationPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     // Create the __init and __deinit functions. They may be empty if there are
@@ -130,7 +130,7 @@ class GlobalInitializationPass
   }
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createGlobalInitializationPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createGlobalInitializationPass() {
   return std::make_unique<GlobalInitializationPass>();
 }
 

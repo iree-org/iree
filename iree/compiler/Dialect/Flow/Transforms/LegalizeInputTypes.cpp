@@ -180,7 +180,7 @@ LogicalResult convertRegion(Region &oldRegion, Region &newRegion,
 }  // namespace
 
 class LegalizeInputTypesPass
-    : public OperationPass<LegalizeInputTypesPass, ModuleOp> {
+    : public PassWrapper<LegalizeInputTypesPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     auto moduleOp = getOperation();
@@ -223,7 +223,7 @@ class LegalizeInputTypesPass
   }
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createLegalizeInputTypesPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createLegalizeInputTypesPass() {
   return std::make_unique<LegalizeInputTypesPass>();
 }
 

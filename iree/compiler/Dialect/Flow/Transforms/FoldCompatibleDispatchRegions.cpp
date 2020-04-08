@@ -357,7 +357,7 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
 // This relies on CSE having deduped workloads to simplify the logic to simply
 // looking for dispatch regions using the same values.
 class FoldCompatibleDispatchRegionsPass
-    : public FunctionPass<FoldCompatibleDispatchRegionsPass> {
+    : public PassWrapper<FoldCompatibleDispatchRegionsPass, FunctionPass> {
  public:
   void runOnFunction() override {
     auto func = getFunction();
@@ -369,7 +369,8 @@ class FoldCompatibleDispatchRegionsPass
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createFoldCompatibleDispatchRegionsPass() {
+std::unique_ptr<OperationPass<FuncOp>>
+createFoldCompatibleDispatchRegionsPass() {
   return std::make_unique<FoldCompatibleDispatchRegionsPass>();
 }
 

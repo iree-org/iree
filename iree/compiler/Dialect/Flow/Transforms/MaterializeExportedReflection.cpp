@@ -118,7 +118,7 @@ StringAttr unrecognizedTypeAttr(Builder builder, char tag) {
 }  // namespace
 
 class MaterializeExportedReflectionPass
-    : public FunctionPass<MaterializeExportedReflectionPass> {
+    : public PassWrapper<MaterializeExportedReflectionPass, FunctionPass> {
   void runOnFunction() override {
     auto func = getFunction();
     auto funcType = func.getType();
@@ -162,7 +162,7 @@ class MaterializeExportedReflectionPass
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createMaterializeExportedReflection() {
+std::unique_ptr<OperationPass<FuncOp>> createMaterializeExportedReflection() {
   return std::make_unique<MaterializeExportedReflectionPass>();
 }
 

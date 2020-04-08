@@ -28,7 +28,7 @@ namespace iree_compiler {
 
 /// Generates a spirv::ModuleOp from the module within an IREE Executable with
 /// target-config vulkan-spirv.
-std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass();
+std::unique_ptr<OperationPass<ModuleOp>> createIREEToSPIRVPass();
 
 /// Adds all the passes needed to lower dispatch function to SPIR-V
 void addIREEToSPIRVPasses(OpPassManager &conversionPassManager);

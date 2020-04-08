@@ -19,7 +19,7 @@
 
 namespace mlir {
 namespace tf_tensorlist {
-std::unique_ptr<OpPassBase<FuncOp>> createConvertTfToTfTensorList();
+std::unique_ptr<OperationPass<FuncOp>> createConvertTfToTfTensorList();
 }
 }  // namespace mlir
 #endif

@@ -741,7 +741,7 @@ struct LinalgOpOnTensorConversion
 
 namespace {
 struct XLAToLinalgOnBuffersPass
-    : public FunctionPass<XLAToLinalgOnBuffersPass> {
+    : public PassWrapper<XLAToLinalgOnBuffersPass, FunctionPass> {
   void runOnFunction() override;
 };
 }  // namespace
@@ -774,7 +774,7 @@ void XLAToLinalgOnBuffersPass::runOnFunction() {
     return signalPassFailure();
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnBuffersPass() {
+std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass() {
   return std::make_unique<XLAToLinalgOnBuffersPass>();
 }
 

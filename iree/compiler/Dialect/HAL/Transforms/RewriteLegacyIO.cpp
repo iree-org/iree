@@ -93,7 +93,8 @@ static void makeLegacyExecutableDispatchABI(
 }
 
 class RewriteLegacyIOPass
-    : public OperationPass<RewriteLegacyIOPass, IREE::Flow::ExecutableOp> {
+    : public PassWrapper<RewriteLegacyIOPass,
+                         OperationPass<IREE::Flow::ExecutableOp>> {
  public:
   void runOnOperation() override {
     auto executableOp = getOperation();
@@ -116,7 +117,7 @@ class RewriteLegacyIOPass
   }
 };
 
-std::unique_ptr<OpPassBase<IREE::Flow::ExecutableOp>>
+std::unique_ptr<OperationPass<IREE::Flow::ExecutableOp>>
 createRewriteLegacyIOPass() {
   return std::make_unique<RewriteLegacyIOPass>();
 }

@@ -40,7 +40,7 @@ namespace VM {
 // related to each other and global data accessed in proximity should be
 // clustered together to make use of paging in memory mapped files.
 class OrdinalAllocationPass
-    : public OperationPass<OrdinalAllocationPass, ModuleOp> {
+    : public PassWrapper<OrdinalAllocationPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     Builder builder(&getContext());
@@ -96,7 +96,7 @@ class OrdinalAllocationPass
   }
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createOrdinalAllocationPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createOrdinalAllocationPass() {
   return std::make_unique<OrdinalAllocationPass>();
 }
 

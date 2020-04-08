@@ -69,7 +69,7 @@ bool isLegallyShapedFunction(FuncOp fnOp) {
 }
 
 class ExpandFunctionDynamicDimsPass
-    : public FunctionPass<ExpandFunctionDynamicDimsPass> {
+    : public PassWrapper<ExpandFunctionDynamicDimsPass, FunctionPass> {
   void runOnFunction() override {
     auto funcOp = getFunction();
     auto &typeExpander = getDynamicShapeTypeExpander();
@@ -83,7 +83,7 @@ class ExpandFunctionDynamicDimsPass
 };
 
 class ExpandFunctionRankedShapeDimsPass
-    : public FunctionPass<ExpandFunctionRankedShapeDimsPass> {
+    : public PassWrapper<ExpandFunctionRankedShapeDimsPass, FunctionPass> {
   void runOnFunction() override {
     auto funcOp = getFunction();
     auto &typeExpander = getShapeToPrimitiveTypeExpander();
@@ -101,14 +101,15 @@ class ExpandFunctionRankedShapeDimsPass
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OpPassBase<FuncOp>> createExpandFunctionDynamicDimsPass() {
+std::unique_ptr<OperationPass<FuncOp>> createExpandFunctionDynamicDimsPass() {
   return std::make_unique<Shape::ExpandFunctionDynamicDimsPass>();
 }
 
 // For any function which contains ranked_shape argument/result types,
 // expands them to individual dynamic dimensions, inserting appropriate casts
 // within the function.
-std::unique_ptr<OpPassBase<FuncOp>> createExpandFunctionRankedShapeDimsPass() {
+std::unique_ptr<OperationPass<FuncOp>>
+createExpandFunctionRankedShapeDimsPass() {
   return std::make_unique<Shape::ExpandFunctionRankedShapeDimsPass>();
 }
 

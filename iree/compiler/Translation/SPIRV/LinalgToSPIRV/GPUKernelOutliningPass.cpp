@@ -47,7 +47,7 @@ struct ConvertToGPUFuncOp : public OpRewritePattern<gpu::LaunchOp> {
 
 // Pass to outline the region of the gpu.LaunchOp.
 class IREEGpuKernelOutliningPass
-    : public OperationPass<IREEGpuKernelOutliningPass, ModuleOp> {
+    : public PassWrapper<IREEGpuKernelOutliningPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override;
 };
@@ -114,7 +114,7 @@ void IREEGpuKernelOutliningPass::runOnOperation() {
   applyPatternsGreedily(moduleOp.getOperation(), patterns);
 }
 
-std::unique_ptr<OpPassBase<ModuleOp>> createIREEGpuKernelOutliningPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createIREEGpuKernelOutliningPass() {
   return std::make_unique<IREEGpuKernelOutliningPass>();
 }
 }  // namespace iree_compiler

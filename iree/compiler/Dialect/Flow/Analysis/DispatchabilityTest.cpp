@@ -20,7 +20,7 @@ namespace mlir {
 namespace iree_compiler {
 
 class DispatchabilityTestPass
-    : public OperationPass<DispatchabilityTestPass, ModuleOp> {
+    : public PassWrapper<DispatchabilityTestPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     if (failed(Dispatchability::annotateIR(getOperation()))) {

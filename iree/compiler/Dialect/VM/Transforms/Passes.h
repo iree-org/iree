@@ -47,7 +47,7 @@ void buildVMTransformPassPipeline(OpPassManager &passManager);
 //===----------------------------------------------------------------------===//
 
 // Converts from various dialects (standard, HAL, etc) to the VM dialect.
-std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 
 //===----------------------------------------------------------------------===//
 // Module Analysis and Assignment
@@ -55,12 +55,13 @@ std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass();
 
 // Gathers all module-level global init/deinit functions into single locations
 // such that the runtime can init/deinit everything at once.
-std::unique_ptr<OpPassBase<IREE::VM::ModuleOp>>
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
 createGlobalInitializationPass();
 
 // Assigns module-unique ordinals to function/global/etc symbols within the
 // module.
-std::unique_ptr<OpPassBase<IREE::VM::ModuleOp>> createOrdinalAllocationPass();
+std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
+createOrdinalAllocationPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

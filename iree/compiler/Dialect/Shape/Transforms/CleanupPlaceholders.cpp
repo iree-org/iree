@@ -35,7 +35,7 @@ class CleanupTieShapePattern : public OpRewritePattern<Shape::TieShapeOp> {
 };
 
 class CleanupShapePlaceholdersPass
-    : public FunctionPass<CleanupShapePlaceholdersPass> {
+    : public PassWrapper<CleanupShapePlaceholdersPass, FunctionPass> {
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     patterns.insert<CleanupTieShapePattern>(&getContext());
@@ -48,7 +48,7 @@ class CleanupShapePlaceholdersPass
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OpPassBase<FuncOp>> createCleanupShapePlaceholdersPass() {
+std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass() {
   return std::make_unique<Shape::CleanupShapePlaceholdersPass>();
 }
 

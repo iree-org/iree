@@ -93,7 +93,8 @@ struct StringFormatOpLowering : public OpRewritePattern<TF::StringFormatOp> {
 };
 
 class LowerTensorflowToStringsPass
-    : public OperationPass<LowerTensorflowToStringsPass, ModuleOp> {
+    : public PassWrapper<LowerTensorflowToStringsPass,
+                         OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     if (failed(run())) {
@@ -160,7 +161,7 @@ void populateTFToTFStringsPatterns(MLIRContext *ctx,
   patterns.insert<StringFormatOpLowering>(ctx);
 }
 
-std::unique_ptr<OpPassBase<ModuleOp>> createConvertTfToTfStrings() {
+std::unique_ptr<OperationPass<ModuleOp>> createConvertTfToTfStrings() {
   return std::make_unique<LowerTensorflowToStringsPass>();
 }
 

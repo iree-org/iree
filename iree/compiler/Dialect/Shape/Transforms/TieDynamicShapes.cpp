@@ -26,7 +26,8 @@ namespace Shape {
 
 namespace {
 
-class TieDynamicShapesPass : public FunctionPass<TieDynamicShapesPass> {
+class TieDynamicShapesPass
+    : public PassWrapper<TieDynamicShapesPass, FunctionPass> {
   void runOnFunction() override {
     getFunction().walk([&](Operation *nestedOp) {
       for (auto result : nestedOp->getResults()) {
@@ -67,7 +68,7 @@ class TieDynamicShapesPass : public FunctionPass<TieDynamicShapesPass> {
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OpPassBase<FuncOp>> createTieDynamicShapesPass() {
+std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass() {
   return std::make_unique<Shape::TieDynamicShapesPass>();
 }
 

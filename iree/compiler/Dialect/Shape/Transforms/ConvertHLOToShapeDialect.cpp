@@ -143,7 +143,8 @@ class BroadcastedRankedBinaryElementwiseConversion
   }
 };
 
-class ConvertHLOToShapePass : public FunctionPass<ConvertHLOToShapePass> {
+class ConvertHLOToShapePass
+    : public PassWrapper<ConvertHLOToShapePass, FunctionPass> {
   void runOnFunction() override {
     ConversionTarget conversionTarget(getContext());
     OwningRewritePatternList conversionPatterns;
@@ -184,7 +185,7 @@ class ConvertHLOToShapePass : public FunctionPass<ConvertHLOToShapePass> {
 
 // Converts shape-sensitive HLOs to be based on facilities in the shape
 // dialect.
-std::unique_ptr<OpPassBase<FuncOp>> createConvertHLOToShapePass() {
+std::unique_ptr<OperationPass<FuncOp>> createConvertHLOToShapePass() {
   return std::make_unique<Shape::ConvertHLOToShapePass>();
 }
 

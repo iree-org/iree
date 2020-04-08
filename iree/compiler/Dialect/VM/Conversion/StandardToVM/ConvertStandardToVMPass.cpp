@@ -27,7 +27,7 @@ namespace {
 // A pass converting MLIR Standard operations into the IREE VM dialect.
 // Used only for testing as in the common case we only rely on rewrite patterns.
 class ConvertStandardToVMPass
-    : public OperationPass<ConvertStandardToVMPass, ModuleOp> {
+    : public PassWrapper<ConvertStandardToVMPass, OperationPass<ModuleOp>> {
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.addLegalDialect<IREE::VM::VMDialect>();

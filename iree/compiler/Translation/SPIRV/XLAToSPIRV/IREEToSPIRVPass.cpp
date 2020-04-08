@@ -41,7 +41,8 @@ namespace mlir {
 namespace iree_compiler {
 
 namespace {
-class IREEToSPIRVPass : public OperationPass<IREEToSPIRVPass, ModuleOp> {
+class IREEToSPIRVPass
+    : public PassWrapper<IREEToSPIRVPass, OperationPass<ModuleOp>> {
   void runOnOperation() override;
 };
 }  // namespace
@@ -170,7 +171,7 @@ void IREEToSPIRVPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OpPassBase<ModuleOp>> createIREEToSPIRVPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createIREEToSPIRVPass() {
   return std::make_unique<IREEToSPIRVPass>();
 }
 

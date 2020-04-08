@@ -32,31 +32,32 @@ void populateMaterializeDynamicShapesPipeline(OpPassManager &pm);
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OpPassBase<FuncOp>> createExpandFunctionDynamicDimsPass();
+std::unique_ptr<OperationPass<FuncOp>> createExpandFunctionDynamicDimsPass();
 
 // For any function which contains ranked_shape argument/result types,
 // expands them to individual dynamic dimensions, inserting appropriate casts
 // within the function.
-std::unique_ptr<OpPassBase<FuncOp>> createExpandFunctionRankedShapeDimsPass();
+std::unique_ptr<OperationPass<FuncOp>>
+createExpandFunctionRankedShapeDimsPass();
 
 // For any dynamically shaped edges in a function, introduces an appropriate
 // get_ranked_shape and corresponding tie_shape op to make the association.
-std::unique_ptr<OpPassBase<FuncOp>> createTieDynamicShapesPass();
+std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass();
 
 // Materializes shape calculations for any get_ranked_shape ops.
-std::unique_ptr<OpPassBase<FuncOp>> createMaterializeShapeCalculationsPass();
+std::unique_ptr<OperationPass<FuncOp>> createMaterializeShapeCalculationsPass();
 
 // Cleans up any unnecessary shape placeholder ops. Can be run after all
 // shape calculation code has been lowered.
-std::unique_ptr<OpPassBase<FuncOp>> createCleanupShapePlaceholdersPass();
+std::unique_ptr<OperationPass<FuncOp>> createCleanupShapePlaceholdersPass();
 
 // Converts shape-sensitive HLOs to be based on facilities in the shape
 // dialect.
-std::unique_ptr<OpPassBase<FuncOp>> createConvertHLOToShapePass();
+std::unique_ptr<OperationPass<FuncOp>> createConvertHLOToShapePass();
 
 // Best-effort hoisting of shape calculations to attempt to establish the
 // invariant that shape.tie_shape second operand dominates the first operand.
-std::unique_ptr<OpPassBase<FuncOp>> createHoistShapeCalculationsPass();
+std::unique_ptr<OperationPass<FuncOp>> createHoistShapeCalculationsPass();
 
 // Register all Passes
 inline void registerShapePasses() {

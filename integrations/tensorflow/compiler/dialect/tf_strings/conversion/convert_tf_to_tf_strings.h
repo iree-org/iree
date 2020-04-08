@@ -23,7 +23,7 @@ namespace mlir {
 namespace iree_compiler {
 namespace tf_strings {
 
-std::unique_ptr<OpPassBase<ModuleOp>> createConvertTfToTfStrings();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertTfToTfStrings();
 
 // Adds rewrite patterns for lowering tensorflow operations to tf_strings.
 void populateTFToTFStringsPatterns(MLIRContext *ctx,

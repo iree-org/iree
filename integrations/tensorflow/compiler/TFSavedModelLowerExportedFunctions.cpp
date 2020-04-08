@@ -62,7 +62,8 @@ LogicalResult setRawSignatureIndex(FuncOp funcOp, SipSignatureMangler &mangler,
 }  // namespace
 
 class TFSavedModelLowerExportedFunctions
-    : public OperationPass<TFSavedModelLowerExportedFunctions, ModuleOp> {
+    : public PassWrapper<TFSavedModelLowerExportedFunctions,
+                         OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     if (failed(run())) {
@@ -163,7 +164,7 @@ class TFSavedModelLowerExportedFunctions
   }
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createTFSavedModelLowerExportedFunctions() {
   return std::make_unique<TFSavedModelLowerExportedFunctions>();
 }

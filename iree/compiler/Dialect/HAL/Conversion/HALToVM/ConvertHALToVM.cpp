@@ -87,7 +87,8 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 namespace {
 
 // A pass converting the IREE flow dialect into the IREE HAL dialect.
-class ConvertHALToVMPass : public OperationPass<ConvertHALToVMPass, ModuleOp> {
+class ConvertHALToVMPass
+    : public PassWrapper<ConvertHALToVMPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     auto *context = &getContext();
@@ -120,7 +121,7 @@ class ConvertHALToVMPass : public OperationPass<ConvertHALToVMPass, ModuleOp> {
 
 }  // namespace
 
-std::unique_ptr<OpPassBase<ModuleOp>> createConvertHALToVMPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createConvertHALToVMPass() {
   return std::make_unique<ConvertHALToVMPass>();  // NOLINT
 }
 

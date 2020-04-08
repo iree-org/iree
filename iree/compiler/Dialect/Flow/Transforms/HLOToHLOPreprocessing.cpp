@@ -194,7 +194,8 @@ class FoldPadIntoMaxPool : public OpRewritePattern<xla_hlo::ReduceWindowOp> {
   }
 };
 
-struct HLOToHLOPreprocessing : public FunctionPass<HLOToHLOPreprocessing> {
+struct HLOToHLOPreprocessing
+    : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     ConversionTarget conversionTarget(*context);
@@ -218,7 +219,7 @@ struct HLOToHLOPreprocessing : public FunctionPass<HLOToHLOPreprocessing> {
 
 }  // namespace
 
-std::unique_ptr<OpPassBase<FuncOp>> createHLOPreprocessingPass() {
+std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass() {
   return std::make_unique<HLOToHLOPreprocessing>();
 }
 

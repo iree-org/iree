@@ -29,7 +29,8 @@ namespace iree_compiler {
 
 namespace {
 
-class IndexComputationPass : public FunctionPass<IndexComputationPass> {
+class IndexComputationPass
+    : public PassWrapper<IndexComputationPass, FunctionPass> {
   void runOnFunction() override;
 };
 
@@ -116,7 +117,7 @@ void IndexComputationPass::runOnFunction() {
   }
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createIndexComputationPass() {
+std::unique_ptr<OperationPass<FuncOp>> createIndexComputationPass() {
   return std::make_unique<IndexComputationPass>();
 }
 static PassRegistration<IndexComputationPass> pass(

@@ -157,7 +157,7 @@ LogicalResult outlineDispatchRegion(
 }  // namespace
 
 class OutlineDispatchRegionsPass
-    : public OperationPass<OutlineDispatchRegionsPass, ModuleOp> {
+    : public PassWrapper<OutlineDispatchRegionsPass, OperationPass<ModuleOp>> {
  public:
   OutlineDispatchRegionsPass() = default;
 
@@ -189,7 +189,7 @@ class OutlineDispatchRegionsPass
   }
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createOutlineDispatchRegionsPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createOutlineDispatchRegionsPass() {
   return std::make_unique<OutlineDispatchRegionsPass>();
 }
 

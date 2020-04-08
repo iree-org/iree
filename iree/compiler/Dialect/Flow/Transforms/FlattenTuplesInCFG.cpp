@@ -284,7 +284,7 @@ bool convertFunction(FuncOp oldFunction, FuncOp newFunction) {
 }
 
 class FlattenTuplesInCFGPass
-    : public OperationPass<FlattenTuplesInCFGPass, ModuleOp> {
+    : public PassWrapper<FlattenTuplesInCFGPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     auto module = getOperation();
@@ -326,7 +326,7 @@ class FlattenTuplesInCFGPass
 
 }  // namespace
 
-std::unique_ptr<OpPassBase<ModuleOp>> createFlattenTuplesInCFGPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createFlattenTuplesInCFGPass() {
   return std::make_unique<FlattenTuplesInCFGPass>();
 }
 

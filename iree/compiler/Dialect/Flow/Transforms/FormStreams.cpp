@@ -70,7 +70,7 @@ static void expandFragmentToPrimitiveTypes(ExStreamFragmentOp fragmentOp) {
 // function CFG, create the streams, and then thread the streams through the CFG
 // to append additional stream work. For now, we just look at basic blocks and
 // cluster all of the dispatches and flow ops together.
-class FormStreamsPass : public FunctionPass<FormStreamsPass> {
+class FormStreamsPass : public PassWrapper<FormStreamsPass, FunctionPass> {
  public:
   void runOnFunction() override {
     for (auto &block : getFunction()) {
@@ -297,7 +297,7 @@ class FormStreamsPass : public FunctionPass<FormStreamsPass> {
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createFormStreamsPass() {
+std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass() {
   return std::make_unique<FormStreamsPass>();
 }
 

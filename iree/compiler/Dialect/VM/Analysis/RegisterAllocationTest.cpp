@@ -21,7 +21,8 @@ namespace mlir {
 namespace iree_compiler {
 
 class RegisterAllocationTestPass
-    : public OperationPass<RegisterAllocationTestPass, IREE::VM::FuncOp> {
+    : public PassWrapper<RegisterAllocationTestPass,
+                         OperationPass<IREE::VM::FuncOp>> {
  public:
   void runOnOperation() override {
     if (failed(RegisterAllocation::annotateIR(getOperation()))) {

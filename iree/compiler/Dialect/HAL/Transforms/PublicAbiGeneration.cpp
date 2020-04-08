@@ -308,7 +308,7 @@ Optional<StringRef> getFuncOpExportName(FuncOp op) {
 }
 
 class PublicABIGenerationPass
-    : public OperationPass<PublicABIGenerationPass, ModuleOp> {
+    : public PassWrapper<PublicABIGenerationPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     auto *ctx = &getContext();
@@ -343,7 +343,7 @@ class PublicABIGenerationPass
 
 }  // namespace
 
-std::unique_ptr<OpPassBase<ModuleOp>> createPublicABIGenerationPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createPublicABIGenerationPass() {
   return std::make_unique<PublicABIGenerationPass>();
 }
 

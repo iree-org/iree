@@ -23,7 +23,7 @@ namespace iree_compiler {
 namespace IREE {
 
 class DropCompilerHintsPass
-    : public OperationPass<DropCompilerHintsPass, ModuleOp> {
+    : public PassWrapper<DropCompilerHintsPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     // We can't use patterns and applyPatternsGreedily because that
@@ -35,7 +35,7 @@ class DropCompilerHintsPass
   }
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createDropCompilerHintsPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createDropCompilerHintsPass() {
   return std::make_unique<DropCompilerHintsPass>();
 }
 

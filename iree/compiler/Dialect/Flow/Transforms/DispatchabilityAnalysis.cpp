@@ -25,7 +25,7 @@ namespace IREE {
 namespace Flow {
 
 class DispatchabilityAnalysisPass
-    : public OperationPass<DispatchabilityAnalysisPass, ModuleOp> {
+    : public PassWrapper<DispatchabilityAnalysisPass, OperationPass<ModuleOp>> {
  public:
   DispatchabilityAnalysisPass() = default;
 
@@ -45,7 +45,7 @@ class DispatchabilityAnalysisPass
   std::shared_ptr<llvm::StringMap<FuncOp>> dispatchableFuncOps_;
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createDispatchabilityAnalysisPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityAnalysisPass() {
   return std::make_unique<DispatchabilityAnalysisPass>();
 }
 

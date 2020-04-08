@@ -53,25 +53,25 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
 // Defines hal.executables and hal.interfaces for flow.executable ops based on
 // usage within the module.
-std::unique_ptr<OpPassBase<ModuleOp>> createMaterializeInterfacesPass(
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     ExecutableTargetOptions executableOptions);
 
 // Translates flow.executable ops to hal.executable ops using the provided
 // options.
-std::unique_ptr<OpPassBase<ModuleOp>> createTranslateExecutablesPass(
+std::unique_ptr<OperationPass<ModuleOp>> createTranslateExecutablesPass(
     ExecutableTargetOptions executableOptions);
 
 // Rewrites hal.interface IO shims to look like the legacy IREE
 // load_input/store_output form. This is incompatible with dynamic shapes and
 // advanced descriptor set usage and will be removed as soon as the existing
 // backends using it are ported to hal.interface.
-std::unique_ptr<OpPassBase<IREE::Flow::ExecutableOp>>
+std::unique_ptr<OperationPass<IREE::Flow::ExecutableOp>>
 createRewriteLegacyIOPass();
 
 // For functions that contain reflection metadata in an
 // iree.generateabi.reflection attribute, generate public ABI functions for
 // typical clients to use.
-std::unique_ptr<OpPassBase<ModuleOp>> createPublicABIGenerationPass();
+std::unique_ptr<OperationPass<ModuleOp>> createPublicABIGenerationPass();
 
 //===----------------------------------------------------------------------===//
 // Resource initialization, caching, and optimization
@@ -80,7 +80,7 @@ std::unique_ptr<OpPassBase<ModuleOp>> createPublicABIGenerationPass();
 // Finds all resource lookups (such as hal.executable.lookup), materializes
 // their cache storage and initialization, and rewrites the lookups to
 // references.
-std::unique_ptr<OpPassBase<ModuleOp>> createMaterializeResourceCachesPass(
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
     ExecutableTargetOptions executableOptions);
 
 }  // namespace HAL

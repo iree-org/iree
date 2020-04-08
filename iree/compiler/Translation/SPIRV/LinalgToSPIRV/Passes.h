@@ -21,7 +21,7 @@ namespace mlir {
 namespace iree_compiler {
 
 /// Pass to get gpu.module from a gpu.launch operation.
-std::unique_ptr<OpPassBase<ModuleOp>> createIREEGpuKernelOutliningPass();
+std::unique_ptr<OperationPass<ModuleOp>> createIREEGpuKernelOutliningPass();
 
 /// Pass to tile and fuse linalg operations on buffers. The pass takes as
 /// argument the `workgroupSize` that the tiling should use. Note that the
@@ -29,7 +29,7 @@ std::unique_ptr<OpPassBase<ModuleOp>> createIREEGpuKernelOutliningPass();
 /// "x" is used to tile the innermost loop, along "y" for the next innermost (if
 /// it exists) and along "z" for the next loop (if it exists). The workgroup
 /// size is expected to be of size at-most 3.
-std::unique_ptr<OpPassBase<FuncOp>> createLinalgTileAndFusePass(
+std::unique_ptr<OperationPass<FuncOp>> createLinalgTileAndFusePass(
     ArrayRef<int64_t> workGroupSize = {});
 
 }  // namespace iree_compiler

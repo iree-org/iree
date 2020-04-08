@@ -50,14 +50,14 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager);
 
 // Unrolls multi-dimensional reduction operations into reductions along each
 // dimension, from innermost to outermost.
-std::unique_ptr<OpPassBase<FuncOp>> createUnrollReductionsPass();
+std::unique_ptr<OperationPass<FuncOp>> createUnrollReductionsPass();
 
 //===----------------------------------------------------------------------===//
 // Dialect conversion
 //===----------------------------------------------------------------------===//
 
 // Converts from various dialects (standard, HLO, etc) to the VMLA dialect.
-std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

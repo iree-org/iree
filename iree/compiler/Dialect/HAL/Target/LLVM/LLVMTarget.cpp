@@ -115,7 +115,7 @@ struct DispatchFnImplRewritePattern : public OpRewritePattern<FuncOp> {
 /// Converting from Linalg to LLVM needs to run on a module and since it
 /// applies a full conversion, make a module with jst the impl function.
 struct PrepareForLLVMLoweringPass
-    : OperationPass<PrepareForLLVMLoweringPass, ModuleOp> {
+    : PassWrapper<PrepareForLLVMLoweringPass, OperationPass<ModuleOp>> {
   void runOnOperation() override {
     OwningRewritePatternList patterns;
     MLIRContext* context = &getContext();

@@ -44,7 +44,8 @@ struct IREEFuseGenericTensorOps : public OpRewritePattern<linalg::GenericOp> {
 
 /// Fuses linalg operations on tensors in dispatch function. For now does only
 /// producer consumer fusion.
-struct IREELinalgFusionPass : public FunctionPass<IREELinalgFusionPass> {
+struct IREELinalgFusionPass
+    : public PassWrapper<IREELinalgFusionPass, FunctionPass> {
   void runOnFunction() override;
 };
 }  // namespace
@@ -168,7 +169,7 @@ void IREELinalgFusionPass::runOnFunction() {
   applyPatternsGreedily(op->getRegions(), patterns);
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createLinalgOnTensorsFusionPass() {
+std::unique_ptr<OperationPass<FuncOp>> createLinalgOnTensorsFusionPass() {
   return std::make_unique<IREELinalgFusionPass>();
 }
 

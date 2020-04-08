@@ -58,7 +58,8 @@ SmallVector<const T *, 4> gatherUsedDialectInterfaces(mlir::ModuleOp moduleOp) {
 }
 
 // Runs conversion with registered input dialects.
-class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
+class ConversionPass
+    : public PassWrapper<ConversionPass, OperationPass<mlir::ModuleOp>> {
  public:
   void runOnOperation() override {
     auto *context = &getContext();
@@ -107,7 +108,7 @@ class ConversionPass : public OperationPass<ConversionPass, mlir::ModuleOp> {
   }
 };
 
-std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass() {
   return std::make_unique<ConversionPass>();
 }
 

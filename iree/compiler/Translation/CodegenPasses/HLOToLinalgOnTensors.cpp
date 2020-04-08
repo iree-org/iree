@@ -102,7 +102,8 @@ class SplatConstConverter : public OpConversionPattern<ConstantOp> {
   }
 };
 
-struct XlaLegalizeToLinalg : public FunctionPass<XlaLegalizeToLinalg> {
+struct XlaLegalizeToLinalg
+    : public PassWrapper<XlaLegalizeToLinalg, FunctionPass> {
   void runOnFunction() override {
     auto func = getFunction();
     if (!isDispatchFuncImpl(func)) return;
@@ -138,7 +139,7 @@ void populateHLOToLinalgOnTensorsConversionPatterns(
   patterns.insert<SplatConstConverter>(context);
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createHLOToLinalgOnTensorsPass() {
+std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass() {
   return std::make_unique<XlaLegalizeToLinalg>();
 }
 

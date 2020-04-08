@@ -22,7 +22,7 @@ namespace mlir {
 namespace iree_compiler {
 
 // Converts flow streams to command buffer recording ops.
-std::unique_ptr<OpPassBase<ModuleOp>> createConvertFlowToHALPass();
+std::unique_ptr<OperationPass<ModuleOp>> createConvertFlowToHALPass();
 
 }  // namespace iree_compiler
 }  // namespace mlir

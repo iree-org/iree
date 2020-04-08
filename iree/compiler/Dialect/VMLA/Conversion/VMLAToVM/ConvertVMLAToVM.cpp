@@ -332,7 +332,7 @@ namespace {
 
 // A pass converting the IREE flow dialect into the IREE VMLA dialect.
 class ConvertVMLAToVMPass
-    : public OperationPass<ConvertVMLAToVMPass, ModuleOp> {
+    : public PassWrapper<ConvertVMLAToVMPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
     auto *context = &getContext();
@@ -369,7 +369,7 @@ class ConvertVMLAToVMPass
 
 }  // namespace
 
-std::unique_ptr<OpPassBase<ModuleOp>> createConvertVMLAToVMPass() {
+std::unique_ptr<OperationPass<ModuleOp>> createConvertVMLAToVMPass() {
   return std::make_unique<ConvertVMLAToVMPass>();  // NOLINT
 }
 

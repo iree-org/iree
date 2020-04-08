@@ -33,7 +33,7 @@ namespace IREE {
 namespace Flow {
 
 class PrePartitioningConversionPass
-    : public FunctionPass<PrePartitioningConversionPass> {
+    : public PassWrapper<PrePartitioningConversionPass, FunctionPass> {
  public:
   void runOnFunction() override {
     auto *context = &getContext();
@@ -79,7 +79,7 @@ class PrePartitioningConversionPass
 };
 
 class PostPartitioningConversionPass
-    : public FunctionPass<PostPartitioningConversionPass> {
+    : public PassWrapper<PostPartitioningConversionPass, FunctionPass> {
  public:
   void runOnFunction() override {
     auto *context = &getContext();
@@ -109,11 +109,11 @@ class PostPartitioningConversionPass
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createPrePartitioningConversionPass() {
+std::unique_ptr<OperationPass<FuncOp>> createPrePartitioningConversionPass() {
   return std::make_unique<PrePartitioningConversionPass>();
 }
 
-std::unique_ptr<OpPassBase<FuncOp>> createPostPartitioningConversionPass() {
+std::unique_ptr<OperationPass<FuncOp>> createPostPartitioningConversionPass() {
   return std::make_unique<PostPartitioningConversionPass>();
 }
 

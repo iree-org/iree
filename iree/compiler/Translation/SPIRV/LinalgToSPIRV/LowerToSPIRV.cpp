@@ -83,8 +83,8 @@ namespace {
 /// convert loops to GPU kernel, need to actually implement a pass to retrieve
 /// the attribute value from the function and pass it along.
 // TODO(ravishankarm): Structure the Loops to GPU pass in MLIR so that we dont
-// have to do this. Maybe make it an OpPassBase<loop::ForOp> ?
-struct LoopsToGPUPass : public FunctionPass<LoopsToGPUPass> {
+// have to do this. Maybe make it an OperationPass<loop::ForOp> ?
+struct LoopsToGPUPass : public PassWrapper<LoopsToGPUPass, FunctionPass> {
   void runOnFunction() override {
     // Get the workgroup size from the attributes.
     FuncOp funcOp = getFunction();
@@ -128,7 +128,8 @@ struct LoopsToGPUPass : public FunctionPass<LoopsToGPUPass> {
 /// convert GPU kernel into SPIR-V kernel, need to actually implement a pass to
 /// retrieve the attribute value from the function and pass it along.
 // TODO(ravishankarm): Move this into MLIR core.
-struct IREEGPUToSPIRVPass : public OperationPass<IREEGPUToSPIRVPass, ModuleOp> {
+struct IREEGPUToSPIRVPass
+    : public PassWrapper<IREEGPUToSPIRVPass, OperationPass<ModuleOp>> {
   void runOnOperation() {
     MLIRContext *context = &getContext();
     ModuleOp moduleOp = getOperation();

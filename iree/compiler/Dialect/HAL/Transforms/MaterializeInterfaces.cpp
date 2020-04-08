@@ -260,7 +260,7 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
 }
 
 class MaterializeInterfacesPass
-    : public OperationPass<MaterializeInterfacesPass, ModuleOp> {
+    : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
   MaterializeInterfacesPass()
       : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
@@ -315,7 +315,7 @@ class MaterializeInterfacesPass
   ExecutableTargetOptions executableOptions_;
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createMaterializeInterfacesPass(
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
     ExecutableTargetOptions executableOptions) {
   return std::make_unique<MaterializeInterfacesPass>(
       executableOptions);  // NOLINT

@@ -61,7 +61,8 @@ void unrollReduceOp(xla_hlo::ReduceOp reduceOp) {
 
 }  // namespace
 
-class UnrollReductionsPass : public FunctionPass<UnrollReductionsPass> {
+class UnrollReductionsPass
+    : public PassWrapper<UnrollReductionsPass, FunctionPass> {
  public:
   void runOnFunction() override {
     for (auto &block : getFunction()) {
@@ -75,7 +76,7 @@ class UnrollReductionsPass : public FunctionPass<UnrollReductionsPass> {
   }
 };
 
-std::unique_ptr<OpPassBase<FuncOp>> createUnrollReductionsPass() {
+std::unique_ptr<OperationPass<FuncOp>> createUnrollReductionsPass() {
   return std::make_unique<UnrollReductionsPass>();
 }
 

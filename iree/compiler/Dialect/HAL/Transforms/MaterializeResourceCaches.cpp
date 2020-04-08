@@ -30,7 +30,8 @@ namespace IREE {
 namespace HAL {
 
 class MaterializeResourceCachesPass
-    : public OperationPass<MaterializeResourceCachesPass, ModuleOp> {
+    : public PassWrapper<MaterializeResourceCachesPass,
+                         OperationPass<ModuleOp>> {
  public:
   MaterializeResourceCachesPass()
       : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
@@ -302,7 +303,7 @@ class MaterializeResourceCachesPass
   int nextUniqueDescriptorSetLayoutId = 0;
 };
 
-std::unique_ptr<OpPassBase<ModuleOp>> createMaterializeResourceCachesPass(
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
     ExecutableTargetOptions executableOptions) {
   return std::make_unique<MaterializeResourceCachesPass>(
       executableOptions);  // NOLINT

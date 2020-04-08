@@ -22,7 +22,7 @@ namespace mlir {
 namespace iree_compiler {
 namespace IREE {
 
-std::unique_ptr<OpPassBase<ModuleOp>> createDropCompilerHintsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createDropCompilerHintsPass();
 
 // Register all Passes
 inline void registerIreePasses() { createDropCompilerHintsPass(); }

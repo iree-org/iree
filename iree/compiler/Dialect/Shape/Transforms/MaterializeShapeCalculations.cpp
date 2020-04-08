@@ -252,7 +252,7 @@ class MaterializeCompileTimeRankedShapePattern
 };
 
 class MaterializeShapeCalculationsPass
-    : public FunctionPass<MaterializeShapeCalculationsPass> {
+    : public PassWrapper<MaterializeShapeCalculationsPass, FunctionPass> {
  public:
   // Gets a CustomOpShapeBuilderList for expanding shapes of custom ops.
   // By default, returns nullptr, which will not handle custom op shapes.
@@ -292,7 +292,8 @@ class MaterializeShapeCalculationsPass
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OpPassBase<FuncOp>> createMaterializeShapeCalculationsPass() {
+std::unique_ptr<OperationPass<FuncOp>>
+createMaterializeShapeCalculationsPass() {
   return std::make_unique<Shape::MaterializeShapeCalculationsPass>();
 }
 

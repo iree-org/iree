@@ -134,7 +134,8 @@ void hoistOps(DenseSet<Operation *> opsToHoistSet, Block &block,
 // ground. Longer-term, IREE's dispatch region formation will use a more
 // sophisticated algorithm and the analysis/hoisting done here will be a
 // byproduct of the dispatch region formation legality analysis/preparation.
-class HoistShapeCalculations : public FunctionPass<HoistShapeCalculations> {
+class HoistShapeCalculations
+    : public PassWrapper<HoistShapeCalculations, FunctionPass> {
  public:
   void runOnFunction() override {
     auto func = getFunction();
@@ -147,7 +148,7 @@ class HoistShapeCalculations : public FunctionPass<HoistShapeCalculations> {
 };
 }  // namespace
 
-std::unique_ptr<OpPassBase<FuncOp>> createHoistShapeCalculationsPass() {
+std::unique_ptr<OperationPass<FuncOp>> createHoistShapeCalculationsPass() {
   return std::make_unique<HoistShapeCalculations>();  // NOLINT
 }
 
