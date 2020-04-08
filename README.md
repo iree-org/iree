@@ -111,7 +111,7 @@ features and quarterly plans. Please check out for updated information.
 ## Build Status
 
 CI System      | Build System | Platform | Status
--------------- | ------------ | -------- | ------
+:------------: | :----------: | :------: | :----:
 GitHub Actions | Bazel        | Linux    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build%22)
 Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
 Kokoro         | CMake        | Linux    | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_result_linux.html)

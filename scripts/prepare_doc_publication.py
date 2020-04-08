@@ -47,12 +47,15 @@ def parse_arguments():
 # By default the generated doc will have a title matching the MarkDown H1
 # header. This dictionary will overrule that default behavior.
 DOC_TITLE_DICT = {
+    'index.md': 'Home',
     'getting_started_linux_bazel.md': 'Linux with Bazel',
     'getting_started_linux_cmake.md': 'Linux with CMake',
     'getting_started_linux_vulkan.md': 'Linux with Vulkan',
     'getting_started_windows_bazel.md': 'Windows with Bazel',
     'getting_started_windows_cmake.md': 'Windows with CMake',
     'getting_started_windows_vulkan.md': 'Windows with Vulkan',
+    'roadmap.md': 'Short-term Focus Areas',
+    'roadmap_design.md': 'Long-term Design Roadmap',
 }
 
 # A dictionary containing source file to permanent link mappings.
@@ -62,13 +65,15 @@ DOC_TITLE_DICT = {
 # for it would be https://google.github.io/iree/Foo/Bar. This dictionary
 # allows one to override the permanent link if necessary.
 PERMALINK_DICT = {
-    'roadmap_design.md': 'DesignRoadmap',
+    'index.md': '/',
     'getting_started_linux_bazel.md': 'GetStarted/LinuxBazel',
     'getting_started_linux_cmake.md': 'GetStarted/LinuxCMake',
     'getting_started_linux_vulkan.md': 'GetStarted/LinuxVulkan',
     'getting_started_windows_bazel.md': 'GetStarted/WindowsBazel',
     'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
+    'roadmap.md': 'FocusAreas',
+    'roadmap_design.md': 'DesignRoadmap',
 }
 
 # A dictionary containing source file to navigation order mappings.
@@ -77,8 +82,10 @@ PERMALINK_DICT = {
 # the left panel of https://google.github.io/iree website. This allows one
 # to specify an order for a specific doc.
 NAVI_ORDER_DICT = {
-    # 'Home' is 1.
+    'index.md': 1,
+    # 'Getting Started' is 2.
     'roadmap_design.md': 3,
+    'roadmap.md': 4,
 }
 
 # A dictionary containing source directory to section tile mappings.
