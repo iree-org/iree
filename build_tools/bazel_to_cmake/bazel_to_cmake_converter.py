@@ -175,6 +175,7 @@ class BuildFileFunctions(object):
       # Bazel `//iree/base`     -> CMake `iree::base`
       # Bazel `//iree/base:api` -> CMake `iree::base::api`
       target = target.replace("//bindings", "bindings")  # bindings:api
+      # Support for experimental targets is best effort with no guarantees.
       target = target.replace("//experimental", "experimental")  # experimental:api
       target = target.replace("//iree", "iree")  # iree/base:api
       target = target.replace(":", "::")  # iree/base::api or ::api
