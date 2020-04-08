@@ -198,20 +198,8 @@ struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
   void runOnFunction() override {
     MLIRContext *context = &getContext();
-    ConversionTarget conversionTarget(*context);
-    OwningRewritePatternList conversionPatterns;
-
-    conversionTarget
-        .addLegalDialect<xla_hlo::XlaHloDialect, StandardOpsDialect>();
-    conversionTarget.addIllegalOp<xla_hlo::BatchNormInferenceOp>();
-
-    xla_hlo::PopulateUnfuseBatchNormPatterns(context, &conversionPatterns);
-    if (failed(applyPartialConversion(getFunction(), conversionTarget,
-                                      conversionPatterns))) {
-      return signalPassFailure();
-    }
-
     OwningRewritePatternList patterns;
+    xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     patterns.insert<FoldPadIntoMaxPool>(context);
     applyPatternsGreedily(getOperation(), patterns);
   }
