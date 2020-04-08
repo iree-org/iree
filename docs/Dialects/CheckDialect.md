@@ -33,6 +33,11 @@ non-zero integer.
 
 Issues a non-fatal failure if the verification fails.
 
+```mlir
+check.expect_all_true(%arg0) : !hal.buffer_view
+check.expect_all_true(%arg1) : tensor<2x2xi32>
+```
+
 #### Operands:
 
 | Operand | Description |
@@ -56,6 +61,10 @@ constant attribute within an implementation-defined "reasonable" tolerance.
 Issues a non-fatal failure if the verification fails.
 
 This op is just a convenience wrapper around the expect_almost_eq op.
+
+```mlir
+check.expect_almost_eq_const(%const0, dense<[0.999999, 2.0]> : tensor<5xf32>) : tensor<5xf32>
+```
 
 #### Attributes:
 
@@ -85,6 +94,10 @@ almost equal to within an implementation-defined "reasonable" tolerance.
 
 Issues a non-fatal failure if the verification fails.
 
+```mlir
+check.expect_almost_eq(%arg0, %arg1) : tensor<5xf32>
+```
+
 #### Operands:
 
 | Operand | Description |
@@ -108,6 +121,10 @@ Verifies that the tensor operand is exactly equal to a constant attribute.
 Issues a non-fatal failure if the verification fails.
 
 This op is just a convenience wrapper around the expect_eq op.
+
+```mlir
+check.expect_eq_const(%arg0, dense<[1, 2]> : tensor<2xi32>) : tensor<2xi32>
+```
 
 #### Attributes:
 
@@ -136,6 +153,10 @@ Verifies that the operands are exactly equal.
 
 Issues a non-fatal failure if the verification fails.
 
+```mlir
+check.expect_eq(%arg0, %arg1) : tensor<5xi32>
+```
+
 #### Operands:
 
 | Operand | Description |
@@ -159,6 +180,10 @@ zero.
 
 Issues a non-fatal failure if the verification fails.
 
+```mlir
+check.expect_false(%arg0) : i32
+```
+
 #### Operands:
 
 | Operand | Description |
@@ -180,6 +205,10 @@ Verifies that the operand contains a true value, which is represented by
 any non-zero integer.
 
 Issues a non-fatal failure if the verification fails.
+
+```mlir
+check.expect_true(%arg0) : i32
+```
 
 #### Operands:
 
