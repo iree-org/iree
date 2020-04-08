@@ -38,7 +38,7 @@ module {
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
     %12 = "xla_hlo.broadcast_in_dim"(%11) {broadcast_dimensions = dense<0> : tensor<1xi64>, name = "broadcast.23"} : (tensor<1xf32>) -> tensor<1x10xf32>
     %13 = "xla_hlo.subtract"(%10, %12) {name = "subtract.24"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xf32>
-    %14 = "xla_hlo.exp"(%13) {name = "exponential.25"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
+    %14 = "xla_hlo.exponential"(%13) {name = "exponential.25"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
     %cst_5 = constant  {name = "constant.27"} dense<0.000000e+00> : tensor<f32>
     %15 = "xla_hlo.reduce"(%14, %cst_5) ( {
     ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):   // no predecessors

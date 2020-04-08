@@ -445,7 +445,7 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
   // for standalone conversion testing).
   xla_hlo::PopulateXlaToStdPatterns(&patterns, context);
 
-  // xla_hlo.conv.
+  // xla_hlo.convolution.
   populateHLOConvToVMLAPatterns(context, patterns, typeConverter);
 
   // xla_hlo.reduce and xla_hlo.reduce_window.
