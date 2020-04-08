@@ -39,6 +39,7 @@ EXPLICIT_TARGET_MAPPING = {
     ],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRLoopToStandard"],
+    "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:GPUDialect": ["MLIRGPU"],
     "@llvm-project//mlir:GPUToSPIRVTransforms": ["MLIRGPUtoSPIRVTransforms"],
     "@llvm-project//mlir:GPUTransforms": ["MLIRGPU"],
@@ -53,9 +54,11 @@ EXPLICIT_TARGET_MAPPING = {
         "MLIRStandardToSPIRVTransforms"
     ],
     "@llvm-project//mlir:TableGen": ["LLVMMLIRTableGen"],
+    "@llvm-project//mlir:mlir_c_runner_utils": ["MLIRExecutionEngine"],
     "@llvm-project//mlir:mlir-translate": ["mlir-translate"],
     "@llvm-project//mlir:MlirTableGenMain": ["MLIRTableGen"],
     "@llvm-project//mlir:MlirOptLib": ["MLIROptLib"],
+    "@llvm-project//mlir:VectorOps": ["MLIRVector"],
     # Vulkan
     # TODO(scotttodd): Set -DVK_NO_PROTOTYPES to COPTS for _no_prototypes.
     #   Maybe add a wrapper CMake lib within build_tools/third_party/?
