@@ -18,7 +18,6 @@
 
 #include "iree/hal/device_info.h"
 #include "iree/hal/llvmjit/llvmjit_device.h"
-#include "llvm/IR/LLVMContext.h"
 
 namespace iree {
 namespace hal {

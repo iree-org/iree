@@ -33,7 +33,6 @@ cc_library(
         "@com_google_absl//absl/types:span",
         "@llvm-project//llvm:asm_parser",
         "@llvm-project//llvm:core",
-        "@llvm-project//llvm:execution_engine",
         "@llvm-project//llvm:orc_jit",
         "@llvm-project//llvm:support",
     ],
@@ -49,10 +48,6 @@ cc_library(
         "//iree/base:tracing",
         "//iree/hal:buffer",
         "//iree/hal/host:host_local_command_processor",
-        "@llvm-project//llvm:core",
-        "@llvm-project//llvm:execution_engine",
-        "@llvm-project//llvm:orc_jit",
-        "@llvm-project//llvm:support",
     ],
 )
 
@@ -69,7 +64,6 @@ cc_library(
         "//iree/hal:executable",
         "//iree/hal:executable_cache",
         "//iree/hal:executable_format",
-        "@llvm-project//llvm:core",
         "@llvm-project//llvm:orc_jit",
     ],
 )
@@ -98,8 +92,6 @@ cc_library(
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/types:span",
-        "@llvm-project//llvm:core",
-        "@llvm-project//llvm:orc_jit",
     ],
 )
 
@@ -111,7 +103,6 @@ cc_library(
         ":llvmjit_device",
         "//iree/hal:device_info",
         "//iree/hal:driver",
-        "@llvm-project//llvm:core",
         "@llvm-project//llvm:execution_engine",
     ],
 )

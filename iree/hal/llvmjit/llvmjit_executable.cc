@@ -23,8 +23,6 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/AsmParser/Parser.h"
-#include "llvm/ExecutionEngine/Orc/ExecutionUtils.h"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/Support/Error.h"
@@ -37,8 +35,7 @@ namespace llvmjit {
 
 // static
 StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
-    hal::Allocator* allocator, ExecutableSpec spec,
-    llvm::orc::LLJIT* execution_engine, bool allow_aliasing_data) {
+    hal::Allocator* allocator, ExecutableSpec spec, bool allow_aliasing_data) {
   auto module_def =
       ::flatbuffers::GetRoot<LLVMIRExecutableDef>(spec.executable_data.data());
   auto data =
@@ -55,11 +52,12 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
   const auto entry_points = module_def->entry_points();
   llvm::orc::ThreadSafeModule thread_safe_module(std::move(module),
                                                  std::move(llvm_context));
-  llvm::Error err =
-      execution_engine->addIRModule(std::move(thread_safe_module));
+  auto ll_jit = llvm::cantFail(llvm::orc::LLJITBuilder().create());
+
+  llvm::Error err = ll_jit->addIRModule(std::move(thread_safe_module));
   if (err)
     return InvalidArgumentErrorBuilder(IREE_LOC)
-           << "Can't add executable module to execution engine:"
+           << "Can't add executable module to executable LLJIT"
            << llvm::toString(std::move(err));
 
   auto dylib_serarch_generator =
@@ -69,14 +67,15 @@ StatusOr<ref_ptr<LLVMJITExecutable>> LLVMJITExecutable::Load(
     return UnavailableErrorBuilder(IREE_LOC)
            << "Can't resolve symbols in current process";
 
-  auto& main_jitdylib = execution_engine->getMainJITDylib();
+  auto& main_jitdylib = ll_jit->getMainJITDylib();
   main_jitdylib.addGenerator(std::move(dylib_serarch_generator.get()));
 
-  auto executable =
-      make_ref<LLVMJITExecutable>(allocator, spec, allow_aliasing_data);
+  auto executable = make_ref<LLVMJITExecutable>(
+      allocator, spec, std::move(ll_jit), allow_aliasing_data);
 
   for (const auto func_name : *entry_points) {
-    auto func_symbol = execution_engine->lookup("invoke_" + func_name->str());
+    auto func_symbol =
+        executable->ll_jit_->lookup("invoke_" + func_name->str());
     if (!func_symbol) {
       return NotFoundErrorBuilder(IREE_LOC)
              << "Can't JIT compile function : " << func_name;
@@ -102,8 +101,9 @@ Status LLVMJITExecutable::Invoke(int func_id,
 
 LLVMJITExecutable::LLVMJITExecutable(hal::Allocator* allocator,
                                      ExecutableSpec spec,
+                                     std::unique_ptr<llvm::orc::LLJIT> ll_jit,
                                      bool allow_aliasing_data)
-    : spec_(spec) {
+    : spec_(spec), ll_jit_(std::move(ll_jit)) {
   if (!allow_aliasing_data) {
     // Clone data.
     cloned_executable_data_ = {spec.executable_data.begin(),

@@ -24,11 +24,7 @@
 #include "iree/hal/executable_spec.h"
 #include "iree/schemas/llvmir_executable_def_generated.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/ExecutionEngine/JITSymbol.h"
 #include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/IR/Module.h"
 
 namespace iree {
 namespace hal {
@@ -38,10 +34,11 @@ struct MemrefType;
 
 class LLVMJITExecutable final : public Executable {
  public:
-  static StatusOr<ref_ptr<LLVMJITExecutable>> Load(
-      hal::Allocator* allocator, ExecutableSpec spec,
-      llvm::orc::LLJIT* execution_engine, bool allow_aliasing_data);
+  static StatusOr<ref_ptr<LLVMJITExecutable>> Load(hal::Allocator* allocator,
+                                                   ExecutableSpec spec,
+                                                   bool allow_aliasing_data);
   LLVMJITExecutable(hal::Allocator* allocator, ExecutableSpec spec,
+                    std::unique_ptr<llvm::orc::LLJIT> ll_jit,
                     bool allow_aliasing_data);
   ~LLVMJITExecutable() override;
 
@@ -56,6 +53,7 @@ class LLVMJITExecutable final : public Executable {
   llvm::SmallVector<llvm::JITEvaluatedSymbol, 4> symbols_;
   ExecutableSpec spec_;
   std::vector<uint8_t> cloned_executable_data_;
+  std::unique_ptr<llvm::orc::LLJIT> ll_jit_;
 };
 
 }  // namespace llvmjit

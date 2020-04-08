@@ -30,7 +30,6 @@
 #include "iree/hal/host/inproc_command_buffer.h"
 #include "iree/hal/llvmjit/llvmjit_command_processor.h"
 #include "iree/hal/llvmjit/llvmjit_executable_cache.h"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
 
 namespace iree {
 namespace hal {
@@ -100,10 +99,8 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
 
 }  // namespace
 
-LLVMJITDevice::LLVMJITDevice(DeviceInfo device_info,
-                             std::unique_ptr<llvm::orc::LLJIT> execution_engine)
-    : Device(std::move(device_info)),
-      execution_engine_(std::move(execution_engine)) {
+LLVMJITDevice::LLVMJITDevice(DeviceInfo device_info)
+    : Device(std::move(device_info)) {
   // We currently only expose a single command queue.
   auto command_queue = absl::make_unique<UnsynchronizedCommandQueue>(
       &allocator_, "cpu0",
@@ -118,20 +115,14 @@ LLVMJITDevice::LLVMJITDevice(DeviceInfo device_info,
 
 StatusOr<ref_ptr<LLVMJITDevice>> LLVMJITDevice::CreateLLVMJITDevice(
     DeviceInfo device_info) {
-  auto execution_engine = llvm::orc::LLJITBuilder().create();
-  if (!execution_engine) {
-    return InternalErrorBuilder(IREE_LOC)
-           << "Can't create LLJIT for llvmjit device";
-  }
-  return make_ref<LLVMJITDevice>(device_info,
-                                 std::move(execution_engine.get()));
+  return make_ref<LLVMJITDevice>(device_info);
 }
 
 LLVMJITDevice::~LLVMJITDevice() = default;
 
 ref_ptr<ExecutableCache> LLVMJITDevice::CreateExecutableCache() {
   IREE_TRACE_SCOPE0("LLVMJITDevice::CreateExecutableCache");
-  return make_ref<LLVMJITExecutableCache>(&allocator_, execution_engine_.get());
+  return make_ref<LLVMJITExecutableCache>(&allocator_);
 }
 
 StatusOr<ref_ptr<DescriptorSetLayout>> LLVMJITDevice::CreateDescriptorSetLayout(

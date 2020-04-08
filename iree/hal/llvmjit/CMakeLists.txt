@@ -24,7 +24,6 @@ iree_cc_library(
   DEPS
     LLVMAsmParser
     LLVMCore
-    LLVMExecutionEngine
     LLVMOrcJIT
     LLVMSupport
     absl::span
@@ -47,10 +46,6 @@ iree_cc_library(
   DEPS
     ::llvmjit_executable
     ::memref_runtime
-    LLVMCore
-    LLVMExecutionEngine
-    LLVMOrcJIT
-    LLVMSupport
     iree::base::tracing
     iree::hal::buffer
     iree::hal::host::host_local_command_processor
@@ -66,7 +61,6 @@ iree_cc_library(
     "llvmjit_executable_cache.cc"
   DEPS
     ::llvmjit_executable
-    LLVMCore
     LLVMOrcJIT
     iree::base::source_location
     iree::base::status
@@ -88,8 +82,6 @@ iree_cc_library(
   DEPS
     ::llvmjit_command_processor
     ::llvmjit_executable_cache
-    LLVMCore
-    LLVMOrcJIT
     absl::inlined_vector
     absl::memory
     absl::span
@@ -119,7 +111,6 @@ iree_cc_library(
     "llvmjit_driver.cc"
   DEPS
     ::llvmjit_device
-    LLVMCore
     LLVMExecutionEngine
     iree::hal::device_info
     iree::hal::driver

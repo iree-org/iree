@@ -19,15 +19,13 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/executable_format.h"
 #include "iree/hal/llvmjit/llvmjit_executable.h"
-#include "llvm/IR/LLVMContext.h"
 
 namespace iree {
 namespace hal {
 namespace llvmjit {
 
-LLVMJITExecutableCache::LLVMJITExecutableCache(
-    hal::Allocator* allocator, llvm::orc::LLJIT* execution_engine)
-    : allocator_(allocator), execution_engine_(execution_engine) {}
+LLVMJITExecutableCache::LLVMJITExecutableCache(hal::Allocator* allocator)
+    : allocator_(allocator) {}
 
 LLVMJITExecutableCache::~LLVMJITExecutableCache() = default;
 
@@ -43,9 +41,9 @@ StatusOr<ref_ptr<Executable>> LLVMJITExecutableCache::PrepareExecutable(
   // Wrap the data (or copy it).
   bool allow_aliasing_data =
       AllBitsSet(mode, ExecutableCachingMode::kAliasProvidedData);
-  ASSIGN_OR_RETURN(auto executable,
-                   LLVMJITExecutable::Load(allocator_, spec, execution_engine_,
-                                           !allow_aliasing_data));
+  ASSIGN_OR_RETURN(
+      auto executable,
+      LLVMJITExecutable::Load(allocator_, spec, !allow_aliasing_data));
 
   return executable;
 }

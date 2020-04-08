@@ -21,12 +21,6 @@
 #include "iree/hal/buffer.h"
 #include "iree/hal/llvmjit/llvmjit_executable.h"
 #include "iree/hal/llvmjit/memref_runtime.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/ExecutionEngine/Orc/LLJIT.h"
-#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
-#include "llvm/IR/LLVMContext.h"
-#include "llvm/Support/Casting.h"
-#include "llvm/Support/Error.h"
 
 namespace iree {
 namespace hal {
