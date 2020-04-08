@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
@@ -68,6 +69,9 @@ bool LLVMOnceInit() {
 
   // Register built-in MLIR dialects.
   mlir::registerMlirDialects();
+  // Passes currently need to be registered for proper generation of crash
+  // reproducers. Should be safe to remove by ~end of April 2020.
+  mlir::registerMlirPasses();
   mlir::iree_compiler::registerIreeDialects();
 
   // Register any pass manager command line options.

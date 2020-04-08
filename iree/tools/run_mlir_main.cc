@@ -58,6 +58,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -458,6 +459,7 @@ extern "C" int main(int argc, char** argv) {
 
   mlir::registerMlirDialects();
   mlir::iree_compiler::registerIreeDialects();
+  mlir::registerMlirPasses();
   mlir::registerPassManagerCLOptions();
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);

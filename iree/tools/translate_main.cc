@@ -18,6 +18,7 @@
 // options, which is missing in MLIR's translation main entry function.
 
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -48,6 +49,9 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
 
   mlir::registerMlirDialects();
+  // Passes currently need to be registered for proper generation of crash
+  // reproducers. Should be safe to remove by ~end of April 2020.
+  mlir::registerMlirPasses();
   mlir::iree_compiler::registerIreeDialects();
   mlir::registerPassManagerCLOptions();
 
