@@ -4,7 +4,7 @@
 // CHECK: func @dynamic_shape
 func @dynamic_shape(%operand: tensor<?x?xf32>)
 attributes {iree.dispatch_fn_name = ""} {
-  %result = "xla_hlo.exp"(%operand) : (tensor<?x?xf32>) -> tensor<?x?xf32>
+  %result = "xla_hlo.exponential"(%operand) : (tensor<?x?xf32>) -> tensor<?x?xf32>
   return
 }
 // CHECK: linalg.generic {
