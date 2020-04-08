@@ -128,6 +128,24 @@ std::unique_ptr<OpPassBase<FuncOp>> createFormStreamsPass();
 // Module Analysis and Finalization
 //===----------------------------------------------------------------------===//
 
+//===----------------------------------------------------------------------===//
+// Register all Passes
+//===----------------------------------------------------------------------===//
+
+inline void registerFlowPasses() {
+  createFlattenTuplesInCFGPass();
+  createLegalizeInputTypesPass();
+  createHLOPreprocessingPass();
+  createPrePartitioningConversionPass();
+  createPostPartitioningConversionPass();
+  createDispatchabilityAnalysisPass();
+  createIdentifyDispatchRegionsPass();
+  createFoldCompatibleDispatchRegionsPass();
+  createRematerializeDispatchConstantsPass();
+  createOutlineDispatchRegionsPass();
+  createFormStreamsPass();
+}
+
 }  // namespace Flow
 }  // namespace IREE
 }  // namespace iree_compiler

@@ -59,6 +59,15 @@ std::unique_ptr<OpPassBase<FuncOp>> createUnrollReductionsPass();
 // Converts from various dialects (standard, HLO, etc) to the VMLA dialect.
 std::unique_ptr<OpPassBase<mlir::ModuleOp>> createConversionPass();
 
+//===----------------------------------------------------------------------===//
+// Register all Passes
+//===----------------------------------------------------------------------===//
+
+inline void registerVMLAPasses() {
+  createUnrollReductionsPass();
+  createConversionPass();
+}
+
 }  // namespace VMLA
 }  // namespace IREE
 }  // namespace iree_compiler
