@@ -13,10 +13,26 @@
 # limitations under the License.
 
 # Utilities for working with IREE MLIR types.
+load("//build_tools/bazel:tblgen.bzl", "gentbl")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+gentbl(
+    name = "LinalgVectorTransformPatternsIncGen",
+    tbl_outs = [
+        (
+            "-gen-rewriters",
+            "LinalgVectorTransformPatterns.h.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "LinalgVectorTransformPatterns.td",
+    td_srcs = [
+        "@llvm-project//mlir:LinalgTransformPatternsTdFiles",
+    ],
 )
 
 cc_library(
@@ -26,12 +42,14 @@ cc_library(
         "HLOToLinalgOnBuffers.cpp",
         "HLOToLinalgOnTensors.cpp",
         "LinalgFusion.cpp",
+        "LinalgVectorTransform.cpp",
         "Passes.cpp",
     ],
     hdrs = [
         "Passes.h",
     ],
     deps = [
+        ":LinalgVectorTransformPatternsIncGen",
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/IR",
         "//iree/compiler/Dialect/IREE/IR",

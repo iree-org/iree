@@ -12,18 +12,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# bazel_to_cmake: DO NOT EDIT
+# TODO: The follwing tablegen_library doesn't convert with bazel_to_cmake
+# see https://github.com/google/iree/issues/1083
+
 iree_add_all_subdirs()
+
+iree_tablegen_library(
+  NAME
+    LinalgVectorTransformPatternsIncGen
+  TD_FILE
+    "LinalgVectorTransformPatterns.td"
+  OUTS
+    -gen-rewriters LinalgVectorTransformPatterns.h.inc
+)
 
 iree_cc_library(
   NAME
     CodegenPasses
   HDRS
     "Passes.h"
+    "LinalgVectorTransformPatterns.h.inc"
   SRCS
     "HALInterfaceToMemrefPass.cpp"
     "HLOToLinalgOnBuffers.cpp"
     "HLOToLinalgOnTensors.cpp"
     "LinalgFusion.cpp"
+    "LinalgVectorTransform.cpp"
     "Passes.cpp"
   DEPS
     LLVMSupport
