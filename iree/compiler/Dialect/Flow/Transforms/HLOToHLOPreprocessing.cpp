@@ -17,6 +17,7 @@
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 #include "tensorflow/compiler/mlir/xla/transforms/rewriters.h"
 
@@ -194,13 +195,55 @@ class FoldPadIntoMaxPool : public OpRewritePattern<xla_hlo::ReduceWindowOp> {
   }
 };
 
+// Remove reshape depthwise_conv filter applied by xla_hlo.
+class RemoveDepthwiseFilterReshape : public OpRewritePattern<xla_hlo::ConvOp> {
+ public:
+  using OpRewritePattern<xla_hlo::ConvOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(xla_hlo::ConvOp op,
+                                PatternRewriter &rewriter) const override {
+    auto reshapeOp =
+        dyn_cast_or_null<xla_hlo::ReshapeOp>(op.rhs().getDefiningOp());
+    if (!reshapeOp) return failure();
+    auto inputFilter =
+        reshapeOp.operand().getType().dyn_cast<RankedTensorType>();
+    auto reshapedFilter = op.rhs().getType().dyn_cast<RankedTensorType>();
+    if (!inputFilter || !reshapedFilter) return failure();
+    // Only remove filter reshapes for depthwise_conv inputs.
+    // Check filter spatial dim are the same.
+    for (const auto &dim : op.dimension_numbers().kernel_spatial_dimensions()) {
+      const auto dimValue = dim.getZExtValue();
+      if (inputFilter.getShape()[dimValue] !=
+          reshapedFilter.getShape()[dimValue]) {
+        return failure();
+      }
+    }
+    const auto featureInDim =
+        op.dimension_numbers().kernel_input_feature_dimension().getInt();
+    const auto featureOutDim =
+        op.dimension_numbers().kernel_output_feature_dimension().getInt();
+    if (reshapedFilter.getShape()[featureInDim] != 1) return failure();
+    if (reshapedFilter.getShape()[featureOutDim] !=
+        (inputFilter.getShape()[featureInDim] *
+         inputFilter.getShape()[featureOutDim]))
+      return failure();
+    if (op.feature_group_count().getZExtValue() == 1) return failure();
+    auto resultType = op.getResult().getType();
+    SmallVector<Value, 2> operands = {op.lhs(), reshapeOp.operand()};
+    auto newOp = rewriter.create<xla_hlo::ConvOp>(op.getLoc(), resultType,
+                                                  operands, op.getAttrs());
+    rewriter.replaceOp(op, newOp.getResult());
+    return success();
+  }
+};
+
 struct HLOToHLOPreprocessing
     : public PassWrapper<HLOToHLOPreprocessing, FunctionPass> {
   void runOnFunction() override {
     MLIRContext *context = &getContext();
     OwningRewritePatternList patterns;
     xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
-    patterns.insert<FoldPadIntoMaxPool>(context);
+    patterns.insert<FoldPadIntoMaxPool, RemoveDepthwiseFilterReshape>(context);
     applyPatternsGreedily(getOperation(), patterns);
   }
 };

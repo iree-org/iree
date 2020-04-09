@@ -57,3 +57,29 @@ func @maxpool(%input: tensor<1x16x16x64xf32>) -> tensor<1x8x8x64xf32> {
   } : (tensor<1x18x18x64xf32>, tensor<f32>) -> tensor<1x8x8x64xf32>
   return %2 : tensor<1x8x8x64xf32>
 }
+
+// -----
+
+// CHECK: @depth_conv(%[[ARG0:.*]]: tensor<2x4x5x2xf32>, %[[ARG1:.*]]: tensor<2x2x2x3xf32>)
+func @depth_conv(%arg0: tensor<2x4x5x2xf32>, %arg1: tensor<2x2x2x3xf32>) -> tensor<2x3x4x6xf32> {
+    // CHECK-NOT: xla_hlo.reshape
+    //CHECK: "xla_hlo.convolution"(%[[ARG0]], %[[ARG1]])
+    %0 = "xla_hlo.reshape"(%arg1) : (tensor<2x2x2x3xf32>) -> tensor<2x2x1x6xf32>
+    %1 = "xla_hlo.convolution"(%arg0, %0) {
+      batch_group_count = 1 : i64,
+      dimension_numbers = {
+        input_batch_dimension = 0 : i64,
+        input_feature_dimension = 3 : i64,
+        input_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>,
+        kernel_input_feature_dimension = 2 : i64,
+        kernel_output_feature_dimension = 3 : i64,
+        kernel_spatial_dimensions = dense<[0, 1]> : tensor<2xi64>,
+        output_batch_dimension = 0 : i64,
+        output_feature_dimension = 3 : i64,
+        output_spatial_dimensions = dense<[1, 2]> : tensor<2xi64>},
+     feature_group_count = 2 : i64,
+     padding = dense<0> : tensor<2x2xi64>,
+     rhs_dilation = dense<1> : tensor<2xi64>,
+     window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x5x2xf32>, tensor<2x2x1x6xf32>) -> tensor<2x3x4x6xf32>
+    return %1 : tensor<2x3x4x6xf32>
+}
