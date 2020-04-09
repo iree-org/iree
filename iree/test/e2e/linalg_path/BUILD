@@ -31,4 +31,5 @@ iree_lit_test_suite(
         "//iree/tools:iree-opt",
         "//iree/tools:iree-run-mlir",
     ],
+    tags = ["hostonly"],
 )

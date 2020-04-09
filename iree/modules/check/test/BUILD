@@ -39,5 +39,5 @@ iree_check_test_suite(
 iree_check_test_suite(
     name = "check_failure",
     srcs = ["failure.mlir"],
-    args = ["--expect_failure"],
+    runner_args = ["--expect_failure"],
 )

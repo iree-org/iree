@@ -40,6 +40,6 @@ iree_check_test_suite(
     check_failure
   SRCS
     "failure.mlir"
-  ARGS
+  RUNNER_ARGS
     "--expect_failure"
 )

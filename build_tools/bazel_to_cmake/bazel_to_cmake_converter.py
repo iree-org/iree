@@ -51,6 +51,11 @@ class BuildFileFunctions(object):
   # between similar rule conversions (e.g. cc_library and cc_binary).         #
   # ------------------------------------------------------------------------- #
 
+  def _convert_string_arg_block(self, name, value):
+    #  NAME
+    #    value
+    return f"  {name}\n    {value}\n"
+
   def _convert_name_block(self, name):
     #  NAME
     #    rule_name
@@ -513,24 +518,60 @@ class BuildFileFunctions(object):
                             f"{labels_block}"
                             f")\n\n")
 
-  def iree_check_test_suite(self,
-                            name,
-                            srcs=None,
-                            target_backends_and_drivers=None,
-                            args=None,
-                            tags=None,
-                            **kwargs):
+  def iree_check_single_backend_test_suite(self,
+                                           name,
+                                           srcs,
+                                           target_backend,
+                                           driver,
+                                           compiler_flags=None,
+                                           target_backends_and_drivers=None,
+                                           runner_args=None,
+                                           tags=None,
+                                           **kwargs):
     name_block = self._convert_name_block(name)
     srcs_block = self._convert_srcs_block(srcs)
+    target_backend_block = self._convert_string_arg_block(
+        "TARGET_BACKEND", target_backend)
+    driver_block = self._convert_string_arg_block("DRIVER", driver)
+    compiler_flags_block = self._convert_string_list_block(
+        "COMPILER_FLAGS", compiler_flags)
+    runner_args_block = self._convert_string_list_block("RUNNER_ARGS",
+                                                        runner_args)
+    labels_block = self._convert_string_list_block("LABELS", tags)
+
+    self.converter.body += (f"iree_check_single_backend_test_suite(\n"
+                            f"{name_block}"
+                            f"{srcs_block}"
+                            f"{target_backend_block}"
+                            f"{driver_block}"
+                            f"{compiler_flags_block}"
+                            f"{runner_args_block}"
+                            f"{labels_block}"
+                            f")\n\n")
+
+  def iree_check_test_suite(self,
+                            name,
+                            srcs,
+                            target_backends_and_drivers=None,
+                            compiler_flags=None,
+                            runner_args=None,
+                            tags=None,
+                            **kwargs):
     target_backends = None
     drivers = None
     if target_backends_and_drivers is not None:
       target_backends = [it[0] for it in target_backends_and_drivers]
       drivers = [it[1] for it in target_backends_and_drivers]
+
+    name_block = self._convert_name_block(name)
+    srcs_block = self._convert_srcs_block(srcs)
     target_backends_block = self._convert_string_list_block(
         "TARGET_BACKENDS", target_backends)
     drivers_block = self._convert_string_list_block("DRIVERS", drivers)
-    args_block = self._convert_string_list_block("ARGS", args)
+    compiler_flags_block = self._convert_string_list_block(
+        "COMPILER_FLAGS", compiler_flags)
+    runner_args_block = self._convert_string_list_block("RUNNER_ARGS",
+                                                        runner_args)
     labels_block = self._convert_string_list_block("LABELS", tags)
 
     self.converter.body += (f"iree_check_test_suite(\n"
@@ -538,7 +579,8 @@ class BuildFileFunctions(object):
                             f"{srcs_block}"
                             f"{target_backends_block}"
                             f"{drivers_block}"
-                            f"{args_block}"
+                            f"{compiler_flags_block}"
+                            f"{runner_args_block}"
                             f"{labels_block}"
                             f")\n\n")
 
