@@ -60,16 +60,16 @@ Tests in IREE's HAL "Conformance Test Suite" (CTS) actually exercise the Vulkan
 HAL, which includes checking for supported layers and extensions.
 
 Run the
-[allocator test](https://github.com/google/iree/blob/master/iree/hal/cts/allocator_test.cc):
+[device creation test](https://github.com/google/iree/blob/master/iree/hal/cts/device_creation_test.cc):
 
 ```shell
 # -- CMake --
 $ set VK_LOADER_DEBUG=all
-$ cmake --build build/ --target iree_hal_cts_allocator_test
-$ ./build/iree/hal/cts/iree_hal_cts_allocator_test
+$ cmake --build build/ --target iree_hal_cts_device_creation_test
+$ ./build/iree/hal/cts/iree_hal_cts_device_creation_test
 
 # -- Bazel --
-$ bazel test iree/hal/cts:allocator_test --test_env=VK_LOADER_DEBUG=all
+$ bazel test iree/hal/cts:device_creation_test --test_env=VK_LOADER_DEBUG=all --test_output=all
 ```
 
 If these tests pass, you can skip down to the next section.
