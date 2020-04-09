@@ -52,7 +52,7 @@ module {
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
     %12 = "xla_hlo.broadcast_in_dim"(%11) {broadcast_dimensions = dense<0> : tensor<1xi64>, name = "broadcast.23"} : (tensor<1xf32>) -> tensor<1x10xf32>
     %13 = "xla_hlo.subtract"(%10, %12) {name = "subtract.24"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xf32>
-    %14 = "xla_hlo.exp"(%13) {name = "exponential.25"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
+    %14 = "xla_hlo.exponential"(%13) {name = "exponential.25"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
     %cst_5 = constant  {name = "constant.27"} dense<0.5> : tensor<f32>
     %15 = "xla_hlo.reduce"(%14, %cst_5) ( {
     ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):   // no predecessors
@@ -177,7 +177,7 @@ module {
           %1 = iree.load_input(%arg1 : memref<1xf32>) : tensor<1xf32>
           %2 = "xla_hlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<0> : tensor<1xi64>, name = "broadcast.23"} : (tensor<1xf32>) -> tensor<1x10xf32>
           %3 = subf %0, %2 : tensor<1x10xf32>
-          %4 = "xla_hlo.exp"(%3) {name = "exponential.25"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
+          %4 = "xla_hlo.exponential"(%3) {name = "exponential.25"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
           iree.store_output(%4 : tensor<1x10xf32>, %arg2 : memref<1x10xf32>)
           iree.return
         }

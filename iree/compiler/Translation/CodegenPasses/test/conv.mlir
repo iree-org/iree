@@ -11,7 +11,7 @@ attributes {iree.dispatch_fn_name = ""} {
   // CHECK-SAME: padding = dense<[
   // CHECK-SAME:                  [0, 1], [0, 1]]> : tensor<2x2xi64>
   // CHECK-SAME: strides = [2, 1]}
-  %2 = "xla_hlo.conv"(%1, %0) {
+  %2 = "xla_hlo.convolution"(%1, %0) {
     batch_group_count = 1 : i64,
     dimension_numbers = {
       input_batch_dimension = 0 : i64,

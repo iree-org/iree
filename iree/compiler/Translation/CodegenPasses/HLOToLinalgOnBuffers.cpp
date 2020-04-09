@@ -138,11 +138,11 @@ struct DotOpConversion
 }  // namespace
 
 // -----------------------------------------------------------------------------
-// xla_hlo.conv conversion patterns and utility functions.
+// xla_hlo.convolution conversion patterns and utility functions.
 // -----------------------------------------------------------------------------
 
 namespace {
-/// Converts xla_hlo.conv operation linalg.conv op
+/// Converts xla_hlo.convolution operation linalg.conv op
 struct ConvOpConversion
     : public ConvertToLinalgBufferOp<ConvOpConversion, xla_hlo::ConvOp,
                                      linalg::ConvOp> {

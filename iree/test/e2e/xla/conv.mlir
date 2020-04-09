@@ -11,7 +11,7 @@ func @conv2d_nopadding() -> tensor<1x2x3x1xf32> {
         [[1.0], [2.0]], [[3.0], [4.0]]],
         [[[5.0], [6.0]], [[7.0], [8.0]]],
         [[[9.0], [10.0]], [[11.0], [12.0]]]]> : tensor<3x2x2x1xf32>
-  %2 = "xla_hlo.conv"(%0, %1) {
+  %2 = "xla_hlo.convolution"(%0, %1) {
         batch_group_count = 1 : i64,
         dimension_numbers = {
           input_batch_dimension = 0 : i64,
@@ -57,7 +57,7 @@ func @conv2d_1452x3221_same() -> tensor<1x4x5x1xf32> {
         [[[9.0], [10.0]],
          [[11.0], [12.0]]
         ]]> : tensor<3x2x2x1xf32>
-  %2 = "xla_hlo.conv"(%0, %1) {
+  %2 = "xla_hlo.convolution"(%0, %1) {
        batch_group_count = 1 : i64,
        dimension_numbers = {
          input_batch_dimension = 0 : i64,
@@ -113,7 +113,7 @@ func @conv2d_2451x2311_same() -> tensor<2x4x5x1xf32> {
          [[5.0]],
          [[6.0]]
         ]]> : tensor <2x3x1x1xf32>
-  %2 = "xla_hlo.conv"(%0, %1) {
+  %2 = "xla_hlo.convolution"(%0, %1) {
        batch_group_count = 1 : i64,
        dimension_numbers = {
          input_batch_dimension = 0 : i64,
@@ -237,7 +237,7 @@ func @conv2d_no_padding() -> tensor<2x3x3x6xf32> {
           [103.0, 104.0, 105.0, 106.0, 107.0, 108.0]
          ]
         ]]> : tensor<2x3x3x6xf32>
-  %2 = "xla_hlo.conv"(%0, %1) {
+  %2 = "xla_hlo.convolution"(%0, %1) {
        batch_group_count = 1 : i64,
        dimension_numbers = {
          input_batch_dimension = 0 : i64,
