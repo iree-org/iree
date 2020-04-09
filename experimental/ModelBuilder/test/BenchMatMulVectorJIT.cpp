@@ -28,8 +28,9 @@ static AffineMap makeMap(ModelBuilder &mb, int i, int j) {
 }
 
 // Helper method to build a NxN matrix-matrix-transpose multiplication function
-// using vector dialect that runs I times to amortize any calling overhead.
-template <unsigned N, unsigned I>
+// using the vector dialect and that runs ITERS times to amortize any calling
+// overhead.
+template <unsigned N, unsigned ITERS>
 void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   auto f32 = mb.f32;
   auto nnVectorType = mb.getVectorType({N, N}, f32);
@@ -57,21 +58,15 @@ void buildMatMat(ModelBuilder &mb, StringLiteral fn) {
   iterator_types.push_back(mb.getStringAttr("parallel"));
   iterator_types.push_back(mb.getStringAttr("reduction"));
 
-  // Loop I times over the kernel to amortize calling overhead.
-  auto loop =
-      b.create<loop::ForOp>(f.getLoc(), std_constant_index(0),
-                            std_constant_index(I), std_constant_index(1));
-
-  OpBuilder bodyBuilder = loop.getBodyBuilder();
-  {
-    edsc::ScopedContext bodyScope(bodyBuilder, f.getLoc());
+  // Loop ITERS times over the kernel to reduce the JIT's overhead.
+  StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)), C(f.getArgument(2));
+  ValueHandle i(mb.getIndexType());
+  LoopNestBuilder(&i, std_constant_index(0), std_constant_index(ITERS),
+                  std_constant_index(1))([&] {
     // Compute C += A x B^T with row-wise dot-products.
-    StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
-        C(f.getArgument(2));
     C() = (vector_contract(*A(), *B(), *C(), mb.getAffineMapArrayAttr(accesses),
                            mb.getArrayAttr(iterator_types)));
-  }
-
+  });
   std_ret();
 }
 

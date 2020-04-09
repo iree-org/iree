@@ -81,6 +81,10 @@ using edsc::intrinsics::std_ret;
 using edsc::intrinsics::StdIndexedValue;
 // From the Affine Dialect.
 using edsc::intrinsics::AffineIndexedValue;
+// From the Loop Dialect.
+using edsc::AffineLoopNestBuilder;
+using edsc::LoopNestBuilder;
+using edsc::ParallelLoopNestBuilder;
 // -----------------------------------------------------------------------------
 
 // Entry point class to build a whole model declaratively with C++ EDSCs.
