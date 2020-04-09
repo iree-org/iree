@@ -19,6 +19,8 @@
 #include <string>
 #include <utility>
 
+#include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "iree/base/bitfield.h"
 
 namespace iree {
@@ -88,6 +90,21 @@ class DeviceInfo {
   // listing. This handle will not be valid across driver instances or outside
   // of the current process.
   DriverDeviceID device_id() const { return device_id_; }
+
+  // Returns a debug string describing the device information.
+  std::string DebugString() const {
+    std::string features = FormatBitfieldValue(
+        supported_features_, {
+                                 {DeviceFeature::kDebugging, "kDebugging"},
+                                 {DeviceFeature::kCoverage, "kCoverage"},
+                                 {DeviceFeature::kProfiling, "kProfiling"},
+                             });
+
+    return absl::StrCat("[DeviceInfo]",                              //
+                        "\n  Name: ", name_,                         //
+                        "\n  Supported features: [", features, "]",  //
+                        "\n  Device ID: ", device_id_);
+  }
 
  private:
   const std::string id_;

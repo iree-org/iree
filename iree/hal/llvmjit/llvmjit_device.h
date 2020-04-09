@@ -32,6 +32,8 @@ class LLVMJITDevice final : public Device {
   explicit LLVMJITDevice(DeviceInfo device_info);
   ~LLVMJITDevice() override;
 
+  std::string DebugString() const override;
+
   Allocator* allocator() const override { return &allocator_; }
 
   absl::Span<CommandQueue*> dispatch_queues() const override {

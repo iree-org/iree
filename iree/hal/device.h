@@ -43,6 +43,9 @@ class Device : public RefObject<Device> {
   // Information about device capabilities.
   const DeviceInfo& info() const { return device_info_; }
 
+  // Returns a debug string describing the device.
+  virtual std::string DebugString() const { return device_info_.DebugString(); }
+
   // TODO(benvanik): status (thermal, power mode, etc).
 
   // TODO(benvanik): throttling adjustment/power profile.

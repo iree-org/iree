@@ -33,6 +33,8 @@ class VMLADevice final : public Device {
                       iree_vm_module_t* vmla_module);
   ~VMLADevice() override;
 
+  std::string DebugString() const override;
+
   Allocator* allocator() const override { return &allocator_; }
 
   absl::Span<CommandQueue*> dispatch_queues() const override {

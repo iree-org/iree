@@ -250,6 +250,7 @@ iree_cc_library(
     "device_info.h"
   DEPS
     absl::core_headers
+    absl::strings
     iree::base::bitfield
   PUBLIC
 )

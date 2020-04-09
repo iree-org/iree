@@ -33,6 +33,8 @@ class DawnDevice final : public Device {
                       ::wgpu::Device backend_device);
   ~DawnDevice() override;
 
+  std::string DebugString() const override;
+
   Allocator* allocator() const override { return &allocator_; }
 
   absl::Span<CommandQueue*> dispatch_queues() const override {

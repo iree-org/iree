@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"
@@ -119,6 +120,12 @@ StatusOr<ref_ptr<LLVMJITDevice>> LLVMJITDevice::CreateLLVMJITDevice(
 }
 
 LLVMJITDevice::~LLVMJITDevice() = default;
+
+std::string LLVMJITDevice::DebugString() const {
+  return absl::StrCat(Device::DebugString(),  //
+                      "\n[LLVMJITDevice]",    //
+                      "\n  Command Queues: ", command_queues_.size());
+}
 
 ref_ptr<ExecutableCache> LLVMJITDevice::CreateExecutableCache() {
   IREE_TRACE_SCOPE0("LLVMJITDevice::CreateExecutableCache");
