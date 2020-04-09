@@ -89,17 +89,10 @@ void DotProdOnVectors() {
       {N}, inputInit2);
 
   // Call the funcOp
-  const std::string funAdapterName =
-      (llvm::Twine("_mlir_ciface_") + funcName).str();
-  auto *bufferA = _A.get();
-  auto *bufferB = _B.get();
-  void *args[3] = {&bufferA, &bufferB};
-
   // CHECK: ( 0, 3, 6, 9 )
   // CHECK: ( 0, 2, 4, 6 )
   // CHECK: 84
-  auto err =
-      runner.engine->invoke(funAdapterName, MutableArrayRef<void *>{args});
+  auto err = runner.invoke(funcName, _A, _B);
 
   if (err) llvm_unreachable("Error running function.");
 }

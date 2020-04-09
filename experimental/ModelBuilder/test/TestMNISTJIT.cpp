@@ -14,7 +14,6 @@
 
 // RUN: test-mnist-jit 2>&1 | IreeFileCheck %s
 
-#include "experimental/ModelBuilder/MemRefUtils.h"
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
 // RunnerUtils.h with iostream needed for printMemRef atm
@@ -183,16 +182,10 @@ int main() {
   auto outputBuffer =
       makeInitializedUnrankedDescriptor<float, 2>({B, W3}, outputLinearInit);
 
-  // 5. Call the funcOp name `kFuncBuffersName` with arguments. Call the wrapped
-  // C-compatible function rather than the function defined above and delegate
-  // memref descriptor unpacking to generated code.
-  const std::string kFuncAdapterName =
-      (llvm::Twine("_mlir_ciface_") + kFuncBuffersName).str();
-  // runner.engine->invoke requires an extra level of indirection.
+  // 5. Call the funcOp name `kFuncBuffersName` with arguments.
   auto *inputDescriptor = inputBuffer.get();
-  void *args[2] = {&inputDescriptor, &outputBuffer->descriptor};
-  auto error = runner.engine->invoke(kFuncAdapterName,
-                                     llvm::MutableArrayRef<void *>{args});
+  void *args[] = {&inputDescriptor, &outputBuffer->descriptor};
+  auto error = runner.invokeIndirect(kFuncBuffersName, args);
 
   // 6. Dump content of output buffer for testing with FileCheck.
   if (error) {

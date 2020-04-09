@@ -19,7 +19,6 @@
 
 // clang-format on
 
-#include "experimental/ModelBuilder/MemRefUtils.h"
 #include "experimental/ModelBuilder/ModelBuilder.h"
 #include "experimental/ModelBuilder/ModelRunner.h"
 #include "llvm/Support/CommandLine.h"
@@ -83,15 +82,7 @@ void testVectorAdd1d(StringLiteral funcName, unsigned kNumElements) {
       {kNumElements}, zeroInit);
 
   // 4. Call the funcOp named `funcName`.
-  const std::string kFuncAdapterName =
-      (llvm::Twine("_mlir_ciface_") + funcName).str();
-  auto *bufferA = A.get();
-  auto *bufferB = B.get();
-  auto *bufferC = C.get();
-  void *args[3] = {&bufferA, &bufferB, &bufferC};
-
-  auto err =
-      runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
+  auto err = runner.invoke(funcName, A, B, C);
   if (err) llvm_unreachable("Error running function.");
 }
 
@@ -151,15 +142,7 @@ void testVectorAdd2d(StringLiteral funcName, unsigned kNumElements) {
       {kNumElements}, zeroInit);
 
   // 4. Call the funcOp named `funcName`.
-  const std::string kFuncAdapterName =
-      (llvm::Twine("_mlir_ciface_") + funcName).str();
-  auto *bufferA = A.get();
-  auto *bufferB = B.get();
-  auto *bufferC = C.get();
-  void *args[3] = {&bufferA, &bufferB, &bufferC};
-
-  auto err =
-      runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
+  auto err = runner.invoke(funcName, A, B, C);
   if (err) llvm_unreachable("Error running function.");
 }
 

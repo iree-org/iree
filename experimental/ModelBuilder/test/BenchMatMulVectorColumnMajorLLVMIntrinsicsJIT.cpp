@@ -108,13 +108,7 @@ void BM_MxMColMajorVectors(benchmark::State &state) {
   auto A = makeInitializedStridedMemRefDescriptor<TypeLHS, 1>({1}, oneInit);
   auto B = makeInitializedStridedMemRefDescriptor<TypeRHS, 1>({1}, incInit);
   auto C = makeInitializedStridedMemRefDescriptor<TypeRES, 1>({1}, zeroInit);
-  auto *bufferA = A.get();
-  auto *bufferB = B.get();
-  auto *bufferC = C.get();
-  void *args[3] = {&bufferA, &bufferB, &bufferC};
   StringLiteral funcName = "matmult_column_major";
-  const std::string kFuncAdapterName =
-      (llvm::Twine("_mlir_ciface_") + funcName).str();
 
   vector::VectorTransformsOptions vectorTransformsOptions{
       LowerToLLVMMatrixIntrinsics};
@@ -129,8 +123,7 @@ void BM_MxMColMajorVectors(benchmark::State &state) {
       buildMatMat<M, N, K, 1>(builder, funcName);
       ModelRunner runner(builder.getModuleRef());
       runner.compile(compilationOptions);
-      auto err = runner.engine->invoke(kFuncAdapterName,
-                                       MutableArrayRef<void *>{args});
+      auto err = runner.invoke(funcName, A, B, C);
       if (err) llvm_unreachable("Error compiling/running function.");
     }
   } else {
@@ -142,12 +135,10 @@ void BM_MxMColMajorVectors(benchmark::State &state) {
     buildMatMat<M, N, K, NumMxMPerIteration>(builder, funcName);
     ModelRunner runner(builder.getModuleRef());
     runner.compile(compilationOptions);
-    auto err =
-        runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
+    auto err = runner.invoke(funcName, A, B, C);
     if (err) llvm_unreachable("Error compiling/running function.");
     for (auto _ : state) {
-      auto err_run = runner.engine->invoke(kFuncAdapterName,
-                                           MutableArrayRef<void *>{args});
+      auto err_run = runner.invoke(funcName, A, B, C);
       if (err_run) llvm_unreachable("Error running function.");
     }
   }

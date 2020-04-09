@@ -47,6 +47,7 @@
 #ifndef IREE_EXPERIMENTAL_MODELBUILDER_MODELRUNNER_H_
 #define IREE_EXPERIMENTAL_MODELBUILDER_MODELRUNNER_H_
 
+#include "experimental/ModelBuilder/MemRefUtils.h"
 #include "mlir/Dialect/Vector/VectorOps.h"
 #include "mlir/ExecutionEngine/ExecutionEngine.h"
 #include "mlir/IR/Module.h"
@@ -87,6 +88,40 @@ class ModelRunner {
   // Reference to the compiled module.
   mlir::OwningModuleRef &module;
 
+  // Indirect invocation where the caller sets up the proper indirect pointers
+  // and passes a void** `args` parameter.
+  llvm::Error invokeIndirect(StringRef funcName, void **args) {
+    const std::string adapterName =
+        std::string("_mlir_ciface_") + funcName.str();
+    return engine->invoke(adapterName, llvm::MutableArrayRef<void *>{*args});
+  }
+
+  // Get the underlying data for a StridedMemRefType wrapped in a unique_ptr.
+  // Used with SFINAE.
+  template <typename T, typename Fun, int U>
+  void *getData(std::unique_ptr<StridedMemRefType<T, U>, Fun> &arg) {
+    return arg.get();
+  }
+  // Get the underlying data for an UnrankedMemRefType wrapped in a unique_ptr.
+  // Used with SFINAE.
+  template <typename T, typename Fun>
+  void *getData(std::unique_ptr<::UnrankedMemRefType<T>, Fun> &arg) {
+    return arg->descriptor;
+  }
+  // Direct invocation based on MemRefType which automatically packs the data.
+  template <typename... Args>
+  llvm::Error invoke(StringRef funcName, Args &... args) {
+    const std::string adapterName =
+        std::string("_mlir_ciface_") + funcName.str();
+    void *argsArray[] = {getData(args)...};
+    std::array<void *, sizeof...(Args)> argsArray2;
+    for (unsigned i = 0; i < sizeof...(Args); ++i)
+      argsArray2[i] = &argsArray[i];
+    return engine->invoke(adapterName,
+                          llvm::MutableArrayRef<void *>{argsArray2});
+  }
+
+ private:
   // An execution engine and an associated target machine. The latter must
   // outlive the former since it may be used by the transformation layers.
   std::unique_ptr<mlir::ExecutionEngine> engine;

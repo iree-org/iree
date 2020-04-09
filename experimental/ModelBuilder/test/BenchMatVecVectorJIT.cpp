@@ -101,13 +101,7 @@ void BM_MxV_UsingVector(benchmark::State &state) {
       {1}, oneInit);
   auto C = makeInitializedStridedMemRefDescriptor<Vector1D<N, float>, 1>(
       {1}, zeroInit);
-  auto *bufferA = A.get();
-  auto *bufferB = B.get();
-  auto *bufferC = C.get();
-  void *args[3] = {&bufferA, &bufferB, &bufferC};
   StringLiteral funcName = "matvec_mult";
-  const std::string kFuncAdapterName =
-      (llvm::Twine("_mlir_ciface_") + funcName).str();
 
   if (MeasureBuild) {
     // If this is a build-time benchmark, build, compile, and execute
@@ -118,8 +112,7 @@ void BM_MxV_UsingVector(benchmark::State &state) {
       buildMatMat<N, 1>(builder, funcName);
       ModelRunner runner(builder.getModuleRef());
       runner.compile(CompilationOptions());
-      auto err = runner.engine->invoke(kFuncAdapterName,
-                                       MutableArrayRef<void *>{args});
+      auto err = runner.invoke(funcName, A, B, C);
       if (err) llvm_unreachable("Error compiling/running function.");
     }
   } else {
@@ -131,12 +124,10 @@ void BM_MxV_UsingVector(benchmark::State &state) {
     buildMatMat<N, 1000>(builder, funcName);
     ModelRunner runner(builder.getModuleRef());
     runner.compile(CompilationOptions());
-    auto err =
-        runner.engine->invoke(kFuncAdapterName, MutableArrayRef<void *>{args});
+    auto err = runner.invoke(funcName, A, B, C);
     if (err) llvm_unreachable("Error compiling/running function.");
     for (auto _ : state) {
-      auto err_run = runner.engine->invoke(kFuncAdapterName,
-                                           MutableArrayRef<void *>{args});
+      auto err_run = runner.invoke(funcName, A, B, C);
       if (err_run) llvm_unreachable("Error running function.");
     }
   }
