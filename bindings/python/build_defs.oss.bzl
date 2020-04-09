@@ -35,6 +35,10 @@ PYBIND_EXTENSION_COPTS = [
     "-fvisibility=hidden",
 ]
 
+PYBIND_REGISTER_MLIR_PASSES = [
+    "-DIREE_REGISTER_MLIR_PASSES",
+]
+
 # Optional deps to enable an intree TensorFlow python. This build configuration
 # defaults to getting TensorFlow from the python environment (empty).
 INTREE_TENSORFLOW_PY_DEPS = []
@@ -49,7 +53,7 @@ def pybind_cc_library(
     """Wrapper cc_library for deps that are part of the python bindings."""
     cc_library(
         name = name,
-        copts = PYBIND_COPTS,
+        copts = copts + PYBIND_COPTS,
         features = PYBIND_FEATURES,
         deps = [
             "@iree_pybind11//:pybind11",

@@ -16,5 +16,6 @@ set(NUMPY_DEPS "")
 
 set(PYBIND_COPTS "-fexceptions")
 set(PYBIND_EXTENSION_COPTS "-fvisibility=hidden")
+set(PYBIND_REGISTER_MLIR_PASSES "-DIREE_REGISTER_MLIR_PASSES")
 
 add_subdirectory(pyiree)

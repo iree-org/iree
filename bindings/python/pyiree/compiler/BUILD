@@ -18,6 +18,7 @@ load(
     "PYBIND_COPTS",
     "PYBIND_EXTENSION_COPTS",
     "PYBIND_FEATURES",
+    "PYBIND_REGISTER_MLIR_PASSES",
     "iree_py_extension",
     "iree_py_library",
     "iree_py_test",
@@ -83,6 +84,7 @@ pybind_cc_library(
     hdrs = [
         "compiler.h",
     ],
+    copts = PYBIND_REGISTER_MLIR_PASSES,
     tags = ["nokokoro"],
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",

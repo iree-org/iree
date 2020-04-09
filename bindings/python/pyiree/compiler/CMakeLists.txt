@@ -64,6 +64,8 @@ iree_pybind_cc_library(
     MLIRLoopOpsTransforms
     MLIRParser
     MLIRPass
+  COPTS
+    ${PYBIND_REGISTER_MLIR_PASSES}
   TYPE
     STATIC
 )
