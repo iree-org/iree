@@ -45,7 +45,10 @@ jobs:
         run: |
           git checkout -f gh-pages
           cp -rf ${IREE_DOC_BUILD_DIR}/doc/* docs/
-          git add docs/
+          # The index.md will be the landing page. It should be placed in the
+          # top directory.
+          mv -f docs/index.md .
+          git add docs/ index.md
           echo "::set-env name=has_diff::false"
           git diff --cached --exit-code || echo "::set-env name=has_diff::true"
       - name: Committing updates
