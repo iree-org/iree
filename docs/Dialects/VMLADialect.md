@@ -768,6 +768,81 @@ expanded into VM ops and the vmla.buffer.const op.
 `dst` | buffer
 `dst_shape` | Ranked shape type
 
+### `vmla.pooling.max` (IREE::VMLA::PoolingMaxOp)
+
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | TypeAttr | any type attribute
+`window_dimensions` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`window_strides` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`padding` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`init` | buffer
+`init_shape` | Ranked shape type
+`dst` | buffer
+`dst_shape` | Ranked shape type
+
+### `vmla.pooling.min` (IREE::VMLA::PoolingMinOp)
+
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | TypeAttr | any type attribute
+`window_dimensions` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`window_strides` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`padding` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`init` | buffer
+`init_shape` | Ranked shape type
+`dst` | buffer
+`dst_shape` | Ranked shape type
+
+### `vmla.pooling.sum` (IREE::VMLA::PoolingSumOp)
+
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`element_type` | TypeAttr | any type attribute
+`window_dimensions` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`window_strides` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+`padding` | DenseIntElementsAttr | 32-bit signless integer elements attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`init` | buffer
+`init_shape` | Ranked shape type
+`dst` | buffer
+`dst_shape` | Ranked shape type
+
 ### `vmla.pow` (IREE::VMLA::PowOp)
 
 
