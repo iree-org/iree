@@ -60,6 +60,7 @@ VMLA_CHECK_TESTS = [
     "sin.mlir",
     "slice.mlir",
     "sqrt.mlir",
+    "while.mlir",
 ]
 
 VULKAN_CHECK_TESTS = [
@@ -96,6 +97,7 @@ VULKAN_CHECK_TESTS = [
     "sin.mlir",
     "slice.mlir",
     "sqrt.mlir",
+    "while.mlir",
 ]
 
 LINALG_TO_SPIRV_VULKAN_CHECK_TESTS = [
@@ -147,6 +149,7 @@ LLVMJIT_CHECK_TESTS = [
     "rsqrt.mlir",
     "select.mlir",
     "sqrt.mlir",
+    "while.mlir",
 ]
 
 LEGACY_LIT_TESTS = [
@@ -165,7 +168,6 @@ LEGACY_LIT_TESTS = [
     "scalar.mlir",
     "store.mlir",
     "unidirectional_lstm.mlir",
-    "while.mlir",
 ]
 
 iree_lit_test_suite(

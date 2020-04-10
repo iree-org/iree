@@ -33,7 +33,6 @@ iree_lit_test_suite(
     "scalar.mlir"
     "store.mlir"
     "unidirectional_lstm.mlir"
-    "while.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
@@ -71,6 +70,7 @@ iree_check_single_backend_test_suite(
     "pad.mlir"
     "reduce_float.mlir"
     "reduce_int.mlir"
+    "reduce_window.mlir"
     "rem.mlir"
     "reshape.mlir"
     "reshape_adddims.mlir"
@@ -81,6 +81,7 @@ iree_check_single_backend_test_suite(
     "sin.mlir"
     "slice.mlir"
     "sqrt.mlir"
+    "while.mlir"
   TARGET_BACKEND
     vmla
   DRIVER
@@ -124,6 +125,7 @@ iree_check_single_backend_test_suite(
     "sin.mlir"
     "slice.mlir"
     "sqrt.mlir"
+    "while.mlir"
   TARGET_BACKEND
     vulkan-spirv
   DRIVER
@@ -191,6 +193,7 @@ iree_check_single_backend_test_suite(
     "rsqrt.mlir"
     "select.mlir"
     "sqrt.mlir"
+    "while.mlir"
   TARGET_BACKEND
     llvm-ir
   DRIVER
