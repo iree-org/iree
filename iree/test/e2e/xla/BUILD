@@ -169,6 +169,7 @@ iree_lit_test_suite(
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
     ],
+    tags = ["hostonly"],
 )
 
 iree_check_single_backend_test_suite(

@@ -39,6 +39,8 @@ iree_lit_test_suite(
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
+  LABELS
+    "hostonly"
 )
 
 iree_check_single_backend_test_suite(
