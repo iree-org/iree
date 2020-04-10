@@ -94,7 +94,8 @@ def models():
 class AppTest(tf_test_utils.SavedModelTestCase):
 
   def test_application(self):
-    input_data = np.random.rand(np.prod(np.array(INPUT_SHAPE)))
+    input_data = np.random.rand(np.prod(np.array(INPUT_SHAPE))).astype(
+        np.float32)
     input_data = input_data.reshape(INPUT_SHAPE)
     self.modules.applications.all.predict(input_data).print().assert_all_close()
 
