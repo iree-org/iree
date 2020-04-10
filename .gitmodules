@@ -48,3 +48,6 @@
 [submodule "third_party/ruy"]
 	path = third_party/ruy
 	url = https://github.com/google/ruy
+[submodule "third_party/tracy"]
+	path = third_party/tracy
+	url = https://github.com/wolfpld/tracy.git
