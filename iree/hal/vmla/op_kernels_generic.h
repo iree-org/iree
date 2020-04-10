@@ -779,6 +779,92 @@ Status ReduceMax::Execute(absl::Span<const T> src_buffer,
       src_buffer, init_buffer, dst_buffer, dimension, src_shape, dst_shape);
 }
 
+namespace impl {
+
+template <typename T, typename KernelImpl>
+Status ComputePoolingWindow(absl::Span<const T> src_buffer,
+                            absl::Span<const int> src_indices,
+                            const Shape& src_shape, T init_value,
+                            const Shape& window_dimensions, T* dst_value) {
+  int rank = src_shape.size();
+  absl::InlinedVector<int, 8> window_indices(rank, 0);
+  auto getSrcValue = [&]() -> T {
+    int flat_idx = 0;
+    for (int i = 0; i < rank; ++i) {
+      int idx = src_indices[i] + window_indices[i];
+      if (idx < 0 || idx >= src_shape[i]) return init_value;
+      flat_idx = flat_idx * src_shape[i] + idx;
+    }
+    return src_buffer[flat_idx];
+  };
+
+  *dst_value = init_value;
+  for (int i = 0, e = window_dimensions.element_count(); i < e; ++i) {
+    KernelImpl()(dst_value, getSrcValue());
+    IncrementShapeIndex(absl::MakeSpan(window_indices), window_dimensions);
+  }
+  return OkStatus();
+}
+
+template <typename T, typename KernelImpl>
+Status GenericPooling(absl::Span<const T> src_buffer,
+                      absl::Span<const T> init_buffer, absl::Span<T> dst_buffer,
+                      const Shape& src_shape, const Shape& dst_shape,
+                      const Shape& window_dimensions, const Shape& strides,
+                      const Shape& pad_low) {
+  int rank = src_shape.size();
+  absl::InlinedVector<int, 8> src_indices(rank, 0);
+  absl::InlinedVector<int, 8> dst_indices(rank, 0);
+  for (int i = 0, e = dst_shape.element_count(); i < e; ++i) {
+    for (int j = 0; j < rank; ++j)
+      src_indices[j] = dst_indices[j] * strides[j] - pad_low[j];
+    Status status = ComputePoolingWindow<T, KernelImpl>(
+        src_buffer, src_indices, src_shape, init_buffer[0], window_dimensions,
+        &dst_buffer[i]);
+    if (!status.ok()) return status;
+    IncrementShapeIndex(absl::MakeSpan(dst_indices), dst_shape);
+  }
+  return OkStatus();
+}
+
+}  // namespace impl
+
+template <typename T>
+Status PoolingSum::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<const T> init_buffer,
+                           absl::Span<T> dst_buffer, const Shape& src_shape,
+                           const Shape& dst_shape,
+                           const Shape& window_dimensions, const Shape& strides,
+                           const Shape& pad_low) {
+  return impl::GenericPooling<T, impl::SumKernel>(
+      src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
+      window_dimensions, strides, pad_low);
+}
+
+template <typename T>
+Status PoolingMin::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<const T> init_buffer,
+                           absl::Span<T> dst_buffer, const Shape& src_shape,
+                           const Shape& dst_shape,
+                           const Shape& window_dimensions, const Shape& strides,
+                           const Shape& pad_low) {
+  return impl::GenericPooling<T, impl::MinKernel>(
+      src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
+      window_dimensions, strides, pad_low);
+}
+
+template <typename T>
+Status PoolingMax::Execute(absl::Span<const T> src_buffer,
+                           absl::Span<const T> init_buffer,
+                           absl::Span<T> dst_buffer, const Shape& src_shape,
+                           const Shape& dst_shape,
+                           const Shape& window_dimensions, const Shape& strides,
+                           const Shape& pad_low) {
+  return impl::GenericPooling<T, impl::MaxKernel>(
+      src_buffer, init_buffer, dst_buffer, src_shape, dst_shape,
+      window_dimensions, strides, pad_low);
+}
+
 }  // namespace kernels
 }  // namespace vmla
 }  // namespace hal

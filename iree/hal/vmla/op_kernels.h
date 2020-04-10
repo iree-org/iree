@@ -392,6 +392,33 @@ struct ReduceMax {
                         const Shape& src_shape, const Shape& dst_shape);
 };
 
+struct PoolingSum {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<const T> init_buffer,
+                        absl::Span<T> dst_buffer, const Shape& src_shape,
+                        const Shape& dst_shape, const Shape& window_dimensions,
+                        const Shape& strides, const Shape& pad_low);
+};
+
+struct PoolingMin {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<const T> init_buffer,
+                        absl::Span<T> dst_buffer, const Shape& src_shape,
+                        const Shape& dst_shape, const Shape& window_dimensions,
+                        const Shape& strides, const Shape& pad_low);
+};
+
+struct PoolingMax {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<const T> init_buffer,
+                        absl::Span<T> dst_buffer, const Shape& src_shape,
+                        const Shape& dst_shape, const Shape& window_dimensions,
+                        const Shape& strides, const Shape& pad_low);
+};
+
 }  // namespace kernels
 }  // namespace vmla
 }  // namespace hal

@@ -744,6 +744,31 @@ class VMLAModuleState final {
   IREE_VMLA_REDUCTION_OP(ReduceMaxI32, kernels::ReduceMax, int32_t);
   IREE_VMLA_REDUCTION_OP(ReduceMaxF32, kernels::ReduceMax, float);
 
+#define IREE_VMLA_POOLING_OP(name, kernel, type)                              \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,               \
+              vm::ref<Buffer> init, iree_vmla_shape_t init_shape,             \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,               \
+              iree_vmla_shape_t window_dimensions, iree_vmla_shape_t strides, \
+              iree_vmla_shape_t pad_low) {                                    \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                             \
+    return kernel::Execute<type>(src->As<type>(), init->As<type>(),           \
+                                 dst->As<type>(), Shape(src_shape),           \
+                                 Shape(dst_shape), Shape(window_dimensions),  \
+                                 Shape(strides), Shape(pad_low));             \
+  }
+  IREE_VMLA_POOLING_OP(PoolingSumI8, kernels::PoolingSum, int8_t);
+  IREE_VMLA_POOLING_OP(PoolingSumI16, kernels::PoolingSum, int16_t);
+  IREE_VMLA_POOLING_OP(PoolingSumI32, kernels::PoolingSum, int32_t);
+  IREE_VMLA_POOLING_OP(PoolingSumF32, kernels::PoolingSum, float);
+  IREE_VMLA_POOLING_OP(PoolingMinI8, kernels::PoolingMin, int8_t);
+  IREE_VMLA_POOLING_OP(PoolingMinI16, kernels::PoolingMin, int16_t);
+  IREE_VMLA_POOLING_OP(PoolingMinI32, kernels::PoolingMin, int32_t);
+  IREE_VMLA_POOLING_OP(PoolingMinF32, kernels::PoolingMin, float);
+  IREE_VMLA_POOLING_OP(PoolingMaxI8, kernels::PoolingMax, int8_t);
+  IREE_VMLA_POOLING_OP(PoolingMaxI16, kernels::PoolingMax, int16_t);
+  IREE_VMLA_POOLING_OP(PoolingMaxI32, kernels::PoolingMax, int32_t);
+  IREE_VMLA_POOLING_OP(PoolingMaxF32, kernels::PoolingMax, float);
+
  private:
   iree_allocator_t allocator_;
 
@@ -906,6 +931,19 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("reduce.max.i16", &VMLAModuleState::ReduceMaxI16),
     vm::MakeNativeFunction("reduce.max.i32", &VMLAModuleState::ReduceMaxI32),
     vm::MakeNativeFunction("reduce.max.f32", &VMLAModuleState::ReduceMaxF32),
+
+    vm::MakeNativeFunction("pooling.sum.i8", &VMLAModuleState::PoolingSumI8),
+    vm::MakeNativeFunction("pooling.sum.i16", &VMLAModuleState::PoolingSumI16),
+    vm::MakeNativeFunction("pooling.sum.i32", &VMLAModuleState::PoolingSumI32),
+    vm::MakeNativeFunction("pooling.sum.f32", &VMLAModuleState::PoolingSumF32),
+    vm::MakeNativeFunction("pooling.min.i8", &VMLAModuleState::PoolingMinI8),
+    vm::MakeNativeFunction("pooling.min.i16", &VMLAModuleState::PoolingMinI16),
+    vm::MakeNativeFunction("pooling.min.i32", &VMLAModuleState::PoolingMinI32),
+    vm::MakeNativeFunction("pooling.min.f32", &VMLAModuleState::PoolingMinF32),
+    vm::MakeNativeFunction("pooling.max.i8", &VMLAModuleState::PoolingMaxI8),
+    vm::MakeNativeFunction("pooling.max.i16", &VMLAModuleState::PoolingMaxI16),
+    vm::MakeNativeFunction("pooling.max.i32", &VMLAModuleState::PoolingMaxI32),
+    vm::MakeNativeFunction("pooling.max.f32", &VMLAModuleState::PoolingMaxF32),
 
     vm::MakeNativeFunction("batch.matmul.f32f32.f32",
                            &VMLAModuleState::BatchMatMulF32F32F32),

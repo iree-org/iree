@@ -412,4 +412,103 @@ vm.import @reduce.max.f32(
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
 )
 
+vm.import @pooling.sum.i8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.sum.i16(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.sum.i32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.sum.f32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+
+vm.import @pooling.min.i8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.min.i16(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.min.i32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.min.f32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+
+vm.import @pooling.max.i8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.max.i16(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.max.i32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+vm.import @pooling.max.f32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %init : !vm.ref<!vmla.buffer>, %init_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %window_dimensions: i32 ...,
+  %window_strides: i32 ...,
+  %padding: i32 ...
+)
+
 }  // module

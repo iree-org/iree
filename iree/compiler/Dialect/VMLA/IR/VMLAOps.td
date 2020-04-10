@@ -401,6 +401,26 @@ def VMLA_ReduceSumOp : VMLA_ReduceOp<"reduce.sum">;
 def VMLA_ReduceMinOp : VMLA_ReduceOp<"reduce.min">;
 def VMLA_ReduceMaxOp : VMLA_ReduceOp<"reduce.max">;
 
+class VMLA_PoolingOp<string mnemonic, list<OpTrait> traits = []> :
+    VMLA_ElementTypeOp<mnemonic, !listconcat(traits, [VMLA_IncludeShapes])> {
+  let arguments = (ins
+    VMLA_Buffer:$src,
+    VMLA_Shape:$src_shape,
+    VMLA_Buffer:$init,
+    VMLA_Shape:$init_shape,
+    VMLA_Buffer:$dst,
+    VMLA_Shape:$dst_shape,
+    VMLA_AnyTypeAttr:$element_type,
+    I32ElementsAttr:$window_dimensions,
+    I32ElementsAttr:$window_strides,
+    I32ElementsAttr:$padding
+  );
+}
+
+def VMLA_PoolingSumOp : VMLA_PoolingOp<"pooling.sum">;
+def VMLA_PoolingMinOp : VMLA_PoolingOp<"pooling.min">;
+def VMLA_PoolingMaxOp : VMLA_PoolingOp<"pooling.max">;
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: ABI
 //===----------------------------------------------------------------------===//

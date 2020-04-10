@@ -224,6 +224,84 @@ struct GenericReduceOpConversion
   TypeConverter &typeConverter;
 };
 
+struct BuiltinPoolingOpConversion
+    : public OpConversionPattern<xla_hlo::ReduceWindowOp> {
+  BuiltinPoolingOpConversion(MLIRContext *context, TypeConverter &typeConverter)
+      : OpConversionPattern(context, /*benefit=*/1000),
+        typeConverter(typeConverter) {}
+
+  LogicalResult matchAndRewrite(
+      xla_hlo::ReduceWindowOp srcOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (srcOp.body().getBlocks().size() > 1) {
+      // Control flow within the computation is not supported; bail to fallback.
+      return failure();
+    } else if (srcOp.body().front().getOperations().size() > 2) {
+      // Require splitting first.
+      return failure();
+    }
+
+    auto operand = operands[0];
+    auto operandShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.operand(), typeConverter, rewriter);
+    auto initValue = operands[1];
+    auto initValueShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.init_value(), typeConverter, rewriter);
+    auto dst = VMLAConversionTarget::allocateOutputBuffer(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    auto dstShape = VMLAConversionTarget::getTensorShape(
+        srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
+    auto elementType =
+        srcOp.operand().getType().cast<ShapedType>().getElementType();
+
+    SmallVector<int32_t, 4> windowDimensions;
+    for (const auto &value : srcOp.window_dimensions().getIntValues())
+      windowDimensions.push_back(value.getSExtValue());
+    int rank = windowDimensions.size();
+    SmallVector<int32_t, 4> windowStrides(rank, 1);
+    SmallVector<int32_t, 4> padding(rank, 0);
+    for (unsigned i = 0; i < rank; ++i) {
+      if (srcOp.window_strides())
+        windowStrides[i] = srcOp.window_stridesAttr().getValue<int64_t>(i);
+      if (srcOp.padding())
+        padding[i] = srcOp.paddingAttr().getValue<int64_t>({i, 0});
+    }
+
+    auto &computeOp = *srcOp.body().front().begin();
+    if (isa<mlir::AddIOp>(computeOp) || isa<mlir::AddFOp>(computeOp) ||
+        isa<xla_hlo::AddOp>(computeOp)) {
+      rewriter.create<IREE::VMLA::PoolingSumOp>(
+          srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
+          dstShape, TypeAttr::get(elementType),
+          rewriter.getI32VectorAttr(windowDimensions),
+          rewriter.getI32VectorAttr(windowStrides),
+          rewriter.getI32VectorAttr(padding));
+    } else if (isa<xla_hlo::MinOp>(computeOp)) {
+      rewriter.create<IREE::VMLA::PoolingMinOp>(
+          srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
+          dstShape, TypeAttr::get(elementType),
+          rewriter.getI32VectorAttr(windowDimensions),
+          rewriter.getI32VectorAttr(windowStrides),
+          rewriter.getI32VectorAttr(padding));
+    } else if (isa<xla_hlo::MaxOp>(computeOp)) {
+      rewriter.create<IREE::VMLA::PoolingMaxOp>(
+          srcOp.getLoc(), operand, operandShape, initValue, initValueShape, dst,
+          dstShape, TypeAttr::get(elementType),
+          rewriter.getI32VectorAttr(windowDimensions),
+          rewriter.getI32VectorAttr(windowStrides),
+          rewriter.getI32VectorAttr(padding));
+    } else {
+      computeOp.emitRemark() << "unsupported builtin reduction operation";
+      return failure();
+    }
+
+    rewriter.replaceOp(srcOp, {dst});
+    return success();
+  }
+
+  TypeConverter &typeConverter;
+};
+
 }  // namespace
 
 void populateHLOReductionToVMLAPatterns(MLIRContext *context,
@@ -232,6 +310,7 @@ void populateHLOReductionToVMLAPatterns(MLIRContext *context,
   patterns.insert<SplitIndependentReductionOpConversion>(context,
                                                          typeConverter);
   patterns.insert<BuiltinReduceOpConversion>(context, typeConverter);
+  patterns.insert<BuiltinPoolingOpConversion>(context, typeConverter);
   patterns.insert<GenericReduceOpConversion>(context, typeConverter);
 }
 

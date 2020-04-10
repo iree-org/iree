@@ -48,6 +48,7 @@ VMLA_CHECK_TESTS = [
     "pad.mlir",
     "reduce_float.mlir",
     "reduce_int.mlir",
+    "reduce_window.mlir",
     "rem.mlir",
     "reshape.mlir",
     "reshape_adddims.mlir",

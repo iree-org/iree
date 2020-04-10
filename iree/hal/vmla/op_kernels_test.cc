@@ -401,6 +401,63 @@ TEST(ReduceMin, TwoDimensionsToOne) {
   }
 }
 
+TEST(PoolingMax, NoOverlapping) {
+  Shape src_shape = {1, 4, 6, 1};
+  Shape dst_shape = {1, 2, 2, 1};
+  Shape window_sizes = {1, 2, 3, 1};
+  Shape strides = {1, 2, 3, 1};
+  Shape pad_low = {0, 0, 0, 0};
+  std::vector<int> src_buffer = MakeIota<int>(src_shape.element_count());
+  std::vector<int> init_buffer(1, 0.0f);
+  std::vector<int> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<int> expected_dst = {9, 12, 21, 24};
+
+  EXPECT_OK(PoolingMax::Execute<int>(
+      src_buffer, init_buffer, absl::MakeSpan(dst_buffer), src_shape, dst_shape,
+      window_sizes, strides, pad_low));
+  EXPECT_EQ(dst_buffer, expected_dst);
+}
+
+TEST(PoolingMin, Padding) {
+  // Padded input:
+  // 100 100 100 100
+  // 100   1   2   3
+  // 100   4   5   6
+  Shape src_shape = {2, 3};
+  Shape dst_shape = {2, 3};
+  Shape window_sizes = {2, 2};
+  Shape strides = {1, 1};
+  Shape pad_low = {1, 1};
+  std::vector<int> src_buffer = MakeIota<int>(src_shape.element_count());
+  std::vector<int> init_buffer(1, 100.0);
+  std::vector<int> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<int> expected_dst = {1, 1, 2, 1, 1, 2};
+
+  EXPECT_OK(PoolingMin::Execute<int>(
+      src_buffer, init_buffer, absl::MakeSpan(dst_buffer), src_shape, dst_shape,
+      window_sizes, strides, pad_low));
+  EXPECT_EQ(dst_buffer, expected_dst);
+}
+
+TEST(PoolingSum, Overlapping) {
+  Shape src_shape = {3, 4};
+  Shape dst_shape = {2, 2};
+  Shape window_sizes = {2, 3};
+  Shape strides = {1, 1};
+  Shape pad_low = {0, 0};
+  std::vector<float> src_buffer = MakeIota<float>(src_shape.element_count());
+  std::vector<float> init_buffer(1, 0.0f);
+  std::vector<float> dst_buffer(dst_shape.element_count(), 0.0f);
+  std::vector<float> expected_dst = {24, 30, 48, 54};
+
+  EXPECT_OK(PoolingSum::Execute<float>(
+      src_buffer, init_buffer, absl::MakeSpan(dst_buffer), src_shape, dst_shape,
+      window_sizes, strides, pad_low));
+  for (int i = 0; i < dst_buffer.size(); ++i) {
+    EXPECT_NEAR(expected_dst[i], dst_buffer[i], kEpsilon);
+  }
+}
+
 TEST(Conv2d, NoDilation) {
   Shape input_shape = {4, 5, 2};
   Shape filter_shape = {3, 2, 2, 1};
