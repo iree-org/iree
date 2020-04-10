@@ -1,20 +1,13 @@
-// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s | IreeFileCheck %s
-// RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s | IreeFileCheck %s)
-
-// CHECK-LABEL: EXEC @tensor
-func @tensor() -> tensor<4xf32> {
+func @tensor() attributes { iree.module.export } {
   %input = iree.unfoldable_constant dense<[0.0, 1.0, 1.5, 2.0]> : tensor<4xf32>
   %result = "xla_hlo.sine"(%input) : (tensor<4xf32>) -> tensor<4xf32>
-  return %result : tensor<4xf32>
+  check.expect_almost_eq_const(%result, dense<[0.0, 0.8415, 0.9975, 0.9093]> : tensor<4xf32>) : tensor<4xf32>
+  return
 }
-// CHECK: 4xf32=0 0.841471 0.997495 0.909297
 
-// -----
-
-// CHECK-LABEL: EXEC @scalar
-func @scalar() -> tensor<f32> {
+func @scalar() attributes { iree.module.export } {
   %input = iree.unfoldable_constant dense<3.0> : tensor<f32>
   %result = "xla_hlo.sine"(%input) : (tensor<f32>) -> tensor<f32>
-  return %result : tensor<f32>
+  check.expect_almost_eq_const(%result, dense<0.14112> : tensor<f32>) : tensor<f32>
+  return
 }
-// CHECK: f32=0.14112

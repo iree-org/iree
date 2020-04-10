@@ -14,24 +14,28 @@
 
 iree_add_all_subdirs()
 
-file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
-file(GLOB _GLOB_REVERSE_MLIR CONFIGURE_DEPENDS reverse.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REVERSE_MLIR})
-file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
-file(GLOB _GLOB_REVERSE_MLIR CONFIGURE_DEPENDS reverse.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REVERSE_MLIR})
-file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
-file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
 iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "${_GLOB_X_MLIR}"
+    "collatz.mlir"
+    "compare.mlir"
+    "constants.mlir"
+    "conv.mlir"
+    "convert_int.mlir"
+    "dynamic_abs.mlir"
+    "fragment_000.mlir"
+    "fullyconnected.mlir"
+    "globals.mlir"
+    "load_i16.mlir"
+    "load_i8.mlir"
+    "mnist.mlir"
+    "multiple_return.mlir"
+    "scalar.mlir"
+    "store.mlir"
+    "through_std.mlir"
+    "unidirectional_lstm.mlir"
+    "while.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir
@@ -42,7 +46,38 @@ iree_check_single_backend_test_suite(
     check_vmla_vmla
   SRCS
     "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast.mlir"
+    "broadcast_in_dim.mlir"
+    "concatenate.mlir"
+    "cos.mlir"
+    "dot.mlir"
+    "dot_general.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "gather_concat.mlir"
+    "gemm.mlir"
+    "gemm_large.mlir"
+    "log.mlir"
+    "max_float.mlir"
+    "max_int.mlir"
+    "min_float.mlir"
+    "min_int.mlir"
+    "pad.mlir"
+    "reduce_float.mlir"
+    "reduce_int.mlir"
+    "rem.mlir"
+    "reshape.mlir"
+    "reshape_adddims.mlir"
+    "reshape_dropdims.mlir"
     "reverse.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sin.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
   TARGET_BACKEND
     vmla
   DRIVER
@@ -54,7 +89,36 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "abs.mlir"
+    "add.mlir"
+    "broadcast.mlir"
+    "broadcast_in_dim.mlir"
+    "concatenate.mlir"
+    "cos.mlir"
+    "dot.mlir"
+    "exp.mlir"
+    "floor.mlir"
+    "gather.mlir"
+    "gather_concat.mlir"
+    "gemm.mlir"
+    "gemm_large.mlir"
+    "log.mlir"
+    "max_float.mlir"
+    "max_int.mlir"
+    "min_float.mlir"
+    "min_int.mlir"
+    "pad.mlir"
+    "reduce_float.mlir"
+    "reduce_int.mlir"
+    "rem.mlir"
+    "reshape.mlir"
+    "reshape_adddims.mlir"
+    "reshape_dropdims.mlir"
     "reverse.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sin.mlir"
+    "slice.mlir"
+    "sqrt.mlir"
   TARGET_BACKEND
     vulkan-spirv
   DRIVER
@@ -66,6 +130,24 @@ iree_check_single_backend_test_suite(
     check_linalg-to-spirv_vulkan
   SRCS
     "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast_in_dim.mlir"
+    "cos.mlir"
+    "exp.mlir"
+    "gemm.mlir"
+    "gemm_large.mlir"
+    "log.mlir"
+    "max_float.mlir"
+    "max_int.mlir"
+    "min_float.mlir"
+    "min_int.mlir"
+    "rem.mlir"
+    "reshape_adddims.mlir"
+    "reshape_dropdims.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sqrt.mlir"
   TARGET_BACKEND
     vulkan-spirv
   DRIVER
@@ -79,6 +161,29 @@ iree_check_single_backend_test_suite(
     check_llvm-ir_llvm
   SRCS
     "abs.mlir"
+    "add.mlir"
+    "batch_norm_inference.mlir"
+    "broadcast_in_dim.mlir"
+    "cos.mlir"
+    "dot.mlir"
+    "exp.mlir"
+    "gemm.mlir"
+    "gemm_large.mlir"
+    "log.mlir"
+    "max_float.mlir"
+    "max_int.mlir"
+    "min_float.mlir"
+    "min_int.mlir"
+    "reduce_float.mlir"
+    "reduce_int.mlir"
+    "reduce_window.mlir"
+    "rem.mlir"
+    "reshape.mlir"
+    "reshape_adddims.mlir"
+    "reshape_dropdims.mlir"
+    "rsqrt.mlir"
+    "select.mlir"
+    "sqrt.mlir"
   TARGET_BACKEND
     llvm-ir
   DRIVER
