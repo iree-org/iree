@@ -34,7 +34,7 @@ void IREELinalgVectorTransformPass::runOnFunction() {
   OwningRewritePatternList patterns;
   auto funcOp = getFunction();
   populateWithGenerated(&getContext(), &patterns);
-  applyPatternsGreedily(funcOp, patterns);
+  applyPatternsAndFoldGreedily(funcOp, patterns);
 }
 
 static PassRegistration<IREELinalgVectorTransformPass> pass(

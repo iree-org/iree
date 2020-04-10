@@ -253,7 +253,7 @@ void LinalgTileAndFusePass::runOnFunction() {
                   TileLinalgOpPattern<linalg::ConvOp>,
                   TileAndFuseLinalgOpPattern<linalg::GenericOp>>(context,
                                                                  tileSizes);
-  applyPatternsGreedily(getOperation(), patterns);
+  applyPatternsAndFoldGreedily(getOperation(), patterns);
 
   // Check that there are single perfectly nested loop.for operations at the top
   // most level that will get mapped to thread blocks/workgroups.

@@ -50,7 +50,7 @@ void mlir::ModelRunner::compile(CompilationOptions compilationOptions,
     vector::populateVectorContractLoweringPatterns(
         patterns, module->getContext(),
         compilationOptions.vectorTransformsOptions);
-    mlir::applyPatternsGreedily(*module, patterns);
+    mlir::applyPatternsAndFoldGreedily(*module, patterns);
   }
 
   // Set up compiler passes.

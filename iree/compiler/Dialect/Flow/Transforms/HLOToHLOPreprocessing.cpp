@@ -244,7 +244,7 @@ struct HLOToHLOPreprocessing
     OwningRewritePatternList patterns;
     xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     patterns.insert<FoldPadIntoMaxPool, RemoveDepthwiseFilterReshape>(context);
-    applyPatternsGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), patterns);
   }
 };
 
