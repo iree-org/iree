@@ -250,6 +250,10 @@ class BuildFileFunctions(object):
   def iree_build_test(self, **kwargs):
     pass
 
+  def test_suite(self, **kwargs):
+    # No CMake equivalent, ignore.
+    pass
+
   def filegroup(self, name, **kwargs):
     # Not implemented yet. Might be a no-op, or may want to evaluate the srcs
     # attribute and pass them along to any targets that depend on the filegroup.

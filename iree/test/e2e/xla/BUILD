@@ -200,3 +200,13 @@ iree_check_single_backend_test_suite(
     driver = "llvm",
     target_backend = "llvm-ir",
 )
+
+test_suite(
+    name = "check",
+    tests = [
+        ":check_linalg-to-spirv_vulkan",
+        ":check_llvm-ir_llvm",
+        ":check_vmla_vmla",
+        ":check_vulkan-spirv_vulkan",
+    ],
+)
