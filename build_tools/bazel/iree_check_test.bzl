@@ -20,6 +20,7 @@ load("//build_tools/bazel:run_binary_test.bzl", "run_binary_test")
 ALL_TARGET_BACKENDS_AND_DRIVERS = [
     ("vmla", "vmla"),
     ("vulkan-spirv", "vulkan"),
+    ("llvm-ir", "llvm"),
 ]
 
 def iree_check_test(name, src, target_backend, driver, args = [], tags = [], **kwargs):

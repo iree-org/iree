@@ -32,4 +32,10 @@ iree_check_test_suite(
     check
   SRCS
     "reverse.mlir"
+  TARGET_BACKENDS
+    "vmla"
+    "vulkan-spirv"
+  DRIVERS
+    "vmla"
+    "vulkan"
 )

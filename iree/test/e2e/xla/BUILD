@@ -41,4 +41,8 @@ iree_lit_test_suite(
 iree_check_test_suite(
     name = "check",
     srcs = CHECK_TESTS,
+    target_backends_and_drivers = [
+        ("vmla", "vmla"),
+        ("vulkan-spirv", "vulkan"),
+    ],
 )
