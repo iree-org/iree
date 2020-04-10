@@ -44,7 +44,6 @@ class CleanupShapePlaceholdersPass
 };
 
 }  // namespace
-}  // namespace Shape
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
@@ -56,5 +55,6 @@ static PassRegistration<Shape::CleanupShapePlaceholdersPass> pass(
     "iree-shape-cleanup-placeholders",
     "Cleans up unnecessary shape placeholders.");
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

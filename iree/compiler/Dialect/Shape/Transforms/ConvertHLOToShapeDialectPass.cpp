@@ -181,7 +181,6 @@ class ConvertHLOToShapePass
 };
 
 }  // namespace
-}  // namespace Shape
 
 // Converts shape-sensitive HLOs to be based on facilities in the shape
 // dialect.
@@ -193,5 +192,6 @@ static PassRegistration<Shape::ConvertHLOToShapePass> pass(
     "iree-shape-convert-hlo",
     "Converts dynamic shape dependent HLO ops to shaped variants.");
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

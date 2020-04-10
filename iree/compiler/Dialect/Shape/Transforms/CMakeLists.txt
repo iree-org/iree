@@ -19,23 +19,28 @@ iree_cc_library(
     Transforms
   HDRS
     "Passes.h"
+    "Patterns.h"
   SRCS
-    "CleanupPlaceholders.cpp"
-    "ConvertHLOToShapeDialect.cpp"
-    "FunctionSignatureExpansion.cpp"
-    "HoistShapeCalculations.cpp"
+    "CleanupPlaceholdersPass.cpp"
+    "ConvertHLOToShapeDialectPass.cpp"
+    "FunctionSignatureExpansionPass.cpp"
+    "HoistShapeCalculationsPass.cpp"
     "MaterializeShapeCalculations.cpp"
+    "MaterializeShapeCalculationsPass.cpp"
     "Passes.cpp"
-    "TieDynamicShapes.cpp"
+    "TieDynamicShapesPass.cpp"
   DEPS
+    LLVMSupport
     MLIRAnalysis
     MLIRIR
     MLIRPass
     MLIRStandardOps
+    MLIRSupport
     MLIRTransforms
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Plugins::XLA::XlaHloShapeBuilder
     iree::compiler::Dialect::Shape::Utils::TypeConversion
+    iree::compiler::Utils
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

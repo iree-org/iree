@@ -25,6 +25,7 @@ namespace mlir {
 class OpPassManager;
 
 namespace iree_compiler {
+namespace Shape {
 
 // Populates a pass manager with the pipeline to expand functions to include
 // explicit shape calculations for all dynamic tensors.
@@ -70,6 +71,7 @@ inline void registerShapePasses() {
   createHoistShapeCalculationsPass();
 }
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir
 

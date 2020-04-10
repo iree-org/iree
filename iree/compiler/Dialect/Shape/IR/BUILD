@@ -49,6 +49,7 @@ cc_library(
     deps = [
         ":ShapeOpsGen",
         "//iree/compiler/Dialect/IREE/IR",
+        "//iree/compiler/Utils",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",

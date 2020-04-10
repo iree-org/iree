@@ -27,6 +27,7 @@ cc_library(
     ],
     hdrs = [
         "GraphUtils.h",
+        "PatternUtils.h",
         "TypeConversionUtils.h",
     ],
     deps = [

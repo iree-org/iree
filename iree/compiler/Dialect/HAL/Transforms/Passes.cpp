@@ -38,7 +38,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // on explicit shape types (such as ranked_shape). After this pass, these
   // composite types will be expanded to primitives (i.e. one 'index' for each
   // dynamic dim in the case of ranked_shape).
-  passManager.addPass(createExpandFunctionRankedShapeDimsPass());
+  passManager.addPass(Shape::createExpandFunctionRankedShapeDimsPass());
 
   // For each exported function, processes the reflection metadata and
   // generates public ABI wrappers for various calling conventions.

@@ -64,7 +64,6 @@ class TieDynamicShapesPass
 };
 
 }  // namespace
-}  // namespace Shape
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
@@ -75,5 +74,6 @@ std::unique_ptr<OperationPass<FuncOp>> createTieDynamicShapesPass() {
 static PassRegistration<Shape::TieDynamicShapesPass> pass(
     "iree-shape-tie-dynamic", "Ties any dynamic shapes in a function.");
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

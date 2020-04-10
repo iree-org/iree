@@ -97,7 +97,6 @@ class ExpandFunctionRankedShapeDimsPass
 };
 
 }  // namespace
-}  // namespace Shape
 
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
@@ -121,5 +120,6 @@ static PassRegistration<Shape::ExpandFunctionRankedShapeDimsPass> pass_rs(
     "iree-shape-expand-function-ranked-shape-dims",
     "Expands ranked_shape types at function boundaries to loose dims.");
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

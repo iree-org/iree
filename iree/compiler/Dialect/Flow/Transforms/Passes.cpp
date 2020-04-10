@@ -71,7 +71,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // The generated ABI wrappers assume such an expansion and will generate code
   // to produce it from the original reflection metadata captured in the
   // previous pass.
-  populateMaterializeDynamicShapesPipeline(passManager);
+  Shape::populateMaterializeDynamicShapesPipeline(passManager);
 
   // Merge arg/result reflection metadata.
   // NOTE(laurenzo): This will eventually not be the right place for this as

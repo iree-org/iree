@@ -13,17 +13,23 @@
 // limitations under the License.
 
 #include "iree/compiler/Dialect/Shape/IR/Builders.h"
+#include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeInterface.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
 #include "iree/compiler/Dialect/Shape/Plugins/XLA/XlaHloShapeBuilder.h"
-#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Patterns.h"
+#include "iree/compiler/Utils/PatternUtils.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/LogicalResult.h"
+
+#define DEBUG_TYPE "iree-shape"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,10 +37,26 @@ namespace Shape {
 
 namespace {
 
-Value rewriteShapexRankedBroadcastShape(RankedBroadcastShapeOp bcastOp,
-                                        OpBuilder &builder) {
-  auto lhsRs = bcastOp.lhs().getType().cast<RankedShapeType>();
-  auto rhsRs = bcastOp.rhs().getType().cast<RankedShapeType>();
+// Gets a CustomOpShapeBuilderList for expanding shapes of custom ops.
+// By default, returns nullptr, which will not handle custom op shapes.
+// TODO(laurenzo): Since it isn't clear yet whether we need this facility
+// long term (i.e. this should come from the ops themselves), we are just
+// hard-linking it here at the expense of a dependency problem. Decouple this
+// if the facility persists.
+const CustomOpShapeBuilderList *getCustomOpShapeBuilder() {
+  static CustomOpShapeBuilderList globalBuilders = ([]() {
+    CustomOpShapeBuilderList builders;
+    xla_hlo::populateXlaHloCustomOpShapeBuilder(builders);
+    return builders;
+  })();
+  return &globalBuilders;
+}
+
+Value rewriteShapexRankedBroadcastShape(
+    RankedBroadcastShapeOp bcastOp,
+    RankedBroadcastShapeOp::OperandAdaptor operands, OpBuilder &builder) {
+  auto lhsRs = operands.lhs().getType().cast<RankedShapeType>();
+  auto rhsRs = operands.rhs().getType().cast<RankedShapeType>();
 
   auto loc = bcastOp.getLoc();
   auto resultRs = bcastOp.getResult().getType().cast<RankedShapeType>();
@@ -58,7 +80,7 @@ Value rewriteShapexRankedBroadcastShape(RankedBroadcastShapeOp bcastOp,
     if (lhsRs.isDimDynamic(inputDimIndex)) {
       lhsDims[outputDimIndex] =
           std::make_pair(-1, builder.create<RankedDimOp>(
-                                 loc, dimType, bcastOp.lhs(),
+                                 loc, dimType, operands.lhs(),
                                  builder.getI64IntegerAttr(inputDimIndex)));
     } else {
       lhsDims[outputDimIndex] = std::make_pair(inputDimIndex, nullptr);
@@ -77,7 +99,7 @@ Value rewriteShapexRankedBroadcastShape(RankedBroadcastShapeOp bcastOp,
     if (rhsRs.isDimDynamic(inputDimIndex)) {
       rhsDims[outputDimIndex] =
           std::make_pair(-1, builder.create<RankedDimOp>(
-                                 loc, dimType, bcastOp.rhs(),
+                                 loc, dimType, operands.rhs(),
                                  builder.getI64IntegerAttr(inputDimIndex)));
     } else {
       rhsDims[outputDimIndex] = std::make_pair(inputDimIndex, nullptr);
@@ -130,175 +152,153 @@ Value rewriteShapexRankedBroadcastShape(RankedBroadcastShapeOp bcastOp,
   return builder.create<MakeRankedShapeOp>(loc, resultRs, dynamicDims);
 }
 
-class ExpandRankedBroadcastShapePattern
-    : public OpRewritePattern<RankedBroadcastShapeOp> {
- public:
-  using OpRewritePattern::OpRewritePattern;
-  LogicalResult matchAndRewrite(RankedBroadcastShapeOp bcastOp,
-                                PatternRewriter &rewriter) const override {
-    auto newValue = rewriteShapexRankedBroadcastShape(bcastOp, rewriter);
-    if (!newValue) return failure();
+LogicalResult expandRankedBroadcastShapePattern(
+    RankedBroadcastShapeOp bcastOp,
+    RankedBroadcastShapeOp::OperandAdaptor operands,
+    PatternRewriter &rewriter) {
+  auto newValue =
+      rewriteShapexRankedBroadcastShape(bcastOp, operands, rewriter);
+  if (!newValue) return failure();
 
-    rewriter.replaceOp(bcastOp, newValue);
-    return success();
-  }
-};
-
-class MaterializeRunTimeRankedShapePattern
-    : public OpRewritePattern<Shape::GetRankedShapeOp> {
- public:
-  MaterializeRunTimeRankedShapePattern(MLIRContext *context)
-      : OpRewritePattern(context, 1) {}
-
-  LogicalResult matchAndRewrite(GetRankedShapeOp getShapeOp,
-                                PatternRewriter &rewriter) const override {
-    auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
-    SmallVector<Value, 4> dynamicDims;
-    for (int64_t i = 0, e = shapeType.getRank(); i < e; ++i) {
-      if (!shapeType.isDimDynamic(i)) continue;
-      dynamicDims.push_back(
-          rewriter.create<DimOp>(getShapeOp.getLoc(), getShapeOp.operand(), i));
-    }
-
-    // TODO(laurenzo): Remove once further along (it is fine to be unsupported
-    // as it will fall back to generic), but in these early phases, it is
-    // extremely useful to be chatty about this fallback.
-    auto inputOperation = getShapeOp.operand().getDefiningOp();
-    if (inputOperation) {
-      inputOperation->emitRemark()
-          << "unable to materialize shape calculation (unsupported op '"
-          << inputOperation->getName() << "'?): falling back to runtime "
-          << "resolution";
-    }
-
-    rewriter.replaceOpWithNewOp<MakeRankedShapeOp>(getShapeOp, shapeType,
-                                                   dynamicDims);
-    return success();
-  }
-};
-
-class MaterializeCompileTimeRankedShapePattern
-    : public OpRewritePattern<Shape::GetRankedShapeOp> {
- public:
-  MaterializeCompileTimeRankedShapePattern(
-      const CustomOpShapeBuilderList *customOpShapeBuilder,
-      MLIRContext *context)
-      : OpRewritePattern(context, 10),
-        customOpShapeBuilder(customOpShapeBuilder) {}
-
-  LogicalResult matchAndRewrite(GetRankedShapeOp getShapeOp,
-                                PatternRewriter &rewriter) const override {
-    // Check for static shape and elide.
-    auto operandType =
-        getShapeOp.operand().getType().dyn_cast<RankedTensorType>();
-    auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
-    if (operandType && shapeType && operandType.hasStaticShape()) {
-      rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(getShapeOp, shapeType);
-      return success();
-    }
-
-    // Check for input operation (unless if a small set of shape ops).
-    Operation *inputOperation = getShapeOp.operand().getDefiningOp();
-    if (inputOperation && !llvm::isa<TieShapeOp>(inputOperation)) {
-      return rewriteInputOp(getShapeOp, inputOperation, rewriter);
-    }
-
-    return failure();
-  }
-
- private:
-  // Matches the case where the input to a GetRankedShapeOp is another
-  // operation. This is the primary supported case as other rewrites should
-  // have isolated function/block boundaries with TieShape ops.
-  LogicalResult rewriteInputOp(GetRankedShapeOp getShapeOp,
-                               Operation *inputOperation,
-                               PatternRewriter &rewriter) const {
-    // SameOperandsAndResultShape trait.
-    if (inputOperation->hasTrait<OpTrait::SameOperandsAndResultShape>() ||
-        inputOperation->hasTrait<OpTrait::SameOperandsAndResultType>()) {
-      return rewriteSameOperandsAndResultShape(getShapeOp, inputOperation,
-                                               rewriter);
-    }
-
-    // Custom shapes.
-    if (customOpShapeBuilder) {
-      auto resultShape = getShapeOp.getRankedShape();
-      for (auto &shapeBuilder : *customOpShapeBuilder) {
-        Value customShape = shapeBuilder->buildRankedShape(
-            resultShape, inputOperation, rewriter);
-        if (customShape) {
-          rewriter.replaceOp(getShapeOp, customShape);
-          return success();
-        }
-      }
-    }
-
-    return failure();
-  }
-
-  LogicalResult rewriteSameOperandsAndResultShape(
-      GetRankedShapeOp getShapeOp, Operation *inputOperation,
-      PatternRewriter &rewriter) const {
-    llvm::SmallVector<Value, 4> inputOperands(inputOperation->getOperands());
-    auto combinedShapeOp = buildCastInputsToResultShape(
-        inputOperation->getLoc(), getShapeOp.getRankedShape(), inputOperands,
-        rewriter);
-    if (!combinedShapeOp) return failure();
-    rewriter.replaceOp(getShapeOp, {combinedShapeOp});
-    return success();
-  }
-
-  const CustomOpShapeBuilderList *customOpShapeBuilder;
-};
-
-class MaterializeShapeCalculationsPass
-    : public PassWrapper<MaterializeShapeCalculationsPass, FunctionPass> {
- public:
-  // Gets a CustomOpShapeBuilderList for expanding shapes of custom ops.
-  // By default, returns nullptr, which will not handle custom op shapes.
-  // TODO(laurenzo): Since it isn't clear yet whether we need this facility
-  // long term (i.e. this should come from the ops themselves), we are just
-  // hard-linking it here at the expense of a dependency problem. Decouple this
-  // if the facility persists.
-  const CustomOpShapeBuilderList *getCustomOpShapeBuilder() {
-    static CustomOpShapeBuilderList globalBuilders = ([]() {
-      CustomOpShapeBuilderList builders;
-      xla_hlo::populateXlaHloCustomOpShapeBuilder(builders);
-      return builders;
-    })();
-    return &globalBuilders;
-  }
-
-  void runOnFunction() override {
-    OwningRewritePatternList patterns;
-    // Always include certain canonicalizations that interop.
-    CastCompatibleShapeOp::getCanonicalizationPatterns(patterns, &getContext());
-    GetRankedShapeOp::getCanonicalizationPatterns(patterns, &getContext());
-    MakeRankedShapeOp::getCanonicalizationPatterns(patterns, &getContext());
-    RankedDimOp::getCanonicalizationPatterns(patterns, &getContext());
-    TieShapeOp::getCanonicalizationPatterns(patterns, &getContext());
-    patterns.insert<ExpandRankedBroadcastShapePattern>(&getContext());
-    patterns.insert<MaterializeCompileTimeRankedShapePattern>(
-        getCustomOpShapeBuilder(), &getContext());
-    patterns.insert<MaterializeRunTimeRankedShapePattern>(&getContext());
-    applyPatternsGreedily(getFunction(), patterns);
-
-    OwningRewritePatternList fallbackPatterns;
-  }
-};
-
-}  // namespace
-}  // namespace Shape
-
-// For any function which contains dynamic dims in its inputs or results,
-// rewrites it so that the dynamic dims are passed in/out.
-std::unique_ptr<OperationPass<FuncOp>>
-createMaterializeShapeCalculationsPass() {
-  return std::make_unique<Shape::MaterializeShapeCalculationsPass>();
+  rewriter.replaceOp(bcastOp, newValue);
+  return success();
 }
 
-static PassRegistration<Shape::MaterializeShapeCalculationsPass> pass(
-    "iree-shape-materialize-calculations", "Materializes shape calculations.");
+LogicalResult rewriteSameOperandsAndResultShape(GetRankedShapeOp getShapeOp,
+                                                Operation *inputOperation,
+                                                PatternRewriter &rewriter) {
+  llvm::SmallVector<Value, 4> inputOperands(inputOperation->getOperands());
+  auto combinedShapeOp = buildCastInputsToResultShape(
+      inputOperation->getLoc(), getShapeOp.getRankedShape(), inputOperands,
+      rewriter);
+  if (!combinedShapeOp) return failure();
+  rewriter.replaceOp(getShapeOp, {combinedShapeOp});
+  return success();
+}
 
+// Matches the case where the input to a GetRankedShapeOp is another
+// operation. This is the primary supported case as other rewrites should
+// have isolated function/block boundaries with TieShape ops.
+LogicalResult rewriteInputOp(GetRankedShapeOp getShapeOp,
+                             GetRankedShapeOp::OperandAdaptor operands,
+                             Operation *inputOperation,
+                             PatternRewriter &rewriter) {
+  // SameOperandsAndResultShape trait.
+  if (inputOperation->hasTrait<OpTrait::SameOperandsAndResultShape>() ||
+      inputOperation->hasTrait<OpTrait::SameOperandsAndResultType>()) {
+    return rewriteSameOperandsAndResultShape(getShapeOp, inputOperation,
+                                             rewriter);
+  }
+
+  // Custom shapes.
+  auto customOpShapeBuilder = getCustomOpShapeBuilder();
+  if (customOpShapeBuilder) {
+    auto resultShape = getShapeOp.getRankedShape();
+    for (auto &shapeBuilder : *customOpShapeBuilder) {
+      Value customShape =
+          shapeBuilder->buildRankedShape(resultShape, inputOperation, rewriter);
+      if (customShape) {
+        rewriter.replaceOp(getShapeOp, customShape);
+        return success();
+      }
+    }
+  }
+
+  return failure();
+}
+
+void rewriteRuntimeShape(GetRankedShapeOp getShapeOp,
+                         GetRankedShapeOp::OperandAdaptor operands,
+                         PatternRewriter &rewriter) {
+  auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
+  SmallVector<Value, 4> dynamicDims;
+  for (int64_t i = 0, e = shapeType.getRank(); i < e; ++i) {
+    if (!shapeType.isDimDynamic(i)) continue;
+    dynamicDims.push_back(
+        rewriter.create<DimOp>(getShapeOp.getLoc(), operands.operand(), i));
+  }
+
+  // TODO(laurenzo): Remove once further along (it is fine to be unsupported
+  // as it will fall back to generic), but in these early phases, it is
+  // extremely useful to be chatty about this fallback.
+  auto inputOperation = operands.operand().getDefiningOp();
+  if (inputOperation) {
+    inputOperation->emitRemark()
+        << "unable to materialize shape calculation (unsupported op '"
+        << inputOperation->getName() << "'?): falling back to runtime "
+        << "resolution";
+  }
+
+  rewriter.replaceOpWithNewOp<MakeRankedShapeOp>(getShapeOp, shapeType,
+                                                 dynamicDims);
+}
+
+// Low benefit fallback pattern to materialize a ranked shape.
+LogicalResult materializeRankedShapePattern(
+    GetRankedShapeOp getShapeOp, GetRankedShapeOp::OperandAdaptor operands,
+    PatternRewriter &rewriter) {
+  // Check for static shape and elide.
+  auto operandType = operands.operand().getType().dyn_cast<RankedTensorType>();
+  auto shapeType = getShapeOp.shape().getType().dyn_cast<RankedShapeType>();
+  if (operandType && shapeType && operandType.hasStaticShape()) {
+    rewriter.replaceOpWithNewOp<ConstRankedShapeOp>(getShapeOp, shapeType);
+    return success();
+  }
+
+  // Check for input operation (unless if a small set of shape ops).
+  if (auto inputOperation = operands.operand().getDefiningOp()) {
+    // Materialize a shape function if possible.
+    LLVM_DEBUG(llvm::dbgs() << "** SHAPE: MATERIALIZE FOR INPUT OP: "
+                            << *inputOperation << "\n");
+    if (!failed(
+            rewriteInputOp(getShapeOp, operands, inputOperation, rewriter))) {
+      return success();
+    }
+  }
+
+  // Runtime fallback.
+  LLVM_DEBUG(llvm::dbgs() << "** SHAPE: RUNTIME RESOLUTION\n");
+  rewriteRuntimeShape(getShapeOp, operands, rewriter);
+  return success();
+}
+
+// Matches a tie_shape -> get_ranked_shape pattern and resolves it statically.
+// This must be a higher benefit than materializeRankedShapePattern.
+LogicalResult passThroughTiedGetRankedShapePattern(
+    GetRankedShapeOp getShapeOp, GetRankedShapeOp::OperandAdaptor operands,
+    PatternRewriter &rewriter) {
+  // Check for input operation (unless if a small set of shape ops).
+  Operation *inputOperation = operands.operand().getDefiningOp();
+  if (auto tieOp = llvm::dyn_cast_or_null<TieShapeOp>(inputOperation)) {
+    LLVM_DEBUG(llvm::dbgs() << "** SHAPE: PASS-THROUGH tie_shape\n");
+    rewriter.replaceOp(getShapeOp, tieOp.shape());
+    return success();
+  }
+  return failure();
+}
+
+}  // namespace
+
+void setupMaterializeShapeCalculationsLegality(ConversionTarget &target) {
+  // We explicitly want to convert these ops, eliminating them.
+  target.addIllegalOp<GetRankedShapeOp>();
+  target.addIllegalOp<RankedBroadcastShapeOp>();
+}
+
+void populateMaterializeShapeCalculationsConversionPatterns(
+    OwningRewritePatternList &patterns, MLIRContext *context) {
+  // Fallback patterns.
+  insertConversionPattern(patterns, context, expandRankedBroadcastShapePattern,
+                          /*benefit=*/1);
+  insertConversionPattern(patterns, context, materializeRankedShapePattern,
+                          /*benefit=*/1);
+
+  // High benefit patterns.
+  insertConversionPattern(patterns, context,
+                          passThroughTiedGetRankedShapePattern,
+                          /*benefit=*/10);
+}
+
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

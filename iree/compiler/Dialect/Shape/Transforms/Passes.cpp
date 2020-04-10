@@ -19,6 +19,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace Shape {
 
 void populateMaterializeDynamicShapesPipeline(OpPassManager &pm) {
   // Expands function signatures to accept/return explicit dynamic dimensions.
@@ -37,5 +38,6 @@ static mlir::PassPipelineRegistration<> pipeline(
     "materializing shapes.",
     populateMaterializeDynamicShapesPipeline);
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

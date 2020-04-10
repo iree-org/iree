@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "iree/compiler/Utils/PatternUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/LogicalResult.h"
@@ -22,63 +23,6 @@
 namespace mlir {
 namespace iree_compiler {
 namespace Shape {
-
-//===----------------------------------------------------------------------===//
-// Generic patterns that can either be greedy rewrite patterns or conversion
-// patterns. This allows patterns that operate within supported behavior for
-// the conversion framework to use the subset of facilities of the
-// PatternRewriter while being compatible with type conversion.
-//===----------------------------------------------------------------------===//
-
-template <typename OpTy>
-using GenericOpRewritePattern = LogicalResult (*)(
-    OpTy op, typename OpTy::OperandAdaptor operands, PatternRewriter &rewriter);
-
-template <typename OpTy>
-static void insertRewritePattern(OwningRewritePatternList &patterns,
-                                 MLIRContext *context,
-                                 GenericOpRewritePattern<OpTy> f,
-                                 PatternBenefit benefit = 1) {
-  struct Pattern : public OpRewritePattern<OpTy> {
-    Pattern(MLIRContext *context, GenericOpRewritePattern<OpTy> f,
-            PatternBenefit benefit = 1)
-        : OpRewritePattern<OpTy>(context, benefit), f(f) {}
-    LogicalResult matchAndRewrite(OpTy op,
-                                  PatternRewriter &rewriter) const override {
-      // TODO(laurenzo): It would be nice if the operand adaptors did not
-      // have a dependency on ArrayRef as it requires doing this copy. In
-      // practice for this level of IR, this is sub-optimal but not the end
-      // of the world.
-      SmallVector<Value, 4> operands;
-      for (unsigned i = 0, e = op.getOperation()->getNumOperands(); i < e;
-           ++i) {
-        operands.push_back(op.getOperation()->getOperand(i));
-      }
-      return f(op, typename OpTy::OperandAdaptor(operands), rewriter);
-    }
-    GenericOpRewritePattern<OpTy> f;
-  };
-  patterns.insert<Pattern>(context, f, benefit);
-}
-
-template <typename OpTy>
-static void insertConversionPattern(OwningRewritePatternList &patterns,
-                                    MLIRContext *context,
-                                    GenericOpRewritePattern<OpTy> f,
-                                    PatternBenefit benefit = 1) {
-  struct Pattern : public OpConversionPattern<OpTy> {
-    Pattern(MLIRContext *context, GenericOpRewritePattern<OpTy> f,
-            PatternBenefit benefit)
-        : OpConversionPattern<OpTy>(context, benefit), f(f) {}
-    LogicalResult matchAndRewrite(
-        OpTy op, ArrayRef<Value> operands,
-        ConversionPatternRewriter &rewriter) const override {
-      return f(op, typename OpTy::OperandAdaptor(operands), rewriter);
-    }
-    GenericOpRewritePattern<OpTy> f;
-  };
-  patterns.insert<Pattern>(context, f, benefit);
-}
 
 //===----------------------------------------------------------------------===//
 // Canonicalization
@@ -263,7 +207,7 @@ LogicalResult elideDuplicateTieShapePattern(TieShapeOp op,
 
 void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
                                              MLIRContext *context) {
-  insertRewritePattern(patterns, context, elideDuplicateTieShapePattern);
+  insertGreedyPattern(patterns, context, elideDuplicateTieShapePattern);
 }
 
 //===----------------------------------------------------------------------===//
@@ -272,7 +216,7 @@ void TieShapeOp::getCanonicalizationPatterns(OwningRewritePatternList &patterns,
 
 void CastCompatibleShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertRewritePattern(patterns, context, safeCastCompatibleShapePattern);
+  insertGreedyPattern(patterns, context, safeCastCompatibleShapePattern);
 }
 
 //===----------------------------------------------------------------------===//
@@ -281,9 +225,9 @@ void CastCompatibleShapeOp::getCanonicalizationPatterns(
 
 void GetRankedShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertRewritePattern(patterns, context, elideTiedGetRankedShapePattern);
-  insertRewritePattern(patterns, context, elideDuplicateGetRankedShapePattern);
-  insertRewritePattern(patterns, context, elideStaticGetRankedShapePattern);
+  insertGreedyPattern(patterns, context, elideTiedGetRankedShapePattern);
+  insertGreedyPattern(patterns, context, elideDuplicateGetRankedShapePattern);
+  insertGreedyPattern(patterns, context, elideStaticGetRankedShapePattern);
 }
 
 //===----------------------------------------------------------------------===//
@@ -292,7 +236,7 @@ void GetRankedShapeOp::getCanonicalizationPatterns(
 
 void MakeRankedShapeOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertRewritePattern(patterns, context, identityMakeRankedShapePattern);
+  insertGreedyPattern(patterns, context, identityMakeRankedShapePattern);
 }
 
 //===----------------------------------------------------------------------===//
@@ -311,7 +255,7 @@ OpFoldResult RankedDimOp::fold(ArrayRef<Attribute> operand) {
 
 void RankedDimOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertRewritePattern(patterns, context, dynamicMakeRankedShapeDimPattern);
+  insertGreedyPattern(patterns, context, dynamicMakeRankedShapeDimPattern);
 }
 
 //===----------------------------------------------------------------------===//
@@ -320,7 +264,7 @@ void RankedDimOp::getCanonicalizationPatterns(
 
 void RankedDimsOp::getCanonicalizationPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
-  insertRewritePattern(patterns, context, expandRankedShapeDimsPattern);
+  insertGreedyPattern(patterns, context, expandRankedShapeDimsPattern);
 }
 
 //===----------------------------------------------------------------------===//

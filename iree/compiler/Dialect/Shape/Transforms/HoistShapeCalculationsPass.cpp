@@ -25,6 +25,7 @@
 
 namespace mlir {
 namespace iree_compiler {
+namespace Shape {
 namespace {
 
 bool isSimpleShapeCalculationOp(Operation *op) {
@@ -156,5 +157,6 @@ static PassRegistration<HoistShapeCalculations> pass(
     "iree-shape-hoist-shape-calculations",
     "Best-effort shape calculation hoisting.");
 
+}  // namespace Shape
 }  // namespace iree_compiler
 }  // namespace mlir

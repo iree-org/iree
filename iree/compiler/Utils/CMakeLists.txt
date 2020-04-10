@@ -19,6 +19,7 @@ iree_cc_library(
     Utils
   HDRS
     "GraphUtils.h"
+    "PatternUtils.h"
     "TypeConversionUtils.h"
   SRCS
     "GraphUtils.cpp"
