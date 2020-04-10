@@ -15,8 +15,18 @@
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
+file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
 file(GLOB _GLOB_REVERSE_MLIR CONFIGURE_DEPENDS reverse.mlir)
 list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REVERSE_MLIR})
+file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
+file(GLOB _GLOB_REVERSE_MLIR CONFIGURE_DEPENDS reverse.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REVERSE_MLIR})
+file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
+file(GLOB _GLOB_ABS_MLIR CONFIGURE_DEPENDS abs.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_ABS_MLIR})
 iree_lit_test_suite(
   NAME
     lit
@@ -27,15 +37,50 @@ iree_lit_test_suite(
     iree::tools::iree-run-mlir
 )
 
-iree_check_test_suite(
+iree_check_single_backend_test_suite(
   NAME
-    check
+    check_vmla_vmla
   SRCS
+    "abs.mlir"
     "reverse.mlir"
-  TARGET_BACKENDS
-    "vmla"
-    "vulkan-spirv"
-  DRIVERS
-    "vmla"
-    "vulkan"
+  TARGET_BACKEND
+    vmla
+  DRIVER
+    vmla
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan
+  SRCS
+    "abs.mlir"
+    "reverse.mlir"
+  TARGET_BACKEND
+    vulkan-spirv
+  DRIVER
+    vulkan
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_linalg-to-spirv_vulkan
+  SRCS
+    "abs.mlir"
+  TARGET_BACKEND
+    vulkan-spirv
+  DRIVER
+    vulkan
+  COMPILER_FLAGS
+    "-iree-use-linalg-to-spirv-path"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_llvm-ir_llvm
+  SRCS
+    "abs.mlir"
+  TARGET_BACKEND
+    llvm-ir
+  DRIVER
+    llvm
 )

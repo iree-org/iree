@@ -25,16 +25,18 @@ include(CMakeParseArguments)
 #   SRC: mlir source file to be compiled to an IREE module.
 #   TARGET_BACKEND: target backend to compile for.
 #   DRIVER: driver to run the module with.
-#   ARGS: additional args to pass to iree-check-module. The driver and input
-#       file are passed automatically.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
+#       translation and backend flags are passed automatically.
+#   RUNNER_ARGS: additional args to pass to iree-check-module. The driver
+#       and input file are passed automatically.
 #   LABELS: Additional labels to apply to the test. The package path and
 #       "driver=${DRIVER}" are added automatically.
 function(iree_check_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;SRC;TARGET_BACKEND;DRIVER;LABELS"
-    "ARGS"
+    "NAME;SRC;TARGET_BACKEND;DRIVER"
+    "COMPILER_FLAGS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
   if(NOT IREE_BUILD_TESTS)
@@ -54,6 +56,7 @@ function(iree_check_test)
     FLAGS
       "-iree-mlir-to-vm-bytecode-module"
       "--iree-hal-target-backends=${_RULE_TARGET_BACKEND}"
+      ${_RULE_COMPILER_FLAGS}
     TESTONLY
   )
 
@@ -93,13 +96,66 @@ function(iree_check_test)
       "$<TARGET_FILE:iree_modules_check_iree-check-module>"
       "--driver=${_RULE_DRIVER}"
       "${CMAKE_CURRENT_BINARY_DIR}/${_MODULE_FILE_NAME}"
-      ${_RULE_ARGS}
+      ${_RULE_RUNNER_ARGS}
   )
 
   list(APPEND _RULE_LABELS "${_PACKAGE_PATH}" "driver=${_RULE_DRIVER}")
   set_property(TEST "${_NAME_PATH}" PROPERTY REQUIRED_FILES "${_MODULE_FILE_NAME}")
   set_property(TEST "${_NAME_PATH}" PROPERTY ENVIRONMENT "TEST_TMPDIR=${_NAME}_test_tmpdir")
   set_property(TEST "${_NAME_PATH}" PROPERTY LABELS "${_RULE_LABELS}")
+endfunction()
+
+
+# iree_check_single_backend_test_suite()
+#
+# Creates a test suite of iree-check-module tests for a single backend/driver pair.
+#
+# Mirrors the bzl rule of the same name.
+#
+# One test is generated per source file.
+# Parameters:
+#   NAME: name of the generated test suite.
+#   SRCS: source mlir files containing the module.
+#   TARGET_BACKEND: target backend to compile for.
+#   DRIVER: driver to run the module with.
+#   COMPILER_FLAGS: additional flags to pass to the compiler. Bytecode
+#       translation and backend flags are passed automatically.
+#   RUNNER_ARGS: additional args to pass to the underlying iree-check-module
+#       tests. The driver and input file are passed automatically. To use
+#       different args per test, create a separate suite or iree_check_test.
+#   LABELS: Additional labels to apply to the generated tests. The package path is
+#       added automatically.
+function(iree_check_single_backend_test_suite)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "NAME;TARGET_BACKEND;DRIVER"
+    "SRCS;COMPILER_FLAGS;RUNNER_ARGS;LABELS"
+    ${ARGN}
+  )
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
+
+  foreach(_SRC IN LISTS _RULE_SRCS)
+    set(_TEST_NAME "${_RULE_NAME}_${_SRC}")
+    iree_check_test(
+      NAME
+        ${_TEST_NAME}
+      SRC
+        ${_SRC}
+      TARGET_BACKEND
+        ${_RULE_TARGET_BACKEND}
+      DRIVER
+        ${_RULE_DRIVER}
+      COMPILER_FLAGS
+        ${_RULE_COMPILER_FLAGS}
+      RUNNER_ARGS
+        ${_RULE_RUNNER_ARGS}
+      LABELS
+        ${_RULE_LABELS}
+    )
+  endforeach()
 endfunction()
 
 
@@ -121,7 +177,7 @@ endfunction()
 #       TARGET_BACKENDS argument (due to cmake limitations they are separate list
 #       arguments). The lengths must exactly match. If no backends or drivers are
 #       specified, a test will be generated for every supported pair.
-#   ARGS: additional args to pass to the underlying iree-check-module tests. The
+#   RUNNER_ARGS: additional args to pass to the underlying iree-check-module tests. The
 #       driver and input file are passed automatically. To use different args per
 #       test, create a separate suite or iree_check_test.
 #   LABELS: Additional labels to apply to the generated tests. The package path is
@@ -131,7 +187,7 @@ function(iree_check_test_suite)
     _RULE
     ""
     "NAME"
-    "SRCS;TARGET_BACKENDS;DRIVERS;ARGS;LABELS"
+    "SRCS;TARGET_BACKENDS;DRIVERS;RUNNER_ARGS;LABELS"
     ${ARGN}
   )
   if(NOT IREE_BUILD_TESTS)
@@ -155,22 +211,22 @@ function(iree_check_test_suite)
   foreach(_INDEX RANGE "${_MAX_INDEX}")
     list(GET _RULE_TARGET_BACKENDS ${_INDEX} _TARGET_BACKEND)
     list(GET _RULE_DRIVERS ${_INDEX} _DRIVER)
-    foreach(_SRC IN LISTS _RULE_SRCS)
-      set(_TEST_NAME "${_RULE_NAME}_${_SRC}_${_TARGET_BACKEND}_${_DRIVER}")
-      iree_check_test(
-        NAME
-	  ${_TEST_NAME}
-	SRC
-	  ${_SRC}
-	TARGET_BACKEND
-	  ${_TARGET_BACKEND}
-	DRIVER
-	  ${_DRIVER}
-	ARGS
-	  ${_RULE_ARGS}
-	LABELS
-	  ${_RULE_LABELS}
-      )
-    endforeach()
+    set(_SUITE_NAME "${_RULE_NAME}_${_TARGET_BACKEND}_${_DRIVER}")
+    iree_check_single_backend_test_suite(
+      NAME
+        ${_SUITE_NAME}
+      SRCS
+        ${_RULE_SRCS}
+      TARGET_BACKEND
+        ${_TARGET_BACKEND}
+      DRIVER
+        ${_DRIVER}
+      COMPILER_FLAGS
+        ${_RULE_COMPILER_FLAGS}
+      RUNNER_ARGS
+        ${_RULE_RUNNER_ARGS}
+      LABELS
+        ${_RULE_LABELS}
+    )
   endforeach()
 endfunction()

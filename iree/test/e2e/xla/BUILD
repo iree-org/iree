@@ -14,7 +14,7 @@
 
 # Tests for end-to-end IREE support starting from the XLA HLO dialect.
 
-load("//build_tools/bazel:iree_check_test.bzl", "iree_check_test_suite")
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -22,11 +22,31 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-CHECK_TESTS = ["reverse.mlir"]
+VMLA_CHECK_TESTS = [
+    "abs.mlir",
+    "reverse.mlir",
+]
+
+VULKAN_CHECK_TESTS = [
+    "abs.mlir",
+    "reverse.mlir",
+]
+
+LINALG_TO_SPIRV_VULKAN_CHECK_TESTS = [
+    "abs.mlir",
+]
+
+LLVMJIT_CHECK_TESTS = [
+    "abs.mlir",
+]
 
 LEGACY_LIT_TESTS = glob(
     ["*.mlir"],
-    exclude = CHECK_TESTS,
+    exclude =
+        VMLA_CHECK_TESTS +
+        VULKAN_CHECK_TESTS +
+        LINALG_TO_SPIRV_VULKAN_CHECK_TESTS +
+        LLVMJIT_CHECK_TESTS,
 )
 
 iree_lit_test_suite(
@@ -38,11 +58,31 @@ iree_lit_test_suite(
     ],
 )
 
-iree_check_test_suite(
-    name = "check",
-    srcs = CHECK_TESTS,
-    target_backends_and_drivers = [
-        ("vmla", "vmla"),
-        ("vulkan-spirv", "vulkan"),
-    ],
+iree_check_single_backend_test_suite(
+    name = "check_vmla_vmla",
+    srcs = VMLA_CHECK_TESTS,
+    driver = "vmla",
+    target_backend = "vmla",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_vulkan-spirv_vulkan",
+    srcs = VULKAN_CHECK_TESTS,
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_linalg-to-spirv_vulkan",
+    srcs = LINALG_TO_SPIRV_VULKAN_CHECK_TESTS,
+    compiler_flags = ["-iree-use-linalg-to-spirv-path"],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_llvm-ir_llvm",
+    srcs = LLVMJIT_CHECK_TESTS,
+    driver = "llvm",
+    target_backend = "llvm-ir",
 )
