@@ -31,9 +31,8 @@ project(iree CXX C)
 set(IREE_IDE_FOLDER IREE)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-option(IREE_ENABLE_DEBUG "Enables debugging of the VM." ON)
+option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_LLVM "Enables LLVM dependencies." ON)
-option(IREE_ENABLE_TRACING "Enables WTF tracing." OFF)
 
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)

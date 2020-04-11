@@ -55,12 +55,6 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 set(IREE_DEFAULT_LINKOPTS "${ABSL_DEFAULT_LINKOPTS}")
 set(IREE_TEST_COPTS "${ABSL_TEST_COPTS}")
 
-if(${IREE_ENABLE_TRACING})
-  list(APPEND IREE_DEFAULT_COPTS
-    "-DGLOBAL_WTF_ENABLE=1"
-  )
-endif()
-
 #-------------------------------------------------------------------------------
 # Compiler: Clang/LLVM
 #-------------------------------------------------------------------------------

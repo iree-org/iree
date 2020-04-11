@@ -44,6 +44,7 @@ iree_cc_library(
     iree::base::platform_headers
     iree::base::status
     iree::base::target_platform
+    iree::base::tracing
   PUBLIC
 )
 

@@ -19,6 +19,7 @@
 #include "iree/base/file_io.h"
 #include "iree/base/source_location.h"
 #include "iree/base/status.h"
+#include "iree/base/tracing.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/bytecode_module.h"
@@ -52,6 +53,7 @@ namespace iree {
 namespace {
 
 StatusOr<std::string> GetModuleContentsFromFlags() {
+  IREE_TRACE_SCOPE0("GetModuleContentsFromFlags");
   auto input_file = absl::GetFlag(FLAGS_input_file);
   if (input_file.empty()) {
     return InvalidArgumentErrorBuilder(IREE_LOC)
@@ -61,6 +63,8 @@ StatusOr<std::string> GetModuleContentsFromFlags() {
 }
 
 Status Run(::benchmark::State& state) {
+  IREE_TRACE_SCOPE0("iree-benchmark-module");
+
   RETURN_IF_ERROR(FromApiStatus(iree_hal_module_register_types(), IREE_LOC))
       << "registering HAL types";
   iree_vm_instance_t* instance = nullptr;

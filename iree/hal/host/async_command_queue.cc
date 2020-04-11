@@ -48,8 +48,7 @@ AsyncCommandQueue::~AsyncCommandQueue() {
 }
 
 void AsyncCommandQueue::ThreadMain() {
-  // TODO(benvanik): make this safer (may die if trace is flushed late).
-  IREE_TRACE_THREAD_ENABLE(target_queue_->name().c_str());
+  IREE_TRACE_SET_THREAD_NAME(target_queue_->name().c_str());
 
   bool is_exiting = false;
   while (!is_exiting) {

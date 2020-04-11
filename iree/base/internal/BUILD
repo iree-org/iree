@@ -46,6 +46,7 @@ cc_library(
         "//iree/base:platform_headers",
         "//iree/base:status",
         "//iree/base:target_platform",
+        "//iree/base:tracing",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
     ],

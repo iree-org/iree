@@ -502,55 +502,8 @@ cc_library(
     name = "tracing",
     hdrs = ["tracing.h"],
     deps = [
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
-    ] + select({
-        "@com_google_tracing_framework_cpp//:wtf_enable": [":tracing_enabled"],
-        "//conditions:default": [":tracing_disabled"],
-    }),
-)
-
-cc_library(
-    name = "tracing_disabled",
-    srcs = [
-        "tracing.h",
-        "tracing_disabled.cc",
-    ],
-    visibility = ["//visibility:private"],
-    deps = [
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
-    ],
-    alwayslink = 1,
-)
-
-cc_library(
-    name = "tracing_enabled",
-    srcs = [
-        "tracing.cc",
-        "tracing.h",
-    ],
-    visibility = ["//visibility:private"],
-    deps = [
-        ":file_io",
-        ":file_path",
-        ":initializer",
-        ":logging",
-        ":status",
         "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/time",
-        "@com_google_absl//absl/types:optional",
-        "@com_google_tracing_framework_cpp//:tracing_framework_bindings_cpp",
     ],
-    alwayslink = 1,
 )
 
 # Dependent code has been removed and wait_handle is currently incompatible
