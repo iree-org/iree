@@ -93,11 +93,10 @@ DenseSet<Operation *> calculateOpsToHoist(Block &block) {
   return opsToHoistSet;
 }
 
-void hoistOps(DenseSet<Operation *> opsToHoistSet, Block &block,
-              DominanceInfo &domInfo) {
+void hoistOps(DenseSet<Operation *> opsToHoistSet, Block &block) {
   auto opsToHoist = llvm::to_vector<16>(opsToHoistSet);
-  llvm::sort(opsToHoist, [&](Operation *lhs, Operation *rhs) {
-    return domInfo.properlyDominates(lhs, rhs);
+  llvm::stable_sort(opsToHoist, [&](Operation *lhs, Operation *rhs) {
+    return lhs->isBeforeInBlock(rhs);
   });
 
   for (Operation *op : opsToHoist) {
@@ -105,7 +104,7 @@ void hoistOps(DenseSet<Operation *> opsToHoistSet, Block &block,
     for (Value operand : op->getOperands()) {
       if (Operation *definingOp = getDefiningOpInBlock(operand, block)) {
         if (insertAfter == nullptr ||
-            domInfo.properlyDominates(definingOp, insertAfter)) {
+            insertAfter->isBeforeInBlock(definingOp)) {
           insertAfter = definingOp;
         }
       }
@@ -140,10 +139,9 @@ class HoistShapeCalculations
  public:
   void runOnFunction() override {
     auto func = getFunction();
-    DominanceInfo domInfo(func);
     for (Block &block : func) {
       DenseSet<Operation *> opsToHoist = calculateOpsToHoist(block);
-      hoistOps(opsToHoist, block, domInfo);
+      hoistOps(opsToHoist, block);
     }
   }
 };

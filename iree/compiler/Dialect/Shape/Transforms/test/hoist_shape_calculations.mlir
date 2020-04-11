@@ -53,3 +53,17 @@ func @f(%arg0: tensor<?xf32>, %arg1: index) {
   shapex.tie_shape %arg0, %shape : tensor<?xf32>, !shapex.ranked_shape<[?]>
   return
 }
+
+// -----
+
+// CHECK-LABEL: func @f
+func @f(%arg0: tensor<?x?xf32>) {
+  // CHECK: constant
+  // CHECK: constant
+  // CHECK: shapex.make_ranked_shape
+  %c0 = constant 0 : index
+  %c1 = constant 1 : index
+  %0 = shapex.make_ranked_shape %c0, %c1 : (index, index) -> !shapex.ranked_shape<[?,?]>
+  %1 = shapex.tie_shape %arg0, %0 : tensor<?x?xf32>, !shapex.ranked_shape<[?,?]>
+  return
+}
