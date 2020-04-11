@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Tests for common transforms.
+# Tests for end-to-end IREE support specific to the vulkan-spirv lowering.
+# TODO(ravishankarm): Reorganize these tests.
 
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
@@ -28,7 +29,6 @@ iree_lit_test_suite(
     ),
     data = [
         "//iree/tools:IreeFileCheck",
-        "//iree/tools:iree-opt",
         "//iree/tools:iree-run-mlir",
     ],
     tags = ["hostonly"],

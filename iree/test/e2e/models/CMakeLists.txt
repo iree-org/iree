@@ -15,6 +15,8 @@
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR CONFIGURE_DEPENDS *.mlir)
+file(GLOB _GLOB_MNIST_MLIR CONFIGURE_DEPENDS mnist.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_MNIST_MLIR})
 iree_lit_test_suite(
   NAME
     lit

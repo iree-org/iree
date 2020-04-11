@@ -12,9 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Model files used for manual testing.
+# Tests for end-to-end IREE support of specific features to prevent regression.
+# These should focus on support by IREE itself, not for issues with specific runner tools. Place
+# those tests in https://github.com/google/iree/tree/master/iree/tools/test/
+
+load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
     default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_lit_test_suite(
+    name = "lit",
+    srcs = glob(["*.mlir"]),
+    data = [
+        "//iree/tools:IreeFileCheck",
+        "//iree/tools:iree-run-mlir",
+    ],
+    tags = ["hostonly"],
 )

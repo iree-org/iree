@@ -18,21 +18,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "collatz.mlir"
     "compare.mlir"
     "constants.mlir"
     "conv.mlir"
-    "dynamic_abs.mlir"
-    "fragment_000.mlir"
-    "fullyconnected.mlir"
-    "globals.mlir"
-    "load_i16.mlir"
-    "load_i8.mlir"
-    "mnist.mlir"
-    "multiple_return.mlir"
-    "scalar.mlir"
-    "store.mlir"
-    "unidirectional_lstm.mlir"
   DATA
     iree::tools::IreeFileCheck
     iree::tools::iree-run-mlir

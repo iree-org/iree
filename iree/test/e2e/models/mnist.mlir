@@ -1,4 +1,7 @@
-// Trained MNIST model generated from tf.keras:
+// TODO(scotttodd) Fix this test
+// RUN: iree-run-mlir -iree-hal-target-backends=vmla %s -input-value="1x28x28x1xf32" | IreeFileCheck %s
+
+// // Trained MNIST model generated from tf.keras:
 //
 //   model = tf.keras.models.Sequential()
 //   model.add(tf.keras.layers.Flatten(input_shape=input_shape))
@@ -50,5 +53,6 @@ module {
     %18 = "xla_hlo.reshape"(%17) {name = "reshape.36"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
     %19 = "xla_hlo.tuple"(%18) {name = "tuple.37"} : (tensor<1x10xf32>) -> tuple<tensor<1x10xf32>>
     return %19 : tuple<tensor<1x10xf32>>
+    // CHECK: 1x10xf32=
   }
 }
