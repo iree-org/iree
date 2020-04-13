@@ -117,13 +117,16 @@ $ VK_ICD_FILENAMES=$PWD/build-swiftshader/Linux/vk_swiftshader_icd.json
 
 ### Setting up Vulkan-ExtensionLayer
 
-IREE's CMake build includes the extension layer automatically. If you are using
-Bazel and are missing support for `VK_KHR_timeline_semaphore`, setup the
-extension layer.
+If you are missing support for `VK_KHR_timeline_semaphore`, setup the extension
+layer.
 
 Build:
 
 ```shell
+# -- CMake --
+$ cmake --build build/ --target vk_layer_khronos_timeline_semaphore
+
+# -- Bazel --
 $ bazel build @vulkan_extensionlayer//:libVkLayer_khronos_timeline_semaphore.so @vulkan_extensionlayer//:VkLayer_khronos_timeline_semaphore_json
 ```
 
@@ -131,7 +134,11 @@ You should then also set the `VK_LAYER_PATH` environment variable to include the
 path to the built layer:
 
 ```shell
-$ VK_LAYER_PATH=$VK_LAYER_PATH:$PWD/bazel-bin/external/vulkan_extensionlayer/
+# -- CMake --
+$ VK_LAYER_PATH=$PWD/build/third_party/vulkan_extensionlayer/layers/:$VK_LAYER_PATH
+
+# -- Bazel --
+$ VK_LAYER_PATH=$PWD/bazel-bin/external/vulkan_extensionlayer/:$VK_LAYER_PATH
 ```
 
 ### Support in Bazel Tests

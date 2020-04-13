@@ -15,7 +15,6 @@
 #include "iree/hal/vulkan/dynamic_symbols.h"
 
 #include <cstddef>
-#include <cstdlib>
 
 #include "absl/base/attributes.h"
 #include "absl/base/macros.h"
@@ -131,31 +130,6 @@ StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::Create(
 // static
 StatusOr<ref_ptr<DynamicSymbols>> DynamicSymbols::CreateFromSystemLoader() {
   IREE_TRACE_SCOPE0("DynamicSymbols::CreateFromSystemLoader");
-
-#define IREE_STRINGIFY_(x) #x
-#define IREE_STRING_(x) IREE_STRINGIFY_(x)
-
-#if defined(IREE_VK_LAYER_PATH_EXTRAS)
-  std::string vk_layer_path_extras = IREE_STRING_(IREE_VK_LAYER_PATH_EXTRAS);
-#if defined(IREE_PLATFORM_WINDOWS)
-// TODO(scotttodd): Layer discovery on Windows
-#else
-  const char* vk_layer_path = ::getenv("VK_LAYER_PATH");
-  std::string combined_path;
-  if (vk_layer_path) {
-    combined_path = absl::StrCat(vk_layer_path, ":", vk_layer_path_extras);
-  } else {
-    combined_path = vk_layer_path_extras;
-  }
-  ::setenv("VK_LAYER_PATH", combined_path.c_str(), 0);
-#endif  // IREE_PLATFORM_WINDOWS
-#else
-// Leave VK_LAYER_PATH unchanged and rely on the system Vulkan loader to
-// discover layers at the default path(s).
-#endif  // IREE_VK_LAYER_PATH_EXTRAS
-
-#undef IREE_STRINGIFY_
-#undef IREE_STRING_
 
   ASSIGN_OR_RETURN(
       auto loader_library,
