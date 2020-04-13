@@ -75,9 +75,10 @@ inline std::array<int64_t, N> makeStrides(const std::array<int64_t, N> &shape) {
 // This is an implementation detail that is kept in sync with MLIR codegen
 // conventions.
 template <typename T, int N>
-StridedMemRefType<T, N> *makeStridedMemRefDescriptor(
-    void *ptr, void *alignedPtr, const std::array<int64_t, N> &shape,
-    AllocFunType alloc = &::malloc) {
+typename std::enable_if<(N >= 1), StridedMemRefType<T, N> *>::type
+makeStridedMemRefDescriptor(void *ptr, void *alignedPtr,
+                            const std::array<int64_t, N> &shape,
+                            AllocFunType alloc = &::malloc) {
   StridedMemRefType<T, N> *descriptor = static_cast<StridedMemRefType<T, N> *>(
       alloc(sizeof(StridedMemRefType<T, N>)));
   descriptor->basePtr = static_cast<T *>(ptr);
@@ -92,9 +93,11 @@ StridedMemRefType<T, N> *makeStridedMemRefDescriptor(
 // Mallocs a StridedMemRefDescriptor<T, 0>* (i.e. a pointer to scalar) that
 // matches the MLIR ABI. This is an implementation detail that is kept in sync
 // with MLIR codegen conventions.
-template <typename T>
-StridedMemRefType<T, 0> *makeStridedMemRefDescriptor(
-    void *ptr, void *alignedPtr, AllocFunType alloc = &::malloc) {
+template <typename T, int N>
+typename std::enable_if<(N == 0), StridedMemRefType<T, 0> *>::type
+makeStridedMemRefDescriptor(void *ptr, void *alignedPtr,
+                            const std::array<int64_t, N> &shape = {},
+                            AllocFunType alloc = &::malloc) {
   StridedMemRefType<T, 0> *descriptor = static_cast<StridedMemRefType<T, 0> *>(
       alloc(sizeof(StridedMemRefType<T, 0>)));
   descriptor->basePtr = static_cast<T *>(ptr);

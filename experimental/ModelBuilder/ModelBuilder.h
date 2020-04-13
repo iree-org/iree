@@ -72,11 +72,13 @@ using edsc::intrinsics::vector_print;
 using edsc::ops::vector_contraction;
 using edsc::ops::vector_contraction_matmul;
 // From the Std Dialect.
+using edsc::intrinsics::std_addf;
 using edsc::intrinsics::std_alloc;
 using edsc::intrinsics::std_constant_float;
 using edsc::intrinsics::std_constant_index;
 using edsc::intrinsics::std_dealloc;
 using edsc::intrinsics::std_dim;
+using edsc::intrinsics::std_mulf;
 using edsc::intrinsics::std_ret;
 using edsc::intrinsics::StdIndexedValue;
 // From the Affine Dialect.
