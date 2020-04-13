@@ -113,6 +113,7 @@ cc_library(
         "//iree/vm:module",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
         "@com_google_absl//absl/types:span",
     ],
 )
