@@ -1,79 +1,78 @@
-# Getting Started
+# Developer Overview
 
-This document provides an overview of IREE's systems, including entry points to
-get started exploring IREE's capabilities.
-
-For information on how to set up a development environment, see
-[Getting Started on Windows](getting_started_on_windows.md) and
-[Getting Started on Linux](getting_started_on_linux.md).
+This guide provides an overview of IREE's project structure and main tools for
+developers.
 
 ## Project Code Layout
 
-[iree/](../iree/)
+[iree/](https://github.com/google/iree/blob/master/iree/)
 
 *   Core IREE project
 
-[integrations/](../integrations/)
+[integrations/](https://github.com/google/iree/blob/master/integrations/)
 
 *   Integrations between IREE and other frameworks, such as TensorFlow
 
-[bindings/](../bindings/)
+[bindings/](https://github.com/google/iree/blob/master/bindings/)
 
 *   Language and platform bindings, such as Python
 
-[colab/](../colab/)
+[colab/](https://github.com/google/iree/blob/master/colab/)
 
 *   Colab notebooks for interactively using IREE's Python bindings
 
 ## IREE Code Layout
 
-[iree/base/](../iree/base/)
+[iree/base/](https://github.com/google/iree/blob/master/iree/base/)
 
 *   Common types and utilities used throughout IREE
 
-[iree/compiler/](../iree/compiler/)
+[iree/compiler/](https://github.com/google/iree/blob/master/iree/compiler/)
 
 *   IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
 
-[iree/hal/](../iree/hal/)
+[iree/hal/](https://github.com/google/iree/blob/master/iree/hal/)
 
 *   **H**ardware **A**bstraction **L**ayer for IREE's runtime, with
     implementations for hardware and software backends
 
-[iree/schemas/](../iree/schemas/)
+[iree/schemas/](https://github.com/google/iree/blob/master/iree/schemas/)
 
 *   Shared data storage format definitions, primarily using
     [FlatBuffers](https://google.github.io/flatbuffers/)
 
-[iree/tools/](../iree/tools/)
+[iree/tools/](https://github.com/google/iree/blob/master/iree/tools/)
 
 *   Assorted tools used to optimize, translate, and evaluate IREE
 
-[iree/vm/](../iree/vm/)
+[iree/vm/](https://github.com/google/iree/blob/master/iree/vm/)
 
 *   Bytecode **V**irtual **M**achine used to work with IREE modules and invoke
     IREE functions
 
-## Working with IREE's Components
+## Developer Tools
 
-IREE ingests MLIR in a high-level dialect like
-[XLA/HLO](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/compiler/mlir/xla),
-after which it can perform its own compiler passes to eventually translate the
-IR into an 'IREE module', which can be executed via IREE's runtime. IREE
-contains programs for running each step in that pipeline under various
-configurations (e.g. for tests, with a debugger attached, etc.).
+IREE's compiler components accept programs and code fragments in several
+formats, including high level TensorFlow Python code, serialized TensorFlow
+[SavedModel](https://www.tensorflow.org/guide/saved_model) programs, and lower
+level textual MLIR files using combinations of supported dialects like
+`xla_hlo` and IREE's internal dialects. While input programs are ultimately
+compiled down to modules suitable for running on some combination of IREE's
+target deployment platforms, IREE's developer tools can run individual compiler
+passes, translations, and other transformations step by step.
 
 ### iree-opt
 
-The `iree-opt` program invokes
+`iree-opt` is a tool for testing IREE's compiler passes. It builds on top of
 [MlirOptMain](https://github.com/llvm/llvm-project/blob/master/mlir/lib/Support/MlirOptMain.cpp)
-to run some set of IREE's optimization passes on a provided .mlir input file.
+to run sets of IREE's compiler passes on .mlir input files.
+
 Test .mlir files that are checked in typically include a `RUN` block at the top
 of the file that specifies which passes should be performed and if `FileCheck`
 should be used to test the generated output.
 
 For example, to run some passes on the
-[reshape.mlir](../iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir)
+[reshape.mlir](https://github.com/google/iree/blob/master/iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir)
 test file with Bazel on Linux, use this command:
 
 ```shell
@@ -88,8 +87,7 @@ $ bazel run //iree/tools:iree-opt -- \
 
 ### iree-translate
 
-The `iree-translate` program translates from a .mlir input file into an IREE
-module.
+`iree-translate` converts MLIR input into external formats like IREE modules.
 
 For example, to translate `simple.mlir` to an IREE module with bazel on Linux,
 use this command:
@@ -103,7 +101,7 @@ $ bazel run //iree/tools:iree-translate -- \
 ```
 
 Custom translations may also be layered on top of `iree-translate` - see
-[iree/samples/custom_modules/dialect](../iree/samples/custom_modules/dialect)
+[iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/master/iree/samples/custom_modules/dialect)
 for a sample.
 
 ### iree-run-module
@@ -113,8 +111,8 @@ and executes an exported main function using the provided inputs.
 
 This program can be used in sequence with `iree-translate` to translate a .mlir
 file to an IREE module and then execute it. Here is an example command that
-executes the simple `module.fb` compiled from `simple.mlir` above on the IREE
-interpreter
+executes the simple `module.fb` compiled from `simple.mlir` above on IREE's
+VMLA driver:
 
 ```shell
 $ bazel run //iree/tools:iree-run-module -- \
