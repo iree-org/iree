@@ -109,6 +109,21 @@ FuncOp createRegionFunction(Location loc, StringRef functionName,
     }
   }
 
+  // Remove any tie_shapes not from entry block args.
+  // TODO(laurenzo): Remove this once we are not materializing ties in
+  // dispatch regions at all. For now, this at least provides a better
+  // contract to the backends without leaking the fact that dispatch
+  // formation fully materializes ties.
+  auto *newEntryBlock = &funcOp.getBlocks().front();
+  funcOp.walk([&](Shape::TieShapeOp tieOp) {
+    if (auto blockArg = tieOp.operand().dyn_cast<BlockArgument>()) {
+      if (blockArg.getOwner() == newEntryBlock) return;
+    }
+    // Elide.
+    tieOp.result().replaceAllUsesWith(tieOp.operand());
+    tieOp.erase();
+  });
+
   // Expand shape types to primitives.
   auto &typeExpander = getShapeToPrimitiveTypeExpander();
   OpBuilder expandBuilder(funcOp.getContext());

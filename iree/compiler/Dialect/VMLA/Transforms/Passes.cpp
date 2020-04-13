@@ -17,6 +17,7 @@
 #include <memory>
 
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/transforms/passes.h"
@@ -29,7 +30,9 @@ namespace VMLA {
 void buildVMLATransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(createCanonicalizerPass());
 
-  // Flatten structured control flow to our CFG.
+  // ---------------------------------------------------------------------------
+  // Inline and flatten structured control flow to our CFG.
+  // ---------------------------------------------------------------------------
   passManager.addNestedPass<FuncOp>(xla_hlo::createLegalizeControlFlowPass());
 
   // Perform inlining and cleanup after CFG manipulation.
@@ -38,6 +41,11 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  // ---------------------------------------------------------------------------
+  // Tensor-level rewrites.
+  // At this point, the computation is in tensor-level CFG form with the ability
+  // perform transformations that alter shapes.
+  // ---------------------------------------------------------------------------
   // Legalize input types.
   // TODO(benvanik): legalize input.
   // passManager.addPass(IREE::VMLA::createLegalizeInputTypesPass());
@@ -47,12 +55,45 @@ void buildVMLATransformPassPipeline(OpPassManager &passManager) {
 
   // Unroll multi-dimensional reductions to one reduction per dimension.
   passManager.addNestedPass<FuncOp>(createUnrollReductionsPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
 
-  // Convert from the various input dialects to the VMLA dialect.
+  // ---------------------------------------------------------------------------
+  // Shape calculation.
+  // Pre-conditions:
+  //   - All transformations altering the tensor-level shapes have been done.
+  //   - "Root" dynamic tensors all pass through a single shapex.tie_shape
+  //     use which associates them to their shape.
+  //   - Loose, non-associated shapex.get_ranked_shape ops can exist anywhere
+  //     and will be resolved.
+  // Post-conditions:
+  //   - All dynamic tensors bridge through a shapex.tie_shape op with the
+  //     appropriate shape.
+  //   - No shapex.get_ranked_shape ops exist.
+  //   - Shape folding and canonicalization has been done.
+  // ---------------------------------------------------------------------------
+  passManager.addNestedPass<FuncOp>(Shape::createTieDynamicShapesPass());
+  passManager.addNestedPass<FuncOp>(
+      Shape::createMaterializeShapeCalculationsPass());
+  passManager.addNestedPass<FuncOp>(Shape::createHoistShapeCalculationsPass());
+
+  // ---------------------------------------------------------------------------
+  // VMLA conversion.
+  // Performs lowering from tensor-level to VMLA-level ops/types and on to the
+  // VM dialect.
+  // Pre-conditions:
+  //   - All tensors with dynamic dimensions must have a tie_shape use which
+  //     associates them with the SSA values providing the missing dims.
+  //   - Functions must be in CFG form.
+  //   - Any non-trivial tensor-level transformations have already been done.
+  //   - No shapex.get_ranked_shape ops can exist (or be introduced).
+  // Post-conditions:
+  //   - All ops and types have been fully lowered to the VM dialect.
+  // ---------------------------------------------------------------------------
+  passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addPass(createConversionPass());
 
+  // ---------------------------------------------------------------------------
   // Cleanup identity ops that clutter up the IR and canonicalize.
+  // ---------------------------------------------------------------------------
   passManager.addNestedPass<FuncOp>(createCSEPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
 

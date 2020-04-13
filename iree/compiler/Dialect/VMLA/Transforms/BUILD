@@ -31,6 +31,7 @@ cc_library(
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Shape/IR",
+        "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Dialect/VMLA/Conversion",
         "//iree/compiler/Dialect/VMLA/Conversion/HALToVMLA",
         "//iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA",

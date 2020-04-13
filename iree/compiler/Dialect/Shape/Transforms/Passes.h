@@ -27,10 +27,6 @@ class OpPassManager;
 namespace iree_compiler {
 namespace Shape {
 
-// Populates a pass manager with the pipeline to expand functions to include
-// explicit shape calculations for all dynamic tensors.
-void populateMaterializeDynamicShapesPipeline(OpPassManager &pm);
-
 // For any function which contains dynamic dims in its inputs or results,
 // rewrites it so that the dynamic dims are passed in/out.
 std::unique_ptr<OperationPass<FuncOp>> createExpandFunctionDynamicDimsPass();

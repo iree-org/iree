@@ -26,7 +26,6 @@ cc_library(
         "HoistShapeCalculationsPass.cpp",
         "MaterializeShapeCalculations.cpp",
         "MaterializeShapeCalculationsPass.cpp",
-        "Passes.cpp",
         "TieDynamicShapesPass.cpp",
     ],
     hdrs = [

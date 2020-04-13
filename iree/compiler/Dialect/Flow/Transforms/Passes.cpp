@@ -71,7 +71,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // The generated ABI wrappers assume such an expansion and will generate code
   // to produce it from the original reflection metadata captured in the
   // previous pass.
-  Shape::populateMaterializeDynamicShapesPipeline(passManager);
+  passManager.addPass(Shape::createExpandFunctionDynamicDimsPass());
 
   // Merge arg/result reflection metadata.
   // NOTE(laurenzo): This will eventually not be the right place for this as
@@ -79,19 +79,64 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   // functions (such as with synthetic barrier arguments).
   passManager.addPass(IREE::Flow::createMergeExportedReflection());
 
+  // ---------------------------------------------------------------------------
+  // Common input-dialect tensor-level rewrites.
+  // Pre-conditions:
+  //   - Input dialect ops must still be present
+  // On completion:
+  //   - All ops remain at the input-dialect tensor-level.
+  //   - Loose shapex.get_ranked_shape ops can exist at points where dynamic
+  //     dims are required.
+  // ---------------------------------------------------------------------------
   // Rewrite some hlo ops to a form that is compatible for all
   // backends.
   passManager.addPass(createHLOPreprocessingPass());
 
   //----------------------------------------------------------------------------
+  // Shape materialization for buffer assignment and stream formation.
+  //
+  // Phase ordering constraints:
+  //   - All tensor-level transformations which alter shapes must be complete
+  //     prior to this phase.
+  //
+  // Pre-conditions:
+  //   - "Root" dynamic tensors all pass through a single shapex.tie_shape
+  //     use which associates them to their shape.
+  //   - Loose, non-associated shapex.get_ranked_shape ops can exist anywhere
+  //     and will be resolved.
+  // Post-conditions:
+  //   - All dynamic tensors bridge through a shapex.tie_shape op with the
+  //     appropriate shape.
+  //   - No shapex.get_ranked_shape ops exist (they have been converted to
+  //     concrete IR which materializes the shapes, either statically or
+  //     dynamically).
+  //   - Shape folding and canonicalization has been done.
+  // TODO(laurenzo): Investigate whether this can be done more incrementally
+  // during dispatch/stream formation versus having such a large phase
+  // ordering constraint.
+  //----------------------------------------------------------------------------
+  passManager.addPass(Shape::createTieDynamicShapesPass());
+  passManager.addPass(Shape::createMaterializeShapeCalculationsPass());
+  passManager.addPass(Shape::createHoistShapeCalculationsPass());
+
+  //----------------------------------------------------------------------------
   // Partitioning and dispatch region formation
-  // Must happen after:
+  //
+  // Phase ordering constraints:
+  //   - Must precede dependencies on fully formed flow.dispatch and
+  //     flow.dispatch_region ops
+  // Pre-conditions:
   //   - Conversion to CFG
   //   - Materialization of shape metadata ops
-  // Must happen before:
-  //   - Dependencies on fully formed flow.dispatch and flow.dispatch_region ops
-  //   - Dependencies on extra-dispatch-region ops being converted to flow
-  //     ops
+  // Post-conditions:
+  //   - Dispatch functions have been outlined such that only their dynamic
+  //     root tensors are tied via shapex.tie_shape
+  //   - Non-dispatchable ops have either been converted to flow ops or deemed
+  //     legal.
+  //   - shapex.tie_shape ops exist at any dispatch operands/results that are
+  //     dynamic, preserving the shape association.
+  //     TODO(laurenzo): determine if this is needed versus only preserving
+  //     for non-dispatchable ops.
   //----------------------------------------------------------------------------
   // Convert into our expected input and (hopefully) some flow ops.
   passManager.addNestedPass<FuncOp>(
@@ -127,7 +172,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
 
   //----------------------------------------------------------------------------
   // Stream formation.
-  // Must happen after:
+  // Pre-conditions:
   //   - Full formation of dispatch regions
   //----------------------------------------------------------------------------
   // Form streams.

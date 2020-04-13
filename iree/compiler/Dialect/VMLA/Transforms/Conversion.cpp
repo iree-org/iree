@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeDialect.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Patterns.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/ConversionTarget.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/HALToVMLA/ConvertHALToVMLA.h"
 #include "iree/compiler/Dialect/VMLA/Conversion/HLOToVMLA/ConvertHLOToVMLA.h"
@@ -85,7 +86,9 @@ class ConversionPass
                                         typeConverter);
 
     // We allow the shape dialect to persist, making specific dim queries
-    // illegal (which allows them to fold away).
+    // illegal (which allows them to fold away). These patterns allow dimension
+    // queries to convert properly, but they do not allow the introduction
+    // of new shaped tensors.
     Shape::populateFoldConversionPatterns(&getContext(), conversionPatterns);
     conversionTarget.addLegalDialect<ShapeDialect>();
     // Since all inputs are converted to buffers, must trigger the TieShape
