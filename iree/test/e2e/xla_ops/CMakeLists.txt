@@ -19,7 +19,6 @@ iree_lit_test_suite(
     lit
   SRCS
     "compare.mlir"
-    "constants.mlir"
     "conv.mlir"
   DATA
     iree::tools::IreeFileCheck
@@ -38,6 +37,7 @@ iree_check_single_backend_test_suite(
     "broadcast.mlir"
     "broadcast_in_dim.mlir"
     "concatenate.mlir"
+    "constant.mlir"
     "convert_int.mlir"
     "cos.mlir"
     "dot.mlir"
@@ -85,6 +85,7 @@ iree_check_single_backend_test_suite(
     "broadcast.mlir"
     "broadcast_in_dim.mlir"
     "concatenate.mlir"
+    "constant.mlir"
     "convert_int.mlir"
     "cos.mlir"
     "dot.mlir"
@@ -128,6 +129,7 @@ iree_check_single_backend_test_suite(
     "add.mlir"
     "batch_norm_inference.mlir"
     "broadcast_in_dim.mlir"
+    "constant.mlir"
     "cos.mlir"
     "exp.mlir"
     "gemm.mlir"
@@ -159,6 +161,7 @@ iree_check_single_backend_test_suite(
     "add.mlir"
     "batch_norm_inference.mlir"
     "broadcast_in_dim.mlir"
+    "constant.mlir"
     "cos.mlir"
     "dot.mlir"
     "exp.mlir"

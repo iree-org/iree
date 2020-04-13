@@ -35,6 +35,7 @@ VMLA_CHECK_TESTS = [
     "broadcast.mlir",
     "broadcast_in_dim.mlir",
     "concatenate.mlir",
+    "constant.mlir",
     "convert_int.mlir",
     "cos.mlir",
     "dot.mlir",
@@ -75,6 +76,7 @@ VULKAN_CHECK_TESTS = [
     "broadcast.mlir",
     "broadcast_in_dim.mlir",
     "concatenate.mlir",
+    "constant.mlir",
     "convert_int.mlir",
     "cos.mlir",
     "dot.mlir",
@@ -111,6 +113,7 @@ LINALG_TO_SPIRV_VULKAN_CHECK_TESTS = [
     "add.mlir",
     "batch_norm_inference.mlir",
     "broadcast_in_dim.mlir",
+    "constant.mlir",
     "cos.mlir",
     "exp.mlir",
     "gemm.mlir",
@@ -133,6 +136,7 @@ LLVMJIT_CHECK_TESTS = [
     "add.mlir",
     "batch_norm_inference.mlir",
     "broadcast_in_dim.mlir",
+    "constant.mlir",
     "cos.mlir",
     "dot.mlir",
     "exp.mlir",
@@ -160,7 +164,6 @@ LLVMJIT_CHECK_TESTS = [
 
 LEGACY_LIT_OP_TESTS = [
     "compare.mlir",
-    "constants.mlir",
     "conv.mlir",
 ]
 
