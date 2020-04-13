@@ -63,7 +63,9 @@ StatusOr<ref_ptr<Driver>> CreateVulkanDriver() {
   options.device_extensibility.required_extensions.push_back(
       VK_KHR_STORAGE_BUFFER_STORAGE_CLASS_EXTENSION_NAME);
   // Multiple extensions depend on VK_KHR_get_physical_device_properties2.
-  options.instance_extensibility.required_extensions.push_back(
+  // This extension was deprecated in Vulkan 1.1 as its functionality was
+  // promoted to core, so we list it as optional even though we require it.
+  options.instance_extensibility.optional_extensions.push_back(
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
   // Timeline semaphore support is required.
   options.device_extensibility.required_extensions.push_back(

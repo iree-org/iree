@@ -91,7 +91,9 @@ ExtensibilitySpec GetInstanceExtensibilitySpec(
   ExtensibilitySpec spec;
 
   // Multiple extensions depend on VK_KHR_get_physical_device_properties2.
-  spec.required_extensions.push_back(
+  // This extension was deprecated in Vulkan 1.1 as its functionality was
+  // promoted to core, so we list it as optional even though we require it.
+  spec.optional_extensions.push_back(
       VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
   if (features & IREE_HAL_VULKAN_ENABLE_VALIDATION_LAYERS) {
