@@ -22,7 +22,6 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Support/Functional.h"
 #include "mlir/Transforms/FoldUtils.h"
 
 namespace mlir {
@@ -276,12 +275,6 @@ void LinalgTileAndFusePass::runOnFunction() {
   // get the workgroup size.
   SmallVector<int64_t, 3> updatedWorkGroupSize(reverse(tileSizes));
   updatedWorkGroupSize.resize(3, 1);
-  auto attrs = functional::map(
-      [&context](int64_t v) -> Attribute {
-        return IntegerAttr::get(IndexType::get(context), v);
-      },
-      updatedWorkGroupSize);
-
   if (failed(updateWorkGroupSize(funcOp, updatedWorkGroupSize)))
     return signalPassFailure();
 }
