@@ -44,3 +44,10 @@ imgui.ini
 # Emacs autosaves
 *~
 \#*\#
+
+# Vim swap files
+[._]*.sw[a-p]
+
+# Source indexing files
+compile_commands.json
+.clangd/
