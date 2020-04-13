@@ -2,8 +2,8 @@
 
 module {
   // CHECK: spv.func @transpose_add
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32 [4]> [0]>, StorageBuffer>
-  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32 [4]> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32, stride=4> [0]>, StorageBuffer>
   func @transpose_add(%arg0: memref<12x12xf32>, %arg1: memref<12x12xf32>)
   attributes {iree.dispatch_fn_name = "transpose_add"} {
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]

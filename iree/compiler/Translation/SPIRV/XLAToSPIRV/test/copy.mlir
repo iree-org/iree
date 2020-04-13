@@ -5,8 +5,8 @@ module {
   // CHECK-DAG: spv.globalVariable [[NUMWORKGROUPSVAR:@.*]] built_in("NumWorkgroups") : !spv.ptr<vector<3xi32>, Input>
   // CHECK-DAG: spv.globalVariable [[GLOBALIDVAR:@.*]] built_in("GlobalInvocationId") : !spv.ptr<vector<3xi32>, Input>
   // CHECK: spv.func [[FN:@simple_load_store]]
-  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<504 x i32 [4]> [0]>, StorageBuffer>
-  // CHECK-SAME: [[ARG2:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<504 x i32 [4]> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<504 x i32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG2:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<504 x i32, stride=4> [0]>, StorageBuffer>
   // CHECK-SAME: {{spirv|spv}}.entry_point_abi = {local_size = dense<[32, 1, 1]> : vector<3xi32>}
   func @simple_load_store(%arg0: memref<12x42xi32>, %arg1: memref<12x42xi32>)
   attributes {iree.dispatch_fn_name = "simple_load_store"} {
