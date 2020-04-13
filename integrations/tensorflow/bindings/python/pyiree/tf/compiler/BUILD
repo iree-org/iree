@@ -33,6 +33,14 @@ package(
 # Runtime deps needed to compile the tensorflow compiler.
 SAVED_MODEL_TF_RUNTIME_DEPS = [
     "@org_tensorflow//tensorflow/core:ops",
+    # As of 2020-04-13, robust constant folding is dependent on the legacy
+    # TensorFlow executor, which requires kernels to operate on/simplify
+    # the graph. This should become less necessary as more robust support
+    # is implemented as part of the MLIR-based tf2xla bridge. This adds
+    # about ~350 files to the system, many of which are quite heavy to
+    # compile.
+    # See: https://github.com/google/iree/issues/1506
+    "@org_tensorflow//tensorflow/core/kernels:array",
 ]
 
 TF_XLA_PASS_DEPS = [
