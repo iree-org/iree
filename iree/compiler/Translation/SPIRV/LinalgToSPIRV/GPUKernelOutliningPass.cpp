@@ -111,7 +111,7 @@ void IREEGpuKernelOutliningPass::runOnOperation() {
     return signalPassFailure();
   }
   patterns.insert<ConvertToGPUFuncOp>(moduleOp.getContext());
-  applyPatternsGreedily(moduleOp.getOperation(), patterns);
+  applyPatternsAndFoldGreedily(moduleOp.getOperation(), patterns);
 }
 
 std::unique_ptr<OperationPass<ModuleOp>> createIREEGpuKernelOutliningPass() {

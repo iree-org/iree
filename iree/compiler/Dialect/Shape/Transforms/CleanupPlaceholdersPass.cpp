@@ -39,7 +39,7 @@ class CleanupShapePlaceholdersPass
   void runOnFunction() override {
     OwningRewritePatternList patterns;
     patterns.insert<CleanupTieShapePattern>(&getContext());
-    applyPatternsGreedily(getFunction(), patterns);
+    applyPatternsAndFoldGreedily(getFunction(), patterns);
   }
 };
 

@@ -120,7 +120,7 @@ struct PrepareForLLVMLoweringPass
     OwningRewritePatternList patterns;
     MLIRContext* context = &getContext();
     patterns.insert<DispatchFnImplRewritePattern>(context);
-    applyPatternsGreedily(getOperation(), patterns);
+    applyPatternsAndFoldGreedily(getOperation(), patterns);
   }
 };
 }  // namespace

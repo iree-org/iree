@@ -26,7 +26,7 @@ class DropCompilerHintsPass
     : public PassWrapper<DropCompilerHintsPass, OperationPass<ModuleOp>> {
  public:
   void runOnOperation() override {
-    // We can't use patterns and applyPatternsGreedily because that
+    // We can't use patterns and applyPatternsAndFoldGreedily because that
     // automatically does canonicalization.
     getOperation().walk([&](DoNotOptimizeOp op) {
       op.replaceAllUsesWith(op.getOperands());

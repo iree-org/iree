@@ -166,7 +166,7 @@ void IREELinalgFusionPass::runOnFunction() {
   Operation *op = getOperation();
   patterns.insert<IREEFuseGenericTensorOps, HLOConstantConverter>(
       op->getContext());
-  applyPatternsGreedily(op->getRegions(), patterns);
+  applyPatternsAndFoldGreedily(op->getRegions(), patterns);
 }
 
 std::unique_ptr<OperationPass<FuncOp>> createLinalgOnTensorsFusionPass() {

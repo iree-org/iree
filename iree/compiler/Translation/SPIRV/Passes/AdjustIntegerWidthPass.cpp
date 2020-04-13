@@ -484,7 +484,7 @@ void AdjustIntegerWidthPass::runOnOperation() {
       AdjustLoadOp, AdjustStoreOp, RemoveNopSConvertOp, AdjustSConvertOp>(
       &getContext());
   Operation *op = getOperation();
-  applyPatternsGreedily(op->getRegions(), patterns);
+  applyPatternsAndFoldGreedily(op->getRegions(), patterns);
 }
 
 static PassRegistration<AdjustIntegerWidthPass> pass(

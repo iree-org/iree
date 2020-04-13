@@ -113,9 +113,6 @@ def FLOW_StreamableOp : OpInterface<"StreamableOpInterface"> {
 // Flow dialect types
 //===----------------------------------------------------------------------===//
 
-// TODO(benvanik): move to base?
-class Optional<Type type> : Variadic<type>;
-
 def FLOW_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
 def FLOW_Dim : TypeAlias<Index>;
