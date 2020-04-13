@@ -7,7 +7,7 @@ a large majority of the features we are most excited to demonstrate are still
 TODO and will be coming over the next few quarters. You can find a highlighted
 set of coming features in the [design roadmap](roadmap_design.md).
 
-## Sprint/Summer 2020 Focus Areas
+## Spring/Summer 2020 Focus Areas
 
 IREE is able to run many foundational models and more are expected to come
 online this spring. Much of the work has been on infrastructure and getting the
