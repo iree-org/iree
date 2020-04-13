@@ -54,6 +54,7 @@ DOC_TITLE_DICT = {
     'getting_started_windows_bazel.md': 'Windows with Bazel',
     'getting_started_windows_cmake.md': 'Windows with CMake',
     'getting_started_windows_vulkan.md': 'Windows with Vulkan',
+    'developer_overview.md': 'Developer Overview',
     'roadmap.md': 'Short-term Focus Areas',
     'roadmap_design.md': 'Long-term Design Roadmap',
 }
@@ -72,6 +73,7 @@ PERMALINK_DICT = {
     'getting_started_windows_bazel.md': 'GetStarted/WindowsBazel',
     'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
+    'developer_overview.md': 'DeveloperOverview',
     'roadmap.md': 'FocusAreas',
     'roadmap_design.md': 'DesignRoadmap',
 }
