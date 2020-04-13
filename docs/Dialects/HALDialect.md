@@ -1248,6 +1248,116 @@ the device.
 | :----: | ----------- |
 `result` | allocator
 
+### `hal.device.match.id` (IREE::HAL::DeviceMatchIDOp)
+
+returns true if the device ID matches the pattern
+
+Syntax:
+
+```
+operation ::= `hal.device.match.id` $device `,` `pattern` `=` `[` $pattern `]` attr-dict
+              `:` `(` type($device) `)` `->` type($result)
+```
+
+
+Pattern matches the device ID with the given wildcard pattern.
+This can be used to conditionally evaluate device-specific code when the
+device is not known at compile-time.
+
+```mlir
+%is_match = hal.device.match.id %device, pattern = ["vulkan-*"] : (!hal.device) -> i1
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`pattern` | StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`device` | device
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | 1-bit signless integer
+
+### `hal.device.switch` (IREE::HAL::DeviceSwitchOp)
+
+runtime device switch pseudo op
+
+Switches between multiple regions based on the runtime device type.
+The provided regions are matched against the runtime backend of the given
+device and executed only when the device matches the conditions.
+
+Conditions can match on wildcards and be folded to enable conditions that
+have similar bodies to be folded. The patterns themselves are only matched
+once at startup and then the results are cached; the runtime overhead is
+equivalent to a normal switch statement. In cases where the compiler can
+statically identify the device type entire cases can be folded away.
+
+Supported conditions:
+* `#hal.match...`: execute the region if the expression matches.
+
+Supported match expressions:
+* `#hal.match.always`: always matches; useful for defaults.
+* `#hal.match.any<[...]>`: matches if any of the nested expressions match.
+* `#hal.match.all<[...]>`: matches only if all of the nested expressions
+  match.
+* `#hal.device.match.id<"pattern*-?-*">`: matches against the device
+  identifier. The pattern is evaluated with standard file path wildcards
+  (`*` for zero or more characters and `?` for one character).
+
+If more than one condition is satisfied the first listed will be chosen.
+More specific conditions should be earlier in the set. If no condition is
+matched but there are return values the switch will abort at runtime. It's
+strongly recommend that all switches that return values end with a trailing
+`#hal.match.always` condition to handle the fallthrough case.
+
+Upon creation each condition region will have an empty entry block with the
+specified operands available as arguments. Each region must be setup to
+return the same types.
+
+```mlir
+%c0 = constant 0 : i32
+%c1 = constant 1 : i32
+%c2 = constant 2 : i32
+%device = ... : !hal.device
+%0 = hal.device.switch(%device : !hal.device) -> i32
+  #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
+    hal.return %c1a : i32
+  },
+  #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
+    hal.return %c2a : i32
+  },
+  #hal.match.always(%c0a = %c0 : i32) {
+    hal.return %c0a : i32
+  }
+```
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`conditions` | ArrayAttr | array attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`device` | device
+`args` | any type
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`results` | any type
+
 ### `hal.ex.defer_release` (IREE::HAL::ExDeferReleaseOp)
 
 
@@ -1896,6 +2006,25 @@ command buffer barrier operations.
 | Result | Description |
 | :----: | ----------- |
 `result` | MemoryBarrier
+
+### `hal.return` (IREE::HAL::ReturnOp)
+
+return from a hal.device.switch region
+
+Syntax:
+
+```
+operation ::= `hal.return` attr-dict ($operands^ `:` type($operands))?
+```
+
+
+Returns the given values from the region and back to the host code.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`operands` | any type
 
 ### `hal.variable.address` (IREE::HAL::VariableAddressOp)
 

@@ -114,3 +114,30 @@ std.constant wrapped in an iree.do_not_optimize.
 | Result | Description |
 | :----: | ----------- |
 &laquo;unnamed&raquo; | any type
+
+### `iree.unreachable` (IREE::UnreachableOp)
+
+unreachable assertion op
+
+Syntax:
+
+```
+operation ::= `iree.unreachable` attr-dict
+```
+
+
+Signals to the compiler that the parent block should not be reachable.
+This may be converted into a runtime assertion, though ideally they are
+stripped during translation.
+
+```mlir
+^bb0:
+  %true = constant 1 : i1
+  cond_br %true, ^bb2, ^bb1
+^bb1:
+  // Indicates that this branch should never be taken.
+  iree.unreachable
+^bb2:
+  ...
+
+```
