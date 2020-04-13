@@ -460,7 +460,7 @@ static LogicalResult lowerNonSplatConstant(
       loc, pointerType,
       builder.getI32IntegerAttr(
           static_cast<int32_t>(spirv::StorageClass::Function)),
-      ArrayRef<Value>(spirvConstOp.getResult()));
+      spirvConstOp.getResult());
 
   Value accessIndex = valueCache.getAccessIndicesForIndexMap(
       builder, loc, index, argType.getShape());
