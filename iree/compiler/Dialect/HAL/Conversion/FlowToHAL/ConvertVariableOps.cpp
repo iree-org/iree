@@ -49,7 +49,7 @@ static FuncOp createInitializerFromImmediate(
 
   // Create const and return ops.
   auto constValue = rewriter.create<ConstantOp>(loc, immediateElements);
-  rewriter.create<ReturnOp>(loc, constValue.getResult());
+  rewriter.create<mlir::ReturnOp>(loc, constValue.getResult());
   return initializerFuncOp;
 }
 

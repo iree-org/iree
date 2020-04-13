@@ -352,6 +352,13 @@ vm.import @device.allocator(
 ) -> !vm.ref<!hal.allocator>
 attributes {nosideeffects}
 
+// Returns true if the device ID matches the pattern.
+vm.import @device.match.id(
+  %device : !vm.ref<!hal.device>,
+  %pattern : !vm.ref<!iree.byte_buffer>
+) -> i32
+attributes {nosideeffects}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::ExecutableCache
 //===----------------------------------------------------------------------===//

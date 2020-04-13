@@ -255,6 +255,22 @@ void BufferViewBufferOp::getCanonicalizationPatterns(
   results.insert<SkipBufferViewBufferOp>(context);
 }
 
+//===----------------------------------------------------------------------===//
+// hal.device.switch
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): fold conditions with the same IR tree.
+// TODO(benvanik): remove duplicate conditions.
+// TODO(benvanik): fold condition expressions (any(always, ...) -> always, etc).
+// TODO(benvanik): completely replace switches with just one always block.
+// TODO(benvanik): remove conditions with no side-effects.
+
+//===----------------------------------------------------------------------===//
+// hal.device.match.id
+//===----------------------------------------------------------------------===//
+
+// TODO(benvanik): fold matches that are known true based on device config.
+
 }  // namespace HAL
 }  // namespace IREE
 }  // namespace iree_compiler

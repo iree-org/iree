@@ -962,6 +962,176 @@ void DeviceAllocatorOp::getAsmResultNames(
 }
 
 //===----------------------------------------------------------------------===//
+// hal.device.switch
+//===----------------------------------------------------------------------===//
+
+void DeviceSwitchOp::build(Builder *builder, OperationState &state,
+                           TypeRange resultTypes, Value device,
+                           ArrayRef<Attribute> conditions,
+                           ArrayRef<ValueRange> conditionArgs,
+                           ArrayRef<NamedAttribute> attributes) {
+  state.addOperands({device});
+  state.addAttribute("conditions", builder->getArrayAttr(conditions));
+  for (auto args : conditionArgs) {
+    state.addOperands(args);
+    auto *region = state.addRegion();
+    auto *entryBlock = OpBuilder(region).createBlock(region);
+    for (auto arg : args) {
+      entryBlock->addArgument(arg.getType());
+    }
+  }
+  state.addTypes(resultTypes);
+  state.addAttributes(attributes);
+  state.resizableOperandList = true;
+}
+
+static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
+                                       OperationState *result) {
+  OpAsmParser::OperandType device;
+  Type deviceType;
+  if (failed(parser.parseLParen()) || failed(parser.parseOperand(device)) ||
+      failed(parser.parseColonType(deviceType)) ||
+      failed(parser.resolveOperand(device, deviceType, result->operands)) ||
+      failed(parser.parseRParen()) ||
+      failed(parser.parseOptionalArrowTypeList(result->types))) {
+    return failure();
+  }
+
+  // Parses each switch condition attribute and region, like:
+  // #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
+  //   hal.return %c1a : i32
+  // }, ...
+  result->setOperandListToResizable();
+  SmallVector<Attribute, 4> conditionAttrs;
+  do {
+    Attribute conditionAttr;
+    SmallVector<NamedAttribute, 1> dummyAttrs;
+    if (failed(parser.parseAttribute(conditionAttr, "condition", dummyAttrs)) ||
+        failed(parser.parseLParen())) {
+      return failure();
+    }
+    conditionAttrs.push_back(conditionAttr);
+    SmallVector<OpAsmParser::OperandType, 16> regionArgs;
+    SmallVector<Type, 16> regionArgTypes;
+    if (failed(parser.parseOptionalRParen())) {
+      SmallVector<OpAsmParser::OperandType, 16> regionOperands;
+      auto argsLoc = parser.getCurrentLocation();
+      do {
+        // Reserve entries in the lists.
+        regionArgs.emplace_back();
+        regionOperands.emplace_back();
+        regionArgTypes.emplace_back();
+        if (failed(parser.parseRegionArgument(regionArgs.back())) ||
+            failed(parser.parseEqual()) ||
+            failed(parser.parseOperand(regionOperands.back())) ||
+            failed(parser.parseColonType(regionArgTypes.back()))) {
+          return failure();
+        }
+      } while (succeeded(parser.parseOptionalComma()));
+      if (failed(parser.parseRParen()) ||
+          failed(parser.resolveOperands(regionOperands, regionArgTypes, argsLoc,
+                                        result->operands))) {
+        return failure();
+      }
+    }
+    auto *regionBody = result->addRegion();
+    if (failed(parser.parseRegion(*regionBody, regionArgs, regionArgTypes))) {
+      return failure();
+    }
+  } while (succeeded(parser.parseOptionalComma()));
+  result->addAttribute("conditions",
+                       ArrayAttr::get(conditionAttrs, result->getContext()));
+
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+  return success();
+}
+
+static void printDeviceSwitchOp(OpAsmPrinter &p, DeviceSwitchOp op) {
+  p << op.getOperationName() << "(";
+  p.printOperand(op.device());
+  p << " : ";
+  p.printType(op.device().getType());
+  p << ")";
+  p.printOptionalArrowTypeList(op.getResultTypes());
+  p << "\n";
+  p.getStream().indent(4);
+  int argOffset = 0;
+  interleave(
+      llvm::zip(op.conditions(), op.condition_regions()),
+      [&](std::tuple<Attribute, Region &> it) {
+        auto &conditionAttr = std::get<0>(it);
+        auto &conditionRegion = std::get<1>(it);
+        p.printAttribute(conditionAttr);
+        p << "(";
+        auto regionOperands = conditionRegion.front().getArguments();
+        auto regionArgs = op.args().slice(argOffset, regionOperands.size());
+        argOffset += regionOperands.size();
+        // TODO(benvanik): figure out how to parse with shadowing.
+        // p.shadowRegionArgs(conditionRegion, regionArgs);
+        interleaveComma(llvm::zip(regionOperands, regionArgs), p,
+                        [&](std::tuple<BlockArgument, Value> it) {
+                          p << std::get<0>(it) << " = " << std::get<1>(it);
+                          p << " : ";
+                          p << std::get<1>(it).getType();
+                        });
+        p << ")";
+        p.printRegion(conditionRegion,
+                      /*printEntryBlockArgs=*/false,
+                      /*printBlockTerminators=*/true);
+      },
+      [&]() {
+        p << ",\n";
+        p.getStream().indent(4);
+      });
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(),
+                                     /*elidedAttrs=*/{"conditions"});
+}
+
+static LogicalResult verifyDeviceSwitchOp(DeviceSwitchOp op) {
+  if (op.conditions().size() != op.condition_regions().size()) {
+    return op.emitOpError() << "requires conditions and regions be matched 1:1";
+  } else if (op.condition_regions().empty()) {
+    return op.emitOpError() << "requires at least one condition";
+  }
+  int argOffset = 0;
+  for (auto &region : op.condition_regions()) {
+    auto regionOperands = region.front().getArguments();
+    auto regionArgs = op.args().slice(argOffset, regionOperands.size());
+    argOffset += regionOperands.size();
+
+    for (auto it : llvm::zip(regionArgs, regionOperands)) {
+      auto regionArg = std::get<0>(it);
+      auto regionOperand = std::get<1>(it);
+      if (regionArg.getType() != regionOperand.getType()) {
+        return op.emitOpError() << "requires that regions have their arguments "
+                                   "represented in the op arg list in order ("
+                                << regionArg.getType()
+                                << " != " << regionOperand.getType() << ")";
+      }
+    }
+
+    for (auto &block : region) {
+      if (auto returnOp =
+              dyn_cast_or_null<IREE::HAL::ReturnOp>(block.getTerminator())) {
+        if (!std::equal(returnOp.getOperandTypes().begin(),
+                        returnOp.getOperandTypes().end(),
+                        op.getResultTypes().begin())) {
+          return op.emitOpError()
+                 << "requires all regions return the same types";
+        }
+      }
+    }
+  }
+  if (argOffset != op.args().size()) {
+    return op.emitOpError() << "requires that the total argument list matches "
+                               "the sum of all region operands";
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable
 //===----------------------------------------------------------------------===//
 

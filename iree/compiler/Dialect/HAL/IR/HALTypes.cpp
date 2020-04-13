@@ -134,6 +134,81 @@ void DescriptorSetLayoutBindingAttr::print(DialectAsmPrinter &p) const {
   os << ">";
 }
 
+// static
+Attribute MatchAlwaysAttr::parse(DialectAsmParser &p) {
+  return get(p.getBuilder().getContext());
+}
+
+void MatchAlwaysAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName();
+}
+
+static ArrayAttr parseMultiMatchAttrArray(DialectAsmParser &p) {
+  auto b = p.getBuilder();
+  SmallVector<Attribute, 4> conditionAttrs;
+  if (failed(p.parseLess()) || failed(p.parseLSquare())) {
+    return {};
+  }
+  do {
+    Attribute conditionAttr;
+    if (failed(p.parseAttribute(conditionAttr))) {
+      return {};
+    }
+    conditionAttrs.push_back(conditionAttr);
+  } while (succeeded(p.parseOptionalComma()));
+  if (failed(p.parseRSquare()) || failed(p.parseGreater())) {
+    return {};
+  }
+  return b.getArrayAttr(conditionAttrs);
+}
+
+static void printMultiMatchAttrList(ArrayAttr conditionAttrs,
+                                    DialectAsmPrinter &p) {
+  auto &os = p.getStream();
+  os << "<[";
+  interleaveComma(conditionAttrs, os,
+                  [&](Attribute condition) { os << condition; });
+  os << "]>";
+}
+
+// static
+Attribute MatchAnyAttr::parse(DialectAsmParser &p) {
+  return get(parseMultiMatchAttrArray(p));
+}
+
+void MatchAnyAttr::print(DialectAsmPrinter &p) const {
+  p << getKindName();
+  printMultiMatchAttrList(conditions().cast<ArrayAttr>(), p);
+}
+
+// static
+Attribute MatchAllAttr::parse(DialectAsmParser &p) {
+  return get(parseMultiMatchAttrArray(p));
+}
+
+void MatchAllAttr::print(DialectAsmPrinter &p) const {
+  p << getKindName();
+  printMultiMatchAttrList(conditions().cast<ArrayAttr>(), p);
+}
+
+// static
+Attribute DeviceMatchIDAttr::parse(DialectAsmParser &p) {
+  StringAttr patternAttr;
+  if (failed(p.parseLess()) || failed(p.parseAttribute(patternAttr)) ||
+      failed(p.parseGreater())) {
+    return {};
+  }
+  return get(patternAttr);
+}
+
+void DeviceMatchIDAttr::print(DialectAsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << getKindName() << "<\"";
+  os << pattern();
+  os << "\">";
+}
+
 #include "iree/compiler/Dialect/HAL/IR/HALOpInterface.cpp.inc"
 
 }  // namespace HAL

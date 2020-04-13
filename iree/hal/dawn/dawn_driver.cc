@@ -37,9 +37,10 @@ StatusOr<DeviceInfo> PopulateDeviceInfo(dawn_native::Adapter* adapter) {
   // supported_features |= DeviceFeature::kProfiling;
 
   // TODO(scotttodd): more clever/sanitized device naming.
+  std::string device_id = "dawn";
   std::string device_name = absl::StrCat("dawn-", adapter->GetPCIInfo().name);
 
-  return DeviceInfo(device_name, supported_features,
+  return DeviceInfo(device_id, device_name, supported_features,
                     reinterpret_cast<DriverDeviceID>(adapter));
 }
 

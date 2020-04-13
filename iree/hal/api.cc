@@ -1023,6 +1023,14 @@ iree_hal_device_allocator(iree_hal_device_t* device) {
   return reinterpret_cast<iree_hal_allocator_t*>(handle->allocator());
 }
 
+IREE_API_EXPORT iree_string_view_t IREE_API_CALL
+iree_hal_device_id(iree_hal_device_t* device) {
+  auto* handle = reinterpret_cast<Device*>(device);
+  if (!handle) return IREE_STRING_VIEW_EMPTY;
+  const auto& id = handle->info().id();
+  return iree_string_view_t{id.data(), id.size()};
+}
+
 //===----------------------------------------------------------------------===//
 // iree::hal::Driver
 //===----------------------------------------------------------------------===//

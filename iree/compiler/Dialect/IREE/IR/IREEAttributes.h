@@ -32,6 +32,10 @@ namespace HAL {
 namespace AttrKind {
 enum Kind {
   DescriptorSetLayoutBindingAttr = IREE::AttrKind::FIRST_HAL_ATTR,
+  MatchAlwaysAttr,
+  MatchAllAttr,
+  MatchAnyAttr,
+  DeviceMatchIDAttr,
 };
 }  // namespace AttrKind
 }  // namespace HAL

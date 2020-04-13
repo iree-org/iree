@@ -51,6 +51,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
+  passManager.addPass(createOutlineDeviceSwitchesPass());
+  passManager.addPass(createMemoizeDeviceQueriesPass());
+  // TODO(benvanik): function deduplication to remove outlined functions.
+
   // TODO(benvanik): run symbol DCE when all symbols have visibility defined.
   // Right now the global value initializers don't have proper tracking and if
   // we do this we lose initializers that have side effects we care about.

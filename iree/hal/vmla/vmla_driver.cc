@@ -35,7 +35,7 @@ DeviceInfo GetDefaultDeviceInfo() {
   // supported_features |= DeviceFeature::kDebugging;
   // supported_features |= DeviceFeature::kCoverage;
   // supported_features |= DeviceFeature::kProfiling;
-  DeviceInfo device_info("vmla", supported_features);
+  DeviceInfo device_info("vmla", "vmla", supported_features);
   // TODO(benvanik): device info.
   return device_info;
 }
