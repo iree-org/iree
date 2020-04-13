@@ -32,8 +32,6 @@ namespace HAL {
 //===----------------------------------------------------------------------===//
 
 template <typename T>
-using EnumSymbolizerFn = llvm::Optional<T> (*)(llvm::StringRef);
-template <typename T, EnumSymbolizerFn<T> F>
 static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
                                    Attribute &attr) {
   Attribute genericAttr;
@@ -48,8 +46,7 @@ static LogicalResult parseEnumAttr(DialectAsmParser &parser, StringRef attrName,
     return parser.emitError(loc)
            << "expected " << attrName << " attribute specified as string";
   }
-  // TODO(b/145167884): remove F and use symbolizeEnum<T> instead.
-  auto symbolized = F(stringAttr.getValue());
+  auto symbolized = symbolizeEnum<T>(stringAttr.getValue());
   if (!symbolized.hasValue()) {
     return parser.emitError(loc)
            << "failed to parse '" << attrName << "' enum value";
@@ -114,11 +111,9 @@ Attribute DescriptorSetLayoutBindingAttr::parse(DialectAsmParser &p) {
   if (failed(p.parseLess()) ||
       failed(p.parseAttribute(bindingAttr, b.getIntegerType(32))) ||
       failed(p.parseComma()) ||
-      failed(parseEnumAttr<DescriptorType, symbolizeDescriptorType>(
-          p, "type", typeAttr)) ||
+      failed(parseEnumAttr<DescriptorType>(p, "type", typeAttr)) ||
       failed(p.parseComma()) ||
-      failed(parseEnumAttr<MemoryAccessBitfield, symbolizeMemoryAccessBitfield>(
-          p, "access", accessAttr)) ||
+      failed(parseEnumAttr<MemoryAccessBitfield>(p, "access", accessAttr)) ||
       failed(p.parseGreater())) {
     return {};
   }

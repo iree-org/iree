@@ -38,8 +38,6 @@ static Type getDeviceSizeType(OpAsmParser &parser) {
 }
 
 template <typename T>
-using EnumSymbolizerFn = llvm::Optional<T> (*)(llvm::StringRef);
-template <typename T, EnumSymbolizerFn<T> F>
 static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
                                    SmallVectorImpl<NamedAttribute> &attrs) {
   Attribute genericAttr;
@@ -55,8 +53,7 @@ static LogicalResult parseEnumAttr(OpAsmParser &parser, StringRef attrName,
     return parser.emitError(loc)
            << "expected " << attrName << " attribute specified as string";
   }
-  // TODO(b/145167884): remove F and use symbolizeEnum<T> instead.
-  auto symbolized = F(stringAttr.getValue());
+  auto symbolized = symbolizeEnum<T>(stringAttr.getValue());
   if (!symbolized.hasValue()) {
     return parser.emitError(loc) << "failed to parse enum value";
   }
@@ -631,13 +628,11 @@ static ParseResult parseCommandBufferExecutionBarrierOp(
                                    CommandBufferType::get(result->getContext()),
                                    result->operands)) ||
       failed(parser.parseComma()) ||
-      failed(parseEnumAttr<ExecutionStageBitfield,
-                           symbolizeExecutionStageBitfield>(
-          parser, "source_stage_mask", result->attributes)) ||
+      failed(parseEnumAttr<ExecutionStageBitfield>(parser, "source_stage_mask",
+                                                   result->attributes)) ||
       failed(parser.parseComma()) ||
-      failed(parseEnumAttr<ExecutionStageBitfield,
-                           symbolizeExecutionStageBitfield>(
-          parser, "target_stage_mask", result->attributes))) {
+      failed(parseEnumAttr<ExecutionStageBitfield>(parser, "target_stage_mask",
+                                                   result->attributes))) {
     return failure();
   }
   SmallVector<OpAsmParser::OperandType, 4> memoryBarriers;
@@ -1393,12 +1388,12 @@ static ParseResult parseInterfaceBindingOp(OpAsmParser &parser,
                                    "binding", result->attributes)) ||
       failed(parser.parseComma()) || failed(parser.parseKeyword("type")) ||
       failed(parser.parseEqual()) ||
-      failed(parseEnumAttr<DescriptorType, symbolizeDescriptorType>(
-          parser, "type", result->attributes)) ||
+      failed(
+          parseEnumAttr<DescriptorType>(parser, "type", result->attributes)) ||
       failed(parser.parseComma()) || failed(parser.parseKeyword("access")) ||
       failed(parser.parseEqual()) ||
-      failed(parseEnumAttr<MemoryAccessBitfield, symbolizeMemoryAccessBitfield>(
-          parser, "access", result->attributes)) ||
+      failed(parseEnumAttr<MemoryAccessBitfield>(parser, "access",
+                                                 result->attributes)) ||
       failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
     return failure();
   }
