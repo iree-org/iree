@@ -1,5 +1,12 @@
 # IREE Repository Management
 
+Due to the process by which we synchronize this GitHub project with our internal
+Google source code repository, there are some oddities in our workflows and
+processes. We aim to minimize these, and especially to minimize their impact on
+external contributors, but they are documented here for clarity and
+transparency. If any of these things are particularly troublesome or painful for
+your workflow, please reach out to us so we can prioritize a fix.
+
 ## Dependencies
 
 As a project which brings together compiler, runtime and graphics systems,
@@ -7,10 +14,9 @@ dependency management is somewhat complex. We use git submodules for C++
 dependencies and, where possible, language specific external package management
 for other types of dependencies (i.e. Python).
 
-In addition, the IREE Open Source project is actually downstream from its
-"source of truth" within Google -- where dependencies are managed entirely
-differently. This imposes constraints on repository management tasks that may
-not be obvious.
+In addition, dependencies are managed entirely different in the Google internal
+source code repository. This imposes constraints on repository management tasks
+that may not be obvious.
 
 Shortcut commands (read below for full documentation):
 
@@ -30,15 +36,15 @@ Shortcut commands (read below for full documentation):
 
 Currently, the two most challenging projects to manage as dependencies are
 TensorFlow and LLVM. Both are typically pinned to specific versions that are
-integrated upstream at a cadence up to many times per day. Further, because LLVM
-does not ship with Bazel BUILD files, IREE "borrows" the BUILD files from
-TensorFlow (for building with Bazel). Just to make it more interesting, since
-TensorFlow does not ship with CMakeLists, IREE uses overlay CMakeLists.txt to
-build subsets of TensorFlow needed for the compiler (when built with CMake).
-While these externally managed build files are written to be moderately generic,
-they can and do break and require manual intervention at times (i.e. there is no
-guarantee that updating to a new commit of either will not require some manual
-work on the build files).
+integrated in the Google source repository at a cadence up to many times per
+day. Further, because LLVM does not ship with Bazel BUILD files, IREE "borrows"
+the BUILD files from TensorFlow (for building with Bazel). Just to make it more
+interesting, since TensorFlow does not ship with CMakeLists, IREE uses overlay
+CMakeLists.txt to build subsets of TensorFlow needed for the compiler (when
+built with CMake). While these externally managed build files are written to be
+moderately generic, they can and do break and require manual intervention at
+times (i.e. there is no guarantee that updating to a new commit of either will
+not require some manual work on the build files).
 
 The only combination which is expected to work is the llvm-project commit noted
 in the `LLVM_COMMIT` setting in
@@ -53,17 +59,16 @@ source of truth prior to accepting code that depends on it.
 #### Adding dependencies
 
 In general, adding dependencies will require coordination with Google engineers
-to make the dependency available in both upstream and downstream. It is
-important to ask on the mailing list prior to expecting to contribute such
-changes.
+to make the dependency available both on GitHub and in the Google source
+repository. It is important to ask on the mailing list prior to expecting to
+contribute such changes.
 
 #### Pushing dependency changes
 
 When working on a development branch, feel free to stage changes however makes
-sense. However, when sending a PR, note that the upstream systems ignore any
-submodule version updates when merging the commit. Our source of truth for
-versions is in the `SUBMODULE_VERSIONS` file in the repository root. Here is an
-example:
+sense. However, when sending a PR, note that our integration systems will
+overwrite the submodule version updates from the `SUBMODULE_VERSIONS` file in
+the repository root. Here is an example:
 
 ```text
 6ec136281086b71da32b5fb068bd6e46b78a5c79 third_party/abseil-cpp
