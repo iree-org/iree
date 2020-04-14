@@ -34,7 +34,10 @@ class LinSpaceModule(tf.Module):
 
 
 @tf_test_utils.compile_modules(
-    backends=["tf", "iree_vmla", "iree_vulkan"], linspace=LinSpaceModule)
+    # TODO(github.com/google/iree/issues/1521):
+    #   Add backends iree_vmla and iree_vulkan.
+    backends=["tf"],
+    linspace=LinSpaceModule)
 class LinspaceTest(tf_test_utils.SavedModelTestCase):
 
   def test_linspace(self):

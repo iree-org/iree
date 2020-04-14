@@ -28,6 +28,7 @@
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -393,8 +394,9 @@ struct DynamicSliceOpConversion
       : OpConversionPattern(context), typeConverter(typeConverter) {}
 
   LogicalResult matchAndRewrite(
-      xla_hlo::DynamicSliceOp srcOp, ArrayRef<Value> operands,
+      xla_hlo::DynamicSliceOp srcOp, ArrayRef<Value> rawOperands,
       ConversionPatternRewriter &rewriter) const override {
+    xla_hlo::DynamicSliceOpOperandAdaptor operands(rawOperands);
     // TODO(benvanik): if the source is only used by this op then replace with
     // a vmla.buffer.view op.
 
@@ -413,9 +415,9 @@ struct DynamicSliceOpConversion
       srcIndices[i] = rewriter.createOrFold<IndexCastOp>(
           srcOp.getLoc(), rewriter.getIndexType(),
           rewriter.createOrFold<IREE::VMLA::BufferLoadI32Op>(
-              srcOp.getLoc(), rewriter.getIntegerType(32), operands[1],
-              rewriter.createOrFold<mlir::ConstantIndexOp>(
-                  srcOp.getLoc(), i * sizeof(int32_t))));
+              srcOp.getLoc(), rewriter.getIntegerType(32),
+              operands.start_indices()[i],
+              rewriter.createOrFold<mlir::ConstantIndexOp>(srcOp.getLoc(), 0)));
       dstIndices[i] = zero;
       lengths[i] = rewriter.createOrFold<mlir::ConstantIndexOp>(
           srcOp.getLoc(),
@@ -425,7 +427,7 @@ struct DynamicSliceOpConversion
     auto dst = VMLAConversionTarget::allocateOutputBuffer(
         srcOp.getLoc(), srcOp.getResult(), typeConverter, rewriter);
     rewriter.create<IREE::VMLA::CopyOp>(
-        srcOp.getLoc(), operands[0], srcShape, srcIndices, dst, dstShape,
+        srcOp.getLoc(), operands.operand(), srcShape, srcIndices, dst, dstShape,
         dstIndices, lengths,
         TypeAttr::get(srcOp.getType().cast<ShapedType>().getElementType()));
     rewriter.replaceOp(srcOp, {dst});
