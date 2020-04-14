@@ -23,8 +23,6 @@
 
 namespace mlir {
 
-void registerFromLLVMIRTranslation();
-void registerToLLVMIRTranslation();
 void registerToSPIRVTranslation();
 
 // This function should be called before creating any MLIRContext if one
@@ -32,8 +30,6 @@ void registerToSPIRVTranslation();
 // automatically.
 inline void registerMlirTranslations() {
   static bool init_once = []() {
-    registerFromLLVMIRTranslation();
-    registerToLLVMIRTranslation();
     registerToSPIRVTranslation();
     return true;
   }();
