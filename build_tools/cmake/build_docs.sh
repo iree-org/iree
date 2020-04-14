@@ -58,6 +58,8 @@ cp docs/IREE-Architecture.svg ${BUILD_DIR}/doc/
 cp docs/roadmap.md ${BUILD_DIR}/doc/
 cp docs/roadmap_design.md ${BUILD_DIR}/doc/
 
+cp docs/developer_overview.md ${BUILD_DIR}/doc/
+
 mkdir -p ${BUILD_DIR}/doc/GetStarted/
 cp docs/getting_started_windows_bazel.md ${BUILD_DIR}/doc/GetStarted/
 cp docs/getting_started_windows_cmake.md ${BUILD_DIR}/doc/GetStarted/
