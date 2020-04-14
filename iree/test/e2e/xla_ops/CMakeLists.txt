@@ -15,20 +15,6 @@
 iree_add_all_subdirs()
 
 file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
-file(GLOB _GLOB_CONV_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS conv.mlir)
-list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_CONV_MLIR})
-iree_lit_test_suite(
-  NAME
-    lit
-  SRCS
-    "conv.mlir"
-  DATA
-    iree::tools::IreeFileCheck
-    iree::tools::iree-run-mlir
-  LABELS
-    "hostonly"
-)
-
 iree_check_single_backend_test_suite(
   NAME
     check_vmla_vmla
@@ -128,6 +114,7 @@ iree_check_single_backend_test_suite(
     "broadcast_in_dim.mlir"
     "compare.mlir"
     "constant.mlir"
+    "conv.mlir"
     "cos.mlir"
     "dot.mlir"
     "exp.mlir"
