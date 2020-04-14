@@ -117,7 +117,7 @@ cc_library(
         "init_translations.h",
     ],
     deps = [
-        "SPIRVTranslateRegistration",
+        "@llvm-project//mlir:SPIRVTranslateRegistration",
     ],
 )
 
