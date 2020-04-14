@@ -25,6 +25,5 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     iree::compiler::Dialect::IREE::IR
-  ALWAYSLINK
   PUBLIC
 )
