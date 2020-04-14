@@ -26,6 +26,7 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Utils.h"
+#include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -89,9 +90,11 @@ LogicalResult convertOperation(Operation *oldOp,
     }
   }
 
-  if (auto constantOp = dyn_cast<mlir::ConstantOp>(oldOp)) {
-    auto newValue =
-        convertAttribute(oldOp->getLoc(), constantOp.value(), typeConverter);
+  if (llvm::isa<mlir::ConstantOp>(oldOp) ||
+      llvm::isa<xla_hlo::ConstOp>(oldOp)) {
+    // Deal with all value-based constant ops generically.
+    Attribute oldValue = oldOp->getAttr("value");
+    auto newValue = convertAttribute(oldOp->getLoc(), oldValue, typeConverter);
     if (!newValue) {
       return failure();
     }

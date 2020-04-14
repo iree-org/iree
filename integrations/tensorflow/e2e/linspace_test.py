@@ -33,11 +33,10 @@ class LinSpaceModule(tf.Module):
     return tf.linspace(start, stop, num)
 
 
+# TODO(laurenzo): Re-enable iree_vulkan once dynamic-slice is implemented
+# See https://github.com/google/iree/issues/1521
 @tf_test_utils.compile_modules(
-    # TODO(github.com/google/iree/issues/1521):
-    #   Add backends iree_vmla and iree_vulkan.
-    backends=["tf"],
-    linspace=LinSpaceModule)
+    backends=["tf", "iree_vmla"], linspace=LinSpaceModule)
 class LinspaceTest(tf_test_utils.SavedModelTestCase):
 
   def test_linspace(self):

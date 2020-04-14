@@ -8,6 +8,14 @@ func @constantI64() -> i64 {
   return %c123 : i64
 }
 
+// CHECK-LABEL: func @hloConstantI64
+// CHECK-SAME: () -> tensor<1xi32>
+func @hloConstantI64() -> tensor<1xi64> {
+  // CHECK-NEXT: xla_hlo.constant dense<123> : tensor<1xi32>
+  %c123 = xla_hlo.constant dense<123> : tensor<1xi64>
+  return %c123 : tensor<1xi64>
+}
+
 // -----
 
 // CHECK-LABEL: func @constantF64
