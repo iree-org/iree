@@ -18,7 +18,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "compare.mlir"
     "conv.mlir"
   DATA
     iree::tools::IreeFileCheck
@@ -36,6 +35,7 @@ iree_check_single_backend_test_suite(
     "batch_norm_inference.mlir"
     "broadcast.mlir"
     "broadcast_in_dim.mlir"
+    "compare.mlir"
     "concatenate.mlir"
     "constant.mlir"
     "convert_int.mlir"
@@ -84,6 +84,7 @@ iree_check_single_backend_test_suite(
     "add.mlir"
     "broadcast.mlir"
     "broadcast_in_dim.mlir"
+    "compare.mlir"
     "concatenate.mlir"
     "constant.mlir"
     "convert_int.mlir"
@@ -161,6 +162,7 @@ iree_check_single_backend_test_suite(
     "add.mlir"
     "batch_norm_inference.mlir"
     "broadcast_in_dim.mlir"
+    "compare.mlir"
     "constant.mlir"
     "cos.mlir"
     "dot.mlir"
