@@ -18,6 +18,7 @@
 // options, which is missing in MLIR's translation main entry function.
 
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_translations.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
@@ -50,6 +51,7 @@ int main(int argc, char **argv) {
 
   mlir::registerMlirDialects();
   mlir::iree_compiler::registerIreeDialects();
+  mlir::registerMlirTranslations();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

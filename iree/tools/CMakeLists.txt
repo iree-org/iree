@@ -170,6 +170,7 @@ if(${IREE_BUILD_COMPILER})
       "opt_main.cc"
     DEPS
       ::PassesAndDialects
+      ::Translations
       LLVMSupport
       MLIRIR
       MLIROptLib

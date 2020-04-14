@@ -241,6 +241,7 @@ cc_library(
     srcs = ["translate_main.cc"],
     deps = [
         ":PassesAndDialects",
+        ":Translations",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
