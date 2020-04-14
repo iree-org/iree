@@ -38,7 +38,6 @@
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Support/Functional.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
@@ -182,11 +181,10 @@ LogicalResult translateToVulkanSPIRVExecutable(
   for (auto executionModeOp :
        spvModuleOp.getBlock().getOps<spirv::ExecutionModeOp>()) {
     if (executionModeOp.execution_mode() == spirv::ExecutionMode::LocalSize) {
-      auto workGroupSize = functional::map(
-          [](Attribute attr) -> int64_t {
+      auto workGroupSize = llvm::to_vector<3>(llvm::map_range(
+          executionModeOp.values(), [](Attribute attr) -> int64_t {
             return attr.cast<IntegerAttr>().getInt();
-          },
-          executionModeOp.values());
+          }));
       workGroupSize.resize(3, 1);
       // Find the corresponding hal.executable.entry_point.
       for (auto halEntryPointOp : halEntryPointOps) {

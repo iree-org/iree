@@ -2,8 +2,8 @@
 
 module {
   // CHECK: spv.func @reverse_2d
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32 [4]> [0]>, StorageBuffer>
-  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32 [4]> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<144 x f32, stride=4> [0]>, StorageBuffer>
   func @reverse_2d(%arg0: memref<12x12xf32>, %arg1 : memref<12x12xf32>)
   attributes {iree.dispatch_fn_name = "reverse_2d"} {
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]
@@ -21,8 +21,8 @@ module {
 
 module {
   // CHECK: spv.func @reverse_3d
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<27 x f32 [4]> [0]>, StorageBuffer>
-  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<27 x f32 [4]> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<27 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9]*]]: !spv.ptr<!spv.struct<!spv.array<27 x f32, stride=4> [0]>, StorageBuffer>
   func @reverse_3d(%arg0: memref<3x3x3xf32>, %arg1 : memref<3x3x3xf32>)
   attributes {iree.dispatch_fn_name = "reverse_3d"} {
     // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]

@@ -79,9 +79,8 @@ static spirv::PointerType convertArgTypeToVariableType(Location loc,
   }
   int64_t stride = elementType.getIntOrFloatBitWidth() / 8;
   if (argType.getRank()) {
-    elementType = spirv::ArrayType::get(
-        elementType, argType.getNumElements(),
-        static_cast<spirv::ArrayType::LayoutInfo>(stride));
+    elementType =
+        spirv::ArrayType::get(elementType, argType.getNumElements(), stride);
   }
   return spirv::PointerType::get(
       spirv::StructType::get(elementType,
@@ -446,9 +445,8 @@ static LogicalResult lowerNonSplatConstant(
       SmallVector<APFloat, 4> valuesVec(values.begin(), values.end());
       spirvConstAttr = DenseElementsAttr::get(tensorType, valuesVec);
     }
-    elementType = spirv::ArrayType::get(
-        elementType, argType.getNumElements(),
-        static_cast<spirv::ArrayType::LayoutInfo>(stride));
+    elementType =
+        spirv::ArrayType::get(elementType, argType.getNumElements(), stride);
   } else {
     spirvConstAttr = constOp.value();
   }
@@ -460,7 +458,7 @@ static LogicalResult lowerNonSplatConstant(
       loc, pointerType,
       builder.getI32IntegerAttr(
           static_cast<int32_t>(spirv::StorageClass::Function)),
-      ArrayRef<Value>(spirvConstOp.getResult()));
+      spirvConstOp.getResult());
 
   Value accessIndex = valueCache.getAccessIndicesForIndexMap(
       builder, loc, index, argType.getShape());

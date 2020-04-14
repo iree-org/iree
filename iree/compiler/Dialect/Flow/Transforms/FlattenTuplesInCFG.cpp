@@ -62,8 +62,8 @@ void copyOperationAttrs(Operation *oldOp, Operation *newOp) {
   for (const auto &oldAttr : oldOp->getAttrs()) {
     // Don't copy segment attributes as these correspond to the number operands,
     // which may be different.
-    if (oldAttr.first.is("operand_segment_sizes") ||
-        oldAttr.first.is("result_segment_sizes"))
+    if (oldAttr.first == "operand_segment_sizes" ||
+        oldAttr.first == "result_segment_sizes")
       continue;
 
     newOp->setAttr(oldAttr.first, oldAttr.second);
