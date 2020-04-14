@@ -119,6 +119,15 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    Translations
+  HDRS
+    "init_translations.h"
+  DEPS
+    MLIRSPIRVSerialization
+)
+
 iree_cc_binary(
   NAME
     iree-run-module
@@ -166,6 +175,7 @@ if(${IREE_BUILD_COMPILER})
       "opt_main.cc"
     DEPS
       ::PassesAndDialects
+      ::Translations
       LLVMSupport
       MLIRIR
       MLIROptLib

@@ -117,6 +117,16 @@ cc_library(
 )
 
 cc_library(
+    name = "Translations",
+    hdrs = [
+        "init_translations.h",
+    ],
+    deps = [
+        "@llvm-project//mlir:SPIRVTranslateRegistration",
+    ],
+)
+
+cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [
@@ -236,6 +246,7 @@ cc_library(
     srcs = ["translate_main.cc"],
     deps = [
         ":PassesAndDialects",
+        ":Translations",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
