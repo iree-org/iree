@@ -80,6 +80,7 @@ bool LLVMOnceInit() {
   // supported.
 #ifdef IREE_REGISTER_MLIR_PASSES
   mlir::registerMlirPasses();
+  mlir::iree_compiler::registerAllIreePasses();
 #endif
 
   // Register any pass manager command line options.
