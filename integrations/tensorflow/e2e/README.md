@@ -17,8 +17,8 @@ instructions.
 
 If you do not have your environment setup to use IREE with Vulkan (see
 [the doc](../../../docs/vulkan_and_spirv.md)), then you can run the tests with
-`IREE_DEFAULT_BACKENDS=tf,iree_vmla` (that is, by omitting `iree_vulkan` from
-the list of backends to use).
+`IREE_AVAILABLE_BACKENDS=tf,iree_vmla` (that is, by omitting `iree_vulkan` from
+the list of available backends).
 
 ## Running tests
 
@@ -75,10 +75,24 @@ The priority order for which backends are ultimately used is:
 
 1.  The backends specified in `--override_backends`.
 
-2.  The backends specified in `IREE_OVERRIDE_BACKENDS`.
+1.  The backends specified in the `IREE_OVERRIDE_BACKENDS` environment variable.
 
-3.  The backends specified in the `tf_test_utils.compile_modules` decorator.
+1.  The backends specified in the `tf_test_utils.compile_modules` decorator.
 
-4.  The backends specified in `IREE_DEFAULT_BACKENDS`.
+1.  All known backends.
 
-5.  All known backends.
+Additionally, the environment variable `IREE_AVAILABLE_BACKENDS` specifies which
+backends should be considered available in a particular environment. Once the
+list of backends above is formed, any backends not listed in
+`IREE_AVAILABLE_BACKENDS` are removed. This is the final list of backends which
+are run for the test.
+
+The default behavior if `IREE_AVAILABLE_BACKENDS` is not provided is that all
+known backends are considered available.
+
+TODO(silvasean): `IREE_AVAILABLE_BACKENDS` is mainly to allow masking off the
+Vulkan backend in environments where it is not a available. Currently, the
+behavior when all backends get masked off is to emit a warning, which can result
+in spuriously "passing" tests. This is only an issue for tests that currently
+only run on Vulkan (which should decrease over time as e.g. VMLA gets more
+coverage).

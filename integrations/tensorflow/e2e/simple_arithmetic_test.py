@@ -75,16 +75,6 @@ class SimpleArithmeticTest(tf_test_utils.SavedModelTestCase):
     r = self.modules.simple_arithmetic.all.simple_matmul(a, b)
     r.print().assert_all_close()
 
-  def test_disagreement(self):
-    a = np.array([1., 2., 3., 4.], dtype=np.float32)
-    b = np.array([400., 5., 6., 7.], dtype=np.float32)
-
-    vmod = self.modules.simple_arithmetic.all
-    r = vmod.simple_mul(a, b)
-    # Using a negative atol will cause disagreement even if identical.
-    with self.assertRaisesRegex(AssertionError, "Disagreements"):
-      r.print().assert_all_close(atol=-3.0)
-
 
 if __name__ == "__main__":
   if hasattr(tf, "enable_v2_behavior"):

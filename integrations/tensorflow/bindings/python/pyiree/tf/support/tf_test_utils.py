@@ -516,9 +516,9 @@ def get_override_backends():
     return None
 
 
-def get_default_backends():
-  """Gets the BackendInfo instances to use by default."""
-  backend_spec = os.environ.get("IREE_DEFAULT_BACKENDS")
+def get_available_backends():
+  """Gets the BackendInfo instances considered available for use."""
+  backend_spec = os.environ.get("IREE_AVAILABLE_BACKENDS")
   if backend_spec is None:
     return BackendInfo.ALL.values()
   return _backend_spec_string_to_backends(backend_spec)
@@ -581,8 +581,19 @@ class SavedModelTestCase(tf.test.TestCase):
           if override_backends is not None:
             backends = override_backends
           elif backends is None:
-            backends = get_default_backends()
+            backends = list(BackendInfo.ALL.keys())
           backends = [_resolve(backend) for backend in backends]
+          available_backends = get_available_backends()
+          backends = [
+              backend for backend in backends if backend in available_backends
+          ]
+          if not backends:
+            # If no backends are available, then to avoid errors down the line,
+            # just use "tf", which should always be safe.
+            backends = [BackendInfo.ALL["tf"]]
+            logging.warning(
+                "Falling back to just `tf` backend because no other requested backends are available. Available backends '%s'",
+                [backend.name for backend in available_backends])
           cls.compiled_modules[name] = dict([
               (backend.name, CompiledModule.create(ctor, exported_names,
                                                    backend))
