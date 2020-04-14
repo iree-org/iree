@@ -2,7 +2,7 @@
 layout: default
 permalink: DesignRoadmap
 title: Long-term Design Roadmap
-nav_order: 3
+nav_order: 4
 ---
 
 # IREE Design Roadmap

@@ -2,7 +2,7 @@
 layout: default
 permalink: FocusAreas
 title: Short-term Focus Areas
-nav_order: 4
+nav_order: 5
 ---
 
 # IREE Roadmap
