@@ -65,9 +65,9 @@ passes, translations, and other transformations step by step.
 
 `iree-opt` is a tool for testing IREE's compiler passes. It builds on top of
 [MlirOptMain](https://github.com/llvm/llvm-project/blob/master/mlir/lib/Support/MlirOptMain.cpp)
-to run sets of IREE's compiler passes on .mlir input files.
+to run sets of IREE's compiler passes on `.mlir` input files.
 
-Test .mlir files that are checked in typically include a `RUN` block at the top
+Test `.mlir` files that are checked in typically include a `RUN` block at the top
 of the file that specifies which passes should be performed and if `FileCheck`
 should be used to test the generated output.
 
@@ -109,9 +109,9 @@ for a sample.
 The `iree-run-module` program takes an already translated IREE module as input
 and executes an exported main function using the provided inputs.
 
-This program can be used in sequence with `iree-translate` to translate a .mlir
-file to an IREE module and then execute it. Here is an example command that
-executes the simple `module.fb` compiled from `simple.mlir` above on IREE's
+This program can be used in sequence with `iree-translate` to translate a
+`.mlir` file to an IREE module and then execute it. Here is an example command
+that executes the simple `module.fb` compiled from `simple.mlir` above on IREE's
 VMLA driver:
 
 ```shell
@@ -124,14 +124,14 @@ $ bazel run //iree/tools:iree-run-module -- \
 
 ### iree-run-mlir
 
-The `iree-run-mlir` program takes a .mlir file as input, translates it to an
+The `iree-run-mlir` program takes a `.mlir` file as input, translates it to an
 IREE bytecode module, and executes the module.
 
 It is designed for testing and debugging, not production use cases, and
 therefore does some additional work that usually must be explicit, like marking
 every function as exported by default and running all of them.
 
-For example, to execute the contents of a test .mlir file, use this command:
+For example, to execute the contents of a test `.mlir` file, use this command:
 
 ```shell
 $ bazel run //iree/tools:iree-run-mlir -- \
