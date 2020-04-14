@@ -14,6 +14,9 @@
 
 iree_add_all_subdirs()
 
+file(GLOB _GLOB_X_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS *.mlir)
+file(GLOB _GLOB_CONV_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} CONFIGURE_DEPENDS conv.mlir)
+list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_CONV_MLIR})
 iree_lit_test_suite(
   NAME
     lit
@@ -30,46 +33,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmla_vmla
   SRCS
-    "abs.mlir"
-    "add.mlir"
-    "batch_norm_inference.mlir"
-    "broadcast.mlir"
-    "broadcast_in_dim.mlir"
-    "compare.mlir"
-    "concatenate.mlir"
-    "constant.mlir"
-    "convert_int.mlir"
-    "cos.mlir"
-    "dot.mlir"
-    "dot_general.mlir"
-    "exp.mlir"
-    "floor.mlir"
-    "gather.mlir"
-    "gather_concat.mlir"
-    "gemm.mlir"
-    "gemm_large.mlir"
-    "log.mlir"
-    "max_float.mlir"
-    "max_int.mlir"
-    "min_float.mlir"
-    "min_int.mlir"
-    "multiply.mlir"
-    "negate.mlir"
-    "pad.mlir"
-    "reduce_float.mlir"
-    "reduce_int.mlir"
-    "reduce_window.mlir"
-    "rem.mlir"
-    "reshape.mlir"
-    "reshape_adddims.mlir"
-    "reshape_dropdims.mlir"
-    "reverse.mlir"
-    "rsqrt.mlir"
-    "select.mlir"
-    "sin.mlir"
-    "slice.mlir"
-    "sqrt.mlir"
-    "while.mlir"
+    "${_GLOB_X_MLIR}"
   TARGET_BACKEND
     vmla
   DRIVER
