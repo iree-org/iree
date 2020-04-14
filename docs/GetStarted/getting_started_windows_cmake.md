@@ -1,4 +1,4 @@
-# Getting Started on Linux with CMake
+# Getting Started on Windows with CMake
 
 <!--
 Notes to those updating this guide:
@@ -6,7 +6,7 @@ Notes to those updating this guide:
     * This document should be __simple__ and cover essential items only.
       Notes for optional components should go in separate files.
 
-    * This document parallels getting_started_windows_cmake.md.
+    * This document parallels getting_started_linux_cmake.md.
       Please keep them in sync.
 -->
 
@@ -18,11 +18,8 @@ documented separately, as they require further setup.
 
 ### Install CMake
 
-Install CMake version >= 3.13:
-
-```shell
-$ sudo apt install cmake
-```
+Install CMake version >= 3.13 from the
+[downloads page](https://cmake.org/download/).
 
 > Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;Your editor of choice likely has plugins for CMake,
@@ -32,34 +29,35 @@ $ sudo apt install cmake
 ### Install Ninja
 
 [Ninja](https://ninja-build.org/) is a fast build system that you can use as a
-CMake generator. Follow Ninja's
-[installing documentation](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages).
+CMake generator. Download it from the
+[releases page](https://github.com/ninja-build/ninja/releases), extract
+somewhere, and it to your PATH.
 
 ### Install a Compiler
 
-We recommend Clang. GCC is not fully supported.
+We recommend MSVC from either the full Visual Studio or from "Build Tools For
+Visual Studio":
 
-```shell
-$ sudo apt install clang
-```
+*   Choose either option from the
+    [downloads page](https://visualstudio.microsoft.com/downloads/) and during
+    installation make sure you include "C++ Build Tools"
+*   Initialize MSVC by running `vcvarsall.bat`:
 
-Set environment variables:
-
-```shell
-export CC=clang
-export CXX=clang++
-```
+    ```powershell
+    > "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+    ```
 
 ## Clone and Build
 
 ### Clone
 
-Clone the repository and initialize its submodules:
+Using your shell of choice (such as PowerShell or [cmder](https://cmder.net/)),
+clone the repository and initialize its submodules:
 
-```shell
-$ git clone https://github.com/google/iree.git
-$ cd iree
-$ git submodule update --init
+```powershell
+> git clone https://github.com/google/iree.git
+> cd iree
+> git submodule update --init
 ```
 
 > Tip:<br>
@@ -70,8 +68,8 @@ $ git submodule update --init
 
 Configure:
 
-```shell
-$ cmake -G Ninja -B build/ .
+```powershell
+> cmake -G Ninja -B build\ .
 ```
 
 > Tip:<br>
@@ -81,8 +79,8 @@ $ cmake -G Ninja -B build/ .
 
 Build all targets:
 
-```shell
-$ cmake --build build/
+```powershell
+> cmake --build build\
 ```
 
 ## What's next?
@@ -91,25 +89,25 @@ $ cmake --build build/
 
 Check out the contents of the 'tools' build directory:
 
-```shell
-$ ls build/iree/tools
-$ ./build/iree/tools/iree-translate --help
+```powershell
+> dir build\iree\tools
+> .\build\iree\tools\iree-translate.exe --help
 ```
 
 Translate a
 [MLIR file](https://github.com/google/iree/blob/master/iree/tools/test/simple.mlir)
 and execute a function in the compiled module:
 
-```shell
-$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+```powershell
+> .\build\iree\tools\iree-run-mlir.exe .\iree\tools\test\simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
 
-*   For an introduction to IREE's project structure and developer tools, see the
-    [Developer Overview](./developer_overview.md) guide
+*   For an introduction to IREE's project structure and developer tools, see
+    [Developer Overview](../developer_overview.md)
 *   To target GPUs using Vulkan, see
-    [Getting Started on Linux with Vulkan](./getting_started_linux_vulkan.md)
+    [Getting Started on Windows with Vulkan](getting_started_windows_vulkan.md)
 
 More documentation coming soon...
 

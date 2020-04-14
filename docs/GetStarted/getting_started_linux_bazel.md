@@ -113,10 +113,10 @@ $ ./bazel-bin/iree/tools/iree-run-mlir ./iree/tools/test/simple.mlir -input-valu
 
 ### Further Reading
 
-*   For an introduction to IREE's project structure and developer tools, see the
-    [Developer Overview](./developer_overview.md) guide
+*   For an introduction to IREE's project structure and developer tools, see
+    [Developer Overview](../developer_overview.md)
 *   To target GPUs using Vulkan, see
-    [Getting Started on Linux with Vulkan](./getting_started_linux_vulkan.md)
+    [Getting Started on Linux with Vulkan](getting_started_linux_vulkan.md)
 
 More documentation coming soon...
 
