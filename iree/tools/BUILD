@@ -112,6 +112,16 @@ cc_library(
 )
 
 cc_library(
+    name = "Translations",
+    hdrs = [
+        "init_translations.h",
+    ],
+    deps = [
+        "SPIRVTranslateRegistration",
+    ],
+)
+
+cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [
