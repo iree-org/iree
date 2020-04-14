@@ -72,6 +72,7 @@ PERMALINK_DICT = {
     'getting_started_windows_bazel.md': 'GetStarted/WindowsBazel',
     'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
+    'developer_overview.md': 'DeveloperOverview',
     'roadmap.md': 'FocusAreas',
     'roadmap_design.md': 'DesignRoadmap',
 }
@@ -84,8 +85,9 @@ PERMALINK_DICT = {
 NAVI_ORDER_DICT = {
     'index.md': 1,
     # 'Getting Started' is 2.
-    'roadmap_design.md': 3,
-    'roadmap.md': 4,
+    'developer_overview.md': 3,
+    'roadmap_design.md': 4,
+    'roadmap.md': 5,
 }
 
 # A dictionary containing source directory to section tile mappings.

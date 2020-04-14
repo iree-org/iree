@@ -104,11 +104,13 @@ and execute a function in the compiled module:
 
 ### Further Reading
 
+*   For an introduction to IREE's project structure and developer tools, see
+    [Developer Overview](../developer_overview.md)
 *   To target GPUs using Vulkan, see
-    [Getting Started on Windows with Vulkan](./getting_started_windows_vulkan.md)
+    [Getting Started on Windows with Vulkan](getting_started_windows_vulkan.md)
 
 More documentation coming soon...
 
 <!-- TODO(scotttodd): Running tests -->
 <!-- TODO(scotttodd): Running samples -->
-<!-- TODO(scotttodd): "getting_started.md" equivalent for iree-translate etc. -->
+<!-- TODO(scotttodd): Python -->
