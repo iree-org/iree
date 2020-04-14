@@ -63,9 +63,12 @@ passes, translations, and other transformations step by step.
 
 ### iree-opt
 
-`iree-opt` is a tool for testing IREE's compiler passes. It builds on top of
-[MlirOptMain](https://github.com/llvm/llvm-project/blob/master/mlir/lib/Support/MlirOptMain.cpp)
-to run sets of IREE's compiler passes on `.mlir` input files.
+`iree-opt` is a tool for testing IREE's compiler passes. It is similar to
+[mlir-opt](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-opt)
+and runs sets of IREE's compiler passes on `.mlir` input files. See
+"conversion" in
+[MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#conversion)
+for more information.
 
 Test `.mlir` files that are checked in typically include a `RUN` block at the top
 of the file that specifies which passes should be performed and if `FileCheck`
@@ -73,7 +76,7 @@ should be used to test the generated output.
 
 For example, to run some passes on the
 [reshape.mlir](https://github.com/google/iree/blob/master/iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir)
-test file with Bazel on Linux, use this command:
+test file:
 
 ```shell
 $ bazel run //iree/tools:iree-opt -- \
@@ -85,12 +88,20 @@ $ bazel run //iree/tools:iree-opt -- \
   $PWD/iree/compiler/Translation/SPIRV/XLAToSPIRV/test/reshape.mlir
 ```
 
+Custom passes may also be layered on top of `iree-opt`, see
+[iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/master/iree/samples/custom_modules/dialect)
+for a sample.
+
 ### iree-translate
 
 `iree-translate` converts MLIR input into external formats like IREE modules.
+It is similar to
+[mlir-translate](https://github.com/llvm/llvm-project/tree/master/mlir/tools/mlir-translate),
+see "translation" in
+[MLIR's Glossary](https://mlir.llvm.org/getting_started/Glossary/#translation)
+for more information.
 
-For example, to translate `simple.mlir` to an IREE module with bazel on Linux,
-use this command:
+For example, to translate `simple.mlir` to an IREE module:
 
 ```shell
 $ bazel run //iree/tools:iree-translate -- \
@@ -100,7 +111,7 @@ $ bazel run //iree/tools:iree-translate -- \
   -o /tmp/module.fb
 ```
 
-Custom translations may also be layered on top of `iree-translate` - see
+Custom translations may also be layered on top of `iree-translate`, see
 [iree/samples/custom_modules/dialect](https://github.com/google/iree/blob/master/iree/samples/custom_modules/dialect)
 for a sample.
 
@@ -127,11 +138,12 @@ $ bazel run //iree/tools:iree-run-module -- \
 The `iree-run-mlir` program takes a `.mlir` file as input, translates it to an
 IREE bytecode module, and executes the module.
 
-It is designed for testing and debugging, not production use cases, and
-therefore does some additional work that usually must be explicit, like marking
-every function as exported by default and running all of them.
+It is designed for testing and debugging, not production uses, and therefore
+does some additional work that usually must be explicit, like marking every
+function as exported by default and running all of them.
 
-For example, to execute the contents of a test `.mlir` file, use this command:
+For example, to execute the contents of
+[iree/tools/test/simple.mlir](https://github.com/google/iree/blob/master/iree/tools/test/simple.mlir):
 
 ```shell
 $ bazel run //iree/tools:iree-run-mlir -- \
@@ -145,7 +157,7 @@ $ bazel run //iree/tools:iree-run-mlir -- \
 The `iree-dump-module` program prints the contents of an IREE module FlatBuffer
 file.
 
-For example:
+For example, to inspect the module translated above:
 
 ```shell
 $ bazel run //iree/tools:iree-dump-module -- /tmp/module.fb
