@@ -73,10 +73,8 @@ Type legalizeIntegerType(Type type) {
       elementTypes.push_back(legalizeIntegerType(structType.getElementType(i)));
     }
     // TODO(ravishankarm): Use ABI attributes to legalize the struct type.
-    spirv::StructType::LayoutInfo structSize = 0;
-    VulkanLayoutUtils::Size structAlignment = 1;
-    auto t = spirv::StructType::get(elementTypes);
-    return VulkanLayoutUtils::decorateType(t, structSize, structAlignment);
+    return VulkanLayoutUtils::decorateType(
+        spirv::StructType::get(elementTypes));
   } else if (auto arrayType = type.dyn_cast<spirv::ArrayType>()) {
     return spirv::ArrayType::get(
         legalizeIntegerType(arrayType.getElementType()),

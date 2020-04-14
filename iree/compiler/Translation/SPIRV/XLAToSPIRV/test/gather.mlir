@@ -2,7 +2,7 @@
 
 module {
   // CHECK-LABEL: spv.func @foo
-  // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<50 x f32 [4]> [0]>, StorageBuffer>
+  // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<50 x f32, stride=4> [0]>, StorageBuffer>
   // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
   func @foo(%arg0: memref<5x1x10xf32>, %arg1: memref<i64>, %arg2: memref<1x10xf32>)
   attributes {iree.dispatch_fn_name = "foo"} {
