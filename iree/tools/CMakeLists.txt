@@ -162,6 +162,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ::PassesAndDialects
       LLVMSupport
+      MLIRIR
       MLIROptLib
       MLIRPass
       MLIRSupport

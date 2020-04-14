@@ -66,6 +66,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/MLIRContext.h"
@@ -458,7 +459,16 @@ extern "C" int main(int argc, char** argv) {
 
   mlir::registerMlirDialects();
   mlir::iree_compiler::registerIreeDialects();
+
+  // Register MLIRContext command-line options like
+  // -mlir-print-op-on-diagnostic.
+  mlir::registerMLIRContextCLOptions();
+  // Register assembly printer command-line options like
+  // -mlir-print-op-generic.
+  mlir::registerAsmPrinterCLOptions();
+  // Register pass manager command-line options like -print-ir-*.
   mlir::registerPassManagerCLOptions();
+
   llvm::InitLLVM init_llvm(argc_llvm, argv_llvm);
   llvm::cl::ParseCommandLineOptions(argc_llvm, argv_llvm);
 

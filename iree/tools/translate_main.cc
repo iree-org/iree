@@ -22,6 +22,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Pass/PassManager.h"
@@ -49,6 +50,14 @@ int main(int argc, char **argv) {
 
   mlir::registerMlirDialects();
   mlir::iree_compiler::registerIreeDialects();
+
+  // Register MLIRContext command-line options like
+  // -mlir-print-op-on-diagnostic.
+  mlir::registerMLIRContextCLOptions();
+  // Register assembly printer command-line options like
+  // -mlir-print-op-generic.
+  mlir::registerAsmPrinterCLOptions();
+  // Register pass manager command-line options like -print-ir-*.
   mlir::registerPassManagerCLOptions();
 
   // Add flags for all the registered translations.

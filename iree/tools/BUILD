@@ -139,6 +139,7 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
         "@llvm-project//llvm:support",
+        "@llvm-project//mlir:IR",
         "@llvm-project//mlir:MlirOptLib",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:Support",

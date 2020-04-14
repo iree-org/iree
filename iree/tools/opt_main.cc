@@ -23,6 +23,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/FileUtilities.h"
@@ -64,8 +65,15 @@ int main(int argc, char **argv) {
   mlir::registerMlirPasses();
   llvm::InitLLVM y(argc, argv);
 
-  // Register any pass manager command line options.
+  // Register MLIRContext command-line options like
+  // -mlir-print-op-on-diagnostic.
+  mlir::registerMLIRContextCLOptions();
+  // Register assembly printer command-line options like
+  // -mlir-print-op-generic.
+  mlir::registerAsmPrinterCLOptions();
+  // Register pass manager command-line options like -print-ir-*.
   mlir::registerPassManagerCLOptions();
+
   mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
 
   // Parse pass names in main to ensure static initialization completed.
