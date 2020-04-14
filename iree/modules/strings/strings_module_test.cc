@@ -98,7 +98,8 @@ class StringsModuleTest : public ::testing::Test {
     return function;
   }
 
-  void CreateBufferView(absl::Span<const float> contents,
+  template <typename T, iree_hal_element_type_t E>
+  void CreateBufferView(absl::Span<const T> contents,
                         absl::Span<const int32_t> shape,
                         iree_hal_buffer_view_t** out_buffer_view) {
     size_t num_elements = 1;
@@ -113,7 +114,7 @@ class StringsModuleTest : public ::testing::Test {
         static_cast<iree_hal_memory_type_t>(
             IREE_HAL_MEMORY_TYPE_HOST_LOCAL |
             IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE),
-        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(float), &buffer));
+        IREE_HAL_BUFFER_USAGE_ALL, contents.size() * sizeof(T), &buffer));
     iree_hal_mapped_memory_t mapped_memory;
     IREE_ASSERT_OK(iree_hal_buffer_map(buffer.get(),
                                        IREE_HAL_MEMORY_ACCESS_WRITE, 0,
@@ -123,8 +124,7 @@ class StringsModuleTest : public ::testing::Test {
            mapped_memory.contents.data_length);
     IREE_ASSERT_OK(iree_hal_buffer_unmap(buffer.get(), &mapped_memory));
     IREE_ASSERT_OK(
-        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(),
-                                    IREE_HAL_ELEMENT_TYPE_FLOAT_32,
+        iree_hal_buffer_view_create(buffer.get(), shape.data(), shape.size(), E,
                                     IREE_ALLOCATOR_SYSTEM, &*out_buffer_view));
   }
 
@@ -170,11 +170,12 @@ class StringsModuleTest : public ::testing::Test {
     iree_vm_variant_list_free(outputs);
   }
 
-  void TestToStringTensor(absl::Span<const float> contents,
+  template <typename T, iree_hal_element_type_t E>
+  void TestToStringTensor(absl::Span<const T> contents,
                           absl::Span<const int32_t> shape,
                           absl::Span<const iree_string_view_t> expected) {
     vm::ref<iree_hal_buffer_view_t> input_buffer_view;
-    CreateBufferView(contents, shape, &input_buffer_view);
+    CreateBufferView<T, E>(contents, shape, &input_buffer_view);
 
     // Construct the input list for execution.
     iree_vm_variant_list_t* inputs = nullptr;
@@ -302,9 +303,9 @@ TEST_F(StringsModuleTest, StringTensorToString_Tensor) {
 TEST_F(StringsModuleTest, ToString_Scalar) {
   absl::InlinedVector<iree_string_view_t, 1> expected{
       iree_make_cstring_view("14.000000")};
-
   absl::InlinedVector<float, 1> contents{14.0f};
-  TestToStringTensor(contents, {}, expected);
+  TestToStringTensor<float, IREE_HAL_ELEMENT_TYPE_FLOAT_32>(contents, {},
+                                                            expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Vector) {
@@ -313,7 +314,8 @@ TEST_F(StringsModuleTest, ToString_Vector) {
 
   absl::InlinedVector<float, 2> contents{42.0f, 43.0f};
   absl::InlinedVector<int32_t, 4> shape{2};
-  TestToStringTensor(contents, shape, expected);
+  TestToStringTensor<float, IREE_HAL_ELEMENT_TYPE_FLOAT_32>(contents, shape,
+                                                            expected);
 }
 
 TEST_F(StringsModuleTest, ToString_Tensor) {
@@ -323,7 +325,106 @@ TEST_F(StringsModuleTest, ToString_Tensor) {
 
   absl::InlinedVector<float, 4> contents{1.0f, 2.0f, 3.0f, 4.0f};
   absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
-  TestToStringTensor(contents, shape, expected);
+  TestToStringTensor<float, IREE_HAL_ELEMENT_TYPE_FLOAT_32>(contents, shape,
+                                                            expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int8) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("127")};
+
+  absl::InlinedVector<int8_t, 4> contents{-1, 2, 3, 127};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<int8_t, IREE_HAL_ELEMENT_TYPE_SINT_8>(contents, shape,
+                                                           expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int8) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("255")};
+
+  absl::InlinedVector<uint8_t, 4> contents{1, 2, 3, 255};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<uint8_t, IREE_HAL_ELEMENT_TYPE_UINT_8>(contents, shape,
+                                                            expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int16) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("32700")};
+
+  absl::InlinedVector<int16_t, 4> contents{-1, 2, 3, 32700};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<int16_t, IREE_HAL_ELEMENT_TYPE_SINT_16>(contents, shape,
+                                                             expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int16) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("65000")};
+
+  absl::InlinedVector<uint16_t, 4> contents{1, 2, 3, 65000};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<uint16_t, IREE_HAL_ELEMENT_TYPE_UINT_16>(contents, shape,
+                                                              expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int32) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("2140000000")};
+
+  absl::InlinedVector<int32_t, 4> contents{-1, 2, 3, 2140000000};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<int32_t, IREE_HAL_ELEMENT_TYPE_SINT_32>(contents, shape,
+                                                             expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int32) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("4290000000")};
+
+  absl::InlinedVector<uint32_t, 4> contents{1, 2, 3, 4290000000};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<uint32_t, IREE_HAL_ELEMENT_TYPE_UINT_32>(contents, shape,
+                                                              expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Signed_Int64) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("-1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("4300000000")};
+
+  absl::InlinedVector<int64_t, 4> contents{-1, 2, 3, 4300000000};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<int64_t, IREE_HAL_ELEMENT_TYPE_SINT_64>(contents, shape,
+                                                             expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Tensor_Unsigned_Int64) {
+  absl::InlinedVector<iree_string_view_t, 4> expected{
+      iree_make_cstring_view("1"), iree_make_cstring_view("2"),
+      iree_make_cstring_view("3"), iree_make_cstring_view("4300000000")};
+
+  absl::InlinedVector<uint64_t, 4> contents{1, 2, 3, 4300000000};
+  absl::InlinedVector<int32_t, 5> shape{1, 2, 1, 1, 2};
+  TestToStringTensor<uint64_t, IREE_HAL_ELEMENT_TYPE_UINT_64>(contents, shape,
+                                                              expected);
+}
+
+TEST_F(StringsModuleTest, ToString_Vector_Float_64) {
+  absl::InlinedVector<iree_string_view_t, 2> expected{
+      iree_make_cstring_view("42.000000"), iree_make_cstring_view("43.000000")};
+
+  absl::InlinedVector<double, 2> contents{42.0f, 43.0f};
+  absl::InlinedVector<int32_t, 4> shape{2};
+  TestToStringTensor<double, IREE_HAL_ELEMENT_TYPE_FLOAT_64>(contents, shape,
+                                                             expected);
 }
 
 }  // namespace

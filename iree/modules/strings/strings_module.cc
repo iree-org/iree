@@ -14,6 +14,7 @@
 
 #include "iree/modules/strings/strings_module.h"
 
+#include <cstdint>
 #include <sstream>
 #include <string>
 
@@ -159,17 +160,50 @@ class StringsModuleState final {
 
     std::vector<std::string> strings;
     strings.reserve(num_elements);
-    const auto& contents = tensor_mapping.contents;
-    if (type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-      for (const float *
-               p = (const float*)contents.data,
-              *s = (const float*)(contents.data + contents.data_length);
-           p < s; p++) {
-        std::string str = std::to_string(*p);
-        strings.push_back(std::move(str));
-      }
-    } else {
-      return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
+
+    switch (type) {
+      case IREE_HAL_ELEMENT_TYPE_SINT_8:
+        GenerateStringsByType<int8_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_UINT_8:
+        GenerateStringsByType<uint8_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_SINT_16:
+        GenerateStringsByType<int16_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_UINT_16:
+        GenerateStringsByType<uint16_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_SINT_32:
+        GenerateStringsByType<int32_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_UINT_32:
+        GenerateStringsByType<uint32_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_SINT_64:
+        GenerateStringsByType<int64_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_UINT_64:
+        GenerateStringsByType<uint64_t>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_FLOAT_32:
+        GenerateStringsByType<float>(tensor_mapping, strings);
+        break;
+
+      case IREE_HAL_ELEMENT_TYPE_FLOAT_64:
+        GenerateStringsByType<double>(tensor_mapping, strings);
+        break;
+
+      default:
+        return FromApiStatus(IREE_STATUS_UNIMPLEMENTED, IREE_LOC);
     }
 
     // Unmap used buffer.
@@ -198,6 +232,18 @@ class StringsModuleState final {
   // Allocator that the caller requested we use for any allocations we need to
   // perform during operation.
   iree_allocator_t allocator_ = IREE_ALLOCATOR_SYSTEM;
+
+  template <typename T>
+  void GenerateStringsByType(iree_hal_mapped_memory_t tensor_mapping,
+                             std::vector<std::string>& strings) {
+    const auto& contents = tensor_mapping.contents;
+    for (const T *p = (const T*)contents.data,
+                 *s = (const T*)(contents.data + contents.data_length);
+         p < s; p++) {
+      std::string str = std::to_string(*p);
+      strings.push_back(std::move(str));
+    }
+  }
 };
 
 static const vm::NativeFunction<StringsModuleState> kStringsModuleFunctions[] =
