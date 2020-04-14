@@ -1,9 +1,9 @@
 # Getting Started on Windows
 
 **This guide is due for an update. For Windows CMake instructions, see
-[Getting Started on Windows with CMake](getting_started_windows_cmake.md). For
-Windows Bazel instructions, see
-[Getting Started on Windows with Bazel](getting_started_windows_bazel.md).**
+[Getting Started on Windows with CMake](GetStarted/getting_started_windows_cmake.md).
+For Windows Bazel instructions, see
+[Getting Started on Windows with Bazel](GetStarted/getting_started_windows_bazel.md).**
 
 There are multiple ways to develop on Windows, and compared to other
 environments, batteries are often not included. This document outlines the setup
