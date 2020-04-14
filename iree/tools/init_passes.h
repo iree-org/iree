@@ -22,6 +22,11 @@
 
 #include <cstdlib>
 
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VM/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
 #include "mlir/Conversion/LinalgToLLVM/LinalgToLLVM.h"
 #include "mlir/Conversion/LinalgToSPIRV/LinalgToSPIRVPass.h"
@@ -155,6 +160,22 @@ inline void registerMlirPasses() {
   createLinalgToSPIRVPass();
 }
 
+}  // namespace mlir
+
+namespace mlir {
+namespace iree_compiler {
+
+// This function may be called to register the IREE passes with the
+// global registry.
+inline void registerAllIreePasses() {
+  IREE::Flow::registerFlowPasses();
+  // TODO: register HAL passes
+  IREE::registerIreePasses();
+  Shape::registerShapePasses();
+  IREE::VM::registerVMPasses();
+  IREE::VMLA::registerVMLAPasses();
+}
+}  // namespace iree_compiler
 }  // namespace mlir
 
 #endif  // IREE_TOOLS_INIT_PASSES_H_

@@ -105,11 +105,16 @@ iree_cc_library(
     MLIRTransforms
     MLIRVector
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::IREE::IR
+    iree::compiler::Dialect::IREE::Transforms
     iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::VM::IR
+    iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VMLA::IR::VMLADialect
+    iree::compiler::Dialect::VMLA::Transforms
     iree::compiler::Dialect::Vulkan::IR
   PUBLIC
 )
