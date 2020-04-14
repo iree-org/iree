@@ -28,6 +28,10 @@ import textwrap
 import bazel_to_cmake_targets
 
 
+def _expand_cmake_var(var):
+  return "${" + var + "}"
+
+
 class BuildFileFunctions(object):
   """Object passed to `exec` that has handlers for BUILD file functions."""
 
@@ -291,18 +295,23 @@ class BuildFileFunctions(object):
       # Bazel `*.mlir` glob -> CMake Variable `_GLOB_X_MLIR`
       var = "_GLOB_" + pattern.replace("*", "X").replace(".", "_").upper()
       glob_vars.append(var)
-      self.converter.body += f"file(GLOB {var} CONFIGURE_DEPENDS {pattern})\n"
+      self.converter.body += (
+          f"file(GLOB {var} LIST_DIRECTORIES false"
+          f" RELATIVE {_expand_cmake_var('CMAKE_CURRENT_SOURCE_DIR')}"
+          f" CONFIGURE_DEPENDS {pattern})\n")
     for pattern in exclude:
       if "**" in pattern:
         raise NotImplementedError("Recursive globs not supported")
       exclude_var = ("_GLOB_" +
                      pattern.replace("*", "X").replace(".", "_").upper())
-      self.converter.body += (f"file(GLOB {exclude_var} CONFIGURE_DEPENDS "
-                              f"{pattern})\n")
+      self.converter.body += (
+          f"file(GLOB {exclude_var} LIST_DIRECTORIES false"
+          f" RELATIVE {_expand_cmake_var('CMAKE_CURRENT_SOURCE_DIR')}"
+          f" CONFIGURE_DEPENDS {pattern})\n")
       for glob_var in glob_vars:
-        self.converter.body += ("list(REMOVE_ITEM " + glob_var + " ${" +
-                                exclude_var + "})\n")
-    return ["${" + var + "}" for var in glob_vars]
+        self.converter.body += (
+            f"list(REMOVE_ITEM {glob_var} {_expand_cmake_var(exclude_var)})\n")
+    return [_expand_cmake_var(var) for var in glob_vars]
 
   # TODO(gcmn) implement these types of functions in a less hard-coded way
   def platform_trampoline_deps(self, basename, path="base"):
