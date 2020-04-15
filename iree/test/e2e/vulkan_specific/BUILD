@@ -15,6 +15,7 @@
 # Tests for end-to-end IREE support specific to the vulkan-spirv lowering.
 # TODO(ravishankarm): Reorganize these tests.
 
+load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 load("//iree:lit_test.bzl", "iree_lit_test_suite")
 
 package(
@@ -22,14 +23,28 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+LEGACY_LIT_TESTS = [
+    "pw_add_multiwg.mlir",
+    "reduce.mlir",
+]
+
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(
-        ["*.mlir"],
-    ),
+    srcs = LEGACY_LIT_TESTS,
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
     ],
     tags = ["hostonly"],
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_linalg-to-spirv_vulkan",
+    srcs = glob(
+        ["*.mlir"],
+        exclude = LEGACY_LIT_TESTS,
+    ),
+    compiler_flags = ["-iree-use-linalg-to-spirv-path"],
+    driver = "vulkan",
+    target_backend = "vulkan-spirv",
 )

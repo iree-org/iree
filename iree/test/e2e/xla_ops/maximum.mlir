@@ -1,4 +1,4 @@
-func @tensor() attributes { iree.module.export } {
+func @tensor_i32() attributes { iree.module.export } {
   %lhs = iree.unfoldable_constant dense<[1, 6, 7, 8]> : tensor<4xi32>
   %rhs = iree.unfoldable_constant dense<[5, 6, 3, 8]> : tensor<4xi32>
   %result = "xla_hlo.maximum"(%lhs, %rhs) : (tensor<4xi32>, tensor<4xi32>) -> tensor<4xi32>
@@ -14,7 +14,7 @@ func @tensor_odd_dim() attributes { iree.module.export } {
   return
 }
 
-func @scalar() attributes { iree.module.export } {
+func @scalar_i32() attributes { iree.module.export } {
   %lhs = iree.unfoldable_constant dense<1> : tensor<i32>
   %rhs = iree.unfoldable_constant dense<2> : tensor<i32>
   %result = "xla_hlo.maximum"(%lhs, %rhs) : (tensor<i32>, tensor<i32>) -> tensor<i32>
@@ -22,7 +22,7 @@ func @scalar() attributes { iree.module.export } {
   return
 }
 
-func @negative() attributes { iree.module.export } {
+func @negative_i32() attributes { iree.module.export } {
   %lhs = iree.unfoldable_constant dense<1> : tensor<i32>
   %rhs = iree.unfoldable_constant dense<-2> : tensor<i32>
   %result = "xla_hlo.maximum"(%lhs, %rhs) : (tensor<i32>, tensor<i32>) -> tensor<i32>
@@ -51,5 +51,37 @@ func @i64() attributes { iree.module.export } {
   %rhs = iree.unfoldable_constant dense<2> : tensor<i64>
   %result = "xla_hlo.maximum"(%lhs, %rhs) : (tensor<i64>, tensor<i64>) -> tensor<i64>
   check.expect_eq_const(%result, dense<2> : tensor<i64>) : tensor<i64>
+  return
+}
+
+func @tensor_f32() attributes { iree.module.export } {
+  %lhs = iree.unfoldable_constant dense<[1.0, 2.0, 7.0, 4.0]> : tensor<4xf32>
+  %rhs = iree.unfoldable_constant dense<[5.0, 2.0, 3.0, 4.0]> : tensor<4xf32>
+  %result = "xla_hlo.minimum"(%lhs, %rhs) : (tensor<4xf32>, tensor<4xf32>) -> tensor<4xf32>
+  check.expect_almost_eq_const(%result, dense<[1.0, 2.0, 3.0, 4.0]> : tensor<4xf32>) : tensor<4xf32>
+  return
+}
+
+func @scalar_f32() attributes { iree.module.export } {
+  %lhs = iree.unfoldable_constant dense<1.0> : tensor<f32>
+  %rhs = iree.unfoldable_constant dense<2.0> : tensor<f32>
+  %result = "xla_hlo.minimum"(%lhs, %rhs) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  check.expect_almost_eq_const(%result, dense<1.0> : tensor<f32>) : tensor<f32>
+  return
+}
+
+func @double() attributes { iree.module.export } {
+  %lhs = iree.unfoldable_constant dense<1.0> : tensor<f64>
+  %rhs = iree.unfoldable_constant dense<2.0> : tensor<f64>
+  %result = "xla_hlo.minimum"(%lhs, %rhs) : (tensor<f64>, tensor<f64>) -> tensor<f64>
+  check.expect_almost_eq_const(%result, dense<1.0> : tensor<f64>) : tensor<f64>
+  return
+}
+
+func @negative_f32() attributes { iree.module.export } {
+  %lhs = iree.unfoldable_constant dense<1.0> : tensor<f32>
+  %rhs = iree.unfoldable_constant dense<-2.0> : tensor<f32>
+  %result = "xla_hlo.minimum"(%lhs, %rhs) : (tensor<f32>, tensor<f32>) -> tensor<f32>
+  check.expect_almost_eq_const(%result, dense<-2.0> : tensor<f32>) : tensor<f32>
   return
 }
