@@ -1418,6 +1418,24 @@ static void printInterfaceBindingOp(OpAsmPrinter &p, InterfaceBindingOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// hal.interface.load.tensor
+//===----------------------------------------------------------------------===//
+
+InterfaceBindingOp InterfaceLoadTensorOp::queryBindingOp() {
+  return dyn_cast_or_null<InterfaceBindingOp>(
+      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
+}
+
+//===----------------------------------------------------------------------===//
+// hal.interface.store.tensor
+//===----------------------------------------------------------------------===//
+
+InterfaceBindingOp InterfaceStoreTensorOp::queryBindingOp() {
+  return dyn_cast_or_null<InterfaceBindingOp>(
+      SymbolTable::lookupNearestSymbolFrom(getOperation(), binding()));
+}
+
+//===----------------------------------------------------------------------===//
 // hal.executable_cache.create
 //===----------------------------------------------------------------------===//
 

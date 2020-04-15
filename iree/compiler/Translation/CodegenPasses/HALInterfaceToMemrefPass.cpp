@@ -181,9 +181,7 @@ template <typename InterfaceOp>
 static spirv::InterfaceVarABIAttr getSPIRVInterfaceVarABIAttr(
     InterfaceOp op, MLIRContext *context) {
   SymbolRefAttr interface = op.binding();
-  IREE::HAL::InterfaceBindingOp binding =
-      dyn_cast_or_null<IREE::HAL::InterfaceBindingOp>(
-          SymbolTable::lookupNearestSymbolFrom(op, interface));
+  IREE::HAL::InterfaceBindingOp binding = op.queryBindingOp();
   if (!binding) {
     op.emitError("unable to resolve binding symbol");
     return nullptr;

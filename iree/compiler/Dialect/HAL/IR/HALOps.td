@@ -1779,6 +1779,12 @@ def HAL_InterfaceLoadTensorOp : HAL_PureOp<"interface.load.tensor"> {
   let assemblyFormat = [{
     $binding `,` `offset` `=` $offset attr-dict `:` type($result)
   }];
+
+  let extraClassDeclaration = [{
+    /// Returns the hal.interface.binding op associated with this op.
+    /// Returns null op if not found.
+    IREE::HAL::InterfaceBindingOp queryBindingOp();
+  }];
 }
 
 def HAL_InterfaceStoreTensorOp : HAL_Op<"interface.store.tensor"> {
@@ -1808,6 +1814,12 @@ def HAL_InterfaceStoreTensorOp : HAL_Op<"interface.store.tensor"> {
 
   let assemblyFormat = [{
     $operand `,` $binding `,` `offset` `=` $offset attr-dict `:` type($operand)
+  }];
+
+  let extraClassDeclaration = [{
+    /// Returns the hal.interface.binding op associated with this op.
+    /// Returns null op if not found.
+    IREE::HAL::InterfaceBindingOp queryBindingOp();
   }];
 }
 

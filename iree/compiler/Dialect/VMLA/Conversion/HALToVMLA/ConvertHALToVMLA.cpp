@@ -87,8 +87,7 @@ struct InterfaceLoadTensorOpConversion
            interfaceArg.getType().isa<IREE::VMLA::InterfaceType>() &&
            "exported VMLA functions require vmla.interface ops as their only "
            "argument");
-    auto bindingOp = cast<IREE::HAL::InterfaceBindingOp>(
-        SymbolTable::lookupNearestSymbolFrom(loadOp, loadOp.binding()));
+    auto bindingOp = loadOp.queryBindingOp();
 
     IREE::HAL::InterfaceLoadTensorOpOperandAdaptor newOperands(operands);
     auto bufferOp = rewriter.create<IREE::VMLA::InterfaceBindingOp>(
@@ -120,8 +119,7 @@ struct InterfaceStoreTensorOpConversion
     assert(interfaceArg.getType().isa<IREE::VMLA::InterfaceType>() &&
            "exported VMLA functions require vmla.interface ops as their only "
            "argument");
-    auto bindingOp = cast<IREE::HAL::InterfaceBindingOp>(
-        SymbolTable::lookupNearestSymbolFrom(storeOp, storeOp.binding()));
+    auto bindingOp = storeOp.queryBindingOp();
 
     IREE::HAL::InterfaceStoreTensorOpOperandAdaptor newOperands(operands);
     auto bufferOp = rewriter.create<IREE::VMLA::InterfaceBindingOp>(
