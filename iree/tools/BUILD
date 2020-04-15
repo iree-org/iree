@@ -253,7 +253,7 @@ cc_library(
     deps = [
         ":init_passes_and_dialects",
         ":init_targets",
-        "init_translations",
+        ":init_translations",
         "//iree/compiler/Dialect/VM/Target/Bytecode",
         "//iree/compiler/Translation:IREEVM",
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
