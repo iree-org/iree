@@ -173,6 +173,7 @@ inline void registerAllIreePasses() {
   IREE::registerIreePasses();
   Shape::registerShapePasses();
   IREE::VM::registerVMPasses();
+  IREE::VM::registerVMTestPasses();
   IREE::VMLA::registerVMLAPasses();
 }
 }  // namespace iree_compiler
