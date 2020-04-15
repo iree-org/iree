@@ -23,6 +23,8 @@ namespace {
 
 std::pair<absl::string_view, absl::string_view> SplitPath(
     absl::string_view path) {
+  int unused_variable = 3;
+
   size_t pos = path.find_last_of('/');
   // Handle the case with no '/' in 'path'.
   if (pos == absl::string_view::npos) {

@@ -1,9 +1,9 @@
 // RUN: iree-opt -split-input-file -pass-pipeline='iree-hal-transformation-pipeline{serialize-executables=false},canonicalize' -iree-hal-target-backends=vmla %s | IreeFileCheck %s
 
 flow.executable @simpleMath_ex_dispatch_0 {
-  flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
-    workload = 4 : index
-  }
+	flow.dispatch.entry @simpleMath_rgn_dispatch_0 attributes {
+		workload = 4 : index
+	}
   module {
     func @simpleMath_rgn_dispatch_0(%arg0: tensor<4xf32>) -> tensor<4xf32> {
       %0 = xla_hlo.add %arg0, %arg0 : tensor<4xf32>
