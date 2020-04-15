@@ -116,11 +116,7 @@ template <typename T, int N>
   ::UnrankedMemRefType<T> *res = static_cast<::UnrankedMemRefType<T> *>(
       alloc(sizeof(::UnrankedMemRefType<T>)));
   res->rank = N;
-  if (N == 0)
-    res->descriptor = makeStridedMemRefDescriptor<T>(data, alignedData);
-  else
-    res->descriptor =
-        makeStridedMemRefDescriptor<T, N>(data, alignedData, shape);
+  res->descriptor = makeStridedMemRefDescriptor<T, N>(data, alignedData, shape);
   return res;
 }
 
