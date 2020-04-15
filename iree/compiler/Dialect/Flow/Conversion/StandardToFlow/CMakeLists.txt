@@ -28,6 +28,5 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::IREE::IR
-  ALWAYSLINK
   PUBLIC
 )
