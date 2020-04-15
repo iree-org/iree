@@ -40,7 +40,6 @@ iree_cc_library(
     iree::compiler::Dialect::Vulkan::Utils
     iree::compiler::Translation::CodegenPasses
     iree::compiler::Translation::CodegenUtils
-    iree::compiler::Translation::SPIRV::EmbeddedKernels
     iree::compiler::Translation::SPIRV::LinalgToSPIRV
     iree::compiler::Translation::SPIRV::XLAToSPIRV
     iree::schemas::spirv_executable_def_cc_fbs
