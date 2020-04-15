@@ -29,6 +29,10 @@ class DispatchabilityTestPass
   }
 };
 
+std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityTestPass() {
+  return std::make_unique<DispatchabilityTestPass>();
+}
+
 static PassRegistration<DispatchabilityTestPass> pass(
     "test-iree-flow-dispatchability",
     "Test pass used for dispatchability analysis");

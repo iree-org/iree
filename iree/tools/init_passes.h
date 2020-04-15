@@ -170,6 +170,7 @@ namespace iree_compiler {
 // global registry.
 inline void registerAllIreePasses() {
   IREE::Flow::registerFlowPasses();
+  IREE::Flow::registerFlowTestPasses();
   IREE::HAL::registerHALPasses();
   IREE::registerIreePasses();
   Shape::registerShapePasses();
