@@ -63,7 +63,7 @@ class IsOkAndHoldsMatcher
 
     ::testing::StringMatchResultListener value_listener;
     bool is_a_match =
-        value_matcher_.MatchAndExplain(status_or.ValueOrDie(), &value_listener);
+        value_matcher_.MatchAndExplain(status_or.value(), &value_listener);
     std::string value_explanation = value_listener.str();
     if (!value_explanation.empty()) {
       *listener << absl::StrCat("which contains a value ", value_explanation);
@@ -320,7 +320,7 @@ inline internal::IsOkMatcherGenerator IsOk() {
 // The value assignment example might expand into:
 //   StatusOr<ValueType> status_or_value = MaybeGetValue(arg);
 //   ASSERT_OK(status_or_value.status());
-//   ValueType value = status_or_value.ValueOrDie();
+//   ValueType value = status_or_value.value();
 #define ASSERT_OK_AND_ASSIGN(lhs, rexpr)                                  \
   IREE_ASSERT_OK_AND_ASSIGN_IMPL(                                         \
       IREE_STATUS_MACROS_CONCAT_NAME(_status_or_value, __COUNTER__), lhs, \
@@ -329,7 +329,7 @@ inline internal::IsOkMatcherGenerator IsOk() {
 #define IREE_ASSERT_OK_AND_ASSIGN_IMPL(statusor, lhs, rexpr) \
   auto statusor = (rexpr);                                   \
   ASSERT_OK(statusor.status()) << statusor.status();         \
-  lhs = std::move(statusor.ValueOrDie())
+  lhs = std::move(statusor.value())
 #define IREE_STATUS_MACROS_CONCAT_NAME(x, y) \
   IREE_STATUS_MACROS_CONCAT_IMPL(x, y)
 #define IREE_STATUS_MACROS_CONCAT_IMPL(x, y) x##y
@@ -343,8 +343,7 @@ void PrintTo(const StatusOr<T> &statusor, std::ostream *os) {
   if (!statusor.ok()) {
     *os << statusor.status();
   } else {
-    *os << absl::StrCat("OK: ",
-                        ::testing::PrintToString(statusor.ValueOrDie()));
+    *os << absl::StrCat("OK: ", ::testing::PrintToString(statusor.value()));
   }
 }
 

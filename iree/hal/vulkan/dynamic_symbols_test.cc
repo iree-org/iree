@@ -51,7 +51,7 @@ VkInstanceCreateInfo GetInstanceCreateInfo(VkApplicationInfo* app_info) {
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   auto status_or_syms = DynamicSymbols::CreateFromSystemLoader();
   ASSERT_OK(status_or_syms);
-  ref_ptr<DynamicSymbols> syms = std::move(status_or_syms.ValueOrDie());
+  ref_ptr<DynamicSymbols> syms = std::move(status_or_syms.value());
 
   // Create and destroy a VkInstance using the symbols. This is mainly testing
   // that the symbols were loaded successfully and are actually able to be used.

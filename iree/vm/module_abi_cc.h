@@ -191,7 +191,7 @@ class NativeModule {
     if (!module_state_or.ok()) {
       return ToApiStatus(module_state_or.status());
     }
-    auto module_state = std::move(module_state_or).ValueOrDie();
+    auto module_state = std::move(module_state_or).value();
 
     *out_module_state =
         reinterpret_cast<iree_vm_module_state_t*>(module_state.release());

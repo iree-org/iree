@@ -438,7 +438,7 @@ struct DispatchFunctor {
         reinterpret_cast<const iree_vm_register_list_t*>(kResultList.data());
 
     ResultPackState result_state{frame};
-    auto results = std::move(results_or).ValueOrDie();
+    auto results = std::move(results_or).value();
     ResultPack<Results>::Store(&result_state, std::move(results));
     return result_state.status;
   }

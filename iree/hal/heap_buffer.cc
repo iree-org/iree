@@ -143,7 +143,7 @@ ref_ptr<Buffer> HeapBuffer::Allocate(MemoryTypeBitfield memory_type,
                                      size_t allocation_size) {
   auto buffer_or =
       HeapAllocator::std_heap()->Allocate(memory_type, usage, allocation_size);
-  return std::move(buffer_or.ValueOrDie());
+  return std::move(buffer_or.value());
 }
 
 // static
@@ -161,7 +161,7 @@ ref_ptr<Buffer> HeapBuffer::AllocateCopy(BufferUsageBitfield usage,
   usage |= BufferUsage::kMapping;
   auto buffer_or = HeapAllocator::std_heap()->Allocate(MemoryType::kHostLocal,
                                                        usage, data_length);
-  auto buffer = std::move(buffer_or.ValueOrDie());
+  auto buffer = std::move(buffer_or.value());
   buffer->WriteData(0, data, data_length).IgnoreError();
   buffer->set_allowed_access(allowed_access);
   return buffer;
@@ -173,7 +173,7 @@ ref_ptr<Buffer> HeapBuffer::Wrap(MemoryTypeBitfield memory_type,
                                  size_t data_length) {
   auto buffer_or =
       HeapAllocator::std_heap()->Wrap(memory_type, usage, data, data_length);
-  return std::move(buffer_or.ValueOrDie());
+  return std::move(buffer_or.value());
 }
 
 // static
@@ -183,7 +183,7 @@ ref_ptr<Buffer> HeapBuffer::WrapMutable(MemoryTypeBitfield memory_type,
                                         size_t data_length) {
   auto buffer_or = HeapAllocator::std_heap()->WrapMutable(
       memory_type, allowed_access, usage, data, data_length);
-  return std::move(buffer_or.ValueOrDie());
+  return std::move(buffer_or.value());
 }
 
 }  // namespace hal

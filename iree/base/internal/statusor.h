@@ -415,12 +415,11 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
 
   // Constructs a new StatusOr with the given value. After calling this
   // constructor, this->ok() will be true and the contained value may be
-  // retrieved with ValueOrDie(), operator*(), or operator->().
+  // retrieved with value(), operator*(), or operator->().
   StatusOr(const T& value);
 
   // Constructs a new StatusOr with the given non-ok status. After calling this
-  // constructor, this->ok() will be false and calls to ValueOrDie() will
-  // CHECK-fail.
+  // constructor, this->ok() will be false and calls to value() will CHECK-fail.
   StatusOr(const Status& status);
   StatusOr& operator=(const Status& status);
   StatusOr(const StatusBuilder& builder);
@@ -483,14 +482,14 @@ class StatusOr : private internal_statusor::StatusOrData<T>,
   const Status& status() const&;
   Status status() &&;
 
-  // Returns a reference to our current value, or CHECK-fails if !this->ok(). If
-  // you have already checked the status using this->ok() or operator bool(),
-  // then you probably want to use operator*() or operator->() to access the
-  // current value instead of ValueOrDie().
-  const T& ValueOrDie() const&;
-  T& ValueOrDie() &;
-  const T&& ValueOrDie() const&&;
-  T&& ValueOrDie() &&;
+  // Returns a reference to the held value if `this->ok()`, or CHECK-fails.
+  // If you have already checked the status using `this->ok()` or
+  // `operator bool()`, you probably want to use `operator*()` or `operator->()`
+  // to access the value instead of `value`.
+  const T& value() const&;
+  T& value() &;
+  const T&& value() const&&;
+  T&& value() &&;
 
   // Returns a reference to the current value.
   //
@@ -576,7 +575,7 @@ template <typename T>
 template <typename U>
 inline void StatusOr<T>::Assign(const StatusOr<U>& other) {
   if (other.ok()) {
-    this->Assign(other.ValueOrDie());
+    this->Assign(other.value());
   } else {
     this->Assign(other.status());
   }
@@ -586,7 +585,7 @@ template <typename T>
 template <typename U>
 inline void StatusOr<T>::Assign(StatusOr<U>&& other) {
   if (other.ok()) {
-    this->Assign(std::move(other).ValueOrDie());
+    this->Assign(std::move(other).value());
   } else {
     this->Assign(std::move(other).status());
   }
@@ -612,25 +611,25 @@ Status StatusOr<T>::status() && {
 }
 
 template <typename T>
-const T& StatusOr<T>::ValueOrDie() const& {
+const T& StatusOr<T>::value() const& {
   this->EnsureOk();
   return this->data_;
 }
 
 template <typename T>
-T& StatusOr<T>::ValueOrDie() & {
+T& StatusOr<T>::value() & {
   this->EnsureOk();
   return this->data_;
 }
 
 template <typename T>
-const T&& StatusOr<T>::ValueOrDie() const&& {
+const T&& StatusOr<T>::value() const&& {
   this->EnsureOk();
   return std::move(this->data_);
 }
 
 template <typename T>
-T&& StatusOr<T>::ValueOrDie() && {
+T&& StatusOr<T>::value() && {
   this->EnsureOk();
   return std::move(this->data_);
 }

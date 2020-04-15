@@ -26,8 +26,8 @@
 #include "iree/testing/gtest.h"
 
 // StatusOr<bool> will be true if the status is ok, which is bad.
-#define ASSERT_STATUSOR_TRUE(x) ASSERT_TRUE(x.ValueOrDie())
-#define ASSERT_STATUSOR_FALSE(x) ASSERT_FALSE(x.ValueOrDie())
+#define ASSERT_STATUSOR_TRUE(x) ASSERT_TRUE(x.value())
+#define ASSERT_STATUSOR_FALSE(x) ASSERT_FALSE(x.value())
 
 namespace iree {
 namespace {
@@ -521,19 +521,19 @@ TEST(ManualResetEventTest, RedundantUse) {
   ManualResetEvent ev;
   ASSERT_OK(ev.Reset());
   ASSERT_OK(ev.Reset());
-  ASSERT_FALSE(ev.OnSet().TryWait().ValueOrDie());
+  ASSERT_FALSE(ev.OnSet().TryWait().value());
   ASSERT_OK(ev.Set());
   ASSERT_OK(ev.Set());
-  ASSERT_TRUE(ev.OnSet().TryWait().ValueOrDie());
+  ASSERT_TRUE(ev.OnSet().TryWait().value());
   ASSERT_OK(ev.Reset());
-  ASSERT_FALSE(ev.OnSet().TryWait().ValueOrDie());
+  ASSERT_FALSE(ev.OnSet().TryWait().value());
 }
 
 // Tests waiting on an initially-set ManualResetEvent;
 TEST(ManualResetEventTest, SetThenWait) {
   ManualResetEvent ev;
   ASSERT_OK(ev.Set());
-  ASSERT_TRUE(ev.OnSet().TryWait().ValueOrDie());
+  ASSERT_TRUE(ev.OnSet().TryWait().value());
 }
 
 // Tests that dangling an event will not wake waiters.

@@ -98,7 +98,7 @@ class StatusAdaptorForApiMacros {
   if (ABSL_PREDICT_FALSE(!statusor.ok())) {                                 \
     return ::iree::ToApiStatus(std::move(statusor).status());               \
   }                                                                         \
-  lhs = std::move(statusor).ValueOrDie()
+  lhs = std::move(statusor).value()
 
 // Converts an iree_time_t to its equivalent absl::Time.
 inline absl::Time ToAbslTime(iree_time_t time) {

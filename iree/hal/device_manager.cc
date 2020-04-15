@@ -126,7 +126,7 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::TryAllocateDeviceVisibleBuffer(
       FindCompatibleAllocator(memory_type | MemoryType::kDeviceVisible,
                               buffer_usage, device_placements);
   if (allocator_or.ok()) {
-    return allocator_or.ValueOrDie()->Allocate(
+    return allocator_or.value()->Allocate(
         memory_type | MemoryType::kDeviceVisible, buffer_usage,
         allocation_size);
   }

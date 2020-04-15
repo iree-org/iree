@@ -179,16 +179,14 @@ TEST(BufferStringUtilTest, PrintBinaryDataToString) {
 }
 
 TEST(BufferStringUtilTest, PrintNumericalDataToString) {
-  EXPECT_EQ(
-      "0 1 2 3",
-      PrintNumericalDataToString({4}, "u8", {0, 1, 2, 3}, 10).ValueOrDie());
-  EXPECT_EQ(
-      "[0 1][2 3]",
-      PrintNumericalDataToString({2, 2}, "u8", {0, 1, 2, 3}, 10).ValueOrDie());
+  EXPECT_EQ("0 1 2 3",
+            PrintNumericalDataToString({4}, "u8", {0, 1, 2, 3}, 10).value());
+  EXPECT_EQ("[0 1][2 3]",
+            PrintNumericalDataToString({2, 2}, "u8", {0, 1, 2, 3}, 10).value());
   std::vector<int32_t> data = {0, -1, 2, 3};
   auto bytes = ReinterpretSpan<uint8_t>(absl::MakeSpan(data));
   EXPECT_EQ("0 -1 2 3",
-            PrintNumericalDataToString({4}, "i32", bytes, 10).ValueOrDie());
+            PrintNumericalDataToString({4}, "i32", bytes, 10).value());
 }
 
 TEST(BufferStringUtilTest, ParseBufferDatai8) {

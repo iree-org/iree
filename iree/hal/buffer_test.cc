@@ -264,9 +264,9 @@ TEST(BufferTest, SubspanIdentity) {
   // Asking for a subspan of the entire buffer should return the same buffer.
   // Mostly an optimization.
   EXPECT_EQ(parent_buffer.get(),
-            Buffer::Subspan(parent_buffer, 0, kWholeBuffer).ValueOrDie().get());
+            Buffer::Subspan(parent_buffer, 0, kWholeBuffer).value().get());
   EXPECT_EQ(parent_buffer.get(),
-            Buffer::Subspan(parent_buffer, 0, 4).ValueOrDie().get());
+            Buffer::Subspan(parent_buffer, 0, 4).value().get());
 }
 
 TEST(BufferTest, SubspanOutOfRange) {

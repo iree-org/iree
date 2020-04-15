@@ -37,17 +37,17 @@ TEST(HostFenceTest, NoOp) {
 // Tests that a fence will accept new values as it is signaled.
 TEST(HostFenceTest, NormalSignaling) {
   HostFence fence(2u);
-  EXPECT_EQ(2u, fence.QueryValue().ValueOrDie());
+  EXPECT_EQ(2u, fence.QueryValue().value());
   EXPECT_OK(fence.Signal(3u));
-  EXPECT_EQ(3u, fence.QueryValue().ValueOrDie());
+  EXPECT_EQ(3u, fence.QueryValue().value());
   EXPECT_OK(fence.Signal(40u));
-  EXPECT_EQ(40u, fence.QueryValue().ValueOrDie());
+  EXPECT_EQ(40u, fence.QueryValue().value());
 }
 
 // Tests that a fence will fail to set non-increasing values.
 TEST(HostFenceTest, RequireIncreasingValues) {
   HostFence fence(2u);
-  EXPECT_EQ(2u, fence.QueryValue().ValueOrDie());
+  EXPECT_EQ(2u, fence.QueryValue().value());
   // Same value.
   EXPECT_TRUE(IsInvalidArgument(fence.Signal(2u)));
   // Decreasing.
@@ -60,17 +60,17 @@ TEST(HostFenceTest, StickyFailure) {
   // Signal to 3.
   EXPECT_OK(fence.Signal(3u));
   EXPECT_TRUE(fence.status().ok());
-  EXPECT_EQ(3u, fence.QueryValue().ValueOrDie());
+  EXPECT_EQ(3u, fence.QueryValue().value());
 
   // Fail now.
   EXPECT_OK(fence.Fail(UnknownErrorBuilder(IREE_LOC)));
   EXPECT_TRUE(IsUnknown(fence.status()));
-  EXPECT_EQ(UINT64_MAX, fence.QueryValue().ValueOrDie());
+  EXPECT_EQ(UINT64_MAX, fence.QueryValue().value());
 
   // Unable to signal again (it'll return the sticky failure).
   EXPECT_TRUE(IsUnknown(fence.Signal(4u)));
   EXPECT_TRUE(IsUnknown(fence.status()));
-  EXPECT_EQ(UINT64_MAX, fence.QueryValue().ValueOrDie());
+  EXPECT_EQ(UINT64_MAX, fence.QueryValue().value());
 }
 
 // Tests waiting on no fences.

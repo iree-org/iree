@@ -442,7 +442,7 @@ void ManualResetEvent::Initialize() {
   //
   // Docs: http://man7.org/linux/man-pages/man2/eventfd.2.html
   fd_type_ = FdType::kEventFd;
-  fd_ = Syscall(::eventfd, 0, EFD_CLOEXEC | EFD_NONBLOCK).ValueOrDie();
+  fd_ = Syscall(::eventfd, 0, EFD_CLOEXEC | EFD_NONBLOCK).value();
 #elif defined(IREE_HAS_PIPE)
   // Android/Linux/iOS-compatible POSIX pipe handle.
   // Two handles are generated: one for transmitting and one for receiving.
@@ -450,8 +450,8 @@ void ManualResetEvent::Initialize() {
   // Docs: http://man7.org/linux/man-pages/man2/pipe.2.html
   fd_type_ = FdType::kPipe;
   int pipefd[2];
-  Syscall(::pipe, pipefd).ValueOrDie();
-  Syscall(::fcntl, pipefd[0], F_SETFL, O_NONBLOCK).ValueOrDie();
+  Syscall(::pipe, pipefd).value();
+  Syscall(::fcntl, pipefd[0], F_SETFL, O_NONBLOCK).value();
   fd_ = pipefd[0];
   write_fd_ = pipefd[1];
 #else
@@ -464,11 +464,11 @@ void ManualResetEvent::Dispose() {
   if (fd_ != kInvalidFd) {
     // Always signal, as we need to ensure waiters are woken.
     CHECK_OK(Set());
-    Syscall(::close, fd_).ValueOrDie();
+    Syscall(::close, fd_).value();
     fd_ = kInvalidFd;
   }
   if (write_fd_ != kInvalidFd) {
-    Syscall(::close, write_fd_).ValueOrDie();
+    Syscall(::close, write_fd_).value();
     write_fd_ = kInvalidFd;
   }
 }

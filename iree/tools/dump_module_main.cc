@@ -168,7 +168,7 @@ extern "C" int main(int argc, char** argv) {
   std::string module_path = argv[1];
   auto module_fb = iree::FlatBufferFile<iree::vm::BytecodeModuleDef>::LoadFile(
                        iree::vm::BytecodeModuleDefIdentifier(), module_path)
-                       .ValueOrDie();
+                       .value();
   TruncatingToStringVisitor tos_visitor("\n");
   auto object = reinterpret_cast<const uint8_t*>(module_fb->root());
   flatbuffers::IterateObject(object, module_fb->root()->MiniReflectTypeTable(),

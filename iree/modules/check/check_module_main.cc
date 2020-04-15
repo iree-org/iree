@@ -195,7 +195,7 @@ extern "C" int main(int argc, char** argv) {
   }
   auto input_file_path = std::string(argv[1]);
 
-  int ret = Run(std::move(input_file_path)).ValueOrDie();
+  int ret = Run(std::move(input_file_path)).value();
 
   if (absl::GetFlag(FLAGS_expect_failure)) {
     if (ret == 0) {
