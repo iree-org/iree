@@ -79,7 +79,6 @@ populate_repo vk https://github.com/KhronosGroup/Vulkan-Headers.git
 populate_repo vkmem https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
 populate_repo gemmlowp https://github.com/google/gemmlowp.git
 populate_repo google_tracing_framework https://github.com/google/tracing-framework.git
-populate_repo glslang https://github.com/KhronosGroup/glslang.git
 populate_repo spirv_tools https://github.com/KhronosGroup/SPIRV-Tools.git
 populate_repo spirv_headers https://github.com/KhronosGroup/SPIRV-Headers.git
 
