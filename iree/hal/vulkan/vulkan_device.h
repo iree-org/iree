@@ -67,6 +67,8 @@ class VulkanDevice final : public Device {
 
   ~VulkanDevice() override;
 
+  std::string DebugString() const override;
+
   const ref_ptr<DynamicSymbols>& syms() const {
     return logical_device_->syms();
   }

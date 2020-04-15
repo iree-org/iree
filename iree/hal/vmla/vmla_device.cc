@@ -17,6 +17,7 @@
 #include <utility>
 
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"
@@ -122,6 +123,12 @@ VMLADevice::VMLADevice(DeviceInfo device_info, iree_vm_instance_t* instance,
 VMLADevice::~VMLADevice() {
   iree_vm_module_release(vmla_module_);
   iree_vm_instance_release(instance_);
+}
+
+std::string VMLADevice::DebugString() const {
+  return absl::StrCat(Device::DebugString(),  //
+                      "\n[VMLADevice]",       //
+                      "\n  Command Queues: ", command_queues_.size());
 }
 
 ref_ptr<ExecutableCache> VMLADevice::CreateExecutableCache() {

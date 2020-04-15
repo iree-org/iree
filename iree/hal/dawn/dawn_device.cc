@@ -15,6 +15,7 @@
 #include "iree/hal/dawn/dawn_device.h"
 
 #include "absl/memory/memory.h"
+#include "absl/strings/str_cat.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/command_queue.h"
@@ -80,6 +81,12 @@ DawnDevice::DawnDevice(const DeviceInfo& device_info,
 }
 
 DawnDevice::~DawnDevice() = default;
+
+std::string DawnDevice::DebugString() const {
+  return absl::StrCat(Device::DebugString(),  //
+                      "\n[DawnDevice]",       //
+                      "\n  Command Queues: ", command_queues_.size());
+}
 
 StatusOr<ref_ptr<DescriptorSetLayout>> DawnDevice::CreateDescriptorSetLayout(
     DescriptorSetLayout::UsageType usage_type,

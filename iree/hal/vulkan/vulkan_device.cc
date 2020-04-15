@@ -486,6 +486,14 @@ VulkanDevice::~VulkanDevice() {
   logical_device_.reset();
 }
 
+std::string VulkanDevice::DebugString() const {
+  return absl::StrCat(Device::DebugString(),                                 //
+                      "\n[VulkanDevice]",                                    //
+                      "\n  Command Queues: ", command_queues_.size(),        //
+                      "\n    - Dispatch Queues: ", dispatch_queues_.size(),  //
+                      "\n    - Transfer Queues: ", transfer_queues_.size());
+}
+
 ref_ptr<ExecutableCache> VulkanDevice::CreateExecutableCache() {
   IREE_TRACE_SCOPE0("VulkanDevice::CreateExecutableCache");
   return make_ref<PipelineCache>(add_ref(logical_device_));

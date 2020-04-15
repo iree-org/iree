@@ -85,6 +85,7 @@ iree_cc_library(
     absl::inlined_vector
     absl::memory
     absl::span
+    absl::strings
     iree::base::memory
     iree::base::status
     iree::base::tracing
