@@ -40,6 +40,5 @@ iree_cc_library(
     iree::compiler::Dialect::VMLA::Conversion::StandardToVMLA
     iree::compiler::Dialect::VMLA::IR
     tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )

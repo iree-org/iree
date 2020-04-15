@@ -63,5 +63,4 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_materialize_broadcasts",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_unfuse_batch_norm",
     ],
-    alwayslink = 1,
 )

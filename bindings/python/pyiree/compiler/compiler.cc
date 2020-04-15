@@ -81,6 +81,8 @@ bool LLVMOnceInit() {
 #ifdef IREE_REGISTER_MLIR_PASSES
   mlir::registerMlirPasses();
 #endif
+  // Register IREE dialects.
+  mlir::iree_compiler::registerAllIreePasses();
 
   // Register any pass manager command line options.
   mlir::registerPassManagerCLOptions();

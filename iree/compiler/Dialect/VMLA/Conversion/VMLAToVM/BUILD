@@ -38,5 +38,4 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )
