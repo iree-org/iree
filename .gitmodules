@@ -26,9 +26,6 @@
 	path = third_party/google_tracing_framework
 	url = https://github.com/google/tracing-framework.git
 	fetchRecurseSubmodules = false
-[submodule "third_party/glslang"]
-	path = third_party/glslang
-	url = https://github.com/KhronosGroup/glslang.git
 [submodule "third_party/spirv_tools"]
 	path = third_party/spirv_tools
 	url = https://github.com/KhronosGroup/SPIRV-Tools.git

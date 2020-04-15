@@ -16,7 +16,6 @@
 
 load("@com_github_google_flatbuffers//:build_defs.bzl", "flatbuffer_cc_library")
 load("@rules_cc//cc:defs.bzl", _cc_binary = "cc_binary", _cc_library = "cc_library")
-load("@iree_core//build_tools/third_party/glslang:build_defs.bzl", "glsl_vulkan")
 
 # Target to the FileCheck binary.
 INTREE_FILECHECK_TARGET = "@llvm-project//llvm:FileCheck"
@@ -86,6 +85,3 @@ def iree_flatbuffer_cc_library(**kwargs):
         gen_reflections = False,
         **kwargs
     )
-
-def iree_glsl_vulkan(**kwargs):
-    glsl_vulkan(**kwargs)
