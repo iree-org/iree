@@ -307,7 +307,7 @@ def Shape_RankedBroadcastInDimOp : Shape_PureOp<"ranked_broadcast_in_dim"> {
 
   let arguments = (ins AnyRankedTensor:$operand,
                        Shape_RankedShape:$result_shape,
-                       OptionalAttr<I64ElementsAttr>:$broadcast_dimensions);
+                       I64ElementsAttr:$broadcast_dimensions);
   let results = (outs AnyRankedTensor:$result);
 
   // TODO: Custom parser/printer
