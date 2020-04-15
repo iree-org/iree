@@ -1,4 +1,4 @@
-// RUN: iree-translate -split-input-file -iree-mlir-to-vm-bytecode-module -iree-vm-bytecode-module-output-format=flatbuffer-text %s | IreeFileCheck %s
+// RUN: iree-translate -split-input-file -iree-hal-target-backends=vmla -iree-mlir-to-vm-bytecode-module -iree-vm-bytecode-module-output-format=flatbuffer-text %s | IreeFileCheck %s
 
 // CHECK-LABEL: name: "simple_module"
 module @simple_module {

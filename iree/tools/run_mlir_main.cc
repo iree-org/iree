@@ -58,6 +58,7 @@
 #include "iree/hal/api.h"
 #include "iree/modules/hal/hal_module.h"
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_targets.h"
 #include "iree/tools/vm_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/bytecode_module.h"
@@ -145,8 +146,7 @@ std::string BackendToDriverName(std::string backend) {
 // Returns a list of target compiler backends to use for file evaluation.
 StatusOr<std::vector<std::string>> GetTargetBackends() {
   auto target_backends =
-      mlir::iree_compiler::IREE::HAL::getExecutableTargetOptionsFromFlags()
-          .targets;
+      mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags().targets;
   if (target_backends.empty()) {
     iree_string_view_t* driver_names = nullptr;
     iree_host_size_t driver_count = 0;
@@ -185,7 +185,7 @@ StatusOr<std::string> PrepareModule(
   // Translate from MLIR to IREE bytecode.
   LOG(INFO) << "Compiling for target backend '" << target_backend << "'...";
   auto executable_options =
-      mlir::iree_compiler::IREE::HAL::getExecutableTargetOptionsFromFlags();
+      mlir::iree_compiler::IREE::HAL::getTargetOptionsFromFlags();
   executable_options.targets = {std::move(target_backend)};
   mlir::PassManager pass_manager(mlir_module->getContext());
   mlir::applyPassManagerCLOptions(pass_manager);
@@ -459,6 +459,7 @@ extern "C" int main(int argc, char** argv) {
 
   mlir::registerMlirDialects();
   mlir::iree_compiler::registerIreeDialects();
+  mlir::iree_compiler::registerHALTargetBackends();
 
   // Register MLIRContext command-line options like
   // -mlir-print-op-on-diagnostic.

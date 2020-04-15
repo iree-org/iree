@@ -20,6 +20,7 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "LinkExecutables.cpp",
         "MaterializeInterfaces.cpp",
         "MaterializeResourceCaches.cpp",
         "MemoizeDeviceQueries.cpp",
@@ -27,6 +28,7 @@ cc_library(
         "Passes.cpp",
         "PublicAbiGeneration.cpp",
         "RewriteLegacyIO.cpp",
+        "SerializeExecutables.cpp",
         "TranslateExecutables.cpp",
     ],
     hdrs = [
@@ -37,7 +39,7 @@ cc_library(
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/HAL/Conversion/FlowToHAL",
         "//iree/compiler/Dialect/HAL/IR",
-        "//iree/compiler/Dialect/HAL/Target:ExecutableTarget",
+        "//iree/compiler/Dialect/HAL/Target",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/Shape/Transforms",
         "//iree/compiler/Utils",

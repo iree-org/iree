@@ -16,6 +16,9 @@
 #include "iree/compiler/Dialect/HAL/Conversion/FlowToHAL/ConvertFlowToHAL.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/DeviceSwitchBuilder.h"
 #include "iree/compiler/Dialect/HAL/Utils/TypeUtils.h"
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
@@ -206,40 +209,6 @@ static void allocateTransientBuffers(IREE::Flow::ExStreamFragmentOp streamOp,
   }
 }
 
-// Returns a the (x, y, z) workgroup counts calculated from the given |workload|
-// (invocation count) and the workgroup size of the dispatch |entryPointOp|.
-static std::array<Value, 3> getDispatchWorkgroupCounts(
-    IREE::HAL::ExecutableEntryPointOp entryPointOp, Value workload,
-    ConversionPatternRewriter &rewriter) {
-  std::array<Value, 3> result;
-  auto loc = entryPointOp.getLoc();
-  auto constantOne = rewriter.createOrFold<mlir::ConstantIndexOp>(loc, 1);
-  auto workgroupSizeArray = entryPointOp.workgroup_size().getValue();
-  for (int i = 0; i < 3; ++i) {
-    // Round up: (workload + workgroup_size - 1) / workgroup_size;
-    auto workgroupSizeI = rewriter.createOrFold<mlir::ConstantIndexOp>(
-        loc, workgroupSizeArray[i].cast<IntegerAttr>().getInt());
-    auto rounded = rewriter.createOrFold<mlir::SubIOp>(
-        loc, rewriter.createOrFold<mlir::AddIOp>(loc, workload, workgroupSizeI),
-        constantOne);
-    auto workgroupCountI = rewriter.createOrFold<mlir::UnsignedDivIOp>(
-        loc, rounded, workgroupSizeI);
-    result[i] = workgroupCountI;
-
-    // Multiply back out and subtract from invocations.
-    workload = rewriter.createOrFold<SubIOp>(
-        loc, workload,
-        rewriter.createOrFold<MulIOp>(loc, workgroupCountI, rounded));
-
-    // Ensure > 0.
-    auto workloadGreaterZero =
-        rewriter.create<CmpIOp>(loc, CmpIPredicate::sge, workload, constantOne);
-    workload = rewriter.create<SelectOp>(loc, workloadGreaterZero, workload,
-                                         constantOne);
-  }
-  return result;
-}
-
 // Records a full execution barrier that forces visibility of all buffers.
 static void recordFullExecutionBarrier(Value commandBuffer, Location loc,
                                        ConversionPatternRewriter &rewriter) {
@@ -363,8 +332,6 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
   // Compute the workgroup count based on the executable's tiling.
   auto entryPointOp = cast<IREE::HAL::ExecutableEntryPointOp>(
       SymbolTable::lookupSymbolIn(executableOp, dispatchOp.entry_point()));
-  auto workgroupCounts = getDispatchWorkgroupCounts(
-      entryPointOp, rewriter.getRemappedValue(dispatchOp.workload()), rewriter);
 
   // Setup push constants for any dynamic values we need to pass across at
   // runtime.
@@ -379,9 +346,62 @@ static LogicalResult recordDispatch(Value device, Value commandBuffer,
     return failure();
   }
 
-  rewriter.create<IREE::HAL::CommandBufferDispatchOp>(
-      dispatchOp.getLoc(), commandBuffer, executable, entryPointOp,
-      workgroupCounts[0], workgroupCounts[1], workgroupCounts[2]);
+  IREE::HAL::TargetBackend::DispatchState dispatchState;
+  dispatchState.dispatchOp = dispatchOp;
+  dispatchState.executableOp = executableOp;
+  dispatchState.entryPointOp = entryPointOp;
+
+  dispatchState.device = device;
+  dispatchState.commandBuffer = commandBuffer;
+  dispatchState.executable = executable;
+  dispatchState.executableLayout = executableLayout;
+
+  dispatchState.workload = rewriter.getRemappedValue(dispatchOp.workload());
+
+  // TODO(benvanik): support extended push constants.
+  dispatchState.basePushConstantOffset = 0;
+
+  // Marshal tensor operands/results in to the state so that backends can
+  // read/write them as they need.
+  SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> operandAdaptors;
+  for (int i = 0; i < dispatchOp.getNumOperands(); ++i) {
+    auto value = dispatchOp.getOperand(i);
+    if (!value.getType().isa<TensorType>()) continue;
+    auto &bufferRange = bufferSet.rangeMap[value];
+    assert(bufferRange.buffer && "operand buffer not allocated");
+    operandAdaptors.emplace_back(IREE::HAL::TensorRewriteAdaptor{
+        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter});
+  }
+  dispatchState.operands = operandAdaptors;
+  SmallVector<Optional<IREE::HAL::TensorRewriteAdaptor>, 4> resultAdaptors;
+  for (int i = 0; i < dispatchOp.getNumResults(); ++i) {
+    auto value = dispatchOp.getResult(i);
+    if (!value.getType().isa<TensorType>()) continue;
+    auto &bufferRange = bufferSet.rangeMap[value];
+    assert(bufferRange.buffer && "result buffer not preallocated");
+    resultAdaptors.emplace_back(IREE::HAL::TensorRewriteAdaptor{
+        dispatchOp.getLoc(), value, bufferRange.buffer, rewriter});
+  }
+  dispatchState.results = resultAdaptors;
+
+  // Ask each target backend to record their dispatch logic.
+  IREE::HAL::DeviceSwitchBuilder switchBuilder(dispatchOp.getLoc(),
+                                               /*resultTypes=*/TypeRange{},
+                                               /*device=*/dispatchState.device,
+                                               rewriter);
+  for (auto targetOp :
+       executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>()) {
+    for (auto &targetBackend :
+         IREE::HAL::matchTargetBackends({targetOp.target_backend().str()})) {
+      if (failed(targetBackend->recordDispatch(dispatchOp.getLoc(),
+                                               dispatchState, switchBuilder))) {
+        return dispatchOp.emitError()
+               << "unable to record dispatch for target backend "
+               << targetBackend->name();
+      }
+    }
+  }
+  switchBuilder.build();
 
   // Full barriers for now as we aren't scheduling things.
   // TODO(benvanik): don't add at the end of the command buffer (we could

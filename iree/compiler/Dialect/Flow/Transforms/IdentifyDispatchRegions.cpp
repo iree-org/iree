@@ -120,6 +120,8 @@ bool isFusionRootOp(Operation *op) {
       isa<xla_hlo::ReduceOp>(op)) {
     // We have hand-written kernels for these right now we want to stand alone.
     // When we do a bit more magic we should allow these ops to fold.
+    LLVM_DEBUG(llvm::dbgs() << "  NOT A FUSION ROOT (Special Op): "
+                            << op->getName() << "\n");
     return false;
   }
 

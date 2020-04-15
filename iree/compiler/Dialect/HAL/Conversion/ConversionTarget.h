@@ -41,7 +41,6 @@ class HALConversionTarget : public ConversionTarget {
  private:
   bool isDynamicallyLegal(Operation *op) const override;
 
-  MLIRContext &context;
   TypeConverter &typeConverter;
 };
 

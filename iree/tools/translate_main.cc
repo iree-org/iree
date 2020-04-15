@@ -18,6 +18,7 @@
 // options, which is missing in MLIR's translation main entry function.
 
 #include "iree/tools/init_dialects.h"
+#include "iree/tools/init_targets.h"
 #include "iree/tools/init_translations.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -51,6 +52,7 @@ int main(int argc, char **argv) {
 
   mlir::registerMlirDialects();
   mlir::iree_compiler::registerIreeDialects();
+  mlir::iree_compiler::registerHALTargetBackends();
   mlir::registerMlirTranslations();
 
   // Register MLIRContext command-line options like

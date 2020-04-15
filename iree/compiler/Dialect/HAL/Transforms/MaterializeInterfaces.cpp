@@ -16,7 +16,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -45,7 +46,7 @@ static llvm::Optional<IREE::HAL::InterfaceOp> declareInterfaceIO(
   // NOTE: we assume right now that all entry points have the same signature.
   SmallVector<FuncOp, 1> entryFuncOps;
   SmallVector<Location, 1> entryLocs;
-  for (auto& op : sourceOp.getBlock()) {
+  for (auto &op : sourceOp.getBlock()) {
     if (auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
       auto funcOp =
           moduleOp.lookupSymbol<FuncOp>(dispatchEntryOp.function_ref());
@@ -154,9 +155,9 @@ static Optional<FuncOp> createDispatchEntryThunk(
       interfaceOp.getBlock().getOps<IREE::HAL::InterfaceBindingOp>());
 
   // Pull all arguments from the bindings.
-  auto* thunkEntryBlock = thunkFuncOp.addEntryBlock();
+  auto *thunkEntryBlock = thunkFuncOp.addEntryBlock();
   OpBuilder thunkEntryBuilder = OpBuilder::atBlockEnd(thunkEntryBlock);
-  Operation* firstNonConstOp = nullptr;
+  Operation *firstNonConstOp = nullptr;
   auto positionForNonConst = [&]() {
     thunkEntryBuilder.setInsertionPointToEnd(thunkEntryBlock);
   };
@@ -235,12 +236,10 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
   OpBuilder builder(targetOp.getContext());
   builder.setInsertionPointAfter(interfaceOp);
   int nextOrdinal = 0;
-  for (auto& op : sourceOp.getBlock()) {
+  for (auto &op : sourceOp.getBlock()) {
     if (auto dispatchEntryOp = dyn_cast<IREE::Flow::DispatchEntryOp>(op)) {
-      // Hardwire workgroup size to 1,1,1 by default. Backends can override.
       auto sourceFuncOp = sourceOp.getInnerModule().lookupSymbol<FuncOp>(
           dispatchEntryOp.function_ref());
-      auto workGroupSizeAttr = builder.getIndexArrayAttr({1, 1, 1});
       auto thunkFuncOp = createDispatchEntryThunk(sourceFuncOp, interfaceOp);
       if (!thunkFuncOp.hasValue()) {
         return failure();
@@ -251,7 +250,7 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
       builder.create<IREE::HAL::ExecutableEntryPointOp>(
           dispatchEntryOp.getLoc(),
           builder.getStringAttr(thunkFuncOp->getName()),
-          builder.getI32IntegerAttr(nextOrdinal++), workGroupSizeAttr,
+          builder.getI32IntegerAttr(nextOrdinal++),
           builder.getSymbolRefAttr(interfaceOp),
           TypeAttr::get(sourceFuncOp.getType()));
     }
@@ -259,66 +258,106 @@ static LogicalResult declareEntryPointOps(IREE::Flow::ExecutableOp sourceOp,
   return success();
 }
 
+// Creates zero or more hal.executable.target ops for each target backend.
+// The source op will contain the flow.executable contents and any attributes
+// the backend wants to carry along during transformation.
+static LogicalResult constructTargetOps(TargetOptions targetOptions,
+                                        IREE::Flow::ExecutableOp sourceOp,
+                                        IREE::HAL::ExecutableOp executableOp) {
+  // The user has specified what targets they want as a set of patterns. This
+  // matches against those patterns so vulkan-* may match vulkan-v1.1 and
+  // vulkan-v1.2.
+  auto targetBackends = matchTargetBackends(targetOptions.targets);
+  if (targetBackends.empty()) {
+    auto diagnostic = sourceOp.emitError();
+    diagnostic
+        << "no target backends available for executable translation; ensure "
+        << "they are linked in and the target options are properly "
+        << "specified. requested = [ ";
+    for (const auto &target : targetOptions.targets) {
+      diagnostic << "'" << target << "' ";
+    }
+    diagnostic << "], available = [ ";
+    for (const auto &target : getRegisteredTargetBackends()) {
+      diagnostic << "'" << target << "' ";
+    }
+    diagnostic << "]";
+    return diagnostic;
+  }
+
+  // Materialize all of the hal.executable.target ops for all backends we are
+  // targeting. Note that each backend may create zero or more target ops.
+  for (auto &targetBackend : targetBackends) {
+    targetBackend->constructTargetOps(sourceOp, executableOp);
+  }
+
+  // Ensure that at least one target op got created. If it didn't that means
+  // the executable cannot be translated and it's better to fail now.
+  if (executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>().empty()) {
+    auto diagnostic = sourceOp.emitError();
+    diagnostic
+        << "no target backend was able to handle this executable; tried = [ ";
+    for (const auto &target : targetOptions.targets) {
+      diagnostic << "'" << target << "' ";
+    }
+    diagnostic << "]";
+    return diagnostic;
+  }
+
+  return success();
+}
+
 class MaterializeInterfacesPass
     : public PassWrapper<MaterializeInterfacesPass, OperationPass<ModuleOp>> {
  public:
-  MaterializeInterfacesPass()
-      : executableOptions_(getExecutableTargetOptionsFromFlags()) {}
-  explicit MaterializeInterfacesPass(ExecutableTargetOptions executableOptions)
-      : executableOptions_(executableOptions) {}
+  MaterializeInterfacesPass() : targetOptions_(getTargetOptionsFromFlags()) {}
+  explicit MaterializeInterfacesPass(TargetOptions targetOptions)
+      : targetOptions_(targetOptions) {}
 
   void runOnOperation() override {
     // Processes all executables within the input module and produce the output
     // HAL ops. We should ensure all deduping is performed prior to this when
     // it's easier to diff IR and where we still have the flow context.
-    auto executableOps =
+    auto sourceOps =
         llvm::to_vector<32>(getOperation().getOps<IREE::Flow::ExecutableOp>());
-    for (auto sourceOp : executableOps) {
+    for (auto sourceOp : sourceOps) {
       // Create the op that will contain the translated executables.
       OpBuilder builder = OpBuilder::atBlockEnd(getOperation().getBody());
       builder.setInsertionPointAfter(sourceOp);
-      auto targetOp = builder.create<IREE::HAL::ExecutableOp>(
+      auto exectuableOp = builder.create<IREE::HAL::ExecutableOp>(
           sourceOp.getLoc(), sourceOp.getName());
-      SymbolTable::setSymbolVisibility(targetOp,
+      SymbolTable::setSymbolVisibility(exectuableOp,
                                        SymbolTable::Visibility::Private);
 
       // Add IO ops to define the bindings and how parameters are passed.
-      auto interfaceOp = declareInterfaceIO(sourceOp, targetOp);
+      auto interfaceOp = declareInterfaceIO(sourceOp, exectuableOp);
       if (!interfaceOp.hasValue()) {
         return signalPassFailure();
       }
 
       // Annotate the entry points.
       // TODO(benvanik): allow entry points to use different interfaces.
-      if (failed(declareEntryPointOps(sourceOp, targetOp,
+      if (failed(declareEntryPointOps(sourceOp, exectuableOp,
                                       interfaceOp.getValue()))) {
         return signalPassFailure();
       }
 
-      // Move the flow.executable into a source op to keep it for later
-      // transformation.
-      // TODO(benvanik): remove the need for this by doing all interface related
-      // things here. The legacy utils currently require the original flow ops
-      // to extract their attributes.
-      OpBuilder targetBuilder(&targetOp.getBlock().back());
-      auto sourceContainerOp =
-          targetBuilder.create<IREE::HAL::ExecutableSourceOp>(
-              sourceOp.getLoc());
-      OpBuilder containerBuilder(&sourceContainerOp.getBlock().back());
-      auto sourceModuleOp =
-          containerBuilder.create<ModuleOp>(sourceOp.getLoc());
-      sourceOp.getOperation()->moveBefore(&sourceModuleOp.getBody()->front());
+      // Embed the hal.executable.target ops for each source.
+      if (failed(constructTargetOps(targetOptions_, sourceOp, exectuableOp))) {
+        return signalPassFailure();
+      }
+
+      sourceOp.erase();
     }
   }
 
  private:
-  ExecutableTargetOptions executableOptions_;
+  TargetOptions targetOptions_;
 };
 
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeInterfacesPass(
-    ExecutableTargetOptions executableOptions) {
-  return std::make_unique<MaterializeInterfacesPass>(
-      executableOptions);  // NOLINT
+    TargetOptions targetOptions) {
+  return std::make_unique<MaterializeInterfacesPass>(targetOptions);  // NOLINT
 }
 
 static PassRegistration<MaterializeInterfacesPass> pass(

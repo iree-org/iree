@@ -48,7 +48,7 @@ iree_pybind_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
     iree::compiler::Dialect::HAL::Transforms
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::Shape::Transforms
     iree::compiler::Dialect::VM::Transforms
@@ -57,7 +57,8 @@ iree_pybind_cc_library(
     iree::compiler::Dialect::HAL::Target::LLVM
     iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
-    iree::tools::PassesAndDialects
+    iree::tools::init_passes_and_dialects
+    iree::tools::init_targets
     bindings::python::pyiree::common
     LLVMSupport
     MLIRIR

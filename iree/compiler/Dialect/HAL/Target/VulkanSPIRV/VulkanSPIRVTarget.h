@@ -17,7 +17,7 @@
 
 #include <string>
 
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace mlir {
@@ -39,11 +39,9 @@ struct VulkanSPIRVTargetOptions {
 // related command-line flags.
 VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags();
 
-// Translates an executable to the Vulkan/SPIR-V backend with the given options.
-LogicalResult translateToVulkanSPIRVExecutable(
-    IREE::HAL::ExecutableOp executableOp,
-    ExecutableTargetOptions executableOptions,
-    VulkanSPIRVTargetOptions targetOptions);
+// Registers the Vulkan/SPIR-V backends.
+void registerVulkanSPIRVTargetBackends(
+    std::function<VulkanSPIRVTargetOptions()> queryOptions);
 
 }  // namespace HAL
 }  // namespace IREE

@@ -23,6 +23,7 @@ cc_library(
         "TypeUtils.cpp",
     ],
     hdrs = [
+        "DeviceSwitchBuilder.h",
         "TypeUtils.h",
     ],
     deps = [

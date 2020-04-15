@@ -15,7 +15,7 @@
 #ifndef IREE_COMPILER_DIALECT_HAL_TARGET_VMLA_VMLATARGET_H_
 #define IREE_COMPILER_DIALECT_HAL_TARGET_VMLA_VMLATARGET_H_
 
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -31,10 +31,9 @@ struct VMLATargetOptions {
 // --iree-hal-vm-la-* flags.
 VMLATargetOptions getVMLATargetOptionsFromFlags();
 
-// Translates an executable to the VM/LA backend with the given options.
-LogicalResult translateToVMLAExecutable(
-    IREE::HAL::ExecutableOp executableOp,
-    ExecutableTargetOptions executableOptions, VMLATargetOptions targetOptions);
+// Registers the VMLA backends.
+void registerVMLATargetBackends(
+    std::function<VMLATargetOptions()> queryOptions);
 
 }  // namespace HAL
 }  // namespace IREE

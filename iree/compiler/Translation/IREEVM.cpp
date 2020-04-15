@@ -15,7 +15,6 @@
 #include "iree/compiler/Translation/IREEVM.h"
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/HAL/Target/ExecutableTarget.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/TranslationFlags.h"
@@ -38,8 +37,8 @@ LogicalResult convertToFlowModule(ModuleOp moduleOp) {
   return success();
 }
 
-LogicalResult convertToHALModule(
-    ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions) {
+LogicalResult convertToHALModule(ModuleOp moduleOp,
+                                 IREE::HAL::TargetOptions executableOptions) {
   PassManager passManager(moduleOp.getContext());
   mlir::applyPassManagerCLOptions(passManager);
   IREE::HAL::buildHALTransformPassPipeline(passManager, executableOptions);
@@ -67,13 +66,13 @@ static PassPipelineRegistration<> transformPassPipeline(
     [](OpPassManager &passManager) {
       IREE::Flow::buildFlowTransformPassPipeline(passManager);
       IREE::HAL::buildHALTransformPassPipeline(
-          passManager, IREE::HAL::getExecutableTargetOptionsFromFlags());
+          passManager, IREE::HAL::getTargetOptionsFromFlags());
       IREE::VM::buildVMTransformPassPipeline(passManager);
       passManager.addPass(IREE::createDropCompilerHintsPass());
     });
 
 LogicalResult translateFromMLIRToVMBytecodeModule(
-    ModuleOp moduleOp, IREE::HAL::ExecutableTargetOptions executableOptions,
+    ModuleOp moduleOp, IREE::HAL::TargetOptions executableOptions,
     IREE::VM::BytecodeTargetOptions bytecodeOptions,
     llvm::raw_ostream &output) {
   // Convert from our source to a vm.module in canonical form.
@@ -96,10 +95,9 @@ LogicalResult translateFromMLIRToVMBytecodeModule(
 static LogicalResult translateFromMLIRToVMBytecodeModuleWithFlags(
     ModuleOp moduleOp, llvm::raw_ostream &output) {
   mlir::registerPassManagerCLOptions();
-  auto executableTargetOptions =
-      IREE::HAL::getExecutableTargetOptionsFromFlags();
+  auto TargetOptions = IREE::HAL::getTargetOptionsFromFlags();
   auto bytecodeTargetOptions = IREE::VM::getBytecodeTargetOptionsFromFlags();
-  return translateFromMLIRToVMBytecodeModule(moduleOp, executableTargetOptions,
+  return translateFromMLIRToVMBytecodeModule(moduleOp, TargetOptions,
                                              bytecodeTargetOptions, output);
 }
 

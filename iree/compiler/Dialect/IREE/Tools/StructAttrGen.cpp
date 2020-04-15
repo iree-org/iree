@@ -335,13 +335,24 @@ static void emitAttrFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
   os << formatv("  return Base::get(context, AttrKind::{0}",
                 structAttr.getStructClassName());
   if (!structAttr.getAllFields().empty()) {
-    os << "\n,                   ";
+    os << ",\n                   ";
     interleaveComma(structAttr.getAllFields(), os,
                     [&](StructFieldAttr field) { os << field.getName(); });
   }
   os << ");\n";
 
   os << "}\n\n";
+}
+
+// Replaces all occurrences of `match` in `str` with `substitute`.
+static std::string replaceAllSubstrs(std::string str, const std::string &match,
+                                     const std::string &substitute) {
+  std::string::size_type scanLoc = 0, matchLoc = std::string::npos;
+  while ((matchLoc = str.find(match, scanLoc)) != std::string::npos) {
+    str = str.replace(matchLoc, match.size(), substitute);
+    scanLoc = matchLoc + substitute.size();
+  }
+  return str;
 }
 
 static void emitTypedFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
@@ -358,8 +369,18 @@ static void emitTypedFactoryDef(const StructAttr &structAttr, raw_ostream &os) {
   ctx.withBuilder("b");
   for (auto field : structAttr.getAllFields()) {
     auto type = field.getType();
+
+    // For StringAttr, its constant builder call will wrap the input in
+    // quotes, which is correct for normal string literals, but incorrect
+    // here given we use function arguments. So we need to strip the
+    // wrapping quotes.
+    std::string builderTemplate = type.getConstBuilderTemplate().str();
+    if (StringRef(builderTemplate).contains("\"$0\"")) {
+      builderTemplate = replaceAllSubstrs(builderTemplate, "\"$0\"", "$0");
+    }
+
     os << formatv("  auto {0}Attr = {1};\n", field.getName(),
-                  tgfmt(type.getConstBuilderTemplate(), &ctx, field.getName()));
+                  tgfmt(builderTemplate, &ctx, field.getName()));
   }
 
   os << "  return get(";

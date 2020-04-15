@@ -50,7 +50,6 @@ iree_cc_library(
     MLIRStandardOps
     MLIRSupport
     MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::CodegenUtils

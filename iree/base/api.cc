@@ -211,10 +211,11 @@ static bool MatchPattern(absl::string_view value, absl::string_view pattern) {
     value = value.substr(next_char_index);
     pattern = pattern.substr(next_char_index);
   }
-  char pattern_char = pattern[0];
   if (value.empty() && pattern.empty()) {
     return true;
-  } else if (pattern_char == '*' && pattern.size() > 1 && value.empty()) {
+  }
+  char pattern_char = pattern[0];
+  if (pattern_char == '*' && pattern.size() > 1 && value.empty()) {
     return false;
   } else if (pattern_char == '*' && pattern.size() == 1) {
     return true;

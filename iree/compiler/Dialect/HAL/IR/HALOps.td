@@ -1481,7 +1481,6 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
 
   let extraClassDeclaration = [{
     Block& getBlock() { return body().front(); }
-    IREE::HAL::ExecutableSourceOp getSourceOp();
     IREE::HAL::InterfaceOp getInterfaceOp();
   }];
 
@@ -1506,29 +1505,33 @@ def HAL_ExecutableEntryPointOp : HAL_Op<"executable.entry_point", [Symbol]> {
   let arguments = (ins
     StrAttr:$sym_name,
     HAL_OrdinalAttr:$ordinal,
-    HAL_WorkgroupSizeAttr:$workgroup_size,
     FlatSymbolRefAttr:$interface,
     TypeAttr:$signature
   );
 }
 
-def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
+def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
     IsolatedFromAbove,
     HasParent<"IREE::HAL::ExecutableOp">,
-    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableSourceEndOp">,
+    SingleBlockImplicitTerminator<"IREE::HAL::ExecutableTargetEndOp">,
   ]> {
-  let summary = [{source executable IR}];
+  let summary = [{target executable IR}];
   let description = [{
-    The source IR for the executable. This can be preserved for debugging but
+    The target IR for the executable. This can be preserved for debugging but
     is usually removed during transformation.
   }];
+
+  let arguments = (ins
+    StrAttr:$target_backend
+    // TODO(benvanik): add compatibility and versioning attributes.
+  );
 
   let regions = (region SizedRegion<1>:$body);
 
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state
+      Builder *builder, OperationState &state, StringRef targetBackend
     }]>,
   ];
 
@@ -1543,11 +1546,11 @@ def HAL_ExecutableSourceOp : HAL_Op<"executable.source", [
   }];
 }
 
-def HAL_ExecutableSourceEndOp : HAL_Op<"executable.source_end", [
-    HasParent<"IREE::HAL::ExecutableSourceOp">,
+def HAL_ExecutableTargetEndOp : HAL_Op<"executable.target_end", [
+    HasParent<"IREE::HAL::ExecutableTargetOp">,
     Terminator,
   ]> {
-  let summary = [{terminator pseudo-op for the executable source op}];
+  let summary = [{terminator pseudo-op for the executable target op}];
   let assemblyFormat = "attr-dict";
 }
 

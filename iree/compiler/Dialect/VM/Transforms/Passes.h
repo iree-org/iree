@@ -46,6 +46,13 @@ void buildVMTransformPassPipeline(OpPassManager &passManager);
 // Conversion
 //===----------------------------------------------------------------------===//
 
+// Marks all symbols with public visibility as being exported with the
+// `iree.module.export` attribute. This is only required until we fully support
+// symbol visibility.
+// TODO(GH-614): remove this when iree.module.export is gone.
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createMarkPublicSymbolsExportedPass();
+
 // Converts from various dialects (standard, HAL, etc) to the VM dialect.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createConversionPass();
 

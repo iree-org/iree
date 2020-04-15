@@ -27,9 +27,7 @@ namespace iree_compiler {
 
 HALConversionTarget::HALConversionTarget(MLIRContext *context,
                                          TypeConverter &typeConverter)
-    : ConversionTarget(*context),
-      context(*context),
-      typeConverter(typeConverter) {
+    : ConversionTarget(*context), typeConverter(typeConverter) {
   // Setup the fallback handler such that all ops without explicitly
   // registered patterns will be checked to ensure that they don't use any
   // illegal types.

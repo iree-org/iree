@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
@@ -81,7 +80,7 @@ struct CallOpConversion : OpConversionPattern<CallOp> {
 /// Pass to convert from HAL tensor interface to HAL memref interface.
 struct HALInterfaceToMemrefPass
     : public PassWrapper<HALInterfaceToMemrefPass,
-                         OperationPass<IREE::Flow::ExecutableOp>> {
+                         OperationPass<mlir::ModuleOp>> {
   void runOnOperation() override;
 };
 }  // namespace
@@ -334,30 +333,28 @@ void HALInterfaceToMemrefPass::runOnOperation() {
 
   // Collect the dispatch functions within the flow.executable op and the
   // implementation function.
-  IREE::Flow::ExecutableOp executableOp = getOperation();
+  mlir::ModuleOp moduleOp = getOperation();
   SmallVector<Operation *, 1> dispatchFns;
   llvm::SetVector<Operation *> implFns;
-  SymbolTable symbolTable(executableOp.getInnerModule());
-  for (auto entryOp :
-       executableOp.getBlock().getOps<IREE::Flow::DispatchEntryOp>()) {
-    auto dispatchFn = symbolTable.lookup<FuncOp>(entryOp.function_ref());
-    if (!dispatchFn)
-      entryOp.emitError("could not find dispatch function")
-          << entryOp.function_ref();
-    dispatchFns.push_back(dispatchFn);
-    auto walkResult =
-        dispatchFn.walk([&implFns, &symbolTable](CallOp callOp) -> WalkResult {
-          auto implFn = symbolTable.lookup<FuncOp>(callOp.callee());
-          if (!implFn) {
-            callOp.emitError("unable to find definition of function ")
-                << callOp.callee();
-            return WalkResult::interrupt();
-          }
-          implFns.insert(implFn);
-          return WalkResult::advance();
-        });
-    if (walkResult.wasInterrupted()) {
-      return signalPassFailure();
+  SymbolTable symbolTable(moduleOp);
+  for (auto funcOp : moduleOp.getOps<mlir::FuncOp>()) {
+    if (SymbolTable::getSymbolVisibility(funcOp) ==
+        SymbolTable::Visibility::Public) {
+      dispatchFns.push_back(funcOp);
+      auto walkResult =
+          funcOp.walk([&implFns, &symbolTable](CallOp callOp) -> WalkResult {
+            auto implFn = symbolTable.lookup<FuncOp>(callOp.callee());
+            if (!implFn) {
+              callOp.emitError("unable to find definition of function ")
+                  << callOp.callee();
+              return WalkResult::interrupt();
+            }
+            implFns.insert(implFn);
+            return WalkResult::advance();
+          });
+      if (walkResult.wasInterrupted()) {
+        return signalPassFailure();
+      }
     }
   }
 
@@ -401,7 +398,7 @@ void HALInterfaceToMemrefPass::runOnOperation() {
     return signalPassFailure();
 }
 
-std::unique_ptr<OperationPass<IREE::Flow::ExecutableOp>>
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createHALInterfaceToMemrefPass() {
   return std::make_unique<HALInterfaceToMemrefPass>();
 }

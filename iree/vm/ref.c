@@ -202,7 +202,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_vm_ref_retain_or_move_checked(
 }
 
 IREE_API_EXPORT void IREE_API_CALL iree_vm_ref_release(iree_vm_ref_t* ref) {
-  if (ref->ptr == NULL) return;
+  if (ref->type == IREE_VM_REF_TYPE_NULL || ref->ptr == NULL) return;
 
   volatile iree_atomic_intptr_t* counter = IREE_GET_REF_COUNTER_PTR(ref);
   if (iree_atomic_fetch_sub(counter, 1) == 1) {

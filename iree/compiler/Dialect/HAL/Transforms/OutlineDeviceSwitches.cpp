@@ -203,15 +203,18 @@ class OutlineDeviceSwitchesPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
     auto funcOps = llvm::to_vector<16>(moduleOp.getOps<FuncOp>());
-    for (auto &funcOp : funcOps) {
-      OpBuilder moduleBuilder(funcOp);
-      moduleBuilder.setInsertionPointAfter(funcOp);
-      for (auto &block : funcOp) {
-        auto switchOps =
-            llvm::to_vector<4>(block.getOps<IREE::HAL::DeviceSwitchOp>());
+    for (auto funcOp : llvm::enumerate(funcOps)) {
+      OpBuilder moduleBuilder(funcOp.value());
+      moduleBuilder.setInsertionPointAfter(funcOp.value());
+      for (auto block : llvm::enumerate(funcOp.value())) {
+        auto switchOps = llvm::to_vector<4>(
+            block.value().getOps<IREE::HAL::DeviceSwitchOp>());
         for (auto switchOp : llvm::enumerate(switchOps)) {
-          std::string baseFuncName = (funcOp.getName() + "_switch_").str() +
-                                     std::to_string(switchOp.index());
+          std::string baseFuncName =
+              (funcOp.value().getName() + "_switch_").str() +
+              std::to_string(funcOp.index()) + "_" +
+              std::to_string(block.index()) + "_" +
+              std::to_string(switchOp.index());
           OpBuilder funcBuilder(switchOp.value());
           buildConditionDispatchTable(switchOp.value(), baseFuncName,
                                       moduleBuilder, funcBuilder);

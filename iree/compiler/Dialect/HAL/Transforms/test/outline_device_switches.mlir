@@ -13,7 +13,7 @@ func @simple_constants(%device : !hal.device) -> i32 {
     // CHECK-NEXT: %[[IS0:.+]] = hal.device.match.id %[[DEVICE]], pattern = ["vulkan-v1.?-*"] : (!hal.device) -> i1
     // CHECK-NEXT: cond_br %[[IS0]], ^bb1, ^bb2
     // CHECK-NEXT: ^bb1:
-    // CHECK-NEXT: %[[RES0:.+]] = call @simple_constants_switch_0_0(%[[C1]]) : (i32) -> i32
+    // CHECK-NEXT: %[[RES0:.+]] = call @simple_constants_switch_0_0_0_0(%[[C1]]) : (i32) -> i32
     // CHECK-NEXT: br ^bb7(%[[RES0]] : i32)
     #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
       hal.return %c1a : i32
@@ -24,7 +24,7 @@ func @simple_constants(%device : !hal.device) -> i32 {
     // CHECK-NEXT: %[[IS1:.+]] = or %[[IS1L]], %[[IS1R]] : i1
     // CHECK-NEXT: cond_br %[[IS1]], ^bb3, ^bb4
     // CHECK-NEXT: ^bb3:
-    // CHECK-NEXT: %[[RES1:.+]] = call @simple_constants_switch_0_1(%[[C2]]) : (i32) -> i32
+    // CHECK-NEXT: %[[RES1:.+]] = call @simple_constants_switch_0_0_0_1(%[[C2]]) : (i32) -> i32
     // CHECK-NEXT: br ^bb7(%[[RES1]] : i32)
     #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>(%c2a = %c2 : i32) {
       hal.return %c2a : i32
@@ -33,7 +33,7 @@ func @simple_constants(%device : !hal.device) -> i32 {
     // CHECK-NEXT: %[[IS2:.+]] = constant 1 : i1
     // CHECK-NEXT: cond_br %[[IS2]], ^bb5, ^bb6
     // CHECK-NEXT: ^bb5:
-    // CHECK-NEXT: %[[RES2:.+]] = call @simple_constants_switch_0_2(%[[C0]]) : (i32) -> i32
+    // CHECK-NEXT: %[[RES2:.+]] = call @simple_constants_switch_0_0_0_2(%[[C0]]) : (i32) -> i32
     // CHECK-NEXT: br ^bb7(%[[RES2]] : i32)
     #hal.match.always(%c0a = %c0 : i32) {
       hal.return %c0a : i32
@@ -45,11 +45,11 @@ func @simple_constants(%device : !hal.device) -> i32 {
   return %0 : i32
 }
 
-// CHECK: func @simple_constants_switch_0_0(%arg0: i32) -> i32
+// CHECK: func @simple_constants_switch_0_0_0_0(%arg0: i32) -> i32
 // CHECK-NEXT: return %arg0 : i32
-// CHECK: func @simple_constants_switch_0_1(%arg0: i32) -> i32
+// CHECK: func @simple_constants_switch_0_0_0_1(%arg0: i32) -> i32
 // CHECK-NEXT: return %arg0 : i32
-// CHECK: func @simple_constants_switch_0_2(%arg0: i32) -> i32
+// CHECK: func @simple_constants_switch_0_0_0_2(%arg0: i32) -> i32
 // CHECK-NEXT: return %arg0 : i32
 
 // -----
@@ -61,7 +61,7 @@ func @no_results(%device : !hal.device) {
     // CHECK-NEXT: %[[IS0:.+]] = hal.device.match.id %[[DEVICE]], pattern = ["vulkan-v1.?-*"] : (!hal.device) -> i1
     // CHECK-NEXT: cond_br %[[IS0]], ^bb1, ^bb2
     // CHECK-NEXT: ^bb1:
-    // CHECK-NEXT: call @no_results_switch_0_0() : () -> ()
+    // CHECK-NEXT: call @no_results_switch_0_0_0_0() : () -> ()
     // CHECK-NEXT: br ^bb7
     #hal.device.match.id<"vulkan-v1.?-*">() {
       hal.return
@@ -72,7 +72,7 @@ func @no_results(%device : !hal.device) {
     // CHECK-NEXT: %[[IS1:.+]] = or %[[IS1L]], %[[IS1R]] : i1
     // CHECK-NEXT: cond_br %[[IS1]], ^bb3, ^bb4
     // CHECK-NEXT: ^bb3:
-    // CHECK-NEXT: call @no_results_switch_0_1() : () -> ()
+    // CHECK-NEXT: call @no_results_switch_0_0_0_1() : () -> ()
     // CHECK-NEXT: br ^bb7
     #hal.match.any<[#hal.device.match.id<"vmla">, #hal.device.match.id<"vulkan-*">]>() {
       hal.return
@@ -81,7 +81,7 @@ func @no_results(%device : !hal.device) {
     // CHECK-NEXT: %[[IS2:.+]] = constant 1 : i1
     // CHECK-NEXT: cond_br %[[IS2]], ^bb5, ^bb6
     // CHECK-NEXT: ^bb5:
-    // CHECK-NEXT: call @no_results_switch_0_2() : () -> ()
+    // CHECK-NEXT: call @no_results_switch_0_0_0_2() : () -> ()
     // CHECK-NEXT: br ^bb7
     #hal.match.always() {
       hal.return
@@ -93,6 +93,6 @@ func @no_results(%device : !hal.device) {
   return
 }
 
-// CHECK: func @no_results_switch_0_0()
-// CHECK: func @no_results_switch_0_1()
-// CHECK: func @no_results_switch_0_2()
+// CHECK: func @no_results_switch_0_0_0_0()
+// CHECK: func @no_results_switch_0_0_0_1()
+// CHECK: func @no_results_switch_0_0_0_2()

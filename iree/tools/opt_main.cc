@@ -19,6 +19,7 @@
 
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_passes.h"
+#include "iree/tools/init_targets.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/SourceMgr.h"
@@ -61,8 +62,10 @@ static llvm::cl::opt<bool> allowUnregisteredDialects(
 
 int main(int argc, char **argv) {
   mlir::registerMlirDialects();
-  mlir::iree_compiler::registerIreeDialects();
   mlir::registerMlirPasses();
+  mlir::iree_compiler::registerIreeDialects();
+  mlir::iree_compiler::registerHALTargetBackends();
+  mlir::iree_compiler::registerHALTargetBackends();
   llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like

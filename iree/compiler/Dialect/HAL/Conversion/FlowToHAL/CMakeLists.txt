@@ -36,7 +36,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
-    iree::compiler::Dialect::HAL::Target::ExecutableTarget
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils
     iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
     iree::compiler::Dialect::IREE::IR

@@ -17,19 +17,10 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // VKSPV-DAG:      hal.interface.binding @arg0, set=0, binding=0, type="StorageBuffer", access="Read"
 // VKSPV-DAG:      hal.interface.binding @ret0, set=0, binding=1, type="StorageBuffer", access="Write|Discard"
 // VKSPV-NEXT:   }
-// VKSPV-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4xf32>) -> tensor<4xf32>, workgroup_size = [32 : index, 1 : index, 1 : index]
+// VKSPV-NEXT:   hal.executable.entry_point @simpleMath_rgn_dispatch_0 attributes {interface = @legacy_io, ordinal = 0 : i32, signature = (tensor<4xf32>) -> tensor<4xf32>
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense
-// VKSPV-SAME:     format = 1397773893 : i32} {
-// VKSPV-NEXT:     module attributes {spv.target_env = #spv.target_env<#spv.vce<v1.3, [Shader], [SPV_KHR_storage_buffer_storage_class]>, {max_compute_workgroup_invocations = 128 : i32, max_compute_workgroup_size = dense<[128, 128, 64]> : vector<3xi32>}>} {
-// VKSPV-NEXT:       spv.module Logical GLSL450 requires #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]> {
-//  VKSPV-DAG:         spv.globalVariable [[GLOBALID:@.*]] built_in("GlobalInvocationId")
-//  VKSPV-DAG:         spv.globalVariable [[NUMWORKGROUPS:@.*]] built_in("NumWorkgroups")
-//      VKSPV:         spv.EntryPoint "GLCompute" @simpleMath_rgn_dispatch_0, [[GLOBALID]], [[NUMWORKGROUPS]]
-// VKSPV-NEXT:         spv.ExecutionMode @simpleMath_rgn_dispatch_0 "LocalSize", 32, 1, 1
-// VKSPV-NEXT:       }
-// VKSPV-NEXT:     }
-// VKSPV-NEXT:   }
+// VKSPV-SAME:     format = 1397773893 : i32}
 
 // -----
 
@@ -58,8 +49,7 @@ flow.executable @reduction_ex_reduce_0_dim_0 {
 // VKSPV-NEXT:   hal.executable.entry_point @reduction_rgn_reduce_0_dim_0_entry attributes {
 // VKSPV-SAME:     interface = @legacy_io,
 // VKSPV-SAME:     ordinal = 0 : i32,
-// VKSPV-SAME:     signature = (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>,
-// VKSPV-SAME:     workgroup_size = [32 : index, 1 : index, 1 : index]
+// VKSPV-SAME:     signature = (tensor<4x8xf32>, tensor<f32>) -> tensor<4xf32>
 // VKSPV-SAME:   }
 // VKSPV-NEXT:   hal.executable.binary attributes {
 // VKSPV-SAME:     data = dense

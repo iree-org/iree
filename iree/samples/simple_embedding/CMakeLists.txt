@@ -23,6 +23,8 @@ iree_bytecode_module(
     "iree::samples"
   FLAGS
     "-iree-mlir-to-vm-bytecode-module"
+    "-iree-hal-target-backends=vmla"
+    "-iree-hal-target-backends=vulkan-spirv"
   PUBLIC
 )
 

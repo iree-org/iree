@@ -31,6 +31,8 @@
 #include "mlir/Transforms/Utils.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
 
+#define DEBUG_TYPE "iree-dispatch"
+
 namespace mlir {
 namespace iree_compiler {
 namespace IREE {
@@ -310,15 +312,15 @@ DispatchRegionOp mergeDispatchRegions(DispatchRegionOp &lhs,
 // if possible. Operations may be reordered if it's possible to merge more while
 // still obeying data dependencies.
 LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
+  LLVM_DEBUG(llvm::dbgs() << "+++ MERGING BLOCK DISPATCH REGIONS:\n");
   SmallVector<DispatchRegionOp, 8> mergableRegions;
   for (auto &op : *parentBlock) {
     if (auto regionOp = dyn_cast<DispatchRegionOp>(op)) {
       if (isDispatchRegionMergable(regionOp)) {
+        LLVM_DEBUG(llvm::dbgs() << "   -REGION MERGABLE-\n");
         mergableRegions.push_back(regionOp);
       } else {
-        regionOp.emitRemark(
-            "unable to merge into following dispatch region; "
-            "contains non-trivial control flow");
+        LLVM_DEBUG(llvm::dbgs() << "   -REGION NOT MERGABLE-\n");
       }
     }
   }
@@ -330,13 +332,13 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
       auto &rhs = mergableRegions[j];
       if (!areDispatchRegionWorkloadsCompatible(lhs, rhs) ||
           areDispatchRegionsTransitivelyDependent(lhs, rhs)) {
+        LLVM_DEBUG(llvm::dbgs() << "   -REGIONS INCOMPATIBLE-\n");
         continue;
       }
       if (!isDispatchRegionMergable(rhs)) {
         // TODO(b/134675461): support non-trivial control flow.
-        rhs.emitRemark(
-            "unable to merge into previous dispatch region; "
-            "contains non-trivial control flow");
+        LLVM_DEBUG(llvm::dbgs()
+                   << "   -REGION CONTAINS NON-TRIVIAL CONTROL FLOW-\n");
       }
       mergableRegions[i] = mergeDispatchRegions(lhs, rhs);
       if (!mergableRegions[i]) {
@@ -344,10 +346,12 @@ LogicalResult mergeBlockDispatchRegions(FuncOp func, Block *parentBlock) {
       }
       mergableRegions[j] = nullptr;
       --i;  // Try again to see if there are subsequent regions to merge.
+      LLVM_DEBUG(llvm::dbgs() << "   -> MERGED REGIONS\n");
       break;
     }
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "--- MERGED BLOCK DISPATCH REGIONS\n");
   return success();
 }
 

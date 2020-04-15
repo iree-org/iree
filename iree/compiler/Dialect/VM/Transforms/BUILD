@@ -22,6 +22,7 @@ cc_library(
     srcs = [
         "Conversion.cpp",
         "GlobalInitialization.cpp",
+        "MarkPublicSymbolsExported.cpp",
         "OrdinalAllocation.cpp",
         "Passes.cpp",
     ],

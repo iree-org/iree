@@ -16,5 +16,3 @@ flow.executable @simpleMath_ex_dispatch_0 {
 // CHECK-DAG:   hal.executable.binary attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = 1280071245 : i32} {
-// CHECK-NEXT:     module {
-// CHECK:            llvm.func @_mlir_ciface_simpleMath_rgn_dispatch_0

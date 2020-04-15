@@ -29,13 +29,13 @@ namespace iree_compiler {
 namespace IREE {
 namespace HAL {
 
-class TranslateExecutablesPass
-    : public PassWrapper<TranslateExecutablesPass,
+class SerializeExecutablesPass
+    : public PassWrapper<SerializeExecutablesPass,
                          OperationPass<IREE::HAL::ExecutableOp>> {
  public:
-  TranslateExecutablesPass()
+  SerializeExecutablesPass()
       : executableOptions_(getTargetOptionsFromFlags()) {}
-  explicit TranslateExecutablesPass(TargetOptions executableOptions)
+  explicit SerializeExecutablesPass(TargetOptions executableOptions)
       : executableOptions_(executableOptions) {}
 
   void runOnOperation() override {
@@ -43,25 +43,20 @@ class TranslateExecutablesPass
     auto targetOps = llvm::to_vector<4>(
         executableOp.getBlock().getOps<IREE::HAL::ExecutableTargetOp>());
     for (auto targetOp : targetOps) {
-      // TODO(GH-1036): this will be what we want the dynamic pass manager to
-      // do for us: we want to nest all of the backend passes on a source op
-      // that matches their target_backend pattern.
       for (auto &targetBackend :
            matchTargetBackends({targetOp.target_backend().str()})) {
-        // Run the nested pass manager. This is effectively the same as
-        // launching a new iree-opt, and as such won't integrate well with the
-        // logging/pass instrumentation of the parent pass manager.
-        PassManager targetPassManager(targetOp.getContext());
-        applyPassManagerCLOptions(targetPassManager);
-        targetBackend->buildTranslationPassPipeline(targetOp,
-                                                    targetPassManager);
-        if (failed(targetPassManager.run(targetOp.getInnerModule()))) {
-          targetOp.emitError() << "failed to run translation of source "
-                                  "executable to target executable for backend "
+        // Ask the target backend to serialize the executable. Note that it may
+        // create one or more hal.executable.binary ops in the case of
+        // multi-architecture binaries.
+        OpBuilder executableBuilder(targetOp);
+        if (failed(targetBackend->serializeExecutable(targetOp,
+                                                      executableBuilder))) {
+          targetOp.emitError() << "failed to serialize op to target backend "
                                << targetOp.target_backend();
           return signalPassFailure();
         }
       }
+      targetOp.erase();
     }
   }
 
@@ -70,13 +65,13 @@ class TranslateExecutablesPass
 };
 
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableOp>>
-createTranslateExecutablesPass(TargetOptions executableOptions) {
-  return std::make_unique<TranslateExecutablesPass>(executableOptions);
+createSerializeExecutablesPass(TargetOptions executableOptions) {
+  return std::make_unique<SerializeExecutablesPass>(executableOptions);
 }
 
-static PassRegistration<TranslateExecutablesPass> pass(
-    "iree-hal-translate-executables",
-    "Translates hal.executable.target via the target backend pipelines");
+static PassRegistration<SerializeExecutablesPass> pass(
+    "iree-hal-serialize-executables",
+    "Serializes hal.executable.target ops to hal.executable.binary ops");
 
 }  // namespace HAL
 }  // namespace IREE

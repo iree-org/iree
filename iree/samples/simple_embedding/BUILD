@@ -24,7 +24,11 @@ iree_bytecode_module(
     name = "simple_embedding_test_bytecode_module",
     src = "simple_embedding_test.mlir",
     cc_namespace = "iree::samples",
-    flags = ["-iree-mlir-to-vm-bytecode-module"],
+    flags = [
+        "-iree-mlir-to-vm-bytecode-module",
+        "-iree-hal-target-backends=vmla",
+        "-iree-hal-target-backends=vulkan-spirv",
+    ],
 )
 
 cc_test(
