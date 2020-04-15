@@ -50,6 +50,10 @@ class ConvertStandardToVMPass
 
 }  // namespace
 
+std::unique_ptr<OperationPass<ModuleOp>> createConvertStandardToVMPass() {
+  return std::make_unique<ConvertStandardToVMPass>();
+}
+
 static PassRegistration<ConvertStandardToVMPass> pass(
     "iree-convert-std-to-vm", "Convert Standard Ops to the IREE VM dialect");
 
