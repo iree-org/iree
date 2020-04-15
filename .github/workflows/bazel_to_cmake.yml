@@ -25,5 +25,5 @@ jobs:
       uses: actions/checkout@v2
     - name: Running bazel_to_cmake
       run: |
-        ./build_tools/bazel_to_cmake/bazel_to_cmake.py --strict
+        ./build_tools/bazel_to_cmake/bazel_to_cmake.py
         git diff --exit-code
