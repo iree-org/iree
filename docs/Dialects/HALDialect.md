@@ -1604,7 +1604,6 @@ information describing the IO interface it uses and other dispatch metadata.
 | :-------: | :-------: | ----------- |
 `sym_name` | StringAttr | string attribute
 `ordinal` | IntegerAttr | 32-bit integer ordinal attribute
-`workgroup_size` | ArrayAttr | index array attribute
 `interface` | FlatSymbolRefAttr | flat symbol reference attribute
 `signature` | TypeAttr | any type attribute
 
@@ -1745,24 +1744,30 @@ kernel/shader/etc.
 | :-------: | :-------: | ----------- |
 `sym_name` | StringAttr | string attribute
 
-### `hal.executable.source_end` (IREE::HAL::ExecutableSourceEndOp)
+### `hal.executable.target_end` (IREE::HAL::ExecutableTargetEndOp)
 
-terminator pseudo-op for the executable source op
+terminator pseudo-op for the executable target op
 
 Syntax:
 
 ```
-operation ::= `hal.executable.source_end` attr-dict
+operation ::= `hal.executable.target_end` attr-dict
 ```
 
 
 
-### `hal.executable.source` (IREE::HAL::ExecutableSourceOp)
+### `hal.executable.target` (IREE::HAL::ExecutableTargetOp)
 
-source executable IR
+target executable IR
 
-The source IR for the executable. This can be preserved for debugging but
+The target IR for the executable. This can be preserved for debugging but
 is usually removed during transformation.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`target_backend` | StringAttr | string attribute
 
 ### `hal.interface.binding` (IREE::HAL::InterfaceBindingOp)
 
