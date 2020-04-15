@@ -56,15 +56,10 @@ endfunction()
 
 function(set_alwayslink_mlir_libs)
   set(_ALWAYSLINK_LIBS_MLIR
-    # Required passes
-    MLIRPass
     # TODO(marbre): Check the previously added libs
     MLIRAnalysis
     MLIREDSC
-    MLIRLoopToStandard
     MLIRParser
-    MLIRStandardToLLVM
-    MLIRTargetLLVMIR
     MLIRTransforms
     MLIRTranslation
     MLIRSupport
