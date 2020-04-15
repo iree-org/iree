@@ -23,10 +23,10 @@
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttribute.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/TensorIndexToScalarValueMap.h"
+#include "llvm/ADT/StringExtras.h"
 #include "mlir/Dialect/SPIRV/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/SPIRVOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Support/StringExtras.h"
 
 namespace mlir {
 namespace iree_compiler {

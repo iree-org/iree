@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 
 #include "iree/compiler/Dialect/IREE/IR/IREETypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -27,7 +28,6 @@
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -269,9 +269,7 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
     p << " -> ";
     p.printType(op.getType().getResult(0));
   } else if (op.getNumFuncResults() > 1) {
-    p << " -> (";
-    interleaveComma(op.getType().getResults(), p);
-    p << ")";
+    p << " -> (" << op.getType().getResults() << ")";
   }
   mlir::impl::printFunctionAttributes(p, op, op.getNumFuncArguments(),
                                       op.getNumFuncResults(),
@@ -879,7 +877,7 @@ static ParseResult parseCallVariadicOp(OpAsmParser &parser,
 static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
   p << op.getOperationName() << ' ' << op.getAttr("callee") << '(';
   int operand = 0;
-  interleaveComma(op.segment_sizes(), p, [&](APInt segmentSize) {
+  llvm::interleaveComma(op.segment_sizes(), p, [&](APInt segmentSize) {
     if (segmentSize.getSExtValue() == -1) {
       p.printOperand(op.getOperand(operand++));
     } else {
@@ -888,9 +886,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
       for (int i = 0; i < segmentSize.getZExtValue(); ++i) {
         segmentOperands.push_back(op.getOperand(operand++));
       }
-      interleaveComma(segmentOperands, p,
-                      [&](Value operand) { p.printOperand(operand); });
-      p << ']';
+      p << segmentOperands << ']';
     }
   });
   p << ')';
@@ -900,7 +896,7 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
                               "segment_types",
                           });
   p << " : (";
-  interleaveComma(
+  llvm::interleaveComma(
       llvm::zip(op.segment_sizes(), op.segment_types()), p,
       [&](std::tuple<APInt, Attribute> segmentSizeType) {
         int segmentSize = std::get<0>(segmentSizeType).getSExtValue();
@@ -915,12 +911,9 @@ static void printCallVariadicOp(OpAsmPrinter &p, CallVariadicOp &op) {
       });
   p << ")";
   if (op.getNumResults() == 1) {
-    p << " -> ";
-    p.printType(op.getResult(0).getType());
+    p << " -> " << op.getResult(0).getType();
   } else if (op.getNumResults() > 1) {
-    p << " -> (";
-    interleaveComma(op.getResultTypes(), p);
-    p << ")";
+    p << " -> (" << op.getResultTypes() << ")";
   }
 }
 

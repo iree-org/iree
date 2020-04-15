@@ -257,7 +257,7 @@ void LinalgTileAndFusePass::runOnFunction() {
   // Check that there are single perfectly nested loop.for operations at the top
   // most level that will get mapped to thread blocks/workgroups.
   auto forLoops = block.getOps<loop::ForOp>();
-  if (!mlir::has_single_element(forLoops)) {
+  if (!llvm::hasSingleElement(forLoops)) {
     funcOp.emitError(
         "unable to fuse operations within a dispatch region to get a single "
         "outer parallel loop nest to map to workgroups");

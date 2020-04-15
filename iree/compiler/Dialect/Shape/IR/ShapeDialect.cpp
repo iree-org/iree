@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -25,7 +26,6 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
-#include "mlir/Support/STLExtras.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir {

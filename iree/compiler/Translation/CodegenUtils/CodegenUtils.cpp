@@ -94,7 +94,7 @@ static LogicalResult getExtentFromStoreOpSrc(IREE::StoreOutputOp storeOp,
 LogicalResult getLaunchSize(FuncOp funcOp,
                             SmallVectorImpl<int64_t> &launchSize) {
   auto &body = funcOp.getBody();
-  if (!mlir::has_single_element(body)) {
+  if (!llvm::hasSingleElement(body)) {
     return funcOp.emitError(
         "unhandled multiple blocks within dispatch function");
   }

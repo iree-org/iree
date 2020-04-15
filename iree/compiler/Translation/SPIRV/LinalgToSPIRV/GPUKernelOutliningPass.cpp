@@ -105,7 +105,7 @@ void IREEGpuKernelOutliningPass::runOnOperation() {
   SmallVector<gpu::LaunchOp, 1> gpuLaunchOp;
   moduleOp.walk(
       [&gpuLaunchOp](gpu::LaunchOp op) { gpuLaunchOp.push_back(op); });
-  if (!mlir::has_single_element(gpuLaunchOp)) {
+  if (!llvm::hasSingleElement(gpuLaunchOp)) {
     moduleOp.emitError(
         "expected single gpu.launch operation within translation module");
     return signalPassFailure();

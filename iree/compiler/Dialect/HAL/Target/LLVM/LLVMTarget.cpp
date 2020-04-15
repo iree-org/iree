@@ -175,7 +175,7 @@ LogicalResult translateToLLVMExecutable(
 
   // Get the module to be passed to llvm lowering.
   auto llvmModuleOps = moduleOp.getOps<ModuleOp>();
-  if (!mlir::has_single_element(llvmModuleOps)) {
+  if (!llvm::hasSingleElement(llvmModuleOps)) {
     return moduleOp.emitError(
         "expected single sub-module that is to be lowered to LLVM IR");
   }

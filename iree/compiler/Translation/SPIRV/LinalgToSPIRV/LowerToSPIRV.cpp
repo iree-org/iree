@@ -136,7 +136,7 @@ struct IREEGPUToSPIRVPass
 
     auto kernelModules = moduleOp.getOps<gpu::GPUModuleOp>();
     if (kernelModules.empty()) return;
-    if (!mlir::has_single_element(kernelModules)) {
+    if (!llvm::hasSingleElement(kernelModules)) {
       moduleOp.emitError(
           "unhandled multiple gpu modules within a dispatch module");
       return signalPassFailure();

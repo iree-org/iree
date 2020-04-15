@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 
 #include "iree/compiler/Dialect/Shape/IR/ShapeTypes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
@@ -32,7 +33,6 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {

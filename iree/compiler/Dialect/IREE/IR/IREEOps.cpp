@@ -14,6 +14,7 @@
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/SMLoc.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -27,7 +28,6 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/STLExtras.h"
 
 namespace mlir {
 namespace iree_compiler {
