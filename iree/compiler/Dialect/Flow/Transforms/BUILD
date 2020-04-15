@@ -61,6 +61,7 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_lower",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_materialize_broadcasts",
+        "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_unfuse_batch_norm",
     ],
     alwayslink = 1,
 )
