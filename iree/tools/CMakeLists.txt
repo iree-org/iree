@@ -155,6 +155,15 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
+      init_compiler_modules
+    HDRS
+      "init_compiler_modules.h"
+    DEPS
+      ${IREE_COMPILER_DIALECT_MODULES}
+  )
+
+  iree_cc_library(
+    NAME
       init_targets
     HDRS
       "init_targets.h"

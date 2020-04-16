@@ -112,6 +112,12 @@ cc_library(
 )
 
 cc_library(
+    name = "init_compiler_modules",
+    hdrs = ["init_compiler_modules.h"],
+    deps = IREE_COMPILER_DIALECT_MODULES,
+)
+
+cc_library(
     name = "init_targets",
     hdrs = ["init_targets.h"],
     deps = [
