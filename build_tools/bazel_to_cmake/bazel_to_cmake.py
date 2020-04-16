@@ -52,10 +52,15 @@ def parse_arguments():
       help="Prints results instead of writing files",
       action="store_true",
       default=False)
-  # TODO(b/149926655): Invert the default to be strict and rename this flag.
+  # TODO(b/149926655): Remove this after updating callers
   parser.add_argument(
       "--strict",
-      help="Does not try to generate files where it cannot convert completely",
+      help="[OBSOLETE] Inverse of --allow_partial_conversion",
+      action="store_true",
+      default=False)
+  parser.add_argument(
+      "--allow_partial_conversion",
+      help="Generates partial files, ignoring errors during conversion",
       action="store_true",
       default=False)
 
@@ -69,9 +74,6 @@ def parse_arguments():
       "--root_dir",
       help="Converts all BUILD files under a root directory (defaults to iree/)",
       default="iree")
-
-  # TODO(scotttodd): --check option that returns success/failure depending on
-  #   if files match the converted versions
 
   args = parser.parse_args()
 
@@ -96,13 +98,14 @@ def log(*args, **kwargs):
   print(*args, **kwargs, file=sys.stderr)
 
 
-def convert_directory_tree(root_directory_path, write_files, strict):
+def convert_directory_tree(root_directory_path, write_files,
+                           allow_partial_conversion):
   log(f"convert_directory_tree: {root_directory_path}")
   for root, _, _ in os.walk(root_directory_path):
-    convert_directory(root, write_files, strict)
+    convert_directory(root, write_files, allow_partial_conversion)
 
 
-def convert_directory(directory_path, write_files, strict):
+def convert_directory(directory_path, write_files, allow_partial_conversion):
   if not os.path.isdir(directory_path):
     raise FileNotFoundError(f"Cannot find directory '{directory_path}'")
 
@@ -145,7 +148,9 @@ def convert_directory(directory_path, write_files, strict):
     build_file_code = compile(build_file.read(), build_file_path, "exec")
     try:
       converted_text = bazel_to_cmake_converter.convert_build_file(
-          build_file_code, copyright_line, strict=strict)
+          build_file_code,
+          copyright_line,
+          allow_partial_conversion=allow_partial_conversion)
       if write_allowed:
         with open(cmakelists_file_path, "wt") as cmakelists_file:
           cmakelists_file.write(converted_text)
@@ -169,10 +174,12 @@ def main(args):
 
   if args.root_dir:
     convert_directory_tree(
-        os.path.join(repo_root, args.root_dir), write_files, args.strict)
+        os.path.join(repo_root, args.root_dir), write_files,
+        args.allow_partial_conversion)
   elif args.dir:
     convert_directory(
-        os.path.join(repo_root, args.dir), write_files, args.strict)
+        os.path.join(repo_root, args.dir), write_files,
+        args.allow_partial_conversion)
 
 
 if __name__ == "__main__":

@@ -641,10 +641,12 @@ def GetDict(obj):
   return ret
 
 
-def convert_build_file(build_file_code, copyright_line, strict=False):
+def convert_build_file(build_file_code,
+                       copyright_line,
+                       allow_partial_conversion=False):
   converter = Converter()
   exec(build_file_code, GetDict(BuildFileFunctions(converter)))
   converted_text = converter.convert(copyright_line)
-  if strict and converter.first_error:
+  if not allow_partial_conversion and converter.first_error:
     raise converter.first_error  # pylint: disable=raising-bad-type
   return converted_text
