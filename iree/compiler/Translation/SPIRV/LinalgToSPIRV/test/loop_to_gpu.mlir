@@ -29,12 +29,12 @@ module {
       linalg.generic
         {args_in = 2 : i64, args_out = 1 : i64,
          indexing_maps = [#map2, #map2, #map2],
-         iterator_types = ["parallel", "parallel"]} %2, %5, %8 {
+         iterator_types = ["parallel", "parallel"]}
+      {__internal_linalg_transform__ = "workitem"} %2, %5, %8 {
       ^bb0(%arg5: i32, %arg6: i32, %arg7: i32): // no predecessors
         %9 = addi %arg5, %arg6 : i32
         linalg.yield %9 : i32
-      } {__internal_linalg_transform__ = "workitem"}
-        : memref<?x?xi32, #map1>, memref<?x?xi32, #map1>, memref<?x?xi32, #map1>
+      } : memref<?x?xi32, #map1>, memref<?x?xi32, #map1>, memref<?x?xi32, #map1>
       loop.yield
     }
     return
@@ -112,11 +112,16 @@ module {
       %16 = subview %arg0[%arg3, %arg4, %arg5, %c0] [%12, %13, %14, %15] [%c1, %c1, %c1, %c1] : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map2>
       %17 = subview %arg1[%arg3, %arg4, %arg5, %c0] [%12, %13, %14, %15] [%c1, %c1, %c1, %c1] : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map2>
       %18 = subview %arg2[%arg3, %arg4, %arg5, %c0] [%12, %13, %14, %15] [%c1, %c1, %c1, %c1] : memref<?x?x?x?xf32> to memref<?x?x?x?xf32, #map2>
-      linalg.generic {args_in = 2 : i64, args_out = 1 : i64, indexing_maps = [#map3, #map3, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} %16, %17, %18 {
-      ^bb0(%arg7: f32, %arg8: f32, %arg9: f32): // no predecessors
-        %19 = addf %arg7, %arg8 : f32
-        linalg.yield %19 : f32
-      } {__internal_linalg_transform__ = "workitem"}: memref<?x?x?x?xf32, #map2>, memref<?x?x?x?xf32, #map2>, memref<?x?x?x?xf32, #map2>
+      linalg.generic {args_in = 2 : i64, args_out = 1 : i64,
+        indexing_maps = [#map3, #map3, #map3],
+        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      {__internal_linalg_transform__ = "workitem"}
+      %16, %17, %18
+      {
+        ^bb0(%arg7: f32, %arg8: f32, %arg9: f32): // no predecessors
+          %19 = addf %arg7, %arg8 : f32
+          linalg.yield %19 : f32
+      } : memref<?x?x?x?xf32, #map2>, memref<?x?x?x?xf32, #map2>, memref<?x?x?x?xf32, #map2>
       loop.yield
     }
     return
