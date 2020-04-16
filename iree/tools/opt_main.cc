@@ -66,7 +66,6 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerAllIreePasses();
   mlir::iree_compiler::registerHALTargetBackends();
-  mlir::iree_compiler::registerHALTargetBackends();
   llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like
