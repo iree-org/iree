@@ -89,7 +89,7 @@ class SplatConstConverter : public OpConversionPattern<ConstantOp> {
         rewriter.getI64IntegerAttr(1),
         rewriter.getAffineMapArrayAttr(rewriter.getMultiDimIdentityMap(nloops)),
         getNParallelLoopsAttrs(nloops, rewriter),
-        /*doc=*/nullptr, /*fun=*/nullptr,
+        /*doc=*/nullptr,
         /*library_call=*/nullptr);
     auto* region = &linalgOp.region();
     auto* block = rewriter.createBlock(region, region->end());
