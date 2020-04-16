@@ -19,6 +19,7 @@ iree_cc_library(
     Analysis
   HDRS
     "RegisterAllocation.h"
+    "TestPasses.h"
     "ValueLiveness.h"
   SRCS
     "RegisterAllocation.cpp"

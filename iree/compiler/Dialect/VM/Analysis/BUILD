@@ -13,6 +13,7 @@ cc_library(
     ],
     hdrs = [
         "RegisterAllocation.h",
+        "TestPasses.h",
         "ValueLiveness.h",
     ],
     deps = [
