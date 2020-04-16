@@ -34,6 +34,5 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VMLA::Transforms
     iree::schemas::vmla_executable_def_cc_fbs
-  ALWAYSLINK
   PUBLIC
 )
