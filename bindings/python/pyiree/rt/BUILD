@@ -43,7 +43,6 @@ iree_py_library(
         "system_api.py",
     ],
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -58,8 +57,6 @@ iree_py_extension(
     copts = PYBIND_COPTS + PYBIND_EXTENSION_COPTS,
     features = PYBIND_FEATURES,
     linkstatic = 1,
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = ["nokokoro"],
     win_def_file = "export.def",
     deps = DRIVER_DEPS + [
         ":rt_library",
@@ -84,7 +81,6 @@ pybind_cc_library(
         "host_types.h",
         "vm.h",
     ],
-    tags = ["nokokoro"],
     deps = [
         "//bindings/python/pyiree/common",
         "//iree/base:api",
@@ -111,8 +107,6 @@ iree_py_library(
     name = "system_api",
     srcs = ["system_api.py"],
     srcs_version = "PY3",
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -124,24 +118,18 @@ iree_py_test(
     srcs = ["function_abi_test.py"],
     python_version = "PY3",
     # TODO(laurenzo): Enable once test does not depend on a real vulkan device.
-    tags = [
-        "noga",
-        "nokokoro",
-    ],
+    tags = ["noga"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
         "//bindings/python/pyiree/rt",
     ],
-    # TODO(b/145815906) Get this running in OSS CI.
 )
 
 iree_py_test(
     name = "hal_test",
     srcs = ["hal_test.py"],
     python_version = "PY3",
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = ["nokokoro"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",
@@ -153,11 +141,7 @@ iree_py_test(
     name = "system_api_test",
     srcs = ["system_api_test.py"],
     python_version = "PY3",
-    tags = [
-        # TODO(b/145815906) Get this running in OSS CI.
-        "noga",
-        "nokokoro",
-    ],
+    tags = ["noga"],
     deps = NUMPY_DEPS + [
         ":system_api",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -171,7 +155,6 @@ iree_py_test(
     name = "vm_test",
     srcs = ["vm_test.py"],
     python_version = "PY3",
-    tags = ["nokokoro"],
     deps = NUMPY_DEPS + [
         "//bindings/python:pathsetup",  # build_cleaner: keep
         "@absl_py//absl/testing:absltest",

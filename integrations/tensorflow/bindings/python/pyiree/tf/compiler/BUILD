@@ -55,7 +55,6 @@ iree_py_library(
         "__init__.py",
     ],
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -71,7 +70,6 @@ iree_py_extension(
     copts = PYBIND_COPTS + PYBIND_EXTENSION_COPTS,
     features = PYBIND_FEATURES,
     linkstatic = 1,
-    tags = ["nokokoro"],
     win_def_file = "export.def",
     deps = [
         ":compiler_library",
@@ -88,7 +86,6 @@ pybind_cc_library(
     hdrs = [
         "register_tensorflow.h",
     ],
-    tags = ["nokokoro"],
     deps = SAVED_MODEL_TF_RUNTIME_DEPS + TF_XLA_PASS_DEPS + [
         "//bindings/python/pyiree/common",
         "//bindings/python/pyiree/compiler:compiler_library",
@@ -103,7 +100,6 @@ iree_py_test(
     name = "saved_model_test",
     srcs = ["saved_model_test.py"],
     python_version = "PY3",
-    tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
         "@absl_py//absl/testing:absltest",
         "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",

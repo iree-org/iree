@@ -53,7 +53,6 @@ iree_py_library(
         "__init__.py",
     ],
     srcs_version = "PY3",
-    tags = ["nokokoro"],
     deps = [
         ":binding",
         "//bindings/python:pathsetup",  # build_cleaner: keep
@@ -68,7 +67,6 @@ iree_py_extension(
     copts = PYBIND_COPTS + PYBIND_EXTENSION_COPTS,
     features = PYBIND_FEATURES,
     linkstatic = 1,
-    tags = ["nokokoro"],
     win_def_file = "export.def",
     deps = [
         ":compiler_library",
@@ -85,7 +83,6 @@ pybind_cc_library(
         "compiler.h",
     ],
     copts = PYBIND_REGISTER_MLIR_PASSES,
-    tags = ["nokokoro"],
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",
         "//iree/tools:init_passes_and_dialects",
