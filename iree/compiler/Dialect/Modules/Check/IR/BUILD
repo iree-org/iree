@@ -62,7 +62,6 @@ cc_library(
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )
 
 gentbl(

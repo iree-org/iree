@@ -36,7 +36,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
-  ALWAYSLINK
   PUBLIC
 )
 
@@ -59,7 +58,6 @@ iree_cc_library(
     iree::compiler::Dialect::Modules::Strings::Conversion
     iree::compiler::Dialect::Modules::Strings::strings_imports
     iree::compiler::Dialect::VM::Conversion
-  ALWAYSLINK
   PUBLIC
 )
 
