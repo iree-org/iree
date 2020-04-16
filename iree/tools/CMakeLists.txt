@@ -23,12 +23,6 @@ iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
     "iree::hal::vulkan::vulkan_driver_module"
 )
 
-set(IREE_COMPILER_DIALECT_MODULES
-  "iree::compiler::Dialect::Modules::Check::IR::CheckDialect"
-  "iree::compiler::Dialect::Modules::Strings::IR::Dialect"
-  "iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect"
-)
-
 iree_cc_binary(
   NAME
     iree-benchmark-module
@@ -159,7 +153,9 @@ if(${IREE_BUILD_COMPILER})
     HDRS
       "init_compiler_modules.h"
     DEPS
-      ${IREE_COMPILER_DIALECT_MODULES}
+      iree::compiler::Dialect::Modules::Check::IR::CheckDialect
+      iree::compiler::Dialect::Modules::Strings::IR::Dialect
+      iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
   )
 
   iree_cc_library(
@@ -220,7 +216,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::CodegenPasses
       tensorflow::mlir_xla
-      ${IREE_COMPILER_DIALECT_MODULES}
     PUBLIC
   )
 
@@ -270,7 +265,6 @@ if(${IREE_BUILD_COMPILER})
       iree::vm
       iree::vm::bytecode_module
       iree::vm::value
-      ${IREE_COMPILER_DIALECT_MODULES}
       ${IREE_HAL_DRIVER_MODULES}
   )
 
@@ -294,7 +288,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       tensorflow::mlir_xla
-      ${IREE_COMPILER_DIALECT_MODULES}
     PUBLIC
   )
 

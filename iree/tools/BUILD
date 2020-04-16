@@ -27,12 +27,6 @@ exports_files([
     "sanitizer_suppressions.txt",
 ])
 
-IREE_COMPILER_DIALECT_MODULES = [
-    "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
-    "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
-    "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
-]
-
 cc_binary(
     name = "iree-benchmark-module",
     testonly = True,
@@ -114,7 +108,11 @@ cc_library(
 cc_library(
     name = "init_compiler_modules",
     hdrs = ["init_compiler_modules.h"],
-    deps = IREE_COMPILER_DIALECT_MODULES,
+    deps = [
+        "//iree/compiler/Dialect/Modules/Check/IR:CheckDialect",
+        "//iree/compiler/Dialect/Modules/Strings/IR:Dialect",
+        "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
+    ],
 )
 
 cc_library(
@@ -175,7 +173,7 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_control_flow",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_test_passes",
-    ] + IREE_COMPILER_DIALECT_MODULES,
+    ],
 )
 
 cc_binary(
@@ -220,7 +218,7 @@ cc_binary(
         "//iree/base:init",
         "//iree/base:status",
         "//iree/compiler/Translation:IREEVM",
-    ] + IREE_COMPILER_DIALECT_MODULES + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
+    ] + PLATFORM_VULKAN_DEPS + IREE_DRIVER_MODULES,
 )
 
 cc_binary(
@@ -274,7 +272,7 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
-    ] + IREE_COMPILER_DIALECT_MODULES,
+    ],
 )
 
 cc_binary(
