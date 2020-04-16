@@ -140,6 +140,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
+      iree::compiler::Dialect::HAL::Transforms
       iree::compiler::Dialect::IREE::IR
       iree::compiler::Dialect::IREE::Transforms
       iree::compiler::Dialect::Shape::IR
@@ -282,7 +283,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       tensorflow::mlir_xla
       ${IREE_COMPILER_DIALECT_MODULES}
-    ALWAYSLINK
     PUBLIC
   )
 

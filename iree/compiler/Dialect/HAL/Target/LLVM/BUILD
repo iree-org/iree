@@ -46,5 +46,4 @@ cc_library(
         "@llvm-project//mlir:TargetLLVMIR",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )

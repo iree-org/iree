@@ -76,6 +76,7 @@ cc_library(
         "//iree/compiler/Dialect/Flow/IR",
         "//iree/compiler/Dialect/Flow/Transforms",
         "//iree/compiler/Dialect/HAL/IR:HALDialect",
+        "//iree/compiler/Dialect/HAL/Transforms",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Dialect/IREE/Transforms",
         "//iree/compiler/Dialect/Shape/IR",
@@ -265,7 +266,6 @@ cc_library(
         "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ] + IREE_COMPILER_DIALECT_MODULES,
-    alwayslink = 1,
 )
 
 cc_binary(

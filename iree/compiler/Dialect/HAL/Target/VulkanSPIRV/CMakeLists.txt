@@ -44,6 +44,5 @@ iree_cc_library(
     iree::compiler::Translation::SPIRV::XLAToSPIRV
     iree::schemas::spirv_executable_def_cc_fbs
     tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )
