@@ -31,6 +31,14 @@ class ValueLivenessTestPass
   }
 };
 
+namespace IREE {
+namespace VM {
+std::unique_ptr<OperationPass<IREE::VM::FuncOp>> createValueLivenessTestPass() {
+  return std::make_unique<ValueLivenessTestPass>();
+}
+}  // namespace VM
+}  // namespace IREE
+
 static PassRegistration<ValueLivenessTestPass> pass(
     "test-iree-vm-value-liveness", "Test pass used for liveness analysis");
 
