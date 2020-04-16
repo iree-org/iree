@@ -382,11 +382,11 @@ external_cc_library(
   PACKAGE
     ruy
   NAME
-    spec
+    mul_params
   ROOT
     ${RUY_SRC_ROOT}
   HDRS
-    "spec.h"
+    "mul_params.h"
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
@@ -457,7 +457,7 @@ external_cc_library(
     ruy::platform
     ruy::side_pair
     ruy::size_util
-    ruy::spec
+    ruy::mul_params
     ruy::tune
 )
 
@@ -800,7 +800,7 @@ external_cc_library(
     ruy::platform
     ruy::side_pair
     ruy::size_util
-    ruy::spec
+    ruy::mul_params
     ruy::tune
 )
 
@@ -858,10 +858,36 @@ external_cc_library(
     context
   ROOT
     ${RUY_SRC_ROOT}
-  SRCS
-    "context.cc"
   HDRS
     "context.h"
+  COPTS
+    ${RUY_COPTS_BASE}
+  DEPS
+    ruy::allocator
+    ruy::check_macros
+    ruy::detect_arm
+    ruy::detect_x86
+    ruy::have_built_path_for
+    ruy::path
+    ruy::platform
+    ruy::prepacked_cache
+    ruy::thread_pool
+    ruy::trace
+    ruy::tune
+  PUBLIC
+)
+
+external_cc_library(
+  PACKAGE
+    ruy
+  NAME
+    context_internal
+  ROOT
+    ${RUY_SRC_ROOT}
+  SRCS
+    "context_internal.cc"
+  HDRS
+    "context_internal.h"
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
@@ -916,12 +942,13 @@ external_cc_library(
     ruy::check_macros
     ruy::common
     ruy::context
+    ruy::context_internal
     ruy::internal_matrix
     ruy::matrix
     ruy::opt_set
     ruy::side_pair
     ruy::size_util
-    ruy::spec
+    ruy::mul_params
     ruy::thread_pool
     ruy::trace
     ruy::trmul_params
@@ -948,6 +975,7 @@ external_cc_library(
     ruy::check_macros
     ruy::common
     ruy::context
+    ruy::context_internal
     ruy::internal_matrix
     ruy::kernel
     ruy::matrix
@@ -957,7 +985,7 @@ external_cc_library(
     ruy::prepacked_cache
     ruy::side_pair
     ruy::size_util
-    ruy::spec
+    ruy::mul_params
     ruy::trmul
     ruy::trmul_params
     ruy::tune

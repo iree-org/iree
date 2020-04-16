@@ -41,34 +41,34 @@ template <typename T, typename ACC>
 Status MatMul::Execute(RuntimeState* runtime_state,
                        const Buffers<T, ACC>& buffers) {
   ruy::Matrix<T> lhs;
-  lhs.data.set(buffers.lhs_buffer.data());
+  lhs.set_data(buffers.lhs_buffer.data());
   ruy::MakeSimpleLayout(buffers.lhs_shape[0], buffers.lhs_shape[1],
-                        ruy::Order::kRowMajor, &lhs.layout);
+                        ruy::Order::kRowMajor, lhs.mutable_layout());
 
   ruy::Matrix<T> rhs;
-  rhs.data.set(buffers.rhs_buffer.data());
+  rhs.set_data(buffers.rhs_buffer.data());
   ruy::MakeSimpleLayout(buffers.rhs_shape[1], buffers.rhs_shape[0],
-                        ruy::Order::kColMajor, &rhs.layout);
+                        ruy::Order::kColMajor, rhs.mutable_layout());
 
   ruy::Matrix<T> dst;
-  dst.data.set(buffers.dst_buffer.data());
+  dst.set_data(buffers.dst_buffer.data());
   ruy::MakeSimpleLayout(buffers.dst_shape[1], buffers.dst_shape[0],
-                        ruy::Order::kColMajor, &dst.layout);
+                        ruy::Order::kColMajor, dst.mutable_layout());
 
-  ruy::BasicSpec<ACC, T> spec;
-  spec.bias = buffers.bias_buffer.data();
+  ruy::MulParams<ACC, T> mul_params;
+  mul_params.set_bias(buffers.bias_buffer.data());
 
   if (buffers.multiplier_mantissa_buffer.size() == 1) {
-    spec.multiplier_fixedpoint = buffers.multiplier_mantissa_buffer[0];
-    spec.multiplier_exponent = buffers.multiplier_exponent_buffer[0];
+    mul_params.set_multiplier_fixedpoint(buffers.multiplier_mantissa_buffer[0]);
+    mul_params.set_multiplier_exponent(buffers.multiplier_exponent_buffer[0]);
   } else {
-    spec.multiplier_fixedpoint_perchannel =
-        buffers.multiplier_mantissa_buffer.data();
-    spec.multiplier_exponent_perchannel =
-        buffers.multiplier_exponent_buffer.data();
+    mul_params.set_multiplier_fixedpoint_perchannel(
+        buffers.multiplier_mantissa_buffer.data());
+    mul_params.set_multiplier_exponent_perchannel(
+        buffers.multiplier_exponent_buffer.data());
   }
 
-  ruy::Mul<ruy::kAllPaths>(lhs, rhs, spec, &runtime_state->context, &dst);
+  ruy::Mul(lhs, rhs, mul_params, &runtime_state->context, &dst);
 
   return OkStatus();
 }
