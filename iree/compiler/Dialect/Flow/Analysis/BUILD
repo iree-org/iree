@@ -25,6 +25,7 @@ cc_library(
     ],
     hdrs = [
         "Dispatchability.h",
+        "TestPasses.h",
     ],
     deps = [
         "//iree/compiler/Dialect/Flow/IR",

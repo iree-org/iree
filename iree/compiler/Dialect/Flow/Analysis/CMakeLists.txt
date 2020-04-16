@@ -19,6 +19,7 @@ iree_cc_library(
     Analysis
   HDRS
     "Dispatchability.h"
+    "TestPasses.h"
   SRCS
     "Dispatchability.cpp"
     "DispatchabilityTest.cpp"

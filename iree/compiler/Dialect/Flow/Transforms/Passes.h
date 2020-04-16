@@ -130,7 +130,6 @@ std::unique_ptr<OperationPass<FuncOp>> createFormStreamsPass();
 // Module Analysis and Finalization
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityTestPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -149,8 +148,6 @@ inline void registerFlowPasses() {
   createOutlineDispatchRegionsPass();
   createFormStreamsPass();
 }
-
-inline void registerFlowTestPasses() { createDispatchabilityTestPass(); }
 
 }  // namespace Flow
 }  // namespace IREE
