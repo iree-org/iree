@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
+#include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
 #include "mlir/Dialect/Linalg/Transforms/LinalgTransforms.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
@@ -92,10 +93,10 @@ static void getTileSizes(unsigned numParallelLoops,
 
 /// Checks if an operation already has an attribute with this marker. If set it
 /// implies this op shouldnt be tiled with the same marker.
-static bool hasMarker(Operation *op, StringRef marker) {
+static bool hasMarker(Operation *op) {
   auto tilingAttr = op->getAttrOfType<StringAttr>(
       linalg::LinalgTransforms::kLinalgTransformMarker);
-  return tilingAttr && tilingAttr.getValue() == marker;
+  return tilingAttr != nullptr;
 }
 
 namespace {
@@ -127,8 +128,7 @@ struct LinalgTilingPattern : public OpRewritePattern<LinalgOp> {
     if (!linalgOp.hasBufferSemantics()) return failure();
     // Currently we are only doing one-level tiling, so a single marker is
     // enough. This might need to move into derived classes.
-    if (hasMarker(linalgOp.getOperation(), getWorkGroupMarker()))
-      return failure();
+    if (hasMarker(linalgOp.getOperation())) return failure();
 
     if (failed(static_cast<const DerivedClass *>(this)->apply(
             linalgOp, tileSizes, rewriter)))
@@ -139,38 +139,6 @@ struct LinalgTilingPattern : public OpRewritePattern<LinalgOp> {
 
  private:
   ArrayRef<int64_t> tileSizes;
-};
-
-/// If the linalg op has no outer parallel loops, inserts dummy one-trip loops
-/// around it to execute it sequentially within a thread.
-template <typename LinalgOp>
-struct SequentialExecutionPattern
-    : public LinalgTilingPattern<SequentialExecutionPattern<LinalgOp>,
-                                 LinalgOp> {
-  using LinalgTilingPattern<SequentialExecutionPattern<LinalgOp>,
-                            LinalgOp>::LinalgTilingPattern;
-  LogicalResult apply(LinalgOp linalgOp, ArrayRef<int64_t> tileSizes,
-                      PatternRewriter &rewriter) const {
-    if (!tileSizes.empty()) return failure();
-
-    OpBuilder::InsertionGuard guard(rewriter);
-    auto indexType = rewriter.getIndexType();
-    auto loc = linalgOp.getLoc();
-    auto zero =
-        rewriter.create<ConstantOp>(loc, rewriter.getIntegerAttr(indexType, 0));
-    auto one =
-        rewriter.create<ConstantOp>(loc, rewriter.getIntegerAttr(indexType, 1));
-    auto outerLoop = rewriter.create<loop::ForOp>(loc, zero, one, one);
-    rewriter.setInsertionPoint(outerLoop.getBody(),
-                               std::prev(outerLoop.getBody()->end()));
-    auto innerLoop = rewriter.create<loop::ForOp>(loc, zero, one, one);
-    rewriter.setInsertionPoint(innerLoop.getBody(),
-                               std::prev(innerLoop.getBody()->end()));
-    Operation *clonedOp = rewriter.clone(*linalgOp.getOperation());
-    clonedOp->setAttr(linalg::LinalgTransforms::kLinalgTransformMarker,
-                      rewriter.getStringAttr(getWorkGroupMarker()));
-    return success();
-  }
 };
 
 /// If there is nothing to fuse the linalg op with, then just tiles it.
@@ -188,9 +156,9 @@ struct TileLinalgOpPattern
     if (!llvm::all_of(linalgOp.getInputsAndOutputBuffers(),
                       [](Value arg) { return arg.hasOneUse(); }))
       return failure();
-    return linalg::tileLinalgOpAndSetMarker(rewriter, linalgOp.getOperation(),
-                                            tileSizes, getWorkGroupMarker(),
-                                            /*permutation=*/{});
+    return linalg::tileLinalgOpToParallelLoopsAndSetMarker(
+        rewriter, linalgOp.getOperation(), tileSizes, getWorkItemMarker(),
+        /*permutation=*/{});
   }
 };
 
@@ -210,9 +178,9 @@ struct TileAndFuseLinalgOpPattern
         operandIndicesToFuse.push_back(buffer.index());
     }
     if (operandIndicesToFuse.empty()) return failure();
-    return linalg::tileAndFuseLinalgOpAndSetMarker(
+    return linalg::tileAndFuseLinalgOpToParallelLoopsAndSetMarker(
         rewriter, linalgOp, tileSizes, operandIndicesToFuse,
-        getWorkGroupMarker());
+        getWorkItemMarker());
   }
 };
 }  // namespace
@@ -243,10 +211,7 @@ void LinalgTileAndFusePass::runOnFunction() {
   getTileSizes(numParallelLoops, workGroupSize, tileSizes);
 
   OwningRewritePatternList patterns;
-  patterns.insert<SequentialExecutionPattern<linalg::ConvOp>,
-                  SequentialExecutionPattern<linalg::GenericOp>,
-                  SequentialExecutionPattern<linalg::IndexedGenericOp>,
-                  TileLinalgOpPattern<linalg::GenericOp>,
+  patterns.insert<TileLinalgOpPattern<linalg::GenericOp>,
                   TileLinalgOpPattern<linalg::IndexedGenericOp>,
                   TileLinalgOpPattern<linalg::MatmulOp>,
                   TileLinalgOpPattern<linalg::ConvOp>,
@@ -254,19 +219,15 @@ void LinalgTileAndFusePass::runOnFunction() {
                                                                  tileSizes);
   applyPatternsAndFoldGreedily(getOperation(), patterns);
 
-  // Check that there are single perfectly nested loop.for operations at the top
-  // most level that will get mapped to thread blocks/workgroups.
-  auto forLoops = block.getOps<loop::ForOp>();
-  if (!llvm::hasSingleElement(forLoops)) {
+  // Check that there are single loop.parallel operation at the top most level
+  // that will get mapped to thread blocks/workgroups.
+  auto forLoops = block.getOps<loop::ParallelOp>();
+  if (numParallelLoops > 0 && !llvm::hasSingleElement(forLoops) &&
+      (*forLoops.begin()).getNumLoops() != numParallelLoops) {
     funcOp.emitError(
-        "unable to fuse operations within a dispatch region to get a single "
-        "outer parallel loop nest to map to workgroups");
+        "unable to generate the tiled loop structure to map to workgroups");
     return signalPassFailure();
   }
-  // TODO(ravishankarm): Also need to check that the loops are perfectly nested
-  // and that there as many as numParallelLoops. That check is more involved, so
-  // come back to it after moving to loop.parallel at which point the check is
-  // just a check of the number of induction variables.
 
   // Update the workgroup size to be consistent with the tile sizes used. Note
   // the tile sizes are ordered from outer most to inner most loops. The

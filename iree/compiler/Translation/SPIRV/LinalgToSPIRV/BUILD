@@ -20,7 +20,7 @@ package(
 cc_library(
     name = "LinalgToSPIRV",
     srcs = [
-        "GPUKernelOutliningPass.cpp",
+        "ConvertToGPUPass.cpp",
         "LinalgTileAndFusePass.cpp",
         "LowerToSPIRV.cpp",
     ],
@@ -43,7 +43,7 @@ cc_library(
         "@llvm-project//mlir:LinalgOps",
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:LoopOps",
-        "@llvm-project//mlir:LoopsToGPU",
+        "@llvm-project//mlir:LoopsToGPUPass",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:SPIRVDialect",
         "@llvm-project//mlir:SPIRVLowering",

@@ -21,7 +21,7 @@ iree_cc_library(
     "LowerToSPIRV.h"
     "Passes.h"
   SRCS
-    "GPUKernelOutliningPass.cpp"
+    "ConvertToGPUPass.cpp"
     "LinalgTileAndFusePass.cpp"
     "LowerToSPIRV.cpp"
   DEPS

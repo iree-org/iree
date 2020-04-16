@@ -24,7 +24,7 @@
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRV.h"
-#include "mlir/Conversion/LoopsToGPU/LoopsToGPU.h"
+#include "mlir/Conversion/LoopsToGPU/LoopsToGPUPass.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRV.h"
 #include "mlir/Conversion/StandardToSPIRV/ConvertStandardToSPIRVPass.h"
 #include "mlir/Dialect/GPU/GPUDialect.h"
@@ -80,51 +80,6 @@ static void createConstantsInFunc(FuncOp funcOp, ArrayRef<int64_t> intVal,
 namespace {
 
 /// To be able to use the workgroup size from the dispatch function attribute to
-/// convert loops to GPU kernel, need to actually implement a pass to retrieve
-/// the attribute value from the function and pass it along.
-// TODO(ravishankarm): Structure the Loops to GPU pass in MLIR so that we dont
-// have to do this. Maybe make it an OperationPass<loop::ForOp> ?
-struct LoopsToGPUPass : public PassWrapper<LoopsToGPUPass, FunctionPass> {
-  void runOnFunction() override {
-    // Get the workgroup size from the attributes.
-    FuncOp funcOp = getFunction();
-    if (!isDispatchFuncImpl(funcOp)) return;
-    SmallVector<int64_t, 3> workGroupSizeVec;
-    workGroupSizeVec.reserve(3);
-    if (failed(getWorkGroupSize(funcOp, workGroupSizeVec))) return;
-    ArrayRef<int64_t> workGroupSize = dropTrailingOnes(workGroupSizeVec);
-
-    SmallVector<Value, 3> numWorkGroupsVal, workGroupSizeVal;
-
-    // The number of workgroups passed in the conversion should not be
-    // considered while generating the device-side code. To avoid some
-    // optimization/folding to kick in, allocate variables for the number of
-    // workgroups. This allocated value should not be used within the region of
-    // the gpu.launch, but if it is the compilation will fail due to ABI
-    // mismatch.
-    numWorkGroupsVal.reserve(3);
-    OpBuilder builder(funcOp.getBody());
-    auto indexType = IndexType::get(funcOp.getContext());
-    auto int32Type = IntegerType::get(32, funcOp.getContext());
-    auto resultType = MemRefType::get(ArrayRef<int64_t>(), int32Type);
-    for (unsigned i = 0, e = workGroupSize.size(); i != e; ++i) {
-      auto allocOp = builder.create<AllocOp>(funcOp.getLoc(), resultType);
-      auto loadVal = builder.create<LoadOp>(funcOp.getLoc(), allocOp);
-      numWorkGroupsVal.push_back(
-          builder.create<IndexCastOp>(funcOp.getLoc(), loadVal, indexType));
-    }
-    workGroupSizeVal.reserve(3);
-    createConstantsInFunc(funcOp, workGroupSize, workGroupSizeVal);
-    for (Block &block : getFunction())
-      for (Operation &op : llvm::make_early_inc_range(block))
-        if (auto forOp = dyn_cast<loop::ForOp>(&op))
-          if (failed(convertLoopToGPULaunch(forOp, numWorkGroupsVal,
-                                            workGroupSizeVal)))
-            return signalPassFailure();
-  }
-};
-
-/// To be able to use the workgroup size from the dispatch function attribute to
 /// convert GPU kernel into SPIR-V kernel, need to actually implement a pass to
 /// retrieve the attribute value from the function and pass it along.
 // TODO(ravishankarm): Move this into MLIR core.
@@ -167,21 +122,15 @@ void addLinalgToSPIRVPasses(OpPassManager &pm,
                             ArrayRef<int64_t> workGroupSize) {
   // Linalg to loops.
   pm.addPass(createLinalgTileAndFusePass(workGroupSize));
-  pm.addPass(createConvertLinalgToLoopsPass());
-  pm.addPass(createLowerAffinePass());
+  pm.addPass(createConvertToGPUPass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
-
-  pm.addPass(std::make_unique<LoopsToGPUPass>());
-  pm.addPass(createIREEGpuKernelOutliningPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
-  pm.addPass(createLowerAffinePass());
+  OpPassManager &gpuModulePM = pm.nest<gpu::GPUModuleOp>();
 
   // GPU to SPIR-V.
-  pm.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
-  pm.addPass(createCanonicalizerPass());
-  pm.addPass(createCSEPass());
+  gpuModulePM.addPass(createLegalizeStdOpsForSPIRVLoweringPass());
+  gpuModulePM.addPass(createCanonicalizerPass());
+  gpuModulePM.addPass(createCSEPass());
   pm.addPass(std::make_unique<IREEGPUToSPIRVPass>());
 
   // SPIR-V passes for lowering attributes.
