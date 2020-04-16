@@ -52,12 +52,6 @@ def parse_arguments():
       help="Prints results instead of writing files",
       action="store_true",
       default=False)
-  # TODO(b/149926655): Remove this after updating callers
-  parser.add_argument(
-      "--strict",
-      help="[OBSOLETE] Inverse of --allow_partial_conversion",
-      action="store_true",
-      default=False)
   parser.add_argument(
       "--allow_partial_conversion",
       help="Generates partial files, ignoring errors during conversion",
