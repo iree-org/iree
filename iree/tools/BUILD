@@ -265,7 +265,6 @@ cc_library(
         "@llvm-project//mlir:Translation",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_dialect_registration",
     ] + IREE_COMPILER_DIALECT_MODULES,
-    alwayslink = 1,
 )
 
 cc_binary(

@@ -282,7 +282,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       tensorflow::mlir_xla
       ${IREE_COMPILER_DIALECT_MODULES}
-    ALWAYSLINK
     PUBLIC
   )
 
