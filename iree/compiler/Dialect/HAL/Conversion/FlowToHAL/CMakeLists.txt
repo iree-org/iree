@@ -42,6 +42,5 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::Shape::IR
     iree::compiler::Dialect::VM::IR
-  ALWAYSLINK
   PUBLIC
 )
