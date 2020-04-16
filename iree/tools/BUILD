@@ -141,6 +141,7 @@ cc_library(
     name = "iree_opt_main",
     srcs = ["opt_main.cc"],
     deps = [
+        ":init_compiler_modules",
         ":init_passes_and_dialects",
         ":init_targets",
         "//iree/compiler/Dialect/IREE/IR",
@@ -190,6 +191,7 @@ cc_binary(
     srcs = ["run_mlir_main.cc"],
     tags = ["hostonly"],
     deps = [
+        ":init_compiler_modules",
         ":init_passes_and_dialects",
         ":init_targets",
         ":vm_util",
@@ -258,6 +260,7 @@ cc_library(
     name = "iree_translate_main",
     srcs = ["translate_main.cc"],
     deps = [
+        ":init_compiler_modules",
         ":init_passes_and_dialects",
         ":init_targets",
         ":init_translations",

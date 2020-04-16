@@ -189,6 +189,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "opt_main.cc"
     DEPS
+      ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
       LLVMSupport
@@ -240,6 +241,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "run_mlir_main.cc"
     DEPS
+      ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
       ::vm_util
@@ -278,6 +280,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "translate_main.cc"
     DEPS
+      ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
       ::init_translations
