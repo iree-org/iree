@@ -29,6 +29,14 @@ class DispatchabilityTestPass
   }
 };
 
+namespace IREE {
+namespace Flow {
+std::unique_ptr<OperationPass<ModuleOp>> createDispatchabilityTestPass() {
+  return std::make_unique<DispatchabilityTestPass>();
+}
+}  // namespace Flow
+}  // namespace IREE
+
 static PassRegistration<DispatchabilityTestPass> pass(
     "test-iree-flow-dispatchability",
     "Test pass used for dispatchability analysis");

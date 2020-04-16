@@ -22,6 +22,7 @@
 
 #include <cstdlib>
 
+#include "iree/compiler/Dialect/Flow/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
@@ -170,6 +171,7 @@ namespace iree_compiler {
 // global registry.
 inline void registerAllIreePasses() {
   IREE::Flow::registerFlowPasses();
+  IREE::Flow::registerFlowAnalysisTestPasses();
   IREE::HAL::registerHALPasses();
   IREE::registerIreePasses();
   Shape::registerShapePasses();

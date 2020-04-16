@@ -131,6 +131,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRStandardToSPIRVTransforms
       MLIRTransforms
       MLIRVector
+      iree::compiler::Dialect::Flow::Analysis
       iree::compiler::Dialect::Flow::IR
       iree::compiler::Dialect::Flow::Transforms
       iree::compiler::Dialect::HAL::IR::HALDialect
