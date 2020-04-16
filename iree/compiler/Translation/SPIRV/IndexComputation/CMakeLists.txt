@@ -49,7 +49,6 @@ iree_cc_library(
     MLIRStandardOps
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::CodegenUtils
-    iree::compiler::Translation::SPIRV::IndexComputation::IndexComputationAttrGen
     tensorflow::mlir_xla
   ALWAYSLINK
   PUBLIC

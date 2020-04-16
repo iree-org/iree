@@ -59,9 +59,9 @@ cc_library(
         "XLAIndexPropagation.h",
     ],
     deps = [
+        ":IndexComputationAttrGen",
         "//iree/compiler/Dialect/IREE/IR",
         "//iree/compiler/Translation/CodegenUtils",
-        "//iree/compiler/Translation/SPIRV/IndexComputation:IndexComputationAttrGen",
         "@llvm-project//llvm:support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
