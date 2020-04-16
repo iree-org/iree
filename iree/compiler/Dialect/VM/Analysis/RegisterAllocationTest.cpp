@@ -31,6 +31,15 @@ class RegisterAllocationTestPass
   }
 };
 
+namespace IREE {
+namespace VM {
+std::unique_ptr<OperationPass<IREE::VM::FuncOp>>
+createRegisterAllocationTestPass() {
+  return std::make_unique<RegisterAllocationTestPass>();
+}
+}  // namespace VM
+}  // namespace IREE
+
 static PassRegistration<RegisterAllocationTestPass> pass(
     "test-iree-vm-register-allocation",
     "Test pass used for register allocation");

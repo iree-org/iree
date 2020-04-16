@@ -19,6 +19,7 @@ iree_cc_library(
     Analysis
   HDRS
     "RegisterAllocation.h"
+    "TestPasses.h"
     "ValueLiveness.h"
   SRCS
     "RegisterAllocation.cpp"
@@ -33,6 +34,5 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::IR
-  ALWAYSLINK
   PUBLIC
 )

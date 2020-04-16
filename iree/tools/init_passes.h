@@ -27,6 +27,7 @@
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/Dialect/IREE/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
+#include "iree/compiler/Dialect/VM/Analysis/TestPasses.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "iree/compiler/Dialect/VMLA/Transforms/Passes.h"
 #include "mlir/Conversion/GPUToSPIRV/ConvertGPUToSPIRVPass.h"
@@ -176,6 +177,7 @@ inline void registerAllIreePasses() {
   IREE::registerIreePasses();
   Shape::registerShapePasses();
   IREE::VM::registerVMPasses();
+  IREE::VM::registerVMAnalysisTestPasses();
   IREE::VM::registerVMTestPasses();
   IREE::VMLA::registerVMLAPasses();
 }
