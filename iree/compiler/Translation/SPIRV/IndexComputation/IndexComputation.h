@@ -201,8 +201,9 @@ class ReverseOpIndexPropagation : public IndexPropagationOp<OpTy> {
         dimensionsExprs.push_back(builder.getAffineDimExpr(index));
       }
     }
-    auto dimensionsAffineMap = AffineMap::get(
-        dimensionsExprs.size(), /*symbolCount=*/0, dimensionsExprs);
+    auto dimensionsAffineMap =
+        AffineMap::get(dimensionsExprs.size(), /*symbolCount=*/0,
+                       dimensionsExprs, op->getContext());
 
     // Compose the index map of the result with the index map for the
     // dimensions.
@@ -238,7 +239,8 @@ class SliceOpIndexPropagation : public IndexPropagationOp<OpTy> {
       exprs.push_back(builder.getAffineDimExpr(i) * strides[i] +
                       start_indices[i]);
     }
-    auto sliceAffineMap = AffineMap::get(rank, /*symbolCount=*/0, exprs);
+    auto sliceAffineMap =
+        AffineMap::get(rank, /*symbolCount=*/0, exprs, op->getContext());
     auto operandMap = sliceAffineMap.compose(resultIndex);
     operandIndices.push_back(operandMap);
     return success();
@@ -264,8 +266,8 @@ class TransposeOpIndexPropagation : public IndexPropagationOp<OpTy> {
     for (auto index : permutation) {
       permutationExprs.push_back(builder.getAffineDimExpr(index));
     }
-    auto permutationAffineMap =
-        AffineMap::get(permutationExprs.size(), 0, permutationExprs);
+    auto permutationAffineMap = AffineMap::get(
+        permutationExprs.size(), 0, permutationExprs, op->getContext());
     // Compute the inverse of the permutation map.
     auto invPermutationMap = inversePermutation(permutationAffineMap);
 

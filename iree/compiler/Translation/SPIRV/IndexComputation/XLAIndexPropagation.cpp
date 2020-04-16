@@ -113,7 +113,7 @@ LogicalResult XLAConcatenateOpIndexPropagation::propagateIndexMap(
     }
     offset += operandType.getDimSize(append_dim);
     AffineMap shiftedMap =
-        AffineMap::get(resultIndex.getNumResults(), 0, exprs);
+        AffineMap::get(resultIndex.getNumResults(), 0, exprs, op->getContext());
 
     AffineMap operandMap = shiftedMap.compose(resultIndex);
     operandIndices.push_back(operandMap);
@@ -271,8 +271,9 @@ LogicalResult XLAPadOpIndexPropagation::propagateIndexMap(
     exprs[resultExpr.index()] =
         (resultExpr.value() - padding_low).floorDiv(padding_stride);
   }
-  auto operandMap = AffineMap::get(resultIndex.getNumDims(),
-                                   resultIndex.getNumSymbols(), exprs);
+  auto operandMap =
+      AffineMap::get(resultIndex.getNumDims(), resultIndex.getNumSymbols(),
+                     exprs, op->getContext());
   operandIndices.push_back(operandMap);
 
   // Scalar operand is just mapped to a single element {0};

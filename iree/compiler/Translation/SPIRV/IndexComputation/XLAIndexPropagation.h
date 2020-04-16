@@ -78,8 +78,9 @@ class ReturnOpIndexPropagation : public IndexPropagationOp<OpTy> {
     for (size_t i = returnRank; i > 0; --i) {
       affineExprs.push_back(builder.getAffineDimExpr(i - 1));
     }
-    return addNewIndexMapForValue(operation->getOperand(0),
-                                  AffineMap::get(returnRank, 0, affineExprs));
+    return addNewIndexMapForValue(
+        operation->getOperand(0),
+        AffineMap::get(returnRank, 0, affineExprs, operation->getContext()));
   }
 };
 

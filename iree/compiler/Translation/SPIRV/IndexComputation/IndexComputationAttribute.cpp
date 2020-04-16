@@ -325,7 +325,7 @@ AffineMap getAffineMap(FuncOp funcOp, ArrayRef<AffineExpr> exprs) {
       funcOp.getAttrOfType<IntegerAttr>(getMaxSymbolNumAttrName());
   return AffineMap::get(numDimsAttr.getInt(),
                         (maxSymbolNumAttr ? maxSymbolNumAttr.getInt() + 1 : 0),
-                        exprs);
+                        exprs, funcOp.getContext());
 }
 
 void getIndexMapsForValue(Value value, SmallVectorImpl<AffineMap> &indices) {

@@ -622,7 +622,8 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
   indexingMaps.emplace_back(AffineMapAttr::get(
       exprs.empty()
           ? AffineMap::get(nInputRank, /*symbolCount=*/0, rewriter.getContext())
-          : AffineMap::get(nInputRank, /*symbolCount=*/0, exprs)));
+          : AffineMap::get(nInputRank, /*symbolCount=*/0, exprs,
+                           rewriter.getContext())));
 
   SmallVector<Type, 2> resultTypes = {};
   SmallVector<Value, 2> linalgOpArgs = {operands[0]};
