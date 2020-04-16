@@ -58,7 +58,6 @@ iree_cc_library(
     iree::compiler::Dialect::Modules::TensorList::Conversion
     iree::compiler::Dialect::Modules::TensorList::tensorlist_imports
     iree::compiler::Dialect::VM::Conversion
-  ALWAYSLINK
   PUBLIC
 )
 

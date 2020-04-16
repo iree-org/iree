@@ -47,7 +47,6 @@ iree_cc_library(
     iree::compiler::Dialect::Modules::Check::Conversion
     iree::compiler::Dialect::Modules::Check::check_imports
     iree::compiler::Dialect::VM::Conversion
-  ALWAYSLINK
   PUBLIC
 )
 

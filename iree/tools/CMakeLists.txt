@@ -23,12 +23,6 @@ iree_select_compiler_opts(IREE_HAL_DRIVER_MODULES
     "iree::hal::vulkan::vulkan_driver_module"
 )
 
-set(IREE_COMPILER_DIALECT_MODULES
-  "iree::compiler::Dialect::Modules::Check::IR::CheckDialect"
-  "iree::compiler::Dialect::Modules::Strings::IR::Dialect"
-  "iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect"
-)
-
 iree_cc_binary(
   NAME
     iree-benchmark-module
@@ -155,6 +149,17 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
+      init_compiler_modules
+    HDRS
+      "init_compiler_modules.h"
+    DEPS
+      iree::compiler::Dialect::Modules::Check::IR::CheckDialect
+      iree::compiler::Dialect::Modules::Strings::IR::Dialect
+      iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
+  )
+
+  iree_cc_library(
+    NAME
       init_targets
     HDRS
       "init_targets.h"
@@ -180,6 +185,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "opt_main.cc"
     DEPS
+      ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
       LLVMSupport
@@ -210,7 +216,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       iree::compiler::Translation::CodegenPasses
       tensorflow::mlir_xla
-      ${IREE_COMPILER_DIALECT_MODULES}
     PUBLIC
   )
 
@@ -231,6 +236,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "run_mlir_main.cc"
     DEPS
+      ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
       ::vm_util
@@ -259,7 +265,6 @@ if(${IREE_BUILD_COMPILER})
       iree::vm
       iree::vm::bytecode_module
       iree::vm::value
-      ${IREE_COMPILER_DIALECT_MODULES}
       ${IREE_HAL_DRIVER_MODULES}
   )
 
@@ -269,6 +274,7 @@ if(${IREE_BUILD_COMPILER})
     SRCS
       "translate_main.cc"
     DEPS
+      ::init_compiler_modules
       ::init_passes_and_dialects
       ::init_targets
       ::init_translations
@@ -282,7 +288,6 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Translation::IREEVM
       iree::compiler::Translation::SPIRV::XLAToSPIRV
       tensorflow::mlir_xla
-      ${IREE_COMPILER_DIALECT_MODULES}
     PUBLIC
   )
 

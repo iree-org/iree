@@ -17,6 +17,7 @@
 // Based on mlir-opt but without registering passes and dialects we don't care
 // about.
 
+#include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_dialects.h"
 #include "iree/tools/init_passes.h"
 #include "iree/tools/init_targets.h"
@@ -64,6 +65,7 @@ int main(int argc, char **argv) {
   mlir::registerMlirDialects();
   mlir::registerMlirPasses();
   mlir::iree_compiler::registerIreeDialects();
+  mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerAllIreePasses();
   mlir::iree_compiler::registerHALTargetBackends();
   llvm::InitLLVM y(argc, argv);
