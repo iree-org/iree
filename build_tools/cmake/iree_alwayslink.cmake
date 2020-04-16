@@ -54,24 +54,6 @@ function(set_alwayslink_property)
 endfunction()
 
 
-function(set_alwayslink_mlir_libs)
-  set(_ALWAYSLINK_LIBS_MLIR
-    # TODO(marbre): Check the previously added libs
-    MLIRAnalysis
-    MLIREDSC
-    MLIRParser
-    MLIRTransforms
-    MLIRTranslation
-    MLIRSupport
-  )
-
-  set_alwayslink_property(
-    ALWAYSLINK_LIBS
-      ${_ALWAYSLINK_LIBS_MLIR}
-  )
-endfunction()
-
-
 function(set_alwayslink_tensorflow_libs)
   set(_ALWAYSLINK_LIBS_TENSORFLOW
     tensorflow::mlir_xla
