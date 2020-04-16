@@ -181,7 +181,6 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ::init_passes_and_dialects
       ::init_targets
-      ::init_translations
       LLVMSupport
       MLIRIR
       MLIROptLib
@@ -271,6 +270,7 @@ if(${IREE_BUILD_COMPILER})
     DEPS
       ::init_passes_and_dialects
       ::init_targets
+      ::init_translations
       LLVMSupport
       MLIRIR
       MLIRLoopOpsTransforms
