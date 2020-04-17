@@ -37,6 +37,7 @@ EXPLICIT_TARGET_MAPPING = {
     "@llvm-project//mlir:AllPassesAndDialectsNoRegistration": [
         "MLIRAllDialects"
     ],
+    "@llvm-project//mlir:Affine": ["MLIRAffineOps"],
     "@llvm-project//mlir:AffineToStandardTransforms": ["MLIRAffineToStandard"],
     "@llvm-project//mlir:CFGTransforms": ["MLIRLoopToStandard"],
     "@llvm-project//mlir:ExecutionEngineUtils": ["MLIRExecutionEngine"],
