@@ -110,7 +110,7 @@ if(${IREE_BUILD_COMPILER})
       "init_dialects.h"
       "init_passes.h"
     DEPS
-      MLIRAffine
+      MLIRAffineOps
       MLIRAffineTransforms
       MLIRGPU
       MLIRGPUtoSPIRVTransforms

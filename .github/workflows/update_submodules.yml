@@ -18,8 +18,8 @@ name: Update Submodules
 
 on:
   schedule:
-     # Every 6 hours at 0, 6, 12, 18 UTC (4, 10, 16, 22 PST)
-     - cron: '0 */6 * * *'
+     # Every weekday at 14:00 UTC (06:00 PST/07:00 PDT)
+     - cron: '0 14 * * 1-5'
 
 jobs:
   update:
