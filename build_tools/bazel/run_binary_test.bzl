@@ -16,7 +16,7 @@
 
 The rule instantiation can pass additional arguments to the binary and provide
 it with additional data files (as well as the standard bazel test classification
-attiributes). This allows compiling the binary once and not recompiling or
+attributes). This allows compiling the binary once and not recompiling or
 relinking it for each test rule. It also avoids a wrapper shell script, which
 adds unnecessary shell dependencies and confuses some tooling about the type of
 the binary.
