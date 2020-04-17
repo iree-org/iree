@@ -98,6 +98,8 @@ def FLOW_VariableLoadOp : FLOW_Op<"variable.load", [MemoryEffects<[MemRead]>]> {
   let assemblyFormat = "$variable attr-dict `:` type($result)";
 
   let verifier = [{ return verifyVariableLoadOp(*this); }];
+
+  let hasFolder = 1;
 }
 
 def FLOW_VariableLoadIndirectOp : FLOW_Op<"variable.load.indirect"> {
