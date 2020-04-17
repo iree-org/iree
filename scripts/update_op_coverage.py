@@ -125,6 +125,6 @@ if __name__ == '__main__':
   args = parse_arguments()
   content = generate_table(args.build_dir)
   table_path = os.path.join(args.build_dir, 'doc', 'op_coverage.md')
-  with open(table_path, 'w') as f:
+  with open(table_path, 'w', encoding='utf-8') as f:
     f.write(OP_COVERAGE_DESCRIPTION)
     f.write(content)
