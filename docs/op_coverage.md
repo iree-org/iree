@@ -58,4 +58,5 @@ select | ✓ | ✓ | ✓ | ✓
 sine | ✓ | ✓ | ✗ | ✗
 slice | ✓ | ✓ | ✗ | ✗
 sqrt | ✓ | ✓ | ✓ | ✓
+transpose | ✓ | ✓ | ✓ | ✓
 while | ✓ | ✓ | ✗ | ✓
