@@ -60,6 +60,7 @@ iree_check_single_backend_test_suite(
     "sine.mlir"
     "slice.mlir"
     "sqrt.mlir"
+    "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
     vulkan-spirv
@@ -87,6 +88,7 @@ iree_check_single_backend_test_suite(
     "rsqrt.mlir"
     "select.mlir"
     "sqrt.mlir"
+    "transpose.mlir"
   TARGET_BACKEND
     vulkan-spirv
   DRIVER
@@ -123,6 +125,7 @@ iree_check_single_backend_test_suite(
     "rsqrt.mlir"
     "select.mlir"
     "sqrt.mlir"
+    "transpose.mlir"
     "while.mlir"
   TARGET_BACKEND
     llvm-ir
