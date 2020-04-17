@@ -7,7 +7,7 @@ cc_library(
     name = "StandardToVM",
     srcs = [
         "ConvertStandardToVM.cpp",
-        "ConvertStandardToVMPass.cpp",
+        "ConvertStandardToVMTest.cpp",
     ],
     hdrs = [
         "ConvertStandardToVM.h",

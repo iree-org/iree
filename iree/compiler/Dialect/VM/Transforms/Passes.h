@@ -74,8 +74,8 @@ createOrdinalAllocationPass();
 // Test passes
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<IREE::VM::ModuleOp>>
-createConvertStandardToVMPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createConvertStandardToVMTestPass();
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
@@ -87,7 +87,7 @@ inline void registerVMPasses() {
   createOrdinalAllocationPass();
 }
 
-inline void registerVMTestPasses() { createConvertStandardToVMPass(); }
+inline void registerVMTestPasses() { createConvertStandardToVMTestPass(); }
 
 }  // namespace VM
 }  // namespace IREE

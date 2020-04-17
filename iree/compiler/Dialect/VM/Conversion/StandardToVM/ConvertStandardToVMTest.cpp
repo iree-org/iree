@@ -26,8 +26,9 @@ namespace {
 
 // A pass converting MLIR Standard operations into the IREE VM dialect.
 // Used only for testing as in the common case we only rely on rewrite patterns.
-class ConvertStandardToVMPass
-    : public PassWrapper<ConvertStandardToVMPass, OperationPass<ModuleOp>> {
+class ConvertStandardToVMTestPass
+    : public PassWrapper<ConvertStandardToVMTestPass,
+                         OperationPass<mlir::ModuleOp>> {
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.addLegalDialect<IREE::VM::VMDialect>();
@@ -52,14 +53,16 @@ class ConvertStandardToVMPass
 
 namespace IREE {
 namespace VM {
-std::unique_ptr<OperationPass<ModuleOp>> createConvertStandardToVMPass() {
-  return std::make_unique<ConvertStandardToVMPass>();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createConvertStandardToVMTestPass() {
+  return std::make_unique<ConvertStandardToVMTestPass>();
 }
 }  // namespace VM
 }  // namespace IREE
 
-static PassRegistration<ConvertStandardToVMPass> pass(
-    "iree-convert-std-to-vm", "Convert Standard Ops to the IREE VM dialect");
+static PassRegistration<ConvertStandardToVMTestPass> pass(
+    "test-iree-convert-std-to-vm",
+    "Convert Standard Ops to the IREE VM dialect");
 
 }  // namespace iree_compiler
 }  // namespace mlir
