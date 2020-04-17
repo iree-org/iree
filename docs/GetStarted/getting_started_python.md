@@ -10,11 +10,11 @@ Python bindings you must build from source.
 ## Prerequisites
 
 You should already have IREE cloned and building on your machine. See the other
-getting started guides for instructions.
+[getting started guides](.) for instructions.
 
 > Note:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;Support is best with Bazel. For CMake (excluding
-> TensorFlow), set the `IREE_BUILD_PYTHON_BINDINGS` CMake option.
+> &nbsp;&nbsp;&nbsp;&nbsp;Support is best with Bazel.
+> For CMake (excluding TensorFlow), set the `IREE_BUILD_PYTHON_BINDINGS` option.
 
 ## Python Setup
 

@@ -93,6 +93,17 @@ NAVI_ORDER_DICT = {
     'roadmap_design.md': 4,
     'roadmap.md': 5,
     'op_coverage.md': 6,
+
+    # Within 'Getting Started' use explicit ordering.
+    # Alphabetical would put 'bazel' before 'cmake' and 'python' between 'linux'
+    # and 'windows'.
+    'getting_started_linux_cmake.md': 1,
+    'getting_started_linux_bazel.md': 2,
+    'getting_started_linux_vulkan.md': 3,
+    'getting_started_windows_cmake.md': 4,
+    'getting_started_windows_bazel.md': 5,
+    'getting_started_windows_vulkan.md': 6,
+    'getting_started_python.md': 7,
 }
 
 # A dictionary containing source directory to section tile mappings.
