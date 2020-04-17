@@ -54,6 +54,7 @@ DOC_TITLE_DICT = {
     'getting_started_windows_bazel.md': 'Windows with Bazel',
     'getting_started_windows_cmake.md': 'Windows with CMake',
     'getting_started_windows_vulkan.md': 'Windows with Vulkan',
+    'op_coverage.md': 'XLA HLO Operation Coverage',
     'roadmap.md': 'Short-term Focus Areas',
     'roadmap_design.md': 'Long-term Design Roadmap',
 }
@@ -73,6 +74,7 @@ PERMALINK_DICT = {
     'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
     'developer_overview.md': 'DeveloperOverview',
+    'op_coverage.md': 'HLOOpCoverage',
     'roadmap.md': 'FocusAreas',
     'roadmap_design.md': 'DesignRoadmap',
 }
@@ -88,6 +90,7 @@ NAVI_ORDER_DICT = {
     'developer_overview.md': 3,
     'roadmap_design.md': 4,
     'roadmap.md': 5,
+    'op_coverage.md': 6,
 }
 
 # A dictionary containing source directory to section tile mappings.

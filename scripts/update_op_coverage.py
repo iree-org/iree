@@ -29,7 +29,7 @@ FAILURE_SYMBOL = '✗'
 
 E2E_XLA_OPS_PATH = 'iree/test/e2e/xla_ops'
 
-OP_COVERAGE_DESCRIPTION = """# Op Coverage
+OP_COVERAGE_DESCRIPTION = """# HLO Op Coverage
 There are four backend [targets](https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/Target) in IREE:
 
 - vmla
