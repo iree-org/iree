@@ -108,9 +108,5 @@ and execute a function in the compiled module:
     [Developer Overview](../developer_overview.md)
 *   To target GPUs using Vulkan, see
     [Getting Started on Windows with Vulkan](getting_started_windows_vulkan.md)
-
-More documentation coming soon...
-
-<!-- TODO(scotttodd): Running tests -->
-<!-- TODO(scotttodd): Running samples -->
-<!-- TODO(scotttodd): Python -->
+*   To use IREE's Python bindings, see
+    [Getting Started with Python](getting_started_python.md)

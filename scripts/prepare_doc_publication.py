@@ -54,6 +54,7 @@ DOC_TITLE_DICT = {
     'getting_started_windows_bazel.md': 'Windows with Bazel',
     'getting_started_windows_cmake.md': 'Windows with CMake',
     'getting_started_windows_vulkan.md': 'Windows with Vulkan',
+    'getting_started_python.md': 'Python',
     'op_coverage.md': 'XLA HLO Operation Coverage',
     'roadmap.md': 'Short-term Focus Areas',
     'roadmap_design.md': 'Long-term Design Roadmap',
@@ -73,6 +74,7 @@ PERMALINK_DICT = {
     'getting_started_windows_bazel.md': 'GetStarted/WindowsBazel',
     'getting_started_windows_cmake.md': 'GetStarted/WindowsCMake',
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
+    'getting_started_python.md': 'GetStarted/Python',
     'developer_overview.md': 'DeveloperOverview',
     'op_coverage.md': 'HLOOpCoverage',
     'roadmap.md': 'FocusAreas',
@@ -169,10 +171,11 @@ def process_file(basedir, relpath, filename):
   # Compose the new content.
   content = '\n'.join(lines)
 
-  # Substitute a specific pattern for "Tips" used in "Getting Started" docs to
-  # make it prettier.
+  # Substitute specific pattern for callouts to make them prettier.
   content = content.replace('> Tip:<br>\n> &nbsp;&nbsp;&nbsp;&nbsp;',
                             '> Tip\n> {: .label .label-green }\n> ')
+  content = content.replace('> Note:<br>\n> &nbsp;&nbsp;&nbsp;&nbsp;',
+                            '> Note\n> {: .label .label-blue }\n> ')
 
   # Update in place.
   with open(full_path, 'w') as f:
