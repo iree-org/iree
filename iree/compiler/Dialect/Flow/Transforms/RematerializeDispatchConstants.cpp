@@ -45,8 +45,16 @@ constexpr int64_t kMaxRematerializedConstantSizeInBytes = 1 * 1024;
 // enough to be worth inlining possibly several times (at the cost of binary
 // bloat).
 bool isConstantSmall(ConstantOp constantOp) {
-  if (auto shapedType = constantOp.getType().dyn_cast<ShapedType>()) {
-    return shapedType.getSizeInBits() / 8 <=
+  if (constantOp.getValue().isa<SplatElementsAttr>()) {
+    // Splats are always small and can be much better handled by broadcasting
+    // within the dispatch regions.
+    return true;
+  } else if (auto value = constantOp.getValue().dyn_cast<DenseElementsAttr>()) {
+    return value.isSplat();
+  } else if (auto shapedType = constantOp.getType().dyn_cast<ShapedType>()) {
+    // Non-splat shaped constants can be large. We rely on the canonicalizer to
+    // make dense constants splats when possible.
+    return (shapedType.getSizeInBits() / 8) <=
            kMaxRematerializedConstantSizeInBytes;
   }
 
@@ -63,6 +71,9 @@ bool canDispatchRegionContainConstants(DispatchRegionOp dispatchRegionOp) {
     for (auto &op : block) {
       // TODO(b/144530470): replace with tablegen attributes/interfaces.
       if (isa<xla_hlo::DotOp>(&op) || isa<xla_hlo::ConvOp>(&op)) {
+        // These two generally result in a lot of generated code so we try to
+        // keep constants out such that can dedupe more. We may still want to
+        // allow some parameters in (shapes/etc).
         return false;
       }
     }
