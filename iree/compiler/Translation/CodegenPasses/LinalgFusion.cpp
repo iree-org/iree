@@ -65,7 +65,7 @@ static bool isConstantFusibleWithLinalgOp(ConstantOp producer,
   auto consumerOp = dyn_cast<linalg::GenericOp>(consumer.getOperation());
   if (!consumerOp || producer.getResult() != consumerOp.getOperand(consumerIdx))
     return false;
-  return !consumerOp.fun();
+  return true;
 }
 
 /// Fuses scalar constant op with linalg::generic op when the former is a
@@ -96,7 +96,6 @@ static Optional<linalg::LinalgOp> fuseGenericOpWithConstantScalar(
       b.getI64IntegerAttr(consumer.getNumOutputs()),
       b.getArrayAttr(fusedIndexingMapAttrs), consumer.iterator_types(),
       /*doc=*/nullptr,
-      /*fun=*/nullptr,
       /*library_call=*/nullptr);
 
   // Build the body of the fused operation. All arguments are the same, except

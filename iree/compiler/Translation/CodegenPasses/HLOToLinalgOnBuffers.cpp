@@ -636,7 +636,7 @@ linalg::IndexedGenericOp ReduceOpConversion::apply(
       rewriter.getArrayAttr(indexingMaps),
       getParallelAndReductionIterAttrs(rewriter, nInputRank,
                                        reductionDims.size()),
-      /*doc=*/nullptr, /*fun=*/nullptr, /*library_call=*/nullptr);
+      /*doc=*/nullptr, /*library_call=*/nullptr);
 
   linalgOp.region().takeBody(reduceOp.body());
   {
@@ -711,7 +711,6 @@ struct LinalgOpOnTensorConversion
         op.getLoc(), ArrayRef<Type>(), opArgs, op.args_in(), op.args_out(),
         op.indexing_maps(), op.iterator_types(),
         /*doc=*/nullptr,
-        /*fun=*/nullptr,
         /*library_call=*/nullptr);
     // Move the region from the replaced op into the new op.
     unsigned numTensorOperands = op.getNumOperands();
