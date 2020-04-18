@@ -157,6 +157,8 @@ LogicalResult outlineDispatchRegion(
       regionOp.getLoc(), namePrefix, {dispatchFuncOp},
       parentFuncOp.getParentOfType<ModuleOp>(), dispatchableFuncOps);
   executableOp.getOperation()->moveBefore(parentFuncOp);
+  SymbolTable::setSymbolVisibility(executableOp,
+                                   SymbolTable::Visibility::Private);
 
   // Add dispatch export pointing at the function.
   OpBuilder builder(executableOp.body());

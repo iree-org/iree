@@ -153,6 +153,10 @@ static ParseResult parseVariableOp(OpAsmParser &parser,
     result->addAttribute("type", TypeAttr::get(type));
   }
 
+  if (failed(parser.parseOptionalAttrDictWithKeyword(result->attributes))) {
+    return failure();
+  }
+
   return success();
 }
 
@@ -174,6 +178,13 @@ static void printVariableOp(OpAsmPrinter &p, VariableOp op) {
     p << " : ";
     p.printType(op.type());
   }
+  p.printOptionalAttrDictWithKeyword(op.getAttrs(), /*elidedAttrs=*/{
+                                         "sym_name",
+                                         "type",
+                                         "is_mutable",
+                                         "initializer",
+                                         "initial_value",
+                                     });
 }
 
 static LogicalResult verifyVariableOp(VariableOp op) {

@@ -73,9 +73,11 @@ static LogicalResult importTfSavedModelGlobalTensorsToIREEFlow(
              << "Multiple exported names for global tensor not supported yet";
     }
     symNameToFlowSymName[globalTensor.sym_name()] = flowSymName;
-    globalBuilder.create<IREE::Flow::VariableOp>(
+    auto variableOp = globalBuilder.create<IREE::Flow::VariableOp>(
         globalTensor.getLoc(), flowSymName, globalTensor.is_mutable(),
         globalTensor.type(), globalTensor.value());
+    SymbolTable::setSymbolVisibility(variableOp,
+                                     SymbolTable::Visibility::Private);
   }
 
   // TODO(silvasean): Make this conversion interprocedural.
