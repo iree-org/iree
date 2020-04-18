@@ -26,8 +26,8 @@ namespace VM {
 
 struct EncodedBytecodeFunction {
   std::vector<uint8_t> bytecodeData;
-  int8_t i32RegisterCount = 0;
-  int8_t refRegisterCount = 0;
+  uint16_t i32RegisterCount = 0;
+  uint16_t refRegisterCount = 0;
 };
 
 // Abstract encoder used for function bytecode encoding.
