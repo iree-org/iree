@@ -204,8 +204,11 @@ class MaterializeResourceCachesPass
         loc, symbolName,
         /*isMutable=*/false, executableCacheType, StringRef(initializerName),
         llvm::None);
+
+    // TODO(GH-1146): we define this as public right now to ensure it remains
+    // after DCE.
     SymbolTable::setSymbolVisibility(variableOp,
-                                     SymbolTable::Visibility::Private);
+                                     SymbolTable::Visibility::Public);
 
     auto initializerOp = moduleBuilder.create<FuncOp>(
         loc, initializerName,
