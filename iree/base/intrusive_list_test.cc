@@ -32,7 +32,7 @@ struct Item {
   size_t some_data_2;
   int value;
 
-  static const size_t kToken = 0xDEADBEEF;
+  static constexpr size_t kToken = 0xDEADBEEF;
   explicit Item(int value)
       : some_data_0(kToken),
         some_data_1(kToken),
