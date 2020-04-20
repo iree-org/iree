@@ -207,6 +207,7 @@ if(${IREE_BUILD_COMPILER})
 elseif(${IREE_ENABLE_LLVM})
   # If not building the compiler, tablegen is still needed
   # to generate vm ops so deep include it only.
+  add_subdirectory(iree/compiler/Dialect/IREE/Tools)
   add_subdirectory(iree/compiler/Dialect/VM/Tools)
 endif()
 
