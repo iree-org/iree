@@ -74,15 +74,14 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   // been expanded to primitives.
   passManager.addPass(createPublicABIGenerationPass());
 
+  // Gather cachable resources such as executables and descriptor sets and
+  // cache them at initialization-time.
   passManager.addPass(createMaterializeResourceCachesPass(targetOptions));
 
-  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<FuncOp>(createCSEPass());
-
-  passManager.addPass(createOutlineDeviceSwitchesPass());
+  // Inline hal.device.switch ops and memoize their queries such that we can
+  // better CSE/fold dispatch logic.
+  passManager.addPass(createInlineDeviceSwitchesPass());
   passManager.addPass(createMemoizeDeviceQueriesPass());
-  // TODO(benvanik): function deduplication to remove outlined functions.
-  passManager.addPass(createInlinerPass());
   passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 

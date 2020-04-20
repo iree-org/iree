@@ -20,11 +20,11 @@ package(
 cc_library(
     name = "Transforms",
     srcs = [
+        "InlineDeviceSwitches.cpp",
         "LinkExecutables.cpp",
         "MaterializeInterfaces.cpp",
         "MaterializeResourceCaches.cpp",
         "MemoizeDeviceQueries.cpp",
-        "OutlineDeviceSwitches.cpp",
         "Passes.cpp",
         "PublicAbiGeneration.cpp",
         "RewriteLegacyIO.cpp",

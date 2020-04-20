@@ -20,11 +20,11 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "InlineDeviceSwitches.cpp"
     "LinkExecutables.cpp"
     "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
     "MemoizeDeviceQueries.cpp"
-    "OutlineDeviceSwitches.cpp"
     "Passes.cpp"
     "PublicAbiGeneration.cpp"
     "RewriteLegacyIO.cpp"
