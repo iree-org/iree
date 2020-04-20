@@ -1,50 +1,47 @@
-// MNIST model with placeholder weights, for translation testing.
+// MNIST model with placeholder weights, for testing.
 
 // RUN: iree-run-mlir -iree-hal-target-backends=vmla %s -input-value="1x28x28x1xf32" | IreeFileCheck %s
 // RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=llvm-ir %s -input-value="1x28x28x1xf32" | IreeFileCheck %s)
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -input-value="1x28x28x1xf32" | IreeFileCheck %s)
 
-module {
-  // CHECK-LABEL: EXEC @main
-  func @main(%arg0: tensor<1x28x28x1xf32>) -> tuple<tensor<1x10xf32>>
-  attributes {iree.module.export} {
-    %cst = constant  {name = "constant.9"} dense<0.5> : tensor<f32>
-    %0 = "xla_hlo.broadcast_in_dim"(%cst) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.10"} : (tensor<f32>) -> tensor<1x128xf32>
-    %1 = "xla_hlo.copy"(%arg0) {name = "copy.1"} : (tensor<1x28x28x1xf32>) -> tensor<1x28x28x1xf32>
-    %2 = "xla_hlo.reshape"(%1) {name = "reshape.2"} : (tensor<1x28x28x1xf32>) -> tensor<1x28x28x1xf32>
-    %3 = "xla_hlo.reshape"(%2) {name = "reshape.3"} : (tensor<1x28x28x1xf32>) -> tensor<1x784xf32>
-    %cst_0 = constant  {name = "constant.4"} dense<0.5> : tensor<784x128xf32>
-    %4 = "xla_hlo.dot"(%3, %cst_0) {name = "dot.5", precision_config = ["DEFAULT", "DEFAULT"]} : (tensor<1x784xf32>, tensor<784x128xf32>) -> tensor<1x128xf32>
-    %cst_1 = constant  {name = "constant.6"} dense<0.5> : tensor<128xf32>
-    %5 = "xla_hlo.broadcast_in_dim"(%cst_1) {broadcast_dimensions = dense<1> : tensor<1xi64>, name = "broadcast.7"} : (tensor<128xf32>) -> tensor<1x128xf32>
-    %6 = "xla_hlo.add"(%4, %5) {name = "add.8"} : (tensor<1x128xf32>, tensor<1x128xf32>) -> tensor<1x128xf32>
-    %7 = "xla_hlo.maximum"(%0, %6) {name = "maximum.11"} : (tensor<1x128xf32>, tensor<1x128xf32>) -> tensor<1x128xf32>
-    %cst_2 = constant  {name = "constant.12"} dense<0.5> : tensor<128x10xf32>
-    %8 = "xla_hlo.dot"(%7, %cst_2) {name = "dot.13", precision_config = ["DEFAULT", "DEFAULT"]} : (tensor<1x128xf32>, tensor<128x10xf32>) -> tensor<1x10xf32>
-    %cst_3 = constant  {name = "constant.14"} dense<0.5> : tensor<10xf32>
-    %9 = "xla_hlo.broadcast_in_dim"(%cst_3) {broadcast_dimensions = dense<1> : tensor<1xi64>, name = "broadcast.15"} : (tensor<10xf32>) -> tensor<1x10xf32>
-    %10 = "xla_hlo.add"(%8, %9) {name = "add.16"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xf32>
-    %cst_4 = constant  {name = "constant.17"} dense<0xFF800000> : tensor<f32>
-    %11 = "xla_hlo.reduce"(%10, %cst_4) ( {
+module attributes {tf.versions = {bad_consumers = [], min_consumer = 12 : i32, producer = 175 : i32}} {
+  flow.variable @"__iree_flow___sm_node15__model.layer-2.kernel" dense<0.5> : tensor<784x128xf32>
+  flow.variable @"__iree_flow___sm_node16__model.layer-2.bias" dense<0.1> : tensor<128xf32>
+  flow.variable @"__iree_flow___sm_node21__model.layer-3.kernel" dense<0.5> : tensor<128x10xf32>
+  flow.variable @"__iree_flow___sm_node22__model.layer-3.bias" dense<0.1> : tensor<10xf32>
+  // CHECK-LABEL: EXEC @predict
+  func @predict(%arg0: tensor<1x28x28x1xf32>) -> tensor<1x10xf32> attributes {iree.module.export, iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I8!S5!k0_0R3!_0"}, tf._input_shapes = ["tfshape$dim { size: 1 } dim { size: 28 } dim { size: 28 } dim { size: 1 }", "tfshape$unknown_rank: true", "tfshape$unknown_rank: true", "tfshape$unknown_rank: true", "tfshape$unknown_rank: true"], tf.signature.is_stateful} {
+    %0 = flow.variable.address @"__iree_flow___sm_node15__model.layer-2.kernel" : !iree.ptr<tensor<784x128xf32>>
+    %1 = flow.variable.address @"__iree_flow___sm_node16__model.layer-2.bias" : !iree.ptr<tensor<128xf32>>
+    %2 = flow.variable.address @"__iree_flow___sm_node21__model.layer-3.kernel" : !iree.ptr<tensor<128x10xf32>>
+    %3 = flow.variable.address @"__iree_flow___sm_node22__model.layer-3.bias" : !iree.ptr<tensor<10xf32>>
+    %4 = xla_hlo.constant dense<0xFF800000> : tensor<f32>
+    %5 = xla_hlo.constant dense<0.000000e+00> : tensor<f32>
+    %6 = flow.variable.load.indirect %3 : !iree.ptr<tensor<10xf32>> -> tensor<10xf32>
+    %7 = flow.variable.load.indirect %2 : !iree.ptr<tensor<128x10xf32>> -> tensor<128x10xf32>
+    %8 = flow.variable.load.indirect %1 : !iree.ptr<tensor<128xf32>> -> tensor<128xf32>
+    %9 = flow.variable.load.indirect %0 : !iree.ptr<tensor<784x128xf32>> -> tensor<784x128xf32>
+    %10 = "xla_hlo.reshape"(%arg0) : (tensor<1x28x28x1xf32>) -> tensor<1x784xf32>
+    %11 = "xla_hlo.dot"(%10, %9) : (tensor<1x784xf32>, tensor<784x128xf32>) -> tensor<1x128xf32>
+    %12 = "xla_hlo.add"(%11, %8) {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x128xf32>, tensor<128xf32>) -> tensor<1x128xf32>
+    %13 = "xla_hlo.maximum"(%12, %5) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<1x128xf32>, tensor<f32>) -> tensor<1x128xf32>
+    %14 = "xla_hlo.dot"(%13, %7) : (tensor<1x128xf32>, tensor<128x10xf32>) -> tensor<1x10xf32>
+    %15 = "xla_hlo.add"(%14, %6) {broadcast_dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<10xf32>) -> tensor<1x10xf32>
+    %16 = "xla_hlo.reduce"(%15, %4) ( {
     ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):   // no predecessors
-      %20 = "xla_hlo.maximum"(%arg1, %arg2) {name = "maximum.21"} : (tensor<f32>, tensor<f32>) -> tensor<f32>
-      "xla_hlo.return"(%20) : (tensor<f32>) -> ()
-    }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
-    %12 = "xla_hlo.broadcast_in_dim"(%11) {broadcast_dimensions = dense<0> : tensor<1xi64>, name = "broadcast.23"} : (tensor<1xf32>) -> tensor<1x10xf32>
-    %13 = "xla_hlo.subtract"(%10, %12) {name = "subtract.24"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xf32>
-    %14 = "xla_hlo.exponential"(%13) {name = "exponential.25"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
-    %cst_5 = constant  {name = "constant.27"} dense<0.5> : tensor<f32>
-    %15 = "xla_hlo.reduce"(%14, %cst_5) ( {
-    ^bb0(%arg3: tensor<f32>, %arg4: tensor<f32>):   // no predecessors
-      %21 = "xla_hlo.add"(%arg3, %arg4) {name = "add.31"} : (tensor<f32>, tensor<f32>) -> tensor<f32>
+      %21 = xla_hlo.maximum %arg1, %arg2 : tensor<f32>
       "xla_hlo.return"(%21) : (tensor<f32>) -> ()
     }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
-    %16 = "xla_hlo.broadcast_in_dim"(%15) {broadcast_dimensions = dense<0> : tensor<1xi64>, name = "broadcast.34"} : (tensor<1xf32>) -> tensor<1x10xf32>
-    %17 = "xla_hlo.divide"(%14, %16) {name = "divide.35"} : (tensor<1x10xf32>, tensor<1x10xf32>) -> tensor<1x10xf32>
-    %18 = "xla_hlo.reshape"(%17) {name = "reshape.36"} : (tensor<1x10xf32>) -> tensor<1x10xf32>
-    %19 = "xla_hlo.tuple"(%18) {name = "tuple.37"} : (tensor<1x10xf32>) -> tuple<tensor<1x10xf32>>
-    return %19 : tuple<tensor<1x10xf32>>
+    %17 = "xla_hlo.subtract"(%15, %16) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<1xf32>) -> tensor<1x10xf32>
+    %18 = "xla_hlo.exponential"(%17) : (tensor<1x10xf32>) -> tensor<1x10xf32>
+    %19 = "xla_hlo.reduce"(%18, %5) ( {
+    ^bb0(%arg1: tensor<f32>, %arg2: tensor<f32>):   // no predecessors
+      %21 = xla_hlo.add %arg1, %arg2 : tensor<f32>
+      "xla_hlo.return"(%21) : (tensor<f32>) -> ()
+    }) {dimensions = dense<1> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<f32>) -> tensor<1xf32>
+    %20 = "xla_hlo.divide"(%18, %19) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<1x10xf32>, tensor<1xf32>) -> tensor<1x10xf32>
+    return %20 : tensor<1x10xf32>
   }
 }
 
-// CHECK: 1x10xf32=[0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}} 0.09{{[0-9]+}}]
+// CHECK: 1x10xf32=[0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1]
