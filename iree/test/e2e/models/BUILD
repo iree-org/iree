@@ -23,9 +23,7 @@ package(
 
 iree_lit_test_suite(
     name = "lit",
-    srcs = glob(
-        ["*.mlir"],
-    ),
+    srcs = glob(["*.mlir"]),
     data = [
         "//iree/tools:IreeFileCheck",
         "//iree/tools:iree-run-mlir",
