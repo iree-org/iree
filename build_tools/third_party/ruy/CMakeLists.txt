@@ -398,11 +398,11 @@ external_cc_library(
   PACKAGE
     ruy
   NAME
-    internal_matrix
+    mat
   ROOT
     ${RUY_SRC_ROOT}
   HDRS
-    "internal_matrix.h"
+    "mat.h"
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
@@ -450,7 +450,7 @@ external_cc_library(
     gemmlowp::profiler
     ruy::check_macros
     ruy::common
-    ruy::internal_matrix
+    ruy::mat
     ruy::matrix
     ruy::opt_set
     ruy::path
@@ -479,7 +479,7 @@ external_cc_library(
     gemmlowp::profiler
     ruy::check_macros
     ruy::common
-    ruy::internal_matrix
+    ruy::mat
     ruy::matrix
     ruy::opt_set
     ruy::path
@@ -787,7 +787,7 @@ external_cc_library(
     gemmlowp::profiler
     ruy::check_macros
     ruy::common
-    ruy::internal_matrix
+    ruy::mat
     ruy::kernel_arm
     ruy::kernel_avx2
     ruy::kernel_avx512
@@ -820,7 +820,7 @@ external_cc_library(
     gemmlowp::profiler
     ruy::check_macros
     ruy::common
-    ruy::internal_matrix
+    ruy::mat
     ruy::matrix
     ruy::opt_set
     ruy::pack_arm  # fixdeps: keep
@@ -917,7 +917,7 @@ external_cc_library(
   COPTS
     ${RUY_COPTS_BASE}
   DEPS
-    ruy::internal_matrix
+    ruy::mat
     ruy::side_pair
     ruy::tune
 )
@@ -943,7 +943,7 @@ external_cc_library(
     ruy::common
     ruy::context
     ruy::context_internal
-    ruy::internal_matrix
+    ruy::mat
     ruy::matrix
     ruy::opt_set
     ruy::side_pair
@@ -976,7 +976,7 @@ external_cc_library(
     ruy::common
     ruy::context
     ruy::context_internal
-    ruy::internal_matrix
+    ruy::mat
     ruy::kernel
     ruy::matrix
     ruy::opt_set
