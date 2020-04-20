@@ -1,4 +1,4 @@
-// RUN: iree-opt -print-ir-after-all -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @device_allocator
 func @device_allocator() -> !hal.allocator {

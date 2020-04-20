@@ -82,16 +82,17 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   passManager.addPass(createOutlineDeviceSwitchesPass());
   passManager.addPass(createMemoizeDeviceQueriesPass());
   // TODO(benvanik): function deduplication to remove outlined functions.
-
-  // TODO(benvanik): run symbol DCE when all symbols have visibility defined.
-  // Right now the global value initializers don't have proper tracking and if
-  // we do this we lose initializers that have side effects we care about.
-  // passManager.addPass(createSymbolDCEPass());
+  passManager.addPass(createInlinerPass());
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
+  passManager.addNestedPass<FuncOp>(createCSEPass());
 
   // TODO(GH-1036): run this once per hal.executable.target in a nested pass
   // manager so that we have as many passes as hal.executable.target ops.
   if (transformOptions.serializeExecutables) {
     passManager.addPass(createSerializeExecutablesPass(targetOptions));
+    // NOTE: symbol DCE will destroy executable target contents, so only run it
+    // if we serialized things.
+    passManager.addPass(createSymbolDCEPass());
   }
 }
 

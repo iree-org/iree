@@ -97,7 +97,8 @@ class T0002b_SimpleVarWrite(tf.Module):
 # CHECK: attributes
 # CHECK-SAME: iree.module.export
 # CHECK-SAME: iree.reflection = {abi = "sip", abiv = 1 : i32, sip = "I1!R3!_0"}
-# CHECK: flow.variable.load [[CONST]] : tensor<f32>
+# NOTE: the constant variable gets inlined:
+# CHECK: = constant dense<0.000000e+00> : tensor<f32>
 # CHECK: FINISH_TEST
 class T0002c_SimpleConst(tf.Module):
 

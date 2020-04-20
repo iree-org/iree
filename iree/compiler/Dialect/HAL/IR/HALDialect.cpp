@@ -24,6 +24,7 @@
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/OpImplementation.h"
 #include "mlir/Parser.h"
+#include "mlir/Transforms/InliningUtils.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -33,6 +34,23 @@ namespace HAL {
 namespace {
 
 static DialectRegistration<HALDialect> hal_dialect;
+
+// Used to control inlining behavior.
+struct HALInlinerInterface : public DialectInlinerInterface {
+  using DialectInlinerInterface::DialectInlinerInterface;
+
+  bool isLegalToInline(Region *dest, Region *src,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+
+  bool isLegalToInline(Operation *op, Region *dest,
+                       BlockAndValueMapping &valueMapping) const final {
+    // Sure!
+    return true;
+  }
+};
 
 class HALToVMConversionInterface : public VMConversionDialectInterface {
  public:
@@ -64,7 +82,7 @@ class HALToVMConversionInterface : public VMConversionDialectInterface {
 
 HALDialect::HALDialect(MLIRContext *context)
     : Dialect(getDialectNamespace(), context) {
-  addInterfaces<HALToVMConversionInterface>();
+  addInterfaces<HALInlinerInterface, HALToVMConversionInterface>();
 
   addAttributes<DescriptorSetLayoutBindingAttr, MatchAlwaysAttr, MatchAnyAttr,
                 MatchAllAttr, DeviceMatchIDAttr>();

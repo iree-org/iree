@@ -179,9 +179,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager) {
   passManager.addPass(IREE::Flow::createFormStreamsPass());
   // Forming streams involves a fair amount of subgraph stitching, which can
   // cause duplication. Run CSE to collapse.
+  passManager.addNestedPass<FuncOp>(createCanonicalizerPass());
   passManager.addNestedPass<FuncOp>(createCSEPass());
 
-  // TODO(benvanik): run symbol DCE pass.
+  // Symbol DCE any remaining variables/functions that are now no longer
+  // required.
+  passManager.addPass(createSymbolDCEPass());
 }
 
 static PassPipelineRegistration<> transformPassPipeline(

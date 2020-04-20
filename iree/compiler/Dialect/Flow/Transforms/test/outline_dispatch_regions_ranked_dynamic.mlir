@@ -6,7 +6,7 @@
 // CHECK-LABEL: @dynamicRankedShapeModule
 // Verify that the outlined function properly expands shape dims
 // Note that all but the entry shape ties/ops are removed.
-// CHECK: flow.executable @dynamicRankedShape_ex_dispatch_0 {
+// CHECK: flow.executable @dynamicRankedShape_ex_dispatch_0
 // CHECK: func @dynamicRankedShape_ex_dispatch_0(%[[EXARG0:.+]]: tensor<7x?x24x?xf32>, %[[EXARG1:.+]]: index, %[[EXARG2:.+]]: index) -> tensor<?x?x1024xf32> {
 // CHECK-DAG: %[[EXSHAPE0:.+]] = shapex.make_ranked_shape %[[EXARG1]], %[[EXARG2]]
 // CHECK-DAG: %[[EXT0:.+]] = shapex.tie_shape %[[EXARG0]], %[[EXSHAPE0]]

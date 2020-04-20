@@ -160,6 +160,23 @@ void VariableOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
   results.insert<InlineConstVariableOpInitializer>(context);
 }
 
+OpFoldResult VariableLoadOp::fold(ArrayRef<Attribute> operands) {
+  auto variableOp = dyn_cast_or_null<VariableOp>(
+      SymbolTable::lookupNearestSymbolFrom(*this, variable()));
+  if (!variableOp) return {};
+  if (variableOp.is_mutable()) {
+    // We can't inline mutable variables as they may be changed at any time.
+    // There may still be other folders/canonicalizers that can help (such as
+    // store-forwarding).
+    return {};
+  } else if (!variableOp.initial_value()) {
+    // Uninitialized variables (or those with initializers) can't be folded as
+    // we don't yet know the value. InlineConstVariableOpInitializer may help.
+    return {};
+  }
+  return variableOp.initial_value().getValue();
+}
+
 namespace {
 
 class PropagateVariableLoadAddress

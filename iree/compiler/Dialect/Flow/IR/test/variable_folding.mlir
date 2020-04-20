@@ -21,6 +21,17 @@ func @unused_load() {
 
 // -----
 
+flow.variable @v_const dense<1.0> : tensor<8xf32>
+// CHECK-LABEL: @fold_immutable_const
+func @fold_immutable_const() -> tensor<8xf32> {
+  // CHECK-NEXT: %[[CONST:.+]] = constant dense<1.{{.+}}> : tensor<8xf32>
+  %0 = flow.variable.load @v_const : tensor<8xf32>
+  // CHECK-NEXT: return %[[CONST]] : tensor<8xf32>
+  return %0 : tensor<8xf32>
+}
+
+// -----
+
 flow.variable @v_nop mutable : tensor<4xi32>
 // CHECK-LABEL: @nop_load_store
 func @nop_load_store() {
