@@ -16,36 +16,40 @@ documented separately, as they require further setup.
 
 ## Prerequisites
 
-### Install CMake
+### Generic and IDE setup
 
-Install CMake version >= 3.13:
+See shortcuts for specific distros below.
 
-```shell
-$ sudo apt install cmake
-```
+#### Install CMake
+
+* Install CMake version >= 3.13
 
 > Tip:<br>
 > &nbsp;&nbsp;&nbsp;&nbsp;Your editor of choice likely has plugins for CMake,
 > such as the Visual Studio Code
 > [CMake Tools](https://github.com/microsoft/vscode-cmake-tools) extension.
 
-### Install Ninja
+#### Install Ninja
 
 [Ninja](https://ninja-build.org/) is a fast build system that you can use as a
 CMake generator. Follow Ninja's
 [installing documentation](https://github.com/ninja-build/ninja/wiki/Pre-built-Ninja-packages).
 
-### Install a Compiler
+#### Install a Compiler
 
 We recommend Clang. GCC is not fully supported.
-
-```shell
-$ sudo apt install clang
-```
 
 Set environment variables:
 
 ```shell
+export CC=clang
+export CXX=clang++
+```
+
+#### Short-cuts for Debian (>= Buster)/Ubuntu
+
+```shell
+sudo apt install cmake ninja-build clang python3-dev libvulkan-dev
 export CC=clang
 export CXX=clang++
 ```
@@ -57,9 +61,9 @@ export CXX=clang++
 Clone the repository and initialize its submodules:
 
 ```shell
-$ git clone https://github.com/google/iree.git
-$ cd iree
-$ git submodule update --init
+git clone https://github.com/google/iree.git
+cd iree
+git submodule update --init
 ```
 
 > Tip:<br>
@@ -71,7 +75,7 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -G Ninja -B build/ .
+cmake -G Ninja -B build/ .
 ```
 
 > Tip:<br>
@@ -82,7 +86,7 @@ $ cmake -G Ninja -B build/ .
 Build all targets:
 
 ```shell
-$ cmake --build build/
+cmake --build build/
 ```
 
 ## What's next?
@@ -92,8 +96,8 @@ $ cmake --build build/
 Check out the contents of the 'tools' build directory:
 
 ```shell
-$ ls build/iree/tools
-$ ./build/iree/tools/iree-translate --help
+ls build/iree/tools
+./build/iree/tools/iree-translate --help
 ```
 
 Translate a
@@ -101,7 +105,7 @@ Translate a
 and execute a function in the compiled module:
 
 ```shell
-$ ./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
+./build/iree/tools/iree-run-mlir $PWD/iree/tools/test/simple.mlir -input-value="i32=-2" -iree-hal-target-backends=vmla -print-mlir
 ```
 
 ### Further Reading
