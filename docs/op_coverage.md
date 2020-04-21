@@ -14,10 +14,12 @@ There are four backend [targets](https://github.com/google/iree/tree/master/iree
 - vulkan (direct path)
 - vulkan (structured ops path)
 
-(**Note**: IREE currently has two compilation paths for Vulkan, shown as above.
-The direct path lowers XLA HLOs to SPIR-V in one step; the structured ops path
-goes multiple steps in a progressive way. The plan is to deprecate the direct
-path soon.)
+> Note
+> {: .label .label-blue }
+> IREE currently has two compilation paths for Vulkan,
+> shown as above. The direct path lowers XLA HLOs to SPIR-V in one step; the
+> structured ops path goes multiple steps in a progressive way. The plan is to
+> deprecate the direct path soon.)
 
 The table shows the supported XLA HLO ops on each backend.
 

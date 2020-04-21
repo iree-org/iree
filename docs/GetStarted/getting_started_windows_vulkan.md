@@ -3,6 +3,7 @@ layout: default
 permalink: GetStarted/WindowsVulkan
 parent: Getting Started
 title: Windows with Vulkan
+nav_order: 6
 ---
 
 # Getting Started on Windows with Vulkan

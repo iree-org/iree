@@ -3,6 +3,7 @@ layout: default
 permalink: GetStarted/LinuxVulkan
 parent: Getting Started
 title: Linux with Vulkan
+nav_order: 3
 ---
 
 # Getting Started on Linux with Vulkan
