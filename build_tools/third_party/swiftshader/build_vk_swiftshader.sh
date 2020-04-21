@@ -65,6 +65,7 @@ fi
 #   - Build Vulkan only, don't build GL
 #   - Don't build samples or tests
 cmake -B build-swiftshader/ \
+    -GNinja \
     $PLATFORM_ARGS \
     -DSWIFTSHADER_BUILD_VULKAN=ON \
     -DSWIFTSHADER_BUILD_EGL=OFF \
@@ -75,7 +76,7 @@ cmake -B build-swiftshader/ \
     third_party/swiftshader/
 
 # Build the project, choosing just the vk_swiftshader target.
-cmake --build build-swiftshader/ --config Release -j 8 --target vk_swiftshader
+cmake --build build-swiftshader/ --config Release --target vk_swiftshader
 
 # Outputs if successful:
 #   Linux:   build-swiftshader/Linux/libvk_swiftshader.so
