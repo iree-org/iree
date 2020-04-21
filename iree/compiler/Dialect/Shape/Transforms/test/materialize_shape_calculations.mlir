@@ -17,6 +17,23 @@ func @compileTime(%arg0 : tensor<?x2xf32>, %arg1 : !shapex.ranked_shape<[?,2]>) 
 }
 
 // -----
+
+// CHECK-LABEL: @f
+func @f(%arg0 : !shapex.ranked_shape<[?]>, %arg1 : !shapex.ranked_shape<[?]>) -> (!shapex.ranked_shape<[?]>) {
+  // CHECK-DAG: %[[LHSEXTENT:.+]] = shapex.ranked_dim %arg0[0]
+  // CHECK-DAG: %[[RHSEXTENT:.+]] = shapex.ranked_dim %arg1[0]
+  // CHECK-DAG: %[[GT:.+]] = cmpi "ugt", %[[LHSEXTENT]], %[[RHSEXTENT]] : index
+  // CHECK-DAG: %[[MAX:.+]] = select %[[GT]], %[[LHSEXTENT]], %[[RHSEXTENT]] : index
+  // CHECK-DAG: %[[RS:.+]] = shapex.make_ranked_shape %[[MAX]]
+  // CHECK-DAG: return %[[RS]]
+  %0 = "shapex.ranked_broadcast_shape"(%arg0, %arg1) {
+    lhs_broadcast_dimensions = dense<[0]> : tensor<1xi64>,
+    rhs_broadcast_dimensions = dense<[0]> : tensor<1xi64>
+  } : (!shapex.ranked_shape<[?]>, !shapex.ranked_shape<[?]>) -> !shapex.ranked_shape<[?]>
+  return %0 : !shapex.ranked_shape<[?]>
+}
+
+// -----
 // CHECK-LABEL: @runTimeFallback
 // CHECK-SAME: %[[T:[^:[:space:]]+]]: tensor<?x2xf32>
 // CHECK-SAME: %[[SHAPE:[^:[:space:]]+]]: !shapex.ranked_shape<[?,2]>

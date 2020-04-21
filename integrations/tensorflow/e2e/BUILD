@@ -36,6 +36,7 @@ package(
         ],
     )
     for name in [
+        "broadcasting_test",
         "batch_norm_test",
         "fill_test",
         "control_flow_test",
