@@ -37,10 +37,11 @@ There are four backend [targets](https://github.com/google/iree/tree/master/iree
 - vulkan (direct path)
 - vulkan (structured ops path)
 
-(**Note**: IREE currently has two compilation paths for Vulkan, shown as above.
-The direct path lowers XLA HLOs to SPIR-V in one step; the structured ops path
-goes multiple steps in a progressive way. The plan is to deprecate the direct
-path soon.)
+> Note:<br>
+> &nbsp;&nbsp;&nbsp;&nbsp;IREE currently has two compilation paths for Vulkan,
+> shown as above. The direct path lowers XLA HLOs to SPIR-V in one step; the
+> structured ops path goes multiple steps in a progressive way. The plan is to
+> deprecate the direct path soon.)
 
 The table shows the supported XLA HLO ops on each backend.
 
@@ -124,6 +125,6 @@ if __name__ == '__main__':
   args = parse_arguments()
   content = generate_table(args.build_dir)
   table_path = os.path.join(args.build_dir, 'doc', 'op_coverage.md')
-  with open(table_path, 'w') as f:
+  with open(table_path, 'w', encoding='utf-8') as f:
     f.write(OP_COVERAGE_DESCRIPTION)
     f.write(content)

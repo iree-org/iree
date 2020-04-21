@@ -70,3 +70,4 @@ cp docs/GetStarted/getting_started_windows_vulkan.md ${BUILD_DIR}/doc/GetStarted
 cp docs/GetStarted/getting_started_linux_bazel.md ${BUILD_DIR}/doc/GetStarted/
 cp docs/GetStarted/getting_started_linux_cmake.md ${BUILD_DIR}/doc/GetStarted/
 cp docs/GetStarted/getting_started_linux_vulkan.md ${BUILD_DIR}/doc/GetStarted/
+cp docs/GetStarted/getting_started_python.md ${BUILD_DIR}/doc/GetStarted/
