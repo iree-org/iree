@@ -141,6 +141,8 @@ typedef struct {
 //===----------------------------------------------------------------------===//
 
 // Well-known status codes matching iree::StatusCode.
+// Note that any code within IREE_STATUS_CODE_MASK is valid even if not
+// enumerated here. Always check for unhandled errors/have default conditions.
 typedef enum {
   IREE_STATUS_OK = 0,
   IREE_STATUS_CANCELLED = 1,

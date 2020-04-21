@@ -146,6 +146,25 @@ vm.module @my_module {
 
 // -----
 
+vm.module @my_module {
+  // CHECK-LABEL: @fail
+  vm.func @fail() {
+    // CHECK-DAG: %[[CODE1:.+]] = constant 1
+    %code1 = constant 1 : i32
+    // CHECK: vm.fail %[[CODE1]]
+    vm.fail %code1
+  }
+  // CHECK-LABEL: @fail_message
+  vm.func @fail_message() {
+    // CHECK-DAG: %[[CODE2:.+]] = constant 2
+    %code2 = constant 2 : i32
+    // CHECK: vm.fail %[[CODE2]], "message"
+    vm.fail %code2, "message"
+  }
+}
+
+// -----
+
 // CHECK-LABEL: @yield
 vm.module @my_module {
   vm.func @yield() {

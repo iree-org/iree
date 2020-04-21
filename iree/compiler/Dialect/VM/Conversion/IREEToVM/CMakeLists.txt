@@ -1,4 +1,4 @@
-# Copyright 2019 Google LLC
+# Copyright 2020 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,27 +16,19 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    Transforms
+    IREEToVM
   HDRS
-    "Passes.h"
+    "ConvertIREEToVM.h"
   SRCS
-    "Conversion.cpp"
-    "GlobalInitialization.cpp"
-    "MarkPublicSymbolsExported.cpp"
-    "OrdinalAllocation.cpp"
-    "Passes.cpp"
+    "ConvertIREEToVM.cpp"
   DEPS
-    LLVMSupport
     MLIRIR
     MLIRPass
-    MLIRSupport
+    MLIRStandardOps
     MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Dialect::IREE::Conversion::PreserveCompilerHints
-    iree::compiler::Dialect::Shape::IR
+    iree::compiler::Dialect::IREE::IR
     iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::IREEToVM
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR
   PUBLIC
 )

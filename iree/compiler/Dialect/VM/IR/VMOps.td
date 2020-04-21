@@ -1577,6 +1577,53 @@ def VM_ReturnOp : VM_Op<"return", [
   ];
 }
 
+def VM_FailOp : VM_Op<"fail", [
+    DeclareOpInterfaceMethods<VM_SerializableOpInterface>,
+    HasParent<"IREE::VM::FuncOp">,
+    Terminator,
+  ]> {
+  let summary = [{raises a global failure}];
+  let description = [{
+    Signals a runtime failure that causes the entire active invocation - and
+    possibly *all* in-flight and pending invocations - to fail with the given
+    status. The status will be propagated back via the available runtime error
+    handling mechanisms such as semaphores or synchronous invocation results.
+
+    As the IREE execution model is deeply pipelined it's possible that failures
+    have a latency between when they are emitted and when the application can
+    observe the failure. It's also possible that other work that is in-flight
+    or pending when the failure occurs will complete.
+  }];
+
+  let arguments = (ins
+    IREE_Status:$status,
+    OptionalAttr<StrAttr>:$message
+  );
+
+  let assemblyFormat = [{
+    $status (`,` $message^)? attr-dict
+  }];
+
+  let encoding = [
+    VM_EncOpcode<VM_OPC_Fail>,
+    VM_EncOperand<"status", 0>,
+    VM_EncStrAttr<"message">,
+  ];
+
+  let builders = [
+    OpBuilder<[{
+      Builder *builder, OperationState &result,
+      Value status, StringRef message = ""
+    }], [{
+      build(
+          builder, result, status,
+          message.empty() ? StringAttr{} : builder->getStringAttr(message));
+    }]>,
+  ];
+
+  let verifier = [{ return verifyFailOp(*this); }];
+}
+
 //===----------------------------------------------------------------------===//
 // Async/fiber ops
 //===----------------------------------------------------------------------===//

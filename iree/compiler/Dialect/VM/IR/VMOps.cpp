@@ -924,6 +924,20 @@ Optional<OperandRange> CondBranchOp::getSuccessorOperands(unsigned index) {
 
 bool CondBranchOp::canEraseSuccessorOperand() { return true; }
 
+static LogicalResult verifyFailOp(FailOp op) {
+  APInt status;
+  if (matchPattern(op.status(), m_ConstantInt(&status))) {
+    if (status == 0) {
+      return op.emitOpError() << "status is 0; expected to not be OK";
+    }
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// Async/fiber ops
+//===----------------------------------------------------------------------===//
+
 //===----------------------------------------------------------------------===//
 // Debugging
 //===----------------------------------------------------------------------===//
