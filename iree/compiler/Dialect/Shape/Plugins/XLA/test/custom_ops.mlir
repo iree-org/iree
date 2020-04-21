@@ -35,3 +35,14 @@ func @dot_general(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>,
   %1 = shapex.get_ranked_shape %0 : tensor<?x?x?xf32> -> !shapex.ranked_shape<[?,?,?]>
   return %1 : !shapex.ranked_shape<[?,?,?]>
 }
+
+// -----
+
+// CHECK-LABEL: func @dynamic_reshape
+func @dynamic_reshape(%arg0: tensor<?xf32>, %arg1: tensor<2xindex>) -> !shapex.ranked_shape<[?,?]> {
+  // CHECK-DAG: %[[SHAPE:.+]] = "shapex.from_extent_tensor"(%arg1)
+  // CHECK-DAG: return %[[SHAPE]]
+  %0 = "xla_hlo.dynamic_reshape"(%arg0, %arg1) : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+  %1 = shapex.get_ranked_shape %0 : tensor<?x?xf32> -> !shapex.ranked_shape<[?,?]>
+  return %1 : !shapex.ranked_shape<[?,?]>
+}

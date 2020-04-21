@@ -277,6 +277,12 @@ Value rewriteDotGeneral(RankedShapeType resultShape, DotGeneralOp op,
   return builder.create<MakeRankedShapeOp>(loc, resultShape, outputExtents);
 }
 
+Value rewriteDynamicReshape(RankedShapeType resultShape, DynamicReshapeOp op,
+                            OpBuilder &builder) {
+  return builder.create<FromExtentTensorOp>(op.getLoc(), resultShape,
+                                            op.output_shape());
+}
+
 }  // namespace
 
 // Creates a custom op shape builder for XLA-HLO ops that are not otherwise
@@ -306,6 +312,8 @@ void populateXlaHloCustomOpShapeBuilder(CustomOpShapeBuilderList &builders) {
   b.insertOpRankedShapeBuilder<ReduceOp>(rewriteReduce);
   b.insertOpRankedShapeBuilder<TransposeOp>(rewriteTranspose);
   b.insertOpRankedShapeBuilder<xla_hlo::DotGeneralOp>(rewriteDotGeneral);
+  b.insertOpRankedShapeBuilder<xla_hlo::DynamicReshapeOp>(
+      rewriteDynamicReshape);
 }
 
 }  // namespace xla_hlo
