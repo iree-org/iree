@@ -59,7 +59,7 @@
 //   e.g. when validating user input.
 
 #if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
-#include "iree/base/google/logging_google.h"
+#include "iree/base/google_internal/logging_google.h"
 #else
 #include "iree/base/internal/logging.h"
 #endif  // IREE_CONFIG_GOOGLE_INTERNAL

@@ -16,7 +16,7 @@
 #define IREE_TESTING_GTEST_H_
 
 #if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
-#include "iree/testing/google/gtest_google.h"
+#include "iree/testing/google_internal/gtest_google.h"
 #else
 #include "iree/testing/internal/gtest_internal.h"
 #endif  // IREE_CONFIG_GOOGLE_INTERNAL

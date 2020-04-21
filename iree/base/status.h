@@ -16,7 +16,7 @@
 #define IREE_BASE_STATUS_H_
 
 #if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
-#include "iree/base/google/status_google.h"
+#include "iree/base/google_internal/status_google.h"
 #else
 #include "iree/base/internal/status.h"
 #include "iree/base/internal/status_builder.h"

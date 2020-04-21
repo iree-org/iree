@@ -19,7 +19,7 @@
 // should be called early in main(), before other code runs.
 
 #if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
-#include "iree/base/google/init_google.h"
+#include "iree/base/google_internal/init_google.h"
 #else
 #include "iree/base/internal/init_internal.h"
 #endif  // IREE_CONFIG_GOOGLE_INTERNAL

@@ -17,7 +17,7 @@
 
 #if defined(IREE_CONFIG_GOOGLE_INTERNAL) && IREE_CONFIG_GOOGLE_INTERNAL
 
-#include "iree/base/google/status_matchers_google.h"  // IWYU pragma: export
+#include "iree/base/google_internal/status_matchers_google.h"  // IWYU pragma: export
 
 #else
 
