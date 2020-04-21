@@ -24,10 +24,11 @@ Install a recent version of [Python 3](https://www.python.org/downloads/) and
 Install packages:
 
 ```shell
-$ pip install numpy
+$ python3 -m pip install --upgrade pip
+$ python3 -m pip install numpy
 
 # If using the TensorFlow integration
-$ pip install tf-nightly
+$ python3 -m pip install tf-nightly
 ```
 
 ## Running Python Tests
