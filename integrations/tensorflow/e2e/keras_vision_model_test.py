@@ -71,6 +71,9 @@ APP_MODELS = {
 
 def models():
   tf.keras.backend.set_learning_phase(False)
+  # TODO(ataei): This should move somewhere in SavedModelTestCase, it should
+  # guarantee test is deterministic.
+  tf.random.set_seed(0)
 
   # keras model receives images size as input,
   # where batch size is not specified - by default it is dynamic
@@ -97,7 +100,8 @@ class AppTest(tf_test_utils.SavedModelTestCase):
     input_data = np.random.rand(np.prod(np.array(INPUT_SHAPE))).astype(
         np.float32)
     input_data = input_data.reshape(INPUT_SHAPE)
-    self.modules.applications.all.predict(input_data).print().assert_all_close()
+    self.modules.applications.all.predict(input_data).print().assert_all_close(
+        atol=1e-6)
 
 
 if __name__ == '__main__':
