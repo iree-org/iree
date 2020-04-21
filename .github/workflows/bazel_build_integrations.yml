@@ -14,7 +14,7 @@
 
 # Builds and tests iree core directory.
 
-name: Integrations Bazel Build
+name: Bazel Build - Integrations
 
 on:
   push:

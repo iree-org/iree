@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Builds and tests directories not covered by other workflows.
+# Builds and tests iree core directory.
 
-name: Fallthrough Bazel Build
+name: Bazel Build - Core
 
 on:
   push:
@@ -62,7 +62,7 @@ jobs:
           # tagged "manual". The "manual" tag allows targets to be excluded from
           # human wildcard builds, but we want them built by CI unless they are
           # excluded with "noga".
-          bazel query '//... -//iree/... -//bindings/... -//integrations/...' \
+          bazel query '//iree/...' \
             | xargs bazel test \
               --build_tag_filters="-noga" \
               --test_tag_filters="-noga,-driver=vulkan" \

@@ -14,7 +14,7 @@
 
 # Builds and tests iree bindings directory.
 
-name: Bindings Bazel Build
+name: Bazel Build - Bindings
 
 on:
   push:
