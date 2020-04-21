@@ -56,7 +56,7 @@ Run the test:
 
 ```shell
 # -- CMake --
-$ set VK_LOADER_DEBUG=all
+$ export VK_LOADER_DEBUG=all
 $ cmake --build build/ --target iree_hal_vulkan_dynamic_symbols_test
 $ ./build/iree/hal/vulkan/iree_hal_vulkan_dynamic_symbols_test
 
@@ -72,7 +72,7 @@ Run the
 
 ```shell
 # -- CMake --
-$ set VK_LOADER_DEBUG=all
+$ export VK_LOADER_DEBUG=all
 $ cmake --build build/ --target iree_hal_cts_device_creation_test
 $ ./build/iree/hal/cts/iree_hal_cts_device_creation_test
 
@@ -120,7 +120,7 @@ After building, set the `VK_ICD_FILENAMES` environment variable so the Vulkan
 loader uses the ICD:
 
 ```shell
-$ VK_ICD_FILENAMES=$PWD/build-swiftshader/Linux/vk_swiftshader_icd.json
+$ export VK_ICD_FILENAMES=$PWD/build-swiftshader/Linux/vk_swiftshader_icd.json
 ```
 
 ### Setting up Vulkan-ExtensionLayer
@@ -143,10 +143,10 @@ path to the built layer:
 
 ```shell
 # -- CMake --
-$ VK_LAYER_PATH=$PWD/build/third_party/vulkan_extensionlayer/layers/:$VK_LAYER_PATH
+$ export VK_LAYER_PATH=$PWD/build/third_party/vulkan_extensionlayer/layers/:$VK_LAYER_PATH
 
 # -- Bazel --
-$ VK_LAYER_PATH=$PWD/bazel-bin/external/vulkan_extensionlayer/:$VK_LAYER_PATH
+$ export VK_LAYER_PATH=$PWD/bazel-bin/external/vulkan_extensionlayer/:$VK_LAYER_PATH
 ```
 
 ### Support in Bazel Tests
