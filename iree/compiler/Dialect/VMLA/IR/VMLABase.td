@@ -161,7 +161,7 @@ class VMLA_ElementTypeOp<string mnemonic, list<OpTrait> traits = []> :
   }];
 }
 
-class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> : 
+class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$src,
@@ -171,12 +171,10 @@ class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     UnitAttr:$forceUnsigned
   );
 
-  let assemblyFormat = [{
-    `(`$src`,` $dst`)` attr-dict`:` $element_type
-  }];
+  let assemblyFormat = "`(`$src`,` $dst`)` attr-dict`:` $element_type";
 }
 
-class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> 
+class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
     : VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$lhs,
@@ -187,12 +185,10 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
     UnitAttr:$forceUnsigned
   );
 
-  let assemblyFormat = [{
-    `(`$lhs`,` $rhs`,` $dst`)` attr-dict `:` $element_type
-  }];
+  let assemblyFormat = "`(`$lhs`,` $rhs`,` $dst`)` attr-dict `:` $element_type";
 }
 
-class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> 
+class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
     : VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$a,
