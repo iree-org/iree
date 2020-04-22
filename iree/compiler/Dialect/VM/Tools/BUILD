@@ -29,5 +29,4 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TableGen",
     ],
-    alwayslink = 1,
 )

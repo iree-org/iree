@@ -25,6 +25,5 @@ iree_cc_library(
     LLVMSupport
     LLVMTableGen
     MLIRSupport
-  ALWAYSLINK
   PUBLIC
 )
