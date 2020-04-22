@@ -72,7 +72,7 @@ bool LLVMOnceInit() {
   // Register built-in MLIR dialects.
   mlir::registerMlirDialects();
 
-  // Register IREE dialects and HAL target backends.
+  // Register IREE dialects, compiler module dialects, and HAL target backends.
   mlir::iree_compiler::registerIreeDialects();
   mlir::iree_compiler::registerIreeCompilerModuleDialects();
   mlir::iree_compiler::registerHALTargetBackends();
