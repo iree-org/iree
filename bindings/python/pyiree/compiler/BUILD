@@ -33,7 +33,6 @@ package(
 COMPILER_DEPS = [
     # Transforms.
     "//iree/compiler/Dialect/Flow/Transforms",
-    "//iree/compiler/Dialect/Modules/TensorList/IR:TensorListDialect",
     "//iree/compiler/Dialect/HAL/Target",
     "//iree/compiler/Dialect/HAL/Transforms",
     "//iree/compiler/Dialect/Shape/IR",
@@ -88,6 +87,7 @@ pybind_cc_library(
     tags = ["nokokoro"],
     deps = COMPILER_DEPS + [
         "//bindings/python/pyiree/common",
+        "//iree/tools:init_compiler_modules",
         "//iree/tools:init_passes_and_dialects",
         "//iree/tools:init_targets",
         "@llvm-project//llvm:support",

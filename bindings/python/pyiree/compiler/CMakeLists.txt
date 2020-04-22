@@ -46,7 +46,6 @@ iree_pybind_cc_library(
   DEPS
     # Transforms. Adopted from the Bazel variable COMPILER_DEPS.
     iree::compiler::Dialect::Flow::Transforms
-    iree::compiler::Dialect::Modules::TensorList::IR::TensorListDialect
     iree::compiler::Dialect::HAL::Transforms
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::Shape::IR
@@ -57,6 +56,7 @@ iree_pybind_cc_library(
     iree::compiler::Dialect::HAL::Target::LLVM
     iree::compiler::Dialect::HAL::Target::VulkanSPIRV
     iree::compiler::Dialect::VM::Target::Bytecode
+    iree::tools::init_compiler_modules
     iree::tools::init_passes_and_dialects
     iree::tools::init_targets
     bindings::python::pyiree::common
