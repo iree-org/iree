@@ -17,8 +17,8 @@
 // Utility passes used in SPIR-V lowering.
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_PASSES_PASSES_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_PASSES_PASSES_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_PASSES_PASSES_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_PASSES_PASSES_H_
 
 #include "mlir/Pass/Pass.h"
 
@@ -32,4 +32,4 @@ std::unique_ptr<Pass> createAdjustIntegerWidthPass();
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_PASSES_PASSES_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_PASSES_PASSES_H_

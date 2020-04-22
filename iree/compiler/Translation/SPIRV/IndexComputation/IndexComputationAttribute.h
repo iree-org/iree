@@ -18,8 +18,8 @@
 // the result of the IndexComputation Analysis
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONATTR_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONATTR_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONATTR_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONATTR_H_
 
 #include "mlir/IR/Attributes.h"
 
@@ -96,4 +96,4 @@ void setNumLaunchDims(FuncOp funcOp, unsigned numLaunchDims);
 
 }  // namespace iree_compiler
 }  // namespace mlir
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONATTR_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONATTR_H_

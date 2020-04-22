@@ -19,8 +19,8 @@
 // index.
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_XLAPROPOGATION_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_XLAPROPOGATION_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_XLAPROPOGATION_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_XLAPROPOGATION_H_
 
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputation.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttribute.h"
@@ -156,4 +156,4 @@ class XLATransposeOpIndexPropagation final
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_XLAPROPOGATION_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_XLAPROPOGATION_H_

@@ -18,8 +18,8 @@
 // tensor computed within that workitem.
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H_
 
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttribute.h"
@@ -344,4 +344,4 @@ class IndexPropagationList {
 
 }  // namespace iree_compiler
 }  // namespace mlir
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_INDEXCOMPUTATION_H_

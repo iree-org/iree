@@ -17,8 +17,8 @@
 // SPIR-V Code-generation for xla_hlo operations within IREE Dispatch functions
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_XLATOSPIRV_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_XLATOSPIRV_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_XLATOSPIRV_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_XLATOSPIRV_H_
 
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/SPIRVLowering.h"
 #include "tensorflow/compiler/mlir/xla/ir/hlo_ops.h"
@@ -76,4 +76,4 @@ class XLAPadOpSPIRVLowering final : public SPIRVOpLowering<xla_hlo::PadOp> {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_XLATOSPIRV_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_XLATOSPIRV_H_

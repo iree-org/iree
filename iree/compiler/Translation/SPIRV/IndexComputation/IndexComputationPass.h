@@ -17,8 +17,8 @@
 // Pass to perform index propagation in iree dispatch functions
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONPASS_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONPASS_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONPASS_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONPASS_H_
 
 #include "mlir/Pass/Pass.h"
 
@@ -31,4 +31,4 @@ std::unique_ptr<OperationPass<FuncOp>> createIndexComputationPass();
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONPASS_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_COMPUTATIONPASS_H_
