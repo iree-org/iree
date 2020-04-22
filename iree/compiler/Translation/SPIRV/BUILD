@@ -18,7 +18,7 @@ package(
 )
 
 cc_library(
-    name = "init_translations"
+    name = "init_translations",
     hdrs = [
         "init_translations.h",
         "IndexComputation.h",
