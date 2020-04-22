@@ -51,5 +51,4 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_standard",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_unfuse_batch_norm",
     ],
-    alwayslink = 1,
 )

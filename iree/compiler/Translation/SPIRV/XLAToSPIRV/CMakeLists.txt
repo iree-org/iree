@@ -44,6 +44,5 @@ iree_cc_library(
     iree::compiler::Translation::SPIRV::IndexComputation
     iree::compiler::Translation::SPIRV::Passes
     tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )

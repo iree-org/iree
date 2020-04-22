@@ -54,5 +54,4 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:xla_legalize_to_linalg",
     ],
-    alwayslink = 1,
 )

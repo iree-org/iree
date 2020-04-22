@@ -69,5 +69,4 @@ cc_library(
         "@llvm-project//mlir:StandardOps",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
-    alwayslink = 1,
 )
