@@ -28,6 +28,5 @@ iree_cc_library(
     MLIRSPIRVTransforms
     MLIRStandardOps
     MLIRTransforms
-  ALWAYSLINK
   PUBLIC
 )

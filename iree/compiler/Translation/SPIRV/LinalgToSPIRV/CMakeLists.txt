@@ -47,6 +47,5 @@ iree_cc_library(
     iree::compiler::Translation::CodegenPasses
     iree::compiler::Translation::CodegenUtils
     tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )
