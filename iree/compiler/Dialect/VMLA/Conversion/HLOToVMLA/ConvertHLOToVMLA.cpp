@@ -212,6 +212,7 @@ struct ConcatenateOpConversion
 
 // Lowers a subset of gathers along axis 0 that are really just a slice and
 // reshape.
+// TODO(ataei): Move this to vmla.gather lowering.
 struct GatherOpConversion : public OpConversionPattern<xla_hlo::GatherOp> {
   GatherOpConversion(MLIRContext *context, TypeConverter &typeConverter)
       : OpConversionPattern(context), typeConverter(typeConverter) {}
@@ -513,6 +514,9 @@ void populateHLOToVMLAPatterns(MLIRContext *context,
       .insert<VMLAOpConversion<xla_hlo::TransposeOp, IREE::VMLA::TransposeOp>>(
           context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::PadOp, IREE::VMLA::PadOp>>(
+      context, typeConverter);
+  patterns.insert<
+      VMLAOpConversion<xla_hlo::TorchIndexSelectOp, IREE::VMLA::GatherOp>>(
       context, typeConverter);
   patterns.insert<VMLAOpConversion<xla_hlo::AbsOp, IREE::VMLA::AbsOp>>(
       context, typeConverter);

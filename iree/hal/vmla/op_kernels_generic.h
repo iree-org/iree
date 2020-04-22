@@ -318,10 +318,65 @@ Status Pad::Execute(absl::Span<const T> src_buffer,
 }
 
 template <typename T>
+Status Gather::Execute(absl::Span<const T> src_buffer,
+                       absl::Span<const int32_t> indices_buffer,
+                       absl::Span<T> dst_buffer, const Shape& src_shape,
+                       const Shape& indices_shape, const Shape& dst_shape,
+                       const int32_t dim, const int32_t batch_dims) {
+  std::vector<int32_t> output_strides(dst_shape.size(), 1);
+  std::vector<int32_t> input_strides(src_shape.size(), 1);
+  std::vector<int32_t> indices_strides(indices_shape.size(), 1);
+  auto compute_strides = [](const Shape& shape, std::vector<int32_t>& strides) {
+    for (int i = shape.size() - 2; i >= 0; --i) {
+      strides[i] = strides[i + 1] * shape[i + 1];
+    }
+  };
+  compute_strides(dst_shape, output_strides);
+  compute_strides(src_shape, input_strides);
+  compute_strides(indices_shape, indices_strides);
+  size_t outer_size = 1;
+  for (size_t i = 0; i < dim; ++i) {
+    outer_size *= src_shape[i];
+  }
+  // stride for batch outer dims.
+  size_t batch_stride = 1;
+  for (size_t i = batch_dims; i > 0; --i) {
+    batch_stride *= src_shape[i];
+  }
+  const size_t input_stride =
+      dim > 0 ? input_strides[dim - 1] : input_strides[0];
+  const size_t output_stride =
+      dim > 0 ? output_strides[dim - 1] : output_strides[0];
+  const size_t slize_size = input_strides[dim];
+  const int indices_size =
+      indices_shape[batch_dims] * indices_strides[batch_dims];
+  // This is equivalent to the linearized version of followng array expression:
+  // clang-format off
+  // dst[d_0,...,d_{dim-1},                     i_B,...,i_{M-1}, d_{dim+1},...,d_{N-1}] =
+  // src[d_0,...,d_{dim-1},indices[d_0,...,d_1, i_B,...,i_{M-1}, d_{dim+1},...,d_{N-1}]
+  // clang-format on
+  // see:https://www.tensorflow.org/api_docs/python/tf/gather
+  // TODO(ataei): Shrink inner loop by scanning indices_buffer for
+  // contiguous indices and collide the copy of these slices.
+  for (size_t i = 0; i < outer_size; ++i) {
+    const int batch_offset =
+        batch_dims == 0 ? 0 : (i / batch_stride) * indices_strides[batch_dims];
+    for (size_t j = 0; j < indices_size; ++j) {
+      const size_t dst_offset = i * output_stride + j * slize_size;
+      const size_t src_offset =
+          i * input_stride + indices_buffer[batch_offset + j] * slize_size;
+      std::memcpy(dst_buffer.data() + dst_offset,
+                  src_buffer.data() + src_offset, sizeof(T) * slize_size);
+    }
+  }
+  return OkStatus();
+}
+
+template <typename T>
 Status Reverse::Execute(absl::Span<const T> src_buffer,
                         absl::Span<T> dst_buffer, const Shape& src_shape,
                         absl::Span<const int32_t> dimensions) {
-  // This implementation is not fast either
+  // This implementation is not fast either.
   int rank = src_shape.size();
   absl::InlinedVector<int, 8> strides(rank);
   size_t stride = 1;
