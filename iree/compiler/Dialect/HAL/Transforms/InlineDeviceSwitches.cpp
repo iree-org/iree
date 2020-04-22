@@ -20,6 +20,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BlockAndValueMapping.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/StandardTypes.h"
@@ -76,62 +77,78 @@ static Value buildConditionExpression(Location loc, Value device,
   return {};
 }
 
-// Outlines a condition region from a switch op into a standalone function.
-static FuncOp outlineConditionRegion(StringRef funcName,
-                                     Region &conditionRegion,
-                                     ArrayRef<Type> resultTypes,
-                                     OpBuilder moduleBuilder) {
-  auto &entryBlock = conditionRegion.front();
-  auto funcType = moduleBuilder.getFunctionType(
-      llvm::to_vector<4>(
-          llvm::map_range(entryBlock.getArguments(),
-                          [](BlockArgument arg) { return arg.getType(); })),
-      resultTypes);
-  auto funcOp = moduleBuilder.create<FuncOp>(
-      conditionRegion.getLoc(), funcName, funcType, ArrayRef<NamedAttribute>{});
-  funcOp.getBody().takeBody(conditionRegion);
-  SymbolTable::setSymbolVisibility(funcOp, SymbolTable::Visibility::Private);
+// Inlines a condition region from a switch op into the function at the given
+// point. This assumes that the insertion point will only be reached if the
+// condition the region is predicated on is true.
+static void inlineConditionRegion(OperandRange regionArgs,
+                                  Region &conditionRegion, Block *exitBlock,
+                                  OpBuilder funcBuilder) {
+  assert(!conditionRegion.empty() && "source regions must not be empty");
 
-  // Replace hal.return statements with normal std.return. This ensures that
-  // normal matchers/inlining/etc works as we continue transformation.
-  for (auto &block : funcOp.getBlocks()) {
-    if (auto returnOp = dyn_cast<IREE::HAL::ReturnOp>(block.back())) {
-      OpBuilder builder(returnOp);
-      builder.create<mlir::ReturnOp>(
-          returnOp.getLoc(), llvm::to_vector<4>(returnOp.getOperands()));
+  // Remap arguments from the function values captured by the switch into the
+  // entry block arguments for the region.
+  auto &entryBlock = conditionRegion.front();
+  assert(regionArgs.size() == entryBlock.getNumArguments() &&
+         "switch capture args must match region args");
+  for (auto argPair : llvm::zip(regionArgs, entryBlock.getArguments())) {
+    auto outerValue = std::get<0>(argPair);
+    auto innerValue = std::get<1>(argPair);
+    assert(outerValue.getType() == innerValue.getType() &&
+           "capture arg types must match");
+    innerValue.replaceAllUsesWith(outerValue);
+  }
+
+  // Splice in the region blocks.
+  auto *insertBlock = funcBuilder.getBlock();
+  auto postInsertBlockIt = std::next(insertBlock->getIterator())->getIterator();
+  auto *insertRegion = insertBlock->getParent();
+  insertRegion->getBlocks().splice(postInsertBlockIt,
+                                   conditionRegion.getBlocks());
+  auto newBlocks = llvm::make_range(std::next(insertBlock->getIterator()),
+                                    postInsertBlockIt);
+  auto *firstNewBlock = &*newBlocks.begin();
+
+  // Handle the hal.return ops which will transfer control to the exitBlock.
+  for (auto &newBlock : newBlocks) {
+    if (auto returnOp =
+            dyn_cast<IREE::HAL::ReturnOp>(newBlock.getTerminator())) {
+      OpBuilder branchBuilder(returnOp);
+      branchBuilder.create<BranchOp>(returnOp.getLoc(), exitBlock,
+                                     returnOp.getOperands());
       returnOp.erase();
     }
   }
 
-  return funcOp;
+  // Splice the instructions of the inlined entry block into the insert block.
+  insertBlock->getOperations().splice(insertBlock->end(),
+                                      firstNewBlock->getOperations());
+  firstNewBlock->erase();
 }
 
-// Outlines each switch condition region into its own function and replaces the
-// switch op with conditioned calls to those functions.
+// Inlines each switch condition region into the parent function predicated on
+// the switch condition expression.
 //
 // Since switch conditions are evaluated in the order they are defined we can
 // trivially turn the switch into a chain of if-else blocks.
 //   if condition_0_match:
-//     call outlined_condition_0
+//     <inlined condition_0>
 //   else
 //     if condition_1_match:
-//       call outlined_condition_1
+//       <inlined condition_1>
 //     else ...
 static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
-                                        StringRef baseFuncName,
-                                        OpBuilder moduleBuilder,
                                         OpBuilder funcBuilder) {
   // Split the block containing the switch op such that all ops before the
   // switch are before and the switch and the following ops are after.
-  // We'll have all of our outlined regions bounce over to the afterBlock with
+  // We'll have all of our inlined regions bounce over to the afterBlock with
   // the results of the call and use that to replace the switch op.
   auto *beforeBlock = funcBuilder.getBlock();
   auto *afterBlock = beforeBlock->splitBlock(switchOp);
   auto finalValues =
       llvm::to_vector<4>(afterBlock->addArguments(switchOp.getResultTypes()));
 
-  // Create the blocks we'll use for all our conditions so that we can reference
-  // them when inserting the branch ops.
+  // Create the blocks we'll use for all our conditions so that we can
+  // reference them when inserting the branch ops.
   SmallVector<Block *, 4> conditionMatchBlocks(
       switchOp.condition_regions().size());
   SmallVector<Block *, 4> conditionFallthroughBlocks(
@@ -154,15 +171,9 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
     auto regionArgs = switchOp.args().slice(argOffset, regionOperands.size());
     argOffset += regionOperands.size();
 
-    // Outline the region into a function.
-    std::string regionFuncName =
-        (baseFuncName + "_").str() + std::to_string(condition.index());
-    auto regionFuncOp = outlineConditionRegion(
-        regionFuncName, conditionRegion,
-        switchOp.getOperation()->getResultTypes(), moduleBuilder);
-
-    // Insert the branch based on the match. We either match and jump to a block
-    // that will call the function or don't match and need to fall through.
+    // Insert the branch based on the match. We either match and jump to a
+    // block that will contain the inlined region or don't match and need to
+    // fall through.
     auto isMatch = buildConditionExpression(
         switchOp.getLoc(), switchOp.device(), conditionAttr, funcBuilder);
     auto *matchBlock = conditionMatchBlocks[condition.index()];
@@ -170,18 +181,15 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
     funcBuilder.create<CondBranchOp>(switchOp.getLoc(), isMatch, matchBlock,
                                      fallthroughBlock);
 
-    // Block that calls the outlined function and then jumps out of the chain.
+    // Block that contains the inlined region and then jumps out of the chain.
     funcBuilder.setInsertionPointToStart(matchBlock);
-    auto matchResults =
-        funcBuilder.create<CallOp>(switchOp.getLoc(), regionFuncOp, regionArgs);
-    funcBuilder.create<BranchOp>(switchOp.getLoc(), afterBlock,
-                                 matchResults.getResults());
+    inlineConditionRegion(regionArgs, conditionRegion, afterBlock, funcBuilder);
 
     // Block that we enter to check the next condition.
     funcBuilder.setInsertionPointToStart(fallthroughBlock);
     if (condition.index() + 1 < conditionFallthroughBlocks.size()) {
-      // Just continue on - the next loop iteration for the following condition
-      // will add its IR to the block.
+      // Just continue on - the next loop iteration for the following
+      // condition will add its IR to the block.
     } else {
       // Fallthrough of all expressions; die if we expected return values.
       if (switchOp.getNumResults() > 0) {
@@ -192,45 +200,35 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
     }
   }
 
-  // Remove the switch op and replace its results with the final joined results.
+  // Remove the switch op and replace its results with the final joined
+  // results.
   switchOp.replaceAllUsesWith(finalValues);
-  switchOp.erase();
 }
 
-class OutlineDeviceSwitchesPass
-    : public PassWrapper<OutlineDeviceSwitchesPass, OperationPass<ModuleOp>> {
+class InlineDeviceSwitchesPass
+    : public PassWrapper<InlineDeviceSwitchesPass, OperationPass<FuncOp>> {
  public:
   void runOnOperation() override {
-    auto moduleOp = getOperation();
-    auto funcOps = llvm::to_vector<16>(moduleOp.getOps<FuncOp>());
-    for (auto funcOp : llvm::enumerate(funcOps)) {
-      OpBuilder moduleBuilder(funcOp.value());
-      moduleBuilder.setInsertionPointAfter(funcOp.value());
-      for (auto block : llvm::enumerate(funcOp.value())) {
-        auto switchOps = llvm::to_vector<4>(
-            block.value().getOps<IREE::HAL::DeviceSwitchOp>());
-        for (auto switchOp : llvm::enumerate(switchOps)) {
-          std::string baseFuncName =
-              (funcOp.value().getName() + "_switch_").str() +
-              std::to_string(funcOp.index()) + "_" +
-              std::to_string(block.index()) + "_" +
-              std::to_string(switchOp.index());
-          OpBuilder funcBuilder(switchOp.value());
-          buildConditionDispatchTable(switchOp.value(), baseFuncName,
-                                      moduleBuilder, funcBuilder);
-        }
-      }
+    auto funcOp = getOperation();
+    SmallVector<IREE::HAL::DeviceSwitchOp, 4> switchOps;
+    funcOp.walk([&](IREE::HAL::DeviceSwitchOp switchOp) {
+      switchOps.push_back(switchOp);
+    });
+    for (auto switchOp : switchOps) {
+      OpBuilder funcBuilder(switchOp);
+      buildConditionDispatchTable(switchOp, funcBuilder);
+      switchOp.erase();
     }
   }
 };
 
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDeviceSwitchesPass() {
-  return std::make_unique<OutlineDeviceSwitchesPass>();
+std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass() {
+  return std::make_unique<InlineDeviceSwitchesPass>();
 }
 
-static PassRegistration<OutlineDeviceSwitchesPass> pass(
-    "iree-hal-outline-device-switches",
-    "Outlines hal.device.switch condition regions");
+static PassRegistration<InlineDeviceSwitchesPass> pass(
+    "iree-hal-inline-device-switches",
+    "Inlines hal.device.switch condition regions");
 
 }  // namespace HAL
 }  // namespace IREE

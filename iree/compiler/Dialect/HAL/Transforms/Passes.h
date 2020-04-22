@@ -52,7 +52,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 // Outlines hal.device.switch conditions into functions and inlines conditions.
-std::unique_ptr<OperationPass<ModuleOp>> createOutlineDeviceSwitchesPass();
+std::unique_ptr<OperationPass<FuncOp>> createInlineDeviceSwitchesPass();
 
 // Finds hal.device.query ops and creates variables initialized on startup.
 std::unique_ptr<OperationPass<ModuleOp>> createMemoizeDeviceQueriesPass();
@@ -110,7 +110,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeResourceCachesPass(
 
 inline void registerHALPasses() {
   auto executableOptions = getTargetOptionsFromFlags();
-  createOutlineDeviceSwitchesPass();
+  createInlineDeviceSwitchesPass();
   createMemoizeDeviceQueriesPass();
   createMaterializeInterfacesPass(executableOptions);
   createRewriteLegacyIOPass();
