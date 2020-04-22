@@ -38,5 +38,4 @@ cc_library(
         "@llvm-project//mlir:Support",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
     ],
-    alwayslink = 1,
 )
