@@ -27,6 +27,7 @@
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgTypes.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -43,6 +44,43 @@
 
 namespace mlir {
 namespace iree_compiler {
+
+// -----------------------------------------------------------------------------
+// Utility functions.
+// -----------------------------------------------------------------------------
+
+static std::vector<int64_t> convertDenseIntAttr(
+    mlir::DenseIntElementsAttr attr) {
+  auto values = attr.getValues<int64_t>();
+  return {values.begin(), values.end()};
+}
+
+/// Returns the constant value associated with the init value if the defining
+/// operation is a constant.
+static Attribute getInitValueAsConst(Value init) {
+  DenseElementsAttr attr;
+  if (!matchPattern(init, m_Constant(&attr))) return {};
+  auto type = attr.getType().dyn_cast<ShapedType>();
+  if (!type || type.getRank() != 0) return {};
+  if (auto intType = type.getElementType().dyn_cast<IntegerType>())
+    return IntegerAttr::get(intType, attr.getValue<APInt>({}));
+  else if (auto floatType = type.getElementType().dyn_cast<FloatType>())
+    return FloatAttr::get(floatType, attr.getValue<APFloat>({}));
+  return {};
+}
+
+/// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
+/// are "parallel" except the last `nReduction` elements, where are "reduction"
+/// attributes.
+// TODO(hanchung): Use helpers in StructuredOpsUtils.h instead of hardcoded
+// strings once the build system is set up.
+static ArrayAttr getParallelAndReductionIterAttrs(Builder b, unsigned nLoops,
+                                                  unsigned nReduction) {
+  SmallVector<Attribute, 3> attrs(nLoops - nReduction,
+                                  b.getStringAttr("parallel"));
+  attrs.append(nReduction, b.getStringAttr("reduction"));
+  return b.getArrayAttr(attrs);
+}
 
 //===----------------------------------------------------------------------===//
 // IREE dialect op conversions.
@@ -236,6 +274,140 @@ linalg::ConvOp ConvOpConversion::apply(
 }
 
 // ----------------------------------------------------------------------------
+// xla_hlo.pad conversion patterns and utility functions.
+// ----------------------------------------------------------------------------
+
+namespace {
+/// Converts xla_hlo.pad operation to linalg.indexed_generic op.
+// TODO(GH-1604): Lower the pad op to a Linalg named op.
+struct PadOpConversion
+    : public ConvertToLinalgBufferOp<PadOpConversion, xla_hlo::PadOp,
+                                     linalg::IndexedGenericOp> {
+  using ConvertToLinalgBufferOp<
+      PadOpConversion, xla_hlo::PadOp,
+      linalg::IndexedGenericOp>::ConvertToLinalgBufferOp;
+
+  AffineMapAttr getInputIndexingMap(xla_hlo::PadOp op, int rank,
+                                    ConversionPatternRewriter &rewriter) const;
+  linalg::IndexedGenericOp apply(xla_hlo::PadOp op, ArrayRef<Value> args,
+                                 ArrayRef<Value> results,
+                                 ConversionPatternRewriter &rewriter) const;
+};
+}  // namespace
+
+AffineMapAttr PadOpConversion::getInputIndexingMap(
+    xla_hlo::PadOp op, int rank, ConversionPatternRewriter &rewriter) const {
+  const auto edgePaddingLow = convertDenseIntAttr(op.edge_padding_low());
+  SmallVector<AffineExpr, 4> exprs;
+  for (int i = 0; i < rank; ++i)
+    exprs.push_back((rewriter.getAffineDimExpr(i) - edgePaddingLow[i]));
+  return AffineMapAttr::get(
+      AffineMap::get(rank, /*symbolCount=*/0, exprs, rewriter.getContext()));
+}
+
+linalg::IndexedGenericOp PadOpConversion::apply(
+    xla_hlo::PadOp op, ArrayRef<Value> args, ArrayRef<Value> results,
+    ConversionPatternRewriter &rewriter) const {
+  if (llvm::any_of(op.interior_padding().getValues<IntegerAttr>(),
+                   [](auto attr) { return attr.getInt() != 0; })) {
+    op.emitError("pad op with non-zero interiror_padding is not supported");
+    return nullptr;
+  }
+
+  xla_hlo::PadOpOperandAdaptor adaptor(args);
+  auto loc = op.getLoc();
+
+  Attribute paddingConstVal = getInitValueAsConst(adaptor.padding_value());
+  Value paddingVal =
+      paddingConstVal
+          ? rewriter.create<ConstantOp>(loc, paddingConstVal).getResult()
+          : adaptor.padding_value();
+
+  auto operandType = adaptor.operand().getType().cast<ShapedType>();
+  int rank = operandType.getRank();
+
+  SmallVector<Attribute, 2> indexingMaps;
+  indexingMaps.emplace_back(getInputIndexingMap(op, rank, rewriter));
+  if (!paddingConstVal) {
+    indexingMaps.emplace_back(AffineMapAttr::get(
+        AffineMap::get(rank, /*symbolCount=*/0, rewriter.getContext())));
+  }
+  indexingMaps.emplace_back(AffineMapAttr::get(
+      AffineMap::getMultiDimIdentityMap(rank, rewriter.getContext())));
+
+  SmallVector<Type, 2> resultTypes = {};
+  SmallVector<Value, 2> linalgOpArgs = {adaptor.operand()};
+  if (!paddingConstVal) linalgOpArgs.push_back(adaptor.padding_value());
+  linalgOpArgs.push_back(results[0]);
+  auto linalgOp = rewriter.create<linalg::IndexedGenericOp>(
+      loc, resultTypes, linalgOpArgs,
+      rewriter.getI64IntegerAttr(linalgOpArgs.size() - 1),  // args_in
+      rewriter.getI64IntegerAttr(1),                        // args_out
+      rewriter.getArrayAttr(indexingMaps),
+      getParallelAndReductionIterAttrs(rewriter, rank, /*nReduction=*/0),
+      /*doc=*/nullptr, /*library_call=*/nullptr);
+
+  // Add a block to the region.
+  auto *region = &linalgOp.region();
+  auto *block = rewriter.createBlock(region, region->end());
+  SmallVector<Type, 4> bodyArgTypes;
+  bodyArgTypes.append(rank, rewriter.getIndexType());
+  bodyArgTypes.append(linalgOpArgs.size(), operandType.getElementType());
+  block->addArguments(bodyArgTypes);
+  rewriter.setInsertionPointToEnd(block);
+
+  // If the `index` of the result at a particular dimension i, is d_i, check if
+  //
+  // (d_i >= edge_padding_low[i]) &&
+  // (d_i < (edge_padding_low[i] + operand_shape[i])).
+  //
+  // If true, then use the value of the operand, otherwise use the padding
+  // value.
+  const auto &edgePaddingLow = op.edge_padding_low();
+  const auto &edgePaddingHigh = op.edge_padding_high();
+
+  Type indexType = rewriter.getIndexType();
+  Value cond = nullptr;
+  auto applyAndOp = [&](Value val) {
+    cond = cond ? rewriter.create<AndOp>(loc, cond, val) : val;
+  };
+  for (int i = 0; i < rank; ++i) {
+    Value dim = block->getArgument(i);
+    int64_t paddingLow = edgePaddingLow.getValue<IntegerAttr>(i).getInt();
+    int64_t paddingHigh = edgePaddingHigh.getValue<IntegerAttr>(i).getInt();
+    auto low = rewriter.create<ConstantOp>(
+        loc, indexType, rewriter.getIntegerAttr(indexType, paddingLow));
+
+    // d_i < (edge_padding_low[i] + operand_shape[i])
+    if (paddingLow != 0 && paddingHigh != 0) {
+      auto operandExtent = rewriter.create<DimOp>(loc, adaptor.operand(), i);
+      auto bound = rewriter.create<AddIOp>(loc, low, operandExtent);
+      auto checkUb =
+          rewriter.create<CmpIOp>(loc, CmpIPredicate::slt, dim, bound);
+      applyAndOp(checkUb);
+    }
+
+    if (paddingLow != 0) {
+      // d_i >= edge_padding_low[i]
+      auto checkLb = rewriter.create<CmpIOp>(loc, CmpIPredicate::sge, dim, low);
+      applyAndOp(checkLb);
+    }
+  }
+  Value inputVal = block->getArgument(rank);
+  if (!paddingConstVal) paddingVal = block->getArgument(rank + 1);
+  Value result =
+      cond ? rewriter.create<SelectOp>(loc, cond, inputVal, paddingVal)
+           : inputVal;
+  rewriter.create<linalg::YieldOp>(loc, result);
+
+  // This is a hacky flag to tell later passes that this operation can't be
+  // tiled.
+  linalgOp.setAttr("do_not_tile", rewriter.getUnitAttr());
+
+  return linalgOp;
+}
+
+// ----------------------------------------------------------------------------
 // xla_hlo.reshape conversion patterns and utility functions.
 // ----------------------------------------------------------------------------
 
@@ -325,24 +497,6 @@ linalg::CopyOp ReshapeOpConversion::apply(
 
   return rewriter.create<linalg::CopyOp>(op.getLoc(), reshapeOp.getResult(),
                                          results[0]);
-}
-
-// -----------------------------------------------------------------------------
-// Reduce operation utility functions.
-// -----------------------------------------------------------------------------
-
-/// Returns the constant value associated with the init value if the defining
-/// operation is a constant.
-static Attribute getInitValueAsConst(Value init) {
-  DenseElementsAttr attr;
-  if (!matchPattern(init, m_Constant(&attr))) return {};
-  auto type = attr.getType().dyn_cast<ShapedType>();
-  if (!type || type.getRank() != 0) return {};
-  if (auto intType = type.getElementType().dyn_cast<IntegerType>())
-    return IntegerAttr::get(intType, attr.getValue<APInt>({}));
-  else if (auto floatType = type.getElementType().dyn_cast<FloatType>())
-    return FloatAttr::get(floatType, attr.getValue<APFloat>({}));
-  return {};
 }
 
 // -----------------------------------------------------------------------------
@@ -450,19 +604,6 @@ linalg::LinalgOp ReduceWindowOpConversion::apply(
 // -----------------------------------------------------------------------------
 // xla_hlo.reduce conversion patterns and utility functions.
 // -----------------------------------------------------------------------------
-
-/// Returns an ArrayAttr that contains `nLoops` attributes. All the attributes
-/// are "parallel" except the last `nReduction` elements, where are "reduction"
-/// attributes.
-// TODO(hanchung): Use helpers in StructuredOpsUtils.h instead of hardcoded
-// strings once the build system is set up.
-static ArrayAttr getParallelAndReductionIterAttrs(Builder b, unsigned nLoops,
-                                                  unsigned nReduction) {
-  SmallVector<Attribute, 3> attrs(nLoops - nReduction,
-                                  b.getStringAttr("parallel"));
-  attrs.append(nReduction, b.getStringAttr("reduction"));
-  return b.getArrayAttr(attrs);
-}
 
 /// Returns a permutation AffineMap that puts all reduction dimensions to the
 /// last. The order of parallel loops and reduction loops are all sorted. E.g.,
@@ -748,8 +889,9 @@ struct XLAToLinalgOnBuffersPass
 
 void populateHLOToLinalgOnConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<ConvOpConversion, DotOpConversion, ReshapeOpConversion,
-                  IREELoadInputOpConversion, IREEStoreOutputOpConversion,
+  patterns.insert<ConvOpConversion, DotOpConversion, PadOpConversion,
+                  ReshapeOpConversion, IREELoadInputOpConversion,
+                  IREEStoreOutputOpConversion,
                   LinalgOpOnTensorConversion<linalg::GenericOp>>(context);
   // Reduce Operation conversions.
   patterns.insert<ReduceOpConversion, ReduceWindowOpConversion,

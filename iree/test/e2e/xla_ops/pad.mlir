@@ -4,13 +4,12 @@ func @pad_test() attributes { iree.module.export } {
   %res = "xla_hlo.pad"(%input, %c0) {
     edge_padding_low = dense<[0, 1]> : tensor<2xi64>,
     edge_padding_high = dense<[1, 5]> : tensor<2xi64>,
-    interior_padding = dense<[1, 2]> : tensor<2xi64>
-  } : (tensor<2x3xi32>, tensor<i32>) -> tensor<4x13xi32>
+    interior_padding = dense<0> : tensor<2xi64>
+  } : (tensor<2x3xi32>, tensor<i32>) -> tensor<3x9xi32>
   check.expect_eq_const(%res, dense<[
-      [0, 1, 0, 0, 2, 0, 0, 3, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-      [0, 4, 0, 0, 5, 0, 0, 6, 0, 0, 0, 0, 0],
-      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]> : tensor<4x13xi32>) : tensor<4x13xi32>
+      [0, 1, 2, 3, 0, 0, 0, 0, 0],
+      [0, 4, 5, 6, 0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0, 0, 0, 0, 0]]> : tensor<3x9xi32>) : tensor<3x9xi32>
   return
 }
 

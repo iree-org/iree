@@ -57,6 +57,7 @@ static void getDefaultTileSizes(unsigned numDims,
 
 /// Returns the number of "outer" parallel loops specified in the `linalgOp`.
 static unsigned getNumOuterParallelLoops(linalg::LinalgOp linalgOp) {
+  if (linalgOp.getAttr("do_not_tile")) return 0;
   if (auto convOp = dyn_cast<linalg::ConvOp>(linalgOp.getOperation())) {
     Optional<DenseIntElementsAttr> padding = convOp.padding();
     if (padding) return convOp.getNumBatchDimensions();
