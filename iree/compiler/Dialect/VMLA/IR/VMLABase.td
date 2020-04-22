@@ -88,6 +88,7 @@ def VMLA_Buffer : DialectType<
   let typeDescription = [{
     A lightweight unshaped byte buffer.
   }];
+  let builderCall = "$_builder.getType<IREE::VMLA::BufferType>()";
 }
 
 def VMLA_Interface : DialectType<
@@ -169,10 +170,12 @@ class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     // TODO(benvanik): remove once unsigned types are in MLIR.
     UnitAttr:$forceUnsigned
   );
+
+  let assemblyFormat = "`(`$src`,` $dst`)` attr-dict`:` $element_type";
 }
 
-class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
-    VMLA_ElementTypeOp<mnemonic, traits> {
+class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
+    : VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$lhs,
     VMLA_Buffer:$rhs,
@@ -181,10 +184,12 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     // TODO(benvanik): remove once unsigned types are in MLIR.
     UnitAttr:$forceUnsigned
   );
+
+  let assemblyFormat = "`(`$lhs`,` $rhs`,` $dst`)` attr-dict `:` $element_type";
 }
 
-class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
-    VMLA_ElementTypeOp<mnemonic, traits> {
+class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
+    : VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$a,
     VMLA_Buffer:$b,
@@ -194,6 +199,10 @@ class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> 
     // TODO(benvanik): remove once unsigned types are in MLIR.
     UnitAttr:$forceUnsigned
   );
+
+  let assemblyFormat = [{
+    `(`$a`,` $b`,` $c`,` $dst`)` attr-dict `:` $element_type
+  }];
 }
 
 #endif  // IREE_DIALECT_VMLA_BASE
