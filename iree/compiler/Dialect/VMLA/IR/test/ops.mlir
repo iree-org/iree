@@ -6,8 +6,8 @@
 // CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
 func @unaryOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
-  // CHECK: vmla.log(%[[SRC]], %[[DST]]) : !vmla.buffer f32
-  vmla.log(%src, %dst) : !vmla.buffer f32
+  // CHECK: vmla.log(%[[SRC]], %[[DST]]) : f32
+  vmla.log(%src, %dst) : f32
   return
 }
 
@@ -18,8 +18,8 @@ func @unaryOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
 // CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
 func @binaryOp(%lhs : !vmla.buffer, %rhs : !vmla.buffer, %dst : !vmla.buffer) {
-  // CHECK: vmla.atan2(%[[LHS]], %[[RHS]], %[[DST]]) : !vmla.buffer f32
-  vmla.atan2(%lhs, %rhs, %dst) : !vmla.buffer f32
+  // CHECK: vmla.atan2(%[[LHS]], %[[RHS]], %[[DST]]) : f32
+  vmla.atan2(%lhs, %rhs, %dst) : f32
   return
 }
 
@@ -32,7 +32,7 @@ func @binaryOp(%lhs : !vmla.buffer, %rhs : !vmla.buffer, %dst : !vmla.buffer) {
 // CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
 func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer, 
                 %dst : !vmla.buffer) {
-  // CHECK: vmla.clamp(%[[A]], %[[B]], %[[C]], %[[DST]]) : !vmla.buffer f32
-  vmla.clamp(%a, %b, %c, %dst) : !vmla.buffer f32
+  // CHECK: vmla.clamp(%[[A]], %[[B]], %[[C]], %[[DST]]) : f32
+  vmla.clamp(%a, %b, %c, %dst) : f32
   return
 }

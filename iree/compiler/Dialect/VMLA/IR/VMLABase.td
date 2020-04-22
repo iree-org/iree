@@ -88,6 +88,7 @@ def VMLA_Buffer : DialectType<
   let typeDescription = [{
     A lightweight unshaped byte buffer.
   }];
+  let builderCall = "$_builder.getType<IREE::VMLA::BufferType>()";
 }
 
 def VMLA_Interface : DialectType<
@@ -160,9 +161,8 @@ class VMLA_ElementTypeOp<string mnemonic, list<OpTrait> traits = []> :
   }];
 }
 
-class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = [
-  AllTypesMatch<["src", "dst"]>
-  ]> : VMLA_ElementTypeOp<mnemonic, traits> {
+class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> : 
+    VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$src,
     VMLA_Buffer:$dst,
@@ -172,13 +172,12 @@ class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = [
   );
 
   let assemblyFormat = [{
-    `(`$src`,` $dst`)` attr-dict`:` type($dst) $element_type
+    `(`$src`,` $dst`)` attr-dict`:` $element_type
   }];
 }
 
-class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = [
-  AllTypesMatch<["lhs", "rhs", "dst"]>
-  ]> : VMLA_ElementTypeOp<mnemonic, traits> {
+class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> 
+    : VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$lhs,
     VMLA_Buffer:$rhs,
@@ -189,13 +188,12 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = [
   );
 
   let assemblyFormat = [{
-    `(`$lhs`,` $rhs`,` $dst`)` attr-dict `:` type($dst) $element_type
+    `(`$lhs`,` $rhs`,` $dst`)` attr-dict `:` $element_type
   }];
 }
 
-class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = [
-  AllTypesMatch<["a", "b", "c", "dst"]>
-  ]> : VMLA_ElementTypeOp<mnemonic, traits> {
+class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> 
+    : VMLA_ElementTypeOp<mnemonic, traits> {
   let arguments = (ins
     VMLA_Buffer:$a,
     VMLA_Buffer:$b,
@@ -207,7 +205,7 @@ class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = [
   );
 
   let assemblyFormat = [{
-    `(`$a`,` $b`,` $c`,` $dst`)` attr-dict `:` type($dst) $element_type
+    `(`$a`,` $b`,` $c`,` $dst`)` attr-dict `:` $element_type
   }];
 }
 
