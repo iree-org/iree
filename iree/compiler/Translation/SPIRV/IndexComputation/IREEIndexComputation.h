@@ -17,8 +17,8 @@
 // Index Propagation for IREE statements that are used in dispatch functions.
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H_
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
@@ -57,4 +57,4 @@ class IREEStoreIndexPropagation final
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_INDEXCOMPUTATION_IREEINDEXCOMP_H_

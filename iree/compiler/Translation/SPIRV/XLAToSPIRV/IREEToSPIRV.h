@@ -17,8 +17,8 @@
 // Translation of IREE statements in dispatch functions to SPIR-V.
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRV_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRV_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRV_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRV_H_
 
 #include "iree/compiler/Dialect/IREE/IR/IREEOps.h"
 #include "iree/compiler/Translation/SPIRV/XLAToSPIRV/SPIRVLowering.h"
@@ -52,4 +52,4 @@ class IREEStoreOpSPIRVLowering final
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRV_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRV_H_

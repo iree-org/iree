@@ -17,8 +17,8 @@
 // Pass to translate iree executables for vulkan-spirv.
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRVPASS_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRVPASS_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRVPASS_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRVPASS_H_
 
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -36,4 +36,4 @@ void addIREEToSPIRVPasses(OpPassManager &conversionPassManager);
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRVPASS_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_IREETOSPIRVPASS_H_

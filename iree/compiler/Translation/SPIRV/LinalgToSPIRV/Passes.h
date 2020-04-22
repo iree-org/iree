@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H_
 
 #include "mlir/Pass/Pass.h"
 
@@ -46,4 +46,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createConvertToGPUPass();
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_LINALGTOSPIRV_PASSES_H_

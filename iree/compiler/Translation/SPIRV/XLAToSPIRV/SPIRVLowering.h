@@ -17,8 +17,8 @@
 // SPIR-V Code-generation for tensor operations within IREE Dispatch functions
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H
-#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H
+#ifndef IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H_
+#define IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H_
 
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationAttribute.h"
@@ -392,4 +392,4 @@ class SPIRVCodegen : public detail::SPIRVCodegenImpl {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H
+#endif  // IREE_COMPILER_TRANSLATION_SPIRV_XLATOSPIRV_SPIRVLOWERING_H_
