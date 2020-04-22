@@ -214,8 +214,7 @@ if(${IREE_BUILD_COMPILER})
       iree::compiler::Dialect::VMLA::Transforms
       iree::compiler::Dialect::Vulkan::IR
       iree::compiler::Translation::IREEVM
-      iree::compiler::Translation::SPIRV::LinalgToSPIRV
-      iree::compiler::Translation::SPIRV::XLAToSPIRV
+      iree::compiler::Translation::SPIRV::init_translations
       iree::compiler::Translation::CodegenPasses
       tensorflow::mlir_xla
     PUBLIC
@@ -288,7 +287,7 @@ if(${IREE_BUILD_COMPILER})
       MLIRTranslation
       iree::compiler::Dialect::VM::Target::Bytecode
       iree::compiler::Translation::IREEVM
-      iree::compiler::Translation::SPIRV::XLAToSPIRV
+      iree::compiler::Translation::SPIRV::init_translations
       tensorflow::mlir_xla
     PUBLIC
   )
