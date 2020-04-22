@@ -17,8 +17,8 @@
 
 #include "iree/compiler/Translation/SPIRV/IndexComputation/IndexComputationPass.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
-#include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
 #include "iree/compiler/Translation/SPIRV/Passes/Passes.h"
+#include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -29,14 +29,14 @@ namespace iree_compiler {
 // automatically.
 inline void registerSPRIVTranslation() {
   static bool init_once = []() {
-  // XLAToSPIRV
-  createIndexComputationPass();
-  createAdjustIntegerWidthPass();
-  createIREEToSPIRVPass();
+    // XLAToSPIRV
+    createIndexComputationPass();
+    createAdjustIntegerWidthPass();
+    createIREEToSPIRVPass();
 
-  // LinalgToSPIRV
-  createConvertToGPUPass();
-  createLinalgTileAndFusePass();
+    // LinalgToSPIRV
+    createConvertToGPUPass();
+    createLinalgTileAndFusePass();
     return true;
   }();
   (void)init_once;
