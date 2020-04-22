@@ -20,6 +20,7 @@ iree_cc_library(
   HDRS
     "init_translations.h"
   DEPS
+    MLIRPass
     iree::compiler::Translation::SPIRV::IndexComputation
     iree::compiler::Translation::SPIRV::LinalgToSPIRV
     iree::compiler::Translation::SPIRV::Passes

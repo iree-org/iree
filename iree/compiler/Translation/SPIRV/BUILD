@@ -27,5 +27,6 @@ cc_library(
         "//iree/compiler/Translation/SPIRV/LinalgToSPIRV",
         "//iree/compiler/Translation/SPIRV/Passes",
         "//iree/compiler/Translation/SPIRV/XLAToSPIRV",
+        "@llvm-project//mlir:Pass",
     ],
 )
