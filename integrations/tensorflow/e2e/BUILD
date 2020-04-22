@@ -80,7 +80,7 @@ package(
     # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
     # and add other supported vision models
     for model_name, backends in [
-        ("ResNet50", "tf"),
+        ("ResNet50", "tf,iree_vmla"),
         ("MobileNet", "tf"),
         ("MobileNetV2", "tf"),
     ]
