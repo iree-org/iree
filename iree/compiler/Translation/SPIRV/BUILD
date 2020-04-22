@@ -21,11 +21,6 @@ cc_library(
     name = "init_translations",
     hdrs = [
         "init_translations.h",
-        "IndexComputation.h",
-        "IndexComputationAttr.h.inc",
-        "IndexComputationAttribute.h",
-        "IndexComputationPass.h",
-        "XLAIndexPropagation.h",
     ],
     deps = [
         "//iree/compiler/Translation/SPIRV/IndexComputation",
