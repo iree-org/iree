@@ -373,6 +373,11 @@ def VMLA_BatchMatMulPseudoOp : VMLA_Op<"batch.matmul.pseudo"> {
   let results = (outs
     AnyTensor:$dst
   );
+
+  let assemblyFormat = [{
+    `(`$lhs`,` $rhs`)` attr-dict `:`
+    `(`type($lhs)`,` type($rhs)`)` `->` type($dst)
+  }];
 }
 
 def VMLA_BatchMatMulOp : VMLA_Op<"batch.matmul", [VMLA_OpInterface, VMLA_IncludeShapes]> {

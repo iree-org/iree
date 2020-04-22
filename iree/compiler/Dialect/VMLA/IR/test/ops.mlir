@@ -48,3 +48,18 @@ func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
   vmla.convert(%src, %dst) : f32 -> i8
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_batch_matmul_pseudo
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
+func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
+                               %rhs : tensor<32x1x128xf32>) {
+  // CHECK: vmla.batch.matmul.pseudo(%[[LHS]], %[[RHS]]) :
+  // CHECK-SAME: (tensor<32x256x128xf32>, tensor<32x1x128xf32>) ->
+  // CHECK-SAME: tensor<32x1x256xf32>
+  %dst = vmla.batch.matmul.pseudo(%lhs, %rhs) :
+    (tensor<32x256x128xf32>, tensor<32x1x128xf32>) -> tensor<32x1x256xf32>
+  return
+}
