@@ -30,9 +30,21 @@ func @binaryOp(%lhs : !vmla.buffer, %rhs : !vmla.buffer, %dst : !vmla.buffer) {
 // CHECK-SAME: %[[B:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[C:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
-func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer, 
+func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer,
                 %dst : !vmla.buffer) {
   // CHECK: vmla.clamp(%[[A]], %[[B]], %[[C]], %[[DST]]) : f32
   vmla.clamp(%a, %b, %c, %dst) : f32
+  return
+}
+
+
+// -----
+
+// CHECK-LABEL: @vmla_convert
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
+  // CHECK: vmla.convert(%[[SRC]], %[[DST]]) : f32 -> i8
+  vmla.convert(%src, %dst) : f32 -> i8
   return
 }

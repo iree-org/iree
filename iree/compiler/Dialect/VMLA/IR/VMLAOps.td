@@ -296,6 +296,10 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
       state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
     }
   }];
+
+  let assemblyFormat = [{
+    `(`$src`,` $dst`)` attr-dict `:` $src_type `->` $dst_type
+  }];
 }
 
 //===----------------------------------------------------------------------===//

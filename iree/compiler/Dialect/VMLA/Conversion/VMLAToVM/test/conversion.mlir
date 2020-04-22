@@ -59,7 +59,7 @@ func @shapeExpansion(%arg0 : !vmla.buffer, %arg1 : index, %arg2 : !vmla.buffer, 
 // CHECK-LABEL: vm.func @convert
 func @convert(%arg0 : !vmla.buffer, %arg1 : !vmla.buffer) {
   // CHECK-NEXT:  vm.call @vmla.convert.f32.i8(%arg0, %arg1)
-  "vmla.convert"(%arg0, %arg1) { src_type = f32, dst_type = i8 } : (!vmla.buffer, !vmla.buffer) -> ()
+  vmla.convert(%arg0, %arg1) : f32 -> i8
   return
 }
 
