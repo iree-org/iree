@@ -35,6 +35,7 @@ class Mlp(tf.Module):
                input_dim=28 * 28,
                classes=10):
     super().__init__()
+    tf_test_utils.set_random_seed()
     self.hidden_1_dim = hidden_1_dim
     self.hidden_2_dim = hidden_2_dim
     self.input_dim = input_dim

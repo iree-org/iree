@@ -38,6 +38,15 @@ bazel test ... --test_env=IREE_OVERRIDE_BACKENDS=tf,iree_vmla,iree_vulkan \
     --test_output=errors
 ```
 
+If you specify the same backend multiple times, for example
+--override_backends=iree_vmla,iree_vmla. The same backends are grouped and in
+this example iree_vmla will run once. If you specify tf,iree_vmla as backends,
+then we will test both backends and compare them with each other. If you specify
+tf backend only, then we will also test tf vs tf to capture any model
+initialization/randomization issues (it is a special case for debug purpose).
+For reproducibility of the unit tests we set random seed of tf and numpy by
+calling tf_test_utils.set_random_seed() before model creation.
+
 ## Debugging tests
 
 If the compiler fails to compile the program, then it will create a crash

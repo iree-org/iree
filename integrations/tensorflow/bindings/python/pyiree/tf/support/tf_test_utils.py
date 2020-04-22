@@ -29,6 +29,7 @@ from absl import logging
 import numpy as np
 from pyiree import rt
 from pyiree.tf import compiler
+import random
 import tensorflow.compat.v2 as tf
 
 flags.DEFINE_string(
@@ -45,6 +46,13 @@ ORIGNAL_SAVED_MODEL_PATH_ATTR = "_ORIGINAL_SAVED_MODEL_PATH"
 
 # Per test directory where debug artifacts are dumped.
 global_debug_dir = None
+
+
+def set_random_seed(seed=0):
+  """Set random seed for tf, np and random."""
+  tf.random.set_seed(seed)
+  random.seed(seed)
+  np.random.seed(seed)
 
 
 def save_and_compile_tf_module(tf_module, exported_names=(),
@@ -462,6 +470,13 @@ BackendInfo.add(
     CompiledModule=TfCompiledModule,
     iree_driver=None,
     iree_compiler_targets=None)
+# tf_also is used for checking test consistency
+# to catch any initialization/randomization issues between model runs
+BackendInfo.add(
+    name="tf_also",
+    CompiledModule=TfCompiledModule,
+    iree_driver=None,
+    iree_compiler_targets=None)
 BackendInfo.add(
     name="iree_vmla",
     CompiledModule=IreeCompiledModule,
@@ -583,6 +598,10 @@ class SavedModelTestCase(tf.test.TestCase):
           elif backends is None:
             backends = list(BackendInfo.ALL.keys())
           backends = [_resolve(backend) for backend in backends]
+          # if "tf" is specified as a only backend then
+          # we will test it always against "tf" by adding "tf_also".
+          if len(backends) == 1 and "tf" == backends[0].name:
+            backends.append(BackendInfo.ALL["tf_also"])
           available_backends = get_available_backends()
           backends = [
               backend for backend in backends if backend in available_backends

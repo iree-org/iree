@@ -16,36 +16,43 @@
 # This test is the same as keras_lstm_test, but all shapes are static.
 # This stresses the TensorList lowering more specifically.
 
+import numpy as np
 from pyiree.tf.support import tf_test_utils
 import tensorflow.compat.v2 as tf
 
 NUM_UNITS = 10
 NUM_TIMESTEPS = 24
 NUM_BATCH = 7
+INPUT_SHAPE = [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]
 
 
-class Lstm(tf.Module):
-
-  def __init__(self):
-    super(Lstm, self).__init__()
-    self.lstm = tf.keras.layers.LSTM(units=NUM_UNITS, return_sequences=True)
-
-  @tf.function(input_signature=[
-      tf.TensorSpec([NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS], tf.float32)
-  ])
-  def predict(self, x):
-    return self.lstm(x)
+def lstm_module():
+  tf_test_utils.set_random_seed()
+  inputs = tf.keras.layers.Input(batch_size=NUM_BATCH, shape=INPUT_SHAPE[1:])
+  outputs = tf.keras.layers.LSTM(units=NUM_UNITS, return_sequences=True)(inputs)
+  model = tf.keras.Model(inputs, outputs)
+  module = tf.Module()
+  module.m = model
+  module.predict = tf.function(
+      input_signature=[tf.TensorSpec(INPUT_SHAPE, tf.float32)])(
+          model.call)
+  return module
 
 
 # TODO(silvasean): Get this test working on other backends.
 @tf_test_utils.compile_modules(
-    backends=["tf", "iree_vmla"], lstm=(Lstm, ["predict"]))
+    backends=["tf", "iree_vmla"], lstm=(lstm_module, ["predict"]))
 class LstmTest(tf_test_utils.SavedModelTestCase):
 
   def test_lstm(self):
     m = self.modules.lstm.all
-    m.predict(tf.constant(0., shape=[NUM_BATCH, NUM_TIMESTEPS,
-                                     NUM_UNITS])).print().assert_all_close()
+    m.predict(
+        tf.constant(
+            np.arange(NUM_BATCH * NUM_TIMESTEPS * NUM_UNITS,
+                      dtype=np.float32).reshape(
+                          [NUM_BATCH, NUM_TIMESTEPS, NUM_UNITS]),
+            shape=[NUM_BATCH, NUM_TIMESTEPS,
+                   NUM_UNITS])).print().assert_all_close()
 
 
 if __name__ == "__main__":

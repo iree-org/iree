@@ -73,7 +73,7 @@ def models():
   tf.keras.backend.set_learning_phase(False)
   # TODO(ataei): This should move somewhere in SavedModelTestCase, it should
   # guarantee test is deterministic.
-  tf.random.set_seed(0)
+  tf_test_utils.set_random_seed()
 
   # keras model receives images size as input,
   # where batch size is not specified - by default it is dynamic

@@ -54,7 +54,7 @@ class StringsTest(tf_test_utils.SavedModelTestCase):
         [[12, 10, 29, 28, 94, 15, 24, 27, 94, 25, 21, 10, 34],
          [13, 24, 16, 28, 94, 15, 24, 27, 94, 28, 29, 10, 34]])
     result = self.modules.strings.all.strings_to_ids(input_ids)
-    result.assert_all_close()
+    result.assert_all_equal()
 
 
 if __name__ == "__main__":
