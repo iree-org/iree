@@ -49,7 +49,7 @@ maximum | ✓ | ✓ | ✓ | ✓
 minimum | ✓ | ✓ | ✓ | ✓
 multiply | ✓ | ✓ | ✗ | ✓
 negate | ✓ | ✗ | ✗ | ✓
-pad | ✓ | ✓ | ✗ | ✗
+pad | ✓ | ✓ | ✓ | ✓
 reduce | ✓ | ✓ | ✗ | ✓
 reduce_window | ✓ | ✗ | ✗ | ✓
 remainder | ✓ | ✓ | ✓ | ✓
