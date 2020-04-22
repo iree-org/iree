@@ -30,7 +30,6 @@ iree_py_library(
         "tf_test_driver.py",
         "tf_test_utils.py",
     ],
-    tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/compiler",
         "//bindings/python/pyiree/rt",

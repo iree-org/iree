@@ -31,7 +31,6 @@ pybind_cc_library(
         "binding.h",
         "status_utils.h",
     ],
-    tags = ["nokokoro"],
     deps = [
         "//iree/base:api",
         "//iree/base:status",

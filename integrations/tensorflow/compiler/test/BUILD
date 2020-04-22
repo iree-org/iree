@@ -35,7 +35,6 @@ iree_lit_test_suite(
         "//integrations/tensorflow/compiler:iree-tf-opt",
         "//iree/tools:IreeFileCheck",
     ],
-    tags = ["nokokoro"],
 )
 
 iree_py_test(
@@ -50,8 +49,6 @@ iree_py_test(
         INTREE_FILECHECK_TARGET,
     ],
     python_version = "PY3",
-    # TODO(b/145815906) Get this running in OSS CI.
-    tags = ["nokokoro"],
     deps = INTREE_TENSORFLOW_PY_DEPS + [
         "//integrations/tensorflow/bindings/python/pyiree/tf/support",
     ],

@@ -91,11 +91,7 @@ package(
         name = name,
         srcs = [name + ".py"],
         python_version = "PY3",
-        # TODO(b/145815906) Get this running in OSS CI.
-        tags = [
-            "noga",
-            "nokokoro",
-        ],
+        tags = ["noga"],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
