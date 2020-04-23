@@ -178,6 +178,12 @@ def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
+
+  let assemblyFormat = [{
+    `(`$src`,` $src_shape`,` $dst`,` $dst_shape`)` attr-dict `:`
+    `(`type($src_shape)`,` type($dst_shape)`)`
+    $element_type
+  }];
 }
 
 def VMLA_ReverseOp : VMLA_ElementTypeOp<"reverse", [VMLA_IncludeShapes]> {
