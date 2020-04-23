@@ -130,7 +130,6 @@ iree_cc_library(
     iree::base::init
     iree::base::status
     iree::hal::driver_registry
-  ALWAYSLINK
   PUBLIC
 )
 

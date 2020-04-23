@@ -120,7 +120,6 @@ cc_library(
         #TODO(ataei): Link with native target dep.
         "@llvm-project//llvm:x86_code_gen",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
