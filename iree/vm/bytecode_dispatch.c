@@ -930,6 +930,25 @@ iree_status_t iree_vm_bytecode_dispatch(
       pc = caller_frame->pc;
     });
 
+    DISPATCH_OP(Fail, {
+      // let encoding = [
+      //   VM_EncOpcode<VM_OPC_Fail>,
+      //   VM_EncOperand<"status", 0>,
+      //   VM_EncStrAttr<"message">,
+      // ];
+      uint32_t status_code = OP_I8(0);
+      iree_string_view_t str;
+      str.size = OP_I16(1);
+      str.data = (const char*)&bytecode_data[pc + 3];
+      pc += 1 + 2 + str.size;
+      // TODO(benvanik): attach string and stack.
+      if (status_code == 0) {
+        // Shouldn't happen; we expect to die here, so there's no way to no-op.
+        return IREE_STATUS_INVALID_ARGUMENT;
+      }
+      return iree_make_status(status_code);
+    });
+
     //===------------------------------------------------------------------===//
     // Async/fiber ops
     //===------------------------------------------------------------------===//

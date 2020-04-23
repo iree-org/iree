@@ -138,6 +138,7 @@ def VM_OPC_CondBranch            : VM_OPC<0x51, "CondBranch">;
 def VM_OPC_Call                  : VM_OPC<0x52, "Call">;
 def VM_OPC_CallVariadic          : VM_OPC<0x53, "CallVariadic">;
 def VM_OPC_Return                : VM_OPC<0x54, "Return">;
+def VM_OPC_Fail                  : VM_OPC<0x55, "Fail">;
 
 // Async/fiber ops:
 def VM_OPC_Yield                 : VM_OPC<0x60, "Yield">;
@@ -198,6 +199,7 @@ def VM_OpcodeAttr : I32EnumAttr<"Opcode", "valid VM operation encodings", [
     VM_OPC_Call,
     VM_OPC_CallVariadic,
     VM_OPC_Return,
+    VM_OPC_Fail,
     VM_OPC_Yield,
     VM_OPC_Trace,
     VM_OPC_Print,

@@ -192,11 +192,7 @@ static void buildConditionDispatchTable(IREE::HAL::DeviceSwitchOp switchOp,
       // condition will add its IR to the block.
     } else {
       // Fallthrough of all expressions; die if we expected return values.
-      if (switchOp.getNumResults() > 0) {
-        funcBuilder.create<IREE::UnreachableOp>(switchOp.getLoc());
-      } else {
-        funcBuilder.create<BranchOp>(switchOp.getLoc(), afterBlock);
-      }
+      funcBuilder.create<IREE::UnreachableOp>(switchOp.getLoc());
     }
   }
 

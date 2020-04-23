@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionDialectInterface.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
+#include "iree/compiler/Dialect/VM/Conversion/IREEToVM/ConvertIREEToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/Conversion/StandardToVM/ConvertStandardToVM.h"
 #include "iree/compiler/Dialect/VM/Conversion/TypeConverter.h"
@@ -87,6 +88,7 @@ class ConversionPass
     }
 
     OwningRewritePatternList conversionPatterns;
+    populateIREEToVMPatterns(context, conversionPatterns);
     populateStandardToVMPatterns(context, conversionPatterns);
 
     // Populate patterns from all used dialects, providing the imports they

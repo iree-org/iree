@@ -448,8 +448,6 @@ def HAL_HostSizeAttr : IREE_IndexAttrBase<"size_t">;
 
 def HAL_TimelineValue : TypeAlias<Index>;
 
-def HAL_Status : TypeAlias<Index>;
-
 def HAL_PrimitiveType : AnyTypeOf<[Index, AnySignlessInteger, AnyFloat]>;
 
 def HAL_VariableRefAttr : AliasedSymbolRefAttr;
