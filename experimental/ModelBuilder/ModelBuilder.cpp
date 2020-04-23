@@ -154,6 +154,5 @@ Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
                           builder.getContext()),
         ArrayRef<NamedAttribute>{});
   }
-  return std_call(builder.getSymbolRefAttr(func), returnTypes, values)
-      .getOperation();
+  return std_call(builder.getSymbolRefAttr(func), returnTypes, values);
 }
