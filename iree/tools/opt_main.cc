@@ -17,6 +17,7 @@
 // Based on mlir-opt but without registering passes and dialects we don't care
 // about.
 
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/compiler/Translation/SPIRV/init_translations.h"
 #include "iree/tools/init_compiler_modules.h"
 #include "iree/tools/init_dialects.h"
@@ -70,6 +71,7 @@ int main(int argc, char **argv) {
   mlir::iree_compiler::registerAllIreePasses();
   mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerSPRIVTranslation();
+  mlir::iree_compiler::registerCodegenPasses();
   llvm::InitLLVM y(argc, argv);
 
   // Register MLIRContext command-line options like

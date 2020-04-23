@@ -68,6 +68,14 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
 void populateHLOToLinalgOnTensorsConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns);
 
+/// Register all Codegen passes
+inline void registerCodegenPasses() {
+  createHALInterfaceToMemrefPass();
+  createHLOToLinalgOnBuffersPass();
+  createHLOToLinalgOnTensorsPass();
+  createLinalgOnTensorsFusionPass();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir
 
