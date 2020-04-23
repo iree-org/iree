@@ -55,7 +55,6 @@
 namespace mlir {
 using edsc::ScopedContext;
 using edsc::StructuredIndexed;
-using edsc::ValueHandle;
 
 // List of MLIR EDSC instrinsics exposed to external clients of ModelBuilder.
 // All other intrinsics are abstracted away via ModelBuilder methods.
@@ -137,7 +136,7 @@ class ModelBuilder : public OpBuilder {
   //      `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
   // Returns O.
   // Version with a MemRef output argument.
-  ValueHandle FCBiasTanh(std::array<Value, 3> fcArgs, Value biasValueArg);
+  Value FCBiasTanh(std::array<Value, 3> fcArgs, Value biasValueArg);
   // Version with a RankedTensor result.
   Value FCBiasTanhTensors(RankedTensorType outputTensorType,
                           std::array<Value, 2> fcArgs, Value biasValueArg);
@@ -146,12 +145,12 @@ class ModelBuilder : public OpBuilder {
   //   `0.5f * tanh(0.5f * (x + bias)) + 0.5f`
   // This assumes `x` and `bias` capture scalar MLIR values of type f32.
   // This is used as a region builder when constructing e.g. a pointwise op.
-  static Value fusedBiasTanh(ValueHandle x, ValueHandle bias);
+  static Value fusedBiasTanh(Value x, Value bias);
 
   // ---------------------------------------------------------------------------
   // Support for emitting special function calls.
   // ---------------------------------------------------------------------------
-  static ValueHandle call_tanhf(Value v);
+  static Value call_tanhf(Value v);
 
  protected:
   // Helper function to support calling into known functions (e.g. libmath).
