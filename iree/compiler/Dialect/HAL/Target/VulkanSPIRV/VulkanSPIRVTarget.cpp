@@ -105,7 +105,7 @@ static bool useLinalgPath(ModuleOp moduleOp,
   // Use linalg path if dispatch function contains any of the following ops.
   auto walkResult = moduleOp.walk([](Operation *op) -> WalkResult {
     if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ConvOp>(op) ||
-        isa<xla_hlo::DotOp>(op)) {
+        isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ReduceWindowOp>(op)) {
       return WalkResult::interrupt();
     }
     return WalkResult::advance();

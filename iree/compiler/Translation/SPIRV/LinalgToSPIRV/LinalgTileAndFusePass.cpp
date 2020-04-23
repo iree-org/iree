@@ -19,6 +19,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/Passes.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 #include "mlir/Dialect/Linalg/Transforms/LinalgTransforms.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/PatternMatch.h"
@@ -154,8 +155,17 @@ struct TileLinalgOpPattern
     // case, there is nothing to tile and fuse with. So just tile it.
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(linalgOp.getOperation());
-    if (!llvm::all_of(linalgOp.getInputsAndOutputBuffers(),
-                      [](Value arg) { return arg.hasOneUse(); }))
+    // Linalg pooling ops has a fake window_dimension memref that has at least
+    // two uses. However, it doesn't affect because it is just a fake memref.
+    auto buffers = linalgOp.getInputsAndOutputBuffers();
+    if (isa<linalg::PoolingMaxOp>(linalgOp.getOperation()) ||
+        isa<linalg::PoolingMinOp>(linalgOp.getOperation()) ||
+        isa<linalg::PoolingSumOp>(linalgOp.getOperation())) {
+      // The second buffer is a fake memref.
+      if (!(*buffers.begin()).hasOneUse()) return failure();
+      buffers = llvm::drop_begin(buffers, 2);
+    }
+    if (!llvm::all_of(buffers, [](Value arg) { return arg.hasOneUse(); }))
       return failure();
     return linalg::tileLinalgOpToParallelLoopsAndSetMarker(
         rewriter, linalgOp.getOperation(), tileSizes, getWorkItemMarker(),
@@ -212,10 +222,13 @@ void LinalgTileAndFusePass::runOnFunction() {
   getTileSizes(numParallelLoops, workGroupSize, tileSizes);
 
   OwningRewritePatternList patterns;
-  patterns.insert<TileLinalgOpPattern<linalg::GenericOp>,
+  patterns.insert<TileLinalgOpPattern<linalg::ConvOp>,
+                  TileLinalgOpPattern<linalg::GenericOp>,
                   TileLinalgOpPattern<linalg::IndexedGenericOp>,
                   TileLinalgOpPattern<linalg::MatmulOp>,
-                  TileLinalgOpPattern<linalg::ConvOp>,
+                  TileLinalgOpPattern<linalg::PoolingMaxOp>,
+                  TileLinalgOpPattern<linalg::PoolingMinOp>,
+                  TileLinalgOpPattern<linalg::PoolingSumOp>,
                   TileAndFuseLinalgOpPattern<linalg::GenericOp>>(context,
                                                                  tileSizes);
   applyPatternsAndFoldGreedily(getOperation(), patterns);
@@ -223,8 +236,9 @@ void LinalgTileAndFusePass::runOnFunction() {
   // Check that there are single loop.parallel operation at the top most level
   // that will get mapped to thread blocks/workgroups.
   auto forLoops = block.getOps<loop::ParallelOp>();
-  if (numParallelLoops > 0 && !llvm::hasSingleElement(forLoops) &&
-      (*forLoops.begin()).getNumLoops() != numParallelLoops) {
+  if (numParallelLoops > 0 &&
+      (!llvm::hasSingleElement(forLoops) ||
+       (*forLoops.begin()).getNumLoops() != numParallelLoops)) {
     funcOp.emitError(
         "unable to generate the tiled loop structure to map to workgroups");
     return signalPassFailure();

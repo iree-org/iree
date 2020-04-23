@@ -468,6 +468,9 @@ void ConvertToGPUPass::runOnOperation() {
               ADD_ALL_LINALG_PATTERNS(linalg::GenericOp),
               ADD_ALL_LINALG_PATTERNS(linalg::IndexedGenericOp),
               ADD_ALL_LINALG_PATTERNS(linalg::MatmulOp),
+              ADD_ALL_LINALG_PATTERNS(linalg::PoolingMaxOp),
+              ADD_ALL_LINALG_PATTERNS(linalg::PoolingMinOp),
+              ADD_ALL_LINALG_PATTERNS(linalg::PoolingSumOp),
 
 #undef ADD_ALL_LINALG_PATTERNS
               PartitionPLoopToWorkgroups, RemoveLinalgRange, ReturnConversion>(

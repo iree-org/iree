@@ -545,13 +545,6 @@ linalg::LinalgOp ReduceWindowOpConversion::apply(
     ArrayRef<Value> results, ConversionPatternRewriter &rewriter) const {
   auto loc = op.getLoc();
 
-  // Initialize the output buffer to `initVal`.
-  Attribute initConstVal = getInitValueAsConst(operands[1]);
-  Value initVal =
-      initConstVal ? rewriter.create<ConstantOp>(loc, initConstVal).getResult()
-                   : rewriter.create<LoadOp>(loc, operands[1]).getResult();
-  rewriter.create<linalg::FillOp>(loc, results[0], initVal);
-
   // Create a fake window dimension.
   SmallVector<int64_t, 4> shapes;
   for (auto dim : op.window_dimensions().getValues<int64_t>())
