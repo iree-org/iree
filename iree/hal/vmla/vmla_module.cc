@@ -903,6 +903,10 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("max.i16", &VMLAModuleState::MaxI16),
     vm::MakeNativeFunction("max.i32", &VMLAModuleState::MaxI32),
     vm::MakeNativeFunction("max.f32", &VMLAModuleState::MaxF32),
+    vm::MakeNativeFunction("clamp.i8", &VMLAModuleState::ClampI8),
+    vm::MakeNativeFunction("clamp.i16", &VMLAModuleState::ClampI16),
+    vm::MakeNativeFunction("clamp.i32", &VMLAModuleState::ClampI32),
+    vm::MakeNativeFunction("clamp.f32", &VMLAModuleState::ClampF32),
     vm::MakeNativeFunction("floor.f32", &VMLAModuleState::FloorF32),
     vm::MakeNativeFunction("ceil.f32", &VMLAModuleState::CeilF32),
 
