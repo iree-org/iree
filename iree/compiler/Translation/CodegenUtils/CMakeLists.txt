@@ -28,6 +28,5 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::IREE::IR
-  ALWAYSLINK
   PUBLIC
 )
