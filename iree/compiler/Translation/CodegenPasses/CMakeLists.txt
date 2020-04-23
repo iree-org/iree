@@ -54,6 +54,5 @@ iree_cc_library(
     iree::compiler::Dialect::IREE::IR
     iree::compiler::Translation::CodegenUtils
     tensorflow::mlir_xla
-  ALWAYSLINK
   PUBLIC
 )
