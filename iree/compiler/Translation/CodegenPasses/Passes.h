@@ -17,8 +17,8 @@
 // IREE specific passes used in the XLA to Linalg conversion
 //
 //===----------------------------------------------------------------------===//
-#ifndef IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H
-#define IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H
+#ifndef IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H_
+#define IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H_
 #include <memory>
 
 #include "mlir/IR/Function.h"
@@ -79,4 +79,4 @@ inline void registerCodegenPasses() {
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H
+#endif  // IREE_COMPILER_TRANSLATION_CODEGENPASSES_PASSES_H_
