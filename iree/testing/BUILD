@@ -29,7 +29,6 @@ cc_library(
         "//iree/base:init",
         "@com_google_benchmark//:benchmark",
     ],
-    alwayslink = 1,
 )
 
 cc_library(

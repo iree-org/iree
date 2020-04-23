@@ -22,7 +22,6 @@ iree_cc_library(
   DEPS
     benchmark
     iree::base::init
-  ALWAYSLINK
   TESTONLY
   PUBLIC
 )
