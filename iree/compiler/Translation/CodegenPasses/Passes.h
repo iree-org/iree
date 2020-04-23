@@ -39,9 +39,6 @@ void addHLOToLinalgOnBuffersPasses(OpPassManager &pm);
 /// memrefs.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createHALInterfaceToMemrefPass();
 
-/// Creates XLA-HLO preprocessing transformation pass.
-std::unique_ptr<OperationPass<FuncOp>> createHLOPreprocessingPass();
-
 /// Creates XLA-HLO to Linalg on buffers transformation pass.
 std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnBuffersPass();
 
