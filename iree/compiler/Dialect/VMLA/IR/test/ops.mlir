@@ -74,19 +74,19 @@ func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
 // CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
 // CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
 func @vmla_batch_matmul(%lhs : !vmla.buffer,
-                        %lhs_shape : !shapex.ranked_shape<[8,10,64]>,
+                        %lhs_shape : !shapex.ranked_shape<[8,4,4]>,
                         %rhs : !vmla.buffer,
-                        %rhs_shape : !shapex.ranked_shape<[8,1,64]>,
+                        %rhs_shape : !shapex.ranked_shape<[8,1,4]>,
                         %dst : !vmla.buffer,
-                        %dst_shape : !shapex.ranked_shape<[8,1,10]>) {
+                        %dst_shape : !shapex.ranked_shape<[8,1,4]>) {
   // CHECK:      vmla.batch.matmul
-  // CHECK-SAME: %[[LHS]](%[[LHS_SHAPE]] !shapex.ranked_shape<[8,10,64]>) : f32,
-  // CHECK-SAME: %[[RHS]](%[[RHS_SHAPE]] !shapex.ranked_shape<[8,1,64]>) : f32,
+  // CHECK-SAME: %[[LHS]](%[[LHS_SHAPE]] : !shapex.ranked_shape<[8,4,4]>) : f32,
+  // CHECK-SAME: %[[RHS]](%[[RHS_SHAPE]] : !shapex.ranked_shape<[8,1,4]>) : f32,
   // CHECK-SAME: out
-  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] !shapex.ranked_shape<[8,1,10]>) : f32
-  vmla.batch.matmul %lhs(%lhs_shape !shapex.ranked_shape<[8,10,64]>) : f32,
-                    %rhs(%rhs_shape !shapex.ranked_shape<[8,1,64]>) : f32,
-                    out %dst(%dst_shape !shapex.ranked_shape<[8,1,10]>) : f32
+  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[8,1,4]>) : f32
+  vmla.batch.matmul %lhs(%lhs_shape : !shapex.ranked_shape<[8,4,4]>) : f32,
+                    %rhs(%rhs_shape : !shapex.ranked_shape<[8,1,4]>) : f32,
+                    out %dst(%dst_shape : !shapex.ranked_shape<[8,1,4]>) : f32
   return
 }
 
@@ -102,12 +102,12 @@ func @vmla_transpose(%src : !vmla.buffer,
                      %dst : !vmla.buffer,
                      %dst_shape : !shapex.ranked_shape<[64,10,32,32]>) {
   // CHECK:      vmla.transpose
-  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] !shapex.ranked_shape<[64,32,32,10]>),
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[64,32,32,10]>),
   // CHECK-SAME: out
-  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] !shapex.ranked_shape<[64,10,32,32]>)
+  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[64,10,32,32]>)
   // CHECK-SAME: {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} : f32
-  vmla.transpose %src(%src_shape !shapex.ranked_shape<[64,32,32,10]>),
-                 out %dst(%dst_shape !shapex.ranked_shape<[64,10,32,32]>)
+  vmla.transpose %src(%src_shape : !shapex.ranked_shape<[64,32,32,10]>),
+                 out %dst(%dst_shape : !shapex.ranked_shape<[64,10,32,32]>)
                  {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} : f32
   return
 }
