@@ -24,6 +24,8 @@ from pyiree.xla import compiler
 import tensorflow.compiler.xla.python.xla_client as xla_client
 # pylint: enable=g-direct-tensorflow-import
 
+ops = xla_client.ops
+
 
 class RuntimeTest(absltest.TestCase):
 
@@ -34,10 +36,10 @@ class RuntimeTest(absltest.TestCase):
     and that there are not no-ops, etc.
     """
     # Generate a sample XLA computation.
-    builder = xla_client.ComputationBuilder("testbuilder")
+    builder = xla_client.XlaBuilder("testbuilder")
     in_shape = np.array([4], dtype=np.float32)
-    in_feed = builder.ParameterWithShape(xla_client.shape_from_pyval(in_shape))
-    result = builder.Add(in_feed, builder.ConstantF32Scalar(1.0))
+    in_feed = ops.Parameter(builder, 0, xla_client.shape_from_pyval(in_shape))
+    result = ops.Add(in_feed, ops.Constant(builder, np.float32(1.0)))
     xla_computation = builder.Build(result)
 
     # Load into XLA Module.

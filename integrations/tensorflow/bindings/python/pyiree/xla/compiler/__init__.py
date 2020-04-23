@@ -76,9 +76,7 @@ def xla_load_module_proto(
   if not compiler_context:
     compiler_context = Context()
   input_module = binding.load_xla_module_proto(
-      compiler_context,
-      xla_computation.computation,
-      exported_names=exported_names)
+      compiler_context, xla_computation, exported_names=exported_names)
   if pass_pipeline:
     input_module.run_pass_pipeline(pass_pipeline)
   return input_module
@@ -106,7 +104,6 @@ def xla_compile_module_proto(
   Returns:
     An OpaqueBlob representing the compiled module.
   """
-  input_module = xla_load_module_proto(xla_computation.computation,
-                                       compiler_context, exported_names,
-                                       pass_pipeline)
+  input_module = xla_load_module_proto(xla_computation, compiler_context,
+                                       exported_names, pass_pipeline)
   return input_module.compile(target_backends=target_backends)
