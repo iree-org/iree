@@ -41,5 +41,10 @@ static PassRegistration<IREELinalgVectorTransformPass> pass(
     "iree-linalg-vector-transforms", "Lower linalg to vector dialect");
 
 }  // namespace
+
+std::unique_ptr<FunctionPass> createIREELinalgVectorTransformPass() {
+  return std::make_unique<IREELinalgVectorTransformPass>();
+}
+
 }  // namespace iree_compiler
 }  // namespace mlir

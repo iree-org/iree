@@ -49,6 +49,9 @@ std::unique_ptr<OperationPass<FuncOp>> createHLOToLinalgOnTensorsPass();
 /// producer consumer fusion.
 std::unique_ptr<OperationPass<FuncOp>> createLinalgOnTensorsFusionPass();
 
+/// Creates IREE Linalg Vector transformation pass.
+std::unique_ptr<FunctionPass> createIREELinalgVectorTransformPass();
+
 /// Populates the patterns that convert from XLA to Linalg on tensors. Imports
 /// patterns from XLA, as well as some IREE specific modifications.
 void populateHLOToLinalgOnTensorsConversionPatterns(
@@ -71,6 +74,7 @@ inline void registerCodegenPasses() {
   createHLOToLinalgOnBuffersPass();
   createHLOToLinalgOnTensorsPass();
   createLinalgOnTensorsFusionPass();
+  createIREELinalgVectorTransformPass();
 }
 
 }  // namespace iree_compiler
