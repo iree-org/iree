@@ -143,7 +143,6 @@ cc_library(
         "//iree/base:status",
         "//iree/hal:driver_registry",
     ],
-    alwayslink = 1,
 )
 
 cc_library(
