@@ -627,7 +627,7 @@ Defines a constant value that is treated as a scalar literal at runtime.
 
 | Attribute | MLIR Type | Description |
 | :-------: | :-------: | ----------- |
-`value` | Attribute | anonymous_370
+`value` | Attribute | anonymous_371
 
 #### Results:
 
@@ -812,6 +812,39 @@ operation ::= `vm.ext.i8.i32.s` $operand attr-dict `:` type($result)
 | :----: | ----------- |
 `result` | 32-bit signless integer
 
+### `vm.fail` (IREE::VM::FailOp)
+
+raises a global failure
+
+Syntax:
+
+```
+operation ::= `vm.fail` $status (`,` $message^)? attr-dict
+```
+
+
+Signals a runtime failure that causes the entire active invocation - and
+possibly *all* in-flight and pending invocations - to fail with the given
+status. The status will be propagated back via the available runtime error
+handling mechanisms such as semaphores or synchronous invocation results.
+
+As the IREE execution model is deeply pipelined it's possible that failures
+have a latency between when they are emitted and when the application can
+observe the failure. It's also possible that other work that is in-flight
+or pending when the failure occurs will complete.
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`message` | StringAttr | string attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`status` | 32-bit signless integer
+
 ### `vm.func` (IREE::VM::FuncOp)
 
 function defined with VM control flow ops
@@ -868,7 +901,7 @@ Initialized to zero unless a custom initializer function is specified.
 `type` | TypeAttr | any type attribute
 `is_mutable` | UnitAttr | unit attribute
 `initializer` | FlatSymbolRefAttr | flat symbol reference attribute
-`initial_value` | Attribute | anonymous_373
+`initial_value` | Attribute | anonymous_374
 `ordinal` | IntegerAttr | ordinal value
 
 ### `vm.global.load.i32` (IREE::VM::GlobalLoadI32Op)
