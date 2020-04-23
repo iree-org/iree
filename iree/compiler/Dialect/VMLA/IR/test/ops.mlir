@@ -89,9 +89,9 @@ func @vmla_batch_matmul(%lhs : !vmla.buffer,
   vmla.batch.matmul(%lhs, %lhs_shape,
                     %rhs, %rhs_shape,
                     %dst, %dst_shape) :
-                    (f32, !shapex.ranked_shape<[32,10,784]>,
-                     f32, !shapex.ranked_shape<[32,1,784]>,
-                     f32, !shapex.ranked_shape<[32,1,10]>)
+                   (f32, !shapex.ranked_shape<[32,10,784]>,
+                    f32, !shapex.ranked_shape<[32,1,784]>,
+                    f32, !shapex.ranked_shape<[32,1,10]>)
   return
 }
 
