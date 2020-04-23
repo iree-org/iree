@@ -6,8 +6,8 @@
 // CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
 func @unaryOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
-  // CHECK: vmla.log(%[[SRC]], %[[DST]]) : f32
-  vmla.log(%src, %dst) : f32
+  // CHECK: vmla.log %[[SRC]], %[[DST]] : f32
+  vmla.log %src, %dst : f32
   return
 }
 
@@ -18,8 +18,8 @@ func @unaryOp(%src : !vmla.buffer, %dst : !vmla.buffer) {
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
 // CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
 func @binaryOp(%lhs : !vmla.buffer, %rhs : !vmla.buffer, %dst : !vmla.buffer) {
-  // CHECK: vmla.atan2(%[[LHS]], %[[RHS]], %[[DST]]) : f32
-  vmla.atan2(%lhs, %rhs, %dst) : f32
+  // CHECK: vmla.atan2 %[[LHS]], %[[RHS]], %[[DST]] : f32
+  vmla.atan2 %lhs, %rhs, %dst : f32
   return
 }
 
@@ -32,8 +32,8 @@ func @binaryOp(%lhs : !vmla.buffer, %rhs : !vmla.buffer, %dst : !vmla.buffer) {
 // CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
 func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer,
                 %dst : !vmla.buffer) {
-  // CHECK: vmla.clamp(%[[A]], %[[B]], %[[C]], %[[DST]]) : f32
-  vmla.clamp(%a, %b, %c, %dst) : f32
+  // CHECK: vmla.clamp %[[A]], %[[B]], %[[C]], %[[DST]] : f32
+  vmla.clamp %a, %b, %c, %dst : f32
   return
 }
 
@@ -44,8 +44,8 @@ func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer,
 // CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
 // CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
 func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
-  // CHECK: vmla.convert(%[[SRC]], %[[DST]]) : f32 -> i8
-  vmla.convert(%src, %dst) : f32 -> i8
+  // CHECK: vmla.convert %[[SRC]], %[[DST]] : f32 -> i8
+  vmla.convert %src, %dst : f32 -> i8
   return
 }
 
@@ -56,10 +56,10 @@ func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
 // CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
 func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
                                %rhs : tensor<32x1x128xf32>) {
-  // CHECK: vmla.batch.matmul.pseudo(%[[LHS]], %[[RHS]]) :
+  // CHECK: vmla.batch.matmul.pseudo %[[LHS]], %[[RHS]] :
   // CHECK-SAME: (tensor<32x256x128xf32>, tensor<32x1x128xf32>) ->
   // CHECK-SAME: tensor<32x1x256xf32>
-  %dst = vmla.batch.matmul.pseudo(%lhs, %rhs) :
+  %dst = vmla.batch.matmul.pseudo %lhs, %rhs :
     (tensor<32x256x128xf32>, tensor<32x1x128xf32>) -> tensor<32x1x256xf32>
   return
 }
@@ -79,16 +79,16 @@ func @vmla_batch_matmul(%lhs : !vmla.buffer,
                         %rhs_shape : !shapex.ranked_shape<[32,1,784]>,
                         %dst : !vmla.buffer,
                         %dst_shape : !shapex.ranked_shape<[32,1,10]>) {
-  // CHECK:      vmla.batch.matmul(
+  // CHECK:      vmla.batch.matmul
   // CHECK-SAME:   %[[LHS]], %[[LHS_SHAPE]],
   // CHECK-SAME:   %[[RHS]], %[[RHS_SHAPE]],
-  // CHECK-SAME:   %[[DST]], %[[DST_SHAPE]]) :
+  // CHECK-SAME:   %[[DST]], %[[DST_SHAPE]] :
   // CHECK-SAME: (f32, !shapex.ranked_shape<[32,10,784]>
   // CHECK-SAME:  f32, !shapex.ranked_shape<[32,1,784]>
   // CHECK-SAME:  f32, !shapex.ranked_shape<[32,1,10]>)
-  vmla.batch.matmul(%lhs, %lhs_shape,
+  vmla.batch.matmul %lhs, %lhs_shape,
                     %rhs, %rhs_shape,
-                    %dst, %dst_shape) :
+                    %dst, %dst_shape :
                    (f32, !shapex.ranked_shape<[32,10,784]>,
                     f32, !shapex.ranked_shape<[32,1,784]>,
                     f32, !shapex.ranked_shape<[32,1,10]>)
@@ -106,13 +106,13 @@ func @vmla_transpose(%src : !vmla.buffer,
                      %src_shape : !shapex.ranked_shape<[64,32,32,10]>,
                      %dst : !vmla.buffer,
                      %dst_shape : !shapex.ranked_shape<[64,10,32,32]>) {
-  // CHECK:      vmla.transpose(
+  // CHECK:      vmla.transpose
   // CHECK-SAME:   %[[SRC]], %[[SRC_SHAPE]],
-  // CHECK-SAME:   %[[DST]], %[[DST_SHAPE]])
+  // CHECK-SAME:   %[[DST]], %[[DST_SHAPE]]
   // CHECK-SAME: {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} :
   // CHECK-SAME: (!shapex.ranked_shape<[64,32,32,10]>,
   // CHECK-SAME:  !shapex.ranked_shape<[64,10,32,32]>) f32
-  vmla.transpose(%src, %src_shape, %dst, %dst_shape)
+  vmla.transpose %src, %src_shape, %dst, %dst_shape
                 {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} :
                 (!shapex.ranked_shape<[64,32,32,10]>,
                  !shapex.ranked_shape<[64,10,32,32]>) f32

@@ -180,7 +180,7 @@ def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
   );
 
   let assemblyFormat = [{
-    `(`$src`,` $src_shape`,` $dst`,` $dst_shape`)` attr-dict `:`
+    $src`,` $src_shape`,` $dst`,` $dst_shape attr-dict `:`
     `(`type($src_shape)`,` type($dst_shape)`)`
     $element_type
   }];
@@ -304,7 +304,7 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
   }];
 
   let assemblyFormat = [{
-    `(`$src`,` $dst`)` attr-dict `:` $src_type `->` $dst_type
+    $src`,` $dst attr-dict `:` $src_type `->` $dst_type
   }];
 }
 
@@ -381,7 +381,7 @@ def VMLA_BatchMatMulPseudoOp : VMLA_Op<"batch.matmul.pseudo"> {
   );
 
   let assemblyFormat = [{
-    `(`$lhs`,` $rhs`)` attr-dict `:`
+    $lhs`,` $rhs attr-dict `:`
     `(`type($lhs)`,` type($rhs)`)` `->` type($dst)
   }];
 }
@@ -408,9 +408,9 @@ def VMLA_BatchMatMulOp : VMLA_Op<"batch.matmul", [VMLA_OpInterface, VMLA_Include
   }];
 
   let assemblyFormat = [{
-    `(`$lhs`,` $lhs_shape`,`
-       $rhs`,` $rhs_shape`,`
-       $dst`,` $dst_shape`)` attr-dict `:`
+    $lhs`,` $lhs_shape`,`
+    $rhs`,` $rhs_shape`,`
+    $dst`,` $dst_shape attr-dict `:`
     `(`$lhs_type`,` type($lhs_shape)`,`
        $rhs_type`,` type($rhs_shape)`,`
        $dst_type`,` type($dst_shape)`)`
