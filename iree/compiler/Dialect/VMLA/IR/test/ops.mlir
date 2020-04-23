@@ -63,3 +63,32 @@ func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
     (tensor<32x256x128xf32>, tensor<32x1x128xf32>) -> tensor<32x1x256xf32>
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_batch_matmul
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LHS_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[RHS_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+func @vmla_batch_matmul(%lhs : !vmla.buffer,
+                        %lhs_shape : !shapex.ranked_shape<[32,10,784]>,
+                        %rhs : !vmla.buffer,
+                        %rhs_shape : !shapex.ranked_shape<[32,1,784]>,
+                        %dst : !vmla.buffer,
+                        %dst_shape : !shapex.ranked_shape<[32,1,10]>) {
+  // CHECK: vmla.batch.matmul(%[[LHS]], %[[LHS_SHAPE]],
+  // CHECK-SAME: %[[RHS]], %[[RHS_SHAPE]], %[[DST]], %[[DST_SHAPE]]) :
+  // CHECK-SAME: (f32, !shapex.ranked_shape<[32,10,784]>
+  // CHECK-SAME:  f32, !shapex.ranked_shape<[32,1,784]>
+  // CHECK-SAME:  f32, !shapex.ranked_shape<[32,1,10]>)
+  vmla.batch.matmul(%lhs, %lhs_shape,
+                    %rhs, %rhs_shape,
+                    %dst, %dst_shape) :
+                    (f32, !shapex.ranked_shape<[32,10,784]>,
+                     f32, !shapex.ranked_shape<[32,1,784]>,
+                     f32, !shapex.ranked_shape<[32,1,10]>)
+  return
+}

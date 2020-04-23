@@ -400,6 +400,15 @@ def VMLA_BatchMatMulOp : VMLA_Op<"batch.matmul", [VMLA_OpInterface, VMLA_Include
       state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
     }
   }];
+
+  let assemblyFormat = [{
+    `(`$lhs`,` $lhs_shape`,`
+       $rhs`,` $rhs_shape`,`
+       $dst`,` $dst_shape`)` attr-dict `:`
+    `(`$lhs_type`,` type($lhs_shape)`,`
+       $rhs_type`,` type($rhs_shape)`,`
+       $dst_type`,` type($dst_shape)`)`
+  }];
 }
 
 //===----------------------------------------------------------------------===//
