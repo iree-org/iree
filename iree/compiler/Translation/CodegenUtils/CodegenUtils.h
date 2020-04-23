@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H
-#define IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H
+#ifndef IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H_
+#define IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H_
 
 #include "mlir/IR/Function.h"
 #include "mlir/Support/LogicalResult.h"
@@ -53,4 +53,4 @@ LogicalResult updateWorkGroupSize(Operation *op,
 }  // namespace iree_compiler
 }  // namespace mlir
 
-#endif  // IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H
+#endif  // IREE_COMPILER_TRANSLATION_CODEGENUTILS_CODEGENUTILS_H_
