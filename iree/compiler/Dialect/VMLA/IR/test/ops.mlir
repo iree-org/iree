@@ -80,13 +80,13 @@ func @vmla_batch_matmul(%lhs : !vmla.buffer,
                         %dst : !vmla.buffer,
                         %dst_shape : !shapex.ranked_shape<[8,1,4]>) {
   // CHECK:      vmla.batch.matmul
-  // CHECK-SAME: %[[LHS]](%[[LHS_SHAPE]] : !shapex.ranked_shape<[8,4,4]>) : f32,
-  // CHECK-SAME: %[[RHS]](%[[RHS_SHAPE]] : !shapex.ranked_shape<[8,1,4]>) : f32,
+  // CHECK-SAME: %[[LHS]] : f32(%[[LHS_SHAPE]] : !shapex.ranked_shape<[8,4,4]>),
+  // CHECK-SAME: %[[RHS]] : f32(%[[RHS_SHAPE]] : !shapex.ranked_shape<[8,1,4]>),
   // CHECK-SAME: out
-  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[8,1,4]>) : f32
-  vmla.batch.matmul %lhs(%lhs_shape : !shapex.ranked_shape<[8,4,4]>) : f32,
-                    %rhs(%rhs_shape : !shapex.ranked_shape<[8,1,4]>) : f32,
-                    out %dst(%dst_shape : !shapex.ranked_shape<[8,1,4]>) : f32
+  // CHECK-SAME: %[[DST]] : f32(%[[DST_SHAPE]] : !shapex.ranked_shape<[8,1,4]>)
+  vmla.batch.matmul %lhs : f32(%lhs_shape : !shapex.ranked_shape<[8,4,4]>),
+                    %rhs : f32(%rhs_shape : !shapex.ranked_shape<[8,1,4]>),
+                    out %dst : f32(%dst_shape : !shapex.ranked_shape<[8,1,4]>)
   return
 }
 

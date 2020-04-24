@@ -78,8 +78,8 @@ func @batch_matmul(
   %rhs_shape = shapex.make_ranked_shape %rhs_dim : (index) -> !shapex.ranked_shape<[3,?,4]>
   %dst_shape = shapex.const_ranked_shape : !shapex.ranked_shape<[3,4,4]>
   // CHECK: vm.call.variadic @vmla.batch.matmul.f32f32.f32(%arg0, [%c3, %c4, %arg1], %arg2, [%c3, %arg3, %c4], %arg4, [%c3, %c4, %c4])
-  vmla.batch.matmul %lhs(%lhs_shape : !shapex.ranked_shape<[3,4,?]>) : f32,
-                    %rhs(%rhs_shape : !shapex.ranked_shape<[3,?,4]>) : f32,
-                    out %dst(%dst_shape : !shapex.ranked_shape<[3,4,4]>) : f32
+  vmla.batch.matmul %lhs : f32(%lhs_shape : !shapex.ranked_shape<[3,4,?]>),
+                    %rhs : f32(%rhs_shape : !shapex.ranked_shape<[3,?,4]>),
+                    out %dst : f32(%dst_shape : !shapex.ranked_shape<[3,4,4]>)
   return
 }
