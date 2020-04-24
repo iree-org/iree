@@ -38,6 +38,7 @@ developers.
 [iree/compiler/](https://github.com/google/iree/blob/master/iree/compiler/)
 
 *   IREE's MLIR dialects, LLVM compiler passes, module translation code, etc.
+    Code here should not depend on anything in the runtime
 
 [iree/hal/](https://github.com/google/iree/blob/master/iree/hal/)
 
@@ -138,6 +139,28 @@ $ bazel run iree/tools:iree-run-module -- \
   --driver=vmla \
   --entry_function=abs \
   --inputs="i32=-2"
+```
+
+### iree-check-module
+
+The `iree-check-module` program takes an already translated IREE module as input
+and executes it as a series of
+[googletest](https://github.com/google/googletest) tests. This is the test
+runner for the IREE
+[check framework](https://github.com/google/iree/tree/master/docs/testing_guide.md#end-to-end-tests).
+
+```shell
+$ bazel run iree/tools:iree-translate -- \
+  -iree-mlir-to-vm-bytecode-module \
+  --iree-hal-target-backends=vmla \
+  $PWD/iree/test/e2e/xla_ops/abs.mlir \
+  -o /tmp/abs.module
+```
+
+```shell
+$ bazel run iree/modules/check:iree-check-module -- \
+  /tmp/abs.module \
+  --driver=vmla
 ```
 
 ### iree-run-mlir
