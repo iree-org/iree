@@ -51,7 +51,6 @@ cc_library(
         "@llvm-project//mlir:SideEffects",
         "@llvm-project//mlir:Transforms",
     ],
-    alwayslink = 1,
 )
 
 gentbl(
