@@ -46,7 +46,9 @@ iree_cc_library(
     ::device
     ::driver
     ::driver_registry
+    ::executable_layout
     ::heap_buffer
+    ::resource_set
     ::semaphore
     absl::span
     absl::strings
@@ -232,8 +234,6 @@ iree_cc_library(
     ::device_info
     ::event
     ::executable_cache
-    ::executable_layout
-    ::semaphore
     absl::time
     iree::base::ref_ptr
     iree::base::status
@@ -424,8 +424,9 @@ iree_cc_library(
   SRCS
     "resource_set.cc"
   DEPS
+    ::resource
     iree::base::ref_ptr
-    iree::hal::resource
+    iree::base::status
   PUBLIC
 )
 
@@ -435,9 +436,9 @@ iree_cc_library(
   HDRS
     "resource_timeline.h"
   DEPS
+    ::resource
+    ::resource_set
     iree::base::ref_ptr
-    iree::hal::resource
-    iree::hal::resource_set
   PUBLIC
 )
 
@@ -450,6 +451,7 @@ iree_cc_library(
     ::resource
     ::resource_set
     absl::time
+    iree::base::intrusive_list
     iree::base::status
     iree::base::time
   PUBLIC

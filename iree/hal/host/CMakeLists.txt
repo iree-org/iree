@@ -151,7 +151,7 @@ iree_cc_library(
   SRCS
     "host_semaphore.cc"
   DEPS
-    absl::base
+    absl::core_headers
     absl::inlined_vector
     absl::span
     absl::synchronization
@@ -169,9 +169,9 @@ iree_cc_test(
   DEPS
     ::host_semaphore
     absl::time
-    iree::testing::gtest_main
     iree::base::status
     iree::base::status_matchers
+    iree::testing::gtest_main
 )
 
 iree_cc_library(
