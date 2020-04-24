@@ -46,7 +46,6 @@ package(
         "exported_names_test",
         "tensorlist_test",
         "keras_lstm_test",
-        "keras_lstm_static_test",
         "mandelbrot_test",
         "matrix_ops_test",
         "ring_buffer_test",
@@ -54,6 +53,23 @@ package(
         "simple_arithmetic_test",
         "simple_stateful_test",
         "strings_test",
+    ]
+]
+
+# TODO(GH-1620): Merge this with the above after fixing the failure on GitHub
+# Actions.
+[
+    iree_py_test(
+        name = name,
+        srcs = [name + ".py"],
+        python_version = "PY3",
+        tags = ["nokokoro", "noga"],
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        ],
+    )
+    for name in [
+        "keras_lstm_static_test",
     ]
 ]
 
