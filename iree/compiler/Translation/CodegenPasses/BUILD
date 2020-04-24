@@ -65,5 +65,4 @@ cc_library(
         "@org_tensorflow//tensorflow/compiler/mlir/xla:hlo",
         "@org_tensorflow//tensorflow/compiler/mlir/xla:map_xla_to_scalar_op",
     ],
-    alwayslink = 1,
 )
