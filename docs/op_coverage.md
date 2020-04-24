@@ -61,5 +61,6 @@ select | ✓ | ✓ | ✓ | ✓
 sine | ✓ | ✓ | ✗ | ✗
 slice | ✓ | ✓ | ✗ | ✗
 sqrt | ✓ | ✓ | ✓ | ✓
+torch_select | ✓ | ✗ | ✗ | ✗
 transpose | ✓ | ✓ | ✓ | ✓
 while | ✓ | ✓ | ✗ | ✓

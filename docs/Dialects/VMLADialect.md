@@ -629,6 +629,30 @@ operation ::= `vmla.floor` `(`$src`,` $dst`)` attr-dict`:` $element_type
 `src` | buffer
 `dst` | buffer
 
+### `vmla.gather` (IREE::VMLA::GatherOp)
+
+
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`dim` | IntegerAttr | 64-bit signless integer attribute
+`batch_dims` | IntegerAttr | 64-bit signless integer attribute
+`element_type` | TypeAttr | any type attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`src` | buffer
+`src_shape` | Ranked shape type
+`indices` | buffer
+`indices_shape` | Ranked shape type
+`dst` | buffer
+`dst_shape` | Ranked shape type
+
 ### `vmla.interface.binding` (IREE::VMLA::InterfaceBindingOp)
 
 
