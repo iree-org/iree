@@ -73,21 +73,21 @@ RankedTensorType mlir::ModelBuilder::getRankedTensorType(
   return RankedTensorType::get(shape, elementType);
 }
 
-Value mlir::ModelBuilder::fusedBiasTanh(ValueHandle x, ValueHandle bias) {
+Value mlir::ModelBuilder::fusedBiasTanh(Value x, Value bias) {
   using edsc::op::operator+;
   using edsc::op::operator*;
   using edsc::intrinsics::std_call;
   assert(x.getType().isF32() && bias.getType().isF32() && "f32 expected");
-  ValueHandle half(constant_f32(0.5f));
+  Value half = constant_f32(0.5f);
   return x + half * call_tanhf((x + bias) * half) + half;
 }
 
-ValueHandle mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
-                                           Value biasValueArg) {
+Value mlir::ModelBuilder::FCBiasTanh(std::array<Value, 3> fcArgs,
+                                     Value biasValueArg) {
   //==========================================================================//
   // Layer 1: FC
   //==========================================================================//
-  ValueHandle I(fcArgs[0]), W(fcArgs[1]), O(fcArgs[2]);
+  Value I = fcArgs[0], W = fcArgs[1], O = fcArgs[2];
   // Emit a linalg.generic op that implements matmul:
   linalg_generic_matmul(I, W, O);
 
@@ -117,26 +117,24 @@ Value ModelBuilder::FCBiasTanhTensors(RankedTensorType outputTensorType,
   //==========================================================================//
   // Layer 1: FC
   //==========================================================================//
-  ValueHandle I(fcArgs[0]), W(fcArgs[1]);
+  Value I = fcArgs[0], W = fcArgs[1];
   Value O2 = linalg_generic_matmul(I, W, outputTensorType)->getResult(0);
 
   //==========================================================================//
   // Layer 2: BiasAddTanh Block
   //==========================================================================//
-  ValueHandle Bias(biasValueArg);
   AffineExpr i, j;
   bindDims(&ctx, i, j);
   // in-place with explicit bias broacast
-  StructuredIndexed o2(O2), bias(Bias), o3Type(outputTensorType);
+  StructuredIndexed o2(O2), bias(biasValueArg), o3Type(outputTensorType);
   return linalg_generic_pointwise(fusedBiasTanh, o2({i, j}), bias({j}),
                                   o3Type({i, j}))
       ->getResult(0);
 }
 
-ValueHandle ModelBuilder::call_tanhf(Value v) {
+Value ModelBuilder::call_tanhf(Value v) {
   assert(v.getType().isF32() && "f32 expected");
-  return ValueHandle(
-      emitCallToRegisteredSymbol("tanhf", v.getType(), v)->getResult(0));
+  return emitCallToRegisteredSymbol("tanhf", v.getType(), v)->getResult(0);
 }
 
 Operation *ModelBuilder::emitCallToRegisteredSymbol(StringRef functionName,
