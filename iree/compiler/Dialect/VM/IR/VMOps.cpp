@@ -68,10 +68,11 @@ static void printModuleOp(OpAsmPrinter &p, ModuleOp &op) {
                 /*printBlockTerminators=*/false);
 }
 
-void ModuleOp::build(Builder *builder, OperationState &result, StringRef name) {
-  ensureTerminator(*result.addRegion(), *builder, result.location);
-  result.attributes.push_back(builder->getNamedAttr(
-      mlir::SymbolTable::getSymbolAttrName(), builder->getStringAttr(name)));
+void ModuleOp::build(OpBuilder &builder, OperationState &result,
+                     StringRef name) {
+  ensureTerminator(*result.addRegion(), builder, result.location);
+  result.attributes.push_back(builder.getNamedAttr(
+      mlir::SymbolTable::getSymbolAttrName(), builder.getStringAttr(name)));
 }
 
 static LogicalResult verifyModuleOp(ModuleOp op) {
@@ -95,12 +96,12 @@ static void printFuncOp(OpAsmPrinter &p, FuncOp &op) {
                             fnType.getResults());
 }
 
-void FuncOp::build(Builder *builder, OperationState &result, StringRef name,
+void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                    FunctionType type, ArrayRef<NamedAttribute> attrs,
                    ArrayRef<NamedAttributeList> argAttrs) {
   result.addRegion();
   result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
+                      builder.getStringAttr(name));
   result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
@@ -171,18 +172,18 @@ static void printExportOp(OpAsmPrinter &p, ExportOp op) {
       op.getAttrs(), /*elidedAttrs=*/{"function_ref", "export_name"});
 }
 
-void ExportOp::build(Builder *builder, OperationState &result,
+void ExportOp::build(OpBuilder &builder, OperationState &result,
                      FuncOp functionRef, StringRef exportName,
                      ArrayRef<NamedAttribute> attrs) {
-  build(builder, result, builder->getSymbolRefAttr(functionRef),
+  build(builder, result, builder.getSymbolRefAttr(functionRef),
         exportName.empty() ? functionRef.getName() : exportName, attrs);
 }
 
-void ExportOp::build(Builder *builder, OperationState &result,
+void ExportOp::build(OpBuilder &builder, OperationState &result,
                      FlatSymbolRefAttr functionRef, StringRef exportName,
                      ArrayRef<NamedAttribute> attrs) {
   result.addAttribute("function_ref", functionRef);
-  result.addAttribute("export_name", builder->getStringAttr(exportName));
+  result.addAttribute("export_name", builder.getStringAttr(exportName));
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
@@ -279,11 +280,11 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
                                       });
 }
 
-void ImportOp::build(Builder *builder, OperationState &result, StringRef name,
+void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      FunctionType type, ArrayRef<NamedAttribute> attrs,
                      ArrayRef<NamedAttributeList> argAttrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
+                      builder.getStringAttr(name));
   result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
   if (argAttrs.empty()) {
@@ -419,19 +420,19 @@ static LogicalResult verifyGlobalOp(Operation *op) {
   return success();
 }
 
-void GlobalI32Op::build(Builder *builder, OperationState &result,
+void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         Optional<StringRef> initializer,
                         Optional<Attribute> initialValue,
                         ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
+                      builder.getStringAttr(name));
   if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
+    result.addAttribute("is_mutable", builder.getUnitAttr());
   }
   if (initializer.hasValue()) {
     result.addAttribute("initializer",
-                        builder->getSymbolRefAttr(initializer.getValue()));
+                        builder.getSymbolRefAttr(initializer.getValue()));
   } else if (initialValue.hasValue()) {
     result.addAttribute("initial_value", initialValue.getValue());
   }
@@ -439,7 +440,7 @@ void GlobalI32Op::build(Builder *builder, OperationState &result,
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
-void GlobalI32Op::build(Builder *builder, OperationState &result,
+void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable,
                         IREE::VM::FuncOp initializer,
                         ArrayRef<NamedAttribute> attrs) {
@@ -447,7 +448,7 @@ void GlobalI32Op::build(Builder *builder, OperationState &result,
         initializer.getName(), llvm::None, attrs);
 }
 
-void GlobalI32Op::build(Builder *builder, OperationState &result,
+void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         Attribute initialValue,
                         ArrayRef<NamedAttribute> attrs) {
@@ -455,31 +456,31 @@ void GlobalI32Op::build(Builder *builder, OperationState &result,
         attrs);
 }
 
-void GlobalI32Op::build(Builder *builder, OperationState &result,
+void GlobalI32Op::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         ArrayRef<NamedAttribute> attrs) {
   build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
 }
 
-void GlobalRefOp::build(Builder *builder, OperationState &result,
+void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         Optional<StringRef> initializer,
                         Optional<Attribute> initialValue,
                         ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
+                      builder.getStringAttr(name));
   if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
+    result.addAttribute("is_mutable", builder.getUnitAttr());
   }
   if (initializer.hasValue()) {
     result.addAttribute("initializer",
-                        builder->getSymbolRefAttr(initializer.getValue()));
+                        builder.getSymbolRefAttr(initializer.getValue()));
   }
   result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
-void GlobalRefOp::build(Builder *builder, OperationState &result,
+void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable,
                         IREE::VM::FuncOp initializer,
                         ArrayRef<NamedAttribute> attrs) {
@@ -487,7 +488,7 @@ void GlobalRefOp::build(Builder *builder, OperationState &result,
         initializer.getName(), llvm::None, attrs);
 }
 
-void GlobalRefOp::build(Builder *builder, OperationState &result,
+void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         Attribute initialValue,
                         ArrayRef<NamedAttribute> attrs) {
@@ -495,7 +496,7 @@ void GlobalRefOp::build(Builder *builder, OperationState &result,
         attrs);
 }
 
-void GlobalRefOp::build(Builder *builder, OperationState &result,
+void GlobalRefOp::build(OpBuilder &builder, OperationState &result,
                         StringRef name, bool isMutable, Type type,
                         ArrayRef<NamedAttribute> attrs) {
   build(builder, result, name, isMutable, type, llvm::None, llvm::None, attrs);
@@ -624,23 +625,23 @@ Attribute ConstI32Op::convertConstValue(Attribute value) {
   return Attribute();
 }
 
-void ConstI32Op::build(Builder *builder, OperationState &result,
+void ConstI32Op::build(OpBuilder &builder, OperationState &result,
                        Attribute value) {
   Attribute newValue = convertConstValue(value);
   result.addAttribute("value", newValue);
   result.addTypes(newValue.getType());
 }
 
-void ConstI32Op::build(Builder *builder, OperationState &result,
+void ConstI32Op::build(OpBuilder &builder, OperationState &result,
                        int32_t value) {
-  return build(builder, result, builder->getI32IntegerAttr(value));
+  return build(builder, result, builder.getI32IntegerAttr(value));
 }
 
-void ConstI32ZeroOp::build(Builder *builder, OperationState &result) {
-  result.addTypes(builder->getIntegerType(32));
+void ConstI32ZeroOp::build(OpBuilder &builder, OperationState &result) {
+  result.addTypes(builder.getIntegerType(32));
 }
 
-void ConstRefZeroOp::build(Builder *builder, OperationState &result,
+void ConstRefZeroOp::build(OpBuilder &builder, OperationState &result,
                            Type objectType) {
   result.addTypes(objectType);
 }
@@ -664,9 +665,9 @@ static void printRodataOp(OpAsmPrinter &p, RodataOp &op) {
   p.printAttribute(op.value());
 }
 
-void RodataOp::build(Builder *builder, OperationState &result, StringRef name,
+void RodataOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      ElementsAttr value, ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute("sym_name", builder->getStringAttr(name));
+  result.addAttribute("sym_name", builder.getStringAttr(name));
   result.addAttribute("value", value);
   result.addAttributes(attrs);
 }
@@ -679,17 +680,16 @@ static LogicalResult verifyConstRefRodataOp(ConstRefRodataOp &op) {
   return success();
 }
 
-void ConstRefRodataOp::build(Builder *builder, OperationState &result,
+void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              StringRef rodataName,
                              ArrayRef<NamedAttribute> attrs) {
-  result.addAttribute("rodata", builder->getSymbolRefAttr(rodataName));
-  auto type =
-      IREE::VM::RefType::get(ByteBufferType::get(builder->getContext()));
+  result.addAttribute("rodata", builder.getSymbolRefAttr(rodataName));
+  auto type = IREE::VM::RefType::get(ByteBufferType::get(builder.getContext()));
   result.addTypes({type});
   result.addAttributes(attrs);
 }
 
-void ConstRefRodataOp::build(Builder *builder, OperationState &result,
+void ConstRefRodataOp::build(OpBuilder &builder, OperationState &result,
                              RodataOp rodataOp,
                              ArrayRef<NamedAttribute> attrs) {
   build(builder, result, rodataOp.getName(), attrs);

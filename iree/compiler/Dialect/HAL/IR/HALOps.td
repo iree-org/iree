@@ -42,9 +42,9 @@ def HAL_ExSharedDeviceOp : HAL_PureOp<"ex.shared_device", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state
+      OpBuilder &builder, OperationState &state
     }], [{
-      state.addTypes({DeviceType::get(builder->getContext())});
+      state.addTypes({DeviceType::get(builder.getContext())});
     }]>,
   ];
 }
@@ -95,7 +95,7 @@ def HAL_MakeMemoryBarrierOp : HAL_MakeTupleOp<"make_memory_barrier", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state,
+      OpBuilder &builder, OperationState &state,
       IREE::HAL::AccessScopeBitfield sourceScope,
       IREE::HAL::AccessScopeBitfield targetScope
     }]>,
@@ -130,7 +130,7 @@ def HAL_MakeBufferBarrierOp : HAL_MakeTupleOp<"make_buffer_barrier", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state,
+      OpBuilder &builder, OperationState &state,
       IREE::HAL::AccessScopeBitfield sourceScope,
       IREE::HAL::AccessScopeBitfield targetScope,
       Value buffer, Value offset, Value length
@@ -165,22 +165,24 @@ def HAL_VariableOp : HAL_Op<"variable", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      Type type,
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, Type type,
       Optional<StringRef> initializer, Optional<Attribute> initialValue,
       ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      mlir::FuncOp initializer, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, mlir::FuncOp initializer,
+      ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      Type type, Attribute initialValue, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, Type type, Attribute initialValue,
+      ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      Type type, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, Type type, ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
 
@@ -310,7 +312,7 @@ def HAL_AllocatorComputeSizeOp : HAL_PureOp<"allocator.compute_size", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value allocator,
+      OpBuilder &builder, OperationState &state, Value allocator,
       ValueRange shape, int32_t elementSize
     }]>,
   ];
@@ -345,7 +347,7 @@ def HAL_AllocatorComputeOffsetOp : HAL_PureOp<"allocator.compute_offset", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value allocator,
+      OpBuilder &builder, OperationState &state, Value allocator,
       ValueRange shape, int32_t elementType, ValueRange indices
     }]>,
   ];
@@ -383,7 +385,7 @@ def HAL_AllocatorComputeRangeOp : HAL_PureOp<"allocator.compute_range", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value allocator,
+      OpBuilder &builder, OperationState &state, Value allocator,
       ValueRange shape, int32_t elementType, ValueRange indices,
       ValueRange lengths
     }]>,
@@ -418,7 +420,7 @@ def HAL_AllocatorAllocateOp : HAL_Op<"allocator.allocate", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value allocator,
+      OpBuilder &builder, OperationState &state, Value allocator,
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
       Value allocationSize
@@ -455,7 +457,7 @@ def HAL_AllocatorAllocateConstOp : HAL_Op<"allocator.allocate.const", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value allocator,
+      OpBuilder &builder, OperationState &state, Value allocator,
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
       ElementsAttr value
@@ -487,7 +489,7 @@ def HAL_BufferAllocatorOp : HAL_PureOp<"buffer.allocator", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value buffer
+      OpBuilder &builder, OperationState &state, Value buffer
     }]>,
   ];
 
@@ -650,7 +652,7 @@ def HAL_BufferViewConstOp : HAL_PureOp<"buffer_view.const", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value allocator,
+      OpBuilder &builder, OperationState &state, Value allocator,
       IREE::HAL::MemoryTypeBitfield memoryTypes,
       IREE::HAL::BufferUsageBitfield bufferUsage,
       ElementsAttr value
@@ -688,7 +690,7 @@ def HAL_BufferViewCreateOp : HAL_PureOp<"buffer_view.create", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value buffer,
+      OpBuilder &builder, OperationState &state, Value buffer,
       ValueRange shape, int32_t elementType
     }]>,
   ];
@@ -739,7 +741,7 @@ def HAL_BufferViewBufferOp : HAL_PureOp<"buffer_view.buffer", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value bufferView
+      OpBuilder &builder, OperationState &state, Value bufferView
     }]>,
   ];
 
@@ -766,7 +768,7 @@ def HAL_BufferViewByteLengthOp : HAL_PureOp<"buffer_view.byte_length", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value bufferView
+      OpBuilder &builder, OperationState &state, Value bufferView
     }]>,
   ];
 }
@@ -795,7 +797,7 @@ def HAL_BufferViewComputeOffsetOp : HAL_PureOp<"buffer_view.compute_offset", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value bufferView,
+      OpBuilder &builder, OperationState &state, Value bufferView,
       ValueRange indices
     }]>,
   ];
@@ -829,7 +831,7 @@ def HAL_BufferViewComputeRangeOp : HAL_PureOp<"buffer_view.compute_range", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value bufferView,
+      OpBuilder &builder, OperationState &state, Value bufferView,
       ValueRange indices, ValueRange lengths
     }]>,
   ];
@@ -913,7 +915,7 @@ def HAL_CommandBufferCreateOp : HAL_Op<"command_buffer.create", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value device,
+      OpBuilder &builder, OperationState &state, Value device,
       IREE::HAL::CommandBufferModeBitfield modes,
       IREE::HAL::CommandCategoryBitfield commandCategories
     }]>,
@@ -967,7 +969,7 @@ def HAL_CommandBufferExecutionBarrierOp : HAL_Op<"command_buffer.execution_barri
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value commandBuffer,
+      OpBuilder &builder, OperationState &state, Value commandBuffer,
       IREE::HAL::ExecutionStageBitfield sourceStageMask,
       IREE::HAL::ExecutionStageBitfield targetStageMask,
       ValueRange memoryBarriers, ValueRange bufferBarriers
@@ -1077,7 +1079,7 @@ def HAL_CommandBufferPushDescriptorSetOp :
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value commandBuffer,
+      OpBuilder &builder, OperationState &state, Value commandBuffer,
       Value executableLayout, uint32_t set,
       ArrayRef<DescriptorSetBindingValue> bindings
     }]>,
@@ -1109,7 +1111,7 @@ def HAL_CommandBufferBindDescriptorSetOp :
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value commandBuffer,
+      OpBuilder &builder, OperationState &state, Value commandBuffer,
       Value executableLayout, uint32_t set, Value descriptorSet,
       ValueRange dynamicOffsets = {}
     }]>,
@@ -1149,7 +1151,7 @@ def HAL_CommandBufferDispatchOp : HAL_Op<"command_buffer.dispatch"> {
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value commandBuffer,
+      OpBuilder &builder, OperationState &state, Value commandBuffer,
       Value executable, IREE::HAL::ExecutableEntryPointOp entryPoint,
       Value workgroupX, Value workgroupY, Value workgroupZ
     }]>,
@@ -1211,7 +1213,7 @@ def HAL_DescriptorSetCreateOp : HAL_PureOp<"descriptor_set.create", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value device, Value setLayout,
+      OpBuilder &builder, OperationState &state, Value device, Value setLayout,
       ArrayRef<DescriptorSetBindingValue> bindings
     }]>,
   ];
@@ -1309,10 +1311,10 @@ def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, Value device
+      OpBuilder &builder, OperationState &state, Value device
     }], [{
       state.addOperands({device});
-      state.addTypes({AllocatorType::get(builder->getContext())});
+      state.addTypes({AllocatorType::get(builder.getContext())});
     }]>,
   ];
 }
@@ -1389,7 +1391,7 @@ def HAL_DeviceSwitchOp : HAL_Op<"device.switch", [IsolatedFromAbove]> {
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, TypeRange resultTypes,
+      OpBuilder &builder, OperationState &state, TypeRange resultTypes,
       Value device, ArrayRef<Attribute> conditions,
       ArrayRef<ValueRange> conditionArgs,
       ArrayRef<NamedAttribute> attributes = {}
@@ -1413,7 +1415,7 @@ def HAL_ReturnOp : HAL_Op<"return", [Terminator]> {
 
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result
+      OpBuilder &builder, OperationState &result
     }], [{
       build(builder, result, llvm::None);
     }]>,
@@ -1475,7 +1477,7 @@ def HAL_ExecutableOp : HAL_Op<"executable", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, StringRef name
+      OpBuilder &builder, OperationState &state, StringRef name
     }]>,
   ];
 
@@ -1531,7 +1533,7 @@ def HAL_ExecutableTargetOp : HAL_Op<"executable.target", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, StringRef targetBackend
+      OpBuilder &builder, OperationState &state, StringRef targetBackend
     }]>,
   ];
 
@@ -1579,7 +1581,7 @@ def HAL_ExecutableBinaryOp : HAL_Op<"executable.binary", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, uint32_t format,
+      OpBuilder &builder, OperationState &state, uint32_t format,
       std::vector<uint8_t> data
     }]>,
   ];
@@ -1627,12 +1629,12 @@ def HAL_ExecutableLookupOp : HAL_PureOp<"executable.lookup", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state,
+      OpBuilder &builder, OperationState &state,
       Value device, StringRef executable
     }], [{
       state.addOperands({device});
-      state.addAttribute("executable", builder->getSymbolRefAttr(executable));
-      state.addTypes({ExecutableType::get(builder->getContext())});
+      state.addAttribute("executable", builder.getSymbolRefAttr(executable));
+      state.addTypes({ExecutableType::get(builder.getContext())});
     }]>,
   ];
 }
@@ -1680,7 +1682,7 @@ def HAL_InterfaceOp : HAL_Op<"interface", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, StringRef name,
+      OpBuilder &builder, OperationState &state, StringRef name,
       IntegerAttr pushConstants = {}
     }]>,
   ];

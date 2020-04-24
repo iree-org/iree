@@ -218,7 +218,7 @@ Value rewriteIntForLoadOp(spirv::LoadOp op, PatternRewriter &rewriter) {
   // result. Use INotEqualOp because SConvert doesn't work for i1.
   if (hasIntTypeOfWidth(valueType, {1})) {
     Type newType = legalizeIntegerType(valueType);
-    auto zero = spirv::ConstantOp::getZero(newType, loc, &rewriter);
+    auto zero = spirv::ConstantOp::getZero(newType, loc, rewriter);
     result = rewriter.create<spirv::INotEqualOp>(loc, valueType, result, zero)
                  .getResult();
   }
@@ -270,9 +270,8 @@ Value shiftStoreValue(spirv::StoreOp op, const Value &offset, const Value &mask,
 
   Value storeVal = op.value();
   if (hasIntTypeOfWidth(valueType, {1})) {
-    Value zero =
-        spirv::ConstantOp::getZero(i32Type, loc, &rewriter).getResult();
-    Value one = spirv::ConstantOp::getOne(i32Type, loc, &rewriter).getResult();
+    Value zero = spirv::ConstantOp::getZero(i32Type, loc, rewriter).getResult();
+    Value one = spirv::ConstantOp::getOne(i32Type, loc, rewriter).getResult();
     storeVal =
         rewriter.create<spirv::SelectOp>(loc, storeVal, one, zero).getResult();
   } else {
@@ -377,7 +376,7 @@ struct RemoveNopSConvertOp : public OpRewritePattern<spirv::SConvertOp> {
     Type t1 = op.operand().getType();
     Type t2 = op.result().getType();
     if (t1 != t2) return failure();
-    auto zero = spirv::ConstantOp::getZero(t1, op.getLoc(), &rewriter);
+    auto zero = spirv::ConstantOp::getZero(t1, op.getLoc(), rewriter);
     rewriter.replaceOpWithNewOp<spirv::IAddOp>(op, op.operand(), zero);
     return success();
   }
