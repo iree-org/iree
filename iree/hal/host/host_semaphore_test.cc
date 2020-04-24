@@ -37,17 +37,17 @@ TEST(HostSemaphoreTest, NoOp) {
 // Tests that a semaphore will accept new values as it is signaled.
 TEST(HostSemaphoreTest, NormalSignaling) {
   HostSemaphore semaphore(2u);
-  EXPECT_EQ(2u, semaphore.Query().ValueOrDie());
+  EXPECT_EQ(2u, semaphore.Query().value());
   EXPECT_OK(semaphore.Signal(3u));
-  EXPECT_EQ(3u, semaphore.Query().ValueOrDie());
+  EXPECT_EQ(3u, semaphore.Query().value());
   EXPECT_OK(semaphore.Signal(40u));
-  EXPECT_EQ(40u, semaphore.Query().ValueOrDie());
+  EXPECT_EQ(40u, semaphore.Query().value());
 }
 
 // Tests that a semaphore will fail to set non-increasing values.
 TEST(HostSemaphoreTest, RequireIncreasingValues) {
   HostSemaphore semaphore(2u);
-  EXPECT_EQ(2u, semaphore.Query().ValueOrDie());
+  EXPECT_EQ(2u, semaphore.Query().value());
   // Same value.
   EXPECT_TRUE(IsInvalidArgument(semaphore.Signal(2u)));
   // Decreasing.
@@ -60,17 +60,17 @@ TEST(HostSemaphoreTest, StickyFailure) {
   // Signal to 3.
   EXPECT_OK(semaphore.Signal(3u));
   EXPECT_TRUE(semaphore.status().ok());
-  EXPECT_EQ(3u, semaphore.Query().ValueOrDie());
+  EXPECT_EQ(3u, semaphore.Query().value());
 
   // Fail now.
-  EXPECT_OK(semaphore.Fail(UnknownErrorBuilder(IREE_LOC)));
+  semaphore.Fail(UnknownErrorBuilder(IREE_LOC));
   EXPECT_TRUE(IsUnknown(semaphore.status()));
-  EXPECT_EQ(UINT64_MAX, semaphore.Query().ValueOrDie());
+  EXPECT_EQ(UINT64_MAX, semaphore.Query().value());
 
   // Unable to signal again (it'll return the sticky failure).
   EXPECT_TRUE(IsUnknown(semaphore.Signal(4u)));
   EXPECT_TRUE(IsUnknown(semaphore.status()));
-  EXPECT_EQ(UINT64_MAX, semaphore.Query().ValueOrDie());
+  EXPECT_EQ(UINT64_MAX, semaphore.Query().value());
 }
 
 // Tests waiting on no semaphores.
@@ -101,7 +101,7 @@ TEST(HostSemaphoreTest, WaitUnsignaled) {
 // semaphore).
 TEST(HostSemaphoreTest, WaitAlreadyFailed) {
   HostSemaphore semaphore(2u);
-  EXPECT_OK(semaphore.Fail(UnknownErrorBuilder(IREE_LOC)));
+  semaphore.Fail(UnknownErrorBuilder(IREE_LOC));
   EXPECT_TRUE(IsUnknown(HostSemaphore::WaitForSemaphores(
       {{&semaphore, 2u}}, /*wait_all=*/true, absl::InfinitePast())));
 }
@@ -138,7 +138,7 @@ TEST(HostSemaphoreTest, FailNotifies) {
   });
   ASSERT_OK(HostSemaphore::WaitForSemaphores({{&b2a, 1u}}, /*wait_all=*/true,
                                              absl::InfiniteFuture()));
-  ASSERT_OK(a2b.Fail(UnknownErrorBuilder(IREE_LOC)));
+  a2b.Fail(UnknownErrorBuilder(IREE_LOC));
   thread.join();
   ASSERT_TRUE(got_failure);
 }

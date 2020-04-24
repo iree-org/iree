@@ -23,10 +23,12 @@ ResourceSet::~ResourceSet() = default;
 
 Status ResourceSet::Insert(ref_ptr<Resource> resource) {
   // DO NOT SUBMIT
+  return UnimplementedErrorBuilder(IREE_LOC) << "Insert NYI";
 }
 
 Status ResourceSet::Union(const ResourceSet& other_set) {
-  //
+  // DO NOT SUBMIT
+  return UnimplementedErrorBuilder(IREE_LOC) << "Union NYI";
 }
 
 }  // namespace hal

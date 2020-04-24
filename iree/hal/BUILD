@@ -371,6 +371,7 @@ cc_library(
     deps = [
         ":resource",
         "//iree/base:ref_ptr",
+        "//iree/base:status",
     ],
 )
 
@@ -390,6 +391,7 @@ cc_library(
     deps = [
         ":resource",
         ":resource_set",
+        "//iree/base:intrusive_list",
         "//iree/base:status",
         "//iree/base:time",
         "@com_google_absl//absl/time",

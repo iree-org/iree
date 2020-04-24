@@ -108,8 +108,13 @@ Status HostSemaphore::WaitForSemaphores(
   return OkStatus();
 }
 
+Status HostSemaphore::Wait(uint64_t value, absl::Time deadline) {
+  return UnimplementedErrorBuilder(IREE_LOC) << "Wait NYI";
+}
+
 bool HostSemaphore::HasReached(uint64_t min_value) {
   // DO NOT SUBMIT
+  return false;
 }
 
 }  // namespace hal

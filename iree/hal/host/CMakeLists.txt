@@ -167,11 +167,11 @@ iree_cc_test(
   SRCS
     "host_semaphore_test.cc"
   DEPS
+    ::host_semaphore
     absl::time
     iree::testing::gtest_main
     iree::base::status
     iree::base::status_matchers
-    iree::hal::host::host_semaphore
 )
 
 iree_cc_library(

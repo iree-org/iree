@@ -1347,7 +1347,7 @@ IREE_API_EXPORT iree_status_t IREE_API_CALL iree_hal_semaphore_query(
   if (!handle) return IREE_STATUS_INVALID_ARGUMENT;
   auto result = handle->Query();
   if (!result.ok()) return ToApiStatus(std::move(result).status());
-  return result.ValueOrDie();
+  return result.value();
 }
 
 IREE_API_EXPORT iree_status_t IREE_API_CALL
