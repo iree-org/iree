@@ -79,7 +79,7 @@ void testValueVectorAdd() {
 
     // CHECK: %[[p:.*]] = load %[[C]][] : memref<vector<8x128xf32>>
     // CHECK: vector.print %[[p]] : vector<8x128xf32>
-    (vector_print(*C()));
+    (vector_print(C()));
 
     std_ret();
   }
@@ -116,12 +116,12 @@ void testMemRefVectorAdd() {
     //     CHECK: store %[[c]], %[[C]][%[[z]]] : memref<1xvector<8x128xf32>>
     StdIndexedValue A(f.getArgument(0)), B(f.getArgument(1)),
         C(f.getArgument(2));
-    auto zero = std_constant_index(0);
-    C(zero) = A(zero) + B(zero);
+    Value idx_0 = std_constant_index(0);
+    C(idx_0) = A(idx_0) + B(idx_0);
 
     // CHECK: %[[p:.*]] = load %[[C]][%[[z]]] : memref<1xvector<8x128xf32>>
     // CHECK: vector.print %[[p]] : vector<8x128xf32>
-    (vector_print(*C(zero)));
+    (vector_print(C(idx_0)));
 
     std_ret();
   }
