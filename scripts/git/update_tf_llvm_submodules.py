@@ -66,7 +66,7 @@ def parse_arguments():
       help="Updates the IREE LLVM build files from TensorFlow",
       type=utils.str2bool,
       nargs="?",
-      default=False)
+      default=None)
   args = parser.parse_args()
 
   # Default repo path.
