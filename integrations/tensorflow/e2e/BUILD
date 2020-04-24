@@ -44,6 +44,7 @@ package(
         "dynamic_mlp_relu_test",
         "depth_conv_test",
         "exported_names_test",
+        "gather_test",
         "tensorlist_test",
         "keras_lstm_test",
         "keras_lstm_static_test",

@@ -130,6 +130,15 @@ struct Pad {
                         absl::Span<const int32_t> interior_padding);
 };
 
+struct Gather {
+  template <typename T>
+  static Status Execute(absl::Span<const T> src_buffer,
+                        absl::Span<const int32_t> indices_buffer,
+                        absl::Span<T> dst_buffer, const Shape& src_shape,
+                        const Shape& indices_shape, const Shape& dst_shape,
+                        const int32_t dim, const int32_t batch_dims);
+};
+
 struct Reverse {
   template <typename T>
   static Status Execute(absl::Span<const T> src_buffer,

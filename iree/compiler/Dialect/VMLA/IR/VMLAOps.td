@@ -226,6 +226,20 @@ def VMLA_TileOp : VMLA_ElementTypeOp<"tile", [VMLA_IncludeShapes]> {
   );
 }
 
+def VMLA_GatherOp : VMLA_ElementTypeOp<"gather", [VMLA_IncludeShapes]> {
+  let arguments = (ins
+    VMLA_Buffer:$src,
+    VMLA_Shape:$src_shape,
+    VMLA_Buffer:$indices,
+    VMLA_Shape:$indices_shape,
+    VMLA_Buffer:$dst,
+    VMLA_Shape:$dst_shape,
+    I64Attr:$dim,
+    I64Attr:$batch_dims,
+    VMLA_AnyTypeAttr:$element_type
+  );
+}
+
 //===----------------------------------------------------------------------===//
 // VMLA Ops: bit manipulation
 //===----------------------------------------------------------------------===//

@@ -478,6 +478,21 @@ class VMLAModuleState final {
   IREE_VMLA_PAD_OP(PadX16, uint16_t);
   IREE_VMLA_PAD_OP(PadX32, uint32_t);
 
+#define IREE_VMLA_GATHER_OP(name, type)                                        \
+  Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,                \
+              vm::ref<Buffer> indices, iree_vmla_shape_t indices_shape,        \
+              vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape,                \
+              const int32_t dim, const int32_t batch_dims) {                   \
+    IREE_TRACE_SCOPE0("VMLAModuleState::" #name);                              \
+    return kernels::Gather::Execute<type>(src->As<type>(), indices->As<int>(), \
+                                          dst->As<type>(), Shape(src_shape),   \
+                                          Shape(indices_shape),                \
+                                          Shape(dst_shape), dim, batch_dims);  \
+  }
+  IREE_VMLA_GATHER_OP(GatherX8, uint8_t);
+  IREE_VMLA_GATHER_OP(GatherX16, uint16_t);
+  IREE_VMLA_GATHER_OP(GatherX32, uint32_t);
+
 #define IREE_VMLA_BROADCAST_OP(name, type)                        \
   Status name(vm::ref<Buffer> src, iree_vmla_shape_t src_shape,   \
               vm::ref<Buffer> dst, iree_vmla_shape_t dst_shape) { \
@@ -825,6 +840,9 @@ static const vm::NativeFunction<VMLAModuleState> kVMLAModuleFunctions[] = {
     vm::MakeNativeFunction("pad.x8", &VMLAModuleState::PadX8),
     vm::MakeNativeFunction("pad.x16", &VMLAModuleState::PadX16),
     vm::MakeNativeFunction("pad.x32", &VMLAModuleState::PadX32),
+    vm::MakeNativeFunction("gather.x8", &VMLAModuleState::GatherX8),
+    vm::MakeNativeFunction("gather.x16", &VMLAModuleState::GatherX16),
+    vm::MakeNativeFunction("gather.x32", &VMLAModuleState::GatherX32),
     vm::MakeNativeFunction("tile.x8", &VMLAModuleState::TileX8),
     vm::MakeNativeFunction("tile.x16", &VMLAModuleState::TileX16),
     vm::MakeNativeFunction("tile.x32", &VMLAModuleState::TileX32),

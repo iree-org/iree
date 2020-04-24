@@ -174,7 +174,24 @@ vm.import @pad.x32(
   %edge_padding_low : i32 ..., %edge_padding_high : i32 ...,
   %interior_padding : i32 ...
 )
-
+vm.import @gather.x8(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %dim : i32, %batch_dims : i32
+)
+vm.import @gather.x16(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %dim : i32, %batch_dims : i32
+)
+vm.import @gather.x32(
+  %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
+  %indices : !vm.ref<!vmla.buffer>, %indices_shape : i32 ...,
+  %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...,
+  %dim : i32, %batch_dims : i32
+)
 vm.import @broadcast.x8(
   %src : !vm.ref<!vmla.buffer>, %src_shape : i32 ...,
   %dst : !vm.ref<!vmla.buffer>, %dst_shape : i32 ...
