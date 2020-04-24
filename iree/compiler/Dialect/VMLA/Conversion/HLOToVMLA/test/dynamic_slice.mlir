@@ -9,11 +9,11 @@ func @slice_whole_buffer(%src_idx_1 : tensor<i64>, %src_idx_2 : tensor<i64>) -> 
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_1]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_1]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_0:.+]] = index_cast %[[SRC_INDEX_0_I32]]
-  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_2]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_2]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_1:.+]] = index_cast %[[SRC_INDEX_1_I32]]
-  // CHECK-DAG: %[[DST:.+]] = "vmla.buffer.alloc"(%c48)
+  // CHECK-DAG: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c48 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %[[SRC_INDEX_0]], %[[SRC_INDEX_1]],
   // CHECK-SAME: %[[DST]], %rs3_4, %c0, %c0,
@@ -37,11 +37,11 @@ func @slice_whole_stride(%src_idx_1 : tensor<i64>, %src_idx_2 : tensor<i64>) -> 
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_1]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_1]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_0:.+]] = index_cast %[[SRC_INDEX_0_I32]]
-  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_2]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_2]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_1:.+]] = index_cast %[[SRC_INDEX_1_I32]]
-  // CHECK-DAG: %[[DST:.+]] = "vmla.buffer.alloc"(%c16)
+  // CHECK-DAG: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c16 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %[[SRC_INDEX_0]], %[[SRC_INDEX_1]],
   // CHECK-SAME: %[[DST]], %rs1_4, %c0, %c0,
@@ -65,11 +65,11 @@ func @slice_stride_part(%src_idx_1 : tensor<i64>, %src_idx_2 : tensor<i64>) -> t
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_1]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_1]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_0:.+]] = index_cast %[[SRC_INDEX_0_I32]]
-  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_2]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_2]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_1:.+]] = index_cast %[[SRC_INDEX_1_I32]]
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c8)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c8 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %[[SRC_INDEX_0]], %[[SRC_INDEX_1]],
   // CHECK-SAME: %[[DST]], %rs1_2, %c0, %c0,
@@ -93,11 +93,11 @@ func @slice_multi_stride(%src_idx_1 : tensor<i64>, %src_idx_2 : tensor<i64>) -> 
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_1]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_0_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_1]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_0:.+]] = index_cast %[[SRC_INDEX_0_I32]]
-  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = "vmla.buffer.load.i32"(%[[SRC_IDX_2]], %c0)
+  // CHECK-DAG: %[[SRC_INDEX_1_I32:.+]] = vmla.buffer.load.i32 %[[SRC_IDX_2]][%c0] : i32
   // CHECK-DAG: %[[SRC_INDEX_1:.+]] = index_cast %[[SRC_INDEX_1_I32]]
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c32)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c32 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %[[SRC_INDEX_0]], %[[SRC_INDEX_1]],
   // CHECK-SAME: %[[DST]], %rs2_4, %c0, %c0,

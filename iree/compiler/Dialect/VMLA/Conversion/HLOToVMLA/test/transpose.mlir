@@ -7,7 +7,7 @@ func @transpose() -> tensor<24x7x10xf32> attributes { sym_visibility = "private"
   // CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[7,24,10]>
   // CHECK-DAG: %[[DST_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[24,7,10]>
   // CHECK-DAG: %[[DST_SIZE:.+]] = constant 6720 : index
-  // CHECK-DAG: %[[DST:.+]] = "vmla.buffer.alloc"(%[[DST_SIZE]])
+  // CHECK-DAG: %[[DST:.+]] = vmla.buffer.alloc byte_length = %[[DST_SIZE]] : !vmla.buffer
   // CHECK-NEXT: vmla.transpose
   // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[7,24,10]>),
   // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[24,7,10]>)
