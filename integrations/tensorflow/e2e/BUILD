@@ -29,8 +29,6 @@ package(
         name = name,
         srcs = [name + ".py"],
         python_version = "PY3",
-        # TODO(b/145815906) Get this running in OSS CI.
-        tags = ["nokokoro"],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
         ],
@@ -56,23 +54,6 @@ package(
     ]
 ]
 
-# TODO(GH-1620): Merge this with the above after fixing the failure on GitHub
-# Actions.
-[
-    iree_py_test(
-        name = name,
-        srcs = [name + ".py"],
-        python_version = "PY3",
-        tags = ["nokokoro", "noga"],
-        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
-            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
-        ],
-    )
-    for name in [
-        "keras_lstm_static_test",
-    ]
-]
-
 [
     iree_py_test(
         name = "keras_vision_model_" + model_name + "_test",
@@ -87,7 +68,6 @@ package(
         tags = [
             "large",
             "manual",
-            "nokokoro",
         ],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
@@ -107,6 +87,7 @@ package(
         name = name,
         srcs = [name + ".py"],
         python_version = "PY3",
+        # TODO(b/145815906) Get this running in OSS CI.
         tags = ["noga"],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
@@ -116,5 +97,8 @@ package(
         "conv_test",
         "linspace_test",
         "math_test",
+        # TODO(GH-1620): Re-enable this after fixing the failure on
+        # GitHub Actions.
+        "keras_lstm_static_test",
     ]
 ]
