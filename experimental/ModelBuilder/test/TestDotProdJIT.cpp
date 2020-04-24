@@ -55,12 +55,12 @@ void DotProdOnVectors() {
 
   OpBuilder b(&func.getBody());
   ScopedContext scope(b, func.getLoc());
-  ValueHandle A(func.getArgument(0)), B(func.getArgument(1));
-  Value zero = ValueBuilder<ConstantIndexOp>(0);
-  Value A_val = std_load(A, ValueRange(zero));
-  Value B_val = std_load(B, ValueRange(zero));
-  Value zeroF = std_constant_float(APFloat(0.0f), f32);
-  Value res_val = (vector_contract(A_val, B_val, zeroF,
+  Value A = func.getArgument(0), B = func.getArgument(1);
+  Value idx_0 = std_constant_index(0);
+  Value A_val = std_load(A, idx_0);
+  Value B_val = std_load(B, idx_0);
+  Value flt_0 = std_constant_float(APFloat(0.0f), f32);
+  Value res_val = (vector_contract(A_val, B_val, flt_0,
                                    modelBuilder.getAffineMapArrayAttr(accesses),
                                    modelBuilder.getArrayAttr(iterator_types)));
 

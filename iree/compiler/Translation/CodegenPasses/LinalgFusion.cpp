@@ -130,9 +130,8 @@ LogicalResult IREEFuseGenericTensorOps::matchAndRewrite(
     bool hasSingleUse = producer->getResult(0).hasOneUse();
     Optional<linalg::LinalgOp> fusedOp;
     if (auto producerOp = dyn_cast<linalg::LinalgOp>(producer)) {
-      fusedOp = linalg::fuseTensorOps(rewriter, producerOp,
-                                      cast<linalg::LinalgOp>(op.getOperation()),
-                                      operand.index());
+      fusedOp = linalg::fuseTensorOps(
+          rewriter, cast<linalg::LinalgOp>(op.getOperation()), operand.index());
     } else if (auto producerOp = dyn_cast<ConstantOp>(producer)) {
       fusedOp = fuseGenericOpWithConstantScalar(rewriter, producerOp, op,
                                                 operand.index());
