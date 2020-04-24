@@ -94,8 +94,12 @@ class RegisterAllocation {
 
   // Maximum allocated register ordinals.
   // May be -1 if no registers of the specific type were allocated.
-  uint16_t getMaxI32RegisterOrdinal() { return maxI32RegisterOrdinal_; }
-  uint16_t getMaxRefRegisterOrdinal() { return maxRefRegisterOrdinal_; }
+  uint16_t getMaxI32RegisterOrdinal() {
+    return maxI32RegisterOrdinal_ + scratchI32RegisterCount_;
+  }
+  uint16_t getMaxRefRegisterOrdinal() {
+    return maxRefRegisterOrdinal_ + scratchRefRegisterCount_;
+  }
 
   // Maps a |value| to a register with no move bit set.
   // Prefer mapUseToRegister when a move is desired.
@@ -114,6 +118,8 @@ class RegisterAllocation {
  private:
   int maxI32RegisterOrdinal_ = -1;
   int maxRefRegisterOrdinal_ = -1;
+  int scratchI32RegisterCount_ = 0;
+  int scratchRefRegisterCount_ = 0;
 
   // Cached liveness information.
   ValueLiveness liveness_;
