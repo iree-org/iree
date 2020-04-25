@@ -72,6 +72,7 @@ external_cc_library(
     LLVMSupport
     MLIRAnalysis
     MLIRIR
+    MLIRLinalgOps
     MLIRPass
     MLIRShape
     MLIRTransformUtils
