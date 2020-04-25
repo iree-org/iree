@@ -8,9 +8,9 @@ module @t001_module_all_options {
 
 // CHECK: module @my_module {
 module @my_module {
-  // CHECK: vm.func @my_fn([[ARG0:%[a-zA-Z0-9]+]]: i32) -> i32
+  // CHECK: vm.func @my_fn(%[[ARG0:[a-zA-Z0-9$._-]+]]: i32) -> i32
   func @my_fn(%arg0: i32) -> (i32) {
-    // CHECK: vm.return [[ARG0]] : i32
+    // CHECK: vm.return %[[ARG0]] : i32
     return %arg0 : i32
   }
 }

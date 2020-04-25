@@ -2,7 +2,7 @@
 
 module {
   // CHECK: func @reverse_2d
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9]*]]: memref<12x12xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<12x12xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []
@@ -27,7 +27,7 @@ module {
 
 module {
   // CHECK: func @reverse_3d
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: memref<3x3x3xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<3x3x3xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []

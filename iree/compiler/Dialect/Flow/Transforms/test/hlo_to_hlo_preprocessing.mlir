@@ -32,7 +32,7 @@ func @batch_norm_inference(
 
 // -----
 
-// CHECK: @depth_conv(%[[ARG0:.*]]: tensor<2x4x5x2xf32>, %[[ARG1:.*]]: tensor<2x2x2x3xf32>)
+// CHECK: @depth_conv(%[[ARG0:.+]]: tensor<2x4x5x2xf32>, %[[ARG1:.+]]: tensor<2x2x2x3xf32>)
 func @depth_conv(%arg0: tensor<2x4x5x2xf32>, %arg1: tensor<2x2x2x3xf32>) -> tensor<2x3x4x6xf32> {
     // CHECK-NOT: xla_hlo.reshape
     //CHECK: "xla_hlo.convolution"(%[[ARG0]], %[[ARG1]])
@@ -60,9 +60,9 @@ func @depth_conv(%arg0: tensor<2x4x5x2xf32>, %arg1: tensor<2x2x2x3xf32>) -> tens
 
 // CHECK-LABEL: @reduce_window
 func @reduce_window(%input: tensor<1x16x16x64xf32>) -> tensor<1x8x8x64xf32> {
-  // CHECK: %[[INITVAL:.*]] = xla_hlo.constant dense<0xFF800000> : tensor<f32>
+  // CHECK: %[[INITVAL:.+]] = xla_hlo.constant dense<0xFF800000> : tensor<f32>
   %initval = xla_hlo.constant dense<0xFF800000> : tensor<f32>
-  //      CHECK: %[[PAD:.*]] = "xla_hlo.pad"(%{{.*}}, %[[INITVAL]])
+  //      CHECK: %[[PAD:.+]] = "xla_hlo.pad"(%{{.+}}, %[[INITVAL]])
   // CHECK-SAME: edge_padding_high = dense<[0, 1, 1, 0]> : tensor<4xi64>
   // CHECK-SAME: edge_padding_low = dense<[0, 1, 1, 0]> : tensor<4xi64>
   //      CHECK: "xla_hlo.reduce_window"(%[[PAD]], %[[INITVAL]])

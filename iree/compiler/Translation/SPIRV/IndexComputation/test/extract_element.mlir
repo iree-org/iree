@@ -2,7 +2,7 @@
 
 module {
   // CHECK: func @extract_element
-  // CHECK-SAME: {{[a-zA-Z0-9_]*}}: memref<i1>
+  // CHECK-SAME: {{[a-zA-Z0-9$._-]+}}: memref<i1>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []

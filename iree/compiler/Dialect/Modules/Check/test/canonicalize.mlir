@@ -3,10 +3,10 @@
 // RUN: iree-opt -canonicalize -split-input-file %s | IreeFileCheck %s
 
 // CHECK-LABEL: @expect_eq_const
-// CHECK-SAME: [[LHS:%[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
 func @expect_eq_const(%lhs : tensor<2x2xi32>) {
-  // CHECK: [[C:%.+]] = constant dense<1> : tensor<2x2xi32>
-  // CHECK: check.expect_eq([[LHS]], [[C]]) : tensor<2x2xi32>
+  // CHECK: %[[C:.+]] = constant dense<1> : tensor<2x2xi32>
+  // CHECK: check.expect_eq(%[[LHS]], %[[C]]) : tensor<2x2xi32>
   check.expect_eq_const(%lhs, dense<1> : tensor<2x2xi32>) : tensor<2x2xi32>
   return
 }
@@ -14,10 +14,10 @@ func @expect_eq_const(%lhs : tensor<2x2xi32>) {
 // -----
 
 // CHECK-LABEL: @expect_almost_eq_const
-// CHECK-SAME: [[LHS:%[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
 func @expect_almost_eq_const(%lhs : tensor<2x2xf32>) {
-  // CHECK: [[C:%.+]] = constant dense<1.000000e+00> : tensor<2x2xf32>
-  // CHECK: check.expect_almost_eq([[LHS]], [[C]]) : tensor<2x2xf32>
+  // CHECK: %[[C:.+]] = constant dense<1.000000e+00> : tensor<2x2xf32>
+  // CHECK: check.expect_almost_eq(%[[LHS]], %[[C]]) : tensor<2x2xf32>
   check.expect_almost_eq_const(%lhs, dense<1.0> : tensor<2x2xf32>) : tensor<2x2xf32>
   return
 }

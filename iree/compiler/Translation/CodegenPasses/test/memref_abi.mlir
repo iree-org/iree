@@ -12,15 +12,15 @@ hal.executable @pw_add_ex_dispatch_0 {
       // CHECK-LABEL: func @pw_add_ex_dispatch_0(
       func @pw_add_ex_dispatch_0() {
         %c0_i32 = constant 0 : index
-        // CHECK: %[[TENSOR0:.*]] = hal.interface.load.tensor
-        // CHECK: %[[MEMREF0:.*]] = alloc : memref<4x8xi32>
+        // CHECK: %[[TENSOR0:.+]] = hal.interface.load.tensor
+        // CHECK: %[[MEMREF0:.+]] = alloc : memref<4x8xi32>
         // CHECK: tensor_store %[[TENSOR0]], %[[MEMREF0]]
-        // CHECK: %[[TENSOR1:.*]] = hal.interface.load.tensor
-        // CHECK: %[[MEMREF1:.*]] = alloc : memref<4x8xi32>
+        // CHECK: %[[TENSOR1:.+]] = hal.interface.load.tensor
+        // CHECK: %[[MEMREF1:.+]] = alloc : memref<4x8xi32>
         // CHECK: tensor_store %[[TENSOR1]], %[[MEMREF1]]
-        // CHECK: %[[MEMREF2:.*]] = alloc : memref<4x8xi32>
+        // CHECK: %[[MEMREF2:.+]] = alloc : memref<4x8xi32>
         // CHECK: call @pw_add_ex_dispatch_0_impl(%[[MEMREF0]], %[[MEMREF1]], %[[MEMREF2]])
-        // CHECK: %[[RESULT:.*]] = tensor_load %[[MEMREF2]]
+        // CHECK: %[[RESULT:.+]] = tensor_load %[[MEMREF2]]
         // CHECK: hal.interface.store.tensor %[[RESULT]]
         %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0_i32 : tensor<4x8xi32>
         %1 = hal.interface.load.tensor @legacy_io::@arg1, offset = %c0_i32 : tensor<4x8xi32>
@@ -29,13 +29,13 @@ hal.executable @pw_add_ex_dispatch_0 {
         return
       }
       //  CHECK-DAG: func @pw_add_ex_dispatch_0_impl(
-      // CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<4x8xi32>
-      // CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<4x8xi32>
-      // CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<4x8xi32>)
+      // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
+      // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
+      // CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>)
       func @pw_add_ex_dispatch_0_impl(%arg0: tensor<4x8xi32>, %arg1: tensor<4x8xi32>) -> tensor<4x8xi32> attributes {sym_visibility = "private"} {
-        //  CHECK-DAG: %[[T0:.*]] = iree.load_tensor(%[[ARG0]]
-        //  CHECK-DAG: %[[T1:.*]] = iree.load_tensor(%[[ARG1]]
-        //      CHECK: %[[T2:.*]] = xla_hlo.add %[[T0]], %[[T1]]
+        //  CHECK-DAG: %[[T0:.+]] = iree.load_tensor(%[[ARG0]]
+        //  CHECK-DAG: %[[T1:.+]] = iree.load_tensor(%[[ARG1]]
+        //      CHECK: %[[T2:.+]] = xla_hlo.add %[[T0]], %[[T1]]
         //      CHECK: iree.store_output(
         // CHECK-SAME: %[[T2]]
         // CHECK-SAME: %[[ARG2]]

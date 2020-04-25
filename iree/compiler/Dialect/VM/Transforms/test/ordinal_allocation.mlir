@@ -9,13 +9,13 @@ vm.module @global_address_propagation {
 
   // CHECK-NEXT: @main
   vm.func @main() -> i32 {
-    // CHECK-NEXT: [[G0_ADDR:%.+]] = vm.const.i32 0
+    // CHECK-NEXT: %[[G0_ADDR:.+]] = vm.const.i32 0
     %0 = vm.global.address @g0 : !iree.ptr<i32>
-    // CHECK-NEXT: vm.global.load.indirect.i32 [[G0_ADDR]]
+    // CHECK-NEXT: vm.global.load.indirect.i32 %[[G0_ADDR]]
     %1 = vm.global.load.indirect.i32 %0 : !iree.ptr<i32> -> i32
-    // CHECK-NEXT: [[G1_ADDR:%.+]] = vm.const.i32 4
+    // CHECK-NEXT: %[[G1_ADDR:.+]] = vm.const.i32 4
     %2 = vm.global.address @g1 : !iree.ptr<i32>
-    // CHECK-NEXT: vm.global.load.indirect.i32 [[G1_ADDR]]
+    // CHECK-NEXT: vm.global.load.indirect.i32 %[[G1_ADDR]]
     %3 = vm.global.load.indirect.i32 %2 : !iree.ptr<i32> -> i32
     vm.return %1, %3 : i32, i32
   }

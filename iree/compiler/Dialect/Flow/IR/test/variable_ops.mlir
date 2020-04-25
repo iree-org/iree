@@ -33,9 +33,9 @@ func @loaded() {
 flow.variable @v_stored mutable : tensor<4xi32>
 // CHECK-LABEL: @stored
 func @stored() {
-  // CHECK-NEXT: [[VAL:%.+]] = constant
+  // CHECK-NEXT: %[[VAL:.+]] = constant
   %cst = constant dense<5> : tensor<4xi32>
-  // CHECK-NEXT: flow.variable.store [[VAL]], @v_stored : tensor<4xi32>
+  // CHECK-NEXT: flow.variable.store %[[VAL]], @v_stored : tensor<4xi32>
   flow.variable.store %cst, @v_stored : tensor<4xi32>
   return
 }
@@ -45,9 +45,9 @@ func @stored() {
 flow.variable @v_loaded : tensor<4xf32>
 // CHECK-LABEL: @loaded_indirect
 func @loaded_indirect() {
-  // CHECK-NEXT: [[ADDR:%.+]] = flow.variable.address @v_loaded
+  // CHECK-NEXT: %[[ADDR:.+]] = flow.variable.address @v_loaded
   %0 = flow.variable.address @v_loaded : !iree.ptr<tensor<4xf32>>
-  // CHECK-NEXT: = flow.variable.load.indirect [[ADDR]]
+  // CHECK-NEXT: = flow.variable.load.indirect %[[ADDR]]
   %1 = flow.variable.load.indirect %0 : !iree.ptr<tensor<4xf32>> -> tensor<4xf32>
   return
 }
@@ -57,11 +57,11 @@ func @loaded_indirect() {
 flow.variable @v_stored mutable : tensor<4xf32>
 // CHECK-LABEL: @stored_indirect
 func @stored_indirect() {
-  // CHECK-NEXT: [[VALUE:%.+]] = "test_flow.tensor"
+  // CHECK-NEXT: %[[VALUE:.+]] = "test_flow.tensor"
   %0 = "test_flow.tensor"() : () -> tensor<4xf32>
-  // CHECK-NEXT: [[ADDR:%.+]] = flow.variable.address @v_stored
+  // CHECK-NEXT: %[[ADDR:.+]] = flow.variable.address @v_stored
   %1 = flow.variable.address @v_stored : !iree.ptr<tensor<4xf32>>
-  // CHECK-NEXT: flow.variable.store.indirect [[VALUE]], [[ADDR]]
+  // CHECK-NEXT: flow.variable.store.indirect %[[VALUE]], %[[ADDR]]
   flow.variable.store.indirect %0, %1 : tensor<4xf32> -> !iree.ptr<tensor<4xf32>>
   return
 }

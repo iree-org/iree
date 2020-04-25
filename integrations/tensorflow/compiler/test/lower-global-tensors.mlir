@@ -6,7 +6,7 @@ module attributes {tf_saved_model.semantics} {
 // TODO(silvasean): Verify "type" handling.
 // I think when "type" is a partial type that flow will not model it correctly.
 
-// CHECK:       flow.variable [[V:@[a-z_]+]] mutable dense<1.000000e+00> : tensor<1xf32>
+// CHECK:       flow.variable [[V:@[a-zA-Z0-9$._-]+]] mutable dense<1.000000e+00> : tensor<1xf32>
 // CHECK:       func @f() -> (tensor<?xf32> {tf_saved_model.index_path = []})
 // CHECK-NEXT:    [[PTR:%.+]] = flow.variable.address [[V]] : !iree.ptr<tensor<?xf32>>
 // CHECK-NEXT:    [[T:%.+]] = flow.variable.load.indirect [[PTR]] : !iree.ptr<tensor<?xf32>> -> tensor<?xf32>
@@ -26,7 +26,7 @@ module attributes {tf_saved_model.semantics} {
 // CHECK-LABEL: module attributes {tf_saved_model.semantics}
 module attributes {tf_saved_model.semantics} {
 
-// CHECK:       flow.variable [[V:@[a-z_]+]] mutable dense<1.000000e+00> : tensor<1xf32>
+// CHECK:       flow.variable [[V:@[a-zA-Z0-9$._-]+]] mutable dense<1.000000e+00> : tensor<1xf32>
 // CHECK:       func @f(%arg0: tensor<?xf32> {tf_saved_model.index_path = [0]})
 // CHECK-NEXT:    [[PTR:%.+]] = flow.variable.address @__iree_flow_v : !iree.ptr<tensor<?xf32>>
 // CHECK-NEXT:    flow.variable.store.indirect %arg0, [[PTR]] : tensor<?xf32> -> !iree.ptr<tensor<?xf32>>

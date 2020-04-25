@@ -93,9 +93,9 @@ vm.module @global_indirect_folds {
   // CHECK-LABEL: @fold_load_i32
   vm.func @fold_load_i32() -> i32 {
     %0 = vm.global.address @g0 : !iree.ptr<i32>
-    // CHECK-NEXT: [[VALUE:%.+]] = vm.global.load.i32 @g0 : i32
+    // CHECK-NEXT: %[[VALUE:.+]] = vm.global.load.i32 @g0 : i32
     %1 = vm.global.load.indirect.i32 %0 : !iree.ptr<i32> -> i32
-    // CHECK-NEXT: vm.return [[VALUE]]
+    // CHECK-NEXT: vm.return %[[VALUE]]
     vm.return %1 : i32
   }
 

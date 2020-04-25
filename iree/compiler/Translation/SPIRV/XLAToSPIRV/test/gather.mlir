@@ -2,19 +2,19 @@
 
 module {
   // CHECK-LABEL: spv.func @foo
-  // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<50 x f32, stride=4> [0]>, StorageBuffer>
-  // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
+  // CHECK-SAME: %[[ARG0:.+]]: !spv.ptr<!spv.struct<!spv.array<50 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: %[[ARG1:.+]]: !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
   func @foo(%arg0: memref<5x1x10xf32>, %arg1: memref<i64>, %arg2: memref<1x10xf32>)
   attributes {iree.dispatch_fn_name = "foo"} {
-    // CHECK: [[ZERO1:%.*]] = spv.constant 0
-    // CHECK: [[LOAD_ADDRESS_ARG1:%.*]] = spv.AccessChain [[ARG1]]{{\[}}[[ZERO1]]{{\]}}
-    // CHECK: [[INDEXI64:%.*]] = spv.Load {{".*"}} [[LOAD_ADDRESS_ARG1]]
-    // CHECK: [[INDEX:%.*]] = spv.SConvert [[INDEXI64]] : i64 to i32
-    // CHECK: [[ZERO2:%.*]] = spv.constant 0
-    // CHECK: [[STRIDE:%.*]] = spv.constant 10
-    // CHECK: [[OUTER:%.*]] = spv.IMul [[INDEX]], [[STRIDE]]
-    // CHECK: [[LINEARIZED:%.*]] = spv.IAdd {{%.*}}, [[OUTER]]
-    // CHECK: spv.AccessChain [[ARG0]]{{\[}}[[ZERO2]], [[LINEARIZED]]
+    // CHECK: %[[ZERO1:.+]] = spv.constant 0
+    // CHECK: %[[LOAD_ADDRESS_ARG1:.+]] = spv.AccessChain %[[ARG1]]{{\[}}%[[ZERO1]]{{\]}}
+    // CHECK: %[[INDEXI64:.+]] = spv.Load {{".+"}} %[[LOAD_ADDRESS_ARG1]]
+    // CHECK: %[[INDEX:.+]] = spv.SConvert %[[INDEXI64]] : i64 to i32
+    // CHECK: %[[ZERO2:.+]] = spv.constant 0
+    // CHECK: %[[STRIDE:.+]] = spv.constant 10
+    // CHECK: %[[OUTER:.+]] = spv.IMul %[[INDEX]], %[[STRIDE]]
+    // CHECK: %[[LINEARIZED:.+]] = spv.IAdd %{{.+}}, %[[OUTER]]
+    // CHECK: spv.AccessChain %[[ARG0]]{{\[}}%[[ZERO2]], %[[LINEARIZED]]
     %0 = iree.load_input(%arg0 : memref<5x1x10xf32>) : tensor<5x1x10xf32>
     %1 = iree.load_input(%arg1 : memref<i64>) : tensor<i64>
     %2 = "xla_hlo.gather"(%0, %1) {

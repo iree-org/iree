@@ -112,9 +112,9 @@ func @independentOps(%arg0: tensor<4xf32>) -> (tensor<4xf32>, tensor<4xf32>) {
   %0 = flow.dispatch @independentOps_ex_dispatch_0::@independentOps_rgn_dispatch_0[%cst : index](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
   // CHECK-DAG:    = flow.dispatch @independentOps_ex_dispatch_0::@independentOps_rgn_dispatch_1[%arg1 : index](%arg2)
   %1 = flow.dispatch @independentOps_ex_dispatch_0::@independentOps_rgn_dispatch_1[%cst : index](%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK-NEXT:   flow.return {{%.+}}, {{%.+}}
+  // CHECK-NEXT:   flow.return %{{.+}}, %{{.+}}
   // CHECK-NEXT: }
-  // CHECK-NEXT: return {{%.+}}, {{%.+}}
+  // CHECK-NEXT: return %{{.+}}, %{{.+}}
   return %0, %1 : tensor<4xf32>, tensor<4xf32>
 }
 

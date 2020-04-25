@@ -8,12 +8,12 @@ module{
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
     spv.func @foo_i64(%arg0 : i64, %arg1 : i64) -> () "None" {
-      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
-      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.Store "StorageBuffer" %{{.*}} %{{.*}} : i32
+      // CHECK: spv._address_of {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.AccessChain {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.Load "StorageBuffer" %{{.+}} : i32
+      // CHECK: spv._address_of {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.AccessChain {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.Store "StorageBuffer" %{{.+}} %{{.+}} : i32
       %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -33,9 +33,9 @@ module{
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
     spv.func @foo_i16(%arg0 : i16, %arg1 : i16) -> () "None" {
-      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
+      // CHECK: spv._address_of {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.AccessChain {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.Load "StorageBuffer" %{{.+}} : i32
       // CHECK: spv.AtomicAnd
       // CHECK: spv.AtomicOr
       %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i16 [0]>, StorageBuffer>
@@ -57,9 +57,9 @@ module{
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
     spv.func @foo_i8(%arg0 : i8, %arg1 : i8) -> () "None" {
-      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
+      // CHECK: spv._address_of {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.AccessChain {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.Load "StorageBuffer" %{{.+}} : i32
       // CHECK: spv.AtomicAnd
       // CHECK: spv.AtomicOr
       %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
@@ -81,12 +81,12 @@ module{
     spv.globalVariable @constant_arg_0 bind(0, 0) : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
     spv.globalVariable @constant_arg_1 bind(0, 1) : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
     spv.func @foo_i1(%arg0 : i1, %arg1 : i1) -> () "None" {
-      // CHECK: spv._address_of {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.AccessChain {{.*}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
-      // CHECK: spv.Load "StorageBuffer" %{{.*}} : i32
+      // CHECK: spv._address_of {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.AccessChain {{.+}} : !spv.ptr<!spv.struct<i32 [0]>, StorageBuffer>
+      // CHECK: spv.Load "StorageBuffer" %{{.+}} : i32
       // CHECK-NEXT: spv.BitwiseAnd
-      // CHECK-NEXT: spv.INotEqual {{.*}} : i32
-      // CHECK: spv.Select {{.*}} : i1, i32
+      // CHECK-NEXT: spv.INotEqual {{.+}} : i32
+      // CHECK: spv.Select {{.+}} : i1, i32
       // CHECK: spv.AtomicAnd
       // CHECK: spv.AtomicOr
       %0 = spv._address_of @constant_arg_0 : !spv.ptr<!spv.struct<i1 [0]>, StorageBuffer>
@@ -110,7 +110,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.IAdd {{.*}} : i32
+      // CHECK: spv.IAdd {{.+}} : i32
       %4 = spv.IAdd %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -124,7 +124,7 @@ module{
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
       %cst = spv.constant 1337 : i64
-      // CHECK: spv.ISub {{.*}} : i32
+      // CHECK: spv.ISub {{.+}} : i32
       %4 = spv.ISub %3, %cst : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -137,7 +137,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.IMul {{.*}} : i32
+      // CHECK: spv.IMul {{.+}} : i32
       %4 = spv.IMul %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -150,7 +150,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.SDiv {{.*}} : i32
+      // CHECK: spv.SDiv {{.+}} : i32
       %4 = spv.SDiv %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -163,7 +163,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.SMod {{.*}} : i32
+      // CHECK: spv.SMod {{.+}} : i32
       %4 = spv.SMod %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -176,7 +176,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.SRem {{.*}} : i32
+      // CHECK: spv.SRem {{.+}} : i32
       %4 = spv.SRem %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -189,7 +189,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.UDiv {{.*}} : i32
+      // CHECK: spv.UDiv {{.+}} : i32
       %4 = spv.UDiv %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -202,7 +202,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.UMod {{.*}} : i32
+      // CHECK: spv.UMod {{.+}} : i32
       %4 = spv.UMod %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -215,7 +215,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.GLSL.SAbs {{.*}} : i32
+      // CHECK: spv.GLSL.SAbs {{.+}} : i32
       %4 = spv.GLSL.SAbs %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -228,7 +228,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.GLSL.SMax {{.*}} : i32
+      // CHECK: spv.GLSL.SMax {{.+}} : i32
       %4 = spv.GLSL.SMax %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -241,7 +241,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.GLSL.SMin {{.*}} : i32
+      // CHECK: spv.GLSL.SMin {{.+}} : i32
       %4 = spv.GLSL.SMin %3, %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -254,7 +254,7 @@ module{
       %1 = spv.constant 0 : i32
       %2 = spv.AccessChain %0[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %3 = spv.Load "StorageBuffer" %2 : i64
-      // CHECK: spv.GLSL.SSign {{.*}} : i32
+      // CHECK: spv.GLSL.SSign {{.+}} : i32
       %4 = spv.GLSL.SSign %3 : i64
       %5 = spv._address_of @arg_1 : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
       %6 = spv.AccessChain %5[%1] : !spv.ptr<!spv.struct<i64 [0]>, StorageBuffer>
@@ -284,7 +284,7 @@ module{
       %3 = spv.Load "StorageBuffer" %2 : i1
       %4 = spv.constant 0 : i8
       %5 = spv.constant 1 : i8
-      // CHECK: spv.Select {{.*}} : i1, i32
+      // CHECK: spv.Select {{.+}} : i1, i32
       %6 = spv.Select %3, %5, %4 : i1, i8
       %7 = spv._address_of @constant_arg_1 : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>
       %8 = spv.AccessChain %7[%1] : !spv.ptr<!spv.struct<i8 [0]>, StorageBuffer>

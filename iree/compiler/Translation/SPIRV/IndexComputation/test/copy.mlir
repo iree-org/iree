@@ -2,7 +2,7 @@
 
 module {
    // CHECK: func @simple_load_store
-   // CHECK: [[ARG0:%[a-zA-Z0-9_]*]]: memref<12x42xi32>
+   // CHECK: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<12x42xi32>
    // CHECK-SAME: iree.index_computation_info
    // CHECK-SAME: operand_indices
    // CHECK-SAME: []

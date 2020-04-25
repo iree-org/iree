@@ -59,11 +59,11 @@ func @foldFullyStaticRankedShape(%arg0: tensor<1x2xf32>) -> (i32, i32) {
 func @foldRankedShapeDims(%arg0: tensor<1x?xf32>) -> (i32, i32) {
   // CHECK-NOT: shapex.get_ranked_shape
   // CHECK-NOT: shapex.ranked_dims
-  // CHECK: [[DIM0:%.+]] = constant 1
-  // CHECK: [[DIM1:%.+]] = shapex.ranked_dim %0[1]
+  // CHECK: %[[DIM0:.+]] = constant 1
+  // CHECK: %[[DIM1:.+]] = shapex.ranked_dim %0[1]
   %0 = shapex.get_ranked_shape %arg0 : tensor<1x?xf32> -> !shapex.ranked_shape<[1,?]>
   %1:2 = shapex.ranked_dims %0 : !shapex.ranked_shape<[1,?]> -> i32, i32
-  // CHECK: return [[DIM0]], [[DIM1]]
+  // CHECK: return %[[DIM0]], %[[DIM1]]
   return %1#0, %1#1 : i32, i32
 }
 

@@ -2,13 +2,13 @@
 
 module {
   // CHECK-LABEL: func @tile_only
-  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<4x8xi32>
-  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<4x8xi32>
-  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<4x8xi32>
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<4x8xi32>
   //       CHECK: loop.parallel
-  //       CHECK:   %[[VIEW0:.*]] = subview %[[ARG0]]
-  //       CHECK:   %[[VIEW1:.*]] = subview %[[ARG1]]
-  //       CHECK:   %[[VIEW2:.*]] = subview %[[ARG2]]
+  //       CHECK:   %[[VIEW0:.+]] = subview %[[ARG0]]
+  //       CHECK:   %[[VIEW1:.+]] = subview %[[ARG1]]
+  //       CHECK:   %[[VIEW2:.+]] = subview %[[ARG2]]
   //       CHECK:   linalg.generic
   //  CHECK-SAME:     %[[VIEW0]]
   //  CHECK-SAME:     %[[VIEW1]]
@@ -35,16 +35,16 @@ module {
 
 module {
   // CHECK-LABEL: func @tile_and_fuse
-  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<?x?xf32>
-  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<?x?xf32>
-  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<?x?xf32>
-  //  CHECK-SAME: %[[ARG3:[a-zA-Z0-9_]*]]: memref<?x?xf32>
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
+  //  CHECK-SAME: %[[ARG3:[a-zA-Z0-9$._-]+]]: memref<?x?xf32>
   //       CHECK: loop.parallel
-  //   CHECK-DAG:   %[[VIEW0:.*]] = subview %[[ARG0]]
-  //   CHECK-DAG:   %[[VIEW1:.*]] = subview %[[ARG1]]
-  //   CHECK-DAG:   %[[VIEW2READ:.*]] = subview %[[ARG2]]
-  //   CHECK-DAG:   %[[VIEW2WRITE:.*]] = subview %[[ARG2]]
-  //   CHECK-DAG:   %[[VIEW3:.*]] = subview %[[ARG3]]
+  //   CHECK-DAG:   %[[VIEW0:.+]] = subview %[[ARG0]]
+  //   CHECK-DAG:   %[[VIEW1:.+]] = subview %[[ARG1]]
+  //   CHECK-DAG:   %[[VIEW2READ:.+]] = subview %[[ARG2]]
+  //   CHECK-DAG:   %[[VIEW2WRITE:.+]] = subview %[[ARG2]]
+  //   CHECK-DAG:   %[[VIEW3:.+]] = subview %[[ARG3]]
   //       CHECK:   linalg.generic
   //  CHECK-SAME:     %[[VIEW0]]
   //  CHECK-SAME:     %[[VIEW1]]
@@ -83,12 +83,12 @@ module {
 
 module {
   // CHECK-LABEL: func @conv_padding
-  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
-  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
-  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
-  //       CHECK: loop.parallel (%{{.*}})
-  //       CHECK:   %[[VIEW1:.*]] = subview %[[ARG1]]
-  //       CHECK:   %[[VIEW2:.*]] = subview %[[ARG2]]
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+  //       CHECK: loop.parallel (%{{.+}})
+  //       CHECK:   %[[VIEW1:.+]] = subview %[[ARG1]]
+  //       CHECK:   %[[VIEW2:.+]] = subview %[[ARG2]]
   //       CHECK:   linalg.conv
   //  CHECK-SAME:     %[[VIEW1]]
   //  CHECK-SAME:     %[[VIEW2]]
@@ -108,12 +108,12 @@ module {
 
 module {
   // CHECK-LABEL: func @conv_no_padding
-  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
-  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
-  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9_]*]]: memref<?x?x?x?xf32>
-  //       CHECK: loop.parallel (%{{.*}}, %{{.*}}, %{{.*}})
-  //       CHECK:   %[[VIEW1:.*]] = subview %[[ARG1]]
-  //       CHECK:   %[[VIEW2:.*]] = subview %[[ARG2]]
+  //  CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+  //  CHECK-SAME: %[[ARG2:[a-zA-Z0-9$._-]+]]: memref<?x?x?x?xf32>
+  //       CHECK: loop.parallel (%{{.+}}, %{{.+}}, %{{.+}})
+  //       CHECK:   %[[VIEW1:.+]] = subview %[[ARG1]]
+  //       CHECK:   %[[VIEW2:.+]] = subview %[[ARG2]]
   //       CHECK:   linalg.conv
   //  CHECK-SAME:     %[[VIEW1]]
   //  CHECK-SAME:     %[[VIEW2]]
@@ -132,7 +132,7 @@ module {
 #map0 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 module {
   // CHECK-LABEL: func @parallel_4D
-  //       CHECK: loop.parallel (%{{.*}}, %{{.*}}, %{{.*}})
+  //       CHECK: loop.parallel (%{{.+}}, %{{.+}}, %{{.+}})
   func @parallel_4D(%arg0: memref<?x?x?x?xf32>,
                     %arg1 : memref<?x?x?x?xf32>,
                     %arg2 : memref<?x?x?x?xf32>)

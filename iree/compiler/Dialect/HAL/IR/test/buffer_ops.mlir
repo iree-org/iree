@@ -77,9 +77,9 @@ func @buffer_copy_data(%arg0 : !hal.buffer, %arg1 : !hal.buffer) {
 // CHECK-LABEL: @buffer_load
 func @buffer_load(%arg0 : !hal.buffer) -> i32 {
   %0 = "test_hal.device_size"() : () -> index
-  // CHECK: [[VAL:%.+]] = hal.buffer.load %arg0[%0] : i32
+  // CHECK: %[[VAL:.+]] = hal.buffer.load %arg0[%0] : i32
   %1 = hal.buffer.load %arg0[%0] : i32
-  // CHECK-NEXT: return [[VAL]]
+  // CHECK-NEXT: return %[[VAL]]
   return %1 : i32
 }
 

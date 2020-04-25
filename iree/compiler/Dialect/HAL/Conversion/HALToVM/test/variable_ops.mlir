@@ -36,9 +36,9 @@ func @stored(%arg0 : !hal.buffer) {
 hal.variable @v_loaded : !hal.buffer
 // CHECK-LABEL: @loaded_indirect
 func @loaded_indirect() -> !hal.buffer {
-  // CHECK-NEXT: [[ADDR:%.+]] = vm.global.address @v_loaded
+  // CHECK-NEXT: %[[ADDR:.+]] = vm.global.address @v_loaded
   %0 = hal.variable.address @v_loaded : !iree.ptr<!hal.buffer>
-  // CHECK-NEXT: = vm.global.load.indirect.ref [[ADDR]]
+  // CHECK-NEXT: = vm.global.load.indirect.ref %[[ADDR]]
   %1 = hal.variable.load.indirect %0 : !iree.ptr<!hal.buffer> -> !hal.buffer
   return %1 : !hal.buffer
 }
@@ -48,9 +48,9 @@ func @loaded_indirect() -> !hal.buffer {
 hal.variable @v_stored mutable : !hal.buffer
 // CHECK-LABEL: @stored_indirect
 func @stored_indirect(%arg0 : !hal.buffer) {
-  // CHECK-NEXT: [[ADDR:%.+]] = vm.global.address @v_stored
+  // CHECK-NEXT: %[[ADDR:.+]] = vm.global.address @v_stored
   %0 = hal.variable.address @v_stored : !iree.ptr<!hal.buffer>
-  // CHECK-NEXT: vm.global.store.indirect.ref %arg0, [[ADDR]]
+  // CHECK-NEXT: vm.global.store.indirect.ref %arg0, %[[ADDR]]
   hal.variable.store.indirect %arg0, %0 : !hal.buffer -> !iree.ptr<!hal.buffer>
   return
 }

@@ -2,14 +2,14 @@
 
 module {
   // CHECK: spv.func @slice_unit_stride
-  // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<36 x f32, stride=4> [0]>, StorageBuffer>
-  // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<6 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: %[[ARG0:.+]]: !spv.ptr<!spv.struct<!spv.array<36 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: %[[ARG1:.+]]: !spv.ptr<!spv.struct<!spv.array<6 x f32, stride=4> [0]>, StorageBuffer>
   func @slice_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)
   attributes {iree.dispatch_fn_name = "slice_unit_stride"} {
-    // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]
-    // CHECK: [[VAL0:%.*]]  = spv.Load "StorageBuffer" [[ARG0LOADPTR]] : f32
-    // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
-    // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL0]] : f32
+    // CHECK: %[[ARG0LOADPTR:.+]] = spv.AccessChain %[[ARG0]]
+    // CHECK: %[[VAL0:.+]]  = spv.Load "StorageBuffer" %[[ARG0LOADPTR]] : f32
+    // CHECK: %[[ARG1STOREPTR:.+]] = spv.AccessChain %[[ARG1]]
+    // CHECK: spv.Store "StorageBuffer" %[[ARG1STOREPTR]], %[[VAL0]] : f32
     %0 = iree.load_input(%arg0 : memref<6x6xf32>) : tensor<6x6xf32>
     %1 = "xla_hlo.slice"(%0) {start_indices = dense<[2, 1]> : tensor<2xi64>, limit_indices = dense<[4, 4]> : tensor<2xi64>, strides = dense<[1, 1]> : tensor<2xi64>} : (tensor<6x6xf32>) -> tensor<2x3xf32>
     iree.store_output(%1 : tensor<2x3xf32>, %arg1 : memref<2x3xf32>)
@@ -21,14 +21,14 @@ module {
 
 module {
   // CHECK: spv.func @slice_non_unit_stride
-  // CHECK-SAME: [[ARG0:%.*]]: !spv.ptr<!spv.struct<!spv.array<36 x f32, stride=4> [0]>, StorageBuffer>
-  // CHECK-SAME: [[ARG1:%.*]]: !spv.ptr<!spv.struct<!spv.array<6 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: %[[ARG0:.+]]: !spv.ptr<!spv.struct<!spv.array<36 x f32, stride=4> [0]>, StorageBuffer>
+  // CHECK-SAME: %[[ARG1:.+]]: !spv.ptr<!spv.struct<!spv.array<6 x f32, stride=4> [0]>, StorageBuffer>
   func @slice_non_unit_stride(%arg0: memref<6x6xf32>, %arg1: memref<2x3xf32>)
   attributes {iree.dispatch_fn_name = "slice_non_unit_stride"} {
-    // CHECK: [[ARG0LOADPTR:%.*]] = spv.AccessChain [[ARG0]]
-    // CHECK: [[VAL0:%.*]]  = spv.Load "StorageBuffer" [[ARG0LOADPTR]] : f32
-    // CHECK: [[ARG1STOREPTR:%.*]] = spv.AccessChain [[ARG1]]
-    // CHECK: spv.Store "StorageBuffer" [[ARG1STOREPTR]], [[VAL0]] : f32
+    // CHECK: %[[ARG0LOADPTR:.+]] = spv.AccessChain %[[ARG0]]
+    // CHECK: %[[VAL0:.+]]  = spv.Load "StorageBuffer" %[[ARG0LOADPTR]] : f32
+    // CHECK: %[[ARG1STOREPTR:.+]] = spv.AccessChain %[[ARG1]]
+    // CHECK: spv.Store "StorageBuffer" %[[ARG1STOREPTR]], %[[VAL0]] : f32
     %0 = iree.load_input(%arg0 : memref<6x6xf32>) : tensor<6x6xf32>
     %1 = "xla_hlo.slice"(%0) {start_indices = dense<[2, 1]> : tensor<2xi64>, limit_indices = dense<[4, 6]> : tensor<2xi64>, strides = dense<[1, 2]> : tensor<2xi64>} : (tensor<6x6xf32>) -> tensor<2x3xf32>
     iree.store_output(%1 : tensor<2x3xf32>, %arg1 : memref<2x3xf32>)

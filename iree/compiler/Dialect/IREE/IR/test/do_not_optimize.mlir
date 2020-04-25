@@ -13,13 +13,13 @@ func @no_fold_constant() -> (i32) {
 
 // CHECK-LABEL: @no_fold_add
 func @no_fold_add() -> (i32) {
-  // CHECK-NEXT: [[C1:%.+]] = vm.const.i32 1 : i32
+  // CHECK-NEXT: %[[C1:.+]] = vm.const.i32 1 : i32
   %c1 = vm.const.i32 1 : i32
-  // CHECK-NEXT: [[R1:%.+]] = iree.do_not_optimize([[C1]])
+  // CHECK-NEXT: %[[R1:.+]] = iree.do_not_optimize(%[[C1]])
   %0 = iree.do_not_optimize(%c1) : i32
-  // CHECK-NEXT: [[R2:%.+]] = vm.add.i32 [[R1]], [[R1]]
+  // CHECK-NEXT: %[[R2:.+]] = vm.add.i32 %[[R1]], %[[R1]]
   %1 = vm.add.i32 %0, %0 : i32
-  // CHECK-NEXT: return [[R2]]
+  // CHECK-NEXT: return %[[R2]]
   return %1 : i32
 }
 
@@ -28,8 +28,8 @@ func @no_fold_add() -> (i32) {
 // Exists to check that the above succeeds because of do_not_optimize
 // CHECK-LABEL: @fold_add
 func @fold_add() -> (i32) {
-  // CHECK-NEXT: [[C2:%.+]] = vm.const.i32 2
-  // CHECK-NEXT: return [[C2]]
+  // CHECK-NEXT: %[[C2:.+]] = vm.const.i32 2
+  // CHECK-NEXT: return %[[C2]]
   %c1 = vm.const.i32 1 : i32
   %0 = vm.add.i32 %c1, %c1 : i32
   return %0 : i32
@@ -55,9 +55,9 @@ func @result_operand_type_mismatch(%arg0 : tensor<i32>, %arg1 : tensor<i32>) {
 
 // CHECK-LABEL: @canonicalize_unfoldable_constant
 func @canonicalize_unfoldable_constant() -> i32 {
-  // CHECK-NEXT: [[C:%.+]] = constant 42 : i32
-  // CHECK-NEXT: [[R:%.+]] = iree.do_not_optimize([[C]]) : i32
+  // CHECK-NEXT: %[[C:.+]] = constant 42 : i32
+  // CHECK-NEXT: %[[R:.+]] = iree.do_not_optimize(%[[C]]) : i32
   %c42 = iree.unfoldable_constant 42 : i32
-  // CHECK-NEXT: return [[R]]
+  // CHECK-NEXT: return %[[R]]
   return %c42 : i32
 }

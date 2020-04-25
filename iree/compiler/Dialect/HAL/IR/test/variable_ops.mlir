@@ -33,9 +33,9 @@ func @loaded() {
 hal.variable @v_stored mutable : !hal.buffer
 // CHECK-LABEL: @stored
 func @stored() {
-  // CHECK-NEXT: [[BUF:%.+]] = "test_hal.buffer"
+  // CHECK-NEXT: %[[BUF:.+]] = "test_hal.buffer"
   %0 = "test_hal.buffer"() : () -> !hal.buffer
-  // CHECK-NEXT: hal.variable.store [[BUF]], @v_stored : !hal.buffer
+  // CHECK-NEXT: hal.variable.store %[[BUF]], @v_stored : !hal.buffer
   hal.variable.store %0, @v_stored : !hal.buffer
   return
 }
@@ -45,9 +45,9 @@ func @stored() {
 hal.variable @v_loaded : !hal.buffer
 // CHECK-LABEL: @loaded_indirect
 func @loaded_indirect() {
-  // CHECK-NEXT: [[ADDR:%.+]] = hal.variable.address @v_loaded
+  // CHECK-NEXT: %[[ADDR:.+]] = hal.variable.address @v_loaded
   %0 = hal.variable.address @v_loaded : !iree.ptr<!hal.buffer>
-  // CHECK-NEXT: = hal.variable.load.indirect [[ADDR]]
+  // CHECK-NEXT: = hal.variable.load.indirect %[[ADDR]]
   %1 = hal.variable.load.indirect %0 : !iree.ptr<!hal.buffer> -> !hal.buffer
   return
 }
@@ -57,11 +57,11 @@ func @loaded_indirect() {
 hal.variable @v_stored mutable : !hal.buffer
 // CHECK-LABEL: @stored_indirect
 func @stored_indirect() {
-  // CHECK-NEXT: [[BUF:%.+]] = "test_hal.buffer"
+  // CHECK-NEXT: %[[BUF:.+]] = "test_hal.buffer"
   %0 = "test_hal.buffer"() : () -> !hal.buffer
-  // CHECK-NEXT: [[ADDR:%.+]] = hal.variable.address @v_stored
+  // CHECK-NEXT: %[[ADDR:.+]] = hal.variable.address @v_stored
   %1 = hal.variable.address @v_stored : !iree.ptr<!hal.buffer>
-  // CHECK-NEXT: hal.variable.store.indirect [[BUF]], [[ADDR]]
+  // CHECK-NEXT: hal.variable.store.indirect %[[BUF]], %[[ADDR]]
   hal.variable.store.indirect %0, %1 : !hal.buffer -> !iree.ptr<!hal.buffer>
   return
 }

@@ -2,10 +2,10 @@
 
 // CHECK-LABEL: @constant
 func @constant() -> i32 {
-  // CHECK-NEXT: [[C1:%.+]] = constant 1
+  // CHECK-NEXT: %[[C1:.+]] = constant 1
   %c1 = constant 1 : i32
   %0 = iree.do_not_optimize(%c1) : i32
-  // CHECK-NEXT: return [[C1]]
+  // CHECK-NEXT: return %[[C1]]
   return %0 : i32
 }
 
@@ -13,15 +13,15 @@ func @constant() -> i32 {
 
 // CHECK-LABEL: @multiple
 func @multiple() -> (i32, i32) {
-  // CHECK-NEXT: [[C1:%.+]] = constant 1
+  // CHECK-NEXT: %[[C1:.+]] = constant 1
   %c1 = constant 1 : i32
   %0 = iree.do_not_optimize(%c1) : i32
   %1 = iree.do_not_optimize(%0) : i32
-  // CHECK-NEXT: [[C2:%.+]] = constant 2
+  // CHECK-NEXT: %[[C2:.+]] = constant 2
   %c2 = constant 2 : i32
   %2 = iree.do_not_optimize(%1) : i32
   %3 = iree.do_not_optimize(%c2) : i32
-  // CHECK-NEXT: return [[C1]], [[C2]]
+  // CHECK-NEXT: return %[[C1]], %[[C2]]
   return %2, %3 : i32, i32
 }
 
@@ -29,12 +29,12 @@ func @multiple() -> (i32, i32) {
 
 // CHECK-LABEL: @multiple_operands
 func @multiple_operands() -> (i32, i32) {
-  // CHECK-NEXT: [[C1:%.+]] = constant 1
+  // CHECK-NEXT: %[[C1:.+]] = constant 1
   %c1 = constant 1 : i32
-  // CHECK-NEXT: [[C2:%.+]] = constant 2
+  // CHECK-NEXT: %[[C2:.+]] = constant 2
   %c2 = constant 2 : i32
   %0, %1 = iree.do_not_optimize(%c1, %c2) : i32, i32
-  // CHECK-NEXT: return [[C1]], [[C2]]
+  // CHECK-NEXT: return %[[C1]], %[[C2]]
   return %0, %1 : i32, i32
 }
 
@@ -51,12 +51,12 @@ func @no_operands() {
 
 // CHECK-LABEL: @no_fold_add
 func @no_fold_add() -> (i32) {
-  // CHECK-NEXT: [[C1:%.+]] = vm.const.i32 1 : i32
+  // CHECK-NEXT: %[[C1:.+]] = vm.const.i32 1 : i32
   %c1 = vm.const.i32 1 : i32
   %0 = iree.do_not_optimize(%c1) : i32
-  // CHECK-NEXT: [[R:%.+]] = vm.add.i32 [[C1]], [[C1]]
+  // CHECK-NEXT: %[[R:.+]] = vm.add.i32 %[[C1]], %[[C1]]
   %1 = vm.add.i32 %0, %0 : i32
-  // CHECK-NEXT: return [[R]]
+  // CHECK-NEXT: return %[[R]]
   return %1 : i32
 }
 

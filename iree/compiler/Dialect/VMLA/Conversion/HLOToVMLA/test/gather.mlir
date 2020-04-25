@@ -1,17 +1,17 @@
 // RUN: iree-opt -split-input-file -iree-vmla-conversion -canonicalize %s -verify-diagnostics | IreeFileCheck %s
 
 // CHECK-LABEL: @gather_scalar_indices
-// CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
-// CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
+// CHECK-SAME: %[[SRC:.+]]: !vmla.buffer,
+// CHECK-SAME: %[[INDICES:.+]]: !vmla.buffer)
 func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<i64>) -> tensor<1x5xi32> attributes { sym_visibility = "private" } {
-  // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,1,5]>
-  // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,1,5]>
-  // CHECK-DAG: [[INDEX0_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0)
-  // CHECK-DAG: [[INDEX0:%.+]] = index_cast [[INDEX0_I32]]
-  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c20)
+  // CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,1,5]>
+  // CHECK-DAG: %[[DST_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,1,5]>
+  // CHECK-DAG: %[[INDEX0_I32:.+]] = "vmla.buffer.load.i32"(%[[INDICES]], %c0)
+  // CHECK-DAG: %[[INDEX0:.+]] = index_cast %[[INDEX0_I32]]
+  // CHECK-DAG: %[[DST:.+]] = "vmla.buffer.alloc"(%c20)
   // CHECK-NEXT: "vmla.copy"(
-  // CHECK-SAME: [[SRC]], [[SRC_SHAPE]], [[INDEX0]], %c0, %c0,
-  // CHECK-SAME: [[DST]], [[DST_SHAPE]], %c0, %c0, %c0,
+  // CHECK-SAME: %[[SRC]], %[[SRC_SHAPE]], %[[INDEX0]], %c0, %c0,
+  // CHECK-SAME: %[[DST]], %[[DST_SHAPE]], %c0, %c0, %c0,
   // CHECK-SAME: %c1, %c1, %c5
   // CHECK-SAME: ) {element_type = i32}
   %0 = "xla_hlo.gather"(%input, %start_indices) {
@@ -23,28 +23,28 @@ func @gather_scalar_indices(%input : tensor<5x1x5xi32>, %start_indices : tensor<
     },
     slice_sizes = dense<[1, 1, 5]> : tensor<3xi64>
   } : (tensor<5x1x5xi32>, tensor<i64>) -> tensor<1x5xi32>
-  // CHECK-NEXT: return [[DST]]
+  // CHECK-NEXT: return %[[DST]]
   return %0 : tensor<1x5xi32>
 }
 
 // -----
 
 // CHECK-LABEL: @gather_fully_specified_indices
-// CHECK-SAME: [[SRC:%.+]]: !vmla.buffer,
-// CHECK-SAME: [[INDICES:%.+]]: !vmla.buffer)
+// CHECK-SAME: %[[SRC:.+]]: !vmla.buffer,
+// CHECK-SAME: %[[INDICES:.+]]: !vmla.buffer)
 func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices : tensor<3xi64>) -> tensor<2x3xf32> attributes { sym_visibility = "private" } {
-  // CHECK-DAG: [[SRC_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,2,3]>
-  // CHECK-DAG: [[DST_SHAPE:%.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,3]>
-  // CHECK-DAG: [[INDEX0_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c0)
-  // CHECK-DAG: [[INDEX0:%.+]] = index_cast [[INDEX0_I32]]
-  // CHECK-DAG: [[INDEX1_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c4)
-  // CHECK-DAG: [[INDEX1:%.+]] = index_cast [[INDEX1_I32]]
-  // CHECK-DAG: [[INDEX2_I32:%.+]] = "vmla.buffer.load.i32"([[INDICES]], %c8)
-  // CHECK-DAG: [[INDEX2:%.+]] = index_cast [[INDEX2_I32]]
-  // CHECK-DAG: [[DST:%.+]] = "vmla.buffer.alloc"(%c24)
+  // CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[5,2,3]>
+  // CHECK-DAG: %[[DST_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,3]>
+  // CHECK-DAG: %[[INDEX0_I32:.+]] = "vmla.buffer.load.i32"(%[[INDICES]], %c0)
+  // CHECK-DAG: %[[INDEX0:.+]] = index_cast %[[INDEX0_I32]]
+  // CHECK-DAG: %[[INDEX1_I32:.+]] = "vmla.buffer.load.i32"(%[[INDICES]], %c4)
+  // CHECK-DAG: %[[INDEX1:.+]] = index_cast %[[INDEX1_I32]]
+  // CHECK-DAG: %[[INDEX2_I32:.+]] = "vmla.buffer.load.i32"(%[[INDICES]], %c8)
+  // CHECK-DAG: %[[INDEX2:.+]] = index_cast %[[INDEX2_I32]]
+  // CHECK-DAG: %[[DST:.+]] = "vmla.buffer.alloc"(%c24)
   // CHECK-NEXT: "vmla.copy"(
-  // CHECK-SAME: [[SRC]], [[SRC_SHAPE]], [[INDEX0]], [[INDEX1]], [[INDEX2]],
-  // CHECK-SAME: [[DST]], [[DST_SHAPE]], %c0, %c0, %c0,
+  // CHECK-SAME: %[[SRC]], %[[SRC_SHAPE]], %[[INDEX0]], %[[INDEX1]], %[[INDEX2]],
+  // CHECK-SAME: %[[DST]], %[[DST_SHAPE]], %c0, %c0, %c0,
   // CHECK-SAME: %c1, %c2, %c3
   // CHECK-SAME: ) {element_type = f32}
   %0 = "xla_hlo.gather"(%input, %start_indices) {
@@ -56,7 +56,7 @@ func @gather_fully_specified_indices(%input : tensor<5x2x3xf32>, %start_indices 
     },
     slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
   } : (tensor<5x2x3xf32>, tensor<3xi64>) -> tensor<2x3xf32>
-  // CHECK-NEXT: return [[DST]]
+  // CHECK-NEXT: return %[[DST]]
   return %0 : tensor<2x3xf32>
 }
 

@@ -40,24 +40,24 @@ module {
     return
   }
 }
-//   CHECK-DAG:   %[[STEPY:.*]] = constant 4 : index
-//   CHECK-DAG:   %[[STEPX:.*]] = constant 32 : index
-//   CHECK-DAG:   %[[BIDX:.*]] = "gpu.block_id"() {dimension = "x"}
-//   CHECK-DAG:   %[[NBLOCKSX:.*]] = "gpu.grid_dim"() {dimension = "x"}
-//   CHECK-DAG:   %[[BIDY:.*]] = "gpu.block_id"() {dimension = "y"}
-//   CHECK-DAG:   %[[NBLOCKSY:.*]] = "gpu.grid_dim"() {dimension = "y"}
-//       CHECK:   %[[NEWLBY:.*]] = muli %[[BIDY]], %[[STEPY]]
-//       CHECK:   %[[NEWSTEPY:.*]] = muli %[[NBLOCKSY]], %[[STEPY]]
-//       CHECK:   %[[NEWLBX:.*]] = muli %[[BIDX]], %[[STEPX]]
-//       CHECK:   %[[NEWSTEPX:.*]] = muli %[[NBLOCKSX]], %[[STEPX]]
-//       CHECK:   loop.for %{{.*}} = %[[NEWLBY]] to %{{.*}} step %[[NEWSTEPY]]
-//       CHECK:     loop.for %{{.*}} = %[[NEWLBX]] to %{{.*}} step %[[NEWSTEPX]]
-//   CHECK-DAG:       %[[TIDX:.*]] = "gpu.thread_id"() {dimension = "x"}
-//   CHECK-DAG:       %[[NTHREADSX:.*]] = "gpu.block_dim"() {dimension = "x"}
-//   CHECK-DAG:       %[[TIDY:.*]] = "gpu.thread_id"() {dimension = "y"}
-//   CHECK-DAG:       %[[NTHREADSY:.*]] = "gpu.block_dim"() {dimension = "y"}
-//       CHECK:       loop.for %{{.*}} = %[[TIDY]] to %{{.*}} step %[[NTHREADSY]]
-//       CHECK:         loop.for %{{.*}} = %[[TIDX]] to %{{.*}} step %[[NTHREADSX]]
+//   CHECK-DAG:   %[[STEPY:.+]] = constant 4 : index
+//   CHECK-DAG:   %[[STEPX:.+]] = constant 32 : index
+//   CHECK-DAG:   %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"}
+//   CHECK-DAG:   %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"}
+//   CHECK-DAG:   %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"}
+//   CHECK-DAG:   %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"}
+//       CHECK:   %[[NEWLBY:.+]] = muli %[[BIDY]], %[[STEPY]]
+//       CHECK:   %[[NEWSTEPY:.+]] = muli %[[NBLOCKSY]], %[[STEPY]]
+//       CHECK:   %[[NEWLBX:.+]] = muli %[[BIDX]], %[[STEPX]]
+//       CHECK:   %[[NEWSTEPX:.+]] = muli %[[NBLOCKSX]], %[[STEPX]]
+//       CHECK:   loop.for %{{.+}} = %[[NEWLBY]] to %{{.+}} step %[[NEWSTEPY]]
+//       CHECK:     loop.for %{{.+}} = %[[NEWLBX]] to %{{.+}} step %[[NEWSTEPX]]
+//   CHECK-DAG:       %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"}
+//   CHECK-DAG:       %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"}
+//   CHECK-DAG:       %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"}
+//   CHECK-DAG:       %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"}
+//       CHECK:       loop.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
+//       CHECK:         loop.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
 
 // -----
 
@@ -81,10 +81,10 @@ module {
     return
   }
 }
-// CHECK-DAG: %[[C0:.*]] = constant 0 : index
-// CHECK-DAG: %[[C4:.*]] = constant 4 : index
-// CHECK-DAG: %[[C1:.*]] = constant 1 : index
-//     CHECK:   loop.for %{{.*}} = %[[C0]] to %[[C4]] step %[[C1]]
+// CHECK-DAG: %[[C0:.+]] = constant 0 : index
+// CHECK-DAG: %[[C4:.+]] = constant 4 : index
+// CHECK-DAG: %[[C1:.+]] = constant 1 : index
+//     CHECK:   loop.for %{{.+}} = %[[C0]] to %[[C4]] step %[[C1]]
 // CHECK-NOT:   loop
 
 // -----
@@ -128,34 +128,34 @@ module {
   }
 }
 
-// CHECK-DAG: %[[C2:.*]] = constant 2 : index
-// CHECK-DAG: %[[C32:.*]] = constant 32 : index
-// CHECK-DAG: %[[C0:.*]] = constant 0 : index
-// CHECK-DAG: %[[C1:.*]] = constant 1 : index
-// CHECK-DAG: %[[SERIALDIMOUTER:.*]] = dim %{{.*}}, 3
-// CHECK-DAG: %[[BIDX:.*]] = "gpu.block_id"() {dimension = "x"} : () -> index
-// CHECK-DAG: %[[NBLOCKSX:.*]] = "gpu.grid_dim"() {dimension = "x"} : () -> index
-// CHECK-DAG: %[[BIDY:.*]] = "gpu.block_id"() {dimension = "y"} : () -> index
-// CHECK-DAG: %[[NBLOCKSY:.*]] = "gpu.grid_dim"() {dimension = "y"} : () -> index
-// CHECK-DAG: %[[BIDZ:.*]] = "gpu.block_id"() {dimension = "z"} : () -> index
-// CHECK-DAG: %[[NBLOCKSZ:.*]] = "gpu.grid_dim"() {dimension = "z"} : () -> index
-// CHECK-DAG: %[[LB0:.*]] = muli %[[BIDZ]], %[[C2]]
-// CHECK-DAG: %[[STEP0:.*]] = muli %[[NBLOCKSZ]], %[[C2]]
-// CHECK-DAG: %[[LB1:.*]] = muli %[[BIDY]], %[[C2]]
-// CHECK-DAG: %[[STEP1:.*]] = muli %[[NBLOCKSY]], %[[C2]]
-// CHECK-DAG: %[[LB2:.*]] = muli %[[BIDX]], %[[C2]]
-// CHECK-DAG: %[[STEP2:.*]] = muli %[[NBLOCKSX]], %[[C2]]
-//     CHECK: loop.for %{{.*}} = %[[LB0]] to %{{.*}} step %[[STEP0]]
-//     CHECK:   loop.for %{{.*}} = %[[LB1]] to %{{.*}} step %[[STEP1]]
-//     CHECK:     loop.for %{{.*}} = %[[LB2]] to %{{.*}} step %[[STEP2]]
-//     CHECK:       loop.for %{{.*}} = %[[C0]] to %[[SERIALDIMOUTER]] step %[[C32]]
-// CHECK-DAG:         %[[TIDX:.*]] = "gpu.thread_id"() {dimension = "x"} : () -> index
-// CHECK-DAG:         %[[NTHREADSX:.*]] = "gpu.block_dim"() {dimension = "x"} : () -> index
-// CHECK-DAG:         %[[TIDY:.*]] = "gpu.thread_id"() {dimension = "y"} : () -> index
-// CHECK-DAG:         %[[NTHREADSY:.*]] = "gpu.block_dim"() {dimension = "y"} : () -> index
-// CHECK-DAG:         %[[TIDZ:.*]] = "gpu.thread_id"() {dimension = "z"} : () -> index
-// CHECK-DAG:         %[[NTHREADSZ:.*]] = "gpu.block_dim"() {dimension = "z"} : () -> index
-//     CHECK:         loop.for %{{.*}} = %[[TIDZ]] to %{{.*}} step %[[NTHREADSZ]]
-//     CHECK:           loop.for %{{.*}} = %[[TIDY]] to %{{.*}} step %[[NTHREADSY]]
-//     CHECK:             loop.for %{{.*}} = %[[TIDX]] to %{{.*}} step %[[NTHREADSX]]
-//     CHECK:               loop.for %{{.*}} = %[[C0]] to %{{.*}} step %[[C1]]
+// CHECK-DAG: %[[C2:.+]] = constant 2 : index
+// CHECK-DAG: %[[C32:.+]] = constant 32 : index
+// CHECK-DAG: %[[C0:.+]] = constant 0 : index
+// CHECK-DAG: %[[C1:.+]] = constant 1 : index
+// CHECK-DAG: %[[SERIALDIMOUTER:.+]] = dim %{{.+}}, 3
+// CHECK-DAG: %[[BIDX:.+]] = "gpu.block_id"() {dimension = "x"} : () -> index
+// CHECK-DAG: %[[NBLOCKSX:.+]] = "gpu.grid_dim"() {dimension = "x"} : () -> index
+// CHECK-DAG: %[[BIDY:.+]] = "gpu.block_id"() {dimension = "y"} : () -> index
+// CHECK-DAG: %[[NBLOCKSY:.+]] = "gpu.grid_dim"() {dimension = "y"} : () -> index
+// CHECK-DAG: %[[BIDZ:.+]] = "gpu.block_id"() {dimension = "z"} : () -> index
+// CHECK-DAG: %[[NBLOCKSZ:.+]] = "gpu.grid_dim"() {dimension = "z"} : () -> index
+// CHECK-DAG: %[[LB0:.+]] = muli %[[BIDZ]], %[[C2]]
+// CHECK-DAG: %[[STEP0:.+]] = muli %[[NBLOCKSZ]], %[[C2]]
+// CHECK-DAG: %[[LB1:.+]] = muli %[[BIDY]], %[[C2]]
+// CHECK-DAG: %[[STEP1:.+]] = muli %[[NBLOCKSY]], %[[C2]]
+// CHECK-DAG: %[[LB2:.+]] = muli %[[BIDX]], %[[C2]]
+// CHECK-DAG: %[[STEP2:.+]] = muli %[[NBLOCKSX]], %[[C2]]
+//     CHECK: loop.for %{{.+}} = %[[LB0]] to %{{.+}} step %[[STEP0]]
+//     CHECK:   loop.for %{{.+}} = %[[LB1]] to %{{.+}} step %[[STEP1]]
+//     CHECK:     loop.for %{{.+}} = %[[LB2]] to %{{.+}} step %[[STEP2]]
+//     CHECK:       loop.for %{{.+}} = %[[C0]] to %[[SERIALDIMOUTER]] step %[[C32]]
+// CHECK-DAG:         %[[TIDX:.+]] = "gpu.thread_id"() {dimension = "x"} : () -> index
+// CHECK-DAG:         %[[NTHREADSX:.+]] = "gpu.block_dim"() {dimension = "x"} : () -> index
+// CHECK-DAG:         %[[TIDY:.+]] = "gpu.thread_id"() {dimension = "y"} : () -> index
+// CHECK-DAG:         %[[NTHREADSY:.+]] = "gpu.block_dim"() {dimension = "y"} : () -> index
+// CHECK-DAG:         %[[TIDZ:.+]] = "gpu.thread_id"() {dimension = "z"} : () -> index
+// CHECK-DAG:         %[[NTHREADSZ:.+]] = "gpu.block_dim"() {dimension = "z"} : () -> index
+//     CHECK:         loop.for %{{.+}} = %[[TIDZ]] to %{{.+}} step %[[NTHREADSZ]]
+//     CHECK:           loop.for %{{.+}} = %[[TIDY]] to %{{.+}} step %[[NTHREADSY]]
+//     CHECK:             loop.for %{{.+}} = %[[TIDX]] to %{{.+}} step %[[NTHREADSX]]
+//     CHECK:               loop.for %{{.+}} = %[[C0]] to %{{.+}} step %[[C1]]

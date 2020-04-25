@@ -6,9 +6,9 @@
 func @allocator_compute_size() -> index {
   %0 = "test_hal.allocator"() : () -> !hal.allocator
   %1:2 = "test_hal.shape"() : () -> (index, index)
-  // CHECK: [[SZ:%.+]] = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = 32
+  // CHECK: %[[SZ:.+]] = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = 32
   %sz = hal.allocator.compute_size %0, shape = [%1#0, %1#1], element_type = 32
-  // CHECK-NEXT: return [[SZ]]
+  // CHECK-NEXT: return %[[SZ]]
   return %sz : index
 }
 
@@ -41,13 +41,13 @@ func @allocator_compute_range() -> (index, index) {
 
 // CHECK-LABEL: @allocator_allocate
 func @allocator_allocate() -> !hal.buffer {
-  // CHECK-DAG: [[C123:%.+]] = constant 123
+  // CHECK-DAG: %[[C123:.+]] = constant 123
   %0 = constant 123 : index
-  // CHECK-DAG: [[AL:%.+]] = "test_hal.allocator"
+  // CHECK-DAG: %[[AL:.+]] = "test_hal.allocator"
   %1 = "test_hal.allocator"() : () -> !hal.allocator
-  // CHECK: [[CB:%.+]] = hal.allocator.allocate [[AL]], "HostVisible|HostCoherent", "Transfer", [[C123]] : !hal.buffer
+  // CHECK: %[[CB:.+]] = hal.allocator.allocate %[[AL]], "HostVisible|HostCoherent", "Transfer", %[[C123]] : !hal.buffer
   %buffer = hal.allocator.allocate %1, "HostVisible|HostCoherent", "Transfer", %0 : !hal.buffer
-  // CHECK-NEXT: return [[CB]]
+  // CHECK-NEXT: return %[[CB]]
   return %buffer : !hal.buffer
 }
 
@@ -55,10 +55,10 @@ func @allocator_allocate() -> !hal.buffer {
 
 // CHECK-LABEL: @allocator_allocate_const
 func @allocator_allocate_const() -> !hal.buffer {
-  // CHECK-DAG: [[AL:%.+]] = "test_hal.allocator"
+  // CHECK-DAG: %[[AL:.+]] = "test_hal.allocator"
   %allocator = "test_hal.allocator"() : () -> !hal.allocator
-  // CHECK: [[CB:%.+]] = hal.allocator.allocate.const [[AL]], "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
+  // CHECK: %[[CB:.+]] = hal.allocator.allocate.const %[[AL]], "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
   %buffer = hal.allocator.allocate.const %allocator, "HostVisible|HostCoherent", "Transfer" : !hal.buffer = dense<123> : tensor<4x4xi32>
-  // CHECK-NEXT: return [[CB]]
+  // CHECK-NEXT: return %[[CB]]
   return %buffer : !hal.buffer
 }

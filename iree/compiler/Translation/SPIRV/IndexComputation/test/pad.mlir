@@ -2,7 +2,7 @@
 
 module {
   // CHECK: func @pad_zero_interior
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: memref<12x4xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<12x4xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []
@@ -29,7 +29,7 @@ module {
 
 module {
   // CHECK: func @pad_no_op
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: memref<12x4xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<12x4xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices = []
   // CHECK-SAME: result_index
@@ -55,7 +55,7 @@ module {
 
 module {
   // CHECK: func @pad_with_stride
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: memref<12x4xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<12x4xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []

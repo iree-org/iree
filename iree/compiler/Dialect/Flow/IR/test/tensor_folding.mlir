@@ -19,9 +19,9 @@ func @reshapeNoOpScalar(%arg0 : tensor<f32>) -> tensor<f32> {
 // CHECK-LABEL: @reshapeTransitive
 func @reshapeTransitive(%arg0 : tensor<4x4xf32>) -> tensor<8x2xf32> {
   %0 = flow.tensor.reshape %arg0 : tensor<4x4xf32> -> tensor<2x8xf32>
-  // CHECK-NEXT: [[T:%.+]] = flow.tensor.reshape %arg0 : tensor<4x4xf32> -> tensor<8x2xf32>
+  // CHECK-NEXT: %[[T:.+]] = flow.tensor.reshape %arg0 : tensor<4x4xf32> -> tensor<8x2xf32>
   %1 = flow.tensor.reshape %0 : tensor<2x8xf32> -> tensor<8x2xf32>
-  // CHECK-NEXT: return [[T]] : tensor<8x2xf32>
+  // CHECK-NEXT: return %[[T]] : tensor<8x2xf32>
   return %1 : tensor<8x2xf32>
 }
 
@@ -32,18 +32,18 @@ func @loadConst() -> i32 {
   %0 = constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
   %c0 = constant 0 : index
   %c1 = constant 1 : index
-  // CHECK-NEXT: [[C2:%.+]] = constant 2 : i32
+  // CHECK-NEXT: %[[C2:.+]] = constant 2 : i32
   %2 = flow.tensor.load %0[%c1, %c0] : tensor<2x2xi32>
-  // CHECK-NEXT: return [[C2]]
+  // CHECK-NEXT: return %[[C2]]
   return %2 : i32
 }
 
 // CHECK-LABEL: @loadConstScalar
 func @loadConstScalar() -> i32 {
   %0 = constant dense<4> : tensor<i32>
-  // CHECK-NEXT: [[C4:%.+]] = constant 4 : i32
+  // CHECK-NEXT: %[[C4:.+]] = constant 4 : i32
   %1 = flow.tensor.load %0 : tensor<i32>
-  // CHECK-NEXT: return [[C4]]
+  // CHECK-NEXT: return %[[C4]]
   return %1 : i32
 }
 
@@ -55,11 +55,11 @@ func @storeConst() -> tensor<2x2xi32> {
   %c0 = constant 0 : index
   %c1 = constant 1 : index
   %c4 = constant 4 : i32
-  // CHECK-NEXT: [[C:%.+]] = constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[
   // CHECK-SAME:     [0, 1], [4, 3]
   // CHECK-SAME: ]> : tensor<2x2xi32>
   %1 = flow.tensor.store %c4, %0[%c1, %c0] : tensor<2x2xi32>
-  // CHECK-NEXT: return [[C]]
+  // CHECK-NEXT: return %[[C]]
   return %1 : tensor<2x2xi32>
 }
 
@@ -67,9 +67,9 @@ func @storeConst() -> tensor<2x2xi32> {
 func @storeConstScalar() -> tensor<i32> {
   %0 = constant dense<0> : tensor<i32>
   %1 = constant 4 : i32
-  // CHECK-NEXT: [[C:%.+]] = constant dense<4> : tensor<i32>
+  // CHECK-NEXT: %[[C:.+]] = constant dense<4> : tensor<i32>
   %2 = flow.tensor.store %1, %0 : tensor<i32>
-  // CHECK-NEXT: return [[C]]
+  // CHECK-NEXT: return %[[C]]
   return %2 : tensor<i32>
 }
 
@@ -78,18 +78,18 @@ func @storeConstScalar() -> tensor<i32> {
 // CHECK-LABEL: @splatConst
 func @splatConst() -> tensor<4xi32> {
   %0 = constant 4 : i32
-  // CHECK-NEXT: [[C:%.+]] = constant dense<4> : tensor<4xi32>
+  // CHECK-NEXT: %[[C:.+]] = constant dense<4> : tensor<4xi32>
   %1 = flow.tensor.splat %0 : tensor<4xi32>
-  // CHECK-NEXT: return [[C]]
+  // CHECK-NEXT: return %[[C]]
   return %1 : tensor<4xi32>
 }
 
 // CHECK-LABEL: @splatConstScalar
 func @splatConstScalar() -> tensor<i32> {
   %0 = constant 4 : i32
-  // CHECK-NEXT: [[C:%.+]] = constant dense<4> : tensor<i32>
+  // CHECK-NEXT: %[[C:.+]] = constant dense<4> : tensor<i32>
   %1 = flow.tensor.splat %0 : tensor<i32>
-  // CHECK-NEXT: return [[C]]
+  // CHECK-NEXT: return %[[C]]
   return %1 : tensor<i32>
 }
 
@@ -98,9 +98,9 @@ func @splatConstScalar() -> tensor<i32> {
 // CHECK-LABEL: @cloneConst
 func @cloneConst() -> tensor<4xi32> {
   %0 = constant dense<[0, 1, 2, 3]> : tensor<4xi32>
-  // CHECK-NEXT: [[C:%.+]] = constant dense<[0, 1, 2, 3]> : tensor<4xi32>
+  // CHECK-NEXT: %[[C:.+]] = constant dense<[0, 1, 2, 3]> : tensor<4xi32>
   %1 = flow.tensor.clone %0 : tensor<4xi32>
-  // CHECK-NEXT: return [[C]]
+  // CHECK-NEXT: return %[[C]]
   return %1 : tensor<4xi32>
 }
 

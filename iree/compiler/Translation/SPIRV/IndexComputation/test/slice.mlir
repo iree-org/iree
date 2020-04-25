@@ -2,7 +2,7 @@
 
 module {
   // CHECK: func @slice_unit_stride
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: memref<6x6xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<6x6xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []
@@ -27,7 +27,7 @@ module {
 
 module {
   // CHECK: func @slice_non_unit_stride
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: memref<6x6xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<6x6xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []

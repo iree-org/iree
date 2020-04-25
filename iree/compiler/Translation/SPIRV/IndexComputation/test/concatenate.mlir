@@ -2,13 +2,13 @@
 
 module {
   // CHECK: func @concatenate
-  // CHECK-SAME: [[ARG0:%[a-zA-Z0-9_]*]]: memref<1x64xf32>
+  // CHECK-SAME: %[[ARG0:[a-zA-Z0-9$._-]+]]: memref<1x64xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []
   // CHECK-SAME: result_index
   // CHECK-SAME: [affine_map<(d0, d1) -> (0, d0)>]
-  // CHECK-SAME: [[ARG1:%[a-zA-Z0-9_]*]]: memref<1x10xf32>
+  // CHECK-SAME: %[[ARG1:[a-zA-Z0-9$._-]+]]: memref<1x10xf32>
   // CHECK-SAME: iree.index_computation_info
   // CHECK-SAME: operand_indices
   // CHECK-SAME: []

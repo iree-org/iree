@@ -30,9 +30,9 @@ vm.module @my_module {
 vm.module @my_module {
   vm.global.i32 @g0 : i32
   vm.func @global_load_indirect_i32() -> i32 {
-    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<i32>
+    // CHECK: %[[ADDR:.+]] = vm.global.address @g0 : !iree.ptr<i32>
     %0 = vm.global.address @g0 : !iree.ptr<i32>
-    // CHECK-NEXT: = vm.global.load.indirect.i32 [[ADDR]] : !iree.ptr<i32> -> i32
+    // CHECK-NEXT: = vm.global.load.indirect.i32 %[[ADDR]] : !iree.ptr<i32> -> i32
     %1 = vm.global.load.indirect.i32 %0 : !iree.ptr<i32> -> i32
     vm.return %1 : i32
   }
@@ -44,9 +44,9 @@ vm.module @my_module {
 vm.module @my_module {
   vm.global.i32 @g0 mutable : i32
   vm.func @global_store_indirect_i32(%arg0 : i32) {
-    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<i32>
+    // CHECK: %[[ADDR:.+]] = vm.global.address @g0 : !iree.ptr<i32>
     %0 = vm.global.address @g0 : !iree.ptr<i32>
-    // CHECK-NEXT: vm.global.store.indirect.i32 %arg0, [[ADDR]] : i32 -> !iree.ptr<i32>
+    // CHECK-NEXT: vm.global.store.indirect.i32 %arg0, %[[ADDR]] : i32 -> !iree.ptr<i32>
     vm.global.store.indirect.i32 %arg0, %0 : i32 -> !iree.ptr<i32>
     vm.return
   }
@@ -82,9 +82,9 @@ vm.module @my_module {
 vm.module @my_module {
   vm.global.ref @g0 : !vm.ref<?>
   vm.func @global_load_indirect_ref() -> !vm.ref<?> {
-    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
+    // CHECK: %[[ADDR:.+]] = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
     %0 = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
-    // CHECK-NEXT: = vm.global.load.indirect.ref [[ADDR]] : !iree.ptr<!vm.ref<?>> -> !vm.ref<?>
+    // CHECK-NEXT: = vm.global.load.indirect.ref %[[ADDR]] : !iree.ptr<!vm.ref<?>> -> !vm.ref<?>
     %1 = vm.global.load.indirect.ref %0 : !iree.ptr<!vm.ref<?>> -> !vm.ref<?>
     vm.return %1 : !vm.ref<?>
   }
@@ -96,9 +96,9 @@ vm.module @my_module {
 vm.module @my_module {
   vm.global.ref @g0 mutable : !vm.ref<?>
   vm.func @global_store_indirect_ref(%arg0 : !vm.ref<?>) {
-    // CHECK: [[ADDR:%.+]] = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
+    // CHECK: %[[ADDR:.+]] = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
     %0 = vm.global.address @g0 : !iree.ptr<!vm.ref<?>>
-    // CHECK-NEXT: vm.global.store.indirect.ref %arg0, [[ADDR]] : !vm.ref<?> -> !iree.ptr<!vm.ref<?>>
+    // CHECK-NEXT: vm.global.store.indirect.ref %arg0, %[[ADDR]] : !vm.ref<?> -> !iree.ptr<!vm.ref<?>>
     vm.global.store.indirect.ref %arg0, %0 : !vm.ref<?> -> !iree.ptr<!vm.ref<?>>
     vm.return
   }
