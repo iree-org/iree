@@ -27,6 +27,10 @@ iree_tablegen_library(
     -gen-rewriters LinalgVectorTransformPatterns.h.inc
 )
 
+#TODO(GH-1673): Remove this once we can properly model dependencies between
+# TableGen targets.
+add_dependencies(iree_compiler_Translation_CodegenPasses_LinalgVectorTransformPatternsIncGen_target MLIRLinalgTransformPatternsIncGen)
+
 iree_cc_library(
   NAME
     CodegenPasses

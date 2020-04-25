@@ -34,8 +34,9 @@ external_cc_library(
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
     "convert_op_folder.cc"
+    "ir/broadcast_utils.cc"
+    "ir/chlo_ops.cc"
     "ir/dialect_registration.cc"
-    "ir/hlo_client_ops.cc"
     "ir/hlo_ops.cc"
     "ir/hlo_utils.cc"
     "ir/lhlo_ops.cc"
@@ -47,7 +48,7 @@ external_cc_library(
     "transforms/xla_legalize_to_linalg.cc"
   HDRS
     "convert_op_folder.h"
-    "ir/hlo_client_ops.h"
+    "ir/chlo_ops.h"
     "ir/hlo_ops.h"
     "ir/hlo_utils.h"
     "ir/lhlo_ops.h"
@@ -63,15 +64,17 @@ external_cc_library(
     absl::core_headers
     absl::flat_hash_set
     tensorflow_mlir_xla_canonicalize_gen
+    tensorflow_mlir_xla_chlo_ops_gen
     tensorflow_mlir_xla_hlo_ops_gen
-    tensorflow_mlir_xla_hlo_client_ops_gen
     tensorflow_mlir_xla_hlo_ops_base_gen
     tensorflow_mlir_xla_legalize_to_standard_patterns_gen
     tensorflow_mlir_xla_lhlo_ops_gen
     LLVMSupport
     MLIRAnalysis
     MLIRIR
+    MLIRLinalgOps
     MLIRPass
+    MLIRShape
     MLIRTransformUtils
   ALWAYSLINK
   PUBLIC
@@ -114,16 +117,16 @@ external_tablegen_library(
   PACKAGE
     tensorflow
   NAME
-    mlir_xla_hlo_client_ops_gen
+    mlir_xla_chlo_ops_gen
   TBLGEN
     MLIR
   ROOT
     ${TF_MLIR_XLA_SRC_ROOT}
   SRCS
-    "ir/hlo_client_ops.td"
+    "ir/chlo_ops.td"
   OUTS
-    -gen-op-decls ir/hlo_client_ops.h.inc
-    -gen-op-defs ir/hlo_client_ops.cc.inc
+    -gen-op-decls ir/chlo_ops.h.inc
+    -gen-op-defs ir/chlo_ops.cc.inc
 )
 
 external_tablegen_library(
