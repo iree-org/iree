@@ -135,7 +135,6 @@ list(APPEND IREE_COMMON_INCLUDE_DIRS
   ${PROJECT_SOURCE_DIR}/third_party/llvm-project/llvm/include
   ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/include
   ${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include
-  ${PROJECT_BINARY_DIR}/third_party/llvm-project/mlir/include
   ${PROJECT_BINARY_DIR}/third_party/llvm-project/llvm/tools/mlir/include
 )
 
