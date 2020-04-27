@@ -26,6 +26,7 @@
 #include "iree/hal/vulkan/status_util.h"
 
 ABSL_FLAG(bool, vulkan_renderdoc, false, "Enables RenderDoc API integration.");
+ABSL_FLAG(int, vulkan_default_index, 0, "Index of the default Vulkan device.");
 
 namespace iree {
 namespace hal {
@@ -264,12 +265,16 @@ StatusOr<ref_ptr<Device>> VulkanDriver::CreateDefaultDevice() {
 
   // Query available devices.
   ASSIGN_OR_RETURN(auto available_devices, EnumerateAvailableDevices());
-  if (available_devices.empty()) {
-    return NotFoundErrorBuilder(IREE_LOC) << "No devices are available";
+  int default_device_index = absl::GetFlag(FLAGS_vulkan_default_index);
+  if (default_device_index < 0 ||
+      default_device_index >= available_devices.size()) {
+    return NotFoundErrorBuilder(IREE_LOC)
+           << "Device index " << default_device_index << " not found "
+           << "(of " << available_devices.size() << ")";
   }
 
   // Just create the first one we find.
-  return CreateDevice(available_devices.front().device_id());
+  return CreateDevice(available_devices[default_device_index].device_id());
 }
 
 StatusOr<ref_ptr<Device>> VulkanDriver::CreateDevice(DriverDeviceID device_id) {
