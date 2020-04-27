@@ -176,6 +176,10 @@ StatusOr<std::string> PrepareModule(
   source_mgr.AddNewSourceBuffer(std::move(file_buffer), llvm::SMLoc());
   mlir::OwningModuleRef mlir_module =
       mlir::parseSourceFile(source_mgr, &context);
+  if (!mlir_module) {
+    return FailedPreconditionErrorBuilder(IREE_LOC)
+           << "Could not parse MLIR file.";
+  }
 
   if (export_all_flag) {
     for (auto function : mlir_module->getOps<mlir::FuncOp>()) {
