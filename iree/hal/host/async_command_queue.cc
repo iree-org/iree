@@ -75,9 +75,9 @@ void AsyncCommandQueue::ThreadMain() {
 
                     // Relay the command buffers to the target queue.
                     // Since we are taking care of all synchronization they
-                    // don't need any waiters or fences.
-                    auto status = target_queue_->Submit(
-                        {{}, command_buffers, {}}, {nullptr, 0u});
+                    // don't need any waiters or semaphores.
+                    auto status =
+                        target_queue_->Submit({{}, command_buffers, {}});
 
                     // Take back the lock so we can manipulate the queue safely.
                     submission_mutex_.Lock();
@@ -97,11 +97,10 @@ void AsyncCommandQueue::ThreadMain() {
   }
 }
 
-Status AsyncCommandQueue::Submit(absl::Span<const SubmissionBatch> batches,
-                                 FenceValue fence) {
+Status AsyncCommandQueue::Submit(absl::Span<const SubmissionBatch> batches) {
   IREE_TRACE_SCOPE0("AsyncCommandQueue::Submit");
   absl::MutexLock lock(&submission_mutex_);
-  return submission_queue_.Enqueue(batches, fence);
+  return submission_queue_.Enqueue(batches);
 }
 
 Status AsyncCommandQueue::WaitIdle(absl::Time deadline) {

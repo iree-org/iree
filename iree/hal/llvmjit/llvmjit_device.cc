@@ -22,7 +22,6 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/command_buffer_validation.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/fence.h"
 #include "iree/hal/host/async_command_queue.h"
 #include "iree/hal/host/host_descriptor_set.h"
 #include "iree/hal/host/host_event.h"
@@ -31,6 +30,7 @@
 #include "iree/hal/host/inproc_command_buffer.h"
 #include "iree/hal/llvmjit/llvmjit_command_processor.h"
 #include "iree/hal/llvmjit/llvmjit_executable_cache.h"
+#include "iree/hal/semaphore.h"
 
 namespace iree {
 namespace hal {
@@ -55,11 +55,8 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
         allocator_(allocator) {}
   ~UnsynchronizedCommandQueue() override = default;
 
-  Status Submit(absl::Span<const SubmissionBatch> batches,
-                FenceValue fence) override {
+  Status Submit(absl::Span<const SubmissionBatch> batches) override {
     IREE_TRACE_SCOPE0("UnsynchronizedCommandQueue::Submit");
-    DCHECK_EQ(nullptr, fence.first)
-        << "Fences must be handled by the wrapping queue";
 
     // Process command buffers and propagate errors asynchronously through the
     // fence. This ensures that even if we are running synchronously we still
@@ -70,7 +67,6 @@ class UnsynchronizedCommandQueue final : public CommandQueue {
       RETURN_IF_ERROR(ProcessCommandBuffers(batch.command_buffers));
     }
 
-    // NOTE: fence is ignored here.
     return OkStatus();
   }
 
@@ -165,36 +161,24 @@ StatusOr<ref_ptr<Event>> LLVMJITDevice::CreateEvent() {
   return make_ref<HostEvent>();
 }
 
-StatusOr<ref_ptr<BinarySemaphore>> LLVMJITDevice::CreateBinarySemaphore(
-    bool initial_value) {
-  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateBinarySemaphore");
-  return make_ref<HostBinarySemaphore>(initial_value);
-}
-
-StatusOr<ref_ptr<TimelineSemaphore>> LLVMJITDevice::CreateTimelineSemaphore(
+StatusOr<ref_ptr<Semaphore>> LLVMJITDevice::CreateSemaphore(
     uint64_t initial_value) {
-  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateTimelineSemaphore");
-
-  // TODO(b/140141417): implement timeline semaphores.
-  return UnimplementedErrorBuilder(IREE_LOC)
-         << "Timeline semaphores not yet implemented";
+  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateSemaphore");
+  return make_ref<HostSemaphore>(initial_value);
 }
 
-StatusOr<ref_ptr<Fence>> LLVMJITDevice::CreateFence(uint64_t initial_value) {
-  IREE_TRACE_SCOPE0("LLVMJITDevice::CreateFence");
-  return make_ref<HostFence>(initial_value);
+Status LLVMJITDevice::WaitAllSemaphores(
+    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+  IREE_TRACE_SCOPE0("LLVMJITDevice::WaitAllSemaphores");
+  return HostSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/true,
+                                          deadline);
 }
 
-Status LLVMJITDevice::WaitAllFences(absl::Span<const FenceValue> fences,
-                                    absl::Time deadline) {
-  IREE_TRACE_SCOPE0("LLVMJITDevice::WaitAllFences");
-  return HostFence::WaitForFences(fences, /*wait_all=*/true, deadline);
-}
-
-StatusOr<int> LLVMJITDevice::WaitAnyFence(absl::Span<const FenceValue> fences,
-                                          absl::Time deadline) {
-  IREE_TRACE_SCOPE0("LLVMJITDevice::WaitAnyFence");
-  return HostFence::WaitForFences(fences, /*wait_all=*/false, deadline);
+StatusOr<int> LLVMJITDevice::WaitAnySemaphore(
+    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+  IREE_TRACE_SCOPE0("LLVMJITDevice::WaitAnySemaphore");
+  return HostSemaphore::WaitForSemaphores(semaphores, /*wait_all=*/false,
+                                          deadline);
 }
 
 Status LLVMJITDevice::WaitIdle(absl::Time deadline) {

@@ -119,6 +119,8 @@ struct DynamicSymbols : public RefObject<DynamicSymbols> {
 #undef PFN_MEMBER
 
  private:
+  void FixupExtensionFunctions();
+
   // Optional Vulkan Loader dynamic library.
   std::unique_ptr<DynamicLibrary> loader_library_;
 };

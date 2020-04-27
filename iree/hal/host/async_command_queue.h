@@ -21,8 +21,8 @@
 #include "absl/base/thread_annotations.h"
 #include "absl/synchronization/mutex.h"
 #include "iree/hal/command_queue.h"
-#include "iree/hal/fence.h"
 #include "iree/hal/host/host_submission_queue.h"
+#include "iree/hal/semaphore.h"
 
 namespace iree {
 namespace hal {
@@ -33,8 +33,8 @@ namespace hal {
 // against the provided |target_queue|.
 //
 // Target queues will receive submissions containing only command buffers as
-// all semaphore synchronization is handled by the wrapper. Fences will also be
-// omitted and code should safely handle nullptr.
+// all semaphore synchronization is handled by the wrapper. Semaphores will also
+// be omitted and code should safely handle nullptr.
 //
 // AsyncCommandQueue (as with CommandQueue) is thread-safe. Multiple threads
 // may submit command buffers concurrently, though the order of execution in
@@ -44,8 +44,7 @@ class AsyncCommandQueue final : public CommandQueue {
   explicit AsyncCommandQueue(std::unique_ptr<CommandQueue> target_queue);
   ~AsyncCommandQueue() override;
 
-  Status Submit(absl::Span<const SubmissionBatch> batches,
-                FenceValue fence) override;
+  Status Submit(absl::Span<const SubmissionBatch> batches) override;
 
   Status WaitIdle(absl::Time deadline) override;
 

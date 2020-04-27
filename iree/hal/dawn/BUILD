@@ -31,7 +31,7 @@ cc_library(
         "//iree/hal:command_queue",
         "//iree/hal:device",
         "//iree/hal:executable_cache",
-        "//iree/hal:fence",
+        "//iree/hal:semaphore",
         "//iree/hal/host:host_local_allocator",
         "//third_party/dawn:dawn_headers",
         "//third_party/dawn:dawn_native",

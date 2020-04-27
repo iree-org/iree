@@ -20,7 +20,7 @@
 #include "iree/base/tracing.h"
 #include "iree/hal/command_queue.h"
 #include "iree/hal/executable_cache.h"
-#include "iree/hal/fence.h"
+#include "iree/hal/semaphore.h"
 
 namespace iree {
 namespace hal {
@@ -123,40 +123,25 @@ StatusOr<ref_ptr<Event>> DawnDevice::CreateEvent() {
   return UnimplementedErrorBuilder(IREE_LOC) << "CreateEvent NYI";
 }
 
-StatusOr<ref_ptr<BinarySemaphore>> DawnDevice::CreateBinarySemaphore(
-    bool initial_value) {
-  IREE_TRACE_SCOPE0("DawnDevice::CreateBinarySemaphore");
-
-  return UnimplementedErrorBuilder(IREE_LOC)
-         << "Binary semaphores not yet implemented";
-}
-
-StatusOr<ref_ptr<TimelineSemaphore>> DawnDevice::CreateTimelineSemaphore(
+StatusOr<ref_ptr<Semaphore>> DawnDevice::CreateSemaphore(
     uint64_t initial_value) {
-  IREE_TRACE_SCOPE0("DawnDevice::CreateTimelineSemaphore");
+  IREE_TRACE_SCOPE0("DawnDevice::CreateSemaphore");
 
-  return UnimplementedErrorBuilder(IREE_LOC)
-         << "Timeline semaphores not yet implemented";
+  return UnimplementedErrorBuilder(IREE_LOC) << "CreateSemaphore NYI";
 }
 
-StatusOr<ref_ptr<Fence>> DawnDevice::CreateFence(uint64_t initial_value) {
-  IREE_TRACE_SCOPE0("DawnDevice::CreateFence");
+Status DawnDevice::WaitAllSemaphores(
+    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+  IREE_TRACE_SCOPE0("DawnDevice::WaitAllSemaphores");
 
-  return UnimplementedErrorBuilder(IREE_LOC) << "CreateFence NYI";
+  return UnimplementedErrorBuilder(IREE_LOC) << "WaitAllSemaphores NYI";
 }
 
-Status DawnDevice::WaitAllFences(absl::Span<const FenceValue> fences,
-                                 absl::Time deadline) {
-  IREE_TRACE_SCOPE0("DawnDevice::WaitAllFences");
+StatusOr<int> DawnDevice::WaitAnySemaphore(
+    absl::Span<const SemaphoreValue> semaphores, absl::Time deadline) {
+  IREE_TRACE_SCOPE0("DawnDevice::WaitAnySemaphore");
 
-  return UnimplementedErrorBuilder(IREE_LOC) << "WaitAllFences NYI";
-}
-
-StatusOr<int> DawnDevice::WaitAnyFence(absl::Span<const FenceValue> fences,
-                                       absl::Time deadline) {
-  IREE_TRACE_SCOPE0("DawnDevice::WaitAnyFence");
-
-  return UnimplementedErrorBuilder(IREE_LOC) << "WaitAnyFence NYI";
+  return UnimplementedErrorBuilder(IREE_LOC) << "WaitAnySemaphore NYI";
 }
 
 Status DawnDevice::WaitIdle(absl::Time deadline) {

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef IREE_HAL_HOST_HOST_FENCE_H_
-#define IREE_HAL_HOST_HOST_FENCE_H_
+#ifndef IREE_HAL_HOST_HOST_SEMAPHORE_H_
+#define IREE_HAL_HOST_HOST_SEMAPHORE_H_
 
 #include <atomic>
 #include <cstdint>
@@ -22,29 +22,30 @@
 #include "absl/synchronization/mutex.h"
 #include "absl/types/span.h"
 #include "iree/base/status.h"
-#include "iree/hal/fence.h"
+#include "iree/hal/semaphore.h"
 
 namespace iree {
 namespace hal {
 
 // TODO(b/140026716): add WaitHandle support for better multi-wait.
-// Simple host-only fence semaphore implemented with a mutex.
+// Simple host-only semaphore semaphore implemented with a mutex.
 //
 // Thread-safe (as instances may be imported and used by others).
-class HostFence final : public Fence {
+class HostSemaphore final : public Semaphore {
  public:
-  // Waits for one or more (or all) fences to reach or exceed the given values.
-  static Status WaitForFences(absl::Span<const FenceValue> fences,
-                              bool wait_all, absl::Time deadline);
+  // Waits for one or more (or all) semaphores to reach or exceed the given
+  // values.
+  static Status WaitForSemaphores(absl::Span<const SemaphoreValue> semaphores,
+                                  bool wait_all, absl::Time deadline);
 
-  explicit HostFence(uint64_t initial_value);
-  ~HostFence() override;
+  explicit HostSemaphore(uint64_t initial_value);
+  ~HostSemaphore() override;
 
-  Status status() const override;
-  StatusOr<uint64_t> QueryValue() override;
+  StatusOr<uint64_t> Query() override;
 
-  Status Signal(uint64_t value);
-  Status Fail(Status status);
+  Status Signal(uint64_t value) override;
+  void Fail(Status status) override;
+  Status Wait(uint64_t value, absl::Time deadline) override;
 
  private:
   // The mutex is not required to query the value; this lets us quickly check if
@@ -61,4 +62,4 @@ class HostFence final : public Fence {
 }  // namespace hal
 }  // namespace iree
 
-#endif  // IREE_HAL_HOST_HOST_FENCE_H_
+#endif  // IREE_HAL_HOST_HOST_SEMAPHORE_H_

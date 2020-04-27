@@ -12,15 +12,6 @@ func @semaphore_create(%arg0 : !hal.device) -> !hal.semaphore {
 
 // -----
 
-// CHECK-LABEL: @semaphore_status
-func @semaphore_status(%arg0 : !hal.semaphore) -> i32 {
-  // CHECK: = hal.semaphore.status %arg0 : i32
-  %0 = hal.semaphore.status %arg0 : i32
-  return %0 : i32
-}
-
-// -----
-
 // CHECK-LABEL: @semaphore_query
 func @semaphore_query(%arg0 : !hal.semaphore) {
   // CHECK: = hal.semaphore.query %arg0 : i32, index

@@ -178,9 +178,9 @@ StatusOr<ref_ptr<Buffer>> DeviceManager::AllocateDeviceLocalBuffer(
 
 Status DeviceManager::Submit(Device* device, CommandQueue* command_queue,
                              absl::Span<const SubmissionBatch> batches,
-                             absl::Time deadline, FenceValue fence) {
+                             absl::Time deadline) {
   IREE_TRACE_SCOPE0("DeviceManager::Submit");
-  return command_queue->Submit(batches, fence);
+  return command_queue->Submit(batches);
 }
 
 Status DeviceManager::Flush() {

@@ -26,8 +26,6 @@ void populateHALSemaphoreToVMPatterns(MLIRContext *context,
                                       OwningRewritePatternList &patterns) {
   patterns.insert<VMImportOpConversion<IREE::HAL::SemaphoreCreateOp>>(
       context, importSymbols, typeConverter, "hal.semaphore.create");
-  patterns.insert<VMImportOpConversion<IREE::HAL::SemaphoreStatusOp>>(
-      context, importSymbols, typeConverter, "hal.semaphore.status");
   patterns.insert<VMImportOpConversion<IREE::HAL::SemaphoreQueryOp>>(
       context, importSymbols, typeConverter, "hal.semaphore.query");
   patterns.insert<VMImportOpConversion<IREE::HAL::SemaphoreSignalOp>>(

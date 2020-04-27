@@ -109,7 +109,6 @@ iree_cc_library(
     iree::hal::command_buffer_validation
     iree::hal::command_queue
     iree::hal::device
-    iree::hal::fence
     iree::hal::host::async_command_queue
     iree::hal::host::host_descriptor_set
     iree::hal::host::host_event
@@ -117,6 +116,7 @@ iree_cc_library(
     iree::hal::host::host_local_allocator
     iree::hal::host::host_submission_queue
     iree::hal::host::inproc_command_buffer
+    iree::hal::semaphore
     iree::vm::instance
     iree::vm::module
   PUBLIC

@@ -414,12 +414,6 @@ vm.import @semaphore.create(
 ) -> !vm.ref<!hal.semaphore>
 attributes {nosideeffects}
 
-// Returns non-zero if the semaphore indicates a failure.
-vm.import @semaphore.status(
-  %semaphore : !vm.ref<!hal.semaphore>
-) -> i32
-attributes {nosideeffects}
-
 // Queries the current payload and returns a tuple of `(status, value)`.
 // As the payload is monotonically increasing it is guaranteed that
 // the value is at least equal to the previous result of a

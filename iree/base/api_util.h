@@ -122,6 +122,17 @@ inline absl::Time ToAbslTime(iree_time_t time) {
   }
 }
 
+// Converts an absl::Time to an iree_time_t.
+inline iree_time_t FromAbslTime(absl::Time time) {
+  if (time == absl::InfinitePast()) {
+    return IREE_TIME_INFINITE_PAST;
+  } else if (time == absl::InfiniteFuture()) {
+    return IREE_TIME_INFINITE_FUTURE;
+  } else {
+    return absl::ToUnixNanos(time);
+  }
+}
+
 // Returns a vector initialized with the contents of a C-style list query.
 // For functions of the form (..., capacity, out_values, out_count) this will
 // try to fetch the items and resize as needed such that the returned value

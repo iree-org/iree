@@ -2056,24 +2056,6 @@ def HAL_SemaphoreCreateOp : HAL_Op<"semaphore.create", [
   }];
 }
 
-def HAL_SemaphoreStatusOp : HAL_PureOp<"semaphore.status"> {
-  let summary = [{semaphore asynchronous status check}];
-  let description = [{
-    Returns non-zero if the semaphore indicates a failure.
-  }];
-
-  let arguments = (ins
-    HAL_Semaphore:$semaphore
-  );
-  let results = (outs
-    IREE_Status:$result
-  );
-
-  let assemblyFormat = [{
-    $semaphore attr-dict-with-keyword `:` type($result)
-  }];
-}
-
 def HAL_SemaphoreQueryOp : HAL_Op<"semaphore.query"> {
   let summary = [{semaphore payload value query}];
   let description = [{

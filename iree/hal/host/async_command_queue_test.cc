@@ -64,19 +64,17 @@ TEST_F(AsyncCommandQueueTest, BlockingSubmit) {
   auto cmd_buffer = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
 
-  EXPECT_CALL(*mock_target_queue, Submit(_, _))
-      .WillOnce(
-          [&](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            CHECK_EQ(1, batches.size());
-            CHECK_EQ(1, batches[0].command_buffers.size());
-            CHECK_EQ(cmd_buffer.get(), batches[0].command_buffers[0]);
-            CHECK_EQ(nullptr, fence.first);
-            return OkStatus();
-          });
-  HostFence fence(0u);
-  ASSERT_OK(command_queue->Submit({{}, {cmd_buffer.get()}, {}}, {&fence, 1u}));
-  ASSERT_OK(HostFence::WaitForFences({{&fence, 1u}}, /*wait_all=*/true,
-                                     absl::InfiniteFuture()));
+  EXPECT_CALL(*mock_target_queue, Submit(_))
+      .WillOnce([&](absl::Span<const SubmissionBatch> batches) {
+        CHECK_EQ(1, batches.size());
+        CHECK_EQ(1, batches[0].command_buffers.size());
+        CHECK_EQ(cmd_buffer.get(), batches[0].command_buffers[0]);
+        return OkStatus();
+      });
+  HostSemaphore semaphore(0ull);
+  ASSERT_OK(
+      command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
+  ASSERT_OK(semaphore.Wait(1ull, absl::InfiniteFuture()));
 }
 
 // Tests that failure is propagated along the fence from the target queue.
@@ -86,15 +84,14 @@ TEST_F(AsyncCommandQueueTest, PropagateSubmitFailure) {
   auto cmd_buffer = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
 
-  EXPECT_CALL(*mock_target_queue, Submit(_, _))
-      .WillOnce(
-          [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            return DataLossErrorBuilder(IREE_LOC);
-          });
-  HostFence fence(0u);
-  ASSERT_OK(command_queue->Submit({{}, {cmd_buffer.get()}, {}}, {&fence, 1u}));
-  EXPECT_TRUE(IsDataLoss(HostFence::WaitForFences(
-      {{&fence, 1u}}, /*wait_all=*/true, absl::InfiniteFuture())));
+  EXPECT_CALL(*mock_target_queue, Submit(_))
+      .WillOnce([](absl::Span<const SubmissionBatch> batches) {
+        return DataLossErrorBuilder(IREE_LOC);
+      });
+  HostSemaphore semaphore(0ull);
+  ASSERT_OK(
+      command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
+  EXPECT_TRUE(IsDataLoss(semaphore.Wait(1ull, absl::InfiniteFuture())));
 }
 
 // Tests that waiting for idle is a no-op when nothing is queued.
@@ -109,21 +106,21 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
   auto cmd_buffer = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
 
-  EXPECT_CALL(*mock_target_queue, Submit(_, _))
-      .WillOnce(
-          [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            Sleep(absl::Milliseconds(100));
-            return OkStatus();
-          });
-  HostFence fence(0u);
-  ASSERT_OK(command_queue->Submit({{}, {cmd_buffer.get()}, {}}, {&fence, 1u}));
+  EXPECT_CALL(*mock_target_queue, Submit(_))
+      .WillOnce([](absl::Span<const SubmissionBatch> batches) {
+        Sleep(absl::Milliseconds(100));
+        return OkStatus();
+      });
+  HostSemaphore semaphore(0ull);
+  ASSERT_OK(
+      command_queue->Submit({{}, {cmd_buffer.get()}, {{&semaphore, 1ull}}}));
 
   // This should block for a sec or two.
   ASSERT_OK(command_queue->WaitIdle());
 
   // Should have already expired.
-  ASSERT_OK_AND_ASSIGN(uint64_t value, fence.QueryValue());
-  ASSERT_EQ(1u, value);
+  ASSERT_OK_AND_ASSIGN(uint64_t value, semaphore.Query());
+  ASSERT_EQ(1ull, value);
 }
 
 // Tests that waiting for idle with multiple pending submissions will wait until
@@ -131,33 +128,32 @@ TEST_F(AsyncCommandQueueTest, WaitIdleWithPending) {
 TEST_F(AsyncCommandQueueTest, WaitIdleAndProgress) {
   ::testing::InSequence sequence;
 
-  EXPECT_CALL(*mock_target_queue, Submit(_, _))
-      .WillRepeatedly(
-          [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            Sleep(absl::Milliseconds(100));
-            return OkStatus();
-          });
+  EXPECT_CALL(*mock_target_queue, Submit(_))
+      .WillRepeatedly([](absl::Span<const SubmissionBatch> batches) {
+        Sleep(absl::Milliseconds(100));
+        return OkStatus();
+      });
 
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
   auto cmd_buffer_1 = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
 
-  HostFence fence_0(0u);
+  HostSemaphore semaphore_0(0u);
+  ASSERT_OK(command_queue->Submit(
+      {{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1ull}}}));
+  HostSemaphore semaphore_1(0u);
   ASSERT_OK(
-      command_queue->Submit({{}, {cmd_buffer_0.get()}, {}}, {&fence_0, 1u}));
-  HostFence fence_1(0u);
-  ASSERT_OK(
-      command_queue->Submit({{}, {cmd_buffer_1.get()}, {}}, {&fence_1, 1u}));
+      command_queue->Submit({{}, {cmd_buffer_1.get()}, {{&semaphore_1, 1u}}}));
 
   // This should block for a sec or two.
   ASSERT_OK(command_queue->WaitIdle());
 
   // Both should have already expired.
-  ASSERT_OK_AND_ASSIGN(uint64_t value_0, fence_0.QueryValue());
-  ASSERT_EQ(1u, value_0);
-  ASSERT_OK_AND_ASSIGN(uint64_t value_1, fence_1.QueryValue());
-  ASSERT_EQ(1u, value_1);
+  ASSERT_OK_AND_ASSIGN(uint64_t value_0, semaphore_0.Query());
+  ASSERT_EQ(1ull, value_0);
+  ASSERT_OK_AND_ASSIGN(uint64_t value_1, semaphore_1.Query());
+  ASSERT_EQ(1ull, value_1);
 }
 
 // Tests that failures are sticky.
@@ -165,19 +161,17 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   ::testing::InSequence sequence;
 
   // Fail.
-  EXPECT_CALL(*mock_target_queue, Submit(_, _))
-      .WillOnce(
-          [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            Sleep(absl::Milliseconds(100));
-            return DataLossErrorBuilder(IREE_LOC);
-          });
+  EXPECT_CALL(*mock_target_queue, Submit(_))
+      .WillOnce([](absl::Span<const SubmissionBatch> batches) {
+        Sleep(absl::Milliseconds(100));
+        return DataLossErrorBuilder(IREE_LOC);
+      });
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
-  HostFence fence_0(0u);
+  HostSemaphore semaphore_0(0ull);
   ASSERT_OK(
-      command_queue->Submit({{}, {cmd_buffer_0.get()}, {}}, {&fence_0, 1u}));
-  EXPECT_TRUE(IsDataLoss(HostFence::WaitForFences(
-      {{&fence_0, 1u}}, /*wait_all=*/true, absl::InfiniteFuture())));
+      command_queue->Submit({{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1u}}}));
+  EXPECT_TRUE(IsDataLoss(semaphore_0.Wait(1ull, absl::InfiniteFuture())));
 
   // Future flushes/waits/etc should also fail.
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
@@ -185,9 +179,9 @@ TEST_F(AsyncCommandQueueTest, StickyFailures) {
   // Future submits should fail asynchronously.
   auto cmd_buffer_1 = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
-  HostFence fence_1(0u);
-  EXPECT_TRUE(IsDataLoss(
-      command_queue->Submit({{}, {cmd_buffer_1.get()}, {}}, {&fence_1, 1u})));
+  HostSemaphore semaphore_1(0ull);
+  EXPECT_TRUE(IsDataLoss(command_queue->Submit(
+      {{}, {cmd_buffer_1.get()}, {{&semaphore_1, 1ull}}})));
 }
 
 // Tests that a failure with two submissions pending causes the second to
@@ -196,32 +190,28 @@ TEST_F(AsyncCommandQueueTest, FailuresCascadeAcrossSubmits) {
   ::testing::InSequence sequence;
 
   // Fail.
-  EXPECT_CALL(*mock_target_queue, Submit(_, _))
-      .WillOnce(
-          [](absl::Span<const SubmissionBatch> batches, FenceValue fence) {
-            Sleep(absl::Milliseconds(100));
-            return DataLossErrorBuilder(IREE_LOC);
-          });
+  EXPECT_CALL(*mock_target_queue, Submit(_))
+      .WillOnce([](absl::Span<const SubmissionBatch> batches) {
+        Sleep(absl::Milliseconds(100));
+        return DataLossErrorBuilder(IREE_LOC);
+      });
 
   auto cmd_buffer_0 = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
   auto cmd_buffer_1 = make_ref<MockCommandBuffer>(
       nullptr, CommandBufferMode::kOneShot, CommandCategory::kTransfer);
 
-  HostBinarySemaphore semaphore_0_1(false);
-  HostFence fence_0(0u);
-  ASSERT_OK(command_queue->Submit({{}, {cmd_buffer_0.get()}, {&semaphore_0_1}},
-                                  {&fence_0, 1u}));
-  HostFence fence_1(0u);
-  ASSERT_OK(command_queue->Submit({{&semaphore_0_1}, {cmd_buffer_1.get()}, {}},
-                                  {&fence_1, 1u}));
+  HostSemaphore semaphore_0(0ull);
+  ASSERT_OK(command_queue->Submit(
+      {{}, {cmd_buffer_0.get()}, {{&semaphore_0, 1ull}}}));
+  HostSemaphore semaphore_1(0ull);
+  ASSERT_OK(command_queue->Submit(
+      {{{&semaphore_0, 1ull}}, {cmd_buffer_1.get()}, {{&semaphore_1, 1ull}}}));
 
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));
 
-  EXPECT_TRUE(IsDataLoss(HostFence::WaitForFences(
-      {{&fence_0, 1u}}, /*wait_all=*/true, absl::InfiniteFuture())));
-  EXPECT_TRUE(IsDataLoss(HostFence::WaitForFences(
-      {{&fence_1, 1u}}, /*wait_all=*/true, absl::InfiniteFuture())));
+  EXPECT_TRUE(IsDataLoss(semaphore_0.Wait(1ull, absl::InfiniteFuture())));
+  EXPECT_TRUE(IsDataLoss(semaphore_1.Wait(1ull, absl::InfiniteFuture())));
 
   // Future flushes/waits/etc should also fail.
   EXPECT_TRUE(IsDataLoss(command_queue->WaitIdle()));

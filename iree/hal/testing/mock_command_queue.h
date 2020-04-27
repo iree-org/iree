@@ -29,8 +29,7 @@ class MockCommandQueue : public ::testing::StrictMock<CommandQueue> {
       : ::testing::StrictMock<CommandQueue>(std::move(name),
                                             supported_categories) {}
 
-  MOCK_METHOD2(Submit, Status(absl::Span<const SubmissionBatch> batches,
-                              FenceValue fence));
+  MOCK_METHOD1(Submit, Status(absl::Span<const SubmissionBatch> batches));
 
   MOCK_METHOD1(WaitIdle, Status(absl::Time deadline));
 };

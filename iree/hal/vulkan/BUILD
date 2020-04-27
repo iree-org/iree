@@ -135,8 +135,7 @@ cc_library(
         ":direct_command_buffer",
         ":dynamic_symbols",
         ":handle_util",
-        ":legacy_fence",
-        ":native_binary_semaphore",
+        ":native_timeline_semaphore",
         ":status_util",
         "//iree/base:arena",
         "//iree/base:memory",
@@ -218,38 +217,6 @@ cc_library(
 )
 
 cc_library(
-    name = "legacy_fence",
-    srcs = ["legacy_fence.cc"],
-    hdrs = ["legacy_fence.h"],
-    deps = [
-        ":handle_util",
-        ":status_util",
-        "//iree/base:intrusive_list",
-        "//iree/base:ref_ptr",
-        "//iree/base:source_location",
-        "//iree/base:status",
-        "//iree/base:tracing",
-        "//iree/hal:fence",
-        "@com_google_absl//absl/base:core_headers",
-        "@com_google_absl//absl/container:inlined_vector",
-        "@com_google_absl//absl/synchronization",
-        "@com_google_absl//absl/time",
-        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
-    ],
-)
-
-cc_library(
-    name = "native_binary_semaphore",
-    srcs = ["native_binary_semaphore.cc"],
-    hdrs = ["native_binary_semaphore.h"],
-    deps = [
-        ":handle_util",
-        "//iree/hal:semaphore",
-        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
-    ],
-)
-
-cc_library(
     name = "native_event",
     srcs = ["native_event.cc"],
     hdrs = ["native_event.h"],
@@ -267,6 +234,20 @@ cc_library(
     deps = [
         ":handle_util",
         "//iree/hal:descriptor_set",
+        "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
+    ],
+)
+
+cc_library(
+    name = "native_timeline_semaphore",
+    srcs = ["native_timeline_semaphore.cc"],
+    hdrs = ["native_timeline_semaphore.h"],
+    deps = [
+        ":handle_util",
+        ":status_util",
+        "//iree/base:tracing",
+        "//iree/hal:semaphore",
+        "@com_google_absl//absl/synchronization",
         "@iree_vulkan_headers//:vulkan_headers_no_prototypes",
     ],
 )
@@ -405,10 +386,8 @@ cc_library(
         ":dynamic_symbols",
         ":extensibility_util",
         ":handle_util",
-        ":legacy_fence",
-        ":native_binary_semaphore",
         ":native_descriptor_set",
-        ":native_event",
+        ":native_timeline_semaphore",
         ":pipeline_cache",
         ":pipeline_executable_layout",
         ":status_util",
@@ -423,7 +402,7 @@ cc_library(
         "//iree/hal:debug_capture_manager",
         "//iree/hal:device",
         "//iree/hal:driver",
-        "//iree/hal:fence",
+        "//iree/hal:semaphore",
         "@com_google_absl//absl/container:inlined_vector",
         "@com_google_absl//absl/memory",
         "@com_google_absl//absl/strings",
