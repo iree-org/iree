@@ -976,7 +976,6 @@ void DeviceSwitchOp::build(Builder *builder, OperationState &state,
   }
   state.addTypes(resultTypes);
   state.addAttributes(attributes);
-  state.resizableOperandList = true;
 }
 
 static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
@@ -995,7 +994,6 @@ static ParseResult parseDeviceSwitchOp(OpAsmParser &parser,
   // #hal.device.match.id<"vulkan-v1.?-*">(%c1a = %c1 : i32) {
   //   hal.return %c1a : i32
   // }, ...
-  result->setOperandListToResizable();
   SmallVector<Attribute, 4> conditionAttrs;
   do {
     Attribute conditionAttr;
