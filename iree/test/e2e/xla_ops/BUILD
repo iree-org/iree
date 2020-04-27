@@ -91,6 +91,7 @@ iree_check_single_backend_test_suite(
         "minimum.mlir",
         "pad.mlir",
         "remainder.mlir",
+        "reshape.mlir",
         "rsqrt.mlir",
         "select.mlir",
         "sqrt.mlir",

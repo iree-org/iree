@@ -79,6 +79,20 @@ static void createConstantsInFunc(FuncOp funcOp, ArrayRef<int64_t> intVal,
 
 namespace {
 
+/// Pattern to lower linalg.reshape to SPIR-V. Since all buffers are linearized
+/// in SPIR-V lowering, linalg.reshape becomes a no-op.
+// TODO(ravishankarm): Move this into MLIR Core.
+struct LinalgReshapeToSPIRVLowering
+    : public SPIRVOpLowering<linalg::ReshapeOp> {
+  using SPIRVOpLowering<linalg::ReshapeOp>::SPIRVOpLowering;
+  LogicalResult matchAndRewrite(
+      linalg::ReshapeOp reshapeOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOp(reshapeOp, operands);
+    return success();
+  }
+};
+
 /// To be able to use the workgroup size from the dispatch function attribute to
 /// convert GPU kernel into SPIR-V kernel, need to actually implement a pass to
 /// retrieve the attribute value from the function and pass it along.
@@ -103,6 +117,7 @@ struct IREEGPUToSPIRVPass
 
     populateGPUToSPIRVPatterns(context, typeConverter, patterns);
     populateStandardToSPIRVPatterns(context, typeConverter, patterns);
+    patterns.insert<LinalgReshapeToSPIRVLowering>(context, typeConverter);
 
     std::unique_ptr<ConversionTarget> target =
         spirv::SPIRVConversionTarget::get(targetAttr);

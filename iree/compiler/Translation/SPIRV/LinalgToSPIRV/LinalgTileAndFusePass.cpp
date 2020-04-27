@@ -223,6 +223,7 @@ void LinalgTileAndFusePass::runOnFunction() {
 
   OwningRewritePatternList patterns;
   patterns.insert<TileLinalgOpPattern<linalg::ConvOp>,
+                  TileLinalgOpPattern<linalg::CopyOp>,
                   TileLinalgOpPattern<linalg::GenericOp>,
                   TileLinalgOpPattern<linalg::IndexedGenericOp>,
                   TileLinalgOpPattern<linalg::MatmulOp>,
