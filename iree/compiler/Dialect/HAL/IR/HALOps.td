@@ -17,6 +17,7 @@
 
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "mlir/IR/OpAsmInterface.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffects.td"
 
 class HAL_PureOp<string mnemonic, list<OpTrait> traits = []> :
