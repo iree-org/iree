@@ -100,6 +100,8 @@ class AppTest(tf_test_utils.SavedModelTestCase):
     input_data = np.random.rand(np.prod(np.array(INPUT_SHAPE))).astype(
         np.float32)
     input_data = input_data.reshape(INPUT_SHAPE)
+    # TODO(GH-1668): Fix the comparison issue. In MobileNet, all the numbers are
+    # less than 1e-10, so the comparison is not really working.
     self.modules.applications.all.predict(input_data).print().assert_all_close(
         atol=1e-6)
 

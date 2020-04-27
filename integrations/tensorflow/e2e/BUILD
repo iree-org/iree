@@ -78,7 +78,7 @@ package(
     # and add other supported vision models
     for model_name, backends in [
         ("ResNet50", "tf,iree_vmla,iree_vulkan"),
-        ("MobileNet", "tf"),
+        ("MobileNet", "tf,iree_vmla"),
         ("MobileNetV2", "tf"),
     ]
 ]
