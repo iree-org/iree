@@ -110,11 +110,14 @@ features and quarterly plans. Please check out for updated information.
 
 ## Build Status
 
-CI System      | Build System | Platform | Status
-:------------: | :----------: | :------: | :----:
-GitHub Actions | Bazel        | Linux    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build%22)
-Kokoro         | Bazel        | Linux    | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
-Kokoro         | CMake        | Linux    | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_result_linux.html)
+CI System      | Build System | Platform | Component       | Status
+:------------: | :----------: | :------: | :-------------: | :----:
+GitHub Actions | Bazel        | Linux    | Core            | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Core%22)
+GitHub Actions | Bazel        | Linux    | Bindings        | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Bindings%22)
+GitHub Actions | Bazel        | Linux    | Integrations    | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Integrations%22)
+GitHub Actions | Bazel        | Linux    | Other           | [Workflow History](https://github.com/google/iree/actions?query=event%3Apush+workflow%3A%22Bazel+Build+-+Fallthrough%22)
+Kokoro         | Bazel        | Linux    | Core            | [![kokoro-status-bazel-linux](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/bazel/build_result_linux.html)
+Kokoro         | CMake        | Linux    | Core + Bindings | [![kokoro-status-cmake-linux](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_status_linux.svg)](https://storage.googleapis.com/iree-oss-build-badges/cmake/build_result_linux.html)
 
 ## License
 
