@@ -76,6 +76,7 @@ PERMALINK_DICT = {
     'getting_started_windows_vulkan.md': 'GetStarted/WindowsVulkan',
     'getting_started_python.md': 'GetStarted/Python',
     'developer_overview.md': 'DeveloperOverview',
+    'testing_guide.md': 'TestingGuide',
     'op_coverage.md': 'HLOOpCoverage',
     'roadmap.md': 'FocusAreas',
     'roadmap_design.md': 'DesignRoadmap',
