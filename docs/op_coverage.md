@@ -54,7 +54,7 @@ pad | ✓ | ✓ | ✓ | ✓
 reduce | ✓ | ✓ | ✗ | ✓
 reduce_window | ✓ | ✗ | ✗ | ✓
 remainder | ✓ | ✓ | ✓ | ✓
-reshape | ✓ | ✓ | ✗ | ✓
+reshape | ✓ | ✓ | ✓ | ✓
 reverse | ✓ | ✓ | ✗ | ✗
 rsqrt | ✓ | ✓ | ✓ | ✓
 select | ✓ | ✓ | ✓ | ✓
