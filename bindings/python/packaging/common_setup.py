@@ -71,7 +71,7 @@ def get_native_file_extension():
   
 
 def setup(**kwargs):
-  # See: https://stackoverflow.com/questions/45150304/how-to-force-a-python-wheel-to-be-platform-specific-when-building-it
+  # See: https://stackoverflow.com/q/45150304
   try:
       from wheel.bdist_wheel import bdist_wheel as _bdist_wheel
       class bdist_wheel(_bdist_wheel):
