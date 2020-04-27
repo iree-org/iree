@@ -81,41 +81,33 @@ class ExtractReduceWindowOpPaddingAttributes
   }
 };
 
-// Remove reshape depthwise_conv filter applied by xla_hlo.
-class RemoveDepthwiseFilterReshape : public OpRewritePattern<xla_hlo::ConvOp> {
+// Adjust the shape of depthwise_conv filter where is applied by xla_hlo.
+class AdjustDepthwiseFilterShape : public OpRewritePattern<xla_hlo::ConvOp> {
  public:
   using OpRewritePattern<xla_hlo::ConvOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(xla_hlo::ConvOp op,
                                 PatternRewriter &rewriter) const override {
-    auto reshapeOp =
-        dyn_cast_or_null<xla_hlo::ReshapeOp>(op.rhs().getDefiningOp());
-    if (!reshapeOp) return failure();
-    auto inputFilter =
-        reshapeOp.operand().getType().dyn_cast<RankedTensorType>();
-    auto reshapedFilter = op.rhs().getType().dyn_cast<RankedTensorType>();
-    if (!inputFilter || !reshapedFilter) return failure();
-    // Only remove filter reshapes for depthwise_conv inputs.
-    // Check filter spatial dim are the same.
-    for (const auto &dim : op.dimension_numbers().kernel_spatial_dimensions()) {
-      const auto dimValue = dim.getZExtValue();
-      if (inputFilter.getShape()[dimValue] !=
-          reshapedFilter.getShape()[dimValue]) {
-        return failure();
-      }
-    }
     const auto featureInDim =
         op.dimension_numbers().kernel_input_feature_dimension().getInt();
     const auto featureOutDim =
         op.dimension_numbers().kernel_output_feature_dimension().getInt();
-    if (reshapedFilter.getShape()[featureInDim] != 1) return failure();
-    if (reshapedFilter.getShape()[featureOutDim] !=
-        (inputFilter.getShape()[featureInDim] *
-         inputFilter.getShape()[featureOutDim]))
-      return failure();
-    if (op.feature_group_count().getZExtValue() == 1) return failure();
+    const auto &kernelShape = op.rhs().getType().cast<ShapedType>().getShape();
+    if (kernelShape[featureInDim] != 1) return failure();
+
+    const auto groupCount = op.feature_group_count().getZExtValue();
+    if (groupCount == 1) return failure();
+    if (kernelShape[featureOutDim] % groupCount != 0) return failure();
+
+    SmallVector<int64_t, 4> newShape(kernelShape.begin(), kernelShape.end());
+    newShape[featureInDim] = groupCount;
+    newShape[featureOutDim] /= groupCount;
+    auto loc = op.getLoc();
+    auto elemType = op.rhs().getType().cast<ShapedType>().getElementType();
+    auto reshapeOp = rewriter.create<xla_hlo::ReshapeOp>(
+        loc, RankedTensorType::get(newShape, elemType), op.rhs());
     auto resultType = op.getResult().getType();
-    SmallVector<Value, 2> operands = {op.lhs(), reshapeOp.operand()};
+    SmallVector<Value, 2> operands = {op.lhs(), reshapeOp.getResult()};
     auto newOp = rewriter.create<xla_hlo::ConvOp>(op.getLoc(), resultType,
                                                   operands, op.getAttrs());
     rewriter.replaceOp(op, newOp.getResult());
@@ -130,7 +122,7 @@ struct HLOToHLOPreprocessing
     OwningRewritePatternList patterns;
     xla_hlo::PopulateUnfuseBatchNormPatterns(context, &patterns);
     patterns.insert<ExtractReduceWindowOpPaddingAttributes,
-                    RemoveDepthwiseFilterReshape>(context);
+                    AdjustDepthwiseFilterShape>(context);
     applyPatternsAndFoldGreedily(getOperation(), patterns);
   }
 };
