@@ -867,6 +867,49 @@ struct LinalgOpOnTensorConversion
     return linalgBufferOp;
   }
 };
+
+/// Convert linalg.tensor_reshape to a linalg.reshape + linalg.copy. This is
+/// only needed when linalg.tensor_reshape ends up in its own dispatch region.
+struct SingleReshapeOpInDispatchConversion
+    : public ConvertToLinalgBufferOp<SingleReshapeOpInDispatchConversion,
+                                     linalg::TensorReshapeOp, linalg::CopyOp> {
+  using ConvertToLinalgBufferOp<SingleReshapeOpInDispatchConversion,
+                                linalg::TensorReshapeOp,
+                                linalg::CopyOp>::ConvertToLinalgBufferOp;
+  linalg::CopyOp apply(linalg::TensorReshapeOp op, ArrayRef<Value> args,
+                       ArrayRef<Value> results,
+                       ConversionPatternRewriter &rewriter) const {
+    linalg::ReshapeOp reshapeOp = rewriter.create<linalg::ReshapeOp>(
+        op.getLoc(), results[0].getType(), args[0], op.reassociation());
+
+    return rewriter.create<linalg::CopyOp>(op.getLoc(), reshapeOp.getResult(),
+                                           results[0]);
+  }
+};
+
+// The tensor reshape op has copy semantics in general, but if the reshape is of
+// an argument tensor, just alias the argument. In the corner case where the
+// result of the reshape is written into another argument, then fallback to the
+// reshape + copy solution.
+struct TensorReshapeOpConversion
+    : public OpConversionPattern<linalg::TensorReshapeOp> {
+  using OpConversionPattern<linalg::TensorReshapeOp>::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      linalg::TensorReshapeOp reshapeOp, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    if (isa_and_nonnull<IREE::LoadInputOp>(reshapeOp.src().getDefiningOp()) &&
+        getBufferForResult(reshapeOp.result(), rewriter) == nullptr) {
+      RankedTensorType resultType = reshapeOp.getResultType();
+      rewriter.replaceOpWithNewOp<linalg::ReshapeOp>(
+          reshapeOp,
+          MemRefType::get(resultType.getShape(), resultType.getElementType()),
+          operands[0], reshapeOp.reassociation());
+      return success();
+    }
+    return failure();
+  }
+};
+
 }  // namespace
 
 // -----------------------------------------------------------------------------
@@ -880,12 +923,14 @@ struct XLAToLinalgOnBuffersPass
 };
 }  // namespace
 
-void populateHLOToLinalgOnConversionPatterns(
+void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
-  patterns.insert<ConvOpConversion, DotOpConversion, PadOpConversion,
-                  ReshapeOpConversion, IREELoadInputOpConversion,
-                  IREEStoreOutputOpConversion,
-                  LinalgOpOnTensorConversion<linalg::GenericOp>>(context);
+  patterns
+      .insert<ConvOpConversion, DotOpConversion, IREELoadInputOpConversion,
+              IREEStoreOutputOpConversion,
+              LinalgOpOnTensorConversion<linalg::GenericOp>, PadOpConversion,
+              ReshapeOpConversion, SingleReshapeOpInDispatchConversion,
+              TensorReshapeOpConversion>(context);
   // Reduce Operation conversions.
   patterns.insert<ReduceOpConversion, ReduceWindowOpConversion,
                   ReduceRegionXLAOpConversion<xla_hlo::AddOp>,
@@ -899,11 +944,12 @@ void XLAToLinalgOnBuffersPass::runOnFunction() {
   if (!isDispatchFuncImpl(funcOp)) return;
   OwningRewritePatternList patterns;
   auto *context = &getContext();
-  populateHLOToLinalgOnConversionPatterns(context, patterns);
+  populateHLOToLinalgOnBuffersConversionPatterns(context, patterns);
   ConversionTarget target(*context);
   target.addLegalDialect<linalg::LinalgDialect, StandardOpsDialect>();
   target.addDynamicallyLegalOp<linalg::GenericOp, linalg::IndexedGenericOp>(
       [](linalg::LinalgOp op) { return op.hasBufferSemantics(); });
+  target.addIllegalOp<linalg::TensorReshapeOp>();
   target.addLegalOp<FuncOp>();
   if (failed(applyFullConversion(getFunction(), target, patterns)))
     return signalPassFailure();

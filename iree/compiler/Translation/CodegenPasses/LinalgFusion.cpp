@@ -20,6 +20,7 @@
 //===----------------------------------------------------------------------===//
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+#include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
@@ -129,10 +130,7 @@ LogicalResult IREEFuseGenericTensorOps::matchAndRewrite(
     if (!producer || producer->getNumResults() != 1) continue;
     bool hasSingleUse = producer->getResult(0).hasOneUse();
     Optional<linalg::LinalgOp> fusedOp;
-    if (auto producerOp = dyn_cast<linalg::LinalgOp>(producer)) {
-      fusedOp = linalg::fuseTensorOps(
-          rewriter, cast<linalg::LinalgOp>(op.getOperation()), operand.index());
-    } else if (auto producerOp = dyn_cast<ConstantOp>(producer)) {
+    if (auto producerOp = dyn_cast<ConstantOp>(producer)) {
       fusedOp = fuseGenericOpWithConstantScalar(rewriter, producerOp, op,
                                                 operand.index());
     }
@@ -162,6 +160,7 @@ class HLOConstantConverter : public OpRewritePattern<xla_hlo::ConstOp> {
 void IREELinalgFusionPass::runOnFunction() {
   OwningRewritePatternList patterns;
   Operation *op = getOperation();
+  populateLinalgTensorOpsFusionPatterns(op->getContext(), patterns);
   patterns.insert<IREEFuseGenericTensorOps, HLOConstantConverter>(
       op->getContext());
   applyPatternsAndFoldGreedily(op->getRegions(), patterns);
