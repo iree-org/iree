@@ -272,7 +272,6 @@ void DispatchRegionOp::build(Builder *builder, OperationState &state,
   state.addOperands(args);
   state.addAttributes(attributes);
   state.addRegion();
-  state.setOperandListToResizable();
 }
 
 ParseResult parseDispatchRegionOp(OpAsmParser &parser, OperationState *result) {
@@ -315,7 +314,6 @@ ParseResult parseDispatchRegionOp(OpAsmParser &parser, OperationState *result) {
       return failure();
     }
   }
-  result->setOperandListToResizable();
 
   // Parse (optional) results.
   if (failed(parser.parseOptionalArrowTypeList(result->types))) {
@@ -539,7 +537,6 @@ void ExStreamFragmentOp::build(Builder *builder, OperationState &state,
   state.addOperands(operands);
   state.addAttributes(attributes);
   state.addRegion();
-  state.setOperandListToResizable();
 }
 
 ParseResult parseExStreamFragmentOp(OpAsmParser &parser,
@@ -570,7 +567,6 @@ ParseResult parseExStreamFragmentOp(OpAsmParser &parser,
       return failure();
     }
   }
-  result->setOperandListToResizable();
 
   // Parse (optional) results.
   if (failed(parser.parseOptionalArrowTypeList(result->types))) {
