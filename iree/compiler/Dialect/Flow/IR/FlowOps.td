@@ -16,6 +16,7 @@
 #define IREE_DIALECT_FLOW_OPS
 
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffects.td"
 
 class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
