@@ -200,6 +200,9 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
            << "failed to caclculate required liveness information";
   }
 
+  scratchI32RegisterCount_ = 0;
+  scratchRefRegisterCount_ = 0;
+
   // Walk the blocks in dominance order and build their register usage tables.
   // We are accumulating value->register mappings in |map_| as we go and since
   // we are traversing in order know that for each block we will have values in
@@ -259,18 +262,6 @@ LogicalResult RegisterAllocation::recalculate(IREE::VM::FuncOp funcOp) {
         std::max(maxI32RegisterOrdinal_, registerUsage.maxI32RegisterOrdinal);
     maxRefRegisterOrdinal_ =
         std::max(maxRefRegisterOrdinal_, registerUsage.maxRefRegisterOrdinal);
-  }
-
-  // Always allocate one register of each type more for scratch space.
-  // These scratch registers are used during remapping registers during branches
-  // that may have hazards (such as a remap set of 0->1 and 1->0). If we
-  // precomputed whether remappings were required here then we could avoid this
-  // but it doesn't seem worth it for a single register (yet).
-  if (maxI32RegisterOrdinal_ > 0) {
-    ++maxI32RegisterOrdinal_;
-  }
-  if (maxRefRegisterOrdinal_ > 0) {
-    ++maxRefRegisterOrdinal_;
   }
 
   // We currently don't check during the allocation above. If we implement
@@ -518,19 +509,36 @@ RegisterAllocation::remapSuccessorRegisters(Operation *op, int successorIndex) {
     return feedbackArcSet.acyclicEdges;
   }
 
-  assert(feedbackArcSet.feedbackEdges.size() == 1 &&
-         "liveness tracking of scratch registers not yet implemented");
-
-  // The last register in each bank is reserved for swapping, when required.
-  uint16_t scratchI32Reg = maxI32RegisterOrdinal_;
-  uint16_t scratchRefReg = kRefRegisterTypeBit | maxRefRegisterOrdinal_;
-
+  // The tail registers in each bank is reserved for swapping, when required.
+  int scratchI32Reg = maxI32RegisterOrdinal_;
+  int scratchRefReg = maxRefRegisterOrdinal_;
   for (auto feedbackEdge : feedbackArcSet.feedbackEdges) {
-    uint16_t scratchReg =
-        isRefRegister(feedbackEdge.first) ? scratchRefReg : scratchI32Reg;
+    uint16_t scratchReg;
+    if (isRefRegister(feedbackEdge.first)) {
+      scratchReg = ++scratchRefReg;
+      scratchReg |= kRefRegisterTypeBit;
+    } else {
+      scratchReg = ++scratchI32Reg;
+    }
     feedbackArcSet.acyclicEdges.insert(feedbackArcSet.acyclicEdges.begin(),
                                        {feedbackEdge.first, scratchReg});
     feedbackArcSet.acyclicEdges.push_back({scratchReg, feedbackEdge.second});
+  }
+  if (scratchI32Reg != maxI32RegisterOrdinal_) {
+    scratchI32RegisterCount_ = scratchI32Reg - maxI32RegisterOrdinal_;
+    assert(getMaxI32RegisterOrdinal() <= kIntRegisterCount &&
+           "spilling i32 regs");
+    if (getMaxI32RegisterOrdinal() > kIntRegisterCount) {
+      op->emitOpError() << "spilling entire i32 register address space";
+    }
+  }
+  if (scratchRefReg != maxRefRegisterOrdinal_) {
+    scratchRefRegisterCount_ = scratchRefReg - maxRefRegisterOrdinal_;
+    assert(getMaxRefRegisterOrdinal() <= kRefRegisterCount &&
+           "spilling ref regs");
+    if (getMaxRefRegisterOrdinal() > kRefRegisterCount) {
+      op->emitOpError() << "spilling entire ref register address space";
+    }
   }
 
   return feedbackArcSet.acyclicEdges;

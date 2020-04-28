@@ -273,8 +273,6 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     funcOp.emitError() << "register allocation failed";
     return llvm::None;
   }
-  result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;
-  result.refRegisterCount = registerAllocation.getMaxRefRegisterOrdinal() + 1;
 
   V0BytecodeEncoder encoder(&typeTable, &registerAllocation);
   for (auto &block : funcOp.getBlocks()) {
@@ -310,6 +308,8 @@ Optional<EncodedBytecodeFunction> BytecodeEncoder::encodeFunction(
     return llvm::None;
   }
   result.bytecodeData = bytecodeData.getValue();
+  result.i32RegisterCount = registerAllocation.getMaxI32RegisterOrdinal() + 1;
+  result.refRegisterCount = registerAllocation.getMaxRefRegisterOrdinal() + 1;
   return result;
 }
 
