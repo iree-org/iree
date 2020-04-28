@@ -57,11 +57,19 @@ package(
 
 [
     iree_py_test(
-        name = "keras_vision_model_" + model_name + "_test",
-        srcs = ["keras_vision_model_test.py"],
+        name = "_".join([
+            "keras_vision_model",
+            data,
+            model_name,
+            "test",
+        ]),
+        srcs = [
+            "keras_vision_model_test.py",
+        ],
         args = [
             "--model=%s" % model_name,
             "--override_backends=%s" % backends,
+            "--data=%s" % data,
         ],
         main = "keras_vision_model_test.py",
         python_version = "PY3",
@@ -76,10 +84,52 @@ package(
     )
     # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
     # and add other supported vision models
-    for model_name, backends in [
-        ("ResNet50", "tf,iree_vmla,iree_vulkan"),
-        ("MobileNet", "tf,iree_vmla"),
-        ("MobileNetV2", "tf"),
+    for data, model_name, backends in [
+        # "cifar10" has toy models with input 32x32, is good for debugging
+        ("cifar10", "ResNet50", "tf,iree_vmla,iree_vulkan"),
+    ]
+]
+
+# it requres access to external URL, so these tests will be run manually
+[
+    iree_py_test(
+        name = "_".join([
+            "keras_vision_model",
+            data,
+            model_name,
+            "test",
+        ]),
+        srcs = [
+            "keras_vision_model_test.py",
+        ],
+        args = [
+            "--model=%s" % model_name,
+            "--override_backends=%s" % backends,
+            "--data=%s" % data,
+            "--url=https://storage.googleapis.com/iree_models/",
+        ],
+        main = "keras_vision_model_test.py",
+        python_version = "PY3",
+        tags = [
+            "external",
+            "large",
+            "manual",
+            "noga",
+            "notap",
+        ],
+        deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+            "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+        ],
+    )
+    # TODO(b/150244105) update backends with "tf,iree_vmla,iree_vulkan"
+    # and add other supported vision models
+    for data, model_name, backends in [
+        # "cifar10" has toy models with input 32x32, is good for debugging
+        # "imagenet" has real model weights for input 224x224
+        ("cifar10", "MobileNet", "tf,iree_vmla"),
+        ("imagenet", "ResNet50", "tf"),
+        ("imagenet", "MobileNet", "tf"),
+        ("imagenet", "MobileNetV2", "tf"),
     ]
 ]
 
@@ -103,3 +153,19 @@ package(
         "keras_lstm_static_test",
     ]
 ]
+
+# It is used to produce weights for keras vision models with input image size 32x32.
+# These models are not optimized for accuracy or latency (they are for debugging only).
+# They have the same neural net topology
+# with keras vision models trained on imagenet data sets
+py_binary(
+    name = "train_vision_models_on_cifar",
+    srcs = [
+        "train_vision_models_on_cifar.py",
+    ],
+    python_version = "PY3",
+    srcs_version = "PY2AND3",
+    deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
+        "//integrations/tensorflow/bindings/python/pyiree/tf/support",
+    ],
+)

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test all applications models in Keras."""
-
+import os
 from absl import flags
 import numpy as np
 from pyiree.tf.support import tf_test_utils
@@ -24,11 +24,11 @@ FLAGS = flags.FLAGS
 # Testing all applications models automatically can take time
 # so we test it one by one, with argument --model=MobileNet
 flags.DEFINE_string('model', 'ResNet50', 'model name')
-
-# 32x32 is the minimum image size (for test speed)
-# for imagenet case it has to be [1, 224, 224, 3]
-INPUT_SHAPE = [1, 32, 32, 3]
-
+flags.DEFINE_string(
+    'url', '', 'url with model weights '
+    'for example https://storage.googleapis.com/iree_models/')
+flags.DEFINE_enum('data', 'cifar10', ['cifar10', 'imagenet'],
+                  'data sets on which model was trained: imagenet, cifar10')
 APP_MODELS = {
     'ResNet50':
         tf.keras.applications.resnet.ResNet50,
@@ -69,26 +69,47 @@ APP_MODELS = {
 }
 
 
+def get_input_shape(data):
+  if data == 'imagenet':
+    return [1, 224, 224, 3]
+  elif data == 'cifar10':
+    return [1, 32, 32, 3]
+  else:
+    raise ValueError('Not supported data ', data)
+
+
 def models():
   tf.keras.backend.set_learning_phase(False)
-  # TODO(ataei): This should move somewhere in SavedModelTestCase, it should
-  # guarantee test is deterministic.
   tf_test_utils.set_random_seed()
 
+  input_shape = get_input_shape(FLAGS.data)
   # keras model receives images size as input,
   # where batch size is not specified - by default it is dynamic
   if FLAGS.model in APP_MODELS:
+    weights = 'imagenet' if FLAGS.data == 'imagenet' else None
+    # TODO(rybakov) with the fix of https://github.com/google/iree/issues/1660
+    # add include_top=True
+
+    # if weights == 'imagenet' it will load weights from external tf.keras URL
     model = APP_MODELS[FLAGS.model](
-        weights=None, include_top=False, input_shape=INPUT_SHAPE[1:])
+        weights=weights, input_shape=input_shape[1:])
+
+    if FLAGS.data == 'cifar10' and FLAGS.url:
+      file_name = 'cifar10' + FLAGS.model
+      # it will download model weights from publically available folder: PATH
+      # and save it to cache_dir=~/.keras and return path to it
+      weights_path = tf.keras.utils.get_file(
+          file_name, os.path.join(FLAGS.url, file_name + '.h5'))
+      model.load_weights(weights_path)
   else:
-    raise ValueError('unsupported model', FLAGS.model)
+    raise ValueError('Unsupported model', FLAGS.model)
 
   module = tf.Module()
   module.m = model
   # specify input size with static batch size
   # TODO(b/142948097): with support of dynamic shape
-  # replace INPUT_SHAPE by model.input_shape, so batch size will be dynamic (-1)
-  module.predict = tf.function(input_signature=[tf.TensorSpec(INPUT_SHAPE)])(
+  # replace input_shape by model.input_shape, so batch size will be dynamic (-1)
+  module.predict = tf.function(input_signature=[tf.TensorSpec(input_shape)])(
       model.call)
   return module
 
@@ -97,11 +118,10 @@ def models():
 class AppTest(tf_test_utils.SavedModelTestCase):
 
   def test_application(self):
-    input_data = np.random.rand(np.prod(np.array(INPUT_SHAPE))).astype(
+    input_shape = get_input_shape(FLAGS.data)
+    input_data = np.random.rand(np.prod(np.array(input_shape))).astype(
         np.float32)
-    input_data = input_data.reshape(INPUT_SHAPE)
-    # TODO(GH-1668): Fix the comparison issue. In MobileNet, all the numbers are
-    # less than 1e-10, so the comparison is not really working.
+    input_data = input_data.reshape(input_shape)
     self.modules.applications.all.predict(input_data).print().assert_all_close(
         atol=1e-6)
 
