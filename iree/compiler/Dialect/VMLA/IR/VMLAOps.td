@@ -59,7 +59,6 @@ def VMLA_BufferConstOp : VMLA_PureOp<"buffer.const"> {
     VMLA_Buffer:$result
   );
 
-  // TODO(meadowlark): Make !iree.byte_buffer buildable to simplify this.
   let assemblyFormat = "$value attr-dict `:` type($value) `->` type($result)";
 }
 
