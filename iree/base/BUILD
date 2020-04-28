@@ -297,7 +297,6 @@ cc_test(
 cc_library(
     name = "localfile",
     deps = platform_trampoline_deps("localfile"),
-    alwayslink = 1,
 )
 
 cc_library(

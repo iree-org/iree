@@ -344,7 +344,6 @@ iree_cc_library(
     localfile
   DEPS
     iree::base::internal::localfile_internal
-  ALWAYSLINK
   PUBLIC
 )
 
