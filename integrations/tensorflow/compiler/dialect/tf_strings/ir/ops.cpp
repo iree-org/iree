@@ -32,25 +32,25 @@ namespace tf_strings {
 #include "integrations/tensorflow/compiler/dialect/tf_strings/ir/ops.cpp.inc"
 #undef GET_OP_CLASSES
 
-void ToStringOp::build(Builder* builder, OperationState& tblgen_state,
+void ToStringOp::build(OpBuilder& builder, OperationState& tblgen_state,
                        Value value) {
-  build(builder, tblgen_state, StringType::get(builder->getContext()), value);
+  build(builder, tblgen_state, StringType::get(builder.getContext()), value);
 }
 
-void ToStringTensorOp::build(Builder* builder, OperationState& tblgen_state,
+void ToStringTensorOp::build(OpBuilder& builder, OperationState& tblgen_state,
                              Value value) {
   if (auto type = value.getType().dyn_cast<ShapedType>()) {
     auto new_type = RankedTensorType::get(
-        type.getShape(), StringType::get(builder->getContext()));
+        type.getShape(), StringType::get(builder.getContext()));
     build(builder, tblgen_state, new_type, value);
     return;
   }
   llvm_unreachable("Invalid input to ToStringTensorOp");
 }
 
-void StringTensorToStringOp::build(Builder* builder,
+void StringTensorToStringOp::build(OpBuilder& builder,
                                    OperationState& tblgen_state, Value value) {
-  build(builder, tblgen_state, StringType::get(builder->getContext()), value);
+  build(builder, tblgen_state, StringType::get(builder.getContext()), value);
 }
 
 }  // namespace tf_strings

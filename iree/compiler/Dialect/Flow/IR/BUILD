@@ -100,6 +100,7 @@ gentbl(
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
     ],
 )
@@ -115,6 +116,7 @@ iree_tablegen_doc(
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:include/mlir/Interfaces/SideEffects.td",
     ],
 )

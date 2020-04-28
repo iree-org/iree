@@ -60,7 +60,7 @@ LogicalResult XLAConcatenateOpSPIRVLowering::lowerOperation(
     // Only select values that offset <= d < offset + operand_shape[append_dim].
     // Since later values will be replaced in the later iterations, only check
     // d >= offset here.
-    Value cond = spirv::ConstantOp::getOne(i1Type, loc, &builder);
+    Value cond = spirv::ConstantOp::getOne(i1Type, loc, builder);
     auto offsetVar = builder.create<spirv::ConstantOp>(
         loc, i32Type, builder.getI32IntegerAttr(offset));
     auto checkLb = builder.create<spirv::SGreaterThanEqualOp>(
@@ -106,9 +106,8 @@ LogicalResult XLAConvertOpSPIRVLowering::lowerOperation(
         // spv.SConvertOp does not support converting a bool to integer, use
         // spv.SelectOp instead.
         if (intOperandType.getWidth() == 1) {
-          Value zero =
-              spirv::ConstantOp::getZero(resultElemType, loc, &builder);
-          Value one = spirv::ConstantOp::getOne(resultElemType, loc, &builder);
+          Value zero = spirv::ConstantOp::getZero(resultElemType, loc, builder);
+          Value one = spirv::ConstantOp::getOne(resultElemType, loc, builder);
           scalarOp =
               builder.create<spirv::SelectOp>(loc, operands[0], one, zero)
                   .getOperation();

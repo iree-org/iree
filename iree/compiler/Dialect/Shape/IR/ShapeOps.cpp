@@ -42,8 +42,8 @@ namespace Shape {
 // shape.tie_shape
 //===----------------------------------------------------------------------===//
 
-void TieShapeOp::build(Builder *builder, OperationState &result, Value operand,
-                       Value shape) {
+void TieShapeOp::build(OpBuilder &builder, OperationState &result,
+                       Value operand, Value shape) {
   result.types.push_back(operand.getType());
   result.addOperands({operand, shape});
 }
@@ -99,12 +99,12 @@ static LogicalResult verifyCastCompatibleShapeOp(CastCompatibleShapeOp op) {
 // shape.get_ranked_shape
 //===----------------------------------------------------------------------===//
 
-void GetRankedShapeOp::build(Builder *builder, OperationState &result,
+void GetRankedShapeOp::build(OpBuilder &builder, OperationState &result,
                              Value operand) {
   auto rankedOperandType = operand.getType().dyn_cast<RankedTensorType>();
   if (rankedOperandType) {
     result.types.push_back(RankedShapeType::get(rankedOperandType.getShape(),
-                                                builder->getContext()));
+                                                builder.getContext()));
   }
   result.addOperands(operand);
 }
@@ -127,7 +127,7 @@ static LogicalResult verifyGetRankedShapeOp(GetRankedShapeOp op) {
 // shape.const_ranked_shape
 //===----------------------------------------------------------------------===//
 
-void ConstRankedShapeOp::build(Builder *builder, OperationState &result,
+void ConstRankedShapeOp::build(OpBuilder &builder, OperationState &result,
                                Type type) {
   assert(type.cast<RankedShapeType>().isFullyStatic());
   result.types.push_back(type);
@@ -168,17 +168,17 @@ static LogicalResult verifyMakeRankedShapeOp(MakeRankedShapeOp op) {
 // shape.ranked_dim
 //===----------------------------------------------------------------------===//
 
-void RankedDimOp::build(Builder *builder, OperationState &result, Type dimType,
-                        Value shape, int index) {
+void RankedDimOp::build(OpBuilder &builder, OperationState &result,
+                        Type dimType, Value shape, int index) {
   result.addOperands(shape);
   result.addAttribute("index",
-                      builder->getIntegerAttr(builder->getIndexType(), index));
+                      builder.getIntegerAttr(builder.getIndexType(), index));
   result.addTypes(dimType);
 }
 
-void RankedDimOp::build(Builder *builder, OperationState &result, Value shape,
+void RankedDimOp::build(OpBuilder &builder, OperationState &result, Value shape,
                         int index) {
-  RankedDimOp::build(builder, result, builder->getIndexType(), shape, index);
+  RankedDimOp::build(builder, result, builder.getIndexType(), shape, index);
 }
 
 ParseResult parseRankedDimOp(OpAsmParser &parser, OperationState &state) {
@@ -226,8 +226,8 @@ static LogicalResult verifyRankedDimOp(RankedDimOp op) {
 // shape.ranked_dims
 //===----------------------------------------------------------------------===//
 
-void RankedDimsOp::build(Builder *builder, OperationState &result, Type dimType,
-                         Value shape) {
+void RankedDimsOp::build(OpBuilder &builder, OperationState &result,
+                         Type dimType, Value shape) {
   result.addOperands(shape);
   auto rankedShapeType = shape.getType().cast<RankedShapeType>();
   for (int i = 0; i < rankedShapeType.getRank(); ++i) {
@@ -235,9 +235,9 @@ void RankedDimsOp::build(Builder *builder, OperationState &result, Type dimType,
   }
 }
 
-void RankedDimsOp::build(Builder *builder, OperationState &result,
+void RankedDimsOp::build(OpBuilder &builder, OperationState &result,
                          Value shape) {
-  RankedDimsOp::build(builder, result, builder->getIndexType(), shape);
+  RankedDimsOp::build(builder, result, builder.getIndexType(), shape);
 }
 
 //===----------------------------------------------------------------------===//

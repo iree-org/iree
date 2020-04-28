@@ -16,6 +16,7 @@
 #define IREE_DIALECT_FLOW_OPS
 
 include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/SideEffects.td"
 
 class FLOW_PureOp<string mnemonic, list<OpTrait> traits = []> :
@@ -47,15 +48,16 @@ def FLOW_VariableOp : FLOW_Op<"variable", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      FuncOp initializer, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, FuncOp initializer, ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      Type type, Attribute initialValue, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, Type type, Attribute initialValue,
+      ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
+      OpBuilder &builder, OperationState &result, StringRef name, bool isMutable,
       Type type, ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
@@ -201,7 +203,7 @@ def FLOW_DispatchRegionOp : FLOW_PureOp<"dispatch.region", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
+      OpBuilder &builder, OperationState &state, ArrayRef<Type> resultTypes,
       Value workload, ValueRange args,
       ArrayRef<NamedAttribute> attributes = {}
     }]>,
@@ -222,7 +224,7 @@ def FLOW_ReturnOp : FLOW_Op<"return", [Terminator]> {
 
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result
+      OpBuilder &builder, OperationState &result
     }], [{
       build(builder, result, llvm::None);
     }]>,
@@ -256,7 +258,7 @@ def FLOW_ExecutableOp : FLOW_Op<"executable", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, StringRef name
+      OpBuilder &builder, OperationState &state, StringRef name
     }]>,
   ];
 
@@ -325,14 +327,14 @@ def FLOW_DispatchOp : FLOW_PureOp<"dispatch", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef executable,
+      OpBuilder &builder, OperationState &result, StringRef executable,
       StringRef entryPoint, Value workload,
       ArrayRef<Type> results, ValueRange operands = {}
     }], [{
       result.addOperands({workload});
       result.addOperands(operands);
-      result.addAttribute("executable", builder->getSymbolRefAttr(executable));
-      result.addAttribute("entry_point", builder->getSymbolRefAttr(entryPoint));
+      result.addAttribute("executable", builder.getSymbolRefAttr(executable));
+      result.addAttribute("entry_point", builder.getSymbolRefAttr(entryPoint));
       result.addTypes(results);
     }]>,
   ];
@@ -601,7 +603,7 @@ def FLOW_ExStreamFragmentOp : FLOW_PureOp<"ex.stream.fragment", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &state, ArrayRef<Type> resultTypes,
+      OpBuilder &builder, OperationState &state, ArrayRef<Type> resultTypes,
       ValueRange args, ArrayRef<NamedAttribute> attributes = {}
     }]>,
   ];
