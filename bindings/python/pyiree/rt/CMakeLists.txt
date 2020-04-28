@@ -30,6 +30,7 @@ iree_py_extension(
   DEPS
     iree::hal::vulkan::vulkan_driver_module
     iree::hal::llvmjit::llvmjit_driver_module
+    iree::hal::vmla::vmla_driver_module
     ::rt_library
     bindings::python::pyiree::common
     iree::base::initializer
