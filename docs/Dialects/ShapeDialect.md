@@ -77,6 +77,104 @@ Usage:
 | :----: | ----------- |
 `result` | Ranked shape type
 
+### `shapex.from_extent_tensor` (Shape::FromExtentTensorOp)
+
+Convert a tensor of extents to a ranked shape.
+
+Convert a rank-1 tensor of integers to a !shapex.ranked_shape.
+
+Examples:
+%t0 = "shapex.from_dimension_tensor"(%rs0)
+  : (tensor<3xi32>)
+  -> !shapex.ranked_shape<[?,?,?],i32>
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`extent_tensor` | a 1D tensor of extents of index or signless integer values
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`shape` | Ranked shape type
+
+### `shapex.gather_extents` (Shape::GatherExtentsOp)
+
+Gather extents across shapes.
+
+Gathers extents across the !shapex.ranked_shape's in `shapes`.
+
+This op conceptually performs the following operation:
+1. The extents of all shapes in `shapes` are concatenated together into
+   a single list.
+2. The resulting shape is constructed by extracting extents from the
+   combined list according to `indices`.
+In pseudocode:
+```
+shapes = ... # a list of lists of extents
+# Example: shapes = [[3,-1],[2,7]]
+extents = [extent for extent in shape for shape in shapes]
+# Example: extents = [3,-1,2,7]
+# or to use another terminology: `extents = flatmap(shapes)`
+results = [extents[index] for index in indices]
+```
+
+A large class of shape manipulations can be canonicalized into this op,
+including:
+- taking slices of shapes
+- concatenating shapes
+- permuting shapes
+The intuition behind this op is that eventually each extent will be
+exploded into its own SSA value. At which point, this op merely becomes
+and identification of each SSA value of the output extents with an
+SSA value of the input extents.
+This op has the useful property that is closed under composition with
+itself, thus allowing an arbitrarily complex subgraph consisting of just
+this op to be folded together.
+
+Some examples of shape transfer functions captured with this op:
+
+- Taking the last two extents of a shape:
+  - [d0,d1,d2,d3] indices=[2,3] -> [d2,d3]
+- Concatenating three shapes:
+  - [d0,d1] [d2,d3] [d4,d5] indices=[0,1,2,3,4,5] -> [d0,d1,d2,d3,d4,d5]
+- Shape transfer function for transpose with permutation [0,2,1]:
+  - [d0,d1,d2] indices=[0,2,1] -> [d0,d2,d1]
+- Shape transfer function for outer product of a vector with itself:
+  - Initial state: [d0] [d1] indices=[0,1] -> [d0,d1]
+  - Canonicalized to a single-operand op after observing that both inputs
+    are the same !shapex.ranked_shape value: [d0] indices=[0,0] -> [d0,d0]
+- Shape transfer function for matmul with a batch dimension on the LHS:
+  - [d0,d1,d2] [d4,d5] indices=[0,1,2,5] -> [d0,d1,d2,d5]
+
+This op is somewhat inspired by the LLVM `shufflevector` instruction.
+
+Possible future pretty syntax for single-arg case:
+%rs = shapex.gather_extents %0[0,2,1] : !shapex.ranked_shape<[5,6,7]>
+Consider a pretty syntax for "concat":
+%rs = shapex.gather_extents concat(%0, %1) : !shapex.ranked_shape<[5,6,7]>, !shapex.ranked_shape<[8,9]>
+
+
+#### Attributes:
+
+| Attribute | MLIR Type | Description |
+| :-------: | :-------: | ----------- |
+`indices` | DenseIntElementsAttr | 64-bit signless integer elements attribute
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`shapes` | Ranked shape type
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`result` | Ranked shape type
+
 ### `shapex.get_ranked_shape` (Shape::GetRankedShapeOp)
 
 Gets the RankedShape associated with the given Tensor.
@@ -302,3 +400,28 @@ Usage:
 | Result | Description |
 | :----: | ----------- |
 `result` | any type
+
+### `shapex.to_extent_tensor` (Shape::ToExtentTensorOp)
+
+Convert a ranked shape to a tensor of extents.
+
+Convert a !shapex.ranked_shape to a rank-1 tensor of integers.
+
+Examples:
+%t0 = "shapex.to_extent_tensor"(%rs0)
+  : (!shapex.ranked_shape<[3,?,5]>)
+  -> tensor<3xi32>
+The resulting tensor will, for example, have elements [3,4,5] if the
+dynamic dimension is 4 at runtime.
+
+#### Operands:
+
+| Operand | Description |
+| :-----: | ----------- |
+`shape` | Ranked shape type
+
+#### Results:
+
+| Result | Description |
+| :----: | ----------- |
+`extent_tensor` | a 1D tensor of extents of index or signless integer values
