@@ -278,6 +278,13 @@ We insert the relevant transposes as needed in the compiler.
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.buffer.alloc` `byte_length` `=` $byte_length attr-dict `:` type($result)
+```
+
+
 
 #### Operands:
 
@@ -293,6 +300,13 @@ We insert the relevant transposes as needed in the compiler.
 
 ### `vmla.buffer.byte_length` (IREE::VMLA::BufferByteLengthOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.buffer.byte_length` $value attr-dict `:` type($result)
+```
 
 
 
@@ -312,6 +326,13 @@ We insert the relevant transposes as needed in the compiler.
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.buffer.clone` $src attr-dict `:` type($result)
+```
+
+
 
 #### Operands:
 
@@ -327,6 +348,13 @@ We insert the relevant transposes as needed in the compiler.
 
 ### `vmla.buffer.const` (IREE::VMLA::BufferConstOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.buffer.const` $value attr-dict `:` type($value) `->` type($result)
+```
 
 
 
@@ -346,6 +374,15 @@ We insert the relevant transposes as needed in the compiler.
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.buffer.copy` $src`[`$src_byte_offset`]``,`
+              `out` $dst`[`$dst_byte_offset`]``,` `byte_length` `=` $byte_length
+              attr-dict
+```
+
+
 
 #### Operands:
 
@@ -361,6 +398,13 @@ We insert the relevant transposes as needed in the compiler.
 
 
 
+Syntax:
+
+```
+operation ::= `vmla.buffer.fill` $value`,` `out` $dst attr-dict
+```
+
+
 
 #### Operands:
 
@@ -371,6 +415,13 @@ We insert the relevant transposes as needed in the compiler.
 
 ### `vmla.buffer.load.i32` (IREE::VMLA::BufferLoadI32Op)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.buffer.load.i32` $src`[`$byte_offset`]` attr-dict `:` type($result)
+```
 
 
 
@@ -389,6 +440,14 @@ We insert the relevant transposes as needed in the compiler.
 
 ### `vmla.buffer.view` (IREE::VMLA::BufferViewOp)
 
+
+
+Syntax:
+
+```
+operation ::= `vmla.buffer.view` $src`[`$byte_offset`]``,` `byte_length` `=` $byte_length
+              attr-dict `:` type($result)
+```
 
 
 
