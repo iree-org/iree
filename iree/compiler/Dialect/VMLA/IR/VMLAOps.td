@@ -407,9 +407,9 @@ def VMLA_BatchMatMulOp : VMLA_Op<"batch.matmul", [VMLA_OpInterface, VMLA_Include
   }];
 
   let assemblyFormat = [{
-    $lhs `:` $lhs_type`(`$lhs_shape `:` type($lhs_shape)`)``,`
-    $rhs `:` $rhs_type`(`$rhs_shape `:` type($rhs_shape)`)``,`
-    `out` $dst `:` $dst_type`(`$dst_shape `:` type($dst_shape)`)` attr-dict
+    $lhs`(`$lhs_shape `:` type($lhs_shape)`)` `:` $lhs_type`,`
+    $rhs`(`$rhs_shape `:` type($rhs_shape)`)` `:` $rhs_type`,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` `:` $dst_type attr-dict
   }];
 }
 
