@@ -73,10 +73,12 @@ package(
         ],
         main = "keras_vision_model_test.py",
         python_version = "PY3",
-        # TODO(b/145815906) Get this running in OSS CI.
+        # TODO(rybakov): Get this down to a manageable size for CI.
         tags = [
             "large",
             "manual",
+            "noga",
+            "notap",
         ],
         deps = INTREE_TENSORFLOW_PY_DEPS + NUMPY_DEPS + [
             "//integrations/tensorflow/bindings/python/pyiree/tf/support",
