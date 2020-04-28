@@ -50,7 +50,9 @@ func @shapeExpansion(%arg0 : !vmla.buffer, %arg1 : index, %arg2 : !vmla.buffer, 
   // CHECK-DAG: %c4 = vm.const.i32 4 : i32
   // CHECK-DAG: %c8 = vm.const.i32 8 : i32
   // CHECK-NEXT: vm.call.variadic @vmla.transpose.x16(%arg0, [%c4, %arg1, %c8], [%c1], %arg2, [%arg3, %c4, %c8]) : (!vm.ref<!vmla.buffer>, i32..., i32..., !vm.ref<!vmla.buffer>, i32...)
-  "vmla.transpose"(%arg0, %rs0, %arg2, %rs1) { permutation = dense<[1]> : tensor<1xi32>, element_type = i16 } : (!vmla.buffer, !shapex.ranked_shape<[4,?,8]>, !vmla.buffer, !shapex.ranked_shape<[?,4,8]>) -> ()
+  vmla.transpose %arg0(%rs0 : !shapex.ranked_shape<[4,?,8]>),
+                 out %arg2(%rs1 : !shapex.ranked_shape<[?,4,8]>)
+                 {permutation = dense<[1]> : tensor<1xi32>} : i16
   return
 }
 
@@ -59,7 +61,7 @@ func @shapeExpansion(%arg0 : !vmla.buffer, %arg1 : index, %arg2 : !vmla.buffer, 
 // CHECK-LABEL: vm.func @convert
 func @convert(%arg0 : !vmla.buffer, %arg1 : !vmla.buffer) {
   // CHECK-NEXT:  vm.call @vmla.convert.f32.i8(%arg0, %arg1)
-  "vmla.convert"(%arg0, %arg1) { src_type = f32, dst_type = i8 } : (!vmla.buffer, !vmla.buffer) -> ()
+  vmla.convert %arg0, out %arg1 : f32 -> i8
   return
 }
 
@@ -76,13 +78,8 @@ func @batch_matmul(
   %rhs_shape = shapex.make_ranked_shape %rhs_dim : (index) -> !shapex.ranked_shape<[3,?,4]>
   %dst_shape = shapex.const_ranked_shape : !shapex.ranked_shape<[3,4,4]>
   // CHECK: vm.call.variadic @vmla.batch.matmul.f32f32.f32(%arg0, [%c3, %c4, %arg1], %arg2, [%c3, %arg3, %c4], %arg4, [%c3, %c4, %c4])
-  "vmla.batch.matmul"(%lhs, %lhs_shape, %rhs, %rhs_shape, %dst, %dst_shape)
-      { lhs_type = f32, rhs_type = f32, dst_type = f32 } :
-      (!vmla.buffer,
-       !shapex.ranked_shape<[3,4,?]>,
-       !vmla.buffer,
-       !shapex.ranked_shape<[3,?,4]>,
-       !vmla.buffer,
-       !shapex.ranked_shape<[3,4,4]>) -> ()
+  vmla.batch.matmul %lhs(%lhs_shape : !shapex.ranked_shape<[3,4,?]>) : f32,
+                    %rhs(%rhs_shape : !shapex.ranked_shape<[3,?,4]>) : f32,
+                    out %dst(%dst_shape : !shapex.ranked_shape<[3,4,4]>) : f32
   return
 }

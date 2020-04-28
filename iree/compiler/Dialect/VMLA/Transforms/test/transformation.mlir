@@ -22,7 +22,7 @@ hal.interface @legacy_io attributes {sym_visibility = "private"} {
 // CHECK-NEXT:   %0 = "vmla.interface.binding"(%arg0) {binding = 0 : i32, set = 0 : i32} : (!vmla.interface) -> !vmla.buffer
 // CHECK-NEXT:   %1 = "vmla.buffer.view"(%0, %c0, %c16) : (!vmla.buffer, index, index) -> !vmla.buffer
 // CHECK-NEXT:   %2 = "vmla.buffer.alloc"(%c16) : (index) -> !vmla.buffer
-// CHECK-NEXT:   vmla.add(%1, %1, %2) : f32
+// CHECK-NEXT:   vmla.add %1, %1, out %2 : f32
 // CHECK-NEXT:   %3 = "vmla.interface.binding"(%arg0) {binding = 1 : i32, set = 0 : i32} : (!vmla.interface) -> !vmla.buffer
 // CHECK-NEXT:   "vmla.buffer.copy"(%2, %c0, %3, %c0, %c16) : (!vmla.buffer, index, !vmla.buffer, index, index) -> ()
 // CHECK-NEXT:   return

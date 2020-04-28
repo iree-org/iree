@@ -178,6 +178,11 @@ def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
+
+  let assemblyFormat = [{
+    $src`(`$src_shape `:` type($src_shape)`)``,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+  }];
 }
 
 def VMLA_ReverseOp : VMLA_ElementTypeOp<"reverse", [VMLA_IncludeShapes]> {
@@ -296,6 +301,10 @@ def VMLA_ConvertOp : VMLA_Op<"convert", [VMLA_OpInterface]> {
       state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
     }
   }];
+
+  let assemblyFormat = [{
+    $src`,` `out` $dst attr-dict `:` $src_type `->` $dst_type
+  }];
 }
 
 //===----------------------------------------------------------------------===//
@@ -369,6 +378,11 @@ def VMLA_BatchMatMulPseudoOp : VMLA_Op<"batch.matmul.pseudo"> {
   let results = (outs
     AnyTensor:$dst
   );
+
+  let assemblyFormat = [{
+    $lhs`,` $rhs attr-dict `:`
+    `(`type($lhs)`,` type($rhs)`)` `->` type($dst)
+  }];
 }
 
 def VMLA_BatchMatMulOp : VMLA_Op<"batch.matmul", [VMLA_OpInterface, VMLA_IncludeShapes]> {
@@ -390,6 +404,12 @@ def VMLA_BatchMatMulOp : VMLA_Op<"batch.matmul", [VMLA_OpInterface, VMLA_Include
       state.addAttribute("rhs_type", TypeAttr::get(operandTypes[1]));
       state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
     }
+  }];
+
+  let assemblyFormat = [{
+    $lhs`(`$lhs_shape `:` type($lhs_shape)`)` `:` $lhs_type`,`
+    $rhs`(`$rhs_shape `:` type($rhs_shape)`)` `:` $rhs_type`,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` `:` $dst_type attr-dict
   }];
 }
 

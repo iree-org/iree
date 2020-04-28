@@ -12,7 +12,7 @@ func @inc_rgn_dispatch_0() attributes {iree.module.export} {
   // CHECK-NEXT: %[[ARG0:.+]] = "vmla.buffer.view"(%[[SET0BINDING0]], %[[C0]], %[[C4]])
   %0 = hal.interface.load.tensor @legacy_io::@arg0, offset = %c0 : tensor<f32>
   // CHECK-NEXT: %[[TEMP:.+]] = "vmla.buffer.alloc"(%[[C4]])
-  // CHECK-NEXT: vmla.add(%[[ARG0]], %[[CST1]], %[[TEMP]]) : f32
+  // CHECK-NEXT: vmla.add %[[ARG0]], %[[CST1]], out %[[TEMP]] : f32
   %1 = xla_hlo.add %0, %cst : tensor<f32>
   // CHECK-NEXT: %[[SET0BINDING1:.+]] = "vmla.interface.binding"([[INTERFACE]]) {binding = 1 : i32, set = 0 : i32}
   // CHECK-NEXT: "vmla.buffer.copy"(%[[TEMP]], %[[C0]], %[[SET0BINDING1]], %[[C0]], %[[C4]])

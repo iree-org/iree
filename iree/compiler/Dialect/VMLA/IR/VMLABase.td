@@ -171,7 +171,7 @@ class VMLA_UnaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []> :
     UnitAttr:$forceUnsigned
   );
 
-  let assemblyFormat = "`(`$src`,` $dst`)` attr-dict`:` $element_type";
+  let assemblyFormat = "$src`,` `out` $dst attr-dict `:` $element_type";
 }
 
 class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
@@ -185,7 +185,7 @@ class VMLA_BinaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
     UnitAttr:$forceUnsigned
   );
 
-  let assemblyFormat = "`(`$lhs`,` $rhs`,` $dst`)` attr-dict `:` $element_type";
+  let assemblyFormat = "$lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type";
 }
 
 class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
@@ -200,9 +200,7 @@ class VMLA_TernaryOp<string mnemonic, Attr typeAttr, list<OpTrait> traits = []>
     UnitAttr:$forceUnsigned
   );
 
-  let assemblyFormat = [{
-    `(`$a`,` $b`,` $c`,` $dst`)` attr-dict `:` $element_type
-  }];
+  let assemblyFormat = "$a`,` $b`,` $c`,` `out` $dst attr-dict `:` $element_type";
 }
 
 #endif  // IREE_DIALECT_VMLA_BASE
