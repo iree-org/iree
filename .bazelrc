@@ -25,9 +25,11 @@ build --copt=-Wno-unused-function
 # C++14 standard version is required.
 build --cxxopt=-std=c++14 --host_cxxopt=-std=c++14
 
-# Default to an optimized build.
+# Default to an optimized build with asserts.
+# This is a good compromise between runtime and debugability.
 # Override via: "-c dbg" or --compilation_mode=dbg
 build --compilation_mode=opt
+build --copt=-UNDEBUG
 
 # Disable visibility checks (works around some private deps in TensorFlow that
 # are being unbundled soon anyway).
