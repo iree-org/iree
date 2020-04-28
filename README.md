@@ -52,10 +52,10 @@ To build the website yourself, mimic the `Publish Documentation` action:
 #### Pushing to a Fork
 
 Pushing to the `gh-pages` branch on a fork will automatically publish a GitHub
-Pages website at `https://[NAME].github.io/iree/`. This is convenient, and will
-map 1:1 to what the website will look like on the main IREE repository, but it
-can be slow to iterate on and publishes content that might not be ready for
-sharing.
+Pages website at `https://[NAME].github.io/iree/` within 20 minutes. This is
+convenient, and will map 1:1 to what the website will look like on the main
+IREE repository, but it can be slow to iterate on and publishes content that
+might not be ready for sharing.
 
 #### Working Locally
 
