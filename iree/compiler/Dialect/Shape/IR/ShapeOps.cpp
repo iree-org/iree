@@ -246,12 +246,8 @@ void RankedDimsOp::build(OpBuilder &builder, OperationState &result,
 // That helper gives the attributes as an `ArrayRef<NamedAttribute>` which isn't
 // the nicest form.
 template <typename Attr>
-static Attr getRequiredAttr(ArrayRef<NamedAttribute> attributes,
-                            StringRef name) {
-  auto it = llvm::find_if(
-      attributes, [&](NamedAttribute attr) { return attr.first == name; });
-  assert(it != attributes.end());
-  return it->second.template cast<Attr>();
+static Attr getRequiredAttr(DictionaryAttr attributes, StringRef name) {
+  return attributes.get(name).cast<Attr>();
 }
 
 /*static*/ SmallVector<int64_t, 6> GatherExtentsOp::getConcatenatedExtents(
@@ -284,7 +280,7 @@ static LogicalResult verifyGatherExtentsOp(GatherExtentsOp op) {
 
 LogicalResult GatherExtentsOp::inferReturnTypes(
     MLIRContext *context, Optional<Location> location, ValueRange operands,
-    ArrayRef<NamedAttribute> attributes, RegionRange regions,
+    DictionaryAttr attributes, RegionRange regions,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   // We can't infer the DimType of the result if there are no operands.
   // If a user requires this, then they should manually specify the return type.
@@ -307,7 +303,7 @@ LogicalResult GatherExtentsOp::inferReturnTypes(
 
 LogicalResult ToExtentTensorOp::inferReturnTypes(
     MLIRContext *context, Optional<Location> location, ValueRange operands,
-    ArrayRef<NamedAttribute> attributes, RegionRange regions,
+    DictionaryAttr attributes, RegionRange regions,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   auto inputType = operands[0].getType().cast<RankedShapeType>();
   inferredReturnTypes.push_back(
@@ -327,7 +323,7 @@ static bool isValidTensorOfExtents(RankedTensorType type) {
 
 LogicalResult FromExtentTensorOp::inferReturnTypes(
     MLIRContext *context, Optional<Location> location, ValueRange operands,
-    ArrayRef<NamedAttribute> attributes, RegionRange regions,
+    DictionaryAttr attributes, RegionRange regions,
     SmallVectorImpl<Type> &inferredReturnTypes) {
   auto inputType = operands[0].getType().dyn_cast<RankedTensorType>();
   if (!inputType || !isValidTensorOfExtents(inputType)) {

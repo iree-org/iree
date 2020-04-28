@@ -469,10 +469,10 @@ static ParseResult parseDispatchOp(OpAsmParser &parser,
                                     result->attributes))) {
     return failure();
   }
-  result->attributes[0].second =
-      parser.getBuilder().getSymbolRefAttr(executableAttr.getValue());
-  result->attributes[1].second =
-      parser.getBuilder().getSymbolRefAttr(entryPointAttr.getValue());
+  result->attributes.set("entry_point", parser.getBuilder().getSymbolRefAttr(
+                                            entryPointAttr.getValue()));
+  result->attributes.set("executable", parser.getBuilder().getSymbolRefAttr(
+                                           executableAttr.getValue()));
 
   OpAsmParser::OperandType workloadArg;
   Type workloadArgType;
