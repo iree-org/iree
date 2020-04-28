@@ -36,6 +36,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRInferTypeOpInterface
     MLIRParser
     MLIRSideEffects
     MLIRStandardOps
