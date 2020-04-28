@@ -8,7 +8,7 @@ func @slice_whole_buffer() -> tensor<3x4xi32> attributes { sym_visibility = "pri
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c48)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c48 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %c0, %c0,
   // CHECK-SAME: %[[DST]], %rs3_4, %c0, %c0,
@@ -33,7 +33,7 @@ func @slice_whole_stride() -> tensor<1x4xi32> attributes { sym_visibility = "pri
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c16)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c16 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %c1, %c0,
   // CHECK-SAME: %[[DST]], %rs1_4, %c0, %c0,
@@ -58,7 +58,7 @@ func @slice_stride_part() -> tensor<1x2xi32> attributes { sym_visibility = "priv
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c8)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c8 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %c1, %c1,
   // CHECK-SAME: %[[DST]], %rs1_2, %c0, %c0,
@@ -83,7 +83,7 @@ func @slice_multi_stride() -> tensor<2x4xi32> attributes { sym_visibility = "pri
     [05, 06, 07, 08],
     [09, 10, 11, 12]
   ]> : tensor<3x4xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c32)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c32 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[SRC]], %rs3_4, %c1, %c0,
   // CHECK-SAME: %[[DST]], %rs2_4, %c0, %c0,

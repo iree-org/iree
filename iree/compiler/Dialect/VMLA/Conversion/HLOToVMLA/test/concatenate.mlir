@@ -6,7 +6,7 @@ func @concatenate_0() -> (tensor<2x5xi32>) attributes { sym_visibility = "privat
   %c0 = constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
   // CHECK-DAG: %[[ARG1:.+]] = "vmla.constant"() {{.+}} tensor<2x3xi32>
   %c1 = constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c40)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c40 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[ARG0]], %rs2_2, %c0, %c0,
   // CHECK-SAME: %[[DST]], %rs2_5, %c0, %c0,
@@ -30,7 +30,7 @@ func @concatenate_1() -> (tensor<2x5xi32>) attributes { sym_visibility = "privat
   %c1 = constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
   // CHECK-DAG: %[[ARG1:.+]] = "vmla.constant"() {{.+}} tensor<2x2xi32>
   %c0 = constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c40)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c40 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[ARG0]], %rs2_3, %c0, %c0,
   // CHECK-SAME: %[[DST]], %rs2_5, %c0, %c0,
@@ -56,7 +56,7 @@ func @concatenate_2() -> (tensor<2x7xi32>) attributes { sym_visibility = "privat
   %c1 = constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
   // CHECK-DAG: %[[ARG2:.+]] = "vmla.constant"() {{.+}} tensor<2x2xi32>
   %c2 = constant dense<[[11, 12], [13, 14]]> : tensor<2x2xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c56)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c56 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[ARG0]], %rs2_2, %c0, %c0,
   // CHECK-SAME: %[[DST]], %rs2_7, %c0, %c0,
@@ -85,7 +85,7 @@ func @concatenate_3() -> (tensor<4x2xi32>) attributes { sym_visibility = "privat
   %c0 = constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
   // CHECK-DAG: %[[ARG1:.+]] = "vmla.constant"() {{.+}} tensor<2x2xi32>
   %c2 = constant dense<[[11, 12], [13, 14]]> : tensor<2x2xi32>
-  // CHECK: %[[DST:.+]] = "vmla.buffer.alloc"(%c32)
+  // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c32 : !vmla.buffer
   // CHECK: "vmla.copy"(
   // CHECK-SAME: %[[ARG0]], %rs2_2, %c0, %c0,
   // CHECK-SAME: %[[DST]], %rs4_2, %c0, %c0,

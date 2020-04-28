@@ -60,6 +60,8 @@ def VMLA_BufferConstOp : VMLA_PureOp<"buffer.const"> {
   let results = (outs
     VMLA_Buffer:$result
   );
+
+  let assemblyFormat = "$value attr-dict `:` type($value) `->` type($result)";
 }
 
 def VMLA_BufferAllocOp : VMLA_Op<"buffer.alloc"> {
@@ -69,6 +71,10 @@ def VMLA_BufferAllocOp : VMLA_Op<"buffer.alloc"> {
   let results = (outs
     VMLA_Buffer:$result
   );
+
+  let assemblyFormat = [{
+    `byte_length` `=` $byte_length attr-dict `:` type($result)
+  }];
 }
 
 def VMLA_BufferCloneOp : VMLA_Op<"buffer.clone"> {
@@ -78,6 +84,8 @@ def VMLA_BufferCloneOp : VMLA_Op<"buffer.clone"> {
   let results = (outs
     VMLA_Buffer:$result
   );
+
+  let assemblyFormat = "$src attr-dict `:` type($result)";
 }
 
 def VMLA_BufferByteLengthOp : VMLA_PureOp<"buffer.byte_length"> {
@@ -87,6 +95,8 @@ def VMLA_BufferByteLengthOp : VMLA_PureOp<"buffer.byte_length"> {
   let results = (outs
     VMLA_DeviceSize:$result
   );
+
+  let assemblyFormat = "$value attr-dict `:` type($result)";
 }
 
 def VMLA_BufferViewOp : VMLA_PureOp<"buffer.view"> {
@@ -98,6 +108,11 @@ def VMLA_BufferViewOp : VMLA_PureOp<"buffer.view"> {
   let results = (outs
     VMLA_Buffer:$result
   );
+
+  let assemblyFormat = [{
+    $src`[`$byte_offset`]``,` `byte_length` `=` $byte_length
+    attr-dict `:` type($result)
+  }];
 }
 
 def VMLA_BufferCopyOp : VMLA_Op<"buffer.copy"> {
@@ -108,6 +123,12 @@ def VMLA_BufferCopyOp : VMLA_Op<"buffer.copy"> {
     VMLA_DeviceSize:$dst_byte_offset,
     VMLA_DeviceSize:$byte_length
   );
+
+  let assemblyFormat = [{
+    $src`[`$src_byte_offset`]``,`
+    `out` $dst`[`$dst_byte_offset`]``,` `byte_length` `=` $byte_length
+    attr-dict
+  }];
 }
 
 def VMLA_BufferFillOp : VMLA_Op<"buffer.fill"> {
@@ -115,6 +136,8 @@ def VMLA_BufferFillOp : VMLA_Op<"buffer.fill"> {
     VMLA_Buffer:$value,
     VMLA_Buffer:$dst
   );
+
+  let assemblyFormat = "$value`,` `out` $dst attr-dict";
 }
 
 def VMLA_BufferLoadI32Op : VMLA_PureOp<"buffer.load.i32"> {
@@ -125,6 +148,8 @@ def VMLA_BufferLoadI32Op : VMLA_PureOp<"buffer.load.i32"> {
   let results = (outs
     I32:$result
   );
+
+  let assemblyFormat = "$src`[`$byte_offset`]` attr-dict `:` type($result)";
 }
 
 //===----------------------------------------------------------------------===//
