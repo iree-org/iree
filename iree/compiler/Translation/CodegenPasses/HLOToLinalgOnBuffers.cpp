@@ -180,7 +180,7 @@ struct DotOpConversion
 // -----------------------------------------------------------------------------
 
 namespace {
-/// Converts xla_hlo.convolution operation linalg.conv op
+/// Converts xla_hlo.convolution operation to linalg.conv op.
 struct ConvOpConversion
     : public ConvertToLinalgBufferOp<ConvOpConversion, xla_hlo::ConvOp,
                                      linalg::ConvOp> {
@@ -195,21 +195,20 @@ struct ConvOpConversion
 linalg::ConvOp ConvOpConversion::apply(
     xla_hlo::ConvOp op, ArrayRef<Value> args, ArrayRef<Value> results,
     ConversionPatternRewriter &rewriter) const {
-  if (op.dimension_numbers()) {
-    const auto dimensionNumbers = op.dimension_numbers();
+  if (const auto dimensionNumbers = op.dimension_numbers()) {
     const int inputSpatialRank =
-        std::distance(dimensionNumbers.input_spatial_dimensions().begin(),
-                      dimensionNumbers.input_spatial_dimensions().end());
-    // Input storage order is N,spatial_dims...,Ci.
+        llvm::size(dimensionNumbers.input_spatial_dimensions());
+    // The dimensions for input should follow the order of
+    // batch_count, spatial_dims..., input_feature_count.
     if (dimensionNumbers.input_batch_dimension().getInt() != 0 ||
         dimensionNumbers.input_feature_dimension().getInt() !=
             (inputSpatialRank + 1))
       return nullptr;
 
     const int kernelSpatialRank =
-        std::distance(dimensionNumbers.kernel_spatial_dimensions().begin(),
-                      dimensionNumbers.kernel_spatial_dimensions().end());
-    // Filter storage order is spatial_dims...,C, Co.
+        llvm::size(dimensionNumbers.kernel_spatial_dimensions());
+    // The dimensions for filter should follow the order of
+    // spatial_dims..., input_feature_count, num_output_feature_count.
     if (dimensionNumbers.kernel_input_feature_dimension().getInt() !=
             kernelSpatialRank ||
         dimensionNumbers.kernel_output_feature_dimension().getInt() !=
@@ -217,9 +216,9 @@ linalg::ConvOp ConvOpConversion::apply(
       return nullptr;
 
     const int outputSpatialRank =
-        std::distance(dimensionNumbers.output_spatial_dimensions().begin(),
-                      dimensionNumbers.output_spatial_dimensions().end());
-    // Output storage order is N,spatial_dims..,Co.
+        llvm::size(dimensionNumbers.output_spatial_dimensions());
+    // The dimensions for output should follow the order of
+    // batch_count, spatial_dims.., output_feature_count.
     if (dimensionNumbers.output_batch_dimension().getInt() != 0 ||
         dimensionNumbers.output_feature_dimension().getInt() !=
             (outputSpatialRank + 1))
@@ -245,32 +244,32 @@ linalg::ConvOp ConvOpConversion::apply(
   }
 
   llvm::SmallVector<Attribute, 4> strides;
-  llvm::SmallVector<Attribute, 4> dilation;
-  if (op.window_strides().hasValue()) {
-    auto range = op.window_strides().getValue().getAttributeValues();
+  if (auto windowStrides = op.window_strides()) {
+    auto range = windowStrides->getAttributeValues();
     strides.append(range.begin(), range.end());
   }
+  auto stridesArg = ArrayAttr::get(strides, op.getContext());
 
-  // TODO(ataei): Support dilated convolution only for now we need to add lhs
-  // for deconvolution support
-  if (op.rhs_dilation().hasValue()) {
-    auto range = op.rhs_dilation().getValue().getAttributeValues();
+  // TODO(ataei): Only support dilated convolution for now. We need to consider
+  // LHS dilation for deconvolution cases.
+  llvm::SmallVector<Attribute, 4> dilation;
+  if (auto rhsDilation = op.rhs_dilation()) {
+    auto range = rhsDilation->getAttributeValues();
     dilation.append(range.begin(), range.end());
   }
-
-  auto stridesArg = ArrayAttr::get(strides, op.getContext());
   auto dilationArg = ArrayAttr::get(dilation, op.getContext());
 
   // Set padding only if it is non-zero.
   DenseIntElementsAttr padding = op.paddingAttr();
-  return rewriter.create<linalg::ConvOp>(
-      op.getLoc(), args[1], args[0], results[0], stridesArg, dilationArg,
-      (padding && llvm::any_of(padding.getValues<APInt>(),
-                               [](APInt intVal) -> bool {
-                                 return intVal.getSExtValue();
-                               })
-           ? padding
-           : nullptr));
+  if (!padding || !llvm::any_of(padding.getValues<APInt>(), [](APInt intVal) {
+        return !intVal.isNullValue();
+      })) {
+    padding = nullptr;
+  }
+
+  return rewriter.create<linalg::ConvOp>(op.getLoc(), args[1], args[0],
+                                         results[0], stridesArg, dilationArg,
+                                         padding);
 }
 
 // ----------------------------------------------------------------------------
