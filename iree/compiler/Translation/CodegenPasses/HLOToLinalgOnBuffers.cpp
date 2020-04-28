@@ -406,98 +406,6 @@ linalg::IndexedGenericOp PadOpConversion::apply(
   return linalgOp;
 }
 
-// ----------------------------------------------------------------------------
-// xla_hlo.reshape conversion patterns and utility functions.
-// ----------------------------------------------------------------------------
-
-namespace {
-// Convert xla_hlo.reshape operation to linalg.copy op
-// This reshape conversion supports only expanding or collapsing a single
-// dimension.
-// TODO(ataei): This is a workaround having a single ReshapeOp in a dispatch
-// reigon. We should remove this once we have a linalg.ReshapeOp that can be
-// tiled and fused with other ops.
-struct ReshapeOpConversion
-    : public ConvertToLinalgBufferOp<ReshapeOpConversion, xla_hlo::ReshapeOp,
-                                     linalg::CopyOp> {
-  using ConvertToLinalgBufferOp<ReshapeOpConversion, xla_hlo::ReshapeOp,
-                                linalg::CopyOp>::ConvertToLinalgBufferOp;
-  linalg::CopyOp apply(xla_hlo::ReshapeOp op, ArrayRef<Value> args,
-                       ArrayRef<Value> results,
-                       ConversionPatternRewriter &rewriter) const;
-};
-}  // namespace
-
-// Finds a range [first, second) in dstShape where size(dstShape[first:second])
-// = srcShape[first]. eg srcShape = [2, 16, 3], dstShape = [1, 2, 2, 4, 3] will
-// return {1, 4}. If can't find such range it returns {-1, -1}.
-static std::pair<int64_t, int64_t> findRange(ArrayRef<int64_t> srcShape,
-                                             ArrayRef<int64_t> dstShape) {
-  const std::pair<int64_t, int64_t> invalidRange = {-1, -1};
-  int64_t start = 0, end = 0;
-  int64_t srcRank = srcShape.size();
-  int64_t dstRank = dstShape.size();
-  while (start < srcRank && srcShape[start] == dstShape[start]) start++;
-  if (start >= srcRank) return invalidRange;
-  int64_t size = srcShape[start];
-  int64_t dstSize = 1;
-  end = start;
-  while (end < dstRank) {
-    dstSize *= dstShape[end];
-    if (dstSize > size) break;
-    end++;
-  }
-  if (end > dstRank) return invalidRange;
-  // Check all remaining dims are equal.
-  int ss = start + 1;
-  int ee = end;
-  while (ss < srcRank && ee < dstRank) {
-    if (srcShape[ss++] != dstShape[ee++]) return invalidRange;
-  }
-  return {start, end};
-}
-
-linalg::CopyOp ReshapeOpConversion::apply(
-    xla_hlo::ReshapeOp op, ArrayRef<Value> args, ArrayRef<Value> results,
-    ConversionPatternRewriter &rewriter) const {
-  // Reassociate dims from
-  auto inShape = args[0].getType().cast<ShapedType>();
-  auto outShape = results[0].getType().cast<ShapedType>();
-
-  bool isCollapseDims = inShape.getRank() > outShape.getRank();
-
-  auto range = isCollapseDims
-                   ? findRange(outShape.getShape(), inShape.getShape())
-                   : findRange(inShape.getShape(), outShape.getShape());
-
-  if (range.first == -1 || range.second == -1) return nullptr;
-
-  llvm::SmallVector<llvm::SmallVector<AffineExpr, 4>, 4> exprs(
-      std::min(outShape.getRank(), inShape.getRank()));
-
-  SmallVector<ArrayRef<AffineExpr>, 4> reassociationMaps;
-
-  int dim = 0;
-  for (int i = 0; i < std::max(inShape.getRank(), outShape.getRank()); ++i) {
-    if (i >= range.first && i < range.second) {
-      for (int j = range.first; j < range.second; ++j) {
-        exprs[dim].push_back(rewriter.getAffineDimExpr(j));
-      }
-      i = range.second - 1;
-      dim++;
-    } else {
-      exprs[dim++].push_back(rewriter.getAffineDimExpr(i));
-    }
-  }
-  for (auto &expr : exprs) reassociationMaps.push_back(expr);
-
-  linalg::ReshapeOp reshapeOp = rewriter.create<linalg::ReshapeOp>(
-      op.getLoc(), results[0].getType(), args[0], reassociationMaps);
-
-  return rewriter.create<linalg::CopyOp>(op.getLoc(), reshapeOp.getResult(),
-                                         results[0]);
-}
-
 // -----------------------------------------------------------------------------
 // xla_hlo.reduce_window conversion patterns and utility functions.
 // -----------------------------------------------------------------------------
@@ -928,8 +836,8 @@ void populateHLOToLinalgOnBuffersConversionPatterns(
       .insert<ConvOpConversion, DotOpConversion, IREELoadInputOpConversion,
               IREEStoreOutputOpConversion,
               LinalgOpOnTensorConversion<linalg::GenericOp>, PadOpConversion,
-              ReshapeOpConversion, SingleReshapeOpInDispatchConversion,
-              TensorReshapeOpConversion>(context);
+              SingleReshapeOpInDispatchConversion, TensorReshapeOpConversion>(
+          context);
   // Reduce Operation conversions.
   patterns.insert<ReduceOpConversion, ReduceWindowOpConversion,
                   ReduceRegionXLAOpConversion<xla_hlo::AddOp>,

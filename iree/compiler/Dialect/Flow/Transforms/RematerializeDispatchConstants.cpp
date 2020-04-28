@@ -37,30 +37,20 @@ namespace Flow {
 
 namespace {
 
-// Chosen randomly for now. We can measure and see what makes sense.
-constexpr int64_t kMaxRematerializedConstantSizeInBytes = 1 * 1024;
-
-// Returns true if the constant value is under a certain threshold.
-// This threshold is fixed for all backends as a value that is assumed small
-// enough to be worth inlining possibly several times (at the cost of binary
-// bloat).
-bool isConstantSmall(ConstantOp constantOp) {
+// Returns true if the constant value is a splat constant and can be
+// rematerialized in a dispatch region.
+bool isSplatConstant(ConstantOp constantOp) {
   if (constantOp.getValue().isa<SplatElementsAttr>()) {
     // Splats are always small and can be much better handled by broadcasting
     // within the dispatch regions.
     return true;
   } else if (auto value = constantOp.getValue().dyn_cast<DenseElementsAttr>()) {
     return value.isSplat();
-  } else if (auto shapedType = constantOp.getType().dyn_cast<ShapedType>()) {
-    // Non-splat shaped constants can be large. We rely on the canonicalizer to
-    // make dense constants splats when possible.
-    return (shapedType.getSizeInBits() / 8) <=
-           kMaxRematerializedConstantSizeInBytes;
   }
 
   // Assume anything unshaped is small. This may not always be true in custom
   // dialects but is in std for now.
-  return true;
+  return false;
 }
 
 // Returns true if the dispatch region is allowed to have constants inside.
@@ -212,7 +202,7 @@ class RematerializeDispatchConstantsPass
     for (auto &block : getFunction()) {
       SmallVector<ConstantOp, 8> smallConstantOps;
       for (auto constantOp : block.getOps<ConstantOp>()) {
-        if (isConstantSmall(constantOp)) {
+        if (isSplatConstant(constantOp)) {
           smallConstantOps.push_back(constantOp);
         }
       }
