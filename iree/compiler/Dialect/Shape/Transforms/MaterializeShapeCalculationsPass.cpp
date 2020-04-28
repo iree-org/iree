@@ -67,6 +67,7 @@ class MaterializeShapeCalculationsPass
     GetRankedShapeOp::getCanonicalizationPatterns(patterns, context);
     MakeRankedShapeOp::getCanonicalizationPatterns(patterns, context);
     RankedDimOp::getCanonicalizationPatterns(patterns, context);
+    RankedDimsOp::getCanonicalizationPatterns(patterns, context);
     TieShapeOp::getCanonicalizationPatterns(patterns, context);
     applyPatternsAndFoldGreedily(getOperation(), patterns);
   }

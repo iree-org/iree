@@ -16,6 +16,8 @@
 
 #include "integrations/tensorflow/compiler/dialect/tf_strings/conversion/convert_tf_to_tf_strings.h"
 #include "integrations/tensorflow/compiler/dialect/tf_tensorlist/conversion/convert_tf_to_tf_tensorlist.h"
+#include "iree/compiler/Dialect/Shape/Conversion/Passes.h"
+#include "iree/compiler/Dialect/Shape/Transforms/Passes.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
@@ -26,6 +28,14 @@ namespace iree_compiler {
 // All IREE-specific passes that lower TF representations before reaching the
 // IREE core should go here.
 void createIreeTfImportPipeline(OpPassManager &pm) {
+  ////////////////////////////////////////////////////////////////////////////
+  // Lowering shape-related constructs.
+  ////////////////////////////////////////////////////////////////////////////
+  pm.addPass(Shape::createConvertHLOToShapePass());
+  pm.addPass(createConvertShapeToShapexPass());
+  // Clean up trivial redundancies.
+  pm.addPass(createCanonicalizerPass());
+
   ////////////////////////////////////////////////////////////////////////////
   // Lowering TensorList-related parts of tf dialect to tf_tensorlist dialect.
   ////////////////////////////////////////////////////////////////////////////

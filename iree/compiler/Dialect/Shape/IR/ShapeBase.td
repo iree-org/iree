@@ -52,4 +52,9 @@ def Shape_RankedShape :
 // be a useful feature.
 def Shape_DimType : AnyTypeOf<[Index, AnySignlessInteger]>;
 
+def Shape_ExtentTensor : ShapedContainerType<
+    [Index, AnySignlessInteger],
+    And<[IsTensorTypePred, HasAnyRankOfPred<[1]>]>,
+    "a 1D tensor of extents">;
+
 #endif  // IREE_DIALECT_SHAPE_BASE

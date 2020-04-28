@@ -56,7 +56,9 @@ LogicalResult elideTiedGetRankedShapePattern(
   // If the immediate predecessor is a TieShapeOp, then this op can be
   // erased in favor of the input to the tie op.
   auto tieOp = dyn_cast_or_null<TieShapeOp>(operands.operand().getDefiningOp());
-  if (!tieOp) return failure();
+  if (!tieOp) {
+    return rewriter.notifyMatchFailure(op, "no associated tie_shape op");
+  }
 
   rewriter.replaceOp(op, tieOp.shape());
   return success();
@@ -132,6 +134,26 @@ LogicalResult identityMakeRankedShapePattern(
          "dynamic ranked_shape did not find a common provider");
 
   rewriter.replaceOp(op, commonRankedDimOp.shape());
+  return success();
+}
+
+// TODO(silvasean): Better handling of "erase unused ops for legality".
+// Currently, the way that we legalize !shapex.ranked_shape into individual SSA
+// values per dimension is to iteratively reduce other ops to
+// shapex.ranked_dim/shapex.ranked_dims and shapex.make_ranked_shape and then
+// have patterns that know how to resolve the
+// shapex.ranked_dim/shapex.ranked_dims to scalar values by looking through the
+// shapex.make_ranked_shape ops, with the eventual goal of not having any uses
+// of the shapex.make_ranked_shape op itself, instead the main computation flow
+// using the individual SSA values. This naturally produces a lot of unused
+// shapex.make_ranked_shape ops which we need to delete for legality reasons.
+// This pattern allows conversions to erase those ops.
+LogicalResult eraseUnusedMakeRankedShapeOp(
+    MakeRankedShapeOp op, MakeRankedShapeOpOperandAdaptor operands,
+    PatternRewriter &rewriter) {
+  if (!op.getResult().use_empty())
+    return rewriter.notifyMatchFailure(op, "op has uses");
+  rewriter.eraseOp(op);
   return success();
 }
 
@@ -268,6 +290,28 @@ void RankedDimsOp::getCanonicalizationPatterns(
 }
 
 //===----------------------------------------------------------------------===//
+// shapex.from_extent_tensor
+//===----------------------------------------------------------------------===//
+
+LogicalResult fromExtentTensorOfToExtentTensorIsIdentity(
+    FromExtentTensorOp op, FromExtentTensorOpOperandAdaptor operands,
+    PatternRewriter &rewriter) {
+  auto toOp =
+      dyn_cast_or_null<ToExtentTensorOp>(op.extent_tensor().getDefiningOp());
+  if (!toOp) {
+    return failure();
+  }
+  rewriter.replaceOp(op, toOp.shape());
+  return success();
+}
+
+void FromExtentTensorOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &patterns, MLIRContext *context) {
+  insertGreedyPattern(patterns, context,
+                      fromExtentTensorOfToExtentTensorIsIdentity);
+}
+
+//===----------------------------------------------------------------------===//
 // Standard folding and canonicalization conversion patterns.
 //===----------------------------------------------------------------------===//
 
@@ -294,6 +338,7 @@ struct TieShapeTypeConversionPattern : public OpConversionPattern<TieShapeOp> {
 void populateFoldConversionPatterns(MLIRContext *context,
                                     OwningRewritePatternList &patterns) {
   patterns.insert<TieShapeTypeConversionPattern>(context);
+  insertConversionPattern(patterns, context, eraseUnusedMakeRankedShapeOp);
   insertConversionPattern(patterns, context, dynamicMakeRankedShapeDimPattern);
   insertConversionPattern(patterns, context,
                           elideDuplicateGetRankedShapePattern);
@@ -303,6 +348,8 @@ void populateFoldConversionPatterns(MLIRContext *context,
   insertConversionPattern(patterns, context, identityMakeRankedShapePattern);
   insertConversionPattern(patterns, context, elideStaticGetRankedShapePattern);
   insertConversionPattern(patterns, context, safeCastCompatibleShapePattern);
+  insertConversionPattern(patterns, context,
+                          fromExtentTensorOfToExtentTensorIsIdentity);
 }
 
 }  // namespace Shape

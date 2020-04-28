@@ -143,6 +143,22 @@ class BroadcastedRankedBinaryElementwiseConversion
   }
 };
 
+class ConvertDynamicBroadcastInDim
+    : public OpConversionPattern<xla_hlo::DynamicBroadcastInDimOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(
+      xla_hlo::DynamicBroadcastInDimOp op, ArrayRef<Value> operands,
+      ConversionPatternRewriter &rewriter) const override {
+    xla_hlo::DynamicBroadcastInDimOpOperandAdaptor adapter(operands);
+    Value rankedShape = rewriter.create<Shape::FromExtentTensorOp>(
+        op.getLoc(), adapter.output_dimensions());
+    rewriter.replaceOpWithNewOp<Shape::RankedBroadcastInDimOp>(
+        op, op.getType(), adapter.operand(), rankedShape,
+        op.broadcast_dimensions());
+    return success();
+  }
+};
+
 class ConvertHLOToShapePass
     : public PassWrapper<ConvertHLOToShapePass, FunctionPass> {
   void runOnFunction() override {
@@ -152,6 +168,9 @@ class ConvertHLOToShapePass
     conversionTarget.addLegalDialect<ShapeDialect>();
     conversionTarget.addLegalDialect<StandardOpsDialect>();
     conversionTarget.addLegalDialect<xla_hlo::XlaHloDialect>();
+
+    conversionTarget.addIllegalOp<xla_hlo::DynamicBroadcastInDimOp>();
+    conversionPatterns.insert<ConvertDynamicBroadcastInDim>(&getContext());
 
 #define CONVERT_BINARY_ELEMENTWISE_OP(HloOpTy)                             \
   conversionTarget.addDynamicallyLegalOp<HloOpTy>(                         \

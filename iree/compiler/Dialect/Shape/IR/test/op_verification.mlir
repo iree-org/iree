@@ -41,3 +41,10 @@ func @ranked_dim_out_of_range(%arg0 : !shapex.ranked_shape<[2,4]>) {
   %0 = shapex.ranked_dim %arg0[2] : !shapex.ranked_shape<[2,4]> -> index
   return
 }
+
+// -----
+
+func @compatible_from_extent_tensor(%arg0: tensor<1xindex>) {
+  %0 = "shapex.from_extent_tensor"(%arg0) : (tensor<1xindex>) -> !shapex.ranked_shape<[3]>
+  return
+}

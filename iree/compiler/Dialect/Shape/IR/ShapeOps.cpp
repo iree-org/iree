@@ -240,6 +240,115 @@ void RankedDimsOp::build(Builder *builder, OperationState &result,
   RankedDimsOp::build(builder, result, builder->getIndexType(), shape);
 }
 
+//===----------------------------------------------------------------------===//
+// shape.gather_extents
+//===----------------------------------------------------------------------===//
+
+// Helper for accessing attributes for inferReturnTypes callback.
+// That helper gives the attributes as an `ArrayRef<NamedAttribute>` which isn't
+// the nicest form.
+template <typename Attr>
+static Attr getRequiredAttr(ArrayRef<NamedAttribute> attributes,
+                            StringRef name) {
+  auto it = llvm::find_if(
+      attributes, [&](NamedAttribute attr) { return attr.first == name; });
+  assert(it != attributes.end());
+  return it->second.template cast<Attr>();
+}
+
+/*static*/ SmallVector<int64_t, 6> GatherExtentsOp::getConcatenatedExtents(
+    ValueRange values) {
+  SmallVector<int64_t, 6> ret;
+  for (auto type : values.getTypes()) {
+    auto rankedShape = type.cast<RankedShapeType>();
+    ret.append(rankedShape.getAllDims().begin(),
+               rankedShape.getAllDims().end());
+  }
+  return ret;
+}
+
+static LogicalResult verifyGatherExtentsOp(GatherExtentsOp op) {
+  int64_t totalExtents = 0;
+  for (Type type : op.shapes().getTypes()) {
+    totalExtents += type.cast<RankedShapeType>().getRank();
+  }
+
+  for (int64_t index : op.indices().getValues<int64_t>()) {
+    if (index >= totalExtents) {
+      return op.emitError() << "index " << index
+                            << " exceeds total number of extents of operands ("
+                            << totalExtents << ")";
+    }
+  }
+
+  return success();
+}
+
+LogicalResult GatherExtentsOp::inferReturnTypes(
+    MLIRContext *context, Optional<Location> location, ValueRange operands,
+    ArrayRef<NamedAttribute> attributes, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  // We can't infer the DimType of the result if there are no operands.
+  // If a user requires this, then they should manually specify the return type.
+  // We could in theory use an index type here (the default).
+  assert(!operands.empty() && "inferring return type for empty operands");
+  auto indices = getRequiredAttr<DenseIntElementsAttr>(attributes, "indices")
+                     .getValues<int64_t>();
+  auto inputExtents = getConcatenatedExtents(operands);
+  SmallVector<int64_t, 6> resultExtents;
+  for (auto index : indices) {
+    resultExtents.push_back(inputExtents[index]);
+  }
+  inferredReturnTypes.push_back(RankedShapeType::get(resultExtents, context));
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// shapex.to_extent_tensor
+//===----------------------------------------------------------------------===//
+
+LogicalResult ToExtentTensorOp::inferReturnTypes(
+    MLIRContext *context, Optional<Location> location, ValueRange operands,
+    ArrayRef<NamedAttribute> attributes, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  auto inputType = operands[0].getType().cast<RankedShapeType>();
+  inferredReturnTypes.push_back(
+      RankedTensorType::get({inputType.getRank()}, IndexType::get(context)));
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// shapex.from_extent_tensor
+//===----------------------------------------------------------------------===//
+
+static bool isValidTensorOfExtents(RankedTensorType type) {
+  // If the tensor of extents is not static shapes, that would imply that the
+  // tensor whose shape it is describing is unranked.
+  return type.getRank() == 1 && type.hasStaticShape();
+}
+
+LogicalResult FromExtentTensorOp::inferReturnTypes(
+    MLIRContext *context, Optional<Location> location, ValueRange operands,
+    ArrayRef<NamedAttribute> attributes, RegionRange regions,
+    SmallVectorImpl<Type> &inferredReturnTypes) {
+  auto inputType = operands[0].getType().dyn_cast<RankedTensorType>();
+  if (!inputType || !isValidTensorOfExtents(inputType)) {
+    return failure();
+  }
+  SmallVector<int64_t, 6> extents(inputType.getDimSize(0),
+                                  static_cast<int64_t>(-1));
+  inferredReturnTypes.push_back(RankedShapeType::get(extents, context));
+  return success();
+}
+
+bool FromExtentTensorOp::isCompatibleReturnTypes(ArrayRef<Type> lhs,
+                                                 ArrayRef<Type> rhs) {
+  auto lhsRs = lhs[0].cast<RankedShapeType>();
+  auto rhsRs = rhs[0].cast<RankedShapeType>();
+  return succeeded(
+      verifyCompatibleShape(lhsRs.getAllDims(), rhsRs.getAllDims()));
+}
+
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/Shape/IR/ShapeOps.cpp.inc"
 

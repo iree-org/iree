@@ -103,6 +103,44 @@ Value rewriteShapexRankedBroadcastShape(
                                            filteredResultExtents);
 }
 
+LogicalResult expandGatherExtentsOp(GatherExtentsOp op,
+                                    GatherExtentsOp::OperandAdaptor operands,
+                                    PatternRewriter &rewriter) {
+  // Calculate cumulative sums of the ranks of each operand, which allows
+  // us to map each index to its corresponding operand easily.
+  SmallVector<int64_t, 6> cumsum;
+  cumsum.push_back(0);
+  for (auto operand : operands.shapes()) {
+    auto rank = operand.getType().cast<Shape::RankedShapeType>().getRank();
+    cumsum.push_back(cumsum.back() + rank);
+  }
+
+  // For each index, extract the relevant extent from the operands.
+  SmallVector<Value, 6> extents;
+  for (auto index : op.indices().getValues<int64_t>()) {
+    auto it = llvm::upper_bound(cumsum, index) - 1;
+    auto operandNum = std::distance(cumsum.begin(), it);
+    auto dimNum = index - *it;
+    auto extent = rewriter.create<Shape::RankedDimOp>(
+        op.getLoc(), operands.shapes()[operandNum], dimNum);
+    extents.push_back(extent);
+  }
+
+  // Due to a quirk of MakeRankedShapeOp, we only want the dynamic
+  // dimensions.
+  SmallVector<Value, 6> onlyDynamicExtents;
+  auto resultType = op.result().getType().cast<Shape::RankedShapeType>();
+  for (int i = 0, e = resultType.getRank(); i < e; i++) {
+    if (resultType.isDimDynamic(i)) {
+      onlyDynamicExtents.push_back(extents[i]);
+    }
+  }
+
+  rewriter.replaceOpWithNewOp<Shape::MakeRankedShapeOp>(op, resultType,
+                                                        onlyDynamicExtents);
+  return success();
+}
+
 LogicalResult expandRankedBroadcastShapePattern(
     RankedBroadcastShapeOp bcastOp,
     RankedBroadcastShapeOp::OperandAdaptor operands,
@@ -234,12 +272,15 @@ void setupMaterializeShapeCalculationsLegality(ConversionTarget &target) {
   // We explicitly want to convert these ops, eliminating them.
   target.addIllegalOp<GetRankedShapeOp>();
   target.addIllegalOp<RankedBroadcastShapeOp>();
+  target.addIllegalOp<GatherExtentsOp>();
 }
 
 void populateMaterializeShapeCalculationsConversionPatterns(
     OwningRewritePatternList &patterns, MLIRContext *context) {
   // Fallback patterns.
   insertConversionPattern(patterns, context, expandRankedBroadcastShapePattern,
+                          /*benefit=*/1);
+  insertConversionPattern(patterns, context, expandGatherExtentsOp,
                           /*benefit=*/1);
   insertConversionPattern(patterns, context, materializeRankedShapePattern,
                           /*benefit=*/1);
