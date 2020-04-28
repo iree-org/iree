@@ -44,7 +44,7 @@ Value genPointerOffset(OpBuilder &builder, Location loc,
 
   SmallVector<Value, 2> accessIndices;
   auto i32Type = builder.getIntegerType(32);
-  auto zero = spirv::ConstantOp::getZero(i32Type, loc, &builder);
+  auto zero = spirv::ConstantOp::getZero(i32Type, loc, builder);
   accessIndices.push_back(zero);
   if (varType.isa<spirv::ArrayType>()) {
     Value linearizedIndex =
@@ -339,7 +339,7 @@ LogicalResult SPIRVCodegenImpl::lowerFunction(
   }
   if (launchSizeVal.size() < 3)
     launchSizeVal.resize(
-        3, spirv::ConstantOp::getOne(integerType, fn.getLoc(), &builder));
+        3, spirv::ConstantOp::getOne(integerType, fn.getLoc(), builder));
   if (failed(createLaunchLoop(builder, entryFn, launchSizeVal, dimValues))) {
     return failure();
   }

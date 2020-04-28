@@ -148,39 +148,39 @@ static LogicalResult verifyVariableOp(VariableOp op) {
   return success();
 }
 
-void VariableOp::build(Builder *builder, OperationState &state, StringRef name,
-                       bool isMutable, FuncOp initializer,
+void VariableOp::build(OpBuilder &builder, OperationState &state,
+                       StringRef name, bool isMutable, FuncOp initializer,
                        ArrayRef<NamedAttribute> attrs) {
   state.addAttribute(SymbolTable::getSymbolAttrName(),
-                     builder->getStringAttr(name));
+                     builder.getStringAttr(name));
   if (isMutable) {
-    state.addAttribute("is_mutable", builder->getUnitAttr());
+    state.addAttribute("is_mutable", builder.getUnitAttr());
   }
-  state.addAttribute("initializer", builder->getSymbolRefAttr(initializer));
+  state.addAttribute("initializer", builder.getSymbolRefAttr(initializer));
   state.addAttribute("type", TypeAttr::get(initializer.getType().getResult(0)));
   state.attributes.append(attrs.begin(), attrs.end());
 }
 
-void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
-                       bool isMutable, Type type, Attribute initialValue,
-                       ArrayRef<NamedAttribute> attrs) {
+void VariableOp::build(OpBuilder &builder, OperationState &result,
+                       StringRef name, bool isMutable, Type type,
+                       Attribute initialValue, ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
+                      builder.getStringAttr(name));
   if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
+    result.addAttribute("is_mutable", builder.getUnitAttr());
   }
   result.addAttribute("initial_value", initialValue);
   result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
 }
 
-void VariableOp::build(Builder *builder, OperationState &result, StringRef name,
-                       bool isMutable, Type type,
+void VariableOp::build(OpBuilder &builder, OperationState &result,
+                       StringRef name, bool isMutable, Type type,
                        ArrayRef<NamedAttribute> attrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
-                      builder->getStringAttr(name));
+                      builder.getStringAttr(name));
   if (isMutable) {
-    result.addAttribute("is_mutable", builder->getUnitAttr());
+    result.addAttribute("is_mutable", builder.getUnitAttr());
   }
   result.addAttribute("type", TypeAttr::get(type));
   result.attributes.append(attrs.begin(), attrs.end());
@@ -263,7 +263,7 @@ static LogicalResult verifyVariableStoreIndirectOp(
 // flow.dispatch.region
 //===----------------------------------------------------------------------===//
 
-void DispatchRegionOp::build(Builder *builder, OperationState &state,
+void DispatchRegionOp::build(OpBuilder &builder, OperationState &state,
                              ArrayRef<Type> resultTypes, Value workload,
                              ValueRange args,
                              ArrayRef<NamedAttribute> attributes) {
@@ -366,11 +366,11 @@ void printDispatchRegionOp(OpAsmPrinter &p, DispatchRegionOp op) {
 // flow.executable
 //===----------------------------------------------------------------------===//
 
-void ExecutableOp::build(Builder *builder, OperationState &state,
+void ExecutableOp::build(OpBuilder &builder, OperationState &state,
                          StringRef name) {
-  ensureTerminator(*state.addRegion(), *builder, state.location);
+  ensureTerminator(*state.addRegion(), builder, state.location);
   state.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
-                     builder->getStringAttr(name));
+                     builder.getStringAttr(name));
 }
 
 static ParseResult parseExecutableOp(OpAsmParser &parser,
@@ -530,7 +530,7 @@ FunctionType DispatchOp::getEntryPointType() {
 // flow.ex.stream.fragment
 //===----------------------------------------------------------------------===//
 
-void ExStreamFragmentOp::build(Builder *builder, OperationState &state,
+void ExStreamFragmentOp::build(OpBuilder &builder, OperationState &state,
                                ArrayRef<Type> resultTypes, ValueRange operands,
                                ArrayRef<NamedAttribute> attributes) {
   state.addTypes(resultTypes);

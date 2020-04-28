@@ -60,7 +60,7 @@ def Shape_TieShapeOp : Shape_PureOp<"tie_shape",
     // Short-hand for building with a shape equivalent to the tensor operand
     // and 'index' dim type.
     OpBuilder<[{
-      Builder *builder, OperationState &result, Value operand, Value shape
+      OpBuilder &builder, OperationState &result, Value operand, Value shape
     }]>,
   ];
   let hasCanonicalizer = 1;
@@ -135,7 +135,7 @@ def Shape_GetRankedShapeOp : Shape_PureOp<"get_ranked_shape"> {
     // Short-hand for building with a shape equivalent to the tensor operand
     // and 'index' dim type.
     OpBuilder<[{
-      Builder *builder, OperationState &result, Value operand
+      OpBuilder &builder, OperationState &result, Value operand
     }]>,
   ];
 
@@ -213,7 +213,7 @@ def Shape_ConstRankedShapeOp : Shape_PureOp<"const_ranked_shape",
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, Type type
+      OpBuilder &builder, OperationState &result, Type type
       }]>,
   ];
   let verifier = [{ return verify$cppClass(*this); }];
@@ -263,12 +263,12 @@ def Shape_RankedDimOp : Shape_PureOp<"ranked_dim"> {
 
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result,
+      OpBuilder &builder, OperationState &result,
       Type dimType, Value shape, int index
     }]>,
     // dimType is defaulted to IndexType.
     OpBuilder<[{
-      Builder *builder, OperationState &result,
+      OpBuilder &builder, OperationState &result,
       Value shape, int index
     }]>,
   ];
@@ -302,10 +302,10 @@ def Shape_RankedDimsOp : Shape_PureOp<"ranked_dims"> {
 
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, Type dimType, Value shape
+      OpBuilder &builder, OperationState &result, Type dimType, Value shape
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, Value shape
+      OpBuilder &builder, OperationState &result, Value shape
     }]>,
   ];
 

@@ -18,6 +18,7 @@
 include "mlir/Interfaces/CallInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffects.td"
+include "mlir/IR/SymbolInterfaces.td"
 include "iree/compiler/Dialect/VM/IR/VMBase.td"
 
 class VM_PureOp<string mnemonic, list<OpTrait> traits = []> :
@@ -51,7 +52,7 @@ def VM_ModuleOp : VM_Op<"module", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &state, StringRef name
+      OpBuilder &, OperationState &state, StringRef name
     }]>,
   ];
 
@@ -97,7 +98,7 @@ def VM_FuncOp : VM_Op<"func", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name,
+      OpBuilder &builder, OperationState &result, StringRef name,
       FunctionType type, ArrayRef<NamedAttribute> attrs = {},
       ArrayRef<NamedAttributeList> argAttrs = {}
     }]>,
@@ -161,11 +162,11 @@ def VM_ExportOp : VM_Op<"export", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, FuncOp functionRef,
+      OpBuilder &builder, OperationState &result, FuncOp functionRef,
       StringRef exportName = "", ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, FlatSymbolRefAttr functionRef,
+      OpBuilder &builder, OperationState &result, FlatSymbolRefAttr functionRef,
       StringRef exportName = "", ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
@@ -191,7 +192,7 @@ def VM_ImportOp : VM_Op<"import", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name,
+      OpBuilder &builder, OperationState &result, StringRef name,
       FunctionType type, ArrayRef<NamedAttribute> attrs = {},
       ArrayRef<NamedAttributeList> argAttrs = {}
     }]>,
@@ -268,22 +269,24 @@ class VM_GlobalOp<string mnemonic, Attr attr_type, list<OpTrait> traits = []> :
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      Type type,
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, Type type,
       Optional<StringRef> initializer, Optional<Attribute> initialValue,
       ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      IREE::VM::FuncOp initializer, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, IREE::VM::FuncOp initializer,
+      ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      Type type, Attribute initialValue, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, Type type, Attribute initialValue,
+      ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name, bool isMutable,
-      Type type, ArrayRef<NamedAttribute> attrs = {}
+      OpBuilder &builder, OperationState &result, StringRef name,
+      bool isMutable, Type type, ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
 
@@ -531,10 +534,10 @@ class VM_ConstOp<string mnemonic, string ctype, list<OpTrait> traits = []> :
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, Attribute value
+      OpBuilder &builder, OperationState &result, Attribute value
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, }] # ctype # [{ value
+      OpBuilder &builder, OperationState &result, }] # ctype # [{ value
     }]>,
   ];
 
@@ -598,7 +601,7 @@ def VM_ConstI32ZeroOp : VM_PureOp<"const.i32.zero", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result
+      OpBuilder &builder, OperationState &result
     }]>,
   ];
 
@@ -629,7 +632,7 @@ def VM_ConstRefZeroOp : VM_PureOp<"const.ref.zero", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, Type objectType
+      OpBuilder &builder, OperationState &result, Type objectType
     }]>,
   ];
 
@@ -662,7 +665,7 @@ def VM_RodataOp : VM_Op<"rodata", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef name,
+      OpBuilder &builder, OperationState &result, StringRef name,
       ElementsAttr value, ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
@@ -695,11 +698,11 @@ def VM_ConstRefRodataOp : VM_PureOp<"const.ref.rodata", [
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef rodataName,
+      OpBuilder &builder, OperationState &result, StringRef rodataName,
       ArrayRef<NamedAttribute> attrs = {}
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, RodataOp rodataOp,
+      OpBuilder &builder, OperationState &result, RodataOp rodataOp,
       ArrayRef<NamedAttribute> attrs = {}
     }]>,
   ];
@@ -1259,7 +1262,7 @@ def VM_BranchOp : VM_Op<"br", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Block *dest,
+      OpBuilder &, OperationState &result, Block *dest,
       ValueRange destOperands = {}
     }], [{
       result.addSuccessors(dest);
@@ -1325,14 +1328,14 @@ def VM_CondBranchOp : VM_Op<"cond_br", [
 
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, Value condition,
+      OpBuilder &builder, OperationState &result, Value condition,
       Block *trueDest, ValueRange trueOperands,
       Block *falseDest, ValueRange falseOperands
     }], [{
       build(builder, result, condition, trueOperands, falseOperands, trueDest,
             falseDest);
     }]>, OpBuilder<[{
-      Builder *builder, OperationState &result, Value condition,
+      OpBuilder &builder, OperationState &result, Value condition,
       Block *trueDest, Block *falseDest, ValueRange falseOperands = {}
     }], [{
       build(builder, result, condition, trueDest, ValueRange(), falseDest,
@@ -1461,15 +1464,15 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, IREE::VM::FuncOp callee,
+      OpBuilder &builder, OperationState &result, IREE::VM::FuncOp callee,
       ValueRange operands = {}
     }], [{
       result.addOperands(operands);
-      result.addAttribute("callee", builder->getSymbolRefAttr(callee));
+      result.addAttribute("callee", builder.getSymbolRefAttr(callee));
       result.addTypes(callee.getType().getResults());
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, FlatSymbolRefAttr callee,
+      OpBuilder &builder, OperationState &result, FlatSymbolRefAttr callee,
       ArrayRef<Type> resultTypes, ValueRange operands = {}
     }], [{
       result.addOperands(operands);
@@ -1477,10 +1480,10 @@ def VM_CallOp : VM_CallBaseOp<"call"> {
       result.addTypes(resultTypes);
     }]>,
     OpBuilder<[{
-      Builder *builder, OperationState &result, StringRef callee,
+      OpBuilder &builder, OperationState &result, StringRef callee,
       ArrayRef<Type> resultTypes, ValueRange operands = {}
     }], [{
-      build(builder, result, builder->getSymbolRefAttr(callee),
+      build(builder, result, builder.getSymbolRefAttr(callee),
             resultTypes, operands);
     }]>,
   ];
@@ -1519,7 +1522,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result, FlatSymbolRefAttr callee,
+      OpBuilder &builder, OperationState &result, FlatSymbolRefAttr callee,
       ArrayRef<Type> resultTypes, ArrayRef<int16_t> segmentSizes = {},
       ArrayRef<Type> segmentTypes = {}, ValueRange operands = {}
     }], [{
@@ -1527,9 +1530,9 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
       result.addAttribute("segment_sizes",
           DenseIntElementsAttr::get(
               VectorType::get({static_cast<int64_t>(segmentSizes.size())},
-                              builder->getIntegerType(16)),
+                              builder.getIntegerType(16)),
               segmentSizes));
-      result.addAttribute("segment_types", builder->getArrayAttr(
+      result.addAttribute("segment_types", builder.getArrayAttr(
           llvm::to_vector<4>(llvm::map_range(segmentTypes, [&](Type type) {
               return TypeAttr::get(type).cast<Attribute>();
           }))));
@@ -1570,7 +1573,7 @@ def VM_ReturnOp : VM_Op<"return", [
 
   let builders = [
     OpBuilder<[{
-      Builder *b, OperationState &result
+      OpBuilder &b, OperationState &result
     }], [{
       build(b, result, llvm::None);
     }]>,
@@ -1612,12 +1615,12 @@ def VM_FailOp : VM_Op<"fail", [
 
   let builders = [
     OpBuilder<[{
-      Builder *builder, OperationState &result,
+      OpBuilder &builder, OperationState &result,
       Value status, StringRef message = ""
     }], [{
       build(
           builder, result, status,
-          message.empty() ? StringAttr{} : builder->getStringAttr(message));
+          message.empty() ? StringAttr{} : builder.getStringAttr(message));
     }]>,
   ];
 
@@ -1747,7 +1750,7 @@ def VM_BreakOp : VM_Op<"break", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Block *dest,
+      OpBuilder &, OperationState &result, Block *dest,
       ValueRange destOperands = {}
     }], [{
       result.addSuccessors(dest);
@@ -1801,7 +1804,7 @@ def VM_CondBreakOp : VM_Op<"cond_break", [
 
   let builders = [
     OpBuilder<[{
-      Builder *, OperationState &result, Value condition, Block *dest,
+      OpBuilder &, OperationState &result, Value condition, Block *dest,
       ValueRange destOperands = {}
     }], [{
       result.addOperands({condition});

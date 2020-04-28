@@ -93,6 +93,7 @@ gentbl(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
@@ -141,6 +142,7 @@ iree_tablegen_doc(
     td_srcs = [
         ":td_files",
         "//iree/compiler/Dialect/IREE/IR:td_files",
+        "@llvm-project//mlir:include/mlir/IR/SymbolInterfaces.td",
         "@llvm-project//mlir:StdOpsTdFiles",
     ],
 )

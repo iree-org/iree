@@ -37,7 +37,7 @@ namespace IREE {
 // iree.do_not_optimize
 //===----------------------------------------------------------------------===//
 
-void DoNotOptimizeOp::build(Builder *builder, OperationState &state,
+void DoNotOptimizeOp::build(OpBuilder &builder, OperationState &state,
                             ValueRange operands,
                             ArrayRef<NamedAttribute> attributes) {
   state.addOperands(operands);
