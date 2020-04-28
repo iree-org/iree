@@ -23,6 +23,13 @@ the list of available backends).
 ## Running tests
 
 ```shell
+# For locally running tests and iterating on backend development,
+# `bazel run` is preferred.
+bazel run :math_test -- --override_backends=iree_vulkan
+
+# Same as above, but add `tf` backend to cross-check numerical correctness.
+bazel run :math_test -- --override_backends=tf,iree_vulkan
+
 # Run all tests with defaults and output on failure.
 bazel test ... --test_output=errors
 
@@ -30,8 +37,8 @@ bazel test ... --test_output=errors
 bazel test simple_arithmetic_test --test_output=streamed
 
 # Run tests with an altered list of backends.
-bazel test ... --test_output=errors -- \
-    --override_backends=tf,iree_vmla,iree_vulkan
+bazel test ... --test_output=errors \
+    --test_arg=--override_backends=tf,iree_vmla,iree_vulkan
 
 # (alternative) Run tests with an altered list of backends.
 bazel test ... --test_env=IREE_OVERRIDE_BACKENDS=tf,iree_vmla,iree_vulkan \
