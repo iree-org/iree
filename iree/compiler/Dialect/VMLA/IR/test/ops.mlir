@@ -105,3 +105,14 @@ func @vmla_select(%cond : !vmla.buffer,
   vmla.select %cond, %lhs, %rhs, out %dst : f16
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_interface_const
+// CHECK-SAME: %[[INTERFACE:[a-zA-Z0-9$._-]+]]
+func @vmla_interface_const(%interface : !vmla.interface) {
+  // CHECK:      vmla.interface.const %[[INTERFACE]]
+  // CHECK-SAME: {offset = 3 : index} : i32
+  vmla.interface.const %interface {offset = 3 : index} : i32
+  return
+}

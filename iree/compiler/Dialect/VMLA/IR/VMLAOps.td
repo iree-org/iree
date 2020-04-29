@@ -554,6 +554,10 @@ def VMLA_InterfaceConstOp :
   let results = (outs
     AnyTypeOf<[I32, VMLA_Index]>:$result
   );
+
+  let assemblyFormat = [{
+    $interface attr-dict `:` type($result)
+  }];
 }
 
 def VMLA_InterfaceBindingOp :
