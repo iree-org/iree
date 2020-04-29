@@ -1,0 +1,113 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      https://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Main entry function for custom-opt.
+// Based on the iree-opt main entry function (opt_main.cc).
+//
+// We need this entry function because we want to register the custom
+// dialect, which is missing in IREE's opt main entry function.
+
+#include "iree/compiler/Translation/CodegenPasses/Passes.h"
+#include "iree/compiler/Translation/SPIRV/init_translations.h"
+#include "iree/samples/custom_modules/dialect/init_dialect.h"
+#include "iree/tools/init_compiler_modules.h"
+#include "iree/tools/init_dialects.h"
+#include "iree/tools/init_passes.h"
+#include "iree/tools/init_targets.h"
+#include "llvm/Support/CommandLine.h"
+#include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/ToolOutputFile.h"
+#include "mlir/IR/AsmState.h"
+#include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/MlirOptMain.h"
+
+static llvm::cl::opt<std::string> inputFilename(llvm::cl::Positional,
+                                                llvm::cl::desc("<input file>"),
+                                                llvm::cl::init("-"));
+
+static llvm::cl::opt<std::string> outputFilename(
+    "o", llvm::cl::desc("Output filename"), llvm::cl::value_desc("filename"),
+    llvm::cl::init("-"));
+
+static llvm::cl::opt<bool> splitInputFile(
+    "split-input-file",
+    llvm::cl::desc("Split the input file into pieces and process each "
+                   "chunk independently"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> verifyDiagnostics(
+    "verify-diagnostics",
+    llvm::cl::desc("Check that emitted diagnostics match "
+                   "expected-* lines on the corresponding line"),
+    llvm::cl::init(false));
+
+static llvm::cl::opt<bool> verifyPasses(
+    "verify-each",
+    llvm::cl::desc("Run the verifier after each transformation pass"),
+    llvm::cl::init(true));
+
+static llvm::cl::opt<bool> allowUnregisteredDialects(
+    "allow-unregistered-dialect",
+    llvm::cl::desc("Allow operation with no registered dialects"),
+    llvm::cl::init(true));
+
+int main(int argc, char **argv) {
+  mlir::registerMlirDialects();
+  mlir::registerMlirPasses();
+  mlir::iree_compiler::registerIreeDialects();
+  mlir::iree_compiler::registerIreeCompilerModuleDialects();
+  // Register the custom dialect
+  mlir::iree_compiler::registerCustomDialect();
+  mlir::iree_compiler::registerAllIreePasses();
+  mlir::iree_compiler::registerHALTargetBackends();
+  mlir::iree_compiler::registerSPRIVTranslation();
+  mlir::iree_compiler::registerCodegenPasses();
+  llvm::InitLLVM y(argc, argv);
+
+  // Register MLIRContext command-line options like
+  // -mlir-print-op-on-diagnostic.
+  mlir::registerMLIRContextCLOptions();
+  // Register assembly printer command-line options like
+  // -mlir-print-op-generic.
+  mlir::registerAsmPrinterCLOptions();
+  // Register pass manager command-line options like -print-ir-*.
+  mlir::registerPassManagerCLOptions();
+
+  mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
+
+  // Parse pass names in main to ensure static initialization completed.
+  llvm::cl::ParseCommandLineOptions(argc, argv,
+                                    "IREE modular optimizer driver\n");
+
+  // Set up the input file.
+  std::string errorMessage;
+  auto file = mlir::openInputFile(inputFilename, &errorMessage);
+  if (!file) {
+    llvm::errs() << errorMessage << "\n";
+    return 1;
+  }
+
+  auto output = mlir::openOutputFile(outputFilename, &errorMessage);
+  if (!output) {
+    llvm::errs() << errorMessage << "\n";
+    exit(1);
+  }
+
+  return failed(mlir::MlirOptMain(output->os(), std::move(file), passPipeline,
+                                  splitInputFile, verifyDiagnostics,
+                                  verifyPasses, allowUnregisteredDialects));
+}
