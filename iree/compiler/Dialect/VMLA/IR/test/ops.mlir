@@ -116,3 +116,15 @@ func @vmla_interface_const(%interface : !vmla.interface) {
   vmla.interface.const %interface {offset = 3 : index} : i32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_interface_binding
+// CHECK-SAME: %[[INTERFACE:[a-zA-Z0-9$._-]+]]
+func @vmla_interface_binding(%interface : !vmla.interface) {
+  // CHECK:      vmla.interface.binding %[[INTERFACE]]
+  // CHECK-SAME: {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
+  vmla.interface.binding %interface
+                         {binding = 0 : i32, set = 0 : i32} : !vmla.buffer
+  return
+}

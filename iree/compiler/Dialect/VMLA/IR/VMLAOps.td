@@ -570,6 +570,10 @@ def VMLA_InterfaceBindingOp :
   let results = (outs
     VMLA_Buffer:$result
   );
+
+  let assemblyFormat = [{
+    $interface attr-dict `:` type($result)
+  }];
 }
 
 #endif  // IREE_DIALECT_VMLA_OPS
