@@ -53,13 +53,6 @@ We recommend Clang. GCC is not fully supported.
 $ sudo apt install clang
 ```
 
-Set environment variables:
-
-```shell
-export CC=clang
-export CXX=clang++
-```
-
 ## Clone and Build
 
 ### Clone
@@ -82,7 +75,7 @@ $ git submodule update --init
 Configure:
 
 ```shell
-$ cmake -G Ninja -B build/ .
+$ cmake -G Ninja -B build/ -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ .
 ```
 
 > Tip
