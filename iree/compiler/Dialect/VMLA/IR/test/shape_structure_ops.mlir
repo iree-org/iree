@@ -78,3 +78,25 @@ func @vmla_transpose(%src : !vmla.buffer,
                  {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} : f32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_reverse
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+func @vmla_reverse(%src : !vmla.buffer,
+                   %src_shape : !shapex.ranked_shape<[4,8]>,
+                   %dst : !vmla.buffer,
+                   %dst_shape : !shapex.ranked_shape<[4,8]>) {
+  // CHECK:      vmla.reverse
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[4,8]>),
+  // CHECK-SAME: out
+  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[4,8]>)
+  // CHECK-SAME: {dimensions = dense<1> : tensor<1xi32>} : f32
+  vmla.reverse %src(%src_shape : !shapex.ranked_shape<[4,8]>),
+               out %dst(%dst_shape : !shapex.ranked_shape<[4,8]>)
+               {dimensions = dense<1> : tensor<1xi32>} : f32
+  return
+}
