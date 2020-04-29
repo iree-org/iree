@@ -41,8 +41,8 @@ func @ternaryOp(%a : !vmla.buffer, %b : !vmla.buffer, %c : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_convert
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
 func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
   // CHECK: vmla.convert %[[SRC]], out %[[DST]] : f32 -> i8
   vmla.convert %src, out %dst : f32 -> i8
@@ -52,8 +52,8 @@ func @vmla_convert(%src : !vmla.buffer, %dst : !vmla.buffer) {
 // -----
 
 // CHECK-LABEL: @vmla_batch_matmul_pseudo
-// CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
 func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
                                %rhs : tensor<32x1x128xf32>) {
   // CHECK: vmla.batch.matmul.pseudo %[[LHS]], %[[RHS]] :
@@ -67,12 +67,12 @@ func @vmla_batch_matmul_pseudo(%lhs : tensor<32x256x128xf32>,
 // -----
 
 // CHECK-LABEL: @vmla_batch_matmul
-// CHECK-SAME: %[[LHS:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[LHS_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[RHS:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[RHS_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[LHS_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_batch_matmul(%lhs : !vmla.buffer,
                         %lhs_shape : !shapex.ranked_shape<[8,4,4]>,
                         %rhs : !vmla.buffer,

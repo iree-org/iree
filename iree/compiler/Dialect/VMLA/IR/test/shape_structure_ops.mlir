@@ -3,16 +3,16 @@
 // RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
 
 // CHECK-LABEL: @vmla_copy
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_INDEX_0:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_INDEX_1:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_INDEX_0:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_INDEX_1:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[LENGTH_0:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[LENGTH_1:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_INDEX_0:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_INDEX_1:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_INDEX_0:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_INDEX_1:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[LENGTH_0:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[LENGTH_1:[a-zA-Z0-9$._-]+]]
 func @vmla_copy(%src : !vmla.buffer,
                 %src_shape : !shapex.ranked_shape<[64]>,
                 %src_index_0 : index,
@@ -40,10 +40,10 @@ func @vmla_copy(%src : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_copy_no_variadic
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_copy_no_variadic(%src : !vmla.buffer,
                 %src_shape : !shapex.ranked_shape<[64]>,
                 %dst : !vmla.buffer,
@@ -60,10 +60,10 @@ func @vmla_copy_no_variadic(%src : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_transpose
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_transpose(%src : !vmla.buffer,
                      %src_shape : !shapex.ranked_shape<[64,32,32,10]>,
                      %dst : !vmla.buffer,
@@ -82,10 +82,10 @@ func @vmla_transpose(%src : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_reverse
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_reverse(%src : !vmla.buffer,
                    %src_shape : !shapex.ranked_shape<[4,8]>,
                    %dst : !vmla.buffer,
@@ -104,12 +104,12 @@ func @vmla_reverse(%src : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_pad
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[VALUE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[VALUE_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[VALUE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[VALUE_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_pad(%src : !vmla.buffer,
                %src_shape : !shapex.ranked_shape<[4,8]>,
                %value : !vmla.buffer,
@@ -136,10 +136,10 @@ func @vmla_pad(%src : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_broadcast
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_broadcast(%src : !vmla.buffer,
                      %src_shape : !shapex.ranked_shape<[]>,
                      %dst : !vmla.buffer,
@@ -156,10 +156,10 @@ func @vmla_broadcast(%src : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_tile
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_tile(%src : !vmla.buffer,
                 %src_shape : !shapex.ranked_shape<[4]>,
                 %dst : !vmla.buffer,
@@ -176,12 +176,12 @@ func @vmla_tile(%src : !vmla.buffer,
 // -----
 
 // CHECK-LABEL: @vmla_gather
-// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[INDICES:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[INDICES_SHAPE:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
-// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[INDICES:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[INDICES_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
 func @vmla_gather(%src : !vmla.buffer,
                   %src_shape : !shapex.ranked_shape<[4,8]>,
                   %indices : !vmla.buffer,
