@@ -1,0 +1,49 @@
+# Copyright 2019 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Runs `bazel query` across the repository to ensure analysis succeeds.
+
+name: Bazel Query
+
+on: [pull_request, push]
+
+jobs:
+  linux:
+    runs-on: ubuntu-18.04
+    env:
+      CXX: clang++
+      CC: clang
+      PYTHON_BIN: /usr/bin/python3
+      # Install the version of Bazel that is required by our .bazelversion file.
+      BAZEL_VERSION: 2.1.0
+    steps:
+      - name: Installing bazel
+        run: |
+          # https://docs.bazel.build/versions/master/install-ubuntu.html
+          sudo apt-get install unzip zip
+          wget https://github.com/bazelbuild/bazel/releases/download/${BAZEL_VERSION?}/bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+          chmod +x bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+          ./bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh --user
+          rm bazel-${BAZEL_VERSION?}-installer-linux-x86_64.sh
+          echo "::add-path::${HOME?}/bin"
+      - name: Installing dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install clang libsdl2-dev
+      - name: Checking out repository
+        uses: actions/checkout@v2
+      - name: Initializing submodules
+        run: ./scripts/git/submodule_versions.py init
+      - name: Querying with Bazel
+        run: bazel query //...
