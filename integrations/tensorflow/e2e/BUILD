@@ -88,7 +88,7 @@ package(
     # and add other supported vision models
     for data, model_name, backends in [
         # "cifar10" has toy models with input 32x32, is good for debugging
-        ("cifar10", "ResNet50", "tf,iree_vmla,iree_vulkan"),
+        ("cifar10", "ResNet50", "tf,iree_vmla,iree_vulkan,iree_llvmjit"),
     ]
 ]
 
