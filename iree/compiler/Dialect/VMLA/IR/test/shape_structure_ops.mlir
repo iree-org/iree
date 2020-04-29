@@ -1,0 +1,80 @@
+// Tests the printing/parsing of the VMLA dialect ops.
+
+// RUN: iree-opt -split-input-file %s | iree-opt -split-input-file | IreeFileCheck %s
+
+// CHECK-LABEL: @vmla_copy
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_INDEX_0:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_INDEX_1:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_INDEX_0:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_INDEX_1:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LENGTH_0:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[LENGTH_1:[a-zA-Z0-9]+]]
+func @vmla_copy(%src : !vmla.buffer,
+                %src_shape : !shapex.ranked_shape<[64]>,
+                %src_index_0 : index,
+                %src_index_1 : index,
+                %dst : !vmla.buffer,
+                %dst_shape : !shapex.ranked_shape<[32]>,
+                %dst_index_0 : index,
+                %dst_index_1 : index,
+                %length_0 : index,
+                %length_1 : index) {
+  // CHECK:      vmla.copy
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[64]>),
+  // CHECK-SAME; src_indices = [%[[SRC_INDEX_0]], %[[SRC_INDEX_1]]],
+  // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[32]>),
+  // CHECK-SAME: dst_indices = [%[[DST_INDEX_0]], %[[DST_INDEX_1]]],
+  // CHECK-SAME: lengths = [%[[LENGTH_0]], %[[LENGTH_1]]] : i32
+  vmla.copy %src(%src_shape : !shapex.ranked_shape<[64]>),
+            src_indices = [%src_index_0, %src_index_1],
+            out %dst(%dst_shape : !shapex.ranked_shape<[32]>),
+            dst_indices = [%dst_index_0, %dst_index_1],
+            lengths = [%length_0, %length_1] : i32
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @vmla_copy_no_variadic
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+func @vmla_copy_no_variadic(%src : !vmla.buffer,
+                %src_shape : !shapex.ranked_shape<[64]>,
+                %dst : !vmla.buffer,
+                %dst_shape : !shapex.ranked_shape<[32]>) {
+  // CHECK:      vmla.copy
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[64]>),
+  // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[32]>)
+  // CHECK-SAME: : i32
+  vmla.copy %src(%src_shape : !shapex.ranked_shape<[64]>),
+            out %dst(%dst_shape : !shapex.ranked_shape<[32]>) : i32
+  return
+}
+
+// -----
+
+// CHECK-LABEL: @vmla_transpose
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+func @vmla_transpose(%src : !vmla.buffer,
+                     %src_shape : !shapex.ranked_shape<[64,32,32,10]>,
+                     %dst : !vmla.buffer,
+                     %dst_shape : !shapex.ranked_shape<[64,10,32,32]>) {
+  // CHECK:      vmla.transpose
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[64,32,32,10]>),
+  // CHECK-SAME: out
+  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[64,10,32,32]>)
+  // CHECK-SAME: {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} : f32
+  vmla.transpose %src(%src_shape : !shapex.ranked_shape<[64,32,32,10]>),
+                 out %dst(%dst_shape : !shapex.ranked_shape<[64,10,32,32]>)
+                 {permutation = dense<[0, 3, 2, 1]> : tensor<4xi32>} : f32
+  return
+}

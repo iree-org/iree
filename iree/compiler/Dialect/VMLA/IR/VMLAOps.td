@@ -194,6 +194,14 @@ def VMLA_CopyOp : VMLA_ElementTypeOp<"copy", [
     Variadic<VMLA_Index>:$lengths,
     VMLA_AnyTypeAttr:$element_type
   );
+
+  let assemblyFormat = [{
+    $src`(`$src_shape `:` type($src_shape)`)``,`
+    (`src_indices` `=` `[` $src_indices^ `]``,`)?
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)`
+    (`,` `dst_indices` `=` `[` $dst_indices^ `]`)?
+    (`,` `lengths` `=` `[` $lengths^ `]`)? attr-dict `:` $element_type
+  }];
 }
 
 def VMLA_TransposeOp : VMLA_ElementTypeOp<"transpose", [VMLA_IncludeShapes]> {
