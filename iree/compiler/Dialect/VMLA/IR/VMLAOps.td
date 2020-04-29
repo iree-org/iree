@@ -176,6 +176,10 @@ def VMLA_SelectOp : VMLA_ElementTypeOp<"select"> {
     VMLA_Buffer:$dst,
     VMLA_AnyTypeAttr:$element_type
   );
+
+  let assemblyFormat = [{
+    $cond`,` $lhs`,` $rhs`,` `out` $dst attr-dict `:` $element_type
+  }];
 }
 
 //===----------------------------------------------------------------------===//

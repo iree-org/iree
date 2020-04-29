@@ -89,3 +89,19 @@ func @vmla_batch_matmul(%lhs : !vmla.buffer,
                     out %dst(%dst_shape : !shapex.ranked_shape<[8,1,4]>) : f32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_select
+// CHECK-SAME: %[[COND:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[LHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[RHS:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+func @vmla_select(%cond : !vmla.buffer,
+                  %lhs : !vmla.buffer,
+                  %rhs : !vmla.buffer,
+                  %dst : !vmla.buffer) {
+  // CHECK: vmla.select %[[COND]], %[[LHS]], %[[RHS]], out %[[DST]] : f16
+  vmla.select %cond, %lhs, %rhs, out %dst : f16
+  return
+}
