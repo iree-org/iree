@@ -79,18 +79,29 @@ cc_embed_data(
     h_file_output = "custom.imports.h",
 )
 
-cc_binary(
-    name = "custom-opt",
+cc_library(
+    name = "init_dialect",
+    hdrs = ["init_dialect.h"],
     deps = [
         ":dialect",
-        "//iree/tools:iree_opt_main",
+        "@llvm-project//mlir:IR",
+    ],
+)
+
+cc_binary(
+    name = "custom-opt",
+    srcs = ["custom_opt.cc"],
+    deps = [
+        ":init_dialect",
+        "//iree/tools:iree_opt_lib",
     ],
 )
 
 cc_binary(
     name = "custom-translate",
+    srcs = ["custom_translate.cc"],
     deps = [
-        ":dialect",
-        "//iree/tools:iree_translate_main",
+        ":init_dialect",
+        "//iree/tools:iree_translate_lib",
     ],
 )

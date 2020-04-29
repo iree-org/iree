@@ -67,14 +67,27 @@ iree_cc_embed_data(
   PUBLIC
 )
 
+iree_cc_library(
+  NAME
+    init_dialect
+  HDRS
+    "init_dialect.h"
+  DEPS
+    ::dialect
+    MLIRIR
+  PUBLIC
+)
+
 iree_cc_binary(
   NAME
     custom-opt
   OUT
     custom-opt
+  SRCS
+    "custom_opt.cc"
   DEPS
-    ::dialect
-    iree::tools::iree_opt_main
+    ::init_dialect
+    iree::tools::iree_opt_lib
 )
 
 iree_cc_binary(
@@ -82,7 +95,9 @@ iree_cc_binary(
     custom-translate
   OUT
     custom-translate
+  SRCS
+    "custom_translate.cc"
   DEPS
-    ::dialect
-    iree::tools::iree_translate_main
+    ::init_dialect
+    iree::tools::iree_translate_lib
 )

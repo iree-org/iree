@@ -184,9 +184,7 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
-      iree_opt_main
-    SRCS
-      "opt_main.cc"
+      iree_opt_lib
     DEPS
       ::init_compiler_modules
       ::init_passes_and_dialects
@@ -224,10 +222,10 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-opt
-    OUT
-      iree-opt
+    SRCS
+      "opt_main.cc"
     DEPS
-      ::iree_opt_main
+      ::iree_opt_lib
   )
 
   iree_cc_binary(
@@ -272,9 +270,7 @@ if(${IREE_BUILD_COMPILER})
 
   iree_cc_library(
     NAME
-      iree_translate_main
-    SRCS
-      "translate_main.cc"
+      iree_translate_lib
     DEPS
       ::init_compiler_modules
       ::init_passes_and_dialects
@@ -296,10 +292,10 @@ if(${IREE_BUILD_COMPILER})
   iree_cc_binary(
     NAME
       iree-translate
-    OUT
-      iree-translate
+    SRCS
+      "translate_main.cc"
     DEPS
-      ::iree_translate_main
+      ::iree_translate_lib
   )
 endif()
 

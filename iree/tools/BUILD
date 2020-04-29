@@ -140,8 +140,7 @@ cc_library(
 )
 
 cc_library(
-    name = "iree_opt_main",
-    srcs = ["opt_main.cc"],
+    name = "iree_opt_lib",
     deps = [
         ":init_compiler_modules",
         ":init_passes_and_dialects",
@@ -182,9 +181,10 @@ cc_library(
 
 cc_binary(
     name = "iree-opt",
+    srcs = ["opt_main.cc"],
     tags = ["hostonly"],
     deps = [
-        ":iree_opt_main",
+        ":iree_opt_lib",
     ],
 )
 
@@ -259,8 +259,7 @@ cc_binary(
 )
 
 cc_library(
-    name = "iree_translate_main",
-    srcs = ["translate_main.cc"],
+    name = "iree_translate_lib",
     deps = [
         ":init_compiler_modules",
         ":init_passes_and_dialects",
@@ -281,9 +280,10 @@ cc_library(
 
 cc_binary(
     name = "iree-translate",
+    srcs = ["translate_main.cc"],
     tags = ["hostonly"],
     deps = [
-        ":iree_translate_main",
+        ":iree_translate_lib",
     ],
 )
 
