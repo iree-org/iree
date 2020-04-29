@@ -57,8 +57,6 @@ def VMLA_CmpPredicateAttr :
       VMLA_CmpPredicate_GT,
       VMLA_CmpPredicate_GE,
     ]> {
-  let returnType = "uint32_t";
-  let convertFromStorage = "static_cast<uint32_t>($_self.getInt())";
   let cppNamespace = "::mlir::iree_compiler::IREE::VMLA";
 }
 
