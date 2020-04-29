@@ -23,44 +23,44 @@ There are four backend [targets](https://github.com/google/iree/tree/master/iree
 
 The table shows the supported XLA HLO ops on each backend.
 
-op | vmla | vulkan (direct path) | vulkan (structured ops path) | llvm-ir
-:-: | :-: | :-: | :-: | :-:
-abs | ✓ | ✓ | ✓ | ✓
-add | ✓ | ✓ | ✓ | ✓
-batch_norm_inference | ✓ | ✗ | ✓ | ✓
-broadcast | ✓ | ✓ | ✗ | ✗
-broadcast_in_dim | ✓ | ✓ | ✓ | ✓
-clamp | ✓ | ✗ | ✗ | ✗
-compare | ✓ | ✓ | ✗ | ✓
-concatenate | ✓ | ✓ | ✗ | ✗
-constant | ✓ | ✓ | ✓ | ✓
-convert | ✓ | ✓ | ✗ | ✗
-convolution | ✓ | ✗ | ✗ | ✓
-cosine | ✓ | ✓ | ✓ | ✓
-dot | ✓ | ✓ | ✗ | ✓
-dot_general | ✓ | ✗ | ✗ | ✗
-exponential | ✓ | ✓ | ✓ | ✓
-floor | ✓ | ✓ | ✗ | ✗
-gather | ✓ | ✓ | ✗ | ✗
-gather_concat | ✓ | ✓ | ✗ | ✗
-gemm | ✓ | ✓ | ✓ | ✓
-gemm_large | ✓ | ✓ | ✓ | ✓
-log | ✓ | ✓ | ✓ | ✓
-maximum | ✓ | ✓ | ✓ | ✓
-minimum | ✓ | ✓ | ✓ | ✓
-multiply | ✓ | ✓ | ✗ | ✓
-negate | ✓ | ✗ | ✗ | ✓
-pad | ✓ | ✓ | ✓ | ✓
-reduce | ✓ | ✓ | ✗ | ✓
-reduce_window | ✓ | ✗ | ✗ | ✓
-remainder | ✓ | ✓ | ✓ | ✓
-reshape | ✓ | ✓ | ✓ | ✓
-reverse | ✓ | ✓ | ✗ | ✗
-rsqrt | ✓ | ✓ | ✓ | ✓
-select | ✓ | ✓ | ✓ | ✓
-sine | ✓ | ✓ | ✗ | ✗
-slice | ✓ | ✓ | ✗ | ✗
-sqrt | ✓ | ✓ | ✓ | ✓
-torch_select | ✓ | ✗ | ✗ | ✗
-transpose | ✓ | ✓ | ✓ | ✓
-while | ✓ | ✓ | ✗ | ✓
+op | vmla | vulkan (direct path) | llvm-ir
+:-: | :-: | :-: | :-:
+abs | ✓ | ✓ | ✓
+add | ✓ | ✓ | ✓
+batch_norm_inference | ✓ | ✗ | ✓
+broadcast | ✓ | ✓ | ✗
+broadcast_in_dim | ✓ | ✓ | ✓
+clamp | ✓ | ✗ | ✗
+compare | ✓ | ✗ | ✓
+concatenate | ✓ | ✗ | ✗
+constant | ✓ | ✓ | ✓
+convert | ✓ | ✗ | ✗
+convolution | ✓ | ✗ | ✓
+cosine | ✓ | ✓ | ✓
+dot | ✓ | ✓ | ✓
+dot_general | ✓ | ✗ | ✗
+exponential | ✓ | ✓ | ✓
+floor | ✓ | ✗ | ✗
+gather | ✓ | ✗ | ✗
+gather_concat | ✓ | ✗ | ✗
+gemm | ✓ | ✓ | ✓
+gemm_large | ✓ | ✓ | ✓
+log | ✓ | ✓ | ✓
+maximum | ✓ | ✓ | ✓
+minimum | ✓ | ✓ | ✓
+multiply | ✓ | ✓ | ✓
+negate | ✓ | ✗ | ✓
+pad | ✓ | ✓ | ✓
+reduce | ✓ | ✓ | ✓
+reduce_window | ✓ | ✗ | ✓
+remainder | ✓ | ✓ | ✓
+reshape | ✓ | ✓ | ✓
+reverse | ✓ | ✗ | ✗
+rsqrt | ✓ | ✓ | ✓
+select | ✓ | ✓ | ✓
+sine | ✓ | ✗ | ✗
+slice | ✓ | ✗ | ✗
+sqrt | ✓ | ✓ | ✓
+torch_select | ✓ | ✗ | ✗
+transpose | ✓ | ✓ | ✓
+while | ✓ | ✗ | ✓
