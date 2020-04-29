@@ -98,7 +98,7 @@ static void printFuncOp(OpAsmPrinter &p, FuncOp &op) {
 
 void FuncOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                    FunctionType type, ArrayRef<NamedAttribute> attrs,
-                   ArrayRef<NamedAttributeList> argAttrs) {
+                   ArrayRef<MutableDictionaryAttr> argAttrs) {
   result.addRegion();
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
@@ -196,7 +196,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
       failed(parser.parseLParen())) {
     return parser.emitError(parser.getNameLoc()) << "invalid import name";
   }
-  SmallVector<NamedAttributeList, 8> argAttrs;
+  SmallVector<MutableDictionaryAttr, 8> argAttrs;
   SmallVector<Type, 8> argTypes;
   while (failed(parser.parseOptionalRParen())) {
     OpAsmParser::OperandType operand;
@@ -207,7 +207,7 @@ static ParseResult parseImportOp(OpAsmParser &parser, OperationState *result) {
       return parser.emitError(operandLoc) << "invalid operand";
     }
     argTypes.push_back(operandType);
-    NamedAttributeList argAttrList;
+    MutableDictionaryAttr argAttrList;
     operand.name.consume_front("%");
     argAttrList.set(builder.getIdentifier("vm.name"),
                     builder.getStringAttr(operand.name));
@@ -282,7 +282,7 @@ static void printImportOp(OpAsmPrinter &p, ImportOp &op) {
 
 void ImportOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      FunctionType type, ArrayRef<NamedAttribute> attrs,
-                     ArrayRef<NamedAttributeList> argAttrs) {
+                     ArrayRef<MutableDictionaryAttr> argAttrs) {
   result.addAttribute(SymbolTable::getSymbolAttrName(),
                       builder.getStringAttr(name));
   result.addAttribute("type", TypeAttr::get(type));

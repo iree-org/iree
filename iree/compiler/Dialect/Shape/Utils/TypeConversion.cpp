@@ -31,15 +31,15 @@ namespace Shape {
 
 LogicalResult TypeExpander::expandFunctionSignature(FuncOp funcOp,
                                                     OpBuilder &builder) const {
-  SmallVector<NamedAttributeList, 4> origArgAttrs;
-  SmallVector<NamedAttributeList, 4> origResultAttrs;
+  SmallVector<MutableDictionaryAttr, 4> origArgAttrs;
+  SmallVector<MutableDictionaryAttr, 4> origResultAttrs;
   funcOp.getAllArgAttrs(origArgAttrs);
   funcOp.getAllResultAttrs(origResultAttrs);
 
   SmallVector<Type, 4> argTypes;
-  SmallVector<NamedAttributeList, 4> argAttrs;
+  SmallVector<MutableDictionaryAttr, 4> argAttrs;
   SmallVector<Type, 4> resultTypes;
-  SmallVector<NamedAttributeList, 4> resultAttrs;
+  SmallVector<MutableDictionaryAttr, 4> resultAttrs;
 
   // Convert arguments.
   auto funcType = funcOp.getType();

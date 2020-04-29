@@ -100,7 +100,7 @@ def VM_FuncOp : VM_Op<"func", [
     OpBuilder<[{
       OpBuilder &builder, OperationState &result, StringRef name,
       FunctionType type, ArrayRef<NamedAttribute> attrs = {},
-      ArrayRef<NamedAttributeList> argAttrs = {}
+      ArrayRef<MutableDictionaryAttr> argAttrs = {}
     }]>,
   ];
 
@@ -194,7 +194,7 @@ def VM_ImportOp : VM_Op<"import", [
     OpBuilder<[{
       OpBuilder &builder, OperationState &result, StringRef name,
       FunctionType type, ArrayRef<NamedAttribute> attrs = {},
-      ArrayRef<NamedAttributeList> argAttrs = {}
+      ArrayRef<MutableDictionaryAttr> argAttrs = {}
     }]>,
   ];
 

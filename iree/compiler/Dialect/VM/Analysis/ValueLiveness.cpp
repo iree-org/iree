@@ -61,7 +61,7 @@ LogicalResult ValueLiveness::annotateIR(IREE::VM::FuncOp funcOp) {
   // that it's easier to slice out the results for printing without also
   // including the attributes we ourselves are trying to add.
   Builder builder(funcOp.getContext());
-  DenseMap<Operation *, NamedAttributeList> livenessAttrs(livePerOp.size());
+  DenseMap<Operation *, MutableDictionaryAttr> livenessAttrs(livePerOp.size());
   auto addValuesAttr = [&](Operation &op, StringRef attrName,
                            const llvm::SmallSetVector<Value, 8> &values) {
     SmallVector<StringAttr, 8> valueNames;
