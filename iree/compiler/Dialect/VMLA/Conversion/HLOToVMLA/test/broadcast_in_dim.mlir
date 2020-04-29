@@ -26,7 +26,7 @@ func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> attributes { sym_visibil
   // CHECK-DAG: %[[DST_SIZE:.+]] = constant 96 : index
   %input = constant dense<42> : tensor<i32>
   // CHECK-NEXT: %[[DST:.+]] = vmla.buffer.alloc byte_length = %[[DST_SIZE]] : !vmla.buffer
-  // CHECK-NEXT: "vmla.broadcast"(%[[SRC]], %[[SRC_SHAPE]], %[[DST]], %[[DST_SHAPE]]) {element_type = i32}
+  // CHECK-NEXT: vmla.broadcast %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[]>), out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[3,2,4]>) : i32
   %0 = "shapex.ranked_broadcast_in_dim"(%input, %rs3_2_4) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<i32>, !shapex.ranked_shape<[3,2,4]>) -> tensor<3x2x4xi32>
   // CHECK-NEXT: return %[[DST]] : !vmla.buffer
   return %0 : tensor<3x2x4xi32>
