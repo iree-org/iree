@@ -47,6 +47,8 @@ def VMLA_ConstantOp : VMLA_PureOp<"constant"> {
             value);
     }]>,
   ];
+
+  let assemblyFormat = "attr-dict $value `->` type($result)";
 }
 
 //===----------------------------------------------------------------------===//

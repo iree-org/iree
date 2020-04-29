@@ -6,7 +6,7 @@ func @inc_rgn_dispatch_0() attributes {iree.module.export} {
   // CHECK-DAG: %[[C0:.+]] = constant 0
   // CHECK-DAG: %[[C4:.+]] = constant 4
   %c0 = constant 0 : index
-  // CHECK-DAG: %[[CST1:.+]] = "vmla.constant"
+  // CHECK-DAG: %[[CST1:.+]] = vmla.constant dense<1.000000e+00> : tensor<f32> -> !vmla.buffer
   %cst = constant dense<1.000000e+00> : tensor<f32>
   // CHECK-NEXT: %[[SET0BINDING0:.+]] = "vmla.interface.binding"(%[[INTERFACE]]) {binding = 0 : i32, set = 0 : i32}
   // CHECK-NEXT: %[[ARG0:.+]] = vmla.buffer.view %[[SET0BINDING0]][%[[C0]]], byte_length = %[[C4]] : !vmla.buffer

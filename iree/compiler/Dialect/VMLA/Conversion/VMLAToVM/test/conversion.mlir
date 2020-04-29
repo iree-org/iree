@@ -5,7 +5,7 @@
 func @constValues() -> !vmla.buffer {
   // CHECK-NEXT: %[[BYTES_REF:.+]] = vm.const.ref.rodata @[[CONST_SYM]] : !vm.ref<!iree.byte_buffer>
   // CHECK-NEXT: %[[BUFFER:.+]] = vm.call @vmla.buffer.const(%[[BYTES_REF]]) : (!vm.ref<!iree.byte_buffer>) -> !vm.ref<!vmla.buffer>
-  %0 = "vmla.constant"() { value = dense<[1.0, 2.0, 3.0]> : tensor<3xf32> } : () -> !vmla.buffer
+  %0 = vmla.constant dense<[1.0, 2.0, 3.0]> : tensor<3xf32> -> !vmla.buffer
   // CHECK-NEXT: vm.return %[[BUFFER]] : !vm.ref<!vmla.buffer>
   return %0 : !vmla.buffer
 }

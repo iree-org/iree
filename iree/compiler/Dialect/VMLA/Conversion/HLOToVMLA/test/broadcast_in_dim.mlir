@@ -4,7 +4,7 @@
 func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> attributes { sym_visibility = "private" } {
   %rs3_2_4 = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4]>
   %input = constant dense<[[1, 2, 3, 4], [5, 6, 7, 8]]> : tensor<2x4xi32>
-  // CHECK-DAG: %[[SRC:.+]] = "vmla.constant"
+  // CHECK-DAG: %[[SRC:.+]] = vmla.constant
   // CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[1,2,4]>
   // CHECK-DAG: %[[DST_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4]>
   // CHECK-DAG: %[[DST_SIZE:.+]] = constant 96 : index
@@ -20,7 +20,7 @@ func @broadcast_in_dim_2D_3D() -> tensor<3x2x4xi32> attributes { sym_visibility 
 // CHECK-LABEL: @broadcast_in_dim_3D_scalar
 func @broadcast_in_dim_3D_scalar() -> tensor<3x2x4xi32> attributes { sym_visibility = "private" } {
   %rs3_2_4 = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4]>
-  // CHECK-DAG: %[[SRC:.+]] = "vmla.constant"
+  // CHECK-DAG: %[[SRC:.+]] = vmla.constant
   // CHECK-DAG: %[[SRC_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[]>
   // CHECK-DAG: %[[DST_SHAPE:.+]] = shapex.const_ranked_shape : !shapex.ranked_shape<[3,2,4]>
   // CHECK-DAG: %[[DST_SIZE:.+]] = constant 96 : index

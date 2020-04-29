@@ -3,7 +3,7 @@
 // CHECK-LABEL: @concatenate_0
 func @concatenate_0(%arg0 : tensor<2x2xi32>) -> (tensor<2x5xi32>) attributes { sym_visibility = "private" } {
   // CHECK-SAME: %[[ARG0:.+]]:
-  // CHECK-DAG: %[[ARG1:.+]] = "vmla.constant"() {{.+}} tensor<2x3xi32>
+  // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x3xi32>
   %c0 = constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
   // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c40 : !vmla.buffer
   // CHECK:      vmla.copy
@@ -26,7 +26,7 @@ func @concatenate_0(%arg0 : tensor<2x2xi32>) -> (tensor<2x5xi32>) attributes { s
 // CHECK-LABEL: @concatenate_1
 func @concatenate_1(%arg0: tensor<2x3xi32>) -> (tensor<2x5xi32>) attributes { sym_visibility = "private" } {
   // CHECK-SAME: %[[ARG0:.+]]:
-  // CHECK-DAG: %[[ARG1:.+]] = "vmla.constant"() {{.+}} tensor<2x2xi32>
+  // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x2xi32>
   %c0 = constant dense<[[1, 2], [3, 4]]> : tensor<2x2xi32>
   // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c40 : !vmla.buffer
   // CHECK:      vmla.copy
@@ -49,9 +49,9 @@ func @concatenate_1(%arg0: tensor<2x3xi32>) -> (tensor<2x5xi32>) attributes { sy
 // CHECK-LABEL: @concatenate_2
 func @concatenate_2(%arg0: tensor<2x2xi32>) -> (tensor<2x7xi32>) attributes { sym_visibility = "private" } {
   // CHECK-SAME: %[[ARG0:.+]]:
-  // CHECK-DAG: %[[ARG1:.+]] = "vmla.constant"() {{.+}} tensor<2x3xi32>
+  // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x3xi32>
   %c0 = constant dense<[[5, 6, 7], [8, 9, 10]]> : tensor<2x3xi32>
-  // CHECK-DAG: %[[ARG2:.+]] = "vmla.constant"() {{.+}} tensor<2x2xi32>
+  // CHECK-DAG: %[[ARG2:.+]] = vmla.constant {{.+}} tensor<2x2xi32>
   %c1 = constant dense<[[11, 12], [13, 14]]> : tensor<2x2xi32>
   // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c56 : !vmla.buffer
   // CHECK:      vmla.copy
@@ -79,7 +79,7 @@ func @concatenate_2(%arg0: tensor<2x2xi32>) -> (tensor<2x7xi32>) attributes { sy
 // CHECK-LABEL: @concatenate_3
 func @concatenate_3(%arg0: tensor<2x2xi32>) -> (tensor<4x2xi32>) attributes { sym_visibility = "private" } {
   // CHECK-SAME: %[[ARG0:.+]]:
-  // CHECK-DAG: %[[ARG1:.+]] = "vmla.constant"() {{.+}} tensor<2x2xi32>
+  // CHECK-DAG: %[[ARG1:.+]] = vmla.constant {{.+}} tensor<2x2xi32>
   %c0 = constant dense<[[11, 12], [13, 14]]> : tensor<2x2xi32>
   // CHECK: %[[DST:.+]] = vmla.buffer.alloc byte_length = %c32 : !vmla.buffer
   // CHECK:      vmla.copy
