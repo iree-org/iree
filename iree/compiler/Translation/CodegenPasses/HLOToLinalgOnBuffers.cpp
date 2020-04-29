@@ -159,18 +159,58 @@ struct ConvertToLinalgBufferOp : public OpConversionPattern<SrcOpTy> {
     return success();
   }
 };
+}  // namespace
 
+// -----------------------------------------------------------------------------
+// xla_hlo.convolution conversion patterns and utility functions.
+// -----------------------------------------------------------------------------
+
+namespace {
+enum class DotOperationType {
+  VectorDot = 0,
+  MatrixVector = 1,
+  MatrixMatrix = 2,
+  Unsupported = 3
+};
+}
+
+static DotOperationType getDotOperationType(xla_hlo::DotOp dotOp) {
+  ArrayRef<int64_t> lhsShape =
+      dotOp.lhs().getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> rhsShape =
+      dotOp.rhs().getType().cast<ShapedType>().getShape();
+  auto shapeMatches = [](int64_t a, int64_t b) {
+    return a == ShapedType::kDynamicSize || b == ShapedType::kDynamicSize ||
+           a == b;
+  };
+  if (lhsShape.size() == 1 && rhsShape.size() == 1 &&
+      shapeMatches(lhsShape[0], rhsShape[0]))
+    return DotOperationType::VectorDot;
+  if (lhsShape.size() == 2 && rhsShape.size() == 1 &&
+      shapeMatches(lhsShape[1], rhsShape[0]))
+    return DotOperationType::MatrixVector;
+  if (rhsShape.size() == 2 && rhsShape.size() == 2 &&
+      shapeMatches(lhsShape[1], rhsShape[0]))
+    return DotOperationType::MatrixMatrix;
+  return DotOperationType::Unsupported;
+}
+
+namespace {
 /// Converts xla_hlo.dot operation to linalg.matmul op
+template <DotOperationType opType, typename LinalgOpTy>
 struct DotOpConversion
-    : public ConvertToLinalgBufferOp<DotOpConversion, xla_hlo::DotOp,
-                                     linalg::MatmulOp> {
-  using ConvertToLinalgBufferOp<DotOpConversion, xla_hlo::DotOp,
-                                linalg::MatmulOp>::ConvertToLinalgBufferOp;
-  linalg::MatmulOp apply(xla_hlo::DotOp op, ArrayRef<Value> args,
-                         ArrayRef<Value> results,
-                         ConversionPatternRewriter &rewriter) const {
-    return rewriter.create<linalg::MatmulOp>(op.getLoc(), args[0], args[1],
-                                             results[0]);
+    : public ConvertToLinalgBufferOp<DotOpConversion<opType, LinalgOpTy>,
+                                     xla_hlo::DotOp, LinalgOpTy> {
+  using ConvertToLinalgBufferOp<DotOpConversion<opType, LinalgOpTy>,
+                                xla_hlo::DotOp,
+                                LinalgOpTy>::ConvertToLinalgBufferOp;
+  LinalgOpTy apply(xla_hlo::DotOp op, ArrayRef<Value> args,
+                   ArrayRef<Value> results,
+                   ConversionPatternRewriter &rewriter) const {
+    if (getDotOperationType(op) == opType)
+      return rewriter.create<LinalgOpTy>(op.getLoc(), args[0], args[1],
+                                         results[0]);
+    return nullptr;
   }
 };
 }  // namespace
@@ -833,8 +873,9 @@ struct XLAToLinalgOnBuffersPass
 void populateHLOToLinalgOnBuffersConversionPatterns(
     MLIRContext *context, OwningRewritePatternList &patterns) {
   patterns
-      .insert<ConvOpConversion, DotOpConversion, IREELoadInputOpConversion,
-              IREEStoreOutputOpConversion,
+      .insert<ConvOpConversion,
+              DotOpConversion<DotOperationType::MatrixMatrix, linalg::MatmulOp>,
+              IREELoadInputOpConversion, IREEStoreOutputOpConversion,
               LinalgOpOnTensorConversion<linalg::GenericOp>, PadOpConversion,
               SingleReshapeOpInDispatchConversion, TensorReshapeOpConversion>(
           context);

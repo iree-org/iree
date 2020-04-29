@@ -12,13 +12,6 @@ func @scalar() attributes { iree.module.export } {
   return
 }
 
-func @double() attributes { iree.module.export } {
-  %input = iree.unfoldable_constant dense<11.2> : tensor<f64>
-  %result = "xla_hlo.floor"(%input) : (tensor<f64>) -> tensor<f64>
-  check.expect_almost_eq_const(%result, dense<11.0> : tensor<f64>): tensor<f64>
-  return
-}
-
 func @negative() attributes { iree.module.export } {
   %input = iree.unfoldable_constant dense<-1.1> : tensor<f32>
   %result = "xla_hlo.floor"(%input) : (tensor<f32>) -> tensor<f32>

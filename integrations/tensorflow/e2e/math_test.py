@@ -39,7 +39,13 @@ class MathModule(tf.Module):
 
 
 @tf_test_utils.compile_modules(
-    backends=["iree_vmla", "iree_vulkan"], math=MathModule)
+    backends=[
+        "iree_vmla"
+        # TODO(GH-1719): Re-enable after lowering of std.cmpi for i1 types
+        # is fixed
+        #, iree_vulkan
+    ],
+    math=MathModule)
 class MathTest(tf_test_utils.SavedModelTestCase):
 
   def test_abs(self):

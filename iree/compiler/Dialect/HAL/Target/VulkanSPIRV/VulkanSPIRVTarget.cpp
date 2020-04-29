@@ -59,7 +59,7 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   static llvm::cl::opt<bool> clUseLinalgPath(
       "iree-use-linalg-to-spirv-path",
       llvm::cl::desc("Use the XLA-HLO to Linalg To SPIR-V pass pipeline"),
-      llvm::cl::init(false));
+      llvm::cl::init(true));
 
   static llvm::cl::list<unsigned> clLinalgPathWorkgroupSize(
       "iree-linalg-to-spirv-workgroup-size",

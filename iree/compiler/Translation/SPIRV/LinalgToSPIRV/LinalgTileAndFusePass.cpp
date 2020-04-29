@@ -101,6 +101,15 @@ static bool hasMarker(Operation *op) {
   return tilingAttr != nullptr;
 }
 
+/// Check that all uses of elements of `values` are within the `operation`.
+static bool allUsesInOperation(ArrayRef<Value> values, Operation *operation) {
+  for (auto value : values) {
+    for (auto &use : value.getUses())
+      if (use.getOwner() != operation) return false;
+  }
+  return true;
+}
+
 namespace {
 /// Function pass that implements tiling and fusion in Linalg on buffers.
 struct LinalgTileAndFusePass
@@ -151,8 +160,6 @@ struct TileLinalgOpPattern
                             LinalgOp>::LinalgTilingPattern;
   LogicalResult apply(LinalgOp linalgOp, ArrayRef<int64_t> tileSizes,
                       PatternRewriter &rewriter) const {
-    // Check that all input and outputs have a single use (this op). In that
-    // case, there is nothing to tile and fuse with. So just tile it.
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPoint(linalgOp.getOperation());
     // Linalg pooling ops has a fake window_dimension memref that has at least
@@ -164,9 +171,15 @@ struct TileLinalgOpPattern
       // The second buffer is a fake memref.
       if (!(*buffers.begin()).hasOneUse()) return failure();
       buffers = llvm::drop_begin(buffers, 2);
+    } else {
+      // Check that all buffers have uses only in this op. In that case, just
+      // tile the operation.
+      // TODO(ravishankarm) : Use Linalg dependence graph information to make
+      // this decision.
+      for (Value buffer : buffers)
+        if (!allUsesInOperation(buffer, linalgOp.getOperation()))
+          return failure();
     }
-    if (!llvm::all_of(buffers, [](Value arg) { return arg.hasOneUse(); }))
-      return failure();
     return linalg::tileLinalgOpToParallelLoopsAndSetMarker(
         rewriter, linalgOp.getOperation(), tileSizes, getWorkItemMarker(),
         /*permutation=*/{});
@@ -184,8 +197,9 @@ struct TileAndFuseLinalgOpPattern
                       PatternRewriter &rewriter) const {
     SmallVector<int64_t, 1> operandIndicesToFuse;
     for (auto buffer : llvm::enumerate(linalgOp.getInputsAndOutputBuffers())) {
-      // If a buffer has multiple uses, then it is a candidate for fusion.
-      if (!buffer.value().hasOneUse())
+      // TODO(ravishankarm): Use Linalg dependence graph information to make
+      // this decision.
+      if (!allUsesInOperation(buffer.value(), linalgOp.getOperation()))
         operandIndicesToFuse.push_back(buffer.index());
     }
     if (operandIndicesToFuse.empty()) return failure();

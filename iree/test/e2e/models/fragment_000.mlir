@@ -1,4 +1,5 @@
 // RUN: iree-run-mlir -iree-hal-target-backends=vmla %s -input-value="f32=0" -input-value="5x1xf32=[1][-2][-3][4][-5]" -input-value="f32=1" -input-value="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" -input-value="5xf32=0 0 0 0 0" | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]"
+// RUN: [[ $IREE_LLVMJIT_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=llvm-ir %s -input-value="f32=0" -input-value="5x1xf32=[1][-2][-3][4][-5]" -input-value="f32=1" -input-value="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" -input-value="5xf32=0 0 0 0 0" | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]")
 // RUN: [[ $IREE_VULKAN_DISABLE == 1 ]] || (iree-run-mlir -iree-hal-target-backends=vulkan-spirv %s -input-value="f32=0" -input-value="5x1xf32=[1][-2][-3][4][-5]" -input-value="f32=1" -input-value="5x5xf32=[3.46499 -7.64389 -5.72249 5.98053 17.6892][2.9707 -6.20734 -4.25962 4.76055 13.8784][2.47641 -4.77079 -2.79675 3.54056 10.0675][1.98212 -3.33424 -1.33388 2.32058 6.25666][1.48783 -1.8977 0.12899 1.1006 2.4458]" -input-value="5xf32=0 0 0 0 0" | IreeFileCheck %s --implicit-check-not="[" --implicit-check-not="]")
 
 // CHECK-LABEL: EXEC @main_entry_dispatch_3
@@ -10,13 +11,13 @@ func @main_entry_dispatch_3(
     %4: tensor<5xf32>) -> tensor<5x5xf32> {
   %5 = "xla_hlo.broadcast_in_dim"(%1) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>, name = "broadcast.44"} : (tensor<5x1xf32>) -> tensor<5x1x5xf32>
   %6 = "xla_hlo.broadcast_in_dim"(%2) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.9"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %7 = mulf %5, %6 : tensor<5x1x5xf32>
+  %7 = xla_hlo.multiply %5, %6 : tensor<5x1x5xf32>
   %8 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.47"} : (tensor<f32>) -> tensor<5x1x5xf32>
-  %9 = cmpf "ogt", %7, %8 : tensor<5x1x5xf32>
+  %9 = "xla_hlo.compare"(%7, %8) {comparison_direction = "GT"} : (tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xi1>
   %10 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.11"} : (tensor<f32>) -> tensor<5x1x5xf32>
   %11 = "xla_hlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<[]> : tensor<0xi64>, name = "broadcast.67"} : (tensor<f32>) -> tensor<5x5xf32>
   %12 = "xla_hlo.broadcast_in_dim"(%4) {broadcast_dimensions = dense<1> : tensor<1xi64>, name = "broadcast.64"} : (tensor<5xf32>) -> tensor<5x5xf32>
-  %13 = addf %3, %12 : tensor<5x5xf32>
+  %13 = xla_hlo.add %3, %12 : tensor<5x5xf32>
   %14 = xla_hlo.maximum %11, %13 {name = "maximum.68"} : tensor<5x5xf32>
   %15 = "xla_hlo.reshape"(%14) {name = "reshape.70"} : (tensor<5x5xf32>) -> tensor<5x1x5xf32>
   %16 = "xla_hlo.select"(%9, %10, %15) {name = "select.71"} : (tensor<5x1x5xi1>, tensor<5x1x5xf32>, tensor<5x1x5xf32>) -> tensor<5x1x5xf32>
