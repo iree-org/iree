@@ -39,12 +39,11 @@ iree_lit_test_suite(
 )
 
 iree_check_single_backend_test_suite(
-    name = "check_linalg-to-spirv_vulkan",
+    name = "check_vulkan-spirv_vulkan",
     srcs = glob(
         ["*.mlir"],
         exclude = LEGACY_LIT_TESTS,
     ),
-    compiler_flags = ["-iree-use-linalg-to-spirv-path"],
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )

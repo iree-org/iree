@@ -25,7 +25,6 @@
 #include "iree/compiler/Translation/CodegenPasses/Passes.h"
 #include "iree/compiler/Translation/CodegenUtils/CodegenUtils.h"
 #include "iree/compiler/Translation/SPIRV/LinalgToSPIRV/LowerToSPIRV.h"
-#include "iree/compiler/Translation/SPIRV/XLAToSPIRV/IREEToSPIRVPass.h"
 #include "iree/schemas/spirv_executable_def_generated.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
@@ -54,15 +53,8 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
   //     "IREE Vulkan/SPIR-V backend options");
 
-  // TODO(ravishankarm): Flags to test the Linalg To SPIR-V path. Need a better
-  // way to handle these options.
-  static llvm::cl::opt<bool> clUseLinalgPath(
-      "iree-use-linalg-to-spirv-path",
-      llvm::cl::desc("Use the XLA-HLO to Linalg To SPIR-V pass pipeline"),
-      llvm::cl::init(true));
-
-  static llvm::cl::list<unsigned> clLinalgPathWorkgroupSize(
-      "iree-linalg-to-spirv-workgroup-size",
+  static llvm::cl::list<unsigned> clWorkgroupSize(
+      "iree-spirv-workgroup-size",
       llvm::cl::desc(
           "Workgroup size to use for XLA-HLO to Linalg to SPIR-V path"),
       llvm::cl::ZeroOrMore, llvm::cl::MiscFlags::CommaSeparated);
@@ -74,9 +66,8 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(Vulkan::swiftShaderTargetEnvAssembly));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.useLinalgToSPIRVPath = clUseLinalgPath;
-  for (unsigned dim : clLinalgPathWorkgroupSize) {
-    targetOptions.linalgToSPIRVWorkgroupSize.push_back(dim);
+  for (unsigned dim : clWorkgroupSize) {
+    targetOptions.workgroupSize.push_back(dim);
   }
   targetOptions.vulkanTargetEnv = clVulkanTargetEnv;
   return targetOptions;
@@ -94,23 +85,6 @@ static spirv::TargetEnvAttr getSPIRVTargetEnv(
   emitError(Builder(context).getUnknownLoc())
       << "cannot parse vulkan target environment as #vk.target_env attribute ";
   return {};
-}
-
-/// Returns true if the linalg on tensors path is to be used for
-/// compilation.
-static bool useLinalgPath(ModuleOp moduleOp,
-                          VulkanSPIRVTargetOptions const &targetOptions) {
-  if (targetOptions.useLinalgToSPIRVPath) return true;
-
-  // Use linalg path if dispatch function contains any of the following ops.
-  auto walkResult = moduleOp.walk([](Operation *op) -> WalkResult {
-    if (isa<xla_hlo::ReduceOp>(op) || isa<xla_hlo::ConvOp>(op) ||
-        isa<xla_hlo::DotOp>(op) || isa<xla_hlo::ReduceWindowOp>(op)) {
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  return walkResult.wasInterrupted();
 }
 
 // Returns a list of entry point names matching the expected export ordinals.
@@ -146,22 +120,12 @@ class VulkanSPIRVTargetBackend : public TargetBackend {
     auto innerModuleOp =
         containerBuilder.clone(*sourceOp.getInnerModule().getOperation());
     innerModuleOp->setAttr(spirv::getTargetEnvAttrName(), spvTargetEnv);
-
-    if (useLinalgPath(sourceOp.getInnerModule(), options_)) {
-      targetOp.setAttr("vkspv.use_linalg",
-                       UnitAttr::get(sourceOp.getContext()));
-    }
   }
 
   void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetOp targetOp,
                                     OpPassManager &passManager) override {
     passManager.addPass(createHALInterfaceToMemrefPass());
-    if (targetOp.getAttr("vkspv.use_linalg")) {
-      addHLOToLinalgToSPIRVPasses(passManager,
-                                  options_.linalgToSPIRVWorkgroupSize);
-    } else {
-      addIREEToSPIRVPasses(passManager);
-    }
+    addHLOToLinalgToSPIRVPasses(passManager, options_.workgroupSize);
   }
 
   // Finds the spv.ExecutionMode operation to get the workgroup size from.

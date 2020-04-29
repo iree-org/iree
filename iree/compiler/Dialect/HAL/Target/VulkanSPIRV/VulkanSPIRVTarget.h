@@ -27,10 +27,8 @@ namespace HAL {
 
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
-  // Use the XLA HLO to Linalg to SPIR-V pass pipeline.
-  bool useLinalgToSPIRVPath = false;
-  // Workgroup size to use for XLA HLO to Linalg to SPIR-V path.
-  SmallVector<int64_t, 3> linalgToSPIRVWorkgroupSize;
+  // Workgroup size to use.
+  SmallVector<int64_t, 3> workgroupSize;
   // Vulkan target environment as #vk.target_env attribute assembly.
   std::string vulkanTargetEnv;
 };

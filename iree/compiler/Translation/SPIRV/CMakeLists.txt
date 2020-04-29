@@ -21,9 +21,7 @@ iree_cc_library(
     "init_translations.h"
   DEPS
     MLIRPass
-    iree::compiler::Translation::SPIRV::IndexComputation
     iree::compiler::Translation::SPIRV::LinalgToSPIRV
     iree::compiler::Translation::SPIRV::Passes
-    iree::compiler::Translation::SPIRV::XLAToSPIRV
   PUBLIC
 )

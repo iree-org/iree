@@ -34,13 +34,11 @@ file(GLOB _GLOB_REDUCE_MLIR LIST_DIRECTORIES false RELATIVE ${CMAKE_CURRENT_SOUR
 list(REMOVE_ITEM _GLOB_X_MLIR ${_GLOB_REDUCE_MLIR})
 iree_check_single_backend_test_suite(
   NAME
-    check_linalg-to-spirv_vulkan
+    check_vulkan-spirv_vulkan
   SRCS
     "${_GLOB_X_MLIR}"
   TARGET_BACKEND
     vulkan-spirv
   DRIVER
     vulkan
-  COMPILER_FLAGS
-    "-iree-use-linalg-to-spirv-path"
 )
