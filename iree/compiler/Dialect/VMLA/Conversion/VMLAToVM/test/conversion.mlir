@@ -16,7 +16,7 @@ func @constValues() -> !vmla.buffer {
 func @bufferImport() -> !vmla.buffer {
   %c0 = std.constant 1 : index
   // CHECK: = vm.call @vmla.buffer.alloc(%c1) : (i32) -> !vm.ref<!vmla.buffer>
-  %0 = "vmla.buffer.alloc"(%c0) : (index) -> !vmla.buffer
+  %0 = vmla.buffer.alloc byte_length = %c0 : !vmla.buffer
   return %0 : !vmla.buffer
 }
 
@@ -35,7 +35,7 @@ func @typedImport(%arg0 : !vmla.buffer, %arg1 : !vmla.buffer) {
 // CHECK-LABEL: vm.func @sizedImport
 func @sizedImport(%arg0 : !vmla.buffer, %arg1 : !vmla.buffer) {
   // CHECK-NEXT: vm.call @vmla.select.x32(%arg0, %arg0, %arg0, %arg1)
-  "vmla.select"(%arg0, %arg0, %arg0, %arg1) { element_type = f32 } : (!vmla.buffer, !vmla.buffer, !vmla.buffer, !vmla.buffer) -> ()
+  vmla.select %arg0, %arg0, %arg0, out %arg1 : f32
   return
 }
 
