@@ -92,7 +92,7 @@ def models():
 
     # if weights == 'imagenet' it will load weights from external tf.keras URL
     model = APP_MODELS[FLAGS.model](
-        weights=weights, input_shape=input_shape[1:])
+        weights=weights, include_top=False, input_shape=input_shape[1:])
 
     if FLAGS.data == 'cifar10' and FLAGS.url:
       file_name = 'cifar10' + FLAGS.model
