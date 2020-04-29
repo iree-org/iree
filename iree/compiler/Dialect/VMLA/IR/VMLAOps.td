@@ -249,6 +249,12 @@ def VMLA_PadOp : VMLA_ElementTypeOp<"pad", [VMLA_IncludeShapes]> {
     ElementsAttr:$interior_padding,
     VMLA_AnyTypeAttr:$element_type
   );
+
+  let assemblyFormat = [{
+    $src`(`$src_shape `:` type($src_shape)`)``,`
+    $value`(`$value_shape `:` type($value_shape)`)``,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+  }];
 }
 
 def VMLA_BroadcastOp : VMLA_ElementTypeOp<"broadcast", [VMLA_IncludeShapes]> {

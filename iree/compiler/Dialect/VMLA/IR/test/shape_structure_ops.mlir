@@ -100,3 +100,35 @@ func @vmla_reverse(%src : !vmla.buffer,
                {dimensions = dense<1> : tensor<1xi32>} : f32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_pad
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[VALUE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[VALUE_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+func @vmla_pad(%src : !vmla.buffer,
+               %src_shape : !shapex.ranked_shape<[4,8]>,
+               %value : !vmla.buffer,
+               %value_shape : !shapex.ranked_shape<[4,8]>,
+               %dst : !vmla.buffer,
+               %dst_shape : !shapex.ranked_shape<[4,8]>) {
+  // CHECK:      vmla.pad
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[4,8]>),
+  // CHECK-SAME: %[[VALUE]](%[[VALUE_SHAPE]] : !shapex.ranked_shape<[4,8]>),
+  // CHECK-SAME: out
+  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[4,8]>)
+  // CHECK-SAME: {edge_padding_high = dense<2> : tensor<i32>,
+  // CHECK-SAME: edge_padding_low = dense<2> : tensor<i32>,
+  // CHECK-SAME: interior_padding = dense<0> : tensor<i32>} : f32
+  vmla.pad %src(%src_shape : !shapex.ranked_shape<[4,8]>),
+           %value(%value_shape : !shapex.ranked_shape<[4,8]>),
+           out %dst(%dst_shape : !shapex.ranked_shape<[4,8]>)
+           {edge_padding_high = dense<2> : tensor<i32>,
+            edge_padding_low = dense<2> : tensor<i32>,
+            interior_padding = dense<0> : tensor<i32>} : f32
+  return
+}
