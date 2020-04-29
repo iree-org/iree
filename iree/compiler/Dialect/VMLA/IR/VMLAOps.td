@@ -503,6 +503,12 @@ class VMLA_ReduceOp<string mnemonic, list<OpTrait> traits = []> :
     VMLA_Shape:$dst_shape,
     VMLA_AnyTypeAttr:$element_type
   );
+
+  let assemblyFormat = [{
+    $src`(`$src_shape `:` type($src_shape)`)``,`
+    $init`(`$init_shape `:` type($init_shape)`)``,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+  }];
 }
 
 def VMLA_ReduceSumOp : VMLA_ReduceOp<"reduce.sum">;

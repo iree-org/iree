@@ -39,3 +39,28 @@ func @vmla_conv(%input : !vmla.buffer,
             window_strides = dense<1> : vector<2xi32>}
   return
 }
+
+// CHECK-LABEL: @vmla_reduce
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[INIT:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[INIT_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
+func @vmla_reduce(%src : !vmla.buffer,
+                  %src_shape : !shapex.ranked_shape<[4,8]>,
+                  %init : !vmla.buffer,
+                  %init_shape : !shapex.ranked_shape<[]>,
+                  %dst : !vmla.buffer,
+                  %dst_shape : !shapex.ranked_shape<[4]>) {
+  // CHECK-NEXT: vmla.reduce.sum
+  // CEHCK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[4,8]>),
+  // CHECK-SAME: %[[INIT]](%[[INIT_SHAPE]] : !shapex.ranked_shape<[]>),
+  // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[4]>)
+  // CHECK-SaME: {dimension = 1 : i32} : f16
+  vmla.reduce.sum %src(%src_shape : !shapex.ranked_shape<[4,8]>),
+                  %init(%init_shape : !shapex.ranked_shape<[]>),
+                  out %dst(%dst_shape : !shapex.ranked_shape<[4]>)
+                  {dimension = 1 : i32} : f16
+  return
+}
