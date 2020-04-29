@@ -152,3 +152,23 @@ func @vmla_broadcast(%src : !vmla.buffer,
                  out %dst(%dst_shape : !shapex.ranked_shape<[4,8]>) : f32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_tile
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+func @vmla_tile(%src : !vmla.buffer,
+                %src_shape : !shapex.ranked_shape<[4]>,
+                %dst : !vmla.buffer,
+                %dst_shape : !shapex.ranked_shape<[4,8]>) {
+  // CHECK:      vmla.tile
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[4]>),
+  // CHECK-SAME: out
+  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[4,8]>) : f32
+  vmla.tile %src(%src_shape : !shapex.ranked_shape<[4]>),
+            out %dst(%dst_shape : !shapex.ranked_shape<[4,8]>) : f32
+  return
+}
