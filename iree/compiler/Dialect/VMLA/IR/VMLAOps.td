@@ -405,6 +405,12 @@ def VLMA_ConvOp : VMLA_Op<"conv", [VMLA_IncludeShapes]> {
       state.addAttribute("dst_type", TypeAttr::get(resultTypes[0]));
     }
   }];
+
+  let assemblyFormat = [{
+    $input`(`$input_shape `:` type($input_shape)`)` `:` $input_type`,`
+    $filter`(`$filter_shape `:` type($filter_shape)`)` `:` $filter_type`,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` `:` $dst_type attr-dict
+  }];
 }
 
 //===----------------------------------------------------------------------===//
