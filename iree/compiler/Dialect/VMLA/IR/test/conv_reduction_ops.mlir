@@ -64,3 +64,34 @@ func @vmla_reduce(%src : !vmla.buffer,
                   {dimension = 1 : i32} : f16
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_pooling
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[INIT:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[INIT_SHAPE:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9$._-]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9$._-]+]]
+func @vmla_pooling(%src : !vmla.buffer,
+                   %src_shape : !shapex.ranked_shape<[32,32]>,
+                   %init : !vmla.buffer,
+                   %init_shape : !shapex.ranked_shape<[]>,
+                   %dst : !vmla.buffer,
+                   %dst_shape : !shapex.ranked_shape<[16,16]>) {
+  // CHECK-NEXT: vmla.pooling.min
+  // CEHCK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[32,32]>),
+  // CHECK-SAME: %[[INIT]](%[[INIT_SHAPE]] : !shapex.ranked_shape<[]>),
+  // CHECK-SAME: out %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[16,16]>)
+  // CHECK-SAME: {padding = dense<0> : tensor<i32>,
+  // CHECK-SaME:  window_dimensions = dense<[2,2]> : tensor<2xi32>,
+  // CHECK-SaME:  window_strides = dense<[2,2]> : tensor<2xi32>} : f16
+  vmla.pooling.min %src(%src_shape : !shapex.ranked_shape<[32,32]>),
+                   %init(%init_shape : !shapex.ranked_shape<[]>),
+                   out %dst(%dst_shape : !shapex.ranked_shape<[16,16]>)
+                   {padding = dense<0> : tensor<i32>,
+                    window_dimensions = dense<[2,2]> : tensor<2xi32>,
+                    window_strides = dense<[2,2]> : tensor<2xi32>} : f16
+  return
+}

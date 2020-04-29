@@ -529,6 +529,12 @@ class VMLA_PoolingOp<string mnemonic, list<OpTrait> traits = []> :
     I32ElementsAttr:$window_strides,
     I32ElementsAttr:$padding
   );
+
+  let assemblyFormat = [{
+    $src`(`$src_shape `:` type($src_shape)`)``,`
+    $init`(`$init_shape `:` type($init_shape)`)``,`
+    `out` $dst`(`$dst_shape `:` type($dst_shape)`)` attr-dict `:` $element_type
+  }];
 }
 
 def VMLA_PoolingSumOp : VMLA_PoolingOp<"pooling.sum">;
