@@ -172,3 +172,31 @@ func @vmla_tile(%src : !vmla.buffer,
             out %dst(%dst_shape : !shapex.ranked_shape<[4,8]>) : f32
   return
 }
+
+// -----
+
+// CHECK-LABEL: @vmla_gather
+// CHECK-SAME: %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[SRC_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[INDICES:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[INDICES_SHAPE:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST:[a-zA-Z0-9]+]]
+// CHECK-SAME: %[[DST_SHAPE:[a-zA-Z0-9]+]]
+func @vmla_gather(%src : !vmla.buffer,
+                  %src_shape : !shapex.ranked_shape<[4,8]>,
+                  %indices : !vmla.buffer,
+                  %indices_shape : !shapex.ranked_shape<[4,8]>,
+                  %dst : !vmla.buffer,
+                  %dst_shape : !shapex.ranked_shape<[4,8]>) {
+  // CHECK:      vmla.gather
+  // CHECK-SAME: %[[SRC]](%[[SRC_SHAPE]] : !shapex.ranked_shape<[4,8]>),
+  // CHECK-SAME: %[[INDICES]](%[[INDICES_SHAPE]] : !shapex.ranked_shape<[4,8]>),
+  // CHECK-SAME: out
+  // CHECK-SAME: %[[DST]](%[[DST_SHAPE]] : !shapex.ranked_shape<[4,8]>)
+  // CHECK-SAME: {batch_dims = 2 : i64, dim = 1 : i64} : f32
+  vmla.gather %src(%src_shape : !shapex.ranked_shape<[4,8]>),
+              %indices(%indices_shape : !shapex.ranked_shape<[4,8]>),
+              out %dst(%dst_shape : !shapex.ranked_shape<[4,8]>)
+              {batch_dims = 2 : i64, dim = 1 : i64} : f32
+  return
+}
