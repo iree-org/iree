@@ -26,7 +26,7 @@ func @bufferImport() -> !vmla.buffer {
 func @typedImport(%arg0 : !vmla.buffer, %arg1 : !vmla.buffer) {
   // CHECK-NEXT: %c1 = vm.const.i32 1 : i32
   // CHECK-NEXT: vm.call @vmla.cmp.f32(%c1, %arg0, %arg0, %arg1) : (i32, !vm.ref<!vmla.buffer>, !vm.ref<!vmla.buffer>, !vm.ref<!vmla.buffer>) -> ()
-  "vmla.cmp"(%arg0, %arg0, %arg1) { predicate = 1 : i32, element_type = f32 } : (!vmla.buffer, !vmla.buffer, !vmla.buffer) -> ()
+  vmla.cmp "NE", %arg0, %arg0, out %arg1 : f32
   return
 }
 
