@@ -30,18 +30,11 @@ FAILURE_SYMBOL = '✗'
 E2E_XLA_OPS_PATH = 'iree/test/e2e/xla_ops'
 
 OP_COVERAGE_DESCRIPTION = """# HLO Op Coverage
-There are four backend [targets](https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/Target) in IREE:
+There are three backend [targets](https://github.com/google/iree/tree/master/iree/compiler/Dialect/HAL/Target) in IREE:
 
 - vmla
 - llvm-ir
-- vulkan (direct path)
-- vulkan (structured ops path)
-
-> Note:<br>
-> &nbsp;&nbsp;&nbsp;&nbsp;IREE currently has two compilation paths for Vulkan,
-> shown as above. The direct path lowers XLA HLOs to SPIR-V in one step; the
-> structured ops path goes multiple steps in a progressive way. The plan is to
-> deprecate the direct path soon.)
+- vulkan-spirv
 
 The table shows the supported XLA HLO ops on each backend.
 
@@ -67,8 +60,7 @@ def get_backend_op_pair(test):
   test_suite_backends = {
       'check_vmla_vmla': 'vmla',
       'check_llvm-ir_llvm': 'llvm-ir',
-      'check_linalg-to-spirv_vulkan': 'vulkan (structured ops path)',
-      'check_vulkan-spirv_vulkan': 'vulkan (direct path)'
+      'check_vulkan-spirv_vulkan': 'vulkan-spirv'
   }
   for (test_suite, backend) in test_suite_backends.items():
     if test_suite in test:
